@@ -19,6 +19,9 @@ class Module extends ModuleAbstract
     {
         return [
             $this->parseAndCompileFunction('str_repeat', __DIR__.'/str_repeat.php'),
+            new abs(),
+            new int_min(),
+            new int_max(),
         ];
     }
 }
