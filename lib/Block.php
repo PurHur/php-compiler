@@ -26,6 +26,9 @@ class Block {
 
     public array $blocks = [];
 
+    /** @var Block[] CFG parent blocks (filled during compilation) */
+    public array $parents = [];
+
     public int $nOpCodes = 0;
 
     public ?Func $func = null;

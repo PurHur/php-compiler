@@ -19,7 +19,7 @@
     "require-dev": {
         "phar-io/manifest": "^2.0.3",
         "phar-io/version": "^3.2.1",
-        "phpunit/phpunit": "^9.6",
+        "phpunit/phpunit": "9.6.21",
         "friendsofphp/php-cs-fixer": "*",
         "pre/plugin": "dev-develop",
         "phan/phan": "dev-master",
@@ -40,6 +40,5 @@
         "macros": [
             "src/macros.yay"
         ]
-    } 
-
+    }
 }

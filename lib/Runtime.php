@@ -42,6 +42,8 @@ class Runtime {
     public int $mode;
     public ?string $debugFile = null;
 
+    public TypeReconstructor $typeReconstructor;
+
     public function __construct(int $mode = self::MODE_NORMAL) {
         $this->mode = $mode;
         $astTraverser = new NodeTraverser;
