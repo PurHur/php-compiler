@@ -19,6 +19,9 @@
         <testsuite name="PHPCompiler Macro Test Suites">
             <directory suffix=".php">./test/macro</directory>
         </testsuite>
+        <testsuite name="PHPCompiler Real World Test Suites">
+            <directory suffix=".php">./test/real</directory>
+        </testsuite>
     </testsuites>
 
     <filter>
