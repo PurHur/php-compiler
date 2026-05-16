@@ -1,0 +1,2 @@
+# Skip Pre\Plugin macro expansion at runtime; use committed generated .php files.
+# Required when Yay/Pre cannot expand .pre sources (e.g. PHP 8.3+).
