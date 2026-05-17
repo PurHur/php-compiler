@@ -26,6 +26,14 @@ class Module extends ModuleAbstract
             new floor(),
             new round(),
             new sqrt(),
+            new pi(),
+            new deg2rad(),
+            new rad2deg(),
+            new log(),
+            new exp(),
+            new is_nan(),
+            new is_finite(),
+            new is_infinite(),
             new pow(),
             new fmod(),
             new intval(),
@@ -70,12 +78,22 @@ class Module extends ModuleAbstract
             $context->registerFunction('strtol', $fn);
         }
         $double = $context->getTypeFromString('double');
-        foreach (['ceil', 'floor', 'round', 'sqrt', 'pow', 'fmod'] as $name) {
+        foreach (['ceil', 'floor', 'round', 'sqrt', 'log', 'exp', 'pow', 'fmod'] as $name) {
             try {
                 $context->lookupFunction($name);
             } catch (\Throwable $e) {
                 $params = in_array($name, ['pow', 'fmod'], true) ? [$double, $double] : [$double];
                 $ft = $context->context->functionType($double, false, ...$params);
+                $fn = $context->module->addFunction($name, $ft);
+                $context->registerFunction($name, $fn);
+            }
+        }
+        $i32 = $context->getTypeFromString('int32');
+        foreach (['isnan', 'isfinite', 'isinf'] as $name) {
+            try {
+                $context->lookupFunction($name);
+            } catch (\Throwable $e) {
+                $ft = $context->context->functionType($i32, false, $double);
                 $fn = $context->module->addFunction($name, $ft);
                 $context->registerFunction($name, $fn);
             }
