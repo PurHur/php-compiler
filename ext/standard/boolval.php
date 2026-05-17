@@ -1,0 +1,110 @@
+<?php
+
+declare(strict_types=1);
+
+/**
+ * This file is part of PHP-Compiler, a PHP CFG Compiler for PHP code
+ *
+ * @copyright 2015 Anthony Ferrara. All rights reserved
+ * @license MIT See LICENSE at the root of the project for more info
+ */
+
+namespace PHPCompiler\ext\standard;
+
+use PHPCompiler\Frame;
+use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\Variable;
+use PHPLLVM\Builder;
+use PHPLLVM\Value;
+
+/**
+ * boolval() for scalar values supported by this compiler (subset of PHP).
+ */
+final class boolval extends Internal
+{
+    public function execute(Frame $frame): void
+    {
+        if (1 !== count($frame->calledArgs)) {
+            throw new \LogicException('boolval() requires exactly one argument');
+        }
+        $v = $frame->calledArgs[0]->resolveIndirect();
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->bool(self::isTruthy($v));
+    }
+
+    public Context $context;
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        $this->context = $context;
+        if (1 !== count($args)) {
+            throw new \LogicException('boolval() requires exactly one argument');
+        }
+        switch ($args[0]->type) {
+            case JITVariable::TYPE_NATIVE_LONG:
+                $v = $context->helper->loadValue($args[0]);
+                $zero = $v->typeOf()->constInt(0, false);
+
+                return $context->builder->icmp(Builder::INT_NE, $v, $zero);
+            case JITVariable::TYPE_NATIVE_DOUBLE:
+                $v = $context->helper->loadValue($args[0]);
+                $zero = $v->typeOf()->constReal(0.0);
+
+                return $context->builder->fcmp(Builder::REAL_ONE, $v, $zero);
+            case JITVariable::TYPE_NATIVE_BOOL:
+                return $context->helper->loadValue($args[0]);
+            case JITVariable::TYPE_STRING:
+                return $this->stringTruthy($context, $context->helper->loadValue($args[0]));
+            case JITVariable::TYPE_NULL:
+                return $context->constantFromBool(false);
+            default:
+                throw new \LogicException('boolval() does not support this value type in this compiler build');
+        }
+    }
+
+    private static function isTruthy(Variable $v): bool
+    {
+        switch ($v->type) {
+            case Variable::TYPE_NULL:
+                return false;
+            case Variable::TYPE_INTEGER:
+                return 0 !== $v->toInt();
+            case Variable::TYPE_FLOAT:
+                return 0.0 !== $v->toFloat();
+            case Variable::TYPE_BOOLEAN:
+                return $v->toBool();
+            case Variable::TYPE_STRING:
+                $s = $v->toString();
+
+                return '' !== $s && '0' !== $s;
+            default:
+                throw new \LogicException('boolval() does not support this value type in this compiler build');
+        }
+    }
+
+    private function stringTruthy(Context $context, Value $strPtr): Value
+    {
+        $structName = $strPtr->typeOf()->getElementType()->getName();
+        $map = $context->structFieldMap[$structName];
+        $len = $context->builder->load(
+            $context->builder->structGep($strPtr, $map['length'])
+        );
+        $zero = $len->typeOf()->constInt(0, false);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $len, $zero);
+        $one = $len->typeOf()->constInt(1, false);
+        $isOne = $context->builder->icmp(Builder::INT_EQ, $len, $one);
+        $ch = $context->builder->load(
+            $context->builder->structGep($strPtr, $map['value'])
+        );
+        $charZero = $ch->typeOf()->constInt(ord('0'), false);
+        $isCharZero = $context->builder->icmp(Builder::INT_EQ, $ch, $charZero);
+        $onlyZero = $context->builder->and($isOne, $isCharZero);
+        $falsy = $context->builder->or($isEmpty, $onlyZero);
+
+        return $context->builder->not($falsy);
+    }
+}

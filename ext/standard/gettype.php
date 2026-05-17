@@ -67,6 +67,9 @@ final class gettype extends Internal
             case JITVariable::TYPE_STRING:
                 $label = 'string';
                 break;
+            case JITVariable::TYPE_NULL:
+                $label = 'NULL';
+                break;
             default:
                 throw new \LogicException('gettype() does not support this value type in this compiler build');
         }
