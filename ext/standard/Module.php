@@ -20,6 +20,7 @@ class Module extends ModuleAbstract
     {
         return [
             $this->parseAndCompileFunction('str_repeat', __DIR__.'/str_repeat.php'),
+            $this->parseAndCompileFunction('decbin', __DIR__.'/decbin.php'),
             new abs(),
             new ceil(),
             new floor(),
@@ -40,6 +41,9 @@ class Module extends ModuleAbstract
             new strcmp(),
             new dechex(),
             new hexdec(),
+            new decoct(),
+            new octdec(),
+            new bindec(),
         ];
     }
 
