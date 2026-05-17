@@ -42,7 +42,12 @@ final class floatval extends Internal
 
             return;
         }
-        throw new \LogicException('floatval() only supports integers and floats in this compiler build');
+        if (Variable::TYPE_BOOLEAN === $v->type) {
+            $frame->returnVar->float($v->toBool() ? 1.0 : 0.0);
+
+            return;
+        }
+        throw new \LogicException('floatval() only supports integers, floats, and booleans in this compiler build');
     }
 
     public Context $context;
@@ -60,8 +65,10 @@ final class floatval extends Internal
                 return $context->builder->siToFp($v, $double);
             case JITVariable::TYPE_NATIVE_DOUBLE:
                 return $v;
+            case JITVariable::TYPE_NATIVE_BOOL:
+                return $context->builder->uiToFp($v, $double);
             default:
-                throw new \LogicException('floatval() only supports integers and floats in this compiler build');
+                throw new \LogicException('floatval() only supports integers, floats, and booleans in this compiler build');
         }
     }
 }
