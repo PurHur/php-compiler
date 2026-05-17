@@ -48,8 +48,12 @@ class is_type extends Internal {
                 return $this->context->constantFromBool($this->type === Variable::TYPE_INTEGER);
             case JITVariable::TYPE_NATIVE_DOUBLE:
                 return $this->context->constantFromBool($this->type === Variable::TYPE_FLOAT);
+            case JITVariable::TYPE_NATIVE_BOOL:
+                return $this->context->constantFromBool($this->type === Variable::TYPE_BOOLEAN);
             case JITVariable::TYPE_STRING:
                 return $this->context->constantFromBool($this->type === Variable::TYPE_STRING);
+            case JITVariable::TYPE_NULL:
+                return $this->context->constantFromBool($this->type === Variable::TYPE_NULL);
             default:
                 throw new \LogicException('Non-implemented type handled for ' . $this->name . '(): ' . JITVariable::getStringType($args[0]->type));
         }

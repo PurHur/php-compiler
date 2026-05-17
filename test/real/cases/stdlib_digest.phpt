@@ -15,6 +15,9 @@ echo intval(ceil(2.1)), "\n";
 echo intval(floor(2.9)), "\n";
 echo round(sqrt(9)), "\n";
 echo gettype(abs(-1)), "\n";
+echo floatval(2), "\n";
+echo boolval(0) ? 'y' : 'n', "\n";
+echo gettype(null), "\n";
 --EXPECT--
 3
 0
@@ -28,3 +31,6 @@ echo gettype(abs(-1)), "\n";
 2
 3
 integer
+2
+n
+NULL

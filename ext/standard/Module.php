@@ -26,6 +26,8 @@ class Module extends ModuleAbstract
             new round(),
             new sqrt(),
             new intval(),
+            new floatval(),
+            new boolval(),
             new gettype(),
             new int_min(),
             new int_max(),
