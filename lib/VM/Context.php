@@ -38,6 +38,14 @@ class Context {
                 $var = new Variable(Variable::TYPE_BOOLEAN);
                 $var->bool(true);
                 return $var;
+            case 'inf':
+                $var = new Variable(Variable::TYPE_FLOAT);
+                $var->float(INF);
+                return $var;
+            case 'nan':
+                $var = new Variable(Variable::TYPE_FLOAT);
+                $var->float(NAN);
+                return $var;
         }
         if (isset($this->constants[$name])) {
             return $this->constants[$name];

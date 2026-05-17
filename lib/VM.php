@@ -297,6 +297,11 @@ restart:
         return self::SUCCESS;
     }
 
+    protected function raise(string $message, Frame $frame): int
+    {
+        throw new \LogicException($message.' in '.$frame->block->getName());
+    }
+
     protected function defineClass(ClassEntry $entry, Block $block): void {
         $frame = $block->getFrame($this->context);
         // TODO

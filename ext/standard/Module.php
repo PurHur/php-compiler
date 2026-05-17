@@ -20,7 +20,7 @@ class Module extends ModuleAbstract
     {
         return [
             $this->parseAndCompileFunction('str_repeat', __DIR__.'/str_repeat.php'),
-            $this->parseAndCompileFunction('decbin', __DIR__.'/decbin.php'),
+            new decbin(),
             new abs(),
             new ceil(),
             new floor(),
@@ -31,6 +31,9 @@ class Module extends ModuleAbstract
             new rad2deg(),
             new log(),
             new exp(),
+            new sin(),
+            new cos(),
+            new tan(),
             new is_nan(),
             new is_finite(),
             new is_infinite(),
@@ -78,7 +81,7 @@ class Module extends ModuleAbstract
             $context->registerFunction('strtol', $fn);
         }
         $double = $context->getTypeFromString('double');
-        foreach (['ceil', 'floor', 'round', 'sqrt', 'log', 'exp', 'pow', 'fmod'] as $name) {
+        foreach (['ceil', 'floor', 'round', 'sqrt', 'log', 'exp', 'sin', 'cos', 'tan', 'pow', 'fmod'] as $name) {
             try {
                 $context->lookupFunction($name);
             } catch (\Throwable $e) {

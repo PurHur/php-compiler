@@ -126,17 +126,46 @@ abstract class BaseTest extends TestCase {
     }
 
     /**
+     * @return list<string>
+     */
+    protected function phpCommand(): array {
+        $cmd = [PHP_BINARY];
+        $extDir = getenv('PHP_COMPILER_EXT_DIR') ?: '/usr/lib/php/20220829';
+        if (!is_dir($extDir)) {
+            return $cmd;
+        }
+        foreach (['tokenizer', 'mbstring', 'dom', 'xml', 'xmlwriter', 'ffi'] as $ext) {
+            $so = $extDir.'/'.$ext.'.so';
+            if (is_file($so)) {
+                $cmd[] = '-d';
+                $cmd[] = 'extension='.$so;
+            }
+        }
+        $cmd[] = '-d';
+        $cmd[] = 'display_errors=0';
+        $cmd[] = '-d';
+        $cmd[] = 'error_reporting=0';
+
+        return $cmd;
+    }
+
+    /**
      * @dataProvider providePHPTests
      */
     public function testCases(string $name, string $code, array $sections): void {
-        $PHP = escapeshellcmd(PHP_BINARY);
         $descriptorSepc = [
             0 => ['pipe', 'r'],
             1 => ['pipe', 'w'],
             2 => ['pipe', 'w'],
         ];
         $pipes = [];
-        $proc = proc_open("$PHP {$this->BIN}", $descriptorSepc, $pipes);
+        $repoRoot = \dirname(__DIR__, 2);
+        $proc = proc_open(
+            array_merge($this->phpCommand(), [$this->BIN]),
+            $descriptorSepc,
+            $pipes,
+            $repoRoot
+        );
         fwrite($pipes[0], $code);
         fclose($pipes[0]);
         $result = stream_get_contents($pipes[1]);
