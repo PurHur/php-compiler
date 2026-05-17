@@ -69,6 +69,11 @@ phan:
 test: rebuild-changed
 	docker run -v $(shell pwd):/compiler ircmaxell/php-compiler:16.04-dev php vendor/bin/phpunit
 
+# Run the full PHPUnit suite on the host PHP (no Docker). Requires composer install.
+.PHONY: test-local
+test-local:
+	./script/ci-local.sh
+
 .PHONY: test-18
 test-18: rebuild-changed
 	docker run -v $(shell pwd):/compiler ircmaxell/php-compiler:18.04-dev php vendor/bin/phpunit

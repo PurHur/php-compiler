@@ -1,14 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
-
-<phpunit backupGlobals="false"
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/9.3/phpunit.xsd"
+         backupGlobals="false"
          backupStaticAttributes="false"
-         colors="false"
+         colors="true"
          convertErrorsToExceptions="true"
          convertNoticesToExceptions="true"
          convertWarningsToExceptions="true"
          processIsolation="false"
          stopOnFailure="false"
          bootstrap="./vendor/autoload.php">
+    <coverage>
+        <include>
+            <directory suffix=".php">./lib</directory>
+        </include>
+    </coverage>
     <testsuites>
         <testsuite name="PHPCompiler Compliance Test Suites">
             <directory suffix=".php">./test/compliance</directory>
@@ -19,11 +25,8 @@
         <testsuite name="PHPCompiler Macro Test Suites">
             <directory suffix=".php">./test/macro</directory>
         </testsuite>
+        <testsuite name="PHPCompiler Real World Test Suites">
+            <directory suffix=".php">./test/real</directory>
+        </testsuite>
     </testsuites>
-
-    <filter>
-        <whitelist>
-            <directory suffix=".php">./lib/PHPCompiler/</directory>
-        </whitelist>
-    </filter>
 </phpunit>
