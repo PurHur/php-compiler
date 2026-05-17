@@ -63,7 +63,7 @@ final class pow extends Internal
         throw new \LogicException('pow() only supports integers and floats in this compiler build');
     }
 
-    private static function toJitDouble(Context $context, JITVariable $arg, $double): Value
+    public static function toJitDouble(Context $context, JITVariable $arg, $double): Value
     {
         $v = $context->helper->loadValue($arg);
         switch ($arg->type) {

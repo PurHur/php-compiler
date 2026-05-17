@@ -66,7 +66,7 @@ final class boolval extends Internal
         }
     }
 
-    private static function isTruthy(Variable $v): bool
+    public static function isTruthy(Variable $v): bool
     {
         switch ($v->type) {
             case Variable::TYPE_NULL:

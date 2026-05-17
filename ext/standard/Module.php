@@ -26,6 +26,7 @@ class Module extends ModuleAbstract
             new round(),
             new sqrt(),
             new pow(),
+            new fmod(),
             new intval(),
             new floatval(),
             new boolval(),
@@ -52,11 +53,12 @@ class Module extends ModuleAbstract
             $context->registerFunction('strcmp', $fn);
         }
         $double = $context->getTypeFromString('double');
-        foreach (['ceil', 'floor', 'round', 'sqrt', 'pow'] as $name) {
+        foreach (['ceil', 'floor', 'round', 'sqrt', 'pow', 'fmod'] as $name) {
             try {
                 $context->lookupFunction($name);
             } catch (\Throwable $e) {
-                $ft = $context->context->functionType($double, false, $double);
+                $params = in_array($name, ['pow', 'fmod'], true) ? [$double, $double] : [$double];
+                $ft = $context->context->functionType($double, false, ...$params);
                 $fn = $context->module->addFunction($name, $ft);
                 $context->registerFunction($name, $fn);
             }
