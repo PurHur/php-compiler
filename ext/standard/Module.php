@@ -38,6 +38,8 @@ class Module extends ModuleAbstract
             new ord(),
             new chr(),
             new strcmp(),
+            new dechex(),
+            new hexdec(),
         ];
     }
 
@@ -51,6 +53,17 @@ class Module extends ModuleAbstract
             $ft = $context->context->functionType($i32, false, $i8p, $i8p);
             $fn = $context->module->addFunction('strcmp', $ft);
             $context->registerFunction('strcmp', $fn);
+        }
+        try {
+            $context->lookupFunction('strtol');
+        } catch (\Throwable $e) {
+            $i8p = $context->getTypeFromString('int8*');
+            $i8pp = $context->getTypeFromString('int8**');
+            $i32 = $context->getTypeFromString('int32');
+            $i64 = $context->getTypeFromString('int64');
+            $ft = $context->context->functionType($i64, false, $i8p, $i8pp, $i32);
+            $fn = $context->module->addFunction('strtol', $ft);
+            $context->registerFunction('strtol', $fn);
         }
         $double = $context->getTypeFromString('double');
         foreach (['ceil', 'floor', 'round', 'sqrt', 'pow', 'fmod'] as $name) {
