@@ -13,6 +13,8 @@ echo min(ord('a'), ord('z')), "\n";
 echo max(abs(-4), min(10, 3)), "\n";
 echo intval(ceil(2.1)), "\n";
 echo intval(floor(2.9)), "\n";
+echo round(sqrt(9)), "\n";
+echo gettype(abs(-1)), "\n";
 --EXPECT--
 3
 0
@@ -24,3 +26,5 @@ echo intval(floor(2.9)), "\n";
 4
 3
 2
+3
+integer

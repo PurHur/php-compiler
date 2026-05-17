@@ -23,7 +23,10 @@ class Module extends ModuleAbstract
             new abs(),
             new ceil(),
             new floor(),
+            new round(),
+            new sqrt(),
             new intval(),
+            new gettype(),
             new int_min(),
             new int_max(),
             new intdiv(),
@@ -45,7 +48,7 @@ class Module extends ModuleAbstract
             $context->registerFunction('strcmp', $fn);
         }
         $double = $context->getTypeFromString('double');
-        foreach (['ceil', 'floor'] as $name) {
+        foreach (['ceil', 'floor', 'round', 'sqrt'] as $name) {
             try {
                 $context->lookupFunction($name);
             } catch (\Throwable $e) {
