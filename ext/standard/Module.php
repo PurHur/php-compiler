@@ -25,6 +25,7 @@ class Module extends ModuleAbstract
             new int_max(),
             new intdiv(),
             new ord(),
+            new chr(),
             new strcmp(),
         ];
     }

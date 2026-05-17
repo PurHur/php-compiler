@@ -40,5 +40,10 @@
         "macros": [
             "src/macros.yay"
         ]
+    },
+    "config": {
+        "allow-plugins": {
+            "pre/plugin": true
+        }
     }
 }
