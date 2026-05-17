@@ -1,5 +1,5 @@
 --TEST--
-Digest: str_repeat, strlen, strcmp, intdiv, ord, min
+Digest: str_repeat, strlen, strcmp, intdiv, ord, min, ceil, floor, intval
 --FILE--
 <?php
 $s = str_repeat('a', 3);
@@ -11,6 +11,8 @@ echo ord('Z'), "\n";
 echo ord(chr(ord('Z'))), "\n";
 echo min(ord('a'), ord('z')), "\n";
 echo max(abs(-4), min(10, 3)), "\n";
+echo intval(ceil(2.1)), "\n";
+echo intval(floor(2.9)), "\n";
 --EXPECT--
 3
 0
@@ -20,3 +22,5 @@ echo max(abs(-4), min(10, 3)), "\n";
 90
 97
 4
+3
+2

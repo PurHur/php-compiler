@@ -21,6 +21,9 @@ class Module extends ModuleAbstract
         return [
             $this->parseAndCompileFunction('str_repeat', __DIR__.'/str_repeat.php'),
             new abs(),
+            new ceil(),
+            new floor(),
+            new intval(),
             new int_min(),
             new int_max(),
             new intdiv(),
@@ -40,6 +43,16 @@ class Module extends ModuleAbstract
             $ft = $context->context->functionType($i32, false, $i8p, $i8p);
             $fn = $context->module->addFunction('strcmp', $ft);
             $context->registerFunction('strcmp', $fn);
+        }
+        $double = $context->getTypeFromString('double');
+        foreach (['ceil', 'floor'] as $name) {
+            try {
+                $context->lookupFunction($name);
+            } catch (\Throwable $e) {
+                $ft = $context->context->functionType($double, false, $double);
+                $fn = $context->module->addFunction($name, $ft);
+                $context->registerFunction($name, $fn);
+            }
         }
     }
 }
