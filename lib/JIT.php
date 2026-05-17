@@ -226,6 +226,14 @@ class JIT {
                 //         throw new \LogicException('Hash tables not implemented yet');
                 //     }
                 //     break;
+                case OpCode::TYPE_EMPTY:
+                    $from = $this->context->getVariableFromOp($block->getOperand($op->arg2));
+                    $truthy = (new ext\standard\boolval())->call($this->context, $from);
+                    $this->assignOperandValue(
+                        $block->getOperand($op->arg1),
+                        $this->context->builder->not($truthy)
+                    );
+                    break;
                 case OpCode::TYPE_BOOLEAN_NOT:
                     $from = $this->context->getVariableFromOp($block->getOperand($op->arg2));
                     if ($from->type === Variable::TYPE_NATIVE_BOOL) {

@@ -279,6 +279,10 @@ restart:
                     $dst = $frame->scope[$op->arg1];
                     $dst->bool($value);
                     break;
+                case OpCode::TYPE_EMPTY:
+                    $v = $frame->scope[$op->arg2]->resolveIndirect();
+                    $frame->scope[$op->arg1]->bool(!ext\standard\boolval::isTruthy($v));
+                    break;
                 case OpCode::TYPE_INCLUDE:
                     $file = $frame->scope[$op->arg1]->toString();
                     $parsed = $this->context->runtime->parseAndCompileFile($file);
