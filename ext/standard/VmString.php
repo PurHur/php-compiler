@@ -143,6 +143,23 @@ final class VmString
         return $parts;
     }
 
+    public static function repeat(string $input, int $multiplier): string
+    {
+        if ($multiplier <= 0) {
+            return '';
+        }
+        $inputLen = self::byteLength($input);
+        if (0 === $inputLen) {
+            return '';
+        }
+        $out = '';
+        for ($i = 0; $i < $multiplier; ++$i) {
+            $out .= $input;
+        }
+
+        return $out;
+    }
+
     public static function strPad(string $input, int $padLength, string $padString = ' ', int $padType = 0): string
     {
         $inputLen = self::byteLength($input);

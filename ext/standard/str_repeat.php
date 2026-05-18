@@ -11,12 +11,55 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
-function str_repeat(string $input, int $multiplier): string
+use PHPCompiler\Frame;
+use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\Variable;
+use PHPLLVM\Value;
+
+/**
+ * str_repeat() for strings (subset of PHP; native LLVM in JIT).
+ */
+final class str_repeat extends Internal
 {
-    $result = '';
-    for ($i = 0; $i < $multiplier; ++$i) {
-        $result .= $input;
+    public function execute(Frame $frame): void
+    {
+        if (2 !== count($frame->calledArgs)) {
+            throw new \LogicException('str_repeat() requires exactly two arguments');
+        }
+        $input = $frame->calledArgs[0]->resolveIndirect();
+        $mult = $frame->calledArgs[1]->resolveIndirect();
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (Variable::TYPE_STRING !== $input->type) {
+            throw new \LogicException('str_repeat() input must be a string in this compiler build');
+        }
+        if (Variable::TYPE_INTEGER !== $mult->type) {
+            throw new \LogicException('str_repeat() multiplier must be an integer in this compiler build');
+        }
+        $frame->returnVar->string(VmString::repeat($input->toString(), $mult->toInt()));
     }
 
-    return $result;
+    public Context $context;
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        $this->context = $context;
+        if (2 !== count($args)) {
+            throw new \LogicException('str_repeat() requires exactly two arguments');
+        }
+        if (JITVariable::TYPE_STRING !== $args[0]->type) {
+            throw new \LogicException('str_repeat() input must be a string in this compiler build');
+        }
+        if (JITVariable::TYPE_NATIVE_LONG !== $args[1]->type) {
+            throw new \LogicException('str_repeat() multiplier must be an integer in this compiler build');
+        }
+        return JitStrRepeat::repeat(
+            $context,
+            $context->helper->loadValue($args[0]),
+            $context->helper->loadValue($args[1])
+        );
+    }
 }
