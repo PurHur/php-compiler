@@ -1,0 +1,302 @@
+<?php
+
+declare(strict_types=1);
+
+/**
+ * LLVM JIT helpers for dirname() and basename() (byte paths, / and \ separators).
+ */
+
+namespace PHPCompiler\ext\standard;
+
+use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Context;
+use PHPLLVM\Builder;
+use PHPLLVM\Value;
+
+final class JitPath
+{
+    private static int $blockSerial = 0;
+
+    public static function dirname(Context $context, Value $str): Value
+    {
+        $id = (string) (++self::$blockSerial);
+        [$len, $charPtr] = self::stringFields($context, $str);
+        $i64 = JitStringIndex::i64($context);
+        $zero = JitStringIndex::zero($context);
+        $one = $i64->constInt(1, false);
+        $minusOne = $i64->constInt(-1, false);
+
+        $done = self::block($context, 'dirname_done_'.$id);
+        $nonEmpty = self::block($context, 'dirname_nonempty_'.$id);
+        $emptyInput = self::block($context, 'dirname_empty_input_'.$id);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_SLE, $len, $zero),
+            $emptyInput,
+            $nonEmpty
+        );
+
+        $context->builder->positionAtEnd($emptyInput);
+        $emptyDot = self::loadLiteral($context, '.');
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($nonEmpty);
+        $endSlot = $context->builder->alloca($i64, 1, 'dirname_end');
+        $context->builder->store($len, $endSlot);
+        self::trimTrailingSeparators($context, $charPtr, $endSlot, $id);
+
+        $end = $context->builder->load($endSlot);
+        $trimmedEmpty = self::block($context, 'dirname_trimmed_empty_'.$id);
+        $scanBlock = self::block($context, 'dirname_scan_'.$id);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $end, $zero),
+            $trimmedEmpty,
+            $scanBlock
+        );
+
+        $context->builder->positionAtEnd($trimmedEmpty);
+        $rootFromTrim = self::rootOrDot($context, $charPtr);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($scanBlock);
+        $lastSlot = $context->builder->alloca($i64, 1, 'dirname_last_sep');
+        $context->builder->store($minusOne, $lastSlot);
+        $idxSlot = $context->builder->alloca($i64, 1, 'dirname_idx');
+        $context->builder->store($context->builder->sub($end, $one), $idxSlot);
+        self::scanBackwardForSeparator($context, $charPtr, $idxSlot, $lastSlot, $id);
+
+        $last = $context->builder->load($lastSlot);
+        $noSep = self::block($context, 'dirname_no_sep_'.$id);
+        $atRoot = self::block($context, 'dirname_at_root_'.$id);
+        $sliceBlock = self::block($context, 'dirname_slice_'.$id);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_SLT, $last, $zero),
+            $noSep,
+            $atRoot
+        );
+
+        $context->builder->positionAtEnd($noSep);
+        $dotResult = self::loadLiteral($context, '.');
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($atRoot);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $last, $zero),
+            $trimmedEmpty,
+            $sliceBlock
+        );
+
+        $context->builder->positionAtEnd($sliceBlock);
+        $sliceResult = string_trim::jitCopySlice($context, $str, $charPtr, $zero, $last, $id);
+        $sliceDoneBlock = $context->builder->getInsertBlock();
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+        $phi = $context->builder->phi($str->typeOf());
+        $phi->addIncoming($emptyDot, $emptyInput);
+        $phi->addIncoming($rootFromTrim, $trimmedEmpty);
+        $phi->addIncoming($dotResult, $noSep);
+        $phi->addIncoming($sliceResult, $sliceDoneBlock);
+
+        return $phi;
+    }
+
+    public static function basename(Context $context, Value $str): Value
+    {
+        $id = (string) (++self::$blockSerial);
+        [$len, $charPtr] = self::stringFields($context, $str);
+        $i64 = JitStringIndex::i64($context);
+        $zero = JitStringIndex::zero($context);
+        $one = $i64->constInt(1, false);
+        $minusOne = $i64->constInt(-1, false);
+
+        $done = self::block($context, 'basename_done_'.$id);
+        $emptyInput = self::block($context, 'basename_empty_input_'.$id);
+        $nonEmpty = self::block($context, 'basename_nonempty_'.$id);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_SLE, $len, $zero),
+            $emptyInput,
+            $nonEmpty
+        );
+
+        $context->builder->positionAtEnd($emptyInput);
+        $emptyStr = self::loadLiteral($context, '');
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($nonEmpty);
+        $endSlot = $context->builder->alloca($i64, 1, 'basename_end');
+        $context->builder->store($len, $endSlot);
+        self::trimTrailingSeparators($context, $charPtr, $endSlot, $id);
+
+        $end = $context->builder->load($endSlot);
+        $trimmedEmpty = self::block($context, 'basename_trimmed_empty_'.$id);
+        $scanBlock = self::block($context, 'basename_scan_'.$id);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $end, $zero),
+            $trimmedEmpty,
+            $scanBlock
+        );
+
+        $context->builder->positionAtEnd($trimmedEmpty);
+        $trimmedEmptyStr = self::loadLiteral($context, '');
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($scanBlock);
+        $lastSlot = $context->builder->alloca($i64, 1, 'basename_last_sep');
+        $context->builder->store($minusOne, $lastSlot);
+        $idxSlot = $context->builder->alloca($i64, 1, 'basename_idx');
+        $context->builder->store($context->builder->sub($end, $one), $idxSlot);
+        self::scanBackwardForSeparator($context, $charPtr, $idxSlot, $lastSlot, $id);
+
+        $last = $context->builder->load($lastSlot);
+        $noSep = self::block($context, 'basename_no_sep_'.$id);
+        $found = self::block($context, 'basename_found_'.$id);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_SLT, $last, $zero),
+            $noSep,
+            $found
+        );
+
+        $context->builder->positionAtEnd($noSep);
+        $whole = string_trim::jitCopySlice($context, $str, $charPtr, $zero, $end, $id);
+        $wholeDoneBlock = $context->builder->getInsertBlock();
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($found);
+        $start = $context->builder->add($last, $one);
+        $tailLen = $context->builder->sub($end, $start);
+        $tail = string_trim::jitCopySlice($context, $str, $charPtr, $start, $tailLen, $id.'_tail');
+        $tailDoneBlock = $context->builder->getInsertBlock();
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+        $phi = $context->builder->phi($str->typeOf());
+        $phi->addIncoming($emptyStr, $emptyInput);
+        $phi->addIncoming($trimmedEmptyStr, $trimmedEmpty);
+        $phi->addIncoming($whole, $wholeDoneBlock);
+        $phi->addIncoming($tail, $tailDoneBlock);
+
+        return $phi;
+    }
+
+    /**
+     * @return array{0: Value, 1: Value}
+     */
+    private static function stringFields(Context $context, Value $str): array
+    {
+        $map = $context->structFieldMap['__string__'];
+        $len = $context->builder->load(
+            $context->builder->structGep($str, $map['length'])
+        );
+        $charPtr = $context->builder->structGep($str, $map['value']);
+
+        return [$len, $charPtr];
+    }
+
+    private static function loadLiteral(Context $context, string $literal): Value
+    {
+        return $context->builder->load($context->constantStringFromString($literal));
+    }
+
+    private static function rootOrDot(Context $context, Value $charPtr): Value
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $first = $context->builder->load($charPtr);
+        $firstI32 = $context->builder->zExt($first, $i32);
+        $isSlash = $context->builder->icmp(
+            Builder::INT_EQ,
+            $firstI32,
+            $i32->constInt(ord('/'), false)
+        );
+
+        return $context->builder->select(
+            $isSlash,
+            self::loadLiteral($context, '/'),
+            self::loadLiteral($context, '.')
+        );
+    }
+
+    private static function isPathSeparator(Context $context, Value $ch): Value
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $byte = $context->builder->zExt($ch, $i32);
+        $slash = $context->builder->icmp(Builder::INT_EQ, $byte, $i32->constInt(ord('/'), false));
+        $back = $context->builder->icmp(Builder::INT_EQ, $byte, $i32->constInt(ord('\\'), false));
+
+        return $context->builder->or($slash, $back);
+    }
+
+    private static function block(Context $context, string $name): \PHPLLVM\BasicBlock
+    {
+        return BasicBlockHelper::append($context, $name);
+    }
+
+    private static function trimTrailingSeparators(Context $context, Value $charPtr, Value $endSlot, string $id): void
+    {
+        $i64 = JitStringIndex::i64($context);
+        $zero = JitStringIndex::zero($context);
+        $one = $i64->constInt(1, false);
+
+        $done = self::block($context, 'path_trim_done_'.$id);
+        $head = self::block($context, 'path_trim_head_'.$id);
+        $body = self::block($context, 'path_trim_body_'.$id);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $end = $context->builder->load($endSlot);
+        $stop = $context->builder->icmp(Builder::INT_SLE, $end, $zero);
+        $context->builder->branchIf($stop, $done, $body);
+
+        $context->builder->positionAtEnd($body);
+        $at = $context->builder->gep($charPtr, $context->builder->sub($end, $one));
+        $ch = $context->builder->load($at);
+        $isSep = self::isPathSeparator($context, $ch);
+        $newEnd = $context->builder->sub($end, $one);
+        $context->builder->store(
+            $context->builder->select($isSep, $newEnd, $end),
+            $endSlot
+        );
+        $context->builder->branchIf($isSep, $head, $done);
+
+        $context->builder->positionAtEnd($done);
+    }
+
+    private static function scanBackwardForSeparator(
+        Context $context,
+        Value $charPtr,
+        Value $idxSlot,
+        Value $lastSlot,
+        string $id
+    ): void {
+        $i64 = JitStringIndex::i64($context);
+        $zero = JitStringIndex::zero($context);
+        $one = $i64->constInt(1, false);
+
+        $done = self::block($context, 'path_scan_done_'.$id);
+        $head = self::block($context, 'path_scan_head_'.$id);
+        $body = self::block($context, 'path_scan_body_'.$id);
+        $found = self::block($context, 'path_scan_found_'.$id);
+        $continueScan = self::block($context, 'path_scan_continue_'.$id);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $idx = $context->builder->load($idxSlot);
+        $stop = $context->builder->icmp(Builder::INT_SLT, $idx, $zero);
+        $context->builder->branchIf($stop, $done, $body);
+
+        $context->builder->positionAtEnd($body);
+        $at = $context->builder->gep($charPtr, $idx);
+        $ch = $context->builder->load($at);
+        $isSep = self::isPathSeparator($context, $ch);
+        $context->builder->branchIf($isSep, $found, $continueScan);
+
+        $context->builder->positionAtEnd($found);
+        $context->builder->store($idx, $lastSlot);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($continueScan);
+        $context->builder->store($context->builder->sub($idx, $one), $idxSlot);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($done);
+    }
+}

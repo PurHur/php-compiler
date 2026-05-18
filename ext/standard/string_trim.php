@@ -87,14 +87,16 @@ final class string_trim extends Internal
         Value $str,
         Value $charPtr,
         Value $start,
-        Value $sliceLen
+        Value $sliceLen,
+        string $blockId = ''
     ): Value {
+        $suffix = '' === $blockId ? '' : '_'.$blockId;
         $zero = JitStringIndex::zero($context);
         $isEmpty = $context->builder->icmp(Builder::INT_SLE, $sliceLen, $zero);
 
-        $emptyBlock = BasicBlockHelper::append($context, 'slice_empty');
-        $copyBlock = BasicBlockHelper::append($context, 'slice_copy');
-        $doneBlock = BasicBlockHelper::append($context, 'slice_done');
+        $emptyBlock = BasicBlockHelper::append($context, 'slice_empty'.$suffix);
+        $copyBlock = BasicBlockHelper::append($context, 'slice_copy'.$suffix);
+        $doneBlock = BasicBlockHelper::append($context, 'slice_done'.$suffix);
         $context->builder->branchIf($isEmpty, $emptyBlock, $copyBlock);
 
         $context->builder->positionAtEnd($emptyBlock);
