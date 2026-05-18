@@ -51,7 +51,8 @@ class Analyzer
                 }
             } elseif ($usage instanceof Op\Expr\ArrayDimFetch
                 || $usage instanceof Op\Phi
-                || $usage instanceof Op\Expr\FuncCall) {
+                || $usage instanceof Op\Expr\FuncCall
+                || $usage instanceof Op\Expr\ConcatList) {
                 continue;
             } else {
                 throw new \LogicException('Not implemented escape operand '.get_class($usage));
@@ -89,8 +90,10 @@ class Analyzer
                 } else {
                     return true;
                 }
-            } elseif ($usage instanceof Op\Phi) {
-                // unsure what to do here skip for now
+            } elseif ($usage instanceof Op\Phi
+                || $usage instanceof Op\Expr\FuncCall
+                || $usage instanceof Op\Expr\ConcatList) {
+                // not a dynamic packed-array append
             } else {
                 throw new \LogicException('Not implemented dynamic append operand '.get_class($usage));
             }

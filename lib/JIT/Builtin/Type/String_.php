@@ -775,6 +775,8 @@ class String_ extends Type {
         } else {
             $destVar = $dest->value;
         }
+        $left = \PHPCompiler\JIT\JitNativeString::coerce($this->context, $left);
+        $right = \PHPCompiler\JIT\JitNativeString::coerce($this->context, $right);
         $leftVar = $this->context->helper->loadValue($left);
         $rightVar = $this->context->helper->loadValue($right);
 
