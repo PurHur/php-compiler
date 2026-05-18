@@ -2,6 +2,8 @@
 
 Each folder here contains a working PHP example `example.php`, and associated generated files (including LLVM IR generated from said file).
 
+CI runs `test/unit/ExamplesCompileTest.php`: every `examples/*/example.php` is linted and smoke-run under `bin/vm.php`; when LLVM 9 is available, `bin/compile.php -l` is exercised as well.
+
 # Benchmark Results
 
 Each example includes a benchmark that compares each mode of operation to just running the file with `php` directly.

@@ -104,6 +104,7 @@ restart:
                     case OpCode::TYPE_EQUAL:
                         $result = $this->context->builder->fcmp(Builder::REAL_OEQ, $leftValue, $rightValue);
                         goto return_bool;
+                    case OpCode::TYPE_NOT_IDENTICAL:
                     case OpCode::TYPE_NOT_EQUAL:
                         $result = $this->context->builder->fcmp(Builder::REAL_ONE, $leftValue, $rightValue);
                         goto return_bool;
@@ -402,6 +403,7 @@ restart:
                         $result = $this->context->builder->icmp(\PHPLLVM\Builder::INT_EQ, $leftValue, $__right);
     
                         goto return_bool;
+                    case OpCode::TYPE_NOT_IDENTICAL:
                     case OpCode::TYPE_NOT_EQUAL:
                         $__right = $this->context->builder->intCast($rightValue, $leftValue->typeOf());
                             
@@ -444,9 +446,18 @@ restart:
                     $result = $leftValue->typeOf()->constInt(0, false);
                     goto return_bool;
                 }
+                if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
+                    $result = $leftValue->typeOf()->constInt(1, false);
+                    goto return_bool;
+                }
                 if (OpCode::TYPE_EQUAL === $opcode->type) {
                     $__right = $this->context->builder->zExt($rightValue, $leftValue->typeOf());
                     $result = $this->context->builder->icmp(\PHPLLVM\Builder::INT_EQ, $leftValue, $__right);
+                    goto return_bool;
+                }
+                if (OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                    $__right = $this->context->builder->zExt($rightValue, $leftValue->typeOf());
+                    $result = $this->context->builder->icmp(\PHPLLVM\Builder::INT_NE, $leftValue, $__right);
                     goto return_bool;
                 }
                 break;
@@ -455,9 +466,18 @@ restart:
                     $result = $leftValue->typeOf()->constInt(0, false);
                     goto return_bool;
                 }
+                if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
+                    $result = $leftValue->typeOf()->constInt(1, false);
+                    goto return_bool;
+                }
                 if (OpCode::TYPE_EQUAL === $opcode->type) {
                     $__left = $this->context->builder->zExt($leftValue, $rightValue->typeOf());
                     $result = $this->context->builder->icmp(\PHPLLVM\Builder::INT_EQ, $__left, $rightValue);
+                    goto return_bool;
+                }
+                if (OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                    $__left = $this->context->builder->zExt($leftValue, $rightValue->typeOf());
+                    $result = $this->context->builder->icmp(\PHPLLVM\Builder::INT_NE, $__left, $rightValue);
                     goto return_bool;
                 }
                 break;
@@ -467,6 +487,7 @@ restart:
                     case OpCode::TYPE_EQUAL:
                         $result = $this->context->builder->icmp(\PHPLLVM\Builder::INT_EQ, $leftValue, $rightValue);
                         goto return_bool;
+                    case OpCode::TYPE_NOT_IDENTICAL:
                     case OpCode::TYPE_NOT_EQUAL:
                         $result = $this->context->builder->icmp(\PHPLLVM\Builder::INT_NE, $leftValue, $rightValue);
                         goto return_bool;
@@ -493,6 +514,25 @@ restart:
                 $result = JitValueCompare::identicalToNative($this->context, $left, $right);
                 goto return_bool;
             }
+            if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
+                if (Variable::TYPE_NATIVE_BOOL === $rightType) {
+                    $valuePtr = Variable::KIND_VARIABLE === $left->kind
+                        ? $left->value
+                        : $this->loadValue($left);
+                    $stored = $this->context->builder->call(
+                        $this->context->lookupFunction('__value__readLong'),
+                        $valuePtr
+                    );
+                    $result = $this->context->builder->icmp(
+                        Builder::INT_NE,
+                        $stored,
+                        $stored->typeOf()->constInt(0, false)
+                    );
+                    goto return_bool;
+                }
+                $result = JitValueCompare::notIdenticalToNative($this->context, $left, $right);
+                goto return_bool;
+            }
         }
         if (Variable::TYPE_VALUE === $rightType && Variable::TYPE_VALUE !== $leftType) {
             if (OpCode::TYPE_IDENTICAL === $opcode->type) {
@@ -512,6 +552,25 @@ restart:
                     goto return_bool;
                 }
                 $result = JitValueCompare::identicalNativeToValue($this->context, $left, $right);
+                goto return_bool;
+            }
+            if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
+                if (Variable::TYPE_NATIVE_BOOL === $leftType) {
+                    $valuePtr = Variable::KIND_VARIABLE === $right->kind
+                        ? $right->value
+                        : $this->loadValue($right);
+                    $stored = $this->context->builder->call(
+                        $this->context->lookupFunction('__value__readLong'),
+                        $valuePtr
+                    );
+                    $result = $this->context->builder->icmp(
+                        Builder::INT_NE,
+                        $stored,
+                        $stored->typeOf()->constInt(0, false)
+                    );
+                    goto return_bool;
+                }
+                $result = JitValueCompare::notIdenticalNativeToValue($this->context, $left, $right);
                 goto return_bool;
             }
         }

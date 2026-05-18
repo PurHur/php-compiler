@@ -6,9 +6,11 @@ LLVM_DIR="$ROOT/.llvm"
 DEB_BASE="http://deb.debian.org/debian/pool/main/l/llvm-toolchain-9"
 BINUTILS_BASE="http://deb.debian.org/debian/pool/main/b/binutils"
 GCC9_BASE="http://deb.debian.org/debian/pool/main/g/gcc-9"
+GLIBC_BASE="http://deb.debian.org/debian/pool/main/g/glibc"
 VER="9.0.1-16.1"
 BINUTILS_VER="2.40-2"
 GCC_VER="9.3.0-22"
+LIBC6_DEV_VER="2.36-9+deb12u14"
 
 mkdir -p "$LLVM_DIR/gcc/9"
 need=0
@@ -18,7 +20,9 @@ need=0
 [[ -f "$LLVM_DIR/gcc/9/crtbegin.o" ]] || need=1
 [[ -f "$LLVM_DIR/libedit.so.2" ]] || need=1
 [[ -f "$LLVM_DIR/libz3.so.4" ]] || need=1
-if [[ "$need" -eq 0 ]]; then
+need_headers=0
+[[ -f "$LLVM_DIR/sysroot/usr/include/stdio.h" ]] || need_headers=1
+if [[ "$need" -eq 0 && "$need_headers" -eq 0 ]]; then
   exit 0
 fi
 
@@ -84,6 +88,21 @@ if [[ ! -f "$LLVM_DIR/gcc/9/crtbegin.o" ]]; then
   install -m 644 "$dir/usr/lib/gcc/x86_64-linux-gnu/9/crtbegin.o" "$LLVM_DIR/gcc/9/crtbegin.o"
   install -m 644 "$dir/usr/lib/gcc/x86_64-linux-gnu/9/crtend.o" "$LLVM_DIR/gcc/9/crtend.o"
   install -m 644 "$dir/usr/lib/gcc/x86_64-linux-gnu/9/libgcc.a" "$LLVM_DIR/gcc/9/libgcc.a"
+fi
+
+if [[ "$need_headers" -eq 1 && ! -d "$LLVM_DIR/sysroot/usr/lib/gcc/x86_64-linux-gnu/9/include" ]]; then
+  dir="$(fetch_deb "${GCC9_BASE}/libgcc-9-dev_${GCC_VER}_amd64.deb" libgcc9-headers.deb)"
+  mkdir -p "$LLVM_DIR/sysroot/usr/lib/gcc/x86_64-linux-gnu/9"
+  cp -a "$dir/usr/lib/gcc/x86_64-linux-gnu/9/include" "$LLVM_DIR/sysroot/usr/lib/gcc/x86_64-linux-gnu/9/"
+fi
+
+if [[ "$need_headers" -eq 1 && ! -f "$LLVM_DIR/sysroot/usr/include/stdio.h" ]]; then
+  dir="$(fetch_deb "${GLIBC_BASE}/libc6-dev_${LIBC6_DEV_VER}_amd64.deb" libc6-dev.deb)"
+  mkdir -p "$LLVM_DIR/sysroot/usr"
+  cp -a "$dir/usr/include" "$LLVM_DIR/sysroot/usr/include"
+  if [[ -d "$dir/usr/include/x86_64-linux-gnu" ]]; then
+    cp -a "$dir/usr/include/x86_64-linux-gnu" "$LLVM_DIR/sysroot/usr/include/"
+  fi
 fi
 
 # libLLVM-9.so.1 also needs libedit and libz3 at load time (not always on minimal images).
