@@ -274,8 +274,12 @@ class Compiler {
             return OpCode::TYPE_GREATER_OR_EQUAL;
         } elseif ($expr instanceof Op\Expr\BinaryOp\Equal) {
             return OpCode::TYPE_EQUAL;
+        } elseif ($expr instanceof Op\Expr\BinaryOp\NotEqual) {
+            return OpCode::TYPE_NOT_EQUAL;
         } elseif ($expr instanceof Op\Expr\BinaryOp\Identical) {
             return OpCode::TYPE_IDENTICAL;
+        } elseif ($expr instanceof Op\Expr\BinaryOp\NotIdentical) {
+            return OpCode::TYPE_NOT_IDENTICAL;
         } elseif ($expr instanceof Op\Expr\BinaryOp\Minus) {
             return OpCode::TYPE_MINUS;
         } elseif ($expr instanceof Op\Expr\BinaryOp\Mul) {

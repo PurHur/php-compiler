@@ -99,18 +99,24 @@ final class Linker
     private static function resolveClang(): string
     {
         $llvmDir = getenv('PHP_COMPILER_LLVM_PATH');
+        $llvmPrefix = (false !== $llvmDir && '' !== $llvmDir) ? realpath($llvmDir) : false;
+        // Prefer the host toolchain for runtime C: bundled LLVM clang often lacks system headers.
+        foreach (['clang', 'gcc', 'cc'] as $name) {
+            $path = trim((string) shell_exec('command -v '.escapeshellarg($name).' 2>/dev/null'));
+            if ('' === $path) {
+                continue;
+            }
+            if (false !== $llvmPrefix && str_starts_with($path, $llvmPrefix)) {
+                continue;
+            }
+            return $path;
+        }
         if (false !== $llvmDir && '' !== $llvmDir) {
             foreach (['clang-9', 'clang'] as $name) {
                 $candidate = $llvmDir.'/'.$name;
                 if (is_executable($candidate)) {
                     return $candidate;
                 }
-            }
-        }
-        foreach (['clang-9', 'clang', 'gcc', 'cc'] as $name) {
-            $path = trim((string) shell_exec('command -v '.escapeshellarg($name).' 2>/dev/null'));
-            if ('' !== $path) {
-                return $path;
             }
         }
 
