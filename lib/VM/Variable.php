@@ -354,6 +354,10 @@ restart:
                 return $self->string === $other->string;
             case TYPE_PAIR_OBJECT_OBJECT:
                 return $self->object === $other->object;
+            case TYPE_PAIR_BOOLEAN_BOOLEAN:
+                return $self->bool === $other->bool;
+            case TYPE_PAIR_NULL_NULL:
+                return true;
             case TYPE_PAIR_INTEGER_FLOAT:
                 return ((float) $self->integer) === $other->float;
             case TYPE_PAIR_FLOAT_INTEGER:
@@ -388,6 +392,12 @@ restart:
                 break;
             case TYPE_PAIR_STRING_STRING:
                 $this->bool($this->_compareOp($opCode, $left->string, $right->string));
+                break;
+            case TYPE_PAIR_BOOLEAN_BOOLEAN:
+                $this->bool($this->_compareOp($opCode, $left->bool, $right->bool));
+                break;
+            case TYPE_PAIR_NULL_NULL:
+                $this->bool($this->_compareOp($opCode, null, null));
                 break;
             default:
                 if ($left->type === self::TYPE_INDIRECT) {
@@ -540,6 +550,8 @@ const TYPE_PAIR_INTEGER_FLOAT = (Variable::TYPE_INTEGER << 8) | Variable::TYPE_F
 const TYPE_PAIR_FLOAT_FLOAT = (Variable::TYPE_FLOAT << 8) | Variable::TYPE_FLOAT;
 const TYPE_PAIR_STRING_STRING = (Variable::TYPE_STRING << 8) | Variable::TYPE_STRING;
 const TYPE_PAIR_OBJECT_OBJECT = (Variable::TYPE_OBJECT << 8) | Variable::TYPE_OBJECT;
+const TYPE_PAIR_BOOLEAN_BOOLEAN = (Variable::TYPE_BOOLEAN << 8) | Variable::TYPE_BOOLEAN;
+const TYPE_PAIR_NULL_NULL = (Variable::TYPE_NULL << 8) | Variable::TYPE_NULL;
 
 function type_pair(int $left, int $right): int {
     return ($left << 8) | $right;

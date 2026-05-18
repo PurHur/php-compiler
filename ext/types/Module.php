@@ -28,6 +28,7 @@ class Module extends ModuleAbstract
             new is_type('is_string', Variable::TYPE_STRING),
             new is_type('is_bool', Variable::TYPE_BOOLEAN),
             new is_type('is_null', Variable::TYPE_NULL),
+            new is_type('is_array', Variable::TYPE_ARRAY),
         ];
     }
 }
