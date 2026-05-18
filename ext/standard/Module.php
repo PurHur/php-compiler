@@ -77,6 +77,7 @@ class Module extends ModuleAbstract
             new array_push(),
             new explode(),
             new implode(),
+            new htmlspecialchars(),
         ];
     }
 

@@ -16,5 +16,5 @@ if (isset($_GET['name'])) {
     $name = 'Guest';
 }
 echo '<!DOCTYPE html><html><body>';
-echo '<h1>Hello ', $name, "</h1>\n";
+echo '<h1>Hello ', htmlspecialchars($name), "</h1>\n";
 echo '</body></html>';
