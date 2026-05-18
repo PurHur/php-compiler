@@ -20,19 +20,20 @@
     </coverage>
     <testsuites>
         <testsuite name="PHPCompiler Compliance Test Suites">
-            <directory suffix=".php">./test/compliance</directory>
+            <file>./test/compliance/JITTest.php</file>
+            <file>./test/compliance/VMTest.php</file>
         </testsuite>
         <testsuite name="PHPCompiler Unit Test Suites">
             <directory suffix=".php">./test/unit</directory>
         </testsuite>
         <testsuite name="PHPCompiler Macro Test Suites">
-            <directory suffix=".php">./test/macro</directory>
+            <file>./test/macro/MacroTest.php</file>
         </testsuite>
         <testsuite name="PHPCompiler Real World Test Suites">
-            <directory suffix=".php">./test/real</directory>
+            <file>./test/real/RealWorldTest.php</file>
         </testsuite>
         <testsuite name="PHPCompiler AOT Test Suites">
-            <directory suffix=".php">./test/aot</directory>
+            <file>./test/aot/AotTest.php</file>
         </testsuite>
     </testsuites>
 </phpunit>

@@ -10,10 +10,18 @@ declare(strict_types=1);
  */
 
 use PHPCompiler\Runtime;
+use PHPCompiler\Web\Superglobals;
 
 function run(string $filename, string $code, array $options): void
 {
     $runtime = new Runtime();
+    $queryString = $options['-q'] ?? null;
+    $postBody = $options['-p'] ?? null;
+    Superglobals::populateFromEnvironment(
+        $runtime->vmContext,
+        is_string($queryString) ? $queryString : null,
+        is_string($postBody) ? $postBody : null
+    );
 
     $debugFile = null;
     if (isset($options['-y'])) {

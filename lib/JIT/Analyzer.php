@@ -49,7 +49,9 @@ class Analyzer
                 if ($this->canEscape($usage->var, $seen) || $this->canEscape($usage->result, $seen)) {
                     return true;
                 }
-            } elseif ($usage instanceof Op\Expr\ArrayDimFetch || $usage instanceof Op\Phi) {
+            } elseif ($usage instanceof Op\Expr\ArrayDimFetch
+                || $usage instanceof Op\Phi
+                || $usage instanceof Op\Expr\FuncCall) {
                 continue;
             } else {
                 throw new \LogicException('Not implemented escape operand '.get_class($usage));
@@ -125,6 +127,8 @@ class Analyzer
                     return null;
                 }
                 $size = max($size, $newSize);
+            } elseif ($op instanceof Op\Expr\FuncCall) {
+                return null;
             } else {
                 throw new \LogicException('Unknown array write op: '.get_class($op));
             }

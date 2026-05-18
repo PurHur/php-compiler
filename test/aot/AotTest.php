@@ -11,7 +11,7 @@ require_once __DIR__ . '/../BaseTest.php';
  */
 final class AotTest extends BaseTest
 {
-    protected static string $DIR = __DIR__;
+    protected static string $DIR = __DIR__ . '/../fixtures/aot';
 
     private static ?bool $llvmReady = null;
 
@@ -56,10 +56,6 @@ final class AotTest extends BaseTest
      */
     public function testCases(string $name, string $code, array $sections): void
     {
-        if (str_contains($name, '$_GET')) {
-            $this->markTestSkipped('$_GET/isset AOT: compile-time superglobals need follow-up (JIT assign)');
-        }
-
         $tmpBase = tempnam(sys_get_temp_dir(), 'phpc_aot_');
         if (false === $tmpBase) {
             $this->fail('Could not create temp file');

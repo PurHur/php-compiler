@@ -16,6 +16,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
@@ -46,6 +47,52 @@ final class array_key_exists extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('array_key_exists() is not implemented for JIT in this compiler build');
+        if (2 !== \count($args)) {
+            throw new \LogicException('array_key_exists() requires exactly two arguments');
+        }
+        $key = $args[0];
+        $array = $args[1];
+        if (JITVariable::TYPE_HASHTABLE === $array->type) {
+            $ht = $context->helper->loadValue($array);
+            if (JITVariable::TYPE_STRING === $key->type) {
+                return $context->builder->call(
+                    $context->lookupFunction('__hashtable__offsetIsSetStringKey'),
+                    $ht,
+                    $context->helper->loadValue($key)
+                );
+            }
+            if (JITVariable::TYPE_NATIVE_LONG === $key->type) {
+                $index = $context->builder->truncOrBitCast(
+                    $context->helper->loadValue($key),
+                    $context->getTypeFromString('size_t')
+                );
+
+                return $context->builder->call(
+                    $context->lookupFunction('__hashtable__offsetIsSet'),
+                    $ht,
+                    $index
+                );
+            }
+            throw new \LogicException(
+                'array_key_exists() key must be an integer or string in this compiler build'
+            );
+        }
+        if ($array->type & JITVariable::IS_NATIVE_ARRAY) {
+            if (JITVariable::TYPE_NATIVE_LONG !== $key->type) {
+                throw new \LogicException(
+                    'array_key_exists() on native arrays only supports integer keys in this compiler build'
+                );
+            }
+            $index = $context->helper->loadValue($key);
+            $size = $context->constantFromInteger($array->nextFreeElement, 'int32');
+            $i32 = $context->getTypeFromString('int32');
+            $inRange = $context->builder->icmp(Builder::INT_SLT, $index, $size);
+            $nonNeg = $context->builder->icmp(Builder::INT_SGE, $index, $i32->constInt(0, false));
+
+            return $context->builder->and($inRange, $nonNeg);
+        }
+        throw new \LogicException(
+            'array_key_exists() second argument must be an array in this compiler build'
+        );
     }
 }
