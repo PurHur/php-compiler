@@ -72,6 +72,27 @@ function handleConnection($conn, string $docroot): void
         $path = '/example.php';
     }
 
+    if (!isSafeUrlPath($path)) {
+        respond($conn, 403, 'text/plain', "Forbidden\n");
+
+        return;
+    }
+
+    if (!str_ends_with(strtolower($path), '.php')) {
+        $static = resolveDocrootFile($docroot, $path);
+        if (null !== $static) {
+            $bytes = file_get_contents($static);
+            if (false === $bytes) {
+                respond($conn, 500, 'text/plain', "Internal Server Error\n");
+
+                return;
+            }
+            respond($conn, 200, guessContentType($static), $bytes);
+
+            return;
+        }
+    }
+
     $scriptName = $path;
     $pathInfo = '';
     if (preg_match('#^(.+\.php)(/.*)?$#', $path, $pm)) {
@@ -189,6 +210,48 @@ function readRequest($conn): ?array
     return [$method, $path, $query, $headers, $body];
 }
 
+function isSafeUrlPath(string $path): bool
+{
+    if ('' === $path || '/' !== $path[0]) {
+        return false;
+    }
+    foreach (explode('/', $path) as $segment) {
+        if ('..' === $segment) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+function resolveDocrootFile(string $docroot, string $urlPath): ?string
+{
+    $candidate = $docroot . $urlPath;
+    $real = realpath($candidate);
+    if (false === $real || !is_file($real)) {
+        return null;
+    }
+    $prefix = $docroot . DIRECTORY_SEPARATOR;
+    if ($real !== $docroot && !str_starts_with($real, $prefix)) {
+        return null;
+    }
+
+    return $real;
+}
+
+function guessContentType(string $filePath): string
+{
+    $ext = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+
+    return [
+        'css' => 'text/css; charset=UTF-8',
+        'js' => 'application/javascript; charset=UTF-8',
+        'png' => 'image/png',
+        'svg' => 'image/svg+xml',
+        'ico' => 'image/x-icon',
+    ][$ext] ?? 'application/octet-stream';
+}
+
 function isServeDebug(): bool
 {
     $v = getenv('PHP_COMPILER_DEBUG');
@@ -216,6 +279,7 @@ function respond($conn, int $status, string $contentType, string $body, array $e
     $reason = [
         200 => 'OK',
         400 => 'Bad Request',
+        403 => 'Forbidden',
         404 => 'Not Found',
         500 => 'Internal Server Error',
     ][$status] ?? 'OK';

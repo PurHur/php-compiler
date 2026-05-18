@@ -74,6 +74,8 @@ curl 'http://127.0.0.1:8080/example.php?name=Dev'
 
 Uncaught errors return HTTP 500 with a generic body. Set `PHP_COMPILER_DEBUG=1` to include the exception class, message, and stack trace in the response (details are always logged to stderr).
 
+Non-`.php` files under the docroot (for example `style.css`) are served as static assets with a guessed `Content-Type`; path segments containing `..` are rejected.
+
 ## Using docker
 
 Docker is optional. The Makefile targets Ubuntu 16.04 and 18.04 images with PHP 7.4 for historical compatibility. For day-to-day development, prefer the host workflow above. Use `make test-18` for the 18.04 image once built.

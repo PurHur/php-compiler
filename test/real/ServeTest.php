@@ -41,6 +41,23 @@ final class ServeTest extends TestCase
     $this->assertStringContainsString('no_such_func', $response);
   }
 
+  public function testServesStaticCssFromDocroot(): void
+  {
+    $docroot = $this->makeDocroot(['style.css' => 'body { color: navy; }']);
+    $response = $this->httpGet($docroot, '/style.css');
+    $this->assertStringContainsString('HTTP/1.1 200', $response);
+    $this->assertStringContainsString('Content-Type: text/css', $response);
+    $this->assertStringContainsString('body { color: navy; }', $response);
+  }
+
+  public function testRejectsPathTraversal(): void
+  {
+    $docroot = $this->makeDocroot(['secret.txt' => 'hidden']);
+    $response = $this->httpGet($docroot, '/../secret.txt');
+    $this->assertStringContainsString('HTTP/1.1 403', $response);
+    $this->assertStringNotContainsString('hidden', $response);
+  }
+
   /**
    * @param array<string, string> $extraEnv
    */
