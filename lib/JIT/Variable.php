@@ -153,9 +153,12 @@ final class Variable {
             if (!$context->analyzer->canEscape($op)) {
                 $size = $context->analyzer->computeStaticArraySize($op);
                 if (!is_null($size) && !$context->analyzer->hasDynamicArrayAppend($op, $size)) {
-                    $origType = self::getTypeFromType($op->type->subTypes[0]);
-                    $type = self::IS_NATIVE_ARRAY | $origType;
-                    $stringType = self::getStringType($origType) . '[' . $size . ']';
+                    $subTypes = $op->type->subTypes ?? [];
+                    if ([] !== $subTypes) {
+                        $origType = self::getTypeFromType($subTypes[0]);
+                        $type = self::IS_NATIVE_ARRAY | $origType;
+                        $stringType = self::getStringType($origType) . '[' . $size . ']';
+                    }
                 }
             }
         }

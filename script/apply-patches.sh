@@ -11,28 +11,27 @@ if [[ ! -d "$VENDOR_LLVM" ]]; then
 fi
 
 apply_patch() {
-  local file="$1"
-  local patch="$2"
+  local patch="$1"
   if [[ ! -f "$patch" ]]; then
     return 0
   fi
-  if patch --forward -p0 -d "$ROOT" -i "$patch" 2>/dev/null; then
+  if git -C "$ROOT" apply --check -p0 "$patch" 2>/dev/null; then
+    git -C "$ROOT" apply -p0 "$patch"
     echo "Applied $(basename "$patch")"
   else
     echo "Skip $(basename "$patch") (already applied or failed)"
   fi
 }
 
-apply_patch "$VENDOR_LLVM/lib/Chooser.php" "$PATCH_DIR/php-llvm-chooser.patch"
-apply_patch "$VENDOR_LLVM/lib/LLVMAbstract/Context.php" "$PATCH_DIR/php-llvm-context-empty-arrays.patch"
-apply_patch "$VENDOR_LLVM/ffi/llvm9.php" "$PATCH_DIR/php-llvm-makearray-empty.patch"
-apply_patch "$VENDOR_LLVM/lib/LLVMAbstract/Builder.php" "$PATCH_DIR/php-llvm-builder-select.patch"
-apply_patch "$VENDOR_LLVM/lib/LLVMAbstract/Value/Instruction.php" "$PATCH_DIR/php-llvm-phi-add-incoming.patch"
-apply_patch "$VENDOR_LLVM/lib/LLVMAbstract/Builder.php" "$PATCH_DIR/php-llvm-builder-and-or.patch"
-apply_patch "$VENDOR_LLVM/lib/LLVMAbstract/TargetSet/X86.php" "$PATCH_DIR/php-llvm-x86-posix-fallback.patch"
+apply_patch "$PATCH_DIR/php-llvm-chooser.patch"
+apply_patch "$PATCH_DIR/php-llvm-context-empty-arrays.patch"
+apply_patch "$PATCH_DIR/php-llvm-makearray-empty.patch"
+apply_patch "$PATCH_DIR/php-llvm-builder-select.patch"
+apply_patch "$PATCH_DIR/php-llvm-phi-add-incoming.patch"
+apply_patch "$PATCH_DIR/php-llvm-builder-and-or.patch"
+apply_patch "$PATCH_DIR/php-llvm-x86-posix-fallback.patch"
 
-VENDOR_TYPES="$ROOT/vendor/ircmaxell/php-types"
-if [[ -d "$VENDOR_TYPES" ]]; then
-  apply_patch "$VENDOR_TYPES/lib/PHPTypes/TypeReconstructor.php" "$PATCH_DIR/php-types-binaryop-pow.patch"
-  apply_patch "$VENDOR_TYPES/lib/PHPTypes/InternalArgInfo.php" "$PATCH_DIR/php-types-str-bool-fns.patch"
+if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
+  apply_patch "$PATCH_DIR/php-types-binaryop-pow.patch"
+  apply_patch "$PATCH_DIR/php-types-str-bool-fns.patch"
 fi

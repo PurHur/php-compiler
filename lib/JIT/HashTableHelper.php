@@ -138,4 +138,117 @@ final class HashTableHelper
             $entry
         );
     }
+
+    public static function initArray(Context $context, Variable $result): void
+    {
+        $result->nextFreeElement = 0;
+        if ($result->type & Variable::IS_NATIVE_ARRAY) {
+            return;
+        }
+        $ht = self::alloc($context);
+        $context->builder->store($ht, $result->value);
+    }
+
+    public static function addElement(
+        Context $context,
+        Variable $array,
+        Variable $element,
+        ?Variable $key = null
+    ): void {
+        if ($array->type & Variable::IS_NATIVE_ARRAY) {
+            self::addNativeElement($context, $array, $element, $key);
+
+            return;
+        }
+        $ht = $context->helper->loadValue($array);
+        $sizeT = $context->getTypeFromString('size_t');
+        if (null === $key) {
+            $index = $context->constantFromInteger($array->nextFreeElement, 'size_t');
+            ++$array->nextFreeElement;
+            self::setAtIndex($context, $ht, $index, $element);
+
+            return;
+        }
+        if (Variable::TYPE_STRING === $key->type) {
+            $keyPtr = $context->helper->loadValue($key);
+            self::setAtStringKey($context, $ht, $keyPtr, $element);
+
+            return;
+        }
+        $index = $context->builder->truncOrBitCast(
+            $context->helper->loadValue($key),
+            $sizeT
+        );
+        self::setAtIndex($context, $ht, $index, $element);
+    }
+
+    private static function addNativeElement(
+        Context $context,
+        Variable $array,
+        Variable $element,
+        ?Variable $key
+    ): void {
+        if (null !== $key) {
+            $index = $context->builder->truncOrBitCast(
+                $context->helper->loadValue($key),
+                $context->getTypeFromString('size_t')
+            );
+        } else {
+            $index = $context->constantFromInteger($array->nextFreeElement, 'size_t');
+            ++$array->nextFreeElement;
+        }
+        $zero = $context->constantFromInteger(0, 'size_t');
+        $slot = $context->builder->inBoundsGep($array->value, $zero, $index);
+        $context->builder->store($context->helper->loadValue($element), $slot);
+    }
+
+    private static function setAtIndex(Context $context, Value $ht, Value $index, Variable $element): void
+    {
+        switch ($element->type) {
+            case Variable::TYPE_NATIVE_LONG:
+                $context->builder->call(
+                    $context->lookupFunction('__hashtable__setLongAt'),
+                    $ht,
+                    $index,
+                    $context->helper->loadValue($element)
+                );
+                break;
+            case Variable::TYPE_STRING:
+                $context->builder->call(
+                    $context->lookupFunction('__hashtable__setStringAt'),
+                    $ht,
+                    $index,
+                    $context->helper->loadValue($element)
+                );
+                break;
+            default:
+                throw new \LogicException(
+                    'Array element type not supported for JIT: '
+                    .Variable::getStringType($element->type)
+                );
+        }
+    }
+
+    private static function setAtStringKey(
+        Context $context,
+        Value $ht,
+        Value $keyPtr,
+        Variable $element
+    ): void {
+        switch ($element->type) {
+            case Variable::TYPE_STRING:
+                $context->builder->call(
+                    $context->lookupFunction('__hashtable__setStringKeyString'),
+                    $ht,
+                    $keyPtr,
+                    $context->helper->loadValue($element)
+                );
+                break;
+            default:
+                throw new \LogicException(
+                    'String-key array element type not supported for JIT: '
+                    .Variable::getStringType($element->type)
+                );
+        }
+    }
 }
