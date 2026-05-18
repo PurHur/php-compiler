@@ -56,19 +56,19 @@ restart:
                     break;
                 case OpCode::TYPE_ARRAY_DIM_FETCH:
                     $arg1 = $frame->scope[$op->arg1];
-                    $arg2 = $frame->scope[$op->arg2];
+                    $container = $frame->scope[$op->arg2]->resolveIndirect();
                     if (is_null($op->arg3)) {
-                        if ($arg2->type !== Variable::TYPE_ARRAY) {
+                        if ($container->type !== Variable::TYPE_ARRAY) {
                             throw new \LogicException('[] is only supported for arrays');
                         }
-                        $arg1->indirect($arg2->toArray()->append(new Variable));
+                        $arg1->indirect($container->toArray()->append(new Variable));
                         break;
                     }
                     $arg3 = $frame->scope[$op->arg3];
-                    if ($arg2->type === Variable::TYPE_STRING) {
-                        $arg1->string($arg2->toString()[$arg3->toInt()]);
-                    } elseif ($arg2->type === Variable::TYPE_ARRAY) {
-                        $arg1->indirect($arg2->toArray()->findVariable($arg3, false));
+                    if ($container->type === Variable::TYPE_STRING) {
+                        $arg1->string($container->toString()[$arg3->toInt()]);
+                    } elseif ($container->type === Variable::TYPE_ARRAY) {
+                        $arg1->indirect($container->toArray()->findVariable($arg3, false));
                     } else {
                         throw new \LogicException('Illegal offset');
                     }

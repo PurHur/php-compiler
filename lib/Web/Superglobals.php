@@ -163,11 +163,88 @@ final class Superglobals
         }
         $params = [];
         parse_str($body, $params);
+        self::mergeParsedParams($ht, $params);
+    }
+
+    /**
+     * Merge PHP parse_str() output into a VM hashtable (supports nested keys and lists).
+     *
+     * @param array<int|string, mixed> $params
+     */
+    private static function mergeParsedParams(HashTable $ht, array $params): void
+    {
         foreach ($params as $key => $value) {
-            if (!is_string($key) || is_array($value)) {
+            if (is_array($value)) {
+                $child = self::ensureArrayChild($ht, $key);
+                self::mergeParsedParams($child, $value);
+
                 continue;
             }
-            self::setStringEntry($ht, $key, (string) $value);
+            if (!is_scalar($value)) {
+                continue;
+            }
+            self::setScalarEntry($ht, $key, $value);
+        }
+    }
+
+    /**
+     * @param int|string $key
+     */
+    private static function ensureArrayChild(HashTable $ht, $key): HashTable
+    {
+        $existing = is_int($key) ? $ht->findIndex($key) : $ht->find((string) $key);
+        if (null !== $existing) {
+            $resolved = $existing->resolveIndirect();
+            if (Variable::TYPE_ARRAY === $resolved->type) {
+                return $resolved->toArray();
+            }
+        }
+
+        $nested = new HashTable();
+        $var = new Variable(Variable::TYPE_ARRAY);
+        $var->array($nested);
+        if (null !== $existing) {
+            $existing->copyFrom($var);
+        } elseif (is_int($key)) {
+            $ht->addIndex($key, $var);
+        } else {
+            $ht->add((string) $key, $var);
+        }
+
+        return $nested;
+    }
+
+    /**
+     * @param int|string $key
+     * @param bool|float|int|string $value
+     */
+    private static function setScalarEntry(HashTable $ht, $key, $value): void
+    {
+        $var = new Variable();
+        if (is_int($value)) {
+            $var->int($value);
+        } elseif (is_float($value)) {
+            $var->float($value);
+        } elseif (is_bool($value)) {
+            $var->bool($value);
+        } else {
+            $var->string((string) $value);
+        }
+        if (is_int($key)) {
+            $existing = $ht->findIndex($key);
+            if (null !== $existing) {
+                $existing->copyFrom($var);
+            } else {
+                $ht->addIndex($key, $var);
+            }
+
+            return;
+        }
+        $existing = $ht->find((string) $key);
+        if (null !== $existing) {
+            $existing->copyFrom($var);
+        } else {
+            $ht->add((string) $key, $var);
         }
     }
 
