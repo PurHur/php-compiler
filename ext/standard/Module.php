@@ -104,6 +104,8 @@ class Module extends ModuleAbstract
             new parse_url(),
             new dirname(),
             new basename(),
+            new getenv_(),
+            new putenv_(),
         ];
     }
 
