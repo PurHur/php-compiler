@@ -306,7 +306,10 @@ final class ArrayBuiltinHelper
         );
         $context->builder->branch($head);
 
+        $merge = BasicBlockHelper::append($context, 'merge_copy_exit');
         $context->builder->positionAtEnd($done);
+        $context->builder->branch($merge);
+        $context->builder->positionAtEnd($merge);
     }
 
     public static function inArray(
@@ -318,6 +321,7 @@ final class ArrayBuiltinHelper
         $ht = self::loadHashTable($context, $haystack);
         $sizeT = $context->getTypeFromString('size_t');
         $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
         $idxSlot = $context->builder->alloca($sizeT, 1, 'in_array_idx');
         $context->builder->store($zero, $idxSlot);
         $num = $context->builder->call(
@@ -346,15 +350,27 @@ final class ArrayBuiltinHelper
         $context->builder->positionAtEnd($body);
         $candidate = self::readListElement($context, $ht, $idx, $needle->type);
         $match = self::valuesEqual($context, $needle, $candidate, $strict);
-        $context->builder->branchIf($match, $foundBlock, $head);
+        $continueBlock = BasicBlockHelper::append($context, 'in_array_continue');
+        $context->builder->branchIf($match, $foundBlock, $continueBlock);
+
+        $context->builder->positionAtEnd($continueBlock);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($idx, $one),
+            $idxSlot
+        );
+        $context->builder->branch($head);
 
         $context->builder->positionAtEnd($foundBlock);
         $context->builder->store($context->getTypeFromString('int1')->constInt(1, false), $foundSlot);
         $context->builder->branch($done);
 
+        $merge = BasicBlockHelper::append($context, 'in_array_merge');
         $context->builder->positionAtEnd($done);
+        $result = $context->builder->load($foundSlot);
+        $context->builder->branch($merge);
+        $context->builder->positionAtEnd($merge);
 
-        return $context->builder->load($foundSlot);
+        return $result;
     }
 
     private static function listEntryAt(Context $context, Value $ht, Value $index): Value
