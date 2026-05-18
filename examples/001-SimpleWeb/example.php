@@ -15,6 +15,6 @@ declare(strict_types=1);
 // $_GET is populated from that string during compilation (see SuperglobalInit).
 $name = $_GET['name'];
 header('Content-Type: text/html; charset=UTF-8');
-echo '<!DOCTYPE html><html><body>';
+echo '<!DOCTYPE html><html><head><link rel="stylesheet" href="/style.css"></head><body>';
 echo '<h1>Hello ', htmlspecialchars($name), "</h1>\n";
 echo '</body></html>';
