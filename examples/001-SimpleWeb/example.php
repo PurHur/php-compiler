@@ -11,13 +11,9 @@ declare(strict_types=1);
  * $_GET is baked in at compile time from -q / QUERY_STRING (see lib/JIT/SuperglobalInit.php).
  * $_SERVER['REQUEST_METHOD'] and $_REQUEST are populated automatically (see lib/Web/Superglobals.php).
  */
-if (isset($_GET['name'])) {
-    $name = $_GET['name'];
-} elseif (isset($_POST['name'])) {
-    $name = $_POST['name'];
-} else {
-    $name = 'Guest';
-}
+// For AOT, pass the query at compile time: -q 'name=World' or QUERY_STRING=name=World
+// $_GET is populated from that string during compilation (see SuperglobalInit).
+$name = $_GET['name'];
 header('Content-Type: text/html; charset=UTF-8');
 echo '<!DOCTYPE html><html><body>';
 echo '<h1>Hello ', htmlspecialchars($name), "</h1>\n";

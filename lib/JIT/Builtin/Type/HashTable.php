@@ -455,6 +455,10 @@ class HashTable extends Type
         $ht = $fn->getParam(0);
         $key = $fn->getParam(1);
         $valPtr = $this->lookupStringKeyValue($fn, $block, $ht, $key);
+        // lookupStringKeyValue finishes in an internal "done" block; continue in a new block.
+        $afterLookup = $fn->appendBasicBlock('strkey_isset_after_lookup');
+        $this->context->builder->branch($afterLookup);
+        $this->context->builder->positionAtEnd($afterLookup);
         $i1 = $this->context->getTypeFromString('int1');
         $isNull = $this->context->builder->icmp(Builder::INT_EQ, $valPtr, $valPtr->typeOf()->constNull());
         $nullType = $this->context->getTypeFromString('int8')->constInt(0, false);
