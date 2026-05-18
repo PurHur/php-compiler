@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\Builder;
@@ -35,18 +36,25 @@ final class StringGetenv
         );
         $nameBytes = $context->builder->structGep($name, $strMap['value']);
         $bufLen = $context->builder->add($nameLen, $one);
-        $nameBuf = $context->builder->call(
-            $context->lookupFunction('__mm__malloc'),
-            $bufLen
-        );
-        $nameCStr = $context->builder->pointerCast($nameBuf, $i8p);
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            $nameBuf = $context->builder->call(
+                $context->lookupFunction('malloc'),
+                $bufLen
+            );
+            $nameCStr = $context->builder->pointerCast($nameBuf, $i8p);
+        } else {
+            $nameBuf = $context->builder->alloca($i8, $bufLen, 'getenv_name');
+            $nameCStr = $context->builder->pointerCast($nameBuf, $i8p);
+        }
         $context->intrinsic->memcpy($nameCStr, $nameBytes, $nameLen, false);
         $context->builder->store(
             $i8->constInt(0, false),
             $context->builder->inBoundsGEP($nameCStr, $nameLen)
         );
         $env = $context->builder->call($context->lookupFunction('getenv'), $nameCStr);
-        $context->builder->call($context->lookupFunction('__mm__free'), $nameBuf);
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            $context->builder->call($context->lookupFunction('free'), $nameBuf);
+        }
         $isNull = $context->builder->icmp(Builder::INT_EQ, $env, $i8p->constNull());
 
         $missing = $fn->appendBasicBlock('getenv_missing');
