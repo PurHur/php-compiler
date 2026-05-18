@@ -411,7 +411,9 @@ class JIT {
                 case OpCode::TYPE_GREATER:
                 case OpCode::TYPE_SMALLER:
                 case OpCode::TYPE_IDENTICAL:
+                case OpCode::TYPE_NOT_IDENTICAL:
                 case OpCode::TYPE_EQUAL:
+                case OpCode::TYPE_NOT_EQUAL:
                     $this->assignOperand(
                         $block->getOperand($op->arg1),
                         $this->context->helper->binaryOp(

@@ -20,10 +20,20 @@ function php_compiler_preload_llvm_deps(string $dir, array $names): void
     }
     static $dl = null;
     if (null === $dl) {
-        $dl = \FFI::cdef(
-            'void *dlopen(const char *filename, int flags);',
-            'libc.so.6'
-        );
+        foreach (['libdl.so.2', 'libc.so.6'] as $lib) {
+            try {
+                $dl = \FFI::cdef(
+                    'void *dlopen(const char *filename, int flags);',
+                    $lib
+                );
+                break;
+            } catch (\FFI\Exception $e) {
+                continue;
+            }
+        }
+        if (null === $dl) {
+            return;
+        }
     }
     // RTLD_NOW | RTLD_GLOBAL — expose symbols to subsequently loaded libs.
     $flags = 258;
