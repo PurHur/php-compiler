@@ -129,7 +129,16 @@ abstract class BaseTest extends TestCase {
      * @return list<string>
      */
     protected function phpCommand(): array {
-        $cmd = [PHP_BINARY];
+        $php = getenv('PHP_COMPILER_PHP') ?: PHP_BINARY;
+        $cmd = [$php];
+        if (getenv('PHP_COMPILER_PHP')) {
+            $cmd[] = '-d';
+            $cmd[] = 'display_errors=0';
+            $cmd[] = '-d';
+            $cmd[] = 'error_reporting=0';
+
+            return $cmd;
+        }
         $extDir = getenv('PHP_COMPILER_EXT_DIR') ?: '/usr/lib/php/20220829';
         if (!is_dir($extDir)) {
             return $cmd;
