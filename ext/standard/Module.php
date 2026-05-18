@@ -85,6 +85,7 @@ class Module extends ModuleAbstract
             new explode(),
             new implode(),
             new htmlspecialchars(),
+            new header_(),
         ];
     }
 

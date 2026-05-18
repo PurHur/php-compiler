@@ -15,6 +15,7 @@ if (isset($_GET['name'])) {
 } else {
     $name = 'Guest';
 }
+header('Content-Type: text/html; charset=UTF-8');
 echo '<!DOCTYPE html><html><body>';
 echo '<h1>Hello ', htmlspecialchars($name), "</h1>\n";
 echo '</body></html>';
