@@ -8,21 +8,61 @@ Now, thanks to [FFI landing in PHP 7.4](https://wiki.php.net/rfc/ffi), the poten
 
 So here we go :)
 
-# Installation
+# Quick start (host PHP)
 
-Install PHP 7.4, being sure to enable the FFI extension, OpenSSL extension, mbstring extension, and zlib extension (`--with-ffi --with-openssl --enable-mbstring --with-zlib`).
-
-Also, you need to install the system dependency `llvm-4.0`. On Ubuntu:
+On a modern Linux host with PHP 8.1+ (8.2 recommended):
 
 ```console
-me@local:~$ sudo apt-get install llvm-4.0-dev clang-4.0
+git clone https://github.com/PurHur/php-compiler.git
+cd php-compiler
+composer install
+./script/ci-local.sh          # full PHPUnit suite (VM, compliance, JIT, AOT)
+php bin/vm.php -r 'echo 1;'
 ```
 
-Then run `composer install`.
+The first `ci-local.sh` run downloads a bundled LLVM 9 toolchain into `.llvm/` (see `script/install-llvm9.sh`) and applies vendor patches. No Docker required.
+
+# Installation
+
+## Host requirements
+
+- **PHP 8.1+** (8.2 recommended) with extensions: `tokenizer`, `mbstring`, `dom`, `xml`, `xmlwriter`, `ffi`, `posix`, `phar`
+- **Composer**
+- **LLVM 9** for JIT/AOT — use the bundled installer (default) or set `PHP_COMPILER_LLVM_PATH` to an existing LLVM 9 tree
+
+On Debian/Ubuntu you can install PHP extensions with:
+
+```console
+sudo apt-get install php-cli php-tokenizer php-mbstring php-xml php-ffi php-posix composer
+```
+
+Then:
+
+```console
+composer install
+./script/install-llvm9.sh    # optional if ci-local.sh has not run yet
+```
+
+### Environment variables
+
+| Variable | Purpose |
+|----------|---------|
+| `PHP_COMPILER_PHP` | PHP binary for tests and scripts (default: `php`, or `php8.2` if found) |
+| `PHP_COMPILER_EXT_DIR` | Directory containing `.so` extensions (default: `/usr/lib/php/20220829` on PHP 8.2) |
+| `PHP_COMPILER_LLVM_PATH` | Path to LLVM 9 `clang`, `ld`, and `libLLVM-9.so.1` (default: repo `.llvm/` after install) |
+
+`script/ci-local.sh` sets these automatically when `.llvm/libLLVM-9.so.1` exists.
+
+### Running tests on the host
+
+```console
+make test-local              # same as ./script/ci-local.sh
+./script/ci-local.sh --filter VMTest
+```
 
 ## Using docker
 
-This project comes with one working and one non-working (yet) Dockerfile. The makefile uses a reasonably old version of Ubuntu (16.04), and once FFIMe is fixed for newer versions of glibc, it will switch to use 18.04 (or newer).
+Docker is optional. The Makefile targets Ubuntu 16.04 and 18.04 images with PHP 7.4 for historical compatibility. For day-to-day development, prefer the host workflow above. Use `make test-18` for the 18.04 image once built.
 
 To build, use make:
 
@@ -157,11 +197,21 @@ block_0:
   TYPE_RETURN_VOID(null, null, null)
 ```
 
-# Future Work
+# Roadmap
 
-Right now, this only supports an EXTREMELY limited subset of PHP. There is no support for dynamic anything. Arrays aren't supported. Neither Object properties nor methods are supported. And the only builtin functions that are supported are `var_dump` and `strlen`.
+Development targets a **web-capable PHP subset**: CGI/superglobals, stdlib for small apps, JIT/AOT deployment, and a reference MiniWebApp. See open [GitHub issues](https://github.com/PurHur/php-compiler/issues) for phase labels (`phase-0:Foundation` through `phase-5:reference-app`).
 
-But it's a start...
+The compiler still supports a limited language subset compared to Zend PHP; many builtins and constructs are VM-only or in progress.
+
+# Troubleshooting
+
+**`libLLVM-9.so.1: cannot open shared object file`** — Run `./script/install-llvm9.sh` or export `LD_LIBRARY_PATH` to include the repo `.llvm/` directory (as `script/ci-local.sh` does).
+
+**Linker / AOT failures** — AOT linking uses `PHP_COMPILER_LLVM_PATH` and bundled `clang-9`/`ld` from `.llvm/` (`lib/AOT/Linker.php`). Ensure `crtbegin.o`, `crtend.o`, and `libgcc.a` exist under `.llvm/gcc/9/`. Re-run `script/install-llvm9.sh` if the bundle is incomplete.
+
+**Missing PHP extensions** — Set `PHP_COMPILER_EXT_DIR` to your PHP's extension directory (`php -i | grep extension_dir`).
+
+**php-parser / lexer errors on PHP 8.2+** — Run `composer install` and `script/apply-patches.sh` so vendored `nikic/php-parser` matches the host PHP version.
 
 # Debugging
 
