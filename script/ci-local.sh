@@ -24,4 +24,6 @@ if [[ -x script/apply-patches.sh ]]; then
   script/apply-patches.sh || true
 fi
 
+"$PHP_BIN" "${PHP_OPTS[@]}" script/capability-matrix.php --check
+
 "$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit "$@"
