@@ -5,8 +5,7 @@ declare(strict_types=1);
 /**
  * LLVM JIT helper for strpos() — strstr-based search with optional byte offset.
  *
- * Not found is represented as -1 (native long); use strict comparison with false
- * only in VM mode. For AOT/JIT, compare with < 0 or use VM.
+ * Not found is represented as -1 (native long). VM mode returns boolean false instead.
  */
 
 namespace PHPCompiler\ext\standard;
@@ -18,7 +17,7 @@ use PHPLLVM\Value;
 
 final class JitStrpos
 {
-    private const NOT_FOUND = -1;
+    public const NOT_FOUND = -1;
 
     public static function find(
         Context $context,
@@ -51,6 +50,7 @@ final class JitStrpos
         $notFoundBlock = BasicBlockHelper::append($context, 'strpos_not_found');
         $foundBlock = BasicBlockHelper::append($context, 'strpos_found');
         $mergeBlock = BasicBlockHelper::append($context, 'strpos_merge');
+        $continueBlock = BasicBlockHelper::append($context, 'strpos_continue');
         $context->builder->branchIf($isNull, $notFoundBlock, $foundBlock);
 
         $context->builder->positionAtEnd($notFoundBlock);
@@ -67,6 +67,9 @@ final class JitStrpos
         $phi = $context->builder->phi($i64);
         $phi->addIncoming($sentinel, $notFoundBlock);
         $phi->addIncoming($pos, $foundBlock);
+        $context->builder->branch($continueBlock);
+
+        $context->builder->positionAtEnd($continueBlock);
 
         return $phi;
     }

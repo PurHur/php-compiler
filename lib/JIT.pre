@@ -556,7 +556,11 @@ class JIT {
         );
         if ($source->type === $dest->type) {
             $dest->free();
-            $this->context->builder->store($value, $dest->value);
+            $toStore = $value;
+            if ('__value__*' === $this->context->getStringFromType($value->typeOf())) {
+                $toStore = $this->context->builder->load($value);
+            }
+            $this->context->builder->store($toStore, $dest->value);
             $dest->addref();
 
             return;

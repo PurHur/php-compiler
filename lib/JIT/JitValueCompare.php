@@ -18,11 +18,13 @@ final class JitValueCompare
         Variable $boxed,
         Variable $native
     ): Value {
-        if (Variable::KIND_VALUE !== $boxed->kind || Variable::TYPE_VALUE !== $boxed->type) {
+        if (Variable::TYPE_VALUE !== $boxed->type) {
             throw new \LogicException('Expected boxed __value__ operand');
         }
 
-        $valuePtr = $context->helper->loadValue($boxed);
+        $valuePtr = Variable::KIND_VARIABLE === $boxed->kind
+            ? $boxed->value
+            : $context->helper->loadValue($boxed);
         $map = $context->structFieldMap['__value__'];
         $typeByte = $context->builder->load(
             $context->builder->structGep($valuePtr, $map['type'])
@@ -32,56 +34,50 @@ final class JitValueCompare
 
         switch ($native->type) {
             case Variable::TYPE_NATIVE_BOOL:
-                $expectedType = $i8->constInt(Variable::TYPE_NATIVE_BOOL, false);
-                $sameType = $context->builder->icmp(Builder::INT_EQ, $typeByte, $expectedType);
-                $boolBlock = BasicBlockHelper::append($context, 'ident_value_bool');
-                $failBlock = BasicBlockHelper::append($context, 'ident_value_fail');
-                $mergeBlock = BasicBlockHelper::append($context, 'ident_value_merge');
-                $context->builder->branchIf($sameType, $boolBlock, $failBlock);
-                $context->builder->positionAtEnd($boolBlock);
-                $stored = $context->builder->call(
+                $nativeBool = $context->helper->loadValue($native);
+                $sentinel = $context->getTypeFromString('int64')->constInt(
+                    \PHPCompiler\ext\standard\JitStrpos::NOT_FOUND,
+                    false
+                );
+                $longType = $i8->constInt(Variable::TYPE_NATIVE_LONG, false);
+                $boolType = $i8->constInt(Variable::TYPE_NATIVE_BOOL, false);
+                $isLong = $context->builder->icmp(Builder::INT_EQ, $typeByte, $longType);
+                $isBool = $context->builder->icmp(Builder::INT_EQ, $typeByte, $boolType);
+                $storedLong = $context->builder->call(
                     $context->lookupFunction('__value__readLong'),
                     $valuePtr
                 );
+                $isNotFound = $context->builder->icmp(Builder::INT_EQ, $storedLong, $sentinel);
+                $isFalse = $context->builder->icmp(
+                    Builder::INT_EQ,
+                    $nativeBool,
+                    $nativeBool->typeOf()->constInt(0, false)
+                );
+                $strposMatch = $context->builder->and($isLong, $context->builder->and($isNotFound, $isFalse));
                 $storedBool = $context->builder->icmp(
                     Builder::INT_NE,
-                    $stored,
-                    $stored->typeOf()->constInt(0, false)
+                    $storedLong,
+                    $storedLong->typeOf()->constInt(0, false)
                 );
-                $nativeBool = $context->helper->loadValue($native);
-                $match = $context->builder->icmp(Builder::INT_EQ, $storedBool, $nativeBool);
-                $context->builder->branch($mergeBlock);
-                $context->builder->positionAtEnd($failBlock);
-                $context->builder->branch($mergeBlock);
-                $context->builder->positionAtEnd($mergeBlock);
-                $phi = $context->builder->phi($match->typeOf());
-                $phi->addIncoming($match, $boolBlock);
-                $phi->addIncoming($falseVal, $failBlock);
+                $boolMatch = $context->builder->and(
+                    $isBool,
+                    $context->builder->icmp(Builder::INT_EQ, $storedBool, $nativeBool)
+                );
 
-                return $phi;
+                return $context->builder->or($strposMatch, $boolMatch);
             case Variable::TYPE_NATIVE_LONG:
                 $expectedType = $i8->constInt(Variable::TYPE_NATIVE_LONG, false);
                 $sameType = $context->builder->icmp(Builder::INT_EQ, $typeByte, $expectedType);
-                $longBlock = BasicBlockHelper::append($context, 'ident_value_long');
-                $failBlock = BasicBlockHelper::append($context, 'ident_value_fail_long');
-                $mergeBlock = BasicBlockHelper::append($context, 'ident_value_merge_long');
-                $context->builder->branchIf($sameType, $longBlock, $failBlock);
-                $context->builder->positionAtEnd($longBlock);
                 $stored = $context->builder->call(
                     $context->lookupFunction('__value__readLong'),
                     $valuePtr
                 );
                 $nativeLong = $context->helper->loadValue($native);
-                $match = $context->builder->icmp(Builder::INT_EQ, $stored, $nativeLong);
-                $context->builder->branch($mergeBlock);
-                $context->builder->positionAtEnd($failBlock);
-                $context->builder->branch($mergeBlock);
-                $context->builder->positionAtEnd($mergeBlock);
-                $phi = $context->builder->phi($match->typeOf());
-                $phi->addIncoming($match, $longBlock);
-                $phi->addIncoming($falseVal, $failBlock);
 
-                return $phi;
+                return $context->builder->and(
+                    $sameType,
+                    $context->builder->icmp(Builder::INT_EQ, $stored, $nativeLong)
+                );
             default:
                 return $falseVal;
         }

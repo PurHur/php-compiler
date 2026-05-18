@@ -60,6 +60,9 @@ class Value extends Type {
         compile {
             function __value__valueDelref($value) {
                 $oldType = $value->type;
+                if (0 === $oldType) {
+                    return;
+                }
                 $mask = (int8) Variable::IS_REFCOUNTED;
                 $isCounted = $oldType & $mask;
                 if ($isCounted) {

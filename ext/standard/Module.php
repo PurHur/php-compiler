@@ -98,6 +98,8 @@ class Module extends ModuleAbstract
             new str_pad(),
             new str_split(),
             new htmlspecialchars(),
+            new urlencode(),
+            new rawurlencode(),
             new header_(),
         ];
     }

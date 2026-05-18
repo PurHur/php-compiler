@@ -225,6 +225,50 @@ final class VmString
         return $out;
     }
 
+    public static function urlencode(string $string): string
+    {
+        return self::percentEncode($string, true);
+    }
+
+    public static function rawurlencode(string $string): string
+    {
+        return self::percentEncode($string, false);
+    }
+
+    private static function percentEncode(string $string, bool $plusForSpace): string
+    {
+        $out = '';
+        $len = self::byteLength($string);
+        for ($i = 0; $i < $len; ++$i) {
+            $ch = $string[$i];
+            $ord = self::byteOrd($ch);
+            if (self::isUrlencodeSafe($ord)) {
+                $out .= $ch;
+            } elseif ($plusForSpace && 32 === $ord) {
+                $out .= '+';
+            } else {
+                $out .= sprintf('%%%02X', $ord);
+            }
+        }
+
+        return $out;
+    }
+
+    private static function isUrlencodeSafe(int $ord): bool
+    {
+        if ($ord >= 48 && $ord <= 57) {
+            return true;
+        }
+        if ($ord >= 65 && $ord <= 90) {
+            return true;
+        }
+        if ($ord >= 97 && $ord <= 122) {
+            return true;
+        }
+
+        return 45 === $ord || 95 === $ord || 46 === $ord;
+    }
+
     /**
      * @return list<string>
      */
