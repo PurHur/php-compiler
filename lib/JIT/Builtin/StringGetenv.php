@@ -36,11 +36,8 @@ final class StringGetenv
         $nameBytes = $context->builder->structGep($name, $strMap['value']);
         $bufLen = $context->builder->add($nameLen, $one);
         $nameBuf = $context->builder->call(
-            $context->lookupFunction('malloc'),
-            $context->builder->mul(
-                $bufLen,
-                $i64->constInt(1, false)
-            )
+            $context->lookupFunction('__mm__malloc'),
+            $bufLen
         );
         $nameCStr = $context->builder->pointerCast($nameBuf, $i8p);
         $context->intrinsic->memcpy($nameCStr, $nameBytes, $nameLen, false);
@@ -49,7 +46,7 @@ final class StringGetenv
             $context->builder->inBoundsGEP($nameCStr, $nameLen)
         );
         $env = $context->builder->call($context->lookupFunction('getenv'), $nameCStr);
-        $context->builder->call($context->lookupFunction('free'), $nameBuf);
+        $context->builder->call($context->lookupFunction('__mm__free'), $nameBuf);
         $isNull = $context->builder->icmp(Builder::INT_EQ, $env, $i8p->constNull());
 
         $missing = $fn->appendBasicBlock('getenv_missing');

@@ -45,8 +45,8 @@ final class JitEnv
         $bytes = $context->builder->structGep($assignmentStr, $map['value']);
         $bufLen = $context->builder->add($len, $one);
         $buf = $context->builder->call(
-            $context->lookupFunction('malloc'),
-            $context->builder->mul($bufLen, $one)
+            $context->lookupFunction('__mm__malloc'),
+            $bufLen
         );
         $cStr = $context->builder->pointerCast($buf, $i8p);
         $context->intrinsic->memcpy($cStr, $bytes, $len, false);
