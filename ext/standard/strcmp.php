@@ -30,7 +30,7 @@ final class strcmp extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->int(\strcmp($a, $b));
+        $frame->returnVar->int(VmString::strcmp($a, $b));
     }
 
     public Context $context;

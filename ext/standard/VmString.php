@@ -12,6 +12,123 @@ final class VmString
 {
     public const TRIM_DEFAULT = " \t\n\r\0\x0B";
 
+    public static function byteLength(string $string): int
+    {
+        $len = 0;
+        while (isset($string[$len])) {
+            ++$len;
+        }
+
+        return $len;
+    }
+
+    public static function byteSlice(string $string, int $offset, ?int $length = null): string
+    {
+        $len = self::byteLength($string);
+        if ($offset < 0) {
+            $offset = $len + $offset;
+            if ($offset < 0) {
+                $offset = 0;
+            }
+        }
+        if ($offset > $len) {
+            return '';
+        }
+        if (null === $length) {
+            $length = $len - $offset;
+        } elseif ($length < 0) {
+            $length = $len - $offset + $length;
+            if ($length < 0) {
+                return '';
+            }
+        }
+        if ($offset + $length > $len) {
+            $length = $len - $offset;
+        }
+        $out = '';
+        for ($i = 0; $i < $length; ++$i) {
+            $out .= $string[$offset + $i];
+        }
+
+        return $out;
+    }
+
+    public static function strrev(string $string): string
+    {
+        $len = self::byteLength($string);
+        $out = '';
+        for ($i = $len - 1; $i >= 0; --$i) {
+            $out .= $string[$i];
+        }
+
+        return $out;
+    }
+
+    public static function strcmp(string $a, string $b): int
+    {
+        $lenA = self::byteLength($a);
+        $lenB = self::byteLength($b);
+        $min = $lenA < $lenB ? $lenA : $lenB;
+        for ($i = 0; $i < $min; ++$i) {
+            $ordA = self::byteOrd($a[$i]);
+            $ordB = self::byteOrd($b[$i]);
+            if ($ordA !== $ordB) {
+                return $ordA <=> $ordB;
+            }
+        }
+
+        return $lenA <=> $lenB;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function strSplit(string $string, int $length = 1): array
+    {
+        if ($length < 1) {
+            throw new \LogicException('str_split(): Argument #2 ($length) must be greater than 0');
+        }
+        $len = self::byteLength($string);
+        if (0 === $len) {
+            return [];
+        }
+        $parts = [];
+        for ($offset = 0; $offset < $len; $offset += $length) {
+            $take = $length;
+            if ($offset + $take > $len) {
+                $take = $len - $offset;
+            }
+            $parts[] = self::byteSlice($string, $offset, $take);
+        }
+
+        return $parts;
+    }
+
+    public static function strPad(string $input, int $padLength, string $padString = ' ', int $padType = 0): string
+    {
+        $inputLen = self::byteLength($input);
+        if ($padLength <= 0 || $padLength <= $inputLen) {
+            return $input;
+        }
+        if ('' === $padString) {
+            throw new \LogicException('str_pad(): Argument #3 ($pad_string) cannot be empty');
+        }
+        if (2 === $padType) {
+            throw new \LogicException('str_pad() STR_PAD_BOTH is not supported in this compiler build');
+        }
+        $need = $padLength - $inputLen;
+        $padding = '';
+        while (self::byteLength($padding) < $need) {
+            $padding .= $padString;
+        }
+        $padding = self::byteSlice($padding, 0, $need);
+        if (1 === $padType) {
+            return $padding.$input;
+        }
+
+        return $input.$padding;
+    }
+
     public static function htmlspecialchars(
         string $string,
         int $flags = ENT_QUOTES | ENT_SUBSTITUTE,
@@ -25,7 +142,7 @@ final class VmString
         $quoteBoth = 0 !== ($flags & ENT_QUOTES);
         $quoteDouble = !$quoteBoth && (0 !== ($flags & ENT_COMPAT));
         $out = '';
-        $len = \strlen($string);
+        $len = self::byteLength($string);
         for ($i = 0; $i < $len; ++$i) {
             $ch = $string[$i];
             switch ($ch) {
@@ -62,15 +179,15 @@ final class VmString
         }
         $parts = [];
         $offset = 0;
-        $delimLen = \strlen($delimiter);
-        $strLen = \strlen($string);
+        $delimLen = self::byteLength($delimiter);
+        $strLen = self::byteLength($string);
         while (true) {
             $pos = self::findSubstring($string, $delimiter, $offset);
             if (false === $pos) {
-                $parts[] = \substr($string, $offset);
+                $parts[] = self::byteSlice($string, $offset);
                 break;
             }
-            $parts[] = \substr($string, $offset, $pos - $offset);
+            $parts[] = self::byteSlice($string, $offset, $pos - $offset);
             $offset = $pos + $delimLen;
             if ($offset > $strLen) {
                 $parts[] = '';
@@ -90,7 +207,7 @@ final class VmString
             return '';
         }
         $result = $parts[0];
-        $count = \count($parts);
+        $count = count($parts);
         for ($i = 1; $i < $count; ++$i) {
             $result .= $glue.$parts[$i];
         }
@@ -100,73 +217,50 @@ final class VmString
 
     public static function substr(string $string, int $offset, ?int $length = null): string
     {
-        $len = \strlen($string);
-        if ($offset < 0) {
-            $offset = $len + $offset;
-            if ($offset < 0) {
-                $offset = 0;
-            }
-        }
-        if ($offset > $len) {
-            return '';
-        }
-        if (null === $length) {
-            return \substr($string, $offset);
-        }
-        if ($length < 0) {
-            $length = $len - $offset + $length;
-            if ($length < 0) {
-                return '';
-            }
-        }
-        if ($offset + $length > $len) {
-            $length = $len - $offset;
-        }
-
-        return \substr($string, $offset, $length);
+        return self::byteSlice($string, $offset, $length);
     }
 
     public static function trim(string $string, string $characterMask = self::TRIM_DEFAULT): string
     {
         $start = 0;
-        $len = \strlen($string);
-        while ($start < $len && false !== \strpos($characterMask, $string[$start])) {
+        $len = self::byteLength($string);
+        while ($start < $len && self::charInMask($string[$start], $characterMask)) {
             ++$start;
         }
         if ($start === $len) {
             return '';
         }
         $end = $len - 1;
-        while ($end >= $start && false !== \strpos($characterMask, $string[$end])) {
+        while ($end >= $start && self::charInMask($string[$end], $characterMask)) {
             --$end;
         }
 
-        return \substr($string, $start, $end - $start + 1);
+        return self::byteSlice($string, $start, $end - $start + 1);
     }
 
     public static function ltrim(string $string, string $characterMask = self::TRIM_DEFAULT): string
     {
         $start = 0;
-        $len = \strlen($string);
-        while ($start < $len && false !== \strpos($characterMask, $string[$start])) {
+        $len = self::byteLength($string);
+        while ($start < $len && self::charInMask($string[$start], $characterMask)) {
             ++$start;
         }
 
-        return \substr($string, $start);
+        return self::byteSlice($string, $start);
     }
 
     public static function rtrim(string $string, string $characterMask = self::TRIM_DEFAULT): string
     {
-        $len = \strlen($string);
+        $len = self::byteLength($string);
         if (0 === $len) {
             return '';
         }
         $end = $len - 1;
-        while ($end >= 0 && false !== \strpos($characterMask, $string[$end])) {
+        while ($end >= 0 && self::charInMask($string[$end], $characterMask)) {
             --$end;
         }
 
-        return \substr($string, 0, $end + 1);
+        return self::byteSlice($string, 0, $end + 1);
     }
 
     public static function asciiLower(string $string): string
@@ -185,11 +279,12 @@ final class VmString
             return '';
         }
         $ch = $string[0];
-        if ($ch >= 'A' && $ch <= 'Z') {
-            $ch = \chr(\ord($ch) + 32);
+        $ord = self::byteOrd($ch);
+        if ($ord >= 65 && $ord <= 90) {
+            $ch = self::byteChr($ord + 32);
         }
 
-        return $ch.\substr($string, 1);
+        return $ch.self::byteSlice($string, 1);
     }
 
     public static function asciiUcfirst(string $string): string
@@ -198,11 +293,12 @@ final class VmString
             return '';
         }
         $ch = $string[0];
-        if ($ch >= 'a' && $ch <= 'z') {
-            $ch = \chr(\ord($ch) - 32);
+        $ord = self::byteOrd($ch);
+        if ($ord >= 97 && $ord <= 122) {
+            $ch = self::byteChr($ord - 32);
         }
 
-        return $ch.\substr($string, 1);
+        return $ch.self::byteSlice($string, 1);
     }
 
     public static function strReplace(string $search, string $replace, string $subject): string
@@ -210,17 +306,17 @@ final class VmString
         if ('' === $search) {
             throw new \LogicException('str_replace(): Argument #1 ($search) cannot be empty');
         }
-        $searchLen = \strlen($search);
+        $searchLen = self::byteLength($search);
         $out = '';
         $offset = 0;
-        $len = \strlen($subject);
+        $len = self::byteLength($subject);
         while ($offset < $len) {
             $pos = self::findSubstring($subject, $search, $offset);
             if (false === $pos) {
-                $out .= \substr($subject, $offset);
+                $out .= self::byteSlice($subject, $offset);
                 break;
             }
-            $out .= \substr($subject, $offset, $pos - $offset).$replace;
+            $out .= self::byteSlice($subject, $offset, $pos - $offset).$replace;
             $offset = $pos + $searchLen;
         }
 
@@ -231,7 +327,7 @@ final class VmString
     {
         $br = $useXhtml ? '<br />' : '<br>';
         $out = '';
-        $len = \strlen($string);
+        $len = self::byteLength($string);
         for ($i = 0; $i < $len; ++$i) {
             $ch = $string[$i];
             if ("\n" === $ch) {
@@ -261,11 +357,11 @@ final class VmString
 
     public static function startsWith(string $haystack, string $needle): bool
     {
-        $nlen = \strlen($needle);
+        $nlen = self::byteLength($needle);
         if (0 === $nlen) {
             return true;
         }
-        $hlen = \strlen($haystack);
+        $hlen = self::byteLength($haystack);
         if ($nlen > $hlen) {
             return false;
         }
@@ -275,16 +371,28 @@ final class VmString
 
     public static function endsWith(string $haystack, string $needle): bool
     {
-        $nlen = \strlen($needle);
+        $nlen = self::byteLength($needle);
         if (0 === $nlen) {
             return true;
         }
-        $hlen = \strlen($haystack);
+        $hlen = self::byteLength($haystack);
         if ($nlen > $hlen) {
             return false;
         }
 
         return self::compareBytes($haystack, $needle, $nlen, $hlen - $nlen);
+    }
+
+    private static function charInMask(string $ch, string $mask): bool
+    {
+        $maskLen = self::byteLength($mask);
+        for ($i = 0; $i < $maskLen; ++$i) {
+            if ($mask[$i] === $ch) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static function compareBytes(string $haystack, string $needle, int $length, int $hayOffset = 0): bool
@@ -303,8 +411,8 @@ final class VmString
      */
     private static function findSubstring(string $haystack, string $needle, int $offset)
     {
-        $hayLen = \strlen($haystack);
-        $needleLen = \strlen($needle);
+        $hayLen = self::byteLength($haystack);
+        $needleLen = self::byteLength($needle);
         if (0 === $needleLen) {
             return false;
         }
@@ -324,20 +432,30 @@ final class VmString
     private static function asciiCaseTransform(string $string, bool $toLower): string
     {
         $out = '';
-        $len = \strlen($string);
+        $len = self::byteLength($string);
         for ($i = 0; $i < $len; ++$i) {
             $ch = $string[$i];
-            $ord = \ord($ch);
+            $ord = self::byteOrd($ch);
             if ($toLower) {
                 if ($ord >= 65 && $ord <= 90) {
-                    $ch = \chr($ord + 32);
+                    $ch = self::byteChr($ord + 32);
                 }
             } elseif ($ord >= 97 && $ord <= 122) {
-                $ch = \chr($ord - 32);
+                $ch = self::byteChr($ord - 32);
             }
             $out .= $ch;
         }
 
         return $out;
+    }
+
+    private static function byteOrd(string $byte): int
+    {
+        return ord($byte);
+    }
+
+    private static function byteChr(int $code): string
+    {
+        return chr($code);
     }
 }

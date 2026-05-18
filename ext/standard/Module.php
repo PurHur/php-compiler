@@ -90,6 +90,9 @@ class Module extends ModuleAbstract
             new array_search(),
             new array_sum(),
             new array_flip(),
+            new array_unique(),
+            new str_pad(),
+            new str_split(),
             new htmlspecialchars(),
             new header_(),
         ];
