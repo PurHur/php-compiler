@@ -63,6 +63,7 @@ class HashTable extends Type
         $this->registerFn('__hashtable__setLongAt', 'void', ['__hashtable__*', 'size_t', 'int64']);
         $this->registerFn('__hashtable__setStringAt', 'void', ['__hashtable__*', 'size_t', '__string__*']);
         $this->registerFn('__hashtable__readLongAt', 'int64', ['__hashtable__*', 'size_t']);
+        $this->registerFn('__hashtable__readStringAt', '__string__*', ['__hashtable__*', 'size_t']);
         $this->registerFn('__hashtable__getNumElements', 'size_t', ['__hashtable__*']);
         $this->registerFn('__hashtable__offsetIsSet', 'int1', ['__hashtable__*', 'size_t']);
         $this->registerFn('__hashtable__setStringKeyString', 'void', ['__hashtable__*', '__string__*', '__string__*']);
@@ -96,6 +97,7 @@ class HashTable extends Type
         $this->implementSetLongAt();
         $this->implementSetStringAt();
         $this->implementReadLongAt();
+        $this->implementReadStringAt();
         $this->implementGetNumElements();
         $this->implementOffsetIsSet();
         $this->implementSetStringKeyString();
@@ -319,6 +321,41 @@ class HashTable extends Type
         $result = $this->context->builder->phi($this->context->getTypeFromString('int64'));
         $result->addIncoming($val, $ok);
         $result->addIncoming($this->context->getTypeFromString('int64')->constInt(0, false), $zeroBlock);
+        $this->context->builder->returnValue($result);
+    }
+
+    private function implementReadStringAt(): void
+    {
+        $fn = $this->context->lookupFunction('__hashtable__readStringAt');
+        $block = $fn->appendBasicBlock('main');
+        $this->context->builder->positionAtEnd($block);
+        $ht = $fn->getParam(0);
+        $index = $fn->getParam(1);
+        $map = $this->context->structFieldMap['__hashtable__'];
+        $stringPtr = $this->context->getTypeFromString('__string__*');
+        $nextFree = $this->context->builder->load(
+            $this->context->builder->structGep($ht, $map['nextFreeElement'])
+        );
+        $inRange = $this->context->builder->icmp(Builder::INT_ULT, $index, $nextFree);
+        $ok = $fn->appendBasicBlock('read_str_ok');
+        $emptyBlock = $fn->appendBasicBlock('read_str_empty');
+        $merge = $fn->appendBasicBlock('read_str_merge');
+        $this->context->builder->branchIf($inRange, $ok, $emptyBlock);
+        $this->context->builder->positionAtEnd($ok);
+        $values = $this->context->builder->load($this->context->builder->structGep($ht, $map['values']));
+        $entry = $this->context->builder->inBoundsGep($values, $index);
+        $str = $this->context->builder->call($this->context->lookupFunction('__value__readString'), $entry);
+        $this->context->builder->branch($merge);
+        $this->context->builder->positionAtEnd($emptyBlock);
+        $empty = $this->context->builder->call(
+            $this->context->lookupFunction('__string__alloc'),
+            $this->context->getTypeFromString('int64')->constInt(0, false)
+        );
+        $this->context->builder->branch($merge);
+        $this->context->builder->positionAtEnd($merge);
+        $result = $this->context->builder->phi($stringPtr);
+        $result->addIncoming($str, $ok);
+        $result->addIncoming($empty, $emptyBlock);
         $this->context->builder->returnValue($result);
     }
 

@@ -20,7 +20,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * explode() with delimiter and string (subset of PHP; VM only).
+ * explode() with delimiter and string (subset of PHP; non-empty delimiter).
  */
 final class explode extends Internal
 {
@@ -48,6 +48,18 @@ final class explode extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('explode() is not implemented for JIT in this compiler build');
+        if (2 !== \count($args)) {
+            throw new \LogicException('explode() requires exactly two arguments in this compiler build');
+        }
+        if (JITVariable::TYPE_STRING !== $args[0]->type
+            || JITVariable::TYPE_STRING !== $args[1]->type) {
+            throw new \LogicException('explode() only supports string delimiter and subject in this compiler build');
+        }
+
+        return JitExplode::explode(
+            $context,
+            $context->helper->loadValue($args[0]),
+            $context->helper->loadValue($args[1])
+        );
     }
 }

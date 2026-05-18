@@ -151,26 +151,4 @@ final class AotTest extends BaseTest
         $this->assertExpect($result !== false ? $result : '', $sections);
     }
 
-    /**
-     * @return list<string>
-     */
-    private static function llvmEnvPrefix(): array
-    {
-        $llvmDir = dirname(__DIR__, 2).'/.llvm';
-        if (!is_file($llvmDir.'/libLLVM-9.so.1')) {
-            return [];
-        }
-        $prefix = realpath($llvmDir) ?: $llvmDir;
-        $ld = getenv('LD_LIBRARY_PATH');
-        $ldVal = false === $ld || '' === $ld ? $prefix : $prefix.':'.$ld;
-        $path = getenv('PATH');
-        $pathVal = false === $path || '' === $path ? $prefix : $prefix.':'.$path;
-
-        return [
-            'env',
-            'LD_LIBRARY_PATH='.$ldVal,
-            'PATH='.$pathVal,
-            'PHP_COMPILER_LLVM_PATH='.$prefix,
-        ];
-    }
 }

@@ -189,10 +189,11 @@ class JIT {
                     $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));
                     $dimOp = $block->getOperand($op->arg3);
                     $dim = $this->context->getVariableFromOp($dimOp);
+                    $resultOp = $block->getOperand($op->arg1);
                     if ($value->type === Variable::TYPE_HASHTABLE) {
                         $this->assignOperand(
-                            $block->getOperand($op->arg1),
-                            $value->dimFetch($dim)
+                            $resultOp,
+                            $value->dimFetch($dim, $resultOp->type)
                         );
                         break;
                     }
@@ -204,8 +205,8 @@ class JIT {
                         );
                     }
                     $this->assignOperand(
-                        $block->getOperand($op->arg1),
-                        $value->dimFetch($dim)
+                        $resultOp,
+                        $value->dimFetch($dim, $resultOp->type)
                     );
                     break;
                 // case OpCode::TYPE_INIT_ARRAY:
