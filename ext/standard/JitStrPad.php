@@ -36,7 +36,7 @@ final class JitStrPad
         $i32 = $context->getTypeFromString('int32');
         $zero = $i64->constInt(0, false);
         $one = $i64->constInt(1, false);
-        $padLeftConst = $i64->constInt(1, false);
+        $padLeftConst = $i64->constInt(0, false);
 
         $noPad = $context->builder->icmp(Builder::INT_SLE, $padLength, $inputLen);
         $shortBlock = BasicBlockHelper::append($context, 'strpad_short');

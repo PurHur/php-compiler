@@ -92,7 +92,7 @@ final class str_pad extends Internal
             }
             $padType = $context->helper->loadValue($args[3]);
         } else {
-            $padType = $context->getTypeFromString('int64')->constInt(0, false);
+            $padType = $context->getTypeFromString('int64')->constInt(1, false);
         }
 
         return JitStrPad::pad($context, $input, $padLength, $padString, $padType);
