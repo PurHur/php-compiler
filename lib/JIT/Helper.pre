@@ -105,6 +105,17 @@ restart:
                     case OpCode::TYPE_NOT_EQUAL:
                         $result = $this->context->builder->fcmp(Builder::REAL_ONE, $leftValue, $rightValue);
                         goto return_bool;
+                    case OpCode::TYPE_SPACESHIP:
+                        compile {
+                            if ($leftValue < $rightValue) {
+                                $result = -1;
+                            } elseif ($leftValue > $rightValue) {
+                                $result = 1;
+                            } else {
+                                $result = 0;
+                            }
+                        }
+                        goto return_long;
                 }
                 break;
             case TYPE_PAIR_NATIVE_LONG_NATIVE_LONG:
@@ -181,6 +192,17 @@ restart:
                             $result = $leftValue != $rightValue;
                         }
                         goto return_bool;
+                    case OpCode::TYPE_SPACESHIP:
+                        compile {
+                            if ($leftValue < $rightValue) {
+                                $result = -1;
+                            } elseif ($leftValue > $rightValue) {
+                                $result = 1;
+                            } else {
+                                $result = 0;
+                            }
+                        }
+                        goto return_long;
                 }
                 break;
             case TYPE_PAIR_NATIVE_LONG_NATIVE_BOOL:

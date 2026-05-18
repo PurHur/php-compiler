@@ -373,8 +373,53 @@ restart:
                     $other = $other->indirect;
                     goto restart;
                 }
+
+                return $this->looseEquals($self, $other);
         }
         throw new \LogicException("Equals comparison between {$self->type} and {$other->type} not implemented");
+    }
+
+    private function looseEquals(self $left, self $right): bool {
+        if ($left->type === self::TYPE_NULL || $right->type === self::TYPE_NULL) {
+            $null = $left->type === self::TYPE_NULL ? $left : $right;
+            $other = $left->type === self::TYPE_NULL ? $right : $left;
+            if ($other->type === self::TYPE_NULL) {
+                return true;
+            }
+            if ($other->type === self::TYPE_BOOLEAN) {
+                return $null->type === self::TYPE_NULL && !$other->bool;
+            }
+            if ($other->type === self::TYPE_INTEGER) {
+                return 0 === $other->integer;
+            }
+            if ($other->type === self::TYPE_STRING) {
+                return '' === $other->string;
+            }
+
+            return false;
+        }
+        if ($left->type === self::TYPE_BOOLEAN || $right->type === self::TYPE_BOOLEAN) {
+            $bool = $left->type === self::TYPE_BOOLEAN ? $left : $right;
+            $other = $left->type === self::TYPE_BOOLEAN ? $right : $left;
+            if ($other->type === self::TYPE_INTEGER) {
+                return ($bool->bool ? 1 : 0) === $other->integer;
+            }
+            if ($other->type === self::TYPE_STRING) {
+                return ($bool->bool ? '1' : '0') === $other->string
+                    || ($bool->bool && is_numeric($other->string) && (int) $other->string !== 0);
+            }
+
+            return false;
+        }
+        if ($left->type === self::TYPE_INTEGER && $right->type === self::TYPE_STRING) {
+            return (string) $left->integer === $right->string
+                || ($right->string !== '' && is_numeric($right->string) && $left->integer == $right->string);
+        }
+        if ($left->type === self::TYPE_STRING && $right->type === self::TYPE_INTEGER) {
+            return $this->looseEquals($right, $left);
+        }
+
+        return false;
     }
 
     public function compareOp(int $opCode, Variable $left, Variable $right): void {
@@ -430,6 +475,56 @@ restart:
             default:
                 throw new \LogicException("Non-implemented numeric comparison operation $opCode");
         }
+    }
+
+    public function spaceshipOp(Variable $left, Variable $right): void {
+        $this->reset();
+restart:
+        switch (type_pair($left->type, $right->type)) {
+            case TYPE_PAIR_INTEGER_INTEGER:
+                $this->int($this->_spaceship($left->integer, $right->integer));
+                break;
+            case TYPE_PAIR_INTEGER_FLOAT:
+                $this->int($this->_spaceship($left->integer, $right->float));
+                break;
+            case TYPE_PAIR_FLOAT_INTEGER:
+                $this->int($this->_spaceship($left->float, $right->integer));
+                break;
+            case TYPE_PAIR_FLOAT_FLOAT:
+                $this->int($this->_spaceship($left->float, $right->float));
+                break;
+            case TYPE_PAIR_STRING_STRING:
+                $cmp = strcmp($left->string, $right->string);
+                $this->int($cmp < 0 ? -1 : ($cmp > 0 ? 1 : 0));
+                break;
+            case TYPE_PAIR_BOOLEAN_BOOLEAN:
+                $this->int($this->_spaceship((int) $left->bool, (int) $right->bool));
+                break;
+            case TYPE_PAIR_NULL_NULL:
+                $this->int(0);
+                break;
+            default:
+                if ($left->type === self::TYPE_INDIRECT) {
+                    $left = $left->indirect;
+                    goto restart;
+                } elseif ($right->type === self::TYPE_INDIRECT) {
+                    $right = $right->indirect;
+                    goto restart;
+                } else {
+                    $this->int($this->_spaceship($left->toNumeric(), $right->toNumeric()));
+                }
+        }
+    }
+
+    private function _spaceship($left, $right): int {
+        if ($left < $right) {
+            return -1;
+        }
+        if ($left > $right) {
+            return 1;
+        }
+
+        return 0;
     }
 
     public function bitwiseOp(int $opCode, Variable $left, Variable $right): void {

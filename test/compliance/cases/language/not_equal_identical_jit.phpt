@@ -19,4 +19,4 @@ $flag = true;
 echo b($flag !== false);
 echo b($flag != false);
 --EXPECT--
-10110111
+10101111

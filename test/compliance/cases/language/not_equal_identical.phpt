@@ -2,7 +2,7 @@
 Not-equal and not-identical operators (VM/JIT parity)
 --FILE--
 <?php
-function b($v): string {
+function b(bool $v): string {
     return $v ? '1' : '0';
 }
 
@@ -23,4 +23,4 @@ $method = 'POST';
 echo b($method !== 'POST');
 echo b($method != 'GET');
 --EXPECT--
-1111000001
+1111010001

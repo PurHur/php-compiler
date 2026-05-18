@@ -414,6 +414,7 @@ class JIT {
                 case OpCode::TYPE_NOT_IDENTICAL:
                 case OpCode::TYPE_EQUAL:
                 case OpCode::TYPE_NOT_EQUAL:
+                case OpCode::TYPE_SPACESHIP:
                     $this->assignOperand(
                         $block->getOperand($op->arg1),
                         $this->context->helper->binaryOp(
