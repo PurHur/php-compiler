@@ -102,6 +102,8 @@ class Module extends ModuleAbstract
             new urlencode(),
             new rawurlencode(),
             new parse_url(),
+            new dirname(),
+            new basename(),
         ];
     }
 

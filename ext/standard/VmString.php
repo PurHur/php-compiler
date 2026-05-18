@@ -633,6 +633,58 @@ final class VmString
         return $out;
     }
 
+    public static function dirname(string $path): string
+    {
+        $len = self::byteLength($path);
+        if (0 === $len) {
+            return '.';
+        }
+        $end = $len;
+        while ($end > 0 && ('/' === $path[$end - 1] || '\\' === $path[$end - 1])) {
+            --$end;
+        }
+        if (0 === $end) {
+            return '/' === $path[0] ? '/' : '.';
+        }
+        $last = -1;
+        for ($i = $end - 1; $i >= 0; --$i) {
+            if ('/' === $path[$i] || '\\' === $path[$i]) {
+                $last = $i;
+                break;
+            }
+        }
+        if (-1 === $last) {
+            return '.';
+        }
+        if (0 === $last) {
+            return '/' === $path[0] ? '/' : '.';
+        }
+
+        return self::byteSlice($path, 0, $last);
+    }
+
+    public static function basename(string $path): string
+    {
+        $len = self::byteLength($path);
+        if (0 === $len) {
+            return '';
+        }
+        $end = $len;
+        while ($end > 0 && ('/' === $path[$end - 1] || '\\' === $path[$end - 1])) {
+            --$end;
+        }
+        if (0 === $end) {
+            return '';
+        }
+        for ($i = $end - 1; $i >= 0; --$i) {
+            if ('/' === $path[$i] || '\\' === $path[$i]) {
+                return self::byteSlice($path, $i + 1, $end - $i - 1);
+            }
+        }
+
+        return self::byteSlice($path, 0, $end);
+    }
+
     private static function byteOrd(string $byte): int
     {
         return ord($byte);

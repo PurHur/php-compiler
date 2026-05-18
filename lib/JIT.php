@@ -368,31 +368,21 @@ class JIT {
     
                             break;
                         case Variable::TYPE_NATIVE_BOOL:
-                            $bool = $this->context->castToBool($argValue);
-                $prev = $this->context->builder->getInsertBlock();
-                $ifBlock = $prev->insertBasicBlock('ifBlock');
-                $prev->moveBefore($ifBlock);
-                
-                $endBlock[] = $tmp = $ifBlock->insertBasicBlock('endBlock');
-                    $this->context->builder->branchIf($bool, $ifBlock, $tmp);
-                
-                $this->context->builder->positionAtEnd($ifBlock);
-                { $fmt = $this->context->builder->pointerCast(
-                        $this->context->constantFromString("1"),
-                        $this->context->getTypeFromString('char*')
-                    );
-    $this->context->builder->call(
-                    $this->context->lookupFunction('printf') , 
-                    $fmt
-                    
-                );
-    }
-                if ($this->context->builder->getInsertBlock()->getTerminator() === null) {
-                    $this->context->builder->branch(end($endBlock));
-                }
-                
-                $this->context->builder->positionAtEnd(array_pop($endBlock));
-    
+                            $boolVal = $this->context->helper->loadValue($arg);
+                            $charPtr = $this->context->getTypeFromString('char*');
+                            $trueBlock = JIT\BasicBlockHelper::append($this->context, 'echo_bool_true');
+                            $doneBlock = JIT\BasicBlockHelper::append($this->context, 'echo_bool_done');
+                            $this->context->builder->branchIf($boolVal, $trueBlock, $doneBlock);
+                            $this->context->builder->positionAtEnd($trueBlock);
+                            $this->context->builder->call(
+                                $this->context->lookupFunction('printf'),
+                                $this->context->builder->pointerCast(
+                                    $this->context->constantFromString('1'),
+                                    $charPtr
+                                )
+                            );
+                            $this->context->builder->branch($doneBlock);
+                            $this->context->builder->positionAtEnd($doneBlock);
                             break;
 
                         default: 
@@ -693,7 +683,11 @@ class JIT {
         );
         if ($source->type === $dest->type) {
             $dest->free();
-            $this->context->builder->store($value, $dest->value);
+            $toStore = $value;
+            if ('__value__*' === $this->context->getStringFromType($value->typeOf())) {
+                $toStore = $this->context->builder->load($value);
+            }
+            $this->context->builder->store($toStore, $dest->value);
             $dest->addref();
 
             return;

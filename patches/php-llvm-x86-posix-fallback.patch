@@ -1,0 +1,15 @@
+--- vendor/ircmaxell/php-llvm/lib/LLVMAbstract/TargetSet/X86.php
++++ vendor/ircmaxell/php-llvm/lib/LLVMAbstract/TargetSet/X86.php
+@@ -26,7 +26,11 @@ class X86 implements TargetSet {
+     }
+ 
+     public function isNative(): bool {
+-        $machine = posix_uname()['machine'];
++        if (\function_exists('posix_uname')) {
++            $machine = posix_uname()['machine'];
++        } else {
++            $machine = php_uname('m');
++        }
+         switch (strtolower($machine)) {
+             case 'i386':
+             case 'i486':
