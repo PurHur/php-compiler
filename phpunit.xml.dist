@@ -31,6 +31,7 @@
         </testsuite>
         <testsuite name="PHPCompiler Real World Test Suites">
             <file>./test/real/RealWorldTest.php</file>
+            <file>./test/real/ServeTest.php</file>
         </testsuite>
         <testsuite name="PHPCompiler AOT Test Suites">
             <file>./test/aot/AotTest.php</file>

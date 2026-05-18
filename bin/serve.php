@@ -118,7 +118,8 @@ function handleConnection($conn, string $docroot): void
         $output = ob_get_clean();
     } catch (\Throwable $e) {
         ob_end_clean();
-        respond($conn, 500, 'text/plain', $e->getMessage() . "\n");
+        logException($e);
+        respond($conn, 500, 'text/plain', formatExceptionBody($e));
 
         return;
     }
@@ -186,6 +187,28 @@ function readRequest($conn): ?array
     }
 
     return [$method, $path, $query, $headers, $body];
+}
+
+function isServeDebug(): bool
+{
+    $v = getenv('PHP_COMPILER_DEBUG');
+
+    return false !== $v && '' !== $v && '0' !== $v;
+}
+
+function logException(\Throwable $e): void
+{
+    fwrite(STDERR, '[serve] ' . get_class($e) . ': ' . $e->getMessage() . "\n");
+    fwrite(STDERR, $e->getTraceAsString() . "\n");
+}
+
+function formatExceptionBody(\Throwable $e): string
+{
+    if (!isServeDebug()) {
+        return "Internal Server Error\n";
+    }
+
+    return get_class($e) . ': ' . $e->getMessage() . "\n" . $e->getTraceAsString() . "\n";
 }
 
 function respond($conn, int $status, string $contentType, string $body, array $extraHeaders = []): void
