@@ -1,13 +1,13 @@
 --TEST--
-AOT: minimal HTML response (header + echo, no superglobals)
+AOT: static web page (header, htmlspecialchars, echo)
 --FILE--
 <?php
 $name = 'World';
 header('Content-Type: text/html; charset=UTF-8');
 echo '<!DOCTYPE html><html><body>';
-echo '<h1>Hello ', $name, "</h1>\n";
+echo '<h1>Hello ', htmlspecialchars($name), "</h1>\n";
 echo '</body></html>';
---EXPECT--
+--EXPECTF--
 Content-Type: text/html; charset=UTF-8
 <!DOCTYPE html><html><body><h1>Hello World</h1>
 </body></html>
