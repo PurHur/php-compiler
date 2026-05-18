@@ -55,26 +55,60 @@ final class gettype extends Internal
         if (1 !== count($args)) {
             throw new \LogicException('gettype() requires exactly one argument');
         }
-        switch ($args[0]->type) {
-            case JITVariable::TYPE_NATIVE_LONG:
-                $label = 'integer';
-                break;
-            case JITVariable::TYPE_NATIVE_DOUBLE:
-                $label = 'double';
-                break;
-            case JITVariable::TYPE_NATIVE_BOOL:
-                $label = 'boolean';
-                break;
-            case JITVariable::TYPE_STRING:
-                $label = 'string';
-                break;
-            case JITVariable::TYPE_NULL:
-                $label = 'NULL';
-                break;
-            default:
-                throw new \LogicException('gettype() does not support this value type in this compiler build');
+        if ($args[0]->type & JITVariable::IS_NATIVE_ARRAY
+            || JITVariable::TYPE_HASHTABLE === $args[0]->type) {
+            $label = 'array';
+        } else {
+            switch ($args[0]->type) {
+                case JITVariable::TYPE_NATIVE_LONG:
+                    $label = 'integer';
+                    break;
+                case JITVariable::TYPE_NATIVE_DOUBLE:
+                    $label = 'double';
+                    break;
+                case JITVariable::TYPE_NATIVE_BOOL:
+                    $label = 'boolean';
+                    break;
+                case JITVariable::TYPE_STRING:
+                    $label = 'string';
+                    break;
+                case JITVariable::TYPE_NULL:
+                    $label = 'NULL';
+                    break;
+                case JITVariable::TYPE_VALUE:
+                    return self::jitGettypeBoxed($context, $args[0]);
+                default:
+                    throw new \LogicException('gettype() does not support this value type in this compiler build');
+            }
         }
 
         return $context->builder->load($context->constantStringFromString($label));
+    }
+
+    private static function jitGettypeBoxed(Context $context, JITVariable $arg): Value
+    {
+        $loaded = $context->helper->loadValue($arg);
+        $typeField = $context->structFieldMap['__value__']['type'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($loaded, $typeField)
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $result = $context->builder->load($context->constantStringFromString('unknown'));
+        foreach ([
+            JITVariable::TYPE_NULL => 'NULL',
+            JITVariable::TYPE_NATIVE_LONG => 'integer',
+            JITVariable::TYPE_NATIVE_DOUBLE => 'double',
+            JITVariable::TYPE_NATIVE_BOOL => 'boolean',
+            JITVariable::TYPE_STRING => 'string',
+            JITVariable::TYPE_HASHTABLE => 'array',
+        ] as $jitType => $name) {
+            $expected = $i8->constInt($jitType, false);
+            $isType = $context->builder->icmp(\PHPLLVM\Builder::INT_EQ, $typeByte, $expected);
+            $candidate = $context->builder->load($context->constantStringFromString($name));
+            $result = $context->builder->select($isType, $candidate, $result);
+        }
+
+        return $result;
     }
 }

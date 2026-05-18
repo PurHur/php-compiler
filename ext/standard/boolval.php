@@ -96,6 +96,12 @@ final class boolval extends Internal
 
                 return $context->builder->icmp(Builder::INT_NE, $num, $zero);
             default:
+                if ($args[0]->type & JITVariable::IS_NATIVE_ARRAY) {
+                    $zero = $context->getTypeFromString('int64')->constInt(0, false);
+                    $count = $context->constantFromInteger($args[0]->nextFreeElement, 'int64');
+
+                    return $context->builder->icmp(Builder::INT_NE, $count, $zero);
+                }
                 throw new \LogicException('boolval() does not support this value type in this compiler build');
         }
     }

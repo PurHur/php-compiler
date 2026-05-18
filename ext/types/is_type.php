@@ -44,6 +44,9 @@ class is_type extends Internal {
         if (count($args) !== 1) {
             throw new \LogicException('Too few args passed to ' . $this->name . '()');
         }
+        if ($args[0]->type & JITVariable::IS_NATIVE_ARRAY) {
+            return $context->constantFromBool($this->type === Variable::TYPE_ARRAY);
+        }
         switch ($args[0]->type) {
             case JITVariable::TYPE_NATIVE_LONG:
                 return $this->context->constantFromBool($this->type === Variable::TYPE_INTEGER);

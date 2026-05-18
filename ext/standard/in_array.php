@@ -13,6 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
@@ -79,6 +80,17 @@ final class in_array extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('in_array() is not implemented for JIT in this compiler build');
+        if (2 !== \count($args) && 3 !== \count($args)) {
+            throw new \LogicException('in_array() requires two or three arguments');
+        }
+        $strict = $context->constantFromBool(false);
+        if (3 === \count($args)) {
+            if (JITVariable::TYPE_NATIVE_BOOL !== $args[2]->type) {
+                throw new \LogicException('in_array() strict flag must be boolean in this compiler build');
+            }
+            $strict = $context->helper->loadValue($args[2]);
+        }
+
+        return ArrayBuiltinHelper::inArray($context, $args[0], $args[1], $strict);
     }
 }

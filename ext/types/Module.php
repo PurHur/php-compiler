@@ -20,6 +20,7 @@ class Module extends ModuleAbstract
     {
         return [
             new strlen(),
+            new mb_strlen(),
             new is_type('is_int', Variable::TYPE_INTEGER),
             new is_type('is_integer', Variable::TYPE_INTEGER),
             new is_type('is_long', Variable::TYPE_INTEGER),
