@@ -516,6 +516,14 @@ restart:
                 return $left * $right;
             case OpCode::TYPE_DIV:
                 return $left / $right;
+            case OpCode::TYPE_MODULO:
+                return $left % $right;
+            case OpCode::TYPE_POW:
+                if (is_int($left) && is_int($right)) {
+                    return $left ** $right;
+                }
+
+                return \pow((float) $left, (float) $right);
             default:
                 throw new \LogicException("Non-implemented numeric binary operation $opCode");
         }

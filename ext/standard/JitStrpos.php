@@ -5,7 +5,8 @@ declare(strict_types=1);
 /**
  * LLVM JIT helper for strpos() — strstr-based search with optional byte offset.
  *
- * Not found is represented as -1 (native long). VM mode returns boolean false instead.
+ * Not found is represented as 0 (native long). VM mode returns boolean false instead.
+ * JIT tests use == false for not-found checks (boxed long 0).
  */
 
 namespace PHPCompiler\ext\standard;
@@ -16,7 +17,6 @@ use PHPLLVM\Value;
 
 final class JitStrpos
 {
-    /** Boxed long value used when strstr finds no match (compare to false via readLong). */
     public const NOT_FOUND = 0;
 
     public static function find(

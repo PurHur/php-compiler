@@ -98,6 +98,15 @@ final class Superglobals
             }
         }
         self::setStringEntry($server, 'REQUEST_URI', $requestUri);
+
+        $pathInfo = getenv('PATH_INFO');
+        if (false === $pathInfo || '' === $pathInfo) {
+            $pathInfo = self::derivePathInfo($scriptName, $requestUri);
+        }
+        if ('' !== $pathInfo) {
+            self::setStringEntry($server, 'PATH_INFO', $pathInfo);
+        }
+
         self::setStringEntry($server, 'GATEWAY_INTERFACE', 'CGI/1.1');
         self::setStringEntry($server, 'SERVER_SOFTWARE', 'PHP-Compiler-VM');
 
@@ -137,6 +146,26 @@ final class Superglobals
             }
             self::setStringEntry($ht, $key, (string) $value);
         }
+    }
+
+    /**
+     * Derive PATH_INFO from REQUEST_URI path suffix after SCRIPT_NAME (front-controller pattern).
+     */
+    public static function derivePathInfo(string $scriptName, string $requestUri): string
+    {
+        $path = parse_url($requestUri, PHP_URL_PATH);
+        if (!is_string($path) || '' === $path) {
+            $path = $requestUri;
+            $q = strpos($path, '?');
+            if (false !== $q) {
+                $path = substr($path, 0, $q);
+            }
+        }
+        if ($path === $scriptName || !str_starts_with($path, $scriptName)) {
+            return '';
+        }
+
+        return substr($path, strlen($scriptName));
     }
 
     private static function setStringEntry(HashTable $ht, string $key, string $value): void

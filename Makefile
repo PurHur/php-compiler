@@ -74,6 +74,18 @@ test: rebuild-changed
 test-local:
 	./script/ci-local.sh
 
+# VM smoke: examples/001-SimpleWeb with ?name=Test
+.PHONY: web-smoke
+web-smoke:
+	./script/web-smoke.sh
+
+# Local HTTP dev server (see bin/serve.php)
+SERVE_ADDR ?= 127.0.0.1:8080
+SERVE_ROOT ?= examples/001-SimpleWeb
+.PHONY: serve
+serve:
+	./script/php-local.sh bin/serve.php $(SERVE_ADDR) $(SERVE_ROOT)
+
 .PHONY: test-18
 test-18: rebuild-changed
 	docker run -v $(shell pwd):/compiler ircmaxell/php-compiler:18.04-dev php vendor/bin/phpunit

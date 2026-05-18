@@ -145,6 +145,24 @@ class String_ extends Type {
             $fn___htmlspecialchars->addAttributeAtIndex(\PHPLLVM\Attribute::INDEX_FUNCTION, $this->context->attributes['alwaysinline']);
             $this->context->registerFunction('__string__htmlspecialchars', $fn___htmlspecialchars);
 
+        $fntype___urlencode = $this->context->context->functionType(
+                $this->context->getTypeFromString('__string__*'),
+                false,
+                $this->context->getTypeFromString('__string__*')
+            );
+            $fn___urlencode = $this->context->module->addFunction('__string__urlencode', $fntype___urlencode);
+            $fn___urlencode->addAttributeAtIndex(\PHPLLVM\Attribute::INDEX_FUNCTION, $this->context->attributes['alwaysinline']);
+            $this->context->registerFunction('__string__urlencode', $fn___urlencode);
+
+        $fntype___rawurlencode = $this->context->context->functionType(
+                $this->context->getTypeFromString('__string__*'),
+                false,
+                $this->context->getTypeFromString('__string__*')
+            );
+            $fn___rawurlencode = $this->context->module->addFunction('__string__rawurlencode', $fntype___rawurlencode);
+            $fn___rawurlencode->addAttributeAtIndex(\PHPLLVM\Attribute::INDEX_FUNCTION, $this->context->attributes['alwaysinline']);
+            $this->context->registerFunction('__string__rawurlencode', $fn___rawurlencode);
+
         $this->pointer = $this->context->getTypeFromString('__string__*');
     }
 
@@ -156,6 +174,7 @@ class String_ extends Type {
         $this->implementSeparate();
         $this->implementStrlen();
         \PHPCompiler\JIT\Builtin\StringHtmlspecialchars::implement($this->context);
+        \PHPCompiler\JIT\Builtin\StringUrlencode::implement($this->context);
     }
 
     private function implementStrlen(): void {
