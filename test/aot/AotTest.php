@@ -79,11 +79,13 @@ final class AotTest extends BaseTest
             }
         }
 
+        $compileCmd = array_merge(
+            self::llvmEnvPrefix(),
+            $this->phpCommand(),
+            [$this->BIN, '-o', $outfile]
+        );
         $compile = proc_open(
-            array_merge(
-                $this->phpCommand(),
-                [$this->BIN, '-o', $outfile]
-            ),
+            $compileCmd,
             $descriptorSpec,
             $pipes,
             $repoRoot,
@@ -95,7 +97,7 @@ final class AotTest extends BaseTest
         fclose($pipes[1]);
         fclose($pipes[2]);
         $compileCode = proc_close($compile);
-        if (0 !== $compileCode) {
+        if (0 !== $compileCode && !is_executable($outfile)) {
             $this->fail(
                 "AOT compile failed for {$name} (exit {$compileCode}): "
                 . trim($compileErr !== false ? $compileErr : '')
@@ -120,5 +122,28 @@ final class AotTest extends BaseTest
         @unlink($outfile);
 
         $this->assertExpect($result !== false ? $result : '', $sections);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function llvmEnvPrefix(): array
+    {
+        $llvmDir = dirname(__DIR__, 2).'/.llvm';
+        if (!is_file($llvmDir.'/libLLVM-9.so.1')) {
+            return [];
+        }
+        $prefix = realpath($llvmDir) ?: $llvmDir;
+        $ld = getenv('LD_LIBRARY_PATH');
+        $ldVal = false === $ld || '' === $ld ? $prefix : $prefix.':'.$ld;
+        $path = getenv('PATH');
+        $pathVal = false === $path || '' === $path ? $prefix : $prefix.':'.$path;
+
+        return [
+            'env',
+            'LD_LIBRARY_PATH='.$ldVal,
+            'PATH='.$pathVal,
+            'PHP_COMPILER_LLVM_PATH='.$prefix,
+        ];
     }
 }

@@ -20,8 +20,8 @@ if [[ "$need" -eq 0 ]]; then
   exit 0
 fi
 
-if ! command -v curl >/dev/null 2>&1; then
-  echo "curl is required to download the LLVM 9 toolchain" >&2
+if ! command -v curl >/dev/null 2>&1 && ! command -v python3 >/dev/null 2>&1; then
+  echo "curl or python3 is required to download the LLVM 9 toolchain" >&2
   exit 1
 fi
 if ! command -v dpkg-deb >/dev/null 2>&1; then
@@ -34,7 +34,11 @@ trap 'rm -rf "$TMP"' EXIT
 
 fetch_deb() {
   local url="$1" out="$2"
-  curl -fsSL -o "$TMP/$out" "$url"
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL -o "$TMP/$out" "$url"
+  else
+    python3 -c "import urllib.request; urllib.request.urlretrieve('$url', '$TMP/$out')"
+  fi
   dpkg-deb -x "$TMP/$out" "$TMP/extract"
   rm -f "$TMP/$out"
   echo "$TMP/extract"
@@ -68,9 +72,9 @@ if [[ ! -x "$LLVM_DIR/ld" ]]; then
   dir="$(fetch_deb "${BINUTILS_BASE}/binutils-x86-64-linux-gnu_${BINUTILS_VER}_amd64.deb" binutils-x86.deb)"
   install -m 755 "$dir/usr/bin/x86_64-linux-gnu-ld" "$LLVM_DIR/ld"
   dir="$(fetch_deb "${BINUTILS_BASE}/libbinutils_${BINUTILS_VER}_amd64.deb" libbinutils.deb)"
-  for lib in "$dir"/usr/lib/x86_64-linux-gnu/lib{bfd,opcodes,sframe}*.so*; do
-    [[ -f "$lib" ]] && install -m 644 "$lib" "$LLVM_DIR/$(basename "$lib")"
-  done
+  while IFS= read -r -d '' lib; do
+    install -m 644 "$lib" "$LLVM_DIR/$(basename "$lib")"
+  done < <(find "$dir/usr/lib/x86_64-linux-gnu" -maxdepth 1 \( -name 'libbfd*.so*' -o -name 'libopcodes*.so*' -o -name 'libsframe*.so*' \) -print0)
 fi
 
 if [[ ! -f "$LLVM_DIR/gcc/9/crtbegin.o" ]]; then

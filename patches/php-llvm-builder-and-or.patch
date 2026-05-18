@@ -1,0 +1,19 @@
+--- vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php
++++ vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php
+@@ -208,10 +208,18 @@ class Builder implements CoreBuilder {
+         return $this->llvm->factory->value($this->context, $this->llvm->lib->LLVMBuildAnd($this->builder, $left->value, $right->value, ''));
+     }
+ 
++    public function and(CoreValue $left, CoreValue $right): CoreValue {
++        return $this->bitwiseAnd($left, $right);
++    }
++
+     public function bitwiseOr(CoreValue $left, CoreValue $right): CoreValue {
+         return $this->llvm->factory->value($this->context, $this->llvm->lib->LLVMBuildOr($this->builder, $left->value, $right->value, ''));
+     }
+ 
++    public function or(CoreValue $left, CoreValue $right): CoreValue {
++        return $this->bitwiseOr($left, $right);
++    }
++
+     public function bitwiseXor(CoreValue $left, CoreValue $right): CoreValue {
