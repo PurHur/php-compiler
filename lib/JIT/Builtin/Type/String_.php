@@ -136,7 +136,15 @@ class String_ extends Type {
         
 
         
-    
+    $fntype___htmlspecialchars = $this->context->context->functionType(
+                $this->context->getTypeFromString('__string__*'),
+                false,
+                $this->context->getTypeFromString('__string__*')
+            );
+            $fn___htmlspecialchars = $this->context->module->addFunction('__string__htmlspecialchars', $fntype___htmlspecialchars);
+            $fn___htmlspecialchars->addAttributeAtIndex(\PHPLLVM\Attribute::INDEX_FUNCTION, $this->context->attributes['alwaysinline']);
+            $this->context->registerFunction('__string__htmlspecialchars', $fn___htmlspecialchars);
+
         $this->pointer = $this->context->getTypeFromString('__string__*');
     }
 
@@ -147,6 +155,7 @@ class String_ extends Type {
         $this->implementRealloc();
         $this->implementSeparate();
         $this->implementStrlen();
+        \PHPCompiler\JIT\Builtin\StringHtmlspecialchars::implement($this->context);
     }
 
     private function implementStrlen(): void {

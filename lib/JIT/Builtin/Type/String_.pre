@@ -30,6 +30,7 @@ class String_ extends Type {
             static inline function __string__realloc(__string__**, int64): void;
             static inline function __string__init(int64, const char*): __string__*;
             static inline function __string__separate(__string__ *): __string__*;
+            static inline function __string__htmlspecialchars(__string__*): __string__*;
         }
         $this->pointer = $this->context->getTypeFromString('__string__*');
     }
@@ -41,6 +42,7 @@ class String_ extends Type {
         $this->implementRealloc();
         $this->implementSeparate();
         $this->implementStrlen();
+        $this->implementHtmlspecialchars();
     }
 
     private function implementStrlen(): void {
@@ -122,6 +124,65 @@ class String_ extends Type {
                 $copySize = $size + 1;
                 memcpy $dest $char $copySize;
                 return $new;
+            }
+        }
+    }
+
+    /**
+     * ENT_QUOTES-style htmlspecialchars for UTF-8 bytes (static web subset).
+     */
+    private function implementHtmlspecialchars(): void {
+        compile {
+            function __string__htmlspecialchars($string) {
+                $src = __string__separate($string);
+                $len = $src->length;
+                $outLen = (int64) 0;
+                $i = (int64) 0;
+                while ($i < $len) {
+                    $ch = $src->value[$i];
+                    if ($ch == 38) {
+                        $outLen = $outLen + 5;
+                    } else if ($ch == 60) {
+                        $outLen = $outLen + 4;
+                    } else if ($ch == 62) {
+                        $outLen = $outLen + 4;
+                    } else if ($ch == 34) {
+                        $outLen = $outLen + 6;
+                    } else if ($ch == 39) {
+                        $outLen = $outLen + 6;
+                    } else {
+                        $outLen = $outLen + 1;
+                    }
+                    $i = $i + 1;
+                }
+                $dest = __string__alloc($outLen);
+                $pos = (int64) 0;
+                $i = (int64) 0;
+                while ($i < $len) {
+                    $ch = $src->value[$i];
+                    $at = &$dest->value[$pos];
+                    if ($ch == 38) {
+                        memcpy $at "&amp;" 5;
+                        $pos = $pos + 5;
+                    } else if ($ch == 60) {
+                        memcpy $at "&lt;" 4;
+                        $pos = $pos + 4;
+                    } else if ($ch == 62) {
+                        memcpy $at "&gt;" 4;
+                        $pos = $pos + 4;
+                    } else if ($ch == 34) {
+                        memcpy $at "&quot;" 6;
+                        $pos = $pos + 6;
+                    } else if ($ch == 39) {
+                        memcpy $at "&#039;" 6;
+                        $pos = $pos + 6;
+                    } else {
+                        store $ch $at;
+                        $pos = $pos + 1;
+                    }
+                    $i = $i + 1;
+                }
+                return $dest;
             }
         }
     }
