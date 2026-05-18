@@ -54,19 +54,52 @@ final class SuperglobalInit
         if (!$table instanceof HashTable) {
             return;
         }
+        self::populateHashTableFromVm($context, $ht, $table);
+    }
+
+    private static function populateHashTableFromVm(
+        Context $context,
+        \PHPLLVM\Value $ht,
+        HashTable $table
+    ): void {
         $setString = $context->lookupFunction('__hashtable__setStringKeyString');
+        $setHashtable = $context->lookupFunction('__hashtable__setStringKeyHashtable');
         foreach ($table->iterateKeyed(true) as [$keyVar, $valueVar]) {
+            $resolved = $valueVar->resolveIndirect();
+            if (VMVariable::TYPE_INTEGER === $keyVar->type) {
+                if (VMVariable::TYPE_STRING !== $resolved->type) {
+                    continue;
+                }
+                $str = $context->builder->load(
+                    $context->constantStringFromString($resolved->toString())
+                );
+                $context->builder->call(
+                    $context->lookupFunction('__hashtable__setStringAt'),
+                    $ht,
+                    $context->getTypeFromString('size_t')->constInt($keyVar->toInt(), false),
+                    $str
+                );
+
+                continue;
+            }
             if (VMVariable::TYPE_STRING !== $keyVar->type) {
                 continue;
             }
             $key = $context->builder->load(
                 $context->constantStringFromString($keyVar->toString())
             );
-            if (VMVariable::TYPE_STRING === $valueVar->type) {
+            if (VMVariable::TYPE_STRING === $resolved->type) {
                 $str = $context->builder->load(
-                    $context->constantStringFromString($valueVar->toString())
+                    $context->constantStringFromString($resolved->toString())
                 );
                 $context->builder->call($setString, $ht, $key, $str);
+            } elseif (VMVariable::TYPE_ARRAY === $resolved->type) {
+                $nested = $resolved->toArray();
+                if ($nested instanceof HashTable) {
+                    $child = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+                    self::populateHashTableFromVm($context, $child, $nested);
+                    $context->builder->call($setHashtable, $ht, $key, $child);
+                }
             }
         }
     }

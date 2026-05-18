@@ -39,6 +39,8 @@
             <file>./test/aot/ExampleWebAotTest.php</file>
             <file>./test/aot/StdlibWebBuiltinsTest.php</file>
             <file>./test/aot/RuntimeSuperglobalRefreshTest.php</file>
+            <file>./test/aot/NestedSuperglobalsAotTest.php</file>
+            <file>./test/aot/WebAppNumberFormatTest.php</file>
         </testsuite>
     </testsuites>
 </phpunit>
