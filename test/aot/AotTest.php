@@ -79,13 +79,24 @@ final class AotTest extends BaseTest
             }
         }
 
-        $compileCmd = array_merge(
-            self::llvmEnvPrefix(),
-            $this->phpCommand(),
-            [$this->BIN, '-o', $outfile]
-        );
+        $compileArgv = [$this->BIN, '-o', $outfile];
+        if (isset($sections['ENV'])) {
+            foreach (explode("\n", trim($sections['ENV'])) as $line) {
+                $line = trim($line);
+                if ('' === $line) {
+                    continue;
+                }
+                $parts = explode('=', $line, 2);
+                if (2 === count($parts) && 'QUERY_STRING' === $parts[0]) {
+                    $compileArgv[] = '-q';
+                    $compileArgv[] = $parts[1];
+                    break;
+                }
+            }
+        }
+
         $compile = proc_open(
-            $compileCmd,
+            array_merge(self::llvmEnvPrefix(), $this->phpCommand(), $compileArgv),
             $descriptorSpec,
             $pipes,
             $repoRoot,

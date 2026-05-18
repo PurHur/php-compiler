@@ -319,6 +319,24 @@ final class Variable {
                 );
             case self::TYPE_HASHTABLE:
                 $ht = $this->context->helper->loadValue($this);
+                if (self::TYPE_STRING === $dim->type) {
+                    $valPtr = $this->context->builder->call(
+                        $this->context->lookupFunction('__hashtable__readStringKeyValue'),
+                        $ht,
+                        $this->context->helper->loadValue($dim)
+                    );
+                    $str = $this->context->builder->call(
+                        $this->context->lookupFunction('__value__readString'),
+                        $valPtr
+                    );
+
+                    return new Variable(
+                        $this->context,
+                        self::TYPE_STRING,
+                        self::KIND_VALUE,
+                        $str
+                    );
+                }
                 $index = $this->context->builder->truncOrBitCast(
                     $this->context->helper->loadValue($dim),
                     $this->context->getTypeFromString('size_t')

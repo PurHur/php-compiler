@@ -1,0 +1,62 @@
+--- vendor/ircmaxell/php-llvm/lib/Value/Instruction.php
++++ vendor/ircmaxell/php-llvm/lib/Value/Instruction.php
+@@ -47,4 +47,6 @@ interface Instruction extends Value {
+ 
+     public function addDestination(BasicBlock $dest): void;
+ 
++    public function addIncoming(Value $value, BasicBlock $block): void;
++
+ }
+--- vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Value/Instruction.php
++++ vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Value/Instruction.php
+@@ -8,6 +8,8 @@ use PHPLLVM\Value as CoreValue;
+ use PHPLLVM\LLVMAbstract\BasicBlock;
+ use PHPLLVM\LLVMAbstract\Value;
+ 
++use llvm\LLVMValueRef_ptr;
++use llvm\LLVMBasicBlockRef_ptr;
++
+ class Instruction extends Value implements CoreValue\Instruction {
+ 
+@@ -86,4 +88,14 @@ class Instruction extends Value implements CoreValue\Instruction {
+         $this->llvm->lib->LLVMAddDestination($this->value, $dest->block);
+     }
+ 
++    public function addIncoming(CoreValue $value, CoreBasicBlock $block): void
++    {
++        $this->llvm->lib->LLVMAddIncoming(
++            $this->value,
++            $this->llvm->lib->makeArray(\llvm\LLVMValueRef_ptr::class, [$value->value]),
++            $this->llvm->lib->makeArray(\llvm\LLVMBasicBlockRef_ptr::class, [$block->block]),
++            1
++        );
++    }
++
+ }
+--- vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Value.php
++++ vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Value.php
+@@ -2,6 +2,7 @@
+ 
+ namespace PHPLLVM\LLVMAbstract;
+ 
++use PHPLLVM\BasicBlock as CoreBasicBlock;
+ use PHPLLVM\LLVM as CoreLLVM;
+ use PHPLLVM\Context as CoreContext;
+ use PHPLLVM\Module as CoreModule;
++use llvm\LLVMValueRef_ptr;
++use llvm\LLVMBasicBlockRef_ptr;
+@@ -395,4 +398,14 @@ class Value implements CoreValue {
+         $this->llvm->lib->LLVMSetMetadata($this->value, $kind, $node->value);
+     }
+ 
++    public function addIncoming(CoreValue $value, CoreBasicBlock $block): void
++    {
++        $this->llvm->lib->LLVMAddIncoming(
++            $this->value,
++            $this->llvm->lib->makeArray(\llvm\LLVMValueRef_ptr::class, [$value->value]),
++            $this->llvm->lib->makeArray(\llvm\LLVMBasicBlockRef_ptr::class, [$block->block]),
++            1
++        );
++    }
++
+ }

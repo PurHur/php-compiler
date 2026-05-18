@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * Packed-list __hashtable__ for JIT/AOT (integer indices; subset of PHP array semantics).
+ * Packed-list __hashtable__ for JIT/AOT (integer indices plus string keys for superglobals).
  */
 
 namespace PHPCompiler\JIT\Builtin\Type;
@@ -20,6 +20,23 @@ class HashTable extends Type
 
     public function register(): void
     {
+        $nodeStruct = $this->context->context->namedStructType('__strkey_node__');
+        $this->context->registerType('__strkey_node__', $nodeStruct);
+        $this->context->registerType('__strkey_node__*', $nodeStruct->pointerType(0));
+        $nodeStruct->setBody(
+            false,
+            $this->context->getTypeFromString('__ref__'),
+            $this->context->getTypeFromString('__string__*'),
+            $this->context->getTypeFromString('__value__'),
+            $nodeStruct->pointerType(0),
+        );
+        $this->context->structFieldMap['__strkey_node__'] = [
+            'ref' => 0,
+            'key' => 1,
+            'value' => 2,
+            'next' => 3,
+        ];
+
         $struct = $this->context->context->namedStructType('__hashtable__');
         $this->context->registerType('__hashtable__', $struct);
         $this->context->registerType('__hashtable__*', $struct->pointerType(0));
@@ -30,6 +47,7 @@ class HashTable extends Type
             $this->context->getTypeFromString('size_t'),
             $this->context->getTypeFromString('size_t'),
             $this->context->getTypeFromString('__value__')->pointerType(0),
+            $this->context->getTypeFromString('__strkey_node__*'),
         );
         $this->context->structFieldMap['__hashtable__'] = [
             'ref' => 0,
@@ -37,6 +55,7 @@ class HashTable extends Type
             'nextFreeElement' => 2,
             'capacity' => 3,
             'values' => 4,
+            'strKeys' => 5,
         ];
 
         $this->registerFn('__hashtable__alloc', '__hashtable__*', []);
@@ -46,6 +65,9 @@ class HashTable extends Type
         $this->registerFn('__hashtable__readLongAt', 'int64', ['__hashtable__*', 'size_t']);
         $this->registerFn('__hashtable__getNumElements', 'size_t', ['__hashtable__*']);
         $this->registerFn('__hashtable__offsetIsSet', 'int1', ['__hashtable__*', 'size_t']);
+        $this->registerFn('__hashtable__setStringKeyString', 'void', ['__hashtable__*', '__string__*', '__string__*']);
+        $this->registerFn('__hashtable__offsetIsSetStringKey', 'int1', ['__hashtable__*', '__string__*']);
+        $this->registerFn('__hashtable__readStringKeyValue', '__value__*', ['__hashtable__*', '__string__*']);
 
         $this->pointer = $this->context->getTypeFromString('__hashtable__*');
     }
@@ -75,6 +97,9 @@ class HashTable extends Type
         $this->implementReadLongAt();
         $this->implementGetNumElements();
         $this->implementOffsetIsSet();
+        $this->implementSetStringKeyString();
+        $this->implementOffsetIsSetStringKey();
+        $this->implementReadStringKeyValue();
     }
 
     private function implementAlloc(): void
@@ -96,6 +121,11 @@ class HashTable extends Type
         $this->context->builder->store(
             $nullValues,
             $this->context->builder->structGep($ht, $map['values'])
+        );
+        $nullStrKeys = $this->context->getTypeFromString('__strkey_node__*')->constNull();
+        $this->context->builder->store(
+            $nullStrKeys,
+            $this->context->builder->structGep($ht, $map['strKeys'])
         );
         $typeinfo = $this->context->getTypeFromString('int32')->constInt(
             Refcount::TYPE_INFO_TYPE_MASKED_ARRAY | Refcount::TYPE_INFO_REFCOUNTED,
@@ -124,6 +154,7 @@ class HashTable extends Type
         $sizeT = $this->context->getTypeFromString('size_t');
         $cap = $this->context->builder->load($this->context->builder->structGep($ht, $map['capacity']));
         $needsGrow = $this->context->builder->icmp(Builder::INT_ULT, $cap, $minCap);
+        // Append successor blocks: inserting before $entry would steal the function entry block.
         $done = $fn->appendBasicBlock('grow_done');
         $grow = $fn->appendBasicBlock('grow_work');
         $this->context->builder->branchIf($needsGrow, $grow, $done);
@@ -321,6 +352,187 @@ class HashTable extends Type
         $result->addIncoming($set, $ok);
         $result->addIncoming($i1->constInt(0, false), $no);
         $this->context->builder->returnValue($result);
+    }
+
+    private function implementSetStringKeyString(): void
+    {
+        $fn = $this->context->lookupFunction('__hashtable__setStringKeyString');
+        $block = $fn->appendBasicBlock('main');
+        $this->context->builder->positionAtEnd($block);
+        $ht = $fn->getParam(0);
+        $key = $fn->getParam(1);
+        $str = $fn->getParam(2);
+
+        $htMap = $this->context->structFieldMap['__hashtable__'];
+        $nodeMap = $this->context->structFieldMap['__strkey_node__'];
+        $headSlot = $this->context->builder->structGep($ht, $htMap['strKeys']);
+        $head = $this->context->builder->load($headSlot);
+
+        $done = $block->insertBasicBlock('strkey_set_done');
+        $prepend = $block->insertBasicBlock('strkey_set_prepend');
+        $loopHead = $block->insertBasicBlock('strkey_set_head');
+        $loopBody = $block->insertBasicBlock('strkey_set_body');
+        $this->context->builder->branch($loopHead);
+
+        $this->context->builder->positionAtEnd($loopHead);
+        $node = $this->context->builder->phi($head->typeOf());
+        $node->addIncoming($head, $block);
+        $isNull = $this->context->builder->icmp(Builder::INT_EQ, $node, $node->typeOf()->constNull());
+        $this->context->builder->branchIf($isNull, $prepend, $loopBody);
+
+        $this->context->builder->positionAtEnd($loopBody);
+        $nodeKey = $this->context->builder->load($this->context->builder->structGep($node, $nodeMap['key']));
+        $cmp = $this->context->builder->call(
+            $this->context->lookupFunction('strcmp'),
+            $this->stringDataPtr($key),
+            $this->stringDataPtr($nodeKey)
+        );
+        $isMatch = $this->context->builder->icmp(Builder::INT_EQ, $cmp, $cmp->typeOf()->constInt(0, false));
+        $update = $loopBody->insertBasicBlock('strkey_set_update');
+        $next = $loopBody->insertBasicBlock('strkey_set_next');
+        $this->context->builder->branchIf($isMatch, $update, $next);
+
+        $this->context->builder->positionAtEnd($update);
+        $valField = $this->context->builder->structGep($node, $nodeMap['value']);
+        $this->context->builder->call(
+            $this->context->lookupFunction('__value__writeString'),
+            $valField,
+            $str
+        );
+        $this->context->builder->branch($done);
+
+        $this->context->builder->positionAtEnd($next);
+        $nextNode = $this->context->builder->load($this->context->builder->structGep($node, $nodeMap['next']));
+        $this->context->builder->branch($loopHead);
+        $node->addIncoming($nextNode, $next);
+
+        $this->context->builder->positionAtEnd($prepend);
+        $nodeType = $this->context->getTypeFromString('__strkey_node__');
+        $newNode = $this->context->memory->malloc($nodeType);
+        $typeinfo = $this->context->getTypeFromString('int32')->constInt(
+            Refcount::TYPE_INFO_TYPE_STRING | Refcount::TYPE_INFO_REFCOUNTED,
+            false
+        );
+        $ref = $this->context->builder->pointerCast(
+            $newNode,
+            $this->context->getTypeFromString('__ref__virtual*')
+        );
+        $this->context->builder->call($this->context->lookupFunction('__ref__init'), $typeinfo, $ref);
+        $storedKey = $this->context->builder->call($this->context->lookupFunction('__string__separate'), $key);
+        $this->context->builder->store($storedKey, $this->context->builder->structGep($newNode, $nodeMap['key']));
+        $this->context->builder->call(
+            $this->context->lookupFunction('__value__writeString'),
+            $this->context->builder->structGep($newNode, $nodeMap['value']),
+            $str
+        );
+        $this->context->builder->store($head, $this->context->builder->structGep($newNode, $nodeMap['next']));
+        $this->context->builder->store($newNode, $headSlot);
+        $this->context->builder->branch($done);
+
+        $this->context->builder->positionAtEnd($done);
+        $this->context->builder->returnVoid();
+    }
+
+    private function implementOffsetIsSetStringKey(): void
+    {
+        $fn = $this->context->lookupFunction('__hashtable__offsetIsSetStringKey');
+        $block = $fn->appendBasicBlock('main');
+        $this->context->builder->positionAtEnd($block);
+        $ht = $fn->getParam(0);
+        $key = $fn->getParam(1);
+        $valPtr = $this->lookupStringKeyValue($block, $ht, $key);
+        $i1 = $this->context->getTypeFromString('int1');
+        $isNull = $this->context->builder->icmp(Builder::INT_EQ, $valPtr, $valPtr->typeOf()->constNull());
+        $found = $block->insertBasicBlock('strkey_isset_found');
+        $notFound = $block->insertBasicBlock('strkey_isset_not_found');
+        $merge = $block->insertBasicBlock('strkey_isset_merge');
+        $this->context->builder->branchIf($isNull, $notFound, $found);
+        $this->context->builder->positionAtEnd($found);
+        $typeByte = $this->context->builder->load(
+            $this->context->builder->structGep($valPtr, $this->context->structFieldMap['__value__']['type'])
+        );
+        $nullType = $this->context->getTypeFromString('int8')->constInt(0, false);
+        $set = $this->context->builder->icmp(Builder::INT_NE, $typeByte, $nullType);
+        $this->context->builder->branch($merge);
+        $this->context->builder->positionAtEnd($notFound);
+        $this->context->builder->branch($merge);
+        $this->context->builder->positionAtEnd($merge);
+        $result = $this->context->builder->phi($i1);
+        $result->addIncoming($set, $found);
+        $result->addIncoming($i1->constInt(0, false), $notFound);
+        $this->context->builder->returnValue($result);
+    }
+
+    private function implementReadStringKeyValue(): void
+    {
+        $fn = $this->context->lookupFunction('__hashtable__readStringKeyValue');
+        $block = $fn->appendBasicBlock('main');
+        $this->context->builder->positionAtEnd($block);
+        $ht = $fn->getParam(0);
+        $key = $fn->getParam(1);
+        $valPtr = $this->lookupStringKeyValue($block, $ht, $key);
+        $this->context->builder->returnValue($valPtr);
+    }
+
+    private function lookupStringKeyValue(
+        PHPLLVM\BasicBlock $block,
+        PHPLLVM\Value $ht,
+        PHPLLVM\Value $key
+    ): PHPLLVM\Value {
+        $htMap = $this->context->structFieldMap['__hashtable__'];
+        $nodeMap = $this->context->structFieldMap['__strkey_node__'];
+        $head = $this->context->builder->load($this->context->builder->structGep($ht, $htMap['strKeys']));
+        $valuePtrType = $this->context->getTypeFromString('__value__*');
+
+        $notFound = $block->insertBasicBlock('strkey_lookup_not_found');
+        $loopHead = $block->insertBasicBlock('strkey_lookup_head');
+        $loopBody = $block->insertBasicBlock('strkey_lookup_body');
+        $found = $block->insertBasicBlock('strkey_lookup_found');
+        $merge = $block->insertBasicBlock('strkey_lookup_merge');
+        $this->context->builder->branch($loopHead);
+
+        $this->context->builder->positionAtEnd($loopHead);
+        $node = $this->context->builder->phi($head->typeOf());
+        $node->addIncoming($head, $block);
+        $isNull = $this->context->builder->icmp(Builder::INT_EQ, $node, $node->typeOf()->constNull());
+        $this->context->builder->branchIf($isNull, $notFound, $loopBody);
+
+        $this->context->builder->positionAtEnd($loopBody);
+        $nodeKey = $this->context->builder->load($this->context->builder->structGep($node, $nodeMap['key']));
+        $cmp = $this->context->builder->call(
+            $this->context->lookupFunction('strcmp'),
+            $this->stringDataPtr($key),
+            $this->stringDataPtr($nodeKey)
+        );
+        $isMatch = $this->context->builder->icmp(Builder::INT_EQ, $cmp, $cmp->typeOf()->constInt(0, false));
+        $next = $loopBody->insertBasicBlock('strkey_lookup_next');
+        $this->context->builder->branchIf($isMatch, $found, $next);
+
+        $this->context->builder->positionAtEnd($found);
+        $valField = $this->context->builder->structGep($node, $nodeMap['value']);
+        $this->context->builder->branch($merge);
+
+        $this->context->builder->positionAtEnd($next);
+        $nextNode = $this->context->builder->load($this->context->builder->structGep($node, $nodeMap['next']));
+        $this->context->builder->branch($loopHead);
+        $node->addIncoming($nextNode, $next);
+
+        $this->context->builder->positionAtEnd($notFound);
+        $this->context->builder->branch($merge);
+
+        $this->context->builder->positionAtEnd($merge);
+        $result = $this->context->builder->phi($valuePtrType);
+        $result->addIncoming($valField, $found);
+        $result->addIncoming($valuePtrType->constNull(), $notFound);
+
+        return $result;
+    }
+
+    private function stringDataPtr(PHPLLVM\Value $str): PHPLLVM\Value
+    {
+        $map = $this->context->structFieldMap['__string__'];
+
+        return $this->context->builder->structGep($str, $map['value']);
     }
 
     /**

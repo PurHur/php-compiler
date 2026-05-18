@@ -99,10 +99,17 @@ final class IssetHelper
 
     private static function compileHashTableOffsetIsSet(Context $context, Variable $container, Variable $dim): Value
     {
-        if (Variable::TYPE_NATIVE_LONG !== $dim->type) {
-            throw new \LogicException('isset() on HashTable arrays only supports integer indices in this compiler build');
-        }
         $ht = $context->helper->loadValue($container);
+        if (Variable::TYPE_STRING === $dim->type) {
+            return $context->builder->call(
+                $context->lookupFunction('__hashtable__offsetIsSetStringKey'),
+                $ht,
+                $context->helper->loadValue($dim)
+            );
+        }
+        if (Variable::TYPE_NATIVE_LONG !== $dim->type) {
+            throw new \LogicException('isset() on HashTable arrays only supports integer or string indices in this compiler build');
+        }
         $index = $context->builder->truncOrBitCast(
             $context->helper->loadValue($dim),
             $context->getTypeFromString('size_t')
