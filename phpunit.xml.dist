@@ -34,6 +34,7 @@
         </testsuite>
         <testsuite name="PHPCompiler AOT Test Suites">
             <file>./test/aot/AotTest.php</file>
+            <file>./test/aot/ExampleWebAotTest.php</file>
         </testsuite>
     </testsuites>
 </phpunit>

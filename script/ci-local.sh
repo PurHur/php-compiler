@@ -21,7 +21,7 @@ fi
 EXT_DIR="$PHP_COMPILER_EXT_DIR"
 PHP_OPTS=()
 if [[ -d "$EXT_DIR" ]]; then
-  for ext in tokenizer mbstring dom xml xmlwriter ffi posix; do
+  for ext in tokenizer mbstring dom xml xmlwriter ffi posix phar; do
     if [[ -f "$EXT_DIR/${ext}.so" ]]; then
       PHP_OPTS+=(-d "extension=$EXT_DIR/${ext}.so")
     fi
