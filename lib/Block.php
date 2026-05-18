@@ -50,6 +50,9 @@ class Block {
 
     public ?Handler $handler = null;
 
+    /** When true, unresolved local reads in child frames become undefined (isset chains). */
+    public bool $inheritUndefinedLocals = false;
+
     public function __construct(?CfgBlock $block) {
         $this->orig = $block;
         $this->scope = new \SplObjectStorage;
@@ -78,6 +81,26 @@ class Block {
         $slot = $this->getVarSlot($operand, false);
         $this->constants[$slot] = $const;
         return $slot;
+    }
+
+    /**
+     * Copy variable slot mappings from a parent block (for synthetic CFG branches).
+     */
+    public function inheritScopeFrom(Block $parent): void
+    {
+        foreach ($parent->scope as $operand) {
+            if ($this->scope->contains($operand)) {
+                continue;
+            }
+            $slot = $parent->scope[$operand];
+            $this->scope[$operand] = $slot;
+            if ($parent->args->contains($operand)) {
+                $this->args[$operand] = $slot;
+            }
+            if (isset($parent->constants[$slot])) {
+                $this->constants[$slot] = $parent->constants[$slot];
+            }
+        }
     }
 
     public function addOpCode(OpCode ...$ops): void {
@@ -125,10 +148,22 @@ class Block {
                         $scope[$pos] = self::initialVariableForOperand($op, $context);
                         continue;
                     }
+                    if ($this->inheritUndefinedLocals) {
+                        $scope[$pos] = new Variable(Variable::TYPE_UNDEFINED);
+                        continue;
+                    }
                     throw new \LogicException("Could not resolve argument");
                 }
             } else {
-                $scope[$pos] = self::initialVariableForOperand($op, $context);
+                if (
+                    $this->inheritUndefinedLocals
+                    && null !== $frame
+                    && isset($frame->scope[$pos])
+                ) {
+                    $scope[$pos] = $frame->scope[$pos];
+                } else {
+                    $scope[$pos] = self::initialVariableForOperand($op, $context);
+                }
             }
         }
 
