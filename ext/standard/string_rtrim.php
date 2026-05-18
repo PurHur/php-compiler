@@ -60,11 +60,11 @@ final class string_rtrim extends Internal
         $len = $context->builder->load(
             $context->builder->structGep($str, $map['length'])
         );
-        $i32 = $context->getTypeFromString('int32');
-        $zero = $i32->constInt(0, false);
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
         $charPtr = $context->builder->structGep($str, $map['value']);
 
-        $endSlot = $context->builder->alloca($i32, 1, 'rtrim_end');
+        $endSlot = $context->builder->alloca($i64, 1, 'rtrim_end');
         $context->builder->store($len, $endSlot);
         string_trim::advanceWhileTrimByte($context, $charPtr, $len, $endSlot, false);
 

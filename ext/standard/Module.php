@@ -19,7 +19,7 @@ class Module extends ModuleAbstract
     public function getFunctions(): array
     {
         return [
-            $this->parseAndCompileFunction('str_repeat', __DIR__.'/str_repeat.php'),
+            new str_repeat(),
             new decbin(),
             new abs(),
             new ceil(),

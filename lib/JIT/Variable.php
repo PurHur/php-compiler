@@ -88,6 +88,31 @@ final class Variable {
         throw new \LogicException("Not implemented type conversion: $type");
     }
 
+    /**
+     * Map VM {@see VMVariable} type tags to the int8 stored in __value__::type.
+     */
+    public static function jitTypeByteFromVmType(int $vmType): int
+    {
+        switch ($vmType) {
+            case VMVariable::TYPE_NULL:
+                return self::TYPE_NULL;
+            case VMVariable::TYPE_INTEGER:
+                return self::TYPE_NATIVE_LONG;
+            case VMVariable::TYPE_FLOAT:
+                return self::TYPE_NATIVE_DOUBLE;
+            case VMVariable::TYPE_BOOLEAN:
+                return self::TYPE_NATIVE_BOOL;
+            case VMVariable::TYPE_STRING:
+                return self::TYPE_STRING;
+            case VMVariable::TYPE_OBJECT:
+                return self::TYPE_OBJECT;
+            case VMVariable::TYPE_ARRAY:
+                return self::TYPE_HASHTABLE;
+            default:
+                throw new \LogicException('Unknown VM type for JIT type byte: '.$vmType);
+        }
+    }
+
     public static function getStringTypeFromType(Type $type): string {
         return self::getStringType(self::getTypeFromType($type));
     }

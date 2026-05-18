@@ -63,7 +63,10 @@ class is_type extends Internal {
                 $typeByte = $context->builder->load(
                     $context->builder->structGep($loaded, $typeField)
                 );
-                $expected = $context->getTypeFromString('int8')->constInt($this->type, false);
+                $expected = $context->getTypeFromString('int8')->constInt(
+                    JITVariable::jitTypeByteFromVmType($this->type),
+                    false
+                );
 
                 return $context->builder->icmp(Builder::INT_EQ, $typeByte, $expected);
             default:

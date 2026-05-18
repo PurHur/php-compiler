@@ -62,13 +62,13 @@ final class string_trim extends Internal
         $len = $context->builder->load(
             $context->builder->structGep($str, $map['length'])
         );
-        $i32 = $context->getTypeFromString('int32');
-        $zero = $i32->constInt(0, false);
-        $one = $i32->constInt(1, false);
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+        $one = $i64->constInt(1, false);
         $charPtr = $context->builder->structGep($str, $map['value']);
 
-        $startSlot = $context->builder->alloca($i32, 1, 'trim_start');
-        $endSlot = $context->builder->alloca($i32, 1, 'trim_end');
+        $startSlot = $context->builder->alloca($i64, 1, 'trim_start');
+        $endSlot = $context->builder->alloca($i64, 1, 'trim_end');
         $context->builder->store($zero, $startSlot);
         $context->builder->store($len, $endSlot);
 
@@ -89,8 +89,8 @@ final class string_trim extends Internal
         Value $start,
         Value $sliceLen
     ): Value {
-        $i32 = $context->getTypeFromString('int32');
-        $zero = $i32->constInt(0, false);
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
         $isEmpty = $context->builder->icmp(Builder::INT_SLE, $sliceLen, $zero);
 
         $emptyBlock = BasicBlockHelper::append($context, 'slice_empty');
@@ -129,9 +129,9 @@ final class string_trim extends Internal
         Value $indexSlot,
         bool $fromStart
     ): void {
-        $i32 = $context->getTypeFromString('int32');
-        $zero = $i32->constInt(0, false);
-        $one = $i32->constInt(1, false);
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+        $one = $i64->constInt(1, false);
 
         $done = BasicBlockHelper::append($context, $fromStart ? 'trim_start_done' : 'trim_end_done');
         $loopHead = BasicBlockHelper::append($context, $fromStart ? 'trim_start_head' : 'trim_end_head');
@@ -152,6 +152,7 @@ final class string_trim extends Internal
             ? $context->builder->gep($charPtr, $idx)
             : $context->builder->gep($charPtr, $context->builder->sub($idx, $one));
         $ch = $context->builder->load($at);
+        $i32 = $context->getTypeFromString('int32');
         $isTrim = self::jitIsTrimByte($context, $context->builder->zExt($ch, $i32));
         $continueLoop = $fromStart
             ? $context->builder->addNoSignedWrap($idx, $one)

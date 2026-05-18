@@ -233,6 +233,12 @@ class JIT {
                 //         throw new \LogicException('Hash tables not implemented yet');
                 //     }
                 //     break;
+                case OpCode::TYPE_TYPE_ASSERT:
+                    $this->assignOperand(
+                        $block->getOperand($op->arg1),
+                        $this->context->getVariableFromOp($block->getOperand($op->arg2))
+                    );
+                    break;
                 case OpCode::TYPE_EMPTY:
                     $from = $this->context->getVariableFromOp($block->getOperand($op->arg2));
                     $truthy = (new ext\standard\boolval())->call($this->context, $from);
