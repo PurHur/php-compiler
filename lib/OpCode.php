@@ -67,6 +67,7 @@ class OpCode {
     const TYPE_STATICCALL_INIT = 55;
     const TYPE_INCLUDE = 56;
     const TYPE_ISSET = 57;
+    const TYPE_POW = 58;
 
     public int $type;
     public ?int $arg1;

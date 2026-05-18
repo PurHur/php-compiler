@@ -29,3 +29,8 @@ apply_patch "$VENDOR_LLVM/ffi/llvm9.php" "$PATCH_DIR/php-llvm-makearray-empty.pa
 apply_patch "$VENDOR_LLVM/lib/LLVMAbstract/Builder.php" "$PATCH_DIR/php-llvm-builder-select.patch"
 apply_patch "$VENDOR_LLVM/lib/LLVMAbstract/Value/Instruction.php" "$PATCH_DIR/php-llvm-phi-add-incoming.patch"
 apply_patch "$VENDOR_LLVM/lib/LLVMAbstract/Builder.php" "$PATCH_DIR/php-llvm-builder-and-or.patch"
+
+VENDOR_TYPES="$ROOT/vendor/ircmaxell/php-types"
+if [[ -d "$VENDOR_TYPES" ]]; then
+  apply_patch "$VENDOR_TYPES/lib/PHPTypes/TypeReconstructor.php" "$PATCH_DIR/php-types-binaryop-pow.patch"
+fi

@@ -284,6 +284,8 @@ class Compiler {
             return OpCode::TYPE_DIV;
         } elseif ($expr instanceof Op\Expr\BinaryOp\Mod) {
             return OpCode::TYPE_MODULO;
+        } elseif ($expr instanceof Op\Expr\BinaryOp\Pow) {
+            return OpCode::TYPE_POW;
         } elseif ($expr instanceof Op\Expr\BinaryOp\BitwiseAnd) {
             return OpCode::TYPE_BITWISE_AND;
         } elseif ($expr instanceof Op\Expr\BinaryOp\BitwiseOr) {
