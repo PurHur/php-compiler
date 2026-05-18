@@ -80,6 +80,45 @@ final class VmString
         return $lenA <=> $lenB;
     }
 
+    public static function strncmp(string $a, string $b, int $length): int
+    {
+        if ($length <= 0) {
+            return 0;
+        }
+        $lenA = self::byteLength($a);
+        $lenB = self::byteLength($b);
+        $compare = $length;
+        if ($compare > $lenA) {
+            $compare = $lenA;
+        }
+        if ($compare > $lenB) {
+            $compare = $lenB;
+        }
+        for ($i = 0; $i < $compare; ++$i) {
+            $ordA = self::byteOrd($a[$i]);
+            $ordB = self::byteOrd($b[$i]);
+            if ($ordA !== $ordB) {
+                return $ordA <=> $ordB;
+            }
+        }
+
+        return 0;
+    }
+
+    public static function bin2hex(string $data): string
+    {
+        $hex = '0123456789abcdef';
+        $len = self::byteLength($data);
+        $out = '';
+        for ($i = 0; $i < $len; ++$i) {
+            $ord = self::byteOrd($data[$i]);
+            $out .= $hex[$ord >> 4];
+            $out .= $hex[$ord & 0x0F];
+        }
+
+        return $out;
+    }
+
     /**
      * @return list<string>
      */

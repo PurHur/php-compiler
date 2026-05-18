@@ -39,7 +39,7 @@ final class strncmp extends Internal
             || Variable::TYPE_INTEGER !== $len->type) {
             throw new \LogicException('strncmp() requires two strings and an integer length in this compiler build');
         }
-        $frame->returnVar->int(\strncmp($a->toString(), $b->toString(), $len->toInt()));
+        $frame->returnVar->int(VmString::strncmp($a->toString(), $b->toString(), $len->toInt()));
     }
 
     public Context $context;
