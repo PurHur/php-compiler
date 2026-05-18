@@ -147,9 +147,12 @@ final class AotTest extends BaseTest
         fclose($runPipes[0]);
         fclose($runPipes[1]);
         fclose($runPipes[2]);
-        proc_close($run);
+        $exitCode = proc_close($run);
         @unlink($outfile);
 
+        if (isset($sections['EXPECT_EXIT'])) {
+            $this->assertSame((int) trim($sections['EXPECT_EXIT']), $exitCode);
+        }
         $this->assertExpect($result !== false ? $result : '', $sections);
     }
 

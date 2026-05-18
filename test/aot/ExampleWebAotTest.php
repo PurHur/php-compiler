@@ -82,7 +82,8 @@ final class ExampleWebAotTest extends TestCase
         fclose($runPipes[0]);
         fclose($runPipes[1]);
         fclose($runPipes[2]);
-        proc_close($run);
+        $exitCode = proc_close($run);
+        $this->assertSame(0, $exitCode, 'AOT binary should exit with status 0');
         @unlink($outfile);
 
         return $result !== false ? $result : '';

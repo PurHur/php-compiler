@@ -170,7 +170,8 @@ class Context {
     public function compileToFile(string $file) {
         // add main function
         if (!is_null($this->main)) {
-            $signature = $this->context->functionType($this->context->voidType(), false);
+            $i32 = $this->context->int32Type();
+            $signature = $this->context->functionType($i32, false);
             $main = $this->module->addFunction('main', $signature);
             $block = $main->appendBasicBlock('main');
             $this->builder->positionAtEnd($block);
@@ -180,7 +181,7 @@ class Context {
             }
             $this->builder->call($this->main);
             $this->builder->call($this->shutdownFunc);
-            $this->builder->returnVoid();
+            $this->builder->returnValue($i32->constInt(0, false));
         }
         $this->compileCommon();
 

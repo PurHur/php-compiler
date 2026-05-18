@@ -104,6 +104,17 @@ final class DevServer
             $requestUri .= '?'.$query;
         }
 
+        $cgiEnv = [
+            'REQUEST_METHOD' => $method,
+            'QUERY_STRING' => $query,
+            'REQUEST_BODY' => $body,
+            'SCRIPT_NAME' => $scriptName,
+            'REQUEST_URI' => $requestUri,
+        ];
+        if ('' !== $pathInfo) {
+            $cgiEnv['PATH_INFO'] = $pathInfo;
+        }
+
         putenv('REQUEST_METHOD='.$method);
         putenv('QUERY_STRING='.$query);
         putenv('REQUEST_BODY='.$body);
@@ -116,7 +127,7 @@ final class DevServer
         }
 
         try {
-            [$status, $contentType, $output, $extraHeaders] = $handlePhpRequest($script);
+            [$status, $contentType, $output, $extraHeaders] = $handlePhpRequest($script, $cgiEnv);
         } catch (\Throwable $e) {
             self::logException($e);
             self::respond($conn, 500, 'text/plain', self::formatExceptionBody($e));
