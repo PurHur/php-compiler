@@ -62,7 +62,7 @@ final class str_contains extends Internal
         $hayPtr = $this->stringDataPtr($context, $context->helper->loadValue($args[0]));
         $needlePtr = $this->stringDataPtr($context, $context->helper->loadValue($args[1]));
         $found = $context->builder->call($context->lookupFunction('strstr'), $hayPtr, $needlePtr);
-        $null = $found->typeOf()->constPointerNull();
+        $null = $context->getTypeFromString('int8*')->constNull();
         $isNull = $context->builder->icmp(Builder::INT_EQ, $found, $null);
 
         return $context->builder->not($isNull);

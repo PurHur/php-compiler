@@ -63,13 +63,29 @@ final class boolval extends Internal
                 return $context->constantFromBool(false);
             case JITVariable::TYPE_VALUE:
                 $loaded = $context->helper->loadValue($args[0]);
-                $typeField = $context->structFieldMap['__value__']['type'];
+                $map = $context->structFieldMap['__value__'];
                 $typeByte = $context->builder->load(
-                    $context->builder->structGep($loaded, $typeField)
+                    $context->builder->structGep($loaded, $map['type'])
                 );
-                $nullType = $context->getTypeFromString('int8')->constInt(Variable::TYPE_NULL, false);
+                $i8 = $context->getTypeFromString('int8');
+                $nullType = $i8->constInt(Variable::TYPE_NULL, false);
+                $boolType = $i8->constInt(JITVariable::TYPE_NATIVE_BOOL, false);
+                $isNull = $context->builder->icmp(Builder::INT_EQ, $typeByte, $nullType);
+                $isBool = $context->builder->icmp(Builder::INT_EQ, $typeByte, $boolType);
+                $boolByte = $context->builder->load(
+                    $context->builder->gep(
+                        $context->builder->structGep($loaded, $map['value']),
+                        $i8->constInt(0, false)
+                    )
+                );
+                $boolTruthy = $context->builder->icmp(Builder::INT_NE, $boolByte, $i8->constInt(0, false));
+                $nonNull = $context->builder->icmp(Builder::INT_NE, $typeByte, $nullType);
 
-                return $context->builder->icmp(Builder::INT_NE, $typeByte, $nullType);
+                return $context->builder->select(
+                    $isNull,
+                    $context->constantFromBool(false),
+                    $context->builder->select($isBool, $boolTruthy, $nonNull)
+                );
             case JITVariable::TYPE_HASHTABLE:
                 $ht = $context->helper->loadValue($args[0]);
                 $num = $context->builder->call(

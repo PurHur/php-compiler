@@ -64,11 +64,18 @@ final class str_ends_with extends Internal
         $hayPtr = $context->builder->structGep($hay, $hayMap['value']);
         $suffixPtr = $context->builder->gep($hayPtr, $start);
         $needlePtr = $context->builder->structGep($needle, $needleMap['value']);
+        $compareLen = $context->builder->zExt(
+            $context->builder->trunc(
+                $needleLen,
+                $context->getTypeFromString('int32')
+            ),
+            $context->getTypeFromString('size_t')
+        );
         $cmp = $context->builder->call(
             $context->lookupFunction('strncmp'),
             $suffixPtr,
             $needlePtr,
-            $needleLen
+            $compareLen
         );
         $cmpZero = $cmp->typeOf()->constInt(0, false);
         $matches = $context->builder->icmp(Builder::INT_EQ, $cmp, $cmpZero);
