@@ -72,6 +72,7 @@ class HashTable extends Type
         $this->registerFn('__hashtable__setStringKeyLong', 'void', ['__hashtable__*', '__string__*', 'int64']);
         $this->registerFn('__hashtable__offsetIsSetStringKey', 'int1', ['__hashtable__*', '__string__*']);
         $this->registerFn('__hashtable__readStringKeyValue', '__value__*', ['__hashtable__*', '__string__*']);
+        $this->registerFn('__hashtable__sortPacked', 'void', ['__hashtable__*']);
 
         $this->pointer = $this->context->getTypeFromString('__hashtable__*');
     }
@@ -106,6 +107,7 @@ class HashTable extends Type
         $this->implementSetStringKeyString();
         $this->implementOffsetIsSetStringKey();
         $this->implementReadStringKeyValue();
+        $this->implementSortPacked();
     }
 
     private function ensureLibcStringCompare(): void
@@ -724,6 +726,222 @@ class HashTable extends Type
         $this->context->builder->positionAtEnd($done);
 
         return $this->context->builder->load($resultSlot);
+    }
+
+    private function implementSortPacked(): void
+    {
+        $fn = $this->context->lookupFunction('__hashtable__sortPacked');
+        $main = $fn->appendBasicBlock('main');
+        $this->context->builder->positionAtEnd($main);
+        $ht = $fn->getParam(0);
+        $map = $this->context->structFieldMap['__hashtable__'];
+        $sizeT = $this->context->getTypeFromString('size_t');
+        $two = $sizeT->constInt(2, false);
+        $num = $this->context->builder->load($this->context->builder->structGep($ht, $map['nextFreeElement']));
+        $tooSmall = $this->context->builder->icmp(Builder::INT_ULT, $num, $two);
+        $done = $fn->appendBasicBlock('sort_done');
+        $work = $fn->appendBasicBlock('sort_work');
+        $this->context->builder->branchIf($tooSmall, $done, $work);
+
+        $this->context->builder->positionAtEnd($work);
+        $zero = $sizeT->constInt(0, false);
+        $firstEntry = $this->listEntryAt($ht, $map, $zero);
+        $valueMap = $this->context->structFieldMap['__value__'];
+        $firstType = $this->context->builder->load(
+            $this->context->builder->structGep($firstEntry, $valueMap['type'])
+        );
+        $i8 = $this->context->getTypeFromString('int8');
+        $stringTag = $i8->constInt(Variable::TYPE_STRING, false);
+        $longTag = $i8->constInt(Variable::TYPE_NATIVE_LONG, false);
+        $isString = $this->context->builder->icmp(Builder::INT_EQ, $firstType, $stringTag);
+        $sortStrings = $fn->appendBasicBlock('sort_strings');
+        $sortLongs = $fn->appendBasicBlock('sort_longs');
+        $this->context->builder->branchIf($isString, $sortStrings, $sortLongs);
+
+        $this->context->builder->positionAtEnd($sortStrings);
+        $this->emitBubbleSortStrings($fn, $ht, $map, $num);
+        $this->context->builder->branch($done);
+
+        $this->context->builder->positionAtEnd($sortLongs);
+        $this->emitBubbleSortLongs($fn, $ht, $map, $num);
+        $this->context->builder->branch($done);
+
+        $this->context->builder->positionAtEnd($done);
+        $this->context->builder->returnVoid();
+    }
+
+    private function emitBubbleSortStrings(
+        PHPLLVM\LLVMAbstract\Value\Function_ $fn,
+        PHPLLVM\Value $ht,
+        array $map,
+        PHPLLVM\Value $num
+    ): void {
+        $sizeT = $this->context->getTypeFromString('size_t');
+        $one = $sizeT->constInt(1, false);
+        $zero = $sizeT->constInt(0, false);
+        $outerSlot = $this->context->builder->alloca($sizeT, 1, 'sort_outer');
+        $this->context->builder->store($zero, $outerSlot);
+        $outerHead = $fn->appendBasicBlock('sort_str_outer_head');
+        $outerBody = $fn->appendBasicBlock('sort_str_outer_body');
+        $outerDone = $fn->appendBasicBlock('sort_str_outer_done');
+        $this->context->builder->branch($outerHead);
+
+        $this->context->builder->positionAtEnd($outerHead);
+        $outer = $this->context->builder->load($outerSlot);
+        $outerEnd = $this->context->builder->sub($num, $one);
+        $outerAtEnd = $this->context->builder->icmp(Builder::INT_SGE, $outer, $outerEnd);
+        $this->context->builder->branchIf($outerAtEnd, $outerDone, $outerBody);
+
+        $this->context->builder->positionAtEnd($outerBody);
+        $innerSlot = $this->context->builder->alloca($sizeT, 1, 'sort_inner');
+        $this->context->builder->store($zero, $innerSlot);
+        $limit = $this->context->builder->sub($num, $outer);
+        $limit = $this->context->builder->sub($limit, $one);
+        $innerHead = $fn->appendBasicBlock('sort_str_inner_head');
+        $innerBody = $fn->appendBasicBlock('sort_str_inner_body');
+        $innerDone = $fn->appendBasicBlock('sort_str_inner_done');
+        $this->context->builder->branch($innerHead);
+
+        $this->context->builder->positionAtEnd($innerHead);
+        $inner = $this->context->builder->load($innerSlot);
+        $innerAtEnd = $this->context->builder->icmp(Builder::INT_SGE, $inner, $limit);
+        $this->context->builder->branchIf($innerAtEnd, $innerDone, $innerBody);
+
+        $this->context->builder->positionAtEnd($innerBody);
+        $nextInner = $this->context->builder->addNoSignedWrap($inner, $one);
+        $strA = $this->context->builder->call(
+            $this->context->lookupFunction('__hashtable__readStringAt'),
+            $ht,
+            $inner
+        );
+        $strB = $this->context->builder->call(
+            $this->context->lookupFunction('__hashtable__readStringAt'),
+            $ht,
+            $nextInner
+        );
+        $cmp = $this->context->builder->call(
+            $this->context->lookupFunction('strcmp'),
+            $this->stringDataPtr($strA),
+            $this->stringDataPtr($strB)
+        );
+        $i32 = $this->context->getTypeFromString('int32');
+        $needsSwap = $this->context->builder->icmp(Builder::INT_SGT, $cmp, $i32->constInt(0, false));
+        $swapBlock = $fn->appendBasicBlock('sort_str_swap');
+        $noSwap = $fn->appendBasicBlock('sort_str_no_swap');
+        $afterSwap = $fn->appendBasicBlock('sort_str_after_swap');
+        $this->context->builder->branchIf($needsSwap, $swapBlock, $noSwap);
+
+        $this->context->builder->positionAtEnd($swapBlock);
+        $entryA = $this->listEntryAt($ht, $map, $inner);
+        $entryB = $this->listEntryAt($ht, $map, $nextInner);
+        $this->context->builder->call($this->context->lookupFunction('__value__writeString'), $entryA, $strB);
+        $this->context->builder->call($this->context->lookupFunction('__value__writeString'), $entryB, $strA);
+        $this->context->builder->branch($afterSwap);
+
+        $this->context->builder->positionAtEnd($noSwap);
+        $this->context->builder->branch($afterSwap);
+
+        $this->context->builder->positionAtEnd($afterSwap);
+        $this->context->builder->store($nextInner, $innerSlot);
+        $this->context->builder->branch($innerHead);
+
+        $this->context->builder->positionAtEnd($innerDone);
+        $this->context->builder->store(
+            $this->context->builder->addNoSignedWrap($outer, $one),
+            $outerSlot
+        );
+        $this->context->builder->branch($outerHead);
+
+        $this->context->builder->positionAtEnd($outerDone);
+    }
+
+    private function emitBubbleSortLongs(
+        PHPLLVM\LLVMAbstract\Value\Function_ $fn,
+        PHPLLVM\Value $ht,
+        array $map,
+        PHPLLVM\Value $num
+    ): void {
+        $sizeT = $this->context->getTypeFromString('size_t');
+        $one = $sizeT->constInt(1, false);
+        $zero = $sizeT->constInt(0, false);
+        $outerSlot = $this->context->builder->alloca($sizeT, 1, 'sort_long_outer');
+        $this->context->builder->store($zero, $outerSlot);
+        $outerHead = $fn->appendBasicBlock('sort_long_outer_head');
+        $outerBody = $fn->appendBasicBlock('sort_long_outer_body');
+        $outerDone = $fn->appendBasicBlock('sort_long_outer_done');
+        $this->context->builder->branch($outerHead);
+
+        $this->context->builder->positionAtEnd($outerHead);
+        $outer = $this->context->builder->load($outerSlot);
+        $outerEnd = $this->context->builder->sub($num, $one);
+        $outerAtEnd = $this->context->builder->icmp(Builder::INT_SGE, $outer, $outerEnd);
+        $this->context->builder->branchIf($outerAtEnd, $outerDone, $outerBody);
+
+        $this->context->builder->positionAtEnd($outerBody);
+        $innerSlot = $this->context->builder->alloca($sizeT, 1, 'sort_long_inner');
+        $this->context->builder->store($zero, $innerSlot);
+        $limit = $this->context->builder->sub($num, $outer);
+        $limit = $this->context->builder->sub($limit, $one);
+        $innerHead = $fn->appendBasicBlock('sort_long_inner_head');
+        $innerBody = $fn->appendBasicBlock('sort_long_inner_body');
+        $innerDone = $fn->appendBasicBlock('sort_long_inner_done');
+        $this->context->builder->branch($innerHead);
+
+        $this->context->builder->positionAtEnd($innerHead);
+        $inner = $this->context->builder->load($innerSlot);
+        $innerAtEnd = $this->context->builder->icmp(Builder::INT_SGE, $inner, $limit);
+        $this->context->builder->branchIf($innerAtEnd, $innerDone, $innerBody);
+
+        $this->context->builder->positionAtEnd($innerBody);
+        $nextInner = $this->context->builder->addNoSignedWrap($inner, $one);
+        $longA = $this->context->builder->call(
+            $this->context->lookupFunction('__hashtable__readLongAt'),
+            $ht,
+            $inner
+        );
+        $longB = $this->context->builder->call(
+            $this->context->lookupFunction('__hashtable__readLongAt'),
+            $ht,
+            $nextInner
+        );
+        $needsSwap = $this->context->builder->icmp(Builder::INT_SGT, $longA, $longB);
+        $swapBlock = $fn->appendBasicBlock('sort_long_swap');
+        $noSwap = $fn->appendBasicBlock('sort_long_no_swap');
+        $afterSwap = $fn->appendBasicBlock('sort_long_after_swap');
+        $this->context->builder->branchIf($needsSwap, $swapBlock, $noSwap);
+
+        $this->context->builder->positionAtEnd($swapBlock);
+        $entryA = $this->listEntryAt($ht, $map, $inner);
+        $entryB = $this->listEntryAt($ht, $map, $nextInner);
+        $this->context->builder->call($this->context->lookupFunction('__value__writeLong'), $entryA, $longB);
+        $this->context->builder->call($this->context->lookupFunction('__value__writeLong'), $entryB, $longA);
+        $this->context->builder->branch($afterSwap);
+
+        $this->context->builder->positionAtEnd($noSwap);
+        $this->context->builder->branch($afterSwap);
+
+        $this->context->builder->positionAtEnd($afterSwap);
+        $this->context->builder->store($nextInner, $innerSlot);
+        $this->context->builder->branch($innerHead);
+
+        $this->context->builder->positionAtEnd($innerDone);
+        $this->context->builder->store(
+            $this->context->builder->addNoSignedWrap($outer, $one),
+            $outerSlot
+        );
+        $this->context->builder->branch($outerHead);
+
+        $this->context->builder->positionAtEnd($outerDone);
+    }
+
+    /**
+     * @param array<string, int> $map
+     */
+    private function listEntryAt(PHPLLVM\Value $ht, array $map, PHPLLVM\Value $index): PHPLLVM\Value
+    {
+        $values = $this->context->builder->load($this->context->builder->structGep($ht, $map['values']));
+
+        return $this->context->builder->inBoundsGep($values, $index);
     }
 
     private function stringDataPtr(PHPLLVM\Value $str): PHPLLVM\Value
