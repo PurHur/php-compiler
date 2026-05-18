@@ -9,7 +9,9 @@ declare(strict_types=1);
  * @license MIT See LICENSE at the root of the project for more info
  */
 
+require __DIR__.'/tokenizer-compat.php';
 require __DIR__.'/yay-php8-compat.php';
+require __DIR__.'/llvm-env.php';
 require __DIR__.'/../vendor/autoload.php';
 
 ini_set('memory_limit', '-1');

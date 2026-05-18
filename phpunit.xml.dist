@@ -9,7 +9,7 @@
          convertWarningsToExceptions="true"
          processIsolation="false"
          stopOnFailure="false"
-         bootstrap="./vendor/autoload.php">
+         bootstrap="./test/bootstrap.php">
     <coverage>
         <include>
             <directory suffix=".php">./lib</directory>
@@ -27,6 +27,9 @@
         </testsuite>
         <testsuite name="PHPCompiler Real World Test Suites">
             <directory suffix=".php">./test/real</directory>
+        </testsuite>
+        <testsuite name="PHPCompiler AOT Test Suites">
+            <directory suffix=".php">./test/aot</directory>
         </testsuite>
     </testsuites>
 </phpunit>

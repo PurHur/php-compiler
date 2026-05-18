@@ -10,6 +10,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Builder;
+use PHPLLVM\Type;
 use PHPLLVM\Value;
 
 final class JitHtmlspecialchars
@@ -81,11 +82,7 @@ final class JitHtmlspecialchars
         $context->builder->branch($allocDone);
 
         $context->builder->positionAtEnd($allocDone);
-        $result = $context->builder->phi($dest->typeOf());
-        $result->addIncoming($emptyStr, $allocEmpty);
-        $result->addIncoming($dest, $writeDone);
-
-        return $result;
+        return $context->builder->select($isEmpty, $emptyStr, $dest);
     }
 
     private static function countLoop(
@@ -94,7 +91,7 @@ final class JitHtmlspecialchars
         Value $len,
         Value $iSlot,
         Value $outLenSlot,
-        Value $i32,
+        Type $i32,
         Value $zero,
         Value $one
     ): void {
@@ -131,7 +128,7 @@ final class JitHtmlspecialchars
         Value $destPtr,
         Value $iSlot,
         Value $posSlot,
-        Value $i32,
+        Type $i32,
         Value $zero,
         Value $one
     ): void {
