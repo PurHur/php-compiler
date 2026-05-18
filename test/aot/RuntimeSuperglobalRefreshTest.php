@@ -78,6 +78,57 @@ final class RuntimeSuperglobalRefreshTest extends TestCase
         @unlink($outfile);
     }
 
+    public function testHttpHostFromCgiEnvironment(): void
+    {
+        $source = <<<'PHP'
+<?php
+declare(strict_types=1);
+header('Content-Type: text/plain; charset=UTF-8');
+echo $_SERVER['HTTP_HOST'], $_SERVER['HTTP_X_CUSTOM'];
+PHP;
+
+        $outfile = tempnam(sys_get_temp_dir(), 'phpc_http_hdr_');
+        $this->assertNotFalse($outfile);
+        unlink($outfile);
+
+        $repoRoot = dirname(__DIR__, 2);
+        $env = $this->llvmProcessEnv($repoRoot);
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+
+        $compile = proc_open(
+            array_merge(
+                self::llvmEnvPrefix(),
+                self::phpCommand(),
+                [$this->compileBin, '-o', $outfile]
+            ),
+            $descriptorSpec,
+            $pipes,
+            $repoRoot,
+            $env
+        );
+        fwrite($pipes[0], $source);
+        fclose($pipes[0]);
+        $compileErr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        proc_close($compile);
+        $this->assertFileExists($outfile, trim($compileErr !== false ? $compileErr : ''));
+
+        $runEnv = $env;
+        $runEnv['HTTP_HOST'] = 'example.test';
+        $runEnv['HTTP_X_CUSTOM'] = '1';
+        $runEnv['SCRIPT_NAME'] = '/index.php';
+        $runEnv['REQUEST_URI'] = '/index.php';
+        $output = $this->runBinary($outfile, $runEnv);
+        $this->assertStringContainsString('example.test1', $output);
+
+        @unlink($outfile);
+    }
+
     /**
      * @param array<string, string> $env
      */

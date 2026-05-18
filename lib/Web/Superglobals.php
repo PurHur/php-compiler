@@ -22,6 +22,12 @@ final class Superglobals
 {
     private static ?Context $activeContext = null;
 
+    /** Maximum incoming request headers mapped into $_SERVER (issue #77). */
+    public const MAX_HTTP_HEADERS = 64;
+
+    /** Maximum length of a single header name or value after trimming. */
+    public const MAX_HTTP_HEADER_LENGTH = 8192;
+
     public const NAMES = [
         '_GET',
         '_POST',
@@ -57,6 +63,54 @@ final class Superglobals
         self::populatePost($context, $postBody);
         self::populateServer($context, $queryString, $postBody);
         self::populateRequest($context);
+    }
+
+    /**
+     * Map an HTTP header name to a CGI-style $_SERVER key (HTTP_* or CONTENT_*).
+     */
+    public static function headerNameToServerKey(string $name): string
+    {
+        $normalized = strtoupper(str_replace('-', '_', trim($name)));
+        if ('CONTENT_TYPE' === $normalized || 'CONTENT_LENGTH' === $normalized) {
+            return $normalized;
+        }
+
+        return 'HTTP_'.$normalized;
+    }
+
+    /**
+     * Apply parsed request headers to PHP $_SERVER and putenv for CGI/AOT refresh.
+     *
+     * @param array<string, string> $headers lowercase header name => value
+     *
+     * @return array<string, string> CGI env entries (HTTP_* / CONTENT_*)
+     */
+    public static function applyHttpHeaders(array $headers): array
+    {
+        $cgi = [];
+        $count = 0;
+        foreach ($headers as $name => $value) {
+            if ($count >= self::MAX_HTTP_HEADERS) {
+                break;
+            }
+            if (!is_string($name) || !is_string($value)) {
+                continue;
+            }
+            $name = trim($name);
+            $value = trim($value);
+            if ('' === $name || strlen($name) > self::MAX_HTTP_HEADER_LENGTH
+                || strlen($value) > self::MAX_HTTP_HEADER_LENGTH
+                || str_contains($value, "\r") || str_contains($value, "\n")) {
+                continue;
+            }
+            $key = self::headerNameToServerKey($name);
+            $_SERVER[$key] = $value;
+            putenv($key.'='.$value);
+            $cgi[$key] = $value;
+            ++$count;
+        }
+
+        return $cgi;
     }
 
     private static function populateGet(Context $context, string $queryString): void
@@ -113,11 +167,11 @@ final class Superglobals
         self::setStringEntry($server, 'GATEWAY_INTERFACE', 'CGI/1.1');
         self::setStringEntry($server, 'SERVER_SOFTWARE', 'PHP-Compiler-VM');
 
-        foreach ($_SERVER as $key => $value) {
+        foreach (array_merge($_ENV, $_SERVER) as $key => $value) {
             if (!is_string($key) || !is_string($value)) {
                 continue;
             }
-            if (str_starts_with($key, 'HTTP_')) {
+            if (str_starts_with($key, 'HTTP_') || str_starts_with($key, 'CONTENT_')) {
                 self::setStringEntry($server, $key, $value);
             }
         }
