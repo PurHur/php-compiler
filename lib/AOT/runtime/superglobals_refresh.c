@@ -7,6 +7,14 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if defined(__APPLE__) || defined(__FreeBSD__)
+#include <crt_externs.h>
+#define phpc_environ (*_NSGetEnviron())
+#else
+extern char **environ;
+#define phpc_environ environ
+#endif
+
 typedef struct __hashtable__ __hashtable__;
 typedef struct __string__ __string__;
 
@@ -84,6 +92,40 @@ static const char *request_method_for(const char *post_body)
     }
 
     return ('\0' != post_body[0]) ? "POST" : "GET";
+}
+
+static int is_cgi_header_env_key(const char *key)
+{
+    if (0 == strncmp(key, "HTTP_", 5)) {
+        return 1;
+    }
+
+    return 0 == strcmp(key, "CONTENT_TYPE") || 0 == strcmp(key, "CONTENT_LENGTH");
+}
+
+static void apply_cgi_headers_from_environ(__hashtable__ *server)
+{
+    char **env;
+    char key_buf[256];
+
+    for (env = phpc_environ; NULL != env && NULL != *env; env++) {
+        const char *eq = strchr(*env, '=');
+        const char *value;
+
+        if (NULL == eq) {
+            continue;
+        }
+        if ((size_t) (eq - *env) >= sizeof(key_buf)) {
+            continue;
+        }
+        memcpy(key_buf, *env, (size_t) (eq - *env));
+        key_buf[eq - *env] = '\0';
+        if (!is_cgi_header_env_key(key_buf)) {
+            continue;
+        }
+        value = eq + 1;
+        set_string_key(server, key_buf, value);
+    }
 }
 
 static void derive_path_info(const char *script_name, const char *request_uri, char *out, size_t out_len)
@@ -171,6 +213,8 @@ void __superglobals__refresh(void)
     if ('\0' != path_info[0]) {
         set_string_key(sg_SERVER, "PATH_INFO", path_info);
     }
+
+    apply_cgi_headers_from_environ(sg_SERVER);
 
     if (NULL == sg_COOKIE) {
         sg_COOKIE = __hashtable__alloc();

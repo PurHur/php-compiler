@@ -122,11 +122,7 @@ final class DevServer
         }
 
         self::clearHttpServerKeys();
-        $httpServer = self::httpHeadersToServerVars($headers);
-        foreach ($httpServer as $key => $value) {
-            $_SERVER[$key] = $value;
-        }
-        $cgiEnv = array_merge($cgiEnv, $httpServer);
+        $cgiEnv = array_merge($cgiEnv, Superglobals::applyHttpHeaders($headers));
 
         putenv('REQUEST_METHOD='.$method);
         putenv('QUERY_STRING='.$query);
@@ -205,7 +201,7 @@ final class DevServer
      */
     public static function headerNameToServerKey(string $name): string
     {
-        return 'HTTP_'.strtoupper(str_replace('-', '_', $name));
+        return Superglobals::headerNameToServerKey($name);
     }
 
     /**
