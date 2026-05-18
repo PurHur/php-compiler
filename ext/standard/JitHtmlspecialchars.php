@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Builder;
 use PHPLLVM\Type;
@@ -37,24 +38,23 @@ final class JitHtmlspecialchars
         );
         $charPtr = $context->builder->structGep($copy, $map['value']);
 
-        $i32 = $context->getTypeFromString('int32');
-        $zero = $i32->constInt(0, false);
-        $one = $i32->constInt(1, false);
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+        $one = $i64->constInt(1, false);
 
-        $outLenSlot = $context->builder->alloca($i32, 1, 'htmlspecialchars_out_len');
+        $outLenSlot = $context->builder->alloca($i64, 1, 'htmlspecialchars_out_len');
         $context->builder->store($zero, $outLenSlot);
-        $iSlot = $context->builder->alloca($i32, 1, 'htmlspecialchars_i');
+        $iSlot = $context->builder->alloca($i64, 1, 'htmlspecialchars_i');
         $context->builder->store($zero, $iSlot);
 
-        self::countLoop($context, $charPtr, $len, $iSlot, $outLenSlot, $i32, $zero, $one);
+        self::countLoop($context, $charPtr, $len, $iSlot, $outLenSlot, $i64, $zero, $one);
 
         $outLenFinal = $context->builder->load($outLenSlot);
         $isEmpty = $context->builder->icmp(Builder::INT_EQ, $outLenFinal, $zero);
 
-        $prev = $context->builder->getInsertBlock();
-        $allocDone = $prev->insertBasicBlock('htmlspecialchars_alloc_done');
-        $allocEmpty = $prev->insertBasicBlock('htmlspecialchars_alloc_empty');
-        $allocBody = $prev->insertBasicBlock('htmlspecialchars_alloc_body');
+        $allocDone = BasicBlockHelper::append($context, 'htmlspecialchars_alloc_done');
+        $allocEmpty = BasicBlockHelper::append($context, 'htmlspecialchars_alloc_empty');
+        $allocBody = BasicBlockHelper::append($context, 'htmlspecialchars_alloc_body');
         $context->builder->branchIf($isEmpty, $allocEmpty, $allocBody);
 
         $context->builder->positionAtEnd($allocEmpty);
@@ -62,27 +62,27 @@ final class JitHtmlspecialchars
         $context->builder->branch($allocDone);
 
         $context->builder->positionAtEnd($allocBody);
-        $outLenI64 = $context->builder->zExt(
-            $outLenFinal,
-            $context->getTypeFromString('int64')
-        );
-        $dest = $context->builder->call($context->lookupFunction('__string__alloc'), $outLenI64);
+        $dest = $context->builder->call($context->lookupFunction('__string__alloc'), $outLenFinal);
         $context->builder->store(
             $outLenFinal,
             $context->builder->structGep($dest, $map['length'])
         );
         $destPtr = $context->builder->structGep($dest, $map['value']);
 
-        $posSlot = $context->builder->alloca($i32, 1, 'htmlspecialchars_pos');
+        $posSlot = $context->builder->alloca($i64, 1, 'htmlspecialchars_pos');
         $context->builder->store($zero, $posSlot);
         $context->builder->store($zero, $iSlot);
 
-        self::writeLoop($context, $charPtr, $len, $destPtr, $iSlot, $posSlot, $i32, $zero, $one);
-        $writeDone = $context->builder->getInsertBlock();
+        self::writeLoop($context, $charPtr, $len, $destPtr, $iSlot, $posSlot, $i64, $zero, $one);
+        $afterWrite = $context->builder->getInsertBlock();
         $context->builder->branch($allocDone);
 
         $context->builder->positionAtEnd($allocDone);
-        return $context->builder->select($isEmpty, $emptyStr, $dest);
+        $result = $context->builder->phi($emptyStr->typeOf());
+        $result->addIncoming($emptyStr, $allocEmpty);
+        $result->addIncoming($dest, $afterWrite);
+
+        return $result;
     }
 
     private static function countLoop(
@@ -91,14 +91,13 @@ final class JitHtmlspecialchars
         Value $len,
         Value $iSlot,
         Value $outLenSlot,
-        Type $i32,
+        Type $i64,
         Value $zero,
         Value $one
     ): void {
-        $prev = $context->builder->getInsertBlock();
-        $done = $prev->insertBasicBlock('htmlspecialchars_count_done');
-        $head = $prev->insertBasicBlock('htmlspecialchars_count_head');
-        $body = $prev->insertBasicBlock('htmlspecialchars_count_body');
+        $done = BasicBlockHelper::append($context, 'htmlspecialchars_count_done');
+        $head = BasicBlockHelper::append($context, 'htmlspecialchars_count_head');
+        $body = BasicBlockHelper::append($context, 'htmlspecialchars_count_body');
         $context->builder->branch($head);
 
         $context->builder->positionAtEnd($head);
@@ -107,6 +106,7 @@ final class JitHtmlspecialchars
         $context->builder->branchIf($atEnd, $done, $body);
 
         $context->builder->positionAtEnd($body);
+        $i32 = $context->getTypeFromString('int32');
         $ch = $context->builder->load($context->builder->gep($charPtr, $i));
         $chI32 = $context->builder->zExt($ch, $i32);
         $addLen = self::replacementLength($context, $chI32, $one);
@@ -128,14 +128,13 @@ final class JitHtmlspecialchars
         Value $destPtr,
         Value $iSlot,
         Value $posSlot,
-        Type $i32,
+        Type $i64,
         Value $zero,
         Value $one
     ): void {
-        $prev = $context->builder->getInsertBlock();
-        $done = $prev->insertBasicBlock('htmlspecialchars_write_done');
-        $head = $prev->insertBasicBlock('htmlspecialchars_write_head');
-        $body = $prev->insertBasicBlock('htmlspecialchars_write_body');
+        $done = BasicBlockHelper::append($context, 'htmlspecialchars_write_done');
+        $head = BasicBlockHelper::append($context, 'htmlspecialchars_write_head');
+        $body = BasicBlockHelper::append($context, 'htmlspecialchars_write_body');
         $context->builder->branch($head);
 
         $context->builder->positionAtEnd($head);
@@ -144,6 +143,7 @@ final class JitHtmlspecialchars
         $context->builder->branchIf($atEnd, $done, $body);
 
         $context->builder->positionAtEnd($body);
+        $i32 = $context->getTypeFromString('int32');
         $ch = $context->builder->load($context->builder->gep($charPtr, $i));
         $chI32 = $context->builder->zExt($ch, $i32);
         $pos = $context->builder->load($posSlot);
@@ -184,30 +184,38 @@ final class JitHtmlspecialchars
         $charPtr = $context->getTypeFromString('char*');
         $i32 = $chI32->typeOf();
 
-        $prev = $context->builder->getInsertBlock();
-        $done = $prev->insertBasicBlock('htmlspecialchars_write_char_done');
-        $defaultBlock = $prev->insertBasicBlock('htmlspecialchars_write_char_default');
+        $done = BasicBlockHelper::append($context, 'htmlspecialchars_write_char_done');
+        $defaultBlock = BasicBlockHelper::append($context, 'htmlspecialchars_write_char_default');
 
-        $checkBlock = $prev;
         $ords = array_keys(self::SPECIAL);
+        $matchBlocks = [];
+        $nextBlocks = [];
         foreach ($ords as $idx => $ord) {
-            $matchBlock = $prev->insertBasicBlock('htmlspecialchars_write_char_match_'.$ord);
-            $nextBlock = $prev->insertBasicBlock('htmlspecialchars_write_char_next_'.$ord);
+            $matchBlocks[$ord] = BasicBlockHelper::append($context, 'htmlspecialchars_write_char_match_'.$ord);
+            if ($idx + 1 < count($ords)) {
+                $nextBlocks[$ord] = BasicBlockHelper::append($context, 'htmlspecialchars_write_char_next_'.$ord);
+            }
+        }
 
+        $checkBlock = $context->builder->getInsertBlock();
+        foreach ($ords as $idx => $ord) {
             $context->builder->positionAtEnd($checkBlock);
+            $fallthrough = $idx + 1 < count($ords) ? $nextBlocks[$ord] : $defaultBlock;
             $context->builder->branchIf(
                 $context->builder->icmp(Builder::INT_EQ, $chI32, $i32->constInt($ord, false)),
-                $matchBlock,
-                $idx + 1 < count($ords) ? $nextBlock : $defaultBlock
+                $matchBlocks[$ord],
+                $fallthrough
             );
 
-            $context->builder->positionAtEnd($matchBlock);
+            $context->builder->positionAtEnd($matchBlocks[$ord]);
             [$text, $textLen] = self::SPECIAL[$ord];
             $src = $context->builder->pointerCast($context->constantFromString($text), $charPtr);
             $context->intrinsic->memcpy($destAt, $src, $i32->constInt($textLen, false), false);
             $context->builder->branch($done);
 
-            $checkBlock = $nextBlock;
+            if ($idx + 1 < count($ords)) {
+                $checkBlock = $nextBlocks[$ord];
+            }
         }
 
         $context->builder->positionAtEnd($defaultBlock);
