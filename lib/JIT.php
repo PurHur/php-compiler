@@ -16,6 +16,7 @@ use PHPCfg\Operand;
 use PHPCfg\Op;
 use PHPTypes\Type;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\IssetHelper;
 use PHPCompiler\JIT\Variable;
 
 use PHPCompiler\Func as CoreFunc;
@@ -301,17 +302,33 @@ class JIT {
                 case OpCode::TYPE_PRINT:
                     $argOffset = $op->type === OpCode::TYPE_ECHO ? $op->arg1 : $op->arg2;
                     $arg = $this->context->getVariableFromOp($block->getOperand($argOffset));
-                    $argValue = $this->context->helper->loadValue($arg);
                     switch ($arg->type) {
                         case Variable::TYPE_VALUE:
                             $argValue = $this->context->builder->call(
                         $this->context->lookupFunction('__value__readString') , 
-                        $argValue
+                        $arg->value
                         
                     );
-    
-                            // Fall through intentional                
-                        case Variable::TYPE_STRING:            
+                            $fmt = $this->context->builder->pointerCast(
+                        $this->context->constantFromString("%.*s"),
+                        $this->context->getTypeFromString('char*')
+                    );
+    $offset = $this->context->structFieldMap[$argValue->typeOf()->getElementType()->getName()]['length'];
+                    $__str__length = $this->context->builder->load(
+                        $this->context->builder->structGep($argValue, $offset)
+                    );
+    $offset = $this->context->structFieldMap[$argValue->typeOf()->getElementType()->getName()]['value'];
+                    $__str__value = $this->context->builder->structGep($argValue, $offset);
+    $this->context->builder->call(
+                    $this->context->lookupFunction('printf') , 
+                    $fmt
+                    , $__str__length
+                    , $__str__value
+                    
+                );
+                            break;
+                        case Variable::TYPE_STRING:
+                            $argValue = $this->context->helper->loadValue($arg);
                             $fmt = $this->context->builder->pointerCast(
                         $this->context->constantFromString("%.*s"),
                         $this->context->getTypeFromString('char*')
@@ -332,6 +349,7 @@ class JIT {
     
                             break;
                         case Variable::TYPE_NATIVE_LONG:
+                            $argValue = $this->context->helper->loadValue($arg);
                             $fmt = $this->context->builder->pointerCast(
                         $this->context->constantFromString("%lld"),
                         $this->context->getTypeFromString('char*')
@@ -345,6 +363,7 @@ class JIT {
     
                             break;
                         case Variable::TYPE_NATIVE_DOUBLE:
+                            $argValue = $this->context->helper->loadValue($arg);
                             $fmt = $this->context->builder->pointerCast(
                         $this->context->constantFromString("%G"),
                         $this->context->getTypeFromString('char*')
@@ -603,6 +622,27 @@ class JIT {
                     
                 );
     
+                    return;
+                case Variable::TYPE_NATIVE_BOOL:
+                    $boolVal = $this->context->helper->loadValue($value);
+                    $longVal = $this->context->builder->zExt(
+                        $boolVal,
+                        $this->context->getTypeFromString('int64')
+                    );
+                    $this->context->builder->call(
+                        $this->context->lookupFunction('__value__writeLong'),
+                        $valueRef,
+                        $longVal
+                    );
+
+                    return;
+                case Variable::TYPE_STRING:
+                    $this->context->builder->call(
+                        $this->context->lookupFunction('__value__writeString'),
+                        $valueRef,
+                        $this->context->helper->loadValue($value)
+                    );
+
                     return;
                 default:
                     throw new \LogicException("Source type: {$value->type}");

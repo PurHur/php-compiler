@@ -13,6 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
@@ -66,10 +67,9 @@ final class strval extends Internal
 
     private function boolToString(Context $context, Value $bool): Value
     {
-        $prev = $context->builder->getInsertBlock();
-        $trueBlock = $prev->insertBasicBlock('strval_true');
-        $falseBlock = $prev->insertBasicBlock('strval_false');
-        $endBlock = $falseBlock->insertBasicBlock('strval_bool_end');
+        $trueBlock = BasicBlockHelper::append($context, 'strval_true');
+        $falseBlock = BasicBlockHelper::append($context, 'strval_false');
+        $endBlock = BasicBlockHelper::append($context, 'strval_bool_end');
         $context->builder->branchIf($bool, $trueBlock, $falseBlock);
         $context->builder->positionAtEnd($trueBlock);
         $trueStr = $context->builder->load($context->constantStringFromString('1'));

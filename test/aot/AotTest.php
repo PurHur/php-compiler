@@ -130,15 +130,12 @@ final class AotTest extends BaseTest
         $compileErr = stream_get_contents($pipes[2]);
         fclose($pipes[1]);
         fclose($pipes[2]);
-        $compileCode = proc_close($compile);
-        if (0 !== $compileCode && !is_executable($outfile)) {
+        proc_close($compile);
+        if (!is_executable($outfile)) {
             $this->fail(
-                "AOT compile failed for {$name} (exit {$compileCode}): "
+                "AOT compile did not produce executable {$outfile}: "
                 . trim($compileErr !== false ? $compileErr : '')
             );
-        }
-        if (!is_executable($outfile)) {
-            $this->fail("AOT compile did not produce executable: {$outfile}");
         }
 
         $run = proc_open(

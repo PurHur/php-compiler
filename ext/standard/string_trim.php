@@ -13,6 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
@@ -92,10 +93,9 @@ final class string_trim extends Internal
         $zero = $i32->constInt(0, false);
         $isEmpty = $context->builder->icmp(Builder::INT_SLE, $sliceLen, $zero);
 
-        $prev = $context->builder->getInsertBlock();
-        $emptyBlock = $prev->insertBasicBlock('slice_empty');
-        $copyBlock = $prev->insertBasicBlock('slice_copy');
-        $doneBlock = $emptyBlock->insertBasicBlock('slice_done');
+        $emptyBlock = BasicBlockHelper::append($context, 'slice_empty');
+        $copyBlock = BasicBlockHelper::append($context, 'slice_copy');
+        $doneBlock = BasicBlockHelper::append($context, 'slice_done');
         $context->builder->branchIf($isEmpty, $emptyBlock, $copyBlock);
 
         $context->builder->positionAtEnd($emptyBlock);
@@ -133,10 +133,9 @@ final class string_trim extends Internal
         $zero = $i32->constInt(0, false);
         $one = $i32->constInt(1, false);
 
-        $prev = $context->builder->getInsertBlock();
-        $done = $prev->insertBasicBlock($fromStart ? 'trim_start_done' : 'trim_end_done');
-        $loopHead = $prev->insertBasicBlock($fromStart ? 'trim_start_head' : 'trim_end_head');
-        $loopBody = $prev->insertBasicBlock($fromStart ? 'trim_start_body' : 'trim_end_body');
+        $done = BasicBlockHelper::append($context, $fromStart ? 'trim_start_done' : 'trim_end_done');
+        $loopHead = BasicBlockHelper::append($context, $fromStart ? 'trim_start_head' : 'trim_end_head');
+        $loopBody = BasicBlockHelper::append($context, $fromStart ? 'trim_start_body' : 'trim_end_body');
         $context->builder->branch($loopHead);
 
         $context->builder->positionAtEnd($loopHead);
