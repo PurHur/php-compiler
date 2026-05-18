@@ -184,23 +184,22 @@ class JIT {
                     $this->assignOperand($block->getOperand($op->arg2), $value);
                     $this->assignOperand($block->getOperand($op->arg1), $value);
                     break;  
-                // case OpCode::TYPE_ARRAY_DIM_FETCH:
-                //     $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));
-                //     $dimOp = $block->getOperand($op->arg3);
-                //     $dim = $this->context->getVariableFromOp($dimOp);
-                //     if ($value->type & Variable::IS_NATIVE_ARRAY && $this->context->analyzer->needsBoundsCheck($value, $dimOp)) {
-                //         // compile bounds check
-                //         $builder->call(
-                //             $this->context->lookupFunction('__nativearray__boundscheck'),
-                //             $dim->value,
-                //             $this->context->constantFromInteger($value->nextFreeElement)
-                //         );
-                //     }
-                //     $this->assignOperand(
-                //         $block->getOperand($op->arg1),
-                //         $value->dimFetch($dim)
-                //     );
-                //     break;
+                case OpCode::TYPE_ARRAY_DIM_FETCH:
+                    $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));
+                    $dimOp = $block->getOperand($op->arg3);
+                    $dim = $this->context->getVariableFromOp($dimOp);
+                    if ($value->type & Variable::IS_NATIVE_ARRAY && $this->context->analyzer->needsBoundsCheck($value, $dimOp)) {
+                        $this->context->builder->call(
+                            $this->context->lookupFunction('__nativearray__boundscheck'),
+                            $dim->value,
+                            $this->context->constantFromInteger($value->nextFreeElement)
+                        );
+                    }
+                    $this->assignOperand(
+                        $block->getOperand($op->arg1),
+                        $value->dimFetch($dim)
+                    );
+                    break;
                 // case OpCode::TYPE_INIT_ARRAY:
                 // case OpCode::TYPE_ADD_ARRAY_ELEMENT:
                 //     $result = $this->context->getVariableFromOp($block->getOperand($op->arg1));
@@ -235,7 +234,14 @@ class JIT {
                     );
                     break;
                 case OpCode::TYPE_ISSET:
-                    throw new \LogicException('isset() is not implemented in JIT mode yet');
+                    $container = $this->context->getVariableFromOp($block->getOperand($op->arg2));
+                    $dim = null;
+                    if (null !== $op->arg3) {
+                        $dim = $this->context->getVariableFromOp($block->getOperand($op->arg3));
+                    }
+                    $issetResult = IssetHelper::compile($this->context, $container, $dim);
+                    $this->assignOperandValue($block->getOperand($op->arg1), $issetResult);
+                    break;
                 case OpCode::TYPE_BOOLEAN_NOT:
                     $from = $this->context->getVariableFromOp($block->getOperand($op->arg2));
                     if ($from->type === Variable::TYPE_NATIVE_BOOL) {

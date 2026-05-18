@@ -47,6 +47,15 @@ final class array_count extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('count() is not implemented for JIT in this compiler build');
+        if (1 !== count($args)) {
+            throw new \LogicException('count() requires exactly one argument');
+        }
+        if ($args[0]->type & JITVariable::IS_NATIVE_ARRAY) {
+            return $context->constantFromInteger($args[0]->nextFreeElement, 'int64');
+        }
+        if (JITVariable::TYPE_HASHTABLE === $args[0]->type) {
+            throw new \LogicException('count() on HashTable arrays is not implemented for JIT in this compiler build');
+        }
+        throw new \LogicException('count() only supports native arrays in this compiler build');
     }
 }

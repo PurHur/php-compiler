@@ -63,6 +63,20 @@ final class header_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('header() is not implemented for JIT in this compiler build');
+        $argc = count($args);
+        if ($argc < 1 || $argc > 3) {
+            throw new \LogicException('header() requires one to three arguments');
+        }
+        if (JITVariable::TYPE_STRING !== $args[0]->type) {
+            throw new \LogicException('header() only supports string header lines in this compiler build');
+        }
+        if ($argc > 1) {
+            throw new \LogicException(
+                'header() JIT only supports a single string argument in this compiler build'
+            );
+        }
+        JitHeader::emit($context, $context->helper->loadValue($args[0]));
+
+        return $context->getTypeFromString('int32')->constInt(0, false);
     }
 }
