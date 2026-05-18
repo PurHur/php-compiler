@@ -62,8 +62,8 @@ final class string_trim extends Internal
         $len = $context->builder->load(
             $context->builder->structGep($str, $map['length'])
         );
-        $i64 = $context->getTypeFromString('int64');
-        $zero = $i64->constInt(0, false);
+        $i64 = JitStringIndex::i64($context);
+        $zero = JitStringIndex::zero($context);
         $one = $i64->constInt(1, false);
         $charPtr = $context->builder->structGep($str, $map['value']);
 
@@ -89,8 +89,7 @@ final class string_trim extends Internal
         Value $start,
         Value $sliceLen
     ): Value {
-        $i64 = $context->getTypeFromString('int64');
-        $zero = $i64->constInt(0, false);
+        $zero = JitStringIndex::zero($context);
         $isEmpty = $context->builder->icmp(Builder::INT_SLE, $sliceLen, $zero);
 
         $emptyBlock = BasicBlockHelper::append($context, 'slice_empty');
@@ -129,8 +128,8 @@ final class string_trim extends Internal
         Value $indexSlot,
         bool $fromStart
     ): void {
-        $i64 = $context->getTypeFromString('int64');
-        $zero = $i64->constInt(0, false);
+        $i64 = JitStringIndex::i64($context);
+        $zero = JitStringIndex::zero($context);
         $one = $i64->constInt(1, false);
 
         $done = BasicBlockHelper::append($context, $fromStart ? 'trim_start_done' : 'trim_end_done');
@@ -152,8 +151,8 @@ final class string_trim extends Internal
             ? $context->builder->gep($charPtr, $idx)
             : $context->builder->gep($charPtr, $context->builder->sub($idx, $one));
         $ch = $context->builder->load($at);
-        $i32 = $context->getTypeFromString('int32');
-        $isTrim = self::jitIsTrimByte($context, $context->builder->zExt($ch, $i32));
+        $chI32 = $context->builder->zExt($ch, $context->getTypeFromString('int32'));
+        $isTrim = self::jitIsTrimByte($context, $chI32);
         $continueLoop = $fromStart
             ? $context->builder->addNoSignedWrap($idx, $one)
             : $context->builder->sub($idx, $one);

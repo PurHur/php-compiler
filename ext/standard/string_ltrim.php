@@ -60,8 +60,8 @@ final class string_ltrim extends Internal
         $len = $context->builder->load(
             $context->builder->structGep($str, $map['length'])
         );
-        $i64 = $context->getTypeFromString('int64');
-        $zero = $i64->constInt(0, false);
+        $i64 = JitStringIndex::i64($context);
+        $zero = JitStringIndex::zero($context);
         $charPtr = $context->builder->structGep($str, $map['value']);
 
         $startSlot = $context->builder->alloca($i64, 1, 'ltrim_start');

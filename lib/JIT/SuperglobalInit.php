@@ -99,4 +99,34 @@ final class SuperglobalInit
 
         return $table->offsetIsSet($keyVar);
     }
+
+    /**
+     * For AOT: read a string value from a superglobal at compile time (e.g. $_GET['name']).
+     */
+    public static function compileTimeReadString(
+        Context $context,
+        string $superglobalName,
+        string $key
+    ): ?\PHPLLVM\Value {
+        if (!self::compileTimeOffsetIsSet($context, $superglobalName, $key)) {
+            return null;
+        }
+        $vmVar = $context->runtime->vmContext->getSuperglobal($superglobalName);
+        $table = $vmVar->toArray();
+        if (!$table instanceof HashTable) {
+            return null;
+        }
+        $stored = $table->find($key);
+        if (null === $stored) {
+            return null;
+        }
+        $valueVar = $stored->resolveIndirect();
+        if (VMVariable::TYPE_STRING !== $valueVar->type) {
+            return null;
+        }
+
+        return $context->builder->load(
+            $context->constantStringFromString($valueVar->toString())
+        );
+    }
 }

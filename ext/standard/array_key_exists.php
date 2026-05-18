@@ -20,7 +20,7 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * array_key_exists() for arrays with int or string keys (subset of PHP; VM only).
+ * array_key_exists() for arrays with int or string keys (subset of PHP).
  */
 final class array_key_exists extends Internal
 {
