@@ -70,6 +70,7 @@ class OpCode {
     const TYPE_POW = 58;
     const TYPE_NOT_EQUAL = 59;
     const TYPE_NOT_IDENTICAL = 60;
+    const TYPE_SPACESHIP = 61;
 
     public int $type;
     public ?int $arg1;
