@@ -70,11 +70,33 @@ final class SuperglobalInit
             throw new \LogicException("Superglobal not initialized for JIT: {$name}");
         }
 
-        return new Variable(
+        $var = new Variable(
             $context,
             Variable::TYPE_HASHTABLE,
             Variable::KIND_VALUE,
             $context->builder->load(self::$globals[$name])
         );
+        $var->superglobalName = $name;
+
+        return $var;
+    }
+
+    /**
+     * For AOT: resolve isset($superglobal['key']) from VM data baked in at compile time.
+     */
+    public static function compileTimeOffsetIsSet(Context $context, string $superglobalName, string $key): ?bool
+    {
+        $vmVar = $context->runtime->vmContext->getSuperglobal($superglobalName);
+        if (null === $vmVar || VMVariable::TYPE_ARRAY !== $vmVar->type) {
+            return false;
+        }
+        $table = $vmVar->toArray();
+        if (!$table instanceof HashTable) {
+            return false;
+        }
+        $keyVar = new VMVariable();
+        $keyVar->string($key);
+
+        return $table->offsetIsSet($keyVar);
     }
 }

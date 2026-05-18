@@ -57,6 +57,12 @@ final class Variable {
     public PHPLLVM\Value $value;
     private Context $context;
 
+    /** When this hashtable is a compile-time superglobal (e.g. $_GET). */
+    public ?string $superglobalName = null;
+
+    /** String literal value when this variable represents a constant string operand. */
+    public ?string $compileTimeString = null;
+
     private static int $lvalueCounter = 0;
     public int $nextFreeElement = 0;
 
@@ -161,6 +167,7 @@ final class Variable {
                 break;
             case self::TYPE_STRING:
                 $value = $context->builder->load($context->constantStringFromString($op->value));
+                $literal = is_string($op->value) ? $op->value : null;
                 break;
             case self::TYPE_NATIVE_DOUBLE:
                 $value = $context->constantFromFloat($op->value, self::getStringType($type));
@@ -171,12 +178,17 @@ final class Variable {
             default:
                 throw new \LogicException("Literal type " . self::getStringType($type) . " not yet supported");
         }
-        return new Variable(
+        $var = new Variable(
             $context,
             $type,
             self::KIND_VALUE,
             $value
         );
+        if (isset($literal)) {
+            $var->compileTimeString = $literal;
+        }
+
+        return $var;
     }
 
     public static function fromConstantInt(Context $context, int $value): Variable {

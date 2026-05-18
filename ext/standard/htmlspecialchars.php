@@ -73,17 +73,29 @@ final class htmlspecialchars extends Internal
         if ($argc < 1 || $argc > 4) {
             throw new \LogicException('htmlspecialchars() requires one to four arguments');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type) {
-            throw new \LogicException('htmlspecialchars() only supports strings in this compiler build');
-        }
         if ($argc >= 2) {
             throw new \LogicException(
                 'htmlspecialchars() JIT only supports the default flags (ENT_QUOTES) in this compiler build'
             );
         }
 
-        $str = $context->helper->loadValue($args[0]);
+        $str = self::jitStringArg($context, $args[0]);
 
         return JitHtmlspecialchars::escape($context, $str);
+    }
+
+    private static function jitStringArg(Context $context, JITVariable $arg): Value
+    {
+        if (JITVariable::TYPE_STRING === $arg->type) {
+            return $context->helper->loadValue($arg);
+        }
+        if (JITVariable::TYPE_VALUE === $arg->type) {
+            return $context->builder->call(
+                $context->lookupFunction('__value__readString'),
+                $arg->value
+            );
+        }
+
+        throw new \LogicException('htmlspecialchars() only supports strings in this compiler build');
     }
 }

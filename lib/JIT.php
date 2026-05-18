@@ -242,12 +242,17 @@ class JIT {
                     );
                     break;
                 case OpCode::TYPE_ISSET:
-                    $container = $this->context->getVariableFromOp($block->getOperand($op->arg2));
-                    $dim = null;
-                    if (null !== $op->arg3) {
-                        $dim = $this->context->getVariableFromOp($block->getOperand($op->arg3));
-                    }
-                    $issetResult = IssetHelper::compile($this->context, $container, $dim);
+                    $containerOp = $block->getOperand($op->arg2);
+                    $dimOp = null !== $op->arg3 ? $block->getOperand($op->arg3) : null;
+                    $container = $this->context->getVariableFromOp($containerOp);
+                    $dim = null !== $dimOp ? $this->context->getVariableFromOp($dimOp) : null;
+                    $issetResult = IssetHelper::compile(
+                        $this->context,
+                        $container,
+                        $dim,
+                        $dimOp,
+                        $containerOp
+                    );
                     $this->assignOperandValue($block->getOperand($op->arg1), $issetResult);
                     break;
                 case OpCode::TYPE_BOOLEAN_NOT:
