@@ -457,23 +457,18 @@ class HashTable extends Type
         $valPtr = $this->lookupStringKeyValue($fn, $block, $ht, $key);
         $i1 = $this->context->getTypeFromString('int1');
         $isNull = $this->context->builder->icmp(Builder::INT_EQ, $valPtr, $valPtr->typeOf()->constNull());
-        $found = $fn->appendBasicBlock('strkey_isset_found');
+        $nullType = $this->context->getTypeFromString('int8')->constInt(0, false);
+        $check = $fn->appendBasicBlock('strkey_isset_check');
         $notFound = $fn->appendBasicBlock('strkey_isset_not_found');
-        $merge = $fn->appendBasicBlock('strkey_isset_merge');
-        $this->context->builder->branchIf($isNull, $notFound, $found);
-        $this->context->builder->positionAtEnd($found);
+        $this->context->builder->branchIf($isNull, $notFound, $check);
+        $this->context->builder->positionAtEnd($check);
         $typeByte = $this->context->builder->load(
             $this->context->builder->structGep($valPtr, $this->context->structFieldMap['__value__']['type'])
         );
-        $nullType = $this->context->getTypeFromString('int8')->constInt(0, false);
-        $set = $this->context->builder->icmp(Builder::INT_NE, $typeByte, $nullType);
-        $this->context->builder->branch($merge);
+        $hasValue = $this->context->builder->icmp(Builder::INT_NE, $typeByte, $nullType);
+        $this->context->builder->returnValue($hasValue);
         $this->context->builder->positionAtEnd($notFound);
-        $this->context->builder->branch($merge);
-        $this->context->builder->positionAtEnd($merge);
-        $result = $this->context->builder->phi($i1);
-        $result->addIncoming($set, $found);
-        $result->addIncoming($i1->constInt(0, false), $notFound);
+        $result = $i1->constInt(0, false);
         $this->context->builder->returnValue($result);
     }
 
@@ -498,18 +493,24 @@ class HashTable extends Type
         $nodeMap = $this->context->structFieldMap['__strkey_node__'];
         $head = $this->context->builder->load($this->context->builder->structGep($ht, $htMap['strKeys']));
         $valuePtrType = $this->context->getTypeFromString('__value__*');
+        $nodePtrType = $head->typeOf();
+
+        $currentSlot = $this->context->builder->alloca($nodePtrType, 1, 'strkey_current');
+        $this->context->builder->store($head, $currentSlot);
+
+        $resultSlot = $this->context->builder->alloca($valuePtrType, 1, 'strkey_lookup_result');
+        $this->context->builder->store($valuePtrType->constNull(), $resultSlot);
 
         $notFound = $fn->appendBasicBlock('strkey_lookup_not_found');
         $loopHead = $fn->appendBasicBlock('strkey_lookup_head');
         $loopBody = $fn->appendBasicBlock('strkey_lookup_body');
         $found = $fn->appendBasicBlock('strkey_lookup_found');
-        $merge = $fn->appendBasicBlock('strkey_lookup_merge');
+        $done = $fn->appendBasicBlock('strkey_lookup_done');
         $this->context->builder->branch($loopHead);
 
         $this->context->builder->positionAtEnd($loopHead);
-        $node = $this->context->builder->phi($head->typeOf());
-        $node->addIncoming($head, $block);
-        $isNull = $this->context->builder->icmp(Builder::INT_EQ, $node, $node->typeOf()->constNull());
+        $node = $this->context->builder->load($currentSlot);
+        $isNull = $this->context->builder->icmp(Builder::INT_EQ, $node, $nodePtrType->constNull());
         $this->context->builder->branchIf($isNull, $notFound, $loopBody);
 
         $this->context->builder->positionAtEnd($loopBody);
@@ -525,22 +526,20 @@ class HashTable extends Type
 
         $this->context->builder->positionAtEnd($found);
         $valField = $this->context->builder->structGep($node, $nodeMap['value']);
-        $this->context->builder->branch($merge);
+        $this->context->builder->store($valField, $resultSlot);
+        $this->context->builder->branch($done);
 
         $this->context->builder->positionAtEnd($next);
         $nextNode = $this->context->builder->load($this->context->builder->structGep($node, $nodeMap['next']));
+        $this->context->builder->store($nextNode, $currentSlot);
         $this->context->builder->branch($loopHead);
-        $node->addIncoming($nextNode, $next);
 
         $this->context->builder->positionAtEnd($notFound);
-        $this->context->builder->branch($merge);
+        $this->context->builder->branch($done);
 
-        $this->context->builder->positionAtEnd($merge);
-        $result = $this->context->builder->phi($valuePtrType);
-        $result->addIncoming($valField, $found);
-        $result->addIncoming($valuePtrType->constNull(), $notFound);
+        $this->context->builder->positionAtEnd($done);
 
-        return $result;
+        return $this->context->builder->load($resultSlot);
     }
 
     private function stringDataPtr(PHPLLVM\Value $str): PHPLLVM\Value

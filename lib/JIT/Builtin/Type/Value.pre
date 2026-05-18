@@ -47,6 +47,7 @@ class Value extends Type {
         $this->implementValueWriteLong();
         $this->implementValueReadDouble();
         $this->implementValueWriteDouble();
+        $this->implementValueReadString();
         $this->implementValueWriteString();
         $this->implementValueWriteNull();
         $this->implementValueDelref();
