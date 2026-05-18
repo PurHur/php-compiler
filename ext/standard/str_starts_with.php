@@ -60,11 +60,18 @@ final class str_starts_with extends Internal
         $tooLong = $context->builder->icmp(Builder::INT_ULT, $hayLen, $needleLen);
         $hayPtr = $context->builder->structGep($hay, $hayMap['value']);
         $needlePtr = $context->builder->structGep($needle, $needleMap['value']);
+        $compareLen = $context->builder->zExt(
+            $context->builder->trunc(
+                $needleLen,
+                $context->getTypeFromString('int32')
+            ),
+            $context->getTypeFromString('size_t')
+        );
         $cmp = $context->builder->call(
             $context->lookupFunction('strncmp'),
             $hayPtr,
             $needlePtr,
-            $needleLen
+            $compareLen
         );
         $zero = $cmp->typeOf()->constInt(0, false);
         $matches = $context->builder->icmp(Builder::INT_EQ, $cmp, $zero);

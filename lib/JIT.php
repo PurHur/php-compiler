@@ -627,15 +627,10 @@ class JIT {
     
                     return;
                 case Variable::TYPE_NATIVE_BOOL:
-                    $boolVal = $this->context->helper->loadValue($value);
-                    $longVal = $this->context->builder->zExt(
-                        $boolVal,
-                        $this->context->getTypeFromString('int64')
-                    );
-                    $this->context->builder->call(
-                        $this->context->lookupFunction('__value__writeLong'),
+                    JIT\JitValueBox::writeBool(
+                        $this->context,
                         $valueRef,
-                        $longVal
+                        $this->context->helper->loadValue($value)
                     );
 
                     return;

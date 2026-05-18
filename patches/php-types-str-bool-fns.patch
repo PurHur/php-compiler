@@ -1,0 +1,13 @@
+--- vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php
+@@ -7565,6 +7565,9 @@
+         'strrpos' => ['int', 'haystack' => 'string', 'needle' => 'string', 'offset=' => 'int'],
+         'str_shuffle' => ['', 'str' => 'string'],
+         'str_split' => ['array', 'str' => 'string', 'split_length=' => 'int'],
+         'strspn' => ['int', 'str' => 'string', 'mask' => 'string', 'start=' => 'int', 'len=' => 'int'],
++        'str_contains' => ['bool', 'haystack' => 'string', 'needle' => 'string'],
++        'str_ends_with' => ['bool', 'haystack' => 'string', 'needle' => 'string'],
++        'str_starts_with' => ['bool', 'haystack' => 'string', 'needle' => 'string'],
+         'strstr' => ['string', 'haystack' => 'string', 'needle' => '', 'part=' => 'bool'],
+         'strtok 1' => ['string', 'token' => 'string'],
+         'strtok' => ['string', 'str' => 'string', 'token' => 'str'],

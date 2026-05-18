@@ -33,4 +33,5 @@ apply_patch "$VENDOR_LLVM/lib/LLVMAbstract/Builder.php" "$PATCH_DIR/php-llvm-bui
 VENDOR_TYPES="$ROOT/vendor/ircmaxell/php-types"
 if [[ -d "$VENDOR_TYPES" ]]; then
   apply_patch "$VENDOR_TYPES/lib/PHPTypes/TypeReconstructor.php" "$PATCH_DIR/php-types-binaryop-pow.patch"
+  apply_patch "$VENDOR_TYPES/lib/PHPTypes/InternalArgInfo.php" "$PATCH_DIR/php-types-str-bool-fns.patch"
 fi
