@@ -119,6 +119,134 @@ final class VmString
         return $out;
     }
 
+    /** application/x-www-form-urlencoded (space as '+'). */
+    public static function urlencode(string $data): string
+    {
+        return self::percentEncode($data, true);
+    }
+
+    /** RFC 3986 raw encoding (space as %20). */
+    public static function rawurlencode(string $data): string
+    {
+        return self::percentEncode($data, false);
+    }
+
+    /**
+     * Minimal parse_url() for routing (http/https, path, query, host).
+     *
+     * @return array<string, int|string>|string|null
+     */
+    public static function parseUrl(string $url, int $component = -1)
+    {
+        $scheme = null;
+        $host = null;
+        $port = null;
+        $path = '';
+        $query = null;
+        $fragment = null;
+        $rest = $url;
+
+        if (preg_match('#^([a-z][a-z0-9+.-]*):#i', $rest, $m)) {
+            $scheme = strtolower($m[1]);
+            $rest = substr($rest, strlen($m[0]));
+            if (str_starts_with($rest, '//')) {
+                $rest = substr($rest, 2);
+                $slash = strpos($rest, '/');
+                $q = strpos($rest, '?');
+                $hash = strpos($rest, '#');
+                $end = self::minPositive($slash, $q, $hash);
+                $authority = false === $end ? $rest : substr($rest, 0, $end);
+                $rest = false === $end ? '' : substr($rest, $end);
+                if (str_contains($authority, '@')) {
+                    $authority = substr($authority, strrpos($authority, '@') + 1);
+                }
+                if (str_contains($authority, ':')) {
+                    [$host, $portStr] = explode(':', $authority, 2);
+                    $port = (int) $portStr;
+                } else {
+                    $host = $authority;
+                }
+            }
+        }
+
+        if (str_contains($rest, '#')) {
+            [$rest, $fragment] = explode('#', $rest, 2);
+        }
+        if (str_contains($rest, '?')) {
+            [$path, $query] = explode('?', $rest, 2);
+        } else {
+            $path = $rest;
+        }
+
+        $parts = [
+            'scheme' => $scheme,
+            'host' => $host,
+            'port' => $port,
+            'path' => $path,
+            'query' => $query,
+            'fragment' => $fragment,
+        ];
+
+        if (-1 === $component) {
+            return array_filter(
+                $parts,
+                static fn ($v) => null !== $v && '' !== $v
+            );
+        }
+
+        return match ($component) {
+            \PHP_URL_SCHEME => $scheme,
+            \PHP_URL_HOST => $host,
+            \PHP_URL_PORT => $port,
+            \PHP_URL_PATH => $path,
+            \PHP_URL_QUERY => $query,
+            \PHP_URL_FRAGMENT => $fragment,
+            default => throw new \LogicException('parse_url() component not supported in this compiler build'),
+        };
+    }
+
+    private static function percentEncode(string $data, bool $formEncoding): string
+    {
+        $len = self::byteLength($data);
+        $out = '';
+        for ($i = 0; $i < $len; ++$i) {
+            $ch = $data[$i];
+            $ord = self::byteOrd($ch);
+            if (
+                ($ord >= 48 && $ord <= 57)
+                || ($ord >= 65 && $ord <= 90)
+                || ($ord >= 97 && $ord <= 122)
+                || $ch === '-' || $ch === '_' || $ch === '.' || $ch === '~'
+            ) {
+                $out .= $ch;
+            } elseif ($formEncoding && $ch === ' ') {
+                $out .= '+';
+            } else {
+                $out .= '%' . strtoupper(self::bin2hex($ch));
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param int|false ...$candidates
+     */
+    private static function minPositive(...$candidates): int|false
+    {
+        $min = false;
+        foreach ($candidates as $c) {
+            if (false === $c) {
+                continue;
+            }
+            if (false === $min || $c < $min) {
+                $min = $c;
+            }
+        }
+
+        return $min;
+    }
+
     /**
      * @return list<string>
      */
