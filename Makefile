@@ -57,6 +57,11 @@ rebuild-changed:
 rebuild-examples:
 	docker run -v $(shell pwd):/compiler ircmaxell/php-compiler:16.04-dev php script/rebuild-examples.php
 
+# Host: refresh examples/README.md benchmark table (requires LLVM for AOT columns)
+.PHONY: bench
+bench:
+	./script/php-local.sh script/rebuild-examples.php
+
 .PHONY: fix
 fix:
 	docker run -v $(shell pwd):/compiler ircmaxell/php-compiler:16.04-dev php vendor/bin/php-cs-fixer fix --allow-risky=yes
