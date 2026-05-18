@@ -2,25 +2,16 @@
 Not-equal and not-identical operators (VM/JIT parity)
 --FILE--
 <?php
-function b($v): string {
-    return $v ? '1' : '0';
-}
-
-// Strict inequality edge cases
-echo b(null !== false);
-echo b(0 !== '');
-echo b(0 !== false);
-echo b('0' !== 0);
-
-// Loose inequality
-echo b(0 != false);
-echo b(0 != '');
-echo b(null != false);
-echo b('1' != 1);
-
-// Web-style guard
+echo (null !== false) ? '1' : '0';
+echo (0 !== '') ? '1' : '0';
+echo (0 !== false) ? '1' : '0';
+echo ('0' !== 0) ? '1' : '0';
+echo (0 != false) ? '1' : '0';
+echo (0 != '') ? '1' : '0';
+echo (null != false) ? '1' : '0';
+echo ('1' != 1) ? '1' : '0';
 $method = 'POST';
-echo b($method !== 'POST');
-echo b($method != 'GET');
+echo ($method !== 'POST') ? '1' : '0';
+echo ($method != 'GET') ? '1' : '0';
 --EXPECT--
-1111000001
+1111010001

@@ -103,6 +103,7 @@ restart:
                         goto return_bool;
                     case OpCode::TYPE_NOT_IDENTICAL:
                     case OpCode::TYPE_NOT_EQUAL:
+                    case OpCode::TYPE_NOT_IDENTICAL:
                         $result = $this->context->builder->fcmp(Builder::REAL_ONE, $leftValue, $rightValue);
                         goto return_bool;
                 }
@@ -177,6 +178,7 @@ restart:
                         goto return_bool;
                     case OpCode::TYPE_NOT_IDENTICAL:
                     case OpCode::TYPE_NOT_EQUAL:
+                    case OpCode::TYPE_NOT_IDENTICAL:
                         compile {
                             $result = $leftValue != $rightValue;
                         }
@@ -185,9 +187,11 @@ restart:
                 break;
             case TYPE_PAIR_NATIVE_LONG_NATIVE_BOOL:
                 if (OpCode::TYPE_IDENTICAL === $opcode->type) {
-                    compile {
-                        $result = 0;
-                    }
+                    $result = $this->context->getTypeFromString('int1')->constInt(0, false);
+                    goto return_bool;
+                }
+                if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
+                    $result = $this->context->getTypeFromString('int1')->constInt(1, false);
                     goto return_bool;
                 }
                 if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
@@ -211,9 +215,11 @@ restart:
                 break;
             case TYPE_PAIR_NATIVE_BOOL_NATIVE_LONG:
                 if (OpCode::TYPE_IDENTICAL === $opcode->type) {
-                    compile {
-                        $result = 0;
-                    }
+                    $result = $this->context->getTypeFromString('int1')->constInt(0, false);
+                    goto return_bool;
+                }
+                if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
+                    $result = $this->context->getTypeFromString('int1')->constInt(1, false);
                     goto return_bool;
                 }
                 if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
@@ -245,12 +251,35 @@ restart:
                         goto return_bool;
                     case OpCode::TYPE_NOT_IDENTICAL:
                     case OpCode::TYPE_NOT_EQUAL:
+                    case OpCode::TYPE_NOT_IDENTICAL:
                         compile {
                             $result = $leftValue != $rightValue;
                         }
                         goto return_bool;
                 }
                 break;
+        }
+        if (Variable::TYPE_VALUE === $leftType && Variable::TYPE_VALUE === $rightType) {
+            if (OpCode::TYPE_IDENTICAL === $opcode->type) {
+                $result = JitValueCompare::identicalValueToValue($this->context, $left, $right);
+                goto return_bool;
+            }
+            if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
+                $result = JitValueCompare::notIdenticalValueToValue($this->context, $left, $right);
+                goto return_bool;
+            }
+            if (OpCode::TYPE_EQUAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                $identical = JitValueCompare::identicalValueToValue($this->context, $left, $right);
+                if (OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                    $result = $this->context->builder->xor(
+                        $identical,
+                        $this->context->getTypeFromString('int1')->constInt(1, false)
+                    );
+                } else {
+                    $result = $identical;
+                }
+                goto return_bool;
+            }
         }
         if (Variable::TYPE_VALUE === $leftType && Variable::TYPE_VALUE !== $rightType) {
             if (OpCode::TYPE_IDENTICAL === $opcode->type) {

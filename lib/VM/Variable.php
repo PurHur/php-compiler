@@ -373,8 +373,47 @@ restart:
                     $other = $other->indirect;
                     goto restart;
                 }
+                return $this->looseEqual($self, $other);
         }
-        throw new \LogicException("Equals comparison between {$self->type} and {$other->type} not implemented");
+    }
+
+    private function looseEqual(Variable $self, Variable $other): bool {
+        if ($self->type === self::TYPE_NULL) {
+            return match ($other->type) {
+                self::TYPE_NULL => true,
+                self::TYPE_BOOLEAN => !$other->bool,
+                self::TYPE_INTEGER => 0 === $other->integer,
+                self::TYPE_STRING => '' === $other->string,
+                self::TYPE_FLOAT => 0.0 === $other->float,
+                default => false,
+            };
+        }
+        if ($other->type === self::TYPE_NULL) {
+            return $this->looseEqual($other, $self);
+        }
+        if ($self->type === self::TYPE_BOOLEAN && $other->type === self::TYPE_INTEGER) {
+            return ($other->integer !== 0) === $self->bool;
+        }
+        if ($self->type === self::TYPE_INTEGER && $other->type === self::TYPE_BOOLEAN) {
+            return ($self->integer !== 0) === $other->bool;
+        }
+        if ($self->type === self::TYPE_STRING && $other->type === self::TYPE_INTEGER) {
+            return is_numeric($self->string) && (int) $self->string == $other->integer;
+        }
+        if ($self->type === self::TYPE_INTEGER && $other->type === self::TYPE_STRING) {
+            return is_numeric($other->string) && $self->integer == (int) $other->string;
+        }
+        if ($self->type === self::TYPE_STRING && $other->type === self::TYPE_BOOLEAN) {
+            return $self->toBool() === $other->bool;
+        }
+        if ($self->type === self::TYPE_BOOLEAN && $other->type === self::TYPE_STRING) {
+            return $other->toBool() === $self->bool;
+        }
+        try {
+            return $self->toNumeric() == $other->toNumeric();
+        } catch (\LogicException) {
+            return false;
+        }
     }
 
     public function compareOp(int $opCode, Variable $left, Variable $right): void {
