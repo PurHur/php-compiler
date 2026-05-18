@@ -33,4 +33,5 @@ apply_patch "$PATCH_DIR/php-llvm-x86-posix-fallback.patch"
 
 if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-binaryop-pow.patch"
+  apply_patch "$PATCH_DIR/php-types-str-bool-fns.patch"
 fi

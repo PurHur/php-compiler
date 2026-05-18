@@ -20,6 +20,8 @@ use PHPCompiler\VM\Variable;
  */
 final class Superglobals
 {
+    private static ?Context $activeContext = null;
+
     public const NAMES = [
         '_GET',
         '_POST',
@@ -41,6 +43,7 @@ final class Superglobals
         ?string $queryString = null,
         ?string $postBody = null
     ): void {
+        self::$activeContext = $context;
         if (null === $queryString) {
             $fromEnv = getenv('QUERY_STRING');
             $queryString = false === $fromEnv ? '' : $fromEnv;
@@ -118,6 +121,26 @@ final class Superglobals
                 self::setStringEntry($server, $key, $value);
             }
         }
+    }
+
+    /**
+     * Keep $_ENV superglobal in sync after putenv() (assignment form only).
+     */
+    public static function syncEnvAfterPutenv(string $assignment): void
+    {
+        if (null === self::$activeContext || !str_contains($assignment, '=')) {
+            return;
+        }
+        [$key, $value] = explode('=', $assignment, 2);
+        if ('' === $key) {
+            return;
+        }
+        $fromEnv = \getenv($key);
+        if (false === $fromEnv) {
+            return;
+        }
+        $env = self::$activeContext->ensureSuperglobal('_ENV')->toArray();
+        self::setStringEntry($env, $key, $fromEnv);
     }
 
     private static function populateRequest(Context $context): void
