@@ -125,11 +125,11 @@ class HashTableTest extends TestCase
         $vars = [];
         for ($i = 0; $i < HashTable::MIN_SIZE + 1; ++$i) {
             $vars[$i] = $var = $this->int($i + 1);
-            $ht->add("${i}", $var);
+            $ht->add((string) $i, $var);
         }
         // resize triggers during MIN_SIZE + 1
         for ($i = 0; $i < HashTable::MIN_SIZE + 1; ++$i) {
-            $result = $ht->find("${i}");
+            $result = $ht->find((string) $i);
             $this->assertNotNull($result, 'ht->findIndex failed for index '.$i);
             $this->assertTrue($result->identicalTo($vars[$i]), 'result is identical to variable at index '.$i);
         }

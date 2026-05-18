@@ -1,0 +1,11 @@
+--- vendor/pre/plugin/source/Parser.php
++++ vendor/pre/plugin/source/Parser.php
+@@ -15,7 +15,7 @@
+ 
+ class Parser
+ {
+-    private $macro = [];
++    private array $macros = [];
+     private $compilers = [];
+ 
+     public function addMacro($macro)
