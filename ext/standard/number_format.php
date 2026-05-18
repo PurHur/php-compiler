@@ -19,7 +19,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * number_format() for integers and floats (C-style locale subset; VM only).
+ * number_format() for integers and floats (C-style locale subset; LLVM JIT/AOT).
  */
 final class number_format extends Internal
 {
@@ -68,6 +68,6 @@ final class number_format extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('number_format() is not implemented for JIT in this compiler build');
+        return JitNumberFormat::format($context, ...$args);
     }
 }
