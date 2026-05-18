@@ -68,7 +68,7 @@ final class strval extends Internal
         }
     }
 
-    private function valueToString(Context $context, Value $valuePtr): Value
+    public function valueToString(Context $context, Value $valuePtr): Value
     {
         $map = $context->structFieldMap['__value__'];
         $typeByte = $context->builder->load(
