@@ -11,7 +11,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** basename() for path strings (subset of PHP; VM only). */
+/** basename() for path strings (subset of PHP; JIT/AOT via JitPath). */
 final class basename extends Internal
 {
     public function execute(Frame $frame): void
@@ -31,6 +31,13 @@ final class basename extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('basename() is not implemented for JIT in this compiler build');
+        if (1 !== \count($args)) {
+            throw new \LogicException('basename() requires exactly one argument');
+        }
+        if (JITVariable::TYPE_STRING !== $args[0]->type) {
+            throw new \LogicException('basename() only supports strings in this compiler build');
+        }
+
+        return JitPath::basename($context, $context->helper->loadValue($args[0]));
     }
 }
