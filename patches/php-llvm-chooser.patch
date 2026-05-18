@@ -14,3 +14,4 @@
 +        }
  
          foreach ($searchPaths as $path) {
+             // search up to 3 subfolders
