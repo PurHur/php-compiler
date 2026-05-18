@@ -93,7 +93,8 @@ final class RuntimeSuperglobalRefreshTest extends TestCase
         fclose($pipes[0]);
         fclose($pipes[1]);
         fclose($pipes[2]);
-        proc_close($run);
+        $exitCode = proc_close($run);
+        $this->assertSame(0, $exitCode, 'AOT binary should exit with status 0');
 
         return $result !== false ? $result : '';
     }

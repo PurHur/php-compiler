@@ -82,18 +82,138 @@ final class Linker
         }
 
         $runtimeObject = $objectFile.'.runtime.o';
-        $clang = self::resolveClang();
-        $cmd = escapeshellarg($clang).' -c -fPIC -O2 '
+        $compiler = self::resolveRuntimeCompiler();
+        $includeFlags = self::runtimeCIncludeFlags();
+        $llvmDir = getenv('PHP_COMPILER_LLVM_PATH');
+        $env = (false !== $llvmDir && '' !== $llvmDir)
+            ? self::toolchainEnvironment($llvmDir)
+            : null;
+        $cmd = escapeshellarg($compiler).' -c -fPIC -O2'.$includeFlags.' '
             .escapeshellarg(self::RUNTIME_C).' -o '.escapeshellarg($runtimeObject);
-        $code = 0;
-        exec($cmd, $output, $code);
+        $descriptor = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+        $proc = proc_open($cmd, $descriptor, $pipes, null, $env);
+        if (!is_resource($proc)) {
+            throw new \LogicException('Failed to start AOT runtime compiler: '.$cmd);
+        }
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $code = proc_close($proc);
         if (0 !== $code || !is_file($runtimeObject)) {
             throw new \LogicException(
-                'Failed to compile AOT runtime: '.implode("\n", $output)
+                'Failed to compile AOT runtime: '.trim(
+                    ($stderr !== false ? $stderr : '')."\n".($stdout !== false ? $stdout : '')
+                )
             );
         }
 
         return $runtimeObject;
+    }
+
+    /**
+     * Prefer a host gcc/cc so libc headers resolve; fall back to the bundled clang-9.
+     */
+    private static function resolveRuntimeCompiler(): string
+    {
+        foreach (['gcc', 'cc', 'clang'] as $name) {
+            $path = trim((string) shell_exec('command -v '.escapeshellarg($name).' 2>/dev/null'));
+            if ('' !== $path) {
+                return $path;
+            }
+        }
+
+        return self::resolveBundledClang();
+    }
+
+    private static function resolveBundledClang(): string
+    {
+        $llvmDir = getenv('PHP_COMPILER_LLVM_PATH');
+        if (false !== $llvmDir && '' !== $llvmDir) {
+            foreach (['clang-9', 'clang'] as $name) {
+                $candidate = $llvmDir.'/'.$name;
+                if (is_executable($candidate)) {
+                    return $candidate;
+                }
+            }
+        }
+        foreach (['clang-9', 'clang'] as $name) {
+            $path = trim((string) shell_exec('command -v '.escapeshellarg($name).' 2>/dev/null'));
+            if ('' !== $path) {
+                return $path;
+            }
+        }
+
+        throw new \LogicException('No C compiler found for AOT runtime (clang/gcc).');
+    }
+
+    private static function runtimeCIncludeFlags(): string
+    {
+        $llvmDir = getenv('PHP_COMPILER_LLVM_PATH');
+        if (false !== $llvmDir && '' !== $llvmDir) {
+            $sysroot = $llvmDir.'/sysroot';
+            if (is_file($sysroot.'/usr/include/stdio.h')) {
+                return ' --sysroot='.escapeshellarg($sysroot);
+            }
+        }
+
+        $flags = '';
+        foreach (self::discoverSystemIncludeDirs() as $dir) {
+            $flags .= ' -isystem '.escapeshellarg($dir);
+        }
+
+        return $flags;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function discoverSystemIncludeDirs(): array
+    {
+        $dirs = [];
+        foreach (['gcc', 'cc', 'clang'] as $compiler) {
+            $path = trim((string) shell_exec('command -v '.escapeshellarg($compiler).' 2>/dev/null'));
+            if ('' === $path) {
+                continue;
+            }
+            $verbose = shell_exec(
+                escapeshellarg($path).' -E -Wp,-v -xc /dev/null 2>&1'
+            );
+            if (!is_string($verbose)) {
+                continue;
+            }
+            $capture = false;
+            foreach (explode("\n", $verbose) as $line) {
+                if (str_contains($line, '#include <...> search starts here:')) {
+                    $capture = true;
+
+                    continue;
+                }
+                if ($capture) {
+                    if (str_contains($line, 'End of search list')) {
+                        break;
+                    }
+                    $dir = trim($line);
+                    if ('' !== $dir && is_dir($dir)) {
+                        $dirs[$dir] = true;
+                    }
+                }
+            }
+            if ([] !== $dirs) {
+                break;
+            }
+        }
+
+        if ([] === $dirs) {
+            foreach (['/usr/include', '/usr/include/x86_64-linux-gnu'] as $fallback) {
+                if (is_dir($fallback)) {
+                    $dirs[$fallback] = true;
+                }
+            }
+        }
+
+        return array_keys($dirs);
     }
 
     private static function resolveClang(): string
