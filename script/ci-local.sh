@@ -16,7 +16,7 @@ if [[ -d "$EXT_DIR" ]]; then
     fi
   done
 fi
-if command -v composer >/dev/null 2>&1; then
-  composer install --no-interaction --ignore-platform-reqs --no-plugins
+if command -v composer >/dev/null 2>&1 && composer --version >/dev/null 2>&1; then
+  composer install --no-interaction --ignore-platform-reqs --no-plugins 2>/dev/null || true
 fi
 "$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit "$@"
