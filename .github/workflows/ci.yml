@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  phpunit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: tokenizer, mbstring, dom, xml, xmlwriter, ffi, posix, phar
+          coverage: none
+
+      - name: Cache Composer
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: composer-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-
+
+      - name: Cache LLVM 9 toolchain
+        id: llvm-cache
+        uses: actions/cache@v4
+        with:
+          path: .llvm
+          key: llvm9-${{ hashFiles('script/install-llvm9.sh') }}
+
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress --ignore-platform-reqs --no-plugins
+
+      - name: Install LLVM 9 (AOT/JIT)
+        run: |
+          chmod +x script/install-llvm9.sh script/apply-patches.sh
+          script/install-llvm9.sh
+          script/apply-patches.sh
+
+      - name: Check capability matrix
+        run: php script/capability-matrix.php --check
+
+      - name: PHPUnit (VM, compliance, real)
+        env:
+          PHP_COMPILER_SKIP_SERVE_TESTS: '1'
+        run: vendor/bin/phpunit --exclude-group llvm
+
+      - name: PHPUnit (JIT, AOT, web fixtures)
+        env:
+          LD_LIBRARY_PATH: ${{ github.workspace }}/.llvm
+          PATH: ${{ github.workspace }}/.llvm:${{ env.PATH }}
+          PHP_COMPILER_LLVM_PATH: ${{ github.workspace }}/.llvm
+        run: |
+          if [[ ! -f .llvm/libLLVM-9.so.1 ]]; then
+            echo 'LLVM 9 not installed; skipping @group llvm tests.'
+            exit 0
+          fi
+          vendor/bin/phpunit --group llvm

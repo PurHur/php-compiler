@@ -7,7 +7,9 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * AOT-compile the shipped SimpleWeb example from disk (not stdin PHPT).
+ * AOT-compile shipped web examples from disk (not stdin PHPT).
+ *
+ * @group llvm
  */
 final class ExampleWebAotTest extends TestCase
 {
@@ -29,31 +31,36 @@ final class ExampleWebAotTest extends TestCase
     {
         $source = realpath(__DIR__ . '/../../examples/001-SimpleWeb/example.php');
         $this->assertNotFalse($source);
+        $result = $this->compileAndRun($source, ['-q', 'name=Example']);
+        $this->assertStringContainsString('Content-Type: text/html; charset=UTF-8', $result);
+        $this->assertStringContainsString('<h1>Hello Example</h1>', $result);
+    }
+
+    public function testStaticWebExampleFile(): void
+    {
+        $source = realpath(__DIR__ . '/../../examples/002-StaticWeb/example.php');
+        $this->assertNotFalse($source);
+        $result = $this->compileAndRun($source, []);
+        $this->assertStringContainsString('Content-Type: text/html; charset=UTF-8', $result);
+        $this->assertStringContainsString('<h1>Hello World</h1>', $result);
+    }
+
+    /**
+     * @param list<string> $compileExtraArgs e.g. ['-q', 'name=Example']
+     */
+    private function compileAndRun(string $source, array $compileExtraArgs): string
+    {
         $outfile = tempnam(sys_get_temp_dir(), 'phpc_web_');
         $this->assertNotFalse($outfile);
         unlink($outfile);
 
         $repoRoot = dirname(__DIR__, 2);
-        $env = [];
-        foreach (array_merge($_ENV, $_SERVER) as $key => $value) {
-            if (is_string($value)) {
-                $env[$key] = $value;
-            }
-        }
-        $llvmDir = $repoRoot.'/.llvm';
-        if (is_file($llvmDir.'/libLLVM-9.so.1')) {
-            $prefix = realpath($llvmDir) ?: $llvmDir;
-            $env['PHP_COMPILER_LLVM_PATH'] = $prefix;
-            $ld = $env['LD_LIBRARY_PATH'] ?? '';
-            $env['LD_LIBRARY_PATH'] = '' === $ld ? $prefix : $prefix.':'.$ld;
-            $path = $env['PATH'] ?? '';
-            $env['PATH'] = '' === $path ? $prefix : $prefix.':'.$path;
-        }
+        $env = $this->llvmProcessEnv($repoRoot);
 
         $compileArgv = array_merge(
             self::llvmEnvPrefix(),
             self::phpCommand(),
-            [$this->compileBin, '-q', 'name=Example', '-o', $outfile, $source]
+            array_merge([$this->compileBin], $compileExtraArgs, ['-o', $outfile, $source])
         );
         $descriptorSpec = [
             0 => ['pipe', 'r'],
@@ -78,8 +85,31 @@ final class ExampleWebAotTest extends TestCase
         proc_close($run);
         @unlink($outfile);
 
-        $this->assertStringContainsString('Content-Type: text/html; charset=UTF-8', $result !== false ? $result : '');
-        $this->assertStringContainsString('<h1>Hello Example</h1>', $result !== false ? $result : '');
+        return $result !== false ? $result : '';
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function llvmProcessEnv(string $repoRoot): array
+    {
+        $env = [];
+        foreach (array_merge($_ENV, $_SERVER) as $key => $value) {
+            if (is_string($value)) {
+                $env[$key] = $value;
+            }
+        }
+        $llvmDir = $repoRoot.'/.llvm';
+        if (is_file($llvmDir.'/libLLVM-9.so.1')) {
+            $prefix = realpath($llvmDir) ?: $llvmDir;
+            $env['PHP_COMPILER_LLVM_PATH'] = $prefix;
+            $ld = $env['LD_LIBRARY_PATH'] ?? '';
+            $env['LD_LIBRARY_PATH'] = '' === $ld ? $prefix : $prefix.':'.$ld;
+            $path = $env['PATH'] ?? '';
+            $env['PATH'] = '' === $path ? $prefix : $prefix.':'.$path;
+        }
+
+        return $env;
     }
 
     /**
