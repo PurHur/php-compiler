@@ -280,6 +280,8 @@ class Compiler {
             return OpCode::TYPE_IDENTICAL;
         } elseif ($expr instanceof Op\Expr\BinaryOp\NotIdentical) {
             return OpCode::TYPE_NOT_IDENTICAL;
+        } elseif ($expr instanceof Op\Expr\BinaryOp\Spaceship) {
+            return OpCode::TYPE_SPACESHIP;
         } elseif ($expr instanceof Op\Expr\BinaryOp\Minus) {
             return OpCode::TYPE_MINUS;
         } elseif ($expr instanceof Op\Expr\BinaryOp\Mul) {

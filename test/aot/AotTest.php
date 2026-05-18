@@ -99,6 +99,7 @@ final class AotTest extends BaseTest
                 $env[$parts[0]] = $parts[1];
             }
         }
+        $runEnv = $env;
 
         $compileArgv = [$this->BIN, '-o', $outfile];
         if (isset($sections['ENV'])) {
@@ -136,12 +137,22 @@ final class AotTest extends BaseTest
             );
         }
 
+        $runArgv = [$outfile];
+        if (isset($sections['ENV'])) {
+            $runArgv = array_merge(self::llvmEnvPrefix(), $runArgv);
+            foreach (explode("\n", trim($sections['ENV'])) as $line) {
+                $line = trim($line);
+                if ('' !== $line) {
+                    array_splice($runArgv, -1, 0, [$line]);
+                }
+            }
+        }
         $run = proc_open(
-            [$outfile],
+            $runArgv,
             $descriptorSpec,
             $runPipes,
             $repoRoot,
-            $env
+            $runEnv
         );
         $result = stream_get_contents($runPipes[1]);
         fclose($runPipes[0]);

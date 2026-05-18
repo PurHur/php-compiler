@@ -106,9 +106,17 @@ restart:
                         goto return_bool;
                     case OpCode::TYPE_NOT_IDENTICAL:
                     case OpCode::TYPE_NOT_EQUAL:
-                    case OpCode::TYPE_NOT_IDENTICAL:
                         $result = $this->context->builder->fcmp(Builder::REAL_ONE, $leftValue, $rightValue);
                         goto return_bool;
+                    case OpCode::TYPE_SPACESHIP:
+                        $lt = $this->context->builder->fcmp(Builder::REAL_OLT, $leftValue, $rightValue);
+                        $gt = $this->context->builder->fcmp(Builder::REAL_OGT, $leftValue, $rightValue);
+                        $ty = $leftValue->typeOf();
+                        $negOne = $ty->constInt(-1, true);
+                        $one = $ty->constInt(1, true);
+                        $zero = $ty->constInt(0, false);
+                        $result = $this->context->builder->select($gt, $one, $this->context->builder->select($lt, $negOne, $zero));
+                        goto return_long;
                 }
                 break;
             case TYPE_PAIR_NATIVE_LONG_NATIVE_LONG:
@@ -437,6 +445,8 @@ restart:
 
                         
 
+                        
+
                         $result = $this->context->builder->icmp(\PHPLLVM\Builder::INT_NE, $leftValue, $__right);
     
                         goto return_bool;
@@ -444,6 +454,16 @@ restart:
                         $__right = $this->context->builder->intCast($rightValue, $leftValue->typeOf());
                         $result = $this->context->builder->icmp(\PHPLLVM\Builder::INT_NE, $leftValue, $__right);
                         goto return_bool;
+                    case OpCode::TYPE_SPACESHIP:
+                        $__right = $this->context->builder->intCast($rightValue, $leftValue->typeOf());
+                        $lt = $this->context->builder->icmp(\PHPLLVM\Builder::INT_SLT, $leftValue, $__right);
+                        $gt = $this->context->builder->icmp(\PHPLLVM\Builder::INT_SGT, $leftValue, $__right);
+                        $ty = $leftValue->typeOf();
+                        $negOne = $ty->constInt(-1, true);
+                        $one = $ty->constInt(1, true);
+                        $zero = $ty->constInt(0, false);
+                        $result = $this->context->builder->select($gt, $one, $this->context->builder->select($lt, $negOne, $zero));
+                        goto return_long;
                 }
                 break;
             case TYPE_PAIR_NATIVE_LONG_NATIVE_BOOL:

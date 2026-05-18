@@ -109,6 +109,12 @@ restart:
                     $arg3 = $frame->scope[$op->arg3];
                     $arg1->compareOp($op->type, $arg2, $arg3);
                     break;
+                case OpCode::TYPE_SPACESHIP:
+                    $arg1 = $frame->scope[$op->arg1];
+                    $arg2 = $frame->scope[$op->arg2];
+                    $arg3 = $frame->scope[$op->arg3];
+                    $arg1->spaceshipOp($arg2, $arg3);
+                    break;
                 case OpCode::TYPE_PLUS:
                 case OpCode::TYPE_MINUS:
                 case OpCode::TYPE_MUL:

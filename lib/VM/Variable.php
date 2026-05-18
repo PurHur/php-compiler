@@ -375,6 +375,7 @@ restart:
                 }
                 return $this->looseEqual($self, $other);
         }
+        throw new \LogicException("Equals comparison between {$self->type} and {$other->type} not implemented");
     }
 
     private function looseEqual(Variable $self, Variable $other): bool {
@@ -469,6 +470,56 @@ restart:
             default:
                 throw new \LogicException("Non-implemented numeric comparison operation $opCode");
         }
+    }
+
+    public function spaceshipOp(Variable $left, Variable $right): void {
+        $this->reset();
+restart:
+        switch (type_pair($left->type, $right->type)) {
+            case TYPE_PAIR_INTEGER_INTEGER:
+                $this->int($this->_spaceship($left->integer, $right->integer));
+                break;
+            case TYPE_PAIR_INTEGER_FLOAT:
+                $this->int($this->_spaceship($left->integer, $right->float));
+                break;
+            case TYPE_PAIR_FLOAT_INTEGER:
+                $this->int($this->_spaceship($left->float, $right->integer));
+                break;
+            case TYPE_PAIR_FLOAT_FLOAT:
+                $this->int($this->_spaceship($left->float, $right->float));
+                break;
+            case TYPE_PAIR_STRING_STRING:
+                $cmp = strcmp($left->string, $right->string);
+                $this->int($cmp < 0 ? -1 : ($cmp > 0 ? 1 : 0));
+                break;
+            case TYPE_PAIR_BOOLEAN_BOOLEAN:
+                $this->int($this->_spaceship((int) $left->bool, (int) $right->bool));
+                break;
+            case TYPE_PAIR_NULL_NULL:
+                $this->int(0);
+                break;
+            default:
+                if ($left->type === self::TYPE_INDIRECT) {
+                    $left = $left->indirect;
+                    goto restart;
+                } elseif ($right->type === self::TYPE_INDIRECT) {
+                    $right = $right->indirect;
+                    goto restart;
+                } else {
+                    $this->int($this->_spaceship($left->toNumeric(), $right->toNumeric()));
+                }
+        }
+    }
+
+    private function _spaceship($left, $right): int {
+        if ($left < $right) {
+            return -1;
+        }
+        if ($left > $right) {
+            return 1;
+        }
+
+        return 0;
     }
 
     public function bitwiseOp(int $opCode, Variable $left, Variable $right): void {
