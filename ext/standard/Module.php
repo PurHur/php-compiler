@@ -73,6 +73,10 @@ class Module extends ModuleAbstract
             new strncmp(),
             new array_count(),
             new array_key_exists(),
+            new in_array(),
+            new array_push(),
+            new explode(),
+            new implode(),
         ];
     }
 
