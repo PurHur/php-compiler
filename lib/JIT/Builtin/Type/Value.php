@@ -228,6 +228,7 @@ class Value extends Type {
         $this->implementValueWriteLong();
         $this->implementValueReadDouble();
         $this->implementValueWriteDouble();
+        $this->implementValueWriteString();
         $this->implementValueWriteNull();
         $this->implementValueDelref();
     }
@@ -3244,10 +3245,12 @@ class Value extends Type {
                     $this->context->builder->structGep($value, $offset)
                 );
     $offset = $this->context->structFieldMap[$value->typeOf()->getElementType()->getName()]['value'];
-                $this->context->builder->store(
-                    $string,
-                    $this->context->builder->structGep($value, $offset)
-                );
+        $ptr = $this->context->builder->structGep($value, $offset);
+        $stringSlot = $this->context->builder->pointerCast(
+            $ptr,
+            $this->context->getTypeFromString('__string__*')->pointerType(0)
+        );
+        $this->context->builder->store($string, $stringSlot);
     $this->context->builder->returnVoid();
     
     $this->context->builder->clearInsertionPosition();
