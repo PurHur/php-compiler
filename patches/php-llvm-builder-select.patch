@@ -1,0 +1,11 @@
+--- vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php
++++ vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php
+@@ -484,7 +484,7 @@ class Builder implements CoreBuilder {
+     }
+ 
+     public function select(CoreValue $if, CoreValue $then, CoreValue $else): CoreValue {
+-        return $this->llvm->factory->value($this->context, $this->llvm->lib->LLVMBuildSelect($this->builder, $if->value, $$then->value, $else->value, ''));
++        return $this->llvm->factory->value($this->context, $this->llvm->lib->LLVMBuildSelect($this->builder, $if->value, $then->value, $else->value, ''));
+     }
+ 
+     public function vaarg(CoreValue $list, CoreType $type): CoreValue {

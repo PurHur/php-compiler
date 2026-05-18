@@ -10,6 +10,7 @@ declare(strict_types=1);
  */
 
 require __DIR__.'/yay-php8-compat.php';
+require __DIR__.'/llvm-env.php';
 require __DIR__.'/../vendor/autoload.php';
 
 ini_set('memory_limit', '-1');

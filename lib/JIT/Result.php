@@ -55,19 +55,15 @@ class Result {
 
     public function getCallable(string $funcName, string $callbackType): callable {
         $address = $this->engine->getFunctionAddress($funcName);
-        $code = FFI::new('size_t');
-        $code = $address;
+        $code = FFI::new('uintptr_t');
+        $code->cdata = $address;
         $cb = FFI::new($callbackType);
         FFI::memcpy(
             FFI::addr($cb),
-	    // Incorrectly flagged due to https://github.com/phan/phan/issues/2659
-	    // @phan-suppress-next-line PhanTypeMismatchArgumentInternal
             FFI::addr($code),
             FFI::sizeof($cb)
         );
 
-	// Phan isn't smart enough to realize that $cb is an address of a callable.
-	//@phan-suppress-next-line PhanTypeMismatchReturn
         return $cb;
     }
 }

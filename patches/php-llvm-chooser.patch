@@ -1,0 +1,16 @@
+--- vendor/ircmaxell/php-llvm/lib/Chooser.php
++++ vendor/ircmaxell/php-llvm/lib/Chooser.php
+@@ -46,10 +46,15 @@ class Chooser {
+     protected static function findFile(string $file): ?string {
+         $searchPaths = [
+             '/usr/lib',
+             '/usr/local/lib',
+-            '/opt'
++            '/opt',
+         ];
++        $bundled = getenv('PHP_COMPILER_LLVM_PATH');
++        if (false !== $bundled && '' !== $bundled) {
++            array_unshift($searchPaths, $bundled);
++        }
+ 
+         foreach ($searchPaths as $path) {
