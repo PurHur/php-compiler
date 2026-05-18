@@ -9,7 +9,7 @@
          convertWarningsToExceptions="true"
          processIsolation="false"
          stopOnFailure="false"
-         bootstrap="./vendor/autoload.php">
+         bootstrap="./test/bootstrap.php">
     <coverage>
         <include>
             <directory suffix=".php">./lib</directory>

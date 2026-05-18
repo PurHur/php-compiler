@@ -42,6 +42,14 @@ final class bin2hex extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('bin2hex() is not implemented for JIT in this compiler build');
+        $this->context = $context;
+        if (1 !== count($args)) {
+            throw new \LogicException('bin2hex() requires exactly one argument');
+        }
+        if (JITVariable::TYPE_STRING !== $args[0]->type) {
+            throw new \LogicException('bin2hex() only supports strings in this compiler build');
+        }
+
+        return JitBin2hex::convert($context, $context->helper->loadValue($args[0]));
     }
 }
