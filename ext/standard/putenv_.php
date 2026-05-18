@@ -42,6 +42,13 @@ final class putenv_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('putenv() is not supported in JIT in this compiler build');
+        if (1 !== \count($args)) {
+            throw new \LogicException('putenv() requires exactly one argument');
+        }
+        if (JITVariable::TYPE_STRING !== $args[0]->type) {
+            throw new \LogicException('putenv() requires a string assignment in this compiler build');
+        }
+
+        return JitEnv::putenv($context, $context->helper->loadValue($args[0]));
     }
 }
