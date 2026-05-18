@@ -55,6 +55,10 @@ class Module extends ModuleAbstract
             new decoct(),
             new octdec(),
             new bindec(),
+            new is_numeric(),
+            new is_scalar(),
+            new lcfirst(),
+            new ucfirst(),
         ];
     }
 
@@ -79,6 +83,16 @@ class Module extends ModuleAbstract
             $ft = $context->context->functionType($i64, false, $i8p, $i8pp, $i32);
             $fn = $context->module->addFunction('strtol', $ft);
             $context->registerFunction('strtol', $fn);
+        }
+        try {
+            $context->lookupFunction('strtod');
+        } catch (\Throwable $e) {
+            $i8p = $context->getTypeFromString('int8*');
+            $i8pp = $context->getTypeFromString('int8**');
+            $double = $context->getTypeFromString('double');
+            $ft = $context->context->functionType($double, false, $i8p, $i8pp);
+            $fn = $context->module->addFunction('strtod', $ft);
+            $context->registerFunction('strtod', $fn);
         }
         $double = $context->getTypeFromString('double');
         foreach (['ceil', 'floor', 'round', 'sqrt', 'log', 'exp', 'sin', 'cos', 'tan', 'pow', 'fmod'] as $name) {
