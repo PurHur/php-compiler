@@ -45,7 +45,7 @@ final class strpos extends Internal
             }
             $offset = $offVar->toInt();
         }
-        $result = \strpos($haystack->toString(), $needle->toString(), $offset);
+        $result = VmString::strpos($haystack->toString(), $needle->toString(), $offset);
         if (false === $result) {
             $frame->returnVar->bool(false);
         } else {

@@ -52,6 +52,8 @@ final class Superglobals
             $postBody = false === $fromEnv ? '' : $fromEnv;
         }
         self::populatePost($context, $postBody);
+        self::populateServer($context, $queryString, $postBody);
+        self::populateRequest($context);
     }
 
     private static function populateGet(Context $context, string $queryString): void
@@ -66,6 +68,62 @@ final class Superglobals
         self::populateFormEncoded($post->toArray(), $postBody);
     }
 
+    private static function populateServer(
+        Context $context,
+        string $queryString,
+        string $postBody
+    ): void {
+        $server = $context->ensureSuperglobal('_SERVER')->toArray();
+
+        $method = getenv('REQUEST_METHOD');
+        if (false === $method || '' === $method) {
+            $method = '' !== $postBody ? 'POST' : 'GET';
+        }
+
+        $scriptName = getenv('SCRIPT_NAME');
+        if (false === $scriptName || '' === $scriptName) {
+            $scriptName = '/index.php';
+        }
+
+        self::setStringEntry($server, 'REQUEST_METHOD', $method);
+        self::setStringEntry($server, 'QUERY_STRING', $queryString);
+        self::setStringEntry($server, 'SCRIPT_NAME', $scriptName);
+        self::setStringEntry($server, 'PHP_SELF', $scriptName);
+
+        $requestUri = getenv('REQUEST_URI');
+        if (false === $requestUri || '' === $requestUri) {
+            $requestUri = $scriptName;
+            if ('' !== $queryString) {
+                $requestUri .= '?'.$queryString;
+            }
+        }
+        self::setStringEntry($server, 'REQUEST_URI', $requestUri);
+        self::setStringEntry($server, 'GATEWAY_INTERFACE', 'CGI/1.1');
+        self::setStringEntry($server, 'SERVER_SOFTWARE', 'PHP-Compiler-VM');
+
+        foreach ($_SERVER as $key => $value) {
+            if (!is_string($key) || !is_string($value)) {
+                continue;
+            }
+            if (str_starts_with($key, 'HTTP_')) {
+                self::setStringEntry($server, $key, $value);
+            }
+        }
+    }
+
+    private static function populateRequest(Context $context): void
+    {
+        $request = $context->ensureSuperglobal('_REQUEST')->toArray();
+        $get = $context->getSuperglobal('_GET');
+        $post = $context->getSuperglobal('_POST');
+        if (null !== $get) {
+            $request->mergeStringKeysFrom($get->toArray());
+        }
+        if (null !== $post) {
+            $request->mergeStringKeysFrom($post->toArray(), true);
+        }
+    }
+
     private static function populateFormEncoded(HashTable $ht, string $body): void
     {
         if ('' === $body) {
@@ -77,9 +135,14 @@ final class Superglobals
             if (!is_string($key) || is_array($value)) {
                 continue;
             }
-            $v = new Variable(Variable::TYPE_STRING);
-            $v->string((string) $value);
-            $ht->add($key, $v);
+            self::setStringEntry($ht, $key, (string) $value);
         }
+    }
+
+    private static function setStringEntry(HashTable $ht, string $key, string $value): void
+    {
+        $v = new Variable(Variable::TYPE_STRING);
+        $v->string($value);
+        $ht->add($key, $v);
     }
 }

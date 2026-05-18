@@ -243,6 +243,22 @@ final class VmString
         return $out;
     }
 
+    /**
+     * @return int|false
+     */
+    public static function strpos(string $haystack, string $needle, int $offset = 0)
+    {
+        if ('' === $needle) {
+            throw new \LogicException('strpos(): Argument #2 ($needle) cannot be empty');
+        }
+        if ($offset < 0) {
+            $offset = 0;
+        }
+        $pos = self::findSubstring($haystack, $needle, $offset);
+
+        return false === $pos ? false : $pos;
+    }
+
     public static function startsWith(string $haystack, string $needle): bool
     {
         $nlen = \strlen($needle);
