@@ -19,7 +19,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * bin2hex() for string arguments (subset of PHP; VM only).
+ * bin2hex() for string arguments (subset of PHP).
  */
 final class bin2hex extends Internal
 {
@@ -43,7 +43,7 @@ final class bin2hex extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
-        if (1 !== count($args)) {
+        if (1 !== \count($args)) {
             throw new \LogicException('bin2hex() requires exactly one argument');
         }
         if (JITVariable::TYPE_STRING !== $args[0]->type) {

@@ -14,13 +14,15 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * array_fill() for integer start index, non-negative count, and a scalar value (subset of PHP; VM only).
+ * array_fill() for integer start index, non-negative count, and a scalar value (subset of PHP).
  */
 final class array_fill extends Internal
 {
@@ -56,6 +58,20 @@ final class array_fill extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('array_fill() is not implemented for JIT in this compiler build');
+        $this->context = $context;
+        if (3 !== \count($args)) {
+            throw new \LogicException('array_fill() requires exactly three arguments');
+        }
+        if (JITVariable::TYPE_NATIVE_LONG !== $args[0]->type
+            || JITVariable::TYPE_NATIVE_LONG !== $args[1]->type) {
+            throw new \LogicException('array_fill() start index and count must be integers in this compiler build');
+        }
+        $startIndex = $context->helper->loadValue($args[0]);
+        $count = $context->helper->loadValue($args[1]);
+        $sizeT = $context->getTypeFromString('size_t');
+        $countSized = $context->builder->truncOrBitCast($count, $sizeT);
+        $startSized = $context->builder->truncOrBitCast($startIndex, $sizeT);
+
+        return HashTableHelper::buildArrayFill($context, $startSized, $countSized, $args[2]);
     }
 }

@@ -61,6 +61,15 @@ final class boolval extends Internal
                 return $this->stringTruthy($context, $context->helper->loadValue($args[0]));
             case JITVariable::TYPE_NULL:
                 return $context->constantFromBool(false);
+            case JITVariable::TYPE_HASHTABLE:
+                $ht = $context->helper->loadValue($args[0]);
+                $num = $context->builder->call(
+                    $context->lookupFunction('__hashtable__getNumElements'),
+                    $ht
+                );
+                $zero = $num->typeOf()->constInt(0, false);
+
+                return $context->builder->icmp(Builder::INT_NE, $num, $zero);
             default:
                 throw new \LogicException('boolval() does not support this value type in this compiler build');
         }

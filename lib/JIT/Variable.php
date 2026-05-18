@@ -317,6 +317,24 @@ final class Variable {
                     self::KIND_VALUE,
                     $ptr,
                 );
+            case self::TYPE_HASHTABLE:
+                $ht = $this->context->helper->loadValue($this);
+                $index = $this->context->builder->truncOrBitCast(
+                    $this->context->helper->loadValue($dim),
+                    $this->context->getTypeFromString('size_t')
+                );
+                $long = $this->context->builder->call(
+                    $this->context->lookupFunction('__hashtable__readLongAt'),
+                    $ht,
+                    $index
+                );
+
+                return new Variable(
+                    $this->context,
+                    self::TYPE_NATIVE_LONG,
+                    self::KIND_VALUE,
+                    $long
+                );
             default:
                 if (!$this->type & self::IS_NATIVE_ARRAY) {
                     throw new \LogicException("Unsupported dim fetch on " . self::getStringType($this->type));
