@@ -209,31 +209,25 @@ class JIT {
                         $value->dimFetch($dim, $resultOp->type)
                     );
                     break;
-                // case OpCode::TYPE_INIT_ARRAY:
-                // case OpCode::TYPE_ADD_ARRAY_ELEMENT:
-                //     $result = $this->context->getVariableFromOp($block->getOperand($op->arg1));
-                //     if ($result->type & Variable::IS_NATIVE_ARRAY) {
-                //         if (is_null($op->arg3)) {
-                //             $idx = $result->nextFreeElement;
-                //         } else {
-                //             // this is safe, since we only compile to native array if it's checked to be good
-                //             $idx = $block->getOperand($op->arg3)->value;
-                //         }
-                //         $this->context->helper->assign(
-                //             $gccBlock,
-                //             \gcc_jit_context_new_array_access(
-                //                 $this->context->context,
-                //                 $this->context->location(),
-                //                 $result->rvalue,
-                //                 $this->context->constantFromInteger($idx, 'size_t')
-                //             ),
-                //             $this->context->getVariableFromOp($block->getOperand($op->arg2))->rvalue
-                //         );
-                //         $result->nextFreeElement = max($result->nextFreeElement, $idx + 1);
-                //     } else {
-                //         throw new \LogicException('Hash tables not implemented yet');
-                //     }
-                //     break;
+                case OpCode::TYPE_INIT_ARRAY:
+                    $result = $this->context->getVariableFromOp($block->getOperand($op->arg1));
+                    JIT\HashTableHelper::initArray($this->context, $result);
+                    if (null !== $op->arg2) {
+                        $element = $this->context->getVariableFromOp($block->getOperand($op->arg2));
+                        $key = null !== $op->arg3
+                            ? $this->context->getVariableFromOp($block->getOperand($op->arg3))
+                            : null;
+                        JIT\HashTableHelper::addElement($this->context, $result, $element, $key);
+                    }
+                    break;
+                case OpCode::TYPE_ADD_ARRAY_ELEMENT:
+                    $result = $this->context->getVariableFromOp($block->getOperand($op->arg1));
+                    $element = $this->context->getVariableFromOp($block->getOperand($op->arg2));
+                    $key = null !== $op->arg3
+                        ? $this->context->getVariableFromOp($block->getOperand($op->arg3))
+                        : null;
+                    JIT\HashTableHelper::addElement($this->context, $result, $element, $key);
+                    break;
                 case OpCode::TYPE_TYPE_ASSERT:
                     $this->assignOperand(
                         $block->getOperand($op->arg1),
@@ -356,7 +350,7 @@ class JIT {
                         case Variable::TYPE_NATIVE_DOUBLE:
                             $argValue = $this->context->helper->loadValue($arg);
                             $fmt = $this->context->builder->pointerCast(
-                        $this->context->constantFromString("%G"),
+                        $this->context->constantFromString("%.14G"),
                         $this->context->getTypeFromString('char*')
                     );
     $this->context->builder->call(
@@ -402,10 +396,7 @@ class JIT {
                         $this->context->getVariableFromOp($block->getOperand($op->arg2)),
                         $this->context->getVariableFromOp($block->getOperand($op->arg3))
                     );
-                    $this->assignOperand(
-                        $block->getOperand($op->arg1),
-                        new Variable($this->context, Variable::TYPE_NATIVE_DOUBLE, Variable::KIND_VALUE, $powResult)
-                    );
+                    $this->assignOperandValue($block->getOperand($op->arg1), $powResult);
                     break;
                 case OpCode::TYPE_MUL:
                 case OpCode::TYPE_PLUS:
@@ -575,9 +566,8 @@ class JIT {
         }
         if ($value->type === $result->type) {
             $result->free();
-            if ($value->type & Variable::IS_NATIVE_ARRAY) {
-                // copy over the nextfreelement
-                //$result->nextFreeElement = $value->nextFreeElement;
+            if ($value->type & Variable::IS_NATIVE_ARRAY || Variable::TYPE_HASHTABLE === $value->type) {
+                $result->nextFreeElement = $value->nextFreeElement;
             }
             $this->context->builder->store(
                 $this->context->helper->loadValue($value),
@@ -651,6 +641,22 @@ class JIT {
                 $this->context->helper->loadValue($value)
             );
             $this->context->builder->store($longVal, $result->value);
+
+            return;
+        } elseif ($result->type === Variable::TYPE_NATIVE_LONG && Variable::TYPE_NATIVE_DOUBLE === $value->type) {
+            $result->free();
+            $fp = $this->context->helper->loadValue($value);
+            $long = $this->context->builder->fpToSi($fp, $this->context->getTypeFromString('int64'));
+            $this->context->builder->store($long, $result->value);
+            $result->addref();
+
+            return;
+        } elseif ($result->type === Variable::TYPE_NATIVE_DOUBLE && Variable::TYPE_NATIVE_LONG === $value->type) {
+            $result->free();
+            $long = $this->context->helper->loadValue($value);
+            $fp = $this->context->builder->siToFp($long, $this->context->getTypeFromString('double'));
+            $this->context->builder->store($fp, $result->value);
+            $result->addref();
 
             return;
         } elseif (Variable::TYPE_VALUE === $result->type && Variable::TYPE_VALUE === $value->type) {
