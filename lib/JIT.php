@@ -188,6 +188,13 @@ class JIT {
                     $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));
                     $dimOp = $block->getOperand($op->arg3);
                     $dim = $this->context->getVariableFromOp($dimOp);
+                    if ($value->type === Variable::TYPE_HASHTABLE) {
+                        $this->assignOperand(
+                            $block->getOperand($op->arg1),
+                            $value->dimFetch($dim)
+                        );
+                        break;
+                    }
                     if ($value->type & Variable::IS_NATIVE_ARRAY && $this->context->analyzer->needsBoundsCheck($value, $dimOp)) {
                         $this->context->builder->call(
                             $this->context->lookupFunction('__nativearray__boundscheck'),

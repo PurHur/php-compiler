@@ -17,6 +17,7 @@
         "ircmaxell/php-llvm": "dev-master"
     },
     "require-dev": {
+        "doctrine/instantiator": "^1.5.0",
         "phar-io/manifest": "^2.0.3",
         "phar-io/version": "^3.2.1",
         "phpunit/phpunit": "9.6.21",

@@ -71,9 +71,7 @@ final class IssetHelper
             return self::compileNativeArrayOffsetIsSet($context, $container, $dim);
         }
         if ($container->type === Variable::TYPE_HASHTABLE) {
-            throw new \LogicException(
-                'isset() on HashTable array offsets is not implemented for JIT in this compiler build'
-            );
+            return self::compileHashTableOffsetIsSet($context, $container, $dim);
         }
 
         throw new \LogicException(
@@ -97,6 +95,24 @@ final class IssetHelper
         $nonNeg = $context->builder->icmp(Builder::INT_SGE, $index, $i32->constInt(0, false));
 
         return $context->builder->and($inRange, $nonNeg);
+    }
+
+    private static function compileHashTableOffsetIsSet(Context $context, Variable $container, Variable $dim): Value
+    {
+        if (Variable::TYPE_NATIVE_LONG !== $dim->type) {
+            throw new \LogicException('isset() on HashTable arrays only supports integer indices in this compiler build');
+        }
+        $ht = $context->helper->loadValue($container);
+        $index = $context->builder->truncOrBitCast(
+            $context->helper->loadValue($dim),
+            $context->getTypeFromString('size_t')
+        );
+
+        return $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $ht,
+            $index
+        );
     }
 
     private static function compileNativeArrayOffsetIsSet(Context $context, Variable $container, Variable $dim): Value

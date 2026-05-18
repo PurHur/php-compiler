@@ -54,7 +54,13 @@ final class array_count extends Internal
             return $context->constantFromInteger($args[0]->nextFreeElement, 'int64');
         }
         if (JITVariable::TYPE_HASHTABLE === $args[0]->type) {
-            throw new \LogicException('count() on HashTable arrays is not implemented for JIT in this compiler build');
+            $ht = $context->helper->loadValue($args[0]);
+            $num = $context->builder->call(
+                $context->lookupFunction('__hashtable__getNumElements'),
+                $ht
+            );
+
+            return $context->builder->zExt($num, $context->getTypeFromString('int64'));
         }
         throw new \LogicException('count() only supports native arrays in this compiler build');
     }

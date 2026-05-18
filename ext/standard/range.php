@@ -14,13 +14,15 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * range() for integer start, end, and optional integer step (subset of PHP; VM only).
+ * range() for integer start, end, and optional integer step (subset of PHP).
  */
 final class range extends Internal
 {
@@ -76,6 +78,28 @@ final class range extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('range() is not implemented for JIT in this compiler build');
+        $this->context = $context;
+        if (\count($args) < 2 || \count($args) > 3) {
+            throw new \LogicException('range() requires two or three arguments');
+        }
+        if (JITVariable::TYPE_NATIVE_LONG !== $args[0]->type
+            || JITVariable::TYPE_NATIVE_LONG !== $args[1]->type) {
+            throw new \LogicException('range() start and end must be integers in this compiler build');
+        }
+        $i64 = $context->getTypeFromString('int64');
+        $start = $context->helper->loadValue($args[0]);
+        $end = $context->helper->loadValue($args[1]);
+        if (3 === \count($args)) {
+            if (JITVariable::TYPE_NATIVE_LONG !== $args[2]->type) {
+                throw new \LogicException('range() step must be an integer in this compiler build');
+            }
+            $step = $context->helper->loadValue($args[2]);
+        } else {
+            $cmp = $context->builder->icmp(Builder::INT_SGT, $start, $end);
+            $one = $i64->constInt(1, false);
+            $negOne = $i64->constInt(-1, false);
+            $step = $context->builder->select($cmp, $negOne, $one);
+        }
+        return HashTableHelper::buildIntegerRange($context, $start, $end, $step);
     }
 }
