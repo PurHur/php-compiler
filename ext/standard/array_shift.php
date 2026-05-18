@@ -19,34 +19,35 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * count() for arrays (subset of PHP; VM only in this compiler build).
+ * array_shift() for packed list arrays (subset of PHP; VM only).
  */
-final class array_count extends Internal
+final class array_shift extends Internal
 {
-    public function __construct(string $name = 'count')
-    {
-        parent::__construct($name);
-    }
-
     public function execute(Frame $frame): void
     {
         if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('count() requires exactly one argument');
+            throw new \LogicException('array_shift() requires exactly one argument');
         }
-        $v = $frame->calledArgs[0]->resolveIndirect();
+        $array = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_ARRAY !== $array->type) {
+            throw new \LogicException('array_shift() argument must be an array in this compiler build');
+        }
+        $shifted = $array->toArray()->shiftFirst();
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_ARRAY !== $v->type) {
-            throw new \LogicException('count() only supports arrays in this compiler build');
+        if (null === $shifted) {
+            $frame->returnVar->null();
+
+            return;
         }
-        $frame->returnVar->int($v->toArray()->getNumElements());
+        $frame->returnVar->copyFrom($shifted);
     }
 
     public Context $context;
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('count() is not implemented for JIT in this compiler build');
+        throw new \LogicException('array_shift() is not implemented for JIT in this compiler build');
     }
 }
