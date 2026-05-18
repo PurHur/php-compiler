@@ -79,7 +79,11 @@ class Compiler {
                 case Op\Stmt\Trait_::class:
                     break;
                 default:
-                    $this->compileOp($child, $block);
+                    if ($child instanceof Op\Expr\Isset_ && count($child->vars) > 1) {
+                        $block = $this->compileIssetMulti($child, $block);
+                    } else {
+                        $this->compileOp($child, $block);
+                    }
             }
         }
     }
@@ -512,9 +516,7 @@ class Compiler {
      */
     protected function compileIsset(Op\Expr\Isset_ $expr, Block $block): array
     {
-        if (count($expr->vars) !== 1) {
-            throw new \LogicException('isset() with multiple variables is not yet supported');
-        }
+        assert(1 === count($expr->vars));
         $resultSlot = $this->compileOperand($expr->result, $block, false);
         [$containerSlot, $dimSlot] = $this->resolveIssetTarget($expr->vars[0], $block);
 
@@ -524,6 +526,86 @@ class Compiler {
             $containerSlot,
             $dimSlot
         )];
+    }
+
+    /**
+     * isset($a, $b, …) with short-circuit evaluation (PHP semantics).
+     * Returns the block where compilation should continue.
+     */
+    protected function compileIssetMulti(Op\Expr\Isset_ $expr, Block $block): Block
+    {
+        $resultSlot = $this->compileOperand($expr->result, $block, false);
+        $falseSlot = $this->compileBoolConstant($block, false);
+        $endBlock = new Block($block->orig);
+        $endBlock->inheritUndefinedLocals = true;
+        $endBlock->inheritScopeFrom($block);
+        $falseBlock = new Block($block->orig);
+        $falseBlock->inheritUndefinedLocals = true;
+        $falseBlock->inheritScopeFrom($block);
+        $falseBlock->addOpCode(new OpCode(
+            OpCode::TYPE_ASSIGN,
+            $resultSlot,
+            $resultSlot,
+            $falseSlot
+        ));
+        $falseJump = new OpCode(OpCode::TYPE_JUMP);
+        $falseJump->block1 = $endBlock;
+        $falseBlock->addOpCode($falseJump);
+        $endBlock->parents[] = $falseBlock;
+
+        $current = $block;
+        $vars = $expr->vars;
+        $last = count($vars) - 1;
+        foreach ($vars as $i => $var) {
+            [$containerSlot, $dimSlot] = $this->resolveIssetTarget($var, $block);
+            $checkSlot = $resultSlot;
+            if ($i < $last) {
+                $checkSlot = $this->compileBoolTemporary($current);
+            }
+            $current->addOpCode(new OpCode(
+                OpCode::TYPE_ISSET,
+                $checkSlot,
+                $containerSlot,
+                $dimSlot
+            ));
+            if ($i < $last) {
+                $next = new Block($block->orig);
+                $next->inheritUndefinedLocals = true;
+                $next->inheritScopeFrom($current);
+                $jump = new OpCode(OpCode::TYPE_JUMPIF, $checkSlot);
+                $jump->block1 = $next;
+                $jump->block2 = $falseBlock;
+                $next->parents[] = $current;
+                $falseBlock->parents[] = $current;
+                $current->addOpCode($jump);
+                $current = $next;
+            }
+        }
+
+        $doneJump = new OpCode(OpCode::TYPE_JUMP);
+        $doneJump->block1 = $endBlock;
+        $current->addOpCode($doneJump);
+        $endBlock->parents[] = $current;
+
+        return $endBlock;
+    }
+
+    protected function compileBoolTemporary(Block $block): int
+    {
+        $operand = new Operand\Temporary;
+        $operand->type = Type::bool();
+
+        return $block->getVarSlot($operand, false);
+    }
+
+    protected function compileBoolConstant(Block $block, bool $value): int
+    {
+        $var = new Variable(Variable::TYPE_BOOLEAN);
+        $var->bool($value);
+        $operand = new Operand\Temporary;
+        $operand->type = Type::bool();
+
+        return $block->registerConstant($operand, $var);
     }
 
     /**
