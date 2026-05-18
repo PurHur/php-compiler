@@ -11,7 +11,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** realpath() — canonical absolute path (VM via PHP; JIT/AOT via libc realpath). */
+/** realpath() — canonical path when the target exists (VM: VmString; JIT: libc via JitRealpath). */
 final class realpath extends Internal
 {
     public function execute(Frame $frame): void
@@ -26,13 +26,15 @@ final class realpath extends Internal
         if (Variable::TYPE_STRING !== $v->type) {
             throw new \LogicException('realpath() only supports strings in this compiler build');
         }
-        $result = \realpath($v->toString());
-        if (false === $result) {
+        $resolved = VmString::realpath($v->toString());
+        if (false === $resolved) {
             $frame->returnVar->bool(false);
         } else {
-            $frame->returnVar->string($result);
+            $frame->returnVar->string($resolved);
         }
     }
+
+    public Context $context;
 
     public function call(Context $context, JITVariable ...$args): Value
     {

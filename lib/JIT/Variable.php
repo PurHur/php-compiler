@@ -118,9 +118,17 @@ final class Variable {
     }
 
     public static function getStringType(int $type): string {
+        if ($type & self::IS_NATIVE_ARRAY) {
+            $base = $type & ~self::IS_NATIVE_ARRAY;
+            if (isset(self::NATIVE_TYPE_MAP[$base])) {
+                return self::NATIVE_TYPE_MAP[$base].'[]';
+            }
+        }
         if (isset(self::NATIVE_TYPE_MAP[$type])) {
             return self::NATIVE_TYPE_MAP[$type];
         }
+
+        return 'unknown(type='.$type.')';
     }
 
     public static function getTypeFromType(Type $type): int {

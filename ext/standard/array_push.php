@@ -13,6 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
@@ -49,6 +50,12 @@ final class array_push extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('array_push() is not implemented for JIT in this compiler build');
+        if (\count($args) < 2) {
+            throw new \LogicException('array_push() requires at least two arguments');
+        }
+        $array = $args[0];
+        $values = \array_slice($args, 1);
+
+        return ArrayBuiltinHelper::push($context, $array, ...$values);
     }
 }

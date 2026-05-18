@@ -16,6 +16,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
@@ -51,6 +52,8 @@ final class is_scalar extends Internal
                 return $context->constantFromBool(true);
             case JITVariable::TYPE_NULL:
                 return $context->constantFromBool(false);
+            case JITVariable::TYPE_VALUE:
+                return $this->jitBoxedIsScalar($context, $args[0]);
             default:
                 throw new \LogicException('is_scalar() does not support this value type in this compiler build');
         }
@@ -69,5 +72,25 @@ final class is_scalar extends Internal
             default:
                 throw new \LogicException('is_scalar() does not support this value type in this compiler build');
         }
+    }
+
+    private function jitBoxedIsScalar(Context $context, JITVariable $arg): Value
+    {
+        $loaded = $context->helper->loadValue($arg);
+        $typeField = $context->structFieldMap['__value__']['type'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($loaded, $typeField)
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_NULL, false));
+        $isLong = $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_NATIVE_LONG, false));
+        $isDouble = $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_NATIVE_DOUBLE, false));
+        $isBool = $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_NATIVE_BOOL, false));
+        $isString = $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_STRING, false));
+        $scalar = $context->builder->or($isLong, $isDouble);
+        $scalar = $context->builder->or($scalar, $isBool);
+        $scalar = $context->builder->or($scalar, $isString);
+
+        return $context->builder->select($isNull, $context->constantFromBool(false), $scalar);
     }
 }

@@ -92,7 +92,7 @@ final class is_numeric extends Internal
             1,
             'is_numeric_end'
         );
-        $nullEnd = $context->getTypeFromString('int8*')->constPointerNull();
+        $nullEnd = $context->getTypeFromString('int8*')->constNull();
         $context->builder->store($nullEnd, $endPtrSlot);
         $context->builder->call($context->lookupFunction('strtod'), $charPtr, $endPtrSlot);
         $endPtr = $context->builder->load($endPtrSlot);
@@ -110,4 +110,5 @@ final class is_numeric extends Internal
 
         return $context->builder->select($isEmpty, $context->constantFromBool(false), $numeric);
     }
+
 }

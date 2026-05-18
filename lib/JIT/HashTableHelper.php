@@ -202,7 +202,7 @@ final class HashTableHelper
         $context->builder->store($context->helper->loadValue($element), $slot);
     }
 
-    private static function setAtIndex(Context $context, Value $ht, Value $index, Variable $element): void
+    public static function setAtIndex(Context $context, Value $ht, Value $index, Variable $element): void
     {
         switch ($element->type) {
             case Variable::TYPE_NATIVE_LONG:

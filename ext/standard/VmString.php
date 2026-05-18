@@ -685,6 +685,59 @@ final class VmString
         return self::byteSlice($path, 0, $end);
     }
 
+    /**
+     * @return string|false
+     */
+    public static function realpath(string $path): string|false
+    {
+        if ('' === $path) {
+            return false;
+        }
+        $normalized = self::normalizePath($path);
+        if (!file_exists($path)) {
+            return false;
+        }
+
+        return $normalized;
+    }
+
+    public static function normalizePath(string $path): string
+    {
+        $absolute = '' !== $path && ('/' === $path[0] || '\\' === $path[0]);
+        $parts = [];
+        $len = self::byteLength($path);
+        $segment = '';
+        for ($i = 0; $i < $len; ++$i) {
+            $ch = $path[$i];
+            if ('/' === $ch || '\\' === $ch) {
+                if ('' !== $segment) {
+                    if ('..' === $segment) {
+                        array_pop($parts);
+                    } elseif ('.' !== $segment) {
+                        $parts[] = $segment;
+                    }
+                    $segment = '';
+                }
+
+                continue;
+            }
+            $segment .= $ch;
+        }
+        if ('' !== $segment) {
+            if ('..' === $segment) {
+                array_pop($parts);
+            } elseif ('.' !== $segment) {
+                $parts[] = $segment;
+            }
+        }
+        $joined = implode('/', $parts);
+        if ($absolute) {
+            return '' === $joined ? '/' : '/'.$joined;
+        }
+
+        return '' === $joined ? '.' : $joined;
+    }
+
     private static function byteOrd(string $byte): int
     {
         return ord($byte);
