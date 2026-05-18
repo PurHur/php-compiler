@@ -191,6 +191,15 @@ class JIT {
                     $dimOp = $block->getOperand($op->arg3);
                     $dim = $this->context->getVariableFromOp($dimOp);
                     $resultOp = $block->getOperand($op->arg1);
+                    if ($value->type === Variable::TYPE_STRING) {
+                        $charPtr = StringOffsetHelper::dimFetch(
+                            $this->context,
+                            $value->value,
+                            $dim
+                        );
+                        $this->context->makeVariableFromValueOp($charPtr, $resultOp);
+                        break;
+                    }
                     if ($value->type === Variable::TYPE_HASHTABLE) {
                         $this->assignOperand(
                             $resultOp,
@@ -314,6 +323,21 @@ class JIT {
                             JIT\ValueEchoHelper::echo($this->context, $arg->value);
                             break;
                         case Variable::TYPE_STRING:
+                            if ($arg->kind === Variable::KIND_VALUE
+                                && 'i8*' === $this->context->getStringFromType($arg->value->typeOf())
+                            ) {
+                                $byte = $this->context->builder->load($arg->value);
+                                $fmt = $this->context->builder->pointerCast(
+                                    $this->context->constantFromString('%c'),
+                                    $this->context->getTypeFromString('char*')
+                                );
+                                $this->context->builder->call(
+                                    $this->context->lookupFunction('printf'),
+                                    $fmt,
+                                    $byte
+                                );
+                                break;
+                            }
                             $argValue = $this->context->helper->loadValue($arg);
                             $fmt = $this->context->builder->pointerCast(
                         $this->context->constantFromString("%.*s"),
@@ -565,6 +589,11 @@ class JIT {
             return;
         }
         $result = $this->context->getVariableFromOp($result);
+        if ($result->kind === Variable::KIND_VALUE && $result->type === Variable::TYPE_STRING) {
+            StringOffsetHelper::dimAssign($this->context, $result->value, $value);
+
+            return;
+        }
         if ($result->kind !== Variable::KIND_VARIABLE) {
             throw new \LogicException("Cannot assign to a value");
         }

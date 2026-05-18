@@ -22,6 +22,8 @@ final class Variable {
     const TYPE_OBJECT = 5;
     const TYPE_ARRAY = 6;
     const TYPE_INDIRECT = 7;
+    /** Writable single-byte view of a parent string (Zend-style $str[$i]). */
+    const TYPE_STRING_OFFSET = 8;
 
 
     const NUMERIC = self::TYPE_INTEGER | self::TYPE_FLOAT;
@@ -35,6 +37,8 @@ final class Variable {
     private ObjectEntry $object;
     private Variable $indirect;
     private HashTable $array;
+    private Variable $stringOffsetParent;
+    private int $stringOffsetIndex;
 
 
     public int $next = -1;
@@ -231,6 +235,8 @@ final class Variable {
                 return $this->bool ? '1' : '';
             case self::TYPE_INDIRECT:
                 return $this->indirect->toString();
+            case self::TYPE_STRING_OFFSET:
+                return $this->readStringOffset();
             case self::TYPE_ARRAY:
                 // todo: raise notice
                 return 'Array';
@@ -267,6 +273,16 @@ final class Variable {
         unset($this->bool);
         unset($this->object);
         unset($this->indirect);
+        unset($this->stringOffsetParent);
+        unset($this->stringOffsetIndex);
+    }
+
+    public function stringOffset(Variable $parent, int $index): void
+    {
+        $this->reset();
+        $this->type = self::TYPE_STRING_OFFSET;
+        $this->stringOffsetParent = $parent;
+        $this->stringOffsetIndex = $index;
     }
 
     public function castFrom(int $type, self $var) {
@@ -306,6 +322,11 @@ final class Variable {
         while ($var->type === self::TYPE_INDIRECT) {
             // destroy the indirection
             $var = $var->indirect;
+        }
+        if ($this->type === self::TYPE_STRING_OFFSET) {
+            $this->writeStringOffset($var);
+
+            return;
         }
         switch ($var->type) {
             case self::TYPE_NULL:
@@ -642,6 +663,60 @@ restart:
                 break;
         }
         throw new \LogicException("UnaryOp $opCode not implemented for type $expr->type");
+    }
+
+    private function readStringOffset(): string
+    {
+        $parent = $this->stringOffsetParent->resolveIndirect();
+        if ($parent->type !== self::TYPE_STRING) {
+            throw new \LogicException('String offset parent is not a string');
+        }
+        $str = $parent->string;
+        $index = $this->stringOffsetIndex;
+        if ($index < 0 || $index >= strlen($str)) {
+            return '';
+        }
+
+        return $str[$index];
+    }
+
+    private function writeStringOffset(self $value): void
+    {
+        $parent = $this->stringOffsetParent->resolveIndirect();
+        if ($parent->type !== self::TYPE_STRING) {
+            throw new \LogicException('String offset parent is not a string');
+        }
+        $str = $parent->string;
+        $index = $this->stringOffsetIndex;
+        if ($index < 0) {
+            throw new \LogicException('Illegal string offset');
+        }
+        $byte = self::byteFromAssignValue($value);
+        $len = strlen($str);
+        if ($index >= $len) {
+            $str .= str_repeat("\0", $index - $len + 1);
+        }
+        $str[$index] = $byte;
+        $parent->string($str);
+    }
+
+    private static function byteFromAssignValue(self $value): string
+    {
+        $value = $value->resolveIndirect();
+        switch ($value->type) {
+            case self::TYPE_STRING:
+                $s = $value->string;
+
+                return '' === $s ? '' : $s[0];
+            case self::TYPE_INTEGER:
+                return chr($value->integer & 0xff);
+            case self::TYPE_NULL:
+                return "\0";
+            default:
+                $s = $value->toString();
+
+                return '' === $s ? '' : $s[0];
+        }
     }
 }
 
