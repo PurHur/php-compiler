@@ -688,6 +688,8 @@ class JIT {
                 return Variable::TYPE_STRING;
             case '__hashtable__*':
                 return Variable::TYPE_HASHTABLE;
+            case '__value__*':
+                return Variable::TYPE_VALUE;
             default:
                 throw new \LogicException(
                     'Cannot infer JIT variable type from LLVM type: '

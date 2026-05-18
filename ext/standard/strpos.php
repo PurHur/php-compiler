@@ -57,6 +57,24 @@ final class strpos extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('strpos() is not implemented for JIT in this compiler build');
+        $this->context = $context;
+        $argc = count($args);
+        if ($argc < 2 || $argc > 3) {
+            throw new \LogicException('strpos() requires two or three arguments');
+        }
+        if (JITVariable::TYPE_STRING !== $args[0]->type || JITVariable::TYPE_STRING !== $args[1]->type) {
+            throw new \LogicException('strpos() only supports strings in this compiler build');
+        }
+        if (3 === $argc && JITVariable::TYPE_NATIVE_LONG !== $args[2]->type) {
+            throw new \LogicException('strpos() offset must be an integer in this compiler build');
+        }
+
+        $hay = $context->helper->loadValue($args[0]);
+        $needle = $context->helper->loadValue($args[1]);
+        $offset = 3 === $argc
+            ? $context->builder->truncOrBitCast($context->helper->loadValue($args[2]), $context->getTypeFromString('int64'))
+            : null;
+
+        return JitStrpos::find($context, $hay, $needle, $offset);
     }
 }
