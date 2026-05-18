@@ -31,9 +31,11 @@ final class abs extends Internal
             return;
         }
         if (Variable::TYPE_INTEGER === $var->type) {
-            $frame->returnVar->int(\abs($var->toInt()));
+            $i = $var->toInt();
+            $frame->returnVar->int($i < 0 ? -$i : $i);
         } elseif (Variable::TYPE_FLOAT === $var->type) {
-            $frame->returnVar->float(\abs($var->toFloat()));
+            $f = $var->toFloat();
+            $frame->returnVar->float($f < 0.0 ? -$f : $f);
         } else {
             throw new \LogicException('Unsupported type for abs(): '.$var->type);
         }

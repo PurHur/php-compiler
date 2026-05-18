@@ -87,6 +87,9 @@ class Module extends ModuleAbstract
             new str_replace(),
             new nl2br(),
             new array_reverse(),
+            new array_search(),
+            new array_sum(),
+            new array_flip(),
             new htmlspecialchars(),
             new header_(),
         ];
