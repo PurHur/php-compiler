@@ -190,15 +190,19 @@ final class JitHtmlspecialchars
 
         $checkBlock = $prev;
         $ords = array_keys(self::SPECIAL);
+        $ordCount = count($ords);
         foreach ($ords as $idx => $ord) {
             $matchBlock = $prev->insertBasicBlock('htmlspecialchars_write_char_match_'.$ord);
-            $nextBlock = $prev->insertBasicBlock('htmlspecialchars_write_char_next_'.$ord);
+            $isLast = $idx + 1 >= $ordCount;
+            $falseBlock = $isLast
+                ? $defaultBlock
+                : $prev->insertBasicBlock('htmlspecialchars_write_char_next_'.$ord);
 
             $context->builder->positionAtEnd($checkBlock);
             $context->builder->branchIf(
                 $context->builder->icmp(Builder::INT_EQ, $chI32, $i32->constInt($ord, false)),
                 $matchBlock,
-                $idx + 1 < count($ords) ? $nextBlock : $defaultBlock
+                $falseBlock
             );
 
             $context->builder->positionAtEnd($matchBlock);
@@ -207,7 +211,9 @@ final class JitHtmlspecialchars
             $context->intrinsic->memcpy($destAt, $src, $i32->constInt($textLen, false), false);
             $context->builder->branch($done);
 
-            $checkBlock = $nextBlock;
+            if (!$isLast) {
+                $checkBlock = $falseBlock;
+            }
         }
 
         $context->builder->positionAtEnd($defaultBlock);

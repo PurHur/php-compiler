@@ -73,7 +73,7 @@ final class JitBin2hex
         $context->builder->positionAtEnd($loopBody);
         $byte = $context->builder->load($context->builder->gep($charPtr, $idx));
         $byteI32 = $context->builder->zExt($byte, $i32);
-        $hi = $context->builder->logicalShiftRight($byteI32, $i32->constInt(4, false));
+        $hi = $context->builder->lShr($byteI32, $i32->constInt(4, false));
         $lo = $context->builder->bitwiseAnd(
             $byteI32,
             $i32->constInt(0x0F, false)
