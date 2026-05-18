@@ -19,7 +19,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * header() for HTTP response headers (delegates to PHP; VM only).
+ * header() for HTTP response headers (AOT/JIT emit via printf; VM delegates to PHP).
  */
 final class header_ extends Internal
 {

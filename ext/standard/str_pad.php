@@ -19,7 +19,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * str_pad() for strings (STR_PAD_RIGHT and STR_PAD_LEFT only; VM only).
+ * str_pad() for strings (STR_PAD_RIGHT and STR_PAD_LEFT only).
  */
 final class str_pad extends Internal
 {
