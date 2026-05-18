@@ -61,7 +61,12 @@ final class number_format extends Internal
             }
             $thousandsSeparator = $thouVar->toString();
         }
-        $frame->returnVar->string(\number_format($num, $decimals, $decimalSeparator, $thousandsSeparator));
+        $frame->returnVar->string(VmNumberFormat::format(
+            $num,
+            $decimals,
+            $decimalSeparator,
+            $thousandsSeparator
+        ));
     }
 
     public Context $context;

@@ -182,6 +182,13 @@ class Module extends ModuleAbstract
             $context->registerFunction('realpath', $fn);
         }
         $double = $context->getTypeFromString('double');
+        try {
+            $context->lookupFunction('fabs');
+        } catch (\Throwable $e) {
+            $ft = $context->context->functionType($double, false, $double);
+            $fn = $context->module->addFunction('fabs', $ft);
+            $context->registerFunction('fabs', $fn);
+        }
         foreach (['ceil', 'floor', 'round', 'sqrt', 'log', 'exp', 'sin', 'cos', 'tan', 'pow', 'fmod'] as $name) {
             try {
                 $context->lookupFunction($name);
