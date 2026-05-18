@@ -65,6 +65,36 @@ final class str_pad extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('str_pad() is not implemented for JIT in this compiler build');
+        $this->context = $context;
+        $argc = \count($args);
+        if ($argc < 2 || $argc > 4) {
+            throw new \LogicException('str_pad() requires two to four arguments');
+        }
+        if (JITVariable::TYPE_STRING !== $args[0]->type) {
+            throw new \LogicException('str_pad() input must be a string in this compiler build');
+        }
+        if (JITVariable::TYPE_NATIVE_LONG !== $args[1]->type) {
+            throw new \LogicException('str_pad() pad length must be an integer in this compiler build');
+        }
+        $input = $context->helper->loadValue($args[0]);
+        $padLength = $context->helper->loadValue($args[1]);
+        if ($argc >= 3) {
+            if (JITVariable::TYPE_STRING !== $args[2]->type) {
+                throw new \LogicException('str_pad() pad string must be a string in this compiler build');
+            }
+            $padString = $context->helper->loadValue($args[2]);
+        } else {
+            $padString = $context->builder->load($context->constantStringFromString(' '));
+        }
+        if (4 === $argc) {
+            if (JITVariable::TYPE_NATIVE_LONG !== $args[3]->type) {
+                throw new \LogicException('str_pad() pad type must be an integer in this compiler build');
+            }
+            $padType = $context->helper->loadValue($args[3]);
+        } else {
+            $padType = $context->getTypeFromString('int64')->constInt(0, false);
+        }
+
+        return JitStrPad::pad($context, $input, $padLength, $padString, $padType);
     }
 }
