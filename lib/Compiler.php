@@ -150,11 +150,15 @@ class Compiler {
     protected function compileParam(Op\Expr\Param $param, Block $block, int $paramIdx): OpCode {
         assert(false === $param->byRef);
         assert(false === $param->variadic);
-        assert(null === $param->defaultBlock);
+        $defaultConst = null;
+        if (null !== $param->defaultVar) {
+            $defaultConst = $this->compileOperand($param->defaultVar, $block, true);
+        }
         return new OpCode(
             OpCode::TYPE_ARG_RECV,
             $this->compileOperand($param->result, $block, false),
-            $paramIdx
+            $paramIdx,
+            $defaultConst
         );
     }
 
@@ -655,8 +659,24 @@ class Compiler {
             return null;
         } elseif ($operand instanceof Operand\Literal) {
             assert($isRead === true);
-            $return = new Variable(Variable::mapFromType($operand->type));
-            switch (Variable::mapFromType($operand->type)) {
+            $mappedType = null !== $operand->type
+                ? Variable::mapFromType($operand->type)
+                : Variable::TYPE_UNDEFINED;
+            if ($mappedType === Variable::TYPE_UNDEFINED) {
+                if (is_int($operand->value)) {
+                    $mappedType = Variable::TYPE_INTEGER;
+                } elseif (is_float($operand->value)) {
+                    $mappedType = Variable::TYPE_FLOAT;
+                } elseif (is_string($operand->value)) {
+                    $mappedType = Variable::TYPE_STRING;
+                } elseif (is_bool($operand->value)) {
+                    $mappedType = Variable::TYPE_BOOLEAN;
+                } elseif (null === $operand->value) {
+                    $mappedType = Variable::TYPE_NULL;
+                }
+            }
+            $return = new Variable($mappedType);
+            switch ($mappedType) {
                 case Variable::TYPE_STRING:
                     $return->string($operand->value);
                     break;
@@ -669,8 +689,10 @@ class Compiler {
                 case Variable::TYPE_BOOLEAN:
                     $return->bool($operand->value);
                     break;
+                case Variable::TYPE_NULL:
+                    break;
                 default:
-                    throw new \LogicException("Unknown Literal Operand Type: " . $operand->type);
+                    throw new \LogicException('Unknown Literal Operand Type: ' . ($operand->type ?? 'untyped'));
             }
             return $block->registerConstant($operand, $return);
         } elseif ($operand instanceof Operand\Temporary) {

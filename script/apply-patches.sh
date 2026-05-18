@@ -36,10 +36,12 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-binaryop-spaceship.patch"
   apply_patch "$PATCH_DIR/php-types-str-bool-fns.patch"
   apply_patch "$PATCH_DIR/php-types-dollars-brace.patch"
+  apply_patch "$PATCH_DIR/php-types-mixed-reserved.patch"
 fi
 
 if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-dollars-brace.patch"
+  apply_patch "$PATCH_DIR/php-cfg-mixed-reserved.patch"
 fi
 
 if [[ -d "$ROOT/vendor/pre/plugin" ]]; then

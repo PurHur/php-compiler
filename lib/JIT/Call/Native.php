@@ -24,15 +24,27 @@ class Native implements Call {
     public string $name;
     public array $argTypes;
 
-    public function __construct(Value $function, string $name, array $argTypes) {
+    /** @var array<int, Variable> compile-time defaults for optional parameters */
+    public array $defaultArgs = [];
+
+    public function __construct(Value $function, string $name, array $argTypes, array $defaultArgs = []) {
         $this->function = $function;
         $this->name = $name;
         $this->argTypes = $argTypes;
+        $this->defaultArgs = $defaultArgs;
     }
 
     public function call(Context $context, Variable ... $args): Value {
         $argValues = [];
-        foreach ($args as $index => $arg) {
+        $total = count($this->argTypes);
+        for ($index = 0; $index < $total; $index++) {
+            if (isset($args[$index])) {
+                $arg = $args[$index];
+            } elseif (isset($this->defaultArgs[$index])) {
+                $arg = $this->defaultArgs[$index];
+            } else {
+                throw new \LogicException("Missing required argument {$index} for {$this->name}()");
+            }
             $argValues[] = $this->compileArg($context, $arg, $index);
         }
         return $context->builder->call(

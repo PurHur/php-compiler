@@ -145,7 +145,8 @@ class JIT {
             if ($isVarArgs) {
                 $this->context->functionProxies[$lcname] = new JIT\Call\Vararg($func, $funcName, count($args));
             } else {
-                $this->context->functionProxies[$lcname] = new JIT\Call\Native($func, $funcName, $args);
+                $defaultArgs = $this->collectParamDefaults($block);
+                $this->context->functionProxies[$lcname] = new JIT\Call\Native($func, $funcName, $args, $defaultArgs);
             }
         }
 
@@ -724,6 +725,44 @@ class JIT {
                     'Cannot infer JIT variable type from LLVM type: '
                     .$this->context->getStringFromType($value->typeOf())
                 );
+        }
+    }
+
+    /**
+     * @return array<int, Variable>
+     */
+    private function collectParamDefaults(Block $block): array {
+        $defaults = [];
+        foreach ($block->opCodes as $op) {
+            if ($op->type !== OpCode::TYPE_ARG_RECV || null === $op->arg3) {
+                continue;
+            }
+            if (!isset($block->constants[$op->arg3])) {
+                continue;
+            }
+            $defaults[$op->arg2] = $this->jitVariableFromVmConstant($block->constants[$op->arg3]);
+        }
+        return $defaults;
+    }
+
+    private function jitVariableFromVmConstant(VM\Variable $vm): Variable {
+        switch ($vm->type) {
+            case VM\Variable::TYPE_INTEGER:
+                return Variable::fromConstantInt($this->context, $vm->toInt());
+            case VM\Variable::TYPE_STRING:
+                $lit = new Operand\Literal($vm->toString());
+                $lit->type = Type::string();
+                return Variable::fromLiteral($this->context, $lit);
+            case VM\Variable::TYPE_FLOAT:
+                $lit = new Operand\Literal($vm->toFloat());
+                $lit->type = Type::float();
+                return Variable::fromLiteral($this->context, $lit);
+            case VM\Variable::TYPE_BOOLEAN:
+                $lit = new Operand\Literal($vm->toBool());
+                $lit->type = Type::bool();
+                return Variable::fromLiteral($this->context, $lit);
+            default:
+                throw new \LogicException('Unsupported default parameter type for JIT');
         }
     }
 

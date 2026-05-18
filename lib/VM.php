@@ -240,8 +240,15 @@ restart:
                 case OpCode::TYPE_ARG_RECV:
                     // Todo: do type checks and transformations
                     $arg1 = $frame->scope[$op->arg1];
-                    $arg1->copyFrom($frame->calledArgs[$op->arg2]);
-                    break;
+                    if (array_key_exists($op->arg2, $frame->calledArgs)) {
+                        $arg1->copyFrom($frame->calledArgs[$op->arg2]);
+                        break;
+                    }
+                    if (null !== $op->arg3 && isset($frame->block->constants[$op->arg3])) {
+                        $arg1->copyFrom($frame->block->constants[$op->arg3]);
+                        break;
+                    }
+                    throw new \LogicException('Missing required argument ' . $op->arg2);
                 case OpCode::TYPE_DECLARE_CLASS:
                     $name = $frame->scope[$op->arg1]->toString();
                     $lcname = strtolower($name);
@@ -330,6 +337,9 @@ restart:
                 default:
                     throw new \LogicException("VM OpCode Not Implemented: " . $op->getType());
             }
+        }
+        if ($frame->ephemeral) {
+            goto nextframe;
         }
         return self::SUCCESS;
     }
