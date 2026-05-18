@@ -135,6 +135,14 @@ class HashTableTest extends TestCase
         }
     }
 
+    public function testFindOnUninitializedReturnsNull(): void
+    {
+        $ht = new HashTable();
+
+        $this->assertNull($ht->find('missing'));
+        $this->assertNull($ht->findIndex(0));
+    }
+
     private function int(int $value): Variable
     {
         $var = new Variable();

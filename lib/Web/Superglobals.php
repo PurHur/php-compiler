@@ -36,24 +36,43 @@ final class Superglobals
         return in_array($name, self::NAMES, true);
     }
 
-    public static function populateFromEnvironment(Context $context, ?string $queryString = null): void
-    {
+    public static function populateFromEnvironment(
+        Context $context,
+        ?string $queryString = null,
+        ?string $postBody = null
+    ): void {
         if (null === $queryString) {
             $fromEnv = getenv('QUERY_STRING');
             $queryString = false === $fromEnv ? '' : $fromEnv;
         }
         self::populateGet($context, $queryString);
+
+        if (null === $postBody) {
+            $fromEnv = getenv('REQUEST_BODY');
+            $postBody = false === $fromEnv ? '' : $fromEnv;
+        }
+        self::populatePost($context, $postBody);
     }
 
     private static function populateGet(Context $context, string $queryString): void
     {
         $get = $context->ensureSuperglobal('_GET');
-        if ('' === $queryString) {
+        self::populateFormEncoded($get->toArray(), $queryString);
+    }
+
+    private static function populatePost(Context $context, string $postBody): void
+    {
+        $post = $context->ensureSuperglobal('_POST');
+        self::populateFormEncoded($post->toArray(), $postBody);
+    }
+
+    private static function populateFormEncoded(HashTable $ht, string $body): void
+    {
+        if ('' === $body) {
             return;
         }
         $params = [];
-        parse_str($queryString, $params);
-        $ht = $get->toArray();
+        parse_str($body, $params);
         foreach ($params as $key => $value) {
             if (!is_string($key) || is_array($value)) {
                 continue;

@@ -62,6 +62,13 @@ while (! empty($opts)) {
             $options['-q'] = array_shift($opts);
 
             break;
+        case '-p':
+            if (empty($opts) || substr($opts[0], 0, 1) === '-') {
+                die("Option -p requires a POST body argument\n");
+            }
+            $options['-p'] = array_shift($opts);
+
+            break;
         default:
             if (! empty($opts)) {
                 die("Extra argument not understood: ${opt}\n");

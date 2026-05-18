@@ -16,7 +16,12 @@ function run(string $filename, string $code, array $options): void
 {
     $runtime = new Runtime();
     $queryString = $options['-q'] ?? null;
-    Superglobals::populateFromEnvironment($runtime->vmContext, is_string($queryString) ? $queryString : null);
+    $postBody = $options['-p'] ?? null;
+    Superglobals::populateFromEnvironment(
+        $runtime->vmContext,
+        is_string($queryString) ? $queryString : null,
+        is_string($postBody) ? $postBody : null
+    );
     $block = $runtime->parseAndCompile($code, $filename);
     if (! isset($options['-l'])) {
         $runtime->run($block);
