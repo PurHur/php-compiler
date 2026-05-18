@@ -228,6 +228,7 @@ class Value extends Type {
         $this->implementValueWriteLong();
         $this->implementValueReadDouble();
         $this->implementValueWriteDouble();
+        $this->implementValueReadString();
         $this->implementValueWriteString();
         $this->implementValueWriteNull();
         $this->implementValueDelref();
@@ -2833,320 +2834,28 @@ class Value extends Type {
     }
 
     protected function implementValueReadString(): void {
-        $fn___1ff1de774005f8da13f42943881c655f = $this->context->lookupFunction('__value__readString');
-    $block___1ff1de774005f8da13f42943881c655f = $fn___1ff1de774005f8da13f42943881c655f->appendBasicBlock('main');
-    $this->context->builder->positionAtEnd($block___1ff1de774005f8da13f42943881c655f);
-    $value = $fn___1ff1de774005f8da13f42943881c655f->getParam(0);
-    
-    $offset = $this->context->structFieldMap[$value->typeOf()->getElementType()->getName()]['type'];
-                    $type = $this->context->builder->load(
-                        $this->context->builder->structGep($value, $offset)
-                    );
-    $__switches[] = $__switch = new \StdClass;
-                $__switch->type = $type->typeOf();
-                $__prev = $this->context->builder->getInsertBlock();
-                $__switch->default = $__prev->insertBasicBlock('default');
-                $__prev->moveBefore($__switch->default);
-                $__switch->end = $__switch->default->insertBasicBlock('end');
-                $__switch->endIsUsed = false;
-                $__switch->numCases = 0;
-                $__switch->numCases++;
-                $__switch->numCases++;
-                
-                $__switch->switch = $this->context->builder->branchSwitch($type, $__switch->default, $__switch->numCases);
-                $__case = end($__switches)->default->insertBasicBlock('case_' . 0);
-                    $this->context->builder->positionAtEnd($__case);
-                    if (is_int(Variable::TYPE_STRING)) {
-                        end($__switches)->switch->addCase(end($__switches)->type->constInt(Variable::TYPE_STRING, false), $__case);
-                    } elseif (Variable::TYPE_STRING instanceof \PHPLLVM\Value) {
-                        end($__switches)->switch->addCase(Variable::TYPE_STRING, $__case);
-                    } else {
-                        throw new \LogicException("Unknown type for switch case");
-                    }
-                    {  $offset = $this->context->structFieldMap[$value->typeOf()->getElementType()->getName()]['value'];
-                    $ptr = $this->context->builder->structGep($value, $offset);
-    $__type = $this->context->getTypeFromString('__string__*');
-                        
-                    
-                    $__kind = $__type->getKind();
-                    $__value = $ptr;
-                    switch ($__kind) {
-                        case \PHPLLVM\Type::KIND_INTEGER:
-                            if (!is_object($__value)) {
-                                $resultPtr = $__type->constInt($__value, false);
-                                break;
-                            }
-                            $__other_type = $__value->typeOf();
-                            switch ($__other_type->getKind()) {
-                                case \PHPLLVM\Type::KIND_INTEGER:
-                                    if ($__other_type->getWidth() >= $__type->getWidth()) {
-                                        $resultPtr = $this->context->builder->truncOrBitCast($__value, $__type);
-                                    } else {
-                                        $resultPtr = $this->context->builder->zExtOrBitCast($__value, $__type);
-                                    }
-                                    break;
-                                case \PHPLLVM\Type::KIND_DOUBLE:
-                                    
-                                    $resultPtr = $this->context->builder->fpToSi($__value, $__type);
-                                    
-                                    break;
-                                case \PHPLLVM\Type::KIND_ARRAY:
-                                case \PHPLLVM\Type::KIND_POINTER:
-                                    $resultPtr = $this->context->builder->ptrToInt($__value, $__type);
-                                    break;
-                                default:
-                                    throw new \LogicException("Unknown how to handle type pair (int, " . $__other_type->toString() . ")");
-                            }
-                            break;
-                        case \PHPLLVM\Type::KIND_DOUBLE:
-                            if (!is_object($__value)) {
-                                $resultPtr = $__type->constReal($ptr);
-                                break;
-                            }
-                            $__other_type = $__value->typeOf();
-                            switch ($__other_type->getKind()) {
-                                case \PHPLLVM\Type::KIND_INTEGER:
-                                    
-                                    $resultPtr = $this->context->builder->siToFp($__value, $__type);
-                                    
-                                    break;
-                                case \PHPLLVM\Type::KIND_DOUBLE:
-                                    $resultPtr = $this->context->builder->fpCast($__value, $__type);
-                                    break;
-                                default:
-                                    throw new \LogicException("Unknown how to handle type pair (double, " . $__other_type->toString() . ")");
-                            }
-                            break;
-                        case \PHPLLVM\Type::KIND_ARRAY:
-                        case \PHPLLVM\Type::KIND_POINTER:
-                            if (!is_object($__value)) {
-                                // this is very likely very wrong...
-                                $resultPtr = $__type->constInt($__value, false);
-                                break;
-                            }
-                            $__other_type = $__value->typeOf();
-                            switch ($__other_type->getKind()) {
-                                case \PHPLLVM\Type::KIND_INTEGER:
-                                    $resultPtr = $this->context->builder->intToPtr($__value, $__type);
-                                    break;
-                                case \PHPLLVM\Type::KIND_ARRAY:
-                                    // $__tmp = $this->context->builder->($__value, $this->context->context->int64Type());
-                                    // $(result) = $this->context->builder->intToPtr($__tmp, $__type);
-                                    // break;
-                                case \PHPLLVM\Type::KIND_POINTER:
-                                    $resultPtr = $this->context->builder->pointerCast($__value, $__type);
-                                    break;
-                                default:
-                                    throw new \LogicException("Unknown how to handle type pair (double, " . $__other_type->toString() . ")");
-                            }
-                            break;
-                        default:
-                            throw new \LogicException("Unsupported type cast: " . $__type->toString());
-                    }
-    $this->context->builder->returnValue($resultPtr);
-     }
-                    if ($this->context->builder->getInsertBlock()->getTerminator() === null) {
-                        $this->context->builder->branch(end($__switches)->end);
-                        end($__switches)->endIsUsed = true;
-                    }
-                $__case = end($__switches)->default->insertBasicBlock('case_' . 0);
-                    $this->context->builder->positionAtEnd($__case);
-                    if (is_int(Variable::TYPE_VALUE)) {
-                        end($__switches)->switch->addCase(end($__switches)->type->constInt(Variable::TYPE_VALUE, false), $__case);
-                    } elseif (Variable::TYPE_VALUE instanceof \PHPLLVM\Value) {
-                        end($__switches)->switch->addCase(Variable::TYPE_VALUE, $__case);
-                    } else {
-                        throw new \LogicException("Unknown type for switch case");
-                    }
-                    {  $offset = $this->context->structFieldMap[$value->typeOf()->getElementType()->getName()]['value'];
-                    $var = $this->context->builder->structGep($value, $offset);
-    $__type = $this->context->getTypeFromString('__value__value*');
-                        
-                    
-                    $__kind = $__type->getKind();
-                    $__value = $var;
-                    switch ($__kind) {
-                        case \PHPLLVM\Type::KIND_INTEGER:
-                            if (!is_object($__value)) {
-                                $ptr = $__type->constInt($__value, false);
-                                break;
-                            }
-                            $__other_type = $__value->typeOf();
-                            switch ($__other_type->getKind()) {
-                                case \PHPLLVM\Type::KIND_INTEGER:
-                                    if ($__other_type->getWidth() >= $__type->getWidth()) {
-                                        $ptr = $this->context->builder->truncOrBitCast($__value, $__type);
-                                    } else {
-                                        $ptr = $this->context->builder->zExtOrBitCast($__value, $__type);
-                                    }
-                                    break;
-                                case \PHPLLVM\Type::KIND_DOUBLE:
-                                    
-                                    $ptr = $this->context->builder->fpToSi($__value, $__type);
-                                    
-                                    break;
-                                case \PHPLLVM\Type::KIND_ARRAY:
-                                case \PHPLLVM\Type::KIND_POINTER:
-                                    $ptr = $this->context->builder->ptrToInt($__value, $__type);
-                                    break;
-                                default:
-                                    throw new \LogicException("Unknown how to handle type pair (int, " . $__other_type->toString() . ")");
-                            }
-                            break;
-                        case \PHPLLVM\Type::KIND_DOUBLE:
-                            if (!is_object($__value)) {
-                                $ptr = $__type->constReal($var);
-                                break;
-                            }
-                            $__other_type = $__value->typeOf();
-                            switch ($__other_type->getKind()) {
-                                case \PHPLLVM\Type::KIND_INTEGER:
-                                    
-                                    $ptr = $this->context->builder->siToFp($__value, $__type);
-                                    
-                                    break;
-                                case \PHPLLVM\Type::KIND_DOUBLE:
-                                    $ptr = $this->context->builder->fpCast($__value, $__type);
-                                    break;
-                                default:
-                                    throw new \LogicException("Unknown how to handle type pair (double, " . $__other_type->toString() . ")");
-                            }
-                            break;
-                        case \PHPLLVM\Type::KIND_ARRAY:
-                        case \PHPLLVM\Type::KIND_POINTER:
-                            if (!is_object($__value)) {
-                                // this is very likely very wrong...
-                                $ptr = $__type->constInt($__value, false);
-                                break;
-                            }
-                            $__other_type = $__value->typeOf();
-                            switch ($__other_type->getKind()) {
-                                case \PHPLLVM\Type::KIND_INTEGER:
-                                    $ptr = $this->context->builder->intToPtr($__value, $__type);
-                                    break;
-                                case \PHPLLVM\Type::KIND_ARRAY:
-                                    // $__tmp = $this->context->builder->($__value, $this->context->context->int64Type());
-                                    // $(result) = $this->context->builder->intToPtr($__tmp, $__type);
-                                    // break;
-                                case \PHPLLVM\Type::KIND_POINTER:
-                                    $ptr = $this->context->builder->pointerCast($__value, $__type);
-                                    break;
-                                default:
-                                    throw new \LogicException("Unknown how to handle type pair (double, " . $__other_type->toString() . ")");
-                            }
-                            break;
-                        default:
-                            throw new \LogicException("Unsupported type cast: " . $__type->toString());
-                    }
-    $offset = $this->context->structFieldMap[$var->typeOf()->getElementType()->getName()]['value'];
-                    $varPtr = $this->context->builder->load(
-                        $this->context->builder->structGep($var, $offset)
-                    );
-    $result = $this->context->builder->call(
-                        $this->context->lookupFunction('__value__readString') , 
-                        $varPtr
-                        
-                    );
-    $this->context->builder->returnValue($result);
-     }
-                    if ($this->context->builder->getInsertBlock()->getTerminator() === null) {
-                        $this->context->builder->branch(end($__switches)->end);
-                        end($__switches)->endIsUsed = true;
-                    }
-                
-                $this->context->builder->positionAtEnd(end($__switches)->default);
-                
-                if ($this->context->builder->getInsertBlock()->getTerminator() === null) {
-                    $this->context->builder->branch(end($__switches)->end);
-                    end($__switches)->endIsUsed = true;
-                }
-                $__switch = array_pop($__switches);
-                if ($__switch->endIsUsed) {
-                    $this->context->builder->positionAtEnd($__switch->end);
-                } else {
-                    $__switch->end->remove();
-                }
-    $__type = $this->context->getTypeFromString('__string__*');
-                        
-                    
-                    $__kind = $__type->getKind();
-                    $__value = null;
-                    switch ($__kind) {
-                        case \PHPLLVM\Type::KIND_INTEGER:
-                            if (!is_object($__value)) {
-                                $result = $__type->constInt($__value, false);
-                                break;
-                            }
-                            $__other_type = $__value->typeOf();
-                            switch ($__other_type->getKind()) {
-                                case \PHPLLVM\Type::KIND_INTEGER:
-                                    if ($__other_type->getWidth() >= $__type->getWidth()) {
-                                        $result = $this->context->builder->truncOrBitCast($__value, $__type);
-                                    } else {
-                                        $result = $this->context->builder->zExtOrBitCast($__value, $__type);
-                                    }
-                                    break;
-                                case \PHPLLVM\Type::KIND_DOUBLE:
-                                    
-                                    $result = $this->context->builder->fpToSi($__value, $__type);
-                                    
-                                    break;
-                                case \PHPLLVM\Type::KIND_ARRAY:
-                                case \PHPLLVM\Type::KIND_POINTER:
-                                    $result = $this->context->builder->ptrToInt($__value, $__type);
-                                    break;
-                                default:
-                                    throw new \LogicException("Unknown how to handle type pair (int, " . $__other_type->toString() . ")");
-                            }
-                            break;
-                        case \PHPLLVM\Type::KIND_DOUBLE:
-                            if (!is_object($__value)) {
-                                $result = $__type->constReal(null);
-                                break;
-                            }
-                            $__other_type = $__value->typeOf();
-                            switch ($__other_type->getKind()) {
-                                case \PHPLLVM\Type::KIND_INTEGER:
-                                    
-                                    $result = $this->context->builder->siToFp($__value, $__type);
-                                    
-                                    break;
-                                case \PHPLLVM\Type::KIND_DOUBLE:
-                                    $result = $this->context->builder->fpCast($__value, $__type);
-                                    break;
-                                default:
-                                    throw new \LogicException("Unknown how to handle type pair (double, " . $__other_type->toString() . ")");
-                            }
-                            break;
-                        case \PHPLLVM\Type::KIND_ARRAY:
-                        case \PHPLLVM\Type::KIND_POINTER:
-                            if (!is_object($__value)) {
-                                // this is very likely very wrong...
-                                $result = $__type->constInt($__value, false);
-                                break;
-                            }
-                            $__other_type = $__value->typeOf();
-                            switch ($__other_type->getKind()) {
-                                case \PHPLLVM\Type::KIND_INTEGER:
-                                    $result = $this->context->builder->intToPtr($__value, $__type);
-                                    break;
-                                case \PHPLLVM\Type::KIND_ARRAY:
-                                    // $__tmp = $this->context->builder->($__value, $this->context->context->int64Type());
-                                    // $(result) = $this->context->builder->intToPtr($__tmp, $__type);
-                                    // break;
-                                case \PHPLLVM\Type::KIND_POINTER:
-                                    $result = $this->context->builder->pointerCast($__value, $__type);
-                                    break;
-                                default:
-                                    throw new \LogicException("Unknown how to handle type pair (double, " . $__other_type->toString() . ")");
-                            }
-                            break;
-                        default:
-                            throw new \LogicException("Unsupported type cast: " . $__type->toString());
-                    }
-    $this->context->builder->returnValue($result);
-    
-    $this->context->builder->clearInsertionPosition();
+        $fn = $this->context->lookupFunction('__value__readString');
+        $block = $fn->appendBasicBlock('main');
+        $this->context->builder->positionAtEnd($block);
+        $value = $fn->getParam(0);
+        $map = $this->context->structFieldMap['__value__'];
+        $i8 = $this->context->getTypeFromString('int8');
+        $stringType = $i8->constInt(\PHPCompiler\JIT\Variable::TYPE_STRING & 0xff, false);
+        $typeByte = $this->context->builder->load(
+            $this->context->builder->structGep($value, $map['type'])
+        );
+        $isString = $this->context->builder->icmp(\PHPLLVM\Builder::INT_EQ, $typeByte, $stringType);
+        $strPtrType = $this->context->getTypeFromString('__string__*');
+        $nullStr = $strPtrType->constNull();
+        $valueField = $this->context->builder->structGep($value, $map['value']);
+        $stringSlot = $this->context->builder->pointerCast(
+            $valueField,
+            $strPtrType->pointerType(0)
+        );
+        $strPtr = $this->context->builder->load($stringSlot);
+        $result = $this->context->builder->select($isString, $strPtr, $nullStr);
+        $this->context->builder->returnValue($result);
+        $this->context->builder->clearInsertionPosition();
     }
 
     public function implementValueWriteString(): void {

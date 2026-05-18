@@ -4,8 +4,6 @@ AOT: $_GET string key (populated at compile time from QUERY_STRING)
 QUERY_STRING=name=Compiled
 --FILE--
 <?php
-if (isset($_GET['name'])) {
-    echo $_GET['name'], "\n";
-}
+echo $_GET['name'], "\n";
 --EXPECT--
 Compiled

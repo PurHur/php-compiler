@@ -13,6 +13,7 @@ use PHPCfg\Operand;
 use PHPCfg\Op;
 use PHPTypes\Type;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\IssetHelper;
 use PHPCompiler\JIT\Variable;
 
 use PHPCompiler\Func as CoreFunc;
@@ -508,6 +509,11 @@ class JIT {
                 case Variable::TYPE_NATIVE_DOUBLE:
                     compile {
                         __value__writeDouble($valueRef, $valueFrom);
+                    }
+                    return;
+                case Variable::TYPE_STRING:
+                    compile {
+                        __value__writeString($valueRef, $valueFrom);
                     }
                     return;
                 default:
