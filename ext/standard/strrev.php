@@ -13,6 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
@@ -57,15 +58,14 @@ final class strrev extends Internal
             $context->builder->structGep($str, $map['length'])
         );
         $charPtr = $context->builder->structGep($str, $map['value']);
-        $i32 = $context->getTypeFromString('int32');
-        $zero = $i32->constInt(0, false);
-        $one = $i32->constInt(1, false);
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+        $one = $i64->constInt(1, false);
 
         $isEmpty = $context->builder->icmp(Builder::INT_EQ, $len, $zero);
-        $prev = $context->builder->getInsertBlock();
-        $emptyBlock = $prev->insertBasicBlock('strrev_empty');
-        $workBlock = $prev->insertBasicBlock('strrev_work');
-        $doneBlock = $emptyBlock->insertBasicBlock('strrev_done');
+        $emptyBlock = BasicBlockHelper::append($context, 'strrev_empty');
+        $workBlock = BasicBlockHelper::append($context, 'strrev_work');
+        $doneBlock = BasicBlockHelper::append($context, 'strrev_done');
         $context->builder->branchIf($isEmpty, $emptyBlock, $workBlock);
 
         $context->builder->positionAtEnd($emptyBlock);
@@ -81,12 +81,12 @@ final class strrev extends Internal
         );
         $destPtr = $context->builder->structGep($dest, $destMap['value']);
 
-        $idxSlot = $context->builder->alloca($i32, 1, 'strrev_idx');
+        $idxSlot = $context->builder->alloca($i64, 1, 'strrev_idx');
         $context->builder->store($zero, $idxSlot);
 
-        $loopHead = $workBlock->insertBasicBlock('strrev_head');
-        $loopBody = $loopHead->insertBasicBlock('strrev_body');
-        $loopDone = $loopBody->insertBasicBlock('strrev_loop_done');
+        $loopHead = BasicBlockHelper::append($context, 'strrev_head');
+        $loopBody = BasicBlockHelper::append($context, 'strrev_body');
+        $loopDone = BasicBlockHelper::append($context, 'strrev_loop_done');
         $context->builder->branch($loopHead);
 
         $context->builder->positionAtEnd($loopHead);

@@ -13,6 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
@@ -66,10 +67,11 @@ final class lcfirst extends Internal
         );
         $zero = $len->typeOf()->constInt(0, false);
         $isEmpty = $context->builder->icmp(Builder::INT_EQ, $len, $zero);
-        $prev = $context->builder->getInsertBlock();
-        $done = $prev->insertBasicBlock('case_transform_done');
-        $work = $prev->insertBasicBlock('case_transform_work');
+
+        $done = BasicBlockHelper::append($context, 'case_transform_done');
+        $work = BasicBlockHelper::append($context, 'case_transform_work');
         $context->builder->branchIf($isEmpty, $done, $work);
+
         $context->builder->positionAtEnd($work);
         $valGep = $context->builder->structGep($strPtr, $map['value']);
         $ch = $context->builder->load($valGep);
@@ -88,6 +90,7 @@ final class lcfirst extends Internal
         );
         $context->builder->store($newCh, $valGep);
         $context->builder->branch($done);
+
         $context->builder->positionAtEnd($done);
     }
 
@@ -98,17 +101,16 @@ final class lcfirst extends Internal
         $len = $context->builder->load(
             $context->builder->structGep($strPtr, $map['length'])
         );
-        $i32 = $context->getTypeFromString('int32');
-        $zero = $i32->constInt(0, false);
-        $one = $i32->constInt(1, false);
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+        $one = $i64->constInt(1, false);
         $charPtr = $context->builder->structGep($strPtr, $map['value']);
-        $iSlot = $context->builder->alloca($i32, 1, 'case_transform_i');
+        $iSlot = $context->builder->alloca($i64, 1, 'case_transform_i');
         $context->builder->store($zero, $iSlot);
 
-        $prev = $context->builder->getInsertBlock();
-        $done = $prev->insertBasicBlock('case_transform_all_done');
-        $loopHead = $prev->insertBasicBlock('case_transform_all_head');
-        $loopBody = $prev->insertBasicBlock('case_transform_all_body');
+        $done = BasicBlockHelper::append($context, 'case_transform_all_done');
+        $loopHead = BasicBlockHelper::append($context, 'case_transform_all_head');
+        $loopBody = BasicBlockHelper::append($context, 'case_transform_all_body');
         $context->builder->branch($loopHead);
 
         $context->builder->positionAtEnd($loopHead);
@@ -117,6 +119,7 @@ final class lcfirst extends Internal
         $context->builder->branchIf($atEnd, $done, $loopBody);
 
         $context->builder->positionAtEnd($loopBody);
+        $i32 = $context->getTypeFromString('int32');
         $atChar = $context->builder->gep($charPtr, $i);
         $ch = $context->builder->load($atChar);
         $chI32 = $context->builder->zExt($ch, $i32);

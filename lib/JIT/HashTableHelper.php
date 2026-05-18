@@ -34,10 +34,9 @@ final class HashTableHelper
         $context->builder->store($zero, $idxSlot);
 
         $setLong = $context->lookupFunction('__hashtable__setLongAt');
-        $prev = $context->builder->getInsertBlock();
-        $done = $prev->insertBasicBlock('range_done');
-        $loopHead = $prev->insertBasicBlock('range_head');
-        $loopBody = $prev->insertBasicBlock('range_body');
+        $done = BasicBlockHelper::append($context, 'range_done');
+        $loopHead = BasicBlockHelper::append($context, 'range_head');
+        $loopBody = BasicBlockHelper::append($context, 'range_body');
         $context->builder->branch($loopHead);
 
         $context->builder->positionAtEnd($loopHead);
@@ -74,7 +73,6 @@ final class HashTableHelper
         Variable $value
     ): Value {
         $ht = self::alloc($context);
-        $i64 = $context->getTypeFromString('int64');
         $sizeT = $context->getTypeFromString('size_t');
         $iSlot = $context->builder->alloca($sizeT, 1, 'fill_i');
         $zero = $sizeT->constInt(0, false);
@@ -83,10 +81,9 @@ final class HashTableHelper
         $setLong = $context->lookupFunction('__hashtable__setLongAt');
         $setString = $context->lookupFunction('__hashtable__setStringAt');
 
-        $prev = $context->builder->getInsertBlock();
-        $done = $prev->insertBasicBlock('fill_done');
-        $loopHead = $prev->insertBasicBlock('fill_head');
-        $loopBody = $prev->insertBasicBlock('fill_body');
+        $done = BasicBlockHelper::append($context, 'fill_done');
+        $loopHead = BasicBlockHelper::append($context, 'fill_head');
+        $loopBody = BasicBlockHelper::append($context, 'fill_body');
         $context->builder->branch($loopHead);
 
         $context->builder->positionAtEnd($loopHead);
