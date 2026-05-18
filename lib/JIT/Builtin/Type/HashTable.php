@@ -90,6 +90,7 @@ class HashTable extends Type
 
     public function implement(): void
     {
+        $this->ensureLibcStringCompare();
         $this->implementAlloc();
         $this->implementGrow();
         $this->implementSetLongAt();
@@ -100,6 +101,19 @@ class HashTable extends Type
         $this->implementSetStringKeyString();
         $this->implementOffsetIsSetStringKey();
         $this->implementReadStringKeyValue();
+    }
+
+    private function ensureLibcStringCompare(): void
+    {
+        try {
+            $this->context->lookupFunction('strcmp');
+        } catch (\Throwable $e) {
+            $i8p = $this->context->getTypeFromString('int8*');
+            $i32 = $this->context->getTypeFromString('int32');
+            $ft = $this->context->context->functionType($i32, false, $i8p, $i8p);
+            $fn = $this->context->module->addFunction('strcmp', $ft);
+            $this->context->registerFunction('strcmp', $fn);
+        }
     }
 
     private function implementAlloc(): void
@@ -368,10 +382,10 @@ class HashTable extends Type
         $headSlot = $this->context->builder->structGep($ht, $htMap['strKeys']);
         $head = $this->context->builder->load($headSlot);
 
-        $done = $block->insertBasicBlock('strkey_set_done');
-        $prepend = $block->insertBasicBlock('strkey_set_prepend');
-        $loopHead = $block->insertBasicBlock('strkey_set_head');
-        $loopBody = $block->insertBasicBlock('strkey_set_body');
+        $done = $fn->appendBasicBlock('strkey_set_done');
+        $prepend = $fn->appendBasicBlock('strkey_set_prepend');
+        $loopHead = $fn->appendBasicBlock('strkey_set_head');
+        $loopBody = $fn->appendBasicBlock('strkey_set_body');
         $this->context->builder->branch($loopHead);
 
         $this->context->builder->positionAtEnd($loopHead);
@@ -388,8 +402,8 @@ class HashTable extends Type
             $this->stringDataPtr($nodeKey)
         );
         $isMatch = $this->context->builder->icmp(Builder::INT_EQ, $cmp, $cmp->typeOf()->constInt(0, false));
-        $update = $loopBody->insertBasicBlock('strkey_set_update');
-        $next = $loopBody->insertBasicBlock('strkey_set_next');
+        $update = $fn->appendBasicBlock('strkey_set_update');
+        $next = $fn->appendBasicBlock('strkey_set_next');
         $this->context->builder->branchIf($isMatch, $update, $next);
 
         $this->context->builder->positionAtEnd($update);
@@ -440,12 +454,12 @@ class HashTable extends Type
         $this->context->builder->positionAtEnd($block);
         $ht = $fn->getParam(0);
         $key = $fn->getParam(1);
-        $valPtr = $this->lookupStringKeyValue($block, $ht, $key);
+        $valPtr = $this->lookupStringKeyValue($fn, $block, $ht, $key);
         $i1 = $this->context->getTypeFromString('int1');
         $isNull = $this->context->builder->icmp(Builder::INT_EQ, $valPtr, $valPtr->typeOf()->constNull());
-        $found = $block->insertBasicBlock('strkey_isset_found');
-        $notFound = $block->insertBasicBlock('strkey_isset_not_found');
-        $merge = $block->insertBasicBlock('strkey_isset_merge');
+        $found = $fn->appendBasicBlock('strkey_isset_found');
+        $notFound = $fn->appendBasicBlock('strkey_isset_not_found');
+        $merge = $fn->appendBasicBlock('strkey_isset_merge');
         $this->context->builder->branchIf($isNull, $notFound, $found);
         $this->context->builder->positionAtEnd($found);
         $typeByte = $this->context->builder->load(
@@ -470,11 +484,12 @@ class HashTable extends Type
         $this->context->builder->positionAtEnd($block);
         $ht = $fn->getParam(0);
         $key = $fn->getParam(1);
-        $valPtr = $this->lookupStringKeyValue($block, $ht, $key);
+        $valPtr = $this->lookupStringKeyValue($fn, $block, $ht, $key);
         $this->context->builder->returnValue($valPtr);
     }
 
     private function lookupStringKeyValue(
+        PHPLLVM\Value\Function_ $fn,
         PHPLLVM\BasicBlock $block,
         PHPLLVM\Value $ht,
         PHPLLVM\Value $key
@@ -484,11 +499,11 @@ class HashTable extends Type
         $head = $this->context->builder->load($this->context->builder->structGep($ht, $htMap['strKeys']));
         $valuePtrType = $this->context->getTypeFromString('__value__*');
 
-        $notFound = $block->insertBasicBlock('strkey_lookup_not_found');
-        $loopHead = $block->insertBasicBlock('strkey_lookup_head');
-        $loopBody = $block->insertBasicBlock('strkey_lookup_body');
-        $found = $block->insertBasicBlock('strkey_lookup_found');
-        $merge = $block->insertBasicBlock('strkey_lookup_merge');
+        $notFound = $fn->appendBasicBlock('strkey_lookup_not_found');
+        $loopHead = $fn->appendBasicBlock('strkey_lookup_head');
+        $loopBody = $fn->appendBasicBlock('strkey_lookup_body');
+        $found = $fn->appendBasicBlock('strkey_lookup_found');
+        $merge = $fn->appendBasicBlock('strkey_lookup_merge');
         $this->context->builder->branch($loopHead);
 
         $this->context->builder->positionAtEnd($loopHead);
@@ -505,7 +520,7 @@ class HashTable extends Type
             $this->stringDataPtr($nodeKey)
         );
         $isMatch = $this->context->builder->icmp(Builder::INT_EQ, $cmp, $cmp->typeOf()->constInt(0, false));
-        $next = $loopBody->insertBasicBlock('strkey_lookup_next');
+        $next = $fn->appendBasicBlock('strkey_lookup_next');
         $this->context->builder->branchIf($isMatch, $found, $next);
 
         $this->context->builder->positionAtEnd($found);
