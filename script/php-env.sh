@@ -1,5 +1,16 @@
 # Shared host PHP / LLVM environment (source from bash scripts).
-PHP_BIN="${PHP_COMPILER_PHP:-php}"
+PHP_BIN="${PHP_COMPILER_PHP:-}"
+if [[ -z "$PHP_BIN" ]]; then
+  for candidate in php8.2 php8.1 php; do
+    if command -v "$candidate" >/dev/null 2>&1; then
+      PHP_BIN="$candidate"
+      break
+    fi
+  done
+fi
+if [[ -z "$PHP_BIN" ]]; then
+  PHP_BIN=php
+fi
 if ! command -v "$PHP_BIN" >/dev/null 2>&1; then
   for candidate in php8.2 php8.1 php; do
     if command -v "$candidate" >/dev/null 2>&1; then

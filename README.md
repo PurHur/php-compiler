@@ -16,10 +16,10 @@ On a modern Linux host with PHP 8.1+ (8.2 recommended):
 git clone https://github.com/PurHur/php-compiler.git
 cd php-compiler
 composer install
-./script/ci-local.sh          # full PHPUnit suite (VM, compliance, JIT, AOT)
-php bin/vm.php -r 'echo 1;'
+./phpc test                    # full PHPUnit suite (VM, compliance, JIT, AOT)
+./phpc run -r 'echo 1;'        # VM mode (or: php bin/vm.php -r 'echo 1;')
 make web-smoke                 # VM: examples/001-SimpleWeb
-make serve                     # http://127.0.0.1:8080/ (001-SimpleWeb docroot)
+./phpc serve examples/001-SimpleWeb   # http://127.0.0.1:8080/ (or: make serve)
 ```
 
 The first `ci-local.sh` run downloads a bundled LLVM 9 toolchain into `.llvm/` (see `script/install-llvm9.sh`) and applies vendor patches. No Docker required.

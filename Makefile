@@ -57,6 +57,11 @@ rebuild-changed:
 rebuild-examples:
 	docker run -v $(shell pwd):/compiler ircmaxell/php-compiler:16.04-dev php script/rebuild-examples.php
 
+# Host: refresh examples/README.md benchmark table (requires LLVM for AOT columns)
+.PHONY: bench
+bench:
+	./script/php-local.sh script/rebuild-examples.php
+
 .PHONY: fix
 fix:
 	docker run -v $(shell pwd):/compiler ircmaxell/php-compiler:16.04-dev php vendor/bin/php-cs-fixer fix --allow-risky=yes
@@ -84,7 +89,7 @@ SERVE_ADDR ?= 127.0.0.1:8080
 SERVE_ROOT ?= examples/001-SimpleWeb
 .PHONY: serve
 serve:
-	./script/php-local.sh bin/serve.php $(SERVE_ADDR) $(SERVE_ROOT)
+	./phpc serve $(SERVE_ADDR) $(SERVE_ROOT)
 
 .PHONY: test-18
 test-18: rebuild-changed

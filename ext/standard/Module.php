@@ -107,6 +107,8 @@ class Module extends ModuleAbstract
             new realpath(),
             new getenv_(),
             new putenv_(),
+            new scandir(),
+            new glob_(),
         ];
     }
 
@@ -159,6 +161,23 @@ class Module extends ModuleAbstract
             $ft = $context->context->functionType($double, false, $i8p, $i8pp);
             $fn = $context->module->addFunction('strtod', $ft);
             $context->registerFunction('strtod', $fn);
+        }
+        try {
+            $context->lookupFunction('strlen');
+        } catch (\Throwable $e) {
+            $i8p = $context->getTypeFromString('int8*');
+            $sizeT = $context->getTypeFromString('size_t');
+            $ft = $context->context->functionType($sizeT, false, $i8p);
+            $fn = $context->module->addFunction('strlen', $ft);
+            $context->registerFunction('strlen', $fn);
+        }
+        try {
+            $context->lookupFunction('realpath');
+        } catch (\Throwable $e) {
+            $i8p = $context->getTypeFromString('int8*');
+            $ft = $context->context->functionType($i8p, false, $i8p, $i8p);
+            $fn = $context->module->addFunction('realpath', $ft);
+            $context->registerFunction('realpath', $fn);
         }
         $double = $context->getTypeFromString('double');
         foreach (['ceil', 'floor', 'round', 'sqrt', 'log', 'exp', 'sin', 'cos', 'tan', 'pow', 'fmod'] as $name) {

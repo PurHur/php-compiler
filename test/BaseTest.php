@@ -163,7 +163,7 @@ abstract class BaseTest extends TestCase {
             2 => ['pipe', 'w'],
         ];
         $pipes = [];
-        $repoRoot = \dirname(__DIR__, 2);
+        $repoRoot = \dirname(__DIR__);
         $env = [];
         foreach (array_merge($_ENV, $_SERVER) as $key => $value) {
             if (is_string($value)) {
