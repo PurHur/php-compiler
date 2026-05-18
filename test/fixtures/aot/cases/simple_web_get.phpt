@@ -13,3 +13,5 @@ echo '</body></html>';
 Content-Type: text/html; charset=UTF-8
 <!DOCTYPE html><html><body><h1>Hello Compiled</h1>
 </body></html>
+--EXPECT_EXIT--
+0

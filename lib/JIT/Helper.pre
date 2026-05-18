@@ -101,6 +101,7 @@ restart:
                     case OpCode::TYPE_EQUAL:
                         $result = $this->context->builder->fcmp(Builder::REAL_OEQ, $leftValue, $rightValue);
                         goto return_bool;
+                    case OpCode::TYPE_NOT_IDENTICAL:
                     case OpCode::TYPE_NOT_EQUAL:
                     case OpCode::TYPE_NOT_IDENTICAL:
                         $result = $this->context->builder->fcmp(Builder::REAL_ONE, $leftValue, $rightValue);
@@ -175,6 +176,7 @@ restart:
                             $result = $leftValue == $rightValue;
                         }
                         goto return_bool;
+                    case OpCode::TYPE_NOT_IDENTICAL:
                     case OpCode::TYPE_NOT_EQUAL:
                     case OpCode::TYPE_NOT_IDENTICAL:
                         compile {
@@ -190,6 +192,12 @@ restart:
                 }
                 if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
                     $result = $this->context->getTypeFromString('int1')->constInt(1, false);
+                    goto return_bool;
+                }
+                if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
+                    compile {
+                        $result = 1;
+                    }
                     goto return_bool;
                 }
                 if (OpCode::TYPE_EQUAL === $opcode->type) {
@@ -214,6 +222,12 @@ restart:
                     $result = $this->context->getTypeFromString('int1')->constInt(1, false);
                     goto return_bool;
                 }
+                if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
+                    compile {
+                        $result = 1;
+                    }
+                    goto return_bool;
+                }
                 if (OpCode::TYPE_EQUAL === $opcode->type) {
                     compile {
                         $result = $leftValue == $rightValue;
@@ -235,6 +249,7 @@ restart:
                             $result = $leftValue == $rightValue;
                         }
                         goto return_bool;
+                    case OpCode::TYPE_NOT_IDENTICAL:
                     case OpCode::TYPE_NOT_EQUAL:
                     case OpCode::TYPE_NOT_IDENTICAL:
                         compile {

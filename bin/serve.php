@@ -22,7 +22,7 @@ use PHPCompiler\Web\Superglobals;
 $listen = $argv[1] ?? '127.0.0.1:8080';
 $docroot = $argv[2] ?? getcwd();
 
-DevServer::run($listen, $docroot, static function (string $script): array {
+DevServer::run($listen, $docroot, static function (string $script, array $cgiEnv): array {
     $code = file_get_contents($script);
     if (false === $code) {
         throw new \RuntimeException('Could not read script');
@@ -31,12 +31,10 @@ DevServer::run($listen, $docroot, static function (string $script): array {
     ob_start();
     try {
         $runtime = new Runtime();
-        $query = getenv('QUERY_STRING');
-        $body = getenv('REQUEST_BODY');
         Superglobals::populateFromEnvironment(
             $runtime->vmContext,
-            false === $query ? '' : $query,
-            false === $body ? '' : $body
+            $cgiEnv['QUERY_STRING'] ?? '',
+            $cgiEnv['REQUEST_BODY'] ?? ''
         );
         $block = $runtime->parseAndCompile($code, $script);
         $runtime->run($block);

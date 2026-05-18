@@ -1,13 +1,17 @@
 --TEST--
-Not-equal and not-identical operators
+Not-equal and not-identical operators (VM/JIT parity)
 --FILE--
 <?php
-echo (1 !== 2) ? "1\n" : "0\n";
-echo (1 !== 1) ? "1\n" : "0\n";
-echo (1 != 2) ? "1\n" : "0\n";
-echo (1 != 1) ? "1\n" : "0\n";
+echo (null !== false) ? '1' : '0';
+echo (0 !== '') ? '1' : '0';
+echo (0 !== false) ? '1' : '0';
+echo ('0' !== 0) ? '1' : '0';
+echo (0 != false) ? '1' : '0';
+echo (0 != '') ? '1' : '0';
+echo (null != false) ? '1' : '0';
+echo ('1' != 1) ? '1' : '0';
+$method = 'POST';
+echo ($method !== 'POST') ? '1' : '0';
+echo ($method != 'GET') ? '1' : '0';
 --EXPECT--
-1
-0
-1
-0
+1111010001

@@ -82,6 +82,12 @@ restart:
                     $arg3 = $frame->scope[$op->arg3];
                     $arg1->bool($arg2->identicalTo($arg3));
                     break;
+                case OpCode::TYPE_NOT_IDENTICAL:
+                    $arg1 = $frame->scope[$op->arg1];
+                    $arg2 = $frame->scope[$op->arg2];
+                    $arg3 = $frame->scope[$op->arg3];
+                    $arg1->bool(!$arg2->identicalTo($arg3));
+                    break;
                 case OpCode::TYPE_EQUAL:
                     $arg1 = $frame->scope[$op->arg1];
                     $arg2 = $frame->scope[$op->arg2];
@@ -93,12 +99,6 @@ restart:
                     $arg2 = $frame->scope[$op->arg2];
                     $arg3 = $frame->scope[$op->arg3];
                     $arg1->bool(!$arg2->equals($arg3));
-                    break;
-                case OpCode::TYPE_NOT_IDENTICAL:
-                    $arg1 = $frame->scope[$op->arg1];
-                    $arg2 = $frame->scope[$op->arg2];
-                    $arg3 = $frame->scope[$op->arg3];
-                    $arg1->bool(!$arg2->identicalTo($arg3));
                     break;
                 case OpCode::TYPE_SMALLER:
                 case OpCode::TYPE_GREATER:

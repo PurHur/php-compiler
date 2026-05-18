@@ -25,6 +25,7 @@ class Module extends ModuleAbstract
             new ceil(),
             new floor(),
             new round(),
+            new number_format(),
             new sqrt(),
             new pi(),
             new deg2rad(),

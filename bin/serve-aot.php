@@ -56,8 +56,8 @@ $env = buildProcessEnv($repoRoot);
 
 fwrite(STDERR, "PHP-Compiler serve-aot: binary {$resolvedBinary}\n");
 
-DevServer::run($listen, $docroot, static function (string $script) use ($resolvedBinary, $env): array {
-    return runAotBinary($resolvedBinary, $env);
+DevServer::run($listen, $docroot, static function (string $script, array $cgiEnv) use ($resolvedBinary, $env): array {
+    return runAotBinary($resolvedBinary, $env, $cgiEnv);
 });
 
 /**
@@ -65,19 +65,21 @@ DevServer::run($listen, $docroot, static function (string $script) use ($resolve
  *
  * @return array{0: int, 1: string, 2: string, 3: list<string>}
  */
-function runAotBinary(string $binary, array $env): array
+function runAotBinary(string $binary, array $env, array $cgiEnv): array
 {
     $descriptorSpec = [
         0 => ['pipe', 'r'],
         1 => ['pipe', 'w'],
         2 => ['pipe', 'w'],
     ];
-    $procEnv = $env;
-    foreach (['REQUEST_METHOD', 'QUERY_STRING', 'REQUEST_BODY', 'SCRIPT_NAME', 'REQUEST_URI', 'PATH_INFO'] as $key) {
-        $value = getenv($key);
-        if (false !== $value) {
-            $procEnv[$key] = $value;
+    $procEnv = $cgiEnv;
+    foreach (['PATH', 'LD_LIBRARY_PATH', 'HOME', 'LANG', 'LC_ALL'] as $key) {
+        if (isset($env[$key]) && '' !== $env[$key]) {
+            $procEnv[$key] = $env[$key];
         }
+    }
+    if (!isset($procEnv['PATH'])) {
+        $procEnv['PATH'] = '/usr/bin:/bin';
     }
 
     $proc = proc_open([$binary], $descriptorSpec, $pipes, null, $procEnv);
@@ -92,7 +94,9 @@ function runAotBinary(string $binary, array $env): array
     $code = proc_close($proc);
     if (0 !== $code) {
         throw new \RuntimeException(
-            'AOT binary exited with code '.$code.': '.trim($stderr !== false ? $stderr : '')
+            'AOT binary exited with code '.$code
+            .': '.trim($stderr !== false ? $stderr : '')
+            .(false !== $stdout && '' !== trim($stdout) ? ' | stdout: '.trim($stdout) : '')
         );
     }
 

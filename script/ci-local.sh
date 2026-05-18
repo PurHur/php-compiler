@@ -35,10 +35,10 @@ fi
 
 # Full suite includes test/real/ServeTest.php (bin/serve.php HTTP). Set
 # PHP_COMPILER_SKIP_SERVE_TESTS=1 in sandboxes that cannot bind TCP ports.
-echo "PHPUnit: VM, compliance (no LLVM), real-world..."
+echo "PHPUnit: VM, compliance (no LLVM), real-world (includes ExamplesCompileTest VM lint/smoke)..."
 "$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit --exclude-group llvm "$@"
 
 if [[ -f "$LLVM_DIR/libLLVM-9.so.1" ]]; then
-  echo "PHPUnit: JIT, AOT (web fixtures + examples)..."
+  echo "PHPUnit: JIT, AOT (web fixtures + examples, ExamplesCompileTest AOT lint)..."
   "$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit --group llvm "$@"
 fi

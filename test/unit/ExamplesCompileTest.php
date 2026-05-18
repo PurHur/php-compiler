@@ -7,86 +7,126 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * AOT-compile shipped web examples from disk (not stdin PHPT).
+ * CI gate: shipped examples compile in VM and (when LLVM is present) AOT lint.
  *
- * @group llvm
+ * @see https://github.com/PurHur/php-compiler/issues/203
  */
-final class ExampleWebAotTest extends TestCase
+final class ExamplesCompileTest extends TestCase
 {
     private static ?bool $llvmReady = null;
 
-    private string $compileBin = '';
-
-    public function setUp(): void
+    /**
+     * @return array<string, array{0: string}>
+     */
+    public static function provideExamples(): array
     {
-        $this->compileBin = realpath(__DIR__ . '/../../bin/compile.php');
+        $cases = [];
+        $root = dirname(__DIR__, 2).'/examples';
+        foreach (glob($root.'/*/example.php') ?: [] as $path) {
+            $name = basename(dirname($path));
+            $cases[$name] = [$path];
+        }
+        ksort($cases);
+
+        return $cases;
+    }
+
+    /**
+     * @dataProvider provideExamples
+     */
+    public function testVmLint(string $examplePath): void
+    {
+        $name = basename(dirname($examplePath));
+        $this->runCli('vm.php', array_merge(self::vmExtraArgs($name), ['-l', $examplePath]));
+    }
+
+    /**
+     * @dataProvider provideExamples
+     */
+    public function testVmSmokeOutput(string $examplePath): void
+    {
+        $name = basename(dirname($examplePath));
+        $out = $this->runCli('vm.php', array_merge(self::vmExtraArgs($name), [$examplePath]));
+        foreach (self::smokeNeedles($name) as $needle) {
+            $this->assertStringContainsString($needle, $out);
+        }
+    }
+
+    /**
+     * @dataProvider provideExamples
+     *
+     * @group llvm
+     */
+    public function testAotLint(string $examplePath): void
+    {
         if (!self::isLlvmReady()) {
             $this->markTestSkipped(
                 'LLVM 9 toolchain not available. Run script/install-llvm9.sh from the repository root.'
             );
         }
-    }
-
-    public function testSimpleWebExampleFile(): void
-    {
-        $source = realpath(__DIR__ . '/../../examples/001-SimpleWeb/example.php');
-        $this->assertNotFalse($source);
-        $result = $this->compileAndRun($source, ['-q', 'name=Example']);
-        $this->assertStringContainsString('Content-Type: text/html; charset=UTF-8', $result);
-        $this->assertStringContainsString('<h1>Hello Example</h1>', $result);
-    }
-
-    public function testStaticWebExampleFile(): void
-    {
-        $source = realpath(__DIR__ . '/../../examples/002-StaticWeb/example.php');
-        $this->assertNotFalse($source);
-        $result = $this->compileAndRun($source, []);
-        $this->assertStringContainsString('Content-Type: text/html; charset=UTF-8', $result);
-        $this->assertStringContainsString('<h1>Hello World</h1>', $result);
+        $name = basename(dirname($examplePath));
+        $this->runCli('compile.php', array_merge(self::vmExtraArgs($name), ['-l', $examplePath]), true);
     }
 
     /**
-     * @param list<string> $compileExtraArgs e.g. ['-q', 'name=Example']
+     * @param list<string> $argvArgs arguments after the bin script path
      */
-    private function compileAndRun(string $source, array $compileExtraArgs): string
+    private function runCli(string $binScript, array $argvArgs, bool $llvm = false): string
     {
-        $outfile = tempnam(sys_get_temp_dir(), 'phpc_web_');
-        $this->assertNotFalse($outfile);
-        unlink($outfile);
-
         $repoRoot = dirname(__DIR__, 2);
-        $env = $this->llvmProcessEnv($repoRoot);
-
-        $compileArgv = array_merge(
-            self::llvmEnvPrefix(),
+        $bin = realpath($repoRoot.'/bin/'.$binScript);
+        $this->assertNotFalse($bin);
+        $cmd = array_merge(
+            $llvm ? self::llvmEnvPrefix() : [],
             self::phpCommand(),
-            array_merge([$this->compileBin], $compileExtraArgs, ['-o', $outfile, $source])
+            array_merge([$bin], $argvArgs)
         );
         $descriptorSpec = [
             0 => ['pipe', 'r'],
             1 => ['pipe', 'w'],
             2 => ['pipe', 'w'],
         ];
-        $compile = proc_open($compileArgv, $descriptorSpec, $pipes, $repoRoot, $env);
+        $env = $llvm ? $this->llvmProcessEnv($repoRoot) : null;
+        $proc = proc_open($cmd, $descriptorSpec, $pipes, $repoRoot, $env);
+        $this->assertIsResource($proc);
         fclose($pipes[0]);
-        $compileErr = stream_get_contents($pipes[2]);
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
         fclose($pipes[1]);
         fclose($pipes[2]);
-        proc_close($compile);
+        $exit = proc_close($proc);
+        $this->assertSame(
+            0,
+            $exit,
+            trim(($stderr !== false ? $stderr : '')."\n".($stdout !== false ? $stdout : ''))
+        );
 
-        $this->assertFileExists($outfile, trim($compileErr !== false ? $compileErr : ''));
-        $this->assertTrue(is_executable($outfile));
+        return $stdout !== false ? $stdout : '';
+    }
 
-        $run = proc_open([$outfile], $descriptorSpec, $runPipes, $repoRoot, $env);
-        $result = stream_get_contents($runPipes[1]);
-        fclose($runPipes[0]);
-        fclose($runPipes[1]);
-        fclose($runPipes[2]);
-        $exitCode = proc_close($run);
-        $this->assertSame(0, $exitCode, 'AOT binary should exit with status 0');
-        @unlink($outfile);
+    /**
+     * @return list<string>
+     */
+    private static function vmExtraArgs(string $exampleName): array
+    {
+        if ('001-SimpleWeb' === $exampleName) {
+            return ['-q', 'name=Example'];
+        }
 
-        return $result !== false ? $result : '';
+        return [];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function smokeNeedles(string $exampleName): array
+    {
+        return match ($exampleName) {
+            '000-HelloWorld' => ['Hello World'],
+            '001-SimpleWeb' => ['Hello Example'],
+            '002-StaticWeb' => ['Hello World'],
+            default => ['Hello'],
+        };
     }
 
     /**
@@ -120,10 +160,9 @@ final class ExampleWebAotTest extends TestCase
     {
         $phpEnv = getenv('PHP_COMPILER_PHP');
         if (false !== $phpEnv && '' !== $phpEnv) {
-            $cmd = preg_split('/\s+/', $phpEnv);
-        } else {
-            $cmd = [PHP_BINARY];
+            return preg_split('/\s+/', $phpEnv) ?: [PHP_BINARY];
         }
+        $cmd = [PHP_BINARY];
         $extDir = getenv('PHP_COMPILER_EXT_DIR') ?: '/usr/lib/php/20220829';
         if (is_dir($extDir)) {
             foreach (['tokenizer', 'mbstring', 'dom', 'xml', 'xmlwriter', 'ffi', 'posix', 'phar'] as $ext) {
