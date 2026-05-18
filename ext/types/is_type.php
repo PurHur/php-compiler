@@ -54,6 +54,8 @@ class is_type extends Internal {
                 return $this->context->constantFromBool($this->type === Variable::TYPE_STRING);
             case JITVariable::TYPE_NULL:
                 return $this->context->constantFromBool($this->type === Variable::TYPE_NULL);
+            case JITVariable::TYPE_HASHTABLE:
+                return $this->context->constantFromBool($this->type === Variable::TYPE_ARRAY);
             default:
                 throw new \LogicException('Non-implemented type handled for ' . $this->name . '(): ' . JITVariable::getStringType($args[0]->type));
         }
