@@ -26,4 +26,6 @@ fi
 
 "$PHP_BIN" "${PHP_OPTS[@]}" script/capability-matrix.php --check
 
+# Full suite includes test/real/ServeTest.php (bin/serve.php HTTP). Set
+# PHP_COMPILER_SKIP_SERVE_TESTS=1 in sandboxes that cannot bind TCP ports.
 "$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit "$@"

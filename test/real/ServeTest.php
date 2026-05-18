@@ -7,7 +7,7 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Integration tests for bin/serve.php (issue #152, #150).
+ * Integration tests for bin/serve.php (issues #151, #152, #150).
  */
 final class ServeTest extends TestCase
 {
@@ -18,8 +18,22 @@ final class ServeTest extends TestCase
 
   protected function setUp(): void
   {
+    if (false !== getenv('PHP_COMPILER_SKIP_SERVE_TESTS') && '' !== getenv('PHP_COMPILER_SKIP_SERVE_TESTS')) {
+      $this->markTestSkipped('PHP_COMPILER_SKIP_SERVE_TESTS is set');
+    }
     $this->repoRoot = dirname(__DIR__, 2);
     $this->phpCmd = self::phpCommand();
+  }
+
+  public function testServes001SimpleWebExample(): void
+  {
+    $docroot = $this->repoRoot.'/examples/001-SimpleWeb';
+    $this->assertDirectoryExists($docroot);
+    $response = $this->httpGet($docroot, '/example.php?name=Dev');
+    $this->assertStringContainsString('HTTP/1.1 200', $response);
+    $this->assertStringContainsString('Content-Type: text/html', $response);
+    $this->assertStringContainsString('Hello', $response);
+    $this->assertStringContainsString('Dev', $response);
   }
 
   public function testUncaughtExceptionReturns500WithoutLeak(): void
