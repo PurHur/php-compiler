@@ -405,6 +405,18 @@ class JIT {
                         );
                     }
                     break;
+                case OpCode::TYPE_POW:
+                    $pow = new \PHPCompiler\ext\standard\pow();
+                    $powResult = $pow->call(
+                        $this->context,
+                        $this->context->getVariableFromOp($block->getOperand($op->arg2)),
+                        $this->context->getVariableFromOp($block->getOperand($op->arg3))
+                    );
+                    $this->assignOperand(
+                        $block->getOperand($op->arg1),
+                        new Variable($this->context, Variable::TYPE_NATIVE_DOUBLE, Variable::KIND_VALUE, $powResult)
+                    );
+                    break;
                 case OpCode::TYPE_MUL:
                 case OpCode::TYPE_PLUS:
                 case OpCode::TYPE_MINUS:

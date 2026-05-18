@@ -101,6 +101,8 @@ restart:
                 case OpCode::TYPE_MINUS:
                 case OpCode::TYPE_MUL:
                 case OpCode::TYPE_DIV:
+                case OpCode::TYPE_MODULO:
+                case OpCode::TYPE_POW:
                     $arg1 = $frame->scope[$op->arg1];
                     $arg2 = $frame->scope[$op->arg2];
                     $arg3 = $frame->scope[$op->arg3];

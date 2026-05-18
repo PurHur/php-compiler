@@ -1,0 +1,10 @@
+--- vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
+@@ -174,6 +174,7 @@
+             case 'Expr_BinaryOp_Plus':
+             case 'Expr_BinaryOp_Minus':
+             case 'Expr_BinaryOp_Mul':
++            case 'Expr_BinaryOp_Pow':
+                 if ($resolved->contains($op->left) && $resolved->contains($op->right)) {
+                     switch ([$resolved[$op->left]->type, $resolved[$op->right]->type]) {
+                         case [Type::TYPE_LONG, Type::TYPE_LONG]:
