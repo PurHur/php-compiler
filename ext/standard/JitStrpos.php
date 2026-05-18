@@ -5,19 +5,20 @@ declare(strict_types=1);
 /**
  * LLVM JIT helper for strpos() — strstr-based search with optional byte offset.
  *
- * Returns a boxed {@see __value__*} (long position or native bool false when not found).
+ * Not found is represented as -1 (native long). VM mode returns boolean false instead.
  */
 
 namespace PHPCompiler\ext\standard;
 
-use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 final class JitStrpos
 {
+    /** Boxed long value used when strstr finds no match (compare to false via readLong). */
+    public const NOT_FOUND = 0;
+
     public static function find(
         Context $context,
         Value $haystack,
@@ -46,27 +47,12 @@ final class JitStrpos
         $null = $context->getTypeFromString('int8*')->constNull();
         $isNull = $context->builder->icmp(Builder::INT_EQ, $found, $null);
 
-        $slot = JitValueBox::alloc($context);
-        $notFoundBlock = BasicBlockHelper::append($context, 'strpos_not_found');
-        $foundBlock = BasicBlockHelper::append($context, 'strpos_found');
-        $mergeBlock = BasicBlockHelper::append($context, 'strpos_merge');
-        $context->builder->branchIf($isNull, $notFoundBlock, $foundBlock);
-
-        $context->builder->positionAtEnd($notFoundBlock);
-        $falseVal = $context->getTypeFromString('int1')->constInt(0, false);
-        JitValueBox::writeBool($context, $slot, $falseVal);
-        $context->builder->branch($mergeBlock);
-
-        $context->builder->positionAtEnd($foundBlock);
         $foundInt = $context->builder->ptrToInt($found, $i64);
         $baseInt = $context->builder->ptrToInt($hayPtr, $i64);
         $pos = $context->builder->sub($foundInt, $baseInt);
-        JitValueBox::writeLong($context, $slot, $pos);
-        $context->builder->branch($mergeBlock);
+        $sentinel = $i64->constInt(self::NOT_FOUND, false);
 
-        $context->builder->positionAtEnd($mergeBlock);
-
-        return JitValueBox::pointer($context, $slot);
+        return $context->builder->select($isNull, $sentinel, $pos);
     }
 
     private static function clampIndex(Context $context, Value $index, Value $min, Value $max): Value

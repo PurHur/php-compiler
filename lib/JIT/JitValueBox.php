@@ -46,7 +46,13 @@ final class JitValueBox
         );
         $boolByte = $context->builder->truncOrBitCast($bool, $i8);
         $valueField = $context->builder->structGep($ptr, $map['value']);
-        $firstByte = $context->builder->gep($valueField, $i8->constInt(0, false));
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $firstByte = $context->builder->inBoundsGEP(
+            $valueField,
+            $i32->constInt(0, false),
+            $i64->constInt(0, false)
+        );
         $context->builder->store($boolByte, $firstByte);
     }
 }

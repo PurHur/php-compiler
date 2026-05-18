@@ -248,6 +248,14 @@ class Value extends Type {
                         $this->context->builder->structGep($value, $offset)
                     );
     $__type = $this->context->getTypeFromString('int8');
+    $zeroType = $__type->constInt(0, false);
+    $isNullType = $this->context->builder->icmp(\PHPLLVM\Builder::INT_EQ, $oldType, $zeroType);
+    $nullDelrefBlock = $fn___c4ca4238a0b923820dcc509a6f75849b->appendBasicBlock('value_delref_null');
+    $contDelrefBlock = $fn___c4ca4238a0b923820dcc509a6f75849b->appendBasicBlock('value_delref_cont');
+    $this->context->builder->branchIf($isNullType, $nullDelrefBlock, $contDelrefBlock);
+    $this->context->builder->positionAtEnd($nullDelrefBlock);
+    $this->context->builder->returnVoid();
+    $this->context->builder->positionAtEnd($contDelrefBlock);
                         
                     
                     $__kind = $__type->getKind();

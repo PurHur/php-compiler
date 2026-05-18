@@ -475,12 +475,42 @@ restart:
         }
         if (Variable::TYPE_VALUE === $leftType && Variable::TYPE_VALUE !== $rightType) {
             if (OpCode::TYPE_IDENTICAL === $opcode->type) {
+                if (Variable::TYPE_NATIVE_BOOL === $rightType) {
+                    $valuePtr = Variable::KIND_VARIABLE === $left->kind
+                        ? $left->value
+                        : $this->loadValue($left);
+                    $stored = $this->context->builder->call(
+                        $this->context->lookupFunction('__value__readLong'),
+                        $valuePtr
+                    );
+                    $result = $this->context->builder->icmp(
+                        Builder::INT_EQ,
+                        $stored,
+                        $stored->typeOf()->constInt(0, false)
+                    );
+                    goto return_bool;
+                }
                 $result = JitValueCompare::identicalToNative($this->context, $left, $right);
                 goto return_bool;
             }
         }
         if (Variable::TYPE_VALUE === $rightType && Variable::TYPE_VALUE !== $leftType) {
             if (OpCode::TYPE_IDENTICAL === $opcode->type) {
+                if (Variable::TYPE_NATIVE_BOOL === $leftType) {
+                    $valuePtr = Variable::KIND_VARIABLE === $right->kind
+                        ? $right->value
+                        : $this->loadValue($right);
+                    $stored = $this->context->builder->call(
+                        $this->context->lookupFunction('__value__readLong'),
+                        $valuePtr
+                    );
+                    $result = $this->context->builder->icmp(
+                        Builder::INT_EQ,
+                        $stored,
+                        $stored->typeOf()->constInt(0, false)
+                    );
+                    goto return_bool;
+                }
                 $result = JitValueCompare::identicalNativeToValue($this->context, $left, $right);
                 goto return_bool;
             }

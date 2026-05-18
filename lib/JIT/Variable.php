@@ -334,6 +334,13 @@ final class Variable {
                 // assign to null
                 $this->context->builder->store($this->context->type->string->pointer->constNull(), $this->value);
                 break;
+            case self::TYPE_VALUE:
+                $map = $this->context->structFieldMap['__value__'];
+                $this->context->builder->store(
+                    $this->context->getTypeFromString('int8')->constInt(self::TYPE_NULL, false),
+                    $this->context->builder->structGep($this->value, $map['type'])
+                );
+                break;
         }
     }
     

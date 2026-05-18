@@ -31,6 +31,17 @@ final class urlencode extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('urlencode() is not implemented for JIT in this compiler build');
+        if (1 !== \count($args)) {
+            throw new \LogicException('urlencode() requires exactly one argument');
+        }
+        if (JITVariable::TYPE_STRING !== $args[0]->type) {
+            throw new \LogicException('urlencode() only supports strings in this compiler build');
+        }
+
+        return JitUrlencode::encode(
+            $context,
+            $context->helper->loadValue($args[0]),
+            true
+        );
     }
 }
