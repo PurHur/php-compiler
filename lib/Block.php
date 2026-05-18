@@ -124,6 +124,11 @@ class Block {
                     $found = true;
                 }
                 if (!$found) {
+                    $name = self::resolveVariableName($op);
+                    if (null !== $name && Superglobals::isSuperglobalName($name)) {
+                        $scope[$pos] = self::initialVariableForOperand($op, $context);
+                        continue;
+                    }
                     throw new \LogicException("Could not resolve argument");
                 }
             } else {

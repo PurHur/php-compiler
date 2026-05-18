@@ -89,6 +89,9 @@ final class HashTable {
 
     public function findIndex(int $index): ?Variable {
         $this->assertConsistent();
+        if ($this->flags & self::FLAG_UNINITIALIZED) {
+            return null;
+        }
         $bucket = $this->findBucket($index, null);
         if (is_null($bucket)) {
             return null;
@@ -98,6 +101,9 @@ final class HashTable {
 
     public function find(string $key): ?Variable {
         $this->assertConsistent();
+        if ($this->flags & self::FLAG_UNINITIALIZED) {
+            return null;
+        }
         $bucket = $this->findBucket($this->hash($key), $key);
         if (is_null($bucket)) {
             return null;
