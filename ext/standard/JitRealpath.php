@@ -17,8 +17,11 @@ use PHPLLVM\Value;
 
 final class JitRealpath
 {
+    private static int $blockSerial = 0;
+
     public static function resolve(Context $context, Value $str): Value
     {
+        $id = (string) (++self::$blockSerial);
         $map = $context->structFieldMap['__string__'];
         $pathPtr = $context->builder->structGep($str, $map['value']);
         $charPtr = $context->getTypeFromString('char*');
@@ -30,9 +33,9 @@ final class JitRealpath
         );
         $isNull = $context->builder->icmp(Builder::INT_EQ, $resolved, $null);
 
-        $failBlock = BasicBlockHelper::append($context, 'realpath_fail');
-        $okBlock = BasicBlockHelper::append($context, 'realpath_ok');
-        $mergeBlock = BasicBlockHelper::append($context, 'realpath_merge');
+        $failBlock = BasicBlockHelper::append($context, 'realpath_fail_'.$id);
+        $okBlock = BasicBlockHelper::append($context, 'realpath_ok_'.$id);
+        $mergeBlock = BasicBlockHelper::append($context, 'realpath_merge_'.$id);
         $context->builder->branchIf($isNull, $failBlock, $okBlock);
 
         $context->builder->positionAtEnd($failBlock);
@@ -59,6 +62,14 @@ final class JitRealpath
         $phi->addIncoming($emptyStr, $failBlock);
         $phi->addIncoming($resultStr, $okBlock);
 
-        return $phi;
+        // Seal the merge block so later compares/ternaries do not append to it.
+        $resultSlot = $context->builder->alloca($str->typeOf(), 1, 'realpath_result_'.$id);
+        $context->builder->store($phi, $resultSlot);
+        $contBlock = BasicBlockHelper::append($context, 'realpath_cont_'.$id);
+        $context->builder->branch($contBlock);
+
+        $context->builder->positionAtEnd($contBlock);
+
+        return $context->builder->load($resultSlot);
     }
 }

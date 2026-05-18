@@ -16,6 +16,8 @@ need=0
 [[ -x "$LLVM_DIR/clang-9" ]] || need=1
 [[ -x "$LLVM_DIR/ld" ]] || need=1
 [[ -f "$LLVM_DIR/gcc/9/crtbegin.o" ]] || need=1
+[[ -f "$LLVM_DIR/libedit.so.2" ]] || need=1
+[[ -f "$LLVM_DIR/libz3.so.4" ]] || need=1
 if [[ "$need" -eq 0 ]]; then
   exit 0
 fi
@@ -82,6 +84,22 @@ if [[ ! -f "$LLVM_DIR/gcc/9/crtbegin.o" ]]; then
   install -m 644 "$dir/usr/lib/gcc/x86_64-linux-gnu/9/crtbegin.o" "$LLVM_DIR/gcc/9/crtbegin.o"
   install -m 644 "$dir/usr/lib/gcc/x86_64-linux-gnu/9/crtend.o" "$LLVM_DIR/gcc/9/crtend.o"
   install -m 644 "$dir/usr/lib/gcc/x86_64-linux-gnu/9/libgcc.a" "$LLVM_DIR/gcc/9/libgcc.a"
+fi
+
+# libLLVM-9.so.1 also needs libedit and libz3 at load time (not always on minimal images).
+if [[ ! -f "$LLVM_DIR/libedit.so.2" ]]; then
+  dir="$(fetch_deb "http://deb.debian.org/debian/pool/main/libe/libedit/libedit2_3.1-20221030-2_amd64.deb" libedit2.deb)"
+  shopt -s nullglob
+  for lib in "$dir"/usr/lib/x86_64-linux-gnu/libedit.so.2.*; do
+    install -m 644 "$lib" "$LLVM_DIR/$(basename "$lib")"
+    ln -sf "$(basename "$lib")" "$LLVM_DIR/libedit.so.2"
+  done
+  shopt -u nullglob
+fi
+
+if [[ ! -f "$LLVM_DIR/libz3.so.4" ]]; then
+  dir="$(fetch_deb "http://deb.debian.org/debian/pool/main/z/z3/libz3-4_4.8.12-3.1_amd64.deb" libz3-4.deb)"
+  install -m 644 "$dir/usr/lib/x86_64-linux-gnu/libz3.so.4" "$LLVM_DIR/libz3.so.4"
 fi
 
 echo "LLVM 9 toolchain installed under $LLVM_DIR"

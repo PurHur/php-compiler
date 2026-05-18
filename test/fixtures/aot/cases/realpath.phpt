@@ -3,9 +3,9 @@ AOT: realpath() via libc
 --FILE--
 <?php
 $ok = realpath('/tmp');
-echo (strlen($ok) > 0 ? 'ok' : 'fail'), "\n";
 $missing = realpath('/tmp/no-such-entry-phpc-aot');
-echo (strlen($missing) > 0 ? 'found' : 'missing'), "\n";
---EXPECT--
-ok
-missing
+echo strlen($ok), "\n";
+echo strlen($missing), "\n";
+--EXPECTF--
+%d
+0
