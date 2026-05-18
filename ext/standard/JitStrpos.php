@@ -5,21 +5,19 @@ declare(strict_types=1);
 /**
  * LLVM JIT helper for strpos() — strstr-based search with optional byte offset.
  *
- * Not found is represented as -1 (native long); use strict comparison with false
- * only in VM mode. For AOT/JIT, compare with < 0 or use VM.
+ * Returns a boxed {@see __value__*} (long position or native bool false when not found).
  */
 
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 final class JitStrpos
 {
-    private const NOT_FOUND = -1;
-
     public static function find(
         Context $context,
         Value $haystack,
@@ -48,27 +46,27 @@ final class JitStrpos
         $null = $context->getTypeFromString('int8*')->constNull();
         $isNull = $context->builder->icmp(Builder::INT_EQ, $found, $null);
 
+        $slot = JitValueBox::alloc($context);
         $notFoundBlock = BasicBlockHelper::append($context, 'strpos_not_found');
         $foundBlock = BasicBlockHelper::append($context, 'strpos_found');
         $mergeBlock = BasicBlockHelper::append($context, 'strpos_merge');
         $context->builder->branchIf($isNull, $notFoundBlock, $foundBlock);
 
         $context->builder->positionAtEnd($notFoundBlock);
-        $sentinel = $i64->constInt(self::NOT_FOUND, false);
+        $falseVal = $context->getTypeFromString('int1')->constInt(0, false);
+        JitValueBox::writeBool($context, $slot, $falseVal);
         $context->builder->branch($mergeBlock);
 
         $context->builder->positionAtEnd($foundBlock);
         $foundInt = $context->builder->ptrToInt($found, $i64);
         $baseInt = $context->builder->ptrToInt($hayPtr, $i64);
         $pos = $context->builder->sub($foundInt, $baseInt);
+        JitValueBox::writeLong($context, $slot, $pos);
         $context->builder->branch($mergeBlock);
 
         $context->builder->positionAtEnd($mergeBlock);
-        $phi = $context->builder->phi($i64);
-        $phi->addIncoming($sentinel, $notFoundBlock);
-        $phi->addIncoming($pos, $foundBlock);
 
-        return $phi;
+        return JitValueBox::pointer($context, $slot);
     }
 
     private static function clampIndex(Context $context, Value $index, Value $min, Value $max): Value

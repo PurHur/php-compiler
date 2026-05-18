@@ -39,14 +39,14 @@ final class JitValueCompare
                 $mergeBlock = BasicBlockHelper::append($context, 'ident_value_merge');
                 $context->builder->branchIf($sameType, $boolBlock, $failBlock);
                 $context->builder->positionAtEnd($boolBlock);
-                $stored = $context->builder->call(
-                    $context->lookupFunction('__value__readLong'),
-                    $valuePtr
+                $valueField = $context->builder->structGep($valuePtr, $map['value']);
+                $storedByte = $context->builder->load(
+                    $context->builder->gep($valueField, $i8->constInt(0, false))
                 );
                 $storedBool = $context->builder->icmp(
                     Builder::INT_NE,
-                    $stored,
-                    $stored->typeOf()->constInt(0, false)
+                    $storedByte,
+                    $i8->constInt(0, false)
                 );
                 $nativeBool = $context->helper->loadValue($native);
                 $match = $context->builder->icmp(Builder::INT_EQ, $storedBool, $nativeBool);
