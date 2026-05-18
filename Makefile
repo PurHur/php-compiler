@@ -94,3 +94,21 @@ serve:
 .PHONY: test-18
 test-18: rebuild-changed
 	docker run -v $(shell pwd):/compiler ircmaxell/php-compiler:18.04-dev php vendor/bin/phpunit
+
+# Ubuntu 22.04 + PHP 8.2 dev image (issues #73, #202). Build once: make docker-build-22
+PHP_COMPILER_DEV_IMAGE ?= ghcr.io/PurHur/php-compiler:dev
+LOCAL_DEV_IMAGE ?= php-compiler:22.04-dev
+
+.PHONY: docker-build-22
+docker-build-22:
+	docker build -t $(LOCAL_DEV_IMAGE) -t $(PHP_COMPILER_DEV_IMAGE) Docker/dev/ubuntu-22.04
+
+# Run full local CI inside Docker (mount repo; harness hosts may need: tar | docker run -i …)
+.PHONY: test-docker
+test-docker: docker-build-22
+	docker run --rm -v $(shell pwd):/compiler -w /compiler $(LOCAL_DEV_IMAGE) ./script/ci-local.sh
+
+# Quick PHPUnit in 22.04 dev image (after composer install on host or in container)
+.PHONY: test-docker-quick
+test-docker-quick:
+	docker run --rm -v $(shell pwd):/compiler -w /compiler $(LOCAL_DEV_IMAGE) php vendor/bin/phpunit --exclude-group llvm

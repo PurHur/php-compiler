@@ -72,10 +72,27 @@ final class ServeTest extends TestCase
     $this->assertStringNotContainsString('hidden', $response);
   }
 
+  public function testPopulatesHttpServerHeaders(): void
+  {
+    $docroot = $this->makeDocroot([
+      'headers.php' => <<<'PHP'
+<?php
+echo $_SERVER['HTTP_HOST'], '|', $_SERVER['HTTP_X_CUSTOM'];
+PHP,
+    ]);
+    $response = $this->httpGet($docroot, '/headers.php', [], [
+      'Host: example.test',
+      'X-Custom: 1',
+    ]);
+    $this->assertStringContainsString('HTTP/1.1 200', $response);
+    $this->assertStringContainsString('example.test|1', $response);
+  }
+
   /**
    * @param array<string, string> $extraEnv
+   * @param list<string>          $extraRequestHeaders
    */
-  private function httpGet(string $docroot, string $path, array $extraEnv = []): string
+  private function httpGet(string $docroot, string $path, array $extraEnv = [], array $extraRequestHeaders = []): string
   {
     $port = $this->findFreePort();
     $addr = "127.0.0.1:{$port}";
@@ -107,7 +124,9 @@ final class ServeTest extends TestCase
 
     $conn = fsockopen('127.0.0.1', $port);
     $this->assertIsResource($conn);
-    fwrite($conn, "GET {$path} HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n");
+    $requestHeaders = array_merge(['Host: 127.0.0.1', 'Connection: close'], $extraRequestHeaders);
+    $headerBlock = implode("\r\n", $requestHeaders);
+    fwrite($conn, "GET {$path} HTTP/1.1\r\n{$headerBlock}\r\n\r\n");
     $response = stream_get_contents($conn);
     fclose($conn);
 

@@ -9,6 +9,12 @@ namespace PHPCompiler\Web;
  */
 final class DevServer
 {
+    /** Maximum request headers mapped into $_SERVER (issue #77). */
+    public const MAX_REQUEST_HEADERS = 128;
+
+    /** Maximum length per header value passed to user scripts. */
+    public const MAX_HEADER_VALUE_LEN = 8192;
+
     public static function run(string $listen, string $docroot, callable $handlePhpRequest): void
     {
         if (!is_dir($docroot)) {
@@ -115,6 +121,13 @@ final class DevServer
             $cgiEnv['PATH_INFO'] = $pathInfo;
         }
 
+        self::clearHttpServerKeys();
+        $httpServer = self::httpHeadersToServerVars($headers);
+        foreach ($httpServer as $key => $value) {
+            $_SERVER[$key] = $value;
+        }
+        $cgiEnv = array_merge($cgiEnv, $httpServer);
+
         putenv('REQUEST_METHOD='.$method);
         putenv('QUERY_STRING='.$query);
         putenv('REQUEST_BODY='.$body);
@@ -185,6 +198,49 @@ final class DevServer
         }
 
         return [$method, $path, $query, $headers, $body];
+    }
+
+    /**
+     * Map an HTTP header name to a CGI $_SERVER key (e.g. host → HTTP_HOST).
+     */
+    public static function headerNameToServerKey(string $name): string
+    {
+        return 'HTTP_'.strtoupper(str_replace('-', '_', $name));
+    }
+
+    /**
+     * @param array<string, string> $headers lowercase header name => value
+     *
+     * @return array<string, string> HTTP_* keys for $_SERVER / CGI env
+     */
+    public static function httpHeadersToServerVars(array $headers): array
+    {
+        $serverVars = [];
+        $count = 0;
+        foreach ($headers as $name => $value) {
+            if ($count >= self::MAX_REQUEST_HEADERS) {
+                break;
+            }
+            if (str_contains($value, "\r") || str_contains($value, "\n")) {
+                continue;
+            }
+            if (strlen($value) > self::MAX_HEADER_VALUE_LEN) {
+                $value = substr($value, 0, self::MAX_HEADER_VALUE_LEN);
+            }
+            $serverVars[self::headerNameToServerKey($name)] = $value;
+            ++$count;
+        }
+
+        return $serverVars;
+    }
+
+    public static function clearHttpServerKeys(): void
+    {
+        foreach (array_keys($_SERVER) as $key) {
+            if (is_string($key) && str_starts_with($key, 'HTTP_')) {
+                unset($_SERVER[$key]);
+            }
+        }
     }
 
     public static function isSafeUrlPath(string $path): bool
