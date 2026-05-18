@@ -11,7 +11,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** urlencode() for strings (subset of PHP; VM only). */
+/** urlencode() for strings (application/x-www-form-urlencoded). */
 final class urlencode extends Internal
 {
     public function execute(Frame $frame): void
@@ -31,6 +31,14 @@ final class urlencode extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('urlencode() is not implemented for JIT in this compiler build');
+        if (1 !== \count($args)) {
+            throw new \LogicException('urlencode() requires exactly one argument');
+        }
+
+        return JitUrlencode::encode(
+            $context,
+            JitUrlencode::loadStringArg($context, $args[0]),
+            true
+        );
     }
 }
