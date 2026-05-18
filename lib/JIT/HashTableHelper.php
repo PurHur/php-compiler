@@ -124,4 +124,18 @@ final class HashTableHelper
 
         return $ht;
     }
+
+    public static function readStringAt(Context $context, Value $ht, Value $index): Value
+    {
+        $map = $context->structFieldMap['__hashtable__'];
+        $values = $context->builder->load(
+            $context->builder->structGep($ht, $map['values'])
+        );
+        $entry = $context->builder->inBoundsGep($values, $index);
+
+        return $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $entry
+        );
+    }
 }
