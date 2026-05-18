@@ -309,28 +309,7 @@ class JIT {
                     $arg = $this->context->getVariableFromOp($block->getOperand($argOffset));
                     switch ($arg->type) {
                         case Variable::TYPE_VALUE:
-                            $argValue = $this->context->builder->call(
-                        $this->context->lookupFunction('__value__readString') , 
-                        $arg->value
-                        
-                    );
-                            $fmt = $this->context->builder->pointerCast(
-                        $this->context->constantFromString("%.*s"),
-                        $this->context->getTypeFromString('char*')
-                    );
-    $offset = $this->context->structFieldMap[$argValue->typeOf()->getElementType()->getName()]['length'];
-                    $__str__length = $this->context->builder->load(
-                        $this->context->builder->structGep($argValue, $offset)
-                    );
-    $offset = $this->context->structFieldMap[$argValue->typeOf()->getElementType()->getName()]['value'];
-                    $__str__value = $this->context->builder->structGep($argValue, $offset);
-    $this->context->builder->call(
-                    $this->context->lookupFunction('printf') , 
-                    $fmt
-                    , $__str__length
-                    , $__str__value
-                    
-                );
+                            JIT\ValueEchoHelper::echo($this->context, $arg->value);
                             break;
                         case Variable::TYPE_STRING:
                             $argValue = $this->context->helper->loadValue($arg);
@@ -661,21 +640,54 @@ class JIT {
             return;
         }
         if (!$this->context->hasVariableOp($result)) {
-            // it's a kind!
             $this->context->makeVariableFromValueOp($value, $result);
+
             return;
         }
-        $result = $this->context->getVariableFromOp($result);
-        if ($result->kind !== Variable::KIND_VARIABLE) {
-            throw new \LogicException("Cannot assign to a value");
+        $dest = $this->context->getVariableFromOp($result);
+        if ($dest->kind !== Variable::KIND_VARIABLE) {
+            throw new \LogicException('Cannot assign to a value');
         }
-        $result->free();
-
-        $this->context->builder->store(
-            $value,
-            $result->value
+        $source = new Variable(
+            $this->context,
+            $this->jitTypeFromLlvmValue($value),
+            Variable::KIND_VALUE,
+            $value
         );
-        $result->addref();
+        if ($source->type === $dest->type) {
+            $dest->free();
+            $this->context->builder->store($value, $dest->value);
+            $dest->addref();
+
+            return;
+        }
+        $this->assignOperand($result, $source);
+    }
+
+    private function jitTypeFromLlvmValue(PHPLLVM\Value $value): int
+    {
+        switch ($this->context->getStringFromType($value->typeOf())) {
+            case 'double':
+                return Variable::TYPE_NATIVE_DOUBLE;
+            case 'int1':
+            case 'bool':
+                return Variable::TYPE_NATIVE_BOOL;
+            case 'int64':
+            case 'long long':
+            case 'int32':
+            case 'size_t':
+            case 'unsigned int':
+                return Variable::TYPE_NATIVE_LONG;
+            case '__string__*':
+                return Variable::TYPE_STRING;
+            case '__hashtable__*':
+                return Variable::TYPE_HASHTABLE;
+            default:
+                throw new \LogicException(
+                    'Cannot infer JIT variable type from LLVM type: '
+                    .$this->context->getStringFromType($value->typeOf())
+                );
+        }
     }
 
 }
