@@ -15,6 +15,7 @@ use PHPCompiler\VM\Variable;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 class is_type extends Internal {
@@ -56,6 +57,15 @@ class is_type extends Internal {
                 return $this->context->constantFromBool($this->type === Variable::TYPE_NULL);
             case JITVariable::TYPE_HASHTABLE:
                 return $this->context->constantFromBool($this->type === Variable::TYPE_ARRAY);
+            case JITVariable::TYPE_VALUE:
+                $loaded = $context->helper->loadValue($args[0]);
+                $typeField = $context->structFieldMap['__value__']['type'];
+                $typeByte = $context->builder->load(
+                    $context->builder->structGep($loaded, $typeField)
+                );
+                $expected = $context->getTypeFromString('int8')->constInt($this->type, false);
+
+                return $context->builder->icmp(Builder::INT_EQ, $typeByte, $expected);
             default:
                 throw new \LogicException('Non-implemented type handled for ' . $this->name . '(): ' . JITVariable::getStringType($args[0]->type));
         }

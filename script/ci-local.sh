@@ -7,6 +7,12 @@ if ! command -v "$PHP_BIN" >/dev/null 2>&1; then
   PHP_BIN="php8.2"
 fi
 export PHP_COMPILER_EXT_DIR="${PHP_COMPILER_EXT_DIR:-/usr/lib/php/20220829}"
+LLVM_DIR="$(cd "$(dirname "$0")/.." && pwd)/.llvm"
+if [[ -f "$LLVM_DIR/libLLVM-9.so.1" ]]; then
+  export LD_LIBRARY_PATH="$LLVM_DIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+  export PATH="$LLVM_DIR${PATH:+:$PATH}"
+  export PHP_COMPILER_LLVM_PATH="$LLVM_DIR"
+fi
 EXT_DIR="$PHP_COMPILER_EXT_DIR"
 PHP_OPTS=()
 if [[ -d "$EXT_DIR" ]]; then

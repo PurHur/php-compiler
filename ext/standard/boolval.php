@@ -61,6 +61,15 @@ final class boolval extends Internal
                 return $this->stringTruthy($context, $context->helper->loadValue($args[0]));
             case JITVariable::TYPE_NULL:
                 return $context->constantFromBool(false);
+            case JITVariable::TYPE_VALUE:
+                $loaded = $context->helper->loadValue($args[0]);
+                $typeField = $context->structFieldMap['__value__']['type'];
+                $typeByte = $context->builder->load(
+                    $context->builder->structGep($loaded, $typeField)
+                );
+                $nullType = $context->getTypeFromString('int8')->constInt(Variable::TYPE_NULL, false);
+
+                return $context->builder->icmp(Builder::INT_NE, $typeByte, $nullType);
             case JITVariable::TYPE_HASHTABLE:
                 $ht = $context->helper->loadValue($args[0]);
                 $num = $context->builder->call(
