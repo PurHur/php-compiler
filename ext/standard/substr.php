@@ -1,0 +1,114 @@
+<?php
+
+declare(strict_types=1);
+
+/**
+ * This file is part of PHP-Compiler, a PHP CFG Compiler for PHP code
+ *
+ * @copyright 2015 Anthony Ferrara. All rights reserved
+ * @license MIT See LICENSE at the root of the project for more info
+ */
+
+namespace PHPCompiler\ext\standard;
+
+use PHPCompiler\Frame;
+use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\Variable;
+use PHPLLVM\Builder;
+use PHPLLVM\Value;
+
+/**
+ * substr() for strings with integer offset and optional length (subset of PHP).
+ */
+final class substr extends Internal
+{
+    public function execute(Frame $frame): void
+    {
+        $argc = count($frame->calledArgs);
+        if ($argc < 2 || $argc > 3) {
+            throw new \LogicException('substr() requires two or three arguments');
+        }
+        $s = $frame->calledArgs[0]->resolveIndirect();
+        $offset = $frame->calledArgs[1]->resolveIndirect();
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (Variable::TYPE_STRING !== $s->type || Variable::TYPE_INTEGER !== $offset->type) {
+            throw new \LogicException('substr() requires a string and integer offset in this compiler build');
+        }
+        if (3 === $argc) {
+            $length = $frame->calledArgs[2]->resolveIndirect();
+            if (Variable::TYPE_INTEGER !== $length->type) {
+                throw new \LogicException('substr() length must be an integer in this compiler build');
+            }
+            $frame->returnVar->string(\substr($s->toString(), $offset->toInt(), $length->toInt()));
+
+            return;
+        }
+        $frame->returnVar->string(\substr($s->toString(), $offset->toInt()));
+    }
+
+    public Context $context;
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        $this->context = $context;
+        $argc = count($args);
+        if ($argc < 2 || $argc > 3) {
+            throw new \LogicException('substr() requires two or three arguments');
+        }
+        if (JITVariable::TYPE_STRING !== $args[0]->type
+            || JITVariable::TYPE_NATIVE_LONG !== $args[1]->type) {
+            throw new \LogicException('substr() requires a string and integer offset in this compiler build');
+        }
+        if (3 === $argc && JITVariable::TYPE_NATIVE_LONG !== $args[2]->type) {
+            throw new \LogicException('substr() length must be an integer in this compiler build');
+        }
+
+        $str = $context->helper->loadValue($args[0]);
+        $structName = $str->typeOf()->getElementType()->getName();
+        $map = $context->structFieldMap[$structName];
+        $len = $context->builder->load(
+            $context->builder->structGep($str, $map['length'])
+        );
+        $charPtr = $context->builder->structGep($str, $map['value']);
+        $i32 = $context->getTypeFromString('int32');
+        $zero = $i32->constInt(0, false);
+        $offset = $context->builder->trunc($context->helper->loadValue($args[1]), $i32);
+        $start = self::clampIndex($context, $offset, $zero, $len);
+
+        if (3 === $argc) {
+            $lengthArg = $context->builder->trunc($context->helper->loadValue($args[2]), $i32);
+            $negLen = $context->builder->icmp(Builder::INT_SLT, $lengthArg, $zero);
+            $remaining = $context->builder->sub($len, $start);
+            $maxLen = $context->builder->select($negLen, $zero, $lengthArg);
+            $sliceLen = self::minValue($context, $maxLen, $remaining);
+        } else {
+            $sliceLen = $context->builder->sub($len, $start);
+            $sliceLen = self::maxValue($context, $sliceLen, $zero);
+        }
+
+        return string_trim::jitCopySlice($context, $str, $charPtr, $start, $sliceLen);
+    }
+
+    private static function clampIndex(Context $context, Value $index, Value $min, Value $max): Value
+    {
+        return self::minValue($context, self::maxValue($context, $index, $min), $max);
+    }
+
+    private static function minValue(Context $context, Value $a, Value $b): Value
+    {
+        $cmp = $context->builder->icmp(Builder::INT_SLT, $a, $b);
+
+        return $context->builder->select($cmp, $a, $b);
+    }
+
+    private static function maxValue(Context $context, Value $a, Value $b): Value
+    {
+        $cmp = $context->builder->icmp(Builder::INT_SGT, $a, $b);
+
+        return $context->builder->select($cmp, $a, $b);
+    }
+}

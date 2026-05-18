@@ -62,6 +62,10 @@ class Module extends ModuleAbstract
             new strtolower(),
             new strtoupper(),
             new string_trim(),
+            new string_ltrim(),
+            new string_rtrim(),
+            new substr(),
+            new strrev(),
         ];
     }
 
