@@ -77,12 +77,25 @@ final class string_trim extends Internal
         $start = $context->builder->load($startSlot);
         $end = $context->builder->load($endSlot);
         $newLen = $context->builder->sub($end, $start);
-        $isEmpty = $context->builder->icmp(Builder::INT_SLE, $newLen, $zero);
+
+        return self::jitCopySlice($context, $str, $charPtr, $start, $newLen);
+    }
+
+    public static function jitCopySlice(
+        Context $context,
+        Value $str,
+        Value $charPtr,
+        Value $start,
+        Value $sliceLen
+    ): Value {
+        $i32 = $context->getTypeFromString('int32');
+        $zero = $i32->constInt(0, false);
+        $isEmpty = $context->builder->icmp(Builder::INT_SLE, $sliceLen, $zero);
 
         $prev = $context->builder->getInsertBlock();
-        $emptyBlock = $prev->insertBasicBlock('trim_empty');
-        $copyBlock = $prev->insertBasicBlock('trim_copy');
-        $doneBlock = $emptyBlock->insertBasicBlock('trim_done');
+        $emptyBlock = $prev->insertBasicBlock('slice_empty');
+        $copyBlock = $prev->insertBasicBlock('slice_copy');
+        $doneBlock = $emptyBlock->insertBasicBlock('slice_done');
         $context->builder->branchIf($isEmpty, $emptyBlock, $copyBlock);
 
         $context->builder->positionAtEnd($emptyBlock);
@@ -90,15 +103,15 @@ final class string_trim extends Internal
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($copyBlock);
-        $dest = $context->builder->call($context->lookupFunction('__string__alloc'), $newLen);
+        $dest = $context->builder->call($context->lookupFunction('__string__alloc'), $sliceLen);
         $destMap = $context->structFieldMap['__string__'];
         $context->builder->store(
-            $newLen,
+            $sliceLen,
             $context->builder->structGep($dest, $destMap['length'])
         );
         $srcAt = $context->builder->gep($charPtr, $start);
         $destAt = $context->builder->structGep($dest, $destMap['value']);
-        $context->intrinsic->memcpy($destAt, $srcAt, $newLen, false);
+        $context->intrinsic->memcpy($destAt, $srcAt, $sliceLen, false);
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
@@ -109,7 +122,7 @@ final class string_trim extends Internal
         return $result;
     }
 
-    private static function advanceWhileTrimByte(
+    public static function advanceWhileTrimByte(
         Context $context,
         Value $charPtr,
         Value $len,
