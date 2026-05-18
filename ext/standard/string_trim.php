@@ -64,7 +64,7 @@ final class string_trim extends Internal
         );
         $i64 = JitStringIndex::i64($context);
         $zero = JitStringIndex::zero($context);
-        $one = JitStringIndex::i64($context)->constInt(1, false);
+        $one = $i64->constInt(1, false);
         $charPtr = $context->builder->structGep($str, $map['value']);
 
         $startSlot = $context->builder->alloca($i64, 1, 'trim_start');
@@ -130,7 +130,7 @@ final class string_trim extends Internal
     ): void {
         $i64 = JitStringIndex::i64($context);
         $zero = JitStringIndex::zero($context);
-        $one = JitStringIndex::i64($context)->constInt(1, false);
+        $one = $i64->constInt(1, false);
 
         $done = BasicBlockHelper::append($context, $fromStart ? 'trim_start_done' : 'trim_end_done');
         $loopHead = BasicBlockHelper::append($context, $fromStart ? 'trim_start_head' : 'trim_end_head');
@@ -151,7 +151,8 @@ final class string_trim extends Internal
             ? $context->builder->gep($charPtr, $idx)
             : $context->builder->gep($charPtr, $context->builder->sub($idx, $one));
         $ch = $context->builder->load($at);
-        $isTrim = self::jitIsTrimByte($context, $context->builder->zExt($ch, $context->getTypeFromString('int32')));
+        $chI32 = $context->builder->zExt($ch, $context->getTypeFromString('int32'));
+        $isTrim = self::jitIsTrimByte($context, $chI32);
         $continueLoop = $fromStart
             ? $context->builder->addNoSignedWrap($idx, $one)
             : $context->builder->sub($idx, $one);

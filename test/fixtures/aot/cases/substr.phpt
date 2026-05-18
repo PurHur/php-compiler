@@ -1,5 +1,5 @@
 --TEST--
-AOT: substr() with int64 string lengths
+AOT: substr() with offset and length
 --FILE--
 <?php
 echo substr('hello', 1), "\n";
