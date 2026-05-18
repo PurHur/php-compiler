@@ -131,23 +131,14 @@ abstract class BaseTest extends TestCase {
     protected function phpCommand(): array {
         $php = getenv('PHP_COMPILER_PHP') ?: PHP_BINARY;
         $cmd = [$php];
-        if (getenv('PHP_COMPILER_PHP')) {
-            $cmd[] = '-d';
-            $cmd[] = 'display_errors=0';
-            $cmd[] = '-d';
-            $cmd[] = 'error_reporting=0';
-
-            return $cmd;
-        }
         $extDir = getenv('PHP_COMPILER_EXT_DIR') ?: '/usr/lib/php/20220829';
-        if (!is_dir($extDir)) {
-            return $cmd;
-        }
-        foreach (['tokenizer', 'mbstring', 'dom', 'xml', 'xmlwriter', 'ffi'] as $ext) {
-            $so = $extDir.'/'.$ext.'.so';
-            if (is_file($so)) {
-                $cmd[] = '-d';
-                $cmd[] = 'extension='.$so;
+        if (is_dir($extDir)) {
+            foreach (['tokenizer', 'mbstring', 'dom', 'xml', 'xmlwriter', 'ffi'] as $ext) {
+                $so = $extDir.'/'.$ext.'.so';
+                if (is_file($so)) {
+                    $cmd[] = '-d';
+                    $cmd[] = 'extension='.$so;
+                }
             }
         }
         $cmd[] = '-d';
@@ -172,6 +163,11 @@ abstract class BaseTest extends TestCase {
         $env = null;
         if (isset($sections['ENV'])) {
             $env = [];
+            foreach (array_merge($_ENV, $_SERVER) as $key => $value) {
+                if (is_string($value)) {
+                    $env[$key] = $value;
+                }
+            }
             foreach (explode("\n", trim($sections['ENV'])) as $line) {
                 $line = trim($line);
                 if ('' === $line) {

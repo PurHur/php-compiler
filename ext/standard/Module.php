@@ -71,6 +71,8 @@ class Module extends ModuleAbstract
             new str_starts_with(),
             new str_ends_with(),
             new strncmp(),
+            new array_count(),
+            new array_key_exists(),
         ];
     }
 

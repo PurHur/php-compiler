@@ -111,6 +111,28 @@ final class HashTable {
         return $bucket->value;
     }
 
+    public function getNumElements(): int
+    {
+        return $this->numElements;
+    }
+
+    public function hasKey(Variable $index): bool
+    {
+        $this->assertConsistent();
+        switch ($index->type) {
+            case Variable::TYPE_INTEGER:
+                $value = $this->findIndex($index->toInt());
+                break;
+            case Variable::TYPE_STRING:
+                $value = $this->find($index->toString());
+                break;
+            default:
+                return false;
+        }
+
+        return null !== $value && !$value->isUndefined();
+    }
+
     /**
      * Whether an offset exists and is not null (PHP isset() on arrays).
      */

@@ -110,12 +110,8 @@ class Block {
                 $scope[$pos] = $this->constants[$pos];
             } elseif ($this->args->contains($op)) {
                 if (is_null($frame)) {
-                    $name = self::resolveVariableName($op);
-                    if (null !== $name && Superglobals::isSuperglobalName($name)) {
-                        $scope[$pos] = self::initialVariableForOperand($op, $context);
-                        continue;
-                    }
-                    throw new \LogicException("Argument var with no parent frame, illegal");
+                    $scope[$pos] = self::initialVariableForOperand($op, $context);
+                    continue;
                 }
                 $found = false;
                 $parent = $frame->block->findSlot($op, $frame);
