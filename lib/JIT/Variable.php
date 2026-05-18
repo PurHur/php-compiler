@@ -365,7 +365,12 @@ final class Variable {
     public function dimFetch(self $dim, ?Type $expectedType = null): Variable {
         switch ($this->type) {
             case self::TYPE_STRING:
-                $ptr = $this->context->type->string->dimFetch($this->value, $dim->value);
+                $ptr = StringOffsetHelper::dimFetch(
+                    $this->context,
+                    $this->value,
+                    $dim
+                );
+
                 return new Variable(
                     $this->context,
                     self::TYPE_STRING,
