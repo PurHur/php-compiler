@@ -3,95 +3,250 @@
 declare(strict_types=1);
 
 /**
- * This file is part of PHP-Compiler, a PHP CFG Compiler for PHP code
+ * Rebuild example JIT artifacts and refresh examples/README.md benchmark table.
  *
  * @copyright 2015 Anthony Ferrara. All rights reserved
  * @license MIT See LICENSE at the root of the project for more info
  */
 
+require_once __DIR__.'/../vendor/autoload.php';
+
 echo "Rebuilding Examples\n";
+
+$repoRoot = realpath(__DIR__.'/..') ?: __DIR__.'/..';
+$llvmReady = isLlvmReady($repoRoot);
+$phpCmd = phpCommand();
+$benchEnv = benchmarkEnv($repoRoot);
 
 $benchmarks = <<<HERE
 |         Example Name |      Native PHP |      bin/vm.php |     bin/jit.php | bin/compile.php |      ./compiled |
 |----------------------|-----------------|-----------------|-----------------|-----------------|-----------------|
 HERE;
 
-$it = new DirectoryIterator(__DIR__.'/../examples/');
+$exampleDirs = [];
+$it = new DirectoryIterator($repoRoot.'/examples/');
 foreach ($it as $file) {
-    if ($file->isFile()) {
+    if ($file->isDot() || !$file->isDir()) {
         continue;
     }
-    $example = $file->getPathname().'/example.php';
-    if (file_exists($example)) {
-        echo ' - Building Example '.$file->getBasename()."\n";
-
-        $cmd = escapeshellcmd(\PHP_BINARY).' '.escapeshellarg(__DIR__.'/../bin/jit.php').' -y '.escapeshellarg($example);
-        ob_start();
-        passthru($cmd);
-        file_put_contents($file->getPathname().'/example.output', ob_get_clean());
-        $benchmarks .= "\n".benchmark($example);
+    $dir = $file->getPathname();
+    $example = $dir.'/example.php';
+    if (is_file($example)) {
+        $exampleDirs[] = $dir;
     }
 }
+usort($exampleDirs, static fn (string $a, string $b): int => strcmp(basename($a), basename($b)));
 
-$readme = file_get_contents(__DIR__.'/../examples/README.md');
+foreach ($exampleDirs as $dir) {
+    $example = $dir.'/example.php';
+    echo ' - Building Example '.basename($dir)."\n";
 
-$readme = preg_replace('((<!-- benchmark table start -->)(.*)(<!-- benchmark table end -->))ims', "\$1\n\n".$benchmarks."\n\$3", $readme);
+    $jitArgv = array_merge($phpCmd, [$repoRoot.'/bin/jit.php', '-y', $example]);
+    runProcess($jitArgv, $benchEnv, $repoRoot);
+    file_put_contents($dir.'/example.output', '');
 
-file_put_contents(__DIR__.'/../examples/README.md', $readme);
+    $benchmarks .= "\n".benchmarkExample($example, $phpCmd, $benchEnv, $repoRoot, $llvmReady);
+}
+
+$readme = file_get_contents($repoRoot.'/examples/README.md');
+$readme = preg_replace(
+    '((<!-- benchmark table start -->)(.*)(<!-- benchmark table end -->))ims',
+    "\$1\n\n".$benchmarks."\n\$3",
+    $readme
+);
+file_put_contents($repoRoot.'/examples/README.md', $readme);
 
 echo "Done\n";
 
-function benchmark(string $example): string
+/**
+ * @return array{query: ?string}
+ */
+function exampleProfile(string $exampleBasename): array
+{
+    if ('001-SimpleWeb' === $exampleBasename) {
+        return ['query' => 'name=World'];
+    }
+
+    return ['query' => null];
+}
+
+function isLlvmReady(string $repoRoot): bool
+{
+    $llvmDir = $repoRoot.'/.llvm';
+    if (!is_file($llvmDir.'/libLLVM-9.so.1')) {
+        return false;
+    }
+    if ('' === getenv('PHP_COMPILER_LLVM_PATH')) {
+        putenv('PHP_COMPILER_LLVM_PATH='.$llvmDir);
+        $_ENV['PHP_COMPILER_LLVM_PATH'] = $llvmDir;
+        $_SERVER['PHP_COMPILER_LLVM_PATH'] = $llvmDir;
+    }
+    try {
+        \PHPLLVM\Chooser::choose();
+
+        return true;
+    } catch (\Throwable $e) {
+        return false;
+    }
+}
+
+/**
+ * @return array<string, string>
+ */
+function benchmarkEnv(string $repoRoot): array
+{
+    $env = [];
+    foreach (array_merge($_ENV, $_SERVER) as $key => $value) {
+        if (is_string($value)) {
+            $env[$key] = $value;
+        }
+    }
+    $llvmDir = $repoRoot.'/.llvm';
+    if (is_file($llvmDir.'/libLLVM-9.so.1')) {
+        $prefix = realpath($llvmDir) ?: $llvmDir;
+        $env['PHP_COMPILER_LLVM_PATH'] = $prefix;
+        $ld = $env['LD_LIBRARY_PATH'] ?? '';
+        $env['LD_LIBRARY_PATH'] = '' === $ld ? $prefix : $prefix.':'.$ld;
+        $path = $env['PATH'] ?? '';
+        $env['PATH'] = '' === $path ? $prefix : $prefix.':'.$path;
+    }
+
+    return $env;
+}
+
+/**
+ * @return list<string>
+ */
+function phpCommand(): array
+{
+    $phpEnv = getenv('PHP_COMPILER_PHP');
+    if (false !== $phpEnv && '' !== $phpEnv) {
+        $cmd = preg_split('/\s+/', $phpEnv) ?: [PHP_BINARY];
+    } else {
+        $cmd = [PHP_BINARY];
+    }
+    $extDir = getenv('PHP_COMPILER_EXT_DIR') ?: '/usr/lib/php/20220829';
+    if (is_dir($extDir)) {
+        foreach (['tokenizer', 'mbstring', 'dom', 'xml', 'xmlwriter', 'ffi', 'posix', 'phar'] as $ext) {
+            $so = $extDir.'/'.$ext.'.so';
+            if (is_file($so)) {
+                $cmd[] = '-d';
+                $cmd[] = 'extension='.$so;
+            }
+        }
+    }
+    $cmd[] = '-d';
+    $cmd[] = 'display_errors=0';
+    $cmd[] = '-d';
+    $cmd[] = 'error_reporting=0';
+
+    return $cmd;
+}
+
+/**
+ * @param list<string> $argv
+ * @param array<string, string> $env
+ */
+function runProcess(array $argv, array $env, string $cwd): void
+{
+    $descriptorSpec = [
+        0 => ['pipe', 'r'],
+        1 => ['pipe', 'w'],
+        2 => ['pipe', 'w'],
+    ];
+    $proc = proc_open($argv, $descriptorSpec, $pipes, $cwd, $env);
+    if (!is_resource($proc)) {
+        return;
+    }
+    fclose($pipes[0]);
+    stream_get_contents($pipes[1]);
+    stream_get_contents($pipes[2]);
+    fclose($pipes[1]);
+    fclose($pipes[2]);
+    proc_close($proc);
+}
+
+/**
+ * @param list<string> $argv
+ * @param array<string, string> $env
+ */
+function runIterations(array $argv, array $env, string $cwd, int $iterations): float
+{
+    $start = microtime(true);
+    for ($i = 0; $i < $iterations; ++$i) {
+        runProcess($argv, $env, $cwd);
+    }
+
+    return microtime(true) - $start;
+}
+
+/**
+ * @param list<string> $phpCmd
+ * @param array<string, string> $benchEnv
+ */
+function benchmarkExample(string $example, array $phpCmd, array $benchEnv, string $repoRoot, bool $llvmReady): string
 {
     $iterations = 10;
-    echo "Benchmarking ${example}\n";
-    $start = microtime(true);
-    $timers = [];
-    $cmd = escapeshellcmd(\PHP_BINARY).' '.escapeshellarg($example);
-    for ($i = 0; $i < $iterations; ++$i) {
-        ob_start();
-        exec($cmd);
-        ob_end_clean();
+    $profile = exampleProfile(basename(dirname($example)));
+    echo "Benchmarking {$example}\n";
+
+    $nativeEnv = $benchEnv;
+    if (null !== $profile['query']) {
+        $nativeEnv['QUERY_STRING'] = $profile['query'];
     }
-    $timers['native'] = microtime(true);
-    $cmd = escapeshellcmd(\PHP_BINARY).' '.escapeshellarg(__DIR__.'/../bin/vm.php').' '.escapeshellarg($example);
-    for ($i = 0; $i < $iterations; ++$i) {
-        ob_start();
-        exec($cmd);
-        ob_end_clean();
+
+    $nativeArgv = array_merge($phpCmd, [$example]);
+    $nativeTime = runIterations($nativeArgv, $nativeEnv, $repoRoot, $iterations) / $iterations;
+
+    $vmArgv = array_merge($phpCmd, [$repoRoot.'/bin/vm.php']);
+    if (null !== $profile['query']) {
+        $vmArgv[] = '-q';
+        $vmArgv[] = $profile['query'];
     }
-    $timers['vm'] = microtime(true);
-    $cmd = escapeshellcmd(\PHP_BINARY).' '.escapeshellarg(__DIR__.'/../bin/jit.php').' '.escapeshellarg($example);
-    for ($i = 0; $i < $iterations; ++$i) {
-        ob_start();
-        exec($cmd);
-        ob_end_clean();
+    $vmArgv[] = $example;
+    $vmTime = runIterations($vmArgv, $benchEnv, $repoRoot, $iterations) / $iterations;
+
+    $jitArgv = array_merge($phpCmd, [$repoRoot.'/bin/jit.php']);
+    if (null !== $profile['query']) {
+        $jitArgv[] = '-q';
+        $jitArgv[] = $profile['query'];
     }
-    $timers['jit'] = microtime(true);
-    $cmd = escapeshellcmd(\PHP_BINARY).' '.escapeshellarg(__DIR__.'/../bin/compile.php').' '.escapeshellarg($example);
-    for ($i = 0; $i < $iterations; ++$i) {
-        ob_start();
-        exec($cmd);
-        ob_end_clean();
+    $jitArgv[] = $example;
+    $jitTime = runIterations($jitArgv, $benchEnv, $repoRoot, $iterations) / $iterations;
+
+    $compileTime = null;
+    $compiledTime = null;
+    if ($llvmReady) {
+        $binary = str_replace('.php', '', $example);
+        $compileArgv = array_merge($phpCmd, [$repoRoot.'/bin/compile.php']);
+        if (null !== $profile['query']) {
+            $compileArgv[] = '-q';
+            $compileArgv[] = $profile['query'];
+        }
+        $compileArgv[] = '-o';
+        $compileArgv[] = $binary;
+        $compileArgv[] = $example;
+        $compileStart = microtime(true);
+        runProcess($compileArgv, $benchEnv, $repoRoot);
+        $compileTime = microtime(true) - $compileStart;
+        if (is_executable($binary)) {
+            $compiledTime = runIterations([$binary], $benchEnv, $repoRoot, $iterations) / $iterations;
+        }
     }
-    $timers['compile'] = microtime(true);
-    $cmd = escapeshellcmd(str_replace('.php', '', $example));
-    for ($i = 0; $i < $iterations; ++$i) {
-        ob_start();
-        exec($cmd);
-        ob_end_clean();
-    }
-    $timers['compiled-result'] = microtime(true);
-    $times = [];
-    $averages = [];
-    foreach ($timers as $name => $time) {
-        $times[$name] = $time - $start;
-        $averages[$name] = $times[$name] / $iterations;
-        $start = $time;
-    }
+
     $result = sprintf('| %20s |', basename(dirname($example)));
-    foreach ($averages as $name => $average) {
-        $result .= sprintf('         %0.5f |', $average);
+    $result .= sprintf('         %0.5f |', $nativeTime);
+    $result .= sprintf('         %0.5f |', $vmTime);
+    $result .= sprintf('         %0.5f |', $jitTime);
+    if (null === $compileTime) {
+        $result .= '             n/a |';
+    } else {
+        $result .= sprintf('         %0.5f |', $compileTime);
+    }
+    if (null === $compiledTime) {
+        $result .= '             n/a |';
+    } else {
+        $result .= sprintf('         %0.5f |', $compiledTime);
     }
 
     return $result;
