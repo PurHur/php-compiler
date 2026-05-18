@@ -35,7 +35,7 @@ final class ucfirst extends Internal
         if (Variable::TYPE_STRING !== $v->type) {
             throw new \LogicException('ucfirst() only supports strings in this compiler build');
         }
-        $frame->returnVar->string(\ucfirst($v->toString()));
+        $frame->returnVar->string(VmString::asciiUcfirst($v->toString()));
     }
 
     public Context $context;

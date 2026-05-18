@@ -235,6 +235,28 @@ final class HashTable {
     }
 
     /**
+     * Copy values in reverse order into a new packed list array.
+     */
+    public function reverseCopy(): HashTable
+    {
+        if (!$this->isWithoutHoles()) {
+            throw new \LogicException('reverseCopy() only supports packed list arrays without holes');
+        }
+        $values = [];
+        foreach ($this->iterate(true) as $value) {
+            $values[] = $value;
+        }
+        $out = new self();
+        for ($i = \count($values) - 1; $i >= 0; --$i) {
+            $copy = new Variable();
+            $copy->copyFrom($values[$i]);
+            $out->append($copy);
+        }
+
+        return $out;
+    }
+
+    /**
      * Copy a sub-range of a packed list array into a new list (non-negative offset).
      */
     public function sliceCopy(int $offset, ?int $length = null): HashTable

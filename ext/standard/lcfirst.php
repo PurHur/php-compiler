@@ -36,7 +36,7 @@ final class lcfirst extends Internal
         if (Variable::TYPE_STRING !== $v->type) {
             throw new \LogicException('lcfirst() only supports strings in this compiler build');
         }
-        $frame->returnVar->string(\lcfirst($v->toString()));
+        $frame->returnVar->string(VmString::asciiLcfirst($v->toString()));
     }
 
     public Context $context;

@@ -43,11 +43,11 @@ final class substr extends Internal
             if (Variable::TYPE_INTEGER !== $length->type) {
                 throw new \LogicException('substr() length must be an integer in this compiler build');
             }
-            $frame->returnVar->string(\substr($s->toString(), $offset->toInt(), $length->toInt()));
+            $frame->returnVar->string(VmString::substr($s->toString(), $offset->toInt(), $length->toInt()));
 
             return;
         }
-        $frame->returnVar->string(\substr($s->toString(), $offset->toInt()));
+        $frame->returnVar->string(VmString::substr($s->toString(), $offset->toInt()));
     }
 
     public Context $context;

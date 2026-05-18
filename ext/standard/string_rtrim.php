@@ -40,7 +40,7 @@ final class string_rtrim extends Internal
         if (Variable::TYPE_STRING !== $v->type) {
             throw new \LogicException('rtrim() only supports strings in this compiler build');
         }
-        $frame->returnVar->string(\rtrim($v->toString()));
+        $frame->returnVar->string(VmString::rtrim($v->toString()));
     }
 
     public Context $context;

@@ -19,7 +19,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * htmlspecialchars() for strings (delegates to PHP; VM only).
+ * htmlspecialchars() for strings (subset of PHP; VM only).
  */
 final class htmlspecialchars extends Internal
 {
@@ -61,7 +61,7 @@ final class htmlspecialchars extends Internal
             }
             $doubleEncode = $deVar->toBool();
         }
-        $frame->returnVar->string(\htmlspecialchars($string, $flags, $encoding, $doubleEncode));
+        $frame->returnVar->string(VmString::htmlspecialchars($string, $flags, $encoding, $doubleEncode));
     }
 
     public function call(Context $context, JITVariable ...$args): Value

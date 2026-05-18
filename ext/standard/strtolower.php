@@ -35,7 +35,7 @@ final class strtolower extends Internal
         if (Variable::TYPE_STRING !== $v->type) {
             throw new \LogicException('strtolower() only supports strings in this compiler build');
         }
-        $frame->returnVar->string(\strtolower($v->toString()));
+        $frame->returnVar->string(VmString::asciiLower($v->toString()));
     }
 
     public Context $context;

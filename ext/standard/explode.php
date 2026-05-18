@@ -34,7 +34,7 @@ final class explode extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $parts = \explode($delimiter, $string);
+        $parts = VmString::explode($delimiter, $string);
         $ht = new HashTable();
         foreach ($parts as $part) {
             $value = new Variable();
