@@ -12,6 +12,7 @@
 
 namespace PHPCompiler\ext\types;
 
+use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\Frame;
 
@@ -29,7 +30,7 @@ class strlen extends Internal {
         }
         $var = $frame->calledArgs[0];
         if (!is_null($frame->returnVar)) {
-            $frame->returnVar->int(strlen($var->toString()));
+            $frame->returnVar->int(VmString::byteLength($var->resolveIndirect()->toString()));
         }
     }
 

@@ -36,7 +36,7 @@ final class strrev extends Internal
         if (Variable::TYPE_STRING !== $v->type) {
             throw new \LogicException('strrev() only supports strings in this compiler build');
         }
-        $frame->returnVar->string(\strrev($v->toString()));
+        $frame->returnVar->string(VmString::strrev($v->toString()));
     }
 
     public Context $context;
