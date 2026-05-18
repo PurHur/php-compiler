@@ -63,6 +63,30 @@ final class HashTable {
         }
     }
 
+    /**
+     * @return \Generator<int, array{0: Variable, 1: Variable}>
+     */
+    public function iterateKeyed(bool $resolveIndirect = false): \Generator
+    {
+        for ($i = 0; $i < $this->numUsed; ++$i) {
+            $bucket = $this->buckets->read($i);
+            if ($bucket->value->isUndefined()) {
+                continue;
+            }
+            $keyVar = new Variable();
+            if (null !== $bucket->key) {
+                $keyVar->string($bucket->key);
+            } else {
+                $keyVar->int($bucket->hash);
+            }
+            $value = $bucket->value;
+            if ($resolveIndirect) {
+                $value = $value->resolveIndirect();
+            }
+            yield [$keyVar, $value];
+        }
+    }
+
     public function findVariable(Variable $index, bool $forWrite): ?Variable {
         switch ($index->type) {
             case Variable::TYPE_INTEGER:

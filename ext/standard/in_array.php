@@ -51,12 +51,12 @@ final class in_array extends Internal
         $frame->returnVar->bool(false);
     }
 
-    private static function looseEquals(Variable $left, Variable $right): bool
+    public static function looseEquals(Variable $left, Variable $right): bool
     {
         return self::toCompareValue($left) == self::toCompareValue($right);
     }
 
-    private static function toCompareValue(Variable $v): mixed
+    public static function toCompareValue(Variable $v): mixed
     {
         $v = $v->resolveIndirect();
         switch ($v->type) {
