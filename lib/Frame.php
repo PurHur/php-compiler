@@ -26,6 +26,9 @@ class Frame {
     public ?Variable $returnVar = null;
     public ?Handler $handler = null;
 
+    /** When true, finishing this frame resumes the caller instead of ending execution. */
+    public bool $ephemeral = false;
+
     public function __construct(?Handler $handler, ?Block $block, ?Frame $parent, Variable ...$scope) {
         $this->handler = $handler;
         $this->block = $block;
