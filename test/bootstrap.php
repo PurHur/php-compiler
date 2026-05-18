@@ -7,4 +7,5 @@ declare(strict_types=1);
  */
 require __DIR__.'/../src/tokenizer-compat.php';
 require __DIR__.'/../src/yay-php8-compat.php';
+require __DIR__.'/../src/llvm-env.php';
 require __DIR__.'/../vendor/autoload.php';

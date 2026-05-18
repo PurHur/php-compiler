@@ -47,6 +47,7 @@ class Value extends Type {
         $this->implementValueWriteLong();
         $this->implementValueReadDouble();
         $this->implementValueWriteDouble();
+        $this->implementValueWriteString();
         $this->implementValueWriteNull();
         $this->implementValueDelref();
     }
@@ -235,7 +236,10 @@ class Value extends Type {
                 __value__valueDelref($value);
                 $type = (int8) Variable::TYPE_STRING;
                 $value->type = $type;
-                $value->value = $string;
+                $ptr = &$value->value;
+                $resultPtr = (__string__**) $ptr;
+                $offset = (int32) 0;
+                $resultPtr[$offset] = $string;
                 return;
             }
         }

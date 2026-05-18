@@ -154,8 +154,9 @@ class HashTable extends Type
         $sizeT = $this->context->getTypeFromString('size_t');
         $cap = $this->context->builder->load($this->context->builder->structGep($ht, $map['capacity']));
         $needsGrow = $this->context->builder->icmp(Builder::INT_ULT, $cap, $minCap);
-        $done = $entry->insertBasicBlock('grow_done');
-        $grow = $entry->insertBasicBlock('grow_work');
+        // Append successor blocks: inserting before $entry would steal the function entry block.
+        $done = $fn->appendBasicBlock('grow_done');
+        $grow = $fn->appendBasicBlock('grow_work');
         $this->context->builder->branchIf($needsGrow, $grow, $done);
 
         $this->context->builder->positionAtEnd($grow);
@@ -289,9 +290,9 @@ class HashTable extends Type
             $this->context->builder->structGep($ht, $map['nextFreeElement'])
         );
         $inRange = $this->context->builder->icmp(Builder::INT_ULT, $index, $nextFree);
-        $ok = $block->insertBasicBlock('read_ok');
-        $zeroBlock = $block->insertBasicBlock('read_zero');
-        $merge = $block->insertBasicBlock('read_merge');
+        $ok = $fn->appendBasicBlock('read_ok');
+        $zeroBlock = $fn->appendBasicBlock('read_zero');
+        $merge = $fn->appendBasicBlock('read_merge');
         $this->context->builder->branchIf($inRange, $ok, $zeroBlock);
         $this->context->builder->positionAtEnd($ok);
         $values = $this->context->builder->load($this->context->builder->structGep($ht, $map['values']));
@@ -331,9 +332,9 @@ class HashTable extends Type
             $this->context->builder->structGep($ht, $map['nextFreeElement'])
         );
         $inRange = $this->context->builder->icmp(Builder::INT_ULT, $index, $nextFree);
-        $ok = $block->insertBasicBlock('isset_ok');
-        $no = $block->insertBasicBlock('isset_no');
-        $merge = $block->insertBasicBlock('isset_merge');
+        $ok = $fn->appendBasicBlock('isset_ok');
+        $no = $fn->appendBasicBlock('isset_no');
+        $merge = $fn->appendBasicBlock('isset_merge');
         $this->context->builder->branchIf($inRange, $ok, $no);
         $this->context->builder->positionAtEnd($no);
         $this->context->builder->branch($merge);
