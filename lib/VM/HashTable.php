@@ -105,6 +105,30 @@ final class HashTable {
         return $bucket->value;
     }
 
+    /**
+     * Whether an offset exists and is not null (PHP isset() on arrays).
+     */
+    public function offsetIsSet(Variable $index): bool
+    {
+        $stored = null;
+        switch ($index->type) {
+            case Variable::TYPE_INTEGER:
+                $stored = $this->findIndex($index->toInt());
+                break;
+            case Variable::TYPE_STRING:
+                $stored = $this->find($index->toString());
+                break;
+            default:
+                throw new \LogicException("Unknown index type {$index->type}");
+        }
+        if (null === $stored) {
+            return false;
+        }
+        $value = $stored->resolveIndirect();
+
+        return !$value->isUndefined() && Variable::TYPE_NULL !== $value->type;
+    }
+
     public function append(Variable $data): ?Variable {
         return $this->addOrUpdate($this->nextFreeElement, null, $data, self::ADD | self::ADD_NEXT);
     }
@@ -303,7 +327,7 @@ final class HashTable {
         for ($i = 0, $len = strlen($key); $i < $len; $i++) {
             $hash = (($hash << 5) + $hash) + ord($key[$i]);
         }
-        return $hash | 0x8000000000000000;
+        return $hash | \PHP_INT_MIN;
     }
 }
 

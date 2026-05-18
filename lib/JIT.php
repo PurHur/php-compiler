@@ -234,6 +234,8 @@ class JIT {
                         $this->context->builder->not($truthy)
                     );
                     break;
+                case OpCode::TYPE_ISSET:
+                    throw new \LogicException('isset() is not implemented in JIT mode yet');
                 case OpCode::TYPE_BOOLEAN_NOT:
                     $from = $this->context->getVariableFromOp($block->getOperand($op->arg2));
                     if ($from->type === Variable::TYPE_NATIVE_BOOL) {
