@@ -199,6 +199,33 @@ final class HashTable {
     }
 
     /**
+     * Replace packed list values in place (indices 0..n-1, no holes).
+     *
+     * @param list<Variable> $values
+     */
+    public function replacePackedValues(array $values): void
+    {
+        $this->assertConsistent();
+        if (!$this->isWithoutHoles()) {
+            throw new \LogicException('replacePackedValues() only supports packed list arrays without holes');
+        }
+        if (\count($values) !== $this->numElements) {
+            throw new \LogicException('replacePackedValues() value count must match array length');
+        }
+        $this->refcount->assertSeparated();
+        for ($i = 0; $i < $this->numUsed; ++$i) {
+            $bucket = $this->buckets->read($i);
+            if ($bucket->value->isUndefined()) {
+                continue;
+            }
+            $bucket->value->copyFrom($values[$i]);
+            $bucket->hash = $i;
+            $bucket->key = null;
+        }
+        $this->rehash();
+    }
+
+    /**
      * Copy all defined values into a new packed list array.
      */
     public function valuesCopy(): HashTable
