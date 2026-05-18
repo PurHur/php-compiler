@@ -501,8 +501,63 @@ class Compiler {
                      OpCode::TYPE_INCLUDE,
 		     $this->compileOperand($expr->expr, $block, true),
 		)];
+            case Op\Expr\Isset_::class:
+                return $this->compileIsset($expr, $block);
         }
         throw new \LogicException("Unsupported expression: " . $expr->getType());
+    }
+
+    /**
+     * @return OpCode[]
+     */
+    protected function compileIsset(Op\Expr\Isset_ $expr, Block $block): array
+    {
+        if (count($expr->vars) !== 1) {
+            throw new \LogicException('isset() with multiple variables is not yet supported');
+        }
+        $resultSlot = $this->compileOperand($expr->result, $block, false);
+        [$containerSlot, $dimSlot] = $this->resolveIssetTarget($expr->vars[0], $block);
+
+        return [new OpCode(
+            OpCode::TYPE_ISSET,
+            $resultSlot,
+            $containerSlot,
+            $dimSlot
+        )];
+    }
+
+    /**
+     * @return array{0: int, 1: ?int}
+     */
+    protected function resolveIssetTarget(Operand $operand, Block $block): array
+    {
+        $fetch = $this->unwrapArrayDimFetch($operand);
+        if (null !== $fetch) {
+            return [
+                $this->compileOperand($fetch->var, $block, true),
+                $this->compileOperand($fetch->dim, $block, true),
+            ];
+        }
+
+        return [$this->compileOperand($operand, $block, true), null];
+    }
+
+    protected function unwrapArrayDimFetch(Operand $operand): ?Op\Expr\ArrayDimFetch
+    {
+        while ($operand instanceof Temporary) {
+            if ($operand->original instanceof Op\Expr\ArrayDimFetch) {
+                return $operand->original;
+            }
+            if (null === $operand->original) {
+                return null;
+            }
+            $operand = $operand->original;
+        }
+        if ($operand instanceof Op\Expr\ArrayDimFetch) {
+            return $operand;
+        }
+
+        return null;
     }
 
     protected function compileOperand(Operand $operand, Block $block, bool $isRead): ?int {

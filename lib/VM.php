@@ -283,6 +283,23 @@ restart:
                     $v = $frame->scope[$op->arg2]->resolveIndirect();
                     $frame->scope[$op->arg1]->bool(!ext\standard\boolval::isTruthy($v));
                     break;
+                case OpCode::TYPE_ISSET:
+                    $dst = $frame->scope[$op->arg1];
+                    if (null !== $op->arg3) {
+                        $container = $frame->scope[$op->arg2]->resolveIndirect();
+                        if (Variable::TYPE_ARRAY !== $container->type) {
+                            $dst->bool(false);
+                            break;
+                        }
+                        $dst->bool($container->toArray()->offsetIsSet($frame->scope[$op->arg3]));
+                        break;
+                    }
+                    $value = $frame->scope[$op->arg2]->resolveIndirect();
+                    $dst->bool(
+                        !$value->isUndefined()
+                        && Variable::TYPE_NULL !== $value->type
+                    );
+                    break;
                 case OpCode::TYPE_INCLUDE:
                     $file = $frame->scope[$op->arg1]->toString();
                     $parsed = $this->context->runtime->parseAndCompileFile($file);

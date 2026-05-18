@@ -110,6 +110,11 @@ class Block {
                 $scope[$pos] = $this->constants[$pos];
             } elseif ($this->args->contains($op)) {
                 if (is_null($frame)) {
+                    $name = self::resolveVariableName($op);
+                    if (null !== $name && Superglobals::isSuperglobalName($name)) {
+                        $scope[$pos] = self::initialVariableForOperand($op, $context);
+                        continue;
+                    }
                     throw new \LogicException("Argument var with no parent frame, illegal");
                 }
                 $found = false;
@@ -163,7 +168,10 @@ class Block {
         if (!$nameOp instanceof Literal) {
             return null;
         }
-        if (Variable::mapFromType($nameOp->type) !== Variable::TYPE_STRING) {
+        if (null !== $nameOp->type && Variable::mapFromType($nameOp->type) !== Variable::TYPE_STRING) {
+            return null;
+        }
+        if (!is_string($nameOp->value)) {
             return null;
         }
 
