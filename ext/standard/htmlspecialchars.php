@@ -19,7 +19,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * htmlspecialchars() for strings (subset of PHP; VM only).
+ * htmlspecialchars() for strings (subset of PHP; JIT supports default ENT_QUOTES).
  */
 final class htmlspecialchars extends Internal
 {
@@ -64,8 +64,26 @@ final class htmlspecialchars extends Internal
         $frame->returnVar->string(VmString::htmlspecialchars($string, $flags, $encoding, $doubleEncode));
     }
 
+    public Context $context;
+
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('htmlspecialchars() is not implemented for JIT in this compiler build');
+        $this->context = $context;
+        $argc = count($args);
+        if ($argc < 1 || $argc > 4) {
+            throw new \LogicException('htmlspecialchars() requires one to four arguments');
+        }
+        if (JITVariable::TYPE_STRING !== $args[0]->type) {
+            throw new \LogicException('htmlspecialchars() only supports strings in this compiler build');
+        }
+        if ($argc >= 2) {
+            throw new \LogicException(
+                'htmlspecialchars() JIT only supports the default flags (ENT_QUOTES) in this compiler build'
+            );
+        }
+
+        $str = $context->helper->loadValue($args[0]);
+
+        return JitHtmlspecialchars::escape($context, $str);
     }
 }
