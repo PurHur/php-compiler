@@ -46,7 +46,10 @@ final class Variable {
         $this->type = $type;
     }
 
-    public static function mapFromType(Type $type): int {
+    public static function mapFromType(?Type $type): int {
+        if (null === $type) {
+            return self::TYPE_UNDEFINED;
+        }
         switch ($type->type) {
             case Type::TYPE_NULL:
                 return self::TYPE_NULL;
@@ -63,7 +66,7 @@ final class Variable {
             case Type::TYPE_ARRAY:
                 return self::TYPE_ARRAY;
         }
-        return self::TYPE_UNKNOWN;
+        return self::TYPE_UNDEFINED;
     }
 
     public function isUndefined(): bool {
