@@ -18,6 +18,8 @@ cd php-compiler
 composer install
 ./script/ci-local.sh          # full PHPUnit suite (VM, compliance, JIT, AOT)
 php bin/vm.php -r 'echo 1;'
+make web-smoke                 # VM: examples/001-SimpleWeb
+make serve                     # http://127.0.0.1:8080/ (001-SimpleWeb docroot)
 ```
 
 The first `ci-local.sh` run downloads a bundled LLVM 9 toolchain into `.llvm/` (see `script/install-llvm9.sh`) and applies vendor patches. No Docker required.
@@ -58,7 +60,17 @@ composer install
 ```console
 make test-local              # same as ./script/ci-local.sh
 ./script/ci-local.sh --filter VMTest
+make web-smoke
 ```
+
+### Developing web apps locally
+
+```console
+make serve
+curl 'http://127.0.0.1:8080/example.php?name=Dev'
+```
+
+`bin/serve.php` sets CGI-style superglobals and runs scripts through the VM (same path as `bin/vm.php` with `-q` / `-p`).
 
 ## Using docker
 
