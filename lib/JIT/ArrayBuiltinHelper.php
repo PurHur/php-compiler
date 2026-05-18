@@ -225,6 +225,257 @@ final class ArrayBuiltinHelper
         return $resultPtr;
     }
 
+    /**
+     * Copy defined list elements into a new packed array (array_values subset).
+     */
+    public static function buildValuesArray(Context $context, Variable $array): Value
+    {
+        if (self::isNativeArray($array->type)) {
+            return self::buildValuesFromNativeArray($context, $array);
+        }
+
+        return self::buildValuesFromHashTable($context, self::loadHashTable($context, $array));
+    }
+
+    private static function buildValuesFromNativeArray(Context $context, Variable $array): Value
+    {
+        $elemType = $array->type & ~Variable::IS_NATIVE_ARRAY;
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $count = $context->constantFromInteger($array->nextFreeElement, 'size_t');
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $count, $zero);
+        $emptyBlock = BasicBlockHelper::append($context, 'array_values_native_empty');
+        $workBlock = BasicBlockHelper::append($context, 'array_values_native_work');
+        $doneBlock = BasicBlockHelper::append($context, 'array_values_native_done');
+        $context->builder->branchIf($isEmpty, $emptyBlock, $workBlock);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        $emptyHt = HashTableHelper::alloc($context);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($workBlock);
+        $dest = HashTableHelper::alloc($context);
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'array_values_native_idx');
+        $destIdxSlot = $context->builder->alloca($sizeT, 1, 'array_values_native_dest');
+        $context->builder->store($zero, $idxSlot);
+        $context->builder->store($zero, $destIdxSlot);
+
+        $head = BasicBlockHelper::append($context, 'array_values_native_head');
+        $body = BasicBlockHelper::append($context, 'array_values_native_body');
+        $advance = BasicBlockHelper::append($context, 'array_values_native_advance');
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $count);
+        $context->builder->branchIf($atEnd, $doneBlock, $body);
+
+        $context->builder->positionAtEnd($body);
+        $slot = $context->builder->inBoundsGep($array->value, $zero, $idx);
+        if (Variable::TYPE_STRING === $elemType) {
+            $elem = new Variable($context, $elemType, Variable::KIND_VARIABLE, $slot);
+        } else {
+            $elem = new Variable(
+                $context,
+                $elemType,
+                Variable::KIND_VALUE,
+                $context->builder->load($slot)
+            );
+        }
+        $destIdx = $context->builder->load($destIdxSlot);
+        HashTableHelper::setAtIndex($context, $dest, $destIdx, $elem);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($destIdx, $one),
+            $destIdxSlot
+        );
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($advance);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($idx, $one),
+            $idxSlot
+        );
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($emptyHt->typeOf());
+        $phi->addIncoming($emptyHt, $emptyBlock);
+        $phi->addIncoming($dest, $head);
+
+        return $phi;
+    }
+
+    private static function buildValuesFromHashTable(Context $context, Value $src): Value
+    {
+        $map = $context->structFieldMap['__hashtable__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $nextFree = $context->builder->load(
+            $context->builder->structGep($src, $map['nextFreeElement'])
+        );
+        $zero = $sizeT->constInt(0, false);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $nextFree, $zero);
+        $emptyBlock = BasicBlockHelper::append($context, 'array_values_empty');
+        $workBlock = BasicBlockHelper::append($context, 'array_values_work');
+        $doneBlock = BasicBlockHelper::append($context, 'array_values_done');
+        $context->builder->branchIf($isEmpty, $emptyBlock, $workBlock);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        $emptyHt = HashTableHelper::alloc($context);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($workBlock);
+        $dest = HashTableHelper::alloc($context);
+        $srcIdxSlot = $context->builder->alloca($sizeT, 1, 'array_values_src');
+        $destIdxSlot = $context->builder->alloca($sizeT, 1, 'array_values_dest');
+        $context->builder->store($zero, $srcIdxSlot);
+        $context->builder->store($zero, $destIdxSlot);
+        $one = $sizeT->constInt(1, false);
+
+        $head = BasicBlockHelper::append($context, 'array_values_head');
+        $check = BasicBlockHelper::append($context, 'array_values_check');
+        $copyBlock = BasicBlockHelper::append($context, 'array_values_copy');
+        $skip = BasicBlockHelper::append($context, 'array_values_skip');
+        $advance = BasicBlockHelper::append($context, 'array_values_advance');
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $srcIdx = $context->builder->load($srcIdxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $srcIdx, $nextFree);
+        $context->builder->branchIf($atEnd, $doneBlock, $check);
+
+        $context->builder->positionAtEnd($check);
+        $isSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $src,
+            $srcIdx
+        );
+        $context->builder->branchIf($isSet, $copyBlock, $skip);
+
+        $context->builder->positionAtEnd($copyBlock);
+        $destIdx = $context->builder->load($destIdxSlot);
+        self::copyListEntry($context, $src, $srcIdx, $dest, $destIdx);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($destIdx, $one),
+            $destIdxSlot
+        );
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($skip);
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($advance);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($srcIdx, $one),
+            $srcIdxSlot
+        );
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($emptyHt->typeOf());
+        $phi->addIncoming($emptyHt, $emptyBlock);
+        $phi->addIncoming($dest, $head);
+
+        return $phi;
+    }
+
+    private static function copyListEntry(
+        Context $context,
+        Value $src,
+        Value $srcIndex,
+        Value $dest,
+        Value $destIndex
+    ): void {
+        $srcEntry = self::listEntryAt($context, $src, $srcIndex);
+        $valueMap = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($srcEntry, $valueMap['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+
+        $longBlock = BasicBlockHelper::append($context, 'array_values_copy_long');
+        $stringBlock = BasicBlockHelper::append($context, 'array_values_copy_string');
+        $doubleBlock = BasicBlockHelper::append($context, 'array_values_copy_double');
+        $boolBlock = BasicBlockHelper::append($context, 'array_values_copy_bool');
+        $done = BasicBlockHelper::append($context, 'array_values_copy_done');
+
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_STRING, false)
+        );
+        $isLong = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
+        );
+        $isBool = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)
+        );
+        $isDouble = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
+        );
+
+        $afterString = BasicBlockHelper::append($context, 'array_values_after_string');
+        $context->builder->branchIf($isString, $stringBlock, $afterString);
+
+        $context->builder->positionAtEnd($stringBlock);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringAt'),
+            $dest,
+            $destIndex,
+            $context->builder->call($context->lookupFunction('__value__readString'), $srcEntry)
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterString);
+        $afterLong = BasicBlockHelper::append($context, 'array_values_after_long');
+        $context->builder->branchIf($isLong, $longBlock, $afterLong);
+
+        $context->builder->positionAtEnd($longBlock);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setLongAt'),
+            $dest,
+            $destIndex,
+            $context->builder->call($context->lookupFunction('__value__readLong'), $srcEntry)
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterLong);
+        $afterBool = BasicBlockHelper::append($context, 'array_values_after_bool');
+        $context->builder->branchIf($isBool, $boolBlock, $afterBool);
+
+        $context->builder->positionAtEnd($boolBlock);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setBoolAt'),
+            $dest,
+            $destIndex,
+            $context->builder->truncOrBitCast(
+                $context->builder->call($context->lookupFunction('__value__readLong'), $srcEntry),
+                $context->getTypeFromString('int1')
+            )
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterBool);
+        $context->builder->branchIf($isDouble, $doubleBlock, $done);
+
+        $context->builder->positionAtEnd($doubleBlock);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setDoubleAt'),
+            $dest,
+            $destIndex,
+            $context->builder->call($context->lookupFunction('__value__readDouble'), $srcEntry)
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+    }
+
     public static function buildKeysArray(Context $context, Value $ht): Value
     {
         $num = $context->builder->call(
@@ -306,10 +557,7 @@ final class ArrayBuiltinHelper
         );
         $context->builder->branch($head);
 
-        $merge = BasicBlockHelper::append($context, 'merge_copy_exit');
         $context->builder->positionAtEnd($done);
-        $context->builder->branch($merge);
-        $context->builder->positionAtEnd($merge);
     }
 
     public static function inArray(
@@ -364,13 +612,9 @@ final class ArrayBuiltinHelper
         $context->builder->store($context->getTypeFromString('int1')->constInt(1, false), $foundSlot);
         $context->builder->branch($done);
 
-        $merge = BasicBlockHelper::append($context, 'in_array_merge');
         $context->builder->positionAtEnd($done);
-        $result = $context->builder->load($foundSlot);
-        $context->builder->branch($merge);
-        $context->builder->positionAtEnd($merge);
 
-        return $result;
+        return $context->builder->load($foundSlot);
     }
 
     private static function listEntryAt(Context $context, Value $ht, Value $index): Value
