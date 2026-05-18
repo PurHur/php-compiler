@@ -90,4 +90,52 @@ final class lcfirst extends Internal
         $context->builder->branch($done);
         $context->builder->positionAtEnd($done);
     }
+
+    public static function transformAllAscii(Context $context, Value $strPtr, int $letterMin, int $letterMax, int $delta): void
+    {
+        $structName = $strPtr->typeOf()->getElementType()->getName();
+        $map = $context->structFieldMap[$structName];
+        $len = $context->builder->load(
+            $context->builder->structGep($strPtr, $map['length'])
+        );
+        $i32 = $context->getTypeFromString('int32');
+        $zero = $i32->constInt(0, false);
+        $one = $i32->constInt(1, false);
+        $charPtr = $context->builder->structGep($strPtr, $map['value']);
+        $iSlot = $context->builder->alloca($i32, 1, 'case_transform_i');
+        $context->builder->store($zero, $iSlot);
+
+        $prev = $context->builder->getInsertBlock();
+        $done = $prev->insertBasicBlock('case_transform_all_done');
+        $loopHead = $prev->insertBasicBlock('case_transform_all_head');
+        $loopBody = $prev->insertBasicBlock('case_transform_all_body');
+        $context->builder->branch($loopHead);
+
+        $context->builder->positionAtEnd($loopHead);
+        $i = $context->builder->load($iSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $i, $len);
+        $context->builder->branchIf($atEnd, $done, $loopBody);
+
+        $context->builder->positionAtEnd($loopBody);
+        $atChar = $context->builder->gep($charPtr, $i);
+        $ch = $context->builder->load($atChar);
+        $chI32 = $context->builder->zExt($ch, $i32);
+        $min = $i32->constInt($letterMin, false);
+        $max = $i32->constInt($letterMax, false);
+        $inRange = $context->builder->and(
+            $context->builder->icmp(Builder::INT_SGE, $chI32, $min),
+            $context->builder->icmp(Builder::INT_SLE, $chI32, $max)
+        );
+        $offset = $i32->constInt($delta, false);
+        $adjusted = $context->builder->addNoSignedWrap($chI32, $offset);
+        $newCh = $context->builder->truncOrBitCast(
+            $context->builder->select($inRange, $adjusted, $chI32),
+            $ch->typeOf()
+        );
+        $context->builder->store($newCh, $atChar);
+        $context->builder->store($context->builder->addNoSignedWrap($i, $one), $iSlot);
+        $context->builder->branch($loopHead);
+
+        $context->builder->positionAtEnd($done);
+    }
 }
