@@ -47,6 +47,18 @@ final class implode extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('implode() is not implemented for JIT in this compiler build');
+        if (2 !== \count($args)) {
+            throw new \LogicException('implode() requires exactly two arguments in this compiler build');
+        }
+        if (JITVariable::TYPE_STRING !== $args[0]->type) {
+            throw new \LogicException('implode() glue must be a string in this compiler build');
+        }
+        if (JITVariable::TYPE_HASHTABLE !== $args[1]->type) {
+            throw new \LogicException('implode() second argument must be an array in this compiler build');
+        }
+        $glue = $context->helper->loadValue($args[0]);
+        $haystack = $context->helper->loadValue($args[1]);
+
+        return JitImplode::implode($context, $glue, $haystack);
     }
 }

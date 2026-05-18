@@ -20,7 +20,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * explode() with delimiter and string (subset of PHP; non-empty delimiter).
+ * explode() with delimiter and string (subset of PHP; VM only).
  */
 final class explode extends Internal
 {
@@ -53,13 +53,14 @@ final class explode extends Internal
         }
         if (JITVariable::TYPE_STRING !== $args[0]->type
             || JITVariable::TYPE_STRING !== $args[1]->type) {
-            throw new \LogicException('explode() only supports string delimiter and subject in this compiler build');
+            throw new \LogicException('explode() only supports string arguments in this compiler build');
         }
+        if ('' === ($args[0]->compileTimeString ?? null)) {
+            throw new \LogicException('explode(): Argument #1 ($separator) cannot be empty');
+        }
+        $delimiter = $context->helper->loadValue($args[0]);
+        $haystack = $context->helper->loadValue($args[1]);
 
-        return JitExplode::explode(
-            $context,
-            $context->helper->loadValue($args[0]),
-            $context->helper->loadValue($args[1])
-        );
+        return JitExplode::explode($context, $delimiter, $haystack);
     }
 }

@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * LLVM JIT/AOT helper for explode() — split a string by a non-empty delimiter.
+ * LLVM JIT helper for explode() — builds a packed __hashtable__ of string parts.
  */
 
 namespace PHPCompiler\ext\standard;
@@ -16,60 +16,79 @@ use PHPLLVM\Value;
 
 final class JitExplode
 {
-    private const NOT_FOUND = -1;
-
-    public static function explode(Context $context, Value $delimiter, Value $string): Value
+    public static function explode(Context $context, Value $delimiter, Value $haystack): Value
     {
         $map = $context->structFieldMap['__string__'];
         $delimLen = $context->builder->load(
             $context->builder->structGep($delimiter, $map['length'])
         );
         $hayLen = $context->builder->load(
-            $context->builder->structGep($string, $map['length'])
+            $context->builder->structGep($haystack, $map['length'])
         );
-        $i64 = JitStringIndex::i64($context);
-        $zero = JitStringIndex::zero($context);
+        $delimPtr = $context->builder->structGep($delimiter, $map['value']);
+        $hayPtr = $context->builder->structGep($haystack, $map['value']);
+
+        $i64 = $context->getTypeFromString('int64');
         $sizeT = $context->getTypeFromString('size_t');
-        $oneSized = $sizeT->constInt(1, false);
+        $zero = $i64->constInt(0, false);
+        $one = $i64->constInt(1, false);
+        $sizeOne = $sizeT->constInt(1, false);
 
         $ht = HashTableHelper::alloc($context);
         $setString = $context->lookupFunction('__hashtable__setStringAt');
-        $charPtr = $context->builder->structGep($string, $map['value']);
 
         $offsetSlot = $context->builder->alloca($i64, 1, 'explode_offset');
-        $indexSlot = $context->builder->alloca($sizeT, 1, 'explode_index');
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'explode_idx');
         $context->builder->store($zero, $offsetSlot);
-        $context->builder->store($sizeT->constInt(0, false), $indexSlot);
+        $context->builder->store($sizeT->constInt(0, false), $idxSlot);
 
         $loopHead = BasicBlockHelper::append($context, 'explode_head');
         $loopBody = BasicBlockHelper::append($context, 'explode_body');
         $tailBlock = BasicBlockHelper::append($context, 'explode_tail');
+        $appendEmptyBlock = BasicBlockHelper::append($context, 'explode_append_empty');
         $doneBlock = BasicBlockHelper::append($context, 'explode_done');
         $context->builder->branch($loopHead);
 
         $context->builder->positionAtEnd($loopHead);
         $offset = $context->builder->load($offsetSlot);
-        $pos = JitStrpos::find($context, $string, $delimiter, $offset);
-        $notFoundVal = $i64->constInt(self::NOT_FOUND, false);
-        $isNotFound = $context->builder->icmp(Builder::INT_EQ, $pos, $notFoundVal);
-        $context->builder->branchIf($isNotFound, $tailBlock, $loopBody);
+        $searchPtr = $context->builder->gep($hayPtr, $offset);
+        $found = $context->builder->call(
+            $context->lookupFunction('strstr'),
+            $searchPtr,
+            $delimPtr
+        );
+        $null = $context->getTypeFromString('int8*')->constNull();
+        $notFound = $context->builder->icmp(Builder::INT_EQ, $found, $null);
+        $context->builder->branchIf($notFound, $tailBlock, $loopBody);
 
         $context->builder->positionAtEnd($loopBody);
+        $foundInt = $context->builder->ptrToInt($found, $i64);
+        $baseInt = $context->builder->ptrToInt($hayPtr, $i64);
+        $pos = $context->builder->sub($foundInt, $baseInt);
         $partLen = $context->builder->sub($pos, $offset);
-        $part = string_trim::jitCopySlice($context, $string, $charPtr, $offset, $partLen);
-        $idx = $context->builder->load($indexSlot);
+        $part = string_trim::jitCopySlice($context, $haystack, $hayPtr, $offset, $partLen);
+        $idx = $context->builder->load($idxSlot);
         $context->builder->call($setString, $ht, $idx, $part);
-        $context->builder->store($context->builder->addNoSignedWrap($idx, $oneSized), $indexSlot);
-        $newOffset = $context->builder->addNoSignedWrap($pos, $delimLen);
-        $pastEnd = $context->builder->icmp(Builder::INT_SGT, $newOffset, $hayLen);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($idx, $sizeOne),
+            $idxSlot
+        );
+        $newOffset = $context->builder->add($pos, $delimLen);
         $context->builder->store($newOffset, $offsetSlot);
-        $context->builder->branchIf($pastEnd, $tailBlock, $loopHead);
+        $pastEnd = $context->builder->icmp(Builder::INT_SGT, $newOffset, $hayLen);
+        $context->builder->branchIf($pastEnd, $appendEmptyBlock, $loopHead);
+
+        $context->builder->positionAtEnd($appendEmptyBlock);
+        $emptyStr = $context->builder->call($context->lookupFunction('__string__alloc'), $zero);
+        $idx = $context->builder->load($idxSlot);
+        $context->builder->call($setString, $ht, $idx, $emptyStr);
+        $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($tailBlock);
         $offset = $context->builder->load($offsetSlot);
-        $partLen = $context->builder->sub($hayLen, $offset);
-        $part = string_trim::jitCopySlice($context, $string, $charPtr, $offset, $partLen);
-        $idx = $context->builder->load($indexSlot);
+        $tailLen = $context->builder->sub($hayLen, $offset);
+        $part = string_trim::jitCopySlice($context, $haystack, $hayPtr, $offset, $tailLen);
+        $idx = $context->builder->load($idxSlot);
         $context->builder->call($setString, $ht, $idx, $part);
         $context->builder->branch($doneBlock);
 
