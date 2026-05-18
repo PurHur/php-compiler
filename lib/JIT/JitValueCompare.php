@@ -67,4 +67,23 @@ final class JitValueCompare
     ): Value {
         return self::identicalToNative($context, $boxed, $native);
     }
+
+    public static function notIdenticalToNative(
+        Context $context,
+        Variable $boxed,
+        Variable $native
+    ): Value {
+        $same = self::identicalToNative($context, $boxed, $native);
+        $i1 = $context->getTypeFromString('int1');
+
+        return $context->builder->xor($same, $i1->constInt(1, false));
+    }
+
+    public static function notIdenticalNativeToValue(
+        Context $context,
+        Variable $native,
+        Variable $boxed
+    ): Value {
+        return self::notIdenticalToNative($context, $boxed, $native);
+    }
 }

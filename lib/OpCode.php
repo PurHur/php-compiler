@@ -68,6 +68,8 @@ class OpCode {
     const TYPE_INCLUDE = 56;
     const TYPE_ISSET = 57;
     const TYPE_POW = 58;
+    const TYPE_NOT_EQUAL = 59;
+    const TYPE_NOT_IDENTICAL = 60;
 
     public int $type;
     public ?int $arg1;
