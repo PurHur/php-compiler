@@ -218,6 +218,14 @@ final class Linker
 
     private static function resolveClang(): string
     {
+        // Runtime C needs system libc headers; bundled LLVM clang often lacks them.
+        foreach (['cc', 'gcc', 'clang'] as $name) {
+            $path = trim((string) shell_exec('command -v '.escapeshellarg($name).' 2>/dev/null'));
+            if ('' !== $path) {
+                return $path;
+            }
+        }
+
         $llvmDir = getenv('PHP_COMPILER_LLVM_PATH');
         $llvmPrefix = (false !== $llvmDir && '' !== $llvmDir) ? realpath($llvmDir) : false;
         // Prefer the host toolchain for runtime C: bundled LLVM clang often lacks system headers.

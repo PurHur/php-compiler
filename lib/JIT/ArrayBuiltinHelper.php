@@ -67,6 +67,164 @@ final class ArrayBuiltinHelper
         return self::getNumElements($context, $ht);
     }
 
+    /**
+     * @return Value __value__* (null when the array is empty)
+     */
+    public static function popLast(Context $context, Variable $array): Value
+    {
+        $ht = self::loadHashTable($context, $array);
+        $map = $context->structFieldMap['__hashtable__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $num = $context->builder->call(
+            $context->lookupFunction('__hashtable__getNumElements'),
+            $ht
+        );
+        $zero = $sizeT->constInt(0, false);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $num, $zero);
+        $resultSlot = JitValueBox::alloc($context);
+        $resultPtr = JitValueBox::pointer($context, $resultSlot);
+
+        $emptyBlock = BasicBlockHelper::append($context, 'array_pop_empty');
+        $popBlock = BasicBlockHelper::append($context, 'array_pop_work');
+        $doneBlock = BasicBlockHelper::append($context, 'array_pop_done');
+        $context->builder->branchIf($isEmpty, $emptyBlock, $popBlock);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            $resultPtr
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($popBlock);
+        $nextFreePtr = $context->builder->structGep($ht, $map['nextFreeElement']);
+        $nextFree = $context->builder->load($nextFreePtr);
+        $one = $sizeT->constInt(1, false);
+        $lastIndex = $context->builder->sub($nextFree, $one);
+        $entry = self::listEntryAt($context, $ht, $lastIndex);
+        $longVal = $context->builder->call(
+            $context->lookupFunction('__value__readLong'),
+            $entry
+        );
+        $context->builder->call(
+            $context->lookupFunction('__value__writeLong'),
+            $resultPtr,
+            $longVal
+        );
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            $entry
+        );
+        $numPtr = $context->builder->structGep($ht, $map['numElements']);
+        $context->builder->store(
+            $context->builder->sub($context->builder->load($numPtr), $one),
+            $numPtr
+        );
+        $context->builder->store(
+            $context->builder->sub($nextFree, $one),
+            $nextFreePtr
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+
+        return $resultPtr;
+    }
+
+    /**
+     * @return Value __value__* (null when the array is empty)
+     */
+    public static function shiftFirst(Context $context, Variable $array): Value
+    {
+        $ht = self::loadHashTable($context, $array);
+        $map = $context->structFieldMap['__hashtable__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $num = $context->builder->call(
+            $context->lookupFunction('__hashtable__getNumElements'),
+            $ht
+        );
+        $zero = $sizeT->constInt(0, false);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $num, $zero);
+        $resultSlot = JitValueBox::alloc($context);
+        $resultPtr = JitValueBox::pointer($context, $resultSlot);
+
+        $emptyBlock = BasicBlockHelper::append($context, 'array_shift_empty');
+        $shiftBlock = BasicBlockHelper::append($context, 'array_shift_work');
+        $doneBlock = BasicBlockHelper::append($context, 'array_shift_done');
+        $context->builder->branchIf($isEmpty, $emptyBlock, $shiftBlock);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            $resultPtr
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($shiftBlock);
+        $one = $sizeT->constInt(1, false);
+        $zeroIndex = $sizeT->constInt(0, false);
+        $firstEntry = self::listEntryAt($context, $ht, $zeroIndex);
+        $firstLong = $context->builder->call(
+            $context->lookupFunction('__value__readLong'),
+            $firstEntry
+        );
+        $context->builder->call(
+            $context->lookupFunction('__value__writeLong'),
+            $resultPtr,
+            $firstLong
+        );
+
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'array_shift_idx');
+        $context->builder->store($zeroIndex, $idxSlot);
+        $loopHead = BasicBlockHelper::append($context, 'array_shift_head');
+        $loopBody = BasicBlockHelper::append($context, 'array_shift_body');
+        $afterLoop = BasicBlockHelper::append($context, 'array_shift_after_loop');
+        $context->builder->branch($loopHead);
+
+        $context->builder->positionAtEnd($loopHead);
+        $idx = $context->builder->load($idxSlot);
+        $lastIndex = $context->builder->sub($num, $one);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $lastIndex);
+        $context->builder->branchIf($atEnd, $afterLoop, $loopBody);
+
+        $context->builder->positionAtEnd($loopBody);
+        $nextIdx = $context->builder->addNoSignedWrap($idx, $one);
+        $fromEntry = self::listEntryAt($context, $ht, $nextIdx);
+        $toEntry = self::listEntryAt($context, $ht, $idx);
+        $movedLong = $context->builder->call(
+            $context->lookupFunction('__value__readLong'),
+            $fromEntry
+        );
+        $context->builder->call(
+            $context->lookupFunction('__value__writeLong'),
+            $toEntry,
+            $movedLong
+        );
+        $context->builder->store($nextIdx, $idxSlot);
+        $context->builder->branch($loopHead);
+
+        $context->builder->positionAtEnd($afterLoop);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            self::listEntryAt($context, $ht, $lastIndex)
+        );
+        $nextFreePtr = $context->builder->structGep($ht, $map['nextFreeElement']);
+        $numPtr = $context->builder->structGep($ht, $map['numElements']);
+        $context->builder->store(
+            $context->builder->sub($context->builder->load($numPtr), $one),
+            $numPtr
+        );
+        $context->builder->store(
+            $context->builder->sub($context->builder->load($nextFreePtr), $one),
+            $nextFreePtr
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+
+        return $resultPtr;
+    }
+
     public static function buildKeysArray(Context $context, Value $ht): Value
     {
         $num = $context->builder->call(
@@ -197,6 +355,16 @@ final class ArrayBuiltinHelper
         $context->builder->positionAtEnd($done);
 
         return $context->builder->load($foundSlot);
+    }
+
+    private static function listEntryAt(Context $context, Value $ht, Value $index): Value
+    {
+        $map = $context->structFieldMap['__hashtable__'];
+        $values = $context->builder->load(
+            $context->builder->structGep($ht, $map['values'])
+        );
+
+        return $context->builder->inBoundsGep($values, $index);
     }
 
     private static function readListElement(
