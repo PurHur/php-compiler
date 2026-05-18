@@ -74,13 +74,13 @@ final class substr extends Internal
             $context->builder->structGep($str, $map['length'])
         );
         $charPtr = $context->builder->structGep($str, $map['value']);
-        $i32 = $context->getTypeFromString('int32');
-        $zero = $i32->constInt(0, false);
-        $offset = $context->builder->trunc($context->helper->loadValue($args[1]), $i32);
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+        $offset = $context->builder->truncOrBitCast($context->helper->loadValue($args[1]), $i64);
         $start = self::clampIndex($context, $offset, $zero, $len);
 
         if (3 === $argc) {
-            $lengthArg = $context->builder->trunc($context->helper->loadValue($args[2]), $i32);
+            $lengthArg = $context->builder->truncOrBitCast($context->helper->loadValue($args[2]), $i64);
             $negLen = $context->builder->icmp(Builder::INT_SLT, $lengthArg, $zero);
             $remaining = $context->builder->sub($len, $start);
             $maxLen = $context->builder->select($negLen, $zero, $lengthArg);

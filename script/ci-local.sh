@@ -4,7 +4,12 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 PHP_BIN="${PHP_COMPILER_PHP:-php}"
 if ! command -v "$PHP_BIN" >/dev/null 2>&1; then
-  PHP_BIN="php8.2"
+  for candidate in php8.2 php8.1 php; do
+    if command -v "$candidate" >/dev/null 2>&1; then
+      PHP_BIN="$candidate"
+      break
+    fi
+  done
 fi
 export PHP_COMPILER_EXT_DIR="${PHP_COMPILER_EXT_DIR:-/usr/lib/php/20220829}"
 LLVM_DIR="$(cd "$(dirname "$0")/.." && pwd)/.llvm"
