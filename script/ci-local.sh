@@ -26,6 +26,19 @@ fi
 
 "$PHP_BIN" "${PHP_OPTS[@]}" script/capability-matrix.php --check
 
+LLVM_DIR="$(cd "$(dirname "$0")/.." && pwd)/.llvm"
+if [[ -f "$LLVM_DIR/libLLVM-9.so.1" ]]; then
+  echo "LLVM 9 found: JIT compliance, AOT fixtures (simple_web_*, static_web), and ExampleWebAotTest will run."
+else
+  echo "LLVM 9 missing: @group llvm tests (JIT, AOT, web AOT) are skipped. Run: script/install-llvm9.sh"
+fi
+
 # Full suite includes test/real/ServeTest.php (bin/serve.php HTTP). Set
 # PHP_COMPILER_SKIP_SERVE_TESTS=1 in sandboxes that cannot bind TCP ports.
-"$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit "$@"
+echo "PHPUnit: VM, compliance (no LLVM), real-world..."
+"$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit --exclude-group llvm "$@"
+
+if [[ -f "$LLVM_DIR/libLLVM-9.so.1" ]]; then
+  echo "PHPUnit: JIT, AOT (web fixtures + examples)..."
+  "$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit --group llvm "$@"
+fi

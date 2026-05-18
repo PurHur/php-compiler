@@ -7,6 +7,9 @@ use PHPCompiler\Backend\VM\Runtime;
 
 require_once __DIR__ . '/../BaseTest.php';
 
+/**
+ * @group llvm
+ */
 class JITTest extends BaseTest {
 
     protected static string $DIR = __DIR__;

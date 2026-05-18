@@ -1,5 +1,6 @@
 # A compiler for PHP
 
+[![CI](https://github.com/PurHur/php-compiler/actions/workflows/ci.yml/badge.svg)](https://github.com/PurHur/php-compiler/actions/workflows/ci.yml)
 [![CircleCI](https://circleci.com/gh/ircmaxell/php-compiler.svg?style=svg)](https://circleci.com/gh/ircmaxell/php-compiler)
 
 Ok, so this used to be a dead project. It required calling out to all sorts of hackery to generate PHP extensions, or PHP itself.

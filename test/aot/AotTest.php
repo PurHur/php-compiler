@@ -8,6 +8,8 @@ require_once __DIR__ . '/../BaseTest.php';
 
 /**
  * End-to-end AOT tests: compile PHP to a native binary via LLVM and run it.
+ *
+ * @group llvm
  */
 final class AotTest extends BaseTest
 {
