@@ -116,6 +116,79 @@ final class HashTable {
         return $this->numElements;
     }
 
+    /**
+     * Remove and return the last element of a packed list array (no holes).
+     * Returns null when the array is empty.
+     */
+    public function popLast(): ?Variable
+    {
+        $this->assertConsistent();
+        if (0 === $this->numElements) {
+            return null;
+        }
+        if (!$this->isWithoutHoles()) {
+            throw new \LogicException('popLast() only supports packed list arrays without holes');
+        }
+        $this->refcount->assertSeparated();
+        $lastSlot = $this->numUsed - 1;
+        $bucket = $this->buckets->read($lastSlot);
+        $result = new Variable();
+        $result->copyFrom($bucket->value->resolveIndirect());
+        --$this->numUsed;
+        --$this->numElements;
+        --$this->nextFreeElement;
+        $this->rehash();
+
+        return $result;
+    }
+
+    /**
+     * Remove and return the first element of a packed list array (no holes).
+     * Returns null when the array is empty.
+     */
+    public function shiftFirst(): ?Variable
+    {
+        $this->assertConsistent();
+        if (0 === $this->numElements) {
+            return null;
+        }
+        if (!$this->isWithoutHoles()) {
+            throw new \LogicException('shiftFirst() only supports packed list arrays without holes');
+        }
+        $this->refcount->assertSeparated();
+        $firstBucket = $this->buckets->read(0);
+        $result = new Variable();
+        $result->copyFrom($firstBucket->value->resolveIndirect());
+        for ($i = 0; $i < $this->numUsed - 1; ++$i) {
+            $src = $this->buckets->read($i + 1);
+            $dst = $this->buckets->read($i);
+            $dst->value->copyFrom($src->value);
+            $dst->hash = $i;
+            $dst->key = null;
+        }
+        --$this->numUsed;
+        --$this->numElements;
+        --$this->nextFreeElement;
+        $this->rehash();
+
+        return $result;
+    }
+
+    /**
+     * Copy all defined values into a new packed list array.
+     */
+    public function valuesCopy(): HashTable
+    {
+        $out = new self();
+        foreach ($this->iterate(true) as $value) {
+            $copy = new Variable();
+            $copy->copyFrom($value);
+            $out->append($copy);
+        }
+
+        return $out;
+    }
+
     public function hasKey(Variable $index): bool
     {
         $this->assertConsistent();
