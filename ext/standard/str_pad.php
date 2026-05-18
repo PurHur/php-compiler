@@ -48,7 +48,8 @@ final class str_pad extends Internal
             }
             $padString = $padArg->toString();
         }
-        $padType = 0;
+        // Compiler convention: 0 = STR_PAD_LEFT, 1 = STR_PAD_RIGHT (default).
+        $padType = 1;
         if (4 === $argc) {
             $typeArg = $frame->calledArgs[3]->resolveIndirect();
             if (Variable::TYPE_INTEGER !== $typeArg->type) {

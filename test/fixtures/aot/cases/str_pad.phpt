@@ -1,5 +1,5 @@
 --TEST--
-AOT: str_pad() STR_PAD_RIGHT (default) and STR_PAD_LEFT (0)
+AOT: str_pad() STR_PAD_RIGHT (default) and STR_PAD_LEFT (explicit 0)
 --FILE--
 <?php
 echo str_pad('5', 4, '0'), "\n";
