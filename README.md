@@ -89,9 +89,35 @@ Non-`.php` files under the docroot (for example `style.css`) are served as stati
 
 ## Using docker
 
-Docker is optional. The Makefile targets Ubuntu 16.04 and 18.04 images with PHP 7.4 for historical compatibility. For day-to-day development, prefer the host workflow above. Use `make test-18` for the 18.04 image once built.
+Docker is optional on a normal dev machine. On **Runforge / harness hosts** (no system PHP or LLVM), use the PHP 8.2 dev image instead of apt-installing toolchains on the host.
 
-To build, use make:
+### Container development (PHP 8.2, Ubuntu 22.04)
+
+Build the dev image once:
+
+```console
+make docker-build-22
+```
+
+Run the full local CI suite inside the container (same as `./script/ci-local.sh` on the host):
+
+```console
+make test-docker
+# or:
+docker run --rm -v "$(pwd):/compiler" -w /compiler php-compiler:22.04-dev ./script/ci-local.sh
+```
+
+If the bind-mount shows an empty `/compiler` directory (some harness setups), use:
+
+```console
+./script/docker-ci-local.sh
+```
+
+Published tag (when available): `ghcr.io/PurHur/php-compiler:dev`. Override with `PHP_COMPILER_DEV_IMAGE`.
+
+Legacy Makefile targets use Ubuntu 16.04 / 18.04 images with PHP 7.4. For day-to-day development on a host with PHP 8.2, prefer the workflow above. Use `make test-18` for the 18.04 image once built.
+
+To build legacy images, use make:
 
 ```console
 me@local:~$ make build
