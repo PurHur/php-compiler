@@ -72,15 +72,21 @@ function handleConnection($conn, string $docroot): void
         $path = '/example.php';
     }
 
-    $script = $docroot . $path;
+    $scriptName = $path;
+    $pathInfo = '';
+    if (preg_match('#^(.+\.php)(/.*)?$#', $path, $pm)) {
+        $scriptName = $pm[1];
+        $pathInfo = $pm[2] ?? '';
+    }
+
+    $script = $docroot . $scriptName;
     if (!is_file($script)) {
         respond($conn, 404, 'text/plain', "Not Found\n");
 
         return;
     }
 
-    $scriptName = $path;
-    $requestUri = $path;
+    $requestUri = $scriptName . $pathInfo;
     if ('' !== $query) {
         $requestUri .= '?' . $query;
     }
@@ -90,6 +96,11 @@ function handleConnection($conn, string $docroot): void
     putenv('REQUEST_BODY=' . $body);
     putenv('SCRIPT_NAME=' . $scriptName);
     putenv('REQUEST_URI=' . $requestUri);
+    if ('' !== $pathInfo) {
+        putenv('PATH_INFO=' . $pathInfo);
+    } else {
+        putenv('PATH_INFO');
+    }
 
     $code = file_get_contents($script);
     if (false === $code) {
