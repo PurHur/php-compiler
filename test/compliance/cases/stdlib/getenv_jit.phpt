@@ -6,8 +6,8 @@ APP_DEBUG=1
 <?php
 echo getenv('APP_DEBUG_NONEXISTENT') === false ? "false\n" : "set\n";
 echo getenv('APP_DEBUG'), "\n";
-putenv('APP_ENV=production');
-echo getenv('APP_ENV'), "\n";
+$ok = putenv('APP_ENV=production');
+echo $ok ? getenv('APP_ENV') : 'fail', "\n";
 --EXPECT--
 false
 1

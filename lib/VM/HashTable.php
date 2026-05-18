@@ -577,7 +577,8 @@ final class HashTable {
     private function hash(string $key): int {
         $hash = 5381;
         for ($i = 0, $len = strlen($key); $i < $len; $i++) {
-            $hash = (($hash << 5) + $hash) + ord($key[$i]);
+            // Keep djb2 steps in int range (PHP 8.2 deprecates float→int conversion).
+            $hash = (($hash << 5) + $hash + ord($key[$i])) & 0x7FFFFFFF;
         }
         return $hash | \PHP_INT_MIN;
     }

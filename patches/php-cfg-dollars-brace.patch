@@ -1,0 +1,11 @@
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
+@@ -1350,7 +1350,7 @@
+     protected function throwUndefinedLabelError()
+     {
+         foreach ($this->ctx->unresolvedGotos as $name => $_) {
+-            throw new \RuntimeException("'goto' to undefined label '${name}'");
++            throw new \RuntimeException("'goto' to undefined label '{$name}'");
+         }
+     }
+ 
