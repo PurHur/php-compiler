@@ -37,8 +37,14 @@ final class str_contains extends Internal
         if (Variable::TYPE_STRING !== $haystack->type || Variable::TYPE_STRING !== $needle->type) {
             throw new \LogicException('str_contains() only supports strings in this compiler build');
         }
+        $needleStr = $needle->toString();
+        if ('' === $needleStr) {
+            $frame->returnVar->bool(true);
+
+            return;
+        }
         $frame->returnVar->bool(
-            false !== \strpos($haystack->toString(), $needle->toString())
+            false !== VmString::strpos($haystack->toString(), $needleStr)
         );
     }
 

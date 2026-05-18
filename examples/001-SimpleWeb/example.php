@@ -7,6 +7,7 @@ declare(strict_types=1);
  * Run with: QUERY_STRING='name=World' php bin/vm.php examples/001-SimpleWeb/example.php
  * Or: php bin/vm.php -q 'name=World' examples/001-SimpleWeb/example.php
  * Or: php bin/vm.php -p 'name=World' examples/001-SimpleWeb/example.php
+ * $_SERVER['REQUEST_METHOD'] and $_REQUEST are populated automatically (see lib/Web/Superglobals.php).
  */
 if (isset($_GET['name'])) {
     $name = $_GET['name'];

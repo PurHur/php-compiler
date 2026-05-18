@@ -235,6 +235,31 @@ final class HashTable {
     }
 
     /**
+     * Copy string-keyed entries from another array into this one.
+     */
+    public function mergeStringKeysFrom(HashTable $other, bool $overwrite = false): void
+    {
+        for ($i = 0; $i < $other->numUsed; ++$i) {
+            $bucket = $other->buckets->read($i);
+            if ($bucket->value->isUndefined() || null === $bucket->key) {
+                continue;
+            }
+            $existing = $this->find($bucket->key);
+            if (null !== $existing) {
+                if (!$overwrite) {
+                    continue;
+                }
+                $existing->copyFrom($bucket->value->resolveIndirect());
+
+                continue;
+            }
+            $copy = new Variable();
+            $copy->copyFrom($bucket->value->resolveIndirect());
+            $this->add($bucket->key, $copy);
+        }
+    }
+
+    /**
      * Copy values in reverse order into a new packed list array.
      */
     public function reverseCopy(): HashTable
