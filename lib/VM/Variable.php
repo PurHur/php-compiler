@@ -373,53 +373,48 @@ restart:
                     $other = $other->indirect;
                     goto restart;
                 }
-
-                return $this->looseEquals($self, $other);
+                return $this->looseEqual($self, $other);
         }
         throw new \LogicException("Equals comparison between {$self->type} and {$other->type} not implemented");
     }
 
-    private function looseEquals(self $left, self $right): bool {
-        if ($left->type === self::TYPE_NULL || $right->type === self::TYPE_NULL) {
-            $null = $left->type === self::TYPE_NULL ? $left : $right;
-            $other = $left->type === self::TYPE_NULL ? $right : $left;
-            if ($other->type === self::TYPE_NULL) {
-                return true;
-            }
-            if ($other->type === self::TYPE_BOOLEAN) {
-                return $null->type === self::TYPE_NULL && !$other->bool;
-            }
-            if ($other->type === self::TYPE_INTEGER) {
-                return 0 === $other->integer;
-            }
-            if ($other->type === self::TYPE_STRING) {
-                return '' === $other->string;
-            }
-
+    private function looseEqual(Variable $self, Variable $other): bool {
+        if ($self->type === self::TYPE_NULL) {
+            return match ($other->type) {
+                self::TYPE_NULL => true,
+                self::TYPE_BOOLEAN => !$other->bool,
+                self::TYPE_INTEGER => 0 === $other->integer,
+                self::TYPE_STRING => '' === $other->string,
+                self::TYPE_FLOAT => 0.0 === $other->float,
+                default => false,
+            };
+        }
+        if ($other->type === self::TYPE_NULL) {
+            return $this->looseEqual($other, $self);
+        }
+        if ($self->type === self::TYPE_BOOLEAN && $other->type === self::TYPE_INTEGER) {
+            return ($other->integer !== 0) === $self->bool;
+        }
+        if ($self->type === self::TYPE_INTEGER && $other->type === self::TYPE_BOOLEAN) {
+            return ($self->integer !== 0) === $other->bool;
+        }
+        if ($self->type === self::TYPE_STRING && $other->type === self::TYPE_INTEGER) {
+            return is_numeric($self->string) && (int) $self->string == $other->integer;
+        }
+        if ($self->type === self::TYPE_INTEGER && $other->type === self::TYPE_STRING) {
+            return is_numeric($other->string) && $self->integer == (int) $other->string;
+        }
+        if ($self->type === self::TYPE_STRING && $other->type === self::TYPE_BOOLEAN) {
+            return $self->toBool() === $other->bool;
+        }
+        if ($self->type === self::TYPE_BOOLEAN && $other->type === self::TYPE_STRING) {
+            return $other->toBool() === $self->bool;
+        }
+        try {
+            return $self->toNumeric() == $other->toNumeric();
+        } catch (\LogicException) {
             return false;
         }
-        if ($left->type === self::TYPE_BOOLEAN || $right->type === self::TYPE_BOOLEAN) {
-            $bool = $left->type === self::TYPE_BOOLEAN ? $left : $right;
-            $other = $left->type === self::TYPE_BOOLEAN ? $right : $left;
-            if ($other->type === self::TYPE_INTEGER) {
-                return ($bool->bool ? 1 : 0) === $other->integer;
-            }
-            if ($other->type === self::TYPE_STRING) {
-                return ($bool->bool ? '1' : '0') === $other->string
-                    || ($bool->bool && is_numeric($other->string) && (int) $other->string !== 0);
-            }
-
-            return false;
-        }
-        if ($left->type === self::TYPE_INTEGER && $right->type === self::TYPE_STRING) {
-            return (string) $left->integer === $right->string
-                || ($right->string !== '' && is_numeric($right->string) && $left->integer == $right->string);
-        }
-        if ($left->type === self::TYPE_STRING && $right->type === self::TYPE_INTEGER) {
-            return $this->looseEquals($right, $left);
-        }
-
-        return false;
     }
 
     public function compareOp(int $opCode, Variable $left, Variable $right): void {

@@ -450,6 +450,10 @@ restart:
                         $result = $this->context->builder->icmp(\PHPLLVM\Builder::INT_NE, $leftValue, $__right);
     
                         goto return_bool;
+                    case OpCode::TYPE_NOT_IDENTICAL:
+                        $__right = $this->context->builder->intCast($rightValue, $leftValue->typeOf());
+                        $result = $this->context->builder->icmp(\PHPLLVM\Builder::INT_NE, $leftValue, $__right);
+                        goto return_bool;
                     case OpCode::TYPE_SPACESHIP:
                         $__right = $this->context->builder->intCast($rightValue, $leftValue->typeOf());
                         $lt = $this->context->builder->icmp(\PHPLLVM\Builder::INT_SLT, $leftValue, $__right);
@@ -464,7 +468,11 @@ restart:
                 break;
             case TYPE_PAIR_NATIVE_LONG_NATIVE_BOOL:
                 if (OpCode::TYPE_IDENTICAL === $opcode->type) {
-                    $result = $leftValue->typeOf()->constInt(0, false);
+                    $result = $this->context->getTypeFromString('int1')->constInt(0, false);
+                    goto return_bool;
+                }
+                if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
+                    $result = $this->context->getTypeFromString('int1')->constInt(1, false);
                     goto return_bool;
                 }
                 if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
@@ -484,7 +492,11 @@ restart:
                 break;
             case TYPE_PAIR_NATIVE_BOOL_NATIVE_LONG:
                 if (OpCode::TYPE_IDENTICAL === $opcode->type) {
-                    $result = $leftValue->typeOf()->constInt(0, false);
+                    $result = $this->context->getTypeFromString('int1')->constInt(0, false);
+                    goto return_bool;
+                }
+                if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
+                    $result = $this->context->getTypeFromString('int1')->constInt(1, false);
                     goto return_bool;
                 }
                 if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
@@ -514,6 +526,28 @@ restart:
                         goto return_bool;
                 }
                 break;
+        }
+        if (Variable::TYPE_VALUE === $leftType && Variable::TYPE_VALUE === $rightType) {
+            if (OpCode::TYPE_IDENTICAL === $opcode->type) {
+                $result = JitValueCompare::identicalValueToValue($this->context, $left, $right);
+                goto return_bool;
+            }
+            if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
+                $result = JitValueCompare::notIdenticalValueToValue($this->context, $left, $right);
+                goto return_bool;
+            }
+            if (OpCode::TYPE_EQUAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                $identical = JitValueCompare::identicalValueToValue($this->context, $left, $right);
+                if (OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                    $result = $this->context->builder->xor(
+                        $identical,
+                        $this->context->getTypeFromString('int1')->constInt(1, false)
+                    );
+                } else {
+                    $result = $identical;
+                }
+                goto return_bool;
+            }
         }
         if (Variable::TYPE_VALUE === $leftType && Variable::TYPE_VALUE !== $rightType) {
             if (OpCode::TYPE_IDENTICAL === $opcode->type) {

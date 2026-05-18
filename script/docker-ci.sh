@@ -12,7 +12,7 @@ mkdir -p /compiler && tar xf - -C /compiler
 cd /compiler
 apt-get update -qq
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
-  dpkg-dev pkg-config libffi-dev build-essential unzip git curl > /dev/null
+  build-essential dpkg-dev pkg-config libffi-dev unzip git curl > /dev/null
 docker-php-ext-install -j"$(nproc)" ffi > /dev/null 2>&1
 if ! command -v composer >/dev/null 2>&1; then
   curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
