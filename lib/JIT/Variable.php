@@ -344,7 +344,7 @@ final class Variable {
         }
     }
 
-    public function dimFetch(self $dim): Variable {
+    public function dimFetch(self $dim, ?Type $expectedType = null): Variable {
         switch ($this->type) {
             case self::TYPE_STRING:
                 $ptr = $this->context->type->string->dimFetch($this->value, $dim->value);
@@ -396,6 +396,20 @@ final class Variable {
                     $this->context->helper->loadValue($dim),
                     $this->context->getTypeFromString('size_t')
                 );
+                if (null !== $expectedType && Type::TYPE_STRING === $expectedType->type) {
+                    $str = $this->context->builder->call(
+                        $this->context->lookupFunction('__hashtable__readStringAt'),
+                        $ht,
+                        $index
+                    );
+
+                    return new Variable(
+                        $this->context,
+                        self::TYPE_STRING,
+                        self::KIND_VALUE,
+                        $str
+                    );
+                }
                 $long = $this->context->builder->call(
                     $this->context->lookupFunction('__hashtable__readLongAt'),
                     $ht,

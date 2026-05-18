@@ -164,14 +164,14 @@ abstract class BaseTest extends TestCase {
         ];
         $pipes = [];
         $repoRoot = \dirname(__DIR__, 2);
-        $env = null;
-        if (isset($sections['ENV'])) {
-            $env = [];
-            foreach (array_merge($_ENV, $_SERVER) as $key => $value) {
-                if (is_string($value)) {
-                    $env[$key] = $value;
-                }
+        $env = [];
+        foreach (array_merge($_ENV, $_SERVER) as $key => $value) {
+            if (is_string($value)) {
+                $env[$key] = $value;
             }
+        }
+        self::applyLlvmToolchainEnv($env);
+        if (isset($sections['ENV'])) {
             foreach (explode("\n", trim($sections['ENV'])) as $line) {
                 $line = trim($line);
                 if ('' === $line) {
@@ -185,7 +185,7 @@ abstract class BaseTest extends TestCase {
             }
         }
         $proc = proc_open(
-            array_merge($this->phpCommand(), [$this->BIN]),
+            array_merge(self::llvmEnvPrefix(), $this->phpCommand(), [$this->BIN]),
             $descriptorSepc,
             $pipes,
             $repoRoot,
@@ -228,6 +228,46 @@ abstract class BaseTest extends TestCase {
         $result = preg_replace('(\s+$)m', '', $result); // get rid of trailing whitespace
         $result = preg_replace('(\n\n+)', "\n", $result); // get rid of blank lines
         return $result;
+    }
+
+    /**
+     * @param array<string, string> $env
+     */
+    protected static function applyLlvmToolchainEnv(array &$env): void
+    {
+        $llvmDir = dirname(__DIR__).'/.llvm';
+        if (!is_file($llvmDir.'/libLLVM-9.so.1')) {
+            return;
+        }
+        $prefix = realpath($llvmDir) ?: $llvmDir;
+        $env['PHP_COMPILER_LLVM_PATH'] = $prefix;
+        $ld = $env['LD_LIBRARY_PATH'] ?? '';
+        $env['LD_LIBRARY_PATH'] = '' === $ld ? $prefix : $prefix.':'.$ld;
+        $path = $env['PATH'] ?? '';
+        $env['PATH'] = '' === $path ? $prefix : $prefix.':'.$path;
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected static function llvmEnvPrefix(): array
+    {
+        $llvmDir = dirname(__DIR__).'/.llvm';
+        if (!is_file($llvmDir.'/libLLVM-9.so.1')) {
+            return [];
+        }
+        $prefix = realpath($llvmDir) ?: $llvmDir;
+        $ld = getenv('LD_LIBRARY_PATH');
+        $ldVal = false === $ld || '' === $ld ? $prefix : $prefix.':'.$ld;
+        $path = getenv('PATH');
+        $pathVal = false === $path || '' === $path ? $prefix : $prefix.':'.$path;
+
+        return [
+            'env',
+            'LD_LIBRARY_PATH='.$ldVal,
+            'PATH='.$pathVal,
+            'PHP_COMPILER_LLVM_PATH='.$prefix,
+        ];
     }
 
 }

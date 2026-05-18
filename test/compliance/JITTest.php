@@ -13,6 +13,13 @@ class JITTest extends BaseTest {
 
     public function setUp(): void {
         $this->BIN = realpath(__DIR__ . '/../../bin/jit.php');
+        $llvmDir = dirname(__DIR__, 2).'/.llvm';
+        if (is_file($llvmDir.'/libLLVM-9.so.1')) {
+            $prefix = realpath($llvmDir) ?: $llvmDir;
+            if ('' === getenv('PHP_COMPILER_LLVM_PATH')) {
+                putenv('PHP_COMPILER_LLVM_PATH='.$prefix);
+            }
+        }
         try {
             \PHPLLVM\Chooser::choose();
         } catch (\Throwable $e) {

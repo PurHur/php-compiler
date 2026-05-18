@@ -263,6 +263,19 @@ class Context {
             case 'int64':
             case 'size_t':
                 return $this->builder->icmp($this->builder::INT_NE, $value, $type->constInt(0, false));
+            case '__value__':
+            case '__value__*':
+                $ptr = $value;
+                if ('__value__' === $this->getStringFromType($type)) {
+                    $slot = $this->builder->alloca($type, 1, 'bool_cast_value');
+                    $this->builder->store($value, $slot);
+                    $ptr = $slot;
+                }
+
+                return (new \PHPCompiler\ext\standard\boolval())->call(
+                    $this,
+                    new Variable($this, Variable::TYPE_VALUE, Variable::KIND_VALUE, $ptr)
+                );
         }
         throw new \LogicException("Unknown bool cast from type: " . $this->getStringFromType($type));
     }
