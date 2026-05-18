@@ -18,6 +18,8 @@ use PHPTypes\Type;
 
 use PHPLLVM;
 use PHPCompiler\AOT\Linker;
+use PHPCompiler\JIT\SuperglobalInit;
+use PHPCompiler\Web\Superglobals;
 
 class Context {
 
@@ -158,6 +160,8 @@ class Context {
         foreach ($this->builtins as $builtin) {
             $builtin->initialize();
         }
+
+        SuperglobalInit::initialize($this);
     }
 
     public function compileToFile(string $file) {
@@ -397,6 +401,12 @@ class Context {
         Operand $op
     ) {
         assert(!$this->scope->variables->contains($op));
+        $name = OperandName::resolve($op);
+        if (null !== $name && Superglobals::isSuperglobalName($name)) {
+            $this->scope->variables[$op] = SuperglobalInit::load($this, $name);
+
+            return;
+        }
         $this->scope->variables[$op] = Variable::fromOp($this, $func, $basicBlock, $block, $op);
         $this->scope->variables[$op]->initialize();
     }
