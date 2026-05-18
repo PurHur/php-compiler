@@ -330,6 +330,24 @@ final class Variable {
                     $ptr,
                 );
             case self::TYPE_HASHTABLE:
+                if (null !== $this->superglobalName && self::TYPE_STRING === $dim->type) {
+                    $key = $dim->compileTimeString;
+                    if (null !== $key) {
+                        $baked = SuperglobalInit::compileTimeReadString(
+                            $this->context,
+                            $this->superglobalName,
+                            $key
+                        );
+                        if (null !== $baked) {
+                            return new Variable(
+                                $this->context,
+                                self::TYPE_STRING,
+                                self::KIND_VALUE,
+                                $baked
+                            );
+                        }
+                    }
+                }
                 $ht = $this->context->helper->loadValue($this);
                 if (self::TYPE_STRING === $dim->type) {
                     $valPtr = $this->context->builder->call(

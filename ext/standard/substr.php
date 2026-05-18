@@ -74,41 +74,21 @@ final class substr extends Internal
             $context->builder->structGep($str, $map['length'])
         );
         $charPtr = $context->builder->structGep($str, $map['value']);
-        $i64 = $context->getTypeFromString('int64');
-        $zero = $i64->constInt(0, false);
-        $offset = $context->builder->truncOrBitCast($context->helper->loadValue($args[1]), $i64);
-        $start = self::clampIndex($context, $offset, $zero, $len);
+        $zero = JitStringIndex::zero($context);
+        $offset = $context->helper->loadValue($args[1]);
+        $start = JitStringIndex::clamp($context, $offset, $zero, $len);
 
         if (3 === $argc) {
-            $lengthArg = $context->builder->truncOrBitCast($context->helper->loadValue($args[2]), $i64);
+            $lengthArg = $context->helper->loadValue($args[2]);
             $negLen = $context->builder->icmp(Builder::INT_SLT, $lengthArg, $zero);
             $remaining = $context->builder->sub($len, $start);
             $maxLen = $context->builder->select($negLen, $zero, $lengthArg);
-            $sliceLen = self::minValue($context, $maxLen, $remaining);
+            $sliceLen = JitStringIndex::min($context, $maxLen, $remaining);
         } else {
             $sliceLen = $context->builder->sub($len, $start);
-            $sliceLen = self::maxValue($context, $sliceLen, $zero);
+            $sliceLen = JitStringIndex::max($context, $sliceLen, $zero);
         }
 
         return string_trim::jitCopySlice($context, $str, $charPtr, $start, $sliceLen);
-    }
-
-    private static function clampIndex(Context $context, Value $index, Value $min, Value $max): Value
-    {
-        return self::minValue($context, self::maxValue($context, $index, $min), $max);
-    }
-
-    private static function minValue(Context $context, Value $a, Value $b): Value
-    {
-        $cmp = $context->builder->icmp(Builder::INT_SLT, $a, $b);
-
-        return $context->builder->select($cmp, $a, $b);
-    }
-
-    private static function maxValue(Context $context, Value $a, Value $b): Value
-    {
-        $cmp = $context->builder->icmp(Builder::INT_SGT, $a, $b);
-
-        return $context->builder->select($cmp, $a, $b);
     }
 }

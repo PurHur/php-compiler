@@ -19,7 +19,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * count() for arrays (subset of PHP; VM only in this compiler build).
+ * count() for arrays (subset of PHP).
  */
 final class array_count extends Internal
 {
