@@ -9,6 +9,7 @@ declare(strict_types=1);
  * @license MIT See LICENSE at the root of the project for more info
  */
 
+require __DIR__.'/yay-php8-compat.php';
 require __DIR__.'/../vendor/autoload.php';
 
 ini_set('memory_limit', '-1');
@@ -71,7 +72,7 @@ while (! empty($opts)) {
             break;
         default:
             if (! empty($opts)) {
-                die("Extra argument not understood: ${opt}\n");
+                die("Extra argument not understood: {$opt}\n");
             }
             if (! empty($execCode)) {
                 die("Unsupported argument combination leading to multiple executions\n");
@@ -83,10 +84,10 @@ while (! empty($opts)) {
 
                     break;
                 }
-                die("Unsupported bare argument ${opt}\n");
+                die("Unsupported bare argument {$opt}\n");
             }
             if (! file_exists($opt)) {
-                die("Could not open file ${opt}\n");
+                die("Could not open file {$opt}\n");
             }
             $execCode = file_get_contents($opt);
             $execFile = $opt;
