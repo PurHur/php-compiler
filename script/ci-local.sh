@@ -14,7 +14,7 @@ else
   python3 -c "import urllib.request; urllib.request.urlretrieve('https://getcomposer.org/download/latest-stable/composer.phar','/tmp/composer.phar')"
   COMPOSER=("$PHP_BIN" -d "extension=$EXT_DIR/phar.so" -d "extension=$EXT_DIR/mbstring.so" /tmp/composer.phar)
 fi
-"${COMPOSER[@]}" install --no-interaction --ignore-platform-reqs --no-plugins 2>/dev/null || true
+"${COMPOSER[@]}" install --no-interaction --ignore-platform-reqs 2>/dev/null || true
 
 chmod +x script/install-llvm9.sh script/apply-patches.sh 2>/dev/null || true
 if [[ -x script/install-llvm9.sh ]]; then

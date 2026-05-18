@@ -69,9 +69,13 @@ class HashTable extends Type
         $this->registerFn('__hashtable__getNumElements', 'size_t', ['__hashtable__*']);
         $this->registerFn('__hashtable__offsetIsSet', 'int1', ['__hashtable__*', 'size_t']);
         $this->registerFn('__hashtable__setStringKeyString', 'void', ['__hashtable__*', '__string__*', '__string__*']);
+        $this->registerFn('__hashtable__setStringKeyHashtable', 'void', ['__hashtable__*', '__string__*', '__hashtable__*']);
         $this->registerFn('__hashtable__setStringKeyLong', 'void', ['__hashtable__*', '__string__*', 'int64']);
         $this->registerFn('__hashtable__offsetIsSetStringKey', 'int1', ['__hashtable__*', '__string__*']);
         $this->registerFn('__hashtable__readStringKeyValue', '__value__*', ['__hashtable__*', '__string__*']);
+        $this->registerFn('__hashtable__readStringKeyHashtable', '__hashtable__*', ['__hashtable__*', '__string__*']);
+        $this->registerFn('__value__readHashtable', '__hashtable__*', ['__value__*']);
+        $this->registerFn('__value__writeHashtable', 'void', ['__value__*', '__hashtable__*']);
         $this->registerFn('__hashtable__sortPacked', 'void', ['__hashtable__*']);
 
         $this->pointer = $this->context->getTypeFromString('__hashtable__*');
@@ -105,8 +109,12 @@ class HashTable extends Type
         $this->implementGetNumElements();
         $this->implementOffsetIsSet();
         $this->implementSetStringKeyString();
+        $this->implementSetStringKeyHashtable();
         $this->implementOffsetIsSetStringKey();
         $this->implementReadStringKeyValue();
+        $this->implementReadStringKeyHashtable();
+        $this->implementValueReadHashtable();
+        $this->implementValueWriteHashtable();
         $this->implementSortPacked();
     }
 
@@ -550,6 +558,85 @@ class HashTable extends Type
         $this->context->builder->returnVoid();
     }
 
+    private function implementSetStringKeyHashtable(): void
+    {
+        $fn = $this->context->lookupFunction('__hashtable__setStringKeyHashtable');
+        $block = $fn->appendBasicBlock('main');
+        $this->context->builder->positionAtEnd($block);
+        $ht = $fn->getParam(0);
+        $key = $fn->getParam(1);
+        $child = $fn->getParam(2);
+
+        $htMap = $this->context->structFieldMap['__hashtable__'];
+        $nodeMap = $this->context->structFieldMap['__strkey_node__'];
+        $headSlot = $this->context->builder->structGep($ht, $htMap['strKeys']);
+        $head = $this->context->builder->load($headSlot);
+
+        $done = $fn->appendBasicBlock('strkey_ht_done');
+        $prepend = $fn->appendBasicBlock('strkey_ht_prepend');
+        $loopHead = $fn->appendBasicBlock('strkey_ht_head');
+        $loopBody = $fn->appendBasicBlock('strkey_ht_body');
+        $this->context->builder->branch($loopHead);
+
+        $this->context->builder->positionAtEnd($loopHead);
+        $node = $this->context->builder->phi($head->typeOf());
+        $node->addIncoming($head, $block);
+        $isNull = $this->context->builder->icmp(Builder::INT_EQ, $node, $node->typeOf()->constNull());
+        $this->context->builder->branchIf($isNull, $prepend, $loopBody);
+
+        $this->context->builder->positionAtEnd($loopBody);
+        $nodeKey = $this->context->builder->load($this->context->builder->structGep($node, $nodeMap['key']));
+        $cmp = $this->context->builder->call(
+            $this->context->lookupFunction('strcmp'),
+            $this->stringDataPtr($key),
+            $this->stringDataPtr($nodeKey)
+        );
+        $isMatch = $this->context->builder->icmp(Builder::INT_EQ, $cmp, $cmp->typeOf()->constInt(0, false));
+        $update = $fn->appendBasicBlock('strkey_ht_update');
+        $next = $fn->appendBasicBlock('strkey_ht_next');
+        $this->context->builder->branchIf($isMatch, $update, $next);
+
+        $this->context->builder->positionAtEnd($update);
+        $valField = $this->context->builder->structGep($node, $nodeMap['value']);
+        $this->context->builder->call(
+            $this->context->lookupFunction('__value__writeHashtable'),
+            $valField,
+            $child
+        );
+        $this->context->builder->branch($done);
+
+        $this->context->builder->positionAtEnd($next);
+        $nextNode = $this->context->builder->load($this->context->builder->structGep($node, $nodeMap['next']));
+        $this->context->builder->branch($loopHead);
+        $node->addIncoming($nextNode, $next);
+
+        $this->context->builder->positionAtEnd($prepend);
+        $nodeType = $this->context->getTypeFromString('__strkey_node__');
+        $newNode = $this->context->memory->malloc($nodeType);
+        $typeinfo = $this->context->getTypeFromString('int32')->constInt(
+            Refcount::TYPE_INFO_TYPE_STRING | Refcount::TYPE_INFO_REFCOUNTED,
+            false
+        );
+        $ref = $this->context->builder->pointerCast(
+            $newNode,
+            $this->context->getTypeFromString('__ref__virtual*')
+        );
+        $this->context->builder->call($this->context->lookupFunction('__ref__init'), $typeinfo, $ref);
+        $storedKey = $this->context->builder->call($this->context->lookupFunction('__string__separate'), $key);
+        $this->context->builder->store($storedKey, $this->context->builder->structGep($newNode, $nodeMap['key']));
+        $this->context->builder->call(
+            $this->context->lookupFunction('__value__writeHashtable'),
+            $this->context->builder->structGep($newNode, $nodeMap['value']),
+            $child
+        );
+        $this->context->builder->store($head, $this->context->builder->structGep($newNode, $nodeMap['next']));
+        $this->context->builder->store($newNode, $headSlot);
+        $this->context->builder->branch($done);
+
+        $this->context->builder->positionAtEnd($done);
+        $this->context->builder->returnVoid();
+    }
+
     private function implementSetStringKeyLong(): void
     {
         $fn = $this->context->lookupFunction('__hashtable__setStringKeyLong');
@@ -667,6 +754,90 @@ class HashTable extends Type
         $key = $fn->getParam(1);
         $valPtr = $this->lookupStringKeyValue($fn, $block, $ht, $key);
         $this->context->builder->returnValue($valPtr);
+    }
+
+    private function implementReadStringKeyHashtable(): void
+    {
+        $fn = $this->context->lookupFunction('__hashtable__readStringKeyHashtable');
+        $block = $fn->appendBasicBlock('main');
+        $this->context->builder->positionAtEnd($block);
+        $ht = $fn->getParam(0);
+        $key = $fn->getParam(1);
+        $htPtr = $this->context->getTypeFromString('__hashtable__*');
+        $valPtr = $this->lookupStringKeyValue($fn, $block, $ht, $key);
+        $afterLookup = $fn->appendBasicBlock('strkey_read_ht_after_lookup');
+        $this->context->builder->branch($afterLookup);
+        $this->context->builder->positionAtEnd($afterLookup);
+        $isNull = $this->context->builder->icmp(Builder::INT_EQ, $valPtr, $valPtr->typeOf()->constNull());
+        $empty = $fn->appendBasicBlock('strkey_read_ht_empty');
+        $read = $fn->appendBasicBlock('strkey_read_ht_read');
+        $merge = $fn->appendBasicBlock('strkey_read_ht_merge');
+        $this->context->builder->branchIf($isNull, $empty, $read);
+        $this->context->builder->positionAtEnd($read);
+        $child = $this->context->builder->call(
+            $this->context->lookupFunction('__value__readHashtable'),
+            $valPtr
+        );
+        $this->context->builder->branch($merge);
+        $this->context->builder->positionAtEnd($empty);
+        $this->context->builder->branch($merge);
+        $this->context->builder->positionAtEnd($merge);
+        $result = $this->context->builder->phi($htPtr);
+        $result->addIncoming($child, $read);
+        $result->addIncoming($htPtr->constNull(), $empty);
+        $this->context->builder->returnValue($result);
+    }
+
+    private function implementValueReadHashtable(): void
+    {
+        $fn = $this->context->lookupFunction('__value__readHashtable');
+        $block = $fn->appendBasicBlock('main');
+        $this->context->builder->positionAtEnd($block);
+        $value = $fn->getParam(0);
+        $map = $this->context->structFieldMap['__value__'];
+        $htPtr = $this->context->getTypeFromString('__hashtable__*');
+        $typeByte = $this->context->builder->load($this->context->builder->structGep($value, $map['type']));
+        $expected = $this->context->getTypeFromString('int8')->constInt(Variable::TYPE_HASHTABLE, false);
+        $isHt = $this->context->builder->icmp(Builder::INT_EQ, $typeByte, $expected);
+        $ok = $fn->appendBasicBlock('read_ht_ok');
+        $empty = $fn->appendBasicBlock('read_ht_empty');
+        $merge = $fn->appendBasicBlock('read_ht_merge');
+        $this->context->builder->branchIf($isHt, $ok, $empty);
+        $this->context->builder->positionAtEnd($ok);
+        $ptrField = $this->context->builder->structGep($value, $map['value']);
+        $htSlot = $this->context->builder->pointerCast($ptrField, $htPtr->pointerType(0));
+        $stored = $this->context->builder->load($htSlot);
+        $this->context->builder->branch($merge);
+        $this->context->builder->positionAtEnd($empty);
+        $this->context->builder->branch($merge);
+        $this->context->builder->positionAtEnd($merge);
+        $result = $this->context->builder->phi($htPtr);
+        $result->addIncoming($stored, $ok);
+        $result->addIncoming($htPtr->constNull(), $empty);
+        $this->context->builder->returnValue($result);
+    }
+
+    private function implementValueWriteHashtable(): void
+    {
+        $fn = $this->context->lookupFunction('__value__writeHashtable');
+        $block = $fn->appendBasicBlock('main');
+        $this->context->builder->positionAtEnd($block);
+        $value = $fn->getParam(0);
+        $hashtable = $fn->getParam(1);
+        $map = $this->context->structFieldMap['__value__'];
+        $htPtr = $this->context->getTypeFromString('__hashtable__*');
+        $this->context->builder->call(
+            $this->context->lookupFunction('__value__valueDelref'),
+            $value
+        );
+        $this->context->builder->store(
+            $this->context->getTypeFromString('int8')->constInt(Variable::TYPE_HASHTABLE, false),
+            $this->context->builder->structGep($value, $map['type'])
+        );
+        $ptrField = $this->context->builder->structGep($value, $map['value']);
+        $htSlot = $this->context->builder->pointerCast($ptrField, $htPtr->pointerType(0));
+        $this->context->builder->store($hashtable, $htSlot);
+        $this->context->builder->returnVoid();
     }
 
     private function lookupStringKeyValue(

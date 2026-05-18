@@ -12,6 +12,10 @@ typedef struct __string__ __string__;
 
 extern __hashtable__ *__hashtable__alloc(void);
 extern void __hashtable__setStringKeyString(__hashtable__ *ht, __string__ *key, __string__ *val);
+extern void __hashtable__setStringKeyHashtable(__hashtable__ *ht, __string__ *key, __hashtable__ *child);
+extern void __hashtable__setStringAt(__hashtable__ *ht, size_t index, __string__ *val);
+extern size_t __hashtable__getNumElements(__hashtable__ *ht);
+extern __hashtable__ *__hashtable__readStringKeyHashtable(__hashtable__ *ht, __string__ *key);
 extern __string__ *__string__init(long long size, const char *value);
 
 extern __hashtable__ *sg_GET;
@@ -38,6 +42,161 @@ static void set_string_key(__hashtable__ *ht, const char *key, const char *value
     __hashtable__setStringKeyString(ht, k, v);
 }
 
+#define SG_MAX_KEY_PARTS 16
+
+typedef struct {
+    char *parts[SG_MAX_KEY_PARTS];
+    size_t count;
+    int append_list;
+} sg_parsed_key;
+
+static int sg_is_hex(char c)
+{
+    return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+}
+
+static int sg_hex_value(char c)
+{
+    if (c >= '0' && c <= '9') {
+        return c - '0';
+    }
+    if (c >= 'a' && c <= 'f') {
+        return c - 'a' + 10;
+    }
+
+    return c - 'A' + 10;
+}
+
+static void sg_url_decode_inplace(char *s)
+{
+    char *w = s;
+
+    for (char *r = s; '\0' != *r; r++) {
+        if ('+' == *r) {
+            *w++ = ' ';
+        } else if ('%' == *r && sg_is_hex(r[1]) && sg_is_hex(r[2])) {
+            *w++ = (char) (sg_hex_value(r[1]) * 16 + sg_hex_value(r[2]));
+            r += 2;
+        } else {
+            *w++ = *r;
+        }
+    }
+    *w = '\0';
+}
+
+static void sg_free_parsed_key(sg_parsed_key *pk)
+{
+    size_t i;
+
+    for (i = 0; i < pk->count; i++) {
+        free(pk->parts[i]);
+        pk->parts[i] = NULL;
+    }
+    pk->count = 0;
+    pk->append_list = 0;
+}
+
+static int sg_parse_key_brackets(const char *raw, sg_parsed_key *out)
+{
+    const char *p = raw;
+    size_t base_len;
+
+    out->count = 0;
+    out->append_list = 0;
+    if ('\0' == raw[0]) {
+        return -1;
+    }
+
+    base_len = strcspn(p, "[");
+    if (base_len > 0) {
+        out->parts[out->count] = strndup(p, base_len);
+        if (NULL == out->parts[out->count]) {
+            return -1;
+        }
+        out->count++;
+        p += base_len;
+    }
+
+    while ('[' == *p) {
+        p++;
+        if (']' == *p) {
+            out->append_list = 1;
+            p++;
+            break;
+        }
+        {
+            const char *close = strchr(p, ']');
+            size_t len;
+
+            if (NULL == close) {
+                return -1;
+            }
+            len = (size_t) (close - p);
+            out->parts[out->count] = malloc(len + 1);
+            if (NULL == out->parts[out->count]) {
+                return -1;
+            }
+            memcpy(out->parts[out->count], p, len);
+            out->parts[out->count][len] = '\0';
+            out->count++;
+            p = close + 1;
+        }
+        if ('[' == *p && ']' == p[1]) {
+            out->append_list = 1;
+            p += 2;
+        }
+    }
+
+    if ('\0' != *p || 0 == out->count) {
+        return -1;
+    }
+
+    return 0;
+}
+
+static __hashtable__ *sg_ensure_child(__hashtable__ *ht, const char *key)
+{
+    __string__ *k = cstr_to_string(key);
+    __hashtable__ *child = __hashtable__readStringKeyHashtable(ht, k);
+
+    if (NULL != child) {
+        return child;
+    }
+    child = __hashtable__alloc();
+    __hashtable__setStringKeyHashtable(ht, k, child);
+
+    return child;
+}
+
+static void sg_set_nested_value(__hashtable__ *root, sg_parsed_key *pk, const char *value)
+{
+    __hashtable__ *ht = root;
+    size_t last;
+    const char *leaf;
+
+    if (0 == pk->count) {
+        return;
+    }
+    last = pk->count;
+    {
+        size_t i;
+
+        for (i = 0; i + 1 < last; i++) {
+            ht = sg_ensure_child(ht, pk->parts[i]);
+        }
+    }
+    leaf = pk->parts[last - 1];
+    if (pk->append_list) {
+        __hashtable__ *list_ht = sg_ensure_child(ht, leaf);
+        size_t idx = __hashtable__getNumElements(list_ht);
+
+        __hashtable__setStringAt(list_ht, idx, cstr_to_string(value));
+
+        return;
+    }
+    set_string_key(ht, leaf, value);
+}
+
 static void parse_form_encoded(__hashtable__ *ht, const char *body)
 {
     char *copy;
@@ -56,12 +215,30 @@ static void parse_form_encoded(__hashtable__ *ht, const char *body)
     pair = strtok_r(copy, "&", &saveptr);
     while (NULL != pair) {
         char *eq = strchr(pair, '=');
+        char *raw_key;
+        char *raw_val;
+        sg_parsed_key pk;
+
         if (NULL != eq) {
             *eq = '\0';
-            set_string_key(ht, pair, eq + 1);
-        } else if ('\0' != pair[0]) {
-            set_string_key(ht, pair, "");
+            raw_key = pair;
+            raw_val = eq + 1;
+        } else {
+            raw_key = pair;
+            raw_val = (char *) "";
         }
+        if ('\0' == raw_key[0]) {
+            pair = strtok_r(NULL, "&", &saveptr);
+            continue;
+        }
+        sg_url_decode_inplace(raw_key);
+        sg_url_decode_inplace(raw_val);
+        if (0 == sg_parse_key_brackets(raw_key, &pk)) {
+            sg_set_nested_value(ht, &pk, raw_val);
+        } else {
+            set_string_key(ht, raw_key, raw_val);
+        }
+        sg_free_parsed_key(&pk);
         pair = strtok_r(NULL, "&", &saveptr);
     }
 

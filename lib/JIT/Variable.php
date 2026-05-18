@@ -373,7 +373,11 @@ final class Variable {
                     $ptr,
                 );
             case self::TYPE_HASHTABLE:
-                if (null !== $this->superglobalName && self::TYPE_STRING === $dim->type) {
+                if (
+                    null !== $this->superglobalName
+                    && self::TYPE_STRING === $dim->type
+                    && (null === $expectedType || Type::TYPE_ARRAY !== $expectedType->type)
+                ) {
                     $key = $dim->compileTimeString;
                     if (null !== $key) {
                         $baked = SuperglobalInit::compileTimeReadString(
@@ -393,10 +397,25 @@ final class Variable {
                 }
                 $ht = $this->context->helper->loadValue($this);
                 if (self::TYPE_STRING === $dim->type) {
+                    $key = $this->context->helper->loadValue($dim);
+                    if (null !== $expectedType && Type::TYPE_ARRAY === $expectedType->type) {
+                        $childHt = $this->context->builder->call(
+                            $this->context->lookupFunction('__hashtable__readStringKeyHashtable'),
+                            $ht,
+                            $key
+                        );
+
+                        return new Variable(
+                            $this->context,
+                            self::TYPE_HASHTABLE,
+                            self::KIND_VALUE,
+                            $childHt
+                        );
+                    }
                     $valPtr = $this->context->builder->call(
                         $this->context->lookupFunction('__hashtable__readStringKeyValue'),
                         $ht,
-                        $this->context->helper->loadValue($dim)
+                        $key
                     );
                     $str = $this->context->builder->call(
                         $this->context->lookupFunction('__value__readString'),
