@@ -7,7 +7,7 @@ echo strval(true), "\n";
 echo strval(false), "\n";
 echo strval(null), "\n";
 echo strval('hi'), "\n";
---EXPECT--
+--EXPECTF--
 42
 1
 

@@ -160,7 +160,7 @@ final class VmString
         return $out;
     }
 
-    public static function strPad(string $input, int $padLength, string $padString = ' ', int $padType = 0): string
+    public static function strPad(string $input, int $padLength, string $padString = ' ', int $padType = 1): string
     {
         $inputLen = self::byteLength($input);
         if ($padLength <= 0 || $padLength <= $inputLen) {
@@ -178,7 +178,7 @@ final class VmString
             $padding .= $padString;
         }
         $padding = self::byteSlice($padding, 0, $need);
-        if (1 === $padType) {
+        if (0 === $padType) {
             return $padding.$input;
         }
 
