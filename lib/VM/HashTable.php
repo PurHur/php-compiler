@@ -189,6 +189,86 @@ final class HashTable {
         return $out;
     }
 
+    /**
+     * Copy all keys into a new packed list array (int or string keys).
+     */
+    public function keysCopy(): HashTable
+    {
+        $out = new self();
+        for ($i = 0; $i < $this->numUsed; ++$i) {
+            $bucket = $this->buckets->read($i);
+            if ($bucket->value->isUndefined()) {
+                continue;
+            }
+            $keyVar = new Variable();
+            if (null !== $bucket->key) {
+                $keyVar->string($bucket->key);
+            } else {
+                $keyVar->int($bucket->hash);
+            }
+            $out->append($keyVar);
+        }
+
+        return $out;
+    }
+
+    /**
+     * Append values from packed list arrays into a copy of this array.
+     *
+     * @param HashTable ...$others
+     */
+    public function mergeCopy(HashTable ...$others): HashTable
+    {
+        $out = $this->valuesCopy();
+        foreach ($others as $other) {
+            if (!$other->isWithoutHoles()) {
+                throw new \LogicException('mergeCopy() only supports packed list arrays without holes');
+            }
+            foreach ($other->iterate(true) as $value) {
+                $copy = new Variable();
+                $copy->copyFrom($value);
+                $out->append($copy);
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Copy a sub-range of a packed list array into a new list (non-negative offset).
+     */
+    public function sliceCopy(int $offset, ?int $length = null): HashTable
+    {
+        if (!$this->isWithoutHoles()) {
+            throw new \LogicException('sliceCopy() only supports packed list arrays without holes');
+        }
+        if ($offset < 0) {
+            $offset = $this->numElements + $offset;
+            if ($offset < 0) {
+                $offset = 0;
+            }
+        }
+        $out = new self();
+        $index = 0;
+        $taken = 0;
+        foreach ($this->iterate(true) as $value) {
+            if ($index < $offset) {
+                ++$index;
+                continue;
+            }
+            if (null !== $length && $taken >= $length) {
+                break;
+            }
+            $copy = new Variable();
+            $copy->copyFrom($value);
+            $out->append($copy);
+            ++$index;
+            ++$taken;
+        }
+
+        return $out;
+    }
+
     public function hasKey(Variable $index): bool
     {
         $this->assertConsistent();
