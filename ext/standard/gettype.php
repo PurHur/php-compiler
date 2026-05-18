@@ -29,6 +29,7 @@ final class gettype extends Internal
         Variable::TYPE_FLOAT => 'double',
         Variable::TYPE_BOOLEAN => 'boolean',
         Variable::TYPE_STRING => 'string',
+        Variable::TYPE_ARRAY => 'array',
     ];
 
     public function execute(Frame $frame): void

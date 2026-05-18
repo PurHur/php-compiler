@@ -57,7 +57,7 @@ final class HashTable {
             }
             $value = $bucket->value;
             if ($resolveIndirect) {
-                $value = $value->resolveIndirect;
+                $value = $value->resolveIndirect();
             }
             yield $value;
         }
