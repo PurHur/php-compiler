@@ -41,6 +41,13 @@ final class getenv_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('getenv() is not supported in JIT in this compiler build');
+        if (1 !== \count($args)) {
+            throw new \LogicException('getenv() requires exactly one argument');
+        }
+        if (JITVariable::TYPE_STRING !== $args[0]->type) {
+            throw new \LogicException('getenv() requires a string name in this compiler build');
+        }
+
+        return JitEnv::getenv($context, $context->helper->loadValue($args[0]));
     }
 }

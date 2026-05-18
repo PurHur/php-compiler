@@ -27,6 +27,28 @@ class Type extends Builtin {
         $this->string->register();
         // $this->object->register();
         $this->value->register();
+        $fntypeGetenv = $this->context->context->functionType(
+            $this->context->getTypeFromString('void'),
+            false,
+            $this->context->getTypeFromString('__string__*'),
+            $this->context->getTypeFromString('__value__*')
+        );
+        $fnGetenv = $this->context->module->addFunction('__compiler_getenv', $fntypeGetenv);
+        $this->context->registerFunction('__compiler_getenv', $fnGetenv);
+        $i8p = $this->context->getTypeFromString('int8*');
+        $i32 = $this->context->getTypeFromString('int32');
+        $sizeT = $this->context->getTypeFromString('size_t');
+        foreach (
+            [
+                'getenv' => [$i8p, false, $i8p],
+                'putenv' => [$i32, false, $i8p],
+                'strlen' => [$sizeT, false, $i8p],
+            ] as $libcName => [$ret, $vararg, $param]
+        ) {
+            $ft = $this->context->context->functionType($ret, $vararg, $param);
+            $fn = $this->context->module->addFunction($libcName, $ft);
+            $this->context->registerFunction($libcName, $fn);
+        }
         $this->hashtable->register();
         // $this->maskedarray->register();
         // $this->nativearray->register();
