@@ -84,6 +84,9 @@ class Module extends ModuleAbstract
             new array_slice(),
             new explode(),
             new implode(),
+            new str_replace(),
+            new nl2br(),
+            new array_reverse(),
             new htmlspecialchars(),
             new header_(),
         ];

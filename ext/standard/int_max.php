@@ -40,12 +40,16 @@ final class int_max extends Internal
             return;
         }
         if (Variable::TYPE_INTEGER === $a->type && Variable::TYPE_INTEGER === $b->type) {
-            $frame->returnVar->int(\max($a->toInt(), $b->toInt()));
+            $ai = $a->toInt();
+            $bi = $b->toInt();
+            $frame->returnVar->int($ai > $bi ? $ai : $bi);
 
             return;
         }
         if (self::isNumeric($a) && self::isNumeric($b)) {
-            $frame->returnVar->float(\max(self::toFloat($a), self::toFloat($b)));
+            $af = self::toFloat($a);
+            $bf = self::toFloat($b);
+            $frame->returnVar->float($af > $bf ? $af : $bf);
 
             return;
         }

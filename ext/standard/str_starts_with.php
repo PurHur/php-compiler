@@ -37,15 +37,7 @@ final class str_starts_with extends Internal
         if (Variable::TYPE_STRING !== $haystack->type || Variable::TYPE_STRING !== $needle->type) {
             throw new \LogicException('str_starts_with() only supports strings in this compiler build');
         }
-        $hay = $haystack->toString();
-        $needleStr = $needle->toString();
-        $nlen = \strlen($needleStr);
-        if ($nlen > \strlen($hay)) {
-            $frame->returnVar->bool(false);
-
-            return;
-        }
-        $frame->returnVar->bool(0 === \strncmp($hay, $needleStr, $nlen));
+        $frame->returnVar->bool(VmString::startsWith($haystack->toString(), $needle->toString()));
     }
 
     public Context $context;

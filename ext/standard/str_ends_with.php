@@ -37,21 +37,7 @@ final class str_ends_with extends Internal
         if (Variable::TYPE_STRING !== $haystack->type || Variable::TYPE_STRING !== $needle->type) {
             throw new \LogicException('str_ends_with() only supports strings in this compiler build');
         }
-        $hay = $haystack->toString();
-        $needleStr = $needle->toString();
-        $nlen = \strlen($needleStr);
-        $hlen = \strlen($hay);
-        if ($nlen > $hlen) {
-            $frame->returnVar->bool(false);
-
-            return;
-        }
-        if (0 === $nlen) {
-            $frame->returnVar->bool(true);
-
-            return;
-        }
-        $frame->returnVar->bool(0 === \strncmp(\substr($hay, $hlen - $nlen), $needleStr, $nlen));
+        $frame->returnVar->bool(VmString::endsWith($haystack->toString(), $needle->toString()));
     }
 
     public Context $context;

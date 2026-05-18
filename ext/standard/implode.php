@@ -40,7 +40,7 @@ final class implode extends Internal
         foreach ($array->toArray()->iterate(true) as $value) {
             $parts[] = $value->resolveIndirect()->toString();
         }
-        $frame->returnVar->string(\implode($glue, $parts));
+        $frame->returnVar->string(VmString::implode($glue, $parts));
     }
 
     public Context $context;
