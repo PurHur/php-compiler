@@ -55,6 +55,13 @@ while (! empty($opts)) {
             $execFile = 'Command line code';
 
             break;
+        case '-q':
+            if (empty($opts) || substr($opts[0], 0, 1) === '-') {
+                die("Option -q requires a query string argument\n");
+            }
+            $options['-q'] = array_shift($opts);
+
+            break;
         default:
             if (! empty($opts)) {
                 die("Extra argument not understood: ${opt}\n");

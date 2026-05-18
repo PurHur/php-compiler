@@ -12,12 +12,16 @@ namespace PHPCompiler\VM;
 use PHPCompiler\Frame;
 use PHPCompiler\Func;
 use PHPCompiler\Runtime;
+use PHPCompiler\Web\Superglobals;
 
 class Context {
     public array $functions = [];
     public array $classes = [];
     private ?RunStackEntry $runStack = null;
     public array $constants = [];
+
+    /** @var array<string, Variable> */
+    private array $superglobalVars = [];
 
     public Runtime $runtime;
     
@@ -56,6 +60,25 @@ class Context {
     public function declareFunction(Func $func): void {
         $lcname = strtolower($func->getName());
         $this->functions[$lcname] = $func;
+    }
+
+    public function ensureSuperglobal(string $name): Variable
+    {
+        if (!Superglobals::isSuperglobalName($name)) {
+            throw new \InvalidArgumentException("Unknown superglobal: {$name}");
+        }
+        if (!isset($this->superglobalVars[$name])) {
+            $var = new Variable(Variable::TYPE_ARRAY);
+            $var->array(new HashTable());
+            $this->superglobalVars[$name] = $var;
+        }
+
+        return $this->superglobalVars[$name];
+    }
+
+    public function getSuperglobal(string $name): ?Variable
+    {
+        return $this->superglobalVars[$name] ?? null;
     }
 
     public function save(Frame $frame): RunStackEntry {
