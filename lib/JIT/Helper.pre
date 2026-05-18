@@ -181,6 +181,61 @@ restart:
                         goto return_bool;
                 }
                 break;
+            case TYPE_PAIR_NATIVE_LONG_NATIVE_BOOL:
+                if (OpCode::TYPE_IDENTICAL === $opcode->type) {
+                    compile {
+                        $result = 0;
+                    }
+                    goto return_bool;
+                }
+                if (OpCode::TYPE_EQUAL === $opcode->type) {
+                    compile {
+                        $result = $leftValue == $rightValue;
+                    }
+                    goto return_bool;
+                }
+                break;
+            case TYPE_PAIR_NATIVE_BOOL_NATIVE_LONG:
+                if (OpCode::TYPE_IDENTICAL === $opcode->type) {
+                    compile {
+                        $result = 0;
+                    }
+                    goto return_bool;
+                }
+                if (OpCode::TYPE_EQUAL === $opcode->type) {
+                    compile {
+                        $result = $leftValue == $rightValue;
+                    }
+                    goto return_bool;
+                }
+                break;
+            case TYPE_PAIR_NATIVE_BOOL_NATIVE_BOOL:
+                switch ($opcode->type) {
+                    case OpCode::TYPE_IDENTICAL:
+                    case OpCode::TYPE_EQUAL:
+                        compile {
+                            $result = $leftValue == $rightValue;
+                        }
+                        goto return_bool;
+                    case OpCode::TYPE_NOT_EQUAL:
+                        compile {
+                            $result = $leftValue != $rightValue;
+                        }
+                        goto return_bool;
+                }
+                break;
+        }
+        if (Variable::TYPE_VALUE === $leftType && Variable::TYPE_VALUE !== $rightType) {
+            if (OpCode::TYPE_IDENTICAL === $opcode->type) {
+                $result = JitValueCompare::identicalToNative($this->context, $left, $right);
+                goto return_bool;
+            }
+        }
+        if (Variable::TYPE_VALUE === $rightType && Variable::TYPE_VALUE !== $leftType) {
+            if (OpCode::TYPE_IDENTICAL === $opcode->type) {
+                $result = JitValueCompare::identicalNativeToValue($this->context, $left, $right);
+                goto return_bool;
+            }
         }
         $type = $opcode->getType();
         throw new \LogicException("Reached end of switch, can't handle binary operation yet: $type for type pair {$leftType} and {$rightType}");

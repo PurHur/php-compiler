@@ -439,6 +439,51 @@ restart:
                         goto return_bool;
                 }
                 break;
+            case TYPE_PAIR_NATIVE_LONG_NATIVE_BOOL:
+                if (OpCode::TYPE_IDENTICAL === $opcode->type) {
+                    $result = $leftValue->typeOf()->constInt(0, false);
+                    goto return_bool;
+                }
+                if (OpCode::TYPE_EQUAL === $opcode->type) {
+                    $__right = $this->context->builder->zExt($rightValue, $leftValue->typeOf());
+                    $result = $this->context->builder->icmp(\PHPLLVM\Builder::INT_EQ, $leftValue, $__right);
+                    goto return_bool;
+                }
+                break;
+            case TYPE_PAIR_NATIVE_BOOL_NATIVE_LONG:
+                if (OpCode::TYPE_IDENTICAL === $opcode->type) {
+                    $result = $leftValue->typeOf()->constInt(0, false);
+                    goto return_bool;
+                }
+                if (OpCode::TYPE_EQUAL === $opcode->type) {
+                    $__left = $this->context->builder->zExt($leftValue, $rightValue->typeOf());
+                    $result = $this->context->builder->icmp(\PHPLLVM\Builder::INT_EQ, $__left, $rightValue);
+                    goto return_bool;
+                }
+                break;
+            case TYPE_PAIR_NATIVE_BOOL_NATIVE_BOOL:
+                switch ($opcode->type) {
+                    case OpCode::TYPE_IDENTICAL:
+                    case OpCode::TYPE_EQUAL:
+                        $result = $this->context->builder->icmp(\PHPLLVM\Builder::INT_EQ, $leftValue, $rightValue);
+                        goto return_bool;
+                    case OpCode::TYPE_NOT_EQUAL:
+                        $result = $this->context->builder->icmp(\PHPLLVM\Builder::INT_NE, $leftValue, $rightValue);
+                        goto return_bool;
+                }
+                break;
+        }
+        if (Variable::TYPE_VALUE === $leftType && Variable::TYPE_VALUE !== $rightType) {
+            if (OpCode::TYPE_IDENTICAL === $opcode->type) {
+                $result = JitValueCompare::identicalToNative($this->context, $left, $right);
+                goto return_bool;
+            }
+        }
+        if (Variable::TYPE_VALUE === $rightType && Variable::TYPE_VALUE !== $leftType) {
+            if (OpCode::TYPE_IDENTICAL === $opcode->type) {
+                $result = JitValueCompare::identicalNativeToValue($this->context, $left, $right);
+                goto return_bool;
+            }
         }
         $type = $opcode->getType();
         throw new \LogicException("Reached end of switch, can't handle binary operation yet: $type for type pair {$leftType} and {$rightType}");

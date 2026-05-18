@@ -635,9 +635,27 @@ class JIT {
                     );
 
                     return;
+                case Variable::TYPE_VALUE:
+                    $loaded = $this->context->builder->load($this->context->helper->loadValue($value));
+                    $this->context->builder->store($loaded, $result->value);
+
+                    return;
                 default:
                     throw new \LogicException("Source type: {$value->type}");
             }
+        } elseif ($result->type === Variable::TYPE_NATIVE_LONG && Variable::TYPE_VALUE === $value->type) {
+            $longVal = $this->context->builder->call(
+                $this->context->lookupFunction('__value__readLong'),
+                $this->context->helper->loadValue($value)
+            );
+            $this->context->builder->store($longVal, $result->value);
+
+            return;
+        } elseif (Variable::TYPE_VALUE === $result->type && Variable::TYPE_VALUE === $value->type) {
+            $loaded = $this->context->builder->load($this->context->helper->loadValue($value));
+            $this->context->builder->store($loaded, $result->value);
+
+            return;
         }
         throw new \LogicException("Cannot assign operands of different types (yet): {$value->type}, {$result->type}");
     }
