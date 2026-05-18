@@ -11,7 +11,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** rawurlencode() for strings (subset of PHP; VM only). */
+/** rawurlencode() for strings (subset of PHP; JIT/AOT via __string__rawurlencode). */
 final class rawurlencode extends Internal
 {
     public function execute(Frame $frame): void
@@ -31,6 +31,25 @@ final class rawurlencode extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('rawurlencode() is not implemented for JIT in this compiler build');
+        if (1 !== \count($args)) {
+            throw new \LogicException('rawurlencode() requires exactly one argument');
+        }
+
+        return JitUrlencode::rawurlencode($context, self::jitStringArg($context, $args[0]));
+    }
+
+    private static function jitStringArg(Context $context, JITVariable $arg): Value
+    {
+        if (JITVariable::TYPE_STRING === $arg->type) {
+            return $context->helper->loadValue($arg);
+        }
+        if (JITVariable::TYPE_VALUE === $arg->type) {
+            return $context->builder->call(
+                $context->lookupFunction('__value__readString'),
+                $arg->value
+            );
+        }
+
+        throw new \LogicException('rawurlencode() only supports strings in this compiler build');
     }
 }
