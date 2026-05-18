@@ -16,6 +16,13 @@ final class SuperglobalInit
     /** @var array<string, \PHPLLVM\Value> */
     public static array $globals = [];
 
+    public static function declareRefresh(Context $context): void
+    {
+        $signature = $context->context->functionType($context->context->voidType(), false);
+        $fn = $context->module->addFunction('__superglobals__refresh', $signature);
+        $context->registerFunction('__superglobals__refresh', $fn);
+    }
+
     public static function initialize(Context $context): void
     {
         self::$globals = [];
