@@ -169,11 +169,27 @@ abstract class BaseTest extends TestCase {
         ];
         $pipes = [];
         $repoRoot = \dirname(__DIR__, 2);
+        $env = null;
+        if (isset($sections['ENV'])) {
+            $env = [];
+            foreach (explode("\n", trim($sections['ENV'])) as $line) {
+                $line = trim($line);
+                if ('' === $line) {
+                    continue;
+                }
+                $parts = explode('=', $line, 2);
+                if (2 !== count($parts)) {
+                    throw new \LogicException("Invalid ENV line: {$line}");
+                }
+                $env[$parts[0]] = $parts[1];
+            }
+        }
         $proc = proc_open(
             array_merge($this->phpCommand(), [$this->BIN]),
             $descriptorSepc,
             $pipes,
-            $repoRoot
+            $repoRoot,
+            $env
         );
         fwrite($pipes[0], $code);
         fclose($pipes[0]);

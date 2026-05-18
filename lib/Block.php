@@ -14,8 +14,12 @@ namespace PHPCompiler;
 use PHPCfg\Func;
 use PHPCfg\Block as CfgBlock;
 use PHPCfg\Operand;
+use PHPCfg\Operand\Literal;
+use PHPCfg\Operand\Temporary;
+use PHPCfg\Operand\Variable as VarOperand;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\Variable;
+use PHPCompiler\Web\Superglobals;
 
 class Block { 
 
@@ -117,8 +121,8 @@ class Block {
                 if (!$found) {
                     throw new \LogicException("Could not resolve argument");
                 }
-            } else { 
-                $scope[$pos] = new Variable(Variable::TYPE_NULL);
+            } else {
+                $scope[$pos] = self::initialVariableForOperand($op, $context);
             }
         }
 
@@ -127,6 +131,43 @@ class Block {
             $return->returnVar = $frame->returnVar;
         }
         return $return;
+    }
+
+    private static function initialVariableForOperand(Operand $op, Context $context): Variable
+    {
+        $name = self::resolveVariableName($op);
+        if (null !== $name && Superglobals::isSuperglobalName($name)) {
+            $existing = $context->getSuperglobal($name);
+            if (null !== $existing) {
+                return $existing;
+            }
+
+            return $context->ensureSuperglobal($name);
+        }
+
+        return new Variable(Variable::TYPE_NULL);
+    }
+
+    private static function resolveVariableName(Operand $op): ?string
+    {
+        while ($op instanceof Temporary) {
+            if (null === $op->original) {
+                return null;
+            }
+            $op = $op->original;
+        }
+        if (!$op instanceof VarOperand) {
+            return null;
+        }
+        $nameOp = $op->name;
+        if (!$nameOp instanceof Literal) {
+            return null;
+        }
+        if (Variable::mapFromType($nameOp->type) !== Variable::TYPE_STRING) {
+            return null;
+        }
+
+        return $nameOp->value;
     }
 
 
