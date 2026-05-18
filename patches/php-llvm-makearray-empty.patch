@@ -1,0 +1,12 @@
+--- vendor/ircmaxell/php-llvm/ffi/llvm9.php
++++ vendor/ircmaxell/php-llvm/ffi/llvm9.php
+@@ -1803,6 +1803,9 @@ class llvm {
+     }
+ 
+     public function makeArray(string $class, array $elements) {
++        if (count($elements) === 0) {
++            return null;
++        }
+         $type = $class::getType();
+         if (substr($type, -1) !== "*") {
+             throw new \LogicException("Attempting to make a non-pointer element into an array");

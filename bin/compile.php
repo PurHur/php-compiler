@@ -10,24 +10,28 @@ declare(strict_types=1);
  */
 
 use PHPCompiler\Runtime;
+use PHPCompiler\Web\Superglobals;
 
 function run(string $filename, string $code, array $options): void
 {
     $runtime = new Runtime(Runtime::MODE_AOT);
+    $queryString = $options['-q'] ?? null;
+    $postBody = $options['-p'] ?? null;
+    Superglobals::populateFromEnvironment(
+        $runtime->vmContext,
+        is_string($queryString) ? $queryString : null,
+        is_string($postBody) ? $postBody : null
+    );
     $block = $runtime->parseAndCompile($code, $filename);
     if (! isset($options['-l'])) {
         if (! isset($options['-o']) || $options['-o'] === true) {
             $options['-o'] = str_replace('.php', '', $filename);
         }
-        $debugFile = null;
         if (isset($options['-y'])) {
-            if ($options['-y'] === true) {
-                $debugFile = $options['-o'];
-            } else {
-                $debugFile = $options['-y'];
-            }
+            $debugFile = true === $options['-y'] ? $options['-o'] : $options['-y'];
+            $runtime->setDebug($debugFile);
         }
-        $runtime->standalone($block, $options['-o'], $debugFile);
+        $runtime->standalone($block, $options['-o']);
     }
 }
 

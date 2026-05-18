@@ -17,6 +17,7 @@ use PHPCompiler\VM\Variable as VMVariable;
 use PHPTypes\Type;
 
 use PHPLLVM;
+use PHPCompiler\AOT\Linker;
 
 class Context {
 
@@ -179,17 +180,10 @@ class Context {
         if (!is_null($this->debugFile)) {
             $machine->emitToFile($this->module, $this->debugFile . '.s', $machine::CODEGEN_FILE_TYPE_ASM);
         }
-        $machine->emitToFile($this->module, $file . '.o', $machine::CODEGEN_FILE_TYPE_OBJECT);
-        $clangFiles = ['clang', 'clang-9', 'clang-8', 'clang-7', 'clang-4.0'];
-        foreach ($clangFiles as $clang) {
-            $test = exec('which ' . $clang);
-            if ($test !== '') {
-                exec($clang . '  ' . escapeshellarg($file . '.o') . ' -o ' . escapeshellarg($file));
-                unlink($file . '.o');
-                return;
-            }
-        }
-        throw new \LogicException('No supported version of clang found, is it installed?');
+        $objectFile = $file . '.o';
+        $machine->emitToFile($this->module, $objectFile, $machine::CODEGEN_FILE_TYPE_OBJECT);
+        Linker::link($objectFile, $file);
+        unlink($objectFile);
     }
 
     public function compileInPlace() {
