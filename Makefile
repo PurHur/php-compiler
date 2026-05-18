@@ -89,7 +89,7 @@ SERVE_ADDR ?= 127.0.0.1:8080
 SERVE_ROOT ?= examples/001-SimpleWeb
 .PHONY: serve
 serve:
-	./script/php-local.sh bin/serve.php $(SERVE_ADDR) $(SERVE_ROOT)
+	./phpc serve $(SERVE_ADDR) $(SERVE_ROOT)
 
 .PHONY: test-18
 test-18: rebuild-changed
