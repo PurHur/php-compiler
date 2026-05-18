@@ -68,6 +68,10 @@ final class boolval extends Internal
 
     public static function isTruthy(Variable $v): bool
     {
+        $v = $v->resolveIndirect();
+        if ($v->isUndefined()) {
+            return false;
+        }
         switch ($v->type) {
             case Variable::TYPE_NULL:
                 return false;
@@ -81,6 +85,10 @@ final class boolval extends Internal
                 $s = $v->toString();
 
                 return '' !== $s && '0' !== $s;
+            case Variable::TYPE_ARRAY:
+                return $v->toArray()->getNumElements() > 0;
+            case Variable::TYPE_OBJECT:
+                return true;
             default:
                 throw new \LogicException('boolval() does not support this value type in this compiler build');
         }

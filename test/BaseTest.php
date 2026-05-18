@@ -129,8 +129,12 @@ abstract class BaseTest extends TestCase {
      * @return list<string>
      */
     protected function phpCommand(): array {
-        $php = getenv('PHP_COMPILER_PHP') ?: PHP_BINARY;
-        $cmd = [$php];
+        $phpEnv = getenv('PHP_COMPILER_PHP');
+        if (false !== $phpEnv && '' !== $phpEnv) {
+            $cmd = preg_split('/\s+/', $phpEnv);
+        } else {
+            $cmd = [PHP_BINARY];
+        }
         $extDir = getenv('PHP_COMPILER_EXT_DIR') ?: '/usr/lib/php/20220829';
         if (is_dir($extDir)) {
             foreach (['tokenizer', 'mbstring', 'dom', 'xml', 'xmlwriter', 'ffi'] as $ext) {
