@@ -106,6 +106,8 @@ class Module extends ModuleAbstract
             new basename(),
             new getenv_(),
             new putenv_(),
+            new scandir(),
+            new glob_(),
         ];
     }
 
