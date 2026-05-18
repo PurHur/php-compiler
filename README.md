@@ -73,6 +73,16 @@ curl 'http://127.0.0.1:8080/example.php?name=Dev'
 
 `bin/serve.php` sets CGI-style superglobals and runs scripts through the VM (same path as `bin/vm.php` with `-q` / `-p`).
 
+To serve a precompiled AOT binary (CGI env per request, static files from docroot):
+
+```console
+phpc build -o .phpc/bin/app examples/001-SimpleWeb/example.php
+phpc serve --aot 127.0.0.1:8080 examples/001-SimpleWeb
+curl 'http://127.0.0.1:8080/example.php?name=Dev'
+```
+
+Use `--binary path` or a `phpc.json` `"binary"` field to point at the executable. AOT binaries refresh `$_GET` / `$_SERVER` from `QUERY_STRING` and related env on each run; pass `-q` to `phpc build` to bake superglobals for static pages instead.
+
 Uncaught errors return HTTP 500 with a generic body. Set `PHP_COMPILER_DEBUG=1` to include the exception class, message, and stack trace in the response (details are always logged to stderr).
 
 Non-`.php` files under the docroot (for example `style.css`) are served as static assets with a guessed `Content-Type`; path segments containing `..` are rejected.

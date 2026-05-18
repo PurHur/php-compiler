@@ -162,6 +162,9 @@ class Context {
         }
 
         SuperglobalInit::initialize($this);
+        if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
+            SuperglobalInit::declareRefresh($this);
+        }
     }
 
     public function compileToFile(string $file) {
@@ -172,6 +175,9 @@ class Context {
             $block = $main->appendBasicBlock('main');
             $this->builder->positionAtEnd($block);
             $this->builder->call($this->initFunc);
+            if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
+                $this->builder->call($this->lookupFunction('__superglobals__refresh'));
+            }
             $this->builder->call($this->main);
             $this->builder->call($this->shutdownFunc);
             $this->builder->returnVoid();

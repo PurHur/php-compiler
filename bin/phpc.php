@@ -8,6 +8,7 @@ declare(strict_types=1);
  *
  * Usage:
  *   phpc serve [host:port] [docroot]
+ *   phpc serve --aot [host:port] [docroot] [--binary path]
  *   phpc run script.php [args...]
  *   phpc build [-o outfile] entry.php
  *   phpc test [-- phpunit/ci-local args...]
@@ -22,10 +23,12 @@ if ([] === $args || in_array($args[0], ['-h', '--help', 'help'], true)) {
     fwrite(STDOUT, <<<'HELP'
 php-compiler CLI
 
-  phpc serve [host:port] [docroot]   Start HTTP dev server (VM)
-  phpc run <script.php> [args...]    Run a script in the VM
-  phpc build [-o out] <entry.php>    AOT compile to a native binary
-  phpc test [args...]                Run ./script/ci-local.sh
+  phpc serve [host:port] [docroot]              Start HTTP dev server (VM)
+  phpc serve --aot [host:port] [docroot]        Serve precompiled AOT binary (CGI env)
+      [--binary path]                           Explicit binary or phpc.json "binary"
+  phpc run <script.php> [args...]              Run a script in the VM
+  phpc build [-o out] <entry.php>               AOT compile to a native binary
+  phpc test [args...]                           Run ./script/ci-local.sh
 
 HELP);
     exit([] === $args ? 1 : 0);
@@ -35,9 +38,18 @@ $command = array_shift($args);
 
 switch ($command) {
     case 'serve':
-        $listen = $args[0] ?? '127.0.0.1:8080';
-        $docroot = $args[1] ?? 'examples/001-SimpleWeb';
-        exit(runProcess(array_merge($php, [$repoRoot.'/bin/serve.php', $listen, $docroot]), $repoRoot));
+        $aot = false;
+        $serveArgs = [];
+        while ([] !== $args) {
+            $arg = array_shift($args);
+            if ('--aot' === $arg) {
+                $aot = true;
+                continue;
+            }
+            $serveArgs[] = $arg;
+        }
+        $script = $aot ? $repoRoot.'/bin/serve-aot.php' : $repoRoot.'/bin/serve.php';
+        exit(runProcess(array_merge($php, array_merge([$script], $serveArgs)), $repoRoot));
 
     case 'run':
         if ([] === $args) {

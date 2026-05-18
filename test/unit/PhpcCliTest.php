@@ -28,6 +28,7 @@ final class PhpcCliTest extends TestCase
         fclose($pipes[2]);
         proc_close($proc);
         $this->assertStringContainsString('phpc serve', $out !== false ? $out : '');
+        $this->assertStringContainsString('phpc serve --aot', $out !== false ? $out : '');
         $this->assertStringContainsString('phpc run', $out !== false ? $out : '');
         $this->assertStringContainsString('phpc build', $out !== false ? $out : '');
         $this->assertStringContainsString('phpc test', $out !== false ? $out : '');
