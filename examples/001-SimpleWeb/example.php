@@ -11,11 +11,10 @@ declare(strict_types=1);
  *   QUERY_STRING='name=World' ./simpleweb
  * Or: phpc build -o .phpc/bin/app example.php && phpc serve --aot examples/001-SimpleWeb
  * $_GET is read from QUERY_STRING at runtime (see lib/AOT/runtime/superglobals_refresh.c).
- * Pass -q at compile time to bake $_GET for static pages instead.
+ * Optional: pass -q at compile time to bake $_GET for static-only builds.
  * $_SERVER['REQUEST_METHOD'] and $_REQUEST are populated automatically (see lib/Web/Superglobals.php).
  */
-// For AOT, pass the query at compile time: -q 'name=World' or QUERY_STRING=name=World
-// $_GET is populated from that string during compilation (see SuperglobalInit).
+// AOT: set QUERY_STRING (or use phpc serve --aot); compile-time -q is optional.
 $name = $_GET['name'];
 header('Content-Type: text/html; charset=UTF-8');
 echo '<!DOCTYPE html><html><head><link rel="stylesheet" href="/style.css"></head><body>';
