@@ -8,7 +8,15 @@ declare(strict_types=1);
  * putenv('LD_LIBRARY_PATH') does not affect in-process dlopen on glibc; preload bundled
  * dependencies with dlopen(RTLD_GLOBAL) before libLLVM is opened via FFI.
  */
-$llvmDir = dirname(__DIR__) . '/.llvm';
+$repoRoot = dirname(__DIR__);
+$llvmDir = '';
+if (is_file($repoRoot.'/.llvm/libLLVM-9.so.1')) {
+    $llvmDir = $repoRoot.'/.llvm';
+} elseif (getenv('PHP_COMPILER_LLVM_PATH') && is_file(getenv('PHP_COMPILER_LLVM_PATH').'/libLLVM-9.so.1')) {
+    $llvmDir = getenv('PHP_COMPILER_LLVM_PATH');
+} elseif (is_file('/opt/llvm9/libLLVM-9.so.1')) {
+    $llvmDir = '/opt/llvm9';
+}
 
 /**
  * @param list<string> $names Basenames under $dir (e.g. libffi.so.7).
@@ -50,7 +58,7 @@ function php_compiler_preload_llvm_deps(string $dir, array $names): void
     }
 }
 
-if (is_file($llvmDir . '/libLLVM-9.so.1')) {
+if ('' !== $llvmDir && is_file($llvmDir . '/libLLVM-9.so.1')) {
     putenv('PHP_COMPILER_LLVM_PATH=' . $llvmDir);
     $ldPath = getenv('LD_LIBRARY_PATH');
     putenv('LD_LIBRARY_PATH=' . $llvmDir . (false === $ldPath || '' === $ldPath ? '' : ':' . $ldPath));
@@ -58,7 +66,7 @@ if (is_file($llvmDir . '/libLLVM-9.so.1')) {
     $_SERVER['LD_LIBRARY_PATH'] = $_ENV['LD_LIBRARY_PATH'];
     php_compiler_preload_llvm_deps($llvmDir, ['libffi.so.7']);
 }
-if (is_executable($llvmDir . '/clang-9')) {
+if ('' !== $llvmDir && is_executable($llvmDir . '/clang-9')) {
     $path = getenv('PATH');
     putenv('PATH=' . $llvmDir . (false === $path ? '' : ':' . $path));
     $_ENV['PATH'] = getenv('PATH');

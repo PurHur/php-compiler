@@ -16,17 +16,10 @@ class JITTest extends BaseTest {
 
     public function setUp(): void {
         $this->BIN = realpath(__DIR__ . '/../../bin/jit.php');
-        $llvmDir = dirname(__DIR__, 2).'/.llvm';
-        if (is_file($llvmDir.'/libLLVM-9.so.1')) {
-            $prefix = realpath($llvmDir) ?: $llvmDir;
-            if ('' === getenv('PHP_COMPILER_LLVM_PATH')) {
-                putenv('PHP_COMPILER_LLVM_PATH='.$prefix);
-            }
-        }
-        try {
-            \PHPLLVM\Chooser::choose();
-        } catch (\Throwable $e) {
-            $this->markTestSkipped('LLVM not available for JIT tests: '.$e->getMessage());
+        if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
+            $this->markTestSkipped(
+                'LLVM 9 toolchain not available. Run script/install-llvm9.sh or use the 22.04-dev Docker image.'
+            );
         }
     }
 
