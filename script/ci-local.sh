@@ -17,8 +17,10 @@ fi
 "${COMPOSER[@]}" install --no-interaction --ignore-platform-reqs 2>/dev/null || true
 
 chmod +x script/install-llvm9.sh script/apply-patches.sh 2>/dev/null || true
-if [[ -x script/install-llvm9.sh ]]; then
-  script/install-llvm9.sh || true
+if [[ -z "${PHP_COMPILER_LLVM_PATH:-}" || ! -f "${PHP_COMPILER_LLVM_PATH}/libLLVM-9.so.1" ]]; then
+  if [[ -x script/install-llvm9.sh ]]; then
+    script/install-llvm9.sh || true
+  fi
 fi
 if [[ -x script/apply-patches.sh ]]; then
   script/apply-patches.sh || true
@@ -27,9 +29,9 @@ fi
 "$PHP_BIN" "${PHP_OPTS[@]}" script/capability-matrix.php --check
 "$PHP_BIN" "${PHP_OPTS[@]}" script/bootstrap-inventory.php --check
 
-LLVM_DIR="$(cd "$(dirname "$0")/.." && pwd)/.llvm"
+LLVM_DIR="${PHP_COMPILER_LLVM_PATH:-$(cd "$(dirname "$0")/.." && pwd)/.llvm}"
 if [[ -f "$LLVM_DIR/libLLVM-9.so.1" ]]; then
-  echo "LLVM 9 found: JIT compliance, AOT fixtures (simple_web_*, static_web), and ExampleWebAotTest will run."
+  echo "LLVM 9 found at $LLVM_DIR: JIT compliance, AOT fixtures (simple_web_*, static_web), and ExampleWebAotTest will run."
 else
   echo "LLVM 9 missing: @group llvm tests (JIT, AOT, web AOT) are skipped. Run: script/install-llvm9.sh"
 fi

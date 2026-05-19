@@ -93,11 +93,15 @@ Docker is optional on a normal dev machine. On **Runforge / harness hosts** (no 
 
 ### Container development (PHP 8.2, Ubuntu 22.04)
 
-Build the dev image once:
+Build the dev image once (from the repository root; LLVM 9 is baked into `/opt/llvm9`):
 
 ```console
 make docker-build-22
+# equivalent:
+docker build -f Docker/dev/ubuntu-22.04/Dockerfile -t php-compiler:22.04-dev .
 ```
+
+When you bind-mount the repo, a host `.llvm/` directory (if present) overrides the image toolchain; otherwise `PHP_COMPILER_LLVM_PATH` defaults to `/opt/llvm9` and JIT/AOT tests run without re-downloading.
 
 Run the full local CI suite inside the container (same as `./script/ci-local.sh` on the host):
 

@@ -20,12 +20,22 @@ if ! command -v "$PHP_BIN" >/dev/null 2>&1; then
   done
 fi
 export PHP_COMPILER_EXT_DIR="${PHP_COMPILER_EXT_DIR:-/usr/lib/php/20220829}"
-LLVM_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/.llvm"
-if [[ -f "$LLVM_DIR/libLLVM-9.so.1" ]]; then
-  export LD_LIBRARY_PATH="$LLVM_DIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-  export PATH="$LLVM_DIR${PATH:+:$PATH}"
-  export PHP_COMPILER_LLVM_PATH="$LLVM_DIR"
+_REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+_REPO_LLVM="$_REPO_ROOT/.llvm"
+_LLVM_DIR=""
+if [[ -f "$_REPO_LLVM/libLLVM-9.so.1" ]]; then
+  _LLVM_DIR="$_REPO_LLVM"
+elif [[ -n "${PHP_COMPILER_LLVM_PATH:-}" && -f "${PHP_COMPILER_LLVM_PATH}/libLLVM-9.so.1" ]]; then
+  _LLVM_DIR="$PHP_COMPILER_LLVM_PATH"
+elif [[ -f /opt/llvm9/libLLVM-9.so.1 ]]; then
+  _LLVM_DIR=/opt/llvm9
 fi
+if [[ -n "$_LLVM_DIR" ]]; then
+  export LD_LIBRARY_PATH="$_LLVM_DIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+  export PATH="$_LLVM_DIR${PATH:+:$PATH}"
+  export PHP_COMPILER_LLVM_PATH="$_LLVM_DIR"
+fi
+unset _REPO_ROOT _REPO_LLVM _LLVM_DIR
 EXT_DIR="$PHP_COMPILER_EXT_DIR"
 PHP_OPTS=()
 if [[ -d "$EXT_DIR" ]]; then
