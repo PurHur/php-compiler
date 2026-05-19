@@ -61,6 +61,10 @@ final class JitValueCompare
                 $matches = $context->builder->icmp(Builder::INT_EQ, $stored, $nativeLong);
 
                 return $context->builder->select($sameType, $matches, $falseVal);
+            case Variable::TYPE_NULL:
+                $nullTag = $i8->constInt(Variable::TYPE_NULL, false);
+
+                return $context->builder->icmp(Builder::INT_EQ, $typeByte, $nullTag);
             default:
                 return $falseVal;
         }
@@ -128,7 +132,12 @@ final class JitValueCompare
             $context->lookupFunction('__value__readString'),
             $rightPtr
         );
-        $cmp = $context->builder->call($context->lookupFunction('strcmp'), $leftStr, $rightStr);
+        $stringMap = $context->structFieldMap['__string__'];
+        $cmp = $context->builder->call(
+            $context->lookupFunction('strcmp'),
+            $context->builder->structGep($leftStr, $stringMap['value']),
+            $context->builder->structGep($rightStr, $stringMap['value'])
+        );
         $stringsMatch = $context->builder->icmp(Builder::INT_EQ, $cmp, $cmp->typeOf()->constInt(0, false));
         $stringIdentical = $context->builder->and($bothString, $stringsMatch);
 

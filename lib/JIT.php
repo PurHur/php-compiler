@@ -460,23 +460,22 @@ class JIT {
                     break;
                 // case OpCode::TYPE_CASE:
                 case OpCode::TYPE_JUMP:
-                    $newBlock = $this->compileBlockInternal($func, $op->block1, ...$args);
                     $branchBlock = $builder->getInsertBlock();
+                    $builder->positionAtEnd($branchBlock);
+                    $newBlock = $this->compileBlockInternal($func, $op->block1, ...$args);
                     $builder->positionAtEnd($branchBlock);
                     $this->context->freeDeadVariables($func, $branchBlock, $block);
                     $builder->branch($newBlock);
                     return $origBasicBlock;
                 case OpCode::TYPE_JUMPIF:
-                    $if = $this->compileBlockInternal($func, $op->block1, ...$args);
-                    $else = $this->compileBlockInternal($func, $op->block2, ...$args);
-
                     $branchBlock = $builder->getInsertBlock();
                     $builder->positionAtEnd($branchBlock);
-
                     $condition = $this->context->castToBool(
                         $this->context->helper->loadValue($this->context->getVariableFromOp($block->getOperand($op->arg1)))
                     );
-
+                    $if = $this->compileBlockInternal($func, $op->block1, ...$args);
+                    $else = $this->compileBlockInternal($func, $op->block2, ...$args);
+                    $builder->positionAtEnd($branchBlock);
                     $this->context->freeDeadVariables($func, $branchBlock, $block);
                     $builder->branchIf($condition, $if, $else);
                     return $origBasicBlock;
