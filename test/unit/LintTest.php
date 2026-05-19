@@ -34,6 +34,24 @@ PHP;
         $this->assertStringContainsString('#99', $exit['stdout']);
     }
 
+    public function testLintShiftAssignReportsIssue136(): void
+    {
+        $code = '<?php $x <<= 1;';
+        $exit = $this->runLint(['-r', $code]);
+        $this->assertSame(1, $exit['code']);
+        $this->assertStringContainsString('#136', $exit['stdout']);
+        $this->assertStringContainsString('Expr_BinaryOp_ShiftLeft', $exit['stdout']);
+    }
+
+    public function testLintYieldReportsIssue167(): void
+    {
+        $code = '<?php function f() { yield 1; }';
+        $exit = $this->runLint(['-r', $code]);
+        $this->assertSame(1, $exit['code']);
+        $this->assertStringContainsString('#167', $exit['stdout']);
+        $this->assertStringNotContainsString('#114', $exit['stdout']);
+    }
+
     public function testLintCleanScriptExitsZero(): void
     {
         $code = '<?php echo "ok";';
