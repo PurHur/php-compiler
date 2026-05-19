@@ -129,6 +129,61 @@ PHP;
         @unlink($outfile);
     }
 
+    public function testCookieFromHttpCookieEnv(): void
+    {
+        $source = <<<'PHP'
+<?php
+declare(strict_types=1);
+header('Content-Type: text/plain; charset=UTF-8');
+echo $_COOKIE['session'];
+PHP;
+
+        $outfile = tempnam(sys_get_temp_dir(), 'phpc_cookie_');
+        $this->assertNotFalse($outfile);
+        unlink($outfile);
+
+        $repoRoot = dirname(__DIR__, 2);
+        $env = $this->llvmProcessEnv($repoRoot);
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+
+        $compile = proc_open(
+            array_merge(
+                self::llvmEnvPrefix(),
+                self::phpCommand(),
+                [$this->compileBin, '-o', $outfile]
+            ),
+            $descriptorSpec,
+            $pipes,
+            $repoRoot,
+            $env
+        );
+        fwrite($pipes[0], $source);
+        fclose($pipes[0]);
+        $compileErr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        proc_close($compile);
+        $this->assertFileExists($outfile, trim($compileErr !== false ? $compileErr : ''));
+
+        $runEnv = $env;
+        $runEnv['HTTP_COOKIE'] = 'session=abc123';
+        $runEnv['SCRIPT_NAME'] = '/index.php';
+        $runEnv['REQUEST_URI'] = '/index.php';
+        $output = $this->runBinary($outfile, $runEnv);
+        $this->assertStringContainsString('abc123', $output);
+
+        $runEnv['HTTP_COOKIE'] = 'session=xyz789';
+        $output2 = $this->runBinary($outfile, $runEnv);
+        $this->assertStringContainsString('xyz789', $output2);
+        $this->assertStringNotContainsString('abc123', $output2);
+
+        @unlink($outfile);
+    }
+
     public function testHttpHostFromCgiEnvironment(): void
     {
         $source = <<<'PHP'

@@ -61,8 +61,22 @@ final class Superglobals
             $postBody = false === $fromEnv ? '' : $fromEnv;
         }
         self::populatePost($context, $postBody);
+        $cookieHeader = getenv('HTTP_COOKIE');
+        self::populateCookie(
+            $context,
+            false === $cookieHeader ? '' : $cookieHeader
+        );
         self::populateServer($context, $queryString, $postBody);
         self::populateRequest($context);
+    }
+
+    /**
+     * Parse a CGI HTTP_COOKIE / Cookie header into $_COOKIE (issue #271).
+     */
+    public static function populateCookie(Context $context, string $cookieHeader): void
+    {
+        $cookie = $context->ensureSuperglobal('_COOKIE');
+        self::populateCookieHeader($cookie->toArray(), $cookieHeader);
     }
 
     /**
@@ -327,6 +341,32 @@ final class Superglobals
         $params = [];
         parse_str($body, $params);
         self::mergeParsedParams($ht, $params);
+    }
+
+    private static function populateCookieHeader(HashTable $ht, string $header): void
+    {
+        if ('' === $header) {
+            return;
+        }
+        foreach (explode(';', $header) as $segment) {
+            $segment = trim($segment);
+            if ('' === $segment) {
+                continue;
+            }
+            $decoded = urldecode($segment);
+            $eq = strpos($decoded, '=');
+            if (false === $eq) {
+                continue;
+            }
+            $name = substr($decoded, 0, $eq);
+            if ('' === $name) {
+                continue;
+            }
+            $value = substr($decoded, $eq + 1);
+            $params = [];
+            parse_str($name.'='.$value, $params);
+            self::mergeParsedParams($ht, $params);
+        }
     }
 
     /**

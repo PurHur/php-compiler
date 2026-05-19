@@ -205,11 +205,12 @@ static void sg_set_nested_value(__hashtable__ *root, sg_parsed_key *pk, const ch
     set_string_key(ht, leaf, value);
 }
 
-static void parse_form_encoded(__hashtable__ *ht, const char *body)
+static void parse_delimited_pairs(__hashtable__ *ht, const char *body, char delimiter, int decode_pair_first)
 {
     char *copy;
     char *pair;
     char *saveptr;
+    char delim[2];
 
     if (NULL == body || '\0' == body[0]) {
         return;
@@ -220,13 +221,19 @@ static void parse_form_encoded(__hashtable__ *ht, const char *body)
         return;
     }
 
-    pair = strtok_r(copy, "&", &saveptr);
+    delim[0] = delimiter;
+    delim[1] = '\0';
+    pair = strtok_r(copy, delim, &saveptr);
     while (NULL != pair) {
-        char *eq = strchr(pair, '=');
+        char *eq;
         char *raw_key;
         char *raw_val;
         sg_parsed_key pk;
 
+        if (decode_pair_first) {
+            sg_url_decode_inplace(pair);
+        }
+        eq = strchr(pair, '=');
         if (NULL != eq) {
             *eq = '\0';
             raw_key = pair;
@@ -236,21 +243,33 @@ static void parse_form_encoded(__hashtable__ *ht, const char *body)
             raw_val = (char *) "";
         }
         if ('\0' == raw_key[0]) {
-            pair = strtok_r(NULL, "&", &saveptr);
+            pair = strtok_r(NULL, delim, &saveptr);
             continue;
         }
-        sg_url_decode_inplace(raw_key);
-        sg_url_decode_inplace(raw_val);
+        if (!decode_pair_first) {
+            sg_url_decode_inplace(raw_key);
+            sg_url_decode_inplace(raw_val);
+        }
         if (0 == sg_parse_key_brackets(raw_key, &pk)) {
             sg_set_nested_value(ht, &pk, raw_val);
         } else {
             set_string_key(ht, raw_key, raw_val);
         }
         sg_free_parsed_key(&pk);
-        pair = strtok_r(NULL, "&", &saveptr);
+        pair = strtok_r(NULL, delim, &saveptr);
     }
 
     free(copy);
+}
+
+static void parse_form_encoded(__hashtable__ *ht, const char *body)
+{
+    parse_delimited_pairs(ht, body, '&', 0);
+}
+
+static void parse_cookie_header(__hashtable__ *ht, const char *header)
+{
+    parse_delimited_pairs(ht, header, ';', 1);
 }
 
 static const char *env_or_empty(const char *name)
@@ -509,9 +528,8 @@ void __superglobals__refresh(void)
     apply_cgi_headers_from_environ(sg_SERVER);
     apply_scheme_and_port(sg_SERVER);
 
-    if (NULL == sg_COOKIE) {
-        sg_COOKIE = __hashtable__alloc();
-    }
+    sg_COOKIE = __hashtable__alloc();
+    parse_cookie_header(sg_COOKIE, env_or_empty("HTTP_COOKIE"));
     if (NULL == sg_ENV) {
         sg_ENV = __hashtable__alloc();
     }
