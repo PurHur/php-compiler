@@ -128,15 +128,7 @@ final class ServeAotTest extends TestCase
     private function llvmEnv(): array
     {
         $env = [];
-        $llvmDir = $this->repoRoot.'/.llvm';
-        if (is_file($llvmDir.'/libLLVM-9.so.1')) {
-            $prefix = realpath($llvmDir) ?: $llvmDir;
-            $env['PHP_COMPILER_LLVM_PATH'] = $prefix;
-            $ld = getenv('LD_LIBRARY_PATH');
-            $env['LD_LIBRARY_PATH'] = false === $ld || '' === $ld ? $prefix : $prefix.':'.$ld;
-            $path = getenv('PATH');
-            $env['PATH'] = false === $path || '' === $path ? $prefix : $prefix.':'.$path;
-        }
+        LlvmToolchain::applyProcessEnv($env, $this->repoRoot);
 
         return $env;
     }
@@ -197,18 +189,7 @@ final class ServeAotTest extends TestCase
         if (null !== self::$llvmReady) {
             return self::$llvmReady;
         }
-        $llvmDir = dirname(__DIR__, 2).'/.llvm';
-        if (!is_file($llvmDir.'/libLLVM-9.so.1')) {
-            self::$llvmReady = false;
-
-            return false;
-        }
-        try {
-            \PHPLLVM\Chooser::choose();
-            self::$llvmReady = true;
-        } catch (\Throwable $e) {
-            self::$llvmReady = false;
-        }
+        self::$llvmReady = LlvmToolchain::isReady(dirname(__DIR__, 2));
 
         return self::$llvmReady;
     }
@@ -218,21 +199,6 @@ final class ServeAotTest extends TestCase
      */
     private static function llvmEnvPrefix(): array
     {
-        $llvmDir = dirname(__DIR__, 2).'/.llvm';
-        if (!is_file($llvmDir.'/libLLVM-9.so.1')) {
-            return [];
-        }
-        $prefix = realpath($llvmDir) ?: $llvmDir;
-        $ld = getenv('LD_LIBRARY_PATH');
-        $ldVal = false === $ld || '' === $ld ? $prefix : $prefix.':'.$ld;
-        $path = getenv('PATH');
-        $pathVal = false === $path || '' === $path ? $prefix : $prefix.':'.$path;
-
-        return [
-            'env',
-            'LD_LIBRARY_PATH='.$ldVal,
-            'PATH='.$pathVal,
-            'PHP_COMPILER_LLVM_PATH='.$prefix,
-        ];
+        return LlvmToolchain::envPrefix(dirname(__DIR__, 2));
     }
 }

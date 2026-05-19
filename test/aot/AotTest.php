@@ -32,23 +32,7 @@ final class AotTest extends BaseTest
         if (null !== self::$llvmReady) {
             return self::$llvmReady;
         }
-        $llvmDir = dirname(__DIR__, 2).'/.llvm';
-        if (!is_file($llvmDir.'/libLLVM-9.so.1')) {
-            self::$llvmReady = false;
-
-            return false;
-        }
-        if ('' === getenv('PHP_COMPILER_LLVM_PATH')) {
-            putenv('PHP_COMPILER_LLVM_PATH='.$llvmDir);
-            $_ENV['PHP_COMPILER_LLVM_PATH'] = $llvmDir;
-            $_SERVER['PHP_COMPILER_LLVM_PATH'] = $llvmDir;
-        }
-        try {
-            \PHPLLVM\Chooser::choose();
-            self::$llvmReady = true;
-        } catch (\Throwable $e) {
-            self::$llvmReady = false;
-        }
+        self::$llvmReady = LlvmToolchain::isReady(dirname(__DIR__, 2));
 
         return self::$llvmReady;
     }
@@ -77,15 +61,7 @@ final class AotTest extends BaseTest
                 $env[$key] = $value;
             }
         }
-        $llvmDir = dirname(__DIR__, 2).'/.llvm';
-        if (is_file($llvmDir.'/libLLVM-9.so.1')) {
-            $prefix = realpath($llvmDir) ?: $llvmDir;
-            $env['PHP_COMPILER_LLVM_PATH'] = $prefix;
-            $ld = $env['LD_LIBRARY_PATH'] ?? '';
-            $env['LD_LIBRARY_PATH'] = '' === $ld ? $prefix : $prefix.':'.$ld;
-            $path = $env['PATH'] ?? '';
-            $env['PATH'] = '' === $path ? $prefix : $prefix.':'.$path;
-        }
+        LlvmToolchain::applyProcessEnv($env, $repoRoot);
         if (isset($sections['ENV'])) {
             foreach (explode("\n", trim($sections['ENV'])) as $line) {
                 $line = trim($line);
