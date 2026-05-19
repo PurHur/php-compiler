@@ -756,3 +756,216 @@ __string__ *__compiler_number_format(
 
     return cstr_to_string(buf);
 }
+
+static int st_is_space(char ch)
+{
+    return ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r' || ch == '\v' || ch == '\f';
+}
+
+static int st_is_tag_char(char ch)
+{
+    return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9');
+}
+
+static int st_find_substr(const char *hay, size_t hlen, const char *needle, size_t nlen, size_t from)
+{
+    size_t i;
+
+    if (nlen == 0 || from + nlen > hlen) {
+        return -1;
+    }
+    for (i = from; i + nlen <= hlen; i++) {
+        if (memcmp(hay + i, needle, nlen) == 0) {
+            return (int) i;
+        }
+    }
+
+    return -1;
+}
+
+static void st_tolower_buf(char *buf, size_t len)
+{
+    size_t i;
+
+    for (i = 0; i < len; i++) {
+        if (buf[i] >= 'A' && buf[i] <= 'Z') {
+            buf[i] = (char) (buf[i] - 'A' + 'a');
+        }
+    }
+}
+
+static int st_extract_tag_name(const char *content, size_t clen, char *out, size_t out_cap)
+{
+    size_t i = 0;
+    size_t start;
+
+    while (i < clen && st_is_space(content[i])) {
+        i++;
+    }
+    if (i < clen && content[i] == '/') {
+        i++;
+    }
+    if (i >= clen) {
+        return 0;
+    }
+    start = i;
+    while (i < clen) {
+        char ch = content[i];
+        if (st_is_space(ch) || ch == '>' || ch == '/') {
+            break;
+        }
+        if (!st_is_tag_char(ch)) {
+            return 0;
+        }
+        i++;
+    }
+    if (start == i || i - start >= out_cap) {
+        return 0;
+    }
+    memcpy(out, content + start, i - start);
+    out[i - start] = '\0';
+    st_tolower_buf(out, i - start);
+
+    return 1;
+}
+
+static int st_tag_allowed(const char *name, const char *allowed_tags[], int allowed_count)
+{
+    int i;
+
+    for (i = 0; i < allowed_count; i++) {
+        if (strcmp(name, allowed_tags[i]) == 0) {
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+static int st_parse_allowed(const char *allowed, size_t alen, char tags[][32], int max_tags)
+{
+    int count = 0;
+    size_t i = 0;
+
+    while (i < alen && count < max_tags) {
+        int gt;
+        char content[128];
+        size_t clen;
+
+        if (allowed[i] != '<') {
+            i++;
+            continue;
+        }
+        gt = st_find_substr(allowed, alen, ">", 1, i + 1);
+        if (gt < 0) {
+            break;
+        }
+        clen = (size_t) gt - i - 1;
+        if (clen >= sizeof(content)) {
+            clen = sizeof(content) - 1;
+        }
+        memcpy(content, allowed + i + 1, clen);
+        content[clen] = '\0';
+        if (st_extract_tag_name(content, clen, tags[count], sizeof(tags[0]))) {
+            count++;
+        }
+        i = (size_t) gt + 1;
+    }
+
+    return count;
+}
+
+/**
+ * LLVM/AOT runtime: strip_tags() subset (mirrors VmString::stripTags).
+ */
+__string__ *__compiler_strip_tags(__string__ *input, __string__ *allowed)
+{
+    const char *src;
+    size_t slen;
+    const char *allow_src = "";
+    size_t alen = 0;
+    char allowed_list[32][32];
+    int allowed_count = 0;
+    char *out;
+    size_t out_cap;
+    size_t out_len = 0;
+    size_t i = 0;
+
+    src = nf_strdata(input);
+    slen = nf_strlen(input);
+    if (allowed != NULL) {
+        allow_src = nf_strdata(allowed);
+        alen = nf_strlen(allowed);
+        if (alen > 0) {
+            allowed_count = st_parse_allowed(allow_src, alen, allowed_list, 32);
+        }
+    }
+    out_cap = slen + 1;
+    out = (char *) malloc(out_cap);
+    if (out == NULL) {
+        return cstr_to_string("");
+    }
+
+    while (i < slen) {
+        if (src[i] != '<') {
+            out[out_len++] = src[i++];
+            continue;
+        }
+        if (i + 3 < slen && memcmp(src + i, "<!--", 4) == 0) {
+            int end = st_find_substr(src, slen, "-->", 3, i + 4);
+            if (end >= 0) {
+                i = (size_t) end + 3;
+                continue;
+            }
+        }
+        if (i + 1 < slen && memcmp(src + i, "<?", 2) == 0) {
+            int end = st_find_substr(src, slen, "?>", 2, i + 2);
+            if (end >= 0) {
+                i = (size_t) end + 2;
+                continue;
+            }
+        }
+        {
+            int gt = st_find_substr(src, slen, ">", 1, i + 1);
+            char tag_name[32];
+            char content[256];
+            size_t clen;
+
+            if (gt < 0) {
+                out[out_len++] = src[i++];
+                continue;
+            }
+            clen = (size_t) gt - i - 1;
+            if (clen >= sizeof(content)) {
+                clen = sizeof(content) - 1;
+            }
+            memcpy(content, src + i + 1, clen);
+            content[clen] = '\0';
+            if (st_extract_tag_name(content, clen, tag_name, sizeof(tag_name))
+                && allowed_count > 0 && st_tag_allowed(tag_name, allowed_list, allowed_count)) {
+                size_t tag_len = (size_t) gt - i + 1;
+                if (out_len + tag_len >= out_cap) {
+                    out_cap = out_cap * 2 + tag_len;
+                    {
+                        char *grown = (char *) realloc(out, out_cap);
+                        if (grown == NULL) {
+                            free(out);
+                            return cstr_to_string("");
+                        }
+                        out = grown;
+                    }
+                }
+                memcpy(out + out_len, src + i, tag_len);
+                out_len += tag_len;
+            }
+            i = (size_t) gt + 1;
+        }
+    }
+    out[out_len] = '\0';
+    {
+        __string__ *result = cstr_to_string(out);
+        free(out);
+
+        return result;
+    }
+}

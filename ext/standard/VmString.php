@@ -354,6 +354,134 @@ final class VmString
     }
 
     /**
+     * strip_tags() subset: removes HTML/PHP tags; optional allow-list like "<b><p>".
+     * HTML comments and PHP tags remove their inner content; other tags keep inner text.
+     */
+    public static function stripTags(string $string, ?string $allowedTags = null): string
+    {
+        $allowed = null === $allowedTags || '' === $allowedTags
+            ? []
+            : self::parseAllowedTags($allowedTags);
+        $out = '';
+        $len = self::byteLength($string);
+        $i = 0;
+        while ($i < $len) {
+            $ch = $string[$i];
+            if ('<' !== $ch) {
+                $out .= $ch;
+                ++$i;
+                continue;
+            }
+            if ($i + 3 < $len && '<!--' === self::byteSlice($string, $i, 4)) {
+                $end = self::findSubstring($string, '-->', $i + 4);
+                if (false !== $end) {
+                    $i = $end + 3;
+                    continue;
+                }
+            }
+            if ($i + 1 < $len && '<?' === self::byteSlice($string, $i, 2)) {
+                $end = self::findSubstring($string, '?>', $i + 2);
+                if (false !== $end) {
+                    $i = $end + 2;
+                    continue;
+                }
+            }
+            $gt = self::findSubstring($string, '>', $i + 1);
+            if (false === $gt) {
+                $out .= $ch;
+                ++$i;
+                continue;
+            }
+            $tagContent = self::byteSlice($string, $i + 1, $gt - $i - 1);
+            $tagName = self::extractTagName($tagContent);
+            if (null !== $tagName && [] !== $allowed && self::isTagAllowed($tagName, $allowed)) {
+                $out .= self::byteSlice($string, $i, $gt - $i + 1);
+            }
+            $i = $gt + 1;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function parseAllowedTags(string $allowedTags): array
+    {
+        $tags = [];
+        $len = self::byteLength($allowedTags);
+        $i = 0;
+        while ($i < $len) {
+            if ('<' !== $allowedTags[$i]) {
+                ++$i;
+                continue;
+            }
+            $gt = self::findSubstring($allowedTags, '>', $i + 1);
+            if (false === $gt) {
+                break;
+            }
+            $name = self::extractTagName(self::byteSlice($allowedTags, $i + 1, $gt - $i - 1));
+            if (null !== $name && '' !== $name) {
+                $tags[] = $name;
+            }
+            $i = $gt + 1;
+        }
+
+        return $tags;
+    }
+
+    private static function extractTagName(string $tagContent): ?string
+    {
+        $len = self::byteLength($tagContent);
+        $i = 0;
+        while ($i < $len && self::isTagWhitespace($tagContent[$i])) {
+            ++$i;
+        }
+        if ($i < $len && '/' === $tagContent[$i]) {
+            ++$i;
+        }
+        if ($i >= $len) {
+            return null;
+        }
+        $start = $i;
+        while ($i < $len) {
+            $ch = $tagContent[$i];
+            if (self::isTagWhitespace($ch) || '>' === $ch || '/' === $ch) {
+                break;
+            }
+            if (!ctype_alpha($ch) && !ctype_digit($ch)) {
+                return null;
+            }
+            ++$i;
+        }
+        if ($start === $i) {
+            return null;
+        }
+
+        return strtolower(self::byteSlice($tagContent, $start, $i - $start));
+    }
+
+    /**
+     * @param list<string> $allowed
+     */
+    private static function isTagAllowed(string $tagName, array $allowed): bool
+    {
+        $tagName = strtolower($tagName);
+        foreach ($allowed as $name) {
+            if ($tagName === $name) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static function isTagWhitespace(string $ch): bool
+    {
+        return str_contains(self::TRIM_DEFAULT, $ch);
+    }
+
+    /**
      * @return list<string>
      */
     public static function explode(string $delimiter, string $string): array
