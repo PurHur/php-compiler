@@ -8,9 +8,9 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 193 |
+| PHP files on vm.php path | 195 |
 | Source constructs flagged (blockers) | 10 |
-| Source constructs flagged (warnings) | 515 |
+| Source constructs flagged (warnings) | 518 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -49,7 +49,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/JitStringIndex.php` | 0 | 1 |
 | `ext/standard/JitStrpos.php` | 0 | 1 |
 | `ext/standard/JitUrlencode.php` | 0 | 1 |
-| `ext/standard/Module.php` | 0 | 93 |
+| `ext/standard/Module.php` | 0 | 94 |
 | `ext/standard/VmFs.php` | 0 | 3 |
 | `ext/standard/VmNumberFormat.php` | 0 | 1 |
 | `ext/standard/VmString.php` | 0 | 2 |
@@ -93,6 +93,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/header_.php` | 0 | 1 |
 | `ext/standard/hexdec.php` | 0 | 1 |
 | `ext/standard/htmlspecialchars.php` | 0 | 1 |
+| `ext/standard/http_response_code.php` | 0 | 1 |
 | `ext/standard/implode.php` | 0 | 1 |
 | `ext/standard/in_array.php` | 0 | 1 |
 | `ext/standard/int_max.php` | 0 | 1 |
@@ -217,6 +218,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `lib/VM/Variable.php` | 0 | 4 |
 | `lib/Web/DevServer.php` | 0 | 1 |
 | `lib/Web/ProjectManifest.php` | 0 | 1 |
+| `lib/Web/ResponseContext.php` | 0 | 1 |
 | `lib/Web/Superglobals.php` | 0 | 5 |
 | `src/macro_functions.php` | 0 | 1 |
 
@@ -392,16 +394,17 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new str_split (line 101)
 - new htmlspecialchars (line 102)
 - new header_ (line 103)
-- new urlencode (line 104)
-- new rawurlencode (line 105)
-- new parse_url (line 106)
-- new dirname (line 107)
-- new basename (line 108)
-- new realpath (line 109)
-- new getenv_ (line 110)
-- new putenv_ (line 111)
-- new scandir (line 112)
-- new glob_ (line 113)
+- new http_response_code (line 104)
+- new urlencode (line 105)
+- new rawurlencode (line 106)
+- new parse_url (line 107)
+- new dirname (line 108)
+- new basename (line 109)
+- new realpath (line 110)
+- new getenv_ (line 111)
+- new putenv_ (line 112)
+- new scandir (line 113)
+- new glob_ (line 114)
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/VmFs.php`
@@ -633,6 +636,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 
 **Warnings** (review for bootstrap subset):
 - 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/http_response_code.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/implode.php`
 
@@ -1484,6 +1492,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/Web/ResponseContext.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/Web/Superglobals.php`
 

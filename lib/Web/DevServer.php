@@ -310,11 +310,20 @@ final class DevServer
     {
         $reason = [
             200 => 'OK',
+            201 => 'Created',
+            204 => 'No Content',
+            301 => 'Moved Permanently',
+            302 => 'Found',
             400 => 'Bad Request',
+            401 => 'Unauthorized',
             403 => 'Forbidden',
             404 => 'Not Found',
+            405 => 'Method Not Allowed',
+            422 => 'Unprocessable Entity',
             500 => 'Internal Server Error',
-        ][$status] ?? 'OK';
+            502 => 'Bad Gateway',
+            503 => 'Service Unavailable',
+        ][$status] ?? 'Unknown';
 
         $out = "HTTP/1.1 {$status} {$reason}\r\n";
         $out .= "Content-Type: {$contentType}\r\n";
