@@ -33,6 +33,33 @@ final class PhpcCliTest extends TestCase
         $this->assertStringContainsString('phpc build', $out !== false ? $out : '');
         $this->assertStringContainsString('phpc test', $out !== false ? $out : '');
         $this->assertStringContainsString('phpc lint', $out !== false ? $out : '');
+        $this->assertStringContainsString('-q', $out !== false ? $out : '');
+        $this->assertStringContainsString('$_GET', $out !== false ? $out : '');
+    }
+
+    public function testRunSimpleWebWithQueryFlag(): void
+    {
+        $repoRoot = dirname(__DIR__, 2);
+        $script = $repoRoot.'/examples/001-SimpleWeb/example.php';
+        $cmd = array_merge(
+            self::phpCommand(),
+            [$repoRoot.'/bin/phpc.php', 'run', '-q', 'name=Dev', $script]
+        );
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open($cmd, $descriptorSpec, $pipes, $repoRoot);
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $out = stream_get_contents($pipes[1]);
+        $err = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+        $this->assertSame(0, $exit, $err !== false ? $err : '');
+        $this->assertStringContainsString('Hello Dev', $out !== false ? $out : '');
     }
 
     /**

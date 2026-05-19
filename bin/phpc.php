@@ -9,7 +9,7 @@ declare(strict_types=1);
  * Usage:
  *   phpc serve [host:port] [docroot]
  *   phpc serve --aot [host:port] [docroot] [--binary path]
- *   phpc run script.php [args...]
+ *   phpc run [-q 'name=World'] [-p 'field=val'] script.php [args...]
  *   phpc build [-o outfile] entry.php
  *   phpc lint [-r 'code'] [--json] entry.php
  *   phpc test [-- phpunit/ci-local args...]
@@ -27,7 +27,10 @@ php-compiler CLI
   phpc serve [host:port] [docroot]              Start HTTP dev server (VM)
   phpc serve --aot [host:port] [docroot]        Serve precompiled AOT binary (CGI env)
       [--binary path]                           Explicit binary or phpc.json "binary"
-  phpc run <script.php> [args...]              Run a script in the VM
+  phpc run <script.php> [vm.php flags...]      Run a script in the VM
+      -q 'name=World'                          CGI-style QUERY_STRING → $_GET
+      -p 'field=value'                         CGI-style POST body → $_POST
+      Example: phpc run -q 'name=Dev' examples/001-SimpleWeb/example.php
   phpc build [-o out] <entry.php>               AOT compile to a native binary
   phpc lint [-r 'code'] [--json] <entry.php>    Report unsupported syntax (line-accurate)
   phpc test [args...]                           Run ./script/ci-local.sh
