@@ -36,12 +36,41 @@ else
   echo "LLVM 9 missing: @group llvm tests (JIT, AOT, web AOT) are skipped. Run: script/install-llvm9.sh"
 fi
 
-# Full suite includes test/real/ServeTest.php (bin/serve.php HTTP). Set
-# PHP_COMPILER_SKIP_SERVE_TESTS=1 in sandboxes that cannot bind TCP ports.
+# HTTP serve integration tests (ServeTest, ServeAotTest) need loopback TCP.
+# GitHub Actions sets PHP_COMPILER_SKIP_SERVE_TESTS=1; local/Docker CI must not.
+can_bind_loopback() {
+  "$PHP_BIN" "${PHP_OPTS[@]}" script/can-bind-loopback.php
+}
+
+configure_serve_tests() {
+  if [[ -n "${PHP_COMPILER_SKIP_SERVE_TESTS:-}" ]]; then
+    echo "HTTP serve integration tests skipped (PHP_COMPILER_SKIP_SERVE_TESTS is set)."
+    return
+  fi
+  if [[ "${PHP_COMPILER_RUN_SERVE_TESTS:-}" == "1" ]]; then
+    echo "HTTP serve integration tests forced (PHP_COMPILER_RUN_SERVE_TESTS=1)."
+    return
+  fi
+  if can_bind_loopback; then
+    echo "Loopback TCP bind OK: ServeTest and ServeAotTest will run."
+    return
+  fi
+  export PHP_COMPILER_SKIP_SERVE_TESTS=1
+  echo "Cannot bind 127.0.0.1 — skipping @group serve tests."
+  echo "  Set PHP_COMPILER_RUN_SERVE_TESTS=1 to force, or PHP_COMPILER_SKIP_SERVE_TESTS=1 to silence."
+}
+
+configure_serve_tests
+
 echo "PHPUnit: VM, compliance (no LLVM), real-world (includes ExamplesCompileTest VM lint/smoke)..."
-"$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit --exclude-group llvm "$@"
+"$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit --exclude-group llvm,serve "$@"
+
+if [[ -z "${PHP_COMPILER_SKIP_SERVE_TESTS:-}" ]]; then
+  echo "PHPUnit: HTTP serve (bin/serve.php, phpc serve --aot)..."
+  "$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit --group serve "$@"
+fi
 
 if [[ -f "$LLVM_DIR/libLLVM-9.so.1" ]]; then
   echo "PHPUnit: JIT, AOT (web fixtures + examples, ExamplesCompileTest AOT lint)..."
-  "$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit --group llvm "$@"
+  "$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit --group llvm --exclude-group serve "$@"
 fi

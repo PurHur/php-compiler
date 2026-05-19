@@ -10,6 +10,7 @@ use PHPUnit\Framework\TestCase;
  * Integration tests for phpc serve --aot (issue #213).
  *
  * @group llvm
+ * @group serve
  */
 final class ServeAotTest extends TestCase
 {
