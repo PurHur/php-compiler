@@ -20,6 +20,7 @@ need=0
 [[ -f "$LLVM_DIR/gcc/9/crtbegin.o" ]] || need=1
 [[ -f "$LLVM_DIR/libedit.so.2" ]] || need=1
 [[ -f "$LLVM_DIR/libz3.so.4" ]] || need=1
+[[ -f "$LLVM_DIR/libjansson.so.4" ]] || need=1
 need_headers=0
 [[ -f "$LLVM_DIR/sysroot/usr/include/stdio.h" ]] || need_headers=1
 if [[ "$need" -eq 0 && "$need_headers" -eq 0 ]]; then
@@ -119,6 +120,17 @@ fi
 if [[ ! -f "$LLVM_DIR/libz3.so.4" ]]; then
   dir="$(fetch_deb "http://deb.debian.org/debian/pool/main/z/z3/libz3-4_4.8.12-3.1_amd64.deb" libz3-4.deb)"
   install -m 644 "$dir/usr/lib/x86_64-linux-gnu/libz3.so.4" "$LLVM_DIR/libz3.so.4"
+fi
+
+# Bundled ld (binutils 2.40) needs libjansson at runtime on minimal images.
+if [[ ! -f "$LLVM_DIR/libjansson.so.4" ]]; then
+  dir="$(fetch_deb "http://deb.debian.org/debian/pool/main/j/jansson/libjansson4_2.14-2_amd64.deb" libjansson4.deb)"
+  shopt -s nullglob
+  for lib in "$dir"/usr/lib/x86_64-linux-gnu/libjansson.so.4.*; do
+    install -m 644 "$lib" "$LLVM_DIR/$(basename "$lib")"
+    ln -sf "$(basename "$lib")" "$LLVM_DIR/libjansson.so.4"
+  done
+  shopt -u nullglob
 fi
 
 echo "LLVM 9 toolchain installed under $LLVM_DIR"
