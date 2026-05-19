@@ -8,9 +8,9 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 192 |
+| PHP files on vm.php path | 193 |
 | Source constructs flagged (blockers) | 10 |
-| Source constructs flagged (warnings) | 514 |
+| Source constructs flagged (warnings) | 515 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -44,6 +44,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/JitRealpath.php` | 0 | 1 |
 | `ext/standard/JitStrPad.php` | 0 | 1 |
 | `ext/standard/JitStrRepeat.php` | 0 | 1 |
+| `ext/standard/JitStrReplace.php` | 0 | 1 |
 | `ext/standard/JitStringConcat.php` | 0 | 1 |
 | `ext/standard/JitStringIndex.php` | 0 | 1 |
 | `ext/standard/JitStrpos.php` | 0 | 1 |
@@ -277,6 +278,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/JitStrRepeat.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/JitStrReplace.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
@@ -809,7 +815,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `ext/standard/str_replace.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/str_split.php`
 
@@ -1048,10 +1054,10 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new JIT\Call\Native (line 149)
 - new ext\standard\boolval (line 249)
 - new Variable (line 413)
-- new Variable (line 712)
-- new Operand\Literal (line 782)
-- new Operand\Literal (line 786)
-- new Operand\Literal (line 790)
+- new Variable (line 718)
+- new Operand\Literal (line 788)
+- new Operand\Literal (line 792)
+- new Operand\Literal (line 796)
 - 11 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Analyzer.php`

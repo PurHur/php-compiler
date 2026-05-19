@@ -72,5 +72,12 @@ fi
 
 if [[ -f "$LLVM_DIR/libLLVM-9.so.1" ]]; then
   echo "PHPUnit: JIT, AOT (web fixtures + examples, ExamplesCompileTest AOT lint)..."
-  "$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit --group llvm --exclude-group serve "$@"
+  LLVM_JUNIT="$(mktemp "${TMPDIR:-/tmp}/llvm-junit.XXXXXX.xml")"
+  "$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit --group llvm --exclude-group serve --log-junit "$LLVM_JUNIT" "$@"
+  if [[ -n "${PHP_COMPILER_ALLOW_JIT_SKIP:-}" ]]; then
+    echo "JIT compliance guard skipped (PHP_COMPILER_ALLOW_JIT_SKIP is set)."
+  else
+    "$PHP_BIN" "${PHP_OPTS[@]}" script/check-jit-compliance-ran.php "$LLVM_JUNIT" "$LLVM_DIR"
+  fi
+  rm -f "$LLVM_JUNIT"
 fi
