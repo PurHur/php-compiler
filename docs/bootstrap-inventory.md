@@ -8,9 +8,9 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 196 |
+| PHP files on vm.php path | 199 |
 | Source constructs flagged (blockers) | 10 |
-| Source constructs flagged (warnings) | 523 |
+| Source constructs flagged (warnings) | 527 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -40,6 +40,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/JitHtmlspecialchars.php` | 0 | 1 |
 | `ext/standard/JitImplode.php` | 0 | 1 |
 | `ext/standard/JitNumberFormat.php` | 0 | 1 |
+| `ext/standard/JitParseUrl.php` | 0 | 1 |
 | `ext/standard/JitPath.php` | 0 | 1 |
 | `ext/standard/JitRealpath.php` | 0 | 1 |
 | `ext/standard/JitStrPad.php` | 0 | 1 |
@@ -47,9 +48,10 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/JitStrReplace.php` | 0 | 1 |
 | `ext/standard/JitStringConcat.php` | 0 | 1 |
 | `ext/standard/JitStringIndex.php` | 0 | 1 |
+| `ext/standard/JitStripTags.php` | 0 | 1 |
 | `ext/standard/JitStrpos.php` | 0 | 1 |
 | `ext/standard/JitUrlencode.php` | 0 | 1 |
-| `ext/standard/Module.php` | 0 | 94 |
+| `ext/standard/Module.php` | 0 | 95 |
 | `ext/standard/VmFs.php` | 0 | 3 |
 | `ext/standard/VmNumberFormat.php` | 0 | 1 |
 | `ext/standard/VmString.php` | 0 | 2 |
@@ -135,6 +137,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/string_ltrim.php` | 0 | 1 |
 | `ext/standard/string_rtrim.php` | 0 | 1 |
 | `ext/standard/string_trim.php` | 0 | 1 |
+| `ext/standard/strip_tags.php` | 0 | 1 |
 | `ext/standard/strncmp.php` | 0 | 1 |
 | `ext/standard/strpos.php` | 0 | 1 |
 | `ext/standard/strrev.php` | 0 | 1 |
@@ -265,6 +268,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 **Warnings** (review for bootstrap subset):
 - 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `ext/standard/JitParseUrl.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `ext/standard/JitPath.php`
 
 **Warnings** (review for bootstrap subset):
@@ -299,6 +307,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 
 **Warnings** (review for bootstrap subset):
 - 5 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/JitStripTags.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/JitStrpos.php`
 
@@ -394,18 +407,19 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new str_pad (line 100)
 - new str_split (line 101)
 - new htmlspecialchars (line 102)
-- new header_ (line 103)
-- new http_response_code (line 104)
-- new urlencode (line 105)
-- new rawurlencode (line 106)
-- new parse_url (line 107)
-- new dirname (line 108)
-- new basename (line 109)
-- new realpath (line 110)
-- new getenv_ (line 111)
-- new putenv_ (line 112)
-- new scandir (line 113)
-- new glob_ (line 114)
+- new strip_tags (line 103)
+- new header_ (line 104)
+- new http_response_code (line 105)
+- new urlencode (line 106)
+- new rawurlencode (line 107)
+- new parse_url (line 108)
+- new dirname (line 109)
+- new basename (line 110)
+- new realpath (line 111)
+- new getenv_ (line 112)
+- new putenv_ (line 113)
+- new scandir (line 114)
+- new glob_ (line 115)
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/VmFs.php`
@@ -423,7 +437,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `ext/standard/VmString.php`
 
 **Warnings** (review for bootstrap subset):
-- 40 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 45 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 - 1 closure(s)
 
 ### `ext/standard/abs.php`
@@ -857,6 +871,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 
 **Warnings** (review for bootstrap subset):
 - 5 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/strip_tags.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/strncmp.php`
 

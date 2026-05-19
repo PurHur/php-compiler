@@ -100,6 +100,7 @@ class Module extends ModuleAbstract
             new str_pad(),
             new str_split(),
             new htmlspecialchars(),
+            new strip_tags(),
             new header_(),
             new http_response_code(),
             new urlencode(),

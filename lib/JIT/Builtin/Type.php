@@ -45,6 +45,14 @@ class Type extends Builtin {
         );
         $fnNumberFormat = $this->context->module->addFunction('__compiler_number_format', $fntypeNumberFormat);
         $this->context->registerFunction('__compiler_number_format', $fnNumberFormat);
+        $fntypeStripTags = $this->context->context->functionType(
+            $this->context->getTypeFromString('__string__*'),
+            false,
+            $this->context->getTypeFromString('__string__*'),
+            $this->context->getTypeFromString('__string__*')
+        );
+        $fnStripTags = $this->context->module->addFunction('__compiler_strip_tags', $fntypeStripTags);
+        $this->context->registerFunction('__compiler_strip_tags', $fnStripTags);
         $i8p = $this->context->getTypeFromString('int8*');
         $i32 = $this->context->getTypeFromString('int32');
         $sizeT = $this->context->getTypeFromString('size_t');
