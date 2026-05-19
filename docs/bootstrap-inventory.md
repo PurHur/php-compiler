@@ -8,9 +8,9 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 195 |
+| PHP files on vm.php path | 196 |
 | Source constructs flagged (blockers) | 10 |
-| Source constructs flagged (warnings) | 518 |
+| Source constructs flagged (warnings) | 523 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -197,9 +197,10 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `lib/JIT/SuperglobalInit.php` | 0 | 3 |
 | `lib/JIT/ValueEchoHelper.php` | 0 | 1 |
 | `lib/JIT/Variable.php` | 0 | 18 |
+| `lib/Lint/IncrementDetector.php` | 0 | 4 |
 | `lib/Lint/Issue.php` | 0 | 2 |
 | `lib/Lint/LintCompiler.php` | 0 | 6 |
-| `lib/Lint/Linter.php` | 0 | 4 |
+| `lib/Lint/Linter.php` | 0 | 5 |
 | `lib/Lint/UnsupportedRegistry.php` | 0 | 1 |
 | `lib/Module.php` | 0 | 1 |
 | `lib/ModuleAbstract.php` | 0 | 1 |
@@ -1318,6 +1319,14 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new Variable (line 473)
 - 15 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `lib/Lint/IncrementDetector.php`
+
+**Warnings** (review for bootstrap subset):
+- new ParserFactory (line 34)
+- new NodeTraverser (line 56)
+- new Issue (line 63)
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `lib/Lint/Issue.php`
 
 **Warnings** (review for bootstrap subset):
@@ -1338,8 +1347,9 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 
 **Warnings** (review for bootstrap subset):
 - new Runtime (line 24)
-- new State (line 83)
-- new LintCompiler (line 98)
+- new IncrementDetector (line 44)
+- new State (line 86)
+- new LintCompiler (line 101)
 - 9 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/Lint/UnsupportedRegistry.php`

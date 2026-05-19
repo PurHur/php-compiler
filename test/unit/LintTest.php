@@ -52,6 +52,22 @@ PHP;
         $this->assertStringNotContainsString('#114', $exit['stdout']);
     }
 
+    public function testLintPreIncReportsIssue137(): void
+    {
+        $exit = $this->runLint(['-r', '++$i;']);
+        $this->assertSame(1, $exit['code']);
+        $this->assertStringContainsString('#137', $exit['stdout']);
+        $this->assertStringContainsString('Expr_PreInc', $exit['stdout']);
+    }
+
+    public function testLintPostIncReportsIssue137(): void
+    {
+        $exit = $this->runLint(['-r', '$i++;']);
+        $this->assertSame(1, $exit['code']);
+        $this->assertStringContainsString('#137', $exit['stdout']);
+        $this->assertStringContainsString('Expr_PostInc', $exit['stdout']);
+    }
+
     public function testLintCleanScriptExitsZero(): void
     {
         $code = '<?php echo "ok";';
