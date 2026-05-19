@@ -101,7 +101,7 @@ LOCAL_DEV_IMAGE ?= php-compiler:22.04-dev
 
 .PHONY: docker-build-22
 docker-build-22:
-	docker build -t $(LOCAL_DEV_IMAGE) -t $(PHP_COMPILER_DEV_IMAGE) Docker/dev/ubuntu-22.04
+	docker build -f Docker/dev/ubuntu-22.04/Dockerfile -t $(LOCAL_DEV_IMAGE) -t $(PHP_COMPILER_DEV_IMAGE) .
 
 # Run full local CI inside Docker (mount repo; harness hosts may need: tar | docker run -i …)
 .PHONY: test-docker

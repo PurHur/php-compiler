@@ -1,0 +1,7 @@
+.git
+.llvm
+vendor
+node_modules
+*.o
+*.a
+build/

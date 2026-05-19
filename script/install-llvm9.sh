@@ -2,7 +2,7 @@
 # Fetch libLLVM-9, clang-9, linker, and crt bits for AOT/JIT on hosts with only LLVM 17+.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-LLVM_DIR="$ROOT/.llvm"
+LLVM_DIR="${PHP_COMPILER_LLVM_INSTALL_DIR:-$ROOT/.llvm}"
 DEB_BASE="http://deb.debian.org/debian/pool/main/l/llvm-toolchain-9"
 BINUTILS_BASE="http://deb.debian.org/debian/pool/main/b/binutils"
 GCC9_BASE="http://deb.debian.org/debian/pool/main/g/gcc-9"
