@@ -101,6 +101,7 @@ class Module extends ModuleAbstract
             new str_split(),
             new htmlspecialchars(),
             new header_(),
+            new http_response_code(),
             new urlencode(),
             new rawurlencode(),
             new parse_url(),

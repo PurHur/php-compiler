@@ -17,12 +17,14 @@ require __DIR__.'/../vendor/autoload.php';
 
 use PHPCompiler\Runtime;
 use PHPCompiler\Web\DevServer;
+use PHPCompiler\Web\ResponseContext;
 use PHPCompiler\Web\Superglobals;
 
 $listen = $argv[1] ?? '127.0.0.1:8080';
 $docroot = $argv[2] ?? getcwd();
 
 DevServer::run($listen, $docroot, static function (string $script, array $cgiEnv): array {
+    ResponseContext::reset();
     $code = file_get_contents($script);
     if (false === $code) {
         throw new \RuntimeException('Could not read script');
@@ -46,7 +48,7 @@ DevServer::run($listen, $docroot, static function (string $script, array $cgiEnv
 
     $responseHeaders = headers_list();
     header_remove();
-    $status = 200;
+    $status = ResponseContext::getStatus();
     $contentType = 'text/html; charset=UTF-8';
     foreach ($responseHeaders as $line) {
         if (stripos($line, 'Content-Type:') === 0) {

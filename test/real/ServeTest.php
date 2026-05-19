@@ -74,6 +74,20 @@ final class ServeTest extends TestCase
     $this->assertStringNotContainsString('hidden', $response);
   }
 
+  public function testHttpResponseCodeSetsStatusLine(): void
+  {
+    $docroot = $this->makeDocroot([
+      'notfound.php' => <<<'PHP'
+<?php
+http_response_code(404);
+echo 'missing';
+PHP,
+    ]);
+    $response = $this->httpGet($docroot, '/notfound.php');
+    $this->assertStringContainsString('HTTP/1.1 404', $response);
+    $this->assertStringContainsString('missing', $response);
+  }
+
   public function testPopulatesHttpServerHeaders(): void
   {
     $docroot = $this->makeDocroot([
