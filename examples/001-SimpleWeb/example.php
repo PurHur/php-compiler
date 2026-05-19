@@ -15,7 +15,7 @@ declare(strict_types=1);
  * $_SERVER['REQUEST_METHOD'] and $_REQUEST are populated automatically (see lib/Web/Superglobals.php).
  */
 // AOT: set QUERY_STRING (or use phpc serve --aot); compile-time -q is optional.
-$name = $_GET['name'];
+$name = $_REQUEST['name'];
 header('Content-Type: text/html; charset=UTF-8');
 echo '<!DOCTYPE html><html><head><link rel="stylesheet" href="/style.css"></head><body>';
 echo '<h1>Hello ', htmlspecialchars($name), "</h1>\n";
