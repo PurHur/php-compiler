@@ -11,6 +11,7 @@ declare(strict_types=1);
  *   phpc serve --aot [host:port] [docroot] [--binary path]
  *   phpc run script.php [args...]
  *   phpc build [-o outfile] entry.php
+ *   phpc lint [-r 'code'] [--json] entry.php
  *   phpc test [-- phpunit/ci-local args...]
  */
 
@@ -28,6 +29,7 @@ php-compiler CLI
       [--binary path]                           Explicit binary or phpc.json "binary"
   phpc run <script.php> [args...]              Run a script in the VM
   phpc build [-o out] <entry.php>               AOT compile to a native binary
+  phpc lint [-r 'code'] [--json] <entry.php>    Report unsupported syntax (line-accurate)
   phpc test [args...]                           Run ./script/ci-local.sh
 
 HELP);
@@ -64,6 +66,9 @@ switch ($command) {
             exit(1);
         }
         exit(runProcess(array_merge($php, [$repoRoot.'/bin/compile.php'], $args), $repoRoot));
+
+    case 'lint':
+        exit(runProcess(array_merge($php, [$repoRoot.'/bin/lint.php'], $args), $repoRoot));
 
     case 'test':
         $testScript = $repoRoot.'/script/ci-local.sh';

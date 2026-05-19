@@ -32,6 +32,7 @@ final class PhpcCliTest extends TestCase
         $this->assertStringContainsString('phpc run', $out !== false ? $out : '');
         $this->assertStringContainsString('phpc build', $out !== false ? $out : '');
         $this->assertStringContainsString('phpc test', $out !== false ? $out : '');
+        $this->assertStringContainsString('phpc lint', $out !== false ? $out : '');
     }
 
     /**
