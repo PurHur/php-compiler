@@ -112,3 +112,7 @@ test-docker: docker-build-22
 .PHONY: test-docker-quick
 test-docker-quick:
 	docker run --rm -v $(shell pwd):/compiler -w /compiler $(LOCAL_DEV_IMAGE) php vendor/bin/phpunit --exclude-group llvm
+
+.PHONY: bootstrap-inventory
+bootstrap-inventory:
+	php script/bootstrap-inventory.php
