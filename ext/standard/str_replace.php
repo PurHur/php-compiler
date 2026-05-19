@@ -19,7 +19,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * str_replace() with string search, replace, and subject (subset of PHP; VM only).
+ * str_replace() with string search, replace, and subject (subset of PHP; LLVM JIT/AOT).
  */
 final class str_replace extends Internal
 {
@@ -50,6 +50,36 @@ final class str_replace extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('str_replace() is not implemented for JIT in this compiler build');
+        $this->context = $context;
+        if (3 !== \count($args)) {
+            throw new \LogicException('str_replace() requires exactly three arguments in this compiler build');
+        }
+        foreach ($args as $arg) {
+            if (JITVariable::TYPE_STRING !== $arg->type && JITVariable::TYPE_VALUE !== $arg->type) {
+                throw new \LogicException('str_replace() requires string arguments in this compiler build');
+            }
+        }
+
+        return JitStrReplace::replace(
+            $context,
+            self::jitStringArg($context, $args[0]),
+            self::jitStringArg($context, $args[1]),
+            self::jitStringArg($context, $args[2])
+        );
+    }
+
+    private static function jitStringArg(Context $context, JITVariable $arg): Value
+    {
+        if (JITVariable::TYPE_STRING === $arg->type) {
+            return $context->helper->loadValue($arg);
+        }
+        if (JITVariable::TYPE_VALUE === $arg->type) {
+            return $context->builder->call(
+                $context->lookupFunction('__value__readString'),
+                $arg->value
+            );
+        }
+
+        throw new \LogicException('str_replace() requires string arguments in this compiler build');
     }
 }
