@@ -79,6 +79,28 @@ PHP,
         @rmdir($binaryDir);
     }
 
+    public function testServeAotPopulatesContentLengthOnPost(): void
+    {
+        $body = 'abcdefghijkl';
+        $docroot = $this->makeDocroot([
+            'length.php' => <<<'PHP'
+<?php
+declare(strict_types=1);
+header('Content-Type: text/plain; charset=UTF-8');
+echo $_SERVER['CONTENT_LENGTH'];
+PHP,
+        ]);
+        $binaryDir = sys_get_temp_dir().'/phpc_serve_aot_cl_'.bin2hex(random_bytes(4));
+        $this->assertTrue(mkdir($binaryDir));
+        $binary = $binaryDir.'/app';
+        $this->compileExample($docroot.'/length.php', $binary);
+        $response = $this->httpPostAot($docroot, $binary, '/length.php', $body);
+        $this->assertStringContainsString('HTTP/1.1 200', $response);
+        $this->assertStringContainsString('12', $response);
+        @unlink($binary);
+        @rmdir($binaryDir);
+    }
+
     public function testServeAot001SimpleWeb(): void
     {
         $docroot = $this->repoRoot.'/examples/001-SimpleWeb';
@@ -165,6 +187,60 @@ PHP,
         $conn = fsockopen('127.0.0.1', $port);
         $this->assertIsResource($conn);
         fwrite($conn, "GET {$path} HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n");
+        $response = stream_get_contents($conn);
+        fclose($conn);
+
+        proc_terminate($proc);
+        proc_close($proc);
+
+        return $response !== false ? $response : '';
+    }
+
+    private function httpPostAot(string $docroot, string $binary, string $path, string $body): string
+    {
+        $port = $this->findFreePort();
+        $addr = "127.0.0.1:{$port}";
+        $env = array_merge($this->baseEnv(), $this->llvmEnv());
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $cmd = array_merge(
+            $this->phpCmd,
+            [$this->repoRoot.'/bin/serve-aot.php', $addr, $docroot, '--binary', $binary]
+        );
+        $proc = proc_open($cmd, $descriptorSpec, $pipes, $this->repoRoot, $env);
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        stream_set_blocking($pipes[1], false);
+        stream_set_blocking($pipes[2], false);
+
+        $deadline = microtime(true) + 15.0;
+        $ready = false;
+        while (microtime(true) < $deadline) {
+            $conn = @fsockopen('127.0.0.1', $port, $errno, $errstr, 0.2);
+            if (false !== $conn) {
+                $ready = true;
+                fclose($conn);
+                break;
+            }
+            usleep(50_000);
+        }
+        $this->assertTrue($ready, 'serve-aot did not become ready');
+
+        $conn = fsockopen('127.0.0.1', $port);
+        $this->assertIsResource($conn);
+        $len = strlen($body);
+        fwrite(
+            $conn,
+            "POST {$path} HTTP/1.1\r\n"
+            ."Host: 127.0.0.1\r\n"
+            ."Content-Type: application/x-www-form-urlencoded\r\n"
+            ."Content-Length: {$len}\r\n"
+            ."Connection: close\r\n\r\n"
+            .$body
+        );
         $response = stream_get_contents($conn);
         fclose($conn);
 

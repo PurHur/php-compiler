@@ -149,6 +149,21 @@ PHP,
     $this->assertStringContainsString('dark', $response);
   }
 
+  public function testPopulatesContentLengthOnPost(): void
+  {
+    $body = 'abcdefghijkl';
+    $docroot = $this->makeDocroot([
+      'length.php' => <<<'PHP'
+<?php
+header('Content-Type: text/plain; charset=UTF-8');
+echo $_SERVER['CONTENT_LENGTH'];
+PHP,
+    ]);
+    $response = $this->httpPost($docroot, '/length.php', $body);
+    $this->assertStringContainsString('HTTP/1.1 200', $response);
+    $this->assertStringContainsString('12', $response);
+  }
+
   /**
    * @param array<string, string> $extraEnv
    * @param list<string>          $extraRequestHeaders
@@ -188,6 +203,57 @@ PHP,
     $requestHeaders = array_merge(['Host: 127.0.0.1', 'Connection: close'], $extraRequestHeaders);
     $headerBlock = implode("\r\n", $requestHeaders);
     fwrite($conn, "GET {$path} HTTP/1.1\r\n{$headerBlock}\r\n\r\n");
+    $response = stream_get_contents($conn);
+    fclose($conn);
+
+    proc_terminate($proc);
+    proc_close($proc);
+
+    return $response !== false ? $response : '';
+  }
+
+  private function httpPost(string $docroot, string $path, string $body, array $extraEnv = []): string
+  {
+    $port = $this->findFreePort();
+    $addr = "127.0.0.1:{$port}";
+    $env = array_merge($this->baseEnv(), $extraEnv);
+    $descriptorSpec = [
+      0 => ['pipe', 'r'],
+      1 => ['pipe', 'w'],
+      2 => ['pipe', 'w'],
+    ];
+    $cmd = array_merge($this->phpCmd, [$this->repoRoot.'/bin/serve.php', $addr, $docroot]);
+    $proc = proc_open($cmd, $descriptorSpec, $pipes, $this->repoRoot, $env);
+    $this->assertIsResource($proc);
+    fclose($pipes[0]);
+    stream_set_blocking($pipes[1], false);
+    stream_set_blocking($pipes[2], false);
+
+    $deadline = microtime(true) + 5.0;
+    $ready = false;
+    while (microtime(true) < $deadline) {
+      $conn = @fsockopen('127.0.0.1', $port, $errno, $errstr, 0.2);
+      if (false !== $conn) {
+        $ready = true;
+        fclose($conn);
+        break;
+      }
+      usleep(50_000);
+    }
+    $this->assertTrue($ready, 'serve did not become ready');
+
+    $conn = fsockopen('127.0.0.1', $port);
+    $this->assertIsResource($conn);
+    $len = strlen($body);
+    fwrite(
+      $conn,
+      "POST {$path} HTTP/1.1\r\n"
+      ."Host: 127.0.0.1\r\n"
+      ."Content-Type: application/x-www-form-urlencoded\r\n"
+      ."Content-Length: {$len}\r\n"
+      ."Connection: close\r\n\r\n"
+      .$body
+    );
     $response = stream_get_contents($conn);
     fclose($conn);
 

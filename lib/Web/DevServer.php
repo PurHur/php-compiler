@@ -130,6 +130,12 @@ final class DevServer
 
         self::clearHttpServerKeys();
         $cgiEnv = array_merge($cgiEnv, Superglobals::applyHttpHeaders($headers));
+        $contentLength = self::contentLengthForRequest($headers, $body);
+        if (null !== $contentLength) {
+            $cgiEnv['CONTENT_LENGTH'] = $contentLength;
+            $_SERVER['CONTENT_LENGTH'] = $contentLength;
+            putenv('CONTENT_LENGTH='.$contentLength);
+        }
 
         putenv('REQUEST_METHOD='.$method);
         putenv('QUERY_STRING='.$query);
@@ -203,6 +209,21 @@ final class DevServer
         }
 
         return [$method, $path, $query, $headers, $body];
+    }
+
+    /**
+     * CGI CONTENT_LENGTH for incoming requests when Content-Length was sent.
+     *
+     * Uses the bytes actually read (not the header alone). Absent for chunked
+     * requests without Content-Length (issue #287).
+     */
+    public static function contentLengthForRequest(array $headers, string $body): ?string
+    {
+        if (!isset($headers['content-length'])) {
+            return null;
+        }
+
+        return (string) strlen($body);
     }
 
     /**

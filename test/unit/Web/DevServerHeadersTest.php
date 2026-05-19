@@ -35,4 +35,11 @@ final class DevServerHeadersTest extends TestCase
         ]);
         $this->assertSame([], $vars);
     }
+
+    public function testContentLengthForRequestUsesBodySize(): void
+    {
+        $body = 'abcdefghijkl';
+        $this->assertSame('12', DevServer::contentLengthForRequest(['content-length' => '99'], $body));
+        $this->assertNull(DevServer::contentLengthForRequest([], $body));
+    }
 }
