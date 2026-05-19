@@ -97,6 +97,65 @@ final class Superglobals
     }
 
     /**
+     * Map a CGI $_SERVER key to an HTTP header name for getallheaders() (issue #307).
+     */
+    public static function serverKeyToHeaderName(string $key): ?string
+    {
+        if (str_starts_with($key, 'HTTP_')) {
+            $segment = substr($key, 5);
+        } elseif ('CONTENT_TYPE' === $key || 'CONTENT_LENGTH' === $key) {
+            $segment = $key;
+        } else {
+            return null;
+        }
+
+        $segment = strtolower(str_replace('_', '-', $segment));
+
+        return implode('-', array_map(
+            static fn (string $part): string => '' === $part ? '' : ucfirst($part),
+            explode('-', $segment)
+        ));
+    }
+
+    /**
+     * Request headers from the active VM $_SERVER or CGI environment (issue #307).
+     *
+     * @return array<string, string>
+     */
+    public static function collectRequestHeaders(): array
+    {
+        $headers = [];
+        $server = self::readServerEntries();
+        foreach ($server as $key => $value) {
+            $name = self::serverKeyToHeaderName($key);
+            if (null === $name) {
+                continue;
+            }
+            $headers[$name] = $value;
+        }
+
+        return $headers;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private static function readServerEntries(): array
+    {
+        $entries = [];
+        foreach (array_merge($_ENV, $_SERVER) as $key => $value) {
+            if (!is_string($key) || !is_string($value)) {
+                continue;
+            }
+            if (str_starts_with($key, 'HTTP_') || str_starts_with($key, 'CONTENT_')) {
+                $entries[$key] = $value;
+            }
+        }
+
+        return $entries;
+    }
+
+    /**
      * Apply parsed request headers to PHP $_SERVER and putenv for CGI/AOT refresh.
      *
      * @param array<string, string> $headers lowercase header name => value

@@ -102,6 +102,7 @@ class Module extends ModuleAbstract
             new htmlspecialchars(),
             new strip_tags(),
             new header_(),
+            new getallheaders_(),
             new http_response_code(),
             new urlencode(),
             new rawurlencode(),
