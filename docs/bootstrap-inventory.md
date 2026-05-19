@@ -8,9 +8,9 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 188 |
+| PHP files on vm.php path | 192 |
 | Source constructs flagged (blockers) | 10 |
-| Source constructs flagged (warnings) | 501 |
+| Source constructs flagged (warnings) | 514 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -195,6 +195,10 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `lib/JIT/SuperglobalInit.php` | 0 | 3 |
 | `lib/JIT/ValueEchoHelper.php` | 0 | 1 |
 | `lib/JIT/Variable.php` | 0 | 18 |
+| `lib/Lint/Issue.php` | 0 | 2 |
+| `lib/Lint/LintCompiler.php` | 0 | 6 |
+| `lib/Lint/Linter.php` | 0 | 4 |
+| `lib/Lint/UnsupportedRegistry.php` | 0 | 1 |
 | `lib/Module.php` | 0 | 1 |
 | `lib/ModuleAbstract.php` | 0 | 1 |
 | `lib/OpCode.php` | 0 | 1 |
@@ -1299,6 +1303,35 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new Variable (line 461)
 - new Variable (line 473)
 - 15 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/Lint/Issue.php`
+
+**Warnings** (review for bootstrap subset):
+- new self (line 39)
+- 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/Lint/LintCompiler.php`
+
+**Warnings** (review for bootstrap subset):
+- new OpCode (line 55)
+- new Block (line 63)
+- new OpCode (line 74)
+- new OpCode (line 106)
+- 9 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 2 closure(s)
+
+### `lib/Lint/Linter.php`
+
+**Warnings** (review for bootstrap subset):
+- new Runtime (line 24)
+- new State (line 83)
+- new LintCompiler (line 98)
+- 9 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/Lint/UnsupportedRegistry.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/Module.php`
 
