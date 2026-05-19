@@ -10,8 +10,8 @@ if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
   make docker-build-22
 fi
 
-if [[ -f vendor/bin/phpunit ]]; then
-  exec docker run --rm -v "$(pwd):/compiler" -w /compiler "$IMAGE" ./script/ci-local.sh "$@"
+if [[ -f vendor/bin/phpunit ]] && docker run --rm -v "$(pwd):/compiler" -w /compiler "$IMAGE" test -f script/ci-local.sh 2>/dev/null; then
+  exec docker run --rm -v "$(pwd):/compiler" -w /compiler "$IMAGE" bash script/ci-local.sh "$@"
 fi
 
 echo "Bind-mount has no vendor/; copying repo into container via tar..."

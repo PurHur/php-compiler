@@ -461,25 +461,29 @@ class JIT {
                 // case OpCode::TYPE_CASE:
                 case OpCode::TYPE_JUMP:
                     $newBlock = $this->compileBlockInternal($func, $op->block1, ...$args);
-                    $builder->positionAtEnd($basicBlock);
-                    $this->context->freeDeadVariables($func, $basicBlock, $block);
+                    $branchBlock = $builder->getInsertBlock();
+                    $builder->positionAtEnd($branchBlock);
+                    $this->context->freeDeadVariables($func, $branchBlock, $block);
                     $builder->branch($newBlock);
                     return $origBasicBlock;
                 case OpCode::TYPE_JUMPIF:
                     $if = $this->compileBlockInternal($func, $op->block1, ...$args);
                     $else = $this->compileBlockInternal($func, $op->block2, ...$args);
 
-                    $builder->positionAtEnd($basicBlock);
+                    $branchBlock = $builder->getInsertBlock();
+                    $builder->positionAtEnd($branchBlock);
 
                     $condition = $this->context->castToBool(
                         $this->context->helper->loadValue($this->context->getVariableFromOp($block->getOperand($op->arg1)))
                     );
 
-                    $this->context->freeDeadVariables($func, $basicBlock, $block);
+                    $this->context->freeDeadVariables($func, $branchBlock, $block);
                     $builder->branchIf($condition, $if, $else);
                     return $origBasicBlock;
                 case OpCode::TYPE_RETURN_VOID:
-                    $this->context->freeDeadVariables($func, $basicBlock, $block);
+                    $returnBlock = $builder->getInsertBlock();
+                    $builder->positionAtEnd($returnBlock);
+                    $this->context->freeDeadVariables($func, $returnBlock, $block);
                     $this->context->builder->returnVoid();
     
                     return $origBasicBlock;
@@ -487,7 +491,9 @@ class JIT {
                     $return = $this->context->getVariableFromOp($block->getOperand($op->arg1));
                     $return->addref();
                     $retval = $this->context->helper->loadValue($return);
-                    $this->context->freeDeadVariables($func, $basicBlock, $block);
+                    $returnBlock = $builder->getInsertBlock();
+                    $builder->positionAtEnd($returnBlock);
+                    $this->context->freeDeadVariables($func, $returnBlock, $block);
                     $this->context->builder->returnValue($retval);
     
                     return $origBasicBlock;
