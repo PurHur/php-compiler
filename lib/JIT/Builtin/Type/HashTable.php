@@ -419,6 +419,7 @@ class HashTable extends Type
         $values = $this->context->builder->load($this->context->builder->structGep($ht, $map['values']));
         $entry = $this->context->builder->inBoundsGep($values, $index);
         $str = $this->context->builder->call($this->context->lookupFunction('__value__readString'), $entry);
+        $str = $this->context->builder->call($this->context->lookupFunction('__string__separate'), $str);
         $this->context->builder->branch($merge);
         $this->context->builder->positionAtEnd($emptyBlock);
         $empty = $this->context->builder->call(

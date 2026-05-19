@@ -439,11 +439,13 @@ final class Variable {
                     $this->context->getTypeFromString('size_t')
                 );
                 if (null !== $expectedType && Type::TYPE_STRING === $expectedType->type) {
+                    $this->context->refcount->addref($ht);
                     $str = $this->context->builder->call(
                         $this->context->lookupFunction('__hashtable__readStringAt'),
                         $ht,
                         $index
                     );
+                    $this->context->refcount->delref($ht);
 
                     return new Variable(
                         $this->context,
