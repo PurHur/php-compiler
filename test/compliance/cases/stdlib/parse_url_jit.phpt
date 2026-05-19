@@ -1,5 +1,5 @@
 --TEST--
-stdlib parse_url() path and query components
+stdlib parse_url() JIT/AOT path and query components
 --FILE--
 <?php
 $path = parse_url('/hello?name=World', 5);

@@ -12,7 +12,7 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** parse_url() for http(s) URLs and path/query routing (subset of PHP; VM only). */
+/** parse_url() for http(s) URLs and path/query routing (subset of PHP; JIT/AOT via native runtime). */
 final class parse_url extends Internal
 {
     public function execute(Frame $frame): void
@@ -68,6 +68,20 @@ final class parse_url extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('parse_url() is not implemented for JIT in this compiler build');
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 2) {
+            throw new \LogicException('parse_url() requires one or two arguments in this compiler build');
+        }
+        if (JITVariable::TYPE_STRING !== $args[0]->type && JITVariable::TYPE_VALUE !== $args[0]->type) {
+            throw new \LogicException('parse_url() first argument must be a string in this compiler build');
+        }
+        $component = 2 === $argc ? $args[1] : null;
+        if (null !== $component
+            && JITVariable::TYPE_NATIVE_LONG !== $component->type
+            && JITVariable::TYPE_VALUE !== $component->type) {
+            throw new \LogicException('parse_url() component must be an integer in this compiler build');
+        }
+
+        return JitParseUrl::parseUrl($context, $args[0], $component);
     }
 }
