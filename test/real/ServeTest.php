@@ -8,6 +8,8 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Integration tests for bin/serve.php (issues #151, #152, #150).
+ *
+ * @group serve
  */
 final class ServeTest extends TestCase
 {

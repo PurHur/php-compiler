@@ -53,8 +53,10 @@ composer install
 | `PHP_COMPILER_PHP` | PHP binary for tests and scripts (default: `php`, or `php8.2` if found) |
 | `PHP_COMPILER_EXT_DIR` | Directory containing `.so` extensions (default: `/usr/lib/php/20220829` on PHP 8.2) |
 | `PHP_COMPILER_LLVM_PATH` | Path to LLVM 9 `clang`, `ld`, and `libLLVM-9.so.1` (default: repo `.llvm/` after install) |
+| `PHP_COMPILER_SKIP_SERVE_TESTS` | Skip `ServeTest` / `ServeAotTest` (set on GitHub Actions; use in sandboxes that cannot bind TCP) |
+| `PHP_COMPILER_RUN_SERVE_TESTS` | Force HTTP serve integration tests even when loopback bind probe fails |
 
-`script/ci-local.sh` sets these automatically when `.llvm/libLLVM-9.so.1` exists.
+`script/ci-local.sh` sets LLVM paths automatically when `.llvm/libLLVM-9.so.1` exists. It probes `127.0.0.1` bind capability and runs `@group serve` tests when allowed. **GitHub Actions** sets `PHP_COMPILER_SKIP_SERVE_TESTS=1` because hosted runners often block listeners; **local and Docker CI** (`make test-docker`, `./script/docker-ci-local.sh`) must run those tests — do not export the skip variable there.
 
 ### Running tests on the host
 
@@ -103,7 +105,7 @@ docker build -f Docker/dev/ubuntu-22.04/Dockerfile -t php-compiler:22.04-dev .
 
 When you bind-mount the repo, a host `.llvm/` directory (if present) overrides the image toolchain; otherwise `PHP_COMPILER_LLVM_PATH` defaults to `/opt/llvm9` and JIT/AOT tests run without re-downloading.
 
-Run the full local CI suite inside the container (same as `./script/ci-local.sh` on the host):
+Run the full local CI suite inside the container (same as `./script/ci-local.sh` on the host). This includes HTTP serve integration tests (`ServeTest`, `ServeAotTest`) unless `PHP_COMPILER_SKIP_SERVE_TESTS=1` is set:
 
 ```console
 make test-docker
@@ -116,6 +118,8 @@ If the bind-mount shows an empty `/compiler` directory (some harness setups), us
 ```console
 ./script/docker-ci-local.sh
 ```
+
+On sandboxes that cannot bind TCP ports, set `PHP_COMPILER_SKIP_SERVE_TESTS=1` before running CI (GitHub Actions does this automatically).
 
 Published tag (when available): `ghcr.io/PurHur/php-compiler:dev`. Override with `PHP_COMPILER_DEV_IMAGE`.
 
