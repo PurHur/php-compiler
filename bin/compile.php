@@ -17,10 +17,18 @@ function run(string $filename, string $code, array $options): void
     $runtime = new Runtime(Runtime::MODE_AOT);
     $queryString = $options['-q'] ?? null;
     $postBody = $options['-p'] ?? null;
+    $scriptFilename = null;
+    if ('-' !== $filename && 'Command line code' !== $filename) {
+        $resolved = realpath($filename);
+        if (false !== $resolved) {
+            $scriptFilename = $resolved;
+        }
+    }
     Superglobals::populateFromEnvironment(
         $runtime->vmContext,
         is_string($queryString) ? $queryString : null,
-        is_string($postBody) ? $postBody : null
+        is_string($postBody) ? $postBody : null,
+        $scriptFilename
     );
     $block = $runtime->parseAndCompile($code, $filename);
     if (! isset($options['-l'])) {

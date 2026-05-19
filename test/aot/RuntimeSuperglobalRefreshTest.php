@@ -184,6 +184,60 @@ PHP;
         @unlink($outfile);
     }
 
+    public function testScriptFilenameFromCgiEnvironment(): void
+    {
+        $source = <<<'PHP'
+<?php
+declare(strict_types=1);
+header('Content-Type: text/plain; charset=UTF-8');
+echo $_SERVER['SCRIPT_FILENAME'];
+PHP;
+
+        $outfile = tempnam(sys_get_temp_dir(), 'phpc_script_fn_');
+        $this->assertNotFalse($outfile);
+        unlink($outfile);
+
+        $repoRoot = dirname(__DIR__, 2);
+        $env = $this->llvmProcessEnv($repoRoot);
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+
+        $compile = proc_open(
+            array_merge(
+                self::llvmEnvPrefix(),
+                self::phpCommand(),
+                [$this->compileBin, '-o', $outfile]
+            ),
+            $descriptorSpec,
+            $pipes,
+            $repoRoot,
+            $env
+        );
+        fwrite($pipes[0], $source);
+        fclose($pipes[0]);
+        $compileErr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        proc_close($compile);
+        $this->assertFileExists($outfile, trim($compileErr !== false ? $compileErr : ''));
+
+        $root = realpath(sys_get_temp_dir());
+        $this->assertNotFalse($root);
+        $runEnv = $env;
+        unset($runEnv['SCRIPT_FILENAME']);
+        $runEnv['DOCUMENT_ROOT'] = $root;
+        $runEnv['SCRIPT_NAME'] = '/index.php';
+        $runEnv['REQUEST_URI'] = '/index.php';
+        $output = $this->runBinary($outfile, $runEnv);
+        $expected = $root.'/index.php';
+        $this->assertStringContainsString($expected, $this->cgiBody($output));
+
+        @unlink($outfile);
+    }
+
     public function testDocumentRootFromCgiEnvironment(): void
     {
         $source = <<<'PHP'
@@ -285,6 +339,13 @@ PHP;
         $this->assertStringContainsString('example.test1', $output);
 
         @unlink($outfile);
+    }
+
+    private function cgiBody(string $output): string
+    {
+        $parts = preg_split("/\r?\n\r?\n/", $output, 2);
+
+        return $parts[1] ?? $output;
     }
 
     /**

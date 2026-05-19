@@ -105,6 +105,11 @@ final class DevServer
             return;
         }
 
+        $scriptFilename = realpath($script);
+        if (false === $scriptFilename) {
+            $scriptFilename = $script;
+        }
+
         $requestUri = $scriptName.$pathInfo;
         if ('' !== $query) {
             $requestUri .= '?'.$query;
@@ -115,6 +120,7 @@ final class DevServer
             'QUERY_STRING' => $query,
             'REQUEST_BODY' => $body,
             'SCRIPT_NAME' => $scriptName,
+            'SCRIPT_FILENAME' => $scriptFilename,
             'REQUEST_URI' => $requestUri,
             'DOCUMENT_ROOT' => $docroot,
         ];
@@ -129,6 +135,7 @@ final class DevServer
         putenv('QUERY_STRING='.$query);
         putenv('REQUEST_BODY='.$body);
         putenv('SCRIPT_NAME='.$scriptName);
+        putenv('SCRIPT_FILENAME='.$scriptFilename);
         putenv('REQUEST_URI='.$requestUri);
         putenv('DOCUMENT_ROOT='.$docroot);
         if ('' !== $pathInfo) {

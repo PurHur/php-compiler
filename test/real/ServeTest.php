@@ -119,6 +119,21 @@ PHP,
     $this->assertStringContainsString($resolved, $response);
   }
 
+  public function testPopulatesScriptFilename(): void
+  {
+    $docroot = $this->makeDocroot([
+      'script.php' => <<<'PHP'
+<?php
+echo $_SERVER['SCRIPT_FILENAME'];
+PHP,
+    ]);
+    $script = realpath($docroot.'/script.php');
+    $this->assertNotFalse($script);
+    $response = $this->httpGet($docroot, '/script.php');
+    $this->assertStringContainsString('HTTP/1.1 200', $response);
+    $this->assertStringContainsString($script, $response);
+  }
+
   public function testPopulatesCookieFromRequestHeader(): void
   {
     $docroot = $this->makeDocroot([
