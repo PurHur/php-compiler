@@ -90,6 +90,21 @@ PHP,
     $this->assertStringContainsString('example.test|1', $response);
   }
 
+  public function testPopulatesCookieFromRequestHeader(): void
+  {
+    $docroot = $this->makeDocroot([
+      'cookie.php' => <<<'PHP'
+<?php
+echo $_COOKIE['theme'];
+PHP,
+    ]);
+    $response = $this->httpGet($docroot, '/cookie.php', [], [
+      'Cookie: theme=dark',
+    ]);
+    $this->assertStringContainsString('HTTP/1.1 200', $response);
+    $this->assertStringContainsString('dark', $response);
+  }
+
   /**
    * @param array<string, string> $extraEnv
    * @param list<string>          $extraRequestHeaders
