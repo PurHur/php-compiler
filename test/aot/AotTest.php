@@ -109,10 +109,16 @@ final class AotTest extends BaseTest
                     continue;
                 }
                 $parts = explode('=', $line, 2);
-                if (2 === count($parts) && 'QUERY_STRING' === $parts[0]) {
+                if (2 !== count($parts)) {
+                    continue;
+                }
+                if ('QUERY_STRING' === $parts[0]) {
                     $compileArgv[] = '-q';
                     $compileArgv[] = $parts[1];
-                    break;
+                }
+                if ('REQUEST_BODY' === $parts[0]) {
+                    $compileArgv[] = '-p';
+                    $compileArgv[] = $parts[1];
                 }
             }
         }
