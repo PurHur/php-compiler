@@ -181,6 +181,11 @@ final class Superglobals
         self::setStringEntry($server, 'GATEWAY_INTERFACE', 'CGI/1.1');
         self::setStringEntry($server, 'SERVER_SOFTWARE', 'PHP-Compiler-VM');
 
+        $documentRoot = getenv('DOCUMENT_ROOT');
+        if (false !== $documentRoot && '' !== $documentRoot) {
+            self::setStringEntry($server, 'DOCUMENT_ROOT', $documentRoot);
+        }
+
         foreach (array_merge($_ENV, $_SERVER) as $key => $value) {
             if (!is_string($key) || !is_string($value)) {
                 continue;

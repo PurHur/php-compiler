@@ -520,6 +520,14 @@ void __superglobals__refresh(void)
     set_string_key(sg_SERVER, "GATEWAY_INTERFACE", "CGI/1.1");
     set_string_key(sg_SERVER, "SERVER_SOFTWARE", "PHP-Compiler-AOT");
 
+    {
+        const char *document_root = getenv("DOCUMENT_ROOT");
+
+        if (NULL != document_root && '\0' != document_root[0]) {
+            set_string_key(sg_SERVER, "DOCUMENT_ROOT", document_root);
+        }
+    }
+
     derive_path_info(script_name, request_uri, path_info, sizeof(path_info));
     if ('\0' != path_info[0]) {
         set_string_key(sg_SERVER, "PATH_INFO", path_info);
