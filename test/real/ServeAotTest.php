@@ -33,6 +33,29 @@ final class ServeAotTest extends TestCase
         $this->phpCmd = self::phpCommand();
     }
 
+    public function testServeAotPopulatesDocumentRoot(): void
+    {
+        $docroot = $this->makeDocroot([
+            'docroot.php' => <<<'PHP'
+<?php
+declare(strict_types=1);
+header('Content-Type: text/plain; charset=UTF-8');
+echo $_SERVER['DOCUMENT_ROOT'];
+PHP,
+        ]);
+        $resolved = realpath($docroot);
+        $this->assertNotFalse($resolved);
+        $binaryDir = sys_get_temp_dir().'/phpc_serve_aot_dr_'.bin2hex(random_bytes(4));
+        $this->assertTrue(mkdir($binaryDir));
+        $binary = $binaryDir.'/app';
+        $this->compileExample($docroot.'/docroot.php', $binary);
+        $response = $this->httpGetAot($docroot, $binary, '/docroot.php');
+        $this->assertStringContainsString('HTTP/1.1 200', $response);
+        $this->assertStringContainsString($resolved, $response);
+        @unlink($binary);
+        @rmdir($binaryDir);
+    }
+
     public function testServeAot001SimpleWeb(): void
     {
         $docroot = $this->repoRoot.'/examples/001-SimpleWeb';
@@ -57,7 +80,8 @@ final class ServeAotTest extends TestCase
             1 => ['pipe', 'w'],
             2 => ['pipe', 'w'],
         ];
-        $env = $this->llvmEnv();
+        $env = $this->baseEnv();
+        LlvmToolchain::applyProcessEnv($env, $this->repoRoot);
         $compile = proc_open(
             array_merge(
                 self::llvmEnvPrefix(),
@@ -73,7 +97,12 @@ final class ServeAotTest extends TestCase
         $err = stream_get_contents($pipes[2]);
         fclose($pipes[1]);
         fclose($pipes[2]);
-        proc_close($compile);
+        $exitCode = proc_close($compile);
+        $this->assertSame(
+            0,
+            $exitCode,
+            'compile.php failed: '.trim($err !== false ? $err : '')
+        );
         $this->assertFileExists($outfile, trim($err !== false ? $err : ''));
     }
 
@@ -133,6 +162,25 @@ final class ServeAotTest extends TestCase
         return $env;
     }
 
+    /**
+     * @param array<string, string> $files relative path => contents
+     */
+    private function makeDocroot(array $files): string
+    {
+        $dir = sys_get_temp_dir().'/phpc_serve_aot_'.bin2hex(random_bytes(4));
+        $this->assertTrue(mkdir($dir));
+        foreach ($files as $name => $contents) {
+            $path = $dir.'/'.$name;
+            $parent = dirname($path);
+            if (!is_dir($parent)) {
+                mkdir($parent, 0777, true);
+            }
+            file_put_contents($path, $contents);
+        }
+
+        return $dir;
+    }
+
     private function findFreePort(): int
     {
         $server = stream_socket_server('tcp://127.0.0.1:0', $errno, $errstr);
@@ -167,6 +215,9 @@ final class ServeAotTest extends TestCase
         $phpEnv = getenv('PHP_COMPILER_PHP');
         if (false !== $phpEnv && '' !== $phpEnv) {
             $cmd = preg_split('/\s+/', $phpEnv);
+            if (!str_contains($cmd[0], '/')) {
+                $cmd[0] = PHP_BINARY;
+            }
         } else {
             $cmd = [PHP_BINARY];
         }

@@ -116,6 +116,7 @@ final class DevServer
             'REQUEST_BODY' => $body,
             'SCRIPT_NAME' => $scriptName,
             'REQUEST_URI' => $requestUri,
+            'DOCUMENT_ROOT' => $docroot,
         ];
         if ('' !== $pathInfo) {
             $cgiEnv['PATH_INFO'] = $pathInfo;
@@ -129,6 +130,7 @@ final class DevServer
         putenv('REQUEST_BODY='.$body);
         putenv('SCRIPT_NAME='.$scriptName);
         putenv('REQUEST_URI='.$requestUri);
+        putenv('DOCUMENT_ROOT='.$docroot);
         if ('' !== $pathInfo) {
             putenv('PATH_INFO='.$pathInfo);
         } else {

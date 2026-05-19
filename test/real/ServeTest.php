@@ -104,6 +104,21 @@ PHP,
     $this->assertStringContainsString('example.test|1', $response);
   }
 
+  public function testPopulatesDocumentRoot(): void
+  {
+    $docroot = $this->makeDocroot([
+      'docroot.php' => <<<'PHP'
+<?php
+echo $_SERVER['DOCUMENT_ROOT'];
+PHP,
+    ]);
+    $resolved = realpath($docroot);
+    $this->assertNotFalse($resolved);
+    $response = $this->httpGet($docroot, '/docroot.php');
+    $this->assertStringContainsString('HTTP/1.1 200', $response);
+    $this->assertStringContainsString($resolved, $response);
+  }
+
   public function testPopulatesCookieFromRequestHeader(): void
   {
     $docroot = $this->makeDocroot([

@@ -1501,10 +1501,10 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/Web/Superglobals.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 406)
-- new Variable (line 407)
-- new Variable (line 426)
-- new Variable (line 476)
+- new HashTable (line 411)
+- new Variable (line 412)
+- new Variable (line 431)
+- new Variable (line 481)
 - 22 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `src/macro_functions.php`
