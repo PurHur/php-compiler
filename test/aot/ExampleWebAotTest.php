@@ -31,9 +31,27 @@ final class ExampleWebAotTest extends TestCase
     {
         $source = realpath(__DIR__ . '/../../examples/001-SimpleWeb/example.php');
         $this->assertNotFalse($source);
-        $result = $this->compileAndRun($source, ['-q', 'name=Example']);
-        $this->assertStringContainsString('Content-Type: text/html; charset=UTF-8', $result);
-        $this->assertStringContainsString('<h1>Hello Example</h1>', $result);
+
+        $repoRoot = dirname(__DIR__, 2);
+        $env = $this->llvmProcessEnv($repoRoot);
+        $binary = $this->compileToBinary($source, [], $repoRoot, $env);
+
+        $envAlice = $env;
+        $envAlice['QUERY_STRING'] = 'name=Alice';
+        $envAlice['SCRIPT_NAME'] = '/example.php';
+        $envAlice['REQUEST_URI'] = '/example.php?name=Alice';
+        $outAlice = $this->runBinary($binary, $envAlice);
+        $this->assertStringContainsString('Content-Type: text/html; charset=UTF-8', $outAlice);
+        $this->assertStringContainsString('<h1>Hello Alice</h1>', $outAlice);
+
+        $envBob = $env;
+        $envBob['QUERY_STRING'] = 'name=Bob';
+        $envBob['SCRIPT_NAME'] = '/example.php';
+        $envBob['REQUEST_URI'] = '/example.php?name=Bob';
+        $outBob = $this->runBinary($binary, $envBob);
+        $this->assertStringContainsString('<h1>Hello Bob</h1>', $outBob);
+
+        @unlink($binary);
     }
 
     public function testStaticWebExampleFile(): void
@@ -46,16 +64,13 @@ final class ExampleWebAotTest extends TestCase
     }
 
     /**
-     * @param list<string> $compileExtraArgs e.g. ['-q', 'name=Example']
+     * @param list<string> $compileExtraArgs
      */
-    private function compileAndRun(string $source, array $compileExtraArgs): string
+    private function compileToBinary(string $source, array $compileExtraArgs, string $repoRoot, array $env): string
     {
         $outfile = tempnam(sys_get_temp_dir(), 'phpc_web_');
         $this->assertNotFalse($outfile);
         unlink($outfile);
-
-        $repoRoot = dirname(__DIR__, 2);
-        $env = $this->llvmProcessEnv($repoRoot);
 
         $compileArgv = array_merge(
             self::llvmEnvPrefix(),
@@ -77,16 +92,42 @@ final class ExampleWebAotTest extends TestCase
         $this->assertFileExists($outfile, trim($compileErr !== false ? $compileErr : ''));
         $this->assertTrue(is_executable($outfile));
 
-        $run = proc_open([$outfile], $descriptorSpec, $runPipes, $repoRoot, $env);
-        $result = stream_get_contents($runPipes[1]);
-        fclose($runPipes[0]);
-        fclose($runPipes[1]);
-        fclose($runPipes[2]);
+        return $outfile;
+    }
+
+    /**
+     * @param array<string, string> $env
+     */
+    private function runBinary(string $binary, array $env): string
+    {
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $run = proc_open([$binary], $descriptorSpec, $pipes, null, $env);
+        $result = stream_get_contents($pipes[1]);
+        fclose($pipes[0]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
         $exitCode = proc_close($run);
         $this->assertSame(0, $exitCode, 'AOT binary should exit with status 0');
-        @unlink($outfile);
 
         return $result !== false ? $result : '';
+    }
+
+    /**
+     * @param list<string> $compileExtraArgs
+     */
+    private function compileAndRun(string $source, array $compileExtraArgs): string
+    {
+        $repoRoot = dirname(__DIR__, 2);
+        $env = $this->llvmProcessEnv($repoRoot);
+        $binary = $this->compileToBinary($source, $compileExtraArgs, $repoRoot, $env);
+        $result = $this->runBinary($binary, $env);
+        @unlink($binary);
+
+        return $result;
     }
 
     /**
