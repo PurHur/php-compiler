@@ -653,10 +653,15 @@ class JIT {
 
                     return;
                 case Variable::TYPE_STRING:
+                    $str = $this->context->helper->loadValue($value);
+                    $owned = $this->context->builder->call(
+                        $this->context->lookupFunction('__string__separate'),
+                        $str
+                    );
                     $this->context->builder->call(
                         $this->context->lookupFunction('__value__writeString'),
                         $valueRef,
-                        $this->context->helper->loadValue($value)
+                        $owned
                     );
 
                     return;
