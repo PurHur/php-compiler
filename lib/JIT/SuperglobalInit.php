@@ -16,6 +16,14 @@ final class SuperglobalInit
     /** @var array<string, \PHPLLVM\Value> */
     public static array $globals = [];
 
+    /** $_SERVER keys repopulated by __superglobals__refresh (issue #201, #235). */
+    private const RUNTIME_SERVER_KEYS = [
+        'REQUEST_SCHEME',
+        'HTTPS',
+        'SERVER_PORT',
+        'SERVER_NAME',
+    ];
+
     public static function declareRefresh(Context $context): void
     {
         $signature = $context->context->functionType($context->context->voidType(), false);
@@ -148,6 +156,9 @@ final class SuperglobalInit
         string $superglobalName,
         string $key
     ): ?\PHPLLVM\Value {
+        if ('_SERVER' === $superglobalName && in_array($key, self::RUNTIME_SERVER_KEYS, true)) {
+            return null;
+        }
         if (!self::compileTimeOffsetIsSet($context, $superglobalName, $key)) {
             return null;
         }
