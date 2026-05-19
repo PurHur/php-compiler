@@ -16,6 +16,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
+use PHPCompiler\Web\ResponseContext;
 use PHPLLVM\Value;
 
 /**
@@ -54,11 +55,14 @@ final class header_ extends Internal
             }
             $responseCode = $codeVar->toInt();
         }
+        $line = $v->toString();
         if (0 !== $responseCode) {
-            \header($v->toString(), $replace, $responseCode);
+            \header($line, $replace, $responseCode);
+            ResponseContext::setStatus($responseCode);
         } else {
-            \header($v->toString(), $replace);
+            \header($line, $replace);
         }
+        ResponseContext::addHeader($line, $replace);
     }
 
     public function call(Context $context, JITVariable ...$args): Value

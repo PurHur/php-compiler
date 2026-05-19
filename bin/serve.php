@@ -46,8 +46,13 @@ DevServer::run($listen, $docroot, static function (string $script, array $cgiEnv
         throw $e;
     }
 
-    $responseHeaders = headers_list();
-    header_remove();
+    $responseHeaders = ResponseContext::listHeaders();
+    if ([] === $responseHeaders && \function_exists('headers_list')) {
+        $responseHeaders = \headers_list();
+    }
+    if (\function_exists('header_remove')) {
+        \header_remove();
+    }
     $status = ResponseContext::getStatus();
     $contentType = 'text/html; charset=UTF-8';
     foreach ($responseHeaders as $line) {

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\Web;
 
 /**
- * Request-scoped HTTP response status for VM scripts (issue #252).
+ * Request-scoped HTTP response state for VM scripts (issues #252, #311).
  *
  * Dev server and CGI drivers read this after script execution; reset per request.
  */
@@ -13,9 +13,13 @@ final class ResponseContext
 {
     private static int $status = 200;
 
+    /** @var list<string> */
+    private static array $headers = [];
+
     public static function reset(): void
     {
         self::$status = 200;
+        self::$headers = [];
     }
 
     public static function getStatus(): int
@@ -34,5 +38,56 @@ final class ResponseContext
         self::$status = $code;
 
         return true;
+    }
+
+    public static function addHeader(string $line, bool $replace = true): void
+    {
+        if (preg_match('#^HTTP/\d(?:\.\d)?\s+(\d{3})#', $line, $m)) {
+            self::setStatus((int) $m[1]);
+        }
+        $name = self::headerNameFromLine($line);
+        if ($replace && null !== $name) {
+            self::removeHeader($name);
+        }
+        self::$headers[] = $line;
+    }
+
+    public static function removeHeader(?string $name = null): void
+    {
+        if (null === $name || '' === $name) {
+            self::$headers = [];
+
+            return;
+        }
+        $needle = strtolower($name);
+        self::$headers = array_values(array_filter(
+            self::$headers,
+            static function (string $line) use ($needle): bool {
+                $headerName = self::headerNameFromLine($line);
+
+                return null === $headerName || strtolower($headerName) !== $needle;
+            }
+        ));
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function listHeaders(): array
+    {
+        return self::$headers;
+    }
+
+    private static function headerNameFromLine(string $line): ?string
+    {
+        if (preg_match('#^HTTP/#i', $line)) {
+            return null;
+        }
+        $colon = strpos($line, ':');
+        if (false === $colon) {
+            return null;
+        }
+
+        return trim(substr($line, 0, $colon));
     }
 }
