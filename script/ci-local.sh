@@ -25,6 +25,7 @@ if [[ -x script/apply-patches.sh ]]; then
 fi
 
 "$PHP_BIN" "${PHP_OPTS[@]}" script/capability-matrix.php --check
+"$PHP_BIN" "${PHP_OPTS[@]}" script/bootstrap-inventory.php --check
 
 LLVM_DIR="$(cd "$(dirname "$0")/.." && pwd)/.llvm"
 if [[ -f "$LLVM_DIR/libLLVM-9.so.1" ]]; then

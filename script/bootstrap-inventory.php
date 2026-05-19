@@ -1,0 +1,285 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+/**
+ * Bootstrap self-host inventory (issue #212 Phase A).
+ *
+ * Lists PHP files on the bin/vm.php dependency path and flags language constructs
+ * that the static compiler cannot lower yet.
+ *
+ * Usage:
+ *   php script/bootstrap-inventory.php          # write docs/bootstrap-inventory.md
+ *   php script/bootstrap-inventory.php --check  # exit 1 if committed doc is stale
+ *   php script/bootstrap-inventory.php --json   # machine-readable report on stdout
+ */
+
+use PhpParser\Node;
+use PhpParser\NodeTraverser;
+use PhpParser\NodeVisitorAbstract;
+use PhpParser\ParserFactory;
+
+$root = dirname(__DIR__);
+require $root.'/vendor/autoload.php';
+
+final class BootstrapConstructVisitor extends NodeVisitorAbstract
+{
+    /** @var list<string> */
+    public array $blockers = [];
+
+    /** @var list<string> */
+    public array $warnings = [];
+
+    private int $classMethodCount = 0;
+
+    private int $closureCount = 0;
+
+    public function enterNode(Node $node)
+    {
+        if ($node instanceof Node\Stmt\Try_) {
+            $this->blockers[] = 'try/catch (line '.$node->getLine().')';
+        } elseif ($node instanceof Node\Expr\Yield_ || $node instanceof Node\Expr\YieldFrom) {
+            $this->blockers[] = 'generator yield (line '.$node->getLine().')';
+        } elseif ($node instanceof Node\Stmt\ClassMethod && $node->name->toString() !== '__construct') {
+            ++$this->classMethodCount;
+        } elseif ($node instanceof Node\Stmt\Enum_) {
+            $this->blockers[] = 'enum (line '.$node->getLine().')';
+        } elseif ($node instanceof Node\Stmt\Trait_) {
+            $this->warnings[] = 'trait '.$node->name.' (line '.$node->getLine().')';
+        } elseif ($node instanceof Node\Expr\Closure || $node instanceof Node\Expr\ArrowFunction) {
+            ++$this->closureCount;
+        } elseif ($node instanceof Node\Expr\New_ && $node->class instanceof Node\Name) {
+            $name = $node->class->toString();
+            if (!str_starts_with($name, 'PHPCompiler\\')
+                && !str_starts_with($name, 'PHPCfg\\')
+                && !str_starts_with($name, 'PHPTypes\\')
+                && !str_starts_with($name, 'PhpParser\\')
+                && !str_starts_with($name, 'PHPLLVM\\')
+                && !in_array($name, ['LogicException', 'RuntimeException', 'InvalidArgumentException', 'TypeError', 'ReflectionClass', 'SplObjectStorage'], true)
+            ) {
+                $this->warnings[] = 'new '.$name.' (line '.$node->getLine().')';
+            }
+        } elseif ($node instanceof Node\Expr\FuncCall && $node->name instanceof Node\Name) {
+            $fn = $node->name->toString();
+            if (in_array($fn, ['eval', 'create_function', 'shell_exec', 'exec', 'passthru'], true)) {
+                $this->blockers[] = $fn.'() (line '.$node->getLine().')';
+            }
+        }
+    }
+
+    public function beforeTraverse(array $nodes)
+    {
+        $this->classMethodCount = 0;
+        $this->closureCount = 0;
+    }
+
+    public function afterTraverse(array $nodes)
+    {
+        if ($this->classMethodCount > 0) {
+            $this->warnings[] = $this->classMethodCount.' class method(s) — PHPCfg Op\\Stmt\\ClassMethod not lowered in Compiler';
+        }
+        if ($this->closureCount > 0) {
+            $this->warnings[] = $this->closureCount.' closure(s)';
+        }
+    }
+}
+
+/**
+ * @return list<string>
+ */
+function bootstrapExtractCompilerBlockers(string $compilerFile): array
+{
+    $source = (string) file_get_contents($compilerFile);
+    $blockers = [];
+    if (preg_match_all('/throw new \\\\LogicException\([\'"]([^\'"]+)[\'"]/', $source, $m)) {
+        foreach ($m[1] as $msg) {
+            if (stripos($msg, 'unknown') !== false || stripos($msg, 'unsupported') !== false) {
+                $blockers[] = $msg;
+            }
+        }
+    }
+
+    return array_values(array_unique($blockers));
+}
+
+/**
+ * @return array{blockers: list<string>, warnings: list<string>}
+ */
+function bootstrapScanConstructs(string $file): array
+{
+    $parser = (new ParserFactory())->create(ParserFactory::PREFER_PHP7);
+    $code = (string) file_get_contents($file);
+    try {
+        $ast = $parser->parse($code);
+    } catch (Throwable $e) {
+        return [
+            'blockers' => ['parse error: '.$e->getMessage()],
+            'warnings' => [],
+        ];
+    }
+    if (!is_array($ast)) {
+        return ['blockers' => [], 'warnings' => []];
+    }
+
+    $visitor = new BootstrapConstructVisitor();
+    $traverser = new NodeTraverser();
+    $traverser->addVisitor($visitor);
+    $traverser->traverse($ast);
+
+    return [
+        'blockers' => $visitor->blockers,
+        'warnings' => $visitor->warnings,
+    ];
+}
+
+/**
+ * @param array<string, mixed> $report
+ */
+function bootstrapRenderMarkdown(array $report): string
+{
+    $lines = [];
+    $lines[] = '# Bootstrap inventory (vm.php path)';
+    $lines[] = '';
+    $lines[] = 'Auto-generated by `script/bootstrap-inventory.php`. Tracks **Phase A** of [#212](https://github.com/PurHur/php-compiler/issues/212) (self-host bootstrap).';
+    $lines[] = '';
+    $lines[] = 'Regenerate: `php script/bootstrap-inventory.php`';
+    $lines[] = '';
+    $lines[] = '## Summary';
+    $lines[] = '';
+    $lines[] = '| Metric | Count |';
+    $lines[] = '|--------|------:|';
+    $lines[] = '| PHP files on vm.php path | '.$report['totals']['files'].' |';
+    $lines[] = '| Source constructs flagged (blockers) | '.$report['totals']['blockers'].' |';
+    $lines[] = '| Source constructs flagged (warnings) | '.$report['totals']['warnings'].' |';
+    $lines[] = '';
+    $lines[] = '## Compiler CFG gaps (`lib/Compiler.php`)';
+    $lines[] = '';
+    $lines[] = 'These `LogicException` messages indicate CFG ops or expressions not yet lowered:';
+    $lines[] = '';
+    foreach ($report['compiler_blockers'] as $msg) {
+        $lines[] = '- `'.$msg.'`';
+    }
+    $lines[] = '';
+    $lines[] = '## Files';
+    $lines[] = '';
+    $lines[] = '| File | Blockers | Warnings |';
+    $lines[] = '|------|----------|----------|';
+    foreach ($report['files'] as $rel => $info) {
+        $b = count($info['blockers']);
+        $w = count($info['warnings']);
+        if ($b === 0 && $w === 0) {
+            continue;
+        }
+        $lines[] = '| `'.$rel.'` | '.$b.' | '.$w.' |';
+    }
+    $lines[] = '';
+    $lines[] = '## Per-file construct flags';
+    $lines[] = '';
+    foreach ($report['files'] as $rel => $info) {
+        if ($info['blockers'] === [] && $info['warnings'] === []) {
+            continue;
+        }
+        $lines[] = '### `'.$rel.'`';
+        $lines[] = '';
+        if ($info['blockers'] !== []) {
+            $lines[] = '**Blockers** (likely prevent AOT bootstrap compile):';
+            foreach ($info['blockers'] as $item) {
+                $lines[] = '- '.$item;
+            }
+            $lines[] = '';
+        }
+        if ($info['warnings'] !== []) {
+            $lines[] = '**Warnings** (review for bootstrap subset):';
+            foreach ($info['warnings'] as $item) {
+                $lines[] = '- '.$item;
+            }
+            $lines[] = '';
+        }
+    }
+
+    return implode("\n", $lines)."\n";
+}
+
+$check = in_array('--check', $argv, true);
+$jsonOut = in_array('--json', $argv, true);
+$outFile = $root.'/docs/bootstrap-inventory.md';
+
+$entryFiles = [
+    'bin/vm.php',
+    'src/cli.php',
+    'src/tokenizer-compat.php',
+    'src/yay-php8-compat.php',
+    'src/llvm-env.php',
+    'src/macro_functions.php',
+];
+
+$compilerBlockers = bootstrapExtractCompilerBlockers($root.'/lib/Compiler.php');
+
+$files = [];
+foreach ($entryFiles as $rel) {
+    $path = $root.'/'.$rel;
+    if (is_file($path)) {
+        $files[$path] = true;
+    }
+}
+foreach (['lib', 'ext', 'src'] as $dir) {
+    $base = $root.'/'.$dir;
+    if (!is_dir($base)) {
+        continue;
+    }
+    $it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($base));
+    foreach ($it as $file) {
+        if ($file->isFile() && str_ends_with($file->getPathname(), '.php')) {
+            $files[$file->getPathname()] = true;
+        }
+    }
+}
+
+ksort($files, SORT_STRING);
+
+$fileReports = [];
+$totals = ['files' => 0, 'blockers' => 0, 'warnings' => 0];
+foreach (array_keys($files) as $path) {
+    if (!is_file($path) || !str_ends_with($path, '.php')) {
+        continue;
+    }
+    $rel = substr($path, strlen($root) + 1);
+    $constructs = bootstrapScanConstructs($path);
+    $fileReports[$rel] = $constructs;
+    ++$totals['files'];
+    $totals['blockers'] += count($constructs['blockers']);
+    $totals['warnings'] += count($constructs['warnings']);
+}
+
+$report = [
+    'entry' => 'bin/vm.php',
+    'compiler_blockers' => $compilerBlockers,
+    'totals' => $totals,
+    'files' => $fileReports,
+];
+
+if ($jsonOut) {
+    echo json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n";
+    exit(0);
+}
+
+$markdown = bootstrapRenderMarkdown($report);
+if ($check) {
+    if (!is_file($outFile)) {
+        fwrite(STDERR, "Missing {$outFile}; run: php script/bootstrap-inventory.php\n");
+        exit(1);
+    }
+    $committed = (string) file_get_contents($outFile);
+    if ($committed !== $markdown) {
+        fwrite(STDERR, "Stale {$outFile}; run: php script/bootstrap-inventory.php\n");
+        exit(1);
+    }
+    exit(0);
+}
+
+if (!is_dir(dirname($outFile))) {
+    mkdir(dirname($outFile), 0775, true);
+}
+file_put_contents($outFile, $markdown);
+fwrite(STDOUT, "Wrote {$outFile} ({$totals['files']} files, {$totals['blockers']} blockers)\n");
