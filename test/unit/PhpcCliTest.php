@@ -37,6 +37,33 @@ final class PhpcCliTest extends TestCase
         $this->assertStringContainsString('$_GET', $out !== false ? $out : '');
     }
 
+    public function testRunPopulatesScriptFilename(): void
+    {
+        $repoRoot = dirname(__DIR__, 2);
+        $runner = $repoRoot.'/test/fixtures/web_echo_script_filename.php';
+        $resolved = realpath($runner);
+        $this->assertNotFalse($resolved);
+        $cmd = array_merge(
+            self::phpCommand(),
+            [$repoRoot.'/bin/phpc.php', 'run', '-q', '', $runner]
+        );
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open($cmd, $descriptorSpec, $pipes, $repoRoot);
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $out = stream_get_contents($pipes[1]);
+        $err = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+        $this->assertSame(0, $exit, $err !== false ? $err : '');
+        $this->assertStringContainsString($resolved, $out !== false ? $out : '');
+    }
+
     public function testRunSimpleWebWithQueryFlag(): void
     {
         $repoRoot = dirname(__DIR__, 2);

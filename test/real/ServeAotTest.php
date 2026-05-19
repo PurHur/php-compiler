@@ -33,6 +33,29 @@ final class ServeAotTest extends TestCase
         $this->phpCmd = self::phpCommand();
     }
 
+    public function testServeAotPopulatesScriptFilename(): void
+    {
+        $docroot = $this->makeDocroot([
+            'script.php' => <<<'PHP'
+<?php
+declare(strict_types=1);
+header('Content-Type: text/plain; charset=UTF-8');
+echo $_SERVER['SCRIPT_FILENAME'];
+PHP,
+        ]);
+        $script = realpath($docroot.'/script.php');
+        $this->assertNotFalse($script);
+        $binaryDir = sys_get_temp_dir().'/phpc_serve_aot_sf_'.bin2hex(random_bytes(4));
+        $this->assertTrue(mkdir($binaryDir));
+        $binary = $binaryDir.'/app';
+        $this->compileExample($docroot.'/script.php', $binary);
+        $response = $this->httpGetAot($docroot, $binary, '/script.php');
+        $this->assertStringContainsString('HTTP/1.1 200', $response);
+        $this->assertStringContainsString($script, $response);
+        @unlink($binary);
+        @rmdir($binaryDir);
+    }
+
     public function testServeAotPopulatesDocumentRoot(): void
     {
         $docroot = $this->makeDocroot([

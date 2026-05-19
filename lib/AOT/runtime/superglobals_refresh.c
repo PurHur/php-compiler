@@ -439,6 +439,37 @@ static void apply_scheme_and_port(__hashtable__ *server)
     set_string_key(server, "SERVER_PORT", port_buf);
 }
 
+static void resolve_script_filename(
+    const char *script_name,
+    char *out,
+    size_t out_len
+) {
+    const char *from_env = getenv("SCRIPT_FILENAME");
+
+    out[0] = '\0';
+    if (NULL != from_env && '\0' != from_env[0]) {
+        strncpy(out, from_env, out_len - 1);
+        out[out_len - 1] = '\0';
+
+        return;
+    }
+
+    {
+        const char *document_root = getenv("DOCUMENT_ROOT");
+        size_t root_len;
+
+        if (NULL == document_root || '\0' == document_root[0]
+            || NULL == script_name || '\0' == script_name[0]) {
+            return;
+        }
+        root_len = strlen(document_root);
+        while (root_len > 0 && '/' == document_root[root_len - 1]) {
+            root_len--;
+        }
+        snprintf(out, out_len, "%.*s%s", (int) root_len, document_root, script_name);
+    }
+}
+
 static void derive_path_info(const char *script_name, const char *request_uri, char *out, size_t out_len)
 {
     char path_buf[1024];
@@ -481,6 +512,7 @@ void __superglobals__refresh(void)
     const char *script_name = env_or_empty("SCRIPT_NAME");
     const char *request_uri = getenv("REQUEST_URI");
     char path_info[512];
+    char script_filename[1024];
     char request_uri_buf[1024];
 
     if (NULL == request_uri || '\0' == request_uri[0]) {
@@ -516,6 +548,10 @@ void __superglobals__refresh(void)
     set_string_key(sg_SERVER, "QUERY_STRING", query_string);
     set_string_key(sg_SERVER, "SCRIPT_NAME", script_name);
     set_string_key(sg_SERVER, "PHP_SELF", script_name);
+    resolve_script_filename(script_name, script_filename, sizeof(script_filename));
+    if ('\0' != script_filename[0]) {
+        set_string_key(sg_SERVER, "SCRIPT_FILENAME", script_filename);
+    }
     set_string_key(sg_SERVER, "REQUEST_URI", request_uri);
     set_string_key(sg_SERVER, "GATEWAY_INTERFACE", "CGI/1.1");
     set_string_key(sg_SERVER, "SERVER_SOFTWARE", "PHP-Compiler-AOT");

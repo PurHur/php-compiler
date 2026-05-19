@@ -47,9 +47,13 @@ final class Superglobals
     public static function populateFromEnvironment(
         Context $context,
         ?string $queryString = null,
-        ?string $postBody = null
+        ?string $postBody = null,
+        ?string $scriptFilename = null
     ): void {
         self::$activeContext = $context;
+        if (null !== $scriptFilename && '' !== $scriptFilename) {
+            putenv('SCRIPT_FILENAME='.$scriptFilename);
+        }
         if (null === $queryString) {
             $fromEnv = getenv('QUERY_STRING');
             $queryString = false === $fromEnv ? '' : $fromEnv;
@@ -160,6 +164,11 @@ final class Superglobals
         self::setStringEntry($server, 'QUERY_STRING', $queryString);
         self::setStringEntry($server, 'SCRIPT_NAME', $scriptName);
         self::setStringEntry($server, 'PHP_SELF', $scriptName);
+
+        $scriptFilename = self::resolveScriptFilename($scriptName);
+        if ('' !== $scriptFilename) {
+            self::setStringEntry($server, 'SCRIPT_FILENAME', $scriptFilename);
+        }
 
         $requestUri = getenv('REQUEST_URI');
         if (false === $requestUri || '' === $requestUri) {
@@ -454,6 +463,31 @@ final class Superglobals
         } else {
             $ht->add((string) $key, $var);
         }
+    }
+
+    /**
+     * Resolve absolute filesystem path for the entry script (issue #302).
+     */
+    public static function resolveScriptFilename(?string $scriptName = null): string
+    {
+        $fromEnv = getenv('SCRIPT_FILENAME');
+        if (false !== $fromEnv && '' !== $fromEnv) {
+            return $fromEnv;
+        }
+
+        if (null === $scriptName) {
+            $scriptName = getenv('SCRIPT_NAME');
+            if (false === $scriptName || '' === $scriptName) {
+                $scriptName = '/index.php';
+            }
+        }
+
+        $documentRoot = getenv('DOCUMENT_ROOT');
+        if (false !== $documentRoot && '' !== $documentRoot) {
+            return rtrim($documentRoot, '/').$scriptName;
+        }
+
+        return '';
     }
 
     /**
