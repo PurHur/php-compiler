@@ -29,6 +29,10 @@ final class UnsupportedRegistryTest extends TestCase
             'yield from' => ['Expr_YieldFrom', 167],
             'closure' => ['Expr_Closure', 72],
             'arrow function' => ['Expr_ArrowFunction', 142],
+            'pre inc' => ['Expr_PreInc', 137],
+            'post inc' => ['Expr_PostInc', 137],
+            'pre dec' => ['Expr_PreDec', 137],
+            'post dec' => ['Expr_PostDec', 137],
         ];
     }
 
