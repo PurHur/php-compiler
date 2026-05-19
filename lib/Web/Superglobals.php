@@ -175,6 +175,115 @@ final class Superglobals
                 self::setStringEntry($server, $key, $value);
             }
         }
+
+        self::applySchemeAndPort($server);
+    }
+
+    /**
+     * Derive REQUEST_SCHEME, HTTPS, SERVER_PORT, and SERVER_NAME (issue #235).
+     */
+    public static function applySchemeAndPort(HashTable $server): void
+    {
+        $host = self::readStringEntry($server, 'HTTP_HOST');
+        if ('' === $host) {
+            $fromEnv = getenv('HTTP_HOST');
+            $host = false === $fromEnv ? '' : $fromEnv;
+            if ('' !== $host) {
+                self::setStringEntry($server, 'HTTP_HOST', $host);
+            }
+        }
+
+        $https = self::detectHttps($server);
+        $scheme = $https ? 'https' : 'http';
+        self::setStringEntry($server, 'REQUEST_SCHEME', $scheme);
+        if ($https) {
+            self::setStringEntry($server, 'HTTPS', 'on');
+        }
+
+        [$serverName, $portFromHost] = self::parseHostAndPort($host);
+        $port = self::resolveServerPort($https, $portFromHost);
+        self::setStringEntry($server, 'SERVER_PORT', (string) $port);
+
+        if ('' !== $serverName) {
+            self::setStringEntry($server, 'SERVER_NAME', $serverName);
+        } elseif ('' !== $host) {
+            self::setStringEntry($server, 'SERVER_NAME', $host);
+        }
+    }
+
+    /**
+     * @return array{0: string, 1: ?int} server name and optional port from Host header
+     */
+    public static function parseHostAndPort(string $host): array
+    {
+        if ('' === $host) {
+            return ['', null];
+        }
+        if ('[' === $host[0]) {
+            $close = strpos($host, ']');
+            if (false !== $close) {
+                $name = substr($host, 1, $close - 1);
+                if (isset($host[$close + 1]) && ':' === $host[$close + 1]) {
+                    $port = (int) substr($host, $close + 2);
+
+                    return [$name, $port > 0 ? $port : null];
+                }
+
+                return [$name, null];
+            }
+        }
+        $colon = strrpos($host, ':');
+        if (false !== $colon && false === strpos($host, ':', $colon + 1)) {
+            $port = (int) substr($host, $colon + 1);
+            if ($port > 0) {
+                return [substr($host, 0, $colon), $port];
+            }
+        }
+
+        return [$host, null];
+    }
+
+    public static function detectHttps(HashTable $server): bool
+    {
+        $https = getenv('HTTPS');
+        if (false !== $https && '' !== $https && '0' !== $https && 'off' !== strtolower($https)) {
+            return true;
+        }
+
+        $proto = self::readStringEntry($server, 'HTTP_X_FORWARDED_PROTO');
+        if ('' === $proto) {
+            $fromEnv = getenv('HTTP_X_FORWARDED_PROTO');
+            $proto = false === $fromEnv ? '' : $fromEnv;
+        }
+
+        return 'https' === strtolower($proto);
+    }
+
+    private static function resolveServerPort(bool $https, ?int $portFromHost): int
+    {
+        $fromEnv = getenv('SERVER_PORT');
+        if (false !== $fromEnv && '' !== $fromEnv && ctype_digit($fromEnv)) {
+            return (int) $fromEnv;
+        }
+        if (null !== $portFromHost && $portFromHost > 0) {
+            return $portFromHost;
+        }
+
+        return $https ? 443 : 80;
+    }
+
+    private static function readStringEntry(HashTable $ht, string $key): string
+    {
+        $var = $ht->find($key);
+        if (null === $var) {
+            return '';
+        }
+        $resolved = $var->resolveIndirect();
+        if (Variable::TYPE_STRING !== $resolved->type) {
+            return '';
+        }
+
+        return $resolved->toString();
     }
 
     /**

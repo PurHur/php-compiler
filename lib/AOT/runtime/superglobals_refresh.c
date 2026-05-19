@@ -305,6 +305,121 @@ static void apply_cgi_headers_from_environ(__hashtable__ *server)
     }
 }
 
+static int sg_is_https_request(void)
+{
+    const char *https = getenv("HTTPS");
+
+    if (NULL != https && '\0' != https[0] && 0 != strcmp(https, "0")
+        && 0 != strcasecmp(https, "off")) {
+        return 1;
+    }
+    {
+        const char *proto = getenv("HTTP_X_FORWARDED_PROTO");
+
+        if (NULL != proto && 0 == strcasecmp(proto, "https")) {
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+static int sg_parse_host_port(const char *host, char *name_out, size_t name_len, int *port_out)
+{
+    const char *colon;
+
+    name_out[0] = '\0';
+    *port_out = 0;
+    if ('\0' == host[0]) {
+        return 0;
+    }
+    if ('[' == host[0]) {
+        const char *close = strchr(host, ']');
+
+        if (NULL != close) {
+            size_t name_part = (size_t) (close - host - 1);
+
+            if (name_part >= name_len) {
+                name_part = name_len - 1;
+            }
+            memcpy(name_out, host + 1, name_part);
+            name_out[name_part] = '\0';
+            if (']' == close[0] && ':' == close[1]) {
+                *port_out = atoi(close + 2);
+            }
+
+            return 1;
+        }
+    }
+    colon = strrchr(host, ':');
+    if (NULL != colon && NULL == strchr(colon + 1, ':')) {
+        int port = atoi(colon + 1);
+
+        if (port > 0) {
+            size_t name_part = (size_t) (colon - host);
+
+            if (name_part >= name_len) {
+                name_part = name_len - 1;
+            }
+            memcpy(name_out, host, name_part);
+            name_out[name_part] = '\0';
+            *port_out = port;
+
+            return 1;
+        }
+    }
+    strncpy(name_out, host, name_len - 1);
+    name_out[name_len - 1] = '\0';
+
+    return 1;
+}
+
+static int sg_resolve_server_port(int https, int port_from_host)
+{
+    const char *from_env = getenv("SERVER_PORT");
+
+    if (NULL != from_env && '\0' != from_env[0]) {
+        int port = atoi(from_env);
+
+        if (port > 0) {
+            return port;
+        }
+    }
+    if (port_from_host > 0) {
+        return port_from_host;
+    }
+
+    return https ? 443 : 80;
+}
+
+static void apply_scheme_and_port(__hashtable__ *server)
+{
+    const char *host = env_or_empty("HTTP_HOST");
+    int https = sg_is_https_request();
+    const char *scheme = https ? "https" : "http";
+    char server_name[256];
+    int port_from_host = 0;
+    int port;
+    char port_buf[16];
+
+    if ('\0' != host[0]) {
+        set_string_key(server, "HTTP_HOST", host);
+        sg_parse_host_port(host, server_name, sizeof(server_name), &port_from_host);
+        if ('\0' != server_name[0]) {
+            set_string_key(server, "SERVER_NAME", server_name);
+        }
+    }
+
+    set_string_key(server, "REQUEST_SCHEME", scheme);
+    if (https) {
+        set_string_key(server, "HTTPS", "on");
+    }
+
+    port = sg_resolve_server_port(https, port_from_host);
+    snprintf(port_buf, sizeof(port_buf), "%d", port);
+    set_string_key(server, "SERVER_PORT", port_buf);
+}
+
 static void derive_path_info(const char *script_name, const char *request_uri, char *out, size_t out_len)
 {
     char path_buf[1024];
@@ -392,6 +507,7 @@ void __superglobals__refresh(void)
     }
 
     apply_cgi_headers_from_environ(sg_SERVER);
+    apply_scheme_and_port(sg_SERVER);
 
     if (NULL == sg_COOKIE) {
         sg_COOKIE = __hashtable__alloc();
