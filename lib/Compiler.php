@@ -434,11 +434,15 @@ class Compiler {
                     $this->compileOperand($expr->expr, $block, true)
                 )];
             case Op\Expr\ArrayDimFetch::class:
+                $dimSlot = null !== $expr->dim
+                    ? $this->compileOperand($expr->dim, $block, true)
+                    : null;
+
                 return [new OpCode(
                     OpCode::TYPE_ARRAY_DIM_FETCH,
                     $this->compileOperand($expr->result, $block, false),
                     $this->compileOperand($expr->var, $block, true),
-                    $this->compileOperand($expr->dim, $block, true)
+                    $dimSlot
                 )];
             case Op\Expr\ConstFetch::class:
                 $nsName = null;
