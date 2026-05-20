@@ -1,7 +1,8 @@
 # A compiler for PHP
 
-[![CI](https://github.com/PurHur/php-compiler/actions/workflows/ci.yml/badge.svg)](https://github.com/PurHur/php-compiler/actions/workflows/ci.yml)
 [![CircleCI](https://circleci.com/gh/ircmaxell/php-compiler.svg?style=svg)](https://circleci.com/gh/ircmaxell/php-compiler)
+
+**CI:** run `./script/ci-local.sh` on the host or `make test` in Docker (`php-compiler:22.04-dev`). GitHub Actions workflows are disabled (see [#394](https://github.com/PurHur/php-compiler/issues/394)).
 
 Ok, so this used to be a dead project. It required calling out to all sorts of hackery to generate PHP extensions, or PHP itself.
 
@@ -68,11 +69,11 @@ composer install
 | `PHP_COMPILER_PHP` | PHP binary for tests and scripts (default: `php`, or `php8.2` if found) |
 | `PHP_COMPILER_EXT_DIR` | Directory containing `.so` extensions (default: `/usr/lib/php/20220829` on PHP 8.2) |
 | `PHP_COMPILER_LLVM_PATH` | Path to LLVM 9 `clang`, `ld`, and `libLLVM-9.so.1` (default: repo `.llvm/` after install) |
-| `PHP_COMPILER_SKIP_SERVE_TESTS` | Skip `ServeTest` / `ServeAotTest` (set on GitHub Actions; use in sandboxes that cannot bind TCP) |
+| `PHP_COMPILER_SKIP_SERVE_TESTS` | Skip `ServeTest` / `ServeAotTest` (use in sandboxes that cannot bind TCP) |
 | `PHP_COMPILER_RUN_SERVE_TESTS` | Force HTTP serve integration tests even when loopback bind probe fails |
 | `PHP_COMPILER_ALLOW_JIT_SKIP` | Do not fail `ci-local.sh` when LLVM is present but JIT compliance tests are 100% skipped (broken dev env only) |
 
-`script/ci-local.sh` sets LLVM paths automatically when `.llvm/libLLVM-9.so.1` exists. It probes `127.0.0.1` bind capability and runs `@group serve` tests when allowed. **GitHub Actions** sets `PHP_COMPILER_SKIP_SERVE_TESTS=1` because hosted runners often block listeners; **local and Docker CI** (`make test-docker`, `./script/docker-ci-local.sh`) must run those tests — do not export the skip variable there.
+`script/ci-local.sh` sets LLVM paths automatically when `.llvm/libLLVM-9.so.1` exists. It probes `127.0.0.1` bind capability and runs `@group serve` tests when allowed. **Local and Docker CI** (`make test-docker`, `./script/docker-ci-local.sh`) should run those tests — only set `PHP_COMPILER_SKIP_SERVE_TESTS=1` when loopback bind is unavailable.
 
 ### Running tests on the host
 
@@ -145,7 +146,7 @@ When the bind-mount works normally, `make test`, `make test-harness`, and `make 
 
 If the container runs out of memory while running the full suite (process exit code **137**), increase the limit (for example `docker run -m 8g`).
 
-On sandboxes that cannot bind TCP ports, set `PHP_COMPILER_SKIP_SERVE_TESTS=1` before running CI (GitHub Actions does this automatically).
+On sandboxes that cannot bind TCP ports, set `PHP_COMPILER_SKIP_SERVE_TESTS=1` before running CI.
 
 Published tag (when available): `ghcr.io/PurHur/php-compiler:dev`. Override with `PHP_COMPILER_DEV_IMAGE`.
 
