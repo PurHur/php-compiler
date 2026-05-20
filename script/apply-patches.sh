@@ -22,6 +22,9 @@ patch_already_applied() {
     php-types-str-split-string-array.patch)
       grep -q "'str_split' => \['string\[\]'" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php" 2>/dev/null
       ;;
+    php-types-readfile-int-false.patch)
+      grep -q "'readfile' => \['int|false'" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php" 2>/dev/null
+      ;;
     php-cfg-nullsafe.patch)
       [[ -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/NullsafePropertyFetch.php" ]]
       ;;
@@ -80,6 +83,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-binaryop-spaceship.patch"
   apply_patch "$PATCH_DIR/php-types-str-bool-fns.patch"
   apply_patch "$PATCH_DIR/php-types-str-split-string-array.patch"
+  apply_patch "$PATCH_DIR/php-types-readfile-int-false.patch"
   apply_patch "$PATCH_DIR/php-types-dollars-brace.patch"
   apply_patch "$PATCH_DIR/php-types-mixed-reserved.patch"
   apply_patch "$PATCH_DIR/php-types-nullsafe.patch"
