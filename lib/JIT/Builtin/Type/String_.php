@@ -175,6 +175,7 @@ class String_ extends Type {
         $this->implementStrlen();
         \PHPCompiler\JIT\Builtin\StringHtmlspecialchars::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringUrlencode::implement($this->context);
+        \PHPCompiler\JIT\Builtin\StringRandomBytes::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringGetenv::implement($this->context);
     }
 
