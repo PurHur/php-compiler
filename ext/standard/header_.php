@@ -13,6 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\HttpResponseCode;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
@@ -74,12 +75,25 @@ final class header_ extends Internal
         if (JITVariable::TYPE_STRING !== $args[0]->type) {
             throw new \LogicException('header() only supports string header lines in this compiler build');
         }
+        $line = $context->helper->loadValue($args[0]);
+        if (3 === $argc) {
+            if (JITVariable::TYPE_NATIVE_BOOL !== $args[1]->type) {
+                throw new \LogicException('header() replace argument must be a boolean in this compiler build');
+            }
+            if (JITVariable::TYPE_NATIVE_LONG !== $args[2]->type) {
+                throw new \LogicException('header() response_code must be an integer in this compiler build');
+            }
+            HttpResponseCode::emitStandaloneStatusLine($context, $context->helper->loadValue($args[2]));
+            JitHeader::emit($context, $line);
+
+            return $context->getTypeFromString('int32')->constInt(0, false);
+        }
         if ($argc > 1) {
             throw new \LogicException(
-                'header() JIT only supports a single string argument in this compiler build'
+                'header() JIT only supports one string or three arguments (line, replace, response_code) in this compiler build'
             );
         }
-        JitHeader::emit($context, $context->helper->loadValue($args[0]));
+        JitHeader::emit($context, $line);
 
         return $context->getTypeFromString('int32')->constInt(0, false);
     }

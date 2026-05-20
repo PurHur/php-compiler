@@ -1,0 +1,11 @@
+--- vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php
+@@ -6107,7 +6107,7 @@
+         'rawurldecode' => ['string', 'str' => 'string'],
+         'rawurlencode' => ['string', 'str' => 'string'],
+         'readdir' => ['string', 'dir_handle=' => ''],
+-        'readfile' => ['int', 'filename' => 'string', 'use_include_path=' => 'bool', 'context=' => ''],
++        'readfile' => ['int|false', 'filename' => 'string', 'use_include_path=' => 'bool', 'context=' => ''],
+         'readgzfile' => ['int', 'filename' => 'string', 'use_include_path=' => 'int'],
+         'readline_add_history' => ['bool', 'prompt' => 'string'],
+         'readline_callback_handler_install' => ['', 'prompt' => 'string', 'callback' => ''],
