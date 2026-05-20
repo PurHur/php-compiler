@@ -26,6 +26,10 @@ class JITTest extends BaseTest {
             if (str_contains(strtolower($case[0]), 'extract') || str_contains(strtolower($case[0]), 'compact')) {
                 continue;
             }
+            // password_hash()/password_verify() are VM-only (#172).
+            if (str_contains(strtolower($case[0]), 'password')) {
+                continue;
+            }
             yield $case;
         }
     }

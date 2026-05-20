@@ -52,6 +52,11 @@ class Context {
                 $var = new Variable(Variable::TYPE_FLOAT);
                 $var->float(NAN);
                 return $var;
+            case 'password_bcrypt':
+            case 'password_default':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(\PHPCompiler\ext\standard\VmPassword::PASSWORD_DEFAULT);
+                return $var;
         }
         if (isset($this->constants[$name])) {
             return $this->constants[$name];

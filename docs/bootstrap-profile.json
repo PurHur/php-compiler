@@ -70,6 +70,7 @@
         "ext/standard/VmInternalCall.php",
         "ext/standard/VmJson.php",
         "ext/standard/VmNumberFormat.php",
+        "ext/standard/VmPassword.php",
         "ext/standard/VmScope.php",
         "ext/standard/VmSprintf.php",
         "ext/standard/VmString.php",
@@ -155,6 +156,8 @@
         "ext/standard/octdec.php",
         "ext/standard/ord.php",
         "ext/standard/parse_url.php",
+        "ext/standard/password_hash.php",
+        "ext/standard/password_verify.php",
         "ext/standard/pi.php",
         "ext/standard/pow.php",
         "ext/standard/putenv_.php",
@@ -308,9 +311,9 @@
         "test/bootstrap-aot/echo_hello.php"
     ],
     "totals": {
-        "inventory_files": 274,
+        "inventory_files": 277,
         "excluded": 2,
-        "eligible": 272,
+        "eligible": 275,
         "aot_lint_targets": 2
     }
 }
