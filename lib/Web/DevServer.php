@@ -57,6 +57,16 @@ final class DevServer
 
     public static function handleConnection($conn, string $docroot, callable $handlePhpRequest): void
     {
+        $remoteAddr = null;
+        $remotePort = null;
+        $peer = stream_socket_get_name($conn, true);
+        if (is_string($peer)) {
+            $parsed = self::parsePeerAddress($peer);
+            if (null !== $parsed) {
+                [$remoteAddr, $remotePort] = $parsed;
+            }
+        }
+
         $raw = self::readRequest($conn);
         if (null === $raw) {
             self::respond($conn, 400, 'text/plain', "Bad Request\n");
@@ -67,7 +77,7 @@ final class DevServer
         [$method, $path, $query, $headers, $body, $serverProtocol] = $raw;
         $path = parse_url($path, PHP_URL_PATH) ?? '/';
         if ('/' === $path) {
-            $path = '/example.php';
+            $path = self::resolveDirectoryIndex($docroot);
         }
 
         if (!self::isSafeUrlPath($path)) {
@@ -128,6 +138,10 @@ final class DevServer
         if ('' !== $pathInfo) {
             $cgiEnv['PATH_INFO'] = $pathInfo;
         }
+        if (null !== $remoteAddr && null !== $remotePort) {
+            $cgiEnv['REMOTE_ADDR'] = $remoteAddr;
+            $cgiEnv['REMOTE_PORT'] = $remotePort;
+        }
 
         self::clearHttpServerKeys();
         $cgiEnv = array_merge($cgiEnv, Superglobals::applyHttpHeaders($headers));
@@ -150,6 +164,16 @@ final class DevServer
             putenv('PATH_INFO='.$pathInfo);
         } else {
             putenv('PATH_INFO');
+        }
+        if (null !== $remoteAddr && null !== $remotePort) {
+            putenv('REMOTE_ADDR='.$remoteAddr);
+            putenv('REMOTE_PORT='.$remotePort);
+            $_SERVER['REMOTE_ADDR'] = $remoteAddr;
+            $_SERVER['REMOTE_PORT'] = $remotePort;
+        } else {
+            putenv('REMOTE_ADDR');
+            putenv('REMOTE_PORT');
+            unset($_SERVER['REMOTE_ADDR'], $_SERVER['REMOTE_PORT']);
         }
 
         try {
@@ -238,6 +262,36 @@ final class DevServer
     }
 
     /**
+     * Parse stream_socket_get_name($socket, true) into address and port (issue #295).
+     *
+     * @return array{0: string, 1: string}|null
+     */
+    public static function parsePeerAddress(string $peer): ?array
+    {
+        if ('' === $peer) {
+            return null;
+        }
+        if ('[' === $peer[0]) {
+            if (!preg_match('#^\[([^\]]+)\]:(\d+)$#', $peer, $m)) {
+                return null;
+            }
+
+            return [$m[1], $m[2]];
+        }
+        $colon = strrpos($peer, ':');
+        if (false === $colon) {
+            return null;
+        }
+        $addr = substr($peer, 0, $colon);
+        $port = substr($peer, $colon + 1);
+        if ('' === $addr || '' === $port || !ctype_digit($port)) {
+            return null;
+        }
+
+        return [$addr, $port];
+    }
+
+    /**
      * @param array<string, string> $headers lowercase header name => value
      *
      * @return array<string, string> HTTP_* keys for $_SERVER / CGI env
@@ -270,6 +324,47 @@ final class DevServer
                 unset($_SERVER[$key]);
             }
         }
+    }
+
+    /**
+     * URL path for GET / when no script is in the request (issue #254).
+     *
+     * Prefer index.php (standard front controller); fall back to example.php for
+     * shipped examples/001-SimpleWeb. Optional phpc.json "index" overrides when set.
+     */
+    public static function resolveDirectoryIndex(string $docroot, ?array $manifest = null): string
+    {
+        if (null !== $manifest && isset($manifest['index']) && is_string($manifest['index']) && '' !== $manifest['index']) {
+            $index = $manifest['index'];
+            if ('/' === $index[0]) {
+                if (is_file($index)) {
+                    return $index;
+                }
+            } else {
+                $base = realpath($docroot);
+                if (false === $base) {
+                    $base = $docroot;
+                }
+                $candidate = $base.'/'.$index;
+                if (is_file($candidate)) {
+                    $urlPath = '/'.ltrim(str_replace('\\', '/', substr($candidate, strlen($base))), '/');
+                    if ('' === $urlPath || '/' === $urlPath) {
+                        return '/index.php';
+                    }
+
+                    return $urlPath;
+                }
+            }
+        }
+
+        if (is_file($docroot.'/index.php')) {
+            return '/index.php';
+        }
+        if (is_file($docroot.'/example.php')) {
+            return '/example.php';
+        }
+
+        return '/index.php';
     }
 
     public static function isSafeUrlPath(string $path): bool

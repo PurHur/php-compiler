@@ -1,0 +1,4 @@
+{
+    "entry": "public/index.php",
+    "binary": ".phpc/bin/app"
+}

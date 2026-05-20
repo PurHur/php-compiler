@@ -38,6 +38,37 @@ final class ServeTest extends TestCase
     $this->assertStringContainsString('Dev', $response);
   }
 
+  public function testServesIndexPhpForRootPath(): void
+  {
+    $docroot = $this->makeDocroot([
+      'index.php' => '<?php echo "from-index";',
+    ]);
+    $response = $this->httpGet($docroot, '/');
+    $this->assertStringContainsString('HTTP/1.1 200', $response);
+    $this->assertStringContainsString('from-index', $response);
+  }
+
+  public function testExamplePhpFallbackWhenNoIndex(): void
+  {
+    $docroot = $this->makeDocroot([
+      'example.php' => '<?php echo "from-example";',
+    ]);
+    $response = $this->httpGet($docroot, '/');
+    $this->assertStringContainsString('HTTP/1.1 200', $response);
+    $this->assertStringContainsString('from-example', $response);
+  }
+
+  public function testPrefersIndexPhpOverExamplePhp(): void
+  {
+    $docroot = $this->makeDocroot([
+      'index.php' => '<?php echo "index-wins";',
+      'example.php' => '<?php echo "example-loses";',
+    ]);
+    $response = $this->httpGet($docroot, '/');
+    $this->assertStringContainsString('index-wins', $response);
+    $this->assertStringNotContainsString('example-loses', $response);
+  }
+
   public function testUncaughtExceptionReturns500WithoutLeak(): void
   {
     $docroot = $this->makeDocroot(['error.php' => '<?php no_such_func();']);
@@ -86,6 +117,21 @@ PHP,
     $response = $this->httpGet($docroot, '/notfound.php');
     $this->assertStringContainsString('HTTP/1.1 404', $response);
     $this->assertStringContainsString('missing', $response);
+  }
+
+  public function testHttpResponseCode405SetsStatusLine(): void
+  {
+    $docroot = $this->makeDocroot([
+      'method.php' => <<<'PHP'
+<?php
+http_response_code(405);
+echo 'Nope';
+PHP,
+    ]);
+    $response = $this->httpGet($docroot, '/method.php');
+    $this->assertStringContainsString('HTTP/1.1 405', $response);
+    $this->assertStringContainsString('Method Not Allowed', $response);
+    $this->assertStringContainsString('Nope', $response);
   }
 
   public function testPopulatesHttpServerHeaders(): void
@@ -143,6 +189,19 @@ PHP,
     $response = $this->httpGet($docroot, '/docroot.php');
     $this->assertStringContainsString('HTTP/1.1 200', $response);
     $this->assertStringContainsString($resolved, $response);
+  }
+
+  public function testPopulatesRemoteAddrForLoopback(): void
+  {
+    $docroot = $this->makeDocroot([
+      'remote.php' => <<<'PHP'
+<?php
+echo $_SERVER['REMOTE_ADDR'], '|', $_SERVER['REMOTE_PORT'];
+PHP,
+    ]);
+    $response = $this->httpGet($docroot, '/remote.php');
+    $this->assertStringContainsString('HTTP/1.1 200', $response);
+    $this->assertMatchesRegularExpression('#127\.0\.0\.1\|\d+#', $this->responseBody($response));
   }
 
   public function testPopulatesScriptFilename(): void
@@ -292,6 +351,13 @@ PHP,
     proc_close($proc);
 
     return $response !== false ? $response : '';
+  }
+
+  private function responseBody(string $response): string
+  {
+    $parts = preg_split("/\r\n\r\n|\n\n/", $response, 2);
+
+    return $parts[1] ?? '';
   }
 
   private function makeDocroot(array $files): string

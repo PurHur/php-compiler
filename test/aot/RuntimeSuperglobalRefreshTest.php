@@ -238,6 +238,57 @@ PHP;
         @unlink($outfile);
     }
 
+    public function testRemoteAddrFromCgiEnvironment(): void
+    {
+        $source = <<<'PHP'
+<?php
+declare(strict_types=1);
+header('Content-Type: text/plain; charset=UTF-8');
+echo $_SERVER['REMOTE_ADDR'], '|', $_SERVER['REMOTE_PORT'];
+PHP;
+
+        $outfile = tempnam(sys_get_temp_dir(), 'phpc_remote_');
+        $this->assertNotFalse($outfile);
+        unlink($outfile);
+
+        $repoRoot = dirname(__DIR__, 2);
+        $env = $this->llvmProcessEnv($repoRoot);
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+
+        $compile = proc_open(
+            array_merge(
+                self::llvmEnvPrefix(),
+                self::phpCommand(),
+                [$this->compileBin, '-o', $outfile]
+            ),
+            $descriptorSpec,
+            $pipes,
+            $repoRoot,
+            $env
+        );
+        fwrite($pipes[0], $source);
+        fclose($pipes[0]);
+        $compileErr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        proc_close($compile);
+        $this->assertFileExists($outfile, trim($compileErr !== false ? $compileErr : ''));
+
+        $runEnv = $env;
+        $runEnv['REMOTE_ADDR'] = '203.0.113.7';
+        $runEnv['REMOTE_PORT'] = '54321';
+        $runEnv['SCRIPT_NAME'] = '/index.php';
+        $runEnv['REQUEST_URI'] = '/index.php';
+        $output = $this->runBinary($outfile, $runEnv);
+        $this->assertStringContainsString('203.0.113.7|54321', $output);
+
+        @unlink($outfile);
+    }
+
     public function testDocumentRootFromCgiEnvironment(): void
     {
         $source = <<<'PHP'

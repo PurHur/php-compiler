@@ -156,10 +156,24 @@ class JIT {
         }
         return $func;
     }
+
+    public function compileSubBlock(
+        PHPLLVM\Value $func,
+        Block $block,
+        Variable ...$args
+    ): PHPLLVM\BasicBlock {
+        $limit = $block->nOpCodes;
+        if ($limit > 0 && OpCode::TYPE_JUMP === $block->opCodes[$limit - 1]->type) {
+            --$limit;
+        }
+
+        return $this->compileBlockInternal($func, $block, $limit, ...$args);
+    }
     
     private function compileBlockInternal(
         PHPLLVM\Value $func,
         Block $block,
+        ?int $limit = null,
         Variable ...$args
     ): PHPLLVM\BasicBlock {
         if ($this->context->scope->blockStorage->contains($block)) {
@@ -175,7 +189,7 @@ class JIT {
             $this->context->makeVariableFromOp($func, $basicBlock, $block, $operand);
         }
 
-        for ($i = 0, $length = count($block->opCodes); $i < $length; $i++) {
+        for ($i = 0, $length = null !== $limit ? $limit : count($block->opCodes); $i < $length; $i++) {
             $op = $block->opCodes[$i];
             switch ($op->type) {
                 case OpCode::TYPE_ARG_RECV:
@@ -414,6 +428,18 @@ class JIT {
                         );
                     }
                     break;
+                case OpCode::TYPE_EXIT:
+                    if (null === $op->arg2) {
+                        $i32 = $this->context->getTypeFromString('int32');
+                        $this->context->builder->call(
+                            $this->context->lookupFunction('exit'),
+                            $i32->constInt(0, false)
+                        );
+                        break;
+                    }
+                    $exitArg = $this->context->getVariableFromOp($block->getOperand($op->arg2));
+                    JIT\Builtin\ScriptExit::emit($this->context, $exitArg);
+                    break;
                 case OpCode::TYPE_POW:
                     $pow = new \PHPCompiler\ext\standard\pow();
                     $powResult = $pow->call(
@@ -466,6 +492,30 @@ class JIT {
                     $builder->positionAtEnd($branchBlock);
                     $this->context->freeDeadVariables($func, $branchBlock, $block);
                     $builder->branch($newBlock);
+                    return $origBasicBlock;
+                case OpCode::TYPE_COALESCE:
+                    $branchBlock = $builder->getInsertBlock();
+                    $builder->positionAtEnd($branchBlock);
+                    $condition = $this->context->castToBool(
+                        $this->context->helper->loadValue($this->context->getVariableFromOp($block->getOperand($op->arg2)))
+                    );
+                    $leftBb = JIT\CoalesceHelper::compileBranch($this, $func, $op->block1);
+                    $rightBb = JIT\CoalesceHelper::compileBranch($this, $func, $op->block2);
+                    $builder->positionAtEnd($branchBlock);
+                    $this->context->freeDeadVariables($func, $branchBlock, $block);
+                    $builder->branchIf($condition, $leftBb, $rightBb);
+                    if (null !== $op->block3) {
+                        $mergeBb = JIT\BasicBlockHelper::append($this->context, 'coalesce_merge');
+                        $builder->positionAtEnd($leftBb);
+                        $builder->branch($mergeBb);
+                        $builder->positionAtEnd($rightBb);
+                        $builder->branch($mergeBb);
+                        $builder->positionAtEnd($mergeBb);
+                        $this->context->scope->blockStorage[$op->block3] = $mergeBb;
+
+                        return $this->compileBlockInternal($func, $op->block3, ...$args);
+                    }
+
                     return $origBasicBlock;
                 case OpCode::TYPE_JUMPIF:
                     $branchBlock = $builder->getInsertBlock();
@@ -560,7 +610,8 @@ class JIT {
                     throw new \LogicException("Unknown JIT opcode: ". $op->getType());
             }
         }
-        throw new \LogicException("Reached the end of the loop, this shouldn't happen...");
+
+        return $builder->getInsertBlock();
     }
 
     private function compileClass(?Block $block, int $classId) {

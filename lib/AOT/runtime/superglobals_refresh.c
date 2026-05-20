@@ -582,6 +582,21 @@ void __superglobals__refresh(void)
         }
     }
 
+    {
+        const char *remote_addr = getenv("REMOTE_ADDR");
+
+        if (NULL != remote_addr && '\0' != remote_addr[0]) {
+            set_string_key(sg_SERVER, "REMOTE_ADDR", remote_addr);
+        }
+    }
+    {
+        const char *remote_port = getenv("REMOTE_PORT");
+
+        if (NULL != remote_port && '\0' != remote_port[0]) {
+            set_string_key(sg_SERVER, "REMOTE_PORT", remote_port);
+        }
+    }
+
     derive_path_info(script_name, request_uri, path_info, sizeof(path_info));
     if ('\0' != path_info[0]) {
         set_string_key(sg_SERVER, "PATH_INFO", path_info);

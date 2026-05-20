@@ -26,12 +26,11 @@ PHP;
         $this->assertMatchesRegularExpression('/line \d+/', $exit['stdout']);
     }
 
-    public function testLintCoalesceReportsIssue99(): void
+    public function testLintCoalesceAccepted(): void
     {
         $code = '<?php $a = $b ?? 1;';
         $exit = $this->runLint(['-r', $code]);
-        $this->assertSame(1, $exit['code']);
-        $this->assertStringContainsString('#99', $exit['stdout']);
+        $this->assertSame(0, $exit['code']);
     }
 
     public function testLintShiftAssignReportsIssue136(): void
@@ -66,6 +65,30 @@ PHP;
         $this->assertSame(1, $exit['code']);
         $this->assertStringContainsString('#137', $exit['stdout']);
         $this->assertStringContainsString('Expr_PostInc', $exit['stdout']);
+    }
+
+    public function testLintShortListDestructuringReportsIssue139(): void
+    {
+        $exit = $this->runLint(['-r', '[$a,$b]=["x","y"];']);
+        $this->assertSame(1, $exit['code']);
+        $this->assertStringContainsString('#139', $exit['stdout']);
+        $this->assertStringContainsString('Expr_List', $exit['stdout']);
+    }
+
+    public function testLintListFunctionDestructuringReportsIssue139(): void
+    {
+        $exit = $this->runLint(['-r', 'list($a,$b)=array(1,2);']);
+        $this->assertSame(1, $exit['code']);
+        $this->assertStringContainsString('#139', $exit['stdout']);
+        $this->assertStringContainsString('Expr_List', $exit['stdout']);
+    }
+
+    public function testLintSwitchReportsIssue96(): void
+    {
+        $exit = $this->runLint(['-r', 'switch (1) { case 1: echo 1; }']);
+        $this->assertSame(1, $exit['code']);
+        $this->assertStringContainsString('#96', $exit['stdout']);
+        $this->assertStringContainsString('Stmt_Switch', $exit['stdout']);
     }
 
     public function testLintCleanScriptExitsZero(): void

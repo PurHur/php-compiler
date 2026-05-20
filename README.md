@@ -18,9 +18,10 @@ git clone https://github.com/PurHur/php-compiler.git
 cd php-compiler
 composer install
 ./phpc test                    # full PHPUnit suite (VM, compliance, JIT, AOT)
+mkdir my-app && ./phpc init my-app   # phpc.json + public/index.php scaffold
 ./phpc run -r 'echo 1;'        # VM mode (or: php bin/vm.php -r 'echo 1;')
 ./phpc run -q 'name=Dev' examples/001-SimpleWeb/example.php   # web example without TCP
-make web-smoke                 # VM: examples/001-SimpleWeb
+make web-smoke                 # lint shipped examples, then VM smoke for 001-SimpleWeb
 ./phpc serve examples/001-SimpleWeb   # http://127.0.0.1:8080/ (or: make serve)
 ```
 

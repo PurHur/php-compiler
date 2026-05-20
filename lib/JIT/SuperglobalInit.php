@@ -16,7 +16,7 @@ final class SuperglobalInit
     /** @var array<string, \PHPLLVM\Value> */
     public static array $globals = [];
 
-    /** $_SERVER keys repopulated by __superglobals__refresh (issue #201, #235, #296, #302, #314). */
+    /** $_SERVER keys repopulated by __superglobals__refresh (issue #201, #235, #296, #302, #295, #314). */
     private const RUNTIME_SERVER_KEYS = [
         'REQUEST_SCHEME',
         'HTTPS',
@@ -27,6 +27,8 @@ final class SuperglobalInit
         'SCRIPT_FILENAME',
         'CONTENT_LENGTH',
         'CONTENT_TYPE',
+        'REMOTE_ADDR',
+        'REMOTE_PORT',
     ];
 
     public static function declareRefresh(Context $context): void

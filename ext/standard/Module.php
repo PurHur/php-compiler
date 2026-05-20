@@ -117,6 +117,9 @@ class Module extends ModuleAbstract
             new putenv_(),
             new scandir(),
             new glob_(),
+            new time(),
+            new date(),
+            new gmdate(),
         ];
     }
 

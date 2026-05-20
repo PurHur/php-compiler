@@ -316,6 +316,16 @@ class JIT {
                         );
                     }
                     break;
+                case OpCode::TYPE_EXIT:
+                    if (null === $op->arg2) {
+                        compile {
+                            exit(0);
+                        }
+                        break;
+                    }
+                    $exitArg = $this->context->getVariableFromOp($block->getOperand($op->arg2));
+                    \PHPCompiler\JIT\Builtin\ScriptExit::emit($this->context, $exitArg);
+                    break;
                 case OpCode::TYPE_POW:
                     $pow = new \PHPCompiler\ext\standard\pow();
                     $powResult = $pow->call(
