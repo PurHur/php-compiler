@@ -70,7 +70,11 @@ restart:
                         $offset->stringOffset($container, $arg3->toInt());
                         $arg1->indirect($offset);
                     } elseif ($container->type === Variable::TYPE_ARRAY) {
-                        $arg1->indirect($container->toArray()->findVariable($arg3, false));
+                        $table = $container->toArray();
+                        if (!$table->keyExists($arg3)) {
+                            $this->context->errors->undefinedArrayKey($arg3);
+                        }
+                        $arg1->indirect($table->findVariable($arg3, false));
                     } else {
                         throw new \LogicException('Illegal offset');
                     }

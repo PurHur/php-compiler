@@ -92,6 +92,23 @@ class Type extends Builtin {
         );
         $fnFormatDt = $this->context->module->addFunction('__compiler_format_datetime', $fntypeFormatDt);
         $this->context->registerFunction('__compiler_format_datetime', $fnFormatDt);
+        $fntypeUndefKeyStr = $this->context->context->functionType(
+            $void,
+            false,
+            $i8p,
+            $sizeT
+        );
+        $fnUndefKeyStr = $this->context->module->addFunction(
+            '__compiler_undefined_array_key_warning_cstr',
+            $fntypeUndefKeyStr
+        );
+        $this->context->registerFunction('__compiler_undefined_array_key_warning_cstr', $fnUndefKeyStr);
+        $fntypeUndefKeyLong = $this->context->context->functionType($void, false, $i64);
+        $fnUndefKeyLong = $this->context->module->addFunction(
+            '__compiler_undefined_array_key_warning_long',
+            $fntypeUndefKeyLong
+        );
+        $this->context->registerFunction('__compiler_undefined_array_key_warning_long', $fnUndefKeyLong);
         $i8p = $this->context->getTypeFromString('int8*');
         $i64p = $this->context->getTypeFromString('int64*');
         $libcFns = [

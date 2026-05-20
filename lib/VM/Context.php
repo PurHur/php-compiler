@@ -24,10 +24,12 @@ class Context {
     private array $superglobalVars = [];
 
     public Runtime $runtime;
-    
+
+    public ErrorReporter $errors;
 
     public function __construct(Runtime $runtime) {
         $this->runtime = $runtime;
+        $this->errors = new ErrorReporter();
     }
 
     public function constantFetch(string $name): ?Variable {

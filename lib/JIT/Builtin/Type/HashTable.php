@@ -754,6 +754,31 @@ class HashTable extends Type
         $ht = $fn->getParam(0);
         $key = $fn->getParam(1);
         $valPtr = $this->lookupStringKeyValue($fn, $block, $ht, $key);
+        $afterLookup = $fn->appendBasicBlock('strkey_read_val_after_lookup');
+        $this->context->builder->branch($afterLookup);
+        $this->context->builder->positionAtEnd($afterLookup);
+        $isNull = $this->context->builder->icmp(Builder::INT_EQ, $valPtr, $valPtr->typeOf()->constNull());
+        $hasValue = $fn->appendBasicBlock('strkey_read_val_has_value');
+        $warn = $fn->appendBasicBlock('strkey_read_val_warn');
+        $merge = $fn->appendBasicBlock('strkey_read_val_merge');
+        $this->context->builder->branchIf($isNull, $warn, $hasValue);
+        $this->context->builder->positionAtEnd($warn);
+        $strMap = $this->context->structFieldMap['__string__'];
+        $i8p = $this->context->getTypeFromString('int8*');
+        $keyLen = $this->context->builder->load(
+            $this->context->builder->structGep($key, $strMap['length'])
+        );
+        $keyBytes = $this->stringDataPtr($key);
+        $keyCStr = $this->context->builder->pointerCast($keyBytes, $i8p);
+        $this->context->builder->call(
+            $this->context->lookupFunction('__compiler_undefined_array_key_warning_cstr'),
+            $keyCStr,
+            $keyLen
+        );
+        $this->context->builder->branch($merge);
+        $this->context->builder->positionAtEnd($hasValue);
+        $this->context->builder->branch($merge);
+        $this->context->builder->positionAtEnd($merge);
         $this->context->builder->returnValue($valPtr);
     }
 
