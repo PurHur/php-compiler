@@ -1,3 +1,4 @@
+Wrote /compiler/docs/bootstrap-profile.json (2 AOT lint targets, 2 excluded files)
 {
     "phase": "B",
     "issue": 212,
@@ -181,6 +182,7 @@
         "ext/standard/web_bool.php",
         "ext/standard/web_int.php",
         "ext/standard/web_string.php",
+        "ext/types/JitMbStrlen.php",
         "ext/types/Module.php",
         "ext/types/is_type.php",
         "ext/types/mb_strlen.php",
@@ -285,9 +287,9 @@
         "test/bootstrap-aot/echo_hello.php"
     ],
     "totals": {
-        "inventory_files": 251,
+        "inventory_files": 252,
         "excluded": 2,
-        "eligible": 249,
+        "eligible": 250,
         "aot_lint_targets": 2
     }
 }
