@@ -847,6 +847,181 @@ static void nf_format_fraction(long long frac, long long decimals, char *buf, si
     buf[pos] = '\0';
 }
 
+typedef struct __value__ {
+    char type;
+    char value[8];
+} __value__;
+
+#define PHPC_TYPE_NULL 0
+#define PHPC_TYPE_LONG 1
+#define PHPC_TYPE_BOOL 2
+#define PHPC_TYPE_DOUBLE 3
+#define PHPC_TYPE_STRING 4
+
+extern long long __value__readLong(__value__ *);
+extern double __value__readDouble(__value__ *);
+extern __string__ *__value__readString(__value__ *);
+
+#define SPRINTF_MAX_OUT 4096
+
+static int sp_type_kind(char type_byte)
+{
+    return (int) (type_byte & 127);
+}
+
+static void sp_append_decimal_ll(char *buf, size_t *pos, size_t cap, long long value)
+{
+    char digits[32];
+    size_t digit_len = 0;
+    int negative = 0;
+
+    if (value < 0) {
+        negative = 1;
+        value = -value;
+    }
+    if (0 == value) {
+        nf_append_char(buf, pos, cap, '0');
+
+        return;
+    }
+    while (value > 0 && digit_len < sizeof(digits)) {
+        digits[digit_len++] = (char) ('0' + (value % 10));
+        value /= 10;
+    }
+    if (negative) {
+        nf_append_char(buf, pos, cap, '-');
+    }
+    while (digit_len > 0) {
+        nf_append_char(buf, pos, cap, digits[--digit_len]);
+    }
+}
+
+static void sp_append_float(char *buf, size_t *pos, size_t cap, double num)
+{
+    char frac_buf[32];
+    long long scale;
+    long long scaled;
+    long long int_part;
+    long long frac_part;
+
+    scale = nf_pow10(6);
+    scaled = nf_round_scaled(num, scale);
+    if (scaled < 0) {
+        nf_append_char(buf, pos, cap, '-');
+        scaled = -scaled;
+    }
+    int_part = scaled / scale;
+    frac_part = scaled % scale;
+    {
+        char int_buf[64];
+
+        nf_format_unsigned(int_part, int_buf, sizeof(int_buf), NULL);
+        nf_append_str(buf, pos, cap, int_buf, strlen(int_buf));
+    }
+    nf_append_char(buf, pos, cap, '.');
+    nf_format_fraction(frac_part, 6, frac_buf, sizeof(frac_buf));
+    nf_append_str(buf, pos, cap, frac_buf, strlen(frac_buf));
+}
+
+static void sp_append_spec(
+    char *buf,
+    size_t *pos,
+    size_t cap,
+    __value__ *v,
+    char spec
+) {
+    int kind = sp_type_kind(v->type);
+
+    switch (spec) {
+        case 's':
+            if (PHPC_TYPE_STRING == kind) {
+                __string__ *s = __value__readString(v);
+                const char *data = nf_strdata(s);
+                size_t len = nf_strlen(s);
+
+                nf_append_str(buf, pos, cap, data, len);
+            } else if (PHPC_TYPE_LONG == kind || PHPC_TYPE_BOOL == kind) {
+                sp_append_decimal_ll(buf, pos, cap, __value__readLong(v));
+            } else if (PHPC_TYPE_DOUBLE == kind) {
+                sp_append_float(buf, pos, cap, __value__readDouble(v));
+            } else if (PHPC_TYPE_NULL == kind) {
+                return;
+            }
+            return;
+        case 'd':
+            if (PHPC_TYPE_LONG == kind || PHPC_TYPE_BOOL == kind) {
+                sp_append_decimal_ll(buf, pos, cap, __value__readLong(v));
+            } else if (PHPC_TYPE_DOUBLE == kind) {
+                sp_append_decimal_ll(buf, pos, cap, (long long) __value__readDouble(v));
+            } else if (PHPC_TYPE_NULL == kind) {
+                nf_append_char(buf, pos, cap, '0');
+            } else if (PHPC_TYPE_STRING == kind) {
+                sp_append_decimal_ll(buf, pos, cap, strtoll(nf_strdata(__value__readString(v)), NULL, 10));
+            }
+            return;
+        case 'f':
+            if (PHPC_TYPE_DOUBLE == kind) {
+                sp_append_float(buf, pos, cap, __value__readDouble(v));
+            } else if (PHPC_TYPE_LONG == kind || PHPC_TYPE_BOOL == kind) {
+                sp_append_float(buf, pos, cap, (double) __value__readLong(v));
+            } else if (PHPC_TYPE_NULL == kind) {
+                nf_append_char(buf, pos, cap, '0');
+                nf_append_char(buf, pos, cap, '.');
+                nf_append_char(buf, pos, cap, '0');
+            } else if (PHPC_TYPE_STRING == kind) {
+                sp_append_float(buf, pos, cap, strtod(nf_strdata(__value__readString(v)), NULL));
+            }
+            return;
+        default:
+            return;
+    }
+}
+
+/**
+ * LLVM/AOT runtime: sprintf() subset (%s, %d, %f, %%).
+ */
+__string__ *__compiler_sprintf(__string__ *fmt, long long argc, __value__ *argv)
+{
+    const char *format;
+    size_t fmt_len;
+    size_t pos = 0;
+    size_t arg_idx = 0;
+    size_t i;
+    char out[SPRINTF_MAX_OUT + 1];
+
+    if (NULL == fmt) {
+        return cstr_to_string("");
+    }
+    format = nf_strdata(fmt);
+    fmt_len = nf_strlen(fmt);
+    for (i = 0; i < fmt_len; i++) {
+        char ch = format[i];
+
+        if ('%' != ch) {
+            nf_append_char(out, &pos, sizeof(out), ch);
+            continue;
+        }
+        if (i + 1 >= fmt_len) {
+            break;
+        }
+        ch = format[++i];
+        if ('%' == ch) {
+            nf_append_char(out, &pos, sizeof(out), '%');
+            continue;
+        }
+        if (arg_idx >= (size_t) argc) {
+            break;
+        }
+        if (NULL != argv) {
+            sp_append_spec(out, &pos, sizeof(out), argv + arg_idx, ch);
+        }
+        arg_idx++;
+    }
+    out[pos] = '\0';
+
+    return cstr_to_string(out);
+}
+
 /**
  * LLVM/AOT runtime: number_format() subset (int/float, custom separators).
  */
