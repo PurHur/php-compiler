@@ -90,6 +90,11 @@ test-local:
 web-smoke:
 	./script/web-smoke.sh
 
+# HTTP smoke: phpc serve + curl for 001-SimpleWeb and 002-StaticWeb (issue #298)
+.PHONY: examples-web-smoke
+examples-web-smoke:
+	./script/examples-web-smoke.sh
+
 # Local HTTP dev server (see bin/serve.php)
 SERVE_ADDR ?= 127.0.0.1:8080
 SERVE_ROOT ?= examples/001-SimpleWeb
