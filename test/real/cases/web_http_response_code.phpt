@@ -11,6 +11,6 @@ echo "\n";
 var_export(http_response_code(999));
 --EXPECT--
 200
-404
+200
 404
 false

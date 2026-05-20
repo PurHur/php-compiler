@@ -53,6 +53,7 @@ class Type extends Builtin {
         );
         $fnStripTags = $this->context->module->addFunction('__compiler_strip_tags', $fntypeStripTags);
         $this->context->registerFunction('__compiler_strip_tags', $fnStripTags);
+        HttpResponseCode::implement($this->context);
         $i8p = $this->context->getTypeFromString('int8*');
         $i32 = $this->context->getTypeFromString('int32');
         $sizeT = $this->context->getTypeFromString('size_t');
