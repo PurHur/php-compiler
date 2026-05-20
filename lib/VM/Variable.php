@@ -224,23 +224,28 @@ final class Variable {
     }
 
     public function toString(): string {
-        switch ($this->type) {
+        $var = $this->resolveIndirect();
+        switch ($var->type) {
             case self::TYPE_STRING:
-                return $this->string;
+                return $var->string;
             case self::TYPE_INTEGER:
-                return (string) $this->integer;
+                return (string) $var->integer;
             case self::TYPE_FLOAT:
-                return (string) $this->float;
+                return (string) $var->float;
             case self::TYPE_BOOLEAN:
-                return $this->bool ? '1' : '';
-            case self::TYPE_INDIRECT:
-                return $this->indirect->toString();
+                return $var->bool ? '1' : '';
             case self::TYPE_STRING_OFFSET:
-                return $this->readStringOffset();
+                return $var->readStringOffset();
+            case self::TYPE_NULL:
+            case self::TYPE_UNDEFINED:
+                return '';
             case self::TYPE_ARRAY:
                 // todo: raise notice
                 return 'Array';
+            case self::TYPE_OBJECT:
+                return 'Object';
         }
+        throw new \LogicException("Cannot convert type {$var->type} to string");
     }
 
     public function object(ObjectEntry $value): void {
