@@ -13,6 +13,8 @@ use PHPLLVM\Value;
 
 final class JitValueBox
 {
+    private static int $copySeq = 0;
+
     public static function alloc(Context $context): Value
     {
         return $context->builder->alloca($context->getTypeFromString('__value__'));
@@ -33,6 +35,120 @@ final class JitValueBox
             self::pointer($context, $slot),
             $long
         );
+    }
+
+    /**
+     * Copy a boxed value from a {@see __value__*} slot into a stack {@see __value__} alloca.
+     */
+    public static function copyFromPointer(Context $context, Value $destSlot, Value $srcPtr): void
+    {
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($srcPtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $destPtr = self::pointer($context, $destSlot);
+
+        $tag = 'v'.(string) self::$copySeq++;
+        $stringBlock = BasicBlockHelper::append($context, 'value_copy_string_'.$tag);
+        $longBlock = BasicBlockHelper::append($context, 'value_copy_long_'.$tag);
+        $doubleBlock = BasicBlockHelper::append($context, 'value_copy_double_'.$tag);
+        $boolBlock = BasicBlockHelper::append($context, 'value_copy_bool_'.$tag);
+        $nullBlock = BasicBlockHelper::append($context, 'value_copy_null_'.$tag);
+        $done = BasicBlockHelper::append($context, 'value_copy_done_'.$tag);
+
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_STRING, false)
+        );
+        $isLong = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
+        );
+        $isBool = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)
+        );
+        $isDouble = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
+        );
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NULL, false)
+        );
+
+        $afterString = BasicBlockHelper::append($context, 'value_copy_after_string_'.$tag);
+        $context->builder->branchIf($isString, $stringBlock, $afterString);
+
+        $context->builder->positionAtEnd($stringBlock);
+        $str = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $srcPtr
+        );
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $str
+        );
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $destPtr,
+            $owned
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterString);
+        $afterLong = BasicBlockHelper::append($context, 'value_copy_after_long_'.$tag);
+        $context->builder->branchIf($isLong, $longBlock, $afterLong);
+
+        $context->builder->positionAtEnd($longBlock);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeLong'),
+            $destPtr,
+            $context->builder->call($context->lookupFunction('__value__readLong'), $srcPtr)
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterLong);
+        $afterBool = BasicBlockHelper::append($context, 'value_copy_after_bool_'.$tag);
+        $context->builder->branchIf($isBool, $boolBlock, $afterBool);
+
+        $context->builder->positionAtEnd($boolBlock);
+        self::writeBool(
+            $context,
+            $destSlot,
+            $context->builder->truncOrBitCast(
+                $context->builder->call($context->lookupFunction('__value__readLong'), $srcPtr),
+                $context->getTypeFromString('int1')
+            )
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterBool);
+        $afterDouble = BasicBlockHelper::append($context, 'value_copy_after_double_'.$tag);
+        $context->builder->branchIf($isDouble, $doubleBlock, $afterDouble);
+
+        $context->builder->positionAtEnd($doubleBlock);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeDouble'),
+            $destPtr,
+            $context->builder->call($context->lookupFunction('__value__readDouble'), $srcPtr)
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterDouble);
+        $context->builder->branchIf($isNull, $nullBlock, $done);
+
+        $context->builder->positionAtEnd($nullBlock);
+        $context->builder->call($context->lookupFunction('__value__writeNull'), $destPtr);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
     }
 
     public static function writeBool(Context $context, Value $slot, Value $bool): void
