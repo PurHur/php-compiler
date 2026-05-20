@@ -234,6 +234,33 @@ PHP,
     $this->assertStringContainsString('dark', $response);
   }
 
+  public function testSetcookieRoundTripOnSecondRequest(): void
+  {
+    $docroot = $this->makeDocroot([
+      'set.php' => <<<'PHP'
+<?php
+header('Content-Type: text/plain; charset=UTF-8');
+setcookie('sid', 'sess42', 0, '/');
+echo 'set';
+PHP,
+      'get.php' => <<<'PHP'
+<?php
+header('Content-Type: text/plain; charset=UTF-8');
+echo $_COOKIE['sid'] ?? '';
+PHP,
+    ]);
+    $setResponse = $this->httpGet($docroot, '/set.php');
+    $this->assertStringContainsString('HTTP/1.1 200', $setResponse);
+    $this->assertStringContainsString('Set-Cookie: sid=sess42', $setResponse);
+    $this->assertStringContainsString('set', $this->responseBody($setResponse));
+
+    $getResponse = $this->httpGet($docroot, '/get.php', [], [
+      'Cookie: sid=sess42',
+    ]);
+    $this->assertStringContainsString('HTTP/1.1 200', $getResponse);
+    $this->assertStringContainsString('sess42', $this->responseBody($getResponse));
+  }
+
   public function testPopulatesContentLengthOnPost(): void
   {
     $body = 'abcdefghijkl';

@@ -114,6 +114,7 @@ class Module extends ModuleAbstract
             new htmlspecialchars(),
             new strip_tags(),
             new header_(),
+            new setcookie(),
             new header_remove(),
             new header_list(),
             new getallheaders_(),
