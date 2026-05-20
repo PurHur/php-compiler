@@ -156,6 +156,10 @@
         "ext/standard/log.php",
         "ext/standard/nl2br.php",
         "ext/standard/number_format.php",
+        "ext/standard/ob_end_flush.php",
+        "ext/standard/ob_get_clean.php",
+        "ext/standard/ob_get_level.php",
+        "ext/standard/ob_start.php",
         "ext/standard/octdec.php",
         "ext/standard/ord.php",
         "ext/standard/parse_url.php",
@@ -296,6 +300,7 @@
         "lib/VM/ObjectEntry.php",
         "lib/VM/Optimizer.php",
         "lib/VM/Optimizer/AssignOp.php",
+        "lib/VM/OutputBuffer.php",
         "lib/VM/Refcount.php",
         "lib/VM/ScriptExit.php",
         "lib/VM/TypeCheck.php",
@@ -317,9 +322,9 @@
         "test/bootstrap-aot/echo_hello.php"
     ],
     "totals": {
-        "inventory_files": 283,
+        "inventory_files": 288,
         "excluded": 2,
-        "eligible": 281,
+        "eligible": 286,
         "aot_lint_targets": 2
     }
 }
