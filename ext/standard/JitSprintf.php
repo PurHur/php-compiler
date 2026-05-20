@@ -40,27 +40,46 @@ final class JitSprintf
         }
 
         $valueTy = $context->getTypeFromString('__value__');
-        $argvSlot = $context->builder->alloca($valueTy, $numArgs, 'sprintf_argv');
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $elemSize = $context->builder->ptrToInt(
+            $context->builder->gep(
+                $valueTy->pointerType(0)->constNull(),
+                $i32->constInt(1, false)
+            ),
+            $sizeT
+        );
+        $argvCountSize = $context->builder->intCast(
+            $i64->constInt($numArgs, false),
+            $sizeT
+        );
+        $argvBytes = $context->builder->mul($elemSize, $argvCountSize);
+        $argvRaw = $context->builder->call(
+            $context->lookupFunction('__mm__malloc'),
+            $argvBytes
+        );
+        $argvPtr = $context->builder->pointerCast(
+            $argvRaw,
+            $context->getTypeFromString('__value__*')
+        );
         for ($i = 0; $i < $numArgs; ++$i) {
             $slot = $context->builder->inBoundsGEP(
-                $argvSlot,
-                $context->getTypeFromString('int32')->constInt(0, false),
-                $context->getTypeFromString('int64')->constInt($i, false)
+                $argvPtr,
+                $i64->constInt($i, false)
             );
             self::writeArg($context, $slot, $args[$i + 1]);
         }
-        $argvPtr = $context->builder->pointerCast(
-            $argvSlot,
-            $context->getTypeFromString('__value__*')
-        );
-        $argcVal = $context->getTypeFromString('int64')->constInt($numArgs, false);
-
-        return $context->builder->call(
+        $argcVal = $i64->constInt($numArgs, false);
+        $result = $context->builder->call(
             $context->lookupFunction('__compiler_sprintf'),
             $fmt,
             $argcVal,
             $argvPtr
         );
+        $context->builder->call($context->lookupFunction('__mm__free'), $argvRaw);
+
+        return $result;
     }
 
     private static function writeArg(Context $context, Value $slot, JITVariable $arg): void
