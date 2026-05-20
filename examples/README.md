@@ -1,8 +1,84 @@
 # Examples
 
-Each folder here contains a working PHP example `example.php`, and associated generated files (including LLVM IR generated from said file).
+Shipped demos live under `examples/00x-*/` with an `example.php` entry script. Use the unified **`phpc`** CLI from the repo root (wrapper around `bin/vm.php`, `bin/compile.php`, `bin/lint.php`, and `bin/serve.php`).
 
-Web examples **001-SimpleWeb** and **002-StaticWeb** ship a minimal `phpc.json` beside `example.php` (issue [#274](https://github.com/PurHur/php-compiler/issues/274)):
+## Quick start (all examples)
+
+```console
+./phpc lint examples/000-HelloWorld/example.php
+./phpc run examples/000-HelloWorld/example.php
+
+./phpc lint examples/001-SimpleWeb/example.php
+./phpc run -q 'name=World' examples/001-SimpleWeb/example.php
+./phpc serve 127.0.0.1:8080 examples/001-SimpleWeb
+
+./phpc lint examples/002-StaticWeb/example.php
+./phpc run examples/002-StaticWeb/example.php
+```
+
+AOT (needs LLVM 9 — see `script/install-llvm9.sh` or the `php-compiler:22.04-dev` Docker image):
+
+```console
+./phpc build -o /tmp/hello examples/000-HelloWorld/example.php && /tmp/hello
+cd examples/001-SimpleWeb && ../../phpc build -o .phpc/bin/app example.php
+../../phpc serve --aot 127.0.0.1:8080 .
+```
+
+Legacy entrypoints still work: `php bin/vm.php`, `php bin/jit.php`, `php bin/compile.php -l`.
+
+## Run matrix
+
+| Example | VM | JIT | AOT build | AOT runtime notes |
+|---------|----|-----|-----------|-------------------|
+| [000-HelloWorld](000-HelloWorld/) | ✅ `./phpc run` | ✅ `bin/jit.php` | optional | no superglobals |
+| [001-SimpleWeb](001-SimpleWeb/) | ✅ `-q` / `-p` / env / `phpc serve` | ✅ `bin/jit.php` | ✅ `phpc build` | runtime `QUERY_STRING` / POST ([#201](https://github.com/PurHur/php-compiler/issues/201), [#257](https://github.com/PurHur/php-compiler/issues/257), [#259](https://github.com/PurHur/php-compiler/issues/259)) |
+| [002-StaticWeb](002-StaticWeb/) | ✅ `./phpc run` | ✅ `bin/jit.php` | ✅ recommended | no superglobals — [#247](https://github.com/PurHur/php-compiler/issues/247) execute smoke |
+
+### 000-HelloWorld
+
+Plain `echo`; no CGI superglobals.
+
+```console
+./phpc lint examples/000-HelloWorld/example.php
+./phpc run examples/000-HelloWorld/example.php
+php bin/jit.php examples/000-HelloWorld/example.php
+./phpc build -o /tmp/hello examples/000-HelloWorld/example.php && /tmp/hello   # optional
+```
+
+### 001-SimpleWeb
+
+Reads `name` from `$_REQUEST` (GET query or POST form body); serves HTML, a POST form, and `/style.css`.
+
+```console
+./phpc lint examples/001-SimpleWeb/example.php
+./phpc run -q 'name=World' examples/001-SimpleWeb/example.php
+./phpc run -p 'name=Posted' examples/001-SimpleWeb/example.php
+./phpc serve 127.0.0.1:8080 examples/001-SimpleWeb
+curl -s 'http://127.0.0.1:8080/example.php?name=Dev'
+curl -s -X POST -d 'name=PostDev' 'http://127.0.0.1:8080/example.php'
+cd examples/001-SimpleWeb
+../../phpc build -o .phpc/bin/app example.php
+../../phpc serve --aot 127.0.0.1:8080 .
+```
+
+AOT binaries refresh `$_GET` / `$_POST` / `$_REQUEST` from CGI env on each request unless you bake values at compile time with `-q` on `phpc build`.
+
+### 002-StaticWeb
+
+Static page (no superglobals); good default for first AOT compile.
+
+```console
+./phpc lint examples/002-StaticWeb/example.php
+./phpc run examples/002-StaticWeb/example.php
+php bin/jit.php examples/002-StaticWeb/example.php
+cd examples/002-StaticWeb
+../../phpc build -o .phpc/bin/app example.php && ./.phpc/bin/app
+../../phpc serve --aot 127.0.0.1:8080 .
+```
+
+## `phpc.json` (web examples)
+
+**001-SimpleWeb** and **002-StaticWeb** ship a minimal manifest beside `example.php` ([#274](https://github.com/PurHur/php-compiler/issues/274)):
 
 ```json
 {
@@ -11,39 +87,37 @@ Web examples **001-SimpleWeb** and **002-StaticWeb** ship a minimal `phpc.json` 
 }
 ```
 
-`entry` is the script to compile; `binary` is the default AOT output path used by `phpc serve --aot` (see `lib/Web/ProjectManifest.php`). Build from the example directory:
+`entry` is the script to compile; `binary` is the default AOT output path for `phpc serve --aot` (see `lib/Web/ProjectManifest.php`).
+
+## CI and local verification
+
+PHPUnit gate: [`test/unit/ExamplesCompileTest.php`](../test/unit/ExamplesCompileTest.php) — every `examples/*/example.php` is linted (`phpc lint`), smoke-run under `bin/vm.php` (GET and POST for **001-SimpleWeb**), and (when LLVM is available) checked with `bin/compile.php -l` / `phpc build` ([#203](https://github.com/PurHur/php-compiler/issues/203), [#243](https://github.com/PurHur/php-compiler/issues/243), [#247](https://github.com/PurHur/php-compiler/issues/247), [#282](https://github.com/PurHur/php-compiler/issues/282), [#259](https://github.com/PurHur/php-compiler/issues/259)).
+
+Before a PR that touches examples or `bin/serve.php`:
 
 ```console
-cd examples/001-SimpleWeb
-../../phpc build -o .phpc/bin/app example.php
-../../phpc serve --aot 127.0.0.1:8080 .          # docroot = cwd; binary from phpc.json
+make web-smoke              # lint all examples + VM ?name= smoke (001-SimpleWeb)
+make examples-web-smoke     # phpc serve + curl GET/POST (001-SimpleWeb, 002-StaticWeb)
 ```
 
-Same layout for `examples/002-StaticWeb`. Project-mode `phpc build` with no extra flags (issue [#106](https://github.com/PurHur/php-compiler/issues/106)) will read `entry` from the manifest later.
-
-**001-SimpleWeb** accepts GET and POST for the `name` field via `$_REQUEST` (issue [#259](https://github.com/PurHur/php-compiler/issues/259)):
+Full suite on the host (after `composer install`):
 
 ```console
-curl -s 'http://127.0.0.1:8080/example.php?name=Dev'
-curl -s -X POST -d 'name=PostDev' 'http://127.0.0.1:8080/example.php'
+./script/ci-local.sh
 ```
 
-CI runs `test/unit/ExamplesCompileTest.php`: every `examples/*/example.php` is checked with `bin/lint.php` / `phpc lint` (structured unsupported-syntax output with GitHub issue links), linted and smoke-run under `bin/vm.php`; when LLVM 9 is available, `bin/compile.php -l` is exercised as well. **001-SimpleWeb** is built with `compile.php` and run twice with different `QUERY_STRING` values to guard runtime superglobal refresh; **002-StaticWeb** is built and executed once (stdout must contain `Hello World`) via `compile.php` and via `phpc build` (issues [#247](https://github.com/PurHur/php-compiler/issues/247), [#282](https://github.com/PurHur/php-compiler/issues/282)).
-
-Before opening a PR that touches web examples or `bin/serve.php`, run:
+In Docker (preferred on harness hosts without host PHP/LLVM):
 
 ```console
-make web-smoke              # lint + VM ?name= smoke
-make examples-web-smoke     # phpc serve + curl (001-SimpleWeb, 002-StaticWeb)
-cd examples/001-SimpleWeb && ../../phpc build -o .phpc/bin/app example.php
-./script/examples-web-smoke.sh --aot   # uses .phpc/bin/app when present per example
+make test-docker            # or: ./script/docker-ci-local.sh
+docker run --rm -v "$(pwd):/compiler" -w /compiler php-compiler:22.04-dev ./script/ci-local.sh
 ```
 
-See issue [#262](https://github.com/PurHur/php-compiler/issues/262) for a full run matrix per folder.
+Root README quick start and local CI matrix: [#48](https://github.com/PurHur/php-compiler/issues/48), [#245](https://github.com/PurHur/php-compiler/issues/245).
 
-# Benchmark Results
+## Benchmark results
 
-Each example includes a benchmark that compares each mode of operation to just running the file with `php` directly.
+Each example includes a benchmark that compares VM, JIT, and (when LLVM is present) AOT against native `php`. Regenerate this table with `script/rebuild-examples.php` ([#60](https://github.com/PurHur/php-compiler/issues/60)).
 
 <!-- benchmark table start -->
 
