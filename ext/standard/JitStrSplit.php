@@ -17,11 +17,19 @@ use PHPLLVM\Value;
 
 final class JitStrSplit
 {
+    private static int $emitSeq = 0;
+
+    private static function nextEmitId(): string
+    {
+        return (string) (++self::$emitSeq);
+    }
+
     /**
      * Emit LLVM for str_split on a compile-time string (unrolled slices, same as explode parts).
      */
     public static function buildPackedStrings(Context $context, string $literal, int $chunkLen): Value
     {
+        $emitId = self::nextEmitId();
         $parts = VmString::strSplit($literal, $chunkLen);
         $full = $context->builder->load($context->constantStringFromString($literal));
         $map = $context->structFieldMap['__string__'];
@@ -39,7 +47,7 @@ final class JitStrSplit
                 $hayPtr,
                 $offset,
                 $take,
-                'ct'.$i
+                'ct'.$emitId.'_'.$i
             );
             $context->builder->call(
                 $setString,
@@ -69,6 +77,7 @@ final class JitStrSplit
 
     public static function split(Context $context, Value $string, Value $chunkLen): Value
     {
+        $emitId = self::nextEmitId();
         $map = $context->structFieldMap['__string__'];
         $hayLen = $context->builder->load(
             $context->builder->structGep($string, $map['length'])
@@ -78,20 +87,19 @@ final class JitStrSplit
         $i64 = $context->getTypeFromString('int64');
         $sizeT = $context->getTypeFromString('size_t');
         $zero = $i64->constInt(0, false);
-        $one = $i64->constInt(1, false);
         $sizeOne = $sizeT->constInt(1, false);
 
         $ht = HashTableHelper::alloc($context);
         $setString = $context->lookupFunction('__hashtable__setStringAt');
 
-        $offsetSlot = $context->builder->alloca($i64, 1, 'strsplit_offset');
-        $idxSlot = $context->builder->alloca($sizeT, 1, 'strsplit_idx');
+        $offsetSlot = $context->builder->alloca($i64, 1, 'strsplit_offset_'.$emitId);
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'strsplit_idx_'.$emitId);
         $context->builder->store($zero, $offsetSlot);
         $context->builder->store($sizeT->constInt(0, false), $idxSlot);
 
-        $loopHead = BasicBlockHelper::append($context, 'strsplit_head');
-        $loopBody = BasicBlockHelper::append($context, 'strsplit_body');
-        $doneBlock = BasicBlockHelper::append($context, 'strsplit_done');
+        $loopHead = BasicBlockHelper::append($context, 'strsplit_head_'.$emitId);
+        $loopBody = BasicBlockHelper::append($context, 'strsplit_body_'.$emitId);
+        $doneBlock = BasicBlockHelper::append($context, 'strsplit_done_'.$emitId);
         $context->builder->branch($loopHead);
 
         $context->builder->positionAtEnd($loopHead);
@@ -104,7 +112,7 @@ final class JitStrSplit
         $endPos = $context->builder->add($offset, $chunkLen);
         $needsTrim = $context->builder->icmp(Builder::INT_SGT, $endPos, $hayLen);
         $take = $context->builder->select($needsTrim, $remaining, $chunkLen);
-        $part = string_trim::jitCopySlice($context, $string, $hayPtr, $offset, $take);
+        $part = string_trim::jitCopySlice($context, $string, $hayPtr, $offset, $take, 'ss'.$emitId);
         $idx = $context->builder->load($idxSlot);
         $context->builder->call($setString, $ht, $idx, $part);
         $context->builder->store(
