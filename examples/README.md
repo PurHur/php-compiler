@@ -31,7 +31,7 @@ Legacy entrypoints still work: `php bin/vm.php`, `php bin/jit.php`, `php bin/com
 | Example | VM | JIT | AOT build | AOT runtime notes |
 |---------|----|-----|-----------|-------------------|
 | [000-HelloWorld](000-HelloWorld/) | ✅ `./phpc run` | ✅ `bin/jit.php` | optional | no superglobals |
-| [001-SimpleWeb](001-SimpleWeb/) | ✅ `-q` / env / `phpc serve` | ✅ `bin/jit.php` | ✅ `phpc build` | runtime `QUERY_STRING` / POST ([#201](https://github.com/PurHur/php-compiler/issues/201), [#257](https://github.com/PurHur/php-compiler/issues/257)) |
+| [001-SimpleWeb](001-SimpleWeb/) | ✅ `-q` / `-p` / env / `phpc serve` | ✅ `bin/jit.php` | ✅ `phpc build` | runtime `QUERY_STRING` / POST ([#201](https://github.com/PurHur/php-compiler/issues/201), [#257](https://github.com/PurHur/php-compiler/issues/257), [#259](https://github.com/PurHur/php-compiler/issues/259)) |
 | [002-StaticWeb](002-StaticWeb/) | ✅ `./phpc run` | ✅ `bin/jit.php` | ✅ recommended | no superglobals — [#247](https://github.com/PurHur/php-compiler/issues/247) execute smoke |
 
 ### 000-HelloWorld
@@ -47,19 +47,21 @@ php bin/jit.php examples/000-HelloWorld/example.php
 
 ### 001-SimpleWeb
 
-Reads `?name=` from `$_GET` / `$_REQUEST` or POST body; serves HTML and `/style.css`.
+Reads `name` from `$_REQUEST` (GET query or POST form body); serves HTML, a POST form, and `/style.css`.
 
 ```console
 ./phpc lint examples/001-SimpleWeb/example.php
 ./phpc run -q 'name=World' examples/001-SimpleWeb/example.php
 ./phpc run -p 'name=Posted' examples/001-SimpleWeb/example.php
 ./phpc serve 127.0.0.1:8080 examples/001-SimpleWeb
+curl -s 'http://127.0.0.1:8080/example.php?name=Dev'
+curl -s -X POST -d 'name=PostDev' 'http://127.0.0.1:8080/example.php'
 cd examples/001-SimpleWeb
 ../../phpc build -o .phpc/bin/app example.php
 ../../phpc serve --aot 127.0.0.1:8080 .
 ```
 
-AOT binaries refresh `$_GET` / `$_SERVER` from `QUERY_STRING` (and related env) on each request unless you bake values at compile time with `-q` on `phpc build`.
+AOT binaries refresh `$_GET` / `$_POST` / `$_REQUEST` from CGI env on each request unless you bake values at compile time with `-q` on `phpc build`.
 
 ### 002-StaticWeb
 
@@ -89,13 +91,13 @@ cd examples/002-StaticWeb
 
 ## CI and local verification
 
-PHPUnit gate: [`test/unit/ExamplesCompileTest.php`](../test/unit/ExamplesCompileTest.php) — every `examples/*/example.php` is linted (`phpc lint`), smoke-run under `bin/vm.php`, and (when LLVM is available) checked with `bin/compile.php -l` / `phpc build` ([#203](https://github.com/PurHur/php-compiler/issues/203), [#243](https://github.com/PurHur/php-compiler/issues/243), [#247](https://github.com/PurHur/php-compiler/issues/247), [#282](https://github.com/PurHur/php-compiler/issues/282)).
+PHPUnit gate: [`test/unit/ExamplesCompileTest.php`](../test/unit/ExamplesCompileTest.php) — every `examples/*/example.php` is linted (`phpc lint`), smoke-run under `bin/vm.php` (GET and POST for **001-SimpleWeb**), and (when LLVM is available) checked with `bin/compile.php -l` / `phpc build` ([#203](https://github.com/PurHur/php-compiler/issues/203), [#243](https://github.com/PurHur/php-compiler/issues/243), [#247](https://github.com/PurHur/php-compiler/issues/247), [#282](https://github.com/PurHur/php-compiler/issues/282), [#259](https://github.com/PurHur/php-compiler/issues/259)).
 
 Before a PR that touches examples or `bin/serve.php`:
 
 ```console
 make web-smoke              # lint all examples + VM ?name= smoke (001-SimpleWeb)
-make examples-web-smoke     # phpc serve + curl (001-SimpleWeb, 002-StaticWeb)
+make examples-web-smoke     # phpc serve + curl GET/POST (001-SimpleWeb, 002-StaticWeb)
 ```
 
 Full suite on the host (after `composer install`):
