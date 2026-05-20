@@ -10,6 +10,7 @@ use PHPUnit\Framework\TestCase;
  * CI gate: shipped examples compile in VM and (when LLVM is present) AOT lint.
  *
  * @see https://github.com/PurHur/php-compiler/issues/203
+ * @see https://github.com/PurHur/php-compiler/issues/309 (001-SimpleWeb AOT execute + QUERY_STRING refresh in this gate)
  */
 final class ExamplesCompileTest extends TestCase
 {
@@ -66,6 +67,105 @@ final class ExamplesCompileTest extends TestCase
         }
         $name = basename(dirname($examplePath));
         $this->runCli('compile.php', array_merge(self::vmExtraArgs($name), ['-l', $examplePath]), true);
+    }
+
+    /**
+     * Shipped 001-SimpleWeb: build AOT binary without compile-time `-q`, run twice with
+     * different QUERY_STRING — catches regressions in runtime superglobal refresh for web binaries.
+     *
+     * @group llvm
+     */
+    public function testAotExecuteSimpleWebDualQuery(): void
+    {
+        if (!self::isLlvmReady()) {
+            $this->markTestSkipped(
+                'LLVM 9 toolchain not available. Run script/install-llvm9.sh from the repository root.'
+            );
+        }
+        $source = realpath(dirname(__DIR__, 2).'/examples/001-SimpleWeb/example.php');
+        $this->assertNotFalse($source);
+
+        $repoRoot = dirname(__DIR__, 2);
+        $env = $this->llvmProcessEnv($repoRoot);
+        $binary = $this->compileAotBinaryNoQueryBaking($source, $repoRoot, $env);
+
+        $envAlice = $env;
+        $envAlice['QUERY_STRING'] = 'name=Alice';
+        $envAlice['SCRIPT_NAME'] = '/example.php';
+        $envAlice['REQUEST_URI'] = '/example.php?name=Alice';
+        $outAlice = $this->runAotBinary($binary, $envAlice);
+        $this->assertStringContainsString('<h1>Hello Alice</h1>', $outAlice);
+
+        $envBob = $env;
+        $envBob['QUERY_STRING'] = 'name=Bob';
+        $envBob['SCRIPT_NAME'] = '/example.php';
+        $envBob['REQUEST_URI'] = '/example.php?name=Bob';
+        $outBob = $this->runAotBinary($binary, $envBob);
+        $this->assertStringContainsString('<h1>Hello Bob</h1>', $outBob);
+
+        @unlink($binary);
+    }
+
+    /**
+     * @param array<string, string> $env
+     */
+    private function compileAotBinaryNoQueryBaking(string $source, string $repoRoot, array $env): string
+    {
+        $outfile = tempnam(sys_get_temp_dir(), 'phpc_ex_gate_');
+        $this->assertNotFalse($outfile);
+        unlink($outfile);
+
+        $bin = realpath($repoRoot.'/bin/compile.php');
+        $this->assertNotFalse($bin);
+        $cmd = array_merge(
+            self::llvmEnvPrefix(),
+            self::phpCommand(),
+            [$bin, '-o', $outfile, $source]
+        );
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open($cmd, $descriptorSpec, $pipes, $repoRoot, $env);
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+        $this->assertSame(
+            0,
+            $exit,
+            trim($stderr !== false ? $stderr : '')."\n".'compile.php failed for '.$source
+        );
+        $this->assertFileExists($outfile, trim($stderr !== false ? $stderr : ''));
+        $this->assertTrue(is_executable($outfile));
+
+        return $outfile;
+    }
+
+    /**
+     * @param array<string, string> $env
+     */
+    private function runAotBinary(string $binary, array $env): string
+    {
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $run = proc_open([$binary], $descriptorSpec, $pipes, null, $env);
+        $this->assertIsResource($run);
+        $stdout = stream_get_contents($pipes[1]);
+        fclose($pipes[0]);
+        fclose($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[2]);
+        $exitCode = proc_close($run);
+        $this->assertSame(0, $exitCode, trim($stderr !== false ? $stderr : ''));
+
+        return $stdout !== false ? $stdout : '';
     }
 
     /**
