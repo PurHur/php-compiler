@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\Web\Params;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -171,6 +172,75 @@ final class JitWebParams
         $phi->addIncoming($final, $valueBlock);
 
         return $phi;
+    }
+
+    public static function webBool(Context $context, JITVariable ...$args): Value
+    {
+        $argc = count($args);
+        if ($argc < 2 || $argc > 3) {
+            throw new \LogicException('web_bool() requires two or three arguments in this compiler build');
+        }
+        if (JITVariable::TYPE_HASHTABLE !== $args[0]->type
+            || JITVariable::TYPE_STRING !== $args[1]->type) {
+            throw new \LogicException(
+                'web_bool() requires (array, string key) in this compiler build'
+            );
+        }
+        $defaultVal = $context->constantFromBool(false);
+        if (3 === $argc) {
+            if (JITVariable::TYPE_NATIVE_BOOL !== $args[2]->type) {
+                throw new \LogicException('web_bool() default must be a boolean in this compiler build');
+            }
+            $defaultVal = $context->helper->loadValue($args[2]);
+        }
+
+        $exists = (new array_key_exists())->call($context, $args[1], $args[0]);
+        $valueResult = self::coerceStringToBoolJit(
+            $context,
+            self::webString($context, $args[0], $args[1]),
+            $defaultVal
+        );
+
+        $picked = $context->builder->select($exists, $valueResult, $defaultVal);
+
+        return $context->builder->zExt($picked, JitStringIndex::i64($context));
+    }
+
+    private static function coerceStringToBoolJit(Context $context, Value $str, Value $defaultVal): Value
+    {
+        $rawVar = new JITVariable($context, JITVariable::TYPE_STRING, JITVariable::KIND_VALUE, $str);
+        $isTrue = self::stringMatchesAnyLiteral($context, $rawVar, Params::BOOL_TRUE_STRINGS);
+        $isFalse = self::stringMatchesAnyLiteral($context, $rawVar, Params::BOOL_FALSE_STRINGS);
+        $trueVal = $context->constantFromBool(true);
+        $falseVal = $context->constantFromBool(false);
+        $knownFalse = $context->builder->select($isFalse, $falseVal, $defaultVal);
+
+        return $context->builder->select($isTrue, $trueVal, $knownFalse);
+    }
+
+    /**
+     * @param list<string> $literals
+     */
+    private static function stringMatchesAnyLiteral(Context $context, JITVariable $str, array $literals): Value
+    {
+        $match = null;
+        foreach ($literals as $literal) {
+            $litVar = new JITVariable(
+                $context,
+                JITVariable::TYPE_STRING,
+                JITVariable::KIND_VALUE,
+                $context->builder->load($context->constantStringFromString($literal))
+            );
+            $cmp = (new strcmp())->call($context, $str, $litVar);
+            $eq = $context->builder->icmp(
+                Builder::INT_EQ,
+                $cmp,
+                $cmp->typeOf()->constInt(0, false)
+            );
+            $match = null === $match ? $eq : $context->builder->or($match, $eq);
+        }
+
+        return $match ?? $context->constantFromBool(false);
     }
 
     private static function stringToInt64(Context $context, Value $strPtr): Value

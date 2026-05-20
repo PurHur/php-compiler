@@ -14,8 +14,11 @@ use PHPCompiler\VM\Variable;
  */
 final class Params
 {
-    private const BOOL_TRUE = ['1', 'true', 'on', 'yes'];
-    private const BOOL_FALSE = ['0', 'false', 'off', 'no', ''];
+    /** @var list<string> */
+    public const BOOL_TRUE_STRINGS = ['1', 'true', 'on', 'yes'];
+
+    /** @var list<string> */
+    public const BOOL_FALSE_STRINGS = ['0', 'false', 'off', 'no', ''];
 
     public static function coerceInt(
         Variable $source,
@@ -85,10 +88,10 @@ final class Params
             return $default;
         }
         $lower = strtolower($raw->toString());
-        if (in_array($lower, self::BOOL_TRUE, true)) {
+        if (in_array($lower, self::BOOL_TRUE_STRINGS, true)) {
             return true;
         }
-        if (in_array($lower, self::BOOL_FALSE, true)) {
+        if (in_array($lower, self::BOOL_FALSE_STRINGS, true)) {
             return false;
         }
 
