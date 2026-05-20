@@ -32,17 +32,18 @@ apply_patch "$PATCH_DIR/php-llvm-llvmabstract-value-addincoming.patch"
 apply_patch "$PATCH_DIR/php-llvm-builder-and-or.patch"
 apply_patch "$PATCH_DIR/php-llvm-x86-posix-fallback.patch"
 
+# php-cfg before php-types: php-types-mixed-reserved.patch references Op\Type\Mixed_.
+if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
+  apply_patch "$PATCH_DIR/php-cfg-dollars-brace.patch"
+  apply_patch "$PATCH_DIR/php-cfg-mixed-reserved.patch"
+fi
+
 if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-binaryop-pow.patch"
   apply_patch "$PATCH_DIR/php-types-binaryop-spaceship.patch"
   apply_patch "$PATCH_DIR/php-types-str-bool-fns.patch"
   apply_patch "$PATCH_DIR/php-types-dollars-brace.patch"
   apply_patch "$PATCH_DIR/php-types-mixed-reserved.patch"
-fi
-
-if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
-  apply_patch "$PATCH_DIR/php-cfg-dollars-brace.patch"
-  apply_patch "$PATCH_DIR/php-cfg-mixed-reserved.patch"
 fi
 
 if [[ -d "$ROOT/vendor/pre/plugin" ]]; then

@@ -1,5 +1,5 @@
---- vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Type/Mixed.php	2019-03-12 17:07:49.000000000 +0000
-+++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Type/Mixed.php	1970-01-01 00:00:00.000000000 +0000
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Type/Mixed.php
++++ /dev/null
 @@ -1,18 +0,0 @@
 -<?php
 -
@@ -19,8 +19,8 @@
 -class Mixed extends Type
 -{
 -}
---- vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Type/Mixed_.php	1970-01-01 00:00:00.000000000 +0000
-+++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Type/Mixed_.php	2026-05-20 10:00:58.961609375 +0000
+--- /dev/null
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Type/Mixed_.php
 @@ -0,0 +1,18 @@
 +<?php
 +
@@ -40,8 +40,8 @@
 +class Mixed_ extends Type
 +{
 +}
---- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php	2026-05-20 09:58:43.000000000 +0000
-+++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php	2026-05-20 10:00:58.964597061 +0000
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
 @@ -173,7 +173,7 @@
      protected function parseTypeNode(Node $node = null): Op\Type
      {
@@ -51,8 +51,8 @@
          }
          if ($node instanceof Node\Name) {
              return new Op\Type\Reference(
---- vendor/ircmaxell/php-cfg/lib/PHPCfg/Printer.php	2019-03-12 17:07:49.000000000 +0000
-+++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Printer.php	2026-05-20 10:00:58.965888211 +0000
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Printer.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Printer.php
 @@ -246,7 +246,7 @@
  
      protected function renderType(Op\Type $type = null): string
