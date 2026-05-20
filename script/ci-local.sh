@@ -28,6 +28,7 @@ fi
 
 "$PHP_BIN" "${PHP_OPTS[@]}" script/capability-matrix.php --check
 "$PHP_BIN" "${PHP_OPTS[@]}" script/bootstrap-inventory.php --check
+"$PHP_BIN" "${PHP_OPTS[@]}" script/bootstrap-profile.php --check
 
 LLVM_DIR="${PHP_COMPILER_LLVM_PATH:-$(cd "$(dirname "$0")/.." && pwd)/.llvm}"
 if [[ -f "$LLVM_DIR/libLLVM-9.so.1" ]]; then
@@ -78,6 +79,19 @@ if [[ -f "$LLVM_DIR/libLLVM-9.so.1" ]]; then
     RUN_JIT=0
     echo "JIT MCJIT probe failed (segfault or bad output); running @group aot only."
     echo "  Re-run with PHP_COMPILER_FORCE_JIT_TESTS=1 after fixing bin/jit.php / LLVM 9."
+  fi
+
+  echo "Bootstrap AOT lint (issue #212 Phase B)..."
+  set +e
+  "$PHP_BIN" "${PHP_OPTS[@]}" script/bootstrap-aot-lint.php
+  bootstrap_lint_code=$?
+  set -e
+  if [[ "$bootstrap_lint_code" -eq 0 ]]; then
+    :
+  elif [[ "$bootstrap_lint_code" -eq 2 ]]; then
+    echo "bootstrap-aot-lint skipped (LLVM 9 not available)."
+  else
+    exit 1
   fi
 
   if [[ "$RUN_JIT" -eq 1 ]]; then
