@@ -19,9 +19,62 @@ final class Linter
 {
     private Runtime $runtime;
 
+    /** @var list<string> */
+    private array $dynamicIncludeWarnings = [];
+
     public function __construct(?Runtime $runtime = null)
     {
         $this->runtime = $runtime ?? new Runtime();
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function consumeDynamicIncludeWarnings(): array
+    {
+        $warnings = $this->dynamicIncludeWarnings;
+        $this->dynamicIncludeWarnings = [];
+
+        return $warnings;
+    }
+
+    /**
+     * Lint an entry file and literal include/require targets reachable from it.
+     *
+     * @return list<Issue>
+     */
+    public function lintProject(string $entry): array
+    {
+        return $this->lintFile($entry);
+    }
+
+    /**
+     * Lint every .php file under a directory (or a single file), merging results.
+     *
+     * @return list<Issue>
+     */
+    public function lintAll(string $path): array
+    {
+        if (is_file($path)) {
+            return $this->lintFile($path);
+        }
+        if (!is_dir($path)) {
+            throw new \InvalidArgumentException("Not a file or directory: {$path}");
+        }
+        $files = self::collectPhpFiles($path);
+        if ([] === $files) {
+            throw new \InvalidArgumentException("No .php files under {$path}");
+        }
+        $this->dynamicIncludeWarnings = [];
+        $issues = [];
+        foreach ($files as $file) {
+            $issues = array_merge(
+                $issues,
+                $this->lintSource((string) file_get_contents($file), $file)
+            );
+        }
+
+        return $this->dedupeIssues($issues);
     }
 
     /**
@@ -32,6 +85,7 @@ final class Linter
         if (!is_file($filename)) {
             throw new \InvalidArgumentException("Could not open file {$filename}");
         }
+        $this->dynamicIncludeWarnings = [];
 
         return $this->lintSource((string) file_get_contents($filename), $filename);
     }
@@ -167,6 +221,10 @@ final class Linter
                 $literal = $this->literalStringOperand($child->expr);
                 if (null !== $literal) {
                     $paths[] = $literal;
+                } else {
+                    $line = $child->getLine();
+                    $where = $line > 0 ? "line {$line}" : 'line ?';
+                    $this->dynamicIncludeWarnings[] = "{$child->getFile()}: {$where}: dynamic include/require (not followed)";
                 }
             }
             foreach ($child->getSubBlocks() as $name) {
@@ -202,5 +260,31 @@ final class Linter
         }
 
         return null;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function collectPhpFiles(string $dir): array
+    {
+        $root = realpath($dir);
+        if (false === $root) {
+            return [];
+        }
+        $files = [];
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS)
+        );
+        foreach ($iterator as $fileInfo) {
+            if (!$fileInfo->isFile() || 'php' !== strtolower($fileInfo->getExtension())) {
+                continue;
+            }
+            $path = $fileInfo->getPathname();
+            $resolved = realpath($path);
+            $files[] = false !== $resolved ? $resolved : $path;
+        }
+        sort($files);
+
+        return $files;
     }
 }
