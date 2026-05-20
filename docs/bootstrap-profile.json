@@ -57,6 +57,7 @@
         "ext/standard/JitStripTags.php",
         "ext/standard/JitStrpos.php",
         "ext/standard/JitUrlencode.php",
+        "ext/standard/JitWebParams.php",
         "ext/standard/Module.php",
         "ext/standard/VmDate.php",
         "ext/standard/VmExit.php",
@@ -73,6 +74,7 @@
         "ext/standard/array_keys.php",
         "ext/standard/array_merge.php",
         "ext/standard/array_pop.php",
+        "ext/standard/array_product.php",
         "ext/standard/array_push.php",
         "ext/standard/array_reverse.php",
         "ext/standard/array_search.php",
@@ -173,6 +175,9 @@
         "ext/standard/urldecode.php",
         "ext/standard/urlencode.php",
         "ext/standard/var_dump.php",
+        "ext/standard/web_bool.php",
+        "ext/standard/web_int.php",
+        "ext/standard/web_string.php",
         "ext/types/Module.php",
         "ext/types/is_type.php",
         "ext/types/mb_strlen.php",
@@ -260,6 +265,7 @@
         "lib/VM/ScriptExit.php",
         "lib/VM/Variable.php",
         "lib/Web/DevServer.php",
+        "lib/Web/Params.php",
         "lib/Web/ProjectManifest.php",
         "lib/Web/ResponseContext.php",
         "lib/Web/Superglobals.php",
@@ -274,9 +280,9 @@
         "test/bootstrap-aot/echo_hello.php"
     ],
     "totals": {
-        "inventory_files": 240,
+        "inventory_files": 246,
         "excluded": 2,
-        "eligible": 238,
+        "eligible": 244,
         "aot_lint_targets": 2
     }
 }
