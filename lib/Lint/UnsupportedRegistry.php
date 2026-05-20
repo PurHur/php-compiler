@@ -25,7 +25,6 @@ final class UnsupportedRegistry
         'Stmt_Try' => 195,
         'Stmt_Catch' => 195,
         'Stmt_Finally' => 195,
-        'Expr_Ternary' => 114,
         'Expr_AssignOp_' => 136,
         'Expr_BinaryOp_ShiftLeft' => 136,
         'Expr_BinaryOp_ShiftRight' => 136,

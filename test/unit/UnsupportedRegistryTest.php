@@ -19,7 +19,6 @@ final class UnsupportedRegistryTest extends TestCase
     public static function kindToIssueProvider(): array
     {
         return [
-            'ternary' => ['Expr_Ternary', 114],
             'compound assign prefix' => ['Expr_AssignOp_Concat', 136],
             'shift left' => ['Expr_BinaryOp_ShiftLeft', 136],
             'shift right' => ['Expr_BinaryOp_ShiftRight', 136],
