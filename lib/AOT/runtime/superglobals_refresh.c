@@ -271,6 +271,360 @@ static void parse_form_encoded(__hashtable__ *ht, const char *body)
     parse_delimited_pairs(ht, body, '&', 0);
 }
 
+#define SG_JSON_MAX_DEPTH 32
+#define SG_JSON_MAX_BODY (8 * 1024 * 1024)
+
+typedef struct {
+    const char *pos;
+    const char *end;
+    int depth;
+} sg_json_ctx;
+
+static void sg_json_skip_ws(sg_json_ctx *ctx)
+{
+    while (ctx->pos < ctx->end) {
+        char c = *ctx->pos;
+
+        if (' ' != c && '\t' != c && '\n' != c && '\r' != c) {
+            break;
+        }
+        ctx->pos++;
+    }
+}
+
+static int sg_json_expect(sg_json_ctx *ctx, char ch)
+{
+    sg_json_skip_ws(ctx);
+    if (ctx->pos >= ctx->end || *ctx->pos != ch) {
+        return 0;
+    }
+    ctx->pos++;
+
+    return 1;
+}
+
+static int sg_json_parse_string(sg_json_ctx *ctx, char *out, size_t out_len)
+{
+    size_t o = 0;
+
+    if (!sg_json_expect(ctx, '"')) {
+        return 0;
+    }
+    while (ctx->pos < ctx->end) {
+        char c = *ctx->pos++;
+
+        if ('"' == c) {
+            out[o] = '\0';
+
+            return 1;
+        }
+        if ('\\' == c && ctx->pos < ctx->end) {
+            char esc = *ctx->pos++;
+
+            if ('"' == esc || '\\' == esc || '/' == esc) {
+                c = esc;
+            } else if ('b' == esc) {
+                c = '\b';
+            } else if ('f' == esc) {
+                c = '\f';
+            } else if ('n' == esc) {
+                c = '\n';
+            } else if ('r' == esc) {
+                c = '\r';
+            } else if ('t' == esc) {
+                c = '\t';
+            } else if ('u' == esc) {
+                /* Minimal UTF-8: skip \uXXXX (issue #52 subset). */
+                if (ctx->pos + 4 > ctx->end) {
+                    return 0;
+                }
+                ctx->pos += 4;
+                continue;
+            } else {
+                return 0;
+            }
+        }
+        if (o + 1 >= out_len) {
+            return 0;
+        }
+        out[o++] = c;
+    }
+
+    return 0;
+}
+
+static int sg_json_parse_number(sg_json_ctx *ctx, char *out, size_t out_len)
+{
+    const char *start = ctx->pos;
+    size_t len;
+
+    if (ctx->pos >= ctx->end) {
+        return 0;
+    }
+    if ('-' == *ctx->pos) {
+        ctx->pos++;
+    }
+    if (ctx->pos >= ctx->end || (*ctx->pos < '0' || *ctx->pos > '9')) {
+        return 0;
+    }
+    while (ctx->pos < ctx->end && *ctx->pos >= '0' && *ctx->pos <= '9') {
+        ctx->pos++;
+    }
+    if (ctx->pos < ctx->end && '.' == *ctx->pos) {
+        ctx->pos++;
+        while (ctx->pos < ctx->end && *ctx->pos >= '0' && *ctx->pos <= '9') {
+            ctx->pos++;
+        }
+    }
+    if (ctx->pos < ctx->end && ('e' == *ctx->pos || 'E' == *ctx->pos)) {
+        ctx->pos++;
+        if (ctx->pos < ctx->end && ('+' == *ctx->pos || '-' == *ctx->pos)) {
+            ctx->pos++;
+        }
+        while (ctx->pos < ctx->end && *ctx->pos >= '0' && *ctx->pos <= '9') {
+            ctx->pos++;
+        }
+    }
+    len = (size_t) (ctx->pos - start);
+    if (len + 1 > out_len) {
+        return 0;
+    }
+    memcpy(out, start, len);
+    out[len] = '\0';
+
+    return 1;
+}
+
+static int sg_json_parse_literal(sg_json_ctx *ctx, const char *lit, char *out, size_t out_len)
+{
+    size_t len = strlen(lit);
+
+    if (ctx->pos + len > ctx->end || 0 != strncmp(ctx->pos, lit, len)) {
+        return 0;
+    }
+    ctx->pos += len;
+    strncpy(out, lit, out_len - 1);
+    out[out_len - 1] = '\0';
+
+    return 1;
+}
+
+static int sg_json_store_scalar(
+    __hashtable__ *ht,
+    const char *key,
+    int use_index,
+    size_t index,
+    const char *value
+)
+{
+    if (use_index) {
+        __hashtable__setStringAt(ht, index, cstr_to_string(value));
+
+        return 1;
+    }
+    set_string_key(ht, key, value);
+
+    return 1;
+}
+
+static int sg_json_parse_value(
+    sg_json_ctx *ctx,
+    __hashtable__ *ht,
+    const char *key,
+    int use_index,
+    size_t index
+);
+
+static int sg_json_parse_array(sg_json_ctx *ctx, __hashtable__ *ht, const char *key);
+
+static int sg_json_parse_object(sg_json_ctx *ctx, __hashtable__ *ht)
+{
+    char key_buf[256];
+
+    if (!sg_json_expect(ctx, '{')) {
+        return 0;
+    }
+    sg_json_skip_ws(ctx);
+    if (sg_json_expect(ctx, '}')) {
+        return 1;
+    }
+    for (;;) {
+        if (!sg_json_parse_string(ctx, key_buf, sizeof(key_buf)) || '\0' == key_buf[0]) {
+            return 0;
+        }
+        if (!sg_json_expect(ctx, ':')) {
+            return 0;
+        }
+        if (!sg_json_parse_value(ctx, ht, key_buf, 0, 0)) {
+            return 0;
+        }
+        sg_json_skip_ws(ctx);
+        if (ctx->pos >= ctx->end) {
+            return 0;
+        }
+        if ('}' == *ctx->pos) {
+            ctx->pos++;
+
+            return 1;
+        }
+        if (',' != *ctx->pos) {
+            return 0;
+        }
+        ctx->pos++;
+    }
+}
+
+static int sg_json_parse_array(sg_json_ctx *ctx, __hashtable__ *ht, const char *key)
+{
+    size_t idx = 0;
+    __hashtable__ *list_ht;
+
+    if (!sg_json_expect(ctx, '[')) {
+        return 0;
+    }
+    sg_json_skip_ws(ctx);
+    if (sg_json_expect(ctx, ']')) {
+        list_ht = sg_ensure_child(ht, key);
+        return 1;
+    }
+    list_ht = sg_ensure_child(ht, key);
+    for (;;) {
+        if (!sg_json_parse_value(ctx, list_ht, NULL, 1, idx)) {
+            return 0;
+        }
+        idx++;
+        sg_json_skip_ws(ctx);
+        if (ctx->pos >= ctx->end) {
+            return 0;
+        }
+        if (']' == *ctx->pos) {
+            ctx->pos++;
+
+            return 1;
+        }
+        if (',' != *ctx->pos) {
+            return 0;
+        }
+        ctx->pos++;
+    }
+}
+
+static int sg_json_parse_value(
+    sg_json_ctx *ctx,
+    __hashtable__ *ht,
+    const char *key,
+    int use_index,
+    size_t index
+)
+{
+    char val_buf[4096];
+
+    if (ctx->depth > SG_JSON_MAX_DEPTH) {
+        return 0;
+    }
+    sg_json_skip_ws(ctx);
+    if (ctx->pos >= ctx->end) {
+        return 0;
+    }
+    if ('"' == *ctx->pos) {
+        if (!sg_json_parse_string(ctx, val_buf, sizeof(val_buf))) {
+            return 0;
+        }
+
+        return sg_json_store_scalar(ht, key, use_index, index, val_buf);
+    }
+    if ('{' == *ctx->pos) {
+        __hashtable__ *child;
+
+        if (use_index || NULL == key) {
+            return 0;
+        }
+        ctx->depth++;
+        child = sg_ensure_child(ht, key);
+        if (!sg_json_parse_object(ctx, child)) {
+            ctx->depth--;
+
+            return 0;
+        }
+        ctx->depth--;
+
+        return 1;
+    }
+    if ('[' == *ctx->pos) {
+        if (use_index || NULL == key) {
+            return 0;
+        }
+        ctx->depth++;
+        if (!sg_json_parse_array(ctx, ht, key)) {
+            ctx->depth--;
+
+            return 0;
+        }
+        ctx->depth--;
+
+        return 1;
+    }
+    if ('-' == *ctx->pos || (*ctx->pos >= '0' && *ctx->pos <= '9')) {
+        if (!sg_json_parse_number(ctx, val_buf, sizeof(val_buf))) {
+            return 0;
+        }
+
+        return sg_json_store_scalar(ht, key, use_index, index, val_buf);
+    }
+    if ('t' == *ctx->pos) {
+        if (!sg_json_parse_literal(ctx, "true", val_buf, sizeof(val_buf))) {
+            return 0;
+        }
+
+        return sg_json_store_scalar(ht, key, use_index, index, "1");
+    }
+    if ('f' == *ctx->pos) {
+        if (!sg_json_parse_literal(ctx, "false", val_buf, sizeof(val_buf))) {
+            return 0;
+        }
+
+        return sg_json_store_scalar(ht, key, use_index, index, "");
+    }
+    if ('n' == *ctx->pos) {
+        if (!sg_json_parse_literal(ctx, "null", val_buf, sizeof(val_buf))) {
+            return 0;
+        }
+
+        return sg_json_store_scalar(ht, key, use_index, index, "");
+    }
+
+    return 0;
+}
+
+static void parse_json_post(__hashtable__ *ht, const char *body)
+{
+    sg_json_ctx ctx;
+
+    if (NULL == body || '\0' == body[0]) {
+        return;
+    }
+    if (strlen(body) > SG_JSON_MAX_BODY) {
+        return;
+    }
+    ctx.pos = body;
+    ctx.end = body + strlen(body);
+    ctx.depth = 0;
+    sg_json_skip_ws(&ctx);
+    if (ctx.pos >= ctx.end || '{' != *ctx.pos) {
+        return;
+    }
+    (void) sg_json_parse_object(&ctx, ht);
+}
+
+static void populate_post_body(__hashtable__ *ht, const char *content_type, const char *body)
+{
+    if (0 == strcmp(content_type, "application/json")) {
+        parse_json_post(ht, body);
+    } else {
+        parse_form_encoded(ht, body);
+    }
+}
+
 static void parse_cookie_header(__hashtable__ *ht, const char *header)
 {
     parse_delimited_pairs(ht, header, ';', 1);
@@ -385,6 +739,9 @@ static int should_populate_post(
             return 1;
         }
         if (0 == strncmp(content_type, "multipart/form-data", 19)) {
+            return 1;
+        }
+        if (0 == strcmp(content_type, "application/json")) {
             return 1;
         }
 
@@ -645,7 +1002,7 @@ void __superglobals__refresh(void)
 
     sg_POST = __hashtable__alloc();
     if (populate_post) {
-        parse_form_encoded(sg_POST, post_body);
+        populate_post_body(sg_POST, content_type, post_body);
     }
 
     sg_REQUEST = __hashtable__alloc();
@@ -653,7 +1010,7 @@ void __superglobals__refresh(void)
         parse_form_encoded(sg_REQUEST, query_string);
     }
     if (populate_post) {
-        parse_form_encoded(sg_REQUEST, post_body);
+        populate_post_body(sg_REQUEST, content_type, post_body);
     }
 
     sg_SERVER = __hashtable__alloc();
