@@ -499,6 +499,7 @@ class HashTable extends Type
 
         $done = $fn->appendBasicBlock('strkey_set_done');
         $prepend = $fn->appendBasicBlock('strkey_set_prepend');
+        $emptyHead = $fn->appendBasicBlock('strkey_set_empty_head');
         $loopHead = $fn->appendBasicBlock('strkey_set_head');
         $loopBody = $fn->appendBasicBlock('strkey_set_body');
         $this->context->builder->branch($loopHead);
@@ -555,7 +556,7 @@ class HashTable extends Type
             $str
         );
         $this->context->builder->store(
-            $newNode,
+            $newNode->typeOf()->constNull(),
             $this->context->builder->structGep($newNode, $nodeMap['next'])
         );
         $tail = $fn->appendBasicBlock('strkey_set_tail');
@@ -565,7 +566,7 @@ class HashTable extends Type
 
         $this->context->builder->positionAtEnd($tail);
         $isEmpty = $this->context->builder->icmp(Builder::INT_EQ, $head, $head->typeOf()->constNull());
-        $this->context->builder->branchIf($isEmpty, $prepend, $tailWalk);
+        $this->context->builder->branchIf($isEmpty, $emptyHead, $tailWalk);
 
         $this->context->builder->positionAtEnd($tailWalk);
         $walkNode = $this->context->builder->phi($head->typeOf());
@@ -582,7 +583,7 @@ class HashTable extends Type
         );
         $this->context->builder->branch($done);
 
-        $this->context->builder->positionAtEnd($prepend);
+        $this->context->builder->positionAtEnd($emptyHead);
         $this->context->builder->store($newNode, $headSlot);
         $this->context->builder->branch($done);
 

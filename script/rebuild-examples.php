@@ -59,15 +59,34 @@ file_put_contents($repoRoot.'/examples/README.md', $readme);
 echo "Done\n";
 
 /**
- * @return array{query: ?string}
+ * Per-example benchmark inputs.
+ *
+ * @return array{
+ *     query: ?string,
+ *     aot_compile_time_query: bool,
+ *     aot_run_env: array<string, string>
+ * }
  */
 function exampleProfile(string $exampleBasename): array
 {
     if ('001-SimpleWeb' === $exampleBasename) {
-        return ['query' => 'name=World'];
+        // Runtime superglobals (#201): compile once without -q; benchmark run uses QUERY_STRING.
+        return [
+            'query' => 'name=World',
+            'aot_compile_time_query' => false,
+            'aot_run_env' => [
+                'QUERY_STRING' => 'name=World',
+                'SCRIPT_NAME' => '/example.php',
+                'REQUEST_URI' => '/example.php?name=World',
+            ],
+        ];
     }
 
-    return ['query' => null];
+    return [
+        'query' => null,
+        'aot_compile_time_query' => true,
+        'aot_run_env' => [],
+    ];
 }
 
 function isLlvmReady(string $repoRoot): bool
@@ -219,7 +238,7 @@ function benchmarkExample(string $example, array $phpCmd, array $benchEnv, strin
     if ($llvmReady) {
         $binary = str_replace('.php', '', $example);
         $compileArgv = array_merge($phpCmd, [$repoRoot.'/bin/compile.php']);
-        if (null !== $profile['query']) {
+        if (null !== $profile['query'] && $profile['aot_compile_time_query']) {
             $compileArgv[] = '-q';
             $compileArgv[] = $profile['query'];
         }
@@ -230,7 +249,12 @@ function benchmarkExample(string $example, array $phpCmd, array $benchEnv, strin
         runProcess($compileArgv, $benchEnv, $repoRoot);
         $compileTime = microtime(true) - $compileStart;
         if (is_executable($binary)) {
-            $compiledTime = runIterations([$binary], $benchEnv, $repoRoot, $iterations) / $iterations;
+            $aotRunEnv = $benchEnv;
+            foreach ($profile['aot_run_env'] as $key => $value) {
+                $aotRunEnv[$key] = $value;
+            }
+            $compiledTime = runIterations([$binary], $aotRunEnv, $repoRoot, $iterations) / $iterations;
+            @unlink($binary);
         }
     }
 

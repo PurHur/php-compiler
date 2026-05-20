@@ -123,11 +123,14 @@ Root README quick start and local CI matrix: [#48](https://github.com/PurHur/php
 
 Each example includes a benchmark that compares VM, JIT, and (when LLVM is present) AOT against native `php`. Regenerate this table with `script/rebuild-examples.php` ([#60](https://github.com/PurHur/php-compiler/issues/60)).
 
+For **001-SimpleWeb**, `bin/compile.php` is timed **without** compile-time `-q`; the `./compiled` column runs the binary with runtime `QUERY_STRING` (and related CGI env), matching production AOT web binaries.
+
 <!-- benchmark table start -->
 
 |         Example Name |      Native PHP |      bin/vm.php |     bin/jit.php | bin/compile.php |      ./compiled |
 |----------------------|-----------------|-----------------|-----------------|-----------------|-----------------|
-|       000-HelloWorld |         0.00695 |         0.03487 |         0.05455 |             n/a |             n/a |
-|        001-SimpleWeb |         0.00714 |         0.03649 |         0.05764 |             n/a |             n/a |
-|        002-StaticWeb |         0.00713 |         0.03538 |         0.05463 |             n/a |             n/a |
+|       000-HelloWorld |         0.01465 |         0.06149 |         0.11364 |         9.42664 |         0.00163 |
+|        001-SimpleWeb |         0.01439 |         0.06331 |         0.10672 |         2.82886 |         0.00165 |
+|        002-StaticWeb |         0.01651 |         0.06435 |         0.12040 |         0.62562 |         0.00139 |
+|          004-ApiJson |         0.01357 |         0.06180 |         0.11049 |         0.62714 |         0.00118 |
 <!-- benchmark table end -->
