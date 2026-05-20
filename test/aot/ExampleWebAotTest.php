@@ -64,6 +64,17 @@ final class ExampleWebAotTest extends TestCase
         $this->assertStringContainsString('<h1>Hello World</h1>', $result);
     }
 
+    public function testApiJsonExampleFile(): void
+    {
+        $source = realpath(__DIR__ . '/../../examples/004-ApiJson/example.php');
+        $this->assertNotFalse($source);
+        $result = $this->compileAndRun($source, []);
+        $this->assertStringContainsString('Content-Type: application/json', $result);
+        $this->assertStringContainsString('Status: 200', $result);
+        $this->assertStringContainsString('"ok":true', $result);
+        $this->assertStringContainsString('php-compiler', $result);
+    }
+
     /**
      * @param list<string> $compileExtraArgs
      */

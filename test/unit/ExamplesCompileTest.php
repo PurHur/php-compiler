@@ -240,6 +240,37 @@ final class ExamplesCompileTest extends TestCase
     }
 
     /**
+     * Shipped 004-ApiJson: compile.php -o temp binary — json_encode + http_response_code(200) AOT smoke.
+     *
+     * @group llvm
+     * @group aot
+     *
+     * @see https://github.com/PurHur/php-compiler/issues/270
+     */
+    public function testAotExecuteSmoke004ApiJson(): void
+    {
+        if (!self::isLlvmReady()) {
+            $this->markTestSkipped(
+                'LLVM 9 toolchain not available. Run script/install-llvm9.sh from the repository root.'
+            );
+        }
+        $repoRoot = dirname(__DIR__, 2);
+        $source = realpath($repoRoot.'/examples/004-ApiJson/example.php');
+        $this->assertNotFalse($source);
+
+        $env = $this->llvmProcessEnv($repoRoot);
+        $binary = $this->compileAotBinaryNoQueryBaking($source, $repoRoot, $env);
+        $out = $this->runAotBinary($binary, $env);
+        $this->assertStringContainsString('Content-Type: application/json', $out);
+        $this->assertStringContainsString('Status: 200', $out);
+        foreach (self::smokeNeedles('004-ApiJson') as $needle) {
+            $this->assertStringContainsString($needle, $out);
+        }
+
+        @unlink($binary);
+    }
+
+    /**
      * Shipped 002-StaticWeb: compile.php -o temp binary, run once — AOT link + runtime smoke (no superglobals).
      *
      * @group llvm
