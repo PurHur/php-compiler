@@ -165,8 +165,28 @@ final class IssetHelper
 
                 return $context->getTypeFromString('int1')->constInt($known ? 1 : 0, false);
             }
+            $ht = $context->helper->loadValue($container);
+            if (Variable::TYPE_STRING === $dim->type) {
+                return $context->builder->call(
+                    $context->lookupFunction('__hashtable__offsetIsSetStringKey'),
+                    $ht,
+                    $context->helper->loadValue($dim)
+                );
+            }
+            if (Variable::TYPE_NATIVE_LONG === $dim->type) {
+                $index = $context->builder->truncOrBitCast(
+                    $context->helper->loadValue($dim),
+                    $context->getTypeFromString('size_t')
+                );
+
+                return $context->builder->call(
+                    $context->lookupFunction('__hashtable__offsetIsSet'),
+                    $ht,
+                    $index
+                );
+            }
             throw new \LogicException(
-                'isset() on superglobals only supports a string literal key in this compiler build'
+                'isset() on superglobals only supports string or integer keys in this compiler build'
             );
         }
 
