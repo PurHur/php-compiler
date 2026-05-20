@@ -240,7 +240,8 @@ static void parse_delimited_pairs(__hashtable__ *ht, const char *body, char deli
             raw_val = eq + 1;
         } else {
             raw_key = pair;
-            raw_val = (char *) "";
+            /* NUL terminator in strdup copy (not a string literal) for __string__init */
+            raw_val = pair + strlen(pair);
         }
         if ('\0' == raw_key[0]) {
             pair = strtok_r(NULL, delim, &saveptr);
@@ -250,12 +251,15 @@ static void parse_delimited_pairs(__hashtable__ *ht, const char *body, char deli
             sg_url_decode_inplace(raw_key);
             sg_url_decode_inplace(raw_val);
         }
-        if (0 == sg_parse_key_brackets(raw_key, &pk)) {
+        if (NULL == strchr(raw_key, '[')) {
+            set_string_key(ht, raw_key, raw_val);
+        } else if (0 == sg_parse_key_brackets(raw_key, &pk)) {
             sg_set_nested_value(ht, &pk, raw_val);
+            sg_free_parsed_key(&pk);
         } else {
             set_string_key(ht, raw_key, raw_val);
+            sg_free_parsed_key(&pk);
         }
-        sg_free_parsed_key(&pk);
         pair = strtok_r(NULL, delim, &saveptr);
     }
 
@@ -537,11 +541,17 @@ void __superglobals__refresh(void)
     parse_form_encoded(sg_GET, query_string);
 
     sg_POST = __hashtable__alloc();
-    parse_form_encoded(sg_POST, post_body);
+    if ('\0' != post_body[0]) {
+        parse_form_encoded(sg_POST, post_body);
+    }
 
     sg_REQUEST = __hashtable__alloc();
-    parse_form_encoded(sg_REQUEST, query_string);
-    parse_form_encoded(sg_REQUEST, post_body);
+    if ('\0' != query_string[0]) {
+        parse_form_encoded(sg_REQUEST, query_string);
+    }
+    if ('\0' != post_body[0]) {
+        parse_form_encoded(sg_REQUEST, post_body);
+    }
 
     sg_SERVER = __hashtable__alloc();
     set_string_key(sg_SERVER, "REQUEST_METHOD", method);

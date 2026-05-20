@@ -15,6 +15,18 @@ final class AotTest extends BaseTest
 {
     protected static string $DIR = __DIR__ . '/../fixtures/aot';
 
+    /**
+     * CGI vars read at AOT runtime via __superglobals__refresh; unset during compile
+     * so PHP/LLVM is not blocked or slowed by CONTENT_LENGTH-style environ (issue #314).
+     *
+     * @var list<string>
+     */
+    private const COMPILE_EXCLUDED_ENV = [
+        'CONTENT_LENGTH',
+        'CONTENT_TYPE',
+        'REQUEST_BODY',
+    ];
+
     private static ?bool $llvmReady = null;
 
     public function setUp(): void
@@ -76,6 +88,10 @@ final class AotTest extends BaseTest
             }
         }
         $runEnv = $env;
+        $compileEnv = $env;
+        foreach (self::COMPILE_EXCLUDED_ENV as $exclude) {
+            unset($compileEnv[$exclude]);
+        }
 
         $compileArgv = [$this->BIN, '-o', $outfile];
         if (isset($sections['ENV'])) {
@@ -92,7 +108,7 @@ final class AotTest extends BaseTest
                     $compileArgv[] = '-q';
                     $compileArgv[] = $parts[1];
                 }
-                if ('REQUEST_BODY' === $parts[0]) {
+                if ('REQUEST_BODY' === $parts[0] && str_contains($parts[1], '=')) {
                     $compileArgv[] = '-p';
                     $compileArgv[] = $parts[1];
                 }
@@ -104,7 +120,7 @@ final class AotTest extends BaseTest
             $descriptorSpec,
             $pipes,
             $repoRoot,
-            $env
+            $compileEnv
         );
         fwrite($pipes[0], $code);
         fclose($pipes[0]);

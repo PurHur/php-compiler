@@ -8,9 +8,9 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 207 |
+| PHP files on vm.php path | 209 |
 | Source constructs flagged (blockers) | 10 |
-| Source constructs flagged (warnings) | 547 |
+| Source constructs flagged (warnings) | 549 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -40,6 +40,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/JitHtmlspecialchars.php` | 0 | 1 |
 | `ext/standard/JitHttpResponseCode.php` | 0 | 1 |
 | `ext/standard/JitImplode.php` | 0 | 1 |
+| `ext/standard/JitNl2br.php` | 0 | 1 |
 | `ext/standard/JitNumberFormat.php` | 0 | 1 |
 | `ext/standard/JitParseUrl.php` | 0 | 1 |
 | `ext/standard/JitPath.php` | 0 | 1 |
@@ -182,6 +183,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `lib/JIT/Builtin/Refcount.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringGetenv.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringHtmlspecialchars.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringNl2br.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringRandomBytes.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringUrlencode.php` | 0 | 1 |
 | `lib/JIT/Builtin/Type.php` | 0 | 4 |
@@ -272,6 +274,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/JitImplode.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/JitNl2br.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
@@ -767,7 +774,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `ext/standard/nl2br.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/number_format.php`
 
@@ -1212,6 +1219,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 **Warnings** (review for bootstrap subset):
 - 5 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `lib/JIT/Builtin/StringNl2br.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `lib/JIT/Builtin/StringRandomBytes.php`
 
 **Warnings** (review for bootstrap subset):
@@ -1365,8 +1377,8 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/JIT/SuperglobalInit.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 124)
-- new VMVariable (line 148)
+- new Variable (line 126)
+- new VMVariable (line 150)
 - 7 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/ValueEchoHelper.php`

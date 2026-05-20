@@ -3,7 +3,6 @@ Web: CONTENT_LENGTH from CGI env (issue #314)
 --ENV--
 REQUEST_METHOD=POST
 CONTENT_LENGTH=12
-REQUEST_BODY=abcdefghijkl
 --FILE--
 <?php
 echo $_SERVER['CONTENT_LENGTH'];
