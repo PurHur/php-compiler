@@ -8,9 +8,9 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 207 |
+| PHP files on vm.php path | 212 |
 | Source constructs flagged (blockers) | 10 |
-| Source constructs flagged (warnings) | 547 |
+| Source constructs flagged (warnings) | 553 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -40,6 +40,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/JitHtmlspecialchars.php` | 0 | 1 |
 | `ext/standard/JitHttpResponseCode.php` | 0 | 1 |
 | `ext/standard/JitImplode.php` | 0 | 1 |
+| `ext/standard/JitNl2br.php` | 0 | 1 |
 | `ext/standard/JitNumberFormat.php` | 0 | 1 |
 | `ext/standard/JitParseUrl.php` | 0 | 1 |
 | `ext/standard/JitPath.php` | 0 | 1 |
@@ -54,6 +55,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/JitStrpos.php` | 0 | 1 |
 | `ext/standard/JitUrlencode.php` | 0 | 1 |
 | `ext/standard/Module.php` | 0 | 99 |
+| `ext/standard/VmExit.php` | 0 | 2 |
 | `ext/standard/VmFs.php` | 0 | 3 |
 | `ext/standard/VmNumberFormat.php` | 0 | 1 |
 | `ext/standard/VmString.php` | 0 | 4 |
@@ -160,7 +162,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/types/strlen.php` | 0 | 1 |
 | `lib/AOT/Linker.php` | 8 | 1 |
 | `lib/Block.php` | 0 | 4 |
-| `lib/Compiler.php` | 0 | 56 |
+| `lib/Compiler.php` | 0 | 57 |
 | `lib/Frame.php` | 0 | 1 |
 | `lib/Func.php` | 0 | 1 |
 | `lib/Func/Internal.php` | 0 | 2 |
@@ -180,8 +182,10 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `lib/JIT/Builtin/MemoryManager/PHP.php` | 0 | 1 |
 | `lib/JIT/Builtin/Output.php` | 0 | 1 |
 | `lib/JIT/Builtin/Refcount.php` | 0 | 1 |
+| `lib/JIT/Builtin/ScriptExit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringGetenv.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringHtmlspecialchars.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringNl2br.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringRandomBytes.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringUrlencode.php` | 0 | 1 |
 | `lib/JIT/Builtin/Type.php` | 0 | 4 |
@@ -272,6 +276,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/JitImplode.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/JitNl2br.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
@@ -442,6 +451,12 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new putenv_ (line 117)
 - new scandir (line 118)
 - new glob_ (line 119)
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/VmExit.php`
+
+**Warnings** (review for bootstrap subset):
+- new ScriptExit (line 15)
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/VmFs.php`
@@ -767,7 +782,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `ext/standard/nl2br.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/number_format.php`
 
@@ -1051,41 +1066,42 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new OpCode (line 360)
 - new OpCode (line 374)
 - new OpCode (line 380)
-- new OpCode (line 395)
-- new OpCode (line 401)
-- new OpCode (line 412)
-- new OpCode (line 420)
-- new OpCode (line 426)
-- new OpCode (line 432)
-- new OpCode (line 437)
-- new OpCode (line 444)
-- new OpCode (line 451)
-- new OpCode (line 457)
-- new OpCode (line 462)
-- new OpCode (line 469)
-- new OpCode (line 476)
-- new OpCode (line 481)
-- new OpCode (line 486)
+- new OpCode (line 398)
+- new OpCode (line 404)
+- new OpCode (line 410)
+- new OpCode (line 421)
+- new OpCode (line 429)
+- new OpCode (line 435)
+- new OpCode (line 441)
+- new OpCode (line 446)
+- new OpCode (line 453)
+- new OpCode (line 460)
+- new OpCode (line 466)
+- new OpCode (line 471)
+- new OpCode (line 478)
+- new OpCode (line 485)
+- new OpCode (line 490)
 - new OpCode (line 495)
-- new OpCode (line 500)
-- new OpCode (line 507)
+- new OpCode (line 504)
+- new OpCode (line 509)
 - new OpCode (line 516)
-- new OpCode (line 535)
-- new Block (line 551)
-- new Block (line 554)
-- new OpCode (line 557)
-- new OpCode (line 563)
-- new OpCode (line 577)
-- new Block (line 584)
-- new OpCode (line 587)
-- new OpCode (line 597)
-- new Operand\Temporary (line 607)
-- new Variable (line 615)
-- new Operand\Temporary (line 617)
-- new Variable (line 678)
-- new OpCode (line 708)
-- new OpCode (line 714)
-- new OpCode (line 718)
+- new OpCode (line 525)
+- new OpCode (line 544)
+- new Block (line 560)
+- new Block (line 563)
+- new OpCode (line 566)
+- new OpCode (line 572)
+- new OpCode (line 586)
+- new Block (line 593)
+- new OpCode (line 596)
+- new OpCode (line 606)
+- new Operand\Temporary (line 616)
+- new Variable (line 624)
+- new Operand\Temporary (line 626)
+- new Variable (line 687)
+- new OpCode (line 717)
+- new OpCode (line 723)
+- new OpCode (line 727)
 - 25 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/Frame.php`
@@ -1128,10 +1144,10 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new JIT\Call\Native (line 149)
 - new ext\standard\boolval (line 249)
 - new Variable (line 413)
-- new Variable (line 722)
-- new Operand\Literal (line 792)
-- new Operand\Literal (line 796)
-- new Operand\Literal (line 800)
+- new Variable (line 734)
+- new Operand\Literal (line 804)
+- new Operand\Literal (line 808)
+- new Operand\Literal (line 812)
 - 11 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Analyzer.php`
@@ -1202,6 +1218,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 **Warnings** (review for bootstrap subset):
 - 11 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `lib/JIT/Builtin/ScriptExit.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `lib/JIT/Builtin/StringGetenv.php`
 
 **Warnings** (review for bootstrap subset):
@@ -1211,6 +1232,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 
 **Warnings** (review for bootstrap subset):
 - 5 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/JIT/Builtin/StringNl2br.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Builtin/StringRandomBytes.php`
 
@@ -1484,10 +1510,10 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 **Warnings** (review for bootstrap subset):
 - new Variable (line 64)
 - new Variable (line 69)
-- new Func\PHP (line 210)
-- new ClassEntry (line 260)
-- new ObjectEntry (line 272)
-- new VM\ClassProperty (line 362)
+- new Func\PHP (line 217)
+- new ClassEntry (line 267)
+- new ObjectEntry (line 279)
+- new VM\ClassProperty (line 369)
 - 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/VM/ClassEntry.php`
