@@ -757,8 +757,11 @@ class JIT {
 
                     return;
                 case Variable::TYPE_VALUE:
-                    $loaded = $this->context->builder->load($this->context->helper->loadValue($value));
-                    $this->context->builder->store($loaded, $result->value);
+                    JIT\JitValueBox::copyFromPointer(
+                        $this->context,
+                        $valueRef,
+                        $this->context->helper->loadValue($value)
+                    );
 
                     return;
                 default:
@@ -789,8 +792,11 @@ class JIT {
 
             return;
         } elseif (Variable::TYPE_VALUE === $result->type && Variable::TYPE_VALUE === $value->type) {
-            $loaded = $this->context->builder->load($this->context->helper->loadValue($value));
-            $this->context->builder->store($loaded, $result->value);
+            JIT\JitValueBox::copyFromPointer(
+                $this->context,
+                $result->value,
+                $this->context->helper->loadValue($value)
+            );
 
             return;
         }

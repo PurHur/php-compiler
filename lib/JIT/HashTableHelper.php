@@ -125,17 +125,84 @@ final class HashTableHelper
         return $ht;
     }
 
-    public static function readStringAt(Context $context, Value $ht, Value $index): Value
+    public static function listEntryPointer(Context $context, Value $ht, Value $index): Value
     {
         $map = $context->structFieldMap['__hashtable__'];
         $values = $context->builder->load(
             $context->builder->structGep($ht, $map['values'])
         );
-        $entry = $context->builder->inBoundsGep($values, $index);
+
+        return $context->builder->inBoundsGep($values, $index);
+    }
+
+    public static function readStringAt(Context $context, Value $ht, Value $index): Value
+    {
+        $entry = self::listEntryPointer($context, $ht, $index);
 
         return $context->builder->call(
             $context->lookupFunction('__value__readString'),
             $entry
+        );
+    }
+
+    /**
+     * Read a packed-list element into a stack {@see __value__} slot (for echo / mixed-type index).
+     */
+    public static function readIndexedToValueBox(Context $context, Value $ht, Value $index): Variable
+    {
+        static $seq = 0;
+        $tag = 'rb'.(string) ++$seq;
+        $slot = JitValueBox::alloc($context);
+        $destPtr = JitValueBox::pointer($context, $slot);
+        $entryPtr = self::listEntryPointer($context, $ht, $index);
+        $valueMap = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($entryPtr, $valueMap['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+
+        $stringBlock = BasicBlockHelper::append($context, 'ht_rb_string_'.$tag);
+        $longBlock = BasicBlockHelper::append($context, 'ht_rb_long_'.$tag);
+        $done = BasicBlockHelper::append($context, 'ht_rb_done_'.$tag);
+
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_STRING, false)
+        );
+        $context->builder->branchIf($isString, $stringBlock, $longBlock);
+
+        $context->builder->positionAtEnd($stringBlock);
+        $str = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $entryPtr
+        );
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $str
+        );
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $destPtr,
+            $owned
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($longBlock);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeLong'),
+            $destPtr,
+            $context->builder->call($context->lookupFunction('__value__readLong'), $entryPtr)
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+
+        return new Variable(
+            $context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VARIABLE,
+            $slot
         );
     }
 

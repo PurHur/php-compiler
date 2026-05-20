@@ -454,18 +454,7 @@ final class Variable {
                         $str
                     );
                 }
-                $long = $this->context->builder->call(
-                    $this->context->lookupFunction('__hashtable__readLongAt'),
-                    $ht,
-                    $index
-                );
-
-                return new Variable(
-                    $this->context,
-                    self::TYPE_NATIVE_LONG,
-                    self::KIND_VALUE,
-                    $long
-                );
+                return HashTableHelper::readIndexedToValueBox($this->context, $ht, $index);
             default:
                 if (!$this->type & self::IS_NATIVE_ARRAY) {
                     throw new \LogicException("Unsupported dim fetch on " . self::getStringType($this->type));
