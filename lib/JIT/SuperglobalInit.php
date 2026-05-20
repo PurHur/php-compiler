@@ -22,6 +22,7 @@ final class SuperglobalInit
         'HTTPS',
         'SERVER_PORT',
         'SERVER_NAME',
+        'SERVER_PROTOCOL',
         'DOCUMENT_ROOT',
         'SCRIPT_FILENAME',
     ];

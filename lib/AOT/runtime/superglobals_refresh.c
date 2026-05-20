@@ -554,6 +554,14 @@ void __superglobals__refresh(void)
     }
     set_string_key(sg_SERVER, "REQUEST_URI", request_uri);
     set_string_key(sg_SERVER, "GATEWAY_INTERFACE", "CGI/1.1");
+    {
+        const char *server_protocol = getenv("SERVER_PROTOCOL");
+
+        if (NULL == server_protocol || '\0' == server_protocol[0]) {
+            server_protocol = "HTTP/1.1";
+        }
+        set_string_key(sg_SERVER, "SERVER_PROTOCOL", server_protocol);
+    }
     set_string_key(sg_SERVER, "SERVER_SOFTWARE", "PHP-Compiler-AOT");
 
     {

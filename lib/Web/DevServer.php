@@ -64,7 +64,7 @@ final class DevServer
             return;
         }
 
-        [$method, $path, $query, $headers, $body] = $raw;
+        [$method, $path, $query, $headers, $body, $serverProtocol] = $raw;
         $path = parse_url($path, PHP_URL_PATH) ?? '/';
         if ('/' === $path) {
             $path = '/example.php';
@@ -123,6 +123,7 @@ final class DevServer
             'SCRIPT_FILENAME' => $scriptFilename,
             'REQUEST_URI' => $requestUri,
             'DOCUMENT_ROOT' => $docroot,
+            'SERVER_PROTOCOL' => $serverProtocol,
         ];
         if ('' !== $pathInfo) {
             $cgiEnv['PATH_INFO'] = $pathInfo;
@@ -144,6 +145,7 @@ final class DevServer
         putenv('SCRIPT_FILENAME='.$scriptFilename);
         putenv('REQUEST_URI='.$requestUri);
         putenv('DOCUMENT_ROOT='.$docroot);
+        putenv('SERVER_PROTOCOL='.$serverProtocol);
         if ('' !== $pathInfo) {
             putenv('PATH_INFO='.$pathInfo);
         } else {
@@ -163,7 +165,7 @@ final class DevServer
     }
 
     /**
-     * @return array{0: string, 1: string, 2: string, 3: array<string, string>, 4: string}|null
+     * @return array{0: string, 1: string, 2: string, 3: array<string, string>, 4: string, 5: string}|null
      */
     public static function readRequest($conn): ?array
     {
@@ -179,12 +181,13 @@ final class DevServer
             }
         }
 
-        if (!preg_match('#^(\S+)\s+(\S+)\s+HTTP/#', $lines, $m)) {
+        if (!preg_match('#^(\S+)\s+(\S+)\s+(HTTP/\S+)#', $lines, $m)) {
             return null;
         }
 
         $method = $m[1];
         $target = $m[2];
+        $serverProtocol = $m[3];
         $path = parse_url($target, PHP_URL_PATH) ?? '/';
         $query = parse_url($target, PHP_URL_QUERY) ?? '';
         if (false === $query) {
@@ -208,7 +211,7 @@ final class DevServer
             }
         }
 
-        return [$method, $path, $query, $headers, $body];
+        return [$method, $path, $query, $headers, $body, $serverProtocol];
     }
 
     /**
