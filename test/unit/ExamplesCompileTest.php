@@ -14,6 +14,7 @@ use PHPUnit\Framework\TestCase;
  * @see https://github.com/PurHur/php-compiler/issues/247 (002-StaticWeb compile.php build + execute)
  * @see https://github.com/PurHur/php-compiler/issues/282 (002-StaticWeb via ./phpc build)
  * @see https://github.com/PurHur/php-compiler/issues/309 (001-SimpleWeb AOT execute + QUERY_STRING refresh in this gate)
+ * @see https://github.com/PurHur/php-compiler/issues/259 (001-SimpleWeb POST via $_REQUEST)
  * @see https://github.com/PurHur/php-compiler/issues/274 (minimal phpc.json beside web examples)
  */
 final class ExamplesCompileTest extends TestCase
@@ -141,6 +142,17 @@ final class ExamplesCompileTest extends TestCase
     }
 
     /**
+     * Shipped 001-SimpleWeb: VM run with -p populates $_REQUEST from POST body (issue #259).
+     */
+    public function testVmSmokePost001SimpleWeb(): void
+    {
+        $examplePath = dirname(__DIR__, 2).'/examples/001-SimpleWeb/example.php';
+        $this->assertFileExists($examplePath);
+        $out = $this->runCli('vm.php', ['-p', 'name=PostExample', $examplePath]);
+        $this->assertStringContainsString('Hello PostExample', $out);
+    }
+
+    /**
      * @dataProvider provideExamples
      *
      * @group llvm
@@ -191,6 +203,37 @@ final class ExamplesCompileTest extends TestCase
         $envBob['REQUEST_URI'] = '/example.php?name=Bob';
         $outBob = $this->runAotBinary($binary, $envBob);
         $this->assertStringContainsString('<h1>Hello Bob</h1>', $outBob);
+
+        @unlink($binary);
+    }
+
+    /**
+     * Shipped 001-SimpleWeb: AOT binary with REQUEST_BODY — $_REQUEST POST path (issue #259).
+     *
+     * @group llvm
+     * @group aot
+     */
+    public function testAotExecuteSimpleWebPost(): void
+    {
+        if (!self::isLlvmReady()) {
+            $this->markTestSkipped(
+                'LLVM 9 toolchain not available. Run script/install-llvm9.sh from the repository root.'
+            );
+        }
+        $source = realpath(dirname(__DIR__, 2).'/examples/001-SimpleWeb/example.php');
+        $this->assertNotFalse($source);
+
+        $repoRoot = dirname(__DIR__, 2);
+        $env = $this->llvmProcessEnv($repoRoot);
+        $binary = $this->compileAotBinaryNoQueryBaking($source, $repoRoot, $env);
+
+        $envPost = $env;
+        $envPost['REQUEST_METHOD'] = 'POST';
+        $envPost['REQUEST_BODY'] = 'name=PostAot';
+        $envPost['SCRIPT_NAME'] = '/example.php';
+        $envPost['REQUEST_URI'] = '/example.php';
+        $out = $this->runAotBinary($binary, $envPost);
+        $this->assertStringContainsString('<h1>Hello PostAot</h1>', $out);
 
         @unlink($binary);
     }

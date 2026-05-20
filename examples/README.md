@@ -21,6 +21,13 @@ cd examples/001-SimpleWeb
 
 Same layout for `examples/002-StaticWeb`. Project-mode `phpc build` with no extra flags (issue [#106](https://github.com/PurHur/php-compiler/issues/106)) will read `entry` from the manifest later.
 
+**001-SimpleWeb** accepts GET and POST for the `name` field via `$_REQUEST` (issue [#259](https://github.com/PurHur/php-compiler/issues/259)):
+
+```console
+curl -s 'http://127.0.0.1:8080/example.php?name=Dev'
+curl -s -X POST -d 'name=PostDev' 'http://127.0.0.1:8080/example.php'
+```
+
 CI runs `test/unit/ExamplesCompileTest.php`: every `examples/*/example.php` is checked with `bin/lint.php` / `phpc lint` (structured unsupported-syntax output with GitHub issue links), linted and smoke-run under `bin/vm.php`; when LLVM 9 is available, `bin/compile.php -l` is exercised as well. **001-SimpleWeb** is built with `compile.php` and run twice with different `QUERY_STRING` values to guard runtime superglobal refresh; **002-StaticWeb** is built and executed once (stdout must contain `Hello World`) via `compile.php` and via `phpc build` (issues [#247](https://github.com/PurHur/php-compiler/issues/247), [#282](https://github.com/PurHur/php-compiler/issues/282)).
 
 Before opening a PR that touches web examples or `bin/serve.php`, run:
