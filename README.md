@@ -27,6 +27,18 @@ make web-smoke                 # lint shipped examples, then VM smoke for 001-Si
 
 The first `ci-local.sh` run downloads a bundled LLVM 9 toolchain into `.llvm/` (see `script/install-llvm9.sh`) and applies vendor patches. No Docker required.
 
+### Quick start (Docker only)
+
+On a host with **only Docker** (no system PHP or LLVM):
+
+```console
+git clone https://github.com/PurHur/php-compiler.git
+cd php-compiler
+make test    # builds php-compiler:22.04-dev if needed, then script/ci-local.sh in the container
+```
+
+`make test` is the same CI path as `make test-docker` when the bind-mount works; on harness hosts it falls back to `script/docker-ci-local.sh` (tar copy) like `make test-harness`.
+
 # Installation
 
 ## Host requirements
@@ -116,18 +128,18 @@ make test-docker
 docker run --rm -v "$(pwd):/compiler" -w /compiler php-compiler:22.04-dev ./script/ci-local.sh
 ```
 
-On **Runforge / harness** hosts (empty bind-mount at `/compiler`), use the canonical target instead — it falls back to copying the repo via tar when the mount has no `vendor/` or `script/ci-local.sh`:
+On **Runforge / harness** hosts (empty bind-mount at `/compiler`), `make test` falls back to copying the repo via tar when the mount has no `vendor/` or `script/ci-local.sh` (same as `make test-harness`):
 
 ```console
-make docker-build-22
-make test-harness
+make test
 # equivalent:
+make test-harness
 ./script/docker-ci-local.sh
 # optional filter:
 make test-harness ARGS='--filter VMTest'
 ```
 
-When the bind-mount works normally, `make test-harness` is equivalent to `make test-docker`. See issue [#245](https://github.com/PurHur/php-compiler/issues/245) for the full local CI matrix; [#249](https://github.com/PurHur/php-compiler/issues/249) tracks deprecating 16.04 `make test` as the default.
+When the bind-mount works normally, `make test`, `make test-harness`, and `make test-docker` all run `script/ci-local.sh` in `php-compiler:22.04-dev`. See issue [#245](https://github.com/PurHur/php-compiler/issues/245) for the full local CI matrix.
 
 If the container runs out of memory while running the full suite (process exit code **137**), increase the limit (for example `docker run -m 8g`).
 
@@ -135,7 +147,7 @@ On sandboxes that cannot bind TCP ports, set `PHP_COMPILER_SKIP_SERVE_TESTS=1` b
 
 Published tag (when available): `ghcr.io/PurHur/php-compiler:dev`. Override with `PHP_COMPILER_DEV_IMAGE`.
 
-Legacy Makefile targets use Ubuntu 16.04 / 18.04 images with PHP 7.4. For day-to-day development on a host with PHP 8.2, prefer the workflow above. Use `make test-18` for the 18.04 image once built.
+Legacy Makefile targets use Ubuntu 16.04 / 18.04 images with PHP 7.4 (`make test-legacy-16`, `make test-legacy-18`; `make test-18` is a deprecated alias). For day-to-day development, prefer `make test` or host `make test-local` above.
 
 To build legacy images, use make:
 
@@ -143,13 +155,13 @@ To build legacy images, use make:
 me@local:~$ make build
 ```
 
-This will take a while (upwards of 10 minutes likely). It will install an Ubuntu container with a custom compile of PHP-7.4 and everything you need to get up and running. It will also composer install all dependencies as well as run the pre-processor. Once it's done, you can run tests:
+This will take a while (upwards of 10 minutes likely). It will install an Ubuntu container with a custom compile of PHP-7.4 and everything you need to get up and running. It will also composer install all dependencies as well as run the pre-processor. Once it's done, you can run legacy tests:
 
 ```console
-me@local:~$ make test
+me@local:~$ make test-legacy-16
 ```
 
-This will execute all unit tests inside the container.
+This executes PHPUnit inside the 16.04 container. For current CI, use `make test` (22.04) instead.
 
 To run your own code or play with the compiler, you can open a shell using `make shell`:
 
