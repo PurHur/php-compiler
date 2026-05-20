@@ -10,7 +10,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 |--------|------:|
 | PHP files on vm.php path | 230 |
 | Source constructs flagged (blockers) | 10 |
-| Source constructs flagged (warnings) | 611 |
+| Source constructs flagged (warnings) | 612 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1273,7 +1273,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new Variable (line 655)
 - new Variable (line 1071)
 - new Variable (line 1079)
-- 29 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 33 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/BasicBlockHelper.php`
 
