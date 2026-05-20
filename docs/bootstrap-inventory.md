@@ -8,9 +8,9 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 274 |
+| PHP files on vm.php path | 277 |
 | Source constructs flagged (blockers) | 10 |
-| Source constructs flagged (warnings) | 707 |
+| Source constructs flagged (warnings) | 713 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -64,7 +64,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/JitStrpos.php` | 0 | 1 |
 | `ext/standard/JitUrlencode.php` | 0 | 1 |
 | `ext/standard/JitWebParams.php` | 0 | 15 |
-| `ext/standard/Module.php` | 0 | 129 |
+| `ext/standard/Module.php` | 0 | 131 |
 | `ext/standard/VmDate.php` | 0 | 1 |
 | `ext/standard/VmExit.php` | 0 | 2 |
 | `ext/standard/VmFs.php` | 0 | 3 |
@@ -72,6 +72,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/VmInternalCall.php` | 0 | 3 |
 | `ext/standard/VmJson.php` | 0 | 1 |
 | `ext/standard/VmNumberFormat.php` | 0 | 1 |
+| `ext/standard/VmPassword.php` | 0 | 1 |
 | `ext/standard/VmScope.php` | 0 | 3 |
 | `ext/standard/VmSprintf.php` | 0 | 1 |
 | `ext/standard/VmString.php` | 0 | 4 |
@@ -157,6 +158,8 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/octdec.php` | 0 | 1 |
 | `ext/standard/ord.php` | 0 | 1 |
 | `ext/standard/parse_url.php` | 0 | 3 |
+| `ext/standard/password_hash.php` | 0 | 1 |
+| `ext/standard/password_verify.php` | 0 | 1 |
 | `ext/standard/pi.php` | 0 | 1 |
 | `ext/standard/pow.php` | 0 | 1 |
 | `ext/standard/putenv_.php` | 0 | 1 |
@@ -283,7 +286,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `lib/VM.php` | 0 | 7 |
 | `lib/VM/ClassEntry.php` | 0 | 1 |
 | `lib/VM/ClassProperty.php` | 0 | 1 |
-| `lib/VM/Context.php` | 0 | 11 |
+| `lib/VM/Context.php` | 0 | 12 |
 | `lib/VM/ErrorReporter.php` | 0 | 1 |
 | `lib/VM/HashTable.php` | 2 | 20 |
 | `lib/VM/ObjectEntry.php` | 0 | 1 |
@@ -566,47 +569,49 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new hex2bin (line 106)
 - new hash_ (line 107)
 - new hash_hmac (line 108)
-- new random_bytes (line 109)
-- new str_pad (line 110)
-- new str_split (line 111)
-- new htmlspecialchars (line 112)
-- new strip_tags (line 113)
-- new header_ (line 114)
-- new header_remove (line 115)
-- new header_list (line 116)
-- new getallheaders_ (line 117)
-- new http_response_code (line 118)
-- new json_encode (line 119)
-- new web_int (line 120)
-- new web_string (line 121)
-- new web_bool (line 122)
-- new urlencode (line 123)
-- new rawurlencode (line 124)
-- new urldecode (line 125)
-- new rawurldecode (line 126)
-- new parse_url (line 127)
-- new dirname (line 128)
-- new basename (line 129)
-- new realpath (line 130)
-- new file_get_contents (line 131)
-- new readfile (line 132)
-- new file_put_contents (line 133)
-- new file_exists (line 134)
-- new is_file (line 135)
-- new is_dir (line 136)
-- new fopen (line 137)
-- new fread (line 138)
-- new fwrite (line 139)
-- new fclose (line 140)
-- new getenv_ (line 141)
-- new putenv_ (line 142)
-- new extract_ (line 143)
-- new compact_ (line 144)
-- new scandir (line 145)
-- new glob_ (line 146)
-- new time (line 147)
-- new date (line 148)
-- new gmdate (line 149)
+- new password_hash (line 109)
+- new password_verify (line 110)
+- new random_bytes (line 111)
+- new str_pad (line 112)
+- new str_split (line 113)
+- new htmlspecialchars (line 114)
+- new strip_tags (line 115)
+- new header_ (line 116)
+- new header_remove (line 117)
+- new header_list (line 118)
+- new getallheaders_ (line 119)
+- new http_response_code (line 120)
+- new json_encode (line 121)
+- new web_int (line 122)
+- new web_string (line 123)
+- new web_bool (line 124)
+- new urlencode (line 125)
+- new rawurlencode (line 126)
+- new urldecode (line 127)
+- new rawurldecode (line 128)
+- new parse_url (line 129)
+- new dirname (line 130)
+- new basename (line 131)
+- new realpath (line 132)
+- new file_get_contents (line 133)
+- new readfile (line 134)
+- new file_put_contents (line 135)
+- new file_exists (line 136)
+- new is_file (line 137)
+- new is_dir (line 138)
+- new fopen (line 139)
+- new fread (line 140)
+- new fwrite (line 141)
+- new fclose (line 142)
+- new getenv_ (line 143)
+- new putenv_ (line 144)
+- new extract_ (line 145)
+- new compact_ (line 146)
+- new scandir (line 147)
+- new glob_ (line 148)
+- new time (line 149)
+- new date (line 150)
+- new gmdate (line 151)
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/VmDate.php`
@@ -648,6 +653,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 
 **Warnings** (review for bootstrap subset):
 - 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/VmPassword.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/VmScope.php`
 
@@ -1098,6 +1108,16 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 **Warnings** (review for bootstrap subset):
 - new HashTable (line 42)
 - new Variable (line 44)
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/password_hash.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/password_verify.php`
+
+**Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/pi.php`
@@ -1977,10 +1997,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new Variable (line 44)
 - new Variable (line 48)
 - new Variable (line 52)
-- new Variable (line 73)
-- new HashTable (line 74)
-- new RunStackEntry (line 101)
-- new RunStackEntry (line 103)
+- new Variable (line 57)
+- new Variable (line 78)
+- new HashTable (line 79)
+- new RunStackEntry (line 106)
+- new RunStackEntry (line 108)
 - 8 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/VM/ErrorReporter.php`
