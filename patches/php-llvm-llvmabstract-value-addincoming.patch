@@ -1,0 +1,35 @@
+--- vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Value.php	2026-05-20 08:16:31.990101360 +0000
++++ vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Value.php
+@@ -2,6 +2,7 @@
+ 
+ namespace PHPLLVM\LLVMAbstract;
+ 
++use PHPLLVM\BasicBlock as CoreBasicBlock;
+ use PHPLLVM\LLVM as CoreLLVM;
+ use PHPLLVM\Context as CoreContext;
+ use PHPLLVM\Module as CoreModule;
+@@ -11,6 +12,8 @@
+ 
+ use llvm\llvm as lib;
+ use llvm\LLVMValueRef;
++use llvm\LLVMValueRef_ptr;
++use llvm\LLVMBasicBlockRef_ptr;
+ 
+ class Value implements CoreValue {
+ 
+@@ -397,4 +400,14 @@
+         $this->llvm->lib->LLVMSetMetadata($this->value, $kind, $node->value);
+     }
+ 
++    public function addIncoming(CoreValue $value, CoreBasicBlock $block): void
++    {
++        $this->llvm->lib->LLVMAddIncoming(
++            $this->value,
++            $this->llvm->lib->makeArray(LLVMValueRef_ptr::class, [$value->value]),
++            $this->llvm->lib->makeArray(LLVMBasicBlockRef_ptr::class, [$block->block]),
++            1
++        );
++    }
++
+ }
+\ No newline at end of file

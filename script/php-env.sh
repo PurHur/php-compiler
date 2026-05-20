@@ -2,8 +2,8 @@
 PHP_BIN="${PHP_COMPILER_PHP:-}"
 if [[ -z "$PHP_BIN" ]]; then
   for candidate in php8.2 php8.1 php; do
-    if command -v "$candidate" >/dev/null 2>&1; then
-      PHP_BIN="$candidate"
+    if resolved="$(command -v "$candidate" 2>/dev/null)" && [[ -n "$resolved" && -x "$resolved" && ! -d "$resolved" ]]; then
+      PHP_BIN="$resolved"
       break
     fi
   done
@@ -11,10 +11,10 @@ fi
 if [[ -z "$PHP_BIN" ]]; then
   PHP_BIN=php
 fi
-if ! command -v "$PHP_BIN" >/dev/null 2>&1; then
+if ! resolved="$(command -v "$PHP_BIN" 2>/dev/null)" || [[ -z "$resolved" || ! -x "$resolved" || -d "$resolved" ]]; then
   for candidate in php8.2 php8.1 php; do
-    if command -v "$candidate" >/dev/null 2>&1; then
-      PHP_BIN="$candidate"
+    if resolved="$(command -v "$candidate" 2>/dev/null)" && [[ -n "$resolved" && -x "$resolved" && ! -d "$resolved" ]]; then
+      PHP_BIN="$resolved"
       break
     fi
   done

@@ -1,0 +1,11 @@
+--- vendor/ircmaxell/php-llvm/lib/Value.php	2026-05-20 08:16:31.990932527 +0000
++++ vendor/ircmaxell/php-llvm/lib/Value.php
+@@ -227,4 +227,6 @@
+ 
+     public function setMetadata(int $kind, Value $node): void;
+ 
+-}
+\ No newline at end of file
++    public function addIncoming(Value $value, BasicBlock $block): void;
++
++}
