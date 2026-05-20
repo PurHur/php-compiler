@@ -1,4 +1,3 @@
-Wrote /compiler/docs/bootstrap-profile.json (2 AOT lint targets, 2 excluded files)
 {
     "phase": "B",
     "issue": 212,
@@ -50,6 +49,7 @@ Wrote /compiler/docs/bootstrap-profile.json (2 AOT lint targets, 2 excluded file
         "ext/standard/JitRandomBytes.php",
         "ext/standard/JitRealpath.php",
         "ext/standard/JitRequestBody.php",
+        "ext/standard/JitSprintf.php",
         "ext/standard/JitStrPad.php",
         "ext/standard/JitStrRepeat.php",
         "ext/standard/JitStrReplace.php",
@@ -67,6 +67,7 @@ Wrote /compiler/docs/bootstrap-profile.json (2 AOT lint targets, 2 excluded file
         "ext/standard/VmJson.php",
         "ext/standard/VmNumberFormat.php",
         "ext/standard/VmScope.php",
+        "ext/standard/VmSprintf.php",
         "ext/standard/VmString.php",
         "ext/standard/abs.php",
         "ext/standard/array_combine.php",
@@ -151,6 +152,7 @@ Wrote /compiler/docs/bootstrap-profile.json (2 AOT lint targets, 2 excluded file
         "ext/standard/scandir.php",
         "ext/standard/sin.php",
         "ext/standard/sort_.php",
+        "ext/standard/sprintf_.php",
         "ext/standard/sqrt.php",
         "ext/standard/str_contains.php",
         "ext/standard/str_ends_with.php",
@@ -287,9 +289,9 @@ Wrote /compiler/docs/bootstrap-profile.json (2 AOT lint targets, 2 excluded file
         "test/bootstrap-aot/echo_hello.php"
     ],
     "totals": {
-        "inventory_files": 252,
+        "inventory_files": 255,
         "excluded": 2,
-        "eligible": 250,
+        "eligible": 253,
         "aot_lint_targets": 2
     }
 }
