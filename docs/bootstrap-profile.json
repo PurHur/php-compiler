@@ -35,6 +35,7 @@
         "ext/standard/JitDate.php",
         "ext/standard/JitEnv.php",
         "ext/standard/JitExplode.php",
+        "ext/standard/JitFileGetContents.php",
         "ext/standard/JitGetallheaders.php",
         "ext/standard/JitHash.php",
         "ext/standard/JitHeader.php",
@@ -237,6 +238,7 @@
         "lib/JIT/Builtin/Refcount.php",
         "lib/JIT/Builtin/ScriptExit.php",
         "lib/JIT/Builtin/StringDateTime.php",
+        "lib/JIT/Builtin/StringFileGetContents.php",
         "lib/JIT/Builtin/StringGetenv.php",
         "lib/JIT/Builtin/StringHtmlspecialchars.php",
         "lib/JIT/Builtin/StringJsonEncode.php",
@@ -315,9 +317,9 @@
         "test/bootstrap-aot/echo_hello.php"
     ],
     "totals": {
-        "inventory_files": 281,
+        "inventory_files": 283,
         "excluded": 2,
-        "eligible": 279,
+        "eligible": 281,
         "aot_lint_targets": 2
     }
 }

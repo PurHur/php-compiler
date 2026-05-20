@@ -8,9 +8,9 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 281 |
+| PHP files on vm.php path | 283 |
 | Source constructs flagged (blockers) | 10 |
-| Source constructs flagged (warnings) | 726 |
+| Source constructs flagged (warnings) | 728 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -37,6 +37,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/JitDate.php` | 0 | 1 |
 | `ext/standard/JitEnv.php` | 0 | 1 |
 | `ext/standard/JitExplode.php` | 0 | 1 |
+| `ext/standard/JitFileGetContents.php` | 0 | 1 |
 | `ext/standard/JitGetallheaders.php` | 0 | 1 |
 | `ext/standard/JitHash.php` | 0 | 1 |
 | `ext/standard/JitHeader.php` | 0 | 1 |
@@ -239,6 +240,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `lib/JIT/Builtin/Refcount.php` | 0 | 1 |
 | `lib/JIT/Builtin/ScriptExit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringDateTime.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringFileGetContents.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringGetenv.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringHtmlspecialchars.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringJsonEncode.php` | 0 | 1 |
@@ -333,6 +335,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/JitFileGetContents.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/JitGetallheaders.php`
 
@@ -1569,10 +1576,10 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new JIT\Call\Native (line 151)
 - new ext\standard\boolval (line 270)
 - new Variable (line 456)
-- new Variable (line 864)
-- new Operand\Literal (line 934)
-- new Operand\Literal (line 938)
-- new Operand\Literal (line 942)
+- new Variable (line 875)
+- new Operand\Literal (line 945)
+- new Operand\Literal (line 949)
+- new Operand\Literal (line 953)
 - 12 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Analyzer.php`
@@ -1657,6 +1664,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 
 **Warnings** (review for bootstrap subset):
 - 5 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/JIT/Builtin/StringFileGetContents.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Builtin/StringGetenv.php`
 
