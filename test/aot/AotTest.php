@@ -108,7 +108,7 @@ final class AotTest extends BaseTest
                     $compileArgv[] = '-q';
                     $compileArgv[] = $parts[1];
                 }
-                if ('REQUEST_BODY' === $parts[0] && str_contains($parts[1], '=')) {
+                if ('REQUEST_BODY' === $parts[0] && '' !== $parts[1]) {
                     $compileArgv[] = '-p';
                     $compileArgv[] = $parts[1];
                 }

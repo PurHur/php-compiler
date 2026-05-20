@@ -294,6 +294,106 @@ static const char *request_method_for(const char *post_body)
     return ('\0' != post_body[0]) ? "POST" : "GET";
 }
 
+static void normalize_content_type(const char *raw, char *out, size_t out_len)
+{
+    size_t i;
+    size_t end;
+
+    if (NULL == raw) {
+        out[0] = '\0';
+
+        return;
+    }
+    strncpy(out, raw, out_len - 1);
+    out[out_len - 1] = '\0';
+    for (i = 0; '\0' != out[i]; i++) {
+        if (out[i] >= 'A' && out[i] <= 'Z') {
+            out[i] = (char) (out[i] - 'A' + 'a');
+        }
+    }
+    end = strlen(out);
+    for (i = 0; i < end; i++) {
+        if (';' == out[i]) {
+            while (end > i + 1 && (' ' == out[end - 1] || '\t' == out[end - 1])) {
+                end--;
+            }
+            out[i] = '\0';
+            break;
+        }
+    }
+}
+
+static const char *resolve_content_type(char *buf, size_t buf_len)
+{
+    const char *ct = getenv("CONTENT_TYPE");
+
+    if (NULL == ct || '\0' == ct[0]) {
+        ct = getenv("HTTP_CONTENT_TYPE");
+    }
+    if (NULL == ct) {
+        buf[0] = '\0';
+
+        return buf;
+    }
+    normalize_content_type(ct, buf, buf_len);
+
+    return buf;
+}
+
+static int method_is(const char *method, const char *name)
+{
+    size_t i;
+
+    if (NULL == method) {
+        return 0;
+    }
+    for (i = 0; '\0' != method[i] && '\0' != name[i]; i++) {
+        char a = method[i];
+        char b = name[i];
+
+        if (a >= 'a' && a <= 'z') {
+            a = (char) (a - 'a' + 'A');
+        }
+        if (b >= 'a' && b <= 'z') {
+            b = (char) (b - 'a' + 'A');
+        }
+        if (a != b) {
+            return 0;
+        }
+    }
+
+    return '\0' == method[i] && '\0' == name[i];
+}
+
+static int should_populate_post(
+    const char *method,
+    const char *content_type,
+    const char *post_body
+)
+{
+    if ('\0' == post_body[0]) {
+        return 0;
+    }
+    if (method_is(method, "PUT") || method_is(method, "PATCH") || method_is(method, "DELETE")) {
+        return 0 == strcmp(content_type, "application/x-www-form-urlencoded");
+    }
+    if (method_is(method, "POST")) {
+        if ('\0' == content_type[0]) {
+            return 1;
+        }
+        if (0 == strcmp(content_type, "application/x-www-form-urlencoded")) {
+            return 1;
+        }
+        if (0 == strncmp(content_type, "multipart/form-data", 19)) {
+            return 1;
+        }
+
+        return 0;
+    }
+
+    return 0;
+}
+
 static int is_cgi_header_env_key(const char *key)
 {
     if (0 == strncmp(key, "HTTP_", 5)) {
@@ -513,6 +613,9 @@ void __superglobals__refresh(void)
     const char *query_string = env_or_empty("QUERY_STRING");
     const char *post_body = env_or_empty("REQUEST_BODY");
     const char *method = request_method_for(post_body);
+    char content_type_buf[256];
+    const char *content_type = resolve_content_type(content_type_buf, sizeof(content_type_buf));
+    int populate_post = should_populate_post(method, content_type, post_body);
     const char *script_name = env_or_empty("SCRIPT_NAME");
     const char *request_uri = getenv("REQUEST_URI");
     char path_info[512];
@@ -541,7 +644,7 @@ void __superglobals__refresh(void)
     parse_form_encoded(sg_GET, query_string);
 
     sg_POST = __hashtable__alloc();
-    if ('\0' != post_body[0]) {
+    if (populate_post) {
         parse_form_encoded(sg_POST, post_body);
     }
 
@@ -549,7 +652,7 @@ void __superglobals__refresh(void)
     if ('\0' != query_string[0]) {
         parse_form_encoded(sg_REQUEST, query_string);
     }
-    if ('\0' != post_body[0]) {
+    if (populate_post) {
         parse_form_encoded(sg_REQUEST, post_body);
     }
 
