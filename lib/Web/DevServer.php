@@ -77,7 +77,7 @@ final class DevServer
         [$method, $path, $query, $headers, $body, $serverProtocol] = $raw;
         $path = parse_url($path, PHP_URL_PATH) ?? '/';
         if ('/' === $path) {
-            $path = '/example.php';
+            $path = self::resolveDirectoryIndex($docroot);
         }
 
         if (!self::isSafeUrlPath($path)) {
@@ -324,6 +324,47 @@ final class DevServer
                 unset($_SERVER[$key]);
             }
         }
+    }
+
+    /**
+     * URL path for GET / when no script is in the request (issue #254).
+     *
+     * Prefer index.php (standard front controller); fall back to example.php for
+     * shipped examples/001-SimpleWeb. Optional phpc.json "index" overrides when set.
+     */
+    public static function resolveDirectoryIndex(string $docroot, ?array $manifest = null): string
+    {
+        if (null !== $manifest && isset($manifest['index']) && is_string($manifest['index']) && '' !== $manifest['index']) {
+            $index = $manifest['index'];
+            if ('/' === $index[0]) {
+                if (is_file($index)) {
+                    return $index;
+                }
+            } else {
+                $base = realpath($docroot);
+                if (false === $base) {
+                    $base = $docroot;
+                }
+                $candidate = $base.'/'.$index;
+                if (is_file($candidate)) {
+                    $urlPath = '/'.ltrim(str_replace('\\', '/', substr($candidate, strlen($base))), '/');
+                    if ('' === $urlPath || '/' === $urlPath) {
+                        return '/index.php';
+                    }
+
+                    return $urlPath;
+                }
+            }
+        }
+
+        if (is_file($docroot.'/index.php')) {
+            return '/index.php';
+        }
+        if (is_file($docroot.'/example.php')) {
+            return '/example.php';
+        }
+
+        return '/index.php';
     }
 
     public static function isSafeUrlPath(string $path): bool

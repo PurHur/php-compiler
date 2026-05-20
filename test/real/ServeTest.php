@@ -38,6 +38,37 @@ final class ServeTest extends TestCase
     $this->assertStringContainsString('Dev', $response);
   }
 
+  public function testServesIndexPhpForRootPath(): void
+  {
+    $docroot = $this->makeDocroot([
+      'index.php' => '<?php echo "from-index";',
+    ]);
+    $response = $this->httpGet($docroot, '/');
+    $this->assertStringContainsString('HTTP/1.1 200', $response);
+    $this->assertStringContainsString('from-index', $response);
+  }
+
+  public function testExamplePhpFallbackWhenNoIndex(): void
+  {
+    $docroot = $this->makeDocroot([
+      'example.php' => '<?php echo "from-example";',
+    ]);
+    $response = $this->httpGet($docroot, '/');
+    $this->assertStringContainsString('HTTP/1.1 200', $response);
+    $this->assertStringContainsString('from-example', $response);
+  }
+
+  public function testPrefersIndexPhpOverExamplePhp(): void
+  {
+    $docroot = $this->makeDocroot([
+      'index.php' => '<?php echo "index-wins";',
+      'example.php' => '<?php echo "example-loses";',
+    ]);
+    $response = $this->httpGet($docroot, '/');
+    $this->assertStringContainsString('index-wins', $response);
+    $this->assertStringNotContainsString('example-loses', $response);
+  }
+
   public function testUncaughtExceptionReturns500WithoutLeak(): void
   {
     $docroot = $this->makeDocroot(['error.php' => '<?php no_such_func();']);
