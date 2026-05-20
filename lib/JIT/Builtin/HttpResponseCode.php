@@ -155,6 +155,50 @@ final class HttpResponseCode
         );
     }
 
+    /**
+     * Set the response status global and emit a CGI {@code Status:} line (AOT/JIT standalone).
+     */
+    public static function emitStandaloneStatusLine(Context $context, \PHPLLVM\Value $code64): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $fn = $context->builder->getInsertBlock()->getParent();
+        assert($fn instanceof \PHPLLVM\Value\Function_);
+        ++self::$setEmitSerial;
+        $sid = (string) self::$setEmitSerial;
+
+        $sInvalid = $fn->appendBasicBlock('hr_hdr_inv_'.$sid);
+        $sValid = $fn->appendBasicBlock('hr_hdr_ok_'.$sid);
+        $sDone = $fn->appendBasicBlock('hr_hdr_done_'.$sid);
+
+        $tooLow = $context->builder->icmp(Builder::INT_SLT, $code64, $i64->constInt(100, false));
+        $tooHigh = $context->builder->icmp(Builder::INT_SGT, $code64, $i64->constInt(599, false));
+        $bad = $context->builder->or($tooLow, $tooHigh);
+        $context->builder->branchIf($bad, $sInvalid, $sValid);
+
+        $context->builder->positionAtEnd($sInvalid);
+        $context->builder->branch($sDone);
+
+        $context->builder->positionAtEnd($sValid);
+        $code32 = $context->builder->trunc($code64, $i32);
+        $context->builder->store($code32, self::$global);
+
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            $fmt = $context->builder->pointerCast(
+                $context->constantFromString("Status: %d\r\n"),
+                $context->getTypeFromString('char*')
+            );
+            $context->builder->call(
+                $context->lookupFunction('printf'),
+                $fmt,
+                $code32
+            );
+        }
+        $context->builder->branch($sDone);
+
+        $context->builder->positionAtEnd($sDone);
+    }
+
     private static function emitSetFromCode64(Context $context, \PHPLLVM\Value $code64, \PHPLLVM\Value $outPtr): void
     {
         $i32 = $context->getTypeFromString('int32');
