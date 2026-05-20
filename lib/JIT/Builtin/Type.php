@@ -83,6 +83,28 @@ class Type extends Builtin {
         $fntypeExit = $this->context->context->functionType($void, false, $i32);
         $fnExit = $this->context->module->addFunction('exit', $fntypeExit);
         $this->context->registerFunction('exit', $fnExit);
+        $fntypeFormatDt = $this->context->context->functionType(
+            $this->context->getTypeFromString('__string__*'),
+            false,
+            $this->context->getTypeFromString('__string__*'),
+            $i64,
+            $this->context->getTypeFromString('int8')
+        );
+        $fnFormatDt = $this->context->module->addFunction('__compiler_format_datetime', $fntypeFormatDt);
+        $this->context->registerFunction('__compiler_format_datetime', $fnFormatDt);
+        $i8p = $this->context->getTypeFromString('int8*');
+        $i64p = $this->context->getTypeFromString('int64*');
+        $libcFns = [
+            'time' => [$i64, false, [$i8p]],
+            'localtime' => [$i8p, false, [$i64p]],
+            'gmtime' => [$i8p, false, [$i64p]],
+        ];
+        foreach ($libcFns as $libcName => $spec) {
+            [$ret, $vararg, $params] = $spec;
+            $ft = $this->context->context->functionType($ret, $vararg, ...$params);
+            $fn = $this->context->module->addFunction($libcName, $ft);
+            $this->context->registerFunction($libcName, $fn);
+        }
         $this->hashtable->register();
         // $this->maskedarray->register();
         // $this->nativearray->register();
