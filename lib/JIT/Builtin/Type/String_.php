@@ -216,6 +216,7 @@ class String_ extends Type {
         \PHPCompiler\JIT\Builtin\StringNl2br::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringUcwords::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringRandomBytes::implement($this->context);
+        \PHPCompiler\JIT\Builtin\StringJsonEncode::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringGetenv::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringDateTime::implement($this->context);
     }

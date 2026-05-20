@@ -41,6 +41,7 @@
         "ext/standard/JitHtmlspecialchars.php",
         "ext/standard/JitHttpResponseCode.php",
         "ext/standard/JitImplode.php",
+        "ext/standard/JitJsonEncode.php",
         "ext/standard/JitNl2br.php",
         "ext/standard/JitNumberFormat.php",
         "ext/standard/JitParseUrl.php",
@@ -61,6 +62,7 @@
         "ext/standard/VmDate.php",
         "ext/standard/VmExit.php",
         "ext/standard/VmFs.php",
+        "ext/standard/VmJson.php",
         "ext/standard/VmNumberFormat.php",
         "ext/standard/VmScope.php",
         "ext/standard/VmString.php",
@@ -125,6 +127,7 @@
         "ext/standard/is_nan.php",
         "ext/standard/is_numeric.php",
         "ext/standard/is_scalar.php",
+        "ext/standard/json_encode.php",
         "ext/standard/lcfirst.php",
         "ext/standard/log.php",
         "ext/standard/nl2br.php",
@@ -204,6 +207,7 @@
         "lib/JIT/Builtin/StringDateTime.php",
         "lib/JIT/Builtin/StringGetenv.php",
         "lib/JIT/Builtin/StringHtmlspecialchars.php",
+        "lib/JIT/Builtin/StringJsonEncode.php",
         "lib/JIT/Builtin/StringNl2br.php",
         "lib/JIT/Builtin/StringRandomBytes.php",
         "lib/JIT/Builtin/StringUcwords.php",
@@ -274,9 +278,9 @@
         "test/bootstrap-aot/echo_hello.php"
     ],
     "totals": {
-        "inventory_files": 240,
+        "inventory_files": 244,
         "excluded": 2,
-        "eligible": 238,
+        "eligible": 242,
         "aot_lint_targets": 2
     }
 }
