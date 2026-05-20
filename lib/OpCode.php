@@ -55,6 +55,8 @@ class OpCode {
     const TYPE_CAST_UNSET = 43;
     const TYPE_EQUAL = 44;
     const TYPE_ARRAY_DIM_FETCH=45;
+    /** Array dim fetch for assignment lvalues (creates missing keys; issue #103). */
+    const TYPE_ARRAY_DIM_FETCH_WRITE=83;
     const TYPE_MODULO = 46;
     const TYPE_SWITCH = 47;
     const TYPE_CASE = 48;

@@ -362,7 +362,7 @@ final class Variable {
         }
     }
 
-    public function dimFetch(self $dim, ?Type $expectedType = null): Variable {
+    public function dimFetch(self $dim, ?Type $expectedType = null, bool $forWrite = false): Variable {
         switch ($this->type) {
             case self::TYPE_STRING:
                 $ptr = StringOffsetHelper::dimFetch(
@@ -379,7 +379,8 @@ final class Variable {
                 );
             case self::TYPE_HASHTABLE:
                 if (
-                    null !== $this->superglobalName
+                    !$forWrite
+                    && null !== $this->superglobalName
                     && self::TYPE_STRING === $dim->type
                     && (null === $expectedType || Type::TYPE_ARRAY !== $expectedType->type)
                 ) {
@@ -403,6 +404,11 @@ final class Variable {
                 $ht = $this->context->helper->loadValue($this);
                 if (self::TYPE_STRING === $dim->type) {
                     $key = $this->context->helper->loadValue($dim);
+                    if ($forWrite && (null === $expectedType || Type::TYPE_ARRAY !== $expectedType->type)) {
+                        $this->context->refcount->addref($ht);
+
+                        return HashTableHelper::writableStringKeyValueBox($this->context, $ht, $key);
+                    }
                     if (null !== $expectedType && Type::TYPE_ARRAY === $expectedType->type) {
                         $childHt = $this->context->builder->call(
                             $this->context->lookupFunction('__hashtable__readStringKeyHashtable'),
