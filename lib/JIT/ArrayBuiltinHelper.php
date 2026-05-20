@@ -1511,4 +1511,354 @@ final class ArrayBuiltinHelper
             $context->builder->siToFp($sumInt, $double)
         );
     }
+    /**
+     * array_product() for packed lists (integers and floats; subset of PHP).
+     */
+    public static function arrayProduct(Context $context, Variable $array): Value
+    {
+        if (self::isNativeArray($array->type)) {
+            return self::arrayProductNative($context, $array);
+        }
+
+        return self::arrayProductHashTable($context, self::loadHashTable($context, $array));
+    }
+
+    private static function arrayProductNative(Context $context, Variable $array): Value
+    {
+        $elemType = $array->type & ~Variable::IS_NATIVE_ARRAY;
+        $sizeT = $context->getTypeFromString('size_t');
+        $i64 = $context->getTypeFromString('int64');
+        $double = $context->getTypeFromString('double');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $count = $context->constantFromInteger($array->nextFreeElement, 'size_t');
+
+        if (Variable::TYPE_NATIVE_DOUBLE === $elemType) {
+            $prodSlot = $context->builder->alloca($double, 1, 'array_product_native_f');
+            $context->builder->store($double->constReal(1.0), $prodSlot);
+            if (0 === $array->nextFreeElement) {
+                return $context->builder->load($prodSlot);
+            }
+            $idxSlot = $context->builder->alloca($sizeT, 1, 'array_product_native_f_idx');
+            $context->builder->store($zero, $idxSlot);
+            $head = BasicBlockHelper::append($context, 'array_product_native_f_head');
+            $body = BasicBlockHelper::append($context, 'array_product_native_f_body');
+            $done = BasicBlockHelper::append($context, 'array_product_native_f_done');
+            $context->builder->branch($head);
+
+            $context->builder->positionAtEnd($head);
+            $idx = $context->builder->load($idxSlot);
+            $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $count);
+            $context->builder->branchIf($atEnd, $done, $body);
+
+            $context->builder->positionAtEnd($body);
+            $slot = $context->builder->inBoundsGep($array->value, $zero, $idx);
+            $elem = $context->builder->load($slot);
+            $prod = $context->builder->load($prodSlot);
+            $context->builder->store($context->builder->fmul($prod, $elem), $prodSlot);
+            $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+            $context->builder->branch($head);
+
+            $context->builder->positionAtEnd($done);
+
+            return $context->builder->load($prodSlot);
+        }
+
+        if (Variable::TYPE_VALUE === $elemType) {
+            return self::arrayProductNativeValue($context, $array);
+        }
+
+        if (Variable::TYPE_NATIVE_LONG !== $elemType) {
+            throw new \LogicException(
+                'array_product() only supports integer and float elements in this compiler build'
+            );
+        }
+
+        $prodSlot = $context->builder->alloca($i64, 1, 'array_product_native_i');
+        $context->builder->store($i64->constInt(1, false), $prodSlot);
+        if (0 === $array->nextFreeElement) {
+            return $context->builder->load($prodSlot);
+        }
+
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'array_product_native_i_idx');
+        $context->builder->store($zero, $idxSlot);
+        $head = BasicBlockHelper::append($context, 'array_product_native_i_head');
+        $body = BasicBlockHelper::append($context, 'array_product_native_i_body');
+        $done = BasicBlockHelper::append($context, 'array_product_native_i_done');
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $count);
+        $context->builder->branchIf($atEnd, $done, $body);
+
+        $context->builder->positionAtEnd($body);
+        $slot = $context->builder->inBoundsGep($array->value, $zero, $idx);
+        $elem = $context->builder->load($slot);
+        $prod = $context->builder->load($prodSlot);
+        $context->builder->store($context->builder->mulNoSignedWrap($prod, $elem), $prodSlot);
+        $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($done);
+
+        return $context->builder->load($prodSlot);
+    }
+
+    private static function arrayProductHashTable(Context $context, Value $ht): Value
+    {
+        $sizeT = $context->getTypeFromString('size_t');
+        $i64 = $context->getTypeFromString('int64');
+        $double = $context->getTypeFromString('double');
+        $i8 = $context->getTypeFromString('int8');
+        $i1 = $context->getTypeFromString('int1');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+
+        $prodIntSlot = $context->builder->alloca($i64, 1, 'array_product_int');
+        $prodFloatSlot = $context->builder->alloca($double, 1, 'array_product_float');
+        $useFloatSlot = $context->builder->alloca($i1, 1, 'array_product_use_float');
+        $context->builder->store($i64->constInt(1, false), $prodIntSlot);
+        $context->builder->store($double->constReal(1.0), $prodFloatSlot);
+        $context->builder->store($i1->constInt(0, false), $useFloatSlot);
+
+        $num = $context->builder->call(
+            $context->lookupFunction('__hashtable__getNumElements'),
+            $ht
+        );
+
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'array_product_ht_idx');
+        $context->builder->store($zero, $idxSlot);
+        $head = BasicBlockHelper::append($context, 'array_product_ht_head');
+        $body = BasicBlockHelper::append($context, 'array_product_ht_body');
+        $afterLong = BasicBlockHelper::append($context, 'array_product_ht_after_long');
+        $longBlock = BasicBlockHelper::append($context, 'array_product_ht_long');
+        $doubleBlock = BasicBlockHelper::append($context, 'array_product_ht_double');
+        $continueBlock = BasicBlockHelper::append($context, 'array_product_ht_continue');
+        $doneBlock = BasicBlockHelper::append($context, 'array_product_ht_done');
+
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $num, $zero);
+        $context->builder->branchIf($isEmpty, $doneBlock, $head);
+
+        $context->builder->positionAtEnd($head);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $num);
+        $context->builder->branchIf($atEnd, $doneBlock, $body);
+
+        $context->builder->positionAtEnd($body);
+        $entry = self::listEntryAt($context, $ht, $idx);
+        $valueMap = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($entry, $valueMap['type'])
+        );
+        $isLong = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
+        );
+        $isDouble = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
+        );
+        $context->builder->branchIf($isLong, $longBlock, $afterLong);
+
+        $context->builder->positionAtEnd($afterLong);
+        $context->builder->branchIf($isDouble, $doubleBlock, $continueBlock);
+
+        $context->builder->positionAtEnd($longBlock);
+        $longVal = $context->builder->call($context->lookupFunction('__value__readLong'), $entry);
+        $useFloat = $context->builder->load($useFloatSlot);
+        $floatPath = BasicBlockHelper::append($context, 'array_product_ht_long_as_float');
+        $intPath = BasicBlockHelper::append($context, 'array_product_ht_long_as_int');
+        $longDone = BasicBlockHelper::append($context, 'array_product_ht_long_done');
+        $context->builder->branchIf($useFloat, $floatPath, $intPath);
+
+        $context->builder->positionAtEnd($intPath);
+        $prodInt = $context->builder->load($prodIntSlot);
+        $context->builder->store(
+            $context->builder->mulNoSignedWrap($prodInt, $longVal),
+            $prodIntSlot
+        );
+        $context->builder->branch($longDone);
+
+        $context->builder->positionAtEnd($floatPath);
+        $prodFloat = $context->builder->load($prodFloatSlot);
+        $context->builder->store(
+            $context->builder->fmul($prodFloat, $context->builder->siToFp($longVal, $double)),
+            $prodFloatSlot
+        );
+        $context->builder->branch($longDone);
+
+        $context->builder->positionAtEnd($longDone);
+        $context->builder->branch($continueBlock);
+
+        $context->builder->positionAtEnd($doubleBlock);
+        $doubleVal = $context->builder->call($context->lookupFunction('__value__readDouble'), $entry);
+        $useFloatNow = $context->builder->load($useFloatSlot);
+        $promoteBlock = BasicBlockHelper::append($context, 'array_product_ht_promote');
+        $addFloatBlock = BasicBlockHelper::append($context, 'array_product_ht_add_float');
+        $doubleDone = BasicBlockHelper::append($context, 'array_product_ht_double_done');
+        $context->builder->branchIf($useFloatNow, $addFloatBlock, $promoteBlock);
+
+        $context->builder->positionAtEnd($promoteBlock);
+        $prodInt = $context->builder->load($prodIntSlot);
+        $context->builder->store(
+            $context->builder->fmul($context->builder->siToFp($prodInt, $double), $doubleVal),
+            $prodFloatSlot
+        );
+        $context->builder->store($i1->constInt(1, false), $useFloatSlot);
+        $context->builder->branch($doubleDone);
+
+        $context->builder->positionAtEnd($addFloatBlock);
+        $prodFloat = $context->builder->load($prodFloatSlot);
+        $context->builder->store($context->builder->fmul($prodFloat, $doubleVal), $prodFloatSlot);
+        $context->builder->branch($doubleDone);
+
+        $context->builder->positionAtEnd($doubleDone);
+        $context->builder->branch($continueBlock);
+
+        $context->builder->positionAtEnd($continueBlock);
+        $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $useFloat = $context->builder->load($useFloatSlot);
+        $prodInt = $context->builder->load($prodIntSlot);
+        $prodFloat = $context->builder->load($prodFloatSlot);
+
+        return $context->builder->select(
+            $useFloat,
+            $prodFloat,
+            $context->builder->siToFp($prodInt, $double)
+        );
+    }
+
+    /** Native array of boxed __value__ (e.g. array(1, 2.5)). */
+    private static function arrayProductNativeValue(Context $context, Variable $array): Value
+    {
+        $sizeT = $context->getTypeFromString('size_t');
+        $i64 = $context->getTypeFromString('int64');
+        $double = $context->getTypeFromString('double');
+        $i8 = $context->getTypeFromString('int8');
+        $i1 = $context->getTypeFromString('int1');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $count = $context->constantFromInteger($array->nextFreeElement, 'size_t');
+        $valueMap = $context->structFieldMap['__value__'];
+
+        $prodIntSlot = $context->builder->alloca($i64, 1, 'array_product_nv_int');
+        $prodFloatSlot = $context->builder->alloca($double, 1, 'array_product_nv_float');
+        $useFloatSlot = $context->builder->alloca($i1, 1, 'array_product_nv_use_float');
+        $context->builder->store($i64->constInt(1, false), $prodIntSlot);
+        $context->builder->store($double->constReal(1.0), $prodFloatSlot);
+        $context->builder->store($i1->constInt(0, false), $useFloatSlot);
+
+        if (0 === $array->nextFreeElement) {
+            return $context->builder->load($prodIntSlot);
+        }
+
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'array_product_nv_idx');
+        $context->builder->store($zero, $idxSlot);
+        $head = BasicBlockHelper::append($context, 'array_product_nv_head');
+        $body = BasicBlockHelper::append($context, 'array_product_nv_body');
+        $afterLong = BasicBlockHelper::append($context, 'array_product_nv_after_long');
+        $longBlock = BasicBlockHelper::append($context, 'array_product_nv_long');
+        $doubleBlock = BasicBlockHelper::append($context, 'array_product_nv_double');
+        $continueBlock = BasicBlockHelper::append($context, 'array_product_nv_continue');
+        $doneBlock = BasicBlockHelper::append($context, 'array_product_nv_done');
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $count);
+        $context->builder->branchIf($atEnd, $doneBlock, $body);
+
+        $context->builder->positionAtEnd($body);
+        $entry = $context->builder->inBoundsGep($array->value, $zero, $idx);
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($entry, $valueMap['type'])
+        );
+        $isLong = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
+        );
+        $isDouble = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
+        );
+        $context->builder->branchIf($isLong, $longBlock, $afterLong);
+
+        $context->builder->positionAtEnd($afterLong);
+        $context->builder->branchIf($isDouble, $doubleBlock, $continueBlock);
+
+        $context->builder->positionAtEnd($longBlock);
+        $longVal = $context->builder->call($context->lookupFunction('__value__readLong'), $entry);
+        $useFloat = $context->builder->load($useFloatSlot);
+        $floatPath = BasicBlockHelper::append($context, 'array_product_nv_long_f');
+        $intPath = BasicBlockHelper::append($context, 'array_product_nv_long_i');
+        $longDone = BasicBlockHelper::append($context, 'array_product_nv_long_done');
+        $context->builder->branchIf($useFloat, $floatPath, $intPath);
+
+        $context->builder->positionAtEnd($intPath);
+        $prodInt = $context->builder->load($prodIntSlot);
+        $context->builder->store(
+            $context->builder->mulNoSignedWrap($prodInt, $longVal),
+            $prodIntSlot
+        );
+        $context->builder->branch($longDone);
+
+        $context->builder->positionAtEnd($floatPath);
+        $prodFloat = $context->builder->load($prodFloatSlot);
+        $context->builder->store(
+            $context->builder->fmul($prodFloat, $context->builder->siToFp($longVal, $double)),
+            $prodFloatSlot
+        );
+        $context->builder->branch($longDone);
+
+        $context->builder->positionAtEnd($longDone);
+        $context->builder->branch($continueBlock);
+
+        $context->builder->positionAtEnd($doubleBlock);
+        $doubleVal = $context->builder->call($context->lookupFunction('__value__readDouble'), $entry);
+        $useFloatNow = $context->builder->load($useFloatSlot);
+        $promoteBlock = BasicBlockHelper::append($context, 'array_product_nv_promote');
+        $addFloatBlock = BasicBlockHelper::append($context, 'array_product_nv_add_float');
+        $doubleDone = BasicBlockHelper::append($context, 'array_product_nv_double_done');
+        $context->builder->branchIf($useFloatNow, $addFloatBlock, $promoteBlock);
+
+        $context->builder->positionAtEnd($promoteBlock);
+        $prodInt = $context->builder->load($prodIntSlot);
+        $context->builder->store(
+            $context->builder->fmul($context->builder->siToFp($prodInt, $double), $doubleVal),
+            $prodFloatSlot
+        );
+        $context->builder->store($i1->constInt(1, false), $useFloatSlot);
+        $context->builder->branch($doubleDone);
+
+        $context->builder->positionAtEnd($addFloatBlock);
+        $prodFloat = $context->builder->load($prodFloatSlot);
+        $context->builder->store($context->builder->fmul($prodFloat, $doubleVal), $prodFloatSlot);
+        $context->builder->branch($doubleDone);
+
+        $context->builder->positionAtEnd($doubleDone);
+        $context->builder->branch($continueBlock);
+
+        $context->builder->positionAtEnd($continueBlock);
+        $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $useFloat = $context->builder->load($useFloatSlot);
+        $prodInt = $context->builder->load($prodIntSlot);
+        $prodFloat = $context->builder->load($prodFloatSlot);
+
+        return $context->builder->select(
+            $useFloat,
+            $prodFloat,
+            $context->builder->siToFp($prodInt, $double)
+        );
+    }
 }
