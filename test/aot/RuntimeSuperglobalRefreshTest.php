@@ -10,6 +10,7 @@ use PHPUnit\Framework\TestCase;
  * AOT binaries refresh superglobals from CGI env each run (issue #201).
  *
  * @group llvm
+ * @group aot
  */
 final class RuntimeSuperglobalRefreshTest extends TestCase
 {

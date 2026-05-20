@@ -13,6 +13,7 @@ use PHPUnit\Framework\TestCase;
  * exercise the bracket parser in lib/AOT/runtime/superglobals_refresh.c.
  *
  * @group llvm
+ * @group aot
  */
 final class NestedSuperglobalsAotTest extends TestCase
 {

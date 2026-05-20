@@ -143,6 +143,7 @@ final class ExamplesCompileTest extends TestCase
      * @dataProvider provideExamples
      *
      * @group llvm
+     * @group aot
      */
     public function testAotLint(string $examplePath): void
     {
@@ -160,6 +161,7 @@ final class ExamplesCompileTest extends TestCase
      * different QUERY_STRING — catches regressions in runtime superglobal refresh for web binaries.
      *
      * @group llvm
+     * @group aot
      */
     public function testAotExecuteSimpleWebDualQuery(): void
     {
@@ -196,6 +198,7 @@ final class ExamplesCompileTest extends TestCase
      * Shipped 002-StaticWeb: ./phpc build then execute — smoke for unified CLI argv/env forwarding.
      *
      * @group llvm
+     * @group aot
      */
     public function testPhpcBuildSmoke002StaticWeb(): void
     {

@@ -10,6 +10,7 @@ use PHPUnit\Framework\TestCase;
  * AOT smoke: number_format() in a minimal web-style template (LLVM binary).
  *
  * @group llvm
+ * @group aot
  */
 final class WebAppNumberFormatTest extends TestCase
 {

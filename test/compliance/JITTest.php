@@ -9,6 +9,7 @@ require_once __DIR__ . '/../BaseTest.php';
 
 /**
  * @group llvm
+ * @group jit
  */
 class JITTest extends BaseTest {
 
