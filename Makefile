@@ -134,6 +134,10 @@ test-harness:
 test-docker-quick:
 	docker run --rm -v $(shell pwd):/compiler -w /compiler $(LOCAL_DEV_IMAGE) php vendor/bin/phpunit --exclude-group llvm
 
-.PHONY: bootstrap-inventory
+.PHONY: bootstrap-inventory bootstrap-profile bootstrap-aot-lint
 bootstrap-inventory:
 	php script/bootstrap-inventory.php
+bootstrap-profile: bootstrap-inventory
+	php script/bootstrap-profile.php
+bootstrap-aot-lint: bootstrap-profile
+	php script/bootstrap-aot-lint.php
