@@ -8,9 +8,9 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 202 |
+| PHP files on vm.php path | 204 |
 | Source constructs flagged (blockers) | 10 |
-| Source constructs flagged (warnings) | 537 |
+| Source constructs flagged (warnings) | 539 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -38,6 +38,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/JitExplode.php` | 0 | 1 |
 | `ext/standard/JitHeader.php` | 0 | 1 |
 | `ext/standard/JitHtmlspecialchars.php` | 0 | 1 |
+| `ext/standard/JitHttpResponseCode.php` | 0 | 1 |
 | `ext/standard/JitImplode.php` | 0 | 1 |
 | `ext/standard/JitNumberFormat.php` | 0 | 1 |
 | `ext/standard/JitParseUrl.php` | 0 | 1 |
@@ -170,6 +171,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `lib/JIT/BasicBlockHelper.php` | 0 | 1 |
 | `lib/JIT/Builtin.php` | 0 | 1 |
 | `lib/JIT/Builtin/ErrorHandler.php` | 0 | 1 |
+| `lib/JIT/Builtin/HttpResponseCode.php` | 0 | 1 |
 | `lib/JIT/Builtin/Internal.php` | 0 | 1 |
 | `lib/JIT/Builtin/MemoryManager.php` | 0 | 3 |
 | `lib/JIT/Builtin/MemoryManager/Native.php` | 0 | 1 |
@@ -257,6 +259,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/JitHtmlspecialchars.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/JitHttpResponseCode.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
@@ -1140,6 +1147,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 **Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `lib/JIT/Builtin/HttpResponseCode.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `lib/JIT/Builtin/Internal.php`
 
 **Warnings** (review for bootstrap subset):
@@ -1264,10 +1276,10 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new Builtin\VarArg (line 101)
 - new Builtin\ErrorHandler (line 102)
 - new Scope (line 117)
-- new Result (line 208)
-- new Variable (line 284)
-- new Variable (line 494)
-- new Variable (line 526)
+- new Result (line 209)
+- new Variable (line 285)
+- new Variable (line 495)
+- new Variable (line 527)
 - 32 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/HashTableHelper.php`

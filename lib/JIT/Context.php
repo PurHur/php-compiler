@@ -177,6 +177,7 @@ class Context {
             $this->builder->positionAtEnd($block);
             $this->builder->call($this->initFunc);
             if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
+                Builtin\HttpResponseCode::emitResetForStandaloneMain($this);
                 $this->builder->call($this->lookupFunction('__superglobals__refresh'));
             }
             $this->builder->call($this->main);

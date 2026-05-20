@@ -90,6 +90,26 @@ PHP;
         return $output !== false ? $output : '';
     }
 
+    public function testHttpResponseCodeAotEmitsStatusCgiLine(): void
+    {
+        $source = <<<'PHP'
+<?php
+declare(strict_types=1);
+http_response_code(404);
+echo 'missing';
+PHP;
+
+        $outfile = tempnam(sys_get_temp_dir(), 'phpc_hrc404_');
+        $this->assertNotFalse($outfile);
+        unlink($outfile);
+
+        $result = $this->compileAndRun($source, [], $outfile);
+        @unlink($outfile);
+
+        $this->assertStringContainsString("Status: 404\r\n", $result);
+        $this->assertStringContainsString('missing', $result);
+    }
+
     /**
      * @return array<string, string>
      */
