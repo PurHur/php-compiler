@@ -10,6 +10,7 @@ use PHPUnit\Framework\TestCase;
  * CI gate: shipped examples compile in VM and (when LLVM is present) AOT lint.
  *
  * @see https://github.com/PurHur/php-compiler/issues/203
+ * @see https://github.com/PurHur/php-compiler/issues/282 (002-StaticWeb via ./phpc build)
  * @see https://github.com/PurHur/php-compiler/issues/309 (001-SimpleWeb AOT execute + QUERY_STRING refresh in this gate)
  */
 final class ExamplesCompileTest extends TestCase
@@ -104,6 +105,65 @@ final class ExamplesCompileTest extends TestCase
         $this->assertStringContainsString('<h1>Hello Bob</h1>', $outBob);
 
         @unlink($binary);
+    }
+
+    /**
+     * Shipped 002-StaticWeb: ./phpc build then execute — smoke for unified CLI argv/env forwarding.
+     *
+     * @group llvm
+     */
+    public function testPhpcBuildSmoke002StaticWeb(): void
+    {
+        if (!self::isLlvmReady()) {
+            $this->markTestSkipped(
+                'LLVM 9 toolchain not available. Run script/install-llvm9.sh from the repository root.'
+            );
+        }
+        $repoRoot = dirname(__DIR__, 2);
+        $source = realpath($repoRoot.'/examples/002-StaticWeb/example.php');
+        $this->assertNotFalse($source);
+
+        $outfile = tempnam(sys_get_temp_dir(), 'phpc_phpc_build_');
+        $this->assertNotFalse($outfile);
+        unlink($outfile);
+
+        $phpc = realpath($repoRoot.'/phpc');
+        $this->assertNotFalse($phpc);
+        $env = $this->llvmProcessEnv($repoRoot);
+        $binary = $this->phpcBuildBinary($phpc, $outfile, $source, $repoRoot, $env);
+
+        $out = $this->runAotBinary($binary, $env);
+        $this->assertStringContainsString('Hello World', $out);
+
+        @unlink($binary);
+    }
+
+    /**
+     * @param array<string, string> $env
+     */
+    private function phpcBuildBinary(string $phpc, string $outfile, string $source, string $repoRoot, array $env): string
+    {
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open([$phpc, 'build', '-o', $outfile, $source], $descriptorSpec, $pipes, $repoRoot, $env);
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+        $this->assertSame(
+            0,
+            $exit,
+            trim($stderr !== false ? $stderr : '')."\n".'phpc build failed for '.$source
+        );
+        $this->assertFileExists($outfile, trim($stderr !== false ? $stderr : ''));
+        $this->assertTrue(is_executable($outfile));
+
+        return $outfile;
     }
 
     /**
