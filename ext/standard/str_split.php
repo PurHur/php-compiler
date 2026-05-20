@@ -20,7 +20,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * str_split() for strings (subset of PHP; VM only).
+ * str_split() for strings (subset of PHP; native LLVM in JIT).
  */
 final class str_split extends Internal
 {
@@ -59,6 +59,34 @@ final class str_split extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('str_split() is not implemented for JIT in this compiler build');
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 2) {
+            throw new \LogicException('str_split() requires one or two arguments');
+        }
+        if (JITVariable::TYPE_STRING !== $args[0]->type) {
+            throw new \LogicException('str_split() argument must be a string in this compiler build');
+        }
+        $literal = $args[0]->compileTimeString ?? null;
+        if (null !== $literal) {
+            $chunkLenInt = 1;
+            if (2 === $argc) {
+                $chunkLenInt = JitStrSplit::compileTimeLong($context, $args[1]);
+            }
+
+            return JitStrSplit::buildPackedStrings($context, $literal, $chunkLenInt);
+        }
+        $chunkLen = $context->constantFromInteger(1, 'int64');
+        if (2 === $argc) {
+            if (JITVariable::TYPE_NATIVE_LONG !== $args[1]->type) {
+                throw new \LogicException('str_split() length must be an integer in this compiler build');
+            }
+            $chunkLen = $context->helper->loadValue($args[1]);
+        }
+
+        return JitStrSplit::split(
+            $context,
+            $context->helper->loadValue($args[0]),
+            $chunkLen
+        );
     }
 }
