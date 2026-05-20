@@ -209,6 +209,36 @@ final class HashTableHelper
     /**
      * Read an associative string-keyed element into a stack {@see __value__} slot.
      */
+    /**
+     * Writable __value__ slot for a string key (creates an empty string entry if missing; issue #103).
+     */
+    public static function writableStringKeyValueBox(Context $context, Value $ht, Value $keyStr): Variable
+    {
+        $i1 = $context->getTypeFromString('int1');
+        $isSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSetStringKey'),
+            $ht,
+            $keyStr
+        );
+        $create = BasicBlockHelper::append($context, 'ht_sk_write_create');
+        $ready = BasicBlockHelper::append($context, 'ht_sk_write_ready');
+        $context->builder->branchIf($isSet, $ready, $create);
+
+        $context->builder->positionAtEnd($create);
+        $empty = $context->builder->call($context->lookupFunction('__string__alloc'), $context->constantFromInteger(0, 'size_t'));
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyString'),
+            $ht,
+            $keyStr,
+            $empty
+        );
+        $context->builder->branch($ready);
+
+        $context->builder->positionAtEnd($ready);
+
+        return self::readStringKeyToValueBox($context, $ht, $keyStr);
+    }
+
     public static function readStringKeyToValueBox(Context $context, Value $ht, Value $keyStr): Variable
     {
         static $seq = 0;

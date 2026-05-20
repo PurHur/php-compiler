@@ -62,8 +62,10 @@ restart:
                     $arg1->copyFrom($arg3); 
                     break;
                 case OpCode::TYPE_ARRAY_DIM_FETCH:
+                case OpCode::TYPE_ARRAY_DIM_FETCH_WRITE:
                     $arg1 = $frame->scope[$op->arg1];
                     $container = $frame->scope[$op->arg2]->resolveIndirect();
+                    $forWrite = OpCode::TYPE_ARRAY_DIM_FETCH_WRITE === $op->type;
                     if (is_null($op->arg3)) {
                         if ($container->type !== Variable::TYPE_ARRAY) {
                             throw new \LogicException('[] is only supported for arrays');
@@ -78,10 +80,10 @@ restart:
                         $arg1->indirect($offset);
                     } elseif ($container->type === Variable::TYPE_ARRAY) {
                         $table = $container->toArray();
-                        if (!$table->keyExists($arg3)) {
+                        if (!$forWrite && !$table->keyExists($arg3)) {
                             $this->context->errors->undefinedArrayKey($arg3);
                         }
-                        $arg1->indirect($table->findVariable($arg3, false));
+                        $arg1->indirect($table->findVariable($arg3, $forWrite));
                     } else {
                         throw new \LogicException('Illegal offset');
                     }

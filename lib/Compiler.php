@@ -437,9 +437,12 @@ class Compiler {
                 $dimSlot = null !== $expr->dim
                     ? $this->compileOperand($expr->dim, $block, true)
                     : null;
+                $fetchType = $this->isArrayDimFetchForWrite($expr, $block)
+                    ? OpCode::TYPE_ARRAY_DIM_FETCH_WRITE
+                    : OpCode::TYPE_ARRAY_DIM_FETCH;
 
                 return [new OpCode(
-                    OpCode::TYPE_ARRAY_DIM_FETCH,
+                    $fetchType,
                     $this->compileOperand($expr->result, $block, false),
                     $this->compileOperand($expr->var, $block, true),
                     $dimSlot
@@ -875,6 +878,38 @@ class Compiler {
         }
 
         return [$this->compileOperand($operand, $block, true), null];
+    }
+
+    /**
+     * True when the fetch result is only used as an Assign lvalue (issue #103).
+     */
+    protected function isArrayDimFetchForWrite(Op\Expr\ArrayDimFetch $fetch, Block $block): bool
+    {
+        foreach ($fetch->result->usages as $usage) {
+            if ($usage instanceof Op\Expr\Assign && $usage->var === $fetch->result) {
+                continue;
+            }
+
+            return false;
+        }
+        if (!empty($fetch->result->usages)) {
+            return true;
+        }
+        // php-cfg often leaves operand->usages empty; fall back to the next stmt in this block.
+        $children = $block->orig->children;
+        foreach ($children as $i => $child) {
+            if ($child !== $fetch) {
+                continue;
+            }
+            if ($i + 1 >= count($children)) {
+                break;
+            }
+            $next = $children[$i + 1];
+
+            return $next instanceof Op\Expr\Assign && $next->var === $fetch->result;
+        }
+
+        return false;
     }
 
     protected function unwrapArrayDimFetch(Operand $operand): ?Op\Expr\ArrayDimFetch
