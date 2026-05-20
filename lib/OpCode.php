@@ -73,6 +73,10 @@ class OpCode {
     const TYPE_SPACESHIP = 61;
     const TYPE_COALESCE = 62;
     const TYPE_NULLSAFE = 63;
+    const TYPE_ITER_RESET = 64;
+    const TYPE_ITER_VALID = 65;
+    const TYPE_ITER_KEY = 66;
+    const TYPE_ITER_VALUE = 67;
 
     public int $type;
     public ?int $arg1;

@@ -87,6 +87,47 @@ final class HashTable {
         }
     }
 
+    public function iterReset(): void
+    {
+        $this->internalPointer = self::INVALID_INDEX;
+    }
+
+    public function iterValid(): bool
+    {
+        while (++$this->internalPointer < $this->numUsed) {
+            if (!$this->buckets->read($this->internalPointer)->value->isUndefined()) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public function iterCurrentKey(): Variable
+    {
+        $bucket = $this->buckets->read($this->internalPointer);
+        $keyVar = new Variable();
+        if (null !== $bucket->key) {
+            $keyVar->string($bucket->key);
+        } else {
+            $keyVar->int($bucket->hash);
+        }
+
+        return $keyVar;
+    }
+
+    public function iterCurrentValue(bool $byRef = false): Variable
+    {
+        if ($byRef) {
+            throw new \LogicException('foreach by-reference is not implemented');
+        }
+        $bucket = $this->buckets->read($this->internalPointer);
+        $result = new Variable();
+        $result->copyFrom($bucket->value->resolveIndirect());
+
+        return $result;
+    }
+
     public function keyExists(Variable $index): bool
     {
         switch ($index->type) {

@@ -551,6 +551,25 @@ class Compiler {
 		)];
             case Op\Expr\Isset_::class:
                 return $this->compileIsset($expr, $block);
+            case Op\Iterator\Valid::class:
+                return [new OpCode(
+                    OpCode::TYPE_ITER_VALID,
+                    $this->compileOperand($expr->result, $block, false),
+                    $this->compileOperand($expr->var, $block, true)
+                )];
+            case Op\Iterator\Key::class:
+                return [new OpCode(
+                    OpCode::TYPE_ITER_KEY,
+                    $this->compileOperand($expr->result, $block, false),
+                    $this->compileOperand($expr->var, $block, true)
+                )];
+            case Op\Iterator\Value::class:
+                return [new OpCode(
+                    OpCode::TYPE_ITER_VALUE,
+                    $this->compileOperand($expr->result, $block, false),
+                    $this->compileOperand($expr->var, $block, true),
+                    $expr->byRef ? 1 : 0
+                )];
         }
         throw new \LogicException("Unsupported expression: " . $expr->getType());
     }
@@ -932,6 +951,11 @@ class Compiler {
                 return new OpCode(
                     OpCode::TYPE_RETURN,
                     $this->compileOperand($terminal->expr, $block, true)
+                );
+            case 'Iterator_Reset':
+                return new OpCode(
+                    OpCode::TYPE_ITER_RESET,
+                    $this->compileOperand($terminal->var, $block, true)
                 );
             default:
                 throw new \LogicException("Unknown Terminal Type: " . $terminal->getType());

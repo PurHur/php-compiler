@@ -372,6 +372,37 @@ restart:
 		    $this->context->push($frame);
 		    $frame = $new;
 		    goto restart;
+                case OpCode::TYPE_ITER_RESET:
+                    $container = $frame->scope[$op->arg1]->resolveIndirect();
+                    if (Variable::TYPE_ARRAY !== $container->type) {
+                        throw new \LogicException('Iterator reset requires an array');
+                    }
+                    $container->toArray()->iterReset();
+                    break;
+                case OpCode::TYPE_ITER_VALID:
+                    $container = $frame->scope[$op->arg2]->resolveIndirect();
+                    if (Variable::TYPE_ARRAY !== $container->type) {
+                        throw new \LogicException('Iterator valid requires an array');
+                    }
+                    $frame->scope[$op->arg1]->bool($container->toArray()->iterValid());
+                    break;
+                case OpCode::TYPE_ITER_KEY:
+                    $container = $frame->scope[$op->arg2]->resolveIndirect();
+                    if (Variable::TYPE_ARRAY !== $container->type) {
+                        throw new \LogicException('Iterator key requires an array');
+                    }
+                    $frame->scope[$op->arg1]->copyFrom($container->toArray()->iterCurrentKey());
+                    break;
+                case OpCode::TYPE_ITER_VALUE:
+                    $container = $frame->scope[$op->arg2]->resolveIndirect();
+                    if (Variable::TYPE_ARRAY !== $container->type) {
+                        throw new \LogicException('Iterator value requires an array');
+                    }
+                    $byRef = (bool) $op->arg3;
+                    $frame->scope[$op->arg1]->copyFrom(
+                        $container->toArray()->iterCurrentValue($byRef)
+                    );
+                    break;
                 default:
                     throw new \LogicException("VM OpCode Not Implemented: " . $op->getType());
             }
