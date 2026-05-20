@@ -193,19 +193,32 @@ final class DevServer
      */
     public static function readRequest($conn): ?array
     {
-        $lines = '';
+        $buf = '';
         while (!feof($conn)) {
-            $chunk = fgets($conn);
-            if (false === $chunk) {
+            $chunk = fread($conn, 8192);
+            if (false === $chunk || '' === $chunk) {
                 break;
             }
-            $lines .= $chunk;
-            if ("\r\n" === $chunk) {
+            $buf .= $chunk;
+            if (str_contains($buf, "\r\n\r\n") || str_contains($buf, "\n\n")) {
                 break;
             }
         }
 
-        if (!preg_match('#^(\S+)\s+(\S+)\s+(HTTP/\S+)#', $lines, $m)) {
+        $headerEnd = strpos($buf, "\r\n\r\n");
+        $sepLen = 4;
+        if (false === $headerEnd) {
+            $headerEnd = strpos($buf, "\n\n");
+            $sepLen = 2;
+        }
+        if (false === $headerEnd) {
+            return null;
+        }
+
+        $headerBlock = substr($buf, 0, $headerEnd);
+        $body = substr($buf, $headerEnd + $sepLen);
+
+        if (!preg_match('#^(\S+)\s+(\S+)\s+(HTTP/\S+)#', $headerBlock, $m)) {
             return null;
         }
 
@@ -219,7 +232,7 @@ final class DevServer
         }
 
         $headers = [];
-        foreach (explode("\r\n", $lines) as $line) {
+        foreach (preg_split("/\r\n|\n/", $headerBlock) as $line) {
             if ('' === $line || false === strpos($line, ':')) {
                 continue;
             }
@@ -227,11 +240,17 @@ final class DevServer
             $headers[strtolower(trim($name))] = trim($value);
         }
 
-        $body = '';
         if (isset($headers['content-length'])) {
             $len = (int) $headers['content-length'];
             while (strlen($body) < $len && !feof($conn)) {
-                $body .= fread($conn, $len - strlen($body));
+                $chunk = fread($conn, $len - strlen($body));
+                if (false === $chunk || '' === $chunk) {
+                    break;
+                }
+                $body .= $chunk;
+            }
+            if (strlen($body) > $len) {
+                $body = substr($body, 0, $len);
             }
         }
 

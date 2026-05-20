@@ -97,4 +97,31 @@ final class DevServerHeadersTest extends TestCase
         $this->assertNull(DevServer::parsePeerAddress('no-port'));
         $this->assertNull(DevServer::parsePeerAddress('[::1]'));
     }
+
+    public function testReadRequestPostBodyWithoutTrailingNewline(): void
+    {
+        $pair = stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP);
+        if (false === $pair) {
+            $this->markTestSkipped('stream_socket_pair unavailable');
+        }
+        [$server, $client] = $pair;
+        $raw = "POST /form.php HTTP/1.1\r\n"
+            ."Host: 127.0.0.1\r\n"
+            ."Content-Type: application/x-www-form-urlencoded\r\n"
+            ."Content-Length: 10\r\n"
+            ."Connection: close\r\n\r\n"
+            .'name=Alice';
+        fwrite($client, $raw);
+        stream_socket_shutdown($client, STREAM_SHUT_WR);
+        fclose($client);
+
+        $parsed = DevServer::readRequest($server);
+        fclose($server);
+
+        $this->assertNotNull($parsed);
+        $this->assertSame('POST', $parsed[0]);
+        $this->assertSame('/form.php', $parsed[1]);
+        $this->assertSame('name=Alice', $parsed[4]);
+        $this->assertSame('10', $parsed[3]['content-length'] ?? null);
+    }
 }

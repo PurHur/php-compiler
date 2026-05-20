@@ -581,10 +581,11 @@ final class HashTable {
         if ($this->isWithoutHoles()) {
             do {
                 $bucket = $this->buckets->read($bucketIndex);
-                $index = $bucket->hash;
-                $bucket->value->next = $index;
-                $this->indexes->write($index, $bucketIndex);
+                $hash = $bucket->hash;
+                $bucket->value->next = $this->indexes->read($hash);
+                $this->indexes->write($hash, $bucketIndex);
             } while (++$bucketIndex < $this->numUsed);
+
             return;
         }
         //todo
