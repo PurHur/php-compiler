@@ -14,6 +14,8 @@ use PHPLLVM\Value;
 
 /**
  * web_bool() — coerce a query/body array value to bool (issue #157).
+ *
+ * JIT/AOT lowering returns int64 0/1 (zext) so results are safe for echo/assign; VM returns bool.
  */
 final class web_bool extends Internal
 {
@@ -51,8 +53,6 @@ final class web_bool extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'web_bool() is not implemented for JIT in this compiler build; use web_int($source, $key, 0) for AOT or VM'
-        );
+        return JitWebParams::webBool($context, ...$args);
     }
 }
