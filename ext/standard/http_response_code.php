@@ -13,7 +13,7 @@ use PHPCompiler\Web\ResponseContext;
 use PHPLLVM\Value;
 
 /**
- * http_response_code() — get/set HTTP status for the current response (VM only; issue #252).
+ * http_response_code() — get/set HTTP status for the current response (VM ResponseContext; JIT global + Status: line, issues #252, #280).
  */
 final class http_response_code extends Internal
 {
@@ -61,6 +61,6 @@ final class http_response_code extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('http_response_code() is not implemented for JIT in this compiler build');
+        return JitHttpResponseCode::invoke($context, ...$args);
     }
 }
