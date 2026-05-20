@@ -94,6 +94,14 @@ class Type extends Builtin {
         );
         $fnRandomBytes = $this->context->module->addFunction('__compiler_random_bytes', $fntypeRandomBytes);
         $this->context->registerFunction('__compiler_random_bytes', $fnRandomBytes);
+        $strPtr = $this->context->getTypeFromString('__string__*');
+        $i1 = $this->context->getTypeFromString('int1');
+        $fntypeHash = $this->context->context->functionType($strPtr, false, $strPtr, $strPtr, $i1);
+        $fnHash = $this->context->module->addFunction('__compiler_hash', $fntypeHash);
+        $this->context->registerFunction('__compiler_hash', $fnHash);
+        $fntypeHashHmac = $this->context->context->functionType($strPtr, false, $strPtr, $strPtr, $strPtr, $i1);
+        $fnHashHmac = $this->context->module->addFunction('__compiler_hash_hmac', $fntypeHashHmac);
+        $this->context->registerFunction('__compiler_hash_hmac', $fnHashHmac);
         $fntypeGetrandom = $this->context->context->functionType($i64, false, $i8p, $sizeT, $i32);
         $fnGetrandom = $this->context->module->addFunction('getrandom', $fntypeGetrandom);
         $this->context->registerFunction('getrandom', $fnGetrandom);
