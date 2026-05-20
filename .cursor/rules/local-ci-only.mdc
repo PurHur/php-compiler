@@ -1,0 +1,44 @@
+---
+description: Verify changes locally or in Docker — do not rely on GitHub Actions
+alwaysApply: true
+---
+
+# Local CI only (no GitHub Actions)
+
+This project **does not use GitHub Actions for CI** (billing limits). Do **not** create, edit, or depend on `.github/workflows/*` to build or test. Implement and verify everything **on the developer machine** (or Runforge harness with Docker).
+
+## Required verification
+
+From repo root, after `composer install`:
+
+```bash
+./script/ci-local.sh
+```
+
+Or in Docker (preferred on harness hosts without host PHP/LLVM):
+
+```bash
+make docker-build-22   # once
+make test              # or: ./script/docker-ci-local.sh
+```
+
+Image: `php-compiler:22.04-dev` (`Docker/dev/ubuntu-22.04/Dockerfile`).
+
+## Harness / empty bind-mount
+
+If `-v "$(pwd):/compiler"` shows an empty tree, use:
+
+```bash
+./script/docker-ci-local.sh
+# or: make test-harness ARGS='--filter VMTest'
+```
+
+## Environment
+
+- **Do not** set `PHP_COMPILER_SKIP_SERVE_TESTS=1` for local/Docker CI unless loopback bind fails (GHA-only skip).
+- LLVM missing → `@group llvm` tests skip; install via `script/install-llvm9.sh`.
+- Run `docker info` before heavy Docker work.
+
+## Before merge
+
+Run the same suite you would expect from CI locally. Do not assume cloud workflows will run.
