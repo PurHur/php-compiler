@@ -70,8 +70,14 @@ fix:
 phan:
 	docker run -v $(shell pwd):/compiler ircmaxell/php-compiler:16.04-dev php vendor/bin/phan
 
+# Default CI: Ubuntu 22.04 + PHP 8.2 dev image (issues #73, #249). Uses bind-mount or tar fallback.
 .PHONY: test
-test: rebuild-changed
+test: docker-build-22
+	./script/docker-ci-local.sh
+
+# Deprecated: PHP 7.4 on Ubuntu 16.04 (ircmaxell/php-compiler:16.04-dev image often unavailable).
+.PHONY: test-legacy-16
+test-legacy-16: rebuild-changed
 	docker run -v $(shell pwd):/compiler ircmaxell/php-compiler:16.04-dev php vendor/bin/phpunit
 
 # Run the full PHPUnit suite on the host PHP (no Docker). Requires composer install.
@@ -91,9 +97,13 @@ SERVE_ROOT ?= examples/001-SimpleWeb
 serve:
 	./phpc serve $(SERVE_ADDR) $(SERVE_ROOT)
 
-.PHONY: test-18
-test-18: rebuild-changed
+# Deprecated: PHP 7.4 on Ubuntu 18.04. Prefer `make test` (22.04).
+.PHONY: test-legacy-18
+test-legacy-18: rebuild-changed
 	docker run -v $(shell pwd):/compiler ircmaxell/php-compiler:18.04-dev php vendor/bin/phpunit
+
+.PHONY: test-18
+test-18: test-legacy-18
 
 # Ubuntu 22.04 + PHP 8.2 dev image (issues #73, #202). Build once: make docker-build-22
 PHP_COMPILER_DEV_IMAGE ?= ghcr.io/PurHur/php-compiler:dev
