@@ -26,12 +26,11 @@ PHP;
         $this->assertMatchesRegularExpression('/line \d+/', $exit['stdout']);
     }
 
-    public function testLintCoalesceReportsIssue99(): void
+    public function testLintCoalesceAccepted(): void
     {
         $code = '<?php $a = $b ?? 1;';
         $exit = $this->runLint(['-r', $code]);
-        $this->assertSame(1, $exit['code']);
-        $this->assertStringContainsString('#99', $exit['stdout']);
+        $this->assertSame(0, $exit['code']);
     }
 
     public function testLintShiftAssignReportsIssue136(): void

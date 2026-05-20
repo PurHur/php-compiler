@@ -1,0 +1,21 @@
+--- vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
+@@ -198,6 +198,17 @@
+                 }
+ 
+                 return false;
++            case 'Expr_BinaryOp_Coalesce':
++                if ($resolved->contains($op->left) && $resolved->contains($op->right)) {
++                    $types = [$resolved[$op->left], $resolved[$op->right]];
++                    $merged = $this->computeMergedType($types);
++                    if ($merged) {
++                        return [$merged];
++                    }
++
++                    return [Type::mixed()];
++                }
++
++                return false;
+             case 'Expr_BinaryOp_Concat':
+             case 'Expr_Cast_String':
+             case 'Expr_ConcatList':

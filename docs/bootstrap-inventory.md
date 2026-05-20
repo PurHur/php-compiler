@@ -8,9 +8,9 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 212 |
+| PHP files on vm.php path | 214 |
 | Source constructs flagged (blockers) | 10 |
-| Source constructs flagged (warnings) | 553 |
+| Source constructs flagged (warnings) | 570 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -162,7 +162,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/types/strlen.php` | 0 | 1 |
 | `lib/AOT/Linker.php` | 8 | 1 |
 | `lib/Block.php` | 0 | 4 |
-| `lib/Compiler.php` | 0 | 57 |
+| `lib/Compiler.php` | 0 | 68 |
 | `lib/Frame.php` | 0 | 1 |
 | `lib/Func.php` | 0 | 1 |
 | `lib/Func/Internal.php` | 0 | 2 |
@@ -199,6 +199,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `lib/JIT/Call.php` | 0 | 1 |
 | `lib/JIT/Call/Native.php` | 0 | 1 |
 | `lib/JIT/Call/Vararg.php` | 0 | 2 |
+| `lib/JIT/CoalesceHelper.php` | 0 | 1 |
 | `lib/JIT/Context.php` | 0 | 15 |
 | `lib/JIT/HashTableHelper.php` | 0 | 1 |
 | `lib/JIT/Helper.php` | 0 | 7 |
@@ -215,7 +216,8 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `lib/Lint/IncrementDetector.php` | 0 | 4 |
 | `lib/Lint/Issue.php` | 0 | 2 |
 | `lib/Lint/LintCompiler.php` | 0 | 6 |
-| `lib/Lint/Linter.php` | 0 | 5 |
+| `lib/Lint/Linter.php` | 0 | 6 |
+| `lib/Lint/ListDestructuringDetector.php` | 0 | 4 |
 | `lib/Lint/UnsupportedRegistry.php` | 0 | 1 |
 | `lib/Module.php` | 0 | 1 |
 | `lib/ModuleAbstract.php` | 0 | 1 |
@@ -1046,63 +1048,74 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/Compiler.php`
 
 **Warnings** (review for bootstrap subset):
-- new Func\PHP (line 41)
-- new Block (line 46)
-- new OpCode (line 100)
-- new Block (line 109)
-- new OpCode (line 119)
-- new Variable (line 134)
-- new Operand\Temporary (line 135)
-- new OpCode (line 157)
-- new Operand\Literal (line 168)
-- new OpCode (line 170)
-- new OpCode (line 185)
-- new OpCode (line 193)
-- new OpCode (line 213)
-- new OpCode (line 218)
-- new OpCode (line 251)
-- new OpCode (line 260)
-- new OpCode (line 353)
-- new OpCode (line 360)
-- new OpCode (line 374)
-- new OpCode (line 380)
-- new OpCode (line 398)
-- new OpCode (line 404)
-- new OpCode (line 410)
-- new OpCode (line 421)
-- new OpCode (line 429)
-- new OpCode (line 435)
-- new OpCode (line 441)
-- new OpCode (line 446)
-- new OpCode (line 453)
-- new OpCode (line 460)
-- new OpCode (line 466)
-- new OpCode (line 471)
-- new OpCode (line 478)
-- new OpCode (line 485)
-- new OpCode (line 490)
-- new OpCode (line 495)
-- new OpCode (line 504)
-- new OpCode (line 509)
-- new OpCode (line 516)
-- new OpCode (line 525)
-- new OpCode (line 544)
-- new Block (line 560)
+- new Func\PHP (line 42)
+- new Block (line 47)
+- new OpCode (line 103)
+- new Block (line 112)
+- new OpCode (line 122)
+- new Variable (line 137)
+- new Operand\Temporary (line 138)
+- new OpCode (line 160)
+- new Operand\Literal (line 171)
+- new OpCode (line 173)
+- new OpCode (line 188)
+- new OpCode (line 196)
+- new OpCode (line 216)
+- new OpCode (line 221)
+- new OpCode (line 254)
+- new OpCode (line 263)
+- new OpCode (line 356)
+- new OpCode (line 363)
+- new OpCode (line 377)
+- new OpCode (line 383)
+- new OpCode (line 401)
+- new OpCode (line 407)
+- new OpCode (line 413)
+- new OpCode (line 424)
+- new OpCode (line 432)
+- new OpCode (line 438)
+- new OpCode (line 444)
+- new OpCode (line 449)
+- new OpCode (line 456)
+- new OpCode (line 463)
+- new OpCode (line 469)
+- new OpCode (line 474)
+- new OpCode (line 481)
+- new OpCode (line 488)
+- new OpCode (line 493)
+- new OpCode (line 498)
+- new OpCode (line 507)
+- new OpCode (line 512)
+- new OpCode (line 519)
+- new OpCode (line 528)
+- new OpCode (line 547)
+- new Block (line 559)
 - new Block (line 563)
-- new OpCode (line 566)
-- new OpCode (line 572)
-- new OpCode (line 586)
-- new Block (line 593)
-- new OpCode (line 596)
-- new OpCode (line 606)
-- new Operand\Temporary (line 616)
-- new Variable (line 624)
-- new Operand\Temporary (line 626)
-- new Variable (line 687)
-- new OpCode (line 717)
-- new OpCode (line 723)
-- new OpCode (line 727)
-- 25 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new OpCode (line 567)
+- new Block (line 574)
+- new OpCode (line 582)
+- new OpCode (line 589)
+- new OpCode (line 597)
+- new OpCode (line 603)
+- new OpCode (line 611)
+- new OpCode (line 614)
+- new OpCode (line 620)
+- new Block (line 674)
+- new Block (line 677)
+- new OpCode (line 680)
+- new OpCode (line 686)
+- new OpCode (line 700)
+- new Block (line 707)
+- new OpCode (line 710)
+- new OpCode (line 720)
+- new Temporary (line 730)
+- new Variable (line 740)
+- new Operand\Temporary (line 742)
+- new Variable (line 803)
+- new OpCode (line 833)
+- new OpCode (line 839)
+- new OpCode (line 843)
+- 28 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/Frame.php`
 
@@ -1142,13 +1155,13 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new Variable (line 139)
 - new JIT\Call\Vararg (line 146)
 - new JIT\Call\Native (line 149)
-- new ext\standard\boolval (line 249)
-- new Variable (line 413)
-- new Variable (line 734)
-- new Operand\Literal (line 804)
-- new Operand\Literal (line 808)
-- new Operand\Literal (line 812)
-- 11 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new ext\standard\boolval (line 263)
+- new Variable (line 427)
+- new Variable (line 773)
+- new Operand\Literal (line 843)
+- new Operand\Literal (line 847)
+- new Operand\Literal (line 851)
+- 12 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Analyzer.php`
 
@@ -1312,6 +1325,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 - 1 closure(s)
 
+### `lib/JIT/CoalesceHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `lib/JIT/Context.php`
 
 **Warnings** (review for bootstrap subset):
@@ -1450,10 +1468,19 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 
 **Warnings** (review for bootstrap subset):
 - new Runtime (line 24)
-- new IncrementDetector (line 44)
-- new State (line 86)
-- new LintCompiler (line 101)
+- new IncrementDetector (line 45)
+- new ListDestructuringDetector (line 46)
+- new State (line 89)
+- new LintCompiler (line 104)
 - 9 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/Lint/ListDestructuringDetector.php`
+
+**Warnings** (review for bootstrap subset):
+- new ParserFactory (line 27)
+- new NodeTraverser (line 54)
+- new Issue (line 61)
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/Lint/UnsupportedRegistry.php`
 
@@ -1510,10 +1537,10 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 **Warnings** (review for bootstrap subset):
 - new Variable (line 64)
 - new Variable (line 69)
-- new Func\PHP (line 217)
-- new ClassEntry (line 267)
-- new ObjectEntry (line 279)
-- new VM\ClassProperty (line 369)
+- new Func\PHP (line 224)
+- new ClassEntry (line 274)
+- new ObjectEntry (line 286)
+- new VM\ClassProperty (line 376)
 - 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/VM/ClassEntry.php`
