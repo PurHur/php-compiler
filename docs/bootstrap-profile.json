@@ -51,6 +51,7 @@
         "ext/standard/JitReadfile.php",
         "ext/standard/JitRealpath.php",
         "ext/standard/JitRequestBody.php",
+        "ext/standard/JitSetcookie.php",
         "ext/standard/JitSprintf.php",
         "ext/standard/JitStrPad.php",
         "ext/standard/JitStrRepeat.php",
@@ -63,6 +64,7 @@
         "ext/standard/JitUrlencode.php",
         "ext/standard/JitWebParams.php",
         "ext/standard/Module.php",
+        "ext/standard/SetcookieLine.php",
         "ext/standard/VmDate.php",
         "ext/standard/VmExit.php",
         "ext/standard/VmFs.php",
@@ -170,6 +172,7 @@
         "ext/standard/realpath.php",
         "ext/standard/round.php",
         "ext/standard/scandir.php",
+        "ext/standard/setcookie.php",
         "ext/standard/sin.php",
         "ext/standard/sort_.php",
         "ext/standard/sprintf_.php",
@@ -259,6 +262,7 @@
         "lib/JIT/HashTableHelper.php",
         "lib/JIT/Helper.php",
         "lib/JIT/IssetHelper.php",
+        "lib/JIT/IteratorHelper.php",
         "lib/JIT/JitNativeString.php",
         "lib/JIT/JitValueBox.php",
         "lib/JIT/JitValueCompare.php",
@@ -311,9 +315,9 @@
         "test/bootstrap-aot/echo_hello.php"
     ],
     "totals": {
-        "inventory_files": 277,
+        "inventory_files": 281,
         "excluded": 2,
-        "eligible": 275,
+        "eligible": 279,
         "aot_lint_targets": 2
     }
 }
