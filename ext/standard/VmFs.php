@@ -43,6 +43,36 @@ final class VmFs
         return $data;
     }
 
+    public static function readfile(string $path): int|false
+    {
+        $fp = @fopen($path, 'rb');
+        if (false === $fp) {
+            return false;
+        }
+        $total = 0;
+        while (!feof($fp)) {
+            $chunk = @fread($fp, 8192);
+            if (false === $chunk) {
+                @fclose($fp);
+
+                return false;
+            }
+            if ('' === $chunk) {
+                break;
+            }
+            $written = @fwrite(\STDOUT, $chunk);
+            if (false === $written) {
+                @fclose($fp);
+
+                return false;
+            }
+            $total += $written;
+        }
+        @fclose($fp);
+
+        return $total;
+    }
+
     /**
      * @param string|list<string> $data
      */

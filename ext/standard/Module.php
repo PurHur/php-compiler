@@ -129,6 +129,7 @@ class Module extends ModuleAbstract
             new basename(),
             new realpath(),
             new file_get_contents(),
+            new readfile(),
             new file_put_contents(),
             new file_exists(),
             new is_file(),
