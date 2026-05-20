@@ -87,6 +87,18 @@ final class HashTable {
         }
     }
 
+    public function keyExists(Variable $index): bool
+    {
+        switch ($index->type) {
+            case Variable::TYPE_INTEGER:
+                return null !== $this->findIndex($index->toInt());
+            case Variable::TYPE_STRING:
+                return null !== $this->find($index->toString());
+            default:
+                throw new \LogicException("Unknown index type {$index->type}");
+        }
+    }
+
     public function findVariable(Variable $index, bool $forWrite): ?Variable {
         switch ($index->type) {
             case Variable::TYPE_INTEGER:

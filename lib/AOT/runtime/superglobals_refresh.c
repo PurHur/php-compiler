@@ -1002,3 +1002,20 @@ __string__ *__compiler_strip_tags(__string__ *input, __string__ *allowed)
         return result;
     }
 }
+
+/*
+ * Zend parity for missing array string keys (issue #273).
+ * Called from JIT __hashtable__readStringKeyValue when lookup returns NULL.
+ */
+void __compiler_undefined_array_key_warning_cstr(const char *key, size_t len)
+{
+    if (!key) {
+        return;
+    }
+    fprintf(stderr, "Warning: Undefined array key \"%.*s\"\n", (int) len, key);
+}
+
+void __compiler_undefined_array_key_warning_long(long long key)
+{
+    fprintf(stderr, "Warning: Undefined array key %lld\n", key);
+}
