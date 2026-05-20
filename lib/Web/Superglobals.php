@@ -76,7 +76,12 @@ final class Superglobals
         if (null === $postBody) {
             $postBody = self::readRequestBody();
         }
-        self::populatePost($context, $postBody);
+        $method = self::requestMethod();
+        if (self::shouldPopulatePost($method, $postBody)) {
+            self::populatePost($context, $postBody);
+        } else {
+            $context->ensureSuperglobal('_POST');
+        }
         $cookieHeader = getenv('HTTP_COOKIE');
         self::populateCookie(
             $context,
@@ -203,6 +208,57 @@ final class Superglobals
         return $cgi;
     }
 
+    /**
+     * Whether to parse the raw body into $_POST (issue #291).
+     *
+     * POST always uses form parsing when a body is present. PUT/PATCH/DELETE only
+     * populate $_POST for application/x-www-form-urlencoded; JSON and other payloads
+     * stay on REQUEST_BODY / php://input.
+     */
+    public static function shouldPopulatePost(string $method, string $postBody): bool
+    {
+        if ('' === $postBody) {
+            return false;
+        }
+        $upper = strtoupper($method);
+        if ('' === $upper) {
+            return true;
+        }
+        if ('POST' === $upper) {
+            return true;
+        }
+        if (!in_array($upper, ['PUT', 'PATCH', 'DELETE'], true)) {
+            return false;
+        }
+
+        return self::isFormUrlencodedContentType();
+    }
+
+    public static function requestMethod(): string
+    {
+        $method = getenv('REQUEST_METHOD');
+
+        return false === $method ? '' : $method;
+    }
+
+    public static function isFormUrlencodedContentType(): bool
+    {
+        $contentType = getenv('CONTENT_TYPE');
+        if (false === $contentType || '' === $contentType) {
+            $contentType = getenv('HTTP_CONTENT_TYPE');
+        }
+        if (false === $contentType || '' === $contentType) {
+            return false;
+        }
+        $contentType = strtolower(trim($contentType));
+        $semi = strpos($contentType, ';');
+        if (false !== $semi) {
+            $contentType = substr($contentType, 0, $semi);
+        }
+
+        return 'application/x-www-form-urlencoded' === trim($contentType);
+    }
+
     private static function populateGet(Context $context, string $queryString): void
     {
         $get = $context->ensureSuperglobal('_GET');
@@ -222,8 +278,8 @@ final class Superglobals
     ): void {
         $server = $context->ensureSuperglobal('_SERVER')->toArray();
 
-        $method = getenv('REQUEST_METHOD');
-        if (false === $method || '' === $method) {
+        $method = self::requestMethod();
+        if ('' === $method) {
             $method = '' !== $postBody ? 'POST' : 'GET';
         }
 
