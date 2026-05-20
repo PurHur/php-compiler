@@ -82,7 +82,9 @@ class JIT {
         $argVars = [];
         if (!is_null($block->func)) {
             $callbackType = '';
-            if ($block->func->returnType instanceof Op\Type\Literal) {
+            if ($block->func->returnType instanceof Op\Type\Void_) {
+                $callbackType = 'void';
+            } elseif ($block->func->returnType instanceof Op\Type\Literal) {
                 switch ($block->func->returnType->name) {
                     case 'void':
                         $callbackType = 'void';
