@@ -10,9 +10,31 @@ if [[ ! -d "$VENDOR_LLVM" ]]; then
   exit 1
 fi
 
+patch_already_applied() {
+  local patch="$1"
+  case "$(basename "$patch")" in
+    php-types-binaryop-coalesce.patch)
+      grep -q "case 'Expr_BinaryOp_Coalesce':" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
+      ;;
+    php-types-nullsafe.patch)
+      grep -q "case 'Expr_NullsafePropertyFetch':" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
+      ;;
+    php-cfg-nullsafe.patch)
+      [[ -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/NullsafePropertyFetch.php" ]]
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
 apply_patch() {
   local patch="$1"
   if [[ ! -f "$patch" ]]; then
+    return 0
+  fi
+  if patch_already_applied "$patch"; then
+    echo "Skip $(basename "$patch") (already applied)"
     return 0
   fi
   if git -C "$ROOT" apply --check -p0 "$patch" 2>/dev/null; then

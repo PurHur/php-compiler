@@ -700,9 +700,17 @@ void __superglobals__refresh(void)
         }
     }
 
-    derive_path_info(script_name, request_uri, path_info, sizeof(path_info));
-    if ('\0' != path_info[0]) {
-        set_string_key(sg_SERVER, "PATH_INFO", path_info);
+    {
+        const char *path_info_env = getenv("PATH_INFO");
+
+        if (NULL != path_info_env && '\0' != path_info_env[0]) {
+            set_string_key(sg_SERVER, "PATH_INFO", path_info_env);
+        } else {
+            derive_path_info(script_name, request_uri, path_info, sizeof(path_info));
+            if ('\0' != path_info[0]) {
+                set_string_key(sg_SERVER, "PATH_INFO", path_info);
+            }
+        }
     }
 
     apply_cgi_headers_from_environ(sg_SERVER);

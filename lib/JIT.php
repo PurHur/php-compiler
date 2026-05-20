@@ -167,20 +167,25 @@ class JIT {
             --$limit;
         }
 
-        return $this->compileBlockInternal($func, $block, $limit, ...$args);
+        return $this->compileBlockInternal($func, $block, $limit, null, ...$args);
     }
     
     private function compileBlockInternal(
         PHPLLVM\Value $func,
         Block $block,
         ?int $limit = null,
+        ?PHPLLVM\BasicBlock $entryBlock = null,
         Variable ...$args
     ): PHPLLVM\BasicBlock {
         if ($this->context->scope->blockStorage->contains($block)) {
             return $this->context->scope->blockStorage[$block];
         }
-        self::$blockNumber++;
-        $origBasicBlock = $basicBlock = $func->appendBasicBlock('block_' . self::$blockNumber);
+        if (null !== $entryBlock) {
+            $origBasicBlock = $basicBlock = $entryBlock;
+        } else {
+            self::$blockNumber++;
+            $origBasicBlock = $basicBlock = $func->appendBasicBlock('block_' . self::$blockNumber);
+        }
         $this->context->scope->blockStorage[$block] = $basicBlock;
         $builder = $this->context->builder;
         $builder->positionAtEnd($basicBlock);
@@ -511,9 +516,8 @@ class JIT {
                         $builder->positionAtEnd($rightBb);
                         $builder->branch($mergeBb);
                         $builder->positionAtEnd($mergeBb);
-                        $this->context->scope->blockStorage[$op->block3] = $mergeBb;
 
-                        return $this->compileBlockInternal($func, $op->block3, ...$args);
+                        return $this->compileBlockInternal($func, $op->block3, null, $mergeBb, ...$args);
                     }
 
                     return $origBasicBlock;
@@ -548,9 +552,8 @@ class JIT {
                         $builder->positionAtEnd($fetchBb);
                         $builder->branch($mergeBb);
                         $builder->positionAtEnd($mergeBb);
-                        $this->context->scope->blockStorage[$op->block3] = $mergeBb;
 
-                        return $this->compileBlockInternal($func, $op->block3, ...$args);
+                        return $this->compileBlockInternal($func, $op->block3, null, $mergeBb, ...$args);
                     }
 
                     return $origBasicBlock;
