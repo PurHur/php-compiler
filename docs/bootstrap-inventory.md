@@ -10,7 +10,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 |--------|------:|
 | PHP files on vm.php path | 226 |
 | Source constructs flagged (blockers) | 10 |
-| Source constructs flagged (warnings) | 603 |
+| Source constructs flagged (warnings) | 604 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1125,7 +1125,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new OpCode (line 365)
 - new OpCode (line 379)
 - new OpCode (line 385)
-- new OpCode (line 398)
+- new OpCode (line 396)
 - new OpCode (line 408)
 - new OpCode (line 414)
 - new OpCode (line 420)
