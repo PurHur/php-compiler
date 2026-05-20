@@ -163,10 +163,10 @@ restart:
                     $arg1->string($arg2 . $arg3);
                     break;
                 case OpCode::TYPE_ECHO:
-                    echo $frame->scope[$op->arg1]->toString();
+                    VM\OutputBuffer::append($frame->scope[$op->arg1]->toString());
                     break;
                 case OpCode::TYPE_PRINT:
-                    echo $frame->scope[$op->arg2]->toString();
+                    VM\OutputBuffer::append($frame->scope[$op->arg2]->toString());
                     $frame->scope[$op->arg1]->int(1);
                     break;
                 case OpCode::TYPE_COALESCE:

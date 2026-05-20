@@ -16,6 +16,7 @@ require __DIR__.'/../src/llvm-env.php';
 require __DIR__.'/../vendor/autoload.php';
 
 use PHPCompiler\Runtime;
+use PHPCompiler\VM\OutputBuffer;
 use PHPCompiler\Web\DevServer;
 use PHPCompiler\Web\ResponseContext;
 use PHPCompiler\Web\Superglobals;
@@ -25,6 +26,7 @@ $docroot = $argv[2] ?? getcwd();
 
 DevServer::run($listen, $docroot, static function (string $script, array $cgiEnv): array {
     ResponseContext::reset();
+    OutputBuffer::reset();
     $code = file_get_contents($script);
     if (false === $code) {
         throw new \RuntimeException('Could not read script');
