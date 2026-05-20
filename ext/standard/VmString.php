@@ -12,6 +12,9 @@ final class VmString
 {
     public const TRIM_DEFAULT = " \t\n\r\0\x0B";
 
+    /** PHP ucwords() default separators: space, tab, CR, LF, form feed, vertical tab. */
+    public const UCWORDS_DEFAULT_SEPARATORS = " \t\r\n\f\v";
+
     public static function byteLength(string $string): int
     {
         $len = 0;
@@ -719,6 +722,31 @@ final class VmString
         }
 
         return $ch.self::byteSlice($string, 1);
+    }
+
+    public static function asciiUcwords(string $string, string $separators = self::UCWORDS_DEFAULT_SEPARATORS): string
+    {
+        $len = self::byteLength($string);
+        if (0 === $len) {
+            return '';
+        }
+        $out = '';
+        $capitalizeNext = true;
+        for ($i = 0; $i < $len; ++$i) {
+            $ch = $string[$i];
+            $ord = self::byteOrd($ch);
+            if ($capitalizeNext && $ord >= 97 && $ord <= 122) {
+                $ch = self::byteChr($ord - 32);
+                $capitalizeNext = false;
+            } elseif (self::charInMask($ch, $separators)) {
+                $capitalizeNext = true;
+            } else {
+                $capitalizeNext = false;
+            }
+            $out .= $ch;
+        }
+
+        return $out;
     }
 
     public static function strReplace(string $search, string $replace, string $subject): string

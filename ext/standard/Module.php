@@ -60,6 +60,7 @@ class Module extends ModuleAbstract
             new is_scalar(),
             new lcfirst(),
             new ucfirst(),
+            new ucwords(),
             new strtolower(),
             new strtoupper(),
             new string_trim(),
