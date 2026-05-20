@@ -53,6 +53,12 @@ class Block {
     /** When true, unresolved local reads in child frames become undefined (isset chains). */
     public bool $inheritUndefinedLocals = false;
 
+    /** File-level declare(strict_types=1) for this function body (issue #156). */
+    public bool $strictTypes = false;
+
+    /** @var array<int, int> scope slot index => Variable::TYPE_* for typed parameters */
+    public array $paramTypeConstraints = [];
+
     public function __construct(?CfgBlock $block) {
         $this->orig = $block;
         $this->scope = new \SplObjectStorage;
@@ -144,7 +150,7 @@ class Block {
                 $scope[$pos] = $this->constants[$pos];
             } elseif ($this->args->contains($op)) {
                 if (is_null($frame)) {
-                    $scope[$pos] = self::initialVariableForOperand($op, $context);
+                    $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
                     continue;
                 }
                 $found = false;
@@ -156,7 +162,7 @@ class Block {
                 if (!$found) {
                     $name = self::resolveVariableName($op);
                     if (null !== $name && Superglobals::isSuperglobalName($name)) {
-                        $scope[$pos] = self::initialVariableForOperand($op, $context);
+                        $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
                         continue;
                     }
                     if ($this->inheritUndefinedLocals) {
@@ -173,7 +179,7 @@ class Block {
                 ) {
                     $scope[$pos] = $frame->scope[$pos];
                 } else {
-                    $scope[$pos] = self::initialVariableForOperand($op, $context);
+                    $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
                 }
             }
         }
@@ -185,8 +191,12 @@ class Block {
         return $return;
     }
 
-    private static function initialVariableForOperand(Operand $op, Context $context): Variable
-    {
+    private static function initialVariableForOperand(
+        Operand $op,
+        Context $context,
+        int $slot,
+        self $block
+    ): Variable {
         $name = self::resolveVariableName($op);
         if (null !== $name && Superglobals::isSuperglobalName($name)) {
             $existing = $context->getSuperglobal($name);
@@ -197,7 +207,12 @@ class Block {
             return $context->ensureSuperglobal($name);
         }
 
-        return new Variable(Variable::TYPE_NULL);
+        $var = new Variable(Variable::TYPE_NULL);
+        if (isset($block->paramTypeConstraints[$slot])) {
+            $var->typeConstraint = $block->paramTypeConstraints[$slot];
+        }
+
+        return $var;
     }
 
     private static function resolveVariableName(Operand $op): ?string
