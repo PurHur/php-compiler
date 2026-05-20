@@ -1,6 +1,6 @@
---- a/lib/PHPTypes/Type.php
-+++ b/lib/PHPTypes/Type.php
-@@ -293,6 +293,9 @@ class Type
+--- vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
+@@ -290,6 +290,9 @@ class Type
          if ($decl instanceof CfgType\Literal) {
              return self::fromDecl($decl->name);
          }
@@ -10,9 +10,9 @@
  
          throw new \LogicException('Unsupported declaration type: '.get_class($decl));
      }
---- a/lib/PHPTypes/TypeReconstructor.php
-+++ b/lib/PHPTypes/TypeReconstructor.php
-@@ -393,9 +393,14 @@ class TypeReconstructor
+--- vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
+@@ -393,8 +393,13 @@
      protected function resolveOp_Expr_Param(Operand $var, Op\Expr\Param $op, SplObjectStorage $resolved)
      {
          $type = $this->resolveOpType($op->declaredType);
@@ -28,7 +28,7 @@
                  $type = (new Type(Type::TYPE_UNION, [$type, Type::null()]))->simplify();
              }
          }
-@@ -541,7 +546,7 @@ class TypeReconstructor
+@@ -541,7 +546,7 @@
          foreach ($this->state->classes as $class) {
              foreach ($class->stmts->children as $stmt) {
                  if ($stmt instanceof Op\Stmt\Property) {
@@ -37,16 +37,16 @@
                          $stmt->type = Type::extractTypeFromComment('var', $stmt->getAttribute('doccomment'));
                      } else {
                          $stmt->type = $this->resolveOpType($stmt->declaredType);
-@@ -677,7 +682,7 @@ class TypeReconstructor
-             foreach ($class->stmts->children as $property) {
-                 if ($property instanceof Op\Stmt\Property) {
-                     $property->type = $this->resolveOpType($property->declaredType);
+@@ -677,7 +682,7 @@
+                 // Lookup property on class
+                 $property = $this->findProperty($class, $propName);
+                 if ($property) {
 -                    if ($property->declaredType instanceof Op\Type\Mixed && $property->type) {
 +                    if ($property->declaredType instanceof Op\Type\Mixed_ && $property->type) {
-                         $property->declaredType = new Op\Type\Literal($property->type->toDecl());
-                     }
-                 }
-@@ -694,7 +699,7 @@ class TypeReconstructor
+                         $types[] = $property->type;
+                     } else {
+                         $types[] = $this->resolveOpType($property->declaredType);
+@@ -694,7 +699,7 @@
  
      private function resolveOpType(Op\Type $type): Type
      {

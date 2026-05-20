@@ -1,32 +1,64 @@
---- a/lib/PHPCfg/Op/Type/Mixed.php
-+++ b/lib/PHPCfg/Op/Type/Mixed_.php
-@@ -13,5 +13,5 @@ namespace PHPCfg\Op\Type;
- 
- use PHPCfg\Op\Type;
- 
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Type/Mixed.php
++++ /dev/null
+@@ -1,18 +0,0 @@
+-<?php
+-
+-declare(strict_types=1);
+-
+-/**
+- * This file is part of PHP-CFG, a Control flow graph implementation for PHP
+- *
+- * @copyright 2015 Anthony Ferrara. All rights reserved
+- * @license MIT See LICENSE at the root of the project for more info
+- */
+-
+-namespace PHPCfg\Op\Type;
+-
+-use PHPCfg\Op\Type;
+-
 -class Mixed extends Type
+-{
+-}
+--- /dev/null
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Type/Mixed_.php
+@@ -0,0 +1,18 @@
++<?php
++
++declare(strict_types=1);
++
++/**
++ * This file is part of PHP-CFG, a Control flow graph implementation for PHP
++ *
++ * @copyright 2015 Anthony Ferrara. All rights reserved
++ * @license MIT See LICENSE at the root of the project for more info
++ */
++
++namespace PHPCfg\Op\Type;
++
++use PHPCfg\Op\Type;
++
 +class Mixed_ extends Type
- {
- }
---- a/lib/PHPCfg/Parser.php
-+++ b/lib/PHPCfg/Parser.php
-@@ -173,7 +173,7 @@ class Parser
-             return new Op\Type\Literal($type);
++{
++}
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
+@@ -173,7 +173,7 @@
+     protected function parseTypeNode(Node $node = null): Op\Type
+     {
+         if (null === $node) {
+-            return new Op\Type\Mixed();
++            return new Op\Type\Mixed_();
          }
+         if ($node instanceof Node\Name) {
+             return new Op\Type\Reference(
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Printer.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Printer.php
+@@ -246,7 +246,7 @@
  
--        return new Op\Type\Mixed();
-+        return new Op\Type\Mixed_();
-     }
- 
-     private function processType(?Node $type): Op\Type
---- a/lib/PHPCfg/Printer.php
-+++ b/lib/PHPCfg/Printer.php
-@@ -246,7 +246,7 @@ class Printer
-         if ($type instanceof Op\Type\Literal) {
-             return $type->name;
-         }
+     protected function renderType(Op\Type $type = null): string
+     {
 -        if ($type instanceof Op\Type\Mixed) {
 +        if ($type instanceof Op\Type\Mixed_) {
              return 'mixed';
          }
-         if ($type instanceof Op\Type\Nullable) {
+         if ($type instanceof Op\Type\Void_) {
