@@ -67,6 +67,7 @@ final class Doctor
         $checks[] = self::checkLlvm($repoRoot);
         $checks[] = self::checkLoopback($repoRoot);
         $checks[] = self::checkDockerImage();
+        $checks[] = self::checkPhpcJsonManifest($repoRoot);
 
         return $checks;
     }
@@ -201,6 +202,34 @@ final class Doctor
             'required' => false,
             'detail' => $ok ? '127.0.0.1 bind OK (@group serve)' : trim($stderr !== false ? $stderr : 'bind failed'),
             'hint' => $ok ? '' : 'ServeTest skipped when bind fails; use Docker dev image or fix network policy',
+        ];
+    }
+
+    /**
+     * @return array{name: string, ok: bool, required: bool, detail: string, hint: string}
+     */
+    private static function checkPhpcJsonManifest(string $repoRoot): array
+    {
+        $manifest = $repoRoot.'/phpc.json';
+        if (!is_file($manifest)) {
+            return [
+                'name' => 'phpc.json',
+                'ok' => true,
+                'required' => false,
+                'detail' => 'not present (optional)',
+                'hint' => '',
+            ];
+        }
+
+        $errors = \PHPCompiler\Web\ManifestValidator::validate($repoRoot);
+        $ok = [] === $errors;
+
+        return [
+            'name' => 'phpc.json',
+            'ok' => $ok,
+            'required' => false,
+            'detail' => $ok ? 'valid manifest' : implode('; ', $errors),
+            'hint' => $ok ? '' : 'phpc validate-manifest '.$repoRoot,
         ];
     }
 
