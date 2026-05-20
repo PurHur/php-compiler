@@ -13,6 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
@@ -20,7 +21,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * array_combine() for two list arrays of equal length (subset of PHP; VM only).
+ * array_combine() for two list arrays of equal length (subset of PHP; JIT via ArrayBuiltinHelper).
  */
 final class array_combine extends Internal
 {
@@ -71,6 +72,18 @@ final class array_combine extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('array_combine() is not implemented for JIT in this compiler build');
+        if (2 !== \count($args)) {
+            throw new \LogicException('array_combine() requires exactly two arguments');
+        }
+        if (JITVariable::TYPE_HASHTABLE !== $args[0]->type
+            && !($args[0]->type & JITVariable::IS_NATIVE_ARRAY)) {
+            throw new \LogicException('array_combine() requires two arrays in this compiler build');
+        }
+        if (JITVariable::TYPE_HASHTABLE !== $args[1]->type
+            && !($args[1]->type & JITVariable::IS_NATIVE_ARRAY)) {
+            throw new \LogicException('array_combine() requires two arrays in this compiler build');
+        }
+
+        return ArrayBuiltinHelper::combine($context, $args[0], $args[1]);
     }
 }

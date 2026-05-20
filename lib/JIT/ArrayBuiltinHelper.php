@@ -954,6 +954,430 @@ final class ArrayBuiltinHelper
         return $result;
     }
 
+    /**
+     * array_combine() for packed list arrays (subset of PHP; returns __value__*).
+     *
+     * @return Value __value__* (hashtable on success, boolean false when lengths differ)
+     */
+    public static function combine(Context $context, Variable $keys, Variable $values): Value
+    {
+        if (self::isNativeArray($keys->type) && self::isNativeArray($values->type)) {
+            return self::combineNativeArrays($context, $keys, $values);
+        }
+
+        return self::combineHashTables(
+            $context,
+            self::loadHashTable($context, $keys),
+            self::loadHashTable($context, $values)
+        );
+    }
+
+    private static function combineHashTables(Context $context, Value $keysHt, Value $valsHt): Value
+    {
+        $sizeT = $context->getTypeFromString('size_t');
+        $i1 = $context->getTypeFromString('int1');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $keysNum = $context->builder->call(
+            $context->lookupFunction('__hashtable__getNumElements'),
+            $keysHt
+        );
+        $valsNum = $context->builder->call(
+            $context->lookupFunction('__hashtable__getNumElements'),
+            $valsHt
+        );
+        $lengthMismatch = $context->builder->icmp(Builder::INT_NE, $keysNum, $valsNum);
+
+        $failSlot = JitValueBox::alloc($context);
+        $failPtr = JitValueBox::pointer($context, $failSlot);
+        $okSlot = JitValueBox::alloc($context);
+        $okPtr = JitValueBox::pointer($context, $okSlot);
+        $failBlock = BasicBlockHelper::append($context, 'array_combine_fail');
+        $workBlock = BasicBlockHelper::append($context, 'array_combine_work');
+        $mergeBlock = BasicBlockHelper::append($context, 'array_combine_merge');
+        $context->builder->branchIf($lengthMismatch, $failBlock, $workBlock);
+
+        $context->builder->positionAtEnd($failBlock);
+        JitValueBox::writeBool($context, $failSlot, $i1->constInt(0, false));
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($workBlock);
+        $dest = HashTableHelper::alloc($context);
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'array_combine_idx');
+        $context->builder->store($zero, $idxSlot);
+        $head = BasicBlockHelper::append($context, 'array_combine_head');
+        $body = BasicBlockHelper::append($context, 'array_combine_body');
+        $advance = BasicBlockHelper::append($context, 'array_combine_advance');
+        $loopDone = BasicBlockHelper::append($context, 'array_combine_loop_done');
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $keysNum);
+        $context->builder->branchIf($atEnd, $loopDone, $body);
+
+        $context->builder->positionAtEnd($body);
+        $keyEntry = self::listEntryAt($context, $keysHt, $idx);
+        $valEntry = self::listEntryAt($context, $valsHt, $idx);
+        self::storeCombinedEntry($context, $dest, $keyEntry, $valEntry);
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($advance);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($idx, $one),
+            $idxSlot
+        );
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($loopDone);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            $okPtr,
+            $dest
+        );
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($mergeBlock);
+        $phi = $context->builder->phi($failPtr->typeOf());
+        $phi->addIncoming($failPtr, $failBlock);
+        $phi->addIncoming($okPtr, $loopDone);
+
+        return $phi;
+    }
+
+    private static function combineNativeArrays(Context $context, Variable $keys, Variable $values): Value
+    {
+        if (!self::isNativeArray($keys->type) || !self::isNativeArray($values->type)) {
+            throw new \LogicException(
+                'array_combine() requires both arguments to be the same array kind in this compiler build'
+            );
+        }
+        $sizeT = $context->getTypeFromString('size_t');
+        $i1 = $context->getTypeFromString('int1');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $keysCount = $context->constantFromInteger($keys->nextFreeElement, 'size_t');
+        $valsCount = $context->constantFromInteger($values->nextFreeElement, 'size_t');
+        $lengthMismatch = $context->builder->icmp(Builder::INT_NE, $keysCount, $valsCount);
+
+        $failSlot = JitValueBox::alloc($context);
+        $failPtr = JitValueBox::pointer($context, $failSlot);
+        $okSlot = JitValueBox::alloc($context);
+        $okPtr = JitValueBox::pointer($context, $okSlot);
+        $failBlock = BasicBlockHelper::append($context, 'array_combine_native_fail');
+        $workBlock = BasicBlockHelper::append($context, 'array_combine_native_work');
+        $mergeBlock = BasicBlockHelper::append($context, 'array_combine_native_merge');
+        $context->builder->branchIf($lengthMismatch, $failBlock, $workBlock);
+
+        $context->builder->positionAtEnd($failBlock);
+        JitValueBox::writeBool($context, $failSlot, $i1->constInt(0, false));
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($workBlock);
+        $dest = HashTableHelper::alloc($context);
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'array_combine_native_idx');
+        $context->builder->store($zero, $idxSlot);
+        $head = BasicBlockHelper::append($context, 'array_combine_native_head');
+        $body = BasicBlockHelper::append($context, 'array_combine_native_body');
+        $advance = BasicBlockHelper::append($context, 'array_combine_native_advance');
+        $loopDone = BasicBlockHelper::append($context, 'array_combine_native_loop_done');
+        $context->builder->branch($head);
+
+        $keyElemType = $keys->type & ~Variable::IS_NATIVE_ARRAY;
+        $valElemType = $values->type & ~Variable::IS_NATIVE_ARRAY;
+
+        $context->builder->positionAtEnd($head);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $keysCount);
+        $context->builder->branchIf($atEnd, $loopDone, $body);
+
+        $context->builder->positionAtEnd($body);
+        $keySlot = $context->builder->inBoundsGep($keys->value, $zero, $idx);
+        $valSlot = $context->builder->inBoundsGep($values->value, $zero, $idx);
+        if (Variable::TYPE_STRING === $keyElemType) {
+            $keyVar = new Variable($context, $keyElemType, Variable::KIND_VARIABLE, $keySlot);
+            $valVar = self::nativeElementVariable($context, $valElemType, $valSlot);
+            HashTableHelper::setAtStringKey(
+                $context,
+                $dest,
+                $context->helper->loadValue($keyVar),
+                $valVar
+            );
+        } elseif (Variable::TYPE_NATIVE_LONG === $keyElemType) {
+            $intKey = $context->builder->truncOrBitCast(
+                $context->builder->load($keySlot),
+                $sizeT
+            );
+            $valVar = self::nativeElementVariable($context, $valElemType, $valSlot);
+            HashTableHelper::setAtIndex($context, $dest, $intKey, $valVar);
+        } else {
+            throw new \LogicException(
+                'array_combine() keys must be integers or strings in this compiler build'
+            );
+        }
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($advance);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($idx, $one),
+            $idxSlot
+        );
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($loopDone);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            $okPtr,
+            $dest
+        );
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($mergeBlock);
+        $phi = $context->builder->phi($failPtr->typeOf());
+        $phi->addIncoming($failPtr, $failBlock);
+        $phi->addIncoming($okPtr, $loopDone);
+
+        return $phi;
+    }
+
+    private static function nativeElementVariable(Context $context, int $elemType, Value $slot): Variable
+    {
+        if (Variable::TYPE_STRING === $elemType) {
+            return new Variable($context, $elemType, Variable::KIND_VARIABLE, $slot);
+        }
+
+        return new Variable(
+            $context,
+            $elemType,
+            Variable::KIND_VALUE,
+            $context->builder->load($slot)
+        );
+    }
+
+    private static function storeCombinedEntry(
+        Context $context,
+        Value $dest,
+        Value $keyEntry,
+        Value $valEntry
+    ): void {
+        $valueMap = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($keyEntry, $valueMap['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $sizeT = $context->getTypeFromString('size_t');
+
+        $stringBlock = BasicBlockHelper::append($context, 'array_combine_key_string');
+        $longBlock = BasicBlockHelper::append($context, 'array_combine_key_long');
+        $done = BasicBlockHelper::append($context, 'array_combine_key_done');
+
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_STRING, false)
+        );
+        $isLong = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
+        );
+
+        $afterString = BasicBlockHelper::append($context, 'array_combine_after_string');
+        $context->builder->branchIf($isString, $stringBlock, $afterString);
+
+        $context->builder->positionAtEnd($stringBlock);
+        $keyStr = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $keyEntry
+        );
+        self::storeValueEntryAtStringKey($context, $dest, $keyStr, $valEntry);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterString);
+        $context->builder->branchIf($isLong, $longBlock, $done);
+
+        $context->builder->positionAtEnd($longBlock);
+        $intKey = $context->builder->truncOrBitCast(
+            $context->builder->call($context->lookupFunction('__value__readLong'), $keyEntry),
+            $sizeT
+        );
+        self::storeValueEntryAtIndex($context, $dest, $intKey, $valEntry);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+    }
+
+    private static function storeValueEntryAtIndex(
+        Context $context,
+        Value $dest,
+        Value $index,
+        Value $valEntry
+    ): void {
+        $valueMap = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valEntry, $valueMap['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+
+        $longBlock = BasicBlockHelper::append($context, 'array_combine_val_long');
+        $stringBlock = BasicBlockHelper::append($context, 'array_combine_val_string');
+        $doubleBlock = BasicBlockHelper::append($context, 'array_combine_val_double');
+        $boolBlock = BasicBlockHelper::append($context, 'array_combine_val_bool');
+        $done = BasicBlockHelper::append($context, 'array_combine_val_done');
+
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_STRING, false)
+        );
+        $isLong = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
+        );
+        $isBool = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)
+        );
+        $isDouble = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
+        );
+
+        $afterString = BasicBlockHelper::append($context, 'array_combine_val_after_string');
+        $context->builder->branchIf($isString, $stringBlock, $afterString);
+
+        $context->builder->positionAtEnd($stringBlock);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringAt'),
+            $dest,
+            $index,
+            $context->builder->call($context->lookupFunction('__value__readString'), $valEntry)
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterString);
+        $afterLong = BasicBlockHelper::append($context, 'array_combine_val_after_long');
+        $context->builder->branchIf($isLong, $longBlock, $afterLong);
+
+        $context->builder->positionAtEnd($longBlock);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setLongAt'),
+            $dest,
+            $index,
+            $context->builder->call($context->lookupFunction('__value__readLong'), $valEntry)
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterLong);
+        $afterBool = BasicBlockHelper::append($context, 'array_combine_val_after_bool');
+        $context->builder->branchIf($isBool, $boolBlock, $afterBool);
+
+        $context->builder->positionAtEnd($boolBlock);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setBoolAt'),
+            $dest,
+            $index,
+            $context->builder->truncOrBitCast(
+                $context->builder->call($context->lookupFunction('__value__readLong'), $valEntry),
+                $context->getTypeFromString('int1')
+            )
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterBool);
+        $context->builder->branchIf($isDouble, $doubleBlock, $done);
+
+        $context->builder->positionAtEnd($doubleBlock);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setDoubleAt'),
+            $dest,
+            $index,
+            $context->builder->call($context->lookupFunction('__value__readDouble'), $valEntry)
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+    }
+
+    private static function storeValueEntryAtStringKey(
+        Context $context,
+        Value $dest,
+        Value $keyStr,
+        Value $valEntry
+    ): void {
+        $valueMap = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valEntry, $valueMap['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+
+        $longBlock = BasicBlockHelper::append($context, 'array_combine_sval_long');
+        $stringBlock = BasicBlockHelper::append($context, 'array_combine_sval_string');
+        $boolBlock = BasicBlockHelper::append($context, 'array_combine_sval_bool');
+        $done = BasicBlockHelper::append($context, 'array_combine_sval_done');
+
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_STRING, false)
+        );
+        $isLong = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
+        );
+        $isBool = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)
+        );
+
+        $afterString = BasicBlockHelper::append($context, 'array_combine_sval_after_string');
+        $context->builder->branchIf($isString, $stringBlock, $afterString);
+
+        $context->builder->positionAtEnd($stringBlock);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyString'),
+            $dest,
+            $keyStr,
+            $context->builder->call($context->lookupFunction('__value__readString'), $valEntry)
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterString);
+        $afterLong = BasicBlockHelper::append($context, 'array_combine_sval_after_long');
+        $context->builder->branchIf($isLong, $longBlock, $afterLong);
+
+        $context->builder->positionAtEnd($longBlock);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyLong'),
+            $dest,
+            $keyStr,
+            $context->builder->call($context->lookupFunction('__value__readLong'), $valEntry)
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterLong);
+        $context->builder->branchIf($isBool, $boolBlock, $done);
+
+        $context->builder->positionAtEnd($boolBlock);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyBool'),
+            $dest,
+            $keyStr,
+            $context->builder->truncOrBitCast(
+                $context->builder->call($context->lookupFunction('__value__readLong'), $valEntry),
+                $context->getTypeFromString('int1')
+            )
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+    }
+
     public static function copyInto(Context $context, Value $dest, Value $src): void
     {
         $sizeT = $context->getTypeFromString('size_t');

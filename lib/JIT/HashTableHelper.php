@@ -206,6 +206,71 @@ final class HashTableHelper
         );
     }
 
+    /**
+     * Read an associative string-keyed element into a stack {@see __value__} slot.
+     */
+    public static function readStringKeyToValueBox(Context $context, Value $ht, Value $keyStr): Variable
+    {
+        static $seq = 0;
+        $tag = 'sk'.(string) ++$seq;
+        $slot = JitValueBox::alloc($context);
+        $destPtr = JitValueBox::pointer($context, $slot);
+        $valPtr = $context->builder->call(
+            $context->lookupFunction('__hashtable__readStringKeyValue'),
+            $ht,
+            $keyStr
+        );
+        $valueMap = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valPtr, $valueMap['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+
+        $stringBlock = BasicBlockHelper::append($context, 'ht_sk_string_'.$tag);
+        $longBlock = BasicBlockHelper::append($context, 'ht_sk_long_'.$tag);
+        $done = BasicBlockHelper::append($context, 'ht_sk_done_'.$tag);
+
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_STRING, false)
+        );
+        $context->builder->branchIf($isString, $stringBlock, $longBlock);
+
+        $context->builder->positionAtEnd($stringBlock);
+        $str = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $valPtr
+        );
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $str
+        );
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $destPtr,
+            $owned
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($longBlock);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeLong'),
+            $destPtr,
+            $context->builder->call($context->lookupFunction('__value__readLong'), $valPtr)
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+
+        return new Variable(
+            $context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VARIABLE,
+            $slot
+        );
+    }
+
     public static function initArray(Context $context, Variable $result): void
     {
         $result->nextFreeElement = 0;
@@ -296,7 +361,7 @@ final class HashTableHelper
         }
     }
 
-    private static function setAtStringKey(
+    public static function setAtStringKey(
         Context $context,
         Value $ht,
         Value $keyPtr,

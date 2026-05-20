@@ -417,22 +417,30 @@ final class Variable {
                             $childHt
                         );
                     }
-                    $valPtr = $this->context->builder->call(
-                        $this->context->lookupFunction('__hashtable__readStringKeyValue'),
-                        $ht,
-                        $key
-                    );
-                    $str = $this->context->builder->call(
-                        $this->context->lookupFunction('__value__readString'),
-                        $valPtr
-                    );
+                    if (null !== $expectedType && Type::TYPE_STRING === $expectedType->type) {
+                        $valPtr = $this->context->builder->call(
+                            $this->context->lookupFunction('__hashtable__readStringKeyValue'),
+                            $ht,
+                            $key
+                        );
+                        $str = $this->context->builder->call(
+                            $this->context->lookupFunction('__value__readString'),
+                            $valPtr
+                        );
 
-                    return new Variable(
-                        $this->context,
-                        self::TYPE_STRING,
-                        self::KIND_VALUE,
-                        $str
-                    );
+                        return new Variable(
+                            $this->context,
+                            self::TYPE_STRING,
+                            self::KIND_VALUE,
+                            $str
+                        );
+                    }
+
+                    $this->context->refcount->addref($ht);
+                    $boxed = HashTableHelper::readStringKeyToValueBox($this->context, $ht, $key);
+                    $this->context->refcount->delref($ht);
+
+                    return $boxed;
                 }
                 $index = $this->context->builder->truncOrBitCast(
                     $this->context->helper->loadValue($dim),
