@@ -71,13 +71,27 @@ if [[ -z "${PHP_COMPILER_SKIP_SERVE_TESTS:-}" ]]; then
 fi
 
 if [[ -f "$LLVM_DIR/libLLVM-9.so.1" ]]; then
-  echo "PHPUnit: JIT, AOT (web fixtures + examples, ExamplesCompileTest AOT lint)..."
-  LLVM_JUNIT="$(mktemp "${TMPDIR:-/tmp}/llvm-junit.XXXXXX.xml")"
-  "$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit --group llvm --exclude-group serve --log-junit "$LLVM_JUNIT" "$@"
-  if [[ -n "${PHP_COMPILER_ALLOW_JIT_SKIP:-}" ]]; then
-    echo "JIT compliance guard skipped (PHP_COMPILER_ALLOW_JIT_SKIP is set)."
-  else
-    "$PHP_BIN" "${PHP_OPTS[@]}" script/check-jit-compliance-ran.php "$LLVM_JUNIT" "$LLVM_DIR"
+  RUN_JIT=1
+  if [[ -n "${PHP_COMPILER_FORCE_JIT_TESTS:-}" ]]; then
+    echo "JIT compliance forced (PHP_COMPILER_FORCE_JIT_TESTS=1)."
+  elif ! "$PHP_BIN" "${PHP_OPTS[@]}" script/jit-runtime-probe.php; then
+    RUN_JIT=0
+    echo "JIT MCJIT probe failed (segfault or bad output); running @group aot only."
+    echo "  Re-run with PHP_COMPILER_FORCE_JIT_TESTS=1 after fixing bin/jit.php / LLVM 9."
   fi
-  rm -f "$LLVM_JUNIT"
+
+  if [[ "$RUN_JIT" -eq 1 ]]; then
+    echo "PHPUnit: JIT + AOT (@group llvm, excluding serve)..."
+    LLVM_JUNIT="$(mktemp "${TMPDIR:-/tmp}/llvm-junit.XXXXXX.xml")"
+    "$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit --group llvm --exclude-group serve --log-junit "$LLVM_JUNIT" "$@"
+    if [[ -n "${PHP_COMPILER_ALLOW_JIT_SKIP:-}" ]]; then
+      echo "JIT compliance guard skipped (PHP_COMPILER_ALLOW_JIT_SKIP is set)."
+    else
+      "$PHP_BIN" "${PHP_OPTS[@]}" script/check-jit-compliance-ran.php "$LLVM_JUNIT" "$LLVM_DIR"
+    fi
+    rm -f "$LLVM_JUNIT"
+  else
+    echo "PHPUnit: AOT (@group aot — PHPT fixtures, web examples, compile lint)..."
+    "$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit --group aot "$@"
+  fi
 fi

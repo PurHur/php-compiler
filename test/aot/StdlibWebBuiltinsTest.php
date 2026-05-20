@@ -10,6 +10,7 @@ use PHPUnit\Framework\TestCase;
  * Smoke-test that web-oriented stdlib calls AOT-compile together (LLVM verify + link).
  *
  * @group llvm
+ * @group aot
  */
 final class StdlibWebBuiltinsTest extends TestCase
 {
