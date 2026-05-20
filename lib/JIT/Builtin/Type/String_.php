@@ -163,6 +163,16 @@ class String_ extends Type {
             $fn___rawurlencode->addAttributeAtIndex(\PHPLLVM\Attribute::INDEX_FUNCTION, $this->context->attributes['alwaysinline']);
             $this->context->registerFunction('__string__rawurlencode', $fn___rawurlencode);
 
+        $fntype___nl2br = $this->context->context->functionType(
+                $this->context->getTypeFromString('__string__*'),
+                false,
+                $this->context->getTypeFromString('__string__*'),
+                $this->context->getTypeFromString('int8')
+            );
+            $fn___nl2br = $this->context->module->addFunction('__string__nl2br', $fntype___nl2br);
+            $fn___nl2br->addAttributeAtIndex(\PHPLLVM\Attribute::INDEX_FUNCTION, $this->context->attributes['alwaysinline']);
+            $this->context->registerFunction('__string__nl2br', $fn___nl2br);
+
         $this->pointer = $this->context->getTypeFromString('__string__*');
     }
 
@@ -175,6 +185,7 @@ class String_ extends Type {
         $this->implementStrlen();
         \PHPCompiler\JIT\Builtin\StringHtmlspecialchars::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringUrlencode::implement($this->context);
+        \PHPCompiler\JIT\Builtin\StringNl2br::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringRandomBytes::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringGetenv::implement($this->context);
     }
