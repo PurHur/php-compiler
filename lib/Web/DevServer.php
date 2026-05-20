@@ -15,6 +15,9 @@ final class DevServer
     /** Maximum length per header value passed to user scripts. */
     public const MAX_HEADER_VALUE_LEN = 8192;
 
+    /** Maximum decoded request body size (issue #77, #287). */
+    public const MAX_REQUEST_BODY = 8_388_608;
+
     public static function run(string $listen, string $docroot, callable $handlePhpRequest): void
     {
         if (!is_dir($docroot)) {
@@ -240,8 +243,17 @@ final class DevServer
             $headers[strtolower(trim($name))] = trim($value);
         }
 
-        if (isset($headers['content-length'])) {
+        if (self::hasChunkedTransferEncoding($headers)) {
+            $decoded = self::readChunkedBody($conn, $body);
+            if (null === $decoded) {
+                return null;
+            }
+            $body = $decoded;
+        } elseif (isset($headers['content-length'])) {
             $len = (int) $headers['content-length'];
+            if ($len > self::MAX_REQUEST_BODY) {
+                return null;
+            }
             while (strlen($body) < $len && !feof($conn)) {
                 $chunk = fread($conn, $len - strlen($body));
                 if (false === $chunk || '' === $chunk) {
@@ -252,9 +264,101 @@ final class DevServer
             if (strlen($body) > $len) {
                 $body = substr($body, 0, $len);
             }
+        } elseif (self::methodMayHaveBody($method) && 'HTTP/1.0' === $serverProtocol) {
+            while (!feof($conn)) {
+                if (strlen($body) >= self::MAX_REQUEST_BODY) {
+                    return null;
+                }
+                $chunk = fread($conn, min(8192, self::MAX_REQUEST_BODY - strlen($body)));
+                if (false === $chunk || '' === $chunk) {
+                    break;
+                }
+                $body .= $chunk;
+            }
         }
 
         return [$method, $path, $query, $headers, $body, $serverProtocol];
+    }
+
+    public static function methodMayHaveBody(string $method): bool
+    {
+        return in_array($method, ['POST', 'PUT', 'PATCH'], true);
+    }
+
+    /**
+     * @param array<string, string> $headers lowercase header name => value
+     */
+    public static function hasChunkedTransferEncoding(array $headers): bool
+    {
+        if (!isset($headers['transfer-encoding'])) {
+            return false;
+        }
+        foreach (explode(',', strtolower($headers['transfer-encoding'])) as $coding) {
+            if ('chunked' === trim($coding)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Decode HTTP/1.1 chunked body (RFC 7230). $buffer holds bytes after the header block.
+     */
+    public static function readChunkedBody($conn, string $buffer): ?string
+    {
+        $result = '';
+        while (true) {
+            $lineEnd = strpos($buffer, "\r\n");
+            if (false === $lineEnd) {
+                if (feof($conn)) {
+                    return null;
+                }
+                $more = fread($conn, 8192);
+                if (false === $more || '' === $more) {
+                    return null;
+                }
+                $buffer .= $more;
+                continue;
+            }
+
+            $line = substr($buffer, 0, $lineEnd);
+            $buffer = substr($buffer, $lineEnd + 2);
+            $semi = strpos($line, ';');
+            if (false !== $semi) {
+                $line = substr($line, 0, $semi);
+            }
+            $line = trim($line);
+            if ('' === $line || !ctype_xdigit($line)) {
+                return null;
+            }
+            $chunkSize = (int) hexdec($line);
+            if ($chunkSize < 0 || $chunkSize > self::MAX_REQUEST_BODY || strlen($result) + $chunkSize > self::MAX_REQUEST_BODY) {
+                return null;
+            }
+            if (0 === $chunkSize) {
+                return $result;
+            }
+
+            while (strlen($buffer) < $chunkSize + 2) {
+                if (feof($conn)) {
+                    return null;
+                }
+                $need = $chunkSize + 2 - strlen($buffer);
+                $more = fread($conn, max(8192, $need));
+                if (false === $more || '' === $more) {
+                    return null;
+                }
+                $buffer .= $more;
+            }
+
+            $result .= substr($buffer, 0, $chunkSize);
+            $buffer = substr($buffer, $chunkSize);
+            if (!str_starts_with($buffer, "\r\n")) {
+                return null;
+            }
+            $buffer = substr($buffer, 2);
+        }
     }
 
     /**

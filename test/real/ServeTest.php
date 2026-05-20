@@ -263,6 +263,20 @@ PHP,
     $this->assertStringContainsString('name=Alice', $this->responseBody($response));
   }
 
+  public function testPostFormUrlencodedChunkedTransferEncoding(): void
+  {
+    $docroot = $this->makeDocroot([
+      'form.php' => <<<'PHP'
+<?php
+header('Content-Type: text/plain; charset=UTF-8');
+echo 'name=', $_POST['name'];
+PHP,
+    ]);
+    $response = $this->httpPostChunked($docroot, '/form.php', 'name=Chunk');
+    $this->assertStringContainsString('HTTP/1.1 200', $response);
+    $this->assertStringContainsString('name=Chunk', $this->responseBody($response));
+  }
+
   public function testPutJsonBody(): void
   {
     $docroot = $this->makeDocroot([
@@ -401,6 +415,24 @@ PHP,
     );
   }
 
+  private function httpPostChunked(string $docroot, string $path, string $body, array $extraEnv = []): string
+  {
+    $chunked = dechex(strlen($body))."\r\n".$body."\r\n0\r\n\r\n";
+
+    return $this->httpRequest(
+      $docroot,
+      'POST',
+      $path,
+      $chunked,
+      [
+        'Content-Type: application/x-www-form-urlencoded',
+        'Transfer-Encoding: chunked',
+      ],
+      $extraEnv,
+      useContentLength: false
+    );
+  }
+
   /**
    * @param list<string>         $extraRequestHeaders
    * @param array<string,string> $extraEnv
@@ -411,7 +443,8 @@ PHP,
       string $path,
       string $body,
       array $extraRequestHeaders = [],
-      array $extraEnv = []
+      array $extraEnv = [],
+      bool $useContentLength = true
   ): string {
     $port = $this->findFreePort();
     $addr = "127.0.0.1:{$port}";
@@ -443,11 +476,11 @@ PHP,
 
     $conn = fsockopen('127.0.0.1', $port);
     $this->assertIsResource($conn);
-    $len = strlen($body);
-    $headers = array_merge(
-      ['Host: 127.0.0.1', "Content-Length: {$len}", 'Connection: close'],
-      $extraRequestHeaders
-    );
+    $headers = ['Host: 127.0.0.1', 'Connection: close'];
+    if ($useContentLength) {
+      $headers[] = 'Content-Length: '.strlen($body);
+    }
+    $headers = array_merge($headers, $extraRequestHeaders);
     $headerBlock = implode("\r\n", $headers);
     fwrite(
       $conn,
