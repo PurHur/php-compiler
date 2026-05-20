@@ -14,7 +14,7 @@ use PHPCompiler\Web\Superglobals;
 use PHPLLVM\Value;
 
 /**
- * getallheaders() — request headers from $_SERVER HTTP_* entries (VM only; issue #307).
+ * getallheaders() — request headers from $_SERVER HTTP_* entries (issue #307).
  */
 final class getallheaders_ extends Internal
 {
@@ -40,6 +40,10 @@ final class getallheaders_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('getallheaders() is not implemented for JIT in this compiler build');
+        if (\count($args) > 0) {
+            throw new \LogicException('getallheaders() takes no arguments');
+        }
+
+        return JitGetallheaders::invoke($context);
     }
 }

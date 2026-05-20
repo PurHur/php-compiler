@@ -35,6 +35,7 @@
         "ext/standard/JitDate.php",
         "ext/standard/JitEnv.php",
         "ext/standard/JitExplode.php",
+        "ext/standard/JitGetallheaders.php",
         "ext/standard/JitHeader.php",
         "ext/standard/JitHex2bin.php",
         "ext/standard/JitHtmlspecialchars.php",
@@ -273,9 +274,9 @@
         "test/bootstrap-aot/echo_hello.php"
     ],
     "totals": {
-        "inventory_files": 239,
+        "inventory_files": 240,
         "excluded": 2,
-        "eligible": 237,
+        "eligible": 238,
         "aot_lint_targets": 2
     }
 }
