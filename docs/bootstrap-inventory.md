@@ -1249,12 +1249,12 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new Variable (line 139)
 - new JIT\Call\Vararg (line 146)
 - new JIT\Call\Native (line 149)
-- new ext\standard\boolval (line 263)
-- new Variable (line 427)
-- new Variable (line 810)
-- new Operand\Literal (line 880)
-- new Operand\Literal (line 884)
-- new Operand\Literal (line 888)
+- new ext\standard\boolval (line 268)
+- new Variable (line 432)
+- new Variable (line 813)
+- new Operand\Literal (line 883)
+- new Operand\Literal (line 887)
+- new Operand\Literal (line 891)
 - 12 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Analyzer.php`

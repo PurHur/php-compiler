@@ -1,6 +1,6 @@
 --- vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
 +++ vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
-@@ -262,6 +262,22 @@
+@@ -262,6 +262,20 @@
                  return false;
              case 'Expr_StaticCall':
                  return $this->resolveMethodCall($op->class, $op->name, $op, $resolved);
