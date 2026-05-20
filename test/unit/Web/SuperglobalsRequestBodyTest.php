@@ -12,9 +12,6 @@ final class SuperglobalsRequestBodyTest extends TestCase
     protected function tearDown(): void
     {
         putenv('REQUEST_BODY');
-        putenv('REQUEST_METHOD');
-        putenv('CONTENT_TYPE');
-        putenv('HTTP_CONTENT_TYPE');
         parent::tearDown();
     }
 
@@ -28,29 +25,5 @@ final class SuperglobalsRequestBodyTest extends TestCase
     {
         putenv('REQUEST_BODY');
         $this->assertSame('', Superglobals::readRequestBody());
-    }
-
-    public function testPutJsonDoesNotPopulatePost(): void
-    {
-        putenv('REQUEST_METHOD=PUT');
-        putenv('REQUEST_BODY={"ok":true}');
-        putenv('CONTENT_TYPE=application/json');
-        $this->assertFalse(Superglobals::shouldPopulatePostFromRequestBody());
-    }
-
-    public function testPutFormUrlencodedPopulatesPost(): void
-    {
-        putenv('REQUEST_METHOD=PUT');
-        putenv('REQUEST_BODY=name=Ada');
-        putenv('CONTENT_TYPE=application/x-www-form-urlencoded');
-        $this->assertTrue(Superglobals::shouldPopulatePostFromRequestBody());
-    }
-
-    public function testPostWithoutContentTypeStillPopulatesPost(): void
-    {
-        putenv('REQUEST_BODY=name=Ada');
-        putenv('REQUEST_METHOD');
-        putenv('CONTENT_TYPE');
-        $this->assertTrue(Superglobals::shouldPopulatePostFromRequestBody());
     }
 }

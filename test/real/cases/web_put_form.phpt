@@ -1,13 +1,13 @@
 --TEST--
-Web: PUT with form body populates $_POST (issue #291)
+Web: PUT form body populates $_POST when Content-Type is form-urlencoded
 --ENV--
 REQUEST_METHOD=PUT
 REQUEST_BODY=name=Ada&role=dev
 CONTENT_TYPE=application/x-www-form-urlencoded
 --FILE--
 <?php
-echo 'Hello ', $_POST['name'], "\n";
+echo 'name=', $_POST['name'], "\n";
 echo 'role=', $_POST['role'], "\n";
 --EXPECT--
-Hello Ada
+name=Ada
 role=dev

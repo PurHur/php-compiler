@@ -1,11 +1,11 @@
 --TEST--
-Web: PUT with JSON body via php://input (issue #291)
+Web: PUT JSON body via php://input (REQUEST_BODY)
 --ENV--
 REQUEST_METHOD=PUT
-REQUEST_BODY={"ok":true}
+REQUEST_BODY={"id":42,"name":"Ada"}
 CONTENT_TYPE=application/json
 --FILE--
 <?php
 echo file_get_contents('php://input');
 --EXPECT--
-{"ok":true}
+{"id":42,"name":"Ada"}
