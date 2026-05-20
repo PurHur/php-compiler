@@ -44,6 +44,7 @@ final class UnsupportedRegistry
         'Expr_PreDec' => 137,
         'Expr_PostDec' => 137,
         'Expr_List' => 139,
+        'Stmt_Switch' => 96,
     ];
 
     public static function trackingIssueForKind(string $kind): ?int

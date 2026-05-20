@@ -83,6 +83,14 @@ PHP;
         $this->assertStringContainsString('Expr_List', $exit['stdout']);
     }
 
+    public function testLintSwitchReportsIssue96(): void
+    {
+        $exit = $this->runLint(['-r', 'switch (1) { case 1: echo 1; }']);
+        $this->assertSame(1, $exit['code']);
+        $this->assertStringContainsString('#96', $exit['stdout']);
+        $this->assertStringContainsString('Stmt_Switch', $exit['stdout']);
+    }
+
     public function testLintCleanScriptExitsZero(): void
     {
         $code = '<?php echo "ok";';
