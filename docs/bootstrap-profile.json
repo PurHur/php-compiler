@@ -48,6 +48,7 @@
         "ext/standard/JitParseUrl.php",
         "ext/standard/JitPath.php",
         "ext/standard/JitRandomBytes.php",
+        "ext/standard/JitReadfile.php",
         "ext/standard/JitRealpath.php",
         "ext/standard/JitRequestBody.php",
         "ext/standard/JitSprintf.php",
@@ -162,6 +163,7 @@
         "ext/standard/range.php",
         "ext/standard/rawurldecode.php",
         "ext/standard/rawurlencode.php",
+        "ext/standard/readfile.php",
         "ext/standard/realpath.php",
         "ext/standard/round.php",
         "ext/standard/scandir.php",
@@ -305,9 +307,9 @@
         "test/bootstrap-aot/echo_hello.php"
     ],
     "totals": {
-        "inventory_files": 271,
+        "inventory_files": 273,
         "excluded": 2,
-        "eligible": 269,
+        "eligible": 271,
         "aot_lint_targets": 2
     }
 }

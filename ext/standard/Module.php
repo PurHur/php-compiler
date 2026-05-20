@@ -129,6 +129,7 @@ class Module extends ModuleAbstract
             new basename(),
             new realpath(),
             new file_get_contents(),
+            new readfile(),
             new file_put_contents(),
             new file_exists(),
             new is_file(),
@@ -223,6 +224,25 @@ class Module extends ModuleAbstract
             $ft = $context->context->functionType($i8p, false, $i8p, $i8p);
             $fn = $context->module->addFunction('realpath', $ft);
             $context->registerFunction('realpath', $fn);
+        }
+        $i8p = $context->getTypeFromString('int8*');
+        $charPtr = $context->getTypeFromString('char*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $readfileLibc = [
+            'fopen' => $context->context->functionType($i8p, false, $charPtr, $charPtr),
+            'fread' => $context->context->functionType($sizeT, false, $i8p, $sizeT, $sizeT, $i8p),
+            'fclose' => $context->context->functionType($i32, false, $i8p),
+            'write' => $context->context->functionType($i64, false, $i32, $i8p, $sizeT),
+        ];
+        foreach ($readfileLibc as $name => $ft) {
+            try {
+                $context->lookupFunction($name);
+            } catch (\Throwable $e) {
+                $fn = $context->module->addFunction($name, $ft);
+                $context->registerFunction($name, $fn);
+            }
         }
         $double = $context->getTypeFromString('double');
         try {

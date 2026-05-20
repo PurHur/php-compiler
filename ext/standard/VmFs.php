@@ -43,6 +43,31 @@ final class VmFs
         return $data;
     }
 
+    /** Stream file bytes to stdout; returns total bytes written or false. */
+    public static function readfile(string $path): int|false
+    {
+        $fp = @fopen($path, 'rb');
+        if (false === $fp) {
+            return false;
+        }
+        $total = 0;
+        while (!feof($fp)) {
+            $chunk = @fread($fp, 8192);
+            if (false === $chunk) {
+                @fclose($fp);
+
+                return false;
+            }
+            if ('' !== $chunk) {
+                echo $chunk;
+                $total += \strlen($chunk);
+            }
+        }
+        @fclose($fp);
+
+        return $total;
+    }
+
     /**
      * @param string|list<string> $data
      */

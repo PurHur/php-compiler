@@ -1,12 +1,12 @@
 --- vendor/ircmaxell/php-cfg/lib/PHPCfg/Func.php
 +++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Func.php
-@@ -54,6 +54,8 @@
+@@ -54,4 +54,7 @@
      /** @var CallableOp|null */
      public $callableOp;
  
 +    /** @var bool */
 +    public $strictTypes = false;
- 
++
      public function __construct(string $name, int $flags, Op\Type $returnType, Operand $class = null, array $attributes = [])
      {
 --- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
