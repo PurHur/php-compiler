@@ -42,4 +42,25 @@ final class DevServerHeadersTest extends TestCase
         $this->assertSame('12', DevServer::contentLengthForRequest(['content-length' => '99'], $body));
         $this->assertNull(DevServer::contentLengthForRequest([], $body));
     }
+
+    public function testParsePeerAddressIpv4(): void
+    {
+        $parsed = DevServer::parsePeerAddress('127.0.0.1:54321');
+        $this->assertNotNull($parsed);
+        $this->assertSame(['127.0.0.1', '54321'], $parsed);
+    }
+
+    public function testParsePeerAddressIpv6(): void
+    {
+        $parsed = DevServer::parsePeerAddress('[::1]:54321');
+        $this->assertNotNull($parsed);
+        $this->assertSame(['::1', '54321'], $parsed);
+    }
+
+    public function testParsePeerAddressRejectsInvalid(): void
+    {
+        $this->assertNull(DevServer::parsePeerAddress(''));
+        $this->assertNull(DevServer::parsePeerAddress('no-port'));
+        $this->assertNull(DevServer::parsePeerAddress('[::1]'));
+    }
 }
