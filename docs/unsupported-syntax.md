@@ -12,6 +12,8 @@
 
 Exit code `0` when the entry (and best-effort `include`/`require` targets with string literals) compiles; `1` when any unsupported construct is found.
 
+Some constructs (for example destructuring assigns and prefix/postfix `++`/`--`) are lowered by php-cfg before the compiler sees them; lint still scans the AST for those patterns and reports the **Expr\_\*** diagnostic kinds below.
+
 ## Known gaps (tracking issues)
 
 | CFG kind | Tracking |
@@ -27,6 +29,7 @@ Exit code `0` when the entry (and best-effort `include`/`require` targets with s
 | `Expr_Closure` | [#72](https://github.com/PurHur/php-compiler/issues/72) |
 | `Expr_ArrowFunction` | [#142](https://github.com/PurHur/php-compiler/issues/142) |
 | `Expr_PreInc`, `Expr_PostInc`, `Expr_PreDec`, `Expr_PostDec` (`++`/`--`) | [#137](https://github.com/PurHur/php-compiler/issues/137) |
+| `Expr_List` (`list()` / short-list destructuring assign targets) | [#139](https://github.com/PurHur/php-compiler/issues/139) |
 | `Expr_New` (non-trivial) | [#136](https://github.com/PurHur/php-compiler/issues/136) |
 | Named arguments, traits, enums | [#168](https://github.com/PurHur/php-compiler/issues/168), [#169](https://github.com/PurHur/php-compiler/issues/169) |
 
