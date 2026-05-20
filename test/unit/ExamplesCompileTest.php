@@ -10,6 +10,7 @@ use PHPUnit\Framework\TestCase;
  * CI gate: shipped examples compile in VM and (when LLVM is present) AOT lint.
  *
  * @see https://github.com/PurHur/php-compiler/issues/203
+ * @see https://github.com/PurHur/php-compiler/issues/243 (structured phpc lint per shipped example)
  * @see https://github.com/PurHur/php-compiler/issues/282 (002-StaticWeb via ./phpc build)
  * @see https://github.com/PurHur/php-compiler/issues/309 (001-SimpleWeb AOT execute + QUERY_STRING refresh in this gate)
  */
@@ -40,6 +41,56 @@ final class ExamplesCompileTest extends TestCase
     {
         $name = basename(dirname($examplePath));
         $this->runCli('vm.php', array_merge(self::vmExtraArgs($name), ['-l', $examplePath]));
+    }
+
+    /**
+     * Structured lint (line + tracking issue) for each shipped example.
+     *
+     * @dataProvider provideExamples
+     *
+     * @see https://github.com/PurHur/php-compiler/issues/243
+     */
+    public function testPhpcLint(string $examplePath): void
+    {
+        $exit = $this->runLint([$examplePath]);
+        $this->assertSame(0, $exit['code'], $exit['stderr']."\n".$exit['stdout']);
+    }
+
+    /**
+     * @dataProvider provideExamples
+     *
+     * @see https://github.com/PurHur/php-compiler/issues/243
+     */
+    public function testPhpcLintJsonClean(string $examplePath): void
+    {
+        $exit = $this->runLint(['--json', $examplePath]);
+        $this->assertSame(0, $exit['code'], $exit['stderr']."\n".$exit['stdout']);
+        $decoded = json_decode($exit['stdout'], true);
+        $this->assertIsArray($decoded);
+        $this->assertArrayHasKey('issues', $decoded);
+        $this->assertSame([], $decoded['issues']);
+    }
+
+    public function testPhpcLintDelegatesViaPhpc(): void
+    {
+        $repoRoot = dirname(__DIR__, 2);
+        $example = $repoRoot.'/examples/000-HelloWorld/example.php';
+        $cmd = array_merge(
+            self::phpCommand(),
+            [$repoRoot.'/bin/phpc.php', 'lint', $example]
+        );
+        $exit = $this->runLintCommand($cmd, $repoRoot);
+        $this->assertSame(0, $exit['code'], $exit['stderr']."\n".$exit['stdout']);
+    }
+
+    public function testPhpcLintFailureSurfacesTrackingIssue(): void
+    {
+        $exit = $this->runLint(['-r', '<?php foreach ([1] as $x) {}']);
+        $this->assertSame(1, $exit['code']);
+        $combined = $exit['stdout'].$exit['stderr'];
+        $this->assertStringContainsString('unsupported', $combined);
+        $this->assertStringContainsString('see #53', $combined);
+        $this->assertMatchesRegularExpression('/line \d+/', $combined);
     }
 
     /**
@@ -226,6 +277,47 @@ final class ExamplesCompileTest extends TestCase
         $this->assertSame(0, $exitCode, trim($stderr !== false ? $stderr : ''));
 
         return $stdout !== false ? $stdout : '';
+    }
+
+    /**
+     * @param list<string> $lintArgs arguments after bin/lint.php
+     *
+     * @return array{code: int, stdout: string, stderr: string}
+     */
+    private function runLint(array $lintArgs): array
+    {
+        $repoRoot = dirname(__DIR__, 2);
+        $cmd = array_merge(self::phpCommand(), [$repoRoot.'/bin/lint.php'], $lintArgs);
+
+        return $this->runLintCommand($cmd, $repoRoot);
+    }
+
+    /**
+     * @param list<string> $cmd
+     *
+     * @return array{code: int, stdout: string, stderr: string}
+     */
+    private function runLintCommand(array $cmd, string $cwd): array
+    {
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open($cmd, $descriptorSpec, $pipes, $cwd);
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $code = proc_close($proc);
+
+        return [
+            'code' => $code,
+            'stdout' => $stdout !== false ? $stdout : '',
+            'stderr' => $stderr !== false ? $stderr : '',
+        ];
     }
 
     /**

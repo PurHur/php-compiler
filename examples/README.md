@@ -2,7 +2,7 @@
 
 Each folder here contains a working PHP example `example.php`, and associated generated files (including LLVM IR generated from said file).
 
-CI runs `test/unit/ExamplesCompileTest.php`: every `examples/*/example.php` is linted and smoke-run under `bin/vm.php`; when LLVM 9 is available, `bin/compile.php -l` is exercised as well, and `001-SimpleWeb` is built to a temp AOT binary and run twice with different `QUERY_STRING` values to guard runtime superglobal refresh.
+CI runs `test/unit/ExamplesCompileTest.php`: every `examples/*/example.php` is checked with `bin/lint.php` / `phpc lint` (structured unsupported-syntax output with GitHub issue links), linted and smoke-run under `bin/vm.php`; when LLVM 9 is available, `bin/compile.php -l` is exercised as well, and `001-SimpleWeb` is built to a temp AOT binary and run twice with different `QUERY_STRING` values to guard runtime superglobal refresh.
 
 # Benchmark Results
 
