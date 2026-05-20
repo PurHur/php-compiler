@@ -33,6 +33,13 @@ PHP;
         $this->assertSame(0, $exit['code']);
     }
 
+    public function testLintNullsafePropertyAccepted(): void
+    {
+        $code = '<?php class C { public int $x = 1; } $c = null; $c?->x;';
+        $exit = $this->runLint(['-r', $code]);
+        $this->assertSame(0, $exit['code']);
+    }
+
     public function testLintShiftAssignReportsIssue136(): void
     {
         $code = '<?php $x <<= 1;';
