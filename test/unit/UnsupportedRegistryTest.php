@@ -19,9 +19,7 @@ final class UnsupportedRegistryTest extends TestCase
     public static function kindToIssueProvider(): array
     {
         return [
-            'compound assign prefix' => ['Expr_AssignOp_Concat', 136],
-            'shift left' => ['Expr_BinaryOp_ShiftLeft', 136],
-            'shift right' => ['Expr_BinaryOp_ShiftRight', 136],
+            'assign coalesce' => ['Expr_AssignOp_Coalesce', 99],
             'break' => ['Stmt_Break', 115],
             'continue' => ['Stmt_Continue', 115],
             'match' => ['Expr_Match', 143],

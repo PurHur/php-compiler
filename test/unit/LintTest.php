@@ -37,13 +37,22 @@ PHP;
         $this->assertSame(0, $exit['code']);
     }
 
-    public function testLintShiftAssignReportsIssue136(): void
+    public function testLintAssignOpConcatAccepted(): void
     {
-        $code = '<?php $x <<= 1;';
-        $exit = $this->runLint(['-r', $code]);
-        $this->assertSame(1, $exit['code']);
-        $this->assertStringContainsString('#136', $exit['stdout']);
-        $this->assertStringContainsString('Expr_BinaryOp_ShiftLeft', $exit['stdout']);
+        $exit = $this->runLint(['-r', '<?php $s = "a"; $s .= "b"; echo $s;']);
+        $this->assertSame(0, $exit['code']);
+    }
+
+    public function testLintAssignOpPlusAccepted(): void
+    {
+        $exit = $this->runLint(['-r', '<?php $n = 1; $n += 2; echo $n;']);
+        $this->assertSame(0, $exit['code']);
+    }
+
+    public function testLintShiftAssignAccepted(): void
+    {
+        $exit = $this->runLint(['-r', '<?php $x = 1; $x <<= 2; echo $x;']);
+        $this->assertSame(0, $exit['code']);
     }
 
     public function testLintYieldReportsIssue167(): void
@@ -105,23 +114,23 @@ PHP;
 
     public function testLintJsonOutput(): void
     {
-        $code = '<?php foreach ([1] as $v) {}';
+        $code = '<?php function f() { yield 1; }';
         $exit = $this->runLint(['--json', '-r', $code]);
         $this->assertSame(1, $exit['code']);
         $decoded = json_decode($exit['stdout'], true);
         $this->assertIsArray($decoded);
         $this->assertNotEmpty($decoded['issues']);
         $this->assertArrayHasKey('line', $decoded['issues'][0]);
-        $this->assertSame(53, $decoded['issues'][0]['issue']);
+        $this->assertSame(167, $decoded['issues'][0]['issue']);
     }
 
     public function testPhpcLintDelegatesToLintScript(): void
     {
         $repoRoot = dirname(__DIR__, 2);
-        $cmd = array_merge(self::phpCommand(), [$repoRoot.'/bin/phpc.php', 'lint', '-r', '<?php foreach ([1] as $x) {}']);
+        $cmd = array_merge(self::phpCommand(), [$repoRoot.'/bin/phpc.php', 'lint', '-r', '<?php function f() { yield 1; }']);
         $exit = $this->runCommand($cmd, $repoRoot);
         $this->assertSame(1, $exit['code']);
-        $this->assertStringContainsString('#53', $exit['stdout']);
+        $this->assertStringContainsString('#167', $exit['stdout']);
     }
 
     /**

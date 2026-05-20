@@ -87,6 +87,8 @@ restart:
                     case OpCode::TYPE_BITWISE_AND:
                     case OpCode::TYPE_BITWISE_OR:
                     case OpCode::TYPE_BITWISE_XOR:
+                    case OpCode::TYPE_SHIFT_LEFT:
+                    case OpCode::TYPE_SHIFT_RIGHT:
                         break;
                     case OpCode::TYPE_GREATER_OR_EQUAL:
                         $result = $this->context->builder->fcmp(Builder::REAL_OGE, $leftValue, $rightValue);
@@ -253,6 +255,14 @@ restart:
 
                         $result = $this->context->builder->bitwiseXor($leftValue, $__right);
     
+                        goto return_long;
+                    case OpCode::TYPE_SHIFT_LEFT:
+                        $__right = $this->context->builder->intCast($rightValue, $leftValue->typeOf());
+                        $result = $this->context->builder->shl($leftValue, $__right);
+                        goto return_long;
+                    case OpCode::TYPE_SHIFT_RIGHT:
+                        $__right = $this->context->builder->intCast($rightValue, $leftValue->typeOf());
+                        $result = $this->context->builder->aShr($leftValue, $__right);
                         goto return_long;
                     case OpCode::TYPE_GREATER_OR_EQUAL:
                         $__right = $this->context->builder->intCast($rightValue, $leftValue->typeOf());

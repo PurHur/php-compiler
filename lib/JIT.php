@@ -486,6 +486,8 @@ class JIT {
                 case OpCode::TYPE_BITWISE_AND:
                 case OpCode::TYPE_BITWISE_OR:
                 case OpCode::TYPE_BITWISE_XOR:
+                case OpCode::TYPE_SHIFT_LEFT:
+                case OpCode::TYPE_SHIFT_RIGHT:
                 case OpCode::TYPE_GREATER_OR_EQUAL:
                 case OpCode::TYPE_SMALLER_OR_EQUAL:
                 case OpCode::TYPE_GREATER:

@@ -142,6 +142,8 @@ restart:
                 case OpCode::TYPE_BITWISE_AND:
                 case OpCode::TYPE_BITWISE_OR:
                 case OpCode::TYPE_BITWISE_XOR:
+                case OpCode::TYPE_SHIFT_LEFT:
+                case OpCode::TYPE_SHIFT_RIGHT:
                     $arg1 = $frame->scope[$op->arg1];
                     $arg2 = $frame->scope[$op->arg2];
                     $arg3 = $frame->scope[$op->arg3];

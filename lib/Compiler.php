@@ -320,6 +320,10 @@ class Compiler {
             return OpCode::TYPE_BITWISE_OR;
         } elseif ($expr instanceof Op\Expr\BinaryOp\BitwiseXor) {
             return OpCode::TYPE_BITWISE_XOR;
+        } elseif ($expr instanceof Op\Expr\BinaryOp\ShiftLeft) {
+            return OpCode::TYPE_SHIFT_LEFT;
+        } elseif ($expr instanceof Op\Expr\BinaryOp\ShiftRight) {
+            return OpCode::TYPE_SHIFT_RIGHT;
         }
         throw new \LogicException("Unknown BinaryOp Type: " . $expr->getType());
     }
