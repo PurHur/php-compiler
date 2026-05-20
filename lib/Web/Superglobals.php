@@ -57,6 +57,45 @@ final class Superglobals
         return false === $fromEnv ? '' : $fromEnv;
     }
 
+    /**
+     * Whether the request body should be parsed into $_POST (issue #291).
+     *
+     * PUT/PATCH/DELETE only populate $_POST for application/x-www-form-urlencoded.
+     * POST keeps legacy behavior when Content-Type is unset (DevServer form posts, PHPT).
+     */
+    public static function shouldPopulatePostFromRequestBody(
+        ?string $method = null,
+        ?string $postBody = null,
+        ?string $contentType = null
+    ): bool {
+        if (null === $postBody) {
+            $postBody = self::readRequestBody();
+        }
+        if ('' === $postBody) {
+            return false;
+        }
+
+        $method = self::resolveRequestMethod($method, $postBody);
+        $contentType = self::resolveContentType($contentType);
+
+        if (in_array($method, ['PUT', 'PATCH', 'DELETE'], true)) {
+            return 'application/x-www-form-urlencoded' === $contentType;
+        }
+
+        if ('POST' === $method) {
+            if ('' === $contentType) {
+                return true;
+            }
+            if ('application/x-www-form-urlencoded' === $contentType) {
+                return true;
+            }
+
+            return str_starts_with($contentType, 'multipart/form-data');
+        }
+
+        return false;
+    }
+
     public static function populateFromEnvironment(
         Context $context,
         ?string $queryString = null,
@@ -76,7 +115,9 @@ final class Superglobals
         if (null === $postBody) {
             $postBody = self::readRequestBody();
         }
-        self::populatePost($context, $postBody);
+        if (self::shouldPopulatePostFromRequestBody(null, $postBody)) {
+            self::populatePost($context, $postBody);
+        }
         $cookieHeader = getenv('HTTP_COOKIE');
         self::populateCookie(
             $context,
@@ -201,6 +242,43 @@ final class Superglobals
         }
 
         return $cgi;
+    }
+
+    private static function resolveRequestMethod(?string $method, string $postBody): string
+    {
+        if (null !== $method && '' !== $method) {
+            return strtoupper($method);
+        }
+        $fromEnv = getenv('REQUEST_METHOD');
+        if (false !== $fromEnv && '' !== $fromEnv) {
+            return strtoupper($fromEnv);
+        }
+
+        return '' !== $postBody ? 'POST' : 'GET';
+    }
+
+    private static function resolveContentType(?string $contentType): string
+    {
+        if (null !== $contentType) {
+            return self::normalizeContentType($contentType);
+        }
+        $fromEnv = getenv('CONTENT_TYPE');
+        if (false === $fromEnv || '' === $fromEnv) {
+            $fromEnv = getenv('HTTP_CONTENT_TYPE');
+        }
+
+        return false === $fromEnv ? '' : self::normalizeContentType($fromEnv);
+    }
+
+    private static function normalizeContentType(string $contentType): string
+    {
+        $contentType = strtolower(trim($contentType));
+        $semi = strpos($contentType, ';');
+        if (false !== $semi) {
+            $contentType = trim(substr($contentType, 0, $semi));
+        }
+
+        return $contentType;
     }
 
     private static function populateGet(Context $context, string $queryString): void

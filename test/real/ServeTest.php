@@ -263,6 +263,44 @@ PHP,
     $this->assertStringContainsString('name=Alice', $this->responseBody($response));
   }
 
+  public function testPutJsonBody(): void
+  {
+    $docroot = $this->makeDocroot([
+      'api.php' => <<<'PHP'
+<?php
+header('Content-Type: text/plain; charset=UTF-8');
+echo file_get_contents('php://input');
+PHP,
+    ]);
+    $response = $this->httpPut(
+      $docroot,
+      '/api.php',
+      '{"ok":true}',
+      'application/json'
+    );
+    $this->assertStringContainsString('HTTP/1.1 200', $response);
+    $this->assertStringContainsString('{"ok":true}', $this->responseBody($response));
+  }
+
+  public function testPutFormUrlencoded(): void
+  {
+    $docroot = $this->makeDocroot([
+      'form.php' => <<<'PHP'
+<?php
+header('Content-Type: text/plain; charset=UTF-8');
+echo 'name=', $_POST['name'];
+PHP,
+    ]);
+    $response = $this->httpPut(
+      $docroot,
+      '/form.php',
+      'name=Alice',
+      'application/x-www-form-urlencoded'
+    );
+    $this->assertStringContainsString('HTTP/1.1 200', $response);
+    $this->assertStringContainsString('name=Alice', $this->responseBody($response));
+  }
+
   public function testPathInfoFrontControllerDispatch(): void
   {
     $docroot = $this->makeDocroot([
@@ -348,8 +386,38 @@ PHP,
     return $response !== false ? $response : '';
   }
 
+  private function httpPut(
+      string $docroot,
+      string $path,
+      string $body,
+      string $contentType
+  ): string {
+    return $this->httpRequestWithBody($docroot, 'PUT', $path, $body, $contentType);
+  }
+
   private function httpPost(string $docroot, string $path, string $body, array $extraEnv = []): string
   {
+    return $this->httpRequestWithBody(
+      $docroot,
+      'POST',
+      $path,
+      $body,
+      'application/x-www-form-urlencoded',
+      $extraEnv
+    );
+  }
+
+  /**
+   * @param array<string, string> $extraEnv
+   */
+  private function httpRequestWithBody(
+      string $docroot,
+      string $method,
+      string $path,
+      string $body,
+      string $contentType,
+      array $extraEnv = []
+  ): string {
     $port = $this->findFreePort();
     $addr = "127.0.0.1:{$port}";
     $env = array_merge($this->baseEnv(), $extraEnv);
@@ -383,9 +451,9 @@ PHP,
     $len = strlen($body);
     fwrite(
       $conn,
-      "POST {$path} HTTP/1.1\r\n"
+      "{$method} {$path} HTTP/1.1\r\n"
       ."Host: 127.0.0.1\r\n"
-      ."Content-Type: application/x-www-form-urlencoded\r\n"
+      ."Content-Type: {$contentType}\r\n"
       ."Content-Length: {$len}\r\n"
       ."Connection: close\r\n\r\n"
       .$body

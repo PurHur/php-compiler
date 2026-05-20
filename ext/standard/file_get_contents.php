@@ -9,11 +9,12 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
+use PHPCompiler\ext\standard\JitRequestBody;
 use PHPCompiler\Web\Superglobals;
 use PHPLLVM\Value;
 
 /**
- * file_get_contents() — php://input reads REQUEST_BODY (VM only; issue #289).
+ * file_get_contents() — php://input reads REQUEST_BODY via getenv (issue #289, #291).
  */
 final class file_get_contents extends Internal
 {
@@ -42,6 +43,18 @@ final class file_get_contents extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('file_get_contents() is not implemented for JIT in this compiler build');
+        if (1 !== \count($args)) {
+            throw new \LogicException('file_get_contents() requires exactly one argument in this compiler build');
+        }
+        $arg = $args[0];
+        if (JITVariable::TYPE_STRING === $arg->type) {
+            $literal = $arg->compileTimeString ?? null;
+            if ('php://input' === $literal) {
+                return JitRequestBody::readPhpInput($context);
+            }
+        }
+        throw new \LogicException(
+            'file_get_contents() only supports php://input in this compiler build'
+        );
     }
 }
