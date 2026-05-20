@@ -756,6 +756,14 @@ class JIT {
                     );
 
                     return;
+                case Variable::TYPE_HASHTABLE:
+                    $this->context->builder->call(
+                        $this->context->lookupFunction('__value__writeHashtable'),
+                        $valueRef,
+                        $this->context->helper->loadValue($value)
+                    );
+
+                    return;
                 case Variable::TYPE_VALUE:
                     JIT\JitValueBox::copyFromPointer(
                         $this->context,
