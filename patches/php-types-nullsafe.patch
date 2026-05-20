@@ -1,0 +1,23 @@
+--- vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
+@@ -262,6 +262,22 @@
+                 return false;
+             case 'Expr_StaticCall':
+                 return $this->resolveMethodCall($op->class, $op->name, $op, $resolved);
++            case 'Expr_NullsafePropertyFetch':
++                $propTypes = $this->resolveOp_Expr_PropertyFetch($var, $op, $resolved);
++                if (false === $propTypes) {
++                    return [Type::null()];
++                }
++
++                return [(new Type(Type::TYPE_UNION, array_merge($propTypes, [Type::null()])))->simplify()];
++            case 'Expr_NullsafeMethodCall':
++                $methodTypes = $this->resolveMethodCall($op->var, $op->name, $op, $resolved);
++                if (false === $methodTypes) {
++                    return [Type::null()];
++                }
++
++                return [(new Type(Type::TYPE_UNION, array_merge($methodTypes, [Type::null()])))->simplify()];
+             case 'Expr_MethodCall':
+                 return $this->resolveMethodCall($op->var, $op->name, $op, $resolved);
+             case 'Expr_Yield':

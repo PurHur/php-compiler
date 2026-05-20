@@ -1,0 +1,101 @@
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/NullsafePropertyFetch.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/NullsafePropertyFetch.php
+@@ -0,0 +1,33 @@
++<?php
++
++declare(strict_types=1);
++
++namespace PHPCfg\Op\Expr;
++
++use PHPCfg\Op\Expr;
++use PHPCfg\Operand;
++
++class NullsafePropertyFetch extends Expr
++{
++    public $var;
++
++    public $name;
++
++    public function __construct(Operand $var, Operand $name, array $attributes = [])
++    {
++        parent::__construct($attributes);
++        $this->var = $this->addReadRef($var);
++        $this->name = $this->addReadRef($name);
++    }
++
++    public function getVariableNames(): array
++    {
++        return ['var', 'name', 'result'];
++    }
++
++    public function getType(): string
++    {
++        return 'Expr_NullsafePropertyFetch';
++    }
++}
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/NullsafeMethodCall.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/NullsafeMethodCall.php
+@@ -0,0 +1,37 @@
++<?php
++
++declare(strict_types=1);
++
++namespace PHPCfg\Op\Expr;
++
++use PHPCfg\Op\Expr;
++use PHPCfg\Operand;
++
++class NullsafeMethodCall extends Expr
++{
++    public $var;
++
++    public $name;
++
++    public $args;
++
++    public function __construct(Operand $var, Operand $name, array $args, array $attributes = [])
++    {
++        parent::__construct($attributes);
++        $this->var = $this->addReadRef($var);
++        $this->name = $this->addReadRef($name);
++        $this->args = $this->addReadRefs(...$args);
++    }
++
++    public function getVariableNames(): array
++    {
++        return ['var', 'name', 'args', 'result'];
++    }
++
++    public function getType(): string
++    {
++        return 'Expr_NullsafeMethodCall';
++    }
++}
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
+@@ -1206,6 +1206,26 @@
+         return new Op\Expr\Print_($this->readVariable($this->parseExprNode($expr->expr)), $this->mapAttributes($expr));
+     }
+ 
++    protected function parseExpr_NullsafePropertyFetch(Expr\NullsafePropertyFetch $expr)
++    {
++        return new Op\Expr\NullsafePropertyFetch(
++            $this->readVariable($this->parseExprNode($expr->var)),
++            $this->readVariable($this->parseExprNode($expr->name)),
++            $this->mapAttributes($expr)
++        );
++    }
++
++    protected function parseExpr_NullsafeMethodCall(Expr\NullsafeMethodCall $expr)
++    {
++        return new Op\Expr\NullsafeMethodCall(
++            $this->readVariable($this->parseExprNode($expr->var)),
++            $this->readVariable($this->parseExprNode($expr->name)),
++            $this->parseExprList($expr->args, self::MODE_READ),
++            $this->mapAttributes($expr)
++        );
++    }
++
+     protected function parseExpr_PropertyFetch(Expr\PropertyFetch $expr)
+     {
+         return new Op\Expr\PropertyFetch(

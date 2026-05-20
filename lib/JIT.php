@@ -517,6 +517,43 @@ class JIT {
                     }
 
                     return $origBasicBlock;
+                case OpCode::TYPE_NULLSAFE:
+                    $branchBlock = $builder->getInsertBlock();
+                    $builder->positionAtEnd($branchBlock);
+                    $receiver = $this->context->getVariableFromOp($block->getOperand($op->arg2));
+                    $valuePtr = JIT\Variable::KIND_VARIABLE === $receiver->kind
+                        ? $receiver->value
+                        : $this->context->helper->loadValue($receiver);
+                    $typeByte = $this->context->builder->load(
+                        $this->context->builder->structGep(
+                            $valuePtr,
+                            $this->context->structFieldMap['__value__']['type']
+                        )
+                    );
+                    $i8 = $this->context->getTypeFromString('int8');
+                    $isNull = $this->context->builder->icmp(
+                        \PHPLLVM\Builder::INT_EQ,
+                        $typeByte,
+                        $i8->constInt(JIT\Variable::TYPE_NULL, false)
+                    );
+                    $nullBb = JIT\NullsafeHelper::compileBranch($this, $func, $op->block1);
+                    $fetchBb = JIT\NullsafeHelper::compileBranch($this, $func, $op->block2);
+                    $builder->positionAtEnd($branchBlock);
+                    $this->context->freeDeadVariables($func, $branchBlock, $block);
+                    $builder->branchIf($isNull, $nullBb, $fetchBb);
+                    if (null !== $op->block3) {
+                        $mergeBb = JIT\BasicBlockHelper::append($this->context, 'nullsafe_merge');
+                        $builder->positionAtEnd($nullBb);
+                        $builder->branch($mergeBb);
+                        $builder->positionAtEnd($fetchBb);
+                        $builder->branch($mergeBb);
+                        $builder->positionAtEnd($mergeBb);
+                        $this->context->scope->blockStorage[$op->block3] = $mergeBb;
+
+                        return $this->compileBlockInternal($func, $op->block3, ...$args);
+                    }
+
+                    return $origBasicBlock;
                 case OpCode::TYPE_JUMPIF:
                     $branchBlock = $builder->getInsertBlock();
                     $builder->positionAtEnd($branchBlock);

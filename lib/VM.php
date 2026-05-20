@@ -163,6 +163,14 @@ restart:
                         $frame
                     );
                     goto restart;
+                case OpCode::TYPE_NULLSAFE:
+                    $receiver = $frame->scope[$op->arg2]->resolveIndirect();
+                    $frame = (
+                        Variable::TYPE_NULL === $receiver->type
+                            ? $op->block1
+                            : $op->block2
+                    )->getFrame($this->context, $frame);
+                    goto restart;
                 case OpCode::TYPE_EXIT:
                     $exitArg = null;
                     if (null !== $op->arg2) {

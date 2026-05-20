@@ -72,6 +72,7 @@ class OpCode {
     const TYPE_NOT_IDENTICAL = 60;
     const TYPE_SPACESHIP = 61;
     const TYPE_COALESCE = 62;
+    const TYPE_NULLSAFE = 63;
 
     public int $type;
     public ?int $arg1;
