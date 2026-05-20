@@ -108,6 +108,12 @@ docker-build-22:
 test-docker: docker-build-22
 	docker run --rm -v $(shell pwd):/compiler -w /compiler $(LOCAL_DEV_IMAGE) ./script/ci-local.sh
 
+# Runforge / harness CI: uses docker-ci-local.sh tar fallback when bind-mount is empty (#272).
+# Optional: make test-harness ARGS='--filter VMTest'
+.PHONY: test-harness
+test-harness:
+	./script/docker-ci-local.sh $(ARGS)
+
 # Quick PHPUnit in 22.04 dev image (after composer install on host or in container)
 .PHONY: test-docker-quick
 test-docker-quick:
