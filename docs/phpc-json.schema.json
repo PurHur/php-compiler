@@ -1,0 +1,47 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/PurHur/php-compiler/docs/phpc-json.schema.json",
+    "title": "phpc.json project manifest",
+    "description": "Machine-readable schema for php-compiler web/AOT project manifests (issue #263).",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+        "binary": {
+            "type": "string",
+            "description": "Relative or absolute path to the AOT executable (phpc serve --aot, phpc build -o)."
+        },
+        "public": {
+            "type": "string",
+            "description": "Document root for static assets (optional; defaults to project directory when serving)."
+        },
+        "entry": {
+            "type": "string",
+            "description": "PHP entry script for phpc build (issue #106; validated when present)."
+        },
+        "index": {
+            "type": "string",
+            "description": "Front-controller script path for directory requests (DevServer; optional)."
+        },
+        "includes": {
+            "type": "array",
+            "description": "Extra PHP paths to bundle with AOT (issue #106; stub until implemented).",
+            "items": {
+                "type": "string"
+            }
+        },
+        "autoload": {
+            "type": "object",
+            "description": "PSR-4 autoload map (issue #155; stub until implemented).",
+            "additionalProperties": false,
+            "properties": {
+                "psr-4": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                }
+            }
+        }
+    },
+    "required": ["binary"]
+}

@@ -15,7 +15,7 @@ final class ProjectManifest
     public static function resolveBinaryPath(string $startDir, ?string $explicit = null): ?string
     {
         if (null !== $explicit && '' !== $explicit) {
-            $path = self::resolvePath($startDir, $explicit);
+            $path = self::resolveRelativePath($startDir, $explicit);
 
             return is_file($path) ? $path : null;
         }
@@ -30,7 +30,7 @@ final class ProjectManifest
             if (is_file($manifest)) {
                 $data = json_decode((string) file_get_contents($manifest), true);
                 if (is_array($data) && isset($data['binary']) && is_string($data['binary'])) {
-                    $candidate = self::resolvePath($dir, $data['binary']);
+                    $candidate = self::resolveRelativePath($dir, $data['binary']);
                     if (is_file($candidate)) {
                         return $candidate;
                     }
@@ -44,7 +44,7 @@ final class ProjectManifest
         }
 
         foreach (['.phpc/bin/app', 'bin/app', 'app'] as $relative) {
-            $candidate = self::resolvePath($startDir, $relative);
+            $candidate = self::resolveRelativePath($startDir, $relative);
             if (is_file($candidate) && is_executable($candidate)) {
                 return $candidate;
             }
@@ -53,7 +53,7 @@ final class ProjectManifest
         return null;
     }
 
-    private static function resolvePath(string $baseDir, string $path): string
+    public static function resolveRelativePath(string $baseDir, string $path): string
     {
         if ('/' === $path[0]) {
             return $path;

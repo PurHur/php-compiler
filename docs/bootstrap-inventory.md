@@ -8,9 +8,9 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 250 |
+| PHP files on vm.php path | 251 |
 | Source constructs flagged (blockers) | 10 |
-| Source constructs flagged (warnings) | 655 |
+| Source constructs flagged (warnings) | 656 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -270,6 +270,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `lib/VM/Refcount.php` | 0 | 1 |
 | `lib/VM/Variable.php` | 0 | 4 |
 | `lib/Web/DevServer.php` | 0 | 1 |
+| `lib/Web/ManifestValidator.php` | 0 | 1 |
 | `lib/Web/Params.php` | 0 | 2 |
 | `lib/Web/ProjectManifest.php` | 0 | 1 |
 | `lib/Web/ResponseContext.php` | 0 | 2 |
@@ -1330,7 +1331,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/Doctor.php`
 
 **Warnings** (review for bootstrap subset):
-- 10 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 11 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/Frame.php`
 
@@ -1886,6 +1887,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 
 **Warnings** (review for bootstrap subset):
 - 20 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/Web/ManifestValidator.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/Web/Params.php`
 

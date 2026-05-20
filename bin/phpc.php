@@ -17,6 +17,7 @@ declare(strict_types=1);
  *   phpc init [--force] [target-dir]
  *   phpc test [-- phpunit/ci-local args...]
  *   phpc doctor                                  Probe PHP, LLVM, deps, loopback (issue #253)
+ *   phpc validate-manifest [dir]                 Validate phpc.json schema and paths (issue #263)
  */
 
 $repoRoot = realpath(__DIR__.'/..') ?: __DIR__.'/..';
@@ -42,6 +43,7 @@ php-compiler CLI
   phpc init [--force] [target-dir]              Scaffold phpc.json + public/index.php
   phpc test [args...]                           Run ./script/ci-local.sh
   phpc doctor                                   Probe environment for full local CI
+  phpc validate-manifest [dir]                  Validate phpc.json (default: cwd)
 
 HELP);
     exit([] === $args ? 1 : 0);
@@ -99,6 +101,27 @@ switch ($command) {
         }
         require $repoRoot.'/vendor/autoload.php';
         exit(\PHPCompiler\Doctor::run($repoRoot));
+
+    case 'validate-manifest':
+        if (!is_file($repoRoot.'/vendor/autoload.php')) {
+            fwrite(STDERR, "phpc validate-manifest: run composer install first\n");
+            exit(1);
+        }
+        require $repoRoot.'/vendor/autoload.php';
+        $targetDir = $args[0] ?? getcwd();
+        if (false === $targetDir || '' === $targetDir) {
+            fwrite(STDERR, "phpc validate-manifest: cannot resolve target directory\n");
+            exit(1);
+        }
+        $errors = \PHPCompiler\Web\ManifestValidator::validate($targetDir);
+        if ([] === $errors) {
+            fwrite(STDOUT, "phpc.json OK: {$targetDir}\n");
+            exit(0);
+        }
+        foreach ($errors as $message) {
+            fwrite(STDERR, $message."\n");
+        }
+        exit(1);
 
     default:
         fwrite(STDERR, "Unknown command: {$command}\n");
