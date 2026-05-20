@@ -84,6 +84,8 @@ class Compiler {
                         $block = $this->compileIssetMulti($child, $block);
                     } elseif ($child instanceof Op\Expr\BinaryOp\Coalesce) {
                         $block = $this->compileCoalesce($child, $block);
+                    } elseif ($child instanceof Op\Expr\NullsafePropertyFetch) {
+                        $block = $this->compileNullsafePropertyFetch($child, $block);
                     } else {
                         $this->compileOp($child, $block);
                     }
@@ -117,7 +119,7 @@ class Compiler {
                         throw new \LogicException('Properties are only supported on classes for now');
                     }
                     if (!is_null($child->defaultBlock)) {
-                        $this->compileOps($child->defaultBlock, $result);
+                        $this->compileOps($child->defaultBlock->children, $result);
                     }
                     $result->addOpCode(new OpCode(
                         OpCode::TYPE_DECLARE_PROPERTY,
@@ -626,6 +628,75 @@ class Compiler {
         $coalesceOp->block2 = $rightBlock;
         $coalesceOp->block3 = $endBlock;
         $block->addOpCode($coalesceOp);
+
+        return $endBlock;
+    }
+
+    protected function compileNullsafePropertyFetch(Op\Expr\NullsafePropertyFetch $expr, Block $block): Block
+    {
+        return $this->compileNullsafe(
+            $block,
+            $this->compileOperand($expr->result, $block, false),
+            $this->compileOperand($expr->var, $block, true),
+            function (Block $fetchBlock) use ($expr): void {
+                $fetchBlock->addOpCode(new OpCode(
+                    OpCode::TYPE_PROPERTY_FETCH,
+                    $this->compileOperand($expr->result, $fetchBlock, false),
+                    $this->compileOperand($expr->var, $fetchBlock, true),
+                    $this->compileOperand($expr->name, $fetchBlock, true)
+                ));
+            }
+        );
+    }
+
+    /**
+     * @param callable(Block): void $compileAccess
+     */
+    protected function compileNullsafe(
+        Block $block,
+        int $resultSlot,
+        int $receiverSlot,
+        callable $compileAccess
+    ): Block {
+        $endBlock = new Block($block->orig);
+        $endBlock->inheritUndefinedLocals = true;
+        $endBlock->inheritScopeFrom($block);
+
+        $nullBlock = new Block($block->orig);
+        $nullBlock->inheritUndefinedLocals = true;
+        $nullBlock->inheritScopeFrom($block);
+        $nullLiteral = new Operand\Literal(null);
+        $nullLiteral->type = Type::null();
+        $nullValueSlot = $this->compileOperand($nullLiteral, $nullBlock, true);
+        $nullBlock->addOpCode(new OpCode(
+            OpCode::TYPE_ASSIGN,
+            $resultSlot,
+            $resultSlot,
+            $nullValueSlot
+        ));
+        $nullJump = new OpCode(OpCode::TYPE_JUMP);
+        $nullJump->block1 = $endBlock;
+        $nullBlock->addOpCode($nullJump);
+
+        $fetchBlock = new Block($block->orig);
+        $fetchBlock->inheritUndefinedLocals = true;
+        $fetchBlock->inheritScopeFrom($block);
+        $compileAccess($fetchBlock);
+        $fetchJump = new OpCode(OpCode::TYPE_JUMP);
+        $fetchJump->block1 = $endBlock;
+        $fetchBlock->addOpCode($fetchJump);
+        $endBlock->parents[] = $nullBlock;
+        $endBlock->parents[] = $fetchBlock;
+
+        $nullsafeOp = new OpCode(
+            OpCode::TYPE_NULLSAFE,
+            $resultSlot,
+            $receiverSlot
+        );
+        $nullsafeOp->block1 = $nullBlock;
+        $nullsafeOp->block2 = $fetchBlock;
+        $nullsafeOp->block3 = $endBlock;
+        $block->addOpCode($nullsafeOp);
 
         return $endBlock;
     }

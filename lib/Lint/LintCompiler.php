@@ -69,7 +69,7 @@ final class LintCompiler extends Compiler
                             throw new \LogicException('Properties are only supported on classes for now');
                         }
                         if (!is_null($child->defaultBlock)) {
-                            $this->compileOps($child->defaultBlock, $result);
+                            $this->compileOps($child->defaultBlock->children, $result);
                         }
                         $result->addOpCode(new OpCode(
                             OpCode::TYPE_DECLARE_PROPERTY,
