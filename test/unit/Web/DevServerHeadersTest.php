@@ -98,6 +98,56 @@ final class DevServerHeadersTest extends TestCase
         $this->assertNull(DevServer::parsePeerAddress('[::1]'));
     }
 
+    public function testHasChunkedTransferEncoding(): void
+    {
+        $this->assertTrue(DevServer::hasChunkedTransferEncoding(['transfer-encoding' => 'chunked']));
+        $this->assertTrue(DevServer::hasChunkedTransferEncoding(['transfer-encoding' => 'gzip, chunked']));
+        $this->assertFalse(DevServer::hasChunkedTransferEncoding(['transfer-encoding' => 'gzip']));
+        $this->assertFalse(DevServer::hasChunkedTransferEncoding([]));
+    }
+
+    public function testReadChunkedBodySingleChunk(): void
+    {
+        $pair = stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP);
+        if (false === $pair) {
+            $this->markTestSkipped('stream_socket_pair unavailable');
+        }
+        [$server, $client] = $pair;
+        fwrite($client, "a\r\nname=Chunk\r\n0\r\n\r\n");
+        fclose($client);
+
+        $decoded = DevServer::readChunkedBody($server, '');
+        fclose($server);
+
+        $this->assertSame('name=Chunk', $decoded);
+    }
+
+    public function testReadRequestChunkedPostBody(): void
+    {
+        $pair = stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP);
+        if (false === $pair) {
+            $this->markTestSkipped('stream_socket_pair unavailable');
+        }
+        [$server, $client] = $pair;
+        $raw = "POST /form.php HTTP/1.1\r\n"
+            ."Host: 127.0.0.1\r\n"
+            ."Content-Type: application/x-www-form-urlencoded\r\n"
+            ."Transfer-Encoding: chunked\r\n"
+            ."Connection: close\r\n\r\n"
+            ."a\r\nname=Chunk\r\n0\r\n\r\n";
+        fwrite($client, $raw);
+        stream_socket_shutdown($client, STREAM_SHUT_WR);
+        fclose($client);
+
+        $parsed = DevServer::readRequest($server);
+        fclose($server);
+
+        $this->assertNotNull($parsed);
+        $this->assertSame('POST', $parsed[0]);
+        $this->assertSame('name=Chunk', $parsed[4]);
+        $this->assertArrayNotHasKey('content-length', $parsed[3]);
+    }
+
     public function testReadRequestPostBodyWithoutTrailingNewline(): void
     {
         $pair = stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP);

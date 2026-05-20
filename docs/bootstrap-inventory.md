@@ -8,9 +8,9 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 231 |
+| PHP files on vm.php path | 232 |
 | Source constructs flagged (blockers) | 10 |
-| Source constructs flagged (warnings) | 613 |
+| Source constructs flagged (warnings) | 615 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -244,7 +244,8 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `lib/VM.php` | 0 | 7 |
 | `lib/VM/ClassEntry.php` | 0 | 1 |
 | `lib/VM/ClassProperty.php` | 0 | 1 |
-| `lib/VM/Context.php` | 0 | 10 |
+| `lib/VM/Context.php` | 0 | 11 |
+| `lib/VM/ErrorReporter.php` | 0 | 1 |
 | `lib/VM/HashTable.php` | 2 | 20 |
 | `lib/VM/ObjectEntry.php` | 0 | 1 |
 | `lib/VM/Optimizer.php` | 0 | 1 |
@@ -1665,10 +1666,10 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 **Warnings** (review for bootstrap subset):
 - new Variable (line 64)
 - new Variable (line 69)
-- new Func\PHP (line 232)
-- new ClassEntry (line 282)
-- new ObjectEntry (line 294)
-- new VM\ClassProperty (line 384)
+- new Func\PHP (line 236)
+- new ClassEntry (line 286)
+- new ObjectEntry (line 298)
+- new VM\ClassProperty (line 388)
 - 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/VM/ClassEntry.php`
@@ -1684,16 +1685,22 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/VM/Context.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 36)
+- new ErrorReporter (line 32)
 - new Variable (line 38)
-- new Variable (line 42)
-- new Variable (line 46)
-- new Variable (line 50)
-- new Variable (line 71)
-- new HashTable (line 72)
-- new RunStackEntry (line 99)
+- new Variable (line 40)
+- new Variable (line 44)
+- new Variable (line 48)
+- new Variable (line 52)
+- new Variable (line 73)
+- new HashTable (line 74)
 - new RunStackEntry (line 101)
+- new RunStackEntry (line 103)
 - 8 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/VM/ErrorReporter.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/VM/HashTable.php`
 
@@ -1704,24 +1711,24 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 **Warnings** (review for bootstrap subset):
 - new Refcount (line 46)
 - new Variable (line 76)
-- new Variable (line 102)
-- new Variable (line 159)
-- new Variable (line 184)
-- new self (line 233)
-- new Variable (line 235)
-- new self (line 248)
-- new Variable (line 254)
-- new Variable (line 279)
-- new Variable (line 307)
-- new self (line 325)
-- new Variable (line 327)
-- new self (line 349)
-- new Variable (line 360)
-- new HashTableBucket (line 563)
-- new Variable (line 563)
-- new HashTableBucket (line 574)
-- new Variable (line 574)
-- 38 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new Variable (line 114)
+- new Variable (line 171)
+- new Variable (line 196)
+- new self (line 245)
+- new Variable (line 247)
+- new self (line 260)
+- new Variable (line 266)
+- new Variable (line 291)
+- new Variable (line 319)
+- new self (line 337)
+- new Variable (line 339)
+- new self (line 361)
+- new Variable (line 372)
+- new HashTableBucket (line 575)
+- new Variable (line 575)
+- new HashTableBucket (line 586)
+- new Variable (line 586)
+- 39 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/VM/ObjectEntry.php`
 
@@ -1754,7 +1761,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/Web/DevServer.php`
 
 **Warnings** (review for bootstrap subset):
-- 17 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 20 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/Web/ProjectManifest.php`
 
