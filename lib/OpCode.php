@@ -77,6 +77,8 @@ class OpCode {
     const TYPE_ITER_VALID = 65;
     const TYPE_ITER_KEY = 66;
     const TYPE_ITER_VALUE = 67;
+    const TYPE_SHIFT_LEFT = 68;
+    const TYPE_SHIFT_RIGHT = 69;
 
     public int $type;
     public ?int $arg1;

@@ -584,6 +584,10 @@ restart:
                 return $left | $right;
             case OpCode::TYPE_BITWISE_XOR:
                 return $left ^ $right;
+            case OpCode::TYPE_SHIFT_LEFT:
+                return (int) $left << (int) $right;
+            case OpCode::TYPE_SHIFT_RIGHT:
+                return (int) $left >> (int) $right;
             default:
                 throw new \LogicException("Non-implemented bitwise operation $opCode");
         }

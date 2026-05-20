@@ -19,6 +19,17 @@ class AssignOp extends Optimizer
 {
     const CANDIDATE_OPS = [
         OpCode::TYPE_CONCAT,
+        OpCode::TYPE_PLUS,
+        OpCode::TYPE_MINUS,
+        OpCode::TYPE_MUL,
+        OpCode::TYPE_DIV,
+        OpCode::TYPE_MODULO,
+        OpCode::TYPE_POW,
+        OpCode::TYPE_BITWISE_AND,
+        OpCode::TYPE_BITWISE_OR,
+        OpCode::TYPE_BITWISE_XOR,
+        OpCode::TYPE_SHIFT_LEFT,
+        OpCode::TYPE_SHIFT_RIGHT,
     ];
 
     public function optimize(Block $block, ?\SplObjectStorage $seen = null): void
