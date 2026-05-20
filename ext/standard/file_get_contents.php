@@ -60,8 +60,6 @@ final class file_get_contents extends Internal
         if (JITVariable::TYPE_STRING !== $arg->type) {
             throw new \LogicException('file_get_contents() requires a string filename in this compiler build');
         }
-        throw new \LogicException(
-            'file_get_contents() for filesystem paths is not implemented for JIT in this compiler build'
-        );
+        return JitFileGetContents::invoke($context, $context->helper->loadValue($arg));
     }
 }
