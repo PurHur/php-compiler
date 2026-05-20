@@ -28,6 +28,14 @@ final class ExampleWebAotTest extends TestCase
         }
     }
 
+    public function testHelloWorldExampleFile(): void
+    {
+        $source = realpath(__DIR__ . '/../../examples/000-HelloWorld/example.php');
+        $this->assertNotFalse($source);
+        $result = $this->compileAndRun($source, []);
+        $this->assertStringContainsString('Hello World', $result);
+    }
+
     public function testSimpleWebExampleFile(): void
     {
         $source = realpath(__DIR__ . '/../../examples/001-SimpleWeb/example.php');

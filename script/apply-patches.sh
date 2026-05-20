@@ -47,7 +47,13 @@ apply_patch() {
     git -C "$ROOT" apply -p0 "$patch"
     echo "Applied $(basename "$patch")"
   else
-    echo "Skip $(basename "$patch") (already applied or failed)"
+    echo "Skip $(basename "$patch") (already applied or failed)" >&2
+    case "$(basename "$patch")" in
+      php-cfg-strict-types.patch)
+        echo "ERROR: php-cfg-strict-types.patch is required for AOT (declare(strict_types))." >&2
+        return 1
+        ;;
+    esac
   fi
 }
 

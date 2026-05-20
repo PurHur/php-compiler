@@ -40,7 +40,7 @@ class Compiler {
 
         $funcBlock = $this->compileCfgBlock($func->cfg, $func->params);
         $funcBlock->func = $func;
-        $funcBlock->strictTypes = $func->strictTypes;
+        $funcBlock->strictTypes = isset($func->strictTypes) ? (bool) $func->strictTypes : false;
         $this->seen = null;
         return new Func\PHP($name, $funcBlock);
     }
@@ -182,7 +182,7 @@ class Compiler {
     protected function compileFunction(Op\Stmt\Function_ $function, Block $block): OpCode {
         $funcBlock = $this->compileCfgBlock($function->func->cfg, $function->func->params);
         $funcBlock->func = $function->func;
-        $funcBlock->strictTypes = $function->func->strictTypes;
+        $funcBlock->strictTypes = isset($function->func->strictTypes) ? (bool) $function->func->strictTypes : false;
         $operand = new Operand\Literal($function->func->name);
         $operand->type = Type::string();
         $return = new OpCode(

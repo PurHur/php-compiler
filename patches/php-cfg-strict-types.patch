@@ -6,9 +6,9 @@
  
 +    /** @var bool */
 +    public $strictTypes = false;
- 
      public function __construct(string $name, int $flags, Op\Type $returnType, Operand $class = null, array $attributes = [])
      {
+         parent::__construct($attributes);
 --- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
 +++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
 @@ -52,6 +52,9 @@
