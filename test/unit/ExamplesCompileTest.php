@@ -11,6 +11,7 @@ use PHPUnit\Framework\TestCase;
  *
  * @see https://github.com/PurHur/php-compiler/issues/203
  * @see https://github.com/PurHur/php-compiler/issues/243 (structured phpc lint per shipped example)
+ * @see https://github.com/PurHur/php-compiler/issues/247 (002-StaticWeb compile.php build + execute)
  * @see https://github.com/PurHur/php-compiler/issues/282 (002-StaticWeb via ./phpc build)
  * @see https://github.com/PurHur/php-compiler/issues/309 (001-SimpleWeb AOT execute + QUERY_STRING refresh in this gate)
  * @see https://github.com/PurHur/php-compiler/issues/274 (minimal phpc.json beside web examples)
@@ -190,6 +191,33 @@ final class ExamplesCompileTest extends TestCase
         $envBob['REQUEST_URI'] = '/example.php?name=Bob';
         $outBob = $this->runAotBinary($binary, $envBob);
         $this->assertStringContainsString('<h1>Hello Bob</h1>', $outBob);
+
+        @unlink($binary);
+    }
+
+    /**
+     * Shipped 002-StaticWeb: compile.php -o temp binary, run once — AOT link + runtime smoke (no superglobals).
+     *
+     * @group llvm
+     * @group aot
+     *
+     * @see https://github.com/PurHur/php-compiler/issues/247
+     */
+    public function testAotExecuteSmoke002StaticWeb(): void
+    {
+        if (!self::isLlvmReady()) {
+            $this->markTestSkipped(
+                'LLVM 9 toolchain not available. Run script/install-llvm9.sh from the repository root.'
+            );
+        }
+        $repoRoot = dirname(__DIR__, 2);
+        $source = realpath($repoRoot.'/examples/002-StaticWeb/example.php');
+        $this->assertNotFalse($source);
+
+        $env = $this->llvmProcessEnv($repoRoot);
+        $binary = $this->compileAotBinaryNoQueryBaking($source, $repoRoot, $env);
+        $out = $this->runAotBinary($binary, $env);
+        $this->assertStringContainsString('Hello World', $out);
 
         @unlink($binary);
     }
