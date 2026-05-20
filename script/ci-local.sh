@@ -38,7 +38,7 @@ else
 fi
 
 # HTTP serve integration tests (ServeTest, ServeAotTest) need loopback TCP.
-# GitHub Actions sets PHP_COMPILER_SKIP_SERVE_TESTS=1; local/Docker CI must not.
+# Local/Docker CI should run serve tests unless loopback bind fails or PHP_COMPILER_SKIP_SERVE_TESTS is set.
 can_bind_loopback() {
   "$PHP_BIN" "${PHP_OPTS[@]}" script/can-bind-loopback.php
 }
