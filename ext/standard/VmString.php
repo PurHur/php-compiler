@@ -131,6 +131,18 @@ final class VmString
         return self::percentEncode($data, false);
     }
 
+    /** application/x-www-form-urlencoded decode ('+' as space). */
+    public static function urldecode(string $data): string
+    {
+        return self::percentDecode($data, true);
+    }
+
+    /** RFC 3986 percent-decode (does not map '+' to space). */
+    public static function rawurldecode(string $data): string
+    {
+        return self::percentDecode($data, false);
+    }
+
     /**
      * Cryptographically secure pseudo-random bytes (read from /dev/urandom).
      *
@@ -260,6 +272,46 @@ final class VmString
         }
 
         return $out;
+    }
+
+    private static function percentDecode(string $data, bool $formDecoding): string
+    {
+        $len = self::byteLength($data);
+        $out = '';
+        for ($i = 0; $i < $len; ++$i) {
+            $ch = $data[$i];
+            if ($formDecoding && '+' === $ch) {
+                $out .= ' ';
+                continue;
+            }
+            if ('%' === $ch && $i + 2 < $len) {
+                $hi = self::hexDigit(self::byteOrd($data[$i + 1]));
+                $lo = self::hexDigit(self::byteOrd($data[$i + 2]));
+                if (null !== $hi && null !== $lo) {
+                    $out .= \chr(($hi << 4) | $lo);
+                    $i += 2;
+                    continue;
+                }
+            }
+            $out .= $ch;
+        }
+
+        return $out;
+    }
+
+    private static function hexDigit(int $ord): ?int
+    {
+        if ($ord >= 48 && $ord <= 57) {
+            return $ord - 48;
+        }
+        if ($ord >= 65 && $ord <= 70) {
+            return $ord - 55;
+        }
+        if ($ord >= 97 && $ord <= 102) {
+            return $ord - 87;
+        }
+
+        return null;
     }
 
     /**
