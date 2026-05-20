@@ -30,8 +30,14 @@ class VM {
             $block->handler->execute($block->getFrame($this->context));
             return self::SUCCESS;
         }
-        
+
         $this->context->push($block->getFrame($this->context));
+
+        return $this->runFrames();
+    }
+
+    private function runFrames(): int
+    {
 nextframe:
         $frame = $this->context->pop();
 
@@ -260,6 +266,7 @@ restart:
                     $new->calledArgs = $frame->callArgs;
                     if ($new->hasHandler()) {
                         $new->parent = $frame;
+                        $new->vmContext = $this->context;
                         $new->handler->execute($new);
                         break;
                     }
