@@ -1,0 +1,39 @@
+---
+description: Compiler, VM, JIT, and AOT change patterns
+globs: lib/**/*,ext/**/*,bin/**/*
+alwaysApply: false
+---
+
+# Compiler / VM / JIT / AOT work
+
+## Prefer static compile path
+
+When an issue is about **compilation** (language features, builtins, AOT):
+
+1. Implement in the **compiler + AOT** path first (`lib/Compiler.php`, `lib/AOT/`, JIT builtins under `lib/JIT/Builtin/`).
+2. Add **compliance** `.phpt` under `test/compliance/cases/` and/or **AOT fixture** `.phpt` under `test/fixtures/aot/cases/`.
+3. VM-only shortcuts are acceptable for bootstrap gaps, but document gaps in `docs/capabilities.md` via the matrix script.
+
+## Tests
+
+- VM: `test/compliance/` — `JITTest` / `VMTest`
+- AOT: `test/aot/AotTest.php` + `test/fixtures/aot/cases/*.phpt`
+- Web: `test/real/`, `test/unit/Web/`, `@group serve` (needs loopback TCP)
+- Examples lint: `test/unit/ExamplesCompileTest.php`
+
+Filter locally:
+
+```bash
+./script/ci-local.sh --filter AotTest
+./script/ci-local.sh --filter VMTest
+```
+
+## Builtins
+
+- PHP implementation: `ext/standard/*.php`
+- Register in `ext/standard/Module.php`
+- JIT: add `lib/JIT/Builtin/` handler or mark VM-only in capability matrix
+
+## Patches
+
+Vendor fixes go in `patches/` and `script/apply-patches.sh` — never edit `vendor/` directly.

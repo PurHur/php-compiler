@@ -1,0 +1,32 @@
+---
+description: php-compiler layout, modes (VM/JIT/AOT), and where to change code
+alwaysApply: true
+---
+
+# php-compiler overview
+
+PurHur/php-compiler compiles a **subset of PHP** to VM bytecode, LLVM JIT, or native AOT binaries. Roadmap work targets a **web-capable subset** (CGI superglobals, stdlib, examples under `examples/`).
+
+## Entrypoints
+
+| Mode | CLI | Role |
+|------|-----|------|
+| VM | `bin/vm.php`, `phpc run` | Interpreter loop in `lib/VM.php` |
+| JIT | `bin/jit.php` | Compile per run via LLVM |
+| AOT | `bin/compile.php`, `phpc build` | Native executable + `lib/AOT/` |
+| Debug | `bin/print.php` | CFG + opcodes |
+
+## Key directories
+
+- `lib/` — compiler, VM, JIT, AOT, web (`lib/Web/`)
+- `ext/standard/` — builtins (VM + optional JIT stubs in `lib/JIT/Builtin/`)
+- `test/` — PHPUnit: `compliance/`, `fixtures/aot/`, `real/`, `unit/`
+- `examples/` — shipped demos with `phpc.json`
+- `docs/capabilities.md` — generated VM/JIT/AOT matrix (`script/capability-matrix.php`)
+
+## Conventions
+
+- Run `composer install` and `script/apply-patches.sh` after vendor changes.
+- LLVM 9: `.llvm/` or `PHP_COMPILER_LLVM_PATH` (see `script/install-llvm9.sh`).
+- Capability or bootstrap changes: update `script/capability-matrix.php` / `script/bootstrap-inventory.php` checks if applicable.
+- Match existing style in the file you edit; avoid drive-by refactors.
