@@ -57,6 +57,16 @@ final class DevServer
 
     public static function handleConnection($conn, string $docroot, callable $handlePhpRequest): void
     {
+        $remoteAddr = null;
+        $remotePort = null;
+        $peer = stream_socket_get_name($conn, true);
+        if (is_string($peer)) {
+            $parsed = self::parsePeerAddress($peer);
+            if (null !== $parsed) {
+                [$remoteAddr, $remotePort] = $parsed;
+            }
+        }
+
         $raw = self::readRequest($conn);
         if (null === $raw) {
             self::respond($conn, 400, 'text/plain', "Bad Request\n");
@@ -128,6 +138,10 @@ final class DevServer
         if ('' !== $pathInfo) {
             $cgiEnv['PATH_INFO'] = $pathInfo;
         }
+        if (null !== $remoteAddr && null !== $remotePort) {
+            $cgiEnv['REMOTE_ADDR'] = $remoteAddr;
+            $cgiEnv['REMOTE_PORT'] = $remotePort;
+        }
 
         self::clearHttpServerKeys();
         $cgiEnv = array_merge($cgiEnv, Superglobals::applyHttpHeaders($headers));
@@ -150,6 +164,16 @@ final class DevServer
             putenv('PATH_INFO='.$pathInfo);
         } else {
             putenv('PATH_INFO');
+        }
+        if (null !== $remoteAddr && null !== $remotePort) {
+            putenv('REMOTE_ADDR='.$remoteAddr);
+            putenv('REMOTE_PORT='.$remotePort);
+            $_SERVER['REMOTE_ADDR'] = $remoteAddr;
+            $_SERVER['REMOTE_PORT'] = $remotePort;
+        } else {
+            putenv('REMOTE_ADDR');
+            putenv('REMOTE_PORT');
+            unset($_SERVER['REMOTE_ADDR'], $_SERVER['REMOTE_PORT']);
         }
 
         try {
@@ -235,6 +259,36 @@ final class DevServer
     public static function headerNameToServerKey(string $name): string
     {
         return Superglobals::headerNameToServerKey($name);
+    }
+
+    /**
+     * Parse stream_socket_get_name($socket, true) into address and port (issue #295).
+     *
+     * @return array{0: string, 1: string}|null
+     */
+    public static function parsePeerAddress(string $peer): ?array
+    {
+        if ('' === $peer) {
+            return null;
+        }
+        if ('[' === $peer[0]) {
+            if (!preg_match('#^\[([^\]]+)\]:(\d+)$#', $peer, $m)) {
+                return null;
+            }
+
+            return [$m[1], $m[2]];
+        }
+        $colon = strrpos($peer, ':');
+        if (false === $colon) {
+            return null;
+        }
+        $addr = substr($peer, 0, $colon);
+        $port = substr($peer, $colon + 1);
+        if ('' === $addr || '' === $port || !ctype_digit($port)) {
+            return null;
+        }
+
+        return [$addr, $port];
     }
 
     /**

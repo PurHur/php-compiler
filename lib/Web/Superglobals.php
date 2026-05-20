@@ -259,6 +259,15 @@ final class Superglobals
             self::setStringEntry($server, 'DOCUMENT_ROOT', $documentRoot);
         }
 
+        $remoteAddr = getenv('REMOTE_ADDR');
+        if (false !== $remoteAddr && '' !== $remoteAddr) {
+            self::setStringEntry($server, 'REMOTE_ADDR', $remoteAddr);
+        }
+        $remotePort = getenv('REMOTE_PORT');
+        if (false !== $remotePort && '' !== $remotePort) {
+            self::setStringEntry($server, 'REMOTE_PORT', $remotePort);
+        }
+
         foreach (array_merge($_ENV, $_SERVER) as $key => $value) {
             if (!is_string($key) || !is_string($value)) {
                 continue;

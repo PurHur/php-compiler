@@ -145,6 +145,19 @@ PHP,
     $this->assertStringContainsString($resolved, $response);
   }
 
+  public function testPopulatesRemoteAddrForLoopback(): void
+  {
+    $docroot = $this->makeDocroot([
+      'remote.php' => <<<'PHP'
+<?php
+echo $_SERVER['REMOTE_ADDR'], '|', $_SERVER['REMOTE_PORT'];
+PHP,
+    ]);
+    $response = $this->httpGet($docroot, '/remote.php');
+    $this->assertStringContainsString('HTTP/1.1 200', $response);
+    $this->assertMatchesRegularExpression('#127\.0\.0\.1\|\d+#', $this->responseBody($response));
+  }
+
   public function testPopulatesScriptFilename(): void
   {
     $docroot = $this->makeDocroot([
@@ -292,6 +305,13 @@ PHP,
     proc_close($proc);
 
     return $response !== false ? $response : '';
+  }
+
+  private function responseBody(string $response): string
+  {
+    $parts = preg_split("/\r\n\r\n|\n\n/", $response, 2);
+
+    return $parts[1] ?? '';
   }
 
   private function makeDocroot(array $files): string

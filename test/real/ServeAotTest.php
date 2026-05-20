@@ -79,6 +79,27 @@ PHP,
         @rmdir($binaryDir);
     }
 
+    public function testServeAotPopulatesRemoteAddrForLoopback(): void
+    {
+        $docroot = $this->makeDocroot([
+            'remote.php' => <<<'PHP'
+<?php
+declare(strict_types=1);
+header('Content-Type: text/plain; charset=UTF-8');
+echo $_SERVER['REMOTE_ADDR'], '|', $_SERVER['REMOTE_PORT'];
+PHP,
+        ]);
+        $binaryDir = sys_get_temp_dir().'/phpc_serve_aot_ra_'.bin2hex(random_bytes(4));
+        $this->assertTrue(mkdir($binaryDir));
+        $binary = $binaryDir.'/app';
+        $this->compileExample($docroot.'/remote.php', $binary);
+        $response = $this->httpGetAot($docroot, $binary, '/remote.php');
+        $this->assertStringContainsString('HTTP/1.1 200', $response);
+        $this->assertMatchesRegularExpression('#127\.0\.0\.1\|\d+#', $response);
+        @unlink($binary);
+        @rmdir($binaryDir);
+    }
+
     public function testServeAotPopulatesServerProtocol(): void
     {
         $docroot = $this->makeDocroot([
