@@ -36,6 +36,40 @@ final class DevServerHeadersTest extends TestCase
         $this->assertSame([], $vars);
     }
 
+    public function testResolveDirectoryIndexPrefersIndexPhp(): void
+    {
+        $dir = sys_get_temp_dir().'/phpc_devserver_idx_'.bin2hex(random_bytes(4));
+        mkdir($dir);
+        file_put_contents($dir.'/index.php', '<?php');
+        file_put_contents($dir.'/example.php', '<?php');
+
+        $this->assertSame('/index.php', DevServer::resolveDirectoryIndex($dir));
+
+        @unlink($dir.'/index.php');
+        $this->assertSame('/example.php', DevServer::resolveDirectoryIndex($dir));
+
+        @unlink($dir.'/example.php');
+        $this->assertSame('/index.php', DevServer::resolveDirectoryIndex($dir));
+
+        @rmdir($dir);
+    }
+
+    public function testResolveDirectoryIndexFromManifest(): void
+    {
+        $dir = sys_get_temp_dir().'/phpc_devserver_mf_'.bin2hex(random_bytes(4));
+        mkdir($dir.'/public', 0777, true);
+        file_put_contents($dir.'/public/index.php', '<?php');
+
+        $this->assertSame(
+            '/public/index.php',
+            DevServer::resolveDirectoryIndex($dir, ['index' => 'public/index.php'])
+        );
+
+        @unlink($dir.'/public/index.php');
+        @rmdir($dir.'/public');
+        @rmdir($dir);
+    }
+
     public function testContentLengthForRequestUsesBodySize(): void
     {
         $body = 'abcdefghijkl';
