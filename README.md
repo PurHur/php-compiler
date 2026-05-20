@@ -116,13 +116,20 @@ make test-docker
 docker run --rm -v "$(pwd):/compiler" -w /compiler php-compiler:22.04-dev ./script/ci-local.sh
 ```
 
-If the container runs out of memory while running the full suite (process exit code **137**), increase the limit (for example `docker run -m 8g`).
-
-If the bind-mount shows an empty `/compiler` directory (some harness setups), use:
+On **Runforge / harness** hosts (empty bind-mount at `/compiler`), use the canonical target instead — it falls back to copying the repo via tar when the mount has no `vendor/` or `script/ci-local.sh`:
 
 ```console
+make docker-build-22
+make test-harness
+# equivalent:
 ./script/docker-ci-local.sh
+# optional filter:
+make test-harness ARGS='--filter VMTest'
 ```
+
+When the bind-mount works normally, `make test-harness` is equivalent to `make test-docker`. See issue [#245](https://github.com/PurHur/php-compiler/issues/245) for the full local CI matrix; [#249](https://github.com/PurHur/php-compiler/issues/249) tracks deprecating 16.04 `make test` as the default.
+
+If the container runs out of memory while running the full suite (process exit code **137**), increase the limit (for example `docker run -m 8g`).
 
 On sandboxes that cannot bind TCP ports, set `PHP_COMPILER_SKIP_SERVE_TESTS=1` before running CI (GitHub Actions does this automatically).
 
@@ -270,6 +277,8 @@ Development targets a **web-capable PHP subset**: CGI/superglobals, stdlib for s
 The compiler still supports a limited language subset compared to Zend PHP; many builtins and constructs are VM-only or in progress. See the generated [builtin capability matrix](docs/capabilities.md) (VM / JIT / AOT per function).
 
 # Troubleshooting
+
+**Empty `/compiler` inside Docker (Runforge / harness)** — `docker run -v "$(pwd):/compiler" …` may show an empty tree even though the repo exists on the host. Symptoms: `make test-docker` fails with missing `vendor/` or `script/ci-local.sh`. Fix: `make test-harness` or `./script/docker-ci-local.sh` (tar-copies the tree into the container). Requires `docker info` and image `php-compiler:22.04-dev` (`make docker-build-22`).
 
 **`libLLVM-9.so.1: cannot open shared object file`** — Run `./script/install-llvm9.sh` or export `LD_LIBRARY_PATH` to include the repo `.llvm/` directory (as `script/ci-local.sh` does).
 

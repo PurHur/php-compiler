@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Run script/ci-local.sh inside the PHP 8.2 dev container (issues #202, #73).
+# Run script/ci-local.sh inside the PHP 8.2 dev container (issues #202, #73, #272).
 # Harness hosts where bind-mounts appear empty can pipe the repo via tar instead.
+# Preferred entrypoint on Runforge: make test-harness (same as this script).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 IMAGE="${PHP_COMPILER_DEV_IMAGE:-php-compiler:22.04-dev}"
