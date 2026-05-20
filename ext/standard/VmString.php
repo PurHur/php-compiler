@@ -119,6 +119,29 @@ final class VmString
         return $out;
     }
 
+    /** Decode a hex string to binary (PHP hex2bin subset; false on invalid input). */
+    public static function hex2bin(string $data): string|false
+    {
+        $len = self::byteLength($data);
+        if (0 === $len) {
+            return '';
+        }
+        if (0 !== ($len & 1)) {
+            return false;
+        }
+        $out = '';
+        for ($i = 0; $i < $len; $i += 2) {
+            $hi = self::hexDigit(self::byteOrd($data[$i]));
+            $lo = self::hexDigit(self::byteOrd($data[$i + 1]));
+            if (null === $hi || null === $lo) {
+                return false;
+            }
+            $out .= \chr(($hi << 4) | $lo);
+        }
+
+        return $out;
+    }
+
     /** application/x-www-form-urlencoded (space as '+'). */
     public static function urlencode(string $data): string
     {
