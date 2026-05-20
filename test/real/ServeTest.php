@@ -104,6 +104,32 @@ PHP,
     $this->assertStringContainsString('example.test|1', $response);
   }
 
+  public function testPopulatesServerProtocolFromRequestLine(): void
+  {
+    $docroot = $this->makeDocroot([
+      'proto.php' => <<<'PHP'
+<?php
+echo 'P:', $_SERVER['SERVER_PROTOCOL'];
+PHP,
+    ]);
+    $response = $this->httpGet($docroot, '/proto.php');
+    $this->assertStringContainsString('HTTP/1.1 200', $response);
+    $this->assertStringContainsString('P:HTTP/1.1', $response);
+  }
+
+  public function testPopulatesServerProtocolHttp10WhenRequestLineIs10(): void
+  {
+    $docroot = $this->makeDocroot([
+      'proto.php' => <<<'PHP'
+<?php
+echo 'P:', $_SERVER['SERVER_PROTOCOL'];
+PHP,
+    ]);
+    $response = $this->httpGet($docroot, '/proto.php', [], [], 'HTTP/1.0');
+    $this->assertStringContainsString('HTTP/1.1 200', $response);
+    $this->assertStringContainsString('P:HTTP/1.0', $response);
+  }
+
   public function testPopulatesDocumentRoot(): void
   {
     $docroot = $this->makeDocroot([
@@ -168,8 +194,13 @@ PHP,
    * @param array<string, string> $extraEnv
    * @param list<string>          $extraRequestHeaders
    */
-  private function httpGet(string $docroot, string $path, array $extraEnv = [], array $extraRequestHeaders = []): string
-  {
+  private function httpGet(
+      string $docroot,
+      string $path,
+      array $extraEnv = [],
+      array $extraRequestHeaders = [],
+      string $requestProtocol = 'HTTP/1.1'
+  ): string {
     $port = $this->findFreePort();
     $addr = "127.0.0.1:{$port}";
     $env = array_merge($this->baseEnv(), $extraEnv);
@@ -202,7 +233,7 @@ PHP,
     $this->assertIsResource($conn);
     $requestHeaders = array_merge(['Host: 127.0.0.1', 'Connection: close'], $extraRequestHeaders);
     $headerBlock = implode("\r\n", $requestHeaders);
-    fwrite($conn, "GET {$path} HTTP/1.1\r\n{$headerBlock}\r\n\r\n");
+    fwrite($conn, "GET {$path} {$requestProtocol}\r\n{$headerBlock}\r\n\r\n");
     $response = stream_get_contents($conn);
     fclose($conn);
 
@@ -263,9 +294,6 @@ PHP,
     return $response !== false ? $response : '';
   }
 
-  /**
-   * @param array<string, string> $files relative path => contents
-   */
   private function makeDocroot(array $files): string
   {
     $dir = sys_get_temp_dir().'/phpc_serve_'.bin2hex(random_bytes(4));

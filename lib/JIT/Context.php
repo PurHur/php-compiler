@@ -377,7 +377,10 @@ class Context {
     public function constantFromString(string $string): PHPLLVM\Value {
         if (!isset($this->stringConstant[$string])) {
             $const = $this->context->constString($string, true);
-            $global = $this->module->addGlobal($const->typeOf(), $string);
+            // Avoid LLVM symbol names that match POSIX/CGI env var names (e.g. SERVER_PROTOCOL)
+            // which break getenv() linkage in the AOT binary (issue #306).
+            $globalName = 'php_cstr_' . hash('sha256', $string);
+            $global = $this->module->addGlobal($const->typeOf(), $globalName);
             $global->setInitializer($const);
             $this->stringConstant[$string] = $global;
         }

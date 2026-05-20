@@ -247,6 +247,11 @@ final class Superglobals
         }
 
         self::setStringEntry($server, 'GATEWAY_INTERFACE', 'CGI/1.1');
+        $serverProtocol = getenv('SERVER_PROTOCOL');
+        if (false === $serverProtocol || '' === $serverProtocol) {
+            $serverProtocol = 'HTTP/1.1';
+        }
+        self::setStringEntry($server, 'SERVER_PROTOCOL', $serverProtocol);
         self::setStringEntry($server, 'SERVER_SOFTWARE', 'PHP-Compiler-VM');
 
         $documentRoot = getenv('DOCUMENT_ROOT');

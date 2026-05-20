@@ -79,6 +79,46 @@ PHP,
         @rmdir($binaryDir);
     }
 
+    public function testServeAotPopulatesServerProtocol(): void
+    {
+        $docroot = $this->makeDocroot([
+            'proto.php' => <<<'PHP'
+<?php
+declare(strict_types=1);
+echo 'P:', $_SERVER['SERVER_PROTOCOL'];
+PHP,
+        ]);
+        $binaryDir = sys_get_temp_dir().'/phpc_serve_aot_sp_'.bin2hex(random_bytes(4));
+        $this->assertTrue(mkdir($binaryDir));
+        $binary = $binaryDir.'/app';
+        $this->compileExample($docroot.'/proto.php', $binary);
+        $response = $this->httpGetAot($docroot, $binary, '/proto.php');
+        $this->assertStringContainsString('HTTP/1.1 200', $response);
+        $this->assertStringContainsString('P:HTTP/1.1', $response);
+        @unlink($binary);
+        @rmdir($binaryDir);
+    }
+
+    public function testServeAotPopulatesServerProtocolHttp10(): void
+    {
+        $docroot = $this->makeDocroot([
+            'proto.php' => <<<'PHP'
+<?php
+declare(strict_types=1);
+echo 'P:', $_SERVER['SERVER_PROTOCOL'];
+PHP,
+        ]);
+        $binaryDir = sys_get_temp_dir().'/phpc_serve_aot_sp10_'.bin2hex(random_bytes(4));
+        $this->assertTrue(mkdir($binaryDir));
+        $binary = $binaryDir.'/app';
+        $this->compileExample($docroot.'/proto.php', $binary);
+        $response = $this->httpGetAot($docroot, $binary, '/proto.php', 'HTTP/1.0');
+        $this->assertStringContainsString('HTTP/1.1 200', $response);
+        $this->assertStringContainsString('P:HTTP/1.0', $response);
+        @unlink($binary);
+        @rmdir($binaryDir);
+    }
+
     public function testServeAotPopulatesContentLengthOnPost(): void
     {
         $body = 'abcdefghijkl';
@@ -151,7 +191,12 @@ PHP,
         $this->assertFileExists($outfile, trim($err !== false ? $err : ''));
     }
 
-    private function httpGetAot(string $docroot, string $binary, string $path): string
+    private function httpGetAot(
+        string $docroot,
+        string $binary,
+        string $path,
+        string $requestProtocol = 'HTTP/1.1'
+    ): string
     {
         $port = $this->findFreePort();
         $addr = "127.0.0.1:{$port}";
@@ -186,7 +231,7 @@ PHP,
 
         $conn = fsockopen('127.0.0.1', $port);
         $this->assertIsResource($conn);
-        fwrite($conn, "GET {$path} HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n");
+        fwrite($conn, "GET {$path} {$requestProtocol}\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n");
         $response = stream_get_contents($conn);
         fclose($conn);
 

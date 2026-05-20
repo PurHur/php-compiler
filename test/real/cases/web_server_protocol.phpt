@@ -1,0 +1,12 @@
+--TEST--
+Web: SERVER_PROTOCOL from CGI env (issue #306)
+--ENV--
+REQUEST_METHOD=GET
+SCRIPT_NAME=/index.php
+REQUEST_URI=/index.php
+SERVER_PROTOCOL=HTTP/1.0
+--FILE--
+<?php
+echo $_SERVER['SERVER_PROTOCOL'];
+--EXPECT--
+HTTP/1.0

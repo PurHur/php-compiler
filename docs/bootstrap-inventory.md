@@ -1278,8 +1278,8 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new Scope (line 117)
 - new Result (line 209)
 - new Variable (line 285)
-- new Variable (line 495)
-- new Variable (line 527)
+- new Variable (line 498)
+- new Variable (line 530)
 - 32 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/HashTableHelper.php`
@@ -1342,8 +1342,8 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/JIT/SuperglobalInit.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 123)
-- new VMVariable (line 147)
+- new Variable (line 124)
+- new VMVariable (line 148)
 - 7 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/ValueEchoHelper.php`
@@ -1566,10 +1566,10 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/Web/Superglobals.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 479)
-- new Variable (line 480)
-- new Variable (line 499)
-- new Variable (line 574)
+- new HashTable (line 484)
+- new Variable (line 485)
+- new Variable (line 504)
+- new Variable (line 579)
 - 26 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 - 1 closure(s)
 
