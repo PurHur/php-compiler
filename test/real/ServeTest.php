@@ -249,6 +249,20 @@ PHP,
     $this->assertStringContainsString('12', $response);
   }
 
+  public function testPostFormUrlencoded(): void
+  {
+    $docroot = $this->makeDocroot([
+      'form.php' => <<<'PHP'
+<?php
+header('Content-Type: text/plain; charset=UTF-8');
+echo 'name=', $_POST['name'];
+PHP,
+    ]);
+    $response = $this->httpPost($docroot, '/form.php', 'name=Alice');
+    $this->assertStringContainsString('HTTP/1.1 200', $response);
+    $this->assertStringContainsString('name=Alice', $this->responseBody($response));
+  }
+
   /**
    * @param array<string, string> $extraEnv
    * @param list<string>          $extraRequestHeaders

@@ -162,6 +162,48 @@ PHP,
         @rmdir($binaryDir);
     }
 
+    public function testServeAotPostFormUrlencoded(): void
+    {
+        $docroot = $this->makeDocroot([
+            'form.php' => <<<'PHP'
+<?php
+declare(strict_types=1);
+header('Content-Type: text/plain; charset=UTF-8');
+echo 'name=', $_POST['name'];
+PHP,
+        ]);
+        $binaryDir = sys_get_temp_dir().'/phpc_serve_aot_post_'.bin2hex(random_bytes(4));
+        $this->assertTrue(mkdir($binaryDir));
+        $binary = $binaryDir.'/app';
+        $this->compileExample($docroot.'/form.php', $binary);
+        $response = $this->httpPostAot($docroot, $binary, '/form.php', 'name=Alice');
+        $this->assertStringContainsString('HTTP/1.1 200', $response);
+        $this->assertStringContainsString('name=Alice', $response);
+        @unlink($binary);
+        @rmdir($binaryDir);
+    }
+
+    public function testServeAotHttpResponseCode404SetsStatusLine(): void
+    {
+        $docroot = $this->makeDocroot([
+            'notfound.php' => <<<'PHP'
+<?php
+declare(strict_types=1);
+http_response_code(404);
+echo 'missing';
+PHP,
+        ]);
+        $binaryDir = sys_get_temp_dir().'/phpc_serve_aot_404_'.bin2hex(random_bytes(4));
+        $this->assertTrue(mkdir($binaryDir));
+        $binary = $binaryDir.'/app';
+        $this->compileExample($docroot.'/notfound.php', $binary);
+        $response = $this->httpGetAot($docroot, $binary, '/notfound.php');
+        $this->assertStringContainsString('HTTP/1.1 404', $response);
+        $this->assertStringContainsString('missing', $response);
+        @unlink($binary);
+        @rmdir($binaryDir);
+    }
+
     public function testServeAotHttpResponseCode405SetsStatusLine(): void
     {
         $docroot = $this->makeDocroot([

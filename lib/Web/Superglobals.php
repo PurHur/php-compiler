@@ -72,6 +72,7 @@ final class Superglobals
         );
         self::populateServer($context, $queryString, $postBody);
         self::populateRequest($context);
+        self::$activeContext = null;
     }
 
     /**

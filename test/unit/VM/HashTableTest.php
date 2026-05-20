@@ -143,6 +143,33 @@ class HashTableTest extends TestCase
         $this->assertNull($ht->findIndex(0));
     }
 
+    /** Regression: rehash must chain buckets (issue #248 POST / $_SERVER population). */
+    public function testAddManyStringKeysIncludingContentLength(): void
+    {
+        $ht = new HashTable();
+        $keys = [
+            'REQUEST_METHOD' => 'POST',
+            'QUERY_STRING' => '',
+            'SCRIPT_NAME' => '/index.php',
+            'PHP_SELF' => '/index.php',
+            'REQUEST_URI' => '/index.php',
+            'GATEWAY_INTERFACE' => 'CGI/1.1',
+            'SERVER_PROTOCOL' => 'HTTP/1.1',
+            'SERVER_SOFTWARE' => 'PHP-Compiler-VM',
+            'CONTENT_LENGTH' => '0',
+        ];
+        foreach ($keys as $name => $value) {
+            $var = new Variable(Variable::TYPE_STRING);
+            $var->string($value);
+            $this->assertNotNull($ht->add($name, $var), 'add failed for '.$name);
+        }
+        foreach ($keys as $name => $value) {
+            $found = $ht->find($name);
+            $this->assertNotNull($found, 'find failed for '.$name);
+            $this->assertSame($value, $found->resolveIndirect()->toString());
+        }
+    }
+
     private function int(int $value): Variable
     {
         $var = new Variable();
