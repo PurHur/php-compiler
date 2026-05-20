@@ -33,6 +33,8 @@ class String_ extends Type {
             static inline function __string__htmlspecialchars(__string__*): __string__*;
             static inline function __string__urlencode(__string__*): __string__*;
             static inline function __string__rawurlencode(__string__*): __string__*;
+            static inline function __string__urldecode(__string__*): __string__*;
+            static inline function __string__rawurldecode(__string__*): __string__*;
             static inline function __string__nl2br(__string__*, int8): __string__*;
         }
         $this->pointer = $this->context->getTypeFromString('__string__*');

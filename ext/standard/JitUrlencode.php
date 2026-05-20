@@ -24,4 +24,20 @@ final class JitUrlencode
             $strPtr
         );
     }
+
+    public static function urldecode(Context $context, Value $strPtr): Value
+    {
+        return $context->builder->call(
+            $context->lookupFunction('__string__urldecode'),
+            $strPtr
+        );
+    }
+
+    public static function rawurldecode(Context $context, Value $strPtr): Value
+    {
+        return $context->builder->call(
+            $context->lookupFunction('__string__rawurldecode'),
+            $strPtr
+        );
+    }
 }
