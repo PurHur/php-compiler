@@ -163,6 +163,24 @@ class String_ extends Type {
             $fn___rawurlencode->addAttributeAtIndex(\PHPLLVM\Attribute::INDEX_FUNCTION, $this->context->attributes['alwaysinline']);
             $this->context->registerFunction('__string__rawurlencode', $fn___rawurlencode);
 
+        $fntype___urldecode = $this->context->context->functionType(
+                $this->context->getTypeFromString('__string__*'),
+                false,
+                $this->context->getTypeFromString('__string__*')
+            );
+            $fn___urldecode = $this->context->module->addFunction('__string__urldecode', $fntype___urldecode);
+            $fn___urldecode->addAttributeAtIndex(\PHPLLVM\Attribute::INDEX_FUNCTION, $this->context->attributes['alwaysinline']);
+            $this->context->registerFunction('__string__urldecode', $fn___urldecode);
+
+        $fntype___rawurldecode = $this->context->context->functionType(
+                $this->context->getTypeFromString('__string__*'),
+                false,
+                $this->context->getTypeFromString('__string__*')
+            );
+            $fn___rawurldecode = $this->context->module->addFunction('__string__rawurldecode', $fntype___rawurldecode);
+            $fn___rawurldecode->addAttributeAtIndex(\PHPLLVM\Attribute::INDEX_FUNCTION, $this->context->attributes['alwaysinline']);
+            $this->context->registerFunction('__string__rawurldecode', $fn___rawurldecode);
+
         $fntype___nl2br = $this->context->context->functionType(
                 $this->context->getTypeFromString('__string__*'),
                 false,
@@ -185,6 +203,7 @@ class String_ extends Type {
         $this->implementStrlen();
         \PHPCompiler\JIT\Builtin\StringHtmlspecialchars::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringUrlencode::implement($this->context);
+        \PHPCompiler\JIT\Builtin\StringUrldecode::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringNl2br::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringRandomBytes::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringGetenv::implement($this->context);

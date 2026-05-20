@@ -109,6 +109,8 @@ class Module extends ModuleAbstract
             new http_response_code(),
             new urlencode(),
             new rawurlencode(),
+            new urldecode(),
+            new rawurldecode(),
             new parse_url(),
             new dirname(),
             new basename(),
