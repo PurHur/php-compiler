@@ -226,6 +226,18 @@ final class ArrayBuiltinHelper
     }
 
     /**
+     * Reverse a packed list array into a new packed array (array_reverse subset; matches VM reverseCopy).
+     */
+    public static function buildReverseArray(Context $context, Variable $array): Value
+    {
+        if (self::isNativeArray($array->type)) {
+            return self::buildReverseFromNativeArray($context, $array);
+        }
+
+        return self::buildReverseFromHashTable($context, self::loadHashTable($context, $array));
+    }
+
+    /**
      * Copy defined list elements into a new packed array (array_values subset).
      */
     public static function buildValuesArray(Context $context, Variable $array): Value
@@ -295,6 +307,126 @@ final class ArrayBuiltinHelper
         $context->builder->store(
             $context->builder->addNoSignedWrap($idx, $one),
             $idxSlot
+        );
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($emptyHt->typeOf());
+        $phi->addIncoming($emptyHt, $emptyBlock);
+        $phi->addIncoming($dest, $head);
+
+        return $phi;
+    }
+
+    private static function buildReverseFromNativeArray(Context $context, Variable $array): Value
+    {
+        $elemType = $array->type & ~Variable::IS_NATIVE_ARRAY;
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $count = $context->constantFromInteger($array->nextFreeElement, 'size_t');
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $count, $zero);
+        $emptyBlock = BasicBlockHelper::append($context, 'array_reverse_native_empty');
+        $workBlock = BasicBlockHelper::append($context, 'array_reverse_native_work');
+        $doneBlock = BasicBlockHelper::append($context, 'array_reverse_native_done');
+        $context->builder->branchIf($isEmpty, $emptyBlock, $workBlock);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        $emptyHt = HashTableHelper::alloc($context);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($workBlock);
+        $dest = HashTableHelper::alloc($context);
+        $destIdxSlot = $context->builder->alloca($sizeT, 1, 'array_reverse_native_dest');
+        $context->builder->store($zero, $destIdxSlot);
+
+        $head = BasicBlockHelper::append($context, 'array_reverse_native_head');
+        $body = BasicBlockHelper::append($context, 'array_reverse_native_body');
+        $advance = BasicBlockHelper::append($context, 'array_reverse_native_advance');
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $destIdx = $context->builder->load($destIdxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $destIdx, $count);
+        $context->builder->branchIf($atEnd, $doneBlock, $body);
+
+        $context->builder->positionAtEnd($body);
+        $lastIdx = $context->builder->sub($count, $one);
+        $srcIdx = $context->builder->sub($lastIdx, $destIdx);
+        $slot = $context->builder->inBoundsGep($array->value, $zero, $srcIdx);
+        if (Variable::TYPE_STRING === $elemType) {
+            $elem = new Variable($context, $elemType, Variable::KIND_VARIABLE, $slot);
+        } else {
+            $elem = new Variable(
+                $context,
+                $elemType,
+                Variable::KIND_VALUE,
+                $context->builder->load($slot)
+            );
+        }
+        $writeIdx = $context->builder->load($destIdxSlot);
+        HashTableHelper::setAtIndex($context, $dest, $writeIdx, $elem);
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($advance);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($destIdx, $one),
+            $destIdxSlot
+        );
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($emptyHt->typeOf());
+        $phi->addIncoming($emptyHt, $emptyBlock);
+        $phi->addIncoming($dest, $head);
+
+        return $phi;
+    }
+
+    private static function buildReverseFromHashTable(Context $context, Value $src): Value
+    {
+        $map = $context->structFieldMap['__hashtable__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $nextFree = $context->builder->load(
+            $context->builder->structGep($src, $map['nextFreeElement'])
+        );
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $nextFree, $zero);
+        $emptyBlock = BasicBlockHelper::append($context, 'array_reverse_empty');
+        $workBlock = BasicBlockHelper::append($context, 'array_reverse_work');
+        $doneBlock = BasicBlockHelper::append($context, 'array_reverse_done');
+        $context->builder->branchIf($isEmpty, $emptyBlock, $workBlock);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        $emptyHt = HashTableHelper::alloc($context);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($workBlock);
+        $dest = HashTableHelper::alloc($context);
+        $destIdxSlot = $context->builder->alloca($sizeT, 1, 'array_reverse_dest');
+        $context->builder->store($zero, $destIdxSlot);
+
+        $head = BasicBlockHelper::append($context, 'array_reverse_head');
+        $body = BasicBlockHelper::append($context, 'array_reverse_body');
+        $advance = BasicBlockHelper::append($context, 'array_reverse_advance');
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $destIdx = $context->builder->load($destIdxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $destIdx, $nextFree);
+        $context->builder->branchIf($atEnd, $doneBlock, $body);
+
+        $context->builder->positionAtEnd($body);
+        $lastIdx = $context->builder->sub($nextFree, $one);
+        $srcIdx = $context->builder->sub($lastIdx, $destIdx);
+        self::copyListEntry($context, $src, $srcIdx, $dest, $destIdx);
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($advance);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($destIdx, $one),
+            $destIdxSlot
         );
         $context->builder->branch($head);
 
