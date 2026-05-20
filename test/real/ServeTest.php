@@ -88,6 +88,21 @@ PHP,
     $this->assertStringContainsString('missing', $response);
   }
 
+  public function testHttpResponseCode405SetsStatusLine(): void
+  {
+    $docroot = $this->makeDocroot([
+      'method.php' => <<<'PHP'
+<?php
+http_response_code(405);
+echo 'Nope';
+PHP,
+    ]);
+    $response = $this->httpGet($docroot, '/method.php');
+    $this->assertStringContainsString('HTTP/1.1 405', $response);
+    $this->assertStringContainsString('Method Not Allowed', $response);
+    $this->assertStringContainsString('Nope', $response);
+  }
+
   public function testPopulatesHttpServerHeaders(): void
   {
     $docroot = $this->makeDocroot([
