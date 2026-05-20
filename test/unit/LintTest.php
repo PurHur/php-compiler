@@ -68,6 +68,22 @@ PHP;
         $this->assertStringContainsString('Expr_PostInc', $exit['stdout']);
     }
 
+    public function testLintShortListDestructuringReportsIssue139(): void
+    {
+        $exit = $this->runLint(['-r', '[$a,$b]=["x","y"];']);
+        $this->assertSame(1, $exit['code']);
+        $this->assertStringContainsString('#139', $exit['stdout']);
+        $this->assertStringContainsString('Expr_List', $exit['stdout']);
+    }
+
+    public function testLintListFunctionDestructuringReportsIssue139(): void
+    {
+        $exit = $this->runLint(['-r', 'list($a,$b)=array(1,2);']);
+        $this->assertSame(1, $exit['code']);
+        $this->assertStringContainsString('#139', $exit['stdout']);
+        $this->assertStringContainsString('Expr_List', $exit['stdout']);
+    }
+
     public function testLintCleanScriptExitsZero(): void
     {
         $code = '<?php echo "ok";';

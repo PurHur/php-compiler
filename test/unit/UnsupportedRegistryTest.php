@@ -9,6 +9,7 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * @see https://github.com/PurHur/php-compiler/issues/258
+ * @see https://github.com/PurHur/php-compiler/issues/297
  */
 final class UnsupportedRegistryTest extends TestCase
 {
@@ -33,6 +34,7 @@ final class UnsupportedRegistryTest extends TestCase
             'post inc' => ['Expr_PostInc', 137],
             'pre dec' => ['Expr_PreDec', 137],
             'post dec' => ['Expr_PostDec', 137],
+            'list destructuring' => ['Expr_List', 139],
         ];
     }
 
