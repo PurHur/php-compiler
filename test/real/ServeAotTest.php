@@ -266,6 +266,33 @@ PHP,
         @rmdir($binaryDir);
     }
 
+    /**
+     * Shipped 001-SimpleWeb: static assets from docroot while PHP is served via AOT binary.
+     *
+     * @see https://github.com/PurHur/php-compiler/issues/277
+     */
+    public function testServeAot001SimpleWebStaticCss(): void
+    {
+        $docroot = $this->repoRoot.'/examples/001-SimpleWeb';
+        $cssPath = $docroot.'/style.css';
+        $this->assertFileExists($cssPath);
+        $expected = (string) file_get_contents($cssPath);
+        $this->assertNotSame('', $expected);
+
+        $binaryDir = sys_get_temp_dir().'/phpc_serve_aot_css_'.bin2hex(random_bytes(4));
+        $this->assertTrue(mkdir($binaryDir));
+        $binary = $binaryDir.'/app';
+
+        $this->compileExample($docroot.'/example.php', $binary);
+        $response = $this->httpGetAot($docroot, $binary, '/style.css');
+        $this->assertStringContainsString('HTTP/1.1 200', $response);
+        $this->assertStringContainsString('Content-Type: text/css', $response);
+        $this->assertStringContainsString('font-family: system-ui', $response);
+
+        @unlink($binary);
+        @rmdir($binaryDir);
+    }
+
     private function compileExample(string $source, string $outfile): void
     {
         $descriptorSpec = [
