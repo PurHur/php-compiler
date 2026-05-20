@@ -162,6 +162,28 @@ PHP,
         @rmdir($binaryDir);
     }
 
+    public function testServeAotHttpResponseCode405SetsStatusLine(): void
+    {
+        $docroot = $this->makeDocroot([
+            'method.php' => <<<'PHP'
+<?php
+declare(strict_types=1);
+http_response_code(405);
+echo 'Nope';
+PHP,
+        ]);
+        $binaryDir = sys_get_temp_dir().'/phpc_serve_aot_405_'.bin2hex(random_bytes(4));
+        $this->assertTrue(mkdir($binaryDir));
+        $binary = $binaryDir.'/app';
+        $this->compileExample($docroot.'/method.php', $binary);
+        $response = $this->httpGetAot($docroot, $binary, '/method.php');
+        $this->assertStringContainsString('HTTP/1.1 405', $response);
+        $this->assertStringContainsString('Method Not Allowed', $response);
+        $this->assertStringContainsString('Nope', $response);
+        @unlink($binary);
+        @rmdir($binaryDir);
+    }
+
     public function testServeAot001SimpleWeb(): void
     {
         $docroot = $this->repoRoot.'/examples/001-SimpleWeb';
