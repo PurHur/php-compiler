@@ -115,6 +115,7 @@ class Module extends ModuleAbstract
             new dirname(),
             new basename(),
             new realpath(),
+            new file_get_contents(),
             new getenv_(),
             new putenv_(),
             new scandir(),
