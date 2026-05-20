@@ -66,6 +66,7 @@
         "ext/standard/VmExit.php",
         "ext/standard/VmFs.php",
         "ext/standard/VmHash.php",
+        "ext/standard/VmInternalCall.php",
         "ext/standard/VmJson.php",
         "ext/standard/VmNumberFormat.php",
         "ext/standard/VmScope.php",
@@ -75,9 +76,11 @@
         "ext/standard/array_combine.php",
         "ext/standard/array_count.php",
         "ext/standard/array_fill.php",
+        "ext/standard/array_filter.php",
         "ext/standard/array_flip.php",
         "ext/standard/array_key_exists.php",
         "ext/standard/array_keys.php",
+        "ext/standard/array_map.php",
         "ext/standard/array_merge.php",
         "ext/standard/array_pop.php",
         "ext/standard/array_product.php",
@@ -283,6 +286,7 @@
         "lib/VM/Optimizer/AssignOp.php",
         "lib/VM/Refcount.php",
         "lib/VM/ScriptExit.php",
+        "lib/VM/TypeCheck.php",
         "lib/VM/Variable.php",
         "lib/Web/DevServer.php",
         "lib/Web/ManifestValidator.php",
@@ -301,9 +305,9 @@
         "test/bootstrap-aot/echo_hello.php"
     ],
     "totals": {
-        "inventory_files": 267,
+        "inventory_files": 271,
         "excluded": 2,
-        "eligible": 265,
+        "eligible": 269,
         "aot_lint_targets": 2
     }
 }

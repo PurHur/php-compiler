@@ -9,6 +9,7 @@
 
 namespace PHPCompiler;
 
+use PHPCompiler\VM\Context;
 use PHPCompiler\VM\Variable;
 
 class Frame {
@@ -28,6 +29,9 @@ class Frame {
 
     /** When true, finishing this frame resumes the caller instead of ending execution. */
     public bool $ephemeral = false;
+
+    /** VM context for nested builtin calls (set when invoking Internal handlers). */
+    public ?Context $vmContext = null;
 
     public function __construct(?Handler $handler, ?Block $block, ?Frame $parent, Variable ...$scope) {
         $this->handler = $handler;

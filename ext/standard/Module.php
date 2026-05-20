@@ -99,6 +99,8 @@ class Module extends ModuleAbstract
             new array_unique(),
             new array_fill(),
             new array_combine(),
+            new array_map(),
+            new array_filter(),
             new range(),
             new bin2hex(),
             new hex2bin(),

@@ -1,0 +1,94 @@
+<?php
+
+declare(strict_types=1);
+
+/**
+ * This file is part of PHP-Compiler, a PHP CFG Compiler for PHP code
+ *
+ * @copyright 2015 Anthony Ferrara. All rights reserved
+ * @license MIT See LICENSE at the root of the project for more info
+ */
+
+namespace PHPCompiler\ext\standard;
+
+use PHPCompiler\Frame;
+use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\Variable;
+use PHPLLVM\Value;
+
+/**
+ * array_map() for list arrays with null or string builtin callbacks (subset of PHP; VM only).
+ */
+final class array_map extends Internal
+{
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \LogicException('array_map() requires exactly two arguments in this compiler build');
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $callback = $frame->calledArgs[0]->resolveIndirect();
+        $array = $frame->calledArgs[1]->resolveIndirect();
+        if (Variable::TYPE_ARRAY !== $array->type) {
+            throw new \LogicException('array_map() second argument must be an array in this compiler build');
+        }
+        $src = $array->toArray();
+        $out = new HashTable();
+        if (Variable::TYPE_NULL === $callback->type) {
+            self::copyKeyed($src, $out);
+            $frame->returnVar->array($out);
+
+            return;
+        }
+        if (Variable::TYPE_STRING !== $callback->type) {
+            throw new \LogicException(
+                'array_map() callback must be null or a string builtin name in this compiler build'
+            );
+        }
+        $fn = VmInternalCall::resolveStringCallback($callback->toString());
+        foreach ($src->iterateKeyed(true) as [$key, $value]) {
+            $mapped = VmInternalCall::invoke($fn, $value);
+            self::appendKeyed($out, $key, $mapped);
+        }
+        $frame->returnVar->array($out);
+    }
+
+    public Context $context;
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException('array_map() is not implemented for JIT in this compiler build');
+    }
+
+    private static function copyKeyed(HashTable $src, HashTable $out): void
+    {
+        foreach ($src->iterateKeyed(true) as [$key, $value]) {
+            $copy = new Variable();
+            $copy->copyFrom($value);
+            self::appendKeyed($out, $key, $copy);
+        }
+    }
+
+    public static function appendKeyedCopy(HashTable $out, Variable $key, Variable $value): void
+    {
+        $copy = new Variable();
+        $copy->copyFrom($value);
+        self::appendKeyed($out, $key, $copy);
+    }
+
+    private static function appendKeyed(HashTable $out, Variable $key, Variable $value): void
+    {
+        if ($key->type === Variable::TYPE_INTEGER) {
+            $out->append($value);
+
+            return;
+        }
+        $out->add($key->toString(), $value);
+    }
+}
