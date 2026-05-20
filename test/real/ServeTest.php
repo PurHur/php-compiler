@@ -263,6 +263,47 @@ PHP,
     $this->assertStringContainsString('name=Alice', $this->responseBody($response));
   }
 
+  public function testPutJsonBody(): void
+  {
+    $docroot = $this->makeDocroot([
+      'api.php' => <<<'PHP'
+<?php
+header('Content-Type: text/plain; charset=UTF-8');
+echo file_get_contents('php://input');
+PHP,
+    ]);
+    $body = '{"id":7}';
+    $response = $this->httpRequest(
+      $docroot,
+      'PUT',
+      '/api.php',
+      $body,
+      ['Content-Type: application/json']
+    );
+    $this->assertStringContainsString('HTTP/1.1 200', $response);
+    $this->assertStringContainsString('{"id":7}', $this->responseBody($response));
+  }
+
+  public function testPutFormUrlencoded(): void
+  {
+    $docroot = $this->makeDocroot([
+      'form.php' => <<<'PHP'
+<?php
+header('Content-Type: text/plain; charset=UTF-8');
+echo 'name=', $_POST['name'];
+PHP,
+    ]);
+    $response = $this->httpRequest(
+      $docroot,
+      'PUT',
+      '/form.php',
+      'name=Patch',
+      ['Content-Type: application/x-www-form-urlencoded']
+    );
+    $this->assertStringContainsString('HTTP/1.1 200', $response);
+    $this->assertStringContainsString('name=Patch', $this->responseBody($response));
+  }
+
   public function testPathInfoFrontControllerDispatch(): void
   {
     $docroot = $this->makeDocroot([
@@ -350,6 +391,28 @@ PHP,
 
   private function httpPost(string $docroot, string $path, string $body, array $extraEnv = []): string
   {
+    return $this->httpRequest(
+      $docroot,
+      'POST',
+      $path,
+      $body,
+      ['Content-Type: application/x-www-form-urlencoded'],
+      $extraEnv
+    );
+  }
+
+  /**
+   * @param list<string>         $extraRequestHeaders
+   * @param array<string,string> $extraEnv
+   */
+  private function httpRequest(
+      string $docroot,
+      string $method,
+      string $path,
+      string $body,
+      array $extraRequestHeaders = [],
+      array $extraEnv = []
+  ): string {
     $port = $this->findFreePort();
     $addr = "127.0.0.1:{$port}";
     $env = array_merge($this->baseEnv(), $extraEnv);
@@ -381,13 +444,15 @@ PHP,
     $conn = fsockopen('127.0.0.1', $port);
     $this->assertIsResource($conn);
     $len = strlen($body);
+    $headers = array_merge(
+      ['Host: 127.0.0.1', "Content-Length: {$len}", 'Connection: close'],
+      $extraRequestHeaders
+    );
+    $headerBlock = implode("\r\n", $headers);
     fwrite(
       $conn,
-      "POST {$path} HTTP/1.1\r\n"
-      ."Host: 127.0.0.1\r\n"
-      ."Content-Type: application/x-www-form-urlencoded\r\n"
-      ."Content-Length: {$len}\r\n"
-      ."Connection: close\r\n\r\n"
+      "{$method} {$path} HTTP/1.1\r\n"
+      ."{$headerBlock}\r\n\r\n"
       .$body
     );
     $response = stream_get_contents($conn);
