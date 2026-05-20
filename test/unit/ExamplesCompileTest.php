@@ -13,6 +13,7 @@ use PHPUnit\Framework\TestCase;
  * @see https://github.com/PurHur/php-compiler/issues/243 (structured phpc lint per shipped example)
  * @see https://github.com/PurHur/php-compiler/issues/282 (002-StaticWeb via ./phpc build)
  * @see https://github.com/PurHur/php-compiler/issues/309 (001-SimpleWeb AOT execute + QUERY_STRING refresh in this gate)
+ * @see https://github.com/PurHur/php-compiler/issues/274 (minimal phpc.json beside web examples)
  */
 final class ExamplesCompileTest extends TestCase
 {
@@ -69,6 +70,39 @@ final class ExamplesCompileTest extends TestCase
         $this->assertIsArray($decoded);
         $this->assertArrayHasKey('issues', $decoded);
         $this->assertSame([], $decoded['issues']);
+    }
+
+    /**
+     * @return array<string, array{0: string}>
+     */
+    public static function provideWebExampleManifestDirs(): array
+    {
+        $root = dirname(__DIR__, 2).'/examples';
+
+        return [
+            '001-SimpleWeb' => [$root.'/001-SimpleWeb'],
+            '002-StaticWeb' => [$root.'/002-StaticWeb'],
+        ];
+    }
+
+    /**
+     * @dataProvider provideWebExampleManifestDirs
+     *
+     * @see https://github.com/PurHur/php-compiler/issues/274
+     */
+    public function testWebExamplePhpcJsonEntryExists(string $exampleDir): void
+    {
+        $manifestPath = $exampleDir.'/phpc.json';
+        $this->assertFileExists($manifestPath);
+        $decoded = json_decode((string) file_get_contents($manifestPath), true);
+        $this->assertIsArray($decoded);
+        $this->assertArrayHasKey('entry', $decoded);
+        $this->assertArrayHasKey('binary', $decoded);
+        $this->assertIsString($decoded['entry']);
+        $this->assertSame('example.php', $decoded['entry']);
+        $this->assertSame('.phpc/bin/app', $decoded['binary']);
+        $entryPath = $exampleDir.'/'.$decoded['entry'];
+        $this->assertFileExists($entryPath, 'phpc.json entry must exist: '.$entryPath);
     }
 
     public function testPhpcLintDelegatesViaPhpc(): void
