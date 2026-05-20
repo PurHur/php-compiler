@@ -721,6 +721,30 @@ final class VmString
         return $ch.self::byteSlice($string, 1);
     }
 
+    /** ucwords() for byte strings — uppercase first letter after default whitespace (TRIM_DEFAULT). */
+    public static function asciiUcwords(string $string): string
+    {
+        if ('' === $string) {
+            return '';
+        }
+        $len = self::byteLength($string);
+        $out = '';
+        $atWordStart = true;
+        for ($i = 0; $i < $len; ++$i) {
+            $ch = $string[$i];
+            if ($atWordStart) {
+                $ord = self::byteOrd($ch);
+                if ($ord >= 97 && $ord <= 122) {
+                    $ch = self::byteChr($ord - 32);
+                }
+            }
+            $out .= $ch;
+            $atWordStart = self::isTagWhitespace($ch);
+        }
+
+        return $out;
+    }
+
     public static function strReplace(string $search, string $replace, string $subject): string
     {
         if ('' === $search) {

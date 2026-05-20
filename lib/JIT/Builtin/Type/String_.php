@@ -191,6 +191,15 @@ class String_ extends Type {
             $fn___nl2br->addAttributeAtIndex(\PHPLLVM\Attribute::INDEX_FUNCTION, $this->context->attributes['alwaysinline']);
             $this->context->registerFunction('__string__nl2br', $fn___nl2br);
 
+        $fntype___ucwords = $this->context->context->functionType(
+                $this->context->getTypeFromString('__string__*'),
+                false,
+                $this->context->getTypeFromString('__string__*')
+            );
+            $fn___ucwords = $this->context->module->addFunction('__string__ucwords', $fntype___ucwords);
+            $fn___ucwords->addAttributeAtIndex(\PHPLLVM\Attribute::INDEX_FUNCTION, $this->context->attributes['alwaysinline']);
+            $this->context->registerFunction('__string__ucwords', $fn___ucwords);
+
         $this->pointer = $this->context->getTypeFromString('__string__*');
     }
 
@@ -205,6 +214,7 @@ class String_ extends Type {
         \PHPCompiler\JIT\Builtin\StringUrlencode::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringUrldecode::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringNl2br::implement($this->context);
+        \PHPCompiler\JIT\Builtin\StringUcwords::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringRandomBytes::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringGetenv::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringDateTime::implement($this->context);

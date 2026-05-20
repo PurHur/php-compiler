@@ -8,9 +8,9 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 232 |
+| PHP files on vm.php path | 234 |
 | Source constructs flagged (blockers) | 10 |
-| Source constructs flagged (warnings) | 615 |
+| Source constructs flagged (warnings) | 618 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -58,7 +58,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/JitStripTags.php` | 0 | 1 |
 | `ext/standard/JitStrpos.php` | 0 | 1 |
 | `ext/standard/JitUrlencode.php` | 0 | 1 |
-| `ext/standard/Module.php` | 0 | 106 |
+| `ext/standard/Module.php` | 0 | 107 |
 | `ext/standard/VmDate.php` | 0 | 1 |
 | `ext/standard/VmExit.php` | 0 | 2 |
 | `ext/standard/VmFs.php` | 0 | 3 |
@@ -166,6 +166,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/tan.php` | 0 | 1 |
 | `ext/standard/time.php` | 0 | 1 |
 | `ext/standard/ucfirst.php` | 0 | 1 |
+| `ext/standard/ucwords.php` | 0 | 1 |
 | `ext/standard/urldecode.php` | 0 | 1 |
 | `ext/standard/urlencode.php` | 0 | 1 |
 | `ext/types/Module.php` | 0 | 13 |
@@ -201,6 +202,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `lib/JIT/Builtin/StringHtmlspecialchars.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringNl2br.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringRandomBytes.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringUcwords.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringUrldecode.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringUrlencode.php` | 0 | 1 |
 | `lib/JIT/Builtin/Type.php` | 0 | 4 |
@@ -434,70 +436,71 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new is_scalar (line 60)
 - new lcfirst (line 61)
 - new ucfirst (line 62)
-- new strtolower (line 63)
-- new strtoupper (line 64)
-- new string_trim (line 65)
-- new string_ltrim (line 66)
-- new string_rtrim (line 67)
-- new substr (line 68)
-- new strrev (line 69)
-- new strpos (line 70)
-- new str_contains (line 71)
-- new str_starts_with (line 72)
-- new str_ends_with (line 73)
-- new strncmp (line 74)
-- new array_count (line 75)
+- new ucwords (line 63)
+- new strtolower (line 64)
+- new strtoupper (line 65)
+- new string_trim (line 66)
+- new string_ltrim (line 67)
+- new string_rtrim (line 68)
+- new substr (line 69)
+- new strrev (line 70)
+- new strpos (line 71)
+- new str_contains (line 72)
+- new str_starts_with (line 73)
+- new str_ends_with (line 74)
+- new strncmp (line 75)
 - new array_count (line 76)
-- new array_key_exists (line 77)
-- new in_array (line 78)
-- new array_push (line 79)
-- new array_pop (line 80)
-- new array_shift (line 81)
-- new sort_ (line 82)
-- new array_values (line 83)
-- new array_keys (line 84)
-- new array_merge (line 85)
-- new array_slice (line 86)
-- new explode (line 87)
-- new implode (line 88)
-- new str_replace (line 89)
-- new nl2br (line 90)
-- new array_reverse (line 91)
-- new array_search (line 92)
-- new array_sum (line 93)
-- new array_flip (line 94)
-- new array_unique (line 95)
-- new array_fill (line 96)
-- new array_combine (line 97)
-- new range (line 98)
-- new bin2hex (line 99)
-- new hex2bin (line 100)
-- new random_bytes (line 101)
-- new str_pad (line 102)
-- new str_split (line 103)
-- new htmlspecialchars (line 104)
-- new strip_tags (line 105)
-- new header_ (line 106)
-- new header_remove (line 107)
-- new header_list (line 108)
-- new getallheaders_ (line 109)
-- new http_response_code (line 110)
-- new urlencode (line 111)
-- new rawurlencode (line 112)
-- new urldecode (line 113)
-- new rawurldecode (line 114)
-- new parse_url (line 115)
-- new dirname (line 116)
-- new basename (line 117)
-- new realpath (line 118)
-- new file_get_contents (line 119)
-- new getenv_ (line 120)
-- new putenv_ (line 121)
-- new scandir (line 122)
-- new glob_ (line 123)
-- new time (line 124)
-- new date (line 125)
-- new gmdate (line 126)
+- new array_count (line 77)
+- new array_key_exists (line 78)
+- new in_array (line 79)
+- new array_push (line 80)
+- new array_pop (line 81)
+- new array_shift (line 82)
+- new sort_ (line 83)
+- new array_values (line 84)
+- new array_keys (line 85)
+- new array_merge (line 86)
+- new array_slice (line 87)
+- new explode (line 88)
+- new implode (line 89)
+- new str_replace (line 90)
+- new nl2br (line 91)
+- new array_reverse (line 92)
+- new array_search (line 93)
+- new array_sum (line 94)
+- new array_flip (line 95)
+- new array_unique (line 96)
+- new array_fill (line 97)
+- new array_combine (line 98)
+- new range (line 99)
+- new bin2hex (line 100)
+- new hex2bin (line 101)
+- new random_bytes (line 102)
+- new str_pad (line 103)
+- new str_split (line 104)
+- new htmlspecialchars (line 105)
+- new strip_tags (line 106)
+- new header_ (line 107)
+- new header_remove (line 108)
+- new header_list (line 109)
+- new getallheaders_ (line 110)
+- new http_response_code (line 111)
+- new urlencode (line 112)
+- new rawurlencode (line 113)
+- new urldecode (line 114)
+- new rawurldecode (line 115)
+- new parse_url (line 116)
+- new dirname (line 117)
+- new basename (line 118)
+- new realpath (line 119)
+- new file_get_contents (line 120)
+- new getenv_ (line 121)
+- new putenv_ (line 122)
+- new scandir (line 123)
+- new glob_ (line 124)
+- new time (line 125)
+- new date (line 126)
+- new gmdate (line 127)
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/VmDate.php`
@@ -528,7 +531,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 **Warnings** (review for bootstrap subset):
 - new Exception (line 182)
 - new Exception (line 190)
-- 51 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 52 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 - 1 closure(s)
 
 ### `ext/standard/abs.php`
@@ -1065,6 +1068,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 **Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `ext/standard/ucwords.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `ext/standard/urldecode.php`
 
 **Warnings** (review for bootstrap subset):
@@ -1363,6 +1371,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/JIT/Builtin/StringUcwords.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Builtin/StringUrldecode.php`
 
