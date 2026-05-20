@@ -32,7 +32,11 @@ function run(string $filename, string $code, array $options): void
     );
     $block = $runtime->parseAndCompile($code, $filename);
     if (! isset($options['-l'])) {
-        $runtime->run($block);
+        try {
+            $runtime->run($block);
+        } catch (PHPCompiler\VM\ScriptExit $e) {
+            exit($e->status);
+        }
     }
 }
 

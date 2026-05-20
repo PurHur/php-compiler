@@ -163,6 +163,13 @@ restart:
                         $frame
                     );
                     goto restart;
+                case OpCode::TYPE_EXIT:
+                    $exitArg = null;
+                    if (null !== $op->arg2) {
+                        $exitArg = $frame->scope[$op->arg2];
+                    }
+                    ext\standard\VmExit::terminate($exitArg);
+                    break;
                 case OpCode::TYPE_JUMP:
                     $frame = $op->block1->getFrame(
                         $this->context,

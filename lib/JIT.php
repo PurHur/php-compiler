@@ -428,6 +428,18 @@ class JIT {
                         );
                     }
                     break;
+                case OpCode::TYPE_EXIT:
+                    if (null === $op->arg2) {
+                        $i32 = $this->context->getTypeFromString('int32');
+                        $this->context->builder->call(
+                            $this->context->lookupFunction('exit'),
+                            $i32->constInt(0, false)
+                        );
+                        break;
+                    }
+                    $exitArg = $this->context->getVariableFromOp($block->getOperand($op->arg2));
+                    JIT\Builtin\ScriptExit::emit($this->context, $exitArg);
+                    break;
                 case OpCode::TYPE_POW:
                     $pow = new \PHPCompiler\ext\standard\pow();
                     $powResult = $pow->call(
