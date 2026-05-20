@@ -8,9 +8,9 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 215 |
+| PHP files on vm.php path | 222 |
 | Source constructs flagged (blockers) | 10 |
-| Source constructs flagged (warnings) | 575 |
+| Source constructs flagged (warnings) | 585 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -34,6 +34,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 |------|----------|----------|
 | `bin/vm.php` | 0 | 1 |
 | `ext/standard/JitBin2hex.php` | 0 | 1 |
+| `ext/standard/JitDate.php` | 0 | 1 |
 | `ext/standard/JitEnv.php` | 0 | 1 |
 | `ext/standard/JitExplode.php` | 0 | 1 |
 | `ext/standard/JitHeader.php` | 0 | 1 |
@@ -54,7 +55,8 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/JitStripTags.php` | 0 | 1 |
 | `ext/standard/JitStrpos.php` | 0 | 1 |
 | `ext/standard/JitUrlencode.php` | 0 | 1 |
-| `ext/standard/Module.php` | 0 | 99 |
+| `ext/standard/Module.php` | 0 | 102 |
+| `ext/standard/VmDate.php` | 0 | 1 |
 | `ext/standard/VmExit.php` | 0 | 2 |
 | `ext/standard/VmFs.php` | 0 | 3 |
 | `ext/standard/VmNumberFormat.php` | 0 | 1 |
@@ -83,6 +85,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/ceil.php` | 0 | 1 |
 | `ext/standard/chr.php` | 0 | 1 |
 | `ext/standard/cos.php` | 0 | 1 |
+| `ext/standard/date.php` | 0 | 1 |
 | `ext/standard/decbin.php` | 0 | 1 |
 | `ext/standard/dechex.php` | 0 | 1 |
 | `ext/standard/decoct.php` | 0 | 1 |
@@ -97,6 +100,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/getenv_.php` | 0 | 1 |
 | `ext/standard/gettype.php` | 0 | 1 |
 | `ext/standard/glob_.php` | 0 | 1 |
+| `ext/standard/gmdate.php` | 0 | 1 |
 | `ext/standard/header_.php` | 0 | 1 |
 | `ext/standard/header_list.php` | 0 | 1 |
 | `ext/standard/header_remove.php` | 0 | 1 |
@@ -154,6 +158,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/strval.php` | 0 | 1 |
 | `ext/standard/substr.php` | 0 | 1 |
 | `ext/standard/tan.php` | 0 | 1 |
+| `ext/standard/time.php` | 0 | 1 |
 | `ext/standard/ucfirst.php` | 0 | 1 |
 | `ext/standard/urlencode.php` | 0 | 1 |
 | `ext/types/Module.php` | 0 | 13 |
@@ -162,6 +167,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/types/strlen.php` | 0 | 1 |
 | `lib/AOT/Linker.php` | 8 | 1 |
 | `lib/Block.php` | 0 | 4 |
+| `lib/Cli/PhpcInit.php` | 0 | 1 |
 | `lib/Compiler.php` | 0 | 68 |
 | `lib/Frame.php` | 0 | 1 |
 | `lib/Func.php` | 0 | 1 |
@@ -183,6 +189,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `lib/JIT/Builtin/Output.php` | 0 | 1 |
 | `lib/JIT/Builtin/Refcount.php` | 0 | 1 |
 | `lib/JIT/Builtin/ScriptExit.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringDateTime.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringGetenv.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringHtmlspecialchars.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringNl2br.php` | 0 | 1 |
@@ -252,6 +259,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/JitDate.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/JitEnv.php`
 
@@ -454,7 +466,15 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new putenv_ (line 117)
 - new scandir (line 118)
 - new glob_ (line 119)
+- new time (line 120)
+- new date (line 121)
+- new gmdate (line 122)
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/VmDate.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/VmExit.php`
 
@@ -612,6 +632,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 **Warnings** (review for bootstrap subset):
 - 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `ext/standard/date.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `ext/standard/decbin.php`
 
 **Warnings** (review for bootstrap subset):
@@ -682,6 +707,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/glob_.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/gmdate.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
@@ -981,6 +1011,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 **Warnings** (review for bootstrap subset):
 - 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `ext/standard/time.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `ext/standard/ucfirst.php`
 
 **Warnings** (review for bootstrap subset):
@@ -1045,6 +1080,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new Frame (line 170)
 - new Variable (line 189)
 - 9 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/Cli/PhpcInit.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/Compiler.php`
 
@@ -1236,6 +1276,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 
 **Warnings** (review for bootstrap subset):
 - 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/JIT/Builtin/StringDateTime.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Builtin/StringGetenv.php`
 
