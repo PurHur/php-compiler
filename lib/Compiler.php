@@ -27,7 +27,9 @@ class Compiler {
     public function compile(Script $script): ?Block {
         $this->seen = new SplObjectStorage;
 
-        $main = $this->compileCfgBlock($script->main->cfg);
+        $main = $this->compileCfgBlock($script->main->cfg, $script->main->params);
+        $main->func = $script->main;
+        $main->strictTypes = $script->main->strictTypes;
 
         $this->seen = null;
         return $main;
@@ -38,6 +40,7 @@ class Compiler {
 
         $funcBlock = $this->compileCfgBlock($func->cfg, $func->params);
         $funcBlock->func = $func;
+        $funcBlock->strictTypes = $func->strictTypes;
         $this->seen = null;
         return new Func\PHP($name, $funcBlock);
     }
@@ -159,9 +162,18 @@ class Compiler {
         if (null !== $param->defaultVar) {
             $defaultConst = $this->compileOperand($param->defaultVar, $block, true);
         }
+        $slot = $this->compileOperand($param->result, $block, false);
+        if ($param->declaredType instanceof Op\Type\Literal) {
+            $rawType = Type::fromDecl($param->declaredType->name);
+            $mapped = Variable::mapFromType($rawType);
+            if ($mapped !== Variable::TYPE_UNDEFINED) {
+                $block->paramTypeConstraints[$slot] = $mapped;
+            }
+        }
+
         return new OpCode(
             OpCode::TYPE_ARG_RECV,
-            $this->compileOperand($param->result, $block, false),
+            $slot,
             $paramIdx,
             $defaultConst
         );
@@ -170,6 +182,7 @@ class Compiler {
     protected function compileFunction(Op\Stmt\Function_ $function, Block $block): OpCode {
         $funcBlock = $this->compileCfgBlock($function->func->cfg, $function->func->params);
         $funcBlock->func = $function->func;
+        $funcBlock->strictTypes = $function->func->strictTypes;
         $operand = new Operand\Literal($function->func->name);
         $operand->type = Type::string();
         $return = new OpCode(

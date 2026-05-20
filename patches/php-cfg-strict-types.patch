@@ -1,0 +1,59 @@
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Func.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Func.php
+@@ -54,6 +54,8 @@
+     /** @var CallableOp|null */
+     public $callableOp;
+ 
++    /** @var bool */
++    public $strictTypes = false;
+ 
+     public function __construct(string $name, int $flags, Op\Type $returnType, Operand $class = null, array $attributes = [])
+     {
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
+@@ -52,6 +52,9 @@
+     /** @var Script */
+     protected $script;
+ 
++    /** @var Func|null */
++    protected $currentFunc = null;
++
+     protected $anonId = 0;
+ 
+     public function __construct(AstParser $astParser, AstTraverser $astTraverser = null)
+@@ -113,6 +116,8 @@
+ 
+     protected function parseFunc(Func $func, array $params, array $stmts)
+     {
++        $prevFunc = $this->currentFunc;
++        $this->currentFunc = $func;
+         // Switch to new function context
+         $prevCtx = $this->ctx;
+         $this->ctx = new FuncContext();
+@@ -151,6 +156,7 @@
+         }
+ 
+         $this->ctx = $prevCtx;
++        $this->currentFunc = $prevFunc;
+     }
+ 
+     protected function parseNode(Node $node)
+@@ -279,7 +285,17 @@
+ 
+     protected function parseStmt_Declare(Stmt\Declare_ $node)
+     {
+-        // TODO
++        if (null === $this->currentFunc) {
++            return;
++        }
++        foreach ($node->declares as $item) {
++            if ('strict_types' !== $item->key->toLowerString()) {
++                continue;
++            }
++            if ($item->value instanceof Node\Scalar\LNumber) {
++                $this->currentFunc->strictTypes = 1 === $item->value->value;
++            }
++        }
+     }
+ 
+     protected function parseStmt_Do(Stmt\Do_ $node)

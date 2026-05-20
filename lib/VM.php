@@ -12,6 +12,7 @@ namespace PHPCompiler;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\ObjectEntry;
+use PHPCompiler\VM\TypeCheck;
 use PHPCompiler\VM\Variable;
 
 class VM {
@@ -222,10 +223,9 @@ restart:
                     // TODO
                     goto nextframe;
                 case OpCode::TYPE_RETURN:
-                    if (is_null($frame->returnVar)) {
-                        var_dump($frame);
+                    if (!is_null($frame->returnVar)) {
+                        $frame->returnVar->copyFrom($frame->scope[$op->arg1]);
                     }
-                    $frame->returnVar->copyFrom($frame->scope[$op->arg1]);
                     goto nextframe;
                 case OpCode::TYPE_FUNCDEF:
                     $name = $frame->scope[$op->arg1]->toString();
@@ -253,7 +253,7 @@ restart:
                         // Used for null constructors, etc
                         break;
                     }
-                    $new = $frame->call->getFrame($this->context);
+                    $new = $frame->call->getFrame($this->context, $frame);
                     if ($op->type === OpCode::TYPE_FUNCCALL_EXEC_RETURN) {
                         $new->returnVar = $frame->scope[$op->arg1];
                     }
@@ -267,17 +267,19 @@ restart:
                     $frame = $new;
                     goto restart;
                 case OpCode::TYPE_ARG_RECV:
-                    // Todo: do type checks and transformations
                     $arg1 = $frame->scope[$op->arg1];
                     if (array_key_exists($op->arg2, $frame->calledArgs)) {
                         $arg1->copyFrom($frame->calledArgs[$op->arg2]);
-                        break;
-                    }
-                    if (null !== $op->arg3 && isset($frame->block->constants[$op->arg3])) {
+                    } elseif (null !== $op->arg3 && isset($frame->block->constants[$op->arg3])) {
                         $arg1->copyFrom($frame->block->constants[$op->arg3]);
-                        break;
+                    } else {
+                        throw new \LogicException('Missing required argument ' . $op->arg2);
                     }
-                    throw new \LogicException('Missing required argument ' . $op->arg2);
+                    $strict = null !== $frame->parent
+                        ? $frame->parent->block->strictTypes
+                        : $frame->block->strictTypes;
+                    TypeCheck::coerceParameter($arg1, $strict);
+                    break;
                 case OpCode::TYPE_DECLARE_CLASS:
                     $name = $frame->scope[$op->arg1]->toString();
                     $lcname = strtolower($name);
