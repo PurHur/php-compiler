@@ -68,6 +68,21 @@ class Type extends Builtin {
             $fn = $this->context->module->addFunction($libcName, $ft);
             $this->context->registerFunction($libcName, $fn);
         }
+        $i64 = $this->context->getTypeFromString('int64');
+        $void = $this->context->getTypeFromString('void');
+        $fntypeRandomBytes = $this->context->context->functionType(
+            $this->context->getTypeFromString('__string__*'),
+            false,
+            $i64
+        );
+        $fnRandomBytes = $this->context->module->addFunction('__compiler_random_bytes', $fntypeRandomBytes);
+        $this->context->registerFunction('__compiler_random_bytes', $fnRandomBytes);
+        $fntypeGetrandom = $this->context->context->functionType($i64, false, $i8p, $sizeT, $i32);
+        $fnGetrandom = $this->context->module->addFunction('getrandom', $fntypeGetrandom);
+        $this->context->registerFunction('getrandom', $fnGetrandom);
+        $fntypeExit = $this->context->context->functionType($void, false, $i32);
+        $fnExit = $this->context->module->addFunction('exit', $fntypeExit);
+        $this->context->registerFunction('exit', $fnExit);
         $this->hashtable->register();
         // $this->maskedarray->register();
         // $this->nativearray->register();

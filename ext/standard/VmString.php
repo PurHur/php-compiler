@@ -132,6 +132,39 @@ final class VmString
     }
 
     /**
+     * Cryptographically secure pseudo-random bytes (read from /dev/urandom).
+     *
+     * @throws \ValueError when length is less than 1
+     * @throws \Exception when the operating system cannot supply random data
+     */
+    public static function randomBytes(int $length): string
+    {
+        if ($length < 1) {
+            throw new \ValueError('random_bytes(): Argument #1 ($length) must be greater than 0');
+        }
+        $fp = @\fopen('/dev/urandom', 'rb');
+        if (false === $fp) {
+            throw new \Exception('Could not gather sufficient random data');
+        }
+        try {
+            $buf = '';
+            $remaining = $length;
+            while ($remaining > 0) {
+                $chunk = \fread($fp, $remaining);
+                if (false === $chunk || '' === $chunk) {
+                    throw new \Exception('Could not gather sufficient random data');
+                }
+                $buf .= $chunk;
+                $remaining -= self::byteLength($chunk);
+            }
+
+            return $buf;
+        } finally {
+            \fclose($fp);
+        }
+    }
+
+    /**
      * Minimal parse_url() for routing (http/https, path, query, host).
      *
      * @return array<string, int|string>|string|null

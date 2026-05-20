@@ -56,7 +56,7 @@ final class BootstrapConstructVisitor extends NodeVisitorAbstract
                 && !str_starts_with($name, 'PHPTypes\\')
                 && !str_starts_with($name, 'PhpParser\\')
                 && !str_starts_with($name, 'PHPLLVM\\')
-                && !in_array($name, ['LogicException', 'RuntimeException', 'InvalidArgumentException', 'TypeError', 'ReflectionClass', 'SplObjectStorage'], true)
+                && !in_array($name, ['LogicException', 'RuntimeException', 'InvalidArgumentException', 'TypeError', 'ValueError', 'ReflectionClass', 'SplObjectStorage'], true)
             ) {
                 $this->warnings[] = 'new '.$name.' (line '.$node->getLine().')';
             }

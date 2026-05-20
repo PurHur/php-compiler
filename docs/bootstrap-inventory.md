@@ -8,9 +8,9 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 204 |
+| PHP files on vm.php path | 207 |
 | Source constructs flagged (blockers) | 10 |
-| Source constructs flagged (warnings) | 539 |
+| Source constructs flagged (warnings) | 545 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -43,6 +43,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/JitNumberFormat.php` | 0 | 1 |
 | `ext/standard/JitParseUrl.php` | 0 | 1 |
 | `ext/standard/JitPath.php` | 0 | 1 |
+| `ext/standard/JitRandomBytes.php` | 0 | 1 |
 | `ext/standard/JitRealpath.php` | 0 | 1 |
 | `ext/standard/JitStrPad.php` | 0 | 1 |
 | `ext/standard/JitStrRepeat.php` | 0 | 1 |
@@ -52,10 +53,10 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/JitStripTags.php` | 0 | 1 |
 | `ext/standard/JitStrpos.php` | 0 | 1 |
 | `ext/standard/JitUrlencode.php` | 0 | 1 |
-| `ext/standard/Module.php` | 0 | 98 |
+| `ext/standard/Module.php` | 0 | 99 |
 | `ext/standard/VmFs.php` | 0 | 3 |
 | `ext/standard/VmNumberFormat.php` | 0 | 1 |
-| `ext/standard/VmString.php` | 0 | 2 |
+| `ext/standard/VmString.php` | 0 | 4 |
 | `ext/standard/abs.php` | 0 | 1 |
 | `ext/standard/array_combine.php` | 0 | 3 |
 | `ext/standard/array_count.php` | 0 | 1 |
@@ -122,6 +123,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/pow.php` | 0 | 1 |
 | `ext/standard/putenv_.php` | 0 | 1 |
 | `ext/standard/rad2deg.php` | 0 | 1 |
+| `ext/standard/random_bytes.php` | 0 | 1 |
 | `ext/standard/range.php` | 0 | 4 |
 | `ext/standard/rawurlencode.php` | 0 | 1 |
 | `ext/standard/realpath.php` | 0 | 1 |
@@ -180,6 +182,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `lib/JIT/Builtin/Refcount.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringGetenv.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringHtmlspecialchars.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringRandomBytes.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringUrlencode.php` | 0 | 1 |
 | `lib/JIT/Builtin/Type.php` | 0 | 4 |
 | `lib/JIT/Builtin/Type/HashTable.php` | 0 | 2 |
@@ -287,6 +290,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 
 **Warnings** (review for bootstrap subset):
 - 9 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/JitRandomBytes.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/JitRealpath.php`
 
@@ -414,25 +422,26 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new array_combine (line 97)
 - new range (line 98)
 - new bin2hex (line 99)
-- new str_pad (line 100)
-- new str_split (line 101)
-- new htmlspecialchars (line 102)
-- new strip_tags (line 103)
-- new header_ (line 104)
-- new header_remove (line 105)
-- new header_list (line 106)
-- new getallheaders_ (line 107)
-- new http_response_code (line 108)
-- new urlencode (line 109)
-- new rawurlencode (line 110)
-- new parse_url (line 111)
-- new dirname (line 112)
-- new basename (line 113)
-- new realpath (line 114)
-- new getenv_ (line 115)
-- new putenv_ (line 116)
-- new scandir (line 117)
-- new glob_ (line 118)
+- new random_bytes (line 100)
+- new str_pad (line 101)
+- new str_split (line 102)
+- new htmlspecialchars (line 103)
+- new strip_tags (line 104)
+- new header_ (line 105)
+- new header_remove (line 106)
+- new header_list (line 107)
+- new getallheaders_ (line 108)
+- new http_response_code (line 109)
+- new urlencode (line 110)
+- new rawurlencode (line 111)
+- new parse_url (line 112)
+- new dirname (line 113)
+- new basename (line 114)
+- new realpath (line 115)
+- new getenv_ (line 116)
+- new putenv_ (line 117)
+- new scandir (line 118)
+- new glob_ (line 119)
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/VmFs.php`
@@ -450,7 +459,9 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `ext/standard/VmString.php`
 
 **Warnings** (review for bootstrap subset):
-- 45 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new Exception (line 147)
+- new Exception (line 155)
+- 46 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 - 1 closure(s)
 
 ### `ext/standard/abs.php`
@@ -799,6 +810,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 
 **Warnings** (review for bootstrap subset):
 - 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/random_bytes.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/range.php`
 
@@ -1193,6 +1209,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 
 **Warnings** (review for bootstrap subset):
 - 5 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/JIT/Builtin/StringRandomBytes.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Builtin/StringUrlencode.php`
 

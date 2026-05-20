@@ -97,6 +97,7 @@ class Module extends ModuleAbstract
             new array_combine(),
             new range(),
             new bin2hex(),
+            new random_bytes(),
             new str_pad(),
             new str_split(),
             new htmlspecialchars(),
