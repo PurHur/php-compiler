@@ -69,6 +69,7 @@ class Module extends ModuleAbstract
             new substr(),
             new strrev(),
             new strpos(),
+            new stripos(),
             new str_contains(),
             new str_starts_with(),
             new str_ends_with(),
@@ -158,6 +159,14 @@ class Module extends ModuleAbstract
             $ft = $context->context->functionType($i8p, false, $i8p, $i8p);
             $fn = $context->module->addFunction('strstr', $ft);
             $context->registerFunction('strstr', $fn);
+        }
+        try {
+            $context->lookupFunction('strcasestr');
+        } catch (\Throwable $e) {
+            $i8p = $context->getTypeFromString('int8*');
+            $ft = $context->context->functionType($i8p, false, $i8p, $i8p);
+            $fn = $context->module->addFunction('strcasestr', $ft);
+            $context->registerFunction('strcasestr', $fn);
         }
         try {
             $context->lookupFunction('strtol');

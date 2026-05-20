@@ -799,6 +799,22 @@ final class VmString
         return false === $pos ? false : $pos;
     }
 
+    /**
+     * @return int|false
+     */
+    public static function stripos(string $haystack, string $needle, int $offset = 0)
+    {
+        if ('' === $needle) {
+            throw new \LogicException('stripos(): Argument #2 ($needle) cannot be empty');
+        }
+        if ($offset < 0) {
+            $offset = 0;
+        }
+        $pos = self::findSubstringCaseInsensitive($haystack, $needle, $offset);
+
+        return false === $pos ? false : $pos;
+    }
+
     public static function startsWith(string $haystack, string $needle): bool
     {
         $nlen = self::byteLength($needle);
@@ -850,6 +866,27 @@ final class VmString
         return true;
     }
 
+    private static function compareBytesCaseInsensitive(string $haystack, string $needle, int $length, int $hayOffset = 0): bool
+    {
+        for ($i = 0; $i < $length; ++$i) {
+            if (self::asciiLowerByte($haystack[$hayOffset + $i]) !== self::asciiLowerByte($needle[$i])) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static function asciiLowerByte(string $byte): string
+    {
+        $ord = self::byteOrd($byte);
+        if ($ord >= 65 && $ord <= 90) {
+            return self::byteChr($ord + 32);
+        }
+
+        return $byte;
+    }
+
     /**
      * @return int|false
      */
@@ -866,6 +903,29 @@ final class VmString
         $limit = $hayLen - $needleLen;
         for ($i = $offset; $i <= $limit; ++$i) {
             if (self::compareBytes($haystack, $needle, $needleLen, $i)) {
+                return $i;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @return int|false
+     */
+    private static function findSubstringCaseInsensitive(string $haystack, string $needle, int $offset)
+    {
+        $hayLen = self::byteLength($haystack);
+        $needleLen = self::byteLength($needle);
+        if (0 === $needleLen) {
+            return false;
+        }
+        if ($offset >= $hayLen) {
+            return false;
+        }
+        $limit = $hayLen - $needleLen;
+        for ($i = $offset; $i <= $limit; ++$i) {
+            if (self::compareBytesCaseInsensitive($haystack, $needle, $needleLen, $i)) {
                 return $i;
             }
         }
