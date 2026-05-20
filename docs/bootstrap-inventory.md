@@ -10,7 +10,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 |--------|------:|
 | PHP files on vm.php path | 229 |
 | Source constructs flagged (blockers) | 10 |
-| Source constructs flagged (warnings) | 609 |
+| Source constructs flagged (warnings) | 611 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -230,7 +230,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `lib/Lint/IncrementDetector.php` | 0 | 4 |
 | `lib/Lint/Issue.php` | 0 | 2 |
 | `lib/Lint/LintCompiler.php` | 0 | 6 |
-| `lib/Lint/Linter.php` | 0 | 7 |
+| `lib/Lint/Linter.php` | 0 | 9 |
 | `lib/Lint/ListDestructuringDetector.php` | 0 | 4 |
 | `lib/Lint/SwitchDetector.php` | 0 | 4 |
 | `lib/Lint/UnsupportedRegistry.php` | 0 | 1 |
@@ -1572,13 +1572,15 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/Lint/Linter.php`
 
 **Warnings** (review for bootstrap subset):
-- new Runtime (line 24)
-- new IncrementDetector (line 45)
-- new ListDestructuringDetector (line 46)
-- new SwitchDetector (line 47)
-- new State (line 90)
-- new LintCompiler (line 105)
-- 9 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new Runtime (line 27)
+- new IncrementDetector (line 99)
+- new ListDestructuringDetector (line 100)
+- new SwitchDetector (line 101)
+- new State (line 144)
+- new LintCompiler (line 159)
+- new RecursiveIteratorIterator (line 275)
+- new RecursiveDirectoryIterator (line 276)
+- 13 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/Lint/ListDestructuringDetector.php`
 
