@@ -12,6 +12,8 @@ declare(strict_types=1);
  *   phpc run [-q 'name=World'] [-p 'field=val'] script.php [args...]
  *   phpc build [-o outfile] entry.php
  *   phpc lint [-r 'code'] [--json] entry.php
+ *   phpc lint --project <entry.php> [--json]
+ *   phpc lint --all <dir-or-file> [--json]
  *   phpc init [--force] [target-dir]
  *   phpc test [-- phpunit/ci-local args...]
  */
@@ -34,6 +36,8 @@ php-compiler CLI
       Example: phpc run -q 'name=Dev' examples/001-SimpleWeb/example.php
   phpc build [-o out] <entry.php>               AOT compile to a native binary
   phpc lint [-r 'code'] [--json] <entry.php>    Report unsupported syntax (line-accurate)
+  phpc lint --project <entry.php> [--json]    Entry + literal include/require chain
+  phpc lint --all <dir-or-file> [--json]      All .php under a tree (aggregated)
   phpc init [--force] [target-dir]              Scaffold phpc.json + public/index.php
   phpc test [args...]                           Run ./script/ci-local.sh
 
