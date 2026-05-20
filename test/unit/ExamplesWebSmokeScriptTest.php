@@ -68,6 +68,7 @@ final class ExamplesWebSmokeScriptTest extends TestCase
         $combined = trim(($stdout !== false ? $stdout : '')."\n".($stderr !== false ? $stderr : ''));
         $this->assertSame(0, $exit, $combined);
         $this->assertStringContainsString('examples-web-smoke: 001-SimpleWeb', $combined);
+        $this->assertStringContainsString('POST example.php', $combined);
         $this->assertStringContainsString('examples-web-smoke: 002-StaticWeb', $combined);
         $this->assertStringContainsString('examples-web-smoke: ok', $combined);
     }
