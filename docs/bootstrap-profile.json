@@ -36,6 +36,7 @@
         "ext/standard/JitEnv.php",
         "ext/standard/JitExplode.php",
         "ext/standard/JitGetallheaders.php",
+        "ext/standard/JitHash.php",
         "ext/standard/JitHeader.php",
         "ext/standard/JitHex2bin.php",
         "ext/standard/JitHtmlspecialchars.php",
@@ -64,6 +65,7 @@
         "ext/standard/VmDate.php",
         "ext/standard/VmExit.php",
         "ext/standard/VmFs.php",
+        "ext/standard/VmHash.php",
         "ext/standard/VmInternalCall.php",
         "ext/standard/VmJson.php",
         "ext/standard/VmNumberFormat.php",
@@ -122,6 +124,8 @@
         "ext/standard/gettype.php",
         "ext/standard/glob_.php",
         "ext/standard/gmdate.php",
+        "ext/standard/hash_.php",
+        "ext/standard/hash_hmac.php",
         "ext/standard/header_.php",
         "ext/standard/header_list.php",
         "ext/standard/header_remove.php",
@@ -301,9 +305,9 @@
         "test/bootstrap-aot/echo_hello.php"
     ],
     "totals": {
-        "inventory_files": 267,
+        "inventory_files": 271,
         "excluded": 2,
-        "eligible": 265,
+        "eligible": 269,
         "aot_lint_targets": 2
     }
 }
