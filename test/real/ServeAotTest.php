@@ -162,6 +162,29 @@ PHP,
         @rmdir($binaryDir);
     }
 
+    public function testServeAotPopulatesCookieFromRequestHeader(): void
+    {
+        $docroot = $this->makeDocroot([
+            'cookie.php' => <<<'PHP'
+<?php
+declare(strict_types=1);
+header('Content-Type: text/plain; charset=UTF-8');
+echo $_COOKIE['theme'];
+PHP,
+        ]);
+        $binaryDir = sys_get_temp_dir().'/phpc_serve_aot_cookie_'.bin2hex(random_bytes(4));
+        $this->assertTrue(mkdir($binaryDir));
+        $binary = $binaryDir.'/app';
+        $this->compileExample($docroot.'/cookie.php', $binary);
+        $response = $this->httpGetAot($docroot, $binary, '/cookie.php', 'HTTP/1.1', [
+            'Cookie: theme=dark',
+        ]);
+        $this->assertStringContainsString('HTTP/1.1 200', $response);
+        $this->assertStringContainsString('dark', $response);
+        @unlink($binary);
+        @rmdir($binaryDir);
+    }
+
     public function testServeAotPostFormUrlencoded(): void
     {
         $docroot = $this->makeDocroot([
@@ -276,11 +299,15 @@ PHP,
         $this->assertFileExists($outfile, trim($err !== false ? $err : ''));
     }
 
+    /**
+     * @param list<string> $extraRequestHeaders
+     */
     private function httpGetAot(
         string $docroot,
         string $binary,
         string $path,
-        string $requestProtocol = 'HTTP/1.1'
+        string $requestProtocol = 'HTTP/1.1',
+        array $extraRequestHeaders = []
     ): string
     {
         $port = $this->findFreePort();
@@ -316,7 +343,9 @@ PHP,
 
         $conn = fsockopen('127.0.0.1', $port);
         $this->assertIsResource($conn);
-        fwrite($conn, "GET {$path} {$requestProtocol}\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n");
+        $requestHeaders = array_merge(['Host: 127.0.0.1', 'Connection: close'], $extraRequestHeaders);
+        $headerBlock = implode("\r\n", $requestHeaders);
+        fwrite($conn, "GET {$path} {$requestProtocol}\r\n{$headerBlock}\r\n\r\n");
         $response = stream_get_contents($conn);
         fclose($conn);
 
