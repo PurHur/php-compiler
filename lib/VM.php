@@ -259,6 +259,7 @@ restart:
                     }
                     $new->calledArgs = $frame->callArgs;
                     if ($new->hasHandler()) {
+                        $new->parent = $frame;
                         $new->handler->execute($new);
                         break;
                     }

@@ -120,6 +120,8 @@ class Module extends ModuleAbstract
             new file_get_contents(),
             new getenv_(),
             new putenv_(),
+            new extract_(),
+            new compact_(),
             new scandir(),
             new glob_(),
             new time(),

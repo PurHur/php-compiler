@@ -122,6 +122,17 @@ class Block {
         return $frame->scope[$idx];
     }
 
+    public function slotIndexForVariableName(string $name): ?int
+    {
+        foreach ($this->scope as $operand) {
+            if (self::resolveVariableName($operand) === $name) {
+                return $this->scope[$operand];
+            }
+        }
+
+        return null;
+    }
+
     public function getFrame(Context $context, ?Frame $frame = null): Frame {
         // Todo: build scope
         $scope = [];
