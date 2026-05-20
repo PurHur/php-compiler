@@ -115,6 +115,8 @@ make test-docker
 docker run --rm -v "$(pwd):/compiler" -w /compiler php-compiler:22.04-dev ./script/ci-local.sh
 ```
 
+If the container runs out of memory while running the full suite (process exit code **137**), increase the limit (for example `docker run -m 8g`).
+
 If the bind-mount shows an empty `/compiler` directory (some harness setups), use:
 
 ```console
