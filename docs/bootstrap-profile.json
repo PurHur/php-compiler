@@ -104,10 +104,16 @@
         "ext/standard/exp.php",
         "ext/standard/explode.php",
         "ext/standard/extract_.php",
+        "ext/standard/fclose.php",
+        "ext/standard/file_exists.php",
         "ext/standard/file_get_contents.php",
+        "ext/standard/file_put_contents.php",
         "ext/standard/floatval.php",
         "ext/standard/floor.php",
         "ext/standard/fmod.php",
+        "ext/standard/fopen.php",
+        "ext/standard/fread.php",
+        "ext/standard/fwrite.php",
         "ext/standard/getallheaders_.php",
         "ext/standard/getenv_.php",
         "ext/standard/gettype.php",
@@ -126,6 +132,8 @@
         "ext/standard/int_min.php",
         "ext/standard/intdiv.php",
         "ext/standard/intval.php",
+        "ext/standard/is_dir.php",
+        "ext/standard/is_file.php",
         "ext/standard/is_finite.php",
         "ext/standard/is_infinite.php",
         "ext/standard/is_nan.php",
@@ -289,9 +297,9 @@
         "test/bootstrap-aot/echo_hello.php"
     ],
     "totals": {
-        "inventory_files": 255,
+        "inventory_files": 263,
         "excluded": 2,
-        "eligible": 253,
+        "eligible": 261,
         "aot_lint_targets": 2
     }
 }
