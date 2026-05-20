@@ -2,13 +2,10 @@
 Web: http_response_code() get and set
 --FILE--
 <?php
-var_export(http_response_code());
-echo "\n";
-var_export(http_response_code(404));
-echo "\n";
-var_export(http_response_code());
-echo "\n";
-var_export(http_response_code(999));
+echo http_response_code(), "\n";
+echo http_response_code(404), "\n";
+echo http_response_code(), "\n";
+echo http_response_code(999) ? 'true' : 'false', "\n";
 --EXPECT--
 200
 200

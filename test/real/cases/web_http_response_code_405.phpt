@@ -2,9 +2,8 @@
 Web: http_response_code(405) Method Not Allowed
 --FILE--
 <?php
-var_export(http_response_code(405));
-echo "\n";
-var_export(http_response_code());
+echo http_response_code(405), "\n";
+echo http_response_code(), "\n";
 --EXPECT--
-405
+200
 405

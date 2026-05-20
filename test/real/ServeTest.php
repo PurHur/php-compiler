@@ -263,6 +263,38 @@ PHP,
     $this->assertStringContainsString('name=Alice', $this->responseBody($response));
   }
 
+  public function testPathInfoFrontControllerDispatch(): void
+  {
+    $docroot = $this->makeDocroot([
+      'index.php' => <<<'PHP'
+<?php
+header('Content-Type: text/plain; charset=UTF-8');
+$path = $_SERVER['PATH_INFO'] ?? '/';
+echo 'SCRIPT_NAME=', $_SERVER['SCRIPT_NAME'], "\n";
+echo 'PATH_INFO=', $path, "\n";
+if ($path === '/hello') {
+    echo 'hi';
+}
+PHP,
+    ]);
+    $response = $this->httpGet($docroot, '/index.php/hello');
+    $this->assertStringContainsString('HTTP/1.1 200', $response);
+    $body = $this->responseBody($response);
+    $this->assertStringContainsString('SCRIPT_NAME=/index.php', $body);
+    $this->assertStringContainsString('PATH_INFO=/hello', $body);
+    $this->assertStringContainsString('hi', $body);
+  }
+
+  public function testPathInfoMissingScriptReturns404(): void
+  {
+    $docroot = $this->makeDocroot([
+      'index.php' => '<?php echo "ok";',
+    ]);
+    $response = $this->httpGet($docroot, '/missing.php/foo');
+    $this->assertStringContainsString('HTTP/1.1 404', $response);
+    $this->assertStringContainsString('Not Found', $this->responseBody($response));
+  }
+
   /**
    * @param array<string, string> $extraEnv
    * @param list<string>          $extraRequestHeaders

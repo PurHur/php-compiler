@@ -395,6 +395,11 @@ class Compiler {
             case Op\Expr\Clone_::class:
             case Op\Expr\Empty_::class:
             case Op\Expr\Eval_::class:
+                return [new OpCode(
+                    $this->getOpCodeTypeFromUnaryOp($expr),
+                    $this->compileOperand($expr->result, $block, false),
+                    $this->compileOperand($expr->expr, $block, true)
+                )];
             case Op\Expr\Exit_::class:
                 $exitExpr = null !== $expr->expr
                     ? $this->compileOperand($expr->expr, $block, true)
