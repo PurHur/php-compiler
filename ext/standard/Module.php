@@ -111,6 +111,7 @@ class Module extends ModuleAbstract
             new header_list(),
             new getallheaders_(),
             new http_response_code(),
+            new json_encode(),
             new web_int(),
             new web_string(),
             new web_bool(),

@@ -123,6 +123,13 @@ class Type extends Builtin {
             $this->context->registerFunction($libcName, $fn);
         }
         $this->hashtable->register();
+        $fntypeJsonEncode = $this->context->context->functionType(
+            $this->context->getTypeFromString('__string__*'),
+            false,
+            $this->context->getTypeFromString('__hashtable__*')
+        );
+        $fnJsonEncode = $this->context->module->addFunction('__compiler_json_encode_hashtable', $fntypeJsonEncode);
+        $this->context->registerFunction('__compiler_json_encode_hashtable', $fnJsonEncode);
         // $this->maskedarray->register();
         // $this->nativearray->register();
     }

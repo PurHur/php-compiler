@@ -311,6 +311,22 @@ final class HashTableHelper
                     $context->helper->loadValue($element)
                 );
                 break;
+            case Variable::TYPE_NATIVE_LONG:
+                $context->builder->call(
+                    $context->lookupFunction('__hashtable__setStringKeyLong'),
+                    $ht,
+                    $keyPtr,
+                    $context->helper->loadValue($element)
+                );
+                break;
+            case Variable::TYPE_NATIVE_BOOL:
+                $context->builder->call(
+                    $context->lookupFunction('__hashtable__setStringKeyBool'),
+                    $ht,
+                    $keyPtr,
+                    $context->helper->loadValue($element)
+                );
+                break;
             default:
                 throw new \LogicException(
                     'String-key array element type not supported for JIT: '

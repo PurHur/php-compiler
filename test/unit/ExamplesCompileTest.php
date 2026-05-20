@@ -84,6 +84,7 @@ final class ExamplesCompileTest extends TestCase
         return [
             '001-SimpleWeb' => [$root.'/001-SimpleWeb'],
             '002-StaticWeb' => [$root.'/002-StaticWeb'],
+            '004-ApiJson' => [$root.'/004-ApiJson'],
         ];
     }
 
@@ -485,6 +486,7 @@ final class ExamplesCompileTest extends TestCase
             '000-HelloWorld' => ['Hello World'],
             '001-SimpleWeb' => ['Hello Example'],
             '002-StaticWeb' => ['Hello World'],
+            '004-ApiJson' => ['"ok":true', 'php-compiler'],
             default => ['Hello'],
         };
     }
