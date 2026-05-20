@@ -102,6 +102,8 @@ class Module extends ModuleAbstract
             new range(),
             new bin2hex(),
             new hex2bin(),
+            new hash_(),
+            new hash_hmac(),
             new random_bytes(),
             new str_pad(),
             new str_split(),

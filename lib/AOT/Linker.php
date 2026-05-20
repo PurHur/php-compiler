@@ -9,14 +9,18 @@ namespace PHPCompiler\AOT;
  */
 final class Linker
 {
-    private const RUNTIME_C = __DIR__.'/runtime/superglobals_refresh.c';
+    /** @var list<string> */
+    private const RUNTIME_C_SOURCES = [
+        __DIR__.'/runtime/superglobals_refresh.c',
+        __DIR__.'/runtime/hash_crypto.c',
+    ];
 
     public static function link(string $objectFile, string $executable): void
     {
-        $runtimeObject = self::compileRuntimeObject($objectFile);
+        $runtimeObjects = self::compileRuntimeObjects($objectFile);
         $llvmDir = getenv('PHP_COMPILER_LLVM_PATH');
         if (false === $llvmDir || '' === $llvmDir) {
-            self::linkWithSystemCompiler($objectFile, $executable, $runtimeObject);
+            self::linkWithSystemCompiler($objectFile, $executable, $runtimeObjects);
 
             return;
         }
@@ -35,7 +39,7 @@ final class Linker
         ) {
             $env = self::toolchainEnvironment($llvmDir);
             $objects = [escapeshellarg($objectFile)];
-            if (null !== $runtimeObject) {
+            foreach ($runtimeObjects as $runtimeObject) {
                 $objects[] = escapeshellarg($runtimeObject);
             }
             $cmd = implode(' ', [
@@ -53,7 +57,7 @@ final class Linker
                 escapeshellarg($executable),
             ]);
             self::run($cmd, $env);
-            self::unlinkIfTemp($runtimeObject);
+            self::unlinkIfTemp($runtimeObjects);
 
             return;
         }
@@ -62,54 +66,62 @@ final class Linker
         if (is_executable($clang)) {
             $env = self::toolchainEnvironment($llvmDir);
             $objects = escapeshellarg($objectFile);
-            if (null !== $runtimeObject) {
+            foreach ($runtimeObjects as $runtimeObject) {
                 $objects .= ' '.escapeshellarg($runtimeObject);
             }
             $cmd = escapeshellarg($clang).' '.$objects.' -o '.escapeshellarg($executable);
             self::run($cmd, $env);
-            self::unlinkIfTemp($runtimeObject);
+            self::unlinkIfTemp($runtimeObjects);
 
             return;
         }
 
-        self::linkWithSystemCompiler($objectFile, $executable, $runtimeObject);
+        self::linkWithSystemCompiler($objectFile, $executable, $runtimeObjects);
     }
 
-    private static function compileRuntimeObject(string $objectFile): ?string
+    /**
+     * @return list<string>
+     */
+    private static function compileRuntimeObjects(string $objectFile): array
     {
-        if (!is_file(self::RUNTIME_C)) {
-            return null;
-        }
-
-        $runtimeObject = $objectFile.'.runtime.o';
+        $objects = [];
         $compiler = self::resolveRuntimeCompiler();
         $includeFlags = self::runtimeCIncludeFlags();
         $llvmDir = getenv('PHP_COMPILER_LLVM_PATH');
         $env = (false !== $llvmDir && '' !== $llvmDir)
             ? self::toolchainEnvironment($llvmDir)
             : null;
-        $cmd = escapeshellarg($compiler).' -c -fPIC -O2'.$includeFlags.' '
-            .escapeshellarg(self::RUNTIME_C).' -o '.escapeshellarg($runtimeObject);
-        $descriptor = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
-        $proc = proc_open($cmd, $descriptor, $pipes, null, $env);
-        if (!is_resource($proc)) {
-            throw new \LogicException('Failed to start AOT runtime compiler: '.$cmd);
-        }
-        fclose($pipes[0]);
-        $stdout = stream_get_contents($pipes[1]);
-        $stderr = stream_get_contents($pipes[2]);
-        fclose($pipes[1]);
-        fclose($pipes[2]);
-        $code = proc_close($proc);
-        if (0 !== $code || !is_file($runtimeObject)) {
-            throw new \LogicException(
-                'Failed to compile AOT runtime: '.trim(
-                    ($stderr !== false ? $stderr : '')."\n".($stdout !== false ? $stdout : '')
-                )
-            );
+        $index = 0;
+        foreach (self::RUNTIME_C_SOURCES as $source) {
+            if (!is_file($source)) {
+                continue;
+            }
+            $runtimeObject = $objectFile.'.runtime'.$index.'.o';
+            ++$index;
+            $cmd = escapeshellarg($compiler).' -c -fPIC -O2'.$includeFlags.' '
+                .escapeshellarg($source).' -o '.escapeshellarg($runtimeObject);
+            $descriptor = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+            $proc = proc_open($cmd, $descriptor, $pipes, null, $env);
+            if (!is_resource($proc)) {
+                throw new \LogicException('Failed to start AOT runtime compiler: '.$cmd);
+            }
+            fclose($pipes[0]);
+            $stdout = stream_get_contents($pipes[1]);
+            $stderr = stream_get_contents($pipes[2]);
+            fclose($pipes[1]);
+            fclose($pipes[2]);
+            $code = proc_close($proc);
+            if (0 !== $code || !is_file($runtimeObject)) {
+                throw new \LogicException(
+                    'Failed to compile AOT runtime: '.trim(
+                        ($stderr !== false ? $stderr : '')."\n".($stdout !== false ? $stdout : '')
+                    )
+                );
+            }
+            $objects[] = $runtimeObject;
         }
 
-        return $runtimeObject;
+        return $objects;
     }
 
     /**
@@ -251,10 +263,21 @@ final class Linker
         throw new \LogicException('No C compiler found for AOT runtime (clang/gcc).');
     }
 
-    private static function unlinkIfTemp(?string $runtimeObject): void
+    /**
+     * @param list<string>|string|null $runtimeObjects
+     */
+    private static function unlinkIfTemp(array|string|null $runtimeObjects): void
     {
-        if (null !== $runtimeObject && is_file($runtimeObject)) {
-            @unlink($runtimeObject);
+        if (null === $runtimeObjects) {
+            return;
+        }
+        if (is_string($runtimeObjects)) {
+            $runtimeObjects = [$runtimeObjects];
+        }
+        foreach ($runtimeObjects as $runtimeObject) {
+            if (is_file($runtimeObject)) {
+                @unlink($runtimeObject);
+            }
         }
     }
 
@@ -273,16 +296,19 @@ final class Linker
         return $env;
     }
 
+    /**
+     * @param list<string> $runtimeObjects
+     */
     private static function linkWithSystemCompiler(
         string $objectFile,
         string $executable,
-        ?string $runtimeObject = null
+        array $runtimeObjects = []
     ): void {
         $linkers = [
             'clang-9', 'clang', 'clang-17', 'clang-14', 'gcc', 'cc',
         ];
         $objects = escapeshellarg($objectFile);
-        if (null !== $runtimeObject) {
+        foreach ($runtimeObjects as $runtimeObject) {
             $objects .= ' '.escapeshellarg($runtimeObject);
         }
         foreach ($linkers as $linker) {
@@ -294,12 +320,12 @@ final class Linker
                 . $objects . ' -o ' . escapeshellarg($executable);
             exec($cmd, $output, $code);
             if (0 === $code) {
-                self::unlinkIfTemp($runtimeObject);
+                self::unlinkIfTemp($runtimeObjects);
 
                 return;
             }
         }
-        self::unlinkIfTemp($runtimeObject);
+        self::unlinkIfTemp($runtimeObjects);
         throw new \LogicException(
             'No supported linker found. Run script/install-llvm9.sh or install clang/gcc.'
         );
