@@ -1160,4 +1160,355 @@ final class ArrayBuiltinHelper
                 return $context->constantFromBool(false);
         }
     }
+
+    /**
+     * array_sum() for packed lists (integers and floats; subset of PHP).
+     */
+    public static function arraySum(Context $context, Variable $array): Value
+    {
+        if (self::isNativeArray($array->type)) {
+            return self::arraySumNative($context, $array);
+        }
+
+        return self::arraySumHashTable($context, self::loadHashTable($context, $array));
+    }
+
+    private static function arraySumNative(Context $context, Variable $array): Value
+    {
+        $elemType = $array->type & ~Variable::IS_NATIVE_ARRAY;
+        $sizeT = $context->getTypeFromString('size_t');
+        $i64 = $context->getTypeFromString('int64');
+        $double = $context->getTypeFromString('double');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $count = $context->constantFromInteger($array->nextFreeElement, 'size_t');
+
+        if (Variable::TYPE_NATIVE_DOUBLE === $elemType) {
+            $sumSlot = $context->builder->alloca($double, 1, 'array_sum_native_f');
+            $context->builder->store($double->constReal(0.0), $sumSlot);
+            if (0 === $array->nextFreeElement) {
+                return $context->builder->load($sumSlot);
+            }
+            $idxSlot = $context->builder->alloca($sizeT, 1, 'array_sum_native_f_idx');
+            $context->builder->store($zero, $idxSlot);
+            $head = BasicBlockHelper::append($context, 'array_sum_native_f_head');
+            $body = BasicBlockHelper::append($context, 'array_sum_native_f_body');
+            $done = BasicBlockHelper::append($context, 'array_sum_native_f_done');
+            $context->builder->branch($head);
+
+            $context->builder->positionAtEnd($head);
+            $idx = $context->builder->load($idxSlot);
+            $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $count);
+            $context->builder->branchIf($atEnd, $done, $body);
+
+            $context->builder->positionAtEnd($body);
+            $slot = $context->builder->inBoundsGep($array->value, $zero, $idx);
+            $elem = $context->builder->load($slot);
+            $sum = $context->builder->load($sumSlot);
+            $context->builder->store($context->builder->fadd($sum, $elem), $sumSlot);
+            $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+            $context->builder->branch($head);
+
+            $context->builder->positionAtEnd($done);
+
+            return $context->builder->load($sumSlot);
+        }
+
+        if (Variable::TYPE_VALUE === $elemType) {
+            return self::arraySumNativeValue($context, $array);
+        }
+
+        if (Variable::TYPE_NATIVE_LONG !== $elemType) {
+            throw new \LogicException(
+                'array_sum() only supports integer and float elements in this compiler build'
+            );
+        }
+
+        $sumSlot = $context->builder->alloca($i64, 1, 'array_sum_native_i');
+        $context->builder->store($i64->constInt(0, false), $sumSlot);
+        if (0 === $array->nextFreeElement) {
+            return $context->builder->load($sumSlot);
+        }
+
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'array_sum_native_i_idx');
+        $context->builder->store($zero, $idxSlot);
+        $head = BasicBlockHelper::append($context, 'array_sum_native_i_head');
+        $body = BasicBlockHelper::append($context, 'array_sum_native_i_body');
+        $done = BasicBlockHelper::append($context, 'array_sum_native_i_done');
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $count);
+        $context->builder->branchIf($atEnd, $done, $body);
+
+        $context->builder->positionAtEnd($body);
+        $slot = $context->builder->inBoundsGep($array->value, $zero, $idx);
+        $elem = $context->builder->load($slot);
+        $sum = $context->builder->load($sumSlot);
+        $context->builder->store($context->builder->addNoSignedWrap($sum, $elem), $sumSlot);
+        $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($done);
+
+        return $context->builder->load($sumSlot);
+    }
+
+    private static function arraySumHashTable(Context $context, Value $ht): Value
+    {
+        $sizeT = $context->getTypeFromString('size_t');
+        $i64 = $context->getTypeFromString('int64');
+        $double = $context->getTypeFromString('double');
+        $i8 = $context->getTypeFromString('int8');
+        $i1 = $context->getTypeFromString('int1');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+
+        $sumIntSlot = $context->builder->alloca($i64, 1, 'array_sum_int');
+        $sumFloatSlot = $context->builder->alloca($double, 1, 'array_sum_float');
+        $useFloatSlot = $context->builder->alloca($i1, 1, 'array_sum_use_float');
+        $context->builder->store($i64->constInt(0, false), $sumIntSlot);
+        $context->builder->store($double->constReal(0.0), $sumFloatSlot);
+        $context->builder->store($i1->constInt(0, false), $useFloatSlot);
+
+        $num = $context->builder->call(
+            $context->lookupFunction('__hashtable__getNumElements'),
+            $ht
+        );
+
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'array_sum_ht_idx');
+        $context->builder->store($zero, $idxSlot);
+        $head = BasicBlockHelper::append($context, 'array_sum_ht_head');
+        $body = BasicBlockHelper::append($context, 'array_sum_ht_body');
+        $afterLong = BasicBlockHelper::append($context, 'array_sum_ht_after_long');
+        $longBlock = BasicBlockHelper::append($context, 'array_sum_ht_long');
+        $doubleBlock = BasicBlockHelper::append($context, 'array_sum_ht_double');
+        $continueBlock = BasicBlockHelper::append($context, 'array_sum_ht_continue');
+        $doneBlock = BasicBlockHelper::append($context, 'array_sum_ht_done');
+
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $num, $zero);
+        $context->builder->branchIf($isEmpty, $doneBlock, $head);
+
+        $context->builder->positionAtEnd($head);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $num);
+        $context->builder->branchIf($atEnd, $doneBlock, $body);
+
+        $context->builder->positionAtEnd($body);
+        $entry = self::listEntryAt($context, $ht, $idx);
+        $valueMap = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($entry, $valueMap['type'])
+        );
+        $isLong = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
+        );
+        $isDouble = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
+        );
+        $context->builder->branchIf($isLong, $longBlock, $afterLong);
+
+        $context->builder->positionAtEnd($afterLong);
+        $context->builder->branchIf($isDouble, $doubleBlock, $continueBlock);
+
+        $context->builder->positionAtEnd($longBlock);
+        $longVal = $context->builder->call($context->lookupFunction('__value__readLong'), $entry);
+        $useFloat = $context->builder->load($useFloatSlot);
+        $floatPath = BasicBlockHelper::append($context, 'array_sum_ht_long_as_float');
+        $intPath = BasicBlockHelper::append($context, 'array_sum_ht_long_as_int');
+        $longDone = BasicBlockHelper::append($context, 'array_sum_ht_long_done');
+        $context->builder->branchIf($useFloat, $floatPath, $intPath);
+
+        $context->builder->positionAtEnd($intPath);
+        $sumInt = $context->builder->load($sumIntSlot);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($sumInt, $longVal),
+            $sumIntSlot
+        );
+        $context->builder->branch($longDone);
+
+        $context->builder->positionAtEnd($floatPath);
+        $sumFloat = $context->builder->load($sumFloatSlot);
+        $context->builder->store(
+            $context->builder->fadd($sumFloat, $context->builder->siToFp($longVal, $double)),
+            $sumFloatSlot
+        );
+        $context->builder->branch($longDone);
+
+        $context->builder->positionAtEnd($longDone);
+        $context->builder->branch($continueBlock);
+
+        $context->builder->positionAtEnd($doubleBlock);
+        $doubleVal = $context->builder->call($context->lookupFunction('__value__readDouble'), $entry);
+        $useFloatNow = $context->builder->load($useFloatSlot);
+        $promoteBlock = BasicBlockHelper::append($context, 'array_sum_ht_promote');
+        $addFloatBlock = BasicBlockHelper::append($context, 'array_sum_ht_add_float');
+        $doubleDone = BasicBlockHelper::append($context, 'array_sum_ht_double_done');
+        $context->builder->branchIf($useFloatNow, $addFloatBlock, $promoteBlock);
+
+        $context->builder->positionAtEnd($promoteBlock);
+        $sumInt = $context->builder->load($sumIntSlot);
+        $context->builder->store(
+            $context->builder->fadd($context->builder->siToFp($sumInt, $double), $doubleVal),
+            $sumFloatSlot
+        );
+        $context->builder->store($i1->constInt(1, false), $useFloatSlot);
+        $context->builder->branch($doubleDone);
+
+        $context->builder->positionAtEnd($addFloatBlock);
+        $sumFloat = $context->builder->load($sumFloatSlot);
+        $context->builder->store($context->builder->fadd($sumFloat, $doubleVal), $sumFloatSlot);
+        $context->builder->branch($doubleDone);
+
+        $context->builder->positionAtEnd($doubleDone);
+        $context->builder->branch($continueBlock);
+
+        $context->builder->positionAtEnd($continueBlock);
+        $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $useFloat = $context->builder->load($useFloatSlot);
+        $sumInt = $context->builder->load($sumIntSlot);
+        $sumFloat = $context->builder->load($sumFloatSlot);
+
+        return $context->builder->select(
+            $useFloat,
+            $sumFloat,
+            $context->builder->siToFp($sumInt, $double)
+        );
+    }
+
+    /** Native array of boxed __value__ (e.g. array(1, 2.5)). */
+    private static function arraySumNativeValue(Context $context, Variable $array): Value
+    {
+        $sizeT = $context->getTypeFromString('size_t');
+        $i64 = $context->getTypeFromString('int64');
+        $double = $context->getTypeFromString('double');
+        $i8 = $context->getTypeFromString('int8');
+        $i1 = $context->getTypeFromString('int1');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $count = $context->constantFromInteger($array->nextFreeElement, 'size_t');
+        $valueMap = $context->structFieldMap['__value__'];
+
+        $sumIntSlot = $context->builder->alloca($i64, 1, 'array_sum_nv_int');
+        $sumFloatSlot = $context->builder->alloca($double, 1, 'array_sum_nv_float');
+        $useFloatSlot = $context->builder->alloca($i1, 1, 'array_sum_nv_use_float');
+        $context->builder->store($i64->constInt(0, false), $sumIntSlot);
+        $context->builder->store($double->constReal(0.0), $sumFloatSlot);
+        $context->builder->store($i1->constInt(0, false), $useFloatSlot);
+
+        if (0 === $array->nextFreeElement) {
+            return $context->builder->load($sumIntSlot);
+        }
+
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'array_sum_nv_idx');
+        $context->builder->store($zero, $idxSlot);
+        $head = BasicBlockHelper::append($context, 'array_sum_nv_head');
+        $body = BasicBlockHelper::append($context, 'array_sum_nv_body');
+        $afterLong = BasicBlockHelper::append($context, 'array_sum_nv_after_long');
+        $longBlock = BasicBlockHelper::append($context, 'array_sum_nv_long');
+        $doubleBlock = BasicBlockHelper::append($context, 'array_sum_nv_double');
+        $continueBlock = BasicBlockHelper::append($context, 'array_sum_nv_continue');
+        $doneBlock = BasicBlockHelper::append($context, 'array_sum_nv_done');
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $count);
+        $context->builder->branchIf($atEnd, $doneBlock, $body);
+
+        $context->builder->positionAtEnd($body);
+        $entry = $context->builder->inBoundsGep($array->value, $zero, $idx);
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($entry, $valueMap['type'])
+        );
+        $isLong = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
+        );
+        $isDouble = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
+        );
+        $context->builder->branchIf($isLong, $longBlock, $afterLong);
+
+        $context->builder->positionAtEnd($afterLong);
+        $context->builder->branchIf($isDouble, $doubleBlock, $continueBlock);
+
+        $context->builder->positionAtEnd($longBlock);
+        $longVal = $context->builder->call($context->lookupFunction('__value__readLong'), $entry);
+        $useFloat = $context->builder->load($useFloatSlot);
+        $floatPath = BasicBlockHelper::append($context, 'array_sum_nv_long_f');
+        $intPath = BasicBlockHelper::append($context, 'array_sum_nv_long_i');
+        $longDone = BasicBlockHelper::append($context, 'array_sum_nv_long_done');
+        $context->builder->branchIf($useFloat, $floatPath, $intPath);
+
+        $context->builder->positionAtEnd($intPath);
+        $sumInt = $context->builder->load($sumIntSlot);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($sumInt, $longVal),
+            $sumIntSlot
+        );
+        $context->builder->branch($longDone);
+
+        $context->builder->positionAtEnd($floatPath);
+        $sumFloat = $context->builder->load($sumFloatSlot);
+        $context->builder->store(
+            $context->builder->fadd($sumFloat, $context->builder->siToFp($longVal, $double)),
+            $sumFloatSlot
+        );
+        $context->builder->branch($longDone);
+
+        $context->builder->positionAtEnd($longDone);
+        $context->builder->branch($continueBlock);
+
+        $context->builder->positionAtEnd($doubleBlock);
+        $doubleVal = $context->builder->call($context->lookupFunction('__value__readDouble'), $entry);
+        $useFloatNow = $context->builder->load($useFloatSlot);
+        $promoteBlock = BasicBlockHelper::append($context, 'array_sum_nv_promote');
+        $addFloatBlock = BasicBlockHelper::append($context, 'array_sum_nv_add_float');
+        $doubleDone = BasicBlockHelper::append($context, 'array_sum_nv_double_done');
+        $context->builder->branchIf($useFloatNow, $addFloatBlock, $promoteBlock);
+
+        $context->builder->positionAtEnd($promoteBlock);
+        $sumInt = $context->builder->load($sumIntSlot);
+        $context->builder->store(
+            $context->builder->fadd($context->builder->siToFp($sumInt, $double), $doubleVal),
+            $sumFloatSlot
+        );
+        $context->builder->store($i1->constInt(1, false), $useFloatSlot);
+        $context->builder->branch($doubleDone);
+
+        $context->builder->positionAtEnd($addFloatBlock);
+        $sumFloat = $context->builder->load($sumFloatSlot);
+        $context->builder->store($context->builder->fadd($sumFloat, $doubleVal), $sumFloatSlot);
+        $context->builder->branch($doubleDone);
+
+        $context->builder->positionAtEnd($doubleDone);
+        $context->builder->branch($continueBlock);
+
+        $context->builder->positionAtEnd($continueBlock);
+        $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $useFloat = $context->builder->load($useFloatSlot);
+        $sumInt = $context->builder->load($sumIntSlot);
+        $sumFloat = $context->builder->load($sumFloatSlot);
+
+        return $context->builder->select(
+            $useFloat,
+            $sumFloat,
+            $context->builder->siToFp($sumInt, $double)
+        );
+    }
 }
