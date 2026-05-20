@@ -8,9 +8,9 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 226 |
+| PHP files on vm.php path | 227 |
 | Source constructs flagged (blockers) | 10 |
-| Source constructs flagged (warnings) | 604 |
+| Source constructs flagged (warnings) | 606 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -55,7 +55,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/JitStripTags.php` | 0 | 1 |
 | `ext/standard/JitStrpos.php` | 0 | 1 |
 | `ext/standard/JitUrlencode.php` | 0 | 1 |
-| `ext/standard/Module.php` | 0 | 104 |
+| `ext/standard/Module.php` | 0 | 105 |
 | `ext/standard/VmDate.php` | 0 | 1 |
 | `ext/standard/VmExit.php` | 0 | 2 |
 | `ext/standard/VmFs.php` | 0 | 3 |
@@ -93,6 +93,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/dirname.php` | 0 | 1 |
 | `ext/standard/exp.php` | 0 | 1 |
 | `ext/standard/explode.php` | 0 | 3 |
+| `ext/standard/file_get_contents.php` | 0 | 1 |
 | `ext/standard/floatval.php` | 0 | 1 |
 | `ext/standard/floor.php` | 0 | 1 |
 | `ext/standard/fmod.php` | 0 | 1 |
@@ -468,13 +469,14 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new dirname (line 115)
 - new basename (line 116)
 - new realpath (line 117)
-- new getenv_ (line 118)
-- new putenv_ (line 119)
-- new scandir (line 120)
-- new glob_ (line 121)
-- new time (line 122)
-- new date (line 123)
-- new gmdate (line 124)
+- new file_get_contents (line 118)
+- new getenv_ (line 119)
+- new putenv_ (line 120)
+- new scandir (line 121)
+- new glob_ (line 122)
+- new time (line 123)
+- new date (line 124)
+- new gmdate (line 125)
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/VmDate.php`
@@ -678,6 +680,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 **Warnings** (review for bootstrap subset):
 - new HashTable (line 38)
 - new Variable (line 40)
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/file_get_contents.php`
+
+**Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/floatval.php`
@@ -1736,11 +1743,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/Web/Superglobals.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 494)
-- new Variable (line 495)
-- new Variable (line 514)
-- new Variable (line 589)
-- 26 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new HashTable (line 506)
+- new Variable (line 507)
+- new Variable (line 526)
+- new Variable (line 601)
+- 27 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 - 1 closure(s)
 
 ### `src/macro_functions.php`

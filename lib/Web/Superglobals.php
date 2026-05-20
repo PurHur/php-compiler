@@ -44,6 +44,19 @@ final class Superglobals
         return in_array($name, self::NAMES, true);
     }
 
+    /**
+     * Raw request body from REQUEST_BODY / CGI stdin (issue #289, #50).
+     *
+     * Same bytes as populatePost() parses for application/x-www-form-urlencoded;
+     * JSON and other payloads are returned unchanged for php://input.
+     */
+    public static function readRequestBody(): string
+    {
+        $fromEnv = getenv('REQUEST_BODY');
+
+        return false === $fromEnv ? '' : $fromEnv;
+    }
+
     public static function populateFromEnvironment(
         Context $context,
         ?string $queryString = null,
@@ -61,8 +74,7 @@ final class Superglobals
         self::populateGet($context, $queryString);
 
         if (null === $postBody) {
-            $fromEnv = getenv('REQUEST_BODY');
-            $postBody = false === $fromEnv ? '' : $fromEnv;
+            $postBody = self::readRequestBody();
         }
         self::populatePost($context, $postBody);
         $cookieHeader = getenv('HTTP_COOKIE');
