@@ -13,6 +13,9 @@ use PHPLLVM\Value;
 
 final class ArrayBuiltinHelper
 {
+    /** Monotonic id so copyListEntry basic blocks stay unique per LLVM function. */
+    private static int $copyListEntrySeq = 0;
+
     public static function isNativeArray(int $type): bool
     {
         return 0 !== ($type & Variable::IS_NATIVE_ARRAY);
@@ -247,6 +250,298 @@ final class ArrayBuiltinHelper
         }
 
         return self::buildValuesFromHashTable($context, self::loadHashTable($context, $array));
+    }
+
+    /**
+     * Copy a sub-range of a packed list array (array_slice subset; matches VM HashTable::sliceCopy).
+     *
+     * @param Value $offset   int64 slice offset (negative offsets normalized against element count)
+     * @param Value $hasLength int1 true when the optional length argument was provided
+     * @param Value $length    int64 maximum elements to copy (ignored when $hasLength is false)
+     */
+    public static function buildSliceArray(
+        Context $context,
+        Variable $array,
+        Value $offset,
+        Value $hasLength,
+        Value $length
+    ): Value {
+        if (self::isNativeArray($array->type)) {
+            return self::buildSliceFromNativeArray($context, $array, $offset, $hasLength, $length);
+        }
+
+        return self::buildSliceFromHashTable(
+            $context,
+            self::loadHashTable($context, $array),
+            $offset,
+            $hasLength,
+            $length
+        );
+    }
+
+    private static function normalizeSliceOffset(Context $context, Value $offset, Value $count): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+        $isNegative = $context->builder->icmp(Builder::INT_SLT, $offset, $zero);
+
+        $negBlock = BasicBlockHelper::append($context, 'array_slice_offset_neg');
+        $posBlock = BasicBlockHelper::append($context, 'array_slice_offset_pos');
+        $doneBlock = BasicBlockHelper::append($context, 'array_slice_offset_done');
+        $context->builder->branchIf($isNegative, $negBlock, $posBlock);
+
+        $context->builder->positionAtEnd($negBlock);
+        $adjusted = $context->builder->add($count, $offset);
+        $stillNegative = $context->builder->icmp(Builder::INT_SLT, $adjusted, $zero);
+        $normalizedNeg = $context->builder->select($stillNegative, $zero, $adjusted);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($posBlock);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($i64);
+        $phi->addIncoming($normalizedNeg, $negBlock);
+        $phi->addIncoming($offset, $posBlock);
+
+        return $phi;
+    }
+
+    private static function buildSliceFromNativeArray(
+        Context $context,
+        Variable $array,
+        Value $offset,
+        Value $hasLength,
+        Value $length
+    ): Value {
+        $elemType = $array->type & ~Variable::IS_NATIVE_ARRAY;
+        $sizeT = $context->getTypeFromString('size_t');
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $count = $context->constantFromInteger($array->nextFreeElement, 'size_t');
+        $countI64 = $context->builder->zExt($count, $i64);
+        $normOffsetI64 = self::normalizeSliceOffset($context, $offset, $countI64);
+        $normOffset = $context->builder->truncOrBitCast($normOffsetI64, $sizeT);
+
+        $emptyHt = HashTableHelper::alloc($context);
+        $beyondEnd = $context->builder->icmp(Builder::INT_SGE, $normOffset, $count);
+        $emptyBlock = BasicBlockHelper::append($context, 'array_slice_native_empty');
+        $workBlock = BasicBlockHelper::append($context, 'array_slice_native_work');
+        $doneBlock = BasicBlockHelper::append($context, 'array_slice_native_done');
+        $context->builder->branchIf($beyondEnd, $emptyBlock, $workBlock);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($workBlock);
+        $dest = HashTableHelper::alloc($context);
+        $srcIdxSlot = $context->builder->alloca($sizeT, 1, 'array_slice_native_src');
+        $destIdxSlot = $context->builder->alloca($sizeT, 1, 'array_slice_native_dest');
+        $takenSlot = $context->builder->alloca($sizeT, 1, 'array_slice_native_taken');
+        $context->builder->store($normOffset, $srcIdxSlot);
+        $context->builder->store($zero, $destIdxSlot);
+        $context->builder->store($zero, $takenSlot);
+        $lengthSized = $context->builder->truncOrBitCast($length, $sizeT);
+
+        $head = BasicBlockHelper::append($context, 'array_slice_native_head');
+        $body = BasicBlockHelper::append($context, 'array_slice_native_body');
+        $advance = BasicBlockHelper::append($context, 'array_slice_native_advance');
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $srcIdx = $context->builder->load($srcIdxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $srcIdx, $count);
+        $context->builder->branchIf($atEnd, $doneBlock, $body);
+
+        $limitExit = BasicBlockHelper::append($context, 'array_slice_native_limit_exit');
+        $copyBlock = BasicBlockHelper::append($context, 'array_slice_native_copy');
+
+        $context->builder->positionAtEnd($body);
+        $taken = $context->builder->load($takenSlot);
+        $limitReached = $context->builder->and(
+            $hasLength,
+            $context->builder->icmp(Builder::INT_SGE, $taken, $lengthSized)
+        );
+        $context->builder->branchIf($limitReached, $limitExit, $copyBlock);
+
+        $context->builder->positionAtEnd($limitExit);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($copyBlock);
+        $srcIdx = $context->builder->load($srcIdxSlot);
+        $slot = $context->builder->inBoundsGep($array->value, $zero, $srcIdx);
+        if (Variable::TYPE_STRING === $elemType) {
+            $elem = new Variable($context, $elemType, Variable::KIND_VARIABLE, $slot);
+        } else {
+            $elem = new Variable(
+                $context,
+                $elemType,
+                Variable::KIND_VALUE,
+                $context->builder->load($slot)
+            );
+        }
+        $destIdx = $context->builder->load($destIdxSlot);
+        HashTableHelper::setAtIndex($context, $dest, $destIdx, $elem);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($destIdx, $one),
+            $destIdxSlot
+        );
+        $context->builder->store(
+            $context->builder->addNoSignedWrap(
+                $context->builder->load($takenSlot),
+                $one
+            ),
+            $takenSlot
+        );
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($advance);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($srcIdx, $one),
+            $srcIdxSlot
+        );
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($emptyHt->typeOf());
+        $phi->addIncoming($emptyHt, $emptyBlock);
+        $phi->addIncoming($dest, $limitExit);
+        $phi->addIncoming($dest, $head);
+
+        return $phi;
+    }
+
+    private static function buildSliceFromHashTable(
+        Context $context,
+        Value $src,
+        Value $offset,
+        Value $hasLength,
+        Value $length
+    ): Value {
+        $map = $context->structFieldMap['__hashtable__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $nextFree = $context->builder->load(
+            $context->builder->structGep($src, $map['nextFreeElement'])
+        );
+        $num = $context->builder->call(
+            $context->lookupFunction('__hashtable__getNumElements'),
+            $src
+        );
+        $countI64 = $context->builder->zExt($num, $i64);
+        $normOffsetI64 = self::normalizeSliceOffset($context, $offset, $countI64);
+        $normOffset = $context->builder->truncOrBitCast($normOffsetI64, $sizeT);
+        $lengthSized = $context->builder->truncOrBitCast($length, $sizeT);
+
+        $emptyHt = HashTableHelper::alloc($context);
+        $beyondEnd = $context->builder->icmp(Builder::INT_SGE, $normOffset, $nextFree);
+        $emptyBlock = BasicBlockHelper::append($context, 'array_slice_empty');
+        $workBlock = BasicBlockHelper::append($context, 'array_slice_work');
+        $doneBlock = BasicBlockHelper::append($context, 'array_slice_done');
+        $context->builder->branchIf($beyondEnd, $emptyBlock, $workBlock);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($workBlock);
+        $dest = HashTableHelper::alloc($context);
+        $srcIdxSlot = $context->builder->alloca($sizeT, 1, 'array_slice_src');
+        $logicalIdxSlot = $context->builder->alloca($sizeT, 1, 'array_slice_logical');
+        $destIdxSlot = $context->builder->alloca($sizeT, 1, 'array_slice_dest');
+        $takenSlot = $context->builder->alloca($sizeT, 1, 'array_slice_taken');
+        $context->builder->store($zero, $srcIdxSlot);
+        $context->builder->store($zero, $logicalIdxSlot);
+        $context->builder->store($zero, $destIdxSlot);
+        $context->builder->store($zero, $takenSlot);
+
+        $head = BasicBlockHelper::append($context, 'array_slice_head');
+        $check = BasicBlockHelper::append($context, 'array_slice_check');
+        $skipUnset = BasicBlockHelper::append($context, 'array_slice_skip_unset');
+        $beforeOffset = BasicBlockHelper::append($context, 'array_slice_before_offset');
+        $limitExit = BasicBlockHelper::append($context, 'array_slice_limit_exit');
+        $limitDone = BasicBlockHelper::append($context, 'array_slice_limit_done');
+        $copyBlock = BasicBlockHelper::append($context, 'array_slice_copy');
+        $advanceLogical = BasicBlockHelper::append($context, 'array_slice_advance_logical');
+        $advanceSrc = BasicBlockHelper::append($context, 'array_slice_advance_src');
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $srcIdx = $context->builder->load($srcIdxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $srcIdx, $nextFree);
+        $context->builder->branchIf($atEnd, $doneBlock, $check);
+
+        $context->builder->positionAtEnd($check);
+        $isSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $src,
+            $srcIdx
+        );
+        $context->builder->branchIf($isSet, $beforeOffset, $skipUnset);
+
+        $context->builder->positionAtEnd($skipUnset);
+        $context->builder->branch($advanceSrc);
+
+        $context->builder->positionAtEnd($beforeOffset);
+        $logicalIdx = $context->builder->load($logicalIdxSlot);
+        $beforeSlice = $context->builder->icmp(Builder::INT_SLT, $logicalIdx, $normOffset);
+        $context->builder->branchIf($beforeSlice, $advanceLogical, $copyBlock);
+
+        $context->builder->positionAtEnd($copyBlock);
+        $taken = $context->builder->load($takenSlot);
+        $limitReached = $context->builder->and(
+            $hasLength,
+            $context->builder->icmp(Builder::INT_SGE, $taken, $lengthSized)
+        );
+        $context->builder->branchIf($limitReached, $limitExit, $limitDone);
+
+        $context->builder->positionAtEnd($limitExit);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($limitDone);
+        $srcIdx = $context->builder->load($srcIdxSlot);
+        $destIdx = $context->builder->load($destIdxSlot);
+        self::copyListEntry($context, $src, $srcIdx, $dest, $destIdx);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($destIdx, $one),
+            $destIdxSlot
+        );
+        $context->builder->store(
+            $context->builder->addNoSignedWrap(
+                $context->builder->load($takenSlot),
+                $one
+            ),
+            $takenSlot
+        );
+        $context->builder->branch($advanceLogical);
+
+        $context->builder->positionAtEnd($advanceLogical);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($context->builder->load($srcIdxSlot), $one),
+            $srcIdxSlot
+        );
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($context->builder->load($logicalIdxSlot), $one),
+            $logicalIdxSlot
+        );
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($advanceSrc);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($context->builder->load($srcIdxSlot), $one),
+            $srcIdxSlot
+        );
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($emptyHt->typeOf());
+        $phi->addIncoming($emptyHt, $emptyBlock);
+        $phi->addIncoming($dest, $head);
+        $phi->addIncoming($dest, $limitExit);
+
+        return $phi;
     }
 
     private static function buildValuesFromNativeArray(Context $context, Variable $array): Value
@@ -518,6 +813,7 @@ final class ArrayBuiltinHelper
         Value $dest,
         Value $destIndex
     ): void {
+        $tag = 'n'.self::$copyListEntrySeq++;
         $srcEntry = self::listEntryAt($context, $src, $srcIndex);
         $valueMap = $context->structFieldMap['__value__'];
         $typeByte = $context->builder->load(
@@ -525,11 +821,11 @@ final class ArrayBuiltinHelper
         );
         $i8 = $context->getTypeFromString('int8');
 
-        $longBlock = BasicBlockHelper::append($context, 'array_values_copy_long');
-        $stringBlock = BasicBlockHelper::append($context, 'array_values_copy_string');
-        $doubleBlock = BasicBlockHelper::append($context, 'array_values_copy_double');
-        $boolBlock = BasicBlockHelper::append($context, 'array_values_copy_bool');
-        $done = BasicBlockHelper::append($context, 'array_values_copy_done');
+        $longBlock = BasicBlockHelper::append($context, 'ht_copy_long_'.$tag);
+        $stringBlock = BasicBlockHelper::append($context, 'ht_copy_string_'.$tag);
+        $doubleBlock = BasicBlockHelper::append($context, 'ht_copy_double_'.$tag);
+        $boolBlock = BasicBlockHelper::append($context, 'ht_copy_bool_'.$tag);
+        $done = BasicBlockHelper::append($context, 'ht_copy_done_'.$tag);
 
         $isString = $context->builder->icmp(
             Builder::INT_EQ,
@@ -552,7 +848,7 @@ final class ArrayBuiltinHelper
             $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
         );
 
-        $afterString = BasicBlockHelper::append($context, 'array_values_after_string');
+        $afterString = BasicBlockHelper::append($context, 'ht_copy_after_string_'.$tag);
         $context->builder->branchIf($isString, $stringBlock, $afterString);
 
         $context->builder->positionAtEnd($stringBlock);
@@ -565,7 +861,7 @@ final class ArrayBuiltinHelper
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($afterString);
-        $afterLong = BasicBlockHelper::append($context, 'array_values_after_long');
+        $afterLong = BasicBlockHelper::append($context, 'ht_copy_after_long_'.$tag);
         $context->builder->branchIf($isLong, $longBlock, $afterLong);
 
         $context->builder->positionAtEnd($longBlock);
@@ -578,7 +874,7 @@ final class ArrayBuiltinHelper
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($afterLong);
-        $afterBool = BasicBlockHelper::append($context, 'array_values_after_bool');
+        $afterBool = BasicBlockHelper::append($context, 'ht_copy_after_bool_'.$tag);
         $context->builder->branchIf($isBool, $boolBlock, $afterBool);
 
         $context->builder->positionAtEnd($boolBlock);
