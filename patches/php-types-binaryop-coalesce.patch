@@ -1,6 +1,6 @@
 --- vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
 +++ vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
-@@ -198,6 +198,17 @@
+@@ -198,6 +198,18 @@
                  }
  
                  return false;

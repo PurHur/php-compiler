@@ -10,6 +10,7 @@ use PHPUnit\Framework\TestCase;
  * AOT binaries refresh superglobals from CGI env each run (issue #201).
  *
  * @group llvm
+ * @group aot
  */
 final class RuntimeSuperglobalRefreshTest extends TestCase
 {
@@ -74,6 +75,68 @@ final class RuntimeSuperglobalRefreshTest extends TestCase
         $envB['REQUEST_URI'] = '/example.php?name=Bob';
         $outB = $this->runBinary($outfile, $envB);
         $this->assertStringContainsString('Hello Bob', $outB);
+
+        @unlink($outfile);
+    }
+
+    /**
+     * One AOT binary, two POST bodies — $_POST must refresh per run (issue #257).
+     */
+    public function testTwoRequestsDifferentPostBody(): void
+    {
+        $source = <<<'PHP'
+<?php
+declare(strict_types=1);
+header('Content-Type: text/plain; charset=UTF-8');
+echo 'Hello ', $_POST['name'];
+PHP;
+
+        $outfile = tempnam(sys_get_temp_dir(), 'phpc_post_refresh_');
+        $this->assertNotFalse($outfile);
+        unlink($outfile);
+
+        $repoRoot = dirname(__DIR__, 2);
+        $env = $this->llvmProcessEnv($repoRoot);
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+
+        $compile = proc_open(
+            array_merge(
+                self::llvmEnvPrefix(),
+                self::phpCommand(),
+                [$this->compileBin, '-o', $outfile]
+            ),
+            $descriptorSpec,
+            $pipes,
+            $repoRoot,
+            $env
+        );
+        fwrite($pipes[0], $source);
+        fclose($pipes[0]);
+        $compileErr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        proc_close($compile);
+        $this->assertFileExists($outfile, trim($compileErr !== false ? $compileErr : ''));
+
+        $base = $env;
+        $base['REQUEST_METHOD'] = 'POST';
+        $base['SCRIPT_NAME'] = '/example.php';
+        $base['REQUEST_URI'] = '/example.php';
+
+        $envAlice = $base;
+        $envAlice['REQUEST_BODY'] = 'name=Alice';
+        $outAlice = $this->runBinary($outfile, $envAlice);
+        $this->assertStringContainsString('Hello Alice', $this->cgiBody($outAlice));
+
+        $envBob = $base;
+        $envBob['REQUEST_BODY'] = 'name=Bob';
+        $outBob = $this->runBinary($outfile, $envBob);
+        $this->assertStringContainsString('Hello Bob', $this->cgiBody($outBob));
+        $this->assertStringNotContainsString('Hello Alice', $this->cgiBody($outBob));
 
         @unlink($outfile);
     }

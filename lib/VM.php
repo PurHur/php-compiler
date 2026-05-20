@@ -259,6 +259,7 @@ restart:
                     }
                     $new->calledArgs = $frame->callArgs;
                     if ($new->hasHandler()) {
+                        $new->parent = $frame;
                         $new->handler->execute($new);
                         break;
                     }
@@ -384,10 +385,10 @@ restart:
             switch ($op->type) {
                 case OpCode::TYPE_DECLARE_PROPERTY:
                     $name = $frame->scope[$op->arg1];
-                    assert(is_null($op->arg2)); // no defaults for now
+                    $default = is_null($op->arg2) ? null : $frame->scope[$op->arg2];
                     $entry->properties[] = new VM\ClassProperty(
                         $name->toString(),
-                        null,
+                        $default,
                         $frame->scope[$op->arg3]
                     );
                     break;

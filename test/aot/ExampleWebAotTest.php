@@ -10,6 +10,7 @@ use PHPUnit\Framework\TestCase;
  * AOT-compile shipped web examples from disk (not stdin PHPT).
  *
  * @group llvm
+ * @group aot
  */
 final class ExampleWebAotTest extends TestCase
 {

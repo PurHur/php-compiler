@@ -11,8 +11,10 @@ use PHPUnit\Framework\TestCase;
  *
  * @see https://github.com/PurHur/php-compiler/issues/203
  * @see https://github.com/PurHur/php-compiler/issues/243 (structured phpc lint per shipped example)
+ * @see https://github.com/PurHur/php-compiler/issues/247 (002-StaticWeb compile.php build + execute)
  * @see https://github.com/PurHur/php-compiler/issues/282 (002-StaticWeb via ./phpc build)
  * @see https://github.com/PurHur/php-compiler/issues/309 (001-SimpleWeb AOT execute + QUERY_STRING refresh in this gate)
+ * @see https://github.com/PurHur/php-compiler/issues/259 (001-SimpleWeb POST via $_REQUEST)
  * @see https://github.com/PurHur/php-compiler/issues/274 (minimal phpc.json beside web examples)
  */
 final class ExamplesCompileTest extends TestCase
@@ -140,9 +142,21 @@ final class ExamplesCompileTest extends TestCase
     }
 
     /**
+     * Shipped 001-SimpleWeb: VM run with -p populates $_REQUEST from POST body (issue #259).
+     */
+    public function testVmSmokePost001SimpleWeb(): void
+    {
+        $examplePath = dirname(__DIR__, 2).'/examples/001-SimpleWeb/example.php';
+        $this->assertFileExists($examplePath);
+        $out = $this->runCli('vm.php', ['-p', 'name=PostExample', $examplePath]);
+        $this->assertStringContainsString('Hello PostExample', $out);
+    }
+
+    /**
      * @dataProvider provideExamples
      *
      * @group llvm
+     * @group aot
      */
     public function testAotLint(string $examplePath): void
     {
@@ -160,6 +174,7 @@ final class ExamplesCompileTest extends TestCase
      * different QUERY_STRING — catches regressions in runtime superglobal refresh for web binaries.
      *
      * @group llvm
+     * @group aot
      */
     public function testAotExecuteSimpleWebDualQuery(): void
     {
@@ -193,9 +208,68 @@ final class ExamplesCompileTest extends TestCase
     }
 
     /**
+     * Shipped 001-SimpleWeb: AOT binary with REQUEST_BODY — $_REQUEST POST path (issue #259).
+     *
+     * @group llvm
+     * @group aot
+     */
+    public function testAotExecuteSimpleWebPost(): void
+    {
+        if (!self::isLlvmReady()) {
+            $this->markTestSkipped(
+                'LLVM 9 toolchain not available. Run script/install-llvm9.sh from the repository root.'
+            );
+        }
+        $source = realpath(dirname(__DIR__, 2).'/examples/001-SimpleWeb/example.php');
+        $this->assertNotFalse($source);
+
+        $repoRoot = dirname(__DIR__, 2);
+        $env = $this->llvmProcessEnv($repoRoot);
+        $binary = $this->compileAotBinaryNoQueryBaking($source, $repoRoot, $env);
+
+        $envPost = $env;
+        $envPost['REQUEST_METHOD'] = 'POST';
+        $envPost['REQUEST_BODY'] = 'name=PostAot';
+        $envPost['SCRIPT_NAME'] = '/example.php';
+        $envPost['REQUEST_URI'] = '/example.php';
+        $out = $this->runAotBinary($binary, $envPost);
+        $this->assertStringContainsString('<h1>Hello PostAot</h1>', $out);
+
+        @unlink($binary);
+    }
+
+    /**
+     * Shipped 002-StaticWeb: compile.php -o temp binary, run once — AOT link + runtime smoke (no superglobals).
+     *
+     * @group llvm
+     * @group aot
+     *
+     * @see https://github.com/PurHur/php-compiler/issues/247
+     */
+    public function testAotExecuteSmoke002StaticWeb(): void
+    {
+        if (!self::isLlvmReady()) {
+            $this->markTestSkipped(
+                'LLVM 9 toolchain not available. Run script/install-llvm9.sh from the repository root.'
+            );
+        }
+        $repoRoot = dirname(__DIR__, 2);
+        $source = realpath($repoRoot.'/examples/002-StaticWeb/example.php');
+        $this->assertNotFalse($source);
+
+        $env = $this->llvmProcessEnv($repoRoot);
+        $binary = $this->compileAotBinaryNoQueryBaking($source, $repoRoot, $env);
+        $out = $this->runAotBinary($binary, $env);
+        $this->assertStringContainsString('Hello World', $out);
+
+        @unlink($binary);
+    }
+
+    /**
      * Shipped 002-StaticWeb: ./phpc build then execute — smoke for unified CLI argv/env forwarding.
      *
      * @group llvm
+     * @group aot
      */
     public function testPhpcBuildSmoke002StaticWeb(): void
     {

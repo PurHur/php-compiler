@@ -23,7 +23,8 @@ final class JitStrpos
         Context $context,
         Value $haystack,
         Value $needle,
-        ?Value $offset = null
+        ?Value $offset = null,
+        bool $caseInsensitive = false
     ): Value {
         $map = $context->structFieldMap['__string__'];
         $hayLen = $context->builder->load(
@@ -39,8 +40,9 @@ final class JitStrpos
             $searchPtr = $context->builder->inBoundsGEP($hayPtr, $clamped);
         }
 
+        $searchFn = $caseInsensitive ? 'strcasestr' : 'strstr';
         $found = $context->builder->call(
-            $context->lookupFunction('strstr'),
+            $context->lookupFunction($searchFn),
             $searchPtr,
             $needlePtr
         );

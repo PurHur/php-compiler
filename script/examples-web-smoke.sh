@@ -114,11 +114,43 @@ curl_expect_200() {
   echo "examples-web-smoke: ${label}: ok"
 }
 
+curl_expect_200_post() {
+  local label="$1"
+  local url="$2"
+  local post_body="$3"
+  shift 3
+  local needles=("$@")
+  local body status
+  body="$(mktemp)"
+  status="$(curl -sS -o "$body" -w '%{http_code}' --connect-timeout 5 --max-time 15 \
+    -X POST -d "$post_body" "$url" || echo "000")"
+  if [[ "$status" != "200" ]]; then
+    echo "examples-web-smoke: ${label}: expected HTTP 200, got ${status}" >&2
+    echo "  url: ${url}" >&2
+    cat "$body" >&2 || true
+    rm -f "$body"
+    return 1
+  fi
+  for needle in "${needles[@]}"; do
+    if ! grep -qF "$needle" "$body"; then
+      echo "examples-web-smoke: ${label}: response missing needle: ${needle}" >&2
+      echo "  url: ${url}" >&2
+      cat "$body" >&2 || true
+      rm -f "$body"
+      return 1
+    fi
+  done
+  rm -f "$body"
+  echo "examples-web-smoke: ${label}: ok"
+}
+
 run_docroot_smoke() {
   local name="$1"
   local docroot="${ROOT}/${2}"
   shift 2
-  # Remaining args: pairs of "label|url|needle1|needle2|..."
+  # Remaining args: "METHOD|label|path|body|needle1;needle2;..."
+  #   GET: body is "-" (no POST payload)
+  #   POST: body is application/x-www-form-urlencoded (no "|" in body)
   if [[ ! -d "$docroot" ]]; then
     echo "examples-web-smoke: missing docroot ${docroot}" >&2
     return 1
@@ -158,14 +190,29 @@ run_docroot_smoke() {
 
   local base="http://127.0.0.1:${port}"
   while [[ $# -gt 0 ]]; do
-    IFS='|' read -r label path needles_str <<<"$1"
+    IFS='|' read -r method label path post_body needles_str <<<"$1"
     shift
     local -a needles=()
     if [[ -n "$needles_str" ]]; then
       IFS=';' read -ra needles <<<"$needles_str"
     fi
     local url="${base}${path}"
-    curl_expect_200 "$name / ${label}" "$url" "${needles[@]}"
+    case "${method}" in
+      GET)
+        curl_expect_200 "$name / ${label}" "$url" "${needles[@]}"
+        ;;
+      POST)
+        if [[ "$post_body" == "-" || -z "$post_body" ]]; then
+          echo "examples-web-smoke: POST ${label} requires a form body" >&2
+          return 1
+        fi
+        curl_expect_200_post "$name / ${label}" "$url" "$post_body" "${needles[@]}"
+        ;;
+      *)
+        echo "examples-web-smoke: unknown method ${method} for ${label}" >&2
+        return 1
+        ;;
+    esac
   done
 
   stop_serve
@@ -175,11 +222,12 @@ run_docroot_smoke() {
 echo "examples-web-smoke: starting ($( [[ "$AOT" -eq 1 ]] && echo --aot || echo VM ))"
 
 run_docroot_smoke "001-SimpleWeb" "examples/001-SimpleWeb" \
-  "GET example.php?name=Smoke|/example.php?name=Smoke|Hello;Smoke" \
-  "static style.css|/style.css|body {"
+  "GET|GET example.php?name=Smoke|/example.php?name=Smoke|-|Hello;Smoke" \
+  "POST|POST example.php|/example.php|name=PostDev|Hello;PostDev" \
+  "GET|static style.css|/style.css|-|body {"
 
 run_docroot_smoke "002-StaticWeb" "examples/002-StaticWeb" \
-  "GET example.php|/example.php|Hello;World" \
-  "GET / (example.php fallback)|/|Hello;World"
+  "GET|GET example.php|/example.php|-|Hello;World" \
+  "GET|GET / (example.php fallback)|/|-|Hello;World"
 
 echo "examples-web-smoke: ok"

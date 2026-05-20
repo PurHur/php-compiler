@@ -1,6 +1,6 @@
 --- vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/NullsafePropertyFetch.php
 +++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/NullsafePropertyFetch.php
-@@ -0,0 +1,33 @@
+@@ -0,0 +1,32 @@
 +<?php
 +
 +declare(strict_types=1);
@@ -35,7 +35,7 @@
 +}
 --- vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/NullsafeMethodCall.php
 +++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/NullsafeMethodCall.php
-@@ -0,0 +1,37 @@
+@@ -0,0 +1,35 @@
 +<?php
 +
 +declare(strict_types=1);
@@ -73,7 +73,7 @@
 +}
 --- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
 +++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
-@@ -1206,6 +1206,26 @@
+@@ -1206,6 +1206,25 @@
          return new Op\Expr\Print_($this->readVariable($this->parseExprNode($expr->expr)), $this->mapAttributes($expr));
      }
  
