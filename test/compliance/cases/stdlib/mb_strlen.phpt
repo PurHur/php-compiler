@@ -1,5 +1,5 @@
 --TEST--
-stdlib mb_strlen() JIT UTF-8 character count
+stdlib mb_strlen() UTF-8 character count (VM)
 --FILE--
 <?php
 echo mb_strlen('é', 'UTF-8'), "\n";

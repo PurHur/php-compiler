@@ -9,10 +9,11 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\VM\Variable as VMVariable;
 use PHPLLVM\Value;
 
 /**
- * mb_strlen() — byte length of string (UTF-8 safe for ASCII subset in this compiler).
+ * mb_strlen() — UTF-8 character count for web forms (issue #158).
  */
 final class mb_strlen extends Internal
 {
@@ -23,31 +24,79 @@ final class mb_strlen extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('mb_strlen() requires exactly one argument');
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 2) {
+            throw new \LogicException('mb_strlen() requires one or two arguments');
         }
-        $var = $frame->calledArgs[0];
-        if (null !== $frame->returnVar) {
-            $frame->returnVar->int(VmString::byteLength($var->resolveIndirect()->toString()));
+        $strVar = $frame->calledArgs[0]->resolveIndirect();
+        if (VMVariable::TYPE_STRING !== $strVar->type) {
+            throw new \LogicException('mb_strlen() only supports strings in this compiler build');
         }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $str = $strVar->toString();
+        $encoding = 'UTF-8';
+        if (2 === $argc) {
+            $encVar = $frame->calledArgs[1]->resolveIndirect();
+            if (VMVariable::TYPE_STRING !== $encVar->type) {
+                throw new \LogicException('mb_strlen() encoding must be a string in this compiler build');
+            }
+            $encoding = $encVar->toString();
+        }
+        $frame->returnVar->int(self::lengthForEncoding($str, $encoding));
     }
-
-    public Context $context;
 
     public function call(Context $context, Variable ...$args): Value
     {
-        $this->context = $context;
-        if (1 !== \count($args)) {
-            throw new \LogicException('mb_strlen() requires exactly one argument');
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 2) {
+            throw new \LogicException('mb_strlen() requires one or two arguments');
         }
-        $argValue = $context->helper->loadValue($args[0]);
+        if (1 === $argc) {
+            return JitMbStrlen::utf8Length($context, $args[0]);
+        }
+        if (Variable::TYPE_STRING !== $args[1]->type) {
+            throw new \LogicException('mb_strlen() encoding must be a string in this compiler build');
+        }
+        $encoding = $args[1]->compileTimeString ?? null;
+        if ('UTF-8' === $encoding) {
+            return JitMbStrlen::utf8Length($context, $args[0]);
+        }
+        if (null !== $encoding && 'ASCII' !== $encoding && '8BIT' !== $encoding) {
+            throw new \LogicException(
+                'mb_strlen() JIT only supports UTF-8, ASCII, or 8BIT encoding literals in this compiler build'
+            );
+        }
         if (Variable::TYPE_STRING !== $args[0]->type) {
             throw new \LogicException('mb_strlen() only supports strings in this compiler build');
         }
-        $offset = $this->context->structFieldMap[$argValue->typeOf()->getElementType()->getName()]['length'];
+        $argValue = $context->helper->loadValue($args[0]);
+        $offset = $context->structFieldMap[$argValue->typeOf()->getElementType()->getName()]['length'];
 
-        return $this->context->builder->load(
-            $this->context->builder->structGep($argValue, $offset)
+        return $context->builder->load(
+            $context->builder->structGep($argValue, $offset)
+        );
+    }
+
+    private static function lengthForEncoding(string $str, string $encoding): int
+    {
+        if ('UTF-8' === $encoding) {
+            if (\function_exists('mb_strlen')) {
+                return (int) \mb_strlen($str, 'UTF-8');
+            }
+
+            return VmString::utf8CharLength($str);
+        }
+        if ('ASCII' === $encoding || '8BIT' === $encoding) {
+            return VmString::byteLength($str);
+        }
+        if (\function_exists('mb_strlen')) {
+            return (int) \mb_strlen($str, $encoding);
+        }
+
+        throw new \LogicException(
+            'mb_strlen() requires mbstring for encoding '.$encoding.' in this compiler build'
         );
     }
 }

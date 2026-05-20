@@ -22,6 +22,31 @@ final class VmString
         return $len;
     }
 
+    /**
+     * UTF-8 codepoint count for BMP web text (issue #158). Invalid bytes count as one character.
+     */
+    public static function utf8CharLength(string $string): int
+    {
+        $byteLen = self::byteLength($string);
+        $count = 0;
+        for ($i = 0; $i < $byteLen; ++$count) {
+            $byte = \ord($string[$i]);
+            if ($byte < 0x80) {
+                $i += 1;
+            } elseif (($byte & 0xE0) === 0xC0 && $i + 1 < $byteLen) {
+                $i += 2;
+            } elseif (($byte & 0xF0) === 0xE0 && $i + 2 < $byteLen) {
+                $i += 3;
+            } elseif (($byte & 0xF8) === 0xF0 && $i + 3 < $byteLen) {
+                $i += 4;
+            } else {
+                $i += 1;
+            }
+        }
+
+        return $count;
+    }
+
     public static function byteSlice(string $string, int $offset, ?int $length = null): string
     {
         $len = self::byteLength($string);

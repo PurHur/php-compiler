@@ -1115,6 +1115,40 @@ __string__ *__compiler_strip_tags(__string__ *input, __string__ *allowed)
 }
 
 /*
+ * UTF-8 character count for mb_strlen() JIT/AOT (issue #158).
+ */
+long long __compiler_utf8_strlen(__string__ *input)
+{
+    const char *src;
+    size_t slen;
+    size_t i = 0;
+    long long count = 0;
+
+    if (input == NULL) {
+        return 0;
+    }
+    src = nf_strdata(input);
+    slen = nf_strlen(input);
+    while (i < slen) {
+        unsigned char b = (unsigned char) src[i];
+        if (b < 0x80) {
+            i += 1;
+        } else if ((b & 0xE0) == 0xC0 && i + 1 < slen) {
+            i += 2;
+        } else if ((b & 0xF0) == 0xE0 && i + 2 < slen) {
+            i += 3;
+        } else if ((b & 0xF8) == 0xF0 && i + 3 < slen) {
+            i += 4;
+        } else {
+            i += 1;
+        }
+        count++;
+    }
+
+    return count;
+}
+
+/*
  * Zend parity for missing array string keys (issue #273).
  * Called from JIT __hashtable__readStringKeyValue when lookup returns NULL.
  */
