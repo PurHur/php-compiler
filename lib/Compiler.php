@@ -388,13 +388,6 @@ class Compiler {
                     $this->compileOperand($expr->var, $block, false),
                     $this->compileOperand($expr->expr, $block, true) 
                 )];
-            case Op\Expr\UnaryMinus::class:
-            case Op\Expr\UnaryPlus::class:
-            case Op\Expr\BitwiseNot::class:
-            case Op\Expr\BooleanNot::class:
-            case Op\Expr\Clone_::class:
-            case Op\Expr\Empty_::class:
-            case Op\Expr\Eval_::class:
             case Op\Expr\Exit_::class:
                 $exitExpr = null !== $expr->expr
                     ? $this->compileOperand($expr->expr, $block, true)
@@ -404,6 +397,18 @@ class Compiler {
                     OpCode::TYPE_EXIT,
                     $this->compileOperand($expr->result, $block, false),
                     $exitExpr
+                )];
+            case Op\Expr\UnaryMinus::class:
+            case Op\Expr\UnaryPlus::class:
+            case Op\Expr\BitwiseNot::class:
+            case Op\Expr\BooleanNot::class:
+            case Op\Expr\Clone_::class:
+            case Op\Expr\Empty_::class:
+            case Op\Expr\Eval_::class:
+                return [new OpCode(
+                    $this->getOpCodeTypeFromUnaryOp($expr),
+                    $this->compileOperand($expr->result, $block, false),
+                    $this->compileOperand($expr->expr, $block, true)
                 )];
             case Op\Expr\Print_::class:
                 return [new OpCode(
