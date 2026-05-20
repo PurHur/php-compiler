@@ -8,9 +8,9 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 237 |
+| PHP files on vm.php path | 238 |
 | Source constructs flagged (blockers) | 10 |
-| Source constructs flagged (warnings) | 625 |
+| Source constructs flagged (warnings) | 626 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -180,6 +180,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `lib/Block.php` | 0 | 4 |
 | `lib/Cli/PhpcInit.php` | 0 | 1 |
 | `lib/Compiler.php` | 0 | 79 |
+| `lib/Doctor.php` | 0 | 1 |
 | `lib/Frame.php` | 0 | 1 |
 | `lib/Func.php` | 0 | 1 |
 | `lib/Func/Internal.php` | 0 | 2 |
@@ -1247,6 +1248,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new OpCode (line 919)
 - 30 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 - 1 closure(s)
+
+### `lib/Doctor.php`
+
+**Warnings** (review for bootstrap subset):
+- 10 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/Frame.php`
 
