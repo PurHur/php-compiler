@@ -1,0 +1,86 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler;
+
+use PHPUnit\Framework\TestCase;
+
+/**
+ * phpc doctor environment probes (issue #253).
+ */
+final class PhpcDoctorTest extends TestCase
+{
+    public function testHelpListsDoctor(): void
+    {
+        $result = $this->runPhpc(['help']);
+        $this->assertSame(0, $result['exit']);
+        $this->assertStringContainsString('phpc doctor', $result['stdout']);
+    }
+
+    public function testDoctorPassesInHealthyRepo(): void
+    {
+        $result = $this->runPhpc(['doctor']);
+        $this->assertSame(0, $result['exit'], $result['stdout']."\n".$result['stderr']);
+        $this->assertStringContainsString('[ok] PHP:', $result['stdout']);
+        $this->assertStringContainsString('[ok] Composer deps:', $result['stdout']);
+        $this->assertStringContainsString('Environment ready for full local CI', $result['stdout']);
+    }
+
+    /**
+     * @param list<string> $phpcArgs
+     *
+     * @return array{exit: int, stdout: string, stderr: string}
+     */
+    private function runPhpc(array $phpcArgs): array
+    {
+        $repoRoot = dirname(__DIR__, 2);
+        $cmd = array_merge(
+            self::phpCommand(),
+            [$repoRoot.'/bin/phpc.php', ...$phpcArgs]
+        );
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open($cmd, $descriptorSpec, $pipes, $repoRoot);
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+
+        return [
+            'exit' => is_int($exit) ? $exit : 1,
+            'stdout' => false !== $stdout ? $stdout : '',
+            'stderr' => false !== $stderr ? $stderr : '',
+        ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function phpCommand(): array
+    {
+        $phpEnv = getenv('PHP_COMPILER_PHP');
+        if (false !== $phpEnv && '' !== $phpEnv) {
+            return preg_split('/\s+/', $phpEnv) ?: [PHP_BINARY];
+        }
+        $cmd = [PHP_BINARY];
+        $extDir = getenv('PHP_COMPILER_EXT_DIR') ?: '/usr/lib/php/20220829';
+        if (is_dir($extDir)) {
+            foreach (['tokenizer', 'mbstring', 'dom', 'xml', 'xmlwriter', 'ffi', 'posix', 'phar'] as $ext) {
+                $so = $extDir.'/'.$ext.'.so';
+                if (is_file($so)) {
+                    $cmd[] = '-d';
+                    $cmd[] = 'extension='.$so;
+                }
+            }
+        }
+
+        return $cmd;
+    }
+}

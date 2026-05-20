@@ -16,6 +16,7 @@ declare(strict_types=1);
  *   phpc lint --all <dir-or-file> [--json]
  *   phpc init [--force] [target-dir]
  *   phpc test [-- phpunit/ci-local args...]
+ *   phpc doctor                                  Probe PHP, LLVM, deps, loopback (issue #253)
  */
 
 $repoRoot = realpath(__DIR__.'/..') ?: __DIR__.'/..';
@@ -40,6 +41,7 @@ php-compiler CLI
   phpc lint --all <dir-or-file> [--json]      All .php under a tree (aggregated)
   phpc init [--force] [target-dir]              Scaffold phpc.json + public/index.php
   phpc test [args...]                           Run ./script/ci-local.sh
+  phpc doctor                                   Probe environment for full local CI
 
 HELP);
     exit([] === $args ? 1 : 0);
@@ -89,6 +91,14 @@ switch ($command) {
             exit(1);
         }
         exit(runProcess(array_merge([$testScript], $args), $repoRoot));
+
+    case 'doctor':
+        if (!is_file($repoRoot.'/vendor/autoload.php')) {
+            fwrite(STDERR, "phpc doctor: run composer install first\n");
+            exit(1);
+        }
+        require $repoRoot.'/vendor/autoload.php';
+        exit(\PHPCompiler\Doctor::run($repoRoot));
 
     default:
         fwrite(STDERR, "Unknown command: {$command}\n");
