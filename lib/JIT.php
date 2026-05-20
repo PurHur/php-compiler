@@ -820,6 +820,17 @@ class JIT {
             $result->addref();
 
             return;
+        } elseif (Variable::TYPE_STRING === $result->type && Variable::TYPE_VALUE === $value->type) {
+            $valuePtr = $this->context->helper->loadValue($value);
+            $str = $this->context->builder->call(
+                $this->context->lookupFunction('__value__readString'),
+                $valuePtr
+            );
+            $result->free();
+            $this->context->builder->store($str, $result->value);
+            $result->addref();
+
+            return;
         }
         throw new \LogicException("Cannot assign operands of different types (yet): {$value->type}, {$result->type}");
     }

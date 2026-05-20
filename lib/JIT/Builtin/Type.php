@@ -104,6 +104,16 @@ class Type extends Builtin {
         );
         $fnReadfile = $this->context->module->addFunction('__compiler_readfile', $fntypeReadfile);
         $this->context->registerFunction('__compiler_readfile', $fnReadfile);
+        $fntypeFileGetContents = $this->context->context->functionType(
+            $this->context->getTypeFromString('__string__*'),
+            false,
+            $this->context->getTypeFromString('__string__*')
+        );
+        $fnFileGetContents = $this->context->module->addFunction(
+            '__compiler_file_get_contents',
+            $fntypeFileGetContents
+        );
+        $this->context->registerFunction('__compiler_file_get_contents', $fnFileGetContents);
         $void = $this->context->getTypeFromString('void');
         $fntypeRandomBytes = $this->context->context->functionType(
             $this->context->getTypeFromString('__string__*'),
