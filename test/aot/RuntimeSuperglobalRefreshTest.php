@@ -141,6 +141,61 @@ PHP;
         @unlink($outfile);
     }
 
+    /**
+     * JSON POST body populates $_POST in AOT refresh (issue #52).
+     */
+    public function testJsonPostBody(): void
+    {
+        $source = <<<'PHP'
+<?php
+declare(strict_types=1);
+header('Content-Type: text/plain; charset=UTF-8');
+echo 'Hello ', $_POST['name'];
+PHP;
+
+        $outfile = tempnam(sys_get_temp_dir(), 'phpc_json_post_');
+        $this->assertNotFalse($outfile);
+        unlink($outfile);
+
+        $repoRoot = dirname(__DIR__, 2);
+        $env = $this->llvmProcessEnv($repoRoot);
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+
+        $compile = proc_open(
+            array_merge(
+                self::llvmEnvPrefix(),
+                self::phpCommand(),
+                [$this->compileBin, '-o', $outfile]
+            ),
+            $descriptorSpec,
+            $pipes,
+            $repoRoot,
+            $env
+        );
+        fwrite($pipes[0], $source);
+        fclose($pipes[0]);
+        $compileErr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        proc_close($compile);
+        $this->assertFileExists($outfile, trim($compileErr !== false ? $compileErr : ''));
+
+        $runEnv = $env;
+        $runEnv['REQUEST_METHOD'] = 'POST';
+        $runEnv['REQUEST_BODY'] = '{"name":"JsonAot"}';
+        $runEnv['CONTENT_TYPE'] = 'application/json';
+        $runEnv['SCRIPT_NAME'] = '/example.php';
+        $runEnv['REQUEST_URI'] = '/example.php';
+        $out = $this->runBinary($outfile, $runEnv);
+        $this->assertStringContainsString('Hello JsonAot', $this->cgiBody($out));
+
+        @unlink($outfile);
+    }
+
     public function testHttpsSchemeFromCgiEnvironment(): void
     {
         $source = <<<'PHP'

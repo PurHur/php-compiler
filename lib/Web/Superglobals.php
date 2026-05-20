@@ -28,6 +28,9 @@ final class Superglobals
     /** Maximum length of a single header name or value after trimming. */
     public const MAX_HTTP_HEADER_LENGTH = 8192;
 
+    /** Maximum JSON decode depth for POST bodies (issue #52). */
+    public const MAX_JSON_DECODE_DEPTH = 512;
+
     public const NAMES = [
         '_GET',
         '_POST',
@@ -241,14 +244,14 @@ final class Superglobals
         return false === $method ? '' : $method;
     }
 
-    public static function isFormUrlencodedContentType(): bool
+    public static function contentTypeMediaType(): string
     {
         $contentType = getenv('CONTENT_TYPE');
         if (false === $contentType || '' === $contentType) {
             $contentType = getenv('HTTP_CONTENT_TYPE');
         }
         if (false === $contentType || '' === $contentType) {
-            return false;
+            return '';
         }
         $contentType = strtolower(trim($contentType));
         $semi = strpos($contentType, ';');
@@ -256,7 +259,17 @@ final class Superglobals
             $contentType = substr($contentType, 0, $semi);
         }
 
-        return 'application/x-www-form-urlencoded' === trim($contentType);
+        return trim($contentType);
+    }
+
+    public static function isFormUrlencodedContentType(): bool
+    {
+        return 'application/x-www-form-urlencoded' === self::contentTypeMediaType();
+    }
+
+    public static function isJsonContentType(): bool
+    {
+        return 'application/json' === self::contentTypeMediaType();
     }
 
     private static function populateGet(Context $context, string $queryString): void
@@ -268,7 +281,33 @@ final class Superglobals
     private static function populatePost(Context $context, string $postBody): void
     {
         $post = $context->ensureSuperglobal('_POST');
-        self::populateFormEncoded($post->toArray(), $postBody);
+        if (self::isJsonContentType()) {
+            self::populateJson($post->toArray(), $postBody);
+        } else {
+            self::populateFormEncoded($post->toArray(), $postBody);
+        }
+    }
+
+    /**
+     * Decode application/json POST body into $_POST (issue #52).
+     */
+    private static function populateJson(HashTable $ht, string $body): void
+    {
+        if ('' === $body) {
+            return;
+        }
+        if (strlen($body) > DevServer::MAX_REQUEST_BODY) {
+            return;
+        }
+        try {
+            $data = json_decode($body, true, self::MAX_JSON_DECODE_DEPTH, JSON_THROW_ON_ERROR);
+        } catch (\JsonException $e) {
+            return;
+        }
+        if (!is_array($data)) {
+            return;
+        }
+        self::mergeParsedParams($ht, $data);
     }
 
     private static function populateServer(
