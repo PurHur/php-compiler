@@ -391,6 +391,15 @@ class Compiler {
             case Op\Expr\Empty_::class:
             case Op\Expr\Eval_::class:
             case Op\Expr\Exit_::class:
+                $exitExpr = null !== $expr->expr
+                    ? $this->compileOperand($expr->expr, $block, true)
+                    : null;
+
+                return [new OpCode(
+                    OpCode::TYPE_EXIT,
+                    $this->compileOperand($expr->result, $block, false),
+                    $exitExpr
+                )];
             case Op\Expr\Print_::class:
                 return [new OpCode(
                     $this->getOpCodeTypeFromUnaryOp($expr),
