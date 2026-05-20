@@ -1,0 +1,4 @@
+{
+    "entry": "example.php",
+    "binary": ".phpc/bin/app"
+}
