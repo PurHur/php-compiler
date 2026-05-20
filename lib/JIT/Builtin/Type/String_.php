@@ -218,6 +218,7 @@ class String_ extends Type {
         \PHPCompiler\JIT\Builtin\StringRandomBytes::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringJsonEncode::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringGetenv::implement($this->context);
+        \PHPCompiler\JIT\Builtin\StringReadfile::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringDateTime::implement($this->context);
     }
 

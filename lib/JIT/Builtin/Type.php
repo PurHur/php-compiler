@@ -85,7 +85,25 @@ class Type extends Builtin {
             $fn = $this->context->module->addFunction($libcName, $ft);
             $this->context->registerFunction($libcName, $fn);
         }
-        $i64 = $this->context->getTypeFromString('int64');
+        $ftOpen = $this->context->context->functionType($i32, false, $i8p, $i32);
+        $fnOpen = $this->context->module->addFunction('open', $ftOpen);
+        $this->context->registerFunction('open', $fnOpen);
+        $ftRead = $this->context->context->functionType($i64, false, $i32, $i8p, $sizeT);
+        $fnRead = $this->context->module->addFunction('read', $ftRead);
+        $this->context->registerFunction('read', $fnRead);
+        $ftWrite = $this->context->context->functionType($i64, false, $i32, $i8p, $sizeT);
+        $fnWrite = $this->context->module->addFunction('write', $ftWrite);
+        $this->context->registerFunction('write', $fnWrite);
+        $ftClose = $this->context->context->functionType($i32, false, $i32);
+        $fnClose = $this->context->module->addFunction('close', $ftClose);
+        $this->context->registerFunction('close', $fnClose);
+        $fntypeReadfile = $this->context->context->functionType(
+            $i64,
+            false,
+            $this->context->getTypeFromString('__string__*')
+        );
+        $fnReadfile = $this->context->module->addFunction('__compiler_readfile', $fntypeReadfile);
+        $this->context->registerFunction('__compiler_readfile', $fnReadfile);
         $void = $this->context->getTypeFromString('void');
         $fntypeRandomBytes = $this->context->context->functionType(
             $this->context->getTypeFromString('__string__*'),

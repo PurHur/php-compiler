@@ -29,7 +29,7 @@ class Compiler {
 
         $main = $this->compileCfgBlock($script->main->cfg, $script->main->params);
         $main->func = $script->main;
-        $main->strictTypes = $script->main->strictTypes;
+        $main->strictTypes = isset($script->main->strictTypes) ? (bool) $script->main->strictTypes : false;
 
         $this->seen = null;
         return $main;
