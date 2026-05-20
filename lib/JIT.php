@@ -287,6 +287,28 @@ class JIT {
                     );
                     $this->assignOperandValue($block->getOperand($op->arg1), $issetResult);
                     break;
+                case OpCode::TYPE_ITER_RESET:
+                    $array = $this->context->getVariableFromOp($block->getOperand($op->arg1));
+                    JIT\IteratorHelper::compileReset($this->context, $array);
+                    break;
+                case OpCode::TYPE_ITER_VALID:
+                    $array = $this->context->getVariableFromOp($block->getOperand($op->arg2));
+                    $valid = JIT\IteratorHelper::compileValid($this->context, $array);
+                    $this->assignOperandValue($block->getOperand($op->arg1), $valid);
+                    break;
+                case OpCode::TYPE_ITER_KEY:
+                    $array = $this->context->getVariableFromOp($block->getOperand($op->arg2));
+                    $key = JIT\IteratorHelper::compileKey($this->context, $array);
+                    $this->assignOperand($block->getOperand($op->arg1), $key);
+                    break;
+                case OpCode::TYPE_ITER_VALUE:
+                    if ($op->arg3) {
+                        throw new \LogicException('foreach by-reference is not implemented');
+                    }
+                    $array = $this->context->getVariableFromOp($block->getOperand($op->arg2));
+                    $value = JIT\IteratorHelper::compileValue($this->context, $array);
+                    $this->assignOperand($block->getOperand($op->arg1), $value);
+                    break;
                 case OpCode::TYPE_BOOLEAN_NOT:
                     $from = $this->context->getVariableFromOp($block->getOperand($op->arg2));
                     if ($from->type === Variable::TYPE_NATIVE_BOOL) {

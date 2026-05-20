@@ -11,7 +11,7 @@ use PHPUnit\Framework\TestCase;
  */
 final class LintTest extends TestCase
 {
-    public function testLintForeachReportsLineAndIssue(): void
+    public function testLintForeachAccepted(): void
     {
         $code = <<<'PHP'
 <?php
@@ -20,10 +20,7 @@ foreach ([1, 2] as $x) {
 }
 PHP;
         $exit = $this->runLint(['-r', $code]);
-        $this->assertSame(1, $exit['code']);
-        $this->assertStringContainsString('unsupported', $exit['stdout']);
-        $this->assertStringContainsString('#53', $exit['stdout']);
-        $this->assertMatchesRegularExpression('/line \d+/', $exit['stdout']);
+        $this->assertSame(0, $exit['code']);
     }
 
     public function testLintCoalesceAccepted(): void

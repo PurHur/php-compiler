@@ -13,13 +13,6 @@ final class UnsupportedRegistry
 {
     /** @var array<string, int> */
     private const KIND_TO_ISSUE = [
-        'Stmt_Foreach' => 53,
-        'Iterator_Reset' => 53,
-        'Iterator_Valid' => 53,
-        'Iterator_Next' => 53,
-        'Iterator_Key' => 53,
-        'Iterator_Current' => 53,
-        'Iterator_Value' => 53,
         'Expr_Throw' => 195,
         'Expr_New' => 136,
         'Stmt_Try' => 195,

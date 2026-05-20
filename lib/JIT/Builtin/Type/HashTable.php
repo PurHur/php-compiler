@@ -554,7 +554,35 @@ class HashTable extends Type
             $this->context->builder->structGep($newNode, $nodeMap['value']),
             $str
         );
-        $this->context->builder->store($head, $this->context->builder->structGep($newNode, $nodeMap['next']));
+        $this->context->builder->store(
+            $newNode,
+            $this->context->builder->structGep($newNode, $nodeMap['next'])
+        );
+        $tail = $fn->appendBasicBlock('strkey_set_tail');
+        $tailWalk = $fn->appendBasicBlock('strkey_set_tail_walk');
+        $tailDone = $fn->appendBasicBlock('strkey_set_tail_done');
+        $this->context->builder->branch($tail);
+
+        $this->context->builder->positionAtEnd($tail);
+        $isEmpty = $this->context->builder->icmp(Builder::INT_EQ, $head, $head->typeOf()->constNull());
+        $this->context->builder->branchIf($isEmpty, $prepend, $tailWalk);
+
+        $this->context->builder->positionAtEnd($tailWalk);
+        $walkNode = $this->context->builder->phi($head->typeOf());
+        $walkNode->addIncoming($head, $tail);
+        $nextWalk = $this->context->builder->load($this->context->builder->structGep($walkNode, $nodeMap['next']));
+        $atEnd = $this->context->builder->icmp(Builder::INT_EQ, $nextWalk, $nextWalk->typeOf()->constNull());
+        $this->context->builder->branchIf($atEnd, $tailDone, $tailWalk);
+        $walkNode->addIncoming($nextWalk, $tailWalk);
+
+        $this->context->builder->positionAtEnd($tailDone);
+        $this->context->builder->store(
+            $newNode,
+            $this->context->builder->structGep($walkNode, $nodeMap['next'])
+        );
+        $this->context->builder->branch($done);
+
+        $this->context->builder->positionAtEnd($prepend);
         $this->context->builder->store($newNode, $headSlot);
         $this->context->builder->branch($done);
 

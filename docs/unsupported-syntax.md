@@ -18,7 +18,6 @@ Some constructs (for example destructuring assigns and prefix/postfix `++`/`--`)
 
 | CFG kind | Tracking |
 |----------|----------|
-| `Stmt_Foreach` | [#53](https://github.com/PurHur/php-compiler/issues/53) |
 | `Expr_Throw`, `Stmt_Try`, `Stmt_Catch`, `Stmt_Finally` | [#195](https://github.com/PurHur/php-compiler/issues/195) |
 | `Expr_AssignOp_*`, `Expr_BinaryOp_ShiftLeft` / `ShiftRight` (compound assign) | [#136](https://github.com/PurHur/php-compiler/issues/136) |
 | `Stmt_Break`, `Stmt_Continue` | [#115](https://github.com/PurHur/php-compiler/issues/115) |
