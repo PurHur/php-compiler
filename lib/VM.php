@@ -156,6 +156,13 @@ restart:
                     echo $frame->scope[$op->arg2]->toString();
                     $frame->scope[$op->arg1]->int(1);
                     break;
+                case OpCode::TYPE_COALESCE:
+                    $takeLeft = $frame->scope[$op->arg2]->toBool();
+                    $frame = ($takeLeft ? $op->block1 : $op->block2)->getFrame(
+                        $this->context,
+                        $frame
+                    );
+                    goto restart;
                 case OpCode::TYPE_JUMP:
                     $frame = $op->block1->getFrame(
                         $this->context,

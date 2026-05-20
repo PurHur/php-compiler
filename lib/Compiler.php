@@ -14,6 +14,7 @@ use PHPCfg\Func as CfgFunc;
 use PHPCfg\Op;
 use PHPCfg\Block as CfgBlock;
 use PHPCfg\Operand;
+use PHPCfg\Operand\Temporary;
 use PHPCfg\Script;
 use PHPTypes\Type;
 use PHPCompiler\VM\Variable;
@@ -81,6 +82,8 @@ class Compiler {
                 default:
                     if ($child instanceof Op\Expr\Isset_ && count($child->vars) > 1) {
                         $block = $this->compileIssetMulti($child, $block);
+                    } elseif ($child instanceof Op\Expr\BinaryOp\Coalesce) {
+                        $block = $this->compileCoalesce($child, $block);
                     } else {
                         $this->compileOp($child, $block);
                     }
@@ -540,6 +543,117 @@ class Compiler {
         )];
     }
 
+    protected function compileCoalesce(Op\Expr\BinaryOp\Coalesce $expr, Block $block): Block
+    {
+        $resultSlot = $this->compileOperand($expr->result, $block, false);
+
+        $endBlock = new Block($block->orig);
+        $endBlock->inheritUndefinedLocals = true;
+        $endBlock->inheritScopeFrom($block);
+
+        $rightBlock = new Block($block->orig);
+        $rightBlock->inheritUndefinedLocals = true;
+        $rightBlock->inheritScopeFrom($block);
+        $rightSlot = $this->compileOperand($expr->right, $rightBlock, true);
+        $rightBlock->addOpCode(new OpCode(
+            OpCode::TYPE_ASSIGN,
+            $resultSlot,
+            $resultSlot,
+            $rightSlot
+        ));
+
+        $leftBlock = new Block($block->orig);
+        $leftBlock->inheritUndefinedLocals = true;
+        $leftBlock->inheritScopeFrom($block);
+
+        $checkSlot = $this->compileBoolTemporary($block);
+        $issetTarget = $this->resolveCoalesceIssetTarget($expr->left, $block);
+        if (null !== $issetTarget) {
+            [$containerSlot, $dimSlot] = $issetTarget;
+            $block->addOpCode(new OpCode(
+                OpCode::TYPE_ISSET,
+                $checkSlot,
+                $containerSlot,
+                $dimSlot
+            ));
+            $leftSlot = $this->compileOperand($expr->left, $leftBlock, true);
+            $leftBlock->addOpCode(new OpCode(
+                OpCode::TYPE_ASSIGN,
+                $resultSlot,
+                $resultSlot,
+                $leftSlot
+            ));
+        } else {
+            $leftSlot = $this->compileOperand($expr->left, $block, true);
+            $block->addOpCode(new OpCode(
+                OpCode::TYPE_ASSIGN,
+                $resultSlot,
+                $resultSlot,
+                $leftSlot
+            ));
+            $block->addOpCode(new OpCode(
+                OpCode::TYPE_ISSET,
+                $checkSlot,
+                $leftSlot,
+                null
+            ));
+        }
+
+        $leftJump = new OpCode(OpCode::TYPE_JUMP);
+        $leftJump->block1 = $endBlock;
+        $leftBlock->addOpCode($leftJump);
+        $rightJump = new OpCode(OpCode::TYPE_JUMP);
+        $rightJump->block1 = $endBlock;
+        $rightBlock->addOpCode($rightJump);
+        $endBlock->parents[] = $leftBlock;
+        $endBlock->parents[] = $rightBlock;
+
+        $coalesceOp = new OpCode(
+            OpCode::TYPE_COALESCE,
+            $resultSlot,
+            $checkSlot
+        );
+        $coalesceOp->block1 = $leftBlock;
+        $coalesceOp->block2 = $rightBlock;
+        $coalesceOp->block3 = $endBlock;
+        $block->addOpCode($coalesceOp);
+
+        return $endBlock;
+    }
+
+    /**
+     * @return ?array{0: int, 1: ?int}
+     */
+    protected function resolveCoalesceIssetTarget(Operand $operand, Block $block): ?array
+    {
+        if (null !== $this->unwrapArrayDimFetch($operand)) {
+            return $this->resolveIssetTarget($operand, $block);
+        }
+        if (null !== $this->unwrapVariableOperand($operand)) {
+            return $this->resolveIssetTarget($operand, $block);
+        }
+
+        return null;
+    }
+
+    protected function unwrapVariableOperand(Operand $operand): ?Operand\Variable
+    {
+        while ($operand instanceof Temporary) {
+            if ($operand->original instanceof Operand\Variable) {
+                return $operand->original;
+            }
+            if (null === $operand->original) {
+                return null;
+            }
+            $operand = $operand->original;
+        }
+        if ($operand instanceof Operand\Variable) {
+            return $operand;
+        }
+
+        return null;
+    }
+
     /**
      * isset($a, $b, …) with short-circuit evaluation (PHP semantics).
      * Returns the block where compilation should continue.
@@ -604,8 +718,10 @@ class Compiler {
 
     protected function compileBoolTemporary(Block $block): int
     {
-        $operand = new Operand\Temporary;
+        $operand = new Temporary;
         $operand->type = Type::bool();
+        // JIT assignOperandValue skips operands with empty usages (#99 coalesce branches).
+        $operand->usages[] = $operand;
 
         return $block->getVarSlot($operand, false);
     }

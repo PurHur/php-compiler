@@ -71,6 +71,7 @@ class OpCode {
     const TYPE_NOT_EQUAL = 59;
     const TYPE_NOT_IDENTICAL = 60;
     const TYPE_SPACESHIP = 61;
+    const TYPE_COALESCE = 62;
 
     public int $type;
     public ?int $arg1;
@@ -78,6 +79,7 @@ class OpCode {
     public ?int $arg3;
     public ?Block $block1 = null;
     public ?Block $block2 = null;
+    public ?Block $block3 = null;
 
     public function __construct(int $type, ?int $arg1 = null, ?int $arg2 = null, ?int $arg3 = null) {
         $this->type = $type;

@@ -20,8 +20,6 @@ final class UnsupportedRegistry
         'Iterator_Key' => 53,
         'Iterator_Current' => 53,
         'Iterator_Value' => 53,
-        'Expr_BinaryOp_Coalesce' => 99,
-        'Expr_Coalesce' => 99,
         'Expr_Throw' => 195,
         'Expr_New' => 136,
         'Stmt_Try' => 195,
