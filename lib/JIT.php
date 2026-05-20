@@ -209,9 +209,19 @@ class JIT {
                     break;  
                 case OpCode::TYPE_ARRAY_DIM_FETCH:
                     $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));
+                    $resultOp = $block->getOperand($op->arg1);
+                    if (null === $op->arg3) {
+                        if (Variable::TYPE_STRING === $value->type) {
+                            throw new \LogicException('[] is only supported for arrays');
+                        }
+                        $this->context->setVariableOp(
+                            $resultOp,
+                            JIT\HashTableHelper::reserveAppendSlot($this->context, $value)
+                        );
+                        break;
+                    }
                     $dimOp = $block->getOperand($op->arg3);
                     $dim = $this->context->getVariableFromOp($dimOp);
-                    $resultOp = $block->getOperand($op->arg1);
                     if ($value->type === Variable::TYPE_STRING) {
                         $charPtr = StringOffsetHelper::dimFetch(
                             $this->context,

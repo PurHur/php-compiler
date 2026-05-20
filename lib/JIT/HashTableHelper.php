@@ -334,6 +334,57 @@ final class HashTableHelper
         $context->builder->store($context->helper->loadValue($element), $slot);
     }
 
+    /**
+     * Reserve the next packed-list slot for $arr[] = … (issue #116).
+     *
+     * Returns a {@see Variable::TYPE_VALUE} lvalue pointing at the new __value__ entry.
+     */
+    public static function reserveAppendSlot(Context $context, Variable $array): Variable
+    {
+        if ($array->type & Variable::IS_NATIVE_ARRAY) {
+            $sizeT = $context->getTypeFromString('size_t');
+            $index = $context->constantFromInteger($array->nextFreeElement, 'size_t');
+            ++$array->nextFreeElement;
+            $zero = $sizeT->constInt(0, false);
+            $slot = $context->builder->inBoundsGep($array->value, $zero, $index);
+            $elementType = $array->type & (~Variable::IS_NATIVE_ARRAY);
+
+            return new Variable($context, $elementType, Variable::KIND_VARIABLE, $slot);
+        }
+
+        $ht = $context->helper->loadValue($array);
+        $map = $context->structFieldMap['__hashtable__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $index = $context->constantFromInteger($array->nextFreeElement, 'size_t');
+        ++$array->nextFreeElement;
+        $one = $sizeT->constInt(1, false);
+        $need = $context->builder->addNoSignedWrap($index, $one);
+        $context->builder->call($context->lookupFunction('__hashtable__grow'), $ht, $need);
+        $entry = self::listEntryPointer($context, $ht, $index);
+        $context->builder->call($context->lookupFunction('__value__writeNull'), $entry);
+
+        $nextFree = $context->builder->load(
+            $context->builder->structGep($ht, $map['nextFreeElement'])
+        );
+        $numElements = $context->builder->load(
+            $context->builder->structGep($ht, $map['numElements'])
+        );
+        $updateNext = $context->builder->icmp(Builder::INT_UGE, $index, $nextFree);
+        $newNext = $context->builder->select($updateNext, $need, $nextFree);
+        $context->builder->store(
+            $newNext,
+            $context->builder->structGep($ht, $map['nextFreeElement'])
+        );
+        $updateNum = $context->builder->icmp(Builder::INT_UGE, $index, $numElements);
+        $newNum = $context->builder->select($updateNum, $need, $numElements);
+        $context->builder->store(
+            $newNum,
+            $context->builder->structGep($ht, $map['numElements'])
+        );
+
+        return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $entry);
+    }
+
     public static function setAtIndex(Context $context, Value $ht, Value $index, Variable $element): void
     {
         switch ($element->type) {
