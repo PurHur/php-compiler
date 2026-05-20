@@ -10,7 +10,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 |--------|------:|
 | PHP files on vm.php path | 230 |
 | Source constructs flagged (blockers) | 10 |
-| Source constructs flagged (warnings) | 611 |
+| Source constructs flagged (warnings) | 612 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
