@@ -753,6 +753,14 @@ class JIT {
                     );
 
                     return;
+                case Variable::TYPE_HASHTABLE:
+                    $this->context->builder->call(
+                        $this->context->lookupFunction('__value__writeHashtable'),
+                        $valueRef,
+                        $this->context->helper->loadValue($value)
+                    );
+
+                    return;
                 case Variable::TYPE_VALUE:
                     $loaded = $this->context->builder->load($this->context->helper->loadValue($value));
                     $this->context->builder->store($loaded, $result->value);

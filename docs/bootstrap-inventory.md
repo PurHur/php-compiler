@@ -8,9 +8,9 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 234 |
+| PHP files on vm.php path | 235 |
 | Source constructs flagged (blockers) | 10 |
-| Source constructs flagged (warnings) | 618 |
+| Source constructs flagged (warnings) | 619 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -37,6 +37,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/JitDate.php` | 0 | 1 |
 | `ext/standard/JitEnv.php` | 0 | 1 |
 | `ext/standard/JitExplode.php` | 0 | 1 |
+| `ext/standard/JitGetallheaders.php` | 0 | 1 |
 | `ext/standard/JitHeader.php` | 0 | 1 |
 | `ext/standard/JitHex2bin.php` | 0 | 1 |
 | `ext/standard/JitHtmlspecialchars.php` | 0 | 1 |
@@ -283,6 +284,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/JitExplode.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/JitGetallheaders.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
@@ -1266,10 +1272,10 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new JIT\Call\Native (line 149)
 - new ext\standard\boolval (line 263)
 - new Variable (line 427)
-- new Variable (line 810)
-- new Operand\Literal (line 880)
-- new Operand\Literal (line 884)
+- new Variable (line 818)
 - new Operand\Literal (line 888)
+- new Operand\Literal (line 892)
+- new Operand\Literal (line 896)
 - 12 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Analyzer.php`
