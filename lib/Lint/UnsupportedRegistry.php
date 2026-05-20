@@ -13,9 +13,6 @@ final class UnsupportedRegistry
 {
     /** @var array<string, int> */
     private const KIND_TO_ISSUE = [
-        'Stmt_While' => 192,
-        'Stmt_Do' => 192,
-        'Stmt_For' => 192,
         'Stmt_Foreach' => 53,
         'Iterator_Reset' => 53,
         'Iterator_Valid' => 53,

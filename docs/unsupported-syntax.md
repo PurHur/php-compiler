@@ -16,7 +16,6 @@ Exit code `0` when the entry (and best-effort `include`/`require` targets with s
 
 | CFG kind | Tracking |
 |----------|----------|
-| `Stmt_While`, `Stmt_Do`, `Stmt_For` | [#192](https://github.com/PurHur/php-compiler/issues/192) |
 | `Stmt_Foreach` | [#53](https://github.com/PurHur/php-compiler/issues/53) |
 | `Expr_BinaryOp_Coalesce` (`??`) | [#99](https://github.com/PurHur/php-compiler/issues/99) |
 | `Expr_Throw`, `Stmt_Try`, `Stmt_Catch`, `Stmt_Finally` | [#195](https://github.com/PurHur/php-compiler/issues/195) |
