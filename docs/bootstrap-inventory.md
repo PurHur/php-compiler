@@ -10,7 +10,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 |--------|------:|
 | PHP files on vm.php path | 289 |
 | Source constructs flagged (blockers) | 10 |
-| Source constructs flagged (warnings) | 753 |
+| Source constructs flagged (warnings) | 754 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -222,7 +222,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `lib/AOT/Linker.php` | 8 | 1 |
 | `lib/Block.php` | 0 | 4 |
 | `lib/Cli/PhpcInit.php` | 0 | 1 |
-| `lib/Compiler.php` | 0 | 84 |
+| `lib/Compiler.php` | 0 | 85 |
 | `lib/Doctor.php` | 0 | 1 |
 | `lib/Frame.php` | 0 | 1 |
 | `lib/Func.php` | 0 | 1 |
@@ -1532,39 +1532,40 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new OpCode (line 650)
 - new Block (line 657)
 - new OpCode (line 668)
-- new OpCode (line 676)
-- new OpCode (line 684)
-- new OpCode (line 693)
-- new OpCode (line 699)
-- new OpCode (line 707)
-- new OpCode (line 710)
-- new OpCode (line 716)
-- new OpCode (line 736)
-- new Block (line 755)
-- new Block (line 759)
-- new Operand\Literal (line 762)
-- new OpCode (line 765)
-- new OpCode (line 771)
-- new Block (line 775)
+- new OpCode (line 677)
+- new OpCode (line 685)
+- new OpCode (line 694)
+- new OpCode (line 700)
+- new OpCode (line 708)
+- new OpCode (line 711)
+- new OpCode (line 717)
+- new OpCode (line 735)
+- new OpCode (line 750)
+- new Block (line 769)
+- new Block (line 773)
+- new Operand\Literal (line 776)
 - new OpCode (line 779)
 - new OpCode (line 785)
-- new Block (line 869)
-- new Block (line 872)
-- new OpCode (line 875)
-- new OpCode (line 881)
+- new Block (line 789)
+- new OpCode (line 793)
+- new OpCode (line 799)
+- new Block (line 883)
+- new Block (line 886)
+- new OpCode (line 889)
 - new OpCode (line 895)
-- new Block (line 902)
-- new OpCode (line 905)
-- new OpCode (line 915)
-- new Temporary (line 925)
-- new Variable (line 935)
-- new Operand\Temporary (line 937)
-- new Variable (line 1030)
-- new OpCode (line 1060)
-- new OpCode (line 1066)
-- new OpCode (line 1070)
-- new OpCode (line 1075)
-- 34 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new OpCode (line 909)
+- new Block (line 916)
+- new OpCode (line 919)
+- new OpCode (line 929)
+- new Temporary (line 939)
+- new Variable (line 949)
+- new Operand\Temporary (line 951)
+- new Variable (line 1044)
+- new OpCode (line 1074)
+- new OpCode (line 1080)
+- new OpCode (line 1084)
+- new OpCode (line 1089)
+- 35 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 - 1 closure(s)
 
 ### `lib/Doctor.php`
@@ -1851,8 +1852,8 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new Scope (line 120)
 - new Result (line 212)
 - new Variable (line 288)
-- new Variable (line 501)
-- new Variable (line 533)
+- new Variable (line 512)
+- new Variable (line 544)
 - 32 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/HashTableHelper.php`
@@ -1938,7 +1939,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 128)
-- new VMVariable (line 152)
+- new VMVariable (line 155)
 - 7 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/ValueEchoHelper.php`
@@ -1962,9 +1963,9 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new Variable (line 384)
 - new Variable (line 405)
 - new Variable (line 429)
-- new Variable (line 447)
-- new Variable (line 474)
-- new Variable (line 495)
+- new Variable (line 451)
+- new Variable (line 486)
+- new Variable (line 507)
 - 15 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/Lint/IncrementDetector.php`
