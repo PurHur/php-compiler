@@ -232,6 +232,15 @@ class Module extends ModuleAbstract
             $fn = $context->module->addFunction('realpath', $ft);
             $context->registerFunction('realpath', $fn);
         }
+        try {
+            $context->lookupFunction('stat');
+        } catch (\Throwable $e) {
+            $i8p = $context->getTypeFromString('int8*');
+            $i32 = $context->getTypeFromString('int32');
+            $ft = $context->context->functionType($i32, false, $i8p, $i8p);
+            $fn = $context->module->addFunction('stat', $ft);
+            $context->registerFunction('stat', $fn);
+        }
         $double = $context->getTypeFromString('double');
         try {
             $context->lookupFunction('fabs');
