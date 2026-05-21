@@ -23,7 +23,8 @@ AOT (needs LLVM 9 — see `script/install-llvm9.sh` or the `php-compiler:22.04-d
 
 ```console
 ./phpc build -o /tmp/hello examples/000-HelloWorld/example.php && /tmp/hello
-cd examples/001-SimpleWeb && ../../phpc build -o .phpc/bin/app example.php
+cd examples/001-SimpleWeb && ../../phpc build --project .
+# or: ../../phpc build -o .phpc/bin/app example.php
 ../../phpc serve --aot 127.0.0.1:8080 .
 ```
 

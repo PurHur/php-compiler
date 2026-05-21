@@ -11,6 +11,7 @@ declare(strict_types=1);
  *   phpc serve --aot [host:port] [docroot] [--binary path]
  *   phpc run [-q 'name=World'] [-p 'field=val'] script.php [args...]
  *   phpc build [-o outfile] entry.php
+ *   phpc build --project [dir]                 AOT compile from phpc.json entry/binary
  *   phpc lint [-r 'code'] [--json] entry.php
  *   phpc lint --project <entry.php> [--json]
  *   phpc lint --all <dir-or-file> [--json]
@@ -37,6 +38,7 @@ php-compiler CLI
       -p 'field=value'                         CGI-style POST body → $_POST
       Example: phpc run -q 'name=Dev' examples/001-SimpleWeb/example.php
   phpc build [-o out] <entry.php>               AOT compile to a native binary
+  phpc build --project [dir]                    Build from phpc.json entry + binary paths
   phpc lint [-r 'code'] [--json] <entry.php>    Report unsupported syntax (line-accurate)
   phpc lint --project <entry.php> [--json]    Entry + literal include/require chain
   phpc lint --all <dir-or-file> [--json]      All .php under a tree (aggregated)
@@ -74,8 +76,13 @@ switch ($command) {
         exit(runProcess(array_merge($php, [$repoRoot.'/bin/vm.php'], $args), $repoRoot));
 
     case 'build':
+        if ([] !== $args && '--project' === $args[0]) {
+            array_shift($args);
+            $projectDir = $args[0] ?? '.';
+            exit(buildFromProject($repoRoot, $php, $projectDir));
+        }
         if ([] === $args) {
-            fwrite(STDERR, "phpc build: missing entry.php\n");
+            fwrite(STDERR, "phpc build: missing entry.php (or use: phpc build --project [dir])\n");
             exit(1);
         }
         exit(runProcess(array_merge($php, [$repoRoot.'/bin/compile.php'], $args), $repoRoot));
@@ -150,6 +157,41 @@ function phpCommand(): array
     }
 
     return $cmd;
+}
+
+/**
+ * @param list<string> $php
+ */
+function buildFromProject(string $repoRoot, array $php, string $projectDir): int
+{
+    if (!is_file($repoRoot.'/vendor/autoload.php')) {
+        fwrite(STDERR, "phpc build --project: run composer install first\n");
+        return 1;
+    }
+    require $repoRoot.'/vendor/autoload.php';
+
+    $errors = \PHPCompiler\Web\ManifestValidator::validateForBuild($projectDir);
+    if ([] !== $errors) {
+        foreach ($errors as $message) {
+            fwrite(STDERR, $message."\n");
+        }
+        return 1;
+    }
+
+    $entry = \PHPCompiler\Web\ProjectManifest::resolveEntryPath($projectDir);
+    $output = \PHPCompiler\Web\ProjectManifest::resolveBinaryOutputPath($projectDir);
+    if (null === $entry || null === $output) {
+        fwrite(STDERR, "phpc build --project: could not resolve entry or binary from phpc.json\n");
+        return 1;
+    }
+
+    $parent = dirname($output);
+    if ('' !== $parent && !is_dir($parent) && !mkdir($parent, 0777, true) && !is_dir($parent)) {
+        fwrite(STDERR, "phpc build --project: cannot create output directory: {$parent}\n");
+        return 1;
+    }
+
+    return runProcess(array_merge($php, [$repoRoot.'/bin/compile.php', '-o', $output, $entry]), $repoRoot);
 }
 
 /**

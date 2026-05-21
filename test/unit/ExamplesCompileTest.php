@@ -298,6 +298,58 @@ final class ExamplesCompileTest extends TestCase
     }
 
     /**
+     * Shipped 002-StaticWeb: phpc build --project reads phpc.json entry/binary (issue #106).
+     *
+     * @group llvm
+     * @group aot
+     */
+    public function testPhpcBuildProject002StaticWeb(): void
+    {
+        if (!self::isLlvmReady()) {
+            $this->markTestSkipped(
+                'LLVM 9 toolchain not available. Run script/install-llvm9.sh from the repository root.'
+            );
+        }
+        $repoRoot = dirname(__DIR__, 2);
+        $exampleDir = realpath($repoRoot.'/examples/002-StaticWeb');
+        $this->assertNotFalse($exampleDir);
+
+        $phpc = realpath($repoRoot.'/phpc');
+        $this->assertNotFalse($phpc);
+        $env = $this->llvmProcessEnv($repoRoot);
+
+        $binaryPath = $exampleDir.'/.phpc/bin/app';
+        if (is_file($binaryPath)) {
+            unlink($binaryPath);
+        }
+        $binDir = dirname($binaryPath);
+        if (!is_dir($binDir)) {
+            mkdir($binDir, 0777, true);
+        }
+
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open([$phpc, 'build', '--project', $exampleDir], $descriptorSpec, $pipes, $repoRoot, $env);
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+        $this->assertSame(0, $exit, trim($stderr !== false ? $stderr : ''));
+        $this->assertFileExists($binaryPath);
+        $this->assertTrue(is_executable($binaryPath));
+
+        $out = $this->runAotBinary($binaryPath, $env);
+        $this->assertStringContainsString('Hello World', $out);
+
+        @unlink($binaryPath);
+    }
+
+    /**
      * Shipped 002-StaticWeb: ./phpc build then execute — smoke for unified CLI argv/env forwarding.
      *
      * @group llvm
