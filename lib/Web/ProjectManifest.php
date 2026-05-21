@@ -135,6 +135,42 @@ final class ProjectManifest
         return null;
     }
 
+    /**
+     * HTTP document root for phpc serve when phpc.json is present (issue #443).
+     *
+     * Uses manifest "public" when set; otherwise keeps the resolved start directory
+     * (e.g. examples/001-SimpleWeb without a public/ subtree).
+     */
+    public static function resolvePublicDir(string $startDir): string
+    {
+        $dir = realpath($startDir);
+        if (false === $dir) {
+            return $startDir;
+        }
+
+        $projectDir = self::resolveProjectDir($dir);
+        if (null === $projectDir) {
+            return $dir;
+        }
+
+        $manifest = self::loadManifest($projectDir);
+        if (null === $manifest) {
+            return $dir;
+        }
+
+        if (!isset($manifest['public']) || !is_string($manifest['public']) || '' === $manifest['public']) {
+            return $dir;
+        }
+
+        $publicDir = self::resolveRelativePath($projectDir, $manifest['public']);
+        $publicReal = realpath($publicDir);
+        if (false !== $publicReal && is_dir($publicReal)) {
+            return $publicReal;
+        }
+
+        return $publicDir;
+    }
+
     public static function resolveRelativePath(string $baseDir, string $path): string
     {
         if ('/' === $path[0]) {

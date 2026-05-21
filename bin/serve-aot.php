@@ -44,8 +44,11 @@ while ([] !== $args) {
     exit(1);
 }
 
-$docroot = $docroot ?? getcwd();
-$resolvedBinary = ProjectManifest::resolveBinaryPath($docroot, $binary);
+$docrootArg = $docroot ?? getcwd();
+$projectDir = ProjectManifest::resolveProjectDir($docrootArg);
+$manifest = null !== $projectDir ? ProjectManifest::loadManifest($projectDir) : null;
+$docroot = ProjectManifest::resolvePublicDir($docrootArg);
+$resolvedBinary = ProjectManifest::resolveBinaryPath($docrootArg, $binary);
 if (null === $resolvedBinary) {
     fwrite(STDERR, "serve-aot: no AOT binary found. Build with: phpc build -o .phpc/bin/app entry.php\n");
     exit(1);
@@ -58,7 +61,7 @@ fwrite(STDERR, "PHP-Compiler serve-aot: binary {$resolvedBinary}\n");
 
 DevServer::run($listen, $docroot, static function (string $script, array $cgiEnv) use ($resolvedBinary, $env): array {
     return runAotBinary($resolvedBinary, $env, $cgiEnv);
-});
+}, $manifest, $projectDir);
 
 /**
  * @param array<string, string> $env

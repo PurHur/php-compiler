@@ -27,6 +27,47 @@ final class ServeTest extends TestCase
     $this->phpCmd = self::phpCommand();
   }
 
+  public function testServeFromProjectRootUsesPublicDocroot(): void
+  {
+    $project = $this->makeDocroot([
+      'phpc.json' => json_encode([
+        'entry' => 'public/index.php',
+        'binary' => '.phpc/bin/app',
+        'public' => 'public',
+      ]),
+      'public/index.php' => '<?php echo "from-public";',
+      'src/secret.txt' => 'leaked',
+    ]);
+    $response = $this->httpGet($project, '/index.php');
+    $this->assertStringContainsString('HTTP/1.1 200', $response);
+    $this->assertStringContainsString('from-public', $response);
+    $this->assertStringNotContainsString('leaked', $response);
+
+    $blocked = $this->httpGet($project, '/../src/secret.txt');
+    $this->assertStringContainsString('HTTP/1.1 403', $blocked);
+    $this->assertStringNotContainsString('leaked', $blocked);
+  }
+
+  public function testServeFromProjectRootSetsDocumentRootToPublic(): void
+  {
+    $project = $this->makeDocroot([
+      'phpc.json' => json_encode([
+        'entry' => 'public/index.php',
+        'binary' => '.phpc/bin/app',
+        'public' => 'public',
+      ]),
+      'public/docroot.php' => <<<'PHP'
+<?php
+echo $_SERVER['DOCUMENT_ROOT'];
+PHP,
+    ]);
+    $public = realpath($project.'/public');
+    $this->assertNotFalse($public);
+    $response = $this->httpGet($project, '/docroot.php');
+    $this->assertStringContainsString('HTTP/1.1 200', $response);
+    $this->assertStringContainsString($public, $this->responseBody($response));
+  }
+
   public function testServes001SimpleWebExample(): void
   {
     $docroot = $this->repoRoot.'/examples/001-SimpleWeb';
