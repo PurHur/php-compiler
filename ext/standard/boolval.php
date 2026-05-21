@@ -58,7 +58,7 @@ final class boolval extends Internal
             case JITVariable::TYPE_NATIVE_BOOL:
                 return $context->helper->loadValue($args[0]);
             case JITVariable::TYPE_STRING:
-                return $this->stringTruthy($context, $context->helper->loadValue($args[0]));
+                return self::stringTruthy($context, $context->helper->loadValue($args[0]));
             case JITVariable::TYPE_NULL:
                 return $context->constantFromBool(false);
             case JITVariable::TYPE_VALUE:
@@ -134,7 +134,7 @@ final class boolval extends Internal
         }
     }
 
-    private function stringTruthy(Context $context, Value $strPtr): Value
+    public static function stringTruthy(Context $context, Value $strPtr): Value
     {
         $structName = $strPtr->typeOf()->getElementType()->getName();
         $map = $context->structFieldMap[$structName];
