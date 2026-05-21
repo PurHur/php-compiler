@@ -38,7 +38,7 @@ final class StringGetenv
         $bufLen = $context->builder->add($nameLen, $one);
         if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
             $nameBuf = $context->builder->call(
-                $context->lookupFunction('malloc'),
+                $context->lookupFunction('__mm__malloc'),
                 $bufLen
             );
             $nameCStr = $context->builder->pointerCast($nameBuf, $i8p);
@@ -53,7 +53,7 @@ final class StringGetenv
         );
         $env = $context->builder->call($context->lookupFunction('getenv'), $nameCStr);
         if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            $context->builder->call($context->lookupFunction('free'), $nameBuf);
+            $context->builder->call($context->lookupFunction('__mm__free'), $nameBuf);
         }
         $isNull = $context->builder->icmp(Builder::INT_EQ, $env, $i8p->constNull());
 

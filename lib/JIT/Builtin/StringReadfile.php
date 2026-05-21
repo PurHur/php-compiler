@@ -49,7 +49,7 @@ final class StringReadfile
         $pathBytes = $context->builder->structGep($path, $strMap['value']);
         $bufLen = $context->builder->add($pathLen, $oneI64);
         if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            $pathBuf = $context->builder->call($context->lookupFunction('malloc'), $bufLen);
+            $pathBuf = $context->builder->call($context->lookupFunction('__mm__malloc'), $bufLen);
             $pathCStr = $context->builder->pointerCast($pathBuf, $i8p);
         } else {
             $pathBuf = $context->builder->alloca($i8, $bufLen, 'readfile_path');
@@ -67,7 +67,7 @@ final class StringReadfile
             $oRdonly
         );
         if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            $context->builder->call($context->lookupFunction('free'), $pathBuf);
+            $context->builder->call($context->lookupFunction('__mm__free'), $pathBuf);
         }
 
         $openFail = $context->builder->icmp(Builder::INT_SLT, $fd, $zeroI32);
@@ -81,7 +81,7 @@ final class StringReadfile
         $context->builder->positionAtEnd($okBlock);
         if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
             $chunkBuf = $context->builder->call(
-                $context->lookupFunction('malloc'),
+                $context->lookupFunction('__mm__malloc'),
                 $chunkSize
             );
             $chunkPtr = $context->builder->pointerCast($chunkBuf, $i8p);
@@ -124,7 +124,7 @@ final class StringReadfile
         $context->builder->positionAtEnd($writeFailBlock);
         $context->builder->call($context->lookupFunction('close'), $fd);
         if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            $context->builder->call($context->lookupFunction('free'), $chunkBuf);
+            $context->builder->call($context->lookupFunction('__mm__free'), $chunkBuf);
         }
         $context->builder->returnValue($minusOne);
 
@@ -139,7 +139,7 @@ final class StringReadfile
         $context->builder->positionAtEnd($loopDone);
         $context->builder->call($context->lookupFunction('close'), $fd);
         if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            $context->builder->call($context->lookupFunction('free'), $chunkBuf);
+            $context->builder->call($context->lookupFunction('__mm__free'), $chunkBuf);
         }
         $context->builder->returnValue($context->builder->load($totalSlot));
 
