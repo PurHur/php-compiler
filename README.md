@@ -73,7 +73,7 @@ composer install
 | `PHP_COMPILER_SKIP_SERVE_TESTS` | Skip `ServeTest` / `ServeAotTest` (use in sandboxes that cannot bind TCP) |
 | `PHP_COMPILER_RUN_SERVE_TESTS` | Force HTTP serve integration tests even when loopback bind probe fails |
 | `PHP_COMPILER_ALLOW_JIT_SKIP` | Do not fail `ci-local.sh` when LLVM is present but JIT compliance tests are 100% skipped (broken dev env only) |
-| `PHP_COMPILER_CI_RAM_GB` | Virtual-memory cap (`ulimit -v`) during LLVM phases in `ci-local.sh` (default `100`; set `0` to disable) |
+| `PHP_COMPILER_CI_RAM_GB` | Virtual-memory cap (`ulimit -v`) during LLVM phases in `ci-local.sh` (default `30`; set `0` to disable) |
 
 `script/ci-local.sh` sets LLVM paths automatically when `.llvm/libLLVM-9.so.1` exists. It runs LLVM work in phases (`aot-lint`, `jit`, `aot-link`) so compile subprocesses exit between stages ([#436](https://github.com/PurHur/php-compiler/issues/436)). Use `script/ci-fast.sh` (or `phpc test --fast`) while iterating — same VM/compliance gate without JIT/AOT. It probes `127.0.0.1` bind capability and runs `@group serve` tests when allowed. **Local and Docker CI** (`make test-docker`, `./script/docker-ci-local.sh`) should run those tests — only set `PHP_COMPILER_SKIP_SERVE_TESTS=1` when loopback bind is unavailable.
 
