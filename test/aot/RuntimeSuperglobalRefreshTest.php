@@ -196,6 +196,73 @@ PHP;
         @unlink($outfile);
     }
 
+    /**
+     * multipart/form-data POST populates $_POST in AOT refresh (issue #52).
+     */
+    public function testMultipartPostBody(): void
+    {
+        $source = <<<'PHP'
+<?php
+declare(strict_types=1);
+header('Content-Type: text/plain; charset=UTF-8');
+echo $_POST['name'];
+PHP;
+
+        $outfile = tempnam(sys_get_temp_dir(), 'phpc_multipart_');
+        $this->assertNotFalse($outfile);
+        unlink($outfile);
+
+        $repoRoot = dirname(__DIR__, 2);
+        $env = $this->llvmProcessEnv($repoRoot);
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+
+        $compile = proc_open(
+            array_merge(
+                self::llvmEnvPrefix(),
+                self::phpCommand(),
+                [$this->compileBin, '-o', $outfile]
+            ),
+            $descriptorSpec,
+            $pipes,
+            $repoRoot,
+            $env
+        );
+        fwrite($pipes[0], $source);
+        fclose($pipes[0]);
+        $compileErr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        proc_close($compile);
+        $this->assertFileExists($outfile, trim($compileErr !== false ? $compileErr : ''));
+
+        $bodyFile = tempnam(sys_get_temp_dir(), 'phpc_multipart_body_');
+        $this->assertNotFalse($bodyFile);
+        file_put_contents(
+            $bodyFile,
+            "--phpcAotBoundary\r\n"
+            ."Content-Disposition: form-data; name=\"name\"\r\n\r\n"
+            ."Bob\r\n"
+            ."--phpcAotBoundary--\r\n"
+        );
+
+        $runEnv = $env;
+        $runEnv['REQUEST_METHOD'] = 'POST';
+        $runEnv['REQUEST_BODY_FILE'] = $bodyFile;
+        unset($runEnv['REQUEST_BODY']);
+        $runEnv['CONTENT_TYPE'] = 'multipart/form-data; boundary=phpcAotBoundary';
+        $runEnv['SCRIPT_NAME'] = '/example.php';
+        $runEnv['REQUEST_URI'] = '/example.php';
+        $out = $this->runBinary($outfile, $runEnv);
+        $this->assertStringContainsString('Bob', $this->cgiBody($out));
+
+        @unlink($outfile);
+        @unlink($bodyFile);
+    }
+
     public function testHttpsSchemeFromCgiEnvironment(): void
     {
         $source = <<<'PHP'

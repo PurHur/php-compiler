@@ -55,6 +55,12 @@ final class Superglobals
      */
     public static function readRequestBody(): string
     {
+        $fromFile = getenv('REQUEST_BODY_FILE');
+        if (false !== $fromFile && '' !== $fromFile && is_readable($fromFile)) {
+            $contents = file_get_contents($fromFile);
+
+            return false === $contents ? '' : $contents;
+        }
         $fromEnv = getenv('REQUEST_BODY');
 
         return false === $fromEnv ? '' : $fromEnv;
@@ -272,6 +278,11 @@ final class Superglobals
         return 'application/json' === self::contentTypeMediaType();
     }
 
+    public static function isMultipartContentType(): bool
+    {
+        return str_starts_with(self::contentTypeMediaType(), 'multipart/form-data');
+    }
+
     private static function populateGet(Context $context, string $queryString): void
     {
         $get = $context->ensureSuperglobal('_GET');
@@ -281,11 +292,172 @@ final class Superglobals
     private static function populatePost(Context $context, string $postBody): void
     {
         $post = $context->ensureSuperglobal('_POST');
+        $files = $context->ensureSuperglobal('_FILES');
         if (self::isJsonContentType()) {
             self::populateJson($post->toArray(), $postBody);
+        } elseif (self::isMultipartContentType()) {
+            self::populateMultipart($post->toArray(), $files->toArray(), $postBody);
         } else {
             self::populateFormEncoded($post->toArray(), $postBody);
         }
+    }
+
+    /**
+     * Parse multipart/form-data into $_POST and $_FILES (issue #52, #87 subset).
+     */
+    private static function populateMultipart(HashTable $post, HashTable $files, string $body): void
+    {
+        if ('' === $body || strlen($body) > DevServer::MAX_REQUEST_BODY) {
+            return;
+        }
+        $body = str_replace("\r\n", "\n", str_replace("\r", "\n", $body));
+        $boundary = self::extractMultipartBoundary();
+        if (null === $boundary) {
+            return;
+        }
+        $delimiter = '--'.$boundary;
+        $segments = explode($delimiter, $body);
+        array_shift($segments);
+        foreach ($segments as $segment) {
+            $segment = ltrim($segment, "\r\n");
+            if ('' === $segment || str_starts_with($segment, '--')) {
+                continue;
+            }
+            if (str_ends_with($segment, '--')) {
+                $segment = substr($segment, 0, -2);
+            }
+            $segment = rtrim($segment, "\r\n");
+            $part = self::splitMultipartPart($segment);
+            if (null === $part) {
+                continue;
+            }
+            [$rawHeaders, $content] = $part;
+            $disposition = self::multipartHeaderValue($rawHeaders, 'Content-Disposition');
+            if (null === $disposition) {
+                continue;
+            }
+            $fieldName = self::multipartParamValue($disposition, 'name');
+            if (null === $fieldName || '' === $fieldName) {
+                continue;
+            }
+            $filename = self::multipartParamValue($disposition, 'filename');
+            if (null !== $filename) {
+                self::populateMultipartFile($files, $fieldName, $filename, $rawHeaders, $content);
+
+                continue;
+            }
+            $params = [];
+            parse_str($fieldName.'='.$content, $params);
+            self::mergeParsedParams($post, $params);
+        }
+    }
+
+    /**
+     * @return array{0: string, 1: string}|null
+     */
+    private static function splitMultipartPart(string $segment): ?array
+    {
+        $lines = preg_split("/\r?\n/", $segment) ?: [];
+        $headerLines = [];
+        $contentLines = [];
+        $index = 0;
+        $lineCount = count($lines);
+        while ($index < $lineCount) {
+            if ('' === trim($lines[$index], "\r\n")) {
+                $peek = $index + 1;
+                while ($peek < $lineCount && '' === trim($lines[$peek], "\r\n")) {
+                    ++$peek;
+                }
+                if ($peek < $lineCount && str_contains($lines[$peek], ':')) {
+                    ++$index;
+
+                    continue;
+                }
+                ++$index;
+
+                break;
+            }
+            $headerLines[] = $lines[$index];
+            ++$index;
+        }
+        while ($index < $lineCount) {
+            $contentLines[] = $lines[$index];
+            ++$index;
+        }
+        if ([] === $headerLines || [] === $contentLines) {
+            return null;
+        }
+
+        return [implode("\n", $headerLines), trim(implode("\n", $contentLines), "\r\n")];
+    }
+
+    private static function extractMultipartBoundary(): ?string
+    {
+        $contentType = getenv('CONTENT_TYPE');
+        if (false === $contentType || '' === $contentType) {
+            $contentType = getenv('HTTP_CONTENT_TYPE');
+        }
+        if (false === $contentType || '' === $contentType) {
+            return null;
+        }
+        if (!preg_match('/boundary\s*=\s*(?:"([^"]+)"|([^\s;]+))/i', $contentType, $matches)) {
+            return null;
+        }
+
+        return '' !== $matches[1] ? $matches[1] : $matches[2];
+    }
+
+    private static function multipartHeaderValue(string $rawHeaders, string $name): ?string
+    {
+        foreach (preg_split("/\r?\n/", $rawHeaders) ?: [] as $line) {
+            $line = trim($line, "\r\n");
+            if ('' === $line || !str_contains($line, ':')) {
+                continue;
+            }
+            [$headerName, $value] = explode(':', $line, 2);
+            if (0 === strcasecmp(trim($headerName), $name)) {
+                return trim($value, "\r\n ");
+            }
+        }
+
+        return null;
+    }
+
+    private static function multipartParamValue(string $disposition, string $param): ?string
+    {
+        if (!preg_match('/'.preg_quote($param, '/').'\s*=\s*"([^"]*)"/i', $disposition, $matches)) {
+            return null;
+        }
+
+        return $matches[1];
+    }
+
+    private static function populateMultipartFile(
+        HashTable $files,
+        string $fieldName,
+        string $filename,
+        string $rawHeaders,
+        string $content
+    ): void {
+        $entry = self::ensureArrayChild($files, $fieldName);
+        self::setStringEntry($entry, 'name', $filename);
+        $partType = self::multipartHeaderValue($rawHeaders, 'Content-Type');
+        self::setStringEntry($entry, 'type', null !== $partType && '' !== $partType ? $partType : 'application/octet-stream');
+        $tmp = tempnam(sys_get_temp_dir(), 'phpc_upload_');
+        if (false === $tmp) {
+            self::setScalarEntry($entry, 'error', 1);
+
+            return;
+        }
+        if (false === file_put_contents($tmp, $content)) {
+            @unlink($tmp);
+            self::setScalarEntry($entry, 'error', 1);
+
+            return;
+        }
+        self::setStringEntry($entry, 'tmp_name', $tmp);
+        self::setScalarEntry($entry, 'error', 0);
+        self::setScalarEntry($entry, 'size', strlen($content));
     }
 
     /**

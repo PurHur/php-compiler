@@ -2194,11 +2194,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/Web/Superglobals.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 601)
-- new Variable (line 602)
-- new Variable (line 621)
-- new Variable (line 696)
-- 33 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new HashTable (line 773)
+- new Variable (line 774)
+- new Variable (line 793)
+- new Variable (line 868)
+- 40 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 - 1 closure(s)
 
 ### `src/macro_functions.php`
