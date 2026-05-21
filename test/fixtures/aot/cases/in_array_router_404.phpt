@@ -13,7 +13,7 @@ if (!in_array($route, $routes, true)) {
     echo 'ok:', $route, "\n";
 }
 --EXPECTF--
-Status: 404 Not Found
+Status: 404
 not found
 --EXPECT_EXIT--
 0

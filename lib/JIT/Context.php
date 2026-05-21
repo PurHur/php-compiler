@@ -13,6 +13,7 @@ use PHPCfg\Operand;
 use PHPCompiler\Runtime;
 use PHPCompiler\Block;
 use PHPCompiler\Module;
+use PHPCompiler\OpCode;
 use PHPCompiler\VM\Variable as VMVariable;
 use PHPTypes\Type;
 
@@ -62,6 +63,10 @@ class Context {
     public Helper $helper;
 
     public Scope $scope;
+
+    /** ?? result operands that must receive branch assigns even when php-cfg marks them dead (#99). */
+    public \SplObjectStorage $coalesceAssignTargets;
+
     private array $exports = [];
     public Runtime $runtime;
 
@@ -76,6 +81,7 @@ class Context {
     public function __construct(Runtime $runtime, int $loadType) {
         $this->runtime = $runtime;
         $this->scope = new Scope;
+        $this->coalesceAssignTargets = new \SplObjectStorage();
         $this->loadType = $loadType;
         $this->llvm = PHPLLVM\Chooser::choose();
         $this->llvm->initializeNative();
@@ -479,7 +485,16 @@ class Context {
         PHPLLVM\BasicBlock $basicBlock,
         Block $block
     ): void {
+        $coalesceResults = new \SplObjectStorage();
+        foreach ($block->opCodes as $blockOp) {
+            if (OpCode::TYPE_COALESCE === $blockOp->type && null !== $blockOp->block3) {
+                $coalesceResults[$block->getOperand($blockOp->arg1)] = true;
+            }
+        }
         foreach ($block->orig->deadOperands as $op) {
+            if ($coalesceResults->contains($op)) {
+                continue;
+            }
             if (!$this->scope->variables->contains($op)) {
                 continue;
             }

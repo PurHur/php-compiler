@@ -22,7 +22,7 @@ final class MiniWebAppSkeletonTest extends TestCase
         $this->assertFileExists($root.'/phpc.json');
     }
 
-    public function testLintAllReportsClassAndMethodBlockers(): void
+    public function testLintAllNoLongerFlagsClassMethods(): void
     {
         $root = dirname(__DIR__, 2);
         $tree = $root.'/examples/003-MiniWebApp';
@@ -45,10 +45,8 @@ final class MiniWebAppSkeletonTest extends TestCase
         $exit = proc_close($proc);
 
         $combined = ($stdout !== false ? $stdout : '').($stderr !== false ? $stderr : '');
-        $this->assertSame(1, $exit, $combined);
-        $this->assertStringContainsString('ClassMethod', $combined);
-        $this->assertStringContainsString('Expr_MethodCall', $combined);
-        $this->assertStringContainsString('#58', $combined);
+        $this->assertStringNotContainsString('Expr_MethodCall', $combined);
+        $this->assertStringNotContainsString('Stmt_ClassMethod', $combined);
         $this->assertStringNotContainsString('dynamic include/require', $combined);
     }
 

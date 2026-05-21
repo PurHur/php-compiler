@@ -159,12 +159,28 @@ class Compiler {
                     if (!is_null($child->defaultBlock)) {
                         $this->compileOps($child->defaultBlock->children, $result);
                     }
+                    $declared = $child->declaredType instanceof Op\Type\Literal
+                        ? Type::fromDecl($child->declaredType->name)
+                        : $child->type;
                     $result->addOpCode(new OpCode(
                         OpCode::TYPE_DECLARE_PROPERTY,
                         $this->compileOperand($child->name, $result, true),
                         is_null($child->defaultVar) ? null : $this->compileOperand($child->defaultVar, $result, true),
-                        $this->compileTypeConstrainedVariable($result, $child->type)
+                        $this->compileTypeConstrainedVariable($result, $declared)
                     ));
+                    break;
+                case Op\Stmt\ClassMethod::class:
+                    $methodBlock = $this->compileCfgBlock($child->func->cfg, $child->func->params);
+                    $methodBlock->func = $child->func;
+                    $methodBlock->strictTypes = isset($child->func->strictTypes) ? (bool) $child->func->strictTypes : false;
+                    $methodName = new Operand\Literal($child->func->name);
+                    $methodName->type = Type::string();
+                    $declare = new OpCode(
+                        OpCode::TYPE_DECLARE_METHOD,
+                        $this->compileOperand($methodName, $result, true)
+                    );
+                    $declare->block1 = $methodBlock;
+                    $result->addOpCode($declare);
                     break;
                 default:
                     throw new \LogicException('Unsupported class body element: ' . get_class($child));
@@ -560,6 +576,32 @@ class Compiler {
                     OpCode::TYPE_FUNCCALL_EXEC_NORETURN
                 );
                 return $return;
+            case Op\Expr\MethodCall::class:
+                $return = [
+                    new OpCode(
+                        OpCode::TYPE_METHODCALL_INIT,
+                        $this->compileOperand($expr->var, $block, true),
+                        $this->compileOperand($expr->name, $block, true)
+                    ),
+                ];
+                foreach ($expr->args as $arg) {
+                    $return[] = new OpCode(
+                        OpCode::TYPE_ARG_SEND,
+                        $this->compileOperand($arg, $block, true)
+                    );
+                }
+                if (!empty($expr->result->usages)) {
+                    $return[] = new OpCode(
+                        OpCode::TYPE_FUNCCALL_EXEC_RETURN,
+                        $this->compileOperand($expr->result, $block, false)
+                    );
+                } else {
+                    $return[] = new OpCode(
+                        OpCode::TYPE_FUNCCALL_EXEC_NORETURN,
+                    );
+                }
+
+                return $return;
             case Op\Expr\PropertyFetch::class:
                 return [new OpCode(
                     OpCode::TYPE_PROPERTY_FETCH,
@@ -653,6 +695,10 @@ class Compiler {
 
     protected function compileCoalesce(Op\Expr\BinaryOp\Coalesce $expr, Block $block): Block
     {
+        // php-cfg may mark the ?? result dead while it is still assigned on branch blocks (#99).
+        if ($expr->result instanceof Operand\Temporary && [] === $expr->result->usages) {
+            $expr->result->usages[] = $expr->result;
+        }
         $resultSlot = $this->compileOperand($expr->result, $block, false);
 
         $endBlock = new Block($block->orig);
@@ -1077,6 +1123,8 @@ class Compiler {
                     throw new \LogicException('Unknown Literal Operand Type: ' . ($operand->type ?? 'untyped'));
             }
             return $block->registerConstant($operand, $return);
+        } elseif ($operand instanceof Operand\Variable) {
+            return $block->getVarSlot($operand, $isRead);
         } elseif ($operand instanceof Operand\Temporary) {
             return $block->getVarSlot($operand, $isRead);
         }

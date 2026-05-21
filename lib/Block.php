@@ -139,13 +139,39 @@ class Block {
         return null;
     }
 
+    /**
+     * Zend include/require: included file shares caller locals by name (issue #471).
+     */
+    private static function findVariableInParentFrames(Operand $op, Frame $frame): ?Variable
+    {
+        $name = self::resolveVariableName($op);
+        if (null === $name) {
+            return null;
+        }
+        for ($f = $frame; null !== $f; $f = $f->parent) {
+            if (null === $f->block) {
+                continue;
+            }
+            $idx = $f->block->slotIndexForVariableName($name);
+            if (null !== $idx && isset($f->scope[$idx])) {
+                return $f->scope[$idx];
+            }
+        }
+
+        return null;
+    }
+
     public function getFrame(Context $context, ?Frame $frame = null): Frame {
         // Todo: build scope
         $scope = [];
         $scopeSize = $this->scope->count();
         foreach ($this->scope as $op) {
             $pos = $this->scope[$op];
-            
+            if (null !== $frame && 'this' === self::resolveVariableName($op) && !empty($frame->callArgs)) {
+                $scope[$pos] = $frame->callArgs[0];
+                continue;
+            }
+
             if (isset($this->constants[$pos])) {
                 $scope[$pos] = $this->constants[$pos];
             } elseif ($this->args->contains($op)) {
@@ -160,6 +186,13 @@ class Block {
                     $found = true;
                 }
                 if (!$found) {
+                    $inherited = self::findVariableInParentFrames($op, $frame);
+                    if (null !== $inherited) {
+                        $scope[$pos] = $inherited;
+                        continue;
+                    }
+                }
+                if (!$found) {
                     $name = self::resolveVariableName($op);
                     if (null !== $name && Superglobals::isSuperglobalName($name)) {
                         $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
@@ -172,6 +205,13 @@ class Block {
                     throw new \LogicException("Could not resolve argument");
                 }
             } else {
+                if (null !== $frame) {
+                    $inherited = self::findVariableInParentFrames($op, $frame);
+                    if (null !== $inherited) {
+                        $scope[$pos] = $inherited;
+                        continue;
+                    }
+                }
                 if (
                     $this->inheritUndefinedLocals
                     && null !== $frame

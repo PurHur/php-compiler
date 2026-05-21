@@ -35,7 +35,7 @@ MINIWEBAPP_LINT_GATE=1 make web-smoke   # fail if lint --all regresses
 | `class Router` + methods | [#145](https://github.com/PurHur/php-compiler/issues/145) | `Unsupported class body element: PHPCfg\Op\Stmt\ClassMethod` |
 | `$router->dispatch(...)` | [#145](https://github.com/PurHur/php-compiler/issues/145) | `Expr_MethodCall` |
 | `require __DIR__ . '/../config.php'` | [#54](https://github.com/PurHur/php-compiler/issues/54) runtime | ✅ lint follows ([#462](https://github.com/PurHur/php-compiler/issues/462)) |
-| `include __DIR__ . '/../templates/...'` | [#54](https://github.com/PurHur/php-compiler/issues/54) runtime | ✅ lint follows ([#462](https://github.com/PurHur/php-compiler/issues/462)) |
+| `include __DIR__ . '/../templates/...'` | [#54](https://github.com/PurHur/php-compiler/issues/54) runtime | ✅ lint follows ([#462](https://github.com/PurHur/php-compiler/issues/462)); VM scope ✅ ([#471](https://github.com/PurHur/php-compiler/issues/471)) |
 | `foreach ($knownRoutes as $known)` | — | ✅ accepted (was [#53](https://github.com/PurHur/php-compiler/issues/53)) |
 | `break` in route scan | [#115](https://github.com/PurHur/php-compiler/issues/115) | `Stmt_Break` (when lint follows index includes) |
 | `$_GET['route'] ?? 'home'` | — | ✅ accepted (was [#99](https://github.com/PurHur/php-compiler/issues/99)) |
