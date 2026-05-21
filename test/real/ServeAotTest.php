@@ -250,6 +250,36 @@ PHP,
         @rmdir($binaryDir);
     }
 
+    /**
+     * Front-controller PATH_INFO via serve-aot (issue #453, mirrors ServeTest #276).
+     */
+    public function testServeAotPathInfoFrontControllerDispatch(): void
+    {
+        $docroot = $this->makeDocroot([
+            'index.php' => <<<'PHP'
+<?php
+declare(strict_types=1);
+header('Content-Type: text/plain; charset=UTF-8');
+echo 'SCRIPT_NAME=', $_SERVER['SCRIPT_NAME'], "\n";
+echo 'PATH_INFO=', $_SERVER['PATH_INFO'], "\n";
+if ($_SERVER['PATH_INFO'] === '/hello') {
+    echo 'hi';
+}
+PHP,
+        ]);
+        $binaryDir = sys_get_temp_dir().'/phpc_serve_aot_pi_'.bin2hex(random_bytes(4));
+        $this->assertTrue(mkdir($binaryDir));
+        $binary = $binaryDir.'/app';
+        $this->compileExample($docroot.'/index.php', $binary);
+        $response = $this->httpGetAot($docroot, $binary, '/index.php/hello');
+        $this->assertStringContainsString('HTTP/1.1 200', $response);
+        $this->assertStringContainsString('SCRIPT_NAME=/index.php', $response);
+        $this->assertStringContainsString('PATH_INFO=/hello', $response);
+        $this->assertStringContainsString('hi', $response);
+        @unlink($binary);
+        @rmdir($binaryDir);
+    }
+
     public function testServeAot001SimpleWeb(): void
     {
         $docroot = $this->repoRoot.'/examples/001-SimpleWeb';
