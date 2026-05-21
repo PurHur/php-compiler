@@ -27,7 +27,6 @@ Some constructs (for example destructuring assigns and prefix/postfix `++`/`--`)
 | `Expr_ArrowFunction` | [#142](https://github.com/PurHur/php-compiler/issues/142) |
 | `Expr_PreInc`, `Expr_PostInc`, `Expr_PreDec`, `Expr_PostDec` (`++`/`--`) | [#137](https://github.com/PurHur/php-compiler/issues/137) |
 | `Expr_List` (`list()` / short-list destructuring assign targets) | [#139](https://github.com/PurHur/php-compiler/issues/139) |
-| `Stmt_Switch` (`switch` / `case`; VM ok, JIT `TYPE_CASE` stubbed) | [#96](https://github.com/PurHur/php-compiler/issues/96) |
 | `Expr_New` (non-trivial) | [#136](https://github.com/PurHur/php-compiler/issues/136) |
 | Named arguments, traits, enums | [#168](https://github.com/PurHur/php-compiler/issues/168), [#169](https://github.com/PurHur/php-compiler/issues/169) |
 

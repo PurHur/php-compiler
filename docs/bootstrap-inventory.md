@@ -229,7 +229,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `lib/Func/JIT.php` | 0 | 2 |
 | `lib/Func/PHP.php` | 0 | 1 |
 | `lib/Handler.php` | 0 | 1 |
-| `lib/JIT.php` | 0 | 10 |
+| `lib/JIT.php` | 0 | 11 |
 | `lib/JIT/Analyzer.php` | 0 | 1 |
 | `lib/JIT/ArrayBuiltinHelper.php` | 0 | 24 |
 | `lib/JIT/BasicBlockHelper.php` | 0 | 1 |
@@ -285,7 +285,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `lib/Lint/IncrementDetector.php` | 0 | 4 |
 | `lib/Lint/Issue.php` | 0 | 2 |
 | `lib/Lint/LintCompiler.php` | 0 | 6 |
-| `lib/Lint/Linter.php` | 0 | 9 |
+| `lib/Lint/Linter.php` | 0 | 8 |
 | `lib/Lint/ListDestructuringDetector.php` | 0 | 4 |
 | `lib/Lint/SwitchDetector.php` | 0 | 4 |
 | `lib/Lint/UnsupportedRegistry.php` | 0 | 1 |
@@ -1606,10 +1606,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new JIT\Call\Native (line 151)
 - new ext\standard\boolval (line 282)
 - new Variable (line 468)
-- new Variable (line 887)
-- new Operand\Literal (line 957)
-- new Operand\Literal (line 961)
-- new Operand\Literal (line 965)
+- new OpCode (line 535)
+- new Variable (line 901)
+- new Operand\Literal (line 971)
+- new Operand\Literal (line 975)
+- new Operand\Literal (line 979)
 - 12 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Analyzer.php`
@@ -1986,11 +1987,10 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new Runtime (line 27)
 - new IncrementDetector (line 99)
 - new ListDestructuringDetector (line 100)
-- new SwitchDetector (line 101)
-- new State (line 144)
-- new LintCompiler (line 159)
-- new RecursiveIteratorIterator (line 275)
-- new RecursiveDirectoryIterator (line 276)
+- new State (line 143)
+- new LintCompiler (line 158)
+- new RecursiveIteratorIterator (line 274)
+- new RecursiveDirectoryIterator (line 275)
 - 13 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/Lint/ListDestructuringDetector.php`
