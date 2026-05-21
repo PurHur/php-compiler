@@ -4,14 +4,18 @@ AOT array_flip() for string and int values
 <?php
 $a = array('a' => 1, 'b' => 2);
 $f = array_flip($a);
-echo $f[1], "\n";
-echo $f[2], "\n";
+$fa = $f[1];
+$fb = $f[2];
+echo $fa, "\n";
+echo $fb, "\n";
 $b = array(10 => 'x', 20 => 'y');
 $g = array_flip($b);
 $k = 'x';
-echo $g[$k], "\n";
+$gx = $g[$k];
+echo $gx, "\n";
 $k = 'y';
-echo $g[$k], "\n";
+$gy = $g[$k];
+echo $gy, "\n";
 --EXPECT--
 a
 b

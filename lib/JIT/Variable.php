@@ -443,18 +443,24 @@ final class Variable {
                             $this->context->lookupFunction('__value__readString'),
                             $valPtr
                         );
+                        $owned = $this->context->builder->call(
+                            $this->context->lookupFunction('__string__separate'),
+                            $str
+                        );
 
                         return new Variable(
                             $this->context,
                             self::TYPE_STRING,
                             self::KIND_VALUE,
-                            $str
+                            $owned
                         );
                     }
 
                     $this->context->refcount->addref($ht);
                     $boxed = HashTableHelper::readStringKeyToValueBox($this->context, $ht, $key);
-                    $this->context->refcount->delref($ht);
+                    if (null === $this->superglobalName) {
+                        $this->context->refcount->delref($ht);
+                    }
 
                     return $boxed;
                 }
@@ -469,13 +475,19 @@ final class Variable {
                         $ht,
                         $index
                     );
-                    $this->context->refcount->delref($ht);
+                    $owned = $this->context->builder->call(
+                        $this->context->lookupFunction('__string__separate'),
+                        $str
+                    );
+                    if (null === $this->superglobalName) {
+                        $this->context->refcount->delref($ht);
+                    }
 
                     return new Variable(
                         $this->context,
                         self::TYPE_STRING,
                         self::KIND_VALUE,
-                        $str
+                        $owned
                     );
                 }
                 return HashTableHelper::readIndexedToValueBox($this->context, $ht, $index);

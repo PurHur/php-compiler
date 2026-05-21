@@ -55,12 +55,7 @@ final class AotTest extends BaseTest
      */
     public function testCases(string $name, string $code, array $sections): void
     {
-        $tmpBase = tempnam(sys_get_temp_dir(), 'phpc_aot_');
-        if (false === $tmpBase) {
-            $this->fail('Could not create temp file');
-        }
-        unlink($tmpBase);
-        $outfile = $tmpBase;
+        $outfile = sys_get_temp_dir().'/phpc_aot_'.bin2hex(random_bytes(8));
 
         $descriptorSpec = [
             0 => ['pipe', 'r'],
@@ -107,10 +102,7 @@ final class AotTest extends BaseTest
                     $compileArgv[] = '-q';
                     $compileArgv[] = $parts[1];
                 }
-                if ('REQUEST_BODY' === $parts[0] && '' !== $parts[1]) {
-                    $compileArgv[] = '-p';
-                    $compileArgv[] = $parts[1];
-                }
+                // REQUEST_BODY in --ENV-- is for runtime refresh only (issues #291, #314).
             }
         }
         $compileArgv = array_merge($compileArgv, PhptWebSections::compileArgvFlags($sections));
@@ -130,6 +122,7 @@ final class AotTest extends BaseTest
             }
             $compileArgv = $stripped;
         }
+        $compileArgv[] = '-';
 
         $compile = proc_open(
             array_merge(self::llvmEnvPrefix(), $this->phpCommand(), $compileArgv),
@@ -143,13 +136,15 @@ final class AotTest extends BaseTest
         $compileErr = stream_get_contents($pipes[2]);
         fclose($pipes[1]);
         fclose($pipes[2]);
-        proc_close($compile);
-        if (!is_executable($outfile)) {
-            $this->fail(
-                "AOT compile did not produce executable {$outfile}: "
-                . trim($compileErr !== false ? $compileErr : '')
-            );
-        }
+        $compileExit = proc_close($compile);
+        $compileErrText = trim($compileErr !== false ? $compileErr : '');
+        $this->assertSame(
+            0,
+            $compileExit,
+            "AOT compile failed for {$name}: {$compileErrText}"
+        );
+        $this->assertFileExists($outfile, $compileErrText);
+        $this->assertTrue(is_executable($outfile), $compileErrText);
 
         $run = proc_open(
             [$outfile],
@@ -159,6 +154,7 @@ final class AotTest extends BaseTest
             $runEnv
         );
         $result = stream_get_contents($runPipes[1]);
+        $runErr = stream_get_contents($runPipes[2]);
         fclose($runPipes[0]);
         fclose($runPipes[1]);
         fclose($runPipes[2]);
@@ -168,8 +164,15 @@ final class AotTest extends BaseTest
             @unlink($bodyFile);
         }
 
+        $runErrText = trim($runErr !== false ? $runErr : '');
         if (isset($sections['EXPECT_EXIT'])) {
-            $this->assertSame((int) trim($sections['EXPECT_EXIT']), $exitCode);
+            $this->assertSame(
+                (int) trim($sections['EXPECT_EXIT']),
+                $exitCode,
+                "AOT run for {$name} stderr: {$runErrText}"
+            );
+        } else {
+            $this->assertSame(0, $exitCode, "AOT run for {$name} stderr: {$runErrText}");
         }
         $this->assertExpect($result !== false ? $result : '', $sections);
     }

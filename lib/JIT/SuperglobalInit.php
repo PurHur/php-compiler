@@ -141,6 +141,9 @@ final class SuperglobalInit
      */
     public static function compileTimeOffsetIsSet(Context $context, string $superglobalName, string $key): ?bool
     {
+        if ('_REQUEST' === $superglobalName) {
+            return null;
+        }
         $vmVar = $context->runtime->vmContext->getSuperglobal($superglobalName);
         if (null === $vmVar || VMVariable::TYPE_ARRAY !== $vmVar->type) {
             return false;
@@ -163,6 +166,10 @@ final class SuperglobalInit
         string $superglobalName,
         string $key
     ): ?\PHPLLVM\Value {
+        // $_REQUEST is rebuilt each run from $_GET + $_POST (issue #291).
+        if ('_REQUEST' === $superglobalName) {
+            return null;
+        }
         if ('_SERVER' === $superglobalName && in_array($key, self::RUNTIME_SERVER_KEYS, true)) {
             return null;
         }
