@@ -13,6 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
@@ -20,7 +21,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * array_unique() for arrays of scalar values (strict identity; VM only).
+ * array_unique() for arrays of scalar values (strict identity; subset of PHP).
  */
 final class array_unique extends Internal
 {
@@ -67,6 +68,10 @@ final class array_unique extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('array_unique() is not implemented for JIT in this compiler build');
+        if (1 !== \count($args)) {
+            throw new \LogicException('array_unique() requires exactly one argument');
+        }
+
+        return ArrayBuiltinHelper::arrayUnique($context, $args[0]);
     }
 }
