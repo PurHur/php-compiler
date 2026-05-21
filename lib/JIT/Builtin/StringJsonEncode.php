@@ -82,7 +82,7 @@ final class StringJsonEncode
         $context->builder->positionAtEnd($countDone);
         $numKeys = $context->builder->load($countSlot);
         $bytes = $context->builder->mulNoSignedWrap($numKeys, $ptrSize);
-        $nodesRaw = $context->builder->call($context->lookupFunction('malloc'), $bytes);
+        $nodesRaw = $context->builder->call($context->lookupFunction('__mm__malloc'), $bytes);
         $nodesArray = $context->builder->pointerCast($nodesRaw, $nodePtrType->pointerType(0));
         $context->builder->store($nodesArray, $nodesSlot);
         $context->builder->store($zeroSize, $idxSlot);
@@ -169,7 +169,7 @@ final class StringJsonEncode
         $context->builder->positionAtEnd($emitDone);
         $nodesArray = $context->builder->load($nodesSlot);
         $nodesRaw = $context->builder->pointerCast($nodesArray, $context->getTypeFromString('int8*'));
-        $context->builder->call($context->lookupFunction('free'), $nodesRaw);
+        $context->builder->call($context->lookupFunction('__mm__free'), $nodesRaw);
         $closeBrace = self::literalString($context, '}');
         $acc = $context->builder->load($resultSlot);
         $workResult = JitStringConcat::concat($context, $acc, $closeBrace);
