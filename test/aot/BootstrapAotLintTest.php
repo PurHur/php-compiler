@@ -11,6 +11,7 @@ use PHPUnit\Framework\TestCase;
  *
  * @group llvm
  * @group aot
+ * @group aot-lint
  */
 final class BootstrapAotLintTest extends TestCase
 {

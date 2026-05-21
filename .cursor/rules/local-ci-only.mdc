@@ -12,14 +12,17 @@ This project **does not use GitHub Actions for CI** (billing limits). Do **not**
 From repo root, after `composer install`:
 
 ```bash
-./script/ci-local.sh
+./script/ci-local.sh   # full gate (JIT + AOT lint + link)
+./script/ci-fast.sh    # VM/compliance only while iterating (#436)
 ```
 
 Or in Docker (preferred on harness hosts without host PHP/LLVM):
 
 ```bash
 make docker-build-22   # once
-make test              # or: ./script/docker-ci-local.sh
+make test              # full CI
+make test-fast         # fast CI (no LLVM compile)
+# or: ./script/docker-ci-local.sh
 ```
 
 Image: `php-compiler:22.04-dev` (`Docker/dev/ubuntu-22.04/Dockerfile`).
@@ -41,4 +44,4 @@ If `-v "$(pwd):/compiler"` shows an empty tree, use:
 
 ## Before merge
 
-Run the same suite you would expect from CI locally. Do not assume cloud workflows will run.
+Run `./script/ci-local.sh` (full LLVM phases). Use `ci-fast.sh` only for iteration. Set `PHP_COMPILER_CI_RAM_GB` (default 100) if LLVM phases exhaust host RAM (#436).

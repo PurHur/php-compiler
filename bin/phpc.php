@@ -16,7 +16,7 @@ declare(strict_types=1);
  *   phpc lint --project <entry.php> [--json]
  *   phpc lint --all <dir-or-file> [--json]
  *   phpc init [--force] [target-dir]
- *   phpc test [-- phpunit/ci-local args...]
+ *   phpc test [--fast] [-- phpunit/ci-local args...]
  *   phpc doctor                                  Probe PHP, LLVM, deps, loopback (issue #253)
  *   phpc validate-manifest [dir]                 Validate phpc.json schema and paths (issue #263)
  */
@@ -43,7 +43,7 @@ php-compiler CLI
   phpc lint --project <entry.php> [--json]    Entry + literal include/require chain
   phpc lint --all <dir-or-file> [--json]      All .php under a tree (aggregated)
   phpc init [--force] [target-dir]              Scaffold phpc.json + public/index.php
-  phpc test [args...]                           Run ./script/ci-local.sh
+  phpc test [--fast] [args...]                  Run ci-local.sh (full) or ci-fast.sh (no LLVM)
   phpc doctor                                   Probe environment for full local CI
   phpc validate-manifest [dir]                  Validate phpc.json (default: cwd)
 
@@ -94,7 +94,12 @@ switch ($command) {
         exit(runProcess(array_merge($php, [$repoRoot.'/bin/init.php'], $args), $repoRoot));
 
     case 'test':
-        $testScript = $repoRoot.'/script/ci-local.sh';
+        $fast = false;
+        if ([] !== $args && in_array($args[0], ['--fast', 'fast'], true)) {
+            $fast = true;
+            array_shift($args);
+        }
+        $testScript = $repoRoot.'/script/'.($fast ? 'ci-fast.sh' : 'ci-local.sh');
         if (!is_executable($testScript)) {
             fwrite(STDERR, "phpc test: {$testScript} is not executable\n");
             exit(1);

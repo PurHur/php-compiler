@@ -2,7 +2,7 @@
 
 [![CircleCI](https://circleci.com/gh/ircmaxell/php-compiler.svg?style=svg)](https://circleci.com/gh/ircmaxell/php-compiler)
 
-**CI:** run `./script/ci-local.sh` on the host or `make test` in Docker (`php-compiler:22.04-dev`). GitHub Actions workflows are disabled (see [#394](https://github.com/PurHur/php-compiler/issues/394)).
+**CI:** full gate `./script/ci-local.sh` or `make test`; fast iteration `./script/ci-fast.sh` or `make test-fast` ([#436](https://github.com/PurHur/php-compiler/issues/436)). Docker image: `php-compiler:22.04-dev`. GitHub Actions workflows are disabled (see [#394](https://github.com/PurHur/php-compiler/issues/394)).
 
 Ok, so this used to be a dead project. It required calling out to all sorts of hackery to generate PHP extensions, or PHP itself.
 
@@ -18,7 +18,8 @@ On a modern Linux host with PHP 8.1+ (8.2 recommended):
 git clone https://github.com/PurHur/php-compiler.git
 cd php-compiler
 composer install
-./phpc test                    # full PHPUnit suite (VM, compliance, JIT, AOT)
+./phpc test --fast             # VM/compliance only (no LLVM compile)
+./phpc test                    # full suite (VM, JIT, AOT lint + link)
 mkdir my-app && ./phpc init my-app   # phpc.json + public/index.php scaffold
 ./phpc run -r 'echo 1;'        # VM mode (or: php bin/vm.php -r 'echo 1;')
 ./phpc run -q 'name=Dev' examples/001-SimpleWeb/example.php   # web example without TCP
@@ -72,13 +73,16 @@ composer install
 | `PHP_COMPILER_SKIP_SERVE_TESTS` | Skip `ServeTest` / `ServeAotTest` (use in sandboxes that cannot bind TCP) |
 | `PHP_COMPILER_RUN_SERVE_TESTS` | Force HTTP serve integration tests even when loopback bind probe fails |
 | `PHP_COMPILER_ALLOW_JIT_SKIP` | Do not fail `ci-local.sh` when LLVM is present but JIT compliance tests are 100% skipped (broken dev env only) |
+| `PHP_COMPILER_CI_RAM_GB` | Virtual-memory cap (`ulimit -v`) during LLVM phases in `ci-local.sh` (default `100`; set `0` to disable) |
 
-`script/ci-local.sh` sets LLVM paths automatically when `.llvm/libLLVM-9.so.1` exists. It probes `127.0.0.1` bind capability and runs `@group serve` tests when allowed. **Local and Docker CI** (`make test-docker`, `./script/docker-ci-local.sh`) should run those tests — only set `PHP_COMPILER_SKIP_SERVE_TESTS=1` when loopback bind is unavailable.
+`script/ci-local.sh` sets LLVM paths automatically when `.llvm/libLLVM-9.so.1` exists. It runs LLVM work in phases (`aot-lint`, `jit`, `aot-link`) so compile subprocesses exit between stages ([#436](https://github.com/PurHur/php-compiler/issues/436)). Use `script/ci-fast.sh` (or `phpc test --fast`) while iterating — same VM/compliance gate without JIT/AOT. It probes `127.0.0.1` bind capability and runs `@group serve` tests when allowed. **Local and Docker CI** (`make test-docker`, `./script/docker-ci-local.sh`) should run those tests — only set `PHP_COMPILER_SKIP_SERVE_TESTS=1` when loopback bind is unavailable.
 
 ### Running tests on the host
 
 ```console
+make test-fast               # VM/compliance only (no LLVM)
 make test-local              # same as ./script/ci-local.sh
+./script/ci-fast.sh --filter VMTest
 ./script/ci-local.sh --filter VMTest
 make web-smoke
 make examples-web-smoke   # HTTP serve + curl (skipped when loopback bind fails)

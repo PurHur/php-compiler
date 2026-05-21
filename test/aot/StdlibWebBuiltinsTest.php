@@ -11,6 +11,7 @@ use PHPUnit\Framework\TestCase;
  *
  * @group llvm
  * @group aot
+ * @group aot-link
  */
 final class StdlibWebBuiltinsTest extends TestCase
 {
