@@ -37,6 +37,53 @@ final class ProjectManifestTest extends TestCase
         }
     }
 
+    public function testResolveIncludePathsFromManifest(): void
+    {
+        $dir = sys_get_temp_dir().'/phpc_manifest_'.bin2hex(random_bytes(6));
+        $this->assertTrue(mkdir($dir));
+        $this->assertTrue(mkdir($dir.'/src', 0777, true));
+        $this->assertTrue(mkdir($dir.'/public', 0777, true));
+        try {
+            file_put_contents($dir.'/src/helpers.php', '<?php function helper(): int { return 1; }');
+            file_put_contents($dir.'/public/index.php', '<?php');
+            file_put_contents(
+                $dir.'/phpc.json',
+                json_encode([
+                    'entry' => 'public/index.php',
+                    'binary' => '.phpc/bin/app',
+                    'includes' => ['src/helpers.php'],
+                ], JSON_THROW_ON_ERROR)
+            );
+            $paths = ProjectManifest::resolveIncludePaths($dir);
+            $this->assertCount(1, $paths);
+            $this->assertStringEndsWith('/src/helpers.php', $paths[0]);
+            $this->assertSame([], ManifestValidator::validateForBuild($dir));
+        } finally {
+            $this->removeTree($dir);
+        }
+    }
+
+    public function testValidateForBuildRejectsMissingInclude(): void
+    {
+        $dir = sys_get_temp_dir().'/phpc_manifest_'.bin2hex(random_bytes(6));
+        $this->assertTrue(mkdir($dir));
+        try {
+            file_put_contents($dir.'/example.php', '<?php');
+            file_put_contents(
+                $dir.'/phpc.json',
+                json_encode([
+                    'entry' => 'example.php',
+                    'binary' => '.phpc/bin/app',
+                    'includes' => ['missing.php'],
+                ], JSON_THROW_ON_ERROR)
+            );
+            $errors = ManifestValidator::validateForBuild($dir);
+            $this->assertContains('includes path not found: missing.php', $errors);
+        } finally {
+            $this->removeTree($dir);
+        }
+    }
+
     public function testValidateForBuildRequiresEntry(): void
     {
         $dir = sys_get_temp_dir().'/phpc_manifest_'.bin2hex(random_bytes(6));

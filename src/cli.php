@@ -72,6 +72,18 @@ while (! empty($opts)) {
             $options['-p'] = array_shift($opts);
 
             break;
+        case '--include':
+            if (empty($opts) || substr($opts[0], 0, 1) === '-') {
+                die("Option --include requires a file path\n");
+            }
+            $includePath = array_shift($opts);
+            if (!is_file($includePath)) {
+                die("Could not open include file {$includePath}\n");
+            }
+            $options['--include'] ??= [];
+            $options['--include'][] = realpath($includePath) ?: $includePath;
+
+            break;
         default:
             if (! empty($opts)) {
                 die("Extra argument not understood: {$opt}\n");

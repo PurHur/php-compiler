@@ -76,6 +76,34 @@ final class ProjectManifest
     /**
      * Output path for AOT binary from manifest "binary" key (file may not exist yet).
      */
+    /**
+     * Extra PHP paths from manifest "includes" (issue #452).
+     *
+     * @return list<string> absolute paths relative to project dir
+     */
+    public static function resolveIncludePaths(string $startDir, ?array $manifest = null): array
+    {
+        $projectDir = self::resolveProjectDir($startDir);
+        if (null === $projectDir) {
+            return [];
+        }
+
+        $manifest ??= self::loadManifest($projectDir);
+        if (null === $manifest || !isset($manifest['includes']) || !is_array($manifest['includes'])) {
+            return [];
+        }
+
+        $paths = [];
+        foreach ($manifest['includes'] as $item) {
+            if (!is_string($item) || '' === $item) {
+                continue;
+            }
+            $paths[] = self::resolveRelativePath($projectDir, $item);
+        }
+
+        return $paths;
+    }
+
     public static function resolveBinaryOutputPath(string $startDir, ?array $manifest = null): ?string
     {
         $projectDir = self::resolveProjectDir($startDir);

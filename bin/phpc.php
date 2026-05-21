@@ -196,7 +196,15 @@ function buildFromProject(string $repoRoot, array $php, string $projectDir): int
         return 1;
     }
 
-    return runProcess(array_merge($php, [$repoRoot.'/bin/compile.php', '-o', $output, $entry]), $repoRoot);
+    $includes = \PHPCompiler\Web\ProjectManifest::resolveIncludePaths($projectDir);
+    $cmd = array_merge($php, [$repoRoot.'/bin/compile.php', '-o', $output]);
+    foreach ($includes as $includePath) {
+        $cmd[] = '--include';
+        $cmd[] = $includePath;
+    }
+    $cmd[] = $entry;
+
+    return runProcess($cmd, $repoRoot);
 }
 
 /**

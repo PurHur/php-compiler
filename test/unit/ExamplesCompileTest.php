@@ -309,6 +309,68 @@ final class ExamplesCompileTest extends TestCase
      * @group aot
      * @group aot-link
      */
+    /**
+     * phpc build --project bundles manifest includes with entry (issue #452).
+     *
+     * @group llvm
+     * @group aot
+     * @group aot-link
+     */
+    public function testPhpcBuildProjectWithIncludes(): void
+    {
+        if (!self::isLlvmReady()) {
+            $this->markTestSkipped(
+                'LLVM 9 toolchain not available. Run script/install-llvm9.sh from the repository root.'
+            );
+        }
+        $repoRoot = dirname(__DIR__, 2);
+        $dir = sys_get_temp_dir().'/phpc_build_inc_'.bin2hex(random_bytes(6));
+        $this->assertTrue(mkdir($dir));
+        $this->assertTrue(mkdir($dir.'/src', 0777, true));
+        $this->assertTrue(mkdir($dir.'/.phpc/bin', 0777, true));
+        try {
+            file_put_contents($dir.'/src/helpers.php', "<?php\n\$greeting = 'Hi ';\n");
+            file_put_contents($dir.'/entry.php', "<?php\necho \$greeting, 'there';\n");
+            file_put_contents(
+                $dir.'/phpc.json',
+                json_encode([
+                    'entry' => 'entry.php',
+                    'binary' => '.phpc/bin/app',
+                    'includes' => ['src/helpers.php'],
+                ], JSON_THROW_ON_ERROR)
+            );
+
+            $phpc = realpath($repoRoot.'/phpc');
+            $this->assertNotFalse($phpc);
+            $env = $this->llvmProcessEnv($repoRoot);
+            $binaryPath = $dir.'/.phpc/bin/app';
+
+            $descriptorSpec = [
+                0 => ['pipe', 'r'],
+                1 => ['pipe', 'w'],
+                2 => ['pipe', 'w'],
+            ];
+            $proc = proc_open([$phpc, 'build', '--project', $dir], $descriptorSpec, $pipes, $repoRoot, $env);
+            $this->assertIsResource($proc);
+            fclose($pipes[0]);
+            $stderr = stream_get_contents($pipes[2]);
+            fclose($pipes[1]);
+            fclose($pipes[2]);
+            $exit = proc_close($proc);
+            $this->assertSame(0, $exit, trim($stderr !== false ? $stderr : ''));
+            $this->assertFileExists($binaryPath);
+
+            $out = $this->runAotBinary($binaryPath, $env);
+            $this->assertStringContainsString('Hi there', $out);
+        } finally {
+            $binaryPath = $dir.'/.phpc/bin/app';
+            if (is_file($binaryPath)) {
+                @unlink($binaryPath);
+            }
+            $this->removeTree($dir);
+        }
+    }
+
     public function testPhpcBuildProject002StaticWeb(): void
     {
         if (!self::isLlvmReady()) {
@@ -623,6 +685,29 @@ final class ExamplesCompileTest extends TestCase
         $cmd[] = 'error_reporting=0';
 
         return $cmd;
+    }
+
+    private function removeTree(string $dir): void
+    {
+        if (!is_dir($dir)) {
+            return;
+        }
+        $items = scandir($dir);
+        if (false === $items) {
+            return;
+        }
+        foreach ($items as $item) {
+            if ('.' === $item || '..' === $item) {
+                continue;
+            }
+            $path = $dir.'/'.$item;
+            if (is_dir($path)) {
+                $this->removeTree($path);
+            } else {
+                unlink($path);
+            }
+        }
+        rmdir($dir);
     }
 
     private static function isLlvmReady(): bool
