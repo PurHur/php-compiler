@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\ext\standard\boolval;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -250,6 +251,18 @@ final class ArrayBuiltinHelper
         }
 
         return self::buildValuesFromHashTable($context, self::loadHashTable($context, $array));
+    }
+
+    /**
+     * array_filter() default mask: copy elements that are truthy, preserving keys (subset of PHP).
+     */
+    public static function buildFilterArray(Context $context, Variable $array): Value
+    {
+        if (self::isNativeArray($array->type)) {
+            return self::buildFilterFromNativeArray($context, $array);
+        }
+
+        return self::buildFilterFromHashTable($context, self::loadHashTable($context, $array));
     }
 
     /**
@@ -937,6 +950,281 @@ final class ArrayBuiltinHelper
         $context->builder->branch($advance);
 
         $context->builder->positionAtEnd($skip);
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($advance);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($srcIdx, $one),
+            $srcIdxSlot
+        );
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($emptyHt->typeOf());
+        $phi->addIncoming($emptyHt, $emptyBlock);
+        $phi->addIncoming($dest, $head);
+
+        return $phi;
+    }
+
+    private static function buildFilterFromNativeArray(Context $context, Variable $array): Value
+    {
+        $elemType = $array->type & ~Variable::IS_NATIVE_ARRAY;
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $count = $context->constantFromInteger($array->nextFreeElement, 'size_t');
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $count, $zero);
+        $emptyBlock = BasicBlockHelper::append($context, 'array_filter_native_empty');
+        $workBlock = BasicBlockHelper::append($context, 'array_filter_native_work');
+        $doneBlock = BasicBlockHelper::append($context, 'array_filter_native_done');
+        $context->builder->branchIf($isEmpty, $emptyBlock, $workBlock);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        $emptyHt = HashTableHelper::alloc($context);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($workBlock);
+        $dest = HashTableHelper::alloc($context);
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'array_filter_native_idx');
+        $destIdxSlot = $context->builder->alloca($sizeT, 1, 'array_filter_native_dest');
+        $context->builder->store($zero, $idxSlot);
+        $context->builder->store($zero, $destIdxSlot);
+        $head = BasicBlockHelper::append($context, 'array_filter_native_head');
+        $body = BasicBlockHelper::append($context, 'array_filter_native_body');
+        $copyBlock = BasicBlockHelper::append($context, 'array_filter_native_copy');
+        $skipBlock = BasicBlockHelper::append($context, 'array_filter_native_skip');
+        $advance = BasicBlockHelper::append($context, 'array_filter_native_advance');
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $count);
+        $context->builder->branchIf($atEnd, $doneBlock, $body);
+
+        $context->builder->positionAtEnd($body);
+        $slot = $context->builder->inBoundsGep($array->value, $zero, $idx);
+        if (Variable::TYPE_STRING === $elemType) {
+            $elem = new Variable($context, $elemType, Variable::KIND_VARIABLE, $slot);
+        } else {
+            $elem = new Variable(
+                $context,
+                $elemType,
+                Variable::KIND_VALUE,
+                $context->builder->load($slot)
+            );
+        }
+        if (Variable::TYPE_STRING === $elem->type) {
+            $truthy = boolval::stringTruthy($context, $context->helper->loadValue($elem));
+        } else {
+            $truthy = (new boolval())->call($context, $elem);
+        }
+        $context->builder->branchIf($truthy, $copyBlock, $skipBlock);
+
+        $context->builder->positionAtEnd($copyBlock);
+        $destIdx = $context->builder->load($destIdxSlot);
+        HashTableHelper::setAtIndex($context, $dest, $destIdx, $elem);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($destIdx, $one),
+            $destIdxSlot
+        );
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($skipBlock);
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($advance);
+        $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($emptyHt->typeOf());
+        $phi->addIncoming($emptyHt, $emptyBlock);
+        $phi->addIncoming($dest, $head);
+
+        return $phi;
+    }
+
+    private static function filterCopyListEntry(
+        Context $context,
+        Value $src,
+        Value $srcIndex,
+        Value $dest,
+        Value $destIndex
+    ): void {
+        $str = $context->builder->call(
+            $context->lookupFunction('__hashtable__readStringAt'),
+            $src,
+            $srcIndex
+        );
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringAt'),
+            $dest,
+            $destIndex,
+            $str
+        );
+    }
+
+    private static function listEntryTruthy(Context $context, Value $entry): Value
+    {
+        static $seq = 0;
+        $tag = 'ft'.(string) ++$seq;
+        $valueMap = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($entry, $valueMap['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $i64 = $context->getTypeFromString('int64');
+        $false = $context->constantFromBool(false);
+
+        $stringBlock = BasicBlockHelper::append($context, 'array_filter_str_'.$tag);
+        $longBlock = BasicBlockHelper::append($context, 'array_filter_long_'.$tag);
+        $doubleBlock = BasicBlockHelper::append($context, 'array_filter_double_'.$tag);
+        $boolBlock = BasicBlockHelper::append($context, 'array_filter_bool_'.$tag);
+        $nullBlock = BasicBlockHelper::append($context, 'array_filter_null_'.$tag);
+        $doneBlock = BasicBlockHelper::append($context, 'array_filter_truthy_done_'.$tag);
+
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_STRING, false)
+        );
+        $afterString = BasicBlockHelper::append($context, 'array_filter_after_str_'.$tag);
+        $context->builder->branchIf($isString, $stringBlock, $afterString);
+
+        $context->builder->positionAtEnd($stringBlock);
+        $str = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $entry
+        );
+        $strTruthy = boolval::stringTruthy($context, $str);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($afterString);
+        $isLong = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
+        );
+        $afterLong = BasicBlockHelper::append($context, 'array_filter_after_long_'.$tag);
+        $context->builder->branchIf($isLong, $longBlock, $afterLong);
+
+        $context->builder->positionAtEnd($longBlock);
+        $longVal = $context->builder->call($context->lookupFunction('__value__readLong'), $entry);
+        $longTruthy = $context->builder->icmp(Builder::INT_NE, $longVal, $i64->constInt(0, false));
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($afterLong);
+        $isDouble = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
+        );
+        $afterDouble = BasicBlockHelper::append($context, 'array_filter_after_double_'.$tag);
+        $context->builder->branchIf($isDouble, $doubleBlock, $afterDouble);
+
+        $context->builder->positionAtEnd($doubleBlock);
+        $doubleVal = $context->builder->call($context->lookupFunction('__value__readDouble'), $entry);
+        $doubleTruthy = $context->builder->fcmp(
+            Builder::REAL_ONE,
+            $doubleVal,
+            $doubleVal->typeOf()->constReal(0.0)
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($afterDouble);
+        $isBool = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)
+        );
+        $afterBool = BasicBlockHelper::append($context, 'array_filter_after_bool_'.$tag);
+        $context->builder->branchIf($isBool, $boolBlock, $afterBool);
+
+        $context->builder->positionAtEnd($boolBlock);
+        $boolVal = $context->builder->truncOrBitCast(
+            $context->builder->call($context->lookupFunction('__value__readLong'), $entry),
+            $context->getTypeFromString('int1')
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($afterBool);
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NULL, false)
+        );
+        $context->builder->branchIf($isNull, $nullBlock, $doneBlock);
+
+        $context->builder->positionAtEnd($nullBlock);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($false->typeOf());
+        $phi->addIncoming($strTruthy, $stringBlock);
+        $phi->addIncoming($longTruthy, $longBlock);
+        $phi->addIncoming($doubleTruthy, $doubleBlock);
+        $phi->addIncoming($boolVal, $boolBlock);
+        $phi->addIncoming($false, $nullBlock);
+        $phi->addIncoming($false, $afterBool);
+
+        return $phi;
+    }
+
+    private static function buildFilterFromHashTable(Context $context, Value $src): Value
+    {
+        $map = $context->structFieldMap['__hashtable__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $nextFree = $context->builder->load(
+            $context->builder->structGep($src, $map['nextFreeElement'])
+        );
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $nextFree, $zero);
+        $emptyBlock = BasicBlockHelper::append($context, 'array_filter_empty');
+        $workBlock = BasicBlockHelper::append($context, 'array_filter_work');
+        $doneBlock = BasicBlockHelper::append($context, 'array_filter_done');
+        $context->builder->branchIf($isEmpty, $emptyBlock, $workBlock);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        $emptyHt = HashTableHelper::alloc($context);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($workBlock);
+        $dest = HashTableHelper::alloc($context);
+        $srcIdxSlot = $context->builder->alloca($sizeT, 1, 'array_filter_src');
+        $context->builder->store($zero, $srcIdxSlot);
+        $head = BasicBlockHelper::append($context, 'array_filter_head');
+        $check = BasicBlockHelper::append($context, 'array_filter_check');
+        $truthyBlock = BasicBlockHelper::append($context, 'array_filter_truthy');
+        $copyBlock = BasicBlockHelper::append($context, 'array_filter_copy');
+        $skipUnset = BasicBlockHelper::append($context, 'array_filter_skip_unset');
+        $advance = BasicBlockHelper::append($context, 'array_filter_advance');
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $srcIdx = $context->builder->load($srcIdxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $srcIdx, $nextFree);
+        $context->builder->branchIf($atEnd, $doneBlock, $check);
+
+        $context->builder->positionAtEnd($check);
+        $isSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $src,
+            $srcIdx
+        );
+        $context->builder->branchIf($isSet, $truthyBlock, $skipUnset);
+
+        $context->builder->positionAtEnd($truthyBlock);
+        $entry = self::listEntryAt($context, $src, $srcIdx);
+        $truthy = self::listEntryTruthy($context, $entry);
+        $context->builder->branchIf($truthy, $copyBlock, $skipUnset);
+
+        $context->builder->positionAtEnd($copyBlock);
+        self::filterCopyListEntry($context, $src, $srcIdx, $dest, $srcIdx);
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($skipUnset);
         $context->builder->branch($advance);
 
         $context->builder->positionAtEnd($advance);
