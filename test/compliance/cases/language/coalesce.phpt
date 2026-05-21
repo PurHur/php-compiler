@@ -19,6 +19,10 @@ function returnsNull() {
     return null;
 }
 echo returnsNull() ?? 'fallback', "\n";
+
+echo $_GET['missing'] ?? 'from-get', "\n";
+--ENV--
+QUERY_STRING=
 --EXPECT--
 Guest
 Alice
@@ -27,3 +31,4 @@ index
 0
 
 fallback
+from-get

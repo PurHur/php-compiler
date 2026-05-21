@@ -75,7 +75,9 @@ class Compiler {
                     break;
             }
         }
-        foreach ($ops as $child) {
+        $opCount = count($ops);
+        for ($i = 0; $i < $opCount; ++$i) {
+            $child = $ops[$i];
             switch (get_class($child)) {
                 case Op\Stmt\Function_::class:
                 case Op\Stmt\Class_::class:
@@ -89,11 +91,42 @@ class Compiler {
                         $block = $this->compileCoalesce($child, $block);
                     } elseif ($child instanceof Op\Expr\NullsafePropertyFetch) {
                         $block = $this->compileNullsafePropertyFetch($child, $block);
+                    } elseif (
+                        $child instanceof Op\Expr\ArrayDimFetch
+                        && $i + 1 < $opCount
+                        && $this->isArrayDimFetchOnlyCoalesceLeft($child, $ops[$i + 1])
+                    ) {
+                        // Lowered by compileCoalesce via isset(container, dim) — no eager fetch (#99, #273).
+                        break;
                     } else {
                         $this->compileOp($child, $block);
                     }
             }
         }
+    }
+
+    /**
+     * php-cfg emits ArrayDimFetch as its own stmt before Coalesce; skip duplicate lowering.
+     */
+    private function isArrayDimFetchOnlyCoalesceLeft(
+        Op\Expr\ArrayDimFetch $fetch,
+        Op $next
+    ): bool {
+        if (!$next instanceof Op\Expr\BinaryOp\Coalesce) {
+            return false;
+        }
+        $left = $next->left;
+        while ($left instanceof Temporary) {
+            if ($left === $fetch->result) {
+                return true;
+            }
+            if (null === $left->original) {
+                break;
+            }
+            $left = $left->original;
+        }
+
+        return $left === $fetch->result;
     }
 
     protected function compileClassLike(Op\Stmt\ClassLike $class, Block $block): OpCode {
@@ -626,7 +659,10 @@ class Compiler {
         $leftBlock->inheritScopeFrom($block);
 
         $checkSlot = $this->compileBoolTemporary($block);
-        $issetTarget = $this->resolveCoalesceIssetTarget($expr->left, $block);
+        $dimFetch = $this->findCoalesceArrayDimFetch($expr->left, $block);
+        $issetTarget = null !== $dimFetch
+            ? $this->resolveIssetTargetFromArrayDimFetch($dimFetch, $block)
+            : $this->resolveCoalesceIssetTarget($expr->left, $block);
         if (null !== $issetTarget) {
             [$containerSlot, $dimSlot] = $issetTarget;
             $block->addOpCode(new OpCode(
@@ -635,13 +671,23 @@ class Compiler {
                 $containerSlot,
                 $dimSlot
             ));
-            $leftSlot = $this->compileOperand($expr->left, $leftBlock, true);
-            $leftBlock->addOpCode(new OpCode(
-                OpCode::TYPE_ASSIGN,
-                $resultSlot,
-                $resultSlot,
-                $leftSlot
-            ));
+            if (null !== $dimFetch) {
+                $leftSlot = $this->compileOperand($dimFetch->result, $leftBlock, true);
+                $leftBlock->addOpCode(new OpCode(
+                    OpCode::TYPE_ASSIGN,
+                    $resultSlot,
+                    $resultSlot,
+                    $leftSlot
+                ));
+            } else {
+                $leftSlot = $this->compileOperand($expr->left, $leftBlock, true);
+                $leftBlock->addOpCode(new OpCode(
+                    OpCode::TYPE_ASSIGN,
+                    $resultSlot,
+                    $resultSlot,
+                    $leftSlot
+                ));
+            }
         } else {
             $leftSlot = $this->compileOperand($expr->left, $block, true);
             $block->addOpCode(new OpCode(
@@ -754,14 +800,44 @@ class Compiler {
      */
     protected function resolveCoalesceIssetTarget(Operand $operand, Block $block): ?array
     {
-        if (null !== $this->unwrapArrayDimFetch($operand)) {
-            return $this->resolveIssetTarget($operand, $block);
+        $fetch = $this->findCoalesceArrayDimFetch($operand, $block);
+        if (null !== $fetch) {
+            return $this->resolveIssetTargetFromArrayDimFetch($fetch, $block);
         }
         if (null !== $this->unwrapVariableOperand($operand)) {
             return $this->resolveIssetTarget($operand, $block);
         }
 
         return null;
+    }
+
+    /**
+     * @return ?Op\Expr\ArrayDimFetch
+     */
+    protected function findCoalesceArrayDimFetch(Operand $operand, Block $block): ?Op\Expr\ArrayDimFetch
+    {
+        $direct = $this->unwrapArrayDimFetch($operand);
+        if (null !== $direct) {
+            return $direct;
+        }
+        foreach ($block->orig->children as $child) {
+            if ($child instanceof Op\Expr\ArrayDimFetch && $child->result === $operand) {
+                return $child;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array{0: int, 1: ?int}
+     */
+    protected function resolveIssetTargetFromArrayDimFetch(Op\Expr\ArrayDimFetch $fetch, Block $block): array
+    {
+        return [
+            $this->compileOperand($fetch->var, $block, true),
+            null !== $fetch->dim ? $this->compileOperand($fetch->dim, $block, true) : null,
+        ];
     }
 
     protected function unwrapVariableOperand(Operand $operand): ?Operand\Variable
