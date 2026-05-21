@@ -11,7 +11,7 @@ examples/003-MiniWebApp/
   config.php
   public/index.php       # front controller (?route= until PATH_INFO #276)
   src/Router.php         # class dispatch (lint blockers #145)
-  templates/             # layout + partials (dynamic include #54, #85)
+  templates/             # layout + partials (__DIR__ includes lint-followed #462; runtime #54)
   assets/style.css       # static asset for future serve tests (#150)
 ```
 
@@ -22,7 +22,7 @@ examples/003-MiniWebApp/
 ./phpc lint --all examples/003-MiniWebApp --json
 ```
 
-During the skeleton phase this **must** exit `1`. Warnings on stderr list dynamic `__DIR__` includes that lint does not follow yet. When [#67](https://github.com/PurHur/php-compiler/issues/67) is done, `phpc lint --all` should exit `0` and `make web-smoke` may treat this tree as a green gate ([#455](https://github.com/PurHur/php-compiler/issues/455)):
+During the skeleton phase this **must** exit `1` because of class/method blockers ([#58](https://github.com/PurHur/php-compiler/issues/58), [#145](https://github.com/PurHur/php-compiler/issues/145)). `__DIR__` + literal `include`/`require` paths are followed by lint ([#462](https://github.com/PurHur/php-compiler/issues/462)); stderr should not list `dynamic include/require` for this tree. When [#67](https://github.com/PurHur/php-compiler/issues/67) is done, `phpc lint --all` should exit `0` and `make web-smoke` may treat this tree as a green gate ([#455](https://github.com/PurHur/php-compiler/issues/455)):
 
 ```console
 MINIWEBAPP_LINT_GATE=1 make web-smoke   # fail if lint --all regresses
@@ -34,8 +34,8 @@ MINIWEBAPP_LINT_GATE=1 make web-smoke   # fail if lint --all regresses
 |-------------------|----------------|-----------|
 | `class Router` + methods | [#145](https://github.com/PurHur/php-compiler/issues/145) | `Unsupported class body element: PHPCfg\Op\Stmt\ClassMethod` |
 | `$router->dispatch(...)` | [#145](https://github.com/PurHur/php-compiler/issues/145) | `Expr_MethodCall` |
-| `require __DIR__ . '/../config.php'` | [#54](https://github.com/PurHur/php-compiler/issues/54), [#85](https://github.com/PurHur/php-compiler/issues/85) | stderr: dynamic include/require (not followed) |
-| `include __DIR__ . '/../templates/...'` | [#54](https://github.com/PurHur/php-compiler/issues/54) | stderr: dynamic include/require (not followed) |
+| `require __DIR__ . '/../config.php'` | [#54](https://github.com/PurHur/php-compiler/issues/54) runtime | ✅ lint follows ([#462](https://github.com/PurHur/php-compiler/issues/462)) |
+| `include __DIR__ . '/../templates/...'` | [#54](https://github.com/PurHur/php-compiler/issues/54) runtime | ✅ lint follows ([#462](https://github.com/PurHur/php-compiler/issues/462)) |
 | `foreach ($knownRoutes as $known)` | — | ✅ accepted (was [#53](https://github.com/PurHur/php-compiler/issues/53)) |
 | `break` in route scan | [#115](https://github.com/PurHur/php-compiler/issues/115) | `Stmt_Break` (when lint follows index includes) |
 | `$_GET['route'] ?? 'home'` | — | ✅ accepted (was [#99](https://github.com/PurHur/php-compiler/issues/99)) |

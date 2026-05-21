@@ -591,7 +591,7 @@ class Compiler {
                 }
                 return $return;
             case Op\Expr\Include_::class:
-                $includePath = ConstStringFolder::foldForInclude($block->orig, $expr->expr);
+                $includePath = ConstStringFolder::foldForInclude($block->orig, $expr->expr, $expr->getFile());
                 if (null !== $includePath) {
                     $resolved = IncludePathResolver::resolve($includePath, $expr->getFile());
                     if (null !== $resolved) {
