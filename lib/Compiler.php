@@ -672,6 +672,7 @@ class Compiler {
                 $dimSlot
             ));
             if (null !== $dimFetch) {
+                $this->compileArrayDimFetchRead($dimFetch, $leftBlock);
                 $leftSlot = $this->compileOperand($dimFetch->result, $leftBlock, true);
                 $leftBlock->addOpCode(new OpCode(
                     OpCode::TYPE_ASSIGN,
@@ -724,6 +725,19 @@ class Compiler {
         $block->addOpCode($coalesceOp);
 
         return $endBlock;
+    }
+
+    /**
+     * Emit a read fetch in $block (used by ?? left branch when the stmt fetch was skipped).
+     */
+    private function compileArrayDimFetchRead(Op\Expr\ArrayDimFetch $fetch, Block $block): void
+    {
+        $block->addOpCode(new OpCode(
+            OpCode::TYPE_ARRAY_DIM_FETCH,
+            $this->compileOperand($fetch->result, $block, false),
+            $this->compileOperand($fetch->var, $block, true),
+            null !== $fetch->dim ? $this->compileOperand($fetch->dim, $block, true) : null
+        ));
     }
 
     protected function compileNullsafePropertyFetch(Op\Expr\NullsafePropertyFetch $expr, Block $block): Block
