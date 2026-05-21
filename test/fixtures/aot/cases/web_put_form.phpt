@@ -6,8 +6,10 @@ REQUEST_BODY=name=Ada&role=dev
 CONTENT_TYPE=application/x-www-form-urlencoded
 --FILE--
 <?php
-echo 'Hello ', $_POST['name'], "\n";
-echo 'role=', $_POST['role'], "\n";
+$name = $_POST['name'];
+$role = $_POST['role'];
+echo 'Hello ', $name, "\n";
+echo 'role=', $role, "\n";
 --EXPECT--
 Hello Ada
 role=dev

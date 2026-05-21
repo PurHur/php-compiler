@@ -480,7 +480,18 @@ class Context {
         Block $block
     ): void {
         foreach ($block->orig->deadOperands as $op) {
-            $this->scope->variables[$op]->free();
+            if (!$this->scope->variables->contains($op)) {
+                continue;
+            }
+            $var = $this->scope->variables[$op];
+            $name = OperandName::resolve($op);
+            if (
+                null !== $var->superglobalName
+                || (null !== $name && Superglobals::isSuperglobalName($name))
+            ) {
+                continue;
+            }
+            $var->free();
         }
     }
 

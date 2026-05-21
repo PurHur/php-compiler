@@ -142,6 +142,70 @@ PHP;
     }
 
     /**
+     * One AOT binary, two PUT bodies — $_POST must refresh per run (issue #291).
+     */
+    public function testTwoRequestsDifferentPutBody(): void
+    {
+        $source = <<<'PHP'
+<?php
+declare(strict_types=1);
+header('Content-Type: text/plain; charset=UTF-8');
+echo 'Hello ', $_POST['name'], "\n";
+PHP;
+
+        $outfile = tempnam(sys_get_temp_dir(), 'phpc_put_refresh_');
+        $this->assertNotFalse($outfile);
+        unlink($outfile);
+
+        $repoRoot = dirname(__DIR__, 2);
+        $env = $this->llvmProcessEnv($repoRoot);
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+
+        $compile = proc_open(
+            array_merge(
+                self::llvmEnvPrefix(),
+                self::phpCommand(),
+                [$this->compileBin, '-o', $outfile]
+            ),
+            $descriptorSpec,
+            $pipes,
+            $repoRoot,
+            $env
+        );
+        fwrite($pipes[0], $source);
+        fclose($pipes[0]);
+        $compileErr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $compileExit = proc_close($compile);
+        $this->assertSame(0, $compileExit, trim($compileErr !== false ? $compileErr : ''));
+        $this->assertFileExists($outfile, trim($compileErr !== false ? $compileErr : ''));
+
+        $base = $env;
+        $base['REQUEST_METHOD'] = 'PUT';
+        $base['CONTENT_TYPE'] = 'application/x-www-form-urlencoded';
+        $base['SCRIPT_NAME'] = '/example.php';
+        $base['REQUEST_URI'] = '/example.php';
+
+        $envAda = $base;
+        $envAda['REQUEST_BODY'] = 'name=Ada';
+        $outAda = $this->runBinary($outfile, $envAda);
+        $this->assertStringContainsString('Hello Ada', $this->cgiBody($outAda));
+
+        $envBob = $base;
+        $envBob['REQUEST_BODY'] = 'name=Bob';
+        $outBob = $this->runBinary($outfile, $envBob);
+        $this->assertStringContainsString('Hello Bob', $this->cgiBody($outBob));
+        $this->assertStringNotContainsString('Hello Ada', $this->cgiBody($outBob));
+
+        @unlink($outfile);
+    }
+
+    /**
      * JSON POST body populates $_POST in AOT refresh (issue #52).
      */
     public function testJsonPostBody(): void
