@@ -234,10 +234,12 @@ class JIT {
                         break;
                     }
                     if ($value->type === Variable::TYPE_HASHTABLE) {
-                        $this->assignOperand(
-                            $resultOp,
-                            $value->dimFetch($dim, $resultOp->type, $forWrite)
-                        );
+                        $fetched = $value->dimFetch($dim, $resultOp->type, $forWrite);
+                        if ($forWrite) {
+                            $this->context->setVariableOp($resultOp, $fetched);
+                        } else {
+                            $this->assignOperand($resultOp, $fetched);
+                        }
                         break;
                     }
                     if ($value->type & Variable::IS_NATIVE_ARRAY && $this->context->analyzer->needsBoundsCheck($value, $dimOp)) {
@@ -801,6 +803,16 @@ class JIT {
                         $this->context->lookupFunction('__string__separate'),
                         $str
                     );
+                    if (null !== $result->writableHt && null !== $result->writableStringKey) {
+                        $this->context->builder->call(
+                            $this->context->lookupFunction('__hashtable__setStringKeyString'),
+                            $result->writableHt,
+                            $result->writableStringKey,
+                            $owned
+                        );
+
+                        return;
+                    }
                     $this->context->builder->call(
                         $this->context->lookupFunction('__value__writeString'),
                         $valueRef,

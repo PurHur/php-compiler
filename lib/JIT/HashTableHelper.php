@@ -235,8 +235,21 @@ final class HashTableHelper
         $context->builder->branch($ready);
 
         $context->builder->positionAtEnd($ready);
+        $valPtr = $context->builder->call(
+            $context->lookupFunction('__hashtable__readStringKeyValue'),
+            $ht,
+            $keyStr
+        );
+        $var = new Variable(
+            $context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VARIABLE,
+            $valPtr
+        );
+        $var->writableHt = $ht;
+        $var->writableStringKey = $keyStr;
 
-        return self::readStringKeyToValueBox($context, $ht, $keyStr);
+        return $var;
     }
 
     public static function readStringKeyToValueBox(Context $context, Value $ht, Value $keyStr): Variable

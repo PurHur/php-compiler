@@ -60,6 +60,16 @@ final class Variable {
     /** When this hashtable is a compile-time superglobal (e.g. $_GET). */
     public ?string $superglobalName = null;
 
+    /**
+     * When set, string assignment updates this hashtable entry in place (issue #103).
+     *
+     * @var \PHPLLVM\Value|null
+     */
+    public ?\PHPLLVM\Value $writableHt = null;
+
+    /** @var \PHPLLVM\Value|null */
+    public ?\PHPLLVM\Value $writableStringKey = null;
+
     /** String literal value when this variable represents a constant string operand. */
     public ?string $compileTimeString = null;
 
