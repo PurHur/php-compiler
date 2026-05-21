@@ -32,6 +32,13 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('ci_apply_resource_limits', $body);
     }
 
+    public function testCiResourceLimitsDefaultThirtyGib(): void
+    {
+        $limits = dirname(__DIR__, 2).'/script/ci-resource-limits.sh';
+        $body = (string) file_get_contents($limits);
+        $this->assertStringContainsString('PHP_COMPILER_CI_RAM_GB:-30}', $body);
+    }
+
     public function testAotLinkGroupTaggedOnAotTest(): void
     {
         $source = (string) file_get_contents(dirname(__DIR__).'/aot/AotTest.php');

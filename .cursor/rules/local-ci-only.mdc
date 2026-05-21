@@ -44,4 +44,4 @@ If `-v "$(pwd):/compiler"` shows an empty tree, use:
 
 ## Before merge
 
-Run `./script/ci-local.sh` (full LLVM phases). Use `ci-fast.sh` only for iteration. Set `PHP_COMPILER_CI_RAM_GB` (default 100) if LLVM phases exhaust host RAM (#436).
+Run `./script/ci-local.sh` (full LLVM phases). Use `ci-fast.sh` only for iteration. Raise `PHP_COMPILER_CI_RAM_GB` (default 30) if LLVM phases hit the cap (#436).
