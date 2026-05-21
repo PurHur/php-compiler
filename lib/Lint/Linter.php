@@ -11,6 +11,8 @@ use PHPCfg\Operand;
 use PHPCfg\Script;
 use PHPTypes\State;
 use PHPCompiler\Runtime;
+use PHPCompiler\Web\ConstStringFolder;
+use PHPCompiler\Web\IncludePathResolver;
 
 /**
  * Best-effort static compile check with line-accurate unsupported-syntax reporting.
@@ -111,7 +113,7 @@ final class Linter
             unset($queue[$currentFile]);
 
             foreach ($this->discoverIncludePaths($currentScript, $currentFile) as $includePath) {
-                $resolved = $this->resolveIncludePath($includePath, $currentFile);
+                $resolved = IncludePathResolver::resolve($includePath, $currentFile);
                 if (null === $resolved || isset($seenFiles[$resolved])) {
                     continue;
                 }
@@ -216,7 +218,7 @@ final class Linter
 
         foreach ($block->children as $child) {
             if ($child instanceof Op\Expr\Include_) {
-                $literal = $this->literalStringOperand($child->expr);
+                $literal = ConstStringFolder::foldForInclude($block, $child->expr);
                 if (null !== $literal) {
                     $paths[] = $literal;
                 } else {
@@ -236,28 +238,7 @@ final class Linter
 
     private function literalStringOperand(Operand $operand): ?string
     {
-        if ($operand instanceof Operand\Literal && is_string($operand->value)) {
-            return $operand->value;
-        }
-
-        return null;
-    }
-
-    private function resolveIncludePath(string $path, string $fromFile): ?string
-    {
-        if ('' === $path) {
-            return null;
-        }
-        if ($path[0] === '/' || (strlen($path) > 1 && $path[1] === ':')) {
-            return is_file($path) ? $path : null;
-        }
-        $base = dirname($fromFile);
-        $candidate = $base.'/'.$path;
-        if (is_file($candidate)) {
-            return realpath($candidate) ?: $candidate;
-        }
-
-        return null;
+        return ConstStringFolder::fold($operand);
     }
 
     /**

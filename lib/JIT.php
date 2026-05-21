@@ -323,6 +323,10 @@ class JIT {
                     $value = JIT\IteratorHelper::compileValue($this->context, $array);
                     $this->assignOperand($block->getOperand($op->arg1), $value);
                     break;
+                case OpCode::TYPE_INCLUDE:
+                    throw new \LogicException(
+                        'include/require must be resolved before AOT compile (literal paths are auto-bundled in bin/compile.php; issue #54)'
+                    );
                 case OpCode::TYPE_BOOLEAN_NOT:
                     $from = $this->context->getVariableFromOp($block->getOperand($op->arg2));
                     if ($from->type === Variable::TYPE_NATIVE_BOOL) {

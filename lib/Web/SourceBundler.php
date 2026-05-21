@@ -29,6 +29,9 @@ final class SourceBundler
         if (false === $entryRaw) {
             throw new \RuntimeException('cannot read entry: '.$entryPath);
         }
+        if ([] !== $includePaths) {
+            $entryRaw = self::stripResolvedRequires($entryRaw, $includePaths);
+        }
         $parts[] = self::stripOpenTag($entryRaw);
 
         return ['<?php'."\n".implode("\n", $parts), $entryPath];
@@ -44,5 +47,37 @@ final class SourceBundler
         }
 
         return ltrim($code, " \t\n\r\0\x0B");
+    }
+
+    /**
+     * Remove literal include/require lines satisfied by bundled paths (issue #54).
+     *
+     * @param list<string> $bundledAbsolute
+     */
+    private static function stripResolvedRequires(string $code, array $bundledAbsolute): string
+    {
+        $lines = preg_split('/\r\n|\n|\r/', $code) ?: [];
+        $drop = [];
+        foreach ($bundledAbsolute as $abs) {
+            $drop[basename($abs)] = true;
+        }
+        $kept = [];
+        foreach ($lines as $line) {
+            if (preg_match('/^\s*(require|include)(?:_once)?\s+/i', $line)) {
+                $remove = false;
+                foreach ($drop as $base => $_) {
+                    if (str_contains($line, $base)) {
+                        $remove = true;
+                        break;
+                    }
+                }
+                if ($remove) {
+                    continue;
+                }
+            }
+            $kept[] = $line;
+        }
+
+        return implode("\n", $kept);
     }
 }
