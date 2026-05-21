@@ -14,6 +14,7 @@ use PHPUnit\Framework\TestCase;
  *
  * @group llvm
  * @group aot
+ * @group aot-link
  */
 final class NestedSuperglobalsAotTest extends TestCase
 {

@@ -11,6 +11,7 @@ require_once __DIR__ . '/../BaseTest.php';
  *
  * @group llvm
  * @group aot
+ * @group aot-link
  */
 final class AotTest extends BaseTest
 {

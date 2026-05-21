@@ -81,9 +81,16 @@ test-legacy-16: rebuild-changed
 	docker run -v $(shell pwd):/compiler ircmaxell/php-compiler:16.04-dev php vendor/bin/phpunit
 
 # Run the full PHPUnit suite on the host PHP (no Docker). Requires composer install.
-.PHONY: test-local
+.PHONY: test-local test-fast test-docker-fast
 test-local:
 	./script/ci-local.sh
+
+# Fast CI: VM/compliance only — no JIT/AOT compile (issue #436).
+test-fast:
+	./script/ci-fast.sh
+
+test-docker-fast: docker-build-22
+	./script/docker-ci-local.sh fast
 
 # VM smoke: examples/001-SimpleWeb with ?name=Test
 .PHONY: web-smoke
@@ -129,10 +136,9 @@ test-docker: docker-build-22
 test-harness:
 	./script/docker-ci-local.sh $(ARGS)
 
-# Quick PHPUnit in 22.04 dev image (after composer install on host or in container)
+# Quick PHPUnit in 22.04 dev image (deprecated: prefer test-docker-fast / ci-fast.sh)
 .PHONY: test-docker-quick
-test-docker-quick:
-	docker run --rm -v $(shell pwd):/compiler -w /compiler $(LOCAL_DEV_IMAGE) php vendor/bin/phpunit --exclude-group llvm
+test-docker-quick: test-docker-fast
 
 .PHONY: bootstrap-inventory bootstrap-profile bootstrap-aot-lint
 bootstrap-inventory:

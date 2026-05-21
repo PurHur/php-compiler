@@ -1,0 +1,129 @@
+#!/usr/bin/env bash
+# Shared CI bootstrap for ci-fast.sh and ci-local.sh (issue #436).
+set -euo pipefail
+
+_CI_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_CI_REPO_ROOT="$(cd "$_CI_SCRIPT_DIR/.." && pwd)"
+
+# shellcheck source=php-env.sh
+source "$_CI_SCRIPT_DIR/php-env.sh"
+# shellcheck source=ci-resource-limits.sh
+source "$_CI_SCRIPT_DIR/ci-resource-limits.sh"
+
+ci_repo_root() {
+  printf '%s\n' "$_CI_REPO_ROOT"
+}
+
+ci_cd_repo() {
+  cd "$_CI_REPO_ROOT"
+}
+
+ci_install_deps() {
+  local ext_dir="$PHP_COMPILER_EXT_DIR"
+  if command -v composer >/dev/null 2>&1 && composer --version >/dev/null 2>&1; then
+    COMPOSER=(composer)
+  elif [[ -f /tmp/composer.phar ]]; then
+    COMPOSER=("$PHP_BIN" -d "extension=$ext_dir/phar.so" -d "extension=$ext_dir/mbstring.so" /tmp/composer.phar)
+  else
+    python3 -c "import urllib.request; urllib.request.urlretrieve('https://getcomposer.org/download/latest-stable/composer.phar','/tmp/composer.phar')"
+    COMPOSER=("$PHP_BIN" -d "extension=$ext_dir/phar.so" -d "extension=$ext_dir/mbstring.so" /tmp/composer.phar)
+  fi
+  "${COMPOSER[@]}" install --no-interaction --ignore-platform-reqs 2>/dev/null || true
+
+  chmod +x script/install-llvm9.sh script/apply-patches.sh 2>/dev/null || true
+  if [[ -z "${PHP_COMPILER_LLVM_PATH:-}" || ! -f "${PHP_COMPILER_LLVM_PATH}/libLLVM-9.so.1" ]]; then
+    if [[ -x script/install-llvm9.sh ]]; then
+      script/install-llvm9.sh || true
+    fi
+  fi
+  if [[ -x script/apply-patches.sh ]]; then
+    script/apply-patches.sh || true
+  fi
+}
+
+ci_run_inventory_checks() {
+  "$PHP_BIN" "${PHP_OPTS[@]}" script/capability-matrix.php --check
+  "$PHP_BIN" "${PHP_OPTS[@]}" script/bootstrap-inventory.php --check
+  "$PHP_BIN" "${PHP_OPTS[@]}" script/bootstrap-profile.php --check
+}
+
+ci_llvm_dir() {
+  LLVM_DIR="${PHP_COMPILER_LLVM_PATH:-$_CI_REPO_ROOT/.llvm}"
+  printf '%s\n' "$LLVM_DIR"
+}
+
+ci_report_llvm_status() {
+  local llvm_dir
+  llvm_dir="$(ci_llvm_dir)"
+  if [[ -f "$llvm_dir/libLLVM-9.so.1" ]]; then
+    echo "LLVM 9 found at $llvm_dir: JIT compliance, AOT fixtures (simple_web_*, static_web), and ExampleWebAotTest will run."
+  else
+    echo "LLVM 9 missing: @group llvm tests (JIT, AOT, web AOT) are skipped. Run: script/install-llvm9.sh"
+  fi
+}
+
+ci_can_bind_loopback() {
+  "$PHP_BIN" "${PHP_OPTS[@]}" script/can-bind-loopback.php
+}
+
+ci_configure_serve_tests() {
+  if [[ -n "${PHP_COMPILER_SKIP_SERVE_TESTS:-}" ]]; then
+    echo "HTTP serve integration tests skipped (PHP_COMPILER_SKIP_SERVE_TESTS is set)."
+    return
+  fi
+  if [[ "${PHP_COMPILER_RUN_SERVE_TESTS:-}" == "1" ]]; then
+    echo "HTTP serve integration tests forced (PHP_COMPILER_RUN_SERVE_TESTS=1)."
+    return
+  fi
+  if ci_can_bind_loopback; then
+    echo "Loopback TCP bind OK: ServeTest and ServeAotTest will run."
+    return
+  fi
+  export PHP_COMPILER_SKIP_SERVE_TESTS=1
+  echo "Cannot bind 127.0.0.1 — skipping @group serve tests."
+  echo "  Set PHP_COMPILER_RUN_SERVE_TESTS=1 to force, or PHP_COMPILER_SKIP_SERVE_TESTS=1 to silence."
+}
+
+ci_llvm_ready() {
+  local llvm_dir
+  llvm_dir="$(ci_llvm_dir)"
+  [[ -f "$llvm_dir/libLLVM-9.so.1" ]]
+}
+
+ci_run_bootstrap_aot_lint() {
+  echo "Bootstrap AOT lint (issue #212 Phase B)..."
+  set +e
+  "$PHP_BIN" "${PHP_OPTS[@]}" script/bootstrap-aot-lint.php
+  local bootstrap_lint_code=$?
+  set -e
+  if [[ "$bootstrap_lint_code" -eq 0 ]]; then
+    :
+  elif [[ "$bootstrap_lint_code" -eq 2 ]]; then
+    echo "bootstrap-aot-lint skipped (LLVM 9 not available)."
+  else
+    exit 1
+  fi
+}
+
+ci_should_run_jit() {
+  if [[ -n "${PHP_COMPILER_FORCE_JIT_TESTS:-}" ]]; then
+    echo "JIT compliance forced (PHP_COMPILER_FORCE_JIT_TESTS=1)."
+    return 0
+  fi
+  if "$PHP_BIN" "${PHP_OPTS[@]}" script/jit-runtime-probe.php; then
+    return 0
+  fi
+  echo "JIT MCJIT probe failed (segfault or bad output); skipping @group jit."
+  echo "  Re-run with PHP_COMPILER_FORCE_JIT_TESTS=1 after fixing bin/jit.php / LLVM 9."
+  return 1
+}
+
+ci_guard_jit_compliance() {
+  local junit_path="$1"
+  local llvm_dir="$2"
+  if [[ -n "${PHP_COMPILER_ALLOW_JIT_SKIP:-}" ]]; then
+    echo "JIT compliance guard skipped (PHP_COMPILER_ALLOW_JIT_SKIP is set)."
+    return 0
+  fi
+  "$PHP_BIN" "${PHP_OPTS[@]}" script/check-jit-compliance-ran.php "$junit_path" "$llvm_dir"
+}

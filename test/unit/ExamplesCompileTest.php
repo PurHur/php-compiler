@@ -158,6 +158,7 @@ final class ExamplesCompileTest extends TestCase
      *
      * @group llvm
      * @group aot
+     * @group aot-lint
      */
     public function testAotLint(string $examplePath): void
     {
@@ -176,6 +177,7 @@ final class ExamplesCompileTest extends TestCase
      *
      * @group llvm
      * @group aot
+     * @group aot-link
      */
     public function testAotExecuteSimpleWebDualQuery(): void
     {
@@ -213,6 +215,7 @@ final class ExamplesCompileTest extends TestCase
      *
      * @group llvm
      * @group aot
+     * @group aot-link
      */
     public function testAotExecuteSimpleWebPost(): void
     {
@@ -244,6 +247,7 @@ final class ExamplesCompileTest extends TestCase
      *
      * @group llvm
      * @group aot
+     * @group aot-link
      *
      * @see https://github.com/PurHur/php-compiler/issues/270
      */
@@ -275,6 +279,7 @@ final class ExamplesCompileTest extends TestCase
      *
      * @group llvm
      * @group aot
+     * @group aot-link
      *
      * @see https://github.com/PurHur/php-compiler/issues/247
      */
@@ -302,6 +307,7 @@ final class ExamplesCompileTest extends TestCase
      *
      * @group llvm
      * @group aot
+     * @group aot-link
      */
     public function testPhpcBuildProject002StaticWeb(): void
     {
@@ -354,6 +360,7 @@ final class ExamplesCompileTest extends TestCase
      *
      * @group llvm
      * @group aot
+     * @group aot-link
      */
     public function testPhpcBuildSmoke002StaticWeb(): void
     {
