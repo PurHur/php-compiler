@@ -193,6 +193,9 @@ class JIT {
         $builder->positionAtEnd($basicBlock);
         // Handle hoisted variables
         foreach ($block->orig->hoistedOperands as $operand) {
+            if ($this->context->coalesceAssignTargets->contains($operand)) {
+                continue;
+            }
             $this->context->makeVariableFromOp($func, $basicBlock, $block, $operand);
         }
 
@@ -204,8 +207,10 @@ class JIT {
                     break;
                 case OpCode::TYPE_ASSIGN:
                     $value = $this->context->getVariableFromOp($block->getOperand($op->arg3));
-                    $this->assignOperand($block->getOperand($op->arg2), $value);
-                    $this->assignOperand($block->getOperand($op->arg1), $value);
+                    $destOp = $block->getOperand($op->arg1);
+                    $forceCoalesce = $this->context->coalesceAssignTargets->contains($destOp);
+                    $this->assignOperand($block->getOperand($op->arg2), $value, $forceCoalesce);
+                    $this->assignOperand($destOp, $value, $forceCoalesce);
                     break;  
                 case OpCode::TYPE_ARRAY_DIM_FETCH:
                 case OpCode::TYPE_ARRAY_DIM_FETCH_WRITE:
@@ -559,13 +564,15 @@ class JIT {
                 case OpCode::TYPE_COALESCE:
                     $branchBlock = $builder->getInsertBlock();
                     $builder->positionAtEnd($branchBlock);
+                    $coalesceResult = $block->getOperand($op->arg1);
+                    $this->context->coalesceAssignTargets[$coalesceResult] = true;
                     $condition = $this->context->castToBool(
                         $this->context->helper->loadValue($this->context->getVariableFromOp($block->getOperand($op->arg2)))
                     );
                     $leftBb = JIT\CoalesceHelper::compileBranch($this, $func, $op->block1);
                     $rightBb = JIT\CoalesceHelper::compileBranch($this, $func, $op->block2);
                     $builder->positionAtEnd($branchBlock);
-                    $this->context->freeDeadVariables($func, $branchBlock, $block);
+                    // Do not free php-cfg "dead" operands here; ?? temps are used on branch/merge blocks (#99).
                     $builder->branchIf($condition, $leftBb, $rightBb);
                     if (null !== $op->block3) {
                         $mergeBb = JIT\BasicBlockHelper::append($this->context, 'coalesce_merge');
@@ -574,9 +581,12 @@ class JIT {
                         $builder->positionAtEnd($rightBb);
                         $builder->branch($mergeBb);
                         $builder->positionAtEnd($mergeBb);
+                        $merged = $this->compileBlockInternal($func, $op->block3, null, $mergeBb, ...$args);
+                        unset($this->context->coalesceAssignTargets[$coalesceResult]);
 
-                        return $this->compileBlockInternal($func, $op->block3, null, $mergeBb, ...$args);
+                        return $merged;
                     }
+                    unset($this->context->coalesceAssignTargets[$coalesceResult]);
 
                     return $origBasicBlock;
                 case OpCode::TYPE_NULLSAFE:
@@ -733,8 +743,12 @@ class JIT {
         }
     }
 
-    private function assignOperand(Operand $result, Variable $value): void {
-        if (empty($result->usages) && !$this->context->scope->variables->contains($result)) {
+    private function assignOperand(Operand $result, Variable $value, bool $force = false): void {
+        if (
+            !$force
+            && empty($result->usages)
+            && !$this->context->scope->variables->contains($result)
+        ) {
             return;
         }
         if (!$this->context->hasVariableOp($result)) {
