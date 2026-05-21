@@ -38,6 +38,7 @@ Legacy entrypoints still work: `php bin/vm.php`, `php bin/jit.php`, `php bin/com
 | [001-SimpleWeb](001-SimpleWeb/) | ✅ `-q` / `-p` / env / `phpc serve` | ✅ `bin/jit.php` | ✅ `phpc build` | runtime `QUERY_STRING` / POST ([#201](https://github.com/PurHur/php-compiler/issues/201), [#257](https://github.com/PurHur/php-compiler/issues/257), [#259](https://github.com/PurHur/php-compiler/issues/259)) |
 | [002-StaticWeb](002-StaticWeb/) | ✅ `./phpc run` | ✅ `bin/jit.php` | ✅ recommended | no superglobals — [#247](https://github.com/PurHur/php-compiler/issues/247) execute smoke |
 | [004-ApiJson](004-ApiJson/) | ✅ `./phpc run` | ✅ `bin/jit.php` | ✅ `phpc build` | JSON + `http_response_code` — [#270](https://github.com/PurHur/php-compiler/issues/270), [#61](https://github.com/PurHur/php-compiler/issues/61) |
+| [003-MiniWebApp](003-MiniWebApp/) | ❌ lint-first | ❌ blocked | ❌ blocked | Reference skeleton — [#246](https://github.com/PurHur/php-compiler/issues/246), [#67](https://github.com/PurHur/php-compiler/issues/67) |
 
 ### 000-HelloWorld
 
@@ -67,6 +68,17 @@ cd examples/001-SimpleWeb
 ```
 
 AOT binaries refresh `$_GET` / `$_POST` / `$_REQUEST` from CGI env on each request unless you bake values at compile time with `-q` on `phpc build`.
+
+### 003-MiniWebApp
+
+Lint-first reference app (front controller + templates). **Not** in `ExamplesCompileTest` until green ([#454](https://github.com/PurHur/php-compiler/issues/454)).
+
+```console
+./phpc lint --all examples/003-MiniWebApp
+./phpc lint --all examples/003-MiniWebApp --json   # expect issues until #67
+```
+
+See [003-MiniWebApp/README.md](003-MiniWebApp/README.md) for the blocker matrix and curl recipes (VM serve expected to fail until language gaps close).
 
 ### 002-StaticWeb
 

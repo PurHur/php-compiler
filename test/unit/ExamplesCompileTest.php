@@ -122,11 +122,11 @@ final class ExamplesCompileTest extends TestCase
 
     public function testPhpcLintFailureSurfacesTrackingIssue(): void
     {
-        $exit = $this->runLint(['-r', '<?php foreach ([1] as $x) {}']);
+        $exit = $this->runLint(['-r', '<?php function f() { yield 1; }']);
         $this->assertSame(1, $exit['code']);
         $combined = $exit['stdout'].$exit['stderr'];
         $this->assertStringContainsString('unsupported', $combined);
-        $this->assertStringContainsString('see #53', $combined);
+        $this->assertStringContainsString('see #167', $combined);
         $this->assertMatchesRegularExpression('/line \d+/', $combined);
     }
 
