@@ -270,6 +270,7 @@
         "lib/JIT/IssetHelper.php",
         "lib/JIT/IteratorHelper.php",
         "lib/JIT/JitNativeString.php",
+        "lib/JIT/JitStringCompare.php",
         "lib/JIT/JitValueBox.php",
         "lib/JIT/JitValueCompare.php",
         "lib/JIT/NullsafeHelper.php",
@@ -322,9 +323,9 @@
         "test/bootstrap-aot/echo_hello.php"
     ],
     "totals": {
-        "inventory_files": 288,
+        "inventory_files": 289,
         "excluded": 2,
-        "eligible": 286,
+        "eligible": 287,
         "aot_lint_targets": 2
     }
 }
