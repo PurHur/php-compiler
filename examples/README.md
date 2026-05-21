@@ -102,7 +102,7 @@ Before a PR that touches examples or `bin/serve.php`:
 
 ```console
 make web-smoke              # lint all examples + VM ?name= smoke (001-SimpleWeb)
-make examples-web-smoke     # phpc serve + curl GET/POST (001-SimpleWeb, 002-StaticWeb)
+make examples-web-smoke     # phpc serve + curl GET/POST (001-SimpleWeb, 002-StaticWeb, 004-ApiJson)
 ```
 
 Full suite on the host (after `composer install`):
