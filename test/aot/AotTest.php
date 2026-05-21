@@ -77,6 +77,15 @@ final class AotTest extends BaseTest
         LlvmToolchain::applyProcessEnv($env, $repoRoot);
         self::applyEnvSection($env, $sections);
         PhptWebSections::applyToEnv($env, $sections);
+        $bodyFile = null;
+        if (isset($sections['POST']) && '' !== $sections['POST']) {
+            $bodyFile = tempnam(sys_get_temp_dir(), 'phpc_post_');
+            if (false !== $bodyFile) {
+                file_put_contents($bodyFile, $sections['POST']);
+                $env['REQUEST_BODY_FILE'] = $bodyFile;
+                unset($env['REQUEST_BODY']);
+            }
+        }
         $runEnv = $env;
         $compileEnv = $env;
         foreach (self::COMPILE_EXCLUDED_ENV as $exclude) {
@@ -105,6 +114,22 @@ final class AotTest extends BaseTest
             }
         }
         $compileArgv = array_merge($compileArgv, PhptWebSections::compileArgvFlags($sections));
+        if (null !== $bodyFile) {
+            $stripped = [];
+            $skipNext = false;
+            foreach ($compileArgv as $arg) {
+                if ($skipNext) {
+                    $skipNext = false;
+                    continue;
+                }
+                if ('-p' === $arg) {
+                    $skipNext = true;
+                    continue;
+                }
+                $stripped[] = $arg;
+            }
+            $compileArgv = $stripped;
+        }
 
         $compile = proc_open(
             array_merge(self::llvmEnvPrefix(), $this->phpCommand(), $compileArgv),
@@ -126,24 +151,8 @@ final class AotTest extends BaseTest
             );
         }
 
-        $runArgv = [$outfile];
-        $runEnvLines = PhptWebSections::envLinesFromSections($sections);
-        if (isset($sections['ENV'])) {
-            foreach (explode("\n", trim($sections['ENV'])) as $line) {
-                $line = trim($line);
-                if ('' !== $line) {
-                    $runEnvLines[] = $line;
-                }
-            }
-        }
-        if ([] !== $runEnvLines) {
-            $runArgv = array_merge(self::llvmEnvPrefix(), $runArgv);
-            foreach ($runEnvLines as $line) {
-                array_splice($runArgv, -1, 0, [$line]);
-            }
-        }
         $run = proc_open(
-            $runArgv,
+            [$outfile],
             $descriptorSpec,
             $runPipes,
             $repoRoot,
@@ -155,6 +164,9 @@ final class AotTest extends BaseTest
         fclose($runPipes[2]);
         $exitCode = proc_close($run);
         @unlink($outfile);
+        if (isset($bodyFile)) {
+            @unlink($bodyFile);
+        }
 
         if (isset($sections['EXPECT_EXIT'])) {
             $this->assertSame((int) trim($sections['EXPECT_EXIT']), $exitCode);

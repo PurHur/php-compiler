@@ -19,6 +19,7 @@ abstract class BaseTest extends TestCase {
 
     const EXTERNAL_SECTIONS = [
         'FILE',
+        'POST',
         'EXPECT',
         'EXPECTF',
         'EXPECTREGEX',

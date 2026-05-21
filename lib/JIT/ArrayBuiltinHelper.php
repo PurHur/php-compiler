@@ -3062,4 +3062,253 @@ final class ArrayBuiltinHelper
             $context->builder->siToFp($prodInt, $double)
         );
     }
+
+    /**
+     * array_unique() for arrays of scalar values (strict identity; subset of PHP).
+     */
+    public static function arrayUnique(Context $context, Variable $array): Value
+    {
+        if (self::isNativeArray($array->type)) {
+            return self::arrayUniqueHashTable($context, self::nativeListToHashTable($context, $array));
+        }
+
+        return self::arrayUniqueHashTable($context, self::loadHashTable($context, $array));
+    }
+
+    private static function arrayUniqueHashTable(Context $context, Value $src): Value
+    {
+        $dest = HashTableHelper::alloc($context);
+        $map = $context->structFieldMap['__hashtable__'];
+        $nodeMap = $context->structFieldMap['__strkey_node__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $nodePtrType = $context->getTypeFromString('__strkey_node__*');
+
+        $nextFree = $context->builder->load($context->builder->structGep($src, $map['nextFreeElement']));
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'array_unique_packed_idx');
+        $context->builder->store($zero, $idxSlot);
+
+        $packedHead = BasicBlockHelper::append($context, 'array_unique_packed_head');
+        $packedBody = BasicBlockHelper::append($context, 'array_unique_packed_body');
+        $packedKeep = BasicBlockHelper::append($context, 'array_unique_packed_keep');
+        $packedSkip = BasicBlockHelper::append($context, 'array_unique_packed_skip');
+        $packedAdd = BasicBlockHelper::append($context, 'array_unique_packed_add');
+        $packedNext = BasicBlockHelper::append($context, 'array_unique_packed_next');
+        $packedDone = BasicBlockHelper::append($context, 'array_unique_packed_done');
+        $context->builder->branch($packedHead);
+
+        $context->builder->positionAtEnd($packedHead);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $nextFree);
+        $context->builder->branchIf($atEnd, $packedDone, $packedBody);
+
+        $context->builder->positionAtEnd($packedBody);
+        $isSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $src,
+            $idx
+        );
+        $context->builder->branchIf($isSet, $packedKeep, $packedNext);
+
+        $context->builder->positionAtEnd($packedKeep);
+        $valEntry = self::listEntryAt($context, $src, $idx);
+        $duplicate = self::destContainsPackedEntry($context, $dest, $valEntry);
+        $context->builder->branchIf($duplicate, $packedSkip, $packedAdd);
+
+        $context->builder->positionAtEnd($packedAdd);
+        self::appendListEntryScalars($context, $src, $idx, $dest);
+        $context->builder->branch($packedNext);
+
+        $context->builder->positionAtEnd($packedSkip);
+        $context->builder->branch($packedNext);
+
+        $context->builder->positionAtEnd($packedNext);
+        $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+        $context->builder->branch($packedHead);
+
+        $strInit = BasicBlockHelper::append($context, 'array_unique_str_init');
+        $strHead = BasicBlockHelper::append($context, 'array_unique_str_head');
+        $context->builder->positionAtEnd($packedDone);
+        $context->builder->branch($strInit);
+
+        $context->builder->positionAtEnd($strInit);
+        $walkSlot = $context->builder->alloca($nodePtrType, 1, 'array_unique_walk');
+        $head = $context->builder->load($context->builder->structGep($src, $map['strKeys']));
+        $context->builder->store($head, $walkSlot);
+        $strBody = BasicBlockHelper::append($context, 'array_unique_str_body');
+        $strSkip = BasicBlockHelper::append($context, 'array_unique_str_skip');
+        $strAdd = BasicBlockHelper::append($context, 'array_unique_str_add');
+        $strNext = BasicBlockHelper::append($context, 'array_unique_str_next');
+        $strDone = BasicBlockHelper::append($context, 'array_unique_str_done');
+        $context->builder->branch($strHead);
+
+        $context->builder->positionAtEnd($strHead);
+        $node = $context->builder->load($walkSlot);
+        $nodeNull = $context->builder->icmp(Builder::INT_EQ, $node, $nodePtrType->constNull());
+        $context->builder->branchIf($nodeNull, $strDone, $strBody);
+
+        $context->builder->positionAtEnd($strBody);
+        $valEntry = $context->builder->structGep($node, $nodeMap['value']);
+        $duplicate = self::destContainsPackedEntry($context, $dest, $valEntry);
+        $context->builder->branchIf($duplicate, $strSkip, $strAdd);
+
+        $context->builder->positionAtEnd($strAdd);
+        $keyStr = $context->builder->load($context->builder->structGep($node, $nodeMap['key']));
+        self::storeValueEntryAtStringKey($context, $dest, $keyStr, $valEntry);
+        $context->builder->branch($strNext);
+
+        $context->builder->positionAtEnd($strSkip);
+        $context->builder->branch($strNext);
+
+        $context->builder->positionAtEnd($strNext);
+        $nextNode = $context->builder->load($context->builder->structGep($node, $nodeMap['next']));
+        $context->builder->store($nextNode, $walkSlot);
+        $context->builder->branch($strHead);
+
+        $context->builder->positionAtEnd($strDone);
+
+        return $dest;
+    }
+
+    /**
+     * Strict duplicate check against a packed hashtable (reuses in_array lowering).
+     */
+    private static function destContainsPackedEntry(Context $context, Value $dest, Value $entry): Value
+    {
+        $valueMap = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($entry, $valueMap['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $i1 = $context->getTypeFromString('int1');
+        $strict = $i1->constInt(1, false);
+        $falseVal = $i1->constInt(0, false);
+        $destVar = new Variable($context, Variable::TYPE_HASHTABLE, Variable::KIND_VALUE, $dest);
+
+        $dupSlot = $context->builder->alloca($i1, 1, 'array_unique_dup');
+        $context->builder->store($falseVal, $dupSlot);
+
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_STRING, false)
+        );
+        $isLong = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
+        );
+
+        $stringBlock = BasicBlockHelper::append($context, 'array_unique_dup_string');
+        $longBlock = BasicBlockHelper::append($context, 'array_unique_dup_long');
+        $falseBlock = BasicBlockHelper::append($context, 'array_unique_dup_false');
+        $mergeBlock = BasicBlockHelper::append($context, 'array_unique_dup_merge');
+
+        $afterString = BasicBlockHelper::append($context, 'array_unique_dup_after_string');
+        $context->builder->branchIf($isString, $stringBlock, $afterString);
+
+        $context->builder->positionAtEnd($stringBlock);
+        $needle = new Variable(
+            $context,
+            Variable::TYPE_STRING,
+            Variable::KIND_VALUE,
+            $context->builder->call($context->lookupFunction('__value__readString'), $entry)
+        );
+        $context->builder->store(
+            self::inArray($context, $needle, $destVar, $strict),
+            $dupSlot
+        );
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($afterString);
+        $context->builder->branchIf($isLong, $longBlock, $falseBlock);
+
+        $context->builder->positionAtEnd($longBlock);
+        $needle = new Variable(
+            $context,
+            Variable::TYPE_NATIVE_LONG,
+            Variable::KIND_VALUE,
+            $context->builder->call($context->lookupFunction('__value__readLong'), $entry)
+        );
+        $context->builder->store(
+            self::inArray($context, $needle, $destVar, $strict),
+            $dupSlot
+        );
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($falseBlock);
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($mergeBlock);
+
+        return $context->builder->load($dupSlot);
+    }
+
+    /**
+     * Append a packed list entry (int or string) to dest; preserves count() vs sparse setLongAt.
+     */
+    private static function appendListEntryScalars(
+        Context $context,
+        Value $src,
+        Value $srcIndex,
+        Value $dest
+    ): void {
+        $tag = 'n'.self::$copyListEntrySeq++;
+        $srcEntry = self::listEntryAt($context, $src, $srcIndex);
+        $valueMap = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($srcEntry, $valueMap['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+
+        $longBlock = BasicBlockHelper::append($context, 'ht_unique_append_long_'.$tag);
+        $stringBlock = BasicBlockHelper::append($context, 'ht_unique_append_string_'.$tag);
+        $done = BasicBlockHelper::append($context, 'ht_unique_append_done_'.$tag);
+
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_STRING, false)
+        );
+        $isLong = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
+        );
+
+        $afterString = BasicBlockHelper::append($context, 'ht_unique_append_after_string_'.$tag);
+        $context->builder->branchIf($isString, $stringBlock, $afterString);
+
+        $context->builder->positionAtEnd($stringBlock);
+        self::appendElement(
+            $context,
+            $dest,
+            new Variable(
+                $context,
+                Variable::TYPE_STRING,
+                Variable::KIND_VALUE,
+                $context->builder->call($context->lookupFunction('__value__readString'), $srcEntry)
+            )
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterString);
+        $context->builder->branchIf($isLong, $longBlock, $done);
+
+        $context->builder->positionAtEnd($longBlock);
+        self::appendElement(
+            $context,
+            $dest,
+            new Variable(
+                $context,
+                Variable::TYPE_NATIVE_LONG,
+                Variable::KIND_VALUE,
+                $context->builder->call($context->lookupFunction('__value__readLong'), $srcEntry)
+            )
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+    }
 }
