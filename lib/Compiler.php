@@ -88,7 +88,13 @@ class Compiler {
                     if ($child instanceof Op\Expr\Isset_ && count($child->vars) > 1) {
                         $block = $this->compileIssetMulti($child, $block);
                     } elseif ($child instanceof Op\Expr\BinaryOp\Coalesce) {
-                        $block = $this->compileCoalesce($child, $block);
+                        $assignVar = ($i + 1 < $opCount)
+                            ? $this->resolveCoalesceAssignVar($child, $ops[$i + 1])
+                            : null;
+                        $block = $this->compileCoalesce($child, $block, $assignVar);
+                        if (null !== $assignVar) {
+                            ++$i;
+                        }
                     } elseif ($child instanceof Op\Expr\NullsafePropertyFetch) {
                         $block = $this->compileNullsafePropertyFetch($child, $block);
                     } elseif (
@@ -127,6 +133,31 @@ class Compiler {
         }
 
         return $left === $fetch->result;
+    }
+
+    /**
+     * php-cfg emits Assign immediately after Coalesce; lower into the assignee slot (#99, #148).
+     */
+    private function resolveCoalesceAssignVar(Op\Expr\BinaryOp\Coalesce $coalesce, Op $next): ?Operand
+    {
+        if (!$next instanceof Op\Expr\Assign) {
+            return null;
+        }
+        $expr = $next->expr;
+        if ($expr === $coalesce->result) {
+            return $next->var;
+        }
+        while ($expr instanceof Temporary) {
+            if ($expr === $coalesce->result) {
+                return $next->var;
+            }
+            if (null === $expr->original) {
+                break;
+            }
+            $expr = $expr->original;
+        }
+
+        return null;
     }
 
     protected function compileClassLike(Op\Stmt\ClassLike $class, Block $block): OpCode {
@@ -635,9 +666,16 @@ class Compiler {
         )];
     }
 
-    protected function compileCoalesce(Op\Expr\BinaryOp\Coalesce $expr, Block $block): Block
+    protected function compileCoalesce(Op\Expr\BinaryOp\Coalesce $expr, Block $block, ?Operand $assignVar = null): Block
     {
-        $resultSlot = $this->compileOperand($expr->result, $block, false);
+        $resultOperand = null !== $assignVar ? $assignVar : $expr->result;
+        $resultSlot = $this->compileOperand($resultOperand, $block, false);
+
+        $checkSlot = $this->compileBoolTemporary($block);
+        $dimFetch = $this->findCoalesceArrayDimFetch($expr->left, $block);
+        $issetTarget = null !== $dimFetch
+            ? $this->resolveIssetTargetFromArrayDimFetch($dimFetch, $block)
+            : $this->resolveCoalesceIssetTarget($expr->left, $block);
 
         $endBlock = new Block($block->orig);
         $endBlock->inheritUndefinedLocals = true;
@@ -657,12 +695,6 @@ class Compiler {
         $leftBlock = new Block($block->orig);
         $leftBlock->inheritUndefinedLocals = true;
         $leftBlock->inheritScopeFrom($block);
-
-        $checkSlot = $this->compileBoolTemporary($block);
-        $dimFetch = $this->findCoalesceArrayDimFetch($expr->left, $block);
-        $issetTarget = null !== $dimFetch
-            ? $this->resolveIssetTargetFromArrayDimFetch($dimFetch, $block)
-            : $this->resolveCoalesceIssetTarget($expr->left, $block);
         if (null !== $issetTarget) {
             [$containerSlot, $dimSlot] = $issetTarget;
             $block->addOpCode(new OpCode(
@@ -672,13 +704,13 @@ class Compiler {
                 $dimSlot
             ));
             if (null !== $dimFetch) {
-                $this->compileArrayDimFetchRead($dimFetch, $leftBlock);
-                $leftSlot = $this->compileOperand($dimFetch->result, $leftBlock, true);
+                // Reuse isset container/dim slots from $block — re-compiling in $leftBlock
+                // would bind $_GET to a different slot and read the wrong hashtable (#99, #148).
                 $leftBlock->addOpCode(new OpCode(
-                    OpCode::TYPE_ASSIGN,
+                    OpCode::TYPE_ARRAY_DIM_FETCH,
                     $resultSlot,
-                    $resultSlot,
-                    $leftSlot
+                    $containerSlot,
+                    $dimSlot
                 ));
             } else {
                 $leftSlot = $this->compileOperand($expr->left, $leftBlock, true);

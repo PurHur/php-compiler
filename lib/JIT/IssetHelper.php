@@ -156,16 +156,14 @@ final class IssetHelper
         $superglobalName = self::superglobalName($container, $containerOp);
         if (null !== $superglobalName) {
             $key = $dim->compileTimeString ?? self::literalStringKey($dimOp);
-            if (null !== $key) {
-                $known = SuperglobalInit::compileTimeOffsetIsSet(
-                    $context,
-                    $superglobalName,
-                    $key
-                );
-
-                return $context->getTypeFromString('int1')->constInt($known ? 1 : 0, false);
-            }
             $ht = $context->helper->loadValue($container);
+            if (null !== $key) {
+                return $context->builder->call(
+                    $context->lookupFunction('__hashtable__offsetIsSetStringKey'),
+                    $ht,
+                    $context->helper->loadValue($dim)
+                );
+            }
             if (Variable::TYPE_STRING === $dim->type) {
                 return $context->builder->call(
                     $context->lookupFunction('__hashtable__offsetIsSetStringKey'),

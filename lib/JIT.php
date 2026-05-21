@@ -171,7 +171,7 @@ class JIT {
 
         return $this->compileBlockInternal($func, $block, $limit, null, ...$args);
     }
-    
+
     private function compileBlockInternal(
         PHPLLVM\Value $func,
         Block $block,
@@ -559,15 +559,17 @@ class JIT {
                         $this->context->helper->loadValue($this->context->getVariableFromOp($block->getOperand($op->arg2)))
                     );
                     $leftBb = JIT\CoalesceHelper::compileBranch($this, $func, $op->block1);
+                    $leftTail = $builder->getInsertBlock();
                     $rightBb = JIT\CoalesceHelper::compileBranch($this, $func, $op->block2);
+                    $rightTail = $builder->getInsertBlock();
                     $builder->positionAtEnd($branchBlock);
                     $this->context->freeDeadVariables($func, $branchBlock, $block);
                     $builder->branchIf($condition, $leftBb, $rightBb);
                     if (null !== $op->block3) {
                         $mergeBb = JIT\BasicBlockHelper::append($this->context, 'coalesce_merge');
-                        $builder->positionAtEnd($leftBb);
+                        $builder->positionAtEnd($leftTail);
                         $builder->branch($mergeBb);
-                        $builder->positionAtEnd($rightBb);
+                        $builder->positionAtEnd($rightTail);
                         $builder->branch($mergeBb);
                         $builder->positionAtEnd($mergeBb);
 
