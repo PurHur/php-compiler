@@ -13,6 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
@@ -20,7 +21,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * array_flip() for arrays with int or string keys and values (subset of PHP; VM only).
+ * array_flip() for arrays with int or string keys and values (subset of PHP; JIT via ArrayBuiltinHelper).
  */
 final class array_flip extends Internal
 {
@@ -57,6 +58,14 @@ final class array_flip extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('array_flip() is not implemented for JIT in this compiler build');
+        if (1 !== \count($args)) {
+            throw new \LogicException('array_flip() requires exactly one argument');
+        }
+        if (JITVariable::TYPE_HASHTABLE !== $args[0]->type
+            && !($args[0]->type & JITVariable::IS_NATIVE_ARRAY)) {
+            throw new \LogicException('array_flip() argument must be an array in this compiler build');
+        }
+
+        return ArrayBuiltinHelper::buildFlipArray($context, $args[0]);
     }
 }

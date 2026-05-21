@@ -122,13 +122,21 @@ class Analyzer
         foreach ($operand->ops as $op) {
             if ($op instanceof Op\Expr\Array_) {
                 $newSize = 0;
+                $nextListIndex = 0;
                 foreach ($op->keys as $key) {
                     if ($key instanceof Operand\NullOperand) {
                         ++$newSize;
+                        ++$nextListIndex;
                     } elseif (! $key instanceof Operand\Literal || $key->type->type !== Type::TYPE_LONG) {
                         return null;
-                    } elseif ($key->value >= $newSize) {
-                        $newSize = $key->value + 1;
+                    } elseif ($key->value !== $nextListIndex) {
+                        // Sparse or non-zero-based int keys (e.g. 10 => 'x') need __hashtable__.
+                        return null;
+                    } else {
+                        ++$nextListIndex;
+                        if ($key->value >= $newSize) {
+                            $newSize = $key->value + 1;
+                        }
                     }
                 }
                 $size = max($size, $newSize);
