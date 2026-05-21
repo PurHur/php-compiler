@@ -1,4 +1,5 @@
 {
     "entry": "public/index.php",
-    "binary": ".phpc/bin/app"
+    "binary": ".phpc/bin/app",
+    "public": "public"
 }
