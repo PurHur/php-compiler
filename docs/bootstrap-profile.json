@@ -54,6 +54,7 @@
         "ext/standard/JitRequestBody.php",
         "ext/standard/JitSetcookie.php",
         "ext/standard/JitSprintf.php",
+        "ext/standard/JitStat.php",
         "ext/standard/JitStrPad.php",
         "ext/standard/JitStrRepeat.php",
         "ext/standard/JitStrReplace.php",
@@ -323,9 +324,9 @@
         "test/bootstrap-aot/echo_hello.php"
     ],
     "totals": {
-        "inventory_files": 289,
+        "inventory_files": 290,
         "excluded": 2,
-        "eligible": 287,
+        "eligible": 288,
         "aot_lint_targets": 2
     }
 }

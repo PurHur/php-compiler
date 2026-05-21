@@ -11,7 +11,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** is_dir() — VM only (issue #194). */
+/** is_dir() — VM via host; JIT via libc stat (issue #194). */
 final class is_dir extends Internal
 {
     public function execute(Frame $frame): void
@@ -31,6 +31,13 @@ final class is_dir extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('is_dir() is not implemented for JIT in this compiler build');
+        if (1 !== \count($args)) {
+            throw new \LogicException('is_dir() requires exactly one argument');
+        }
+        if (JITVariable::TYPE_STRING !== $args[0]->type) {
+            throw new \LogicException('is_dir() requires a string path in this compiler build');
+        }
+
+        return JitStat::pathIsDir($context, $context->helper->loadValue($args[0]));
     }
 }
