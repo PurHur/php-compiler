@@ -73,6 +73,9 @@ final class Variable {
     /** String literal value when this variable represents a constant string operand. */
     public ?string $compileTimeString = null;
 
+    /** {@see __value__} slot holds a nested {@see __hashtable__} (e.g. $_FILES['field']). */
+    public bool $valueBoxHashtable = false;
+
     private static int $lvalueCounter = 0;
     public int $nextFreeElement = 0;
 
@@ -419,6 +422,19 @@ final class Variable {
 
                         return HashTableHelper::writableStringKeyValueBox($this->context, $ht, $key);
                     }
+                    if ('_FILES' === $this->superglobalName && !$forWrite) {
+                        $childHt = $this->context->builder->call(
+                            $this->context->lookupFunction('__hashtable__readStringKeyHashtable'),
+                            $ht,
+                            $key
+                        );
+                        return new Variable(
+                            $this->context,
+                            self::TYPE_HASHTABLE,
+                            self::KIND_VALUE,
+                            $childHt
+                        );
+                    }
                     if (null !== $expectedType && Type::TYPE_ARRAY === $expectedType->type) {
                         $childHt = $this->context->builder->call(
                             $this->context->lookupFunction('__hashtable__readStringKeyHashtable'),
@@ -434,26 +450,10 @@ final class Variable {
                         );
                     }
                     if (null !== $expectedType && Type::TYPE_STRING === $expectedType->type) {
-                        $valPtr = $this->context->builder->call(
-                            $this->context->lookupFunction('__hashtable__readStringKeyValue'),
-                            $ht,
-                            $key
-                        );
-                        $str = $this->context->builder->call(
-                            $this->context->lookupFunction('__value__readString'),
-                            $valPtr
-                        );
-                        $owned = $this->context->builder->call(
-                            $this->context->lookupFunction('__string__separate'),
-                            $str
-                        );
+                        $this->context->refcount->addref($ht);
+                        $boxed = HashTableHelper::readStringKeyToValueBox($this->context, $ht, $key);
 
-                        return new Variable(
-                            $this->context,
-                            self::TYPE_STRING,
-                            self::KIND_VALUE,
-                            $owned
-                        );
+                        return $boxed;
                     }
 
                     $this->context->refcount->addref($ht);
@@ -491,6 +491,25 @@ final class Variable {
                     );
                 }
                 return HashTableHelper::readIndexedToValueBox($this->context, $ht, $index);
+            case self::TYPE_VALUE:
+                if (!$this->valueBoxHashtable || self::TYPE_STRING !== $dim->type) {
+                    throw new \LogicException(
+                        'Array dim fetch on __value__ requires a nested hashtable in this compiler build'
+                    );
+                }
+                $valPtr = JitValueBox::pointer($this->context, $this->value);
+                $childHt = $this->context->builder->call(
+                    $this->context->lookupFunction('__value__readHashtable'),
+                    $valPtr
+                );
+                $htVar = new Variable(
+                    $this->context,
+                    self::TYPE_HASHTABLE,
+                    self::KIND_VALUE,
+                    $childHt
+                );
+
+                return $htVar->dimFetch($dim, $expectedType, $forWrite);
             default:
                 if (!($this->type & self::IS_NATIVE_ARRAY)) {
                     throw new \LogicException("Unsupported dim fetch on " . self::getStringType($this->type));

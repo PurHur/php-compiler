@@ -826,6 +826,7 @@ class JIT {
                         $valueRef,
                         $this->context->helper->loadValue($value)
                     );
+                    $result->valueBoxHashtable = true;
 
                     return;
                 case Variable::TYPE_VALUE:
