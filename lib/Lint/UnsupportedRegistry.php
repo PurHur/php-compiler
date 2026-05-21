@@ -33,8 +33,6 @@ final class UnsupportedRegistry
         'Expr_PostInc' => 137,
         'Expr_PreDec' => 137,
         'Expr_PostDec' => 137,
-        'Expr_MethodCall' => 58,
-        'Stmt_ClassMethod' => 58,
     ];
 
     public static function trackingIssueForKind(string $kind): ?int

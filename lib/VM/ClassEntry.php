@@ -9,6 +9,7 @@
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\Func;
 // bug in phan: https://github.com/phan/phan/issues/2661
 // @phan-suppress-next-line PhanUnreferencedUseNormal
 use PHPCompiler\Block;
@@ -18,8 +19,10 @@ class ClassEntry {
     const PROP_PURPOSE_DEBUG = 1;
 
     public string $name;
-    public ?Block $constructor = null;
+    public ?Func\PHP $constructor = null;
     public array $properties = [];
+    /** @var array<string, Func\PHP> method name (lowercase) => callable */
+    public array $methods = [];
 
     public function __construct(string $name) {
         $this->name = $name;

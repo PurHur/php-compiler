@@ -9,6 +9,7 @@
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\Func;
 // Bug in phan: https://github.com/phan/phan/issues/2661
 // @phan-suppress-next-line PhanUnreferencedUseNormal
 use PHPCompiler\Block;
@@ -19,11 +20,12 @@ class ObjectEntry {
     public ClassEntry $class;
     public int $id;
     private array $properties = [];
-    public ?Block $constructor = null;
+    public ?Func\PHP $constructor = null;
 
     public function __construct(ClassEntry $class) {
         $this->class = $class;
         $this->id = ++self::$counter;
+        $this->constructor = $class->constructor;
         foreach ($class->properties as $property) {
             $this->properties[$property->name] = $property->getVariable();
         }
