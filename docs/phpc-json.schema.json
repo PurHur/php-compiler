@@ -24,7 +24,7 @@
         },
         "includes": {
             "type": "array",
-            "description": "Extra PHP paths to bundle with AOT (issue #106; stub until implemented).",
+            "description": "Extra PHP paths bundled with entry on phpc build --project (issue #452).",
             "items": {
                 "type": "string"
             }

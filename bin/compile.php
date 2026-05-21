@@ -10,10 +10,20 @@ declare(strict_types=1);
  */
 
 use PHPCompiler\Runtime;
+use PHPCompiler\Web\SourceBundler;
 use PHPCompiler\Web\Superglobals;
 
 function run(string $filename, string $code, array $options): void
 {
+    $includes = $options['--include'] ?? [];
+    if (!is_array($includes)) {
+        $includes = [] === $includes || '' === $includes ? [] : [$includes];
+    }
+    /** @var list<string> $includes */
+    if ([] !== $includes) {
+        [$code, $filename] = SourceBundler::bundleForAot($filename, $includes);
+    }
+
     $runtime = new Runtime(Runtime::MODE_AOT);
     $queryString = $options['-q'] ?? null;
     $postBody = $options['-p'] ?? null;

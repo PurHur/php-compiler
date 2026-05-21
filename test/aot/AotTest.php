@@ -123,7 +123,21 @@ final class AotTest extends BaseTest
             }
             $compileArgv = $stripped;
         }
-        $compileArgv[] = '-';
+        $includeFile = null;
+        $entryFile = null;
+        if (isset($sections['INCLUDE'])) {
+            $includeFile = tempnam(sys_get_temp_dir(), 'phpc_inc_');
+            $this->assertNotFalse($includeFile);
+            file_put_contents($includeFile, $sections['INCLUDE']);
+            $compileArgv[] = '--include';
+            $compileArgv[] = $includeFile;
+            $entryFile = tempnam(sys_get_temp_dir(), 'phpc_ent_').'.php';
+            $this->assertNotFalse($entryFile);
+            file_put_contents($entryFile, $code);
+            $compileArgv[] = $entryFile;
+        } else {
+            $compileArgv[] = '-';
+        }
 
         $compile = proc_open(
             array_merge(self::llvmEnvPrefix(), $this->phpCommand(), $compileArgv),
@@ -132,7 +146,9 @@ final class AotTest extends BaseTest
             $repoRoot,
             $compileEnv
         );
-        fwrite($pipes[0], $code);
+        if (!isset($sections['INCLUDE'])) {
+            fwrite($pipes[0], $code);
+        }
         fclose($pipes[0]);
         $compileErr = stream_get_contents($pipes[2]);
         fclose($pipes[1]);
@@ -163,6 +179,12 @@ final class AotTest extends BaseTest
         @unlink($outfile);
         if (isset($bodyFile)) {
             @unlink($bodyFile);
+        }
+        if (null !== $includeFile) {
+            @unlink($includeFile);
+        }
+        if (null !== $entryFile) {
+            @unlink($entryFile);
         }
 
         $runErrText = trim($runErr !== false ? $runErr : '');

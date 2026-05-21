@@ -69,6 +69,10 @@ final class ManifestValidator
             $errors[] = 'missing required key: binary';
         }
 
+        if (isset($data['includes'])) {
+            $errors = array_merge($errors, self::validateIncludesOnDisk($dir, $data['includes']));
+        }
+
         return $errors;
     }
 
@@ -157,19 +161,35 @@ final class ManifestValidator
         }
 
         if (isset($data['includes'])) {
-            if (!is_array($data['includes'])) {
-                $errors[] = 'includes must be an array of strings';
-            } else {
-                foreach ($data['includes'] as $i => $item) {
-                    if (!is_string($item) || '' === $item) {
-                        $errors[] = 'includes['.$i.'] must be a non-empty string';
-                    }
-                }
-            }
+            $errors = array_merge($errors, self::validateIncludesOnDisk($dir, $data['includes']));
         }
 
         if (isset($data['autoload'])) {
             $errors = array_merge($errors, self::validateAutoload($data['autoload']));
+        }
+
+        return $errors;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function validateIncludesOnDisk(string $projectDir, mixed $includes): array
+    {
+        if (!is_array($includes)) {
+            return ['includes must be an array of strings'];
+        }
+
+        $errors = [];
+        foreach ($includes as $i => $item) {
+            if (!is_string($item) || '' === $item) {
+                $errors[] = 'includes['.$i.'] must be a non-empty string';
+                continue;
+            }
+            $includePath = ProjectManifest::resolveRelativePath($projectDir, $item);
+            if (!is_file($includePath)) {
+                $errors[] = 'includes path not found: '.$item;
+            }
         }
 
         return $errors;
