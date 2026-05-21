@@ -15,7 +15,7 @@ When `error_reporting` includes `E_WARNING` (default in VM: full `E_ALL`):
 
 Writes to missing keys (`$arr['new'] = 1`) create the key without a warning (PHP behavior).
 
-Recommended app pattern once [#99](https://github.com/PurHur/php-compiler/issues/99) lands: `$name = $_GET['name'] ?? 'Guest';`
+Recommended app pattern: `$name = $_GET['name'] ?? 'Guest';` (no undefined-key warning; see `test/real/cases/coalesce_get_default.phpt`).
 
 ## Verification
 
