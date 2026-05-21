@@ -581,10 +581,12 @@ class HashTable extends Type
             $newNode,
             $this->context->builder->structGep($walkNode, $nodeMap['next'])
         );
+        $this->incrementNumElements($ht);
         $this->context->builder->branch($done);
 
         $this->context->builder->positionAtEnd($emptyHead);
         $this->context->builder->store($newNode, $headSlot);
+        $this->incrementNumElements($ht);
         $this->context->builder->branch($done);
 
         $this->context->builder->positionAtEnd($done);
@@ -743,6 +745,7 @@ class HashTable extends Type
         );
         $this->context->builder->store($head, $this->context->builder->structGep($newNode, $nodeMap['next']));
         $this->context->builder->store($newNode, $headSlot);
+        $this->incrementNumElements($ht);
         $this->context->builder->branch($done);
 
         $this->context->builder->positionAtEnd($done);
@@ -1278,6 +1281,18 @@ class HashTable extends Type
     /**
      * @param array<string, int> $map
      */
+    private function incrementNumElements(PHPLLVM\Value $ht): void
+    {
+        $map = $this->context->structFieldMap['__hashtable__'];
+        $sizeT = $this->context->getTypeFromString('size_t');
+        $numPtr = $this->context->builder->structGep($ht, $map['numElements']);
+        $num = $this->context->builder->load($numPtr);
+        $this->context->builder->store(
+            $this->context->builder->addNoSignedWrap($num, $sizeT->constInt(1, false)),
+            $numPtr
+        );
+    }
+
     private function updateIndexMetadata(PHPLLVM\Value $ht, array $map, PHPLLVM\Value $index, PHPLLVM\Value $need): void
     {
         $nextFree = $this->context->builder->load(

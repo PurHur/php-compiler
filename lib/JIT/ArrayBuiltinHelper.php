@@ -253,6 +253,154 @@ final class ArrayBuiltinHelper
     }
 
     /**
+     * array_flip() for hashtable arrays (int/string keys and values; subset of PHP).
+     */
+    public static function buildFlipArray(Context $context, Variable $array): Value
+    {
+        if (self::isNativeArray($array->type)) {
+            return self::buildFlipHashTable($context, self::nativeListToHashTable($context, $array));
+        }
+
+        return self::buildFlipHashTable($context, self::loadHashTable($context, $array));
+    }
+
+    /**
+     * Copy a zero-based native list array into a packed hashtable (indices 0..n-1).
+     */
+    private static function nativeListToHashTable(Context $context, Variable $array): Value
+    {
+        $dest = HashTableHelper::alloc($context);
+        $elemType = $array->type & ~Variable::IS_NATIVE_ARRAY;
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $count = $context->constantFromInteger($array->nextFreeElement, 'size_t');
+
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'array_flip_native_idx');
+        $context->builder->store($zero, $idxSlot);
+        $head = BasicBlockHelper::append($context, 'array_flip_native_head');
+        $body = BasicBlockHelper::append($context, 'array_flip_native_body');
+        $advance = BasicBlockHelper::append($context, 'array_flip_native_advance');
+        $done = BasicBlockHelper::append($context, 'array_flip_native_done');
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $count);
+        $context->builder->branchIf($atEnd, $done, $body);
+
+        $context->builder->positionAtEnd($body);
+        $slot = $context->builder->inBoundsGep($array->value, $zero, $idx);
+        if (Variable::TYPE_STRING === $elemType) {
+            $elem = new Variable($context, $elemType, Variable::KIND_VARIABLE, $slot);
+        } else {
+            $elem = new Variable(
+                $context,
+                $elemType,
+                Variable::KIND_VALUE,
+                $context->builder->load($slot)
+            );
+        }
+        HashTableHelper::setAtIndex($context, $dest, $idx, $elem);
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($advance);
+        $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($done);
+
+        return $dest;
+    }
+
+    private static function buildFlipHashTable(Context $context, Value $src): Value
+    {
+        $dest = HashTableHelper::alloc($context);
+        $map = $context->structFieldMap['__hashtable__'];
+        $nodeMap = $context->structFieldMap['__strkey_node__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $nodePtrType = $context->getTypeFromString('__strkey_node__*');
+
+        $nextFree = $context->builder->load($context->builder->structGep($src, $map['nextFreeElement']));
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'array_flip_packed_idx');
+        $context->builder->store($zero, $idxSlot);
+
+        $packedHead = BasicBlockHelper::append($context, 'array_flip_packed_head');
+        $packedBody = BasicBlockHelper::append($context, 'array_flip_packed_body');
+        $packedFlip = BasicBlockHelper::append($context, 'array_flip_packed_flip');
+        $packedNext = BasicBlockHelper::append($context, 'array_flip_packed_next');
+        $packedDone = BasicBlockHelper::append($context, 'array_flip_packed_done');
+        $context->builder->branch($packedHead);
+
+        $context->builder->positionAtEnd($packedHead);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $nextFree);
+        $context->builder->branchIf($atEnd, $packedDone, $packedBody);
+
+        $context->builder->positionAtEnd($packedBody);
+        $isSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $src,
+            $idx
+        );
+        $context->builder->branchIf($isSet, $packedFlip, $packedNext);
+
+        $context->builder->positionAtEnd($packedFlip);
+        $valEntry = self::listEntryAt($context, $src, $idx);
+        self::flipStorePackedEntry($context, $dest, $valEntry, $idx);
+        $context->builder->branch($packedNext);
+
+        $context->builder->positionAtEnd($packedNext);
+        $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+        $context->builder->branch($packedHead);
+
+        $strInit = BasicBlockHelper::append($context, 'array_flip_str_init');
+        $strHead = BasicBlockHelper::append($context, 'array_flip_str_head');
+        $context->builder->positionAtEnd($packedDone);
+        $context->builder->branch($strInit);
+
+        $context->builder->positionAtEnd($strInit);
+        $walkSlot = $context->builder->alloca($nodePtrType, 1, 'array_flip_walk');
+        $head = $context->builder->load($context->builder->structGep($src, $map['strKeys']));
+        $context->builder->store($head, $walkSlot);
+        $strBody = BasicBlockHelper::append($context, 'array_flip_str_body');
+        $strNext = BasicBlockHelper::append($context, 'array_flip_str_next');
+        $strDone = BasicBlockHelper::append($context, 'array_flip_str_done');
+        $context->builder->branch($strHead);
+
+        $context->builder->positionAtEnd($strHead);
+        $node = $context->builder->load($walkSlot);
+        $nodeNull = $context->builder->icmp(Builder::INT_EQ, $node, $nodePtrType->constNull());
+        $context->builder->branchIf($nodeNull, $strDone, $strBody);
+
+        $context->builder->positionAtEnd($strBody);
+        $valEntry = $context->builder->structGep($node, $nodeMap['value']);
+        $keyStr = $context->builder->load($context->builder->structGep($node, $nodeMap['key']));
+        $keySlot = JitValueBox::alloc($context);
+        $owned = $context->builder->call($context->lookupFunction('__string__separate'), $keyStr);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            JitValueBox::pointer($context, $keySlot),
+            $owned
+        );
+        $keyEntry = JitValueBox::pointer($context, $keySlot);
+        self::flipStoreEntry($context, $dest, $valEntry, $keyEntry);
+        $context->builder->branch($strNext);
+
+        $context->builder->positionAtEnd($strNext);
+        $nextNode = $context->builder->load($context->builder->structGep($node, $nodeMap['next']));
+        $context->builder->store($nextNode, $walkSlot);
+        $context->builder->branch($strHead);
+
+        $context->builder->positionAtEnd($strDone);
+
+        return $dest;
+    }
+
+    /**
      * Copy a sub-range of a packed list array (array_slice subset; matches VM HashTable::sliceCopy).
      *
      * @param Value $offset   int64 slice offset (negative offsets normalized against element count)
@@ -1152,6 +1300,246 @@ final class ArrayBuiltinHelper
             Variable::KIND_VALUE,
             $context->builder->load($slot)
         );
+    }
+
+    /**
+     * array_flip from a packed hashtable slot: old value becomes key, index becomes long value.
+     */
+    private static function flipStorePackedEntry(
+        Context $context,
+        Value $dest,
+        Value $valEntry,
+        Value $index
+    ): void {
+        $valueMap = $context->structFieldMap['__value__'];
+        $valType = $context->builder->load(
+            $context->builder->structGep($valEntry, $valueMap['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $keyLong = $context->builder->zExt($index, $i64);
+
+        $stringBlock = BasicBlockHelper::append($context, 'array_flip_packed_val_string');
+        $longBlock = BasicBlockHelper::append($context, 'array_flip_packed_val_long');
+        $done = BasicBlockHelper::append($context, 'array_flip_packed_val_done');
+
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $valType,
+            $i8->constInt(Variable::TYPE_STRING, false)
+        );
+        $isLong = $context->builder->icmp(
+            Builder::INT_EQ,
+            $valType,
+            $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
+        );
+
+        $afterString = BasicBlockHelper::append($context, 'array_flip_packed_after_string');
+        $context->builder->branchIf($isString, $stringBlock, $afterString);
+
+        $context->builder->positionAtEnd($stringBlock);
+        $newKeyStr = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $valEntry
+        );
+        $ownedKey = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $newKeyStr
+        );
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyLong'),
+            $dest,
+            $ownedKey,
+            $keyLong
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterString);
+        $context->builder->branchIf($isLong, $longBlock, $done);
+
+        $context->builder->positionAtEnd($longBlock);
+        $newKeyIdx = $context->builder->truncOrBitCast(
+            $context->builder->call($context->lookupFunction('__value__readLong'), $valEntry),
+            $sizeT
+        );
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setLongAt'),
+            $dest,
+            $newKeyIdx,
+            $keyLong
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+    }
+
+    /**
+     * array_flip: store old value as key and old key as value (int/string subset only).
+     */
+    private static function flipStoreEntry(
+        Context $context,
+        Value $dest,
+        Value $valEntry,
+        Value $keyEntry
+    ): void {
+        $valueMap = $context->structFieldMap['__value__'];
+        $valType = $context->builder->load(
+            $context->builder->structGep($valEntry, $valueMap['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $sizeT = $context->getTypeFromString('size_t');
+
+        $stringKeyBlock = BasicBlockHelper::append($context, 'array_flip_newkey_string');
+        $longKeyBlock = BasicBlockHelper::append($context, 'array_flip_newkey_long');
+        $done = BasicBlockHelper::append($context, 'array_flip_newkey_done');
+
+        $isStringKey = $context->builder->icmp(
+            Builder::INT_EQ,
+            $valType,
+            $i8->constInt(Variable::TYPE_STRING, false)
+        );
+        $isLongKey = $context->builder->icmp(
+            Builder::INT_EQ,
+            $valType,
+            $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
+        );
+
+        $afterString = BasicBlockHelper::append($context, 'array_flip_after_string_key');
+        $context->builder->branchIf($isStringKey, $stringKeyBlock, $afterString);
+
+        $context->builder->positionAtEnd($stringKeyBlock);
+        $newKeyStr = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $valEntry
+        );
+        $ownedKey = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $newKeyStr
+        );
+        self::flipStoreValueAtStringKey($context, $dest, $ownedKey, $keyEntry);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterString);
+        $context->builder->branchIf($isLongKey, $longKeyBlock, $done);
+
+        $context->builder->positionAtEnd($longKeyBlock);
+        $newKeyIdx = $context->builder->truncOrBitCast(
+            $context->builder->call($context->lookupFunction('__value__readLong'), $valEntry),
+            $sizeT
+        );
+        self::flipStoreValueAtIndex($context, $dest, $newKeyIdx, $keyEntry);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+    }
+
+    private static function flipStoreValueAtIndex(
+        Context $context,
+        Value $dest,
+        Value $index,
+        Value $keyEntry
+    ): void {
+        $valueMap = $context->structFieldMap['__value__'];
+        $keyType = $context->builder->load(
+            $context->builder->structGep($keyEntry, $valueMap['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+
+        $stringBlock = BasicBlockHelper::append($context, 'array_flip_val_string');
+        $longBlock = BasicBlockHelper::append($context, 'array_flip_val_long');
+        $done = BasicBlockHelper::append($context, 'array_flip_val_done');
+
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $keyType,
+            $i8->constInt(Variable::TYPE_STRING, false)
+        );
+        $isLong = $context->builder->icmp(
+            Builder::INT_EQ,
+            $keyType,
+            $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
+        );
+
+        $afterString = BasicBlockHelper::append($context, 'array_flip_val_after_string');
+        $context->builder->branchIf($isString, $stringBlock, $afterString);
+
+        $context->builder->positionAtEnd($stringBlock);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringAt'),
+            $dest,
+            $index,
+            $context->builder->call($context->lookupFunction('__value__readString'), $keyEntry)
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterString);
+        $context->builder->branchIf($isLong, $longBlock, $done);
+
+        $context->builder->positionAtEnd($longBlock);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setLongAt'),
+            $dest,
+            $index,
+            $context->builder->call($context->lookupFunction('__value__readLong'), $keyEntry)
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+    }
+
+    private static function flipStoreValueAtStringKey(
+        Context $context,
+        Value $dest,
+        Value $keyStr,
+        Value $keyEntry
+    ): void {
+        $valueMap = $context->structFieldMap['__value__'];
+        $keyType = $context->builder->load(
+            $context->builder->structGep($keyEntry, $valueMap['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+
+        $stringBlock = BasicBlockHelper::append($context, 'array_flip_sval_string');
+        $longBlock = BasicBlockHelper::append($context, 'array_flip_sval_long');
+        $done = BasicBlockHelper::append($context, 'array_flip_sval_done');
+
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $keyType,
+            $i8->constInt(Variable::TYPE_STRING, false)
+        );
+        $isLong = $context->builder->icmp(
+            Builder::INT_EQ,
+            $keyType,
+            $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
+        );
+
+        $afterString = BasicBlockHelper::append($context, 'array_flip_sval_after_string');
+        $context->builder->branchIf($isString, $stringBlock, $afterString);
+
+        $context->builder->positionAtEnd($stringBlock);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyString'),
+            $dest,
+            $keyStr,
+            $context->builder->call($context->lookupFunction('__value__readString'), $keyEntry)
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterString);
+        $context->builder->branchIf($isLong, $longBlock, $done);
+
+        $context->builder->positionAtEnd($longBlock);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyLong'),
+            $dest,
+            $keyStr,
+            $context->builder->call($context->lookupFunction('__value__readLong'), $keyEntry)
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
     }
 
     private static function storeCombinedEntry(
