@@ -181,4 +181,26 @@ final class DevServerHeadersTest extends TestCase
         $this->assertSame('name=Alice', $parsed[4]);
         $this->assertSame('10', $parsed[3]['content-length'] ?? null);
     }
+
+    public function testParseCgiOutputSingleCrlfAfterHeaders(): void
+    {
+        $raw = "Content-Type: text/html; charset=UTF-8\r\n<h1>Hello Smoke</h1>\n";
+        [$status, $contentType, $body, $extraHeaders] = DevServer::parseCgiOutput($raw);
+
+        $this->assertSame(200, $status);
+        $this->assertSame('text/html; charset=UTF-8', $contentType);
+        $this->assertStringContainsString('Hello Smoke', $body);
+        $this->assertSame([], $extraHeaders);
+    }
+
+    public function testParseCgiOutputBlankLineSeparator(): void
+    {
+        $raw = "Status: 201 Created\r\nContent-Type: application/json\r\n\r\n{\"ok\":true}";
+        [$status, $contentType, $body, $extraHeaders] = DevServer::parseCgiOutput($raw);
+
+        $this->assertSame(201, $status);
+        $this->assertSame('application/json', $contentType);
+        $this->assertSame('{"ok":true}', $body);
+        $this->assertSame([], $extraHeaders);
+    }
 }

@@ -127,3 +127,19 @@ ci_guard_jit_compliance() {
   fi
   "$PHP_BIN" "${PHP_OPTS[@]}" script/check-jit-compliance-ran.php "$junit_path" "$llvm_dir"
 }
+
+# HTTP curl harness for shipped web examples via phpc serve --aot (issue #444).
+ci_run_examples_web_smoke_aot() {
+  if [[ -n "${PHP_COMPILER_SKIP_SERVE_TESTS:-}" ]]; then
+    echo "examples-web-smoke (AOT): skipped (PHP_COMPILER_SKIP_SERVE_TESTS is set)"
+    return 0
+  fi
+  if ! ci_can_bind_loopback; then
+    echo "examples-web-smoke (AOT): skipped (cannot bind loopback TCP)"
+    return 0
+  fi
+  echo "examples-web-smoke-prebuild: building shipped web example AOT binaries..."
+  "$_CI_SCRIPT_DIR/examples-web-smoke-prebuild.sh"
+  echo "examples-web-smoke (AOT): HTTP harness via phpc serve --aot..."
+  "$_CI_SCRIPT_DIR/examples-web-smoke.sh" --aot
+}
