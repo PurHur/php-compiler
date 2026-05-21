@@ -23,7 +23,7 @@ composer install
 mkdir my-app && ./phpc init my-app   # phpc.json + public/index.php scaffold
 ./phpc run -r 'echo 1;'        # VM mode (or: php bin/vm.php -r 'echo 1;')
 ./phpc run -q 'name=Dev' examples/001-SimpleWeb/example.php   # web example without TCP
-make web-smoke                 # lint shipped examples, then VM smoke for 001-SimpleWeb
+make web-smoke                 # lint shipped examples + 003-MiniWebApp tree, VM smoke 001-SimpleWeb
 make examples-web-smoke        # phpc serve + curl for 001-SimpleWeb, 002-StaticWeb, and 004-ApiJson
 ./phpc serve examples/001-SimpleWeb   # http://127.0.0.1:8080/ (or: make serve)
 ```

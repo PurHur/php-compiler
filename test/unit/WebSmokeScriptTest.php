@@ -7,7 +7,7 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Makefile web-smoke preflight (issue #304).
+ * Makefile web-smoke preflight (issues #304, #455).
  */
 final class WebSmokeScriptTest extends TestCase
 {
@@ -34,6 +34,10 @@ final class WebSmokeScriptTest extends TestCase
         $combined = trim(($stdout !== false ? $stdout : '')."\n".($stderr !== false ? $stderr : ''));
         $this->assertSame(0, $exit, $combined);
         $this->assertStringContainsString('web-smoke: lint examples/', $combined);
+        if (is_dir($repoRoot.'/examples/003-MiniWebApp/public')) {
+            $this->assertStringContainsString('web-smoke: lint --all examples/003-MiniWebApp', $combined);
+            $this->assertStringContainsString('web-smoke: 003-MiniWebApp:', $combined);
+        }
         $this->assertStringContainsString('web-smoke: ok', $combined);
     }
 }

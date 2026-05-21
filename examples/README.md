@@ -76,7 +76,10 @@ Lint-first reference app (front controller + templates). **Not** in `ExamplesCom
 ```console
 ./phpc lint --all examples/003-MiniWebApp
 ./phpc lint --all examples/003-MiniWebApp --json   # expect issues until #67
+make web-smoke   # also runs lint --all when public/ exists; JSON -> /tmp/miniwebapp-lint.json
 ```
+
+During the skeleton phase `make web-smoke` **continues** when 003 lint exits `1` (blockers logged with tracking issue links). After [#67](https://github.com/PurHur/php-compiler/issues/67), set `MINIWEBAPP_LINT_GATE=1` so `make web-smoke` fails if `phpc lint --all` regresses.
 
 See [003-MiniWebApp/README.md](003-MiniWebApp/README.md) for the blocker matrix and curl recipes (VM serve expected to fail until language gaps close).
 
@@ -113,7 +116,7 @@ PHPUnit gate: [`test/unit/ExamplesCompileTest.php`](../test/unit/ExamplesCompile
 Before a PR that touches examples or `bin/serve.php`:
 
 ```console
-make web-smoke              # lint all examples + VM ?name= smoke (001-SimpleWeb)
+make web-smoke              # lint examples/*/example.php + 003 lint --all + VM ?name= smoke
 make examples-web-smoke     # phpc serve + curl GET/POST (001-SimpleWeb, 002-StaticWeb, 004-ApiJson)
 ```
 
