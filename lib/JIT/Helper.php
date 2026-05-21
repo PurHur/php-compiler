@@ -536,6 +536,37 @@ restart:
                         goto return_bool;
                 }
                 break;
+            case TYPE_PAIR_STRING_STRING:
+                $result = JitStringCompare::binaryOp($this->context, $opcode, $leftValue, $rightValue);
+                goto return_bool;
+        }
+        if (Variable::TYPE_STRING === $leftType && Variable::TYPE_VALUE === $rightType) {
+            if (OpCode::TYPE_IDENTICAL === $opcode->type || OpCode::TYPE_EQUAL === $opcode->type) {
+                $result = JitStringCompare::identicalValueToString($this->context, $right, $leftValue);
+                goto return_bool;
+            }
+            if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                $same = JitStringCompare::identicalValueToString($this->context, $right, $leftValue);
+                $result = $this->context->builder->xor(
+                    $same,
+                    $this->context->getTypeFromString('int1')->constInt(1, false)
+                );
+                goto return_bool;
+            }
+        }
+        if (Variable::TYPE_VALUE === $leftType && Variable::TYPE_STRING === $rightType) {
+            if (OpCode::TYPE_IDENTICAL === $opcode->type || OpCode::TYPE_EQUAL === $opcode->type) {
+                $result = JitStringCompare::identicalStringToValue($this->context, $rightValue, $left);
+                goto return_bool;
+            }
+            if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                $same = JitStringCompare::identicalStringToValue($this->context, $rightValue, $left);
+                $result = $this->context->builder->xor(
+                    $same,
+                    $this->context->getTypeFromString('int1')->constInt(1, false)
+                );
+                goto return_bool;
+            }
         }
         if (Variable::TYPE_VALUE === $leftType && Variable::TYPE_VALUE === $rightType) {
             if (OpCode::TYPE_IDENTICAL === $opcode->type) {

@@ -492,6 +492,7 @@ const TYPE_PAIR_NATIVE_DOUBLE_NATIVE_LONG = (Variable::TYPE_NATIVE_DOUBLE << 16)
 const TYPE_PAIR_NATIVE_LONG_NATIVE_BOOL = (Variable::TYPE_NATIVE_LONG << 16) | Variable::TYPE_NATIVE_BOOL;
 const TYPE_PAIR_NATIVE_BOOL_NATIVE_LONG = (Variable::TYPE_NATIVE_BOOL << 16) | Variable::TYPE_NATIVE_LONG;
 const TYPE_PAIR_NATIVE_BOOL_NATIVE_BOOL = (Variable::TYPE_NATIVE_BOOL << 16) | Variable::TYPE_NATIVE_BOOL;
+const TYPE_PAIR_STRING_STRING = (Variable::TYPE_STRING << 16) | Variable::TYPE_STRING;
 
 function type_pair(int $left, int $right): int {
     return ($left << 16) | $right;
