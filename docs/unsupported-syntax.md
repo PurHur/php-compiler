@@ -12,6 +12,15 @@
 
 Exit code `0` when the entry (and best-effort `include`/`require` targets with string literals) compiles; `1` when any unsupported construct is found.
 
+## Include / require graph
+
+`phpc lint --project` and `phpc lint --all` follow `include`/`require` when the path is known at lint time:
+
+- a **string literal** operand, or
+- **`__DIR__` concatenated with a literal** suffix (for example `require __DIR__ . '/../config.php'`).
+
+Operands that are not foldable (variables, function calls, non-literal concatenation) emit a **stderr warning** (`dynamic include/require (not followed)`) and are not traversed. Runtime include for VM/JIT/AOT is tracked separately ([#54](https://github.com/PurHur/php-compiler/issues/54), [#85](https://github.com/PurHur/php-compiler/issues/85)).
+
 Some constructs (for example `list()` / short-list destructuring and prefix/postfix `++`/`--`) are lowered by php-cfg before the compiler sees them; lint still scans the AST for unsupported increment patterns and reports the **Expr\_\*** diagnostic kinds below.
 
 ## Known gaps (tracking issues)

@@ -95,7 +95,7 @@ final class LiteralIncludeDiscovery
 
         foreach ($block->children as $child) {
             if ($child instanceof Op\Expr\Include_) {
-                $literal = ConstStringFolder::foldForInclude($block, $child->expr);
+                $literal = ConstStringFolder::foldForInclude($block, $child->expr, $fromFile);
                 if (null !== $literal) {
                     $paths[] = $literal;
                 }
