@@ -311,6 +311,7 @@
         "lib/Web/Params.php",
         "lib/Web/ProjectManifest.php",
         "lib/Web/ResponseContext.php",
+        "lib/Web/SourceBundler.php",
         "lib/Web/Superglobals.php",
         "src/cli.php",
         "src/llvm-env.php",
@@ -323,9 +324,9 @@
         "test/bootstrap-aot/echo_hello.php"
     ],
     "totals": {
-        "inventory_files": 289,
+        "inventory_files": 290,
         "excluded": 2,
-        "eligible": 287,
+        "eligible": 288,
         "aot_lint_targets": 2
     }
 }
