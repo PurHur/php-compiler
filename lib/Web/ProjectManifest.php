@@ -5,10 +5,92 @@ declare(strict_types=1);
 namespace PHPCompiler\Web;
 
 /**
- * Minimal phpc.json reader (issue #106 subset for serve --aot).
+ * Minimal phpc.json reader (issue #106 subset for serve --aot and phpc build --project).
  */
 final class ProjectManifest
 {
+    /**
+     * Directory containing phpc.json (walks up from $startDir).
+     */
+    public static function resolveProjectDir(string $startDir): ?string
+    {
+        $dir = realpath($startDir);
+        if (false === $dir) {
+            return null;
+        }
+
+        for ($i = 0; $i < 8; ++$i) {
+            if (is_file($dir.'/phpc.json')) {
+                return $dir;
+            }
+            $parent = dirname($dir);
+            if ($parent === $dir) {
+                break;
+            }
+            $dir = $parent;
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array<string, mixed>|null decoded phpc.json from project dir
+     */
+    public static function loadManifest(string $startDir): ?array
+    {
+        $projectDir = self::resolveProjectDir($startDir);
+        if (null === $projectDir) {
+            return null;
+        }
+
+        $raw = file_get_contents($projectDir.'/phpc.json');
+        if (false === $raw) {
+            return null;
+        }
+
+        $data = json_decode($raw, true);
+
+        return is_array($data) ? $data : null;
+    }
+
+    /**
+     * Entry script path for phpc build --project (issue #106).
+     */
+    public static function resolveEntryPath(string $startDir, ?array $manifest = null): ?string
+    {
+        $projectDir = self::resolveProjectDir($startDir);
+        if (null === $projectDir) {
+            return null;
+        }
+
+        $manifest ??= self::loadManifest($projectDir);
+        if (null === $manifest || !isset($manifest['entry']) || !is_string($manifest['entry']) || '' === $manifest['entry']) {
+            return null;
+        }
+
+        $path = self::resolveRelativePath($projectDir, $manifest['entry']);
+
+        return is_file($path) ? $path : null;
+    }
+
+    /**
+     * Output path for AOT binary from manifest "binary" key (file may not exist yet).
+     */
+    public static function resolveBinaryOutputPath(string $startDir, ?array $manifest = null): ?string
+    {
+        $projectDir = self::resolveProjectDir($startDir);
+        if (null === $projectDir) {
+            return null;
+        }
+
+        $manifest ??= self::loadManifest($projectDir);
+        if (null === $manifest || !isset($manifest['binary']) || !is_string($manifest['binary']) || '' === $manifest['binary']) {
+            return null;
+        }
+
+        return self::resolveRelativePath($projectDir, $manifest['binary']);
+    }
+
     /**
      * Resolve AOT binary path from phpc.json, explicit flag, or default layout.
      */

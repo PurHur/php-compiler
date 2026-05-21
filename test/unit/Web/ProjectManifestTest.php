@@ -11,6 +11,45 @@ use PHPUnit\Framework\TestCase;
  */
 final class ProjectManifestTest extends TestCase
 {
+    public function testResolveEntryAndBinaryOutputFromManifest(): void
+    {
+        $dir = sys_get_temp_dir().'/phpc_manifest_'.bin2hex(random_bytes(6));
+        $this->assertTrue(mkdir($dir));
+        try {
+            file_put_contents($dir.'/example.php', '<?php');
+            file_put_contents(
+                $dir.'/phpc.json',
+                json_encode([
+                    'entry' => 'example.php',
+                    'binary' => '.phpc/bin/app',
+                ], JSON_THROW_ON_ERROR)
+            );
+            $this->assertSame($dir, ProjectManifest::resolveProjectDir($dir));
+            $entry = ProjectManifest::resolveEntryPath($dir);
+            $this->assertNotNull($entry);
+            $this->assertStringEndsWith('/example.php', $entry);
+            $binary = ProjectManifest::resolveBinaryOutputPath($dir);
+            $this->assertNotNull($binary);
+            $this->assertStringEndsWith('/.phpc/bin/app', $binary);
+            $this->assertSame([], ManifestValidator::validateForBuild($dir));
+        } finally {
+            $this->removeTree($dir);
+        }
+    }
+
+    public function testValidateForBuildRequiresEntry(): void
+    {
+        $dir = sys_get_temp_dir().'/phpc_manifest_'.bin2hex(random_bytes(6));
+        $this->assertTrue(mkdir($dir));
+        try {
+            file_put_contents($dir.'/phpc.json', '{"binary": ".phpc/bin/app"}');
+            $errors = ManifestValidator::validateForBuild($dir);
+            $this->assertContains('missing required key: entry', $errors);
+        } finally {
+            $this->removeTree($dir);
+        }
+    }
+
     public function testValidateRejectsMissingBinaryPath(): void
     {
         $dir = sys_get_temp_dir().'/phpc_manifest_'.bin2hex(random_bytes(6));
