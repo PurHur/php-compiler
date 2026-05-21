@@ -63,6 +63,7 @@
         "ext/standard/JitStringIndex.php",
         "ext/standard/JitStripTags.php",
         "ext/standard/JitStrpos.php",
+        "ext/standard/JitStrrpos.php",
         "ext/standard/JitUrlencode.php",
         "ext/standard/JitWebParams.php",
         "ext/standard/Module.php",
@@ -199,6 +200,7 @@
         "ext/standard/strncmp.php",
         "ext/standard/strpos.php",
         "ext/standard/strrev.php",
+        "ext/standard/strrpos.php",
         "ext/standard/strtolower.php",
         "ext/standard/strtoupper.php",
         "ext/standard/strval.php",
@@ -306,7 +308,10 @@
         "lib/VM/ScriptExit.php",
         "lib/VM/TypeCheck.php",
         "lib/VM/Variable.php",
+        "lib/Web/ConstStringFolder.php",
         "lib/Web/DevServer.php",
+        "lib/Web/IncludePathResolver.php",
+        "lib/Web/LiteralIncludeDiscovery.php",
         "lib/Web/ManifestValidator.php",
         "lib/Web/Params.php",
         "lib/Web/ProjectManifest.php",
@@ -324,9 +329,9 @@
         "test/bootstrap-aot/echo_hello.php"
     ],
     "totals": {
-        "inventory_files": 290,
+        "inventory_files": 295,
         "excluded": 2,
-        "eligible": 288,
+        "eligible": 293,
         "aot_lint_targets": 2
     }
 }
