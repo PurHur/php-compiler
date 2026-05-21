@@ -20,7 +20,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * array_merge() for packed list arrays (subset of PHP; VM only).
+ * array_merge() for packed list arrays (subset of PHP; JIT via ArrayBuiltinHelper).
  */
 final class array_merge extends Internal
 {

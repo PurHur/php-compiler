@@ -20,7 +20,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * array_keys() for list arrays (subset of PHP; VM only).
+ * array_keys() for list arrays (subset of PHP; JIT via ArrayBuiltinHelper).
  */
 final class array_keys extends Internal
 {
@@ -47,9 +47,6 @@ final class array_keys extends Internal
             throw new \LogicException('array_keys() requires exactly one argument');
         }
 
-        return ArrayBuiltinHelper::buildKeysArray(
-            $context,
-            ArrayBuiltinHelper::loadHashTable($context, $args[0])
-        );
+        return ArrayBuiltinHelper::buildKeysArrayFromVariable($context, $args[0]);
     }
 }
