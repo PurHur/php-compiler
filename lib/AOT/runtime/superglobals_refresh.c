@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #if defined(__APPLE__) || defined(__FreeBSD__)
 #include <crt_externs.h>
@@ -616,10 +617,334 @@ static void parse_json_post(__hashtable__ *ht, const char *body)
     (void) sg_json_parse_object(&ctx, ht);
 }
 
+#define SG_MULTIPART_MAX_BODY SG_JSON_MAX_BODY
+
+static int sg_extract_boundary(const char *content_type, char *out, size_t out_len)
+{
+    const char *p;
+    const char *start;
+    const char *raw;
+    size_t len;
+
+    out[0] = '\0';
+    raw = getenv("CONTENT_TYPE");
+    if (NULL == raw || '\0' == raw[0]) {
+        raw = getenv("HTTP_CONTENT_TYPE");
+    }
+    if (NULL != raw && '\0' != raw[0]) {
+        content_type = raw;
+    }
+    if (NULL == content_type) {
+        return 0;
+    }
+    p = strstr(content_type, "boundary=");
+    if (NULL == p) {
+        return 0;
+    }
+    p += 9;
+    while (' ' == *p || '\t' == *p) {
+        p++;
+    }
+    if ('"' == *p) {
+        p++;
+        start = p;
+        while ('\0' != *p && '"' != *p) {
+            p++;
+        }
+        len = (size_t) (p - start);
+        if ('"' == *p) {
+            p++;
+        }
+    } else {
+        start = p;
+        while ('\0' != *p && ';' != *p && ' ' != *p && '\t' != *p && '\r' != *p && '\n' != *p) {
+            p++;
+        }
+        len = (size_t) (p - start);
+    }
+    if (0 == len || len >= out_len) {
+        return 0;
+    }
+    memcpy(out, start, len);
+    out[len] = '\0';
+
+    return 1;
+}
+
+static const char *sg_find_header_value(const char *headers, const char *name)
+{
+    size_t name_len = strlen(name);
+    const char *line = headers;
+
+    while ('\0' != *line) {
+        const char *colon;
+        const char *end;
+        size_t line_name_len;
+
+        end = strstr(line, "\r\n");
+        if (NULL == end) {
+            end = line + strlen(line);
+        }
+        colon = strchr(line, ':');
+        if (NULL == colon || colon >= end) {
+            if (NULL == end || '\0' == end[0]) {
+                break;
+            }
+            line = end + 2;
+            continue;
+        }
+        line_name_len = (size_t) (colon - line);
+        while (line_name_len > 0 && (' ' == line[line_name_len - 1] || '\t' == line[line_name_len - 1])) {
+            line_name_len--;
+        }
+        if (line_name_len == name_len && 0 == strncasecmp(line, name, name_len)) {
+            const char *value = colon + 1;
+
+            while (' ' == *value || '\t' == *value) {
+                value++;
+            }
+            return value;
+        }
+        if (NULL == end || '\0' == end[0]) {
+            break;
+        }
+        line = end + 2;
+    }
+
+    return NULL;
+}
+
+static int sg_multipart_param(const char *disposition, const char *param, char *out, size_t out_len)
+{
+    char needle[64];
+    const char *p;
+    const char *start;
+    size_t len;
+
+    snprintf(needle, sizeof(needle), "%s=\"", param);
+    p = strstr(disposition, needle);
+    if (NULL == p) {
+        return 0;
+    }
+    p += strlen(needle);
+    start = p;
+    while ('\0' != *p && '"' != *p) {
+        p++;
+    }
+    len = (size_t) (p - start);
+    if (len + 1 > out_len) {
+        return 0;
+    }
+    memcpy(out, start, len);
+    out[len] = '\0';
+
+    return 1;
+}
+
+static void sg_set_file_entry(
+    __hashtable__ *files,
+    const char *field,
+    const char *filename,
+    const char *part_type,
+    const char *content,
+    size_t content_len
+)
+{
+    __hashtable__ *entry;
+    char tmp_path[] = "/tmp/phpc_upload_XXXXXX";
+    int fd;
+    FILE *fp;
+    char size_buf[32];
+
+    entry = sg_ensure_child(files, field);
+    set_string_key(entry, "name", filename);
+    set_string_key(entry, "type", (NULL != part_type && '\0' != part_type[0])
+        ? part_type : "application/octet-stream");
+    fd = mkstemp(tmp_path);
+    if (fd < 0) {
+        set_string_key(entry, "error", "1");
+
+        return;
+    }
+    fp = fdopen(fd, "wb");
+    if (NULL == fp) {
+        set_string_key(entry, "error", "1");
+
+        return;
+    }
+    if (content_len > 0 && 1 != fwrite(content, 1, content_len, fp)) {
+        fclose(fp);
+        unlink(tmp_path);
+        set_string_key(entry, "error", "1");
+
+        return;
+    }
+    fclose(fp);
+    set_string_key(entry, "tmp_name", tmp_path);
+    set_string_key(entry, "error", "0");
+    snprintf(size_buf, sizeof(size_buf), "%zu", content_len);
+    set_string_key(entry, "size", size_buf);
+}
+
+static char *sg_normalize_body_newlines(const char *body, size_t *out_len)
+{
+    size_t len;
+    size_t i;
+    size_t w;
+    char *copy;
+
+    if (NULL == body) {
+        *out_len = 0;
+
+        return NULL;
+    }
+    len = strlen(body);
+    copy = (char *) malloc(len + 1);
+    if (NULL == copy) {
+        *out_len = 0;
+
+        return NULL;
+    }
+    for (i = 0, w = 0; i < len; i++) {
+        if ('\r' == body[i]) {
+            if (i + 1 < len && '\n' == body[i + 1]) {
+                i++;
+            }
+            copy[w++] = '\n';
+        } else {
+            copy[w++] = body[i];
+        }
+    }
+    copy[w] = '\0';
+    *out_len = w;
+
+    return copy;
+}
+
+static void parse_multipart_post(
+    __hashtable__ *post,
+    __hashtable__ *files,
+    const char *content_type,
+    const char *body
+)
+{
+    char boundary[256];
+    char delim[260];
+    char *normalized;
+    const char *cursor;
+    const char *end;
+    size_t delim_len;
+    size_t body_len;
+
+    if (NULL == body || '\0' == body[0]) {
+        return;
+    }
+    normalized = sg_normalize_body_newlines(body, &body_len);
+    if (NULL == normalized) {
+        return;
+    }
+    if (body_len > SG_MULTIPART_MAX_BODY) {
+        free(normalized);
+
+        return;
+    }
+    body = normalized;
+    if (!sg_extract_boundary(content_type, boundary, sizeof(boundary))) {
+        return;
+    }
+    snprintf(delim, sizeof(delim), "--%s", boundary);
+    delim_len = strlen(delim);
+    cursor = body;
+    end = body + body_len;
+    while (cursor < end) {
+        const char *part_start;
+        const char *headers_end;
+        const char *part_end;
+        const char *disposition;
+        char field[256];
+        char filename[256];
+        size_t content_len;
+
+        part_start = strstr(cursor, delim);
+        if (NULL == part_start) {
+            break;
+        }
+        part_start += delim_len;
+        if (part_start < end && '\r' == part_start[0] && '\n' == part_start[1]) {
+            part_start += 2;
+        } else if (part_start < end && '\n' == part_start[0]) {
+            part_start += 1;
+        }
+        if (part_start + 2 <= end && '-' == part_start[0] && '-' == part_start[1]) {
+            break;
+        }
+        part_end = strstr(part_start, delim);
+        if (NULL == part_end) {
+            part_end = end;
+        }
+        headers_end = strstr(part_start, "\n\n");
+        if (NULL == headers_end || headers_end >= part_end) {
+            cursor = part_end;
+            continue;
+        }
+        headers_end += 2;
+        disposition = sg_find_header_value(part_start, "Content-Disposition");
+        if (NULL == disposition) {
+            cursor = part_end;
+            continue;
+        }
+        if (!sg_multipart_param(disposition, "name", field, sizeof(field)) || '\0' == field[0]) {
+            cursor = part_end;
+            continue;
+        }
+        content_len = (size_t) (part_end - headers_end);
+        while (content_len > 0
+            && ('\r' == headers_end[content_len - 1]
+                || '\n' == headers_end[content_len - 1])) {
+            content_len--;
+        }
+        if (sg_multipart_param(disposition, "filename", filename, sizeof(filename))) {
+            const char *part_type = sg_find_header_value(part_start, "Content-Type");
+
+            sg_set_file_entry(
+                files,
+                field,
+                filename,
+                part_type,
+                headers_end,
+                content_len
+            );
+        } else {
+            char *copy;
+            char pair_buf[4096];
+
+            if (content_len + strlen(field) + 2 >= sizeof(pair_buf)) {
+                cursor = part_end;
+                continue;
+            }
+            copy = (char *) malloc(content_len + 1);
+            if (NULL == copy) {
+                cursor = part_end;
+                continue;
+            }
+            memcpy(copy, headers_end, content_len);
+            copy[content_len] = '\0';
+            snprintf(pair_buf, sizeof(pair_buf), "%s=%s", field, copy);
+            free(copy);
+            parse_delimited_pairs(post, pair_buf, '&', 0);
+        }
+        cursor = part_end;
+    }
+
+    free(normalized);
+}
+
 static void populate_post_body(__hashtable__ *ht, const char *content_type, const char *body)
 {
     if (0 == strcmp(content_type, "application/json")) {
         parse_json_post(ht, body);
+    } else if (0 == strncmp(content_type, "multipart/form-data", 19)) {
+        parse_multipart_post(ht, sg_FILES, content_type, body);
     } else {
         parse_form_encoded(ht, body);
     }
@@ -635,6 +960,87 @@ static const char *env_or_empty(const char *name)
     const char *v = getenv(name);
 
     return NULL != v ? v : "";
+}
+
+static char *read_request_body_from_env(size_t *out_len)
+{
+    const char *path = getenv("REQUEST_BODY_FILE");
+    FILE *fp;
+    char *buf;
+    size_t cap;
+    size_t len;
+
+    *out_len = 0;
+    if (NULL != path && '\0' != path[0]) {
+        fp = fopen(path, "rb");
+        if (NULL == fp) {
+            return NULL;
+        }
+        cap = 4096;
+        len = 0;
+        buf = (char *) malloc(cap);
+        if (NULL == buf) {
+            fclose(fp);
+
+            return NULL;
+        }
+        for (;;) {
+            size_t n;
+
+            if (len + 4096 > cap) {
+                char *grown;
+
+                cap *= 2;
+                if (cap > SG_MULTIPART_MAX_BODY + 1) {
+                    free(buf);
+                    fclose(fp);
+
+                    return NULL;
+                }
+                grown = (char *) realloc(buf, cap);
+                if (NULL == grown) {
+                    free(buf);
+                    fclose(fp);
+
+                    return NULL;
+                }
+                buf = grown;
+            }
+            n = fread(buf + len, 1, 4096, fp);
+            if (0 == n) {
+                break;
+            }
+            len += n;
+            if (len > SG_MULTIPART_MAX_BODY) {
+                free(buf);
+                fclose(fp);
+
+                return NULL;
+            }
+        }
+        fclose(fp);
+        buf[len] = '\0';
+        *out_len = len;
+
+        return buf;
+    }
+
+    {
+        const char *inline_body = env_or_empty("REQUEST_BODY");
+
+        len = strlen(inline_body);
+        if (0 == len) {
+            return NULL;
+        }
+        buf = (char *) malloc(len + 1);
+        if (NULL == buf) {
+            return NULL;
+        }
+        memcpy(buf, inline_body, len + 1);
+        *out_len = len;
+
+        return buf;
+    }
 }
 
 static const char *request_method_for(const char *post_body)
@@ -968,7 +1374,9 @@ static void derive_path_info(const char *script_name, const char *request_uri, c
 void __superglobals__refresh(void)
 {
     const char *query_string = env_or_empty("QUERY_STRING");
-    const char *post_body = env_or_empty("REQUEST_BODY");
+    size_t post_body_len = 0;
+    char *post_body_owned = read_request_body_from_env(&post_body_len);
+    const char *post_body = NULL != post_body_owned ? post_body_owned : "";
     const char *method = request_method_for(post_body);
     char content_type_buf[256];
     const char *content_type = resolve_content_type(content_type_buf, sizeof(content_type_buf));
@@ -1000,6 +1408,7 @@ void __superglobals__refresh(void)
     sg_GET = __hashtable__alloc();
     parse_form_encoded(sg_GET, query_string);
 
+    sg_FILES = __hashtable__alloc();
     sg_POST = __hashtable__alloc();
     if (populate_post) {
         populate_post_body(sg_POST, content_type, post_body);
@@ -1083,6 +1492,10 @@ void __superglobals__refresh(void)
     }
     if (NULL == sg_SESSION) {
         sg_SESSION = __hashtable__alloc();
+    }
+
+    if (NULL != post_body_owned) {
+        free(post_body_owned);
     }
 }
 
