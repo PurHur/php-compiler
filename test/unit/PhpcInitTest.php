@@ -27,6 +27,7 @@ final class PhpcInitTest extends TestCase
             $manifest = json_decode((string) file_get_contents($work.'/phpc.json'), true);
             $this->assertIsArray($manifest);
             $this->assertSame('public/index.php', $manifest['entry'] ?? null);
+            $this->assertSame('public', $manifest['public'] ?? null);
             $this->assertSame('.phpc/bin/app', $manifest['binary'] ?? null);
 
             $entry = $work.'/public/index.php';

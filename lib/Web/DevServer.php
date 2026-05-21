@@ -18,8 +18,13 @@ final class DevServer
     /** Maximum decoded request body size (issue #77, #287). */
     public const MAX_REQUEST_BODY = 8_388_608;
 
-    public static function run(string $listen, string $docroot, callable $handlePhpRequest): void
-    {
+    public static function run(
+        string $listen,
+        string $docroot,
+        callable $handlePhpRequest,
+        ?array $manifest = null,
+        ?string $projectDir = null
+    ): void {
         if (!is_dir($docroot)) {
             fwrite(STDERR, "Docroot not found: {$docroot}\n");
             exit(1);
@@ -53,13 +58,18 @@ final class DevServer
                 continue;
             }
             stream_set_timeout($conn, 5);
-            self::handleConnection($conn, $docroot, $handlePhpRequest);
+            self::handleConnection($conn, $docroot, $handlePhpRequest, $manifest, $projectDir);
             fclose($conn);
         }
     }
 
-    public static function handleConnection($conn, string $docroot, callable $handlePhpRequest): void
-    {
+    public static function handleConnection(
+        $conn,
+        string $docroot,
+        callable $handlePhpRequest,
+        ?array $manifest = null,
+        ?string $projectDir = null
+    ): void {
         $remoteAddr = null;
         $remotePort = null;
         $peer = stream_socket_get_name($conn, true);
@@ -80,7 +90,7 @@ final class DevServer
         [$method, $path, $query, $headers, $body, $serverProtocol] = $raw;
         $path = parse_url($path, PHP_URL_PATH) ?? '/';
         if ('/' === $path) {
-            $path = self::resolveDirectoryIndex($docroot);
+            $path = self::resolveDirectoryIndex($docroot, $manifest, $projectDir);
         }
 
         if (!self::isSafeUrlPath($path)) {
@@ -455,7 +465,7 @@ final class DevServer
      * Prefer index.php (standard front controller); fall back to example.php for
      * shipped examples/001-SimpleWeb. Optional phpc.json "index" overrides when set.
      */
-    public static function resolveDirectoryIndex(string $docroot, ?array $manifest = null): string
+    public static function resolveDirectoryIndex(string $docroot, ?array $manifest = null, ?string $projectDir = null): string
     {
         if (null !== $manifest && isset($manifest['index']) && is_string($manifest['index']) && '' !== $manifest['index']) {
             $index = $manifest['index'];
@@ -464,13 +474,20 @@ final class DevServer
                     return $index;
                 }
             } else {
-                $base = realpath($docroot);
-                if (false === $base) {
-                    $base = $docroot;
+                $base = $projectDir ?? realpath($docroot);
+                if (false === $base || null === $base) {
+                    $base = $projectDir ?? $docroot;
                 }
                 $candidate = $base.'/'.$index;
                 if (is_file($candidate)) {
-                    $urlPath = '/'.ltrim(str_replace('\\', '/', substr($candidate, strlen($base))), '/');
+                    $docrootBase = realpath($docroot);
+                    if (false === $docrootBase) {
+                        $docrootBase = $docroot;
+                    }
+                    $relativeBase = str_starts_with($candidate, $docrootBase)
+                        ? $docrootBase
+                        : $base;
+                    $urlPath = '/'.ltrim(str_replace('\\', '/', substr($candidate, strlen($relativeBase))), '/');
                     if ('' === $urlPath || '/' === $urlPath) {
                         return '/index.php';
                     }
