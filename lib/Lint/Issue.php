@@ -56,11 +56,24 @@ final class Issue
         if (preg_match('/^Unknown Literal Operand Type:/', $message)) {
             return 'Literal';
         }
-        if (preg_match('/^Unsupported (?:class type|class body element): /', $message)) {
-            return trim($message);
+        if (preg_match('/^Unsupported class body element: (.+)$/', $message, $m)) {
+            return self::shortCfgKind($m[1]);
+        }
+        if (preg_match('/^Unsupported class type: (.+)$/', $message, $m)) {
+            return self::shortCfgKind($m[1]);
         }
 
         return $message;
+    }
+
+    private static function shortCfgKind(string $fqcn): string
+    {
+        $fqcn = trim($fqcn);
+        if (preg_match('/\\\\Op\\\\(Stmt|Expr)\\\\(.+)$/', $fqcn, $m)) {
+            return $m[1].'_'.$m[2];
+        }
+
+        return $fqcn;
     }
 
     /**

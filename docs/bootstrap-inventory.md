@@ -8,9 +8,9 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 289 |
+| PHP files on vm.php path | 290 |
 | Source constructs flagged (blockers) | 10 |
-| Source constructs flagged (warnings) | 758 |
+| Source constructs flagged (warnings) | 760 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -282,7 +282,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `lib/JIT/StringOffsetHelper.php` | 0 | 1 |
 | `lib/JIT/SuperglobalInit.php` | 0 | 3 |
 | `lib/JIT/ValueEchoHelper.php` | 0 | 1 |
-| `lib/JIT/Variable.php` | 0 | 17 |
+| `lib/JIT/Variable.php` | 0 | 18 |
 | `lib/Lint/IncrementDetector.php` | 0 | 4 |
 | `lib/Lint/Issue.php` | 0 | 2 |
 | `lib/Lint/LintCompiler.php` | 0 | 6 |
@@ -312,6 +312,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `lib/Web/Params.php` | 0 | 2 |
 | `lib/Web/ProjectManifest.php` | 0 | 1 |
 | `lib/Web/ResponseContext.php` | 0 | 2 |
+| `lib/Web/SourceBundler.php` | 0 | 1 |
 | `lib/Web/Superglobals.php` | 0 | 6 |
 | `src/macro_functions.php` | 0 | 1 |
 
@@ -1614,10 +1615,10 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new ext\standard\boolval (line 284)
 - new Variable (line 470)
 - new OpCode (line 537)
-- new Variable (line 913)
-- new Operand\Literal (line 983)
-- new Operand\Literal (line 987)
-- new Operand\Literal (line 991)
+- new Variable (line 914)
+- new Operand\Literal (line 984)
+- new Operand\Literal (line 988)
+- new Operand\Literal (line 992)
 - 12 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Analyzer.php`
@@ -1942,8 +1943,8 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/JIT/SuperglobalInit.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 128)
-- new VMVariable (line 155)
+- new Variable (line 132)
+- new VMVariable (line 159)
 - 7 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/ValueEchoHelper.php`
@@ -1954,22 +1955,23 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/JIT/Variable.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 183)
-- new Variable (line 200)
-- new Variable (line 227)
-- new Variable (line 241)
-- new self (line 256)
-- new self (line 263)
-- new self (line 276)
-- new self (line 283)
-- new self (line 296)
-- new self (line 303)
-- new Variable (line 384)
-- new Variable (line 405)
-- new Variable (line 429)
-- new Variable (line 451)
+- new Variable (line 186)
+- new Variable (line 203)
+- new Variable (line 230)
+- new Variable (line 244)
+- new self (line 259)
+- new self (line 266)
+- new self (line 279)
+- new self (line 286)
+- new self (line 299)
+- new self (line 306)
+- new Variable (line 387)
+- new Variable (line 408)
+- new Variable (line 431)
+- new Variable (line 445)
 - new Variable (line 486)
-- new Variable (line 507)
+- new Variable (line 505)
+- new Variable (line 526)
 - 15 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/Lint/IncrementDetector.php`
@@ -1984,7 +1986,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 
 **Warnings** (review for bootstrap subset):
 - new self (line 39)
-- 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 5 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/Lint/LintCompiler.php`
 
@@ -2183,7 +2185,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/Web/ManifestValidator.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/Web/Params.php`
 
@@ -2194,13 +2196,18 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/Web/ProjectManifest.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 8 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/Web/ResponseContext.php`
 
 **Warnings** (review for bootstrap subset):
 - 7 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 - 1 closure(s)
+
+### `lib/Web/SourceBundler.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/Web/Superglobals.php`
 

@@ -28,6 +28,8 @@ Some constructs (for example `list()` / short-list destructuring and prefix/post
 | `Expr_PreInc`, `Expr_PostInc`, `Expr_PreDec`, `Expr_PostDec` (`++`/`--`) | [#137](https://github.com/PurHur/php-compiler/issues/137) |
 | `Expr_New` (non-trivial) | [#136](https://github.com/PurHur/php-compiler/issues/136) |
 | Named arguments, traits, enums | [#168](https://github.com/PurHur/php-compiler/issues/168), [#169](https://github.com/PurHur/php-compiler/issues/169) |
+| `Expr_MethodCall` | [#58](https://github.com/PurHur/php-compiler/issues/58) |
+| `Stmt_ClassMethod` (class body methods) | [#58](https://github.com/PurHur/php-compiler/issues/58) (visibility/ctors: [#145](https://github.com/PurHur/php-compiler/issues/145)) |
 
 The mapping lives in `lib/Lint/UnsupportedRegistry.php`. Compiler gaps are also listed in `docs/bootstrap-inventory.md` (self-host bootstrap).
 
