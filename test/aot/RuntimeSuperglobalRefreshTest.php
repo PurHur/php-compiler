@@ -328,6 +328,66 @@ PHP;
         @unlink($bodyFile);
     }
 
+    /**
+     * multipart upload populates nested $_FILES for AOT JIT dim fetch (issue #87).
+     */
+    public function testNestedFilesFieldAot(): void
+    {
+        $source = <<<'PHP'
+<?php
+declare(strict_types=1);
+header('Content-Type: text/plain; charset=UTF-8');
+echo $_FILES['doc']['name'];
+PHP;
+
+        $outfile = tempnam(sys_get_temp_dir(), 'phpc_files_nested_');
+        $this->assertNotFalse($outfile);
+        unlink($outfile);
+
+        $repoRoot = dirname(__DIR__, 2);
+        $env = $this->llvmProcessEnv($repoRoot);
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+
+        $compile = proc_open(
+            array_merge(
+                self::llvmEnvPrefix(),
+                self::phpCommand(),
+                [$this->compileBin, '-o', $outfile]
+            ),
+            $descriptorSpec,
+            $pipes,
+            $repoRoot,
+            $env
+        );
+        fwrite($pipes[0], $source);
+        fclose($pipes[0]);
+        $compileErr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        proc_close($compile);
+        $this->assertFileExists($outfile, trim($compileErr !== false ? $compileErr : ''));
+
+        $runEnv = $env;
+        $runEnv['REQUEST_METHOD'] = 'POST';
+        $runEnv['REQUEST_BODY'] = "--phpcFileB\r\n"
+            ."Content-Disposition: form-data; name=\"doc\"; filename=\"f.txt\"\r\n"
+            ."Content-Type: text/plain\r\n\r\n"
+            ."bytes\r\n"
+            ."--phpcFileB--\r\n";
+        $runEnv['CONTENT_TYPE'] = 'multipart/form-data; boundary=phpcFileB';
+        $runEnv['SCRIPT_NAME'] = '/example.php';
+        $runEnv['REQUEST_URI'] = '/example.php';
+        $out = $this->runBinary($outfile, $runEnv);
+        $body = $this->cgiBody($out);
+        $this->assertStringContainsString('f.txt', $body);
+
+        @unlink($outfile);
+    }
+
     public function testHttpsSchemeFromCgiEnvironment(): void
     {
         $source = <<<'PHP'
