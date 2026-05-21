@@ -840,6 +840,22 @@ final class VmString
         return false === $pos ? false : $pos;
     }
 
+    /**
+     * @return int|false
+     */
+    public static function strrpos(string $haystack, string $needle, int $offset = 0)
+    {
+        if ('' === $needle) {
+            throw new \LogicException('strrpos(): Argument #2 ($needle) cannot be empty');
+        }
+        if ($offset < 0) {
+            $offset = 0;
+        }
+        $pos = self::findRSubstring($haystack, $needle, $offset);
+
+        return false === $pos ? false : $pos;
+    }
+
     public static function startsWith(string $haystack, string $needle): bool
     {
         $nlen = self::byteLength($needle);
@@ -956,6 +972,30 @@ final class VmString
         }
 
         return false;
+    }
+
+    /**
+     * @return int|false
+     */
+    private static function findRSubstring(string $haystack, string $needle, int $offset)
+    {
+        $hayLen = self::byteLength($haystack);
+        $needleLen = self::byteLength($needle);
+        if (0 === $needleLen) {
+            return false;
+        }
+        if ($offset >= $hayLen) {
+            return false;
+        }
+        $limit = $hayLen - $needleLen;
+        $last = false;
+        for ($i = $offset; $i <= $limit; ++$i) {
+            if (self::compareBytes($haystack, $needle, $needleLen, $i)) {
+                $last = $i;
+            }
+        }
+
+        return $last;
     }
 
     private static function asciiCaseTransform(string $string, bool $toLower): string

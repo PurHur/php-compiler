@@ -70,6 +70,7 @@ class Module extends ModuleAbstract
             new strrev(),
             new strpos(),
             new stripos(),
+            new strrpos(),
             new str_contains(),
             new str_starts_with(),
             new str_ends_with(),
