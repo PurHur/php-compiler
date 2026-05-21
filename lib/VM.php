@@ -230,11 +230,18 @@ restart:
                     $frame->scope[$op->arg1]->copyFrom($value);
                     break;
                 case OpCode::TYPE_RETURN_VOID:
-                    // TODO
+                    if ($frame->ephemeral && null !== $frame->parent) {
+                        $frame = $frame->parent;
+                        goto restart;
+                    }
                     goto nextframe;
                 case OpCode::TYPE_RETURN:
                     if (!is_null($frame->returnVar)) {
                         $frame->returnVar->copyFrom($frame->scope[$op->arg1]);
+                    }
+                    if ($frame->ephemeral && null !== $frame->parent) {
+                        $frame = $frame->parent;
+                        goto restart;
                     }
                     goto nextframe;
                 case OpCode::TYPE_FUNCDEF:
@@ -372,10 +379,11 @@ restart:
                 case OpCode::TYPE_INCLUDE:
                     $file = $frame->scope[$op->arg1]->toString();
                     $parsed = $this->context->runtime->parseAndCompileFile($file);
-		    $new = $parsed->getFrame($this->context);
-		    $this->context->push($frame);
-		    $frame = $new;
-		    goto restart;
+                    $new = $parsed->getFrame($this->context, $frame);
+                    $new->ephemeral = true;
+                    $new->parent = $frame;
+                    $frame = $new;
+                    goto restart;
                 case OpCode::TYPE_ITER_RESET:
                     $container = $frame->scope[$op->arg1]->resolveIndirect();
                     if (Variable::TYPE_ARRAY !== $container->type) {
@@ -412,6 +420,10 @@ restart:
             }
         }
         if ($frame->ephemeral) {
+            if (null !== $frame->parent) {
+                $frame = $frame->parent;
+                goto restart;
+            }
             goto nextframe;
         }
         return self::SUCCESS;
