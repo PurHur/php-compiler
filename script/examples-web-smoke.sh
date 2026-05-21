@@ -230,4 +230,7 @@ run_docroot_smoke "002-StaticWeb" "examples/002-StaticWeb" \
   "GET|GET example.php|/example.php|-|Hello;World" \
   "GET|GET / (example.php fallback)|/|-|Hello;World"
 
+run_docroot_smoke "004-ApiJson" "examples/004-ApiJson" \
+  'GET|GET example.php|/example.php|-|"ok":true;php-compiler'
+
 echo "examples-web-smoke: ok"

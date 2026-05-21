@@ -62,7 +62,14 @@ final class DevServerHeadersTest extends TestCase
 
         $this->assertSame(
             '/public/index.php',
-            DevServer::resolveDirectoryIndex($dir, ['index' => 'public/index.php'])
+            DevServer::resolveDirectoryIndex($dir, ['index' => 'public/index.php'], $dir)
+        );
+
+        $publicDir = realpath($dir.'/public');
+        $this->assertNotFalse($publicDir);
+        $this->assertSame(
+            '/index.php',
+            DevServer::resolveDirectoryIndex($publicDir, ['index' => 'public/index.php'], $dir)
         );
 
         @unlink($dir.'/public/index.php');

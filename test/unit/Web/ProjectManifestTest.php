@@ -99,6 +99,48 @@ final class ProjectManifestTest extends TestCase
         }
     }
 
+    public function testResolvePublicDirUsesManifestPublicKey(): void
+    {
+        $dir = sys_get_temp_dir().'/phpc_manifest_'.bin2hex(random_bytes(6));
+        $this->assertTrue(mkdir($dir));
+        $this->assertTrue(mkdir($dir.'/public', 0777, true));
+        try {
+            file_put_contents($dir.'/public/index.php', '<?php');
+            file_put_contents(
+                $dir.'/phpc.json',
+                json_encode([
+                    'entry' => 'public/index.php',
+                    'binary' => '.phpc/bin/app',
+                    'public' => 'public',
+                ], JSON_THROW_ON_ERROR)
+            );
+            $public = ProjectManifest::resolvePublicDir($dir);
+            $this->assertSame(realpath($dir.'/public'), $public);
+            $this->assertSame(realpath($dir.'/public'), ProjectManifest::resolvePublicDir($dir.'/public'));
+        } finally {
+            $this->removeTree($dir);
+        }
+    }
+
+    public function testResolvePublicDirWithoutPublicKeyKeepsStartDir(): void
+    {
+        $dir = sys_get_temp_dir().'/phpc_manifest_'.bin2hex(random_bytes(6));
+        $this->assertTrue(mkdir($dir));
+        try {
+            file_put_contents($dir.'/example.php', '<?php');
+            file_put_contents(
+                $dir.'/phpc.json',
+                json_encode([
+                    'entry' => 'example.php',
+                    'binary' => '.phpc/bin/app',
+                ], JSON_THROW_ON_ERROR)
+            );
+            $this->assertSame(realpath($dir), ProjectManifest::resolvePublicDir($dir));
+        } finally {
+            $this->removeTree($dir);
+        }
+    }
+
     public function testValidatePublicRequiresIndexPhp(): void
     {
         $dir = sys_get_temp_dir().'/phpc_manifest_'.bin2hex(random_bytes(6));

@@ -45,12 +45,14 @@ final class Doctor
         if ($failed > 0) {
             fwrite(STDOUT, "\n".$failed.' required check(s) failed.'."\n");
             fwrite(STDOUT, "Full local CI: ./script/ci-local.sh or ./script/docker-ci-local.sh (make test-docker)\n");
+            fwrite(STDOUT, "Fast iteration (no LLVM): ./script/ci-fast.sh or phpc test --fast (make test-fast)\n");
 
             return 1;
         }
 
         fwrite(STDOUT, "\nEnvironment ready for full local CI (VM + LLVM + serve when loopback bind OK).\n");
         fwrite(STDOUT, "Run: phpc test  or  ./script/docker-ci-local.sh\n");
+        fwrite(STDOUT, "Fast (VM only): phpc test --fast  or  ./script/ci-fast.sh\n");
 
         return 0;
     }

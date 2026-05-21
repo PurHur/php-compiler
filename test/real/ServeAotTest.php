@@ -11,6 +11,7 @@ use PHPUnit\Framework\TestCase;
  *
  * @group llvm
  * @group serve
+ * @group aot-link
  */
 final class ServeAotTest extends TestCase
 {
