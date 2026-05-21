@@ -491,6 +491,38 @@ final class Variable {
                     );
                 }
                 return HashTableHelper::readIndexedToValueBox($this->context, $ht, $index);
+            case self::TYPE_VALUE:
+                $ht = $this->context->builder->call(
+                    $this->context->lookupFunction('__value__readHashtable'),
+                    $this->value
+                );
+                if (self::TYPE_NATIVE_LONG !== $dim->type) {
+                    throw new \LogicException('Array index must be an integer in this compiler build');
+                }
+                $index = $this->context->builder->truncOrBitCast(
+                    $this->context->helper->loadValue($dim),
+                    $this->context->getTypeFromString('size_t')
+                );
+                if (null !== $expectedType && Type::TYPE_STRING === $expectedType->type) {
+                    $str = $this->context->builder->call(
+                        $this->context->lookupFunction('__hashtable__readStringAt'),
+                        $ht,
+                        $index
+                    );
+                    $owned = $this->context->builder->call(
+                        $this->context->lookupFunction('__string__separate'),
+                        $str
+                    );
+
+                    return new Variable(
+                        $this->context,
+                        self::TYPE_STRING,
+                        self::KIND_VALUE,
+                        $owned
+                    );
+                }
+
+                return HashTableHelper::readIndexedToValueBox($this->context, $ht, $index);
             default:
                 if (!($this->type & self::IS_NATIVE_ARRAY)) {
                     throw new \LogicException("Unsupported dim fetch on " . self::getStringType($this->type));

@@ -60,6 +60,14 @@ final class array_count extends Internal
                 ArrayBuiltinHelper::loadHashTable($context, $args[0])
             );
         }
+        if (JITVariable::TYPE_VALUE === $args[0]->type) {
+            $ht = $context->builder->call(
+                $context->lookupFunction('__value__readHashtable'),
+                $args[0]->value
+            );
+
+            return ArrayBuiltinHelper::getNumElements($context, $ht);
+        }
         throw new \LogicException('count() only supports native arrays in this compiler build');
     }
 }

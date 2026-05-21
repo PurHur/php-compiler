@@ -14,6 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\HttpResponseCode;
+use PHPCompiler\JIT\Builtin\ResponseHeaders;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
@@ -85,7 +86,13 @@ final class header_ extends Internal
             }
             HttpResponseCode::emitStandaloneStatusLine($context, $context->helper->loadValue($args[2]));
         }
-        JitHeader::emit($context, $line);
+        JitHeader::emitTransport($context, $line);
+        $i1 = $context->getTypeFromString('int1');
+        $replaceVal = $i1->constInt(1, false);
+        if ($argc >= 2 && JITVariable::TYPE_NATIVE_BOOL === $args[1]->type) {
+            $replaceVal = $context->helper->loadValue($args[1]);
+        }
+        ResponseHeaders::emitAdd($context, $line, $replaceVal);
 
         return $context->getTypeFromString('int32')->constInt(0, false);
     }

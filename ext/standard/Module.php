@@ -179,6 +179,16 @@ class Module extends ModuleAbstract
             $context->registerFunction('strncmp', $fn);
         }
         try {
+            $context->lookupFunction('strncasecmp');
+        } catch (\Throwable $e) {
+            $i8p = $context->getTypeFromString('int8*');
+            $sizeT = $context->getTypeFromString('size_t');
+            $i32 = $context->getTypeFromString('int32');
+            $ft = $context->context->functionType($i32, false, $i8p, $i8p, $sizeT);
+            $fn = $context->module->addFunction('strncasecmp', $ft);
+            $context->registerFunction('strncasecmp', $fn);
+        }
+        try {
             $context->lookupFunction('strstr');
         } catch (\Throwable $e) {
             $i8p = $context->getTypeFromString('int8*');

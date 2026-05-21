@@ -4,6 +4,7 @@ AOT: json_encode API body with Content-Type and Status 200 (issues #61, #270)
 <?php
 header('Content-Type: application/json');
 http_response_code(200);
+echo header_list()[0], "\n";
 echo json_encode(['ok' => true, 'service' => 'php-compiler']);
 --EXPECT--
 Content-Type: application/json

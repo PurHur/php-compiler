@@ -76,12 +76,13 @@ class Type extends Builtin {
         $sizeT = $this->context->getTypeFromString('size_t');
         foreach (
             [
-                'getenv' => [$i8p, false, $i8p],
-                'putenv' => [$i32, false, $i8p],
-                'strlen' => [$sizeT, false, $i8p],
-            ] as $libcName => [$ret, $vararg, $param]
+                'getenv' => [$i8p, false, [$i8p]],
+                'putenv' => [$i32, false, [$i8p]],
+                'strlen' => [$sizeT, false, [$i8p]],
+                'memchr' => [$i8p, false, [$i8p, $i32, $sizeT]],
+            ] as $libcName => [$ret, $vararg, $params]
         ) {
-            $ft = $this->context->context->functionType($ret, $vararg, $param);
+            $ft = $this->context->context->functionType($ret, $vararg, ...$params);
             $fn = $this->context->module->addFunction($libcName, $ft);
             $this->context->registerFunction($libcName, $fn);
         }
@@ -176,6 +177,7 @@ class Type extends Builtin {
             $this->context->registerFunction($libcName, $fn);
         }
         $this->hashtable->register();
+        ResponseHeaders::implement($this->context);
         $fntypeJsonEncode = $this->context->context->functionType(
             $this->context->getTypeFromString('__string__*'),
             false,

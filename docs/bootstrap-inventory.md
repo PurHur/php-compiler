@@ -8,9 +8,9 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 289 |
+| PHP files on vm.php path | 290 |
 | Source constructs flagged (blockers) | 10 |
-| Source constructs flagged (warnings) | 754 |
+| Source constructs flagged (warnings) | 760 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -40,7 +40,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/JitFileGetContents.php` | 0 | 1 |
 | `ext/standard/JitGetallheaders.php` | 0 | 1 |
 | `ext/standard/JitHash.php` | 0 | 1 |
-| `ext/standard/JitHeader.php` | 0 | 1 |
+| `ext/standard/JitHeader.php` | 0 | 2 |
 | `ext/standard/JitHex2bin.php` | 0 | 1 |
 | `ext/standard/JitHtmlspecialchars.php` | 0 | 1 |
 | `ext/standard/JitHttpResponseCode.php` | 0 | 1 |
@@ -243,6 +243,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `lib/JIT/Builtin/MemoryManager/PHP.php` | 0 | 1 |
 | `lib/JIT/Builtin/Output.php` | 0 | 1 |
 | `lib/JIT/Builtin/Refcount.php` | 0 | 1 |
+| `lib/JIT/Builtin/ResponseHeaders.php` | 0 | 4 |
 | `lib/JIT/Builtin/ScriptExit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringDateTime.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFileGetContents.php` | 0 | 1 |
@@ -282,7 +283,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `lib/JIT/StringOffsetHelper.php` | 0 | 1 |
 | `lib/JIT/SuperglobalInit.php` | 0 | 3 |
 | `lib/JIT/ValueEchoHelper.php` | 0 | 1 |
-| `lib/JIT/Variable.php` | 0 | 17 |
+| `lib/JIT/Variable.php` | 0 | 18 |
 | `lib/Lint/IncrementDetector.php` | 0 | 4 |
 | `lib/Lint/Issue.php` | 0 | 2 |
 | `lib/Lint/LintCompiler.php` | 0 | 6 |
@@ -360,7 +361,8 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `ext/standard/JitHeader.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 2 closure(s)
 
 ### `ext/standard/JitHex2bin.php`
 
@@ -1708,6 +1710,14 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 **Warnings** (review for bootstrap subset):
 - 11 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `lib/JIT/Builtin/ResponseHeaders.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 65)
+- new Variable (line 109)
+- new Variable (line 168)
+- 9 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `lib/JIT/Builtin/ScriptExit.php`
 
 **Warnings** (review for bootstrap subset):
@@ -1965,7 +1975,8 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new Variable (line 429)
 - new Variable (line 451)
 - new Variable (line 486)
-- new Variable (line 507)
+- new Variable (line 517)
+- new Variable (line 539)
 - 15 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/Lint/IncrementDetector.php`
@@ -2190,7 +2201,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/Web/ProjectManifest.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 7 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/Web/ResponseContext.php`
 
