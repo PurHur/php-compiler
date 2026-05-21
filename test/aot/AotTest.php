@@ -75,19 +75,8 @@ final class AotTest extends BaseTest
             }
         }
         LlvmToolchain::applyProcessEnv($env, $repoRoot);
-        if (isset($sections['ENV'])) {
-            foreach (explode("\n", trim($sections['ENV'])) as $line) {
-                $line = trim($line);
-                if ('' === $line) {
-                    continue;
-                }
-                $parts = explode('=', $line, 2);
-                if (2 !== count($parts)) {
-                    throw new \LogicException("Invalid ENV line: {$line}");
-                }
-                $env[$parts[0]] = $parts[1];
-            }
-        }
+        self::applyEnvSection($env, $sections);
+        PhptWebSections::applyToEnv($env, $sections);
         $runEnv = $env;
         $compileEnv = $env;
         foreach (self::COMPILE_EXCLUDED_ENV as $exclude) {
@@ -115,6 +104,7 @@ final class AotTest extends BaseTest
                 }
             }
         }
+        $compileArgv = array_merge($compileArgv, PhptWebSections::compileArgvFlags($sections));
 
         $compile = proc_open(
             array_merge(self::llvmEnvPrefix(), $this->phpCommand(), $compileArgv),
@@ -137,13 +127,19 @@ final class AotTest extends BaseTest
         }
 
         $runArgv = [$outfile];
+        $runEnvLines = PhptWebSections::envLinesFromSections($sections);
         if (isset($sections['ENV'])) {
-            $runArgv = array_merge(self::llvmEnvPrefix(), $runArgv);
             foreach (explode("\n", trim($sections['ENV'])) as $line) {
                 $line = trim($line);
                 if ('' !== $line) {
-                    array_splice($runArgv, -1, 0, [$line]);
+                    $runEnvLines[] = $line;
                 }
+            }
+        }
+        if ([] !== $runEnvLines) {
+            $runArgv = array_merge(self::llvmEnvPrefix(), $runArgv);
+            foreach ($runEnvLines as $line) {
+                array_splice($runArgv, -1, 0, [$line]);
             }
         }
         $run = proc_open(
