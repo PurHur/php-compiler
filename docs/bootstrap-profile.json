@@ -286,7 +286,6 @@
         "lib/Lint/Issue.php",
         "lib/Lint/LintCompiler.php",
         "lib/Lint/Linter.php",
-        "lib/Lint/ListDestructuringDetector.php",
         "lib/Lint/SwitchDetector.php",
         "lib/Lint/UnsupportedRegistry.php",
         "lib/Module.php",
@@ -324,9 +323,9 @@
         "test/bootstrap-aot/echo_hello.php"
     ],
     "totals": {
-        "inventory_files": 290,
+        "inventory_files": 289,
         "excluded": 2,
-        "eligible": 288,
+        "eligible": 287,
         "aot_lint_targets": 2
     }
 }

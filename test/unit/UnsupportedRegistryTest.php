@@ -31,7 +31,6 @@ final class UnsupportedRegistryTest extends TestCase
             'post inc' => ['Expr_PostInc', 137],
             'pre dec' => ['Expr_PreDec', 137],
             'post dec' => ['Expr_PostDec', 137],
-            'list destructuring' => ['Expr_List', 139],
         ];
     }
 
