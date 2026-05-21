@@ -13,6 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
@@ -54,13 +55,10 @@ final class array_count extends Internal
             return $context->constantFromInteger($args[0]->nextFreeElement, 'int64');
         }
         if (JITVariable::TYPE_HASHTABLE === $args[0]->type) {
-            $ht = $context->helper->loadValue($args[0]);
-            $num = $context->builder->call(
-                $context->lookupFunction('__hashtable__getNumElements'),
-                $ht
+            return ArrayBuiltinHelper::getNumElements(
+                $context,
+                ArrayBuiltinHelper::loadHashTable($context, $args[0])
             );
-
-            return $context->builder->zExt($num, $context->getTypeFromString('int64'));
         }
         throw new \LogicException('count() only supports native arrays in this compiler build');
     }
