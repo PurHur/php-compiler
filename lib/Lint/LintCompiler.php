@@ -71,12 +71,33 @@ final class LintCompiler extends Compiler
                         if (!is_null($child->defaultBlock)) {
                             $this->compileOps($child->defaultBlock->children, $result);
                         }
+                        $declared = $child->declaredType instanceof Op\Type\Literal
+                            ? Type::fromDecl($child->declaredType->name)
+                            : $child->type;
                         $result->addOpCode(new OpCode(
                             OpCode::TYPE_DECLARE_PROPERTY,
                             $this->compileOperand($child->name, $result, true),
                             is_null($child->defaultVar) ? null : $this->compileOperand($child->defaultVar, $result, true),
-                            $this->compileTypeConstrainedVariable($result, $child->type)
+                            $this->compileTypeConstrainedVariable($result, $declared)
                         ));
+                    } catch (\LogicException $e) {
+                        if (!$this->recordIfUnsupported($child, $e)) {
+                            throw $e;
+                        }
+                    }
+                    break;
+                case Op\Stmt\ClassMethod::class:
+                    try {
+                        $methodBlock = $this->compileCfgBlock($child->func->cfg, $child->func->params);
+                        $methodBlock->func = $child->func;
+                        $methodName = new Operand\Literal($child->func->name);
+                        $methodName->type = Type::string();
+                        $declare = new OpCode(
+                            OpCode::TYPE_DECLARE_METHOD,
+                            $this->compileOperand($methodName, $result, true)
+                        );
+                        $declare->block1 = $methodBlock;
+                        $result->addOpCode($declare);
                     } catch (\LogicException $e) {
                         if (!$this->recordIfUnsupported($child, $e)) {
                             throw $e;

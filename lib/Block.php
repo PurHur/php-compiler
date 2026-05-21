@@ -167,7 +167,11 @@ class Block {
         $scopeSize = $this->scope->count();
         foreach ($this->scope as $op) {
             $pos = $this->scope[$op];
-            
+            if (null !== $frame && 'this' === self::resolveVariableName($op) && !empty($frame->callArgs)) {
+                $scope[$pos] = $frame->callArgs[0];
+                continue;
+            }
+
             if (isset($this->constants[$pos])) {
                 $scope[$pos] = $this->constants[$pos];
             } elseif ($this->args->contains($op)) {

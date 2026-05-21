@@ -11,14 +11,25 @@ final class TypeCheck
 {
     public static function coerceParameter(Variable $dest, bool $strict): void
     {
-        $constraint = $dest->typeConstraint;
+        self::coerceTypedSlot($dest, $strict, 'Argument');
+    }
+
+    public static function coercePropertyWrite(Variable $dest, bool $strict): void
+    {
+        self::coerceTypedSlot($dest, $strict, 'Property');
+    }
+
+    private static function coerceTypedSlot(Variable $dest, bool $strict, string $kind): void
+    {
+        $target = $dest->resolveIndirect();
+        $constraint = $target->typeConstraint;
         if (null === $constraint) {
             return;
         }
-        $value = $dest->resolveIndirect();
+        $value = $target;
         if ($strict) {
             if (!self::isExactType($value, $constraint)) {
-                throw new \TypeError(self::strictMessage($constraint, $value));
+                throw new \TypeError(self::strictMessage($constraint, $value, $kind));
             }
 
             return;
@@ -26,7 +37,7 @@ final class TypeCheck
         if (self::isExactType($value, $constraint)) {
             return;
         }
-        self::weakCoerceInPlace($dest, $constraint, $value);
+        self::weakCoerceInPlace($target, $constraint, $value);
     }
 
     private static function isExactType(Variable $value, int $constraint): bool
@@ -50,7 +61,7 @@ final class TypeCheck
                 $dest->string($value->toString());
                 return;
         }
-        throw new \TypeError(self::strictMessage($constraint, $value));
+        throw new \TypeError(self::strictMessage($constraint, $value, 'Argument'));
     }
 
     private static function coerceToInt(Variable $value): int
@@ -127,12 +138,12 @@ final class TypeCheck
         throw new \TypeError('Argument must be of type bool');
     }
 
-    private static function strictMessage(int $constraint, Variable $value): string
+    private static function strictMessage(int $constraint, Variable $value, string $kind = 'Argument'): string
     {
         $expected = self::typeName($constraint);
         $given = self::typeName($value->type);
 
-        return "Argument must be of type {$expected}, {$given} given";
+        return "{$kind} must be of type {$expected}, {$given} given";
     }
 
     private static function typeName(int $type): string

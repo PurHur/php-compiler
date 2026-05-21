@@ -9,6 +9,7 @@
 
 namespace PHPCompiler;
 
+use PHPCompiler\Func;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\ObjectEntry;
@@ -59,7 +60,11 @@ restart:
                     $arg2 = $frame->scope[$op->arg2];
                     $arg3 = $frame->scope[$op->arg3];
                     $arg2->copyFrom($arg3);
-                    $arg1->copyFrom($arg3); 
+                    $arg1->copyFrom($arg3);
+                    $strict = null !== $frame->parent
+                        ? $frame->parent->block->strictTypes
+                        : $frame->block->strictTypes;
+                    TypeCheck::coercePropertyWrite($arg2, $strict);
                     break;
                 case OpCode::TYPE_ARRAY_DIM_FETCH:
                 case OpCode::TYPE_ARRAY_DIM_FETCH_WRITE:
@@ -261,6 +266,19 @@ restart:
                     $frame->call = $this->context->functions[$lcname];
                     $frame->callArgs = [];
                     break;
+                case OpCode::TYPE_METHODCALL_INIT:
+                    $receiver = $frame->scope[$op->arg1]->resolveIndirect();
+                    if ($receiver->type !== Variable::TYPE_OBJECT) {
+                        throw new \LogicException('Method call on non-object');
+                    }
+                    $methodName = strtolower($frame->scope[$op->arg2]->toString());
+                    $class = $receiver->toObject()->class;
+                    if (!isset($class->methods[$methodName])) {
+                        throw new \LogicException("Call to undefined method {$class->name}::{$methodName}()");
+                    }
+                    $frame->call = $class->methods[$methodName];
+                    $frame->callArgs = [$receiver];
+                    break;
                 case OpCode::TYPE_ARG_SEND:
                     $frame->callArgs[] = $frame->scope[$op->arg1];
                     break;
@@ -286,8 +304,12 @@ restart:
                     goto restart;
                 case OpCode::TYPE_ARG_RECV:
                     $arg1 = $frame->scope[$op->arg1];
-                    if (array_key_exists($op->arg2, $frame->calledArgs)) {
-                        $arg1->copyFrom($frame->calledArgs[$op->arg2]);
+                    $recvIdx = $op->arg2;
+                    if (null !== $frame->block->func && null !== $frame->block->func->class) {
+                        ++$recvIdx;
+                    }
+                    if (array_key_exists($recvIdx, $frame->calledArgs)) {
+                        $arg1->copyFrom($frame->calledArgs[$recvIdx]);
                     } elseif (null !== $op->arg3 && isset($frame->block->constants[$op->arg3])) {
                         $arg1->copyFrom($frame->block->constants[$op->arg3]);
                     } else {
@@ -447,6 +469,14 @@ restart:
                         $default,
                         $frame->scope[$op->arg3]
                     );
+                    break;
+                case OpCode::TYPE_DECLARE_METHOD:
+                    $name = strtolower($frame->scope[$op->arg1]->toString());
+                    $method = new Func\PHP($entry->name.'::'.$name, $op->block1);
+                    $entry->methods[$name] = $method;
+                    if ('__construct' === $name) {
+                        $entry->constructor = $method;
+                    }
                     break;
                 default:
                     var_dump($op);
