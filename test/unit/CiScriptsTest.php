@@ -30,6 +30,17 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('--group jit', $body);
         $this->assertStringContainsString('--group aot-link', $body);
         $this->assertStringContainsString('ci_apply_resource_limits', $body);
+        $this->assertStringContainsString('ci_run_examples_web_smoke_aot', $body);
+    }
+
+    public function testExamplesWebSmokePrebuildScriptExists(): void
+    {
+        $prebuild = dirname(__DIR__, 2).'/script/examples-web-smoke-prebuild.sh';
+        $this->assertFileExists($prebuild);
+        $this->assertTrue(is_executable($prebuild));
+        $body = (string) file_get_contents($prebuild);
+        $this->assertStringContainsString('001-SimpleWeb', $body);
+        $this->assertStringContainsString('phpc build --project', $body);
     }
 
     public function testCiResourceLimitsDefaultThirtyGib(): void

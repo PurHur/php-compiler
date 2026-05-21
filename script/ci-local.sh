@@ -42,4 +42,6 @@ if ci_llvm_ready; then
     echo "PHPUnit: AOT link + execute (@group aot-link — PHPT fixtures, web examples)..."
     "$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit --group aot-link --exclude-group serve "$@"
   fi
+
+  ci_run_examples_web_smoke_aot
 fi

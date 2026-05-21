@@ -620,6 +620,13 @@ final class DevServer
         $parts = preg_split("/\r\n\r\n|\n\n/", $raw, 2);
         $headerBlock = $parts[0] ?? '';
         $body = $parts[1] ?? '';
+
+        // AOT binaries may emit a single CRLF after headers (no blank line).
+        if ('' === $body && preg_match('/\A(.+?\r\n)(.+)\z/s', $raw, $m)) {
+            $headerBlock = rtrim($m[1], "\r\n");
+            $body = $m[2];
+        }
+
         $status = 200;
         $contentType = 'text/html; charset=UTF-8';
         $extraHeaders = [];
