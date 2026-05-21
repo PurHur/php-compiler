@@ -22,7 +22,11 @@ examples/003-MiniWebApp/
 ./phpc lint --all examples/003-MiniWebApp --json
 ```
 
-During the skeleton phase this **must** exit `1`. Warnings on stderr list dynamic `__DIR__` includes that lint does not follow yet. When [#67](https://github.com/PurHur/php-compiler/issues/67) is done, `phpc lint --all` should exit `0` and `make web-smoke` may treat this tree as a green gate ([#455](https://github.com/PurHur/php-compiler/issues/455)).
+During the skeleton phase this **must** exit `1`. Warnings on stderr list dynamic `__DIR__` includes that lint does not follow yet. When [#67](https://github.com/PurHur/php-compiler/issues/67) is done, `phpc lint --all` should exit `0` and `make web-smoke` may treat this tree as a green gate ([#455](https://github.com/PurHur/php-compiler/issues/455)):
+
+```console
+MINIWEBAPP_LINT_GATE=1 make web-smoke   # fail if lint --all regresses
+```
 
 ### Blocker matrix (from `phpc lint --all`, 2026-05-21)
 
@@ -78,7 +82,7 @@ curl -s 'http://127.0.0.1:8080/?route=api/status'
 ## CI hooks (follow-ups)
 
 - [#454](https://github.com/PurHur/php-compiler/issues/454) — `ExamplesCompileTest` `@group miniwebapp` (skipped until green)
-- [#455](https://github.com/PurHur/php-compiler/issues/455) — `make web-smoke` runs `phpc lint --all` when this tree exists
+- [#455](https://github.com/PurHur/php-compiler/issues/455) — `make web-smoke` runs `phpc lint --all` when `public/` exists (shipped)
 - [#298](https://github.com/PurHur/php-compiler/issues/298) — extend `examples-web-smoke.sh` for 003 when serve is green
 
 ## Related
