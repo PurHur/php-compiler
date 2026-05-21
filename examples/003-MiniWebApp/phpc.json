@@ -1,0 +1,6 @@
+{
+    "entry": "public/index.php",
+    "binary": ".phpc/bin/app",
+    "public": "public",
+    "includes": ["src/Router.php", "config.php"]
+}
