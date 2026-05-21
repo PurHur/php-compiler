@@ -480,16 +480,23 @@ final class Variable {
                 }
                 return HashTableHelper::readIndexedToValueBox($this->context, $ht, $index);
             default:
-                if (!$this->type & self::IS_NATIVE_ARRAY) {
+                if (!($this->type & self::IS_NATIVE_ARRAY)) {
                     throw new \LogicException("Unsupported dim fetch on " . self::getStringType($this->type));
                 }
                 $offset = $dim->castTo(self::TYPE_NATIVE_LONG);
-                $value = $this->context->builder->inBoundsGep($this->value, $dim->value);
+                $sizeT = $this->context->getTypeFromString('size_t');
+                $zero = $this->context->constantFromInteger(0, 'size_t');
+                $index = $this->context->builder->truncOrBitCast(
+                    $this->context->helper->loadValue($offset),
+                    $sizeT
+                );
+                $slot = $this->context->builder->inBoundsGep($this->value, $zero, $index);
+
                 return new Variable(
                     $this->context,
                     $this->type & (~self::IS_NATIVE_ARRAY),
                     self::KIND_VARIABLE,
-                    $value
+                    $slot
                 );
         }
     }

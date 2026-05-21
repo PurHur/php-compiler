@@ -80,20 +80,18 @@ PHP;
         $this->assertStringContainsString('Expr_PostInc', $exit['stdout']);
     }
 
-    public function testLintShortListDestructuringReportsIssue139(): void
+    public function testLintShortListDestructuringExitsZero(): void
     {
-        $exit = $this->runLint(['-r', '[$a,$b]=["x","y"];']);
-        $this->assertSame(1, $exit['code']);
-        $this->assertStringContainsString('#139', $exit['stdout']);
-        $this->assertStringContainsString('Expr_List', $exit['stdout']);
+        $exit = $this->runLint(['-r', '[$a,$b]=["x","y"]; echo $a, $b;']);
+        $this->assertSame(0, $exit['code']);
+        $this->assertStringNotContainsString('Expr_List', $exit['stdout']);
     }
 
-    public function testLintListFunctionDestructuringReportsIssue139(): void
+    public function testLintListFunctionDestructuringExitsZero(): void
     {
-        $exit = $this->runLint(['-r', 'list($a,$b)=array(1,2);']);
-        $this->assertSame(1, $exit['code']);
-        $this->assertStringContainsString('#139', $exit['stdout']);
-        $this->assertStringContainsString('Expr_List', $exit['stdout']);
+        $exit = $this->runLint(['-r', 'list($a,$b)=array(1,2); echo $a, $b;']);
+        $this->assertSame(0, $exit['code']);
+        $this->assertStringNotContainsString('Expr_List', $exit['stdout']);
     }
 
     public function testLintSwitchWithLiteralCasesExitsZero(): void
