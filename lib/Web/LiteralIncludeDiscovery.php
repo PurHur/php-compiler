@@ -73,10 +73,10 @@ final class LiteralIncludeDiscovery
     {
         $paths = [];
         $seen = new \SplObjectStorage();
-        self::walkCfgBlock($script->main->cfg, $paths, $seen);
+        self::walkCfgBlock($script->main->cfg, $fromFile, $paths, $seen);
         foreach ($script->functions as $func) {
             if ($func instanceof CfgFunc) {
-                self::walkCfgBlock($func->cfg, $paths, $seen);
+                self::walkCfgBlock($func->cfg, $fromFile, $paths, $seen);
             }
         }
 
@@ -86,8 +86,12 @@ final class LiteralIncludeDiscovery
     /**
      * @param list<string> $paths
      */
-    private static function walkCfgBlock(CfgBlock $block, array &$paths, \SplObjectStorage $seen): void
-    {
+    private static function walkCfgBlock(
+        CfgBlock $block,
+        string $fromFile,
+        array &$paths,
+        \SplObjectStorage $seen
+    ): void {
         if ($seen->contains($block)) {
             return;
         }
@@ -95,7 +99,7 @@ final class LiteralIncludeDiscovery
 
         foreach ($block->children as $child) {
             if ($child instanceof Op\Expr\Include_) {
-                $literal = ConstStringFolder::foldForInclude($block, $child->expr, $fromFile);
+                $literal = ConstStringFolder::foldForInclude($block, $child->expr, $child->getFile() ?: $fromFile);
                 if (null !== $literal) {
                     $paths[] = $literal;
                 }
@@ -103,7 +107,7 @@ final class LiteralIncludeDiscovery
             foreach ($child->getSubBlocks() as $name) {
                 $sub = $child->{$name} ?? null;
                 if ($sub instanceof CfgBlock) {
-                    self::walkCfgBlock($sub, $paths, $seen);
+                    self::walkCfgBlock($sub, $fromFile, $paths, $seen);
                 }
             }
         }

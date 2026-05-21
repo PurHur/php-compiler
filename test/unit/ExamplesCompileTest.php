@@ -16,10 +16,28 @@ use PHPUnit\Framework\TestCase;
  * @see https://github.com/PurHur/php-compiler/issues/309 (001-SimpleWeb AOT execute + QUERY_STRING refresh in this gate)
  * @see https://github.com/PurHur/php-compiler/issues/259 (001-SimpleWeb POST via $_REQUEST)
  * @see https://github.com/PurHur/php-compiler/issues/274 (minimal phpc.json beside web examples)
+ * @see https://github.com/PurHur/php-compiler/issues/454 (003-MiniWebApp gate)
  */
 final class ExamplesCompileTest extends TestCase
 {
     private static ?bool $llvmReady = null;
+
+    /**
+     * MiniWebApp progress gate — skipped until #67 (class/method blockers).
+     *
+     * @group miniwebapp
+     * @group llvm
+     */
+    public function test003MiniWebAppEventuallyRuns(): void
+    {
+        $index = dirname(__DIR__, 2).'/examples/003-MiniWebApp/public/index.php';
+        if (!is_file($index)) {
+            $this->markTestSkipped('examples/003-MiniWebApp/public/index.php missing (#246)');
+        }
+        $this->markTestSkipped(
+            'Blocked by #58/#145 (class methods) — see examples/003-MiniWebApp/README.md'
+        );
+    }
 
     /**
      * @return array<string, array{0: string}>

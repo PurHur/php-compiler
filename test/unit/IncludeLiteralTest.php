@@ -14,6 +14,30 @@ require_once __DIR__.'/../LlvmToolchain.php';
  */
 final class IncludeLiteralTest extends TestCase
 {
+    /**
+     * Included file reads locals set in the caller (issue #471).
+     */
+    public function testVmIncludeInheritsCallerScope(): void
+    {
+        $entry = realpath(__DIR__.'/../compliance/cases/language/include_scope_inherit/entry.php');
+        $this->assertNotFalse($entry);
+        $exit = $this->runVm([$entry]);
+        $this->assertSame(0, $exit['code'], $exit['stderr']);
+        $this->assertSame("Home\n", $exit['stdout']);
+    }
+
+    /**
+     * Nested include chain inherits outer caller scope (layout → partial).
+     */
+    public function testVmNestedIncludeInheritsCallerScope(): void
+    {
+        $entry = realpath(__DIR__.'/../compliance/cases/language/include_scope_inherit/nested_entry.php');
+        $this->assertNotFalse($entry);
+        $exit = $this->runVm([$entry]);
+        $this->assertSame(0, $exit['code'], $exit['stderr']);
+        $this->assertSame("nested-scope\n", $exit['stdout']);
+    }
+
     public function testVmRequireDirRelative(): void
     {
         $entry = realpath(__DIR__.'/../compliance/cases/language/include_dir_literal/entry.php');
