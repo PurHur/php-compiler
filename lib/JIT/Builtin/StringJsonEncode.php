@@ -109,7 +109,7 @@ final class StringJsonEncode
         $openBrace = self::literalString($context, '{');
         $context->builder->store($openBrace, $resultSlot);
         $context->builder->store($i8->constInt(1, false), $firstSlot);
-        $context->builder->store($numKeys, $emitIdxSlot);
+        $context->builder->store($zeroSize, $emitIdxSlot);
 
         $emitHead = $fn->appendBasicBlock('je_emit_head');
         $emitBody = $fn->appendBasicBlock('je_emit_body');
@@ -117,14 +117,13 @@ final class StringJsonEncode
         $context->builder->branch($emitHead);
         $context->builder->positionAtEnd($emitHead);
         $emitIdx = $context->builder->load($emitIdxSlot);
-        $emitEnd = $context->builder->icmp(Builder::INT_EQ, $emitIdx, $zeroSize);
+        $emitEnd = $context->builder->icmp(Builder::INT_SGE, $emitIdx, $numKeys);
         $context->builder->branchIf($emitEnd, $emitDone, $emitBody);
 
         $context->builder->positionAtEnd($emitBody);
-        $prevIdx = $context->builder->subNoSignedWrap($emitIdx, $oneSize);
-        $context->builder->store($prevIdx, $emitIdxSlot);
         $nodesArray = $context->builder->load($nodesSlot);
-        $nodePtr = $context->builder->load($context->builder->inBoundsGEP($nodesArray, $prevIdx));
+        $nodePtr = $context->builder->load($context->builder->inBoundsGEP($nodesArray, $emitIdx));
+        $context->builder->store($context->builder->addNoSignedWrap($emitIdx, $oneSize), $emitIdxSlot);
 
         $acc = $context->builder->load($resultSlot);
         $isFirst = $context->builder->load($firstSlot);

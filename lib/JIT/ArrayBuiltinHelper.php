@@ -978,7 +978,7 @@ final class ArrayBuiltinHelper
         $isString = $context->builder->icmp(
             Builder::INT_EQ,
             $typeByte,
-            $i8->constInt(Variable::TYPE_STRING, false)
+            $i8->constInt(Variable::TYPE_STRING & 0xff, false)
         );
         $isLong = $context->builder->icmp(
             Builder::INT_EQ,
@@ -1562,7 +1562,7 @@ final class ArrayBuiltinHelper
         $isString = $context->builder->icmp(
             Builder::INT_EQ,
             $typeByte,
-            $i8->constInt(Variable::TYPE_STRING, false)
+            $i8->constInt(Variable::TYPE_STRING & 0xff, false)
         );
         $isLong = $context->builder->icmp(
             Builder::INT_EQ,
@@ -1616,7 +1616,7 @@ final class ArrayBuiltinHelper
         $isString = $context->builder->icmp(
             Builder::INT_EQ,
             $typeByte,
-            $i8->constInt(Variable::TYPE_STRING, false)
+            $i8->constInt(Variable::TYPE_STRING & 0xff, false)
         );
         $isLong = $context->builder->icmp(
             Builder::INT_EQ,
@@ -1710,7 +1710,7 @@ final class ArrayBuiltinHelper
         $isString = $context->builder->icmp(
             Builder::INT_EQ,
             $typeByte,
-            $i8->constInt(Variable::TYPE_STRING, false)
+            $i8->constInt(Variable::TYPE_STRING & 0xff, false)
         );
         $isLong = $context->builder->icmp(
             Builder::INT_EQ,
@@ -1935,20 +1935,82 @@ final class ArrayBuiltinHelper
         $context->builder->branch($strInit);
 
         $context->builder->positionAtEnd($strInit);
+        $ptrSize = $sizeT->constInt(8, false);
+        $strCountSlot = $context->builder->alloca($sizeT, 1, 'array_search_str_count');
+        $strRemainSlot = $context->builder->alloca($sizeT, 1, 'array_search_str_remain');
+        $nodesSlot = $context->builder->alloca($nodePtrType->pointerType(0), 1, 'array_search_str_nodes');
         $walkSlot = $context->builder->alloca($nodePtrType, 1, 'array_search_walk');
         $head = $context->builder->load($context->builder->structGep($ht, $map['strKeys']));
+        $context->builder->store($zero, $strCountSlot);
         $context->builder->store($head, $walkSlot);
+        $countHead = BasicBlockHelper::append($context, 'array_search_str_count_head');
+        $countBody = BasicBlockHelper::append($context, 'array_search_str_count_body');
+        $countDone = BasicBlockHelper::append($context, 'array_search_str_count_done');
+        $context->builder->branch($countHead);
+        $context->builder->positionAtEnd($countHead);
+        $walkNode = $context->builder->load($walkSlot);
+        $walkEnd = $context->builder->icmp(Builder::INT_EQ, $walkNode, $nodePtrType->constNull());
+        $context->builder->branchIf($walkEnd, $countDone, $countBody);
+        $context->builder->positionAtEnd($countBody);
+        $strCount = $context->builder->load($strCountSlot);
+        $context->builder->store($context->builder->addNoSignedWrap($strCount, $one), $strCountSlot);
+        $nextWalk = $context->builder->load($context->builder->structGep($walkNode, $nodeMap['next']));
+        $context->builder->store($nextWalk, $walkSlot);
+        $context->builder->branch($countHead);
+        $context->builder->positionAtEnd($countDone);
+        $numStrKeys = $context->builder->load($strCountSlot);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $numStrKeys, $zero);
+        $strEmpty = BasicBlockHelper::append($context, 'array_search_str_empty');
+        $strWork = BasicBlockHelper::append($context, 'array_search_str_work');
+        $context->builder->branchIf($isEmpty, $strEmpty, $strWork);
+        $context->builder->positionAtEnd($strEmpty);
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($strWork);
+        $bytes = $context->builder->mulNoSignedWrap($numStrKeys, $ptrSize);
+        $nodesRaw = $context->builder->call($context->lookupFunction('malloc'), $bytes);
+        $nodesArray = $context->builder->pointerCast($nodesRaw, $nodePtrType->pointerType(0));
+        $context->builder->store($nodesArray, $nodesSlot);
+        $context->builder->store($zero, $strCountSlot);
+        $context->builder->store($head, $walkSlot);
+        $fillHead = BasicBlockHelper::append($context, 'array_search_str_fill_head');
+        $fillBody = BasicBlockHelper::append($context, 'array_search_str_fill_body');
+        $fillDone = BasicBlockHelper::append($context, 'array_search_str_fill_done');
+        $context->builder->branch($fillHead);
+        $context->builder->positionAtEnd($fillHead);
+        $fillNode = $context->builder->load($walkSlot);
+        $fillEnd = $context->builder->icmp(Builder::INT_EQ, $fillNode, $nodePtrType->constNull());
+        $context->builder->branchIf($fillEnd, $fillDone, $fillBody);
+        $context->builder->positionAtEnd($fillBody);
+        $fillIdx = $context->builder->load($strCountSlot);
+        $nodesArray = $context->builder->load($nodesSlot);
+        $context->builder->store($fillNode, $context->builder->inBoundsGEP($nodesArray, $fillIdx));
+        $context->builder->store($context->builder->addNoSignedWrap($fillIdx, $one), $strCountSlot);
+        $nextFill = $context->builder->load($context->builder->structGep($fillNode, $nodeMap['next']));
+        $context->builder->store($nextFill, $walkSlot);
+        $context->builder->branch($fillHead);
+        $context->builder->positionAtEnd($fillDone);
+        $context->builder->store($numStrKeys, $strRemainSlot);
         $strBody = BasicBlockHelper::append($context, 'array_search_str_body');
         $strFound = BasicBlockHelper::append($context, 'array_search_str_found');
         $strNext = BasicBlockHelper::append($context, 'array_search_str_next');
         $context->builder->branch($strHead);
 
         $context->builder->positionAtEnd($strHead);
-        $node = $context->builder->load($walkSlot);
-        $nodeNull = $context->builder->icmp(Builder::INT_EQ, $node, $nodePtrType->constNull());
-        $context->builder->branchIf($nodeNull, $done, $strBody);
+        $remain = $context->builder->load($strRemainSlot);
+        $remainZero = $context->builder->icmp(Builder::INT_EQ, $remain, $zero);
+        $strDrain = BasicBlockHelper::append($context, 'array_search_str_drain');
+        $context->builder->branchIf($remainZero, $strDrain, $strBody);
+
+        $context->builder->positionAtEnd($strDrain);
+        $nodesArray = $context->builder->load($nodesSlot);
+        $nodesRaw = $context->builder->pointerCast($nodesArray, $context->getTypeFromString('int8*'));
+        $context->builder->call($context->lookupFunction('free'), $nodesRaw);
+        $context->builder->branch($done);
 
         $context->builder->positionAtEnd($strBody);
+        $nodeIdx = $context->builder->subNoSignedWrap($remain, $one);
+        $nodesArray = $context->builder->load($nodesSlot);
+        $node = $context->builder->load($context->builder->inBoundsGEP($nodesArray, $nodeIdx));
         $valEntry = $context->builder->structGep($node, $nodeMap['value']);
         $match = self::entryMatchesNeedle($context, $valEntry, $needle, $strict);
         $context->builder->branchIf($match, $strFound, $strNext);
@@ -1961,11 +2023,13 @@ final class ArrayBuiltinHelper
             $resultPtr,
             $owned
         );
+        $nodesArray = $context->builder->load($nodesSlot);
+        $nodesRaw = $context->builder->pointerCast($nodesArray, $context->getTypeFromString('int8*'));
+        $context->builder->call($context->lookupFunction('free'), $nodesRaw);
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($strNext);
-        $nextNode = $context->builder->load($context->builder->structGep($node, $nodeMap['next']));
-        $context->builder->store($nextNode, $walkSlot);
+        $context->builder->store($nodeIdx, $strRemainSlot);
         $context->builder->branch($strHead);
 
         $retBlock = BasicBlockHelper::append($context, 'array_search_return');
@@ -2047,55 +2111,63 @@ final class ArrayBuiltinHelper
         $i8 = $context->getTypeFromString('int8');
         $i1 = $context->getTypeFromString('int1');
         $false = $i1->constInt(0, false);
+        $resultSlot = $context->builder->alloca($i1, 1, 'entry_match');
+        $context->builder->store($false, $resultSlot);
+
+        $bbString = BasicBlockHelper::append($context, 'entry_match_string');
+        $bbCheckLong = BasicBlockHelper::append($context, 'entry_match_check_long');
+        $bbLong = BasicBlockHelper::append($context, 'entry_match_long');
+        $bbCheckBool = BasicBlockHelper::append($context, 'entry_match_check_bool');
+        $bbBool = BasicBlockHelper::append($context, 'entry_match_bool');
+        $bbCheckDouble = BasicBlockHelper::append($context, 'entry_match_check_double');
+        $bbDouble = BasicBlockHelper::append($context, 'entry_match_double');
+        $bbNull = BasicBlockHelper::append($context, 'entry_match_null');
+        $bbDone = BasicBlockHelper::append($context, 'entry_match_done');
 
         $isString = $context->builder->icmp(
             Builder::INT_EQ,
             $typeByte,
-            $i8->constInt(Variable::TYPE_STRING, false)
+            $i8->constInt(Variable::TYPE_STRING & 0xff, false)
         );
-        $isLong = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
-        );
-        $isBool = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)
-        );
-        $isDouble = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
-        );
-        $isNull = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_NULL, false)
-        );
+        $context->builder->branchIf($isString, $bbString, $bbCheckLong);
 
+        $context->builder->positionAtEnd($bbString);
         $strCand = new Variable(
             $context,
             Variable::TYPE_STRING,
             Variable::KIND_VALUE,
             $context->builder->call($context->lookupFunction('__value__readString'), $entry)
         );
-        $matchStr = $context->builder->and(
-            $isString,
-            self::valuesEqual($context, $needle, $strCand, $strict)
-        );
+        $context->builder->store(self::valuesEqual($context, $needle, $strCand, $strict), $resultSlot);
+        $context->builder->branch($bbDone);
 
+        $context->builder->positionAtEnd($bbCheckLong);
+        $isLong = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
+        );
+        $context->builder->branchIf($isLong, $bbLong, $bbCheckBool);
+
+        $context->builder->positionAtEnd($bbLong);
         $longCand = new Variable(
             $context,
             Variable::TYPE_NATIVE_LONG,
             Variable::KIND_VALUE,
             $context->builder->call($context->lookupFunction('__value__readLong'), $entry)
         );
-        $matchLong = $context->builder->and(
-            $isLong,
-            self::valuesEqual($context, $needle, $longCand, $strict)
-        );
+        $context->builder->store(self::valuesEqual($context, $needle, $longCand, $strict), $resultSlot);
+        $context->builder->branch($bbDone);
 
+        $context->builder->positionAtEnd($bbCheckBool);
+        $isBool = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)
+        );
+        $context->builder->branchIf($isBool, $bbBool, $bbCheckDouble);
+
+        $context->builder->positionAtEnd($bbBool);
         $boolCand = new Variable(
             $context,
             Variable::TYPE_NATIVE_BOOL,
@@ -2105,36 +2177,41 @@ final class ArrayBuiltinHelper
                 $i1
             )
         );
-        $matchBool = $context->builder->and(
-            $isBool,
-            self::valuesEqual($context, $needle, $boolCand, $strict)
-        );
+        $context->builder->store(self::valuesEqual($context, $needle, $boolCand, $strict), $resultSlot);
+        $context->builder->branch($bbDone);
 
+        $context->builder->positionAtEnd($bbCheckDouble);
+        $isDouble = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
+        );
+        $context->builder->branchIf($isDouble, $bbDouble, $bbNull);
+
+        $context->builder->positionAtEnd($bbDouble);
         $doubleCand = new Variable(
             $context,
             Variable::TYPE_NATIVE_DOUBLE,
             Variable::KIND_VALUE,
             $context->builder->call($context->lookupFunction('__value__readDouble'), $entry)
         );
-        $matchDouble = $context->builder->and(
-            $isDouble,
-            self::valuesEqual($context, $needle, $doubleCand, $strict)
-        );
+        $context->builder->store(self::valuesEqual($context, $needle, $doubleCand, $strict), $resultSlot);
+        $context->builder->branch($bbDone);
 
-        $matchNull = Variable::TYPE_NULL === $needle->type
-            ? $isNull
-            : $false;
+        $context->builder->positionAtEnd($bbNull);
+        if (Variable::TYPE_NULL === $needle->type) {
+            $isNull = $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(Variable::TYPE_NULL, false)
+            );
+            $context->builder->store($isNull, $resultSlot);
+        }
+        $context->builder->branch($bbDone);
 
-        return $context->builder->or(
-            $matchStr,
-            $context->builder->or(
-                $matchLong,
-                $context->builder->or(
-                    $matchBool,
-                    $context->builder->or($matchDouble, $matchNull)
-                )
-            )
-        );
+        $context->builder->positionAtEnd($bbDone);
+
+        return $context->builder->load($resultSlot);
     }
 
     private static function listEntryAt(Context $context, Value $ht, Value $index): Value
@@ -2207,8 +2284,40 @@ final class ArrayBuiltinHelper
         if (Variable::TYPE_NATIVE_DOUBLE === $left->type && Variable::TYPE_NATIVE_LONG === $right->type) {
             return self::looseEqual($context, $right, $left);
         }
+        if (Variable::TYPE_STRING === $left->type && Variable::TYPE_NATIVE_LONG === $right->type) {
+            return self::looseEqualStringLong($context, $left, $right);
+        }
+        if (Variable::TYPE_NATIVE_LONG === $left->type && Variable::TYPE_STRING === $right->type) {
+            return self::looseEqualStringLong($context, $right, $left);
+        }
 
         return $context->constantFromBool(false);
+    }
+
+    private static function looseEqualStringLong(Context $context, Variable $str, Variable $long): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $numBuf = $context->builder->alloca($context->getTypeFromString('int8'), $i64->constInt(32, false), 'loose_strlong_buf');
+        $num = $context->helper->loadValue($long);
+        $bufC = $context->builder->pointerCast($numBuf, $i8p);
+        $fmt = $context->builder->pointerCast($context->constantFromString('%lld'), $i8p);
+        $context->builder->call($context->lookupFunction('sprintf'), $bufC, $fmt, $num);
+        $len = $context->builder->call($context->lookupFunction('strlen'), $bufC);
+        $lenI64 = $len->typeOf() === $i64
+            ? $len
+            : $context->builder->zExt($len, $i64);
+        $numStr = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $lenI64,
+            $bufC
+        );
+
+        return JitStringCompare::identical(
+            $context,
+            $context->helper->loadValue($str),
+            $numStr
+        );
     }
 
     public static function sortPacked(Context $context, Variable $array): void
@@ -2241,11 +2350,11 @@ final class ArrayBuiltinHelper
 
                 return $context->builder->icmp(Builder::INT_EQ, $l, $r);
             case Variable::TYPE_STRING:
-                $l = $context->helper->loadValue($left);
-                $r = $context->helper->loadValue($right);
-                $cmp = $context->builder->call($context->lookupFunction('strcmp'), $l, $r);
-
-                return $context->builder->icmp(Builder::INT_EQ, $cmp, $cmp->typeOf()->constInt(0, false));
+                return JitStringCompare::identical(
+                    $context,
+                    $context->helper->loadValue($left),
+                    $context->helper->loadValue($right)
+                );
             case Variable::TYPE_NULL:
                 return $context->constantFromBool(true);
             default:
