@@ -695,6 +695,10 @@ class Compiler {
 
     protected function compileCoalesce(Op\Expr\BinaryOp\Coalesce $expr, Block $block): Block
     {
+        // php-cfg may mark the ?? result dead while it is still assigned on branch blocks (#99).
+        if ($expr->result instanceof Operand\Temporary && [] === $expr->result->usages) {
+            $expr->result->usages[] = $expr->result;
+        }
         $resultSlot = $this->compileOperand($expr->result, $block, false);
 
         $endBlock = new Block($block->orig);

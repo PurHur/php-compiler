@@ -1,11 +1,10 @@
 --TEST--
 AOT: $_GET['name'] ?? default when key is present (issues #99, #148)
---ENV--
-QUERY_STRING=name=Ada
+--GET--
+name=Ada
 --FILE--
 <?php
-$name = $_GET['name'] ?? 'Guest';
-echo $name, "\n";
+echo $_GET['name'] ?? 'Guest', "\n";
 --EXPECT--
 Ada
 --EXPECT_EXIT--

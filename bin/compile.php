@@ -31,7 +31,19 @@ function run(string $filename, string $code, array $options): void
 
     $runtime = new Runtime(Runtime::MODE_AOT);
     $queryString = $options['-q'] ?? null;
+    if (!is_string($queryString) || '' === $queryString) {
+        $fromEnv = getenv('QUERY_STRING');
+        if (is_string($fromEnv) && '' !== $fromEnv) {
+            $queryString = $fromEnv;
+        }
+    }
     $postBody = $options['-p'] ?? null;
+    if (!is_string($postBody) || '' === $postBody) {
+        $bodyEnv = getenv('REQUEST_BODY');
+        if (is_string($bodyEnv) && '' !== $bodyEnv) {
+            $postBody = $bodyEnv;
+        }
+    }
     $scriptFilename = null;
     if ('-' !== $filename && 'Command line code' !== $filename) {
         $resolved = realpath($filename);
