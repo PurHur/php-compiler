@@ -54,6 +54,15 @@ final class PhpcLintProjectTest extends TestCase
         $this->assertSame(0, $exit['code'], $exit['stderr']."\n".$exit['stdout']);
     }
 
+    public function testDirRelativeIncludeIsFollowed(): void
+    {
+        $entry = realpath(__DIR__.'/../compliance/cases/language/include_dir_literal/entry.php');
+        $this->assertNotFalse($entry);
+        $exit = $this->runLint(['--project', $entry]);
+        $this->assertSame(0, $exit['code'], $exit['stderr']."\n".$exit['stdout']);
+        $this->assertStringNotContainsString('dynamic include/require', $exit['stderr']);
+    }
+
     public function testDynamicIncludeEmitsWarning(): void
     {
         $tmp = sys_get_temp_dir().'/phpc_lint_proj_'.bin2hex(random_bytes(4));

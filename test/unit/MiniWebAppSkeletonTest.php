@@ -48,7 +48,6 @@ final class MiniWebAppSkeletonTest extends TestCase
         $this->assertSame(1, $exit, $combined);
         $this->assertStringContainsString('ClassMethod', $combined);
         $this->assertStringContainsString('Expr_MethodCall', $combined);
-        $this->assertStringContainsString('dynamic include/require', $combined);
     }
 
     /**

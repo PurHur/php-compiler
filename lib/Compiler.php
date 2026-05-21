@@ -18,6 +18,8 @@ use PHPCfg\Operand\Temporary;
 use PHPCfg\Script;
 use PHPTypes\Type;
 use PHPCompiler\VM\Variable;
+use PHPCompiler\Web\ConstStringFolder;
+use PHPCompiler\Web\IncludePathResolver;
 
 class Compiler {
 
@@ -589,10 +591,24 @@ class Compiler {
                 }
                 return $return;
             case Op\Expr\Include_::class:
+                $includePath = ConstStringFolder::foldForInclude($block->orig, $expr->expr);
+                if (null !== $includePath) {
+                    $resolved = IncludePathResolver::resolve($includePath, $expr->getFile());
+                    if (null !== $resolved) {
+                        $literal = new Operand\Literal($resolved);
+                        $literal->type = Type::string();
+
+                        return [new OpCode(
+                            OpCode::TYPE_INCLUDE,
+                            $this->compileOperand($literal, $block, true),
+                        )];
+                    }
+                }
+
                 return [new OpCode(
-                     OpCode::TYPE_INCLUDE,
-		     $this->compileOperand($expr->expr, $block, true),
-		)];
+                    OpCode::TYPE_INCLUDE,
+                    $this->compileOperand($expr->expr, $block, true),
+                )];
             case Op\Expr\Isset_::class:
                 return $this->compileIsset($expr, $block);
             case Op\Iterator\Valid::class:
