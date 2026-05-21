@@ -1,7 +1,7 @@
 --TEST--
 Web: read query parameter from $_GET
---ENV--
-QUERY_STRING=name=World&page=home
+--GET--
+name=World&page=home
 --FILE--
 <?php
 echo 'Hello ', $_GET['name'], "\n";

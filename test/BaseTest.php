@@ -4,6 +4,8 @@ namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
 
+require_once __DIR__ . '/PhptWebSections.php';
+
 abstract class BaseTest extends TestCase {
 
     protected string $BIN = '';
@@ -30,13 +32,10 @@ abstract class BaseTest extends TestCase {
     const UNSUPPORTED_SECTIONS = [
         'REDIRECTTEST',
         'REQUEST',
-        'POST',
         'PUT',
         'POST_RAW',
         'GZIP_POST',
         'DEFLATE_POST',
-        'GET',
-        'COOKIE',
         'HEADERS',
         'CGI',
         'EXPECTHEADERS',
@@ -171,19 +170,8 @@ abstract class BaseTest extends TestCase {
             }
         }
         self::applyLlvmToolchainEnv($env);
-        if (isset($sections['ENV'])) {
-            foreach (explode("\n", trim($sections['ENV'])) as $line) {
-                $line = trim($line);
-                if ('' === $line) {
-                    continue;
-                }
-                $parts = explode('=', $line, 2);
-                if (2 !== count($parts)) {
-                    throw new \LogicException("Invalid ENV line: {$line}");
-                }
-                $env[$parts[0]] = $parts[1];
-            }
-        }
+        self::applyEnvSection($env, $sections);
+        PhptWebSections::applyToEnv($env, $sections);
         $proc = proc_open(
             array_merge(self::llvmEnvPrefix(), $this->phpCommand(), [$this->BIN]),
             $descriptorSepc,
@@ -228,6 +216,28 @@ abstract class BaseTest extends TestCase {
         $result = preg_replace('(\s+$)m', '', $result); // get rid of trailing whitespace
         $result = preg_replace('(\n\n+)', "\n", $result); // get rid of blank lines
         return $result;
+    }
+
+    /**
+     * @param array<string, string> $env
+     * @param array<string, string> $sections
+     */
+    protected static function applyEnvSection(array &$env, array $sections): void
+    {
+        if (!isset($sections['ENV'])) {
+            return;
+        }
+        foreach (explode("\n", trim($sections['ENV'])) as $line) {
+            $line = trim($line);
+            if ('' === $line) {
+                continue;
+            }
+            $parts = explode('=', $line, 2);
+            if (2 !== count($parts)) {
+                throw new \LogicException("Invalid ENV line: {$line}");
+            }
+            $env[$parts[0]] = $parts[1];
+        }
     }
 
     /**
