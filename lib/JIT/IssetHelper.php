@@ -45,7 +45,7 @@ final class IssetHelper
         return null;
     }
 
-    private static function literalStringKey(?Operand $dimOp): ?string
+    public static function literalStringKey(?Operand $dimOp): ?string
     {
         if (null === $dimOp) {
             return null;

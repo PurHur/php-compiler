@@ -234,7 +234,7 @@ class JIT {
                         break;
                     }
                     if ($value->type === Variable::TYPE_HASHTABLE) {
-                        $fetched = $value->dimFetch($dim, $resultOp->type, $forWrite);
+                        $fetched = $value->dimFetch($dim, $resultOp->type, $forWrite, $dimOp);
                         if ($forWrite) {
                             $this->context->setVariableOp($resultOp, $fetched);
                         } else {
@@ -561,7 +561,7 @@ class JIT {
                     $leftBb = JIT\CoalesceHelper::compileBranch($this, $func, $op->block1);
                     $rightBb = JIT\CoalesceHelper::compileBranch($this, $func, $op->block2);
                     $builder->positionAtEnd($branchBlock);
-                    $this->context->freeDeadVariables($func, $branchBlock, $block);
+                    // Do not free here: $op->arg1 is assigned in branch blocks (#99, #148).
                     $builder->branchIf($condition, $leftBb, $rightBb);
                     if (null !== $op->block3) {
                         $mergeBb = JIT\BasicBlockHelper::append($this->context, 'coalesce_merge');

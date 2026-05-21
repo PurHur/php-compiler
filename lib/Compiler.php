@@ -93,8 +93,7 @@ class Compiler {
                         $block = $this->compileNullsafePropertyFetch($child, $block);
                     } elseif (
                         $child instanceof Op\Expr\ArrayDimFetch
-                        && $i + 1 < $opCount
-                        && $this->isArrayDimFetchOnlyCoalesceLeft($child, $ops[$i + 1])
+                        && $this->findsCoalesceUsingFetchAsLeft($ops, $i, $child)
                     ) {
                         // Lowered by compileCoalesce via isset(container, dim) — no eager fetch (#99, #273).
                         break;
@@ -127,6 +126,29 @@ class Compiler {
         }
 
         return $left === $fetch->result;
+    }
+
+    /**
+     * php-cfg may emit ConstFetch (e.g. ?? right literal) between fetch and Coalesce; still skip eager fetch.
+     *
+     * @param Op[] $ops
+     */
+    private function findsCoalesceUsingFetchAsLeft(array $ops, int $fetchIndex, Op\Expr\ArrayDimFetch $fetch): bool
+    {
+        $opCount = count($ops);
+        for ($j = $fetchIndex + 1; $j < $opCount; ++$j) {
+            $candidate = $ops[$j];
+            if ($candidate instanceof Op\Expr\BinaryOp\Coalesce) {
+                return $this->isArrayDimFetchOnlyCoalesceLeft($fetch, $candidate);
+            }
+            if ($candidate instanceof Op\Expr\ConstFetch) {
+                continue;
+            }
+
+            return false;
+        }
+
+        return false;
     }
 
     protected function compileClassLike(Op\Stmt\ClassLike $class, Block $block): OpCode {
@@ -637,11 +659,13 @@ class Compiler {
 
     protected function compileCoalesce(Op\Expr\BinaryOp\Coalesce $expr, Block $block): Block
     {
+        if ($expr->result instanceof Temporary) {
+            $expr->result->usages[] = $expr->result;
+        }
         $resultSlot = $this->compileOperand($expr->result, $block, false);
 
         $endBlock = new Block($block->orig);
         $endBlock->inheritUndefinedLocals = true;
-        $endBlock->inheritScopeFrom($block);
 
         $rightBlock = new Block($block->orig);
         $rightBlock->inheritUndefinedLocals = true;
@@ -656,7 +680,6 @@ class Compiler {
 
         $leftBlock = new Block($block->orig);
         $leftBlock->inheritUndefinedLocals = true;
-        $leftBlock->inheritScopeFrom($block);
 
         $checkSlot = $this->compileBoolTemporary($block);
         $dimFetch = $this->findCoalesceArrayDimFetch($expr->left, $block);
@@ -672,6 +695,7 @@ class Compiler {
                 $dimSlot
             ));
             if (null !== $dimFetch) {
+                $leftBlock->inheritScopeFrom($block);
                 $this->compileArrayDimFetchRead($dimFetch, $leftBlock);
                 $leftSlot = $this->compileOperand($dimFetch->result, $leftBlock, true);
                 $leftBlock->addOpCode(new OpCode(
@@ -723,6 +747,7 @@ class Compiler {
         $coalesceOp->block2 = $rightBlock;
         $coalesceOp->block3 = $endBlock;
         $block->addOpCode($coalesceOp);
+        $endBlock->inheritScopeFrom($block);
 
         return $endBlock;
     }

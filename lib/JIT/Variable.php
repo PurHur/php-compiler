@@ -372,7 +372,7 @@ final class Variable {
         }
     }
 
-    public function dimFetch(self $dim, ?Type $expectedType = null, bool $forWrite = false): Variable {
+    public function dimFetch(self $dim, ?Type $expectedType = null, bool $forWrite = false, ?Operand $dimOp = null): Variable {
         switch ($this->type) {
             case self::TYPE_STRING:
                 $ptr = StringOffsetHelper::dimFetch(
@@ -395,6 +395,9 @@ final class Variable {
                     && (null === $expectedType || Type::TYPE_ARRAY !== $expectedType->type)
                 ) {
                     $key = $dim->compileTimeString;
+                    if (null === $key && isset($dimOp)) {
+                        $key = IssetHelper::literalStringKey($dimOp);
+                    }
                     if (null !== $key) {
                         $baked = SuperglobalInit::compileTimeReadString(
                             $this->context,
