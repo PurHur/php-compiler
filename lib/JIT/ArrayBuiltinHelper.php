@@ -1340,6 +1340,15 @@ final class ArrayBuiltinHelper
         $context->builder->positionAtEnd($done);
     }
 
+    public static function buildKeysArrayFromVariable(Context $context, Variable $array): Value
+    {
+        $ht = self::isNativeArray($array->type)
+            ? self::nativeListToHashTable($context, $array)
+            : self::loadHashTable($context, $array);
+
+        return self::buildKeysArray($context, $ht);
+    }
+
     public static function buildKeysArray(Context $context, Value $ht): Value
     {
         $num = $context->builder->call(
@@ -1384,7 +1393,10 @@ final class ArrayBuiltinHelper
         }
         $result = HashTableHelper::alloc($context);
         foreach ($arrays as $array) {
-            self::copyInto($context, $result, self::loadHashTable($context, $array));
+            $ht = self::isNativeArray($array->type)
+                ? self::nativeListToHashTable($context, $array)
+                : self::loadHashTable($context, $array);
+            self::copyInto($context, $result, $ht);
         }
 
         return $result;
@@ -2094,7 +2106,9 @@ final class ArrayBuiltinHelper
         Variable $haystack,
         Value $strict
     ): Value {
-        $ht = self::loadHashTable($context, $haystack);
+        $ht = self::isNativeArray($haystack->type)
+            ? self::nativeListToHashTable($context, $haystack)
+            : self::loadHashTable($context, $haystack);
         $sizeT = $context->getTypeFromString('size_t');
         $zero = $sizeT->constInt(0, false);
         $one = $sizeT->constInt(1, false);
@@ -2124,8 +2138,8 @@ final class ArrayBuiltinHelper
         $context->builder->branchIf($atEnd, $done, $body);
 
         $context->builder->positionAtEnd($body);
-        $candidate = self::readListElement($context, $ht, $idx, $needle->type);
-        $match = self::valuesEqual($context, $needle, $candidate, $strict);
+        $entry = self::listEntryAt($context, $ht, $idx);
+        $match = self::entryMatchesNeedle($context, $entry, $needle, $strict);
         $continueBlock = BasicBlockHelper::append($context, 'in_array_continue');
         $context->builder->branchIf($match, $foundBlock, $continueBlock);
 
@@ -2386,6 +2400,58 @@ final class ArrayBuiltinHelper
         return JitValueBox::pointer($context, $resultSlot);
     }
 
+    /**
+     * Unbox a TYPE_VALUE needle (e.g. $_GET['route']) for comparison with a typed candidate.
+     */
+    private static function coerceNeedleForCompare(Context $context, Variable $needle, int $targetType): Variable
+    {
+        if ($needle->type === $targetType) {
+            return $needle;
+        }
+        if (Variable::TYPE_VALUE !== $needle->type) {
+            return $needle;
+        }
+        if (Variable::TYPE_STRING === $targetType) {
+            return new Variable(
+                $context,
+                Variable::TYPE_STRING,
+                Variable::KIND_VALUE,
+                $context->builder->call($context->lookupFunction('__value__readString'), $needle->value)
+            );
+        }
+        if (Variable::TYPE_NATIVE_LONG === $targetType) {
+            return new Variable(
+                $context,
+                Variable::TYPE_NATIVE_LONG,
+                Variable::KIND_VALUE,
+                $context->builder->call($context->lookupFunction('__value__readLong'), $needle->value)
+            );
+        }
+        if (Variable::TYPE_NATIVE_BOOL === $targetType) {
+            $i1 = $context->getTypeFromString('int1');
+
+            return new Variable(
+                $context,
+                Variable::TYPE_NATIVE_BOOL,
+                Variable::KIND_VALUE,
+                $context->builder->truncOrBitCast(
+                    $context->builder->call($context->lookupFunction('__value__readLong'), $needle->value),
+                    $i1
+                )
+            );
+        }
+        if (Variable::TYPE_NATIVE_DOUBLE === $targetType) {
+            return new Variable(
+                $context,
+                Variable::TYPE_NATIVE_DOUBLE,
+                Variable::KIND_VALUE,
+                $context->builder->call($context->lookupFunction('__value__readDouble'), $needle->value)
+            );
+        }
+
+        return $needle;
+    }
+
     private static function entryMatchesNeedle(
         Context $context,
         Value $entry,
@@ -2426,7 +2492,10 @@ final class ArrayBuiltinHelper
             Variable::KIND_VALUE,
             $context->builder->call($context->lookupFunction('__value__readString'), $entry)
         );
-        $context->builder->store(self::valuesEqual($context, $needle, $strCand, $strict), $resultSlot);
+        $context->builder->store(
+            self::valuesEqual($context, self::coerceNeedleForCompare($context, $needle, Variable::TYPE_STRING), $strCand, $strict),
+            $resultSlot
+        );
         $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbCheckLong);
@@ -2444,7 +2513,10 @@ final class ArrayBuiltinHelper
             Variable::KIND_VALUE,
             $context->builder->call($context->lookupFunction('__value__readLong'), $entry)
         );
-        $context->builder->store(self::valuesEqual($context, $needle, $longCand, $strict), $resultSlot);
+        $context->builder->store(
+            self::valuesEqual($context, self::coerceNeedleForCompare($context, $needle, Variable::TYPE_NATIVE_LONG), $longCand, $strict),
+            $resultSlot
+        );
         $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbCheckBool);
@@ -2465,7 +2537,10 @@ final class ArrayBuiltinHelper
                 $i1
             )
         );
-        $context->builder->store(self::valuesEqual($context, $needle, $boolCand, $strict), $resultSlot);
+        $context->builder->store(
+            self::valuesEqual($context, self::coerceNeedleForCompare($context, $needle, Variable::TYPE_NATIVE_BOOL), $boolCand, $strict),
+            $resultSlot
+        );
         $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbCheckDouble);
@@ -2483,7 +2558,10 @@ final class ArrayBuiltinHelper
             Variable::KIND_VALUE,
             $context->builder->call($context->lookupFunction('__value__readDouble'), $entry)
         );
-        $context->builder->store(self::valuesEqual($context, $needle, $doubleCand, $strict), $resultSlot);
+        $context->builder->store(
+            self::valuesEqual($context, self::coerceNeedleForCompare($context, $needle, Variable::TYPE_NATIVE_DOUBLE), $doubleCand, $strict),
+            $resultSlot
+        );
         $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbNull);

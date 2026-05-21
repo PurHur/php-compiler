@@ -11,6 +11,9 @@ echo $b[2], "\n";
 echo sizeof($a), "\n";
 $assoc = array('x' => 10, 'y' => 20);
 echo count($assoc), "\n";
+for ($i = 0; $i < count($a); $i++) {
+    echo $a[$i], "\n";
+}
 --EXPECT--
 3
 0
@@ -18,3 +21,6 @@ echo count($assoc), "\n";
 30
 3
 2
+1
+2
+3

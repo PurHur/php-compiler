@@ -20,7 +20,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * in_array() for arrays of scalar values (subset of PHP; VM only).
+ * in_array() for arrays of scalar values (subset of PHP; JIT via ArrayBuiltinHelper).
  */
 final class in_array extends Internal
 {
