@@ -527,7 +527,21 @@ class JIT {
                         )
                     );
                     break;
-                // case OpCode::TYPE_CASE:
+                case OpCode::TYPE_CASE:
+                    $branchBlock = $builder->getInsertBlock();
+                    $builder->positionAtEnd($branchBlock);
+                    $switchVar = $this->context->getVariableFromOp($block->getOperand($op->arg1));
+                    $caseVar = $this->context->getVariableFromOp($block->getOperand($op->arg2));
+                    $equalOp = new OpCode(OpCode::TYPE_EQUAL);
+                    $matchVar = $this->context->helper->binaryOp($equalOp, $switchVar, $caseVar);
+                    $match = $this->context->helper->loadValue($matchVar);
+                    $caseBb = $this->compileBlockInternal($func, $op->block1, ...$args);
+                    $nextBb = JIT\BasicBlockHelper::append($this->context, 'switch_next_case');
+                    $builder->positionAtEnd($branchBlock);
+                    $this->context->freeDeadVariables($func, $branchBlock, $block);
+                    $builder->branchIf($match, $caseBb, $nextBb);
+                    $builder->positionAtEnd($nextBb);
+                    break;
                 case OpCode::TYPE_JUMP:
                     $branchBlock = $builder->getInsertBlock();
                     $builder->positionAtEnd($branchBlock);

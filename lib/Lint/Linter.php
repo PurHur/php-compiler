@@ -98,7 +98,6 @@ final class Linter
         $issues = [
             ...(new IncrementDetector())->detect($code, $filename),
             ...(new ListDestructuringDetector())->detect($code, $filename),
-            ...(new SwitchDetector())->detect($code, $filename),
         ];
         $script = $this->parseForLint($code, $filename);
         foreach ($this->lintScript($script) as $issue) {
