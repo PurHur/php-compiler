@@ -40,9 +40,9 @@ final class ArrayBuiltinHelper
 
     public static function getNumElements(Context $context, Value $ht): Value
     {
-        $num = $context->builder->call(
-            $context->lookupFunction('__hashtable__getNumElements'),
-            $ht
+        $map = $context->structFieldMap['__hashtable__'];
+        $num = $context->builder->load(
+            $context->builder->structGep($ht, $map['numElements'])
         );
 
         return $context->builder->zExt($num, $context->getTypeFromString('int64'));
