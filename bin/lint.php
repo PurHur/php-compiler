@@ -107,7 +107,7 @@ foreach ($linter->consumeDynamicIncludeWarnings() as $warning) {
 
 if ($json) {
     $payload = array_map(static fn (Issue $i) => $i->toArray(), $issues);
-    fwrite(STDOUT, json_encode(['issues' => $payload], JSON_PRETTY_PRINT)."\n");
+    fwrite(STDOUT, json_encode(['issues' => $payload], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n");
 } else {
     foreach ($issues as $issue) {
         fwrite(STDOUT, $issue->formatHuman()."\n");

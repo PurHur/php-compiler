@@ -11,6 +11,8 @@ namespace PHPCompiler\Lint;
  */
 final class UnsupportedRegistry
 {
+    public const ISSUE_URL_BASE = 'https://github.com/PurHur/php-compiler/issues/';
+
     /** @var array<string, int> */
     private const KIND_TO_ISSUE = [
         'Expr_Throw' => 195,
@@ -47,6 +49,11 @@ final class UnsupportedRegistry
         }
 
         return null;
+    }
+
+    public static function issueUrl(int $issue): string
+    {
+        return self::ISSUE_URL_BASE.$issue;
     }
 
     /**

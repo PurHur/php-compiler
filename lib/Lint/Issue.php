@@ -81,13 +81,18 @@ final class Issue
      */
     public function toArray(): array
     {
-        return [
+        $row = [
             'file' => $this->file,
             'line' => $this->line,
             'kind' => $this->kind,
             'message' => $this->message,
             'issue' => $this->trackingIssue,
         ];
+        if (null !== $this->trackingIssue) {
+            $row['issue_url'] = UnsupportedRegistry::issueUrl($this->trackingIssue);
+        }
+
+        return $row;
     }
 
     public function formatHuman(): string

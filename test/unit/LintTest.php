@@ -120,6 +120,10 @@ PHP;
         $this->assertNotEmpty($decoded['issues']);
         $this->assertArrayHasKey('line', $decoded['issues'][0]);
         $this->assertSame(167, $decoded['issues'][0]['issue']);
+        $this->assertSame(
+            'https://github.com/PurHur/php-compiler/issues/167',
+            $decoded['issues'][0]['issue_url']
+        );
     }
 
     public function testPhpcLintDelegatesToLintScript(): void
