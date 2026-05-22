@@ -93,6 +93,7 @@ class OpCode {
     const TYPE_TRY = 92;
     const TYPE_CATCH = 93;
     const TYPE_FINALLY = 94;
+    const TYPE_DECLARE_GLOBAL_CONST = 95;
 
     public int $type;
     public ?int $arg1;

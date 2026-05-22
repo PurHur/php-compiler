@@ -572,6 +572,15 @@ restart:
             }
         }
         if (Variable::TYPE_VALUE === $leftType && Variable::TYPE_VALUE === $rightType) {
+            if (OpCode::TYPE_PLUS === $opcode->type) {
+                $leftPtr = Variable::KIND_VARIABLE === $left->kind ? $left->value : $this->loadValue($left);
+                $rightPtr = Variable::KIND_VARIABLE === $right->kind ? $right->value : $this->loadValue($right);
+                $readLong = $this->context->lookupFunction('__value__readLong');
+                $leftLong = $this->context->builder->call($readLong, $leftPtr);
+                $rightLong = $this->context->builder->call($readLong, $rightPtr);
+                $result = $this->context->builder->addNoSignedWrap($leftLong, $rightLong);
+                goto return_long;
+            }
             if (OpCode::TYPE_IDENTICAL === $opcode->type) {
                 $result = JitValueCompare::identicalValueToValue($this->context, $left, $right);
                 goto return_bool;
@@ -594,6 +603,16 @@ restart:
             }
         }
         if (Variable::TYPE_VALUE === $leftType && Variable::TYPE_VALUE !== $rightType) {
+            if (OpCode::TYPE_PLUS === $opcode->type && Variable::TYPE_NATIVE_LONG === $rightType) {
+                $leftPtr = Variable::KIND_VARIABLE === $left->kind ? $left->value : $this->loadValue($left);
+                $leftLong = $this->context->builder->call(
+                    $this->context->lookupFunction('__value__readLong'),
+                    $leftPtr
+                );
+                $__right = $this->context->builder->intCast($rightValue, $leftLong->typeOf());
+                $result = $this->context->builder->addNoSignedWrap($leftLong, $__right);
+                goto return_long;
+            }
             if (OpCode::TYPE_IDENTICAL === $opcode->type) {
                 if (Variable::TYPE_NATIVE_BOOL === $rightType) {
                     $valuePtr = Variable::KIND_VARIABLE === $left->kind
@@ -634,6 +653,16 @@ restart:
             }
         }
         if (Variable::TYPE_VALUE === $rightType && Variable::TYPE_VALUE !== $leftType) {
+            if (OpCode::TYPE_PLUS === $opcode->type && Variable::TYPE_NATIVE_LONG === $leftType) {
+                $rightPtr = Variable::KIND_VARIABLE === $right->kind ? $right->value : $this->loadValue($right);
+                $rightLong = $this->context->builder->call(
+                    $this->context->lookupFunction('__value__readLong'),
+                    $rightPtr
+                );
+                $__left = $this->context->builder->intCast($leftValue, $rightLong->typeOf());
+                $result = $this->context->builder->addNoSignedWrap($__left, $rightLong);
+                goto return_long;
+            }
             if (OpCode::TYPE_IDENTICAL === $opcode->type) {
                 if (Variable::TYPE_NATIVE_BOOL === $leftType) {
                     $valuePtr = Variable::KIND_VARIABLE === $right->kind

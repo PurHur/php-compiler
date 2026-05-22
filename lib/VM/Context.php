@@ -80,6 +80,24 @@ class Context {
         return null;
     }
 
+    public function isUserConstantDefined(string $name): bool
+    {
+        return isset($this->constants[$name]);
+    }
+
+    /**
+     * Register a user constant (const / define). Returns false if already defined.
+     */
+    public function defineConstant(string $name, Variable $value): bool
+    {
+        if (isset($this->constants[$name])) {
+            return false;
+        }
+        $this->constants[$name] = clone $value;
+
+        return true;
+    }
+
     public function declareFunction(Func $func): void {
         $lcname = strtolower($func->getName());
         $this->functions[$lcname] = $func;

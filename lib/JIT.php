@@ -905,6 +905,19 @@ class JIT {
                     $result = $this->context->scope->toCall->call($this->context, ...$this->context->scope->args);
                     $this->assignOperandValue($block->getOperand($op->arg1), $result);
                     break;
+                case OpCode::TYPE_DECLARE_GLOBAL_CONST:
+                    $nameOp = $block->getOperand($op->arg1);
+                    assert($nameOp instanceof Operand\Literal);
+                    if (!isset($block->constants[$op->arg2])) {
+                        throw new \LogicException('Global constant value must be a compile-time constant');
+                    }
+                    if (!$this->context->runtime->vmContext->defineConstant(
+                        $nameOp->value,
+                        $block->constants[$op->arg2]
+                    )) {
+                        throw new \LogicException("Cannot redefine constant {$nameOp->value}");
+                    }
+                    break;
                 case OpCode::TYPE_DECLARE_CLASS:
                     $nameOp = $block->getOperand($op->arg1);
                     assert($nameOp instanceof Operand\Literal);
