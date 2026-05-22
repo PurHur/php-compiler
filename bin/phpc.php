@@ -12,6 +12,7 @@ declare(strict_types=1);
  *   phpc run [-q 'name=World'] [-p 'field=val'] script.php [args...]
  *   phpc build [-o outfile] entry.php
  *   phpc build --project [dir] [--dry-run]     AOT compile from phpc.json entry/binary
+ *   phpc deploy [dir] -o <dist> [--from-build]  Bundle binary, public/, assets/, phpc.json
  *   phpc lint [-r 'code'] [--json] entry.php
  *   phpc lint --project <entry.php> [--json]
  *   phpc lint --all <dir-or-file> [--json]
@@ -40,6 +41,8 @@ php-compiler CLI
   phpc build [-o out] <entry.php>               AOT compile to a native binary
   phpc build --project [dir] [--dry-run]        Build from phpc.json entry + binary paths
       --dry-run                                 List entry + includes graph; exit before LLVM
+  phpc deploy [dir] -o <dist>                   Package AOT binary + manifest trees into dist/
+      --from-build                              Require existing binary (skip phpc build --project)
   phpc lint [-r 'code'] [--json] <entry.php>    Report unsupported syntax (line-accurate)
   phpc lint --project <entry.php> [--json]    Entry + literal include/require chain
   phpc lint --all <dir-or-file> [--json]      All .php under a tree (aggregated)
@@ -76,6 +79,14 @@ switch ($command) {
             exit(1);
         }
         exit(runProcess(array_merge($php, [$repoRoot.'/bin/vm.php'], $args), $repoRoot));
+
+    case 'deploy':
+        if (!is_file($repoRoot.'/vendor/autoload.php')) {
+            fwrite(STDERR, "phpc deploy: run composer install first\n");
+            exit(1);
+        }
+        require $repoRoot.'/vendor/autoload.php';
+        exit(deployFromProject($repoRoot, phpCommand(), $args));
 
     case 'build':
         if ([] !== $args && '--project' === $args[0]) {
@@ -176,6 +187,87 @@ function phpCommand(): array
     }
 
     return $cmd;
+}
+
+/**
+ * @param list<string> $args CLI args after "deploy"
+ */
+function deployFromProject(string $repoRoot, array $php, array $args): int
+{
+    $fromBuild = false;
+    $outputDir = null;
+    $projectDir = '.';
+
+    $i = 0;
+    $argc = count($args);
+    while ($i < $argc) {
+        $arg = $args[$i];
+        if ('--from-build' === $arg) {
+            ++$i;
+            continue;
+        }
+        if ('-o' === $arg || '--output' === $arg) {
+            if ($i + 1 >= $argc) {
+                fwrite(STDERR, "phpc deploy: missing value for {$arg}\n");
+                return 1;
+            }
+            $outputDir = $args[$i + 1];
+            $i += 2;
+            continue;
+        }
+        if (!str_starts_with($arg, '-')) {
+            $projectDir = $arg;
+            ++$i;
+            continue;
+        }
+        fwrite(STDERR, "phpc deploy: unknown option: {$arg}\n");
+        return 1;
+    }
+
+    if (null === $outputDir || '' === $outputDir) {
+        fwrite(STDERR, "phpc deploy: required -o <dist>\n");
+        return 1;
+    }
+
+    $projectReal = realpath($projectDir);
+    if (false === $projectReal) {
+        fwrite(STDERR, "phpc deploy: project directory not found: {$projectDir}\n");
+        return 1;
+    }
+
+    $binary = \PHPCompiler\Web\ProjectManifest::resolveBinaryOutputPath($projectReal);
+    if (null === $binary) {
+        fwrite(STDERR, "phpc deploy: could not resolve binary from phpc.json\n");
+        return 1;
+    }
+
+    if (!is_file($binary)) {
+        if ($fromBuild) {
+            fwrite(STDERR, "phpc deploy: binary not found: {$binary}\n");
+            return 1;
+        }
+        $buildCode = buildFromProject($repoRoot, $php, $projectReal, false);
+        if (0 !== $buildCode) {
+            return $buildCode;
+        }
+        if (!is_file($binary)) {
+            fwrite(STDERR, "phpc deploy: build completed but binary missing: {$binary}\n");
+            return 1;
+        }
+    }
+
+    $errors = \PHPCompiler\Web\ProjectDeploy::deploy($projectReal, $outputDir, false);
+    if ([] !== $errors) {
+        foreach ($errors as $message) {
+            fwrite(STDERR, $message."\n");
+        }
+        return 1;
+    }
+
+    $dist = realpath($outputDir) ?: $outputDir;
+    fwrite(STDOUT, "Deployed to {$dist}\n");
+
+    return 0;
 }
 
 /**
