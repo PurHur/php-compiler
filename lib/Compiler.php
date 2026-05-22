@@ -88,9 +88,10 @@ class Compiler {
                     $block->addOpCode($this->compileFunction($child, $block));
                     break;
                 case Op\Stmt\Class_::class:
+                    $block->addOpCode($this->compileClassLike($child, $block));
+                    break;
                 case Op\Stmt\Interface_::class:
                 case Op\Stmt\Trait_::class:
-                    $block->addOpCode($this->compileClassLike($child, $block));
                     break;
             }
         }

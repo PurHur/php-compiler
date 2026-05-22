@@ -99,9 +99,11 @@ final class LiteralIncludeDiscovery
     {
         $paths = [];
         $seen = new \SplObjectStorage();
-        self::walkCfgBlock($script->main->cfg, $fromFile, $paths, $seen);
+        if ($script->main->cfg instanceof CfgBlock) {
+            self::walkCfgBlock($script->main->cfg, $fromFile, $paths, $seen);
+        }
         foreach ($script->functions as $func) {
-            if ($func instanceof CfgFunc) {
+            if ($func instanceof CfgFunc && $func->cfg instanceof CfgBlock) {
                 self::walkCfgBlock($func->cfg, $fromFile, $paths, $seen);
             }
         }

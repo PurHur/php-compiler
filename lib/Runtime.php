@@ -12,7 +12,7 @@ namespace PHPCompiler;
 use PHPCfg\Func as CfgFunc;
 use PHPCfg\Parser;
 use PHPCfg\Traverser;
-use PHPCfg\LivenessDetector;
+use PHPCfg\LivenessDetector as CfgLivenessDetector;
 use PHPCfg\Visitor;
 use PHPCfg\Script;
 use PHPTypes\TypeReconstructor;
@@ -32,7 +32,7 @@ class Runtime {
     public Parser $parser;
     public Traverser $preprocessor;
     public Traverser $postprocessor;
-    public LivenessDetector $detector;
+    public CfgLivenessDetector $detector;
     public Optimizer $assignOpResolver;
     public VMContext $vmContext;
     public VM $vm;
@@ -60,7 +60,7 @@ class Runtime {
         $this->preprocessor->addVisitor(new Visitor\DeadBlockEliminator);
         $this->postprocessor = new Traverser;
         $this->postprocessor->addVisitor(new Visitor\PhiResolver);
-        $this->detector = new LivenessDetector;
+        $this->detector = new NullSafeLivenessDetector;
         $this->assignOpResolver = new Optimizer\AssignOp;
 
         $this->typeReconstructor = new TypeReconstructor;
