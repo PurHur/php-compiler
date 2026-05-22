@@ -78,4 +78,25 @@ final class ConstStringFolderTest extends TestCase
         $this->assertNotNull($resolved);
         $this->assertStringEndsWith('/templates/layout.php', $resolved);
     }
+
+    public function testFoldForIncludeSkipsDeployPathConcat(): void
+    {
+        $fallback = realpath(__DIR__.'/../../../examples/003-MiniWebApp/src');
+        $this->assertNotFalse($fallback);
+        $code = "<?php\ninclude phpc_deploy_path('src', '".$fallback."') . '/../templates/layout.php';\n";
+        $runtime = new Runtime();
+        $script = $runtime->parser->parse($code, $fallback.'/Router.php');
+        $runtime->preprocessor->traverse($script);
+        foreach ($script->main->cfg->children as $child) {
+            if (!$child instanceof \PHPCfg\Op\Expr\Include_) {
+                continue;
+            }
+            $this->assertNull(
+                ConstStringFolder::foldForInclude($script->main->cfg, $child->expr, $fallback.'/Router.php')
+            );
+
+            return;
+        }
+        $this->fail('expected include op');
+    }
 }

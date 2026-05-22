@@ -14,6 +14,7 @@ use PHPCompiler\JIT\Variable;
 use PHPCompiler\Web\Superglobals;
 use PHPCompiler\OpCode;
 use PHPCompiler\VM\Variable as VmVariable;
+use PHPCompiler\Web\DeployRoot;
 
 /**
  * Compile-time literal include/require for JIT/AOT (issue #54, #475, #485).
@@ -28,6 +29,11 @@ final class IncludeHelper
         ?Operand $resultOperand
     ): void {
         $context = $jit->context;
+        if (null !== $op->arg3 && isset($callerBlock->deployIncludePaths[$op->arg3])) {
+            self::compileDeployPathInclude($jit, $func, $callerBlock, $op, $resultOperand);
+
+            return;
+        }
         $path = null;
         if (null !== $op->arg3 && isset($callerBlock->literalIncludePaths[$op->arg3])) {
             $path = $callerBlock->literalIncludePaths[$op->arg3];
@@ -44,6 +50,17 @@ final class IncludeHelper
                 'include/require must use a compile-time literal path for JIT/AOT (issue #54)'
             );
         }
+        self::compileIncludedFile($jit, $func, $callerBlock, $path, $resultOperand);
+    }
+
+    private static function compileIncludedFile(
+        JIT $jit,
+        Function_ $func,
+        Block $callerBlock,
+        string $path,
+        ?Operand $resultOperand
+    ): void {
+        $context = $jit->context;
         if (!is_file($path)) {
             throw new \LogicException('include file not found for JIT/AOT: '.$path);
         }
@@ -71,6 +88,30 @@ final class IncludeHelper
         if (null !== $resultOperand) {
             $jit->assignIncludeResult($resultOperand);
         }
+    }
+
+    /**
+     * Inline deploy-path includes using the compile-tree file; runtime PHPC_DEPLOY_ROOT is VM-only until #623 AOT runtime hook.
+     */
+    private static function compileDeployPathInclude(
+        JIT $jit,
+        Function_ $func,
+        Block $callerBlock,
+        OpCode $op,
+        ?Operand $resultOperand
+    ): void {
+        $spec = $callerBlock->deployIncludePaths[$op->arg3];
+        $path = $spec['compile'];
+        if (null === $path) {
+            $path = DeployRoot::resolvePathWithSuffix($spec['rel'], $spec['fallback'], $spec['suffix']);
+        }
+        if (null === $path || '' === $path || !is_file($path)) {
+            throw new \LogicException(
+                'deploy-path include file not found for JIT/AOT (issue #623): '
+                .$spec['rel'].$spec['suffix']
+            );
+        }
+        self::compileIncludedFile($jit, $func, $callerBlock, $path, $resultOperand);
     }
 
     /**

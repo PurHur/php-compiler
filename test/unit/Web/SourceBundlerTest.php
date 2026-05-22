@@ -44,7 +44,7 @@ final class SourceBundlerTest extends TestCase
         }
     }
 
-    public function testBundleMiniWebAppRewritesDeployPathIncludesToLiterals(): void
+    public function testBundleMiniWebAppPreservesDeployPathIncludes(): void
     {
         $entry = realpath(dirname(__DIR__, 3).'/examples/003-MiniWebApp/public/index.php');
         $this->assertNotFalse($entry);
@@ -53,8 +53,7 @@ final class SourceBundlerTest extends TestCase
         $root = DeployRoot::findProjectRootForPath($entry);
         [$bundled] = SourceBundler::bundleForAot($entry, $includes, $root);
 
-        $this->assertStringNotContainsString('phpc_deploy_path(', $bundled);
-        $this->assertStringContainsString("include '", $bundled);
+        $this->assertStringContainsString('phpc_deploy_path(', $bundled);
         $this->assertStringContainsString('/templates/layout.php', $bundled);
     }
 }
