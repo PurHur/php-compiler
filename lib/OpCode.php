@@ -112,10 +112,7 @@ class OpCode {
         $this->arg3 = $arg3;
     }
 
-<<<<<<< HEAD
-=======
     public function getType(): string {
         return 'opcode_'.$this->type;
     }
->>>>>>> d97ed38 (WIP: JIT fixes for native self-host compile (issue #557))
 }
