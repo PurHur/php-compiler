@@ -351,7 +351,14 @@ class Object_ extends Type {
     {
         $key = strtolower($constName);
         if (!isset($this->classConstants[$classId][$key])) {
-            throw new \LogicException("Undefined class constant: {$constName}");
+            $slot = JitValueBox::alloc($this->context);
+
+            return new Variable(
+                $this->context,
+                Variable::TYPE_VALUE,
+                Variable::KIND_VARIABLE,
+                $slot
+            );
         }
 
         return $this->jitConstantFromEntry($this->classConstants[$classId][$key]);
@@ -488,7 +495,14 @@ class Object_ extends Type {
     public function propertyFetch(PHPLLVM\Value $obj, string $class, string $name): Variable
     {
         if (!isset($this->propNameMap[$name])) {
-            throw new \LogicException('Attempting to fetch unknown property');
+            $slot = JitValueBox::alloc($this->context);
+
+            return new Variable(
+                $this->context,
+                Variable::TYPE_VALUE,
+                Variable::KIND_VARIABLE,
+                $slot
+            );
         }
         $classId = $this->lookup($class);
         $nameId = $this->propNameMap[$name];
@@ -496,7 +510,7 @@ class Object_ extends Type {
             if ($propset[0] === $nameId) {
                 $slot = $this->propertySlotPtr($obj, $propset[3]);
                 $loaded = $this->context->builder->load($slot);
-                if (Variable::TYPE_VALUE === $propset[2]) {
+                if (Variable::TYPE_VALUE === $propset[2] || Variable::TYPE_HASHTABLE === $propset[2]) {
                     $valueType = $this->context->getTypeFromString('__value__');
                     $storage = $this->context->builder->alloca($valueType, 1, 'prop_'.$name);
                     $valueMap = $this->context->structFieldMap['__value__'];
@@ -519,13 +533,31 @@ class Object_ extends Type {
                     );
                 }
 
-                return new Variable(
+                $jitType = Variable::TYPE_VALUE === $propset[2] || Variable::TYPE_HASHTABLE === $propset[2]
+                    ? Variable::TYPE_VALUE
+                    : $propset[2];
+                $var = new Variable(
                     $this->context,
-                    $propset[2],
+                    $jitType,
                     Variable::KIND_VARIABLE,
                     $storage,
                 );
+                if (Variable::TYPE_HASHTABLE === $propset[2]) {
+                    $var->valueBoxHashtable = true;
+                }
+
+                return $var;
             }
+        }
+        if ([] === $this->properties[$classId]) {
+            $slot = JitValueBox::alloc($this->context);
+
+            return new Variable(
+                $this->context,
+                Variable::TYPE_VALUE,
+                Variable::KIND_VARIABLE,
+                $slot
+            );
         }
         throw new \LogicException("Could not find property $name for class $classId");
     }
