@@ -103,6 +103,22 @@ function syntaxRowDefinitions(): array
             'notes' => ['Requires `namespace` declaration (#84)'],
             'probe' => null,
         ],
+        [
+            'id' => 'magic_const_dir_file',
+            'construct' => 'Magic constants `__DIR__`, `__FILE__`',
+            'opcodes' => ['TYPE_SCRIPT_MAGIC', 'TYPE_INCLUDE'],
+            'issue' => 707,
+            'notes' => ['VM script stack on include; JIT uses per-unit script path'],
+            'probe' => null,
+        ],
+        [
+            'id' => 'magic_const_line',
+            'construct' => 'Magic constant `__LINE__`',
+            'opcodes' => [],
+            'issue' => 707,
+            'notes' => ['Lowered at parse time via php-cfg MagicStringResolver (best effort)'],
+            'probe' => null,
+        ],
     ];
 }
 

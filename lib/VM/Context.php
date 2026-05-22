@@ -27,9 +27,12 @@ class Context {
 
     public ErrorReporter $errors;
 
+    public ScriptStack $scriptStack;
+
     public function __construct(Runtime $runtime) {
         $this->runtime = $runtime;
         $this->errors = new ErrorReporter();
+        $this->scriptStack = new ScriptStack();
     }
 
     public function constantFetch(string $name): ?Variable {

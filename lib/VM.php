@@ -30,13 +30,29 @@ class VM {
 
     public function run(Block $block): int {
         if (!is_null($block->handler)) {
-            $block->handler->execute($block->getFrame($this->context));
+            $frame = $block->getFrame($this->context);
+            $this->seedScriptPath($frame);
+            $block->handler->execute($frame);
             return self::SUCCESS;
         }
 
-        $this->context->push($block->getFrame($this->context));
+        $frame = $block->getFrame($this->context);
+        $this->seedScriptPath($frame);
+        $this->context->push($frame);
 
-        return $this->runFrames();
+        $result = $this->runFrames();
+        if ('' !== $frame->scriptPath) {
+            $this->context->scriptStack->pop();
+        }
+
+        return $result;
+    }
+
+    private function seedScriptPath(Frame $frame): void
+    {
+        if ('' !== $frame->scriptPath) {
+            $this->context->scriptStack->push($frame->scriptPath);
+        }
     }
 
     private function runFrames(): int
@@ -460,9 +476,28 @@ restart:
                         && Variable::TYPE_NULL !== $value->type
                     );
                     break;
+                case OpCode::TYPE_SCRIPT_MAGIC:
+                    $script = '' !== $frame->scriptPath
+                        ? $frame->scriptPath
+                        : $this->context->scriptStack->current();
+                    if ('' === $script) {
+                        return $this->raise('__DIR__/__FILE__ used without script context', $frame);
+                    }
+                    $dst = $frame->scope[$op->arg1];
+                    if (OpCode::SCRIPT_MAGIC_DIR === $op->arg3) {
+                        $dst->string(dirname($script));
+                    } else {
+                        $dst->string($script);
+                    }
+                    break;
                 case OpCode::TYPE_INCLUDE:
                     $file = $frame->scope[$op->arg1]->toString();
-                    $parsed = $this->context->runtime->parseAndCompileFile($file);
+                    $resolved = VM\ScriptStack::normalize($file);
+                    if ('' === $resolved || !is_file($resolved)) {
+                        return $this->raise('Failed opening required \''.$file.'\' for inclusion', $frame);
+                    }
+                    $this->context->scriptStack->push($resolved);
+                    $parsed = $this->context->runtime->parseAndCompileFile($resolved);
                     $new = $parsed->getFrame($this->context, $frame);
                     $new->ephemeral = true;
                     $new->parent = $frame;
@@ -530,6 +565,7 @@ restart:
             }
         }
         if ($frame->ephemeral) {
+            $this->context->scriptStack->pop();
             if (null !== $frame->parent) {
                 $frame = $frame->parent;
                 goto restart;
@@ -541,7 +577,8 @@ restart:
 
     protected function raise(string $message, Frame $frame): int
     {
-        throw new \LogicException($message.' in '.$frame->block->getName());
+        $where = '' !== $frame->scriptPath ? $frame->scriptPath : 'script';
+        throw new \LogicException($message.' in '.$where);
     }
 
     protected function defineClass(ClassEntry $entry, Block $block): void {

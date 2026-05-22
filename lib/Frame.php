@@ -30,6 +30,9 @@ class Frame {
     /** When true, finishing this frame resumes the caller instead of ending execution. */
     public bool $ephemeral = false;
 
+    /** Absolute path of the script this frame executes (issue #707). */
+    public string $scriptPath = '';
+
     /** VM context for nested builtin calls (set when invoking Internal handlers). */
     public ?Context $vmContext = null;
 

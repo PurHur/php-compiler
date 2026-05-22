@@ -65,6 +65,12 @@ patch_already_applied() {
     php-cfg-magic-constants.patch)
       grep -q 'namespaceStack' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/MagicStringResolver.php" 2>/dev/null
       ;;
+    php-cfg-magic-script-const.patch)
+      [[ -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/MagicScriptConst.php" ]]
+      ;;
+    php-types-magic-script-const.patch)
+      grep -q "case 'Expr_MagicScriptConst':" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
+      ;;
     *)
       return 1
       ;;
@@ -112,6 +118,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-strict-types.patch"
   apply_patch "$PATCH_DIR/php-cfg-trycatch.patch"
   apply_patch "$PATCH_DIR/php-cfg-magic-constants.patch"
+  apply_patch "$PATCH_DIR/php-cfg-magic-script-const.patch"
 fi
 
 if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
@@ -132,6 +139,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-generics-fallback.patch"
   apply_patch "$PATCH_DIR/php-types-generics-list-array.patch"
   apply_patch "$PATCH_DIR/php-types-ns-func-call.patch"
+  apply_patch "$PATCH_DIR/php-types-magic-script-const.patch"
 fi
 
 if [[ -d "$ROOT/vendor/pre/plugin" ]]; then

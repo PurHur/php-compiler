@@ -445,6 +445,15 @@ class JIT {
                     $value = JIT\IteratorHelper::compileValue($this->context, $array);
                     $this->assignOperand($block->getOperand($op->arg1), $value);
                     break;
+                case OpCode::TYPE_SCRIPT_MAGIC:
+                    $magicStr = JIT\ScriptMagic::stringForBlock($block, (int) $op->arg3);
+                    $lit = new Operand\Literal($magicStr);
+                    $lit->type = \PHPTypes\Type::string();
+                    $this->assignOperand(
+                        $block->getOperand($op->arg1),
+                        JIT\Variable::fromLiteral($this->context, $lit)
+                    );
+                    break;
                 case OpCode::TYPE_INCLUDE:
                     JIT\IncludeHelper::compileLiteral(
                         $this,

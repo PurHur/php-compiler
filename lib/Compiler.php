@@ -763,6 +763,13 @@ class Compiler {
                     );
                 }
                 return $return;
+            case Op\Expr\MagicScriptConst::class:
+                return [new OpCode(
+                    OpCode::TYPE_SCRIPT_MAGIC,
+                    $this->compileOperand($expr->result, $block, false),
+                    null,
+                    $expr->kind,
+                )];
             case Op\Expr\Include_::class:
                 return [$this->compileIncludeOp($expr, $block)];
             case Op\Expr\Isset_::class:

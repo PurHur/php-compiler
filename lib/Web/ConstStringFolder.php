@@ -22,6 +22,10 @@ final class ConstStringFolder
 {
     public static function fold(Operand $operand, string $sourceFile = ''): ?string
     {
+        $magic = self::magicScriptConstValue($operand, $sourceFile, null);
+        if (null !== $magic) {
+            return $magic;
+        }
         $literal = self::literalStringValue($operand);
         if (null !== $literal) {
             return $literal;
@@ -29,7 +33,7 @@ final class ConstStringFolder
         if ($operand instanceof Operand\Temporary) {
             $original = $operand->original;
             if ($original instanceof Op\Expr\BinaryOp\Concat) {
-                return self::foldConcat($original, $sourceFile);
+                return self::foldConcat($original, $sourceFile, null);
             }
             if ($original instanceof Operand\Literal && is_string($original->value)) {
                 return $original->value;
@@ -39,7 +43,7 @@ final class ConstStringFolder
         return null;
     }
 
-    public static function foldConcat(Op\Expr\BinaryOp\Concat $concat, string $sourceFile = ''): ?string
+    public static function foldConcat(Op\Expr\BinaryOp\Concat $concat, string $sourceFile = '', ?CfgBlock $cfg = null): ?string
     {
         $left = self::fold($concat->left, $sourceFile);
         $right = self::fold($concat->right, $sourceFile);
@@ -54,6 +58,10 @@ final class ConstStringFolder
         $rightLit = self::literalStringValue($concat->right);
         if (null !== $leftLit && null !== $rightLit) {
             return $leftLit.$rightLit;
+        }
+        $leftMagic = self::magicScriptConstValue($concat->left, $sourceFile, $cfg);
+        if (null !== $leftMagic && null !== $rightLit) {
+            return $leftMagic.$rightLit;
         }
         if (null !== $rightLit && $rightLit === $dir && null !== $leftLit) {
             return $leftLit.$dir;
@@ -247,7 +255,7 @@ final class ConstStringFolder
         if ($operand instanceof Operand\Temporary) {
             $concat = self::findConcatForOperand($cfg, $operand);
             if (null !== $concat) {
-                return self::foldConcat($concat, $sourceFile);
+                return self::foldConcat($concat, $sourceFile, $cfg);
             }
         }
 
@@ -298,8 +306,70 @@ final class ConstStringFolder
         if ($operand instanceof Operand\Literal && is_string($operand->value)) {
             return $operand->value;
         }
+        $magic = self::magicScriptConstValue($operand);
+        if (null !== $magic) {
+            return $magic;
+        }
 
         return null;
+    }
+
+    private static function magicScriptConstValue(Operand $operand, string $sourceFile = '', ?CfgBlock $cfg = null): ?string
+    {
+        $magic = null;
+        if ($operand instanceof Op\Expr\MagicScriptConst) {
+            $magic = $operand;
+        } elseif ($operand instanceof Operand\Temporary && $operand->original instanceof Op\Expr\MagicScriptConst) {
+            $magic = $operand->original;
+        } elseif (null !== $cfg) {
+            $magic = self::findMagicScriptConstForOperand($cfg, $operand);
+        }
+        if (null === $magic || '' === $sourceFile) {
+            return null;
+        }
+        if (Op\Expr\MagicScriptConst::KIND_DIR === $magic->kind) {
+            return self::sourceDir($sourceFile);
+        }
+        if (Op\Expr\MagicScriptConst::KIND_FILE === $magic->kind) {
+            $resolved = realpath($sourceFile);
+
+            return false !== $resolved ? $resolved : $sourceFile;
+        }
+
+        return null;
+    }
+
+    private static function findMagicScriptConstForOperand(CfgBlock $cfg, Operand $operand): ?Op\Expr\MagicScriptConst
+    {
+        foreach (self::collectMagicScriptConsts($cfg) as $magic) {
+            if ($magic->result === $operand) {
+                return $magic;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return list<Op\Expr\MagicScriptConst>
+     */
+    private static function collectMagicScriptConsts(CfgBlock $block): array
+    {
+        $found = [];
+        foreach ($block->children as $child) {
+            if ($child instanceof Op\Expr\MagicScriptConst) {
+                $found[] = $child;
+            }
+            foreach ($child->getSubBlocks() as $sub) {
+                if ($sub instanceof CfgBlock) {
+                    foreach (self::collectMagicScriptConsts($sub) as $nested) {
+                        $found[] = $nested;
+                    }
+                }
+            }
+        }
+
+        return $found;
     }
 
     private static function sourceDir(string $sourceFile): string
