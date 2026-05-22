@@ -23,8 +23,7 @@ final class ExamplesCompileTest extends TestCase
     private static ?bool $llvmReady = null;
 
     /**
-     * Shipped 003-MiniWebApp: AOT link still blocked on template includes in render* (#58).
-     * Typed array property compile is covered by ObjectPropertyArrayAotCompileTest.
+     * Shipped 003-MiniWebApp: native AOT link via phpc build --project (#568).
      *
      * @group miniwebapp
      * @group llvm
@@ -33,19 +32,44 @@ final class ExamplesCompileTest extends TestCase
      */
     public function test003MiniWebAppEventuallyRuns(): void
     {
-        $index = dirname(__DIR__, 2).'/examples/003-MiniWebApp/public/index.php';
-        if (!is_file($index)) {
-            $this->markTestSkipped('examples/003-MiniWebApp/public/index.php missing (#246)');
-        }
         if (!self::isLlvmReady()) {
             $this->markTestSkipped(
                 'LLVM 9 toolchain not available. Run script/install-llvm9.sh from the repository root.'
             );
         }
-        $this->markTestSkipped(
-            'MiniWebApp AOT link blocked on include/layout templates and render* CFG (#58);'
-            .' see ObjectPropertyArrayAotCompileTest for array property compile'
+        $project = realpath(dirname(__DIR__, 2).'/examples/003-MiniWebApp');
+        if (false === $project) {
+            $this->markTestSkipped('examples/003-MiniWebApp missing (#246)');
+        }
+        $phpc = realpath(dirname(__DIR__, 2).'/phpc');
+        $this->assertNotFalse($phpc);
+        $repoRoot = dirname(__DIR__, 2);
+        $env = $this->llvmProcessEnv($repoRoot);
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open(
+            [$phpc, 'build', '--project', $project],
+            $descriptorSpec,
+            $pipes,
+            $repoRoot,
+            $env
         );
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+        $this->assertSame(
+            0,
+            $exit,
+            'phpc build --project 003-MiniWebApp failed (#568): '.trim($stderr !== false ? $stderr : '')
+        );
+        $binary = $project.'/.phpc/bin/app';
+        $this->assertFileExists($binary);
     }
 
     /**

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCfg\Operand;
+use PHPLLVM\BasicBlock;
 use PHPLLVM\Value\Function_;
 use PHPCompiler\Block;
 use PHPCompiler\JIT;
@@ -21,6 +22,8 @@ use PHPCompiler\Web\DeployRoot;
  */
 final class IncludeHelper
 {
+    private static int $includeEntrySerial = 0;
+
     public static function compileLiteral(
         JIT $jit,
         Function_ $func,
@@ -74,19 +77,32 @@ final class IncludeHelper
         $included->inheritUndefinedLocals = true;
 
         $localBindings = self::collectCalleeLocalBindings($context, $callerBlock, $included);
+        $preIncludeBb = $context->builder->getInsertBlock();
+        $entryBb = $func->appendBasicBlock('include_entry_'.(++self::$includeEntrySerial));
+        if (null !== $preIncludeBb && null === $preIncludeBb->getTerminator()) {
+            $context->builder->positionAtEnd($preIncludeBb);
+            $context->builder->branch($entryBb);
+        }
+        $context->builder->positionAtEnd($entryBb);
+
         $context->pushScope();
+        ++$context->inlineIncludeDepth;
         foreach ($localBindings as $operand) {
             $context->setVariableOp($operand, $localBindings[$operand]);
         }
         try {
-            $exitBb = $jit->compileSubBlock($func, $included);
+            $exitBb = $jit->compileIncludedAtEntry($func, $included, $entryBb);
         } finally {
+            --$context->inlineIncludeDepth;
             $context->popScope();
         }
+
+        $resumeBb = self::appendIncludeResume($context, $func);
         $context->builder->positionAtEnd($exitBb);
         if (null === $exitBb->getTerminator()) {
-            $context->builder->returnVoid();
+            $context->builder->branch($resumeBb);
         }
+        $context->builder->positionAtEnd($resumeBb);
 
         if (null !== $resultOperand) {
             $jit->assignIncludeResult($resultOperand);
@@ -152,6 +168,11 @@ final class IncludeHelper
         }
 
         return $bindings;
+    }
+
+    private static function appendIncludeResume(Context $context, Function_ $func): BasicBlock
+    {
+        return $func->appendBasicBlock('include_resume_'.(++self::$includeEntrySerial));
     }
 
     private static function resolveLiteralPath(

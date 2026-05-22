@@ -115,7 +115,7 @@ ERR;
         $this->assertStringContainsString('lint:', $result['stderr']);
     }
 
-    public function testMiniWebAppBuildPrintsTrailerWhenCompileFails(): void
+    public function testMiniWebAppBuildLinksNativeBinary(): void
     {
         $repoRoot = dirname(__DIR__, 2);
         $phpc = $repoRoot.'/phpc';
@@ -151,15 +151,11 @@ ERR;
         fclose($pipes[1]);
         fclose($pipes[2]);
         $exit = proc_close($proc);
-        $this->assertNotSame(0, $exit);
         $stderr = false !== $stderr ? $stderr : '';
-        if (!PhpcBuild::isUserClassAotBlocked($stderr)) {
-            $this->markTestSkipped(
-                'MiniWebApp AOT failure is not the known #568 user-class gap: '.substr($stderr, 0, 300)
-            );
-        }
-        $this->assertStringContainsString('#568', $stderr);
-        $this->assertStringContainsString('user-defined classes', $stderr);
+        $this->assertSame(0, $exit, 'phpc build --project failed: '.substr($stderr, 0, 500));
+        $this->assertStringNotContainsString('user-defined classes are not yet linkable', $stderr);
+        $binary = $repoRoot.'/examples/003-MiniWebApp/.phpc/bin/app';
+        $this->assertFileExists($binary);
     }
 
     private function captureEmitBuildOutput(string $compileStderr, bool $verbose): string
