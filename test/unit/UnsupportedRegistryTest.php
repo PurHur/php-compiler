@@ -48,6 +48,14 @@ final class UnsupportedRegistryTest extends TestCase
         $this->assertNull(UnsupportedRegistry::trackingIssueForKind('Expr_FooBar'));
     }
 
+    public function testIssueUrl(): void
+    {
+        $this->assertSame(
+            'https://github.com/PurHur/php-compiler/issues/115',
+            UnsupportedRegistry::issueUrl(115)
+        );
+    }
+
     public function testClassMethodAndMethodCallNoLongerTrackedAsUnsupported(): void
     {
         $this->assertNull(UnsupportedRegistry::trackingIssueForKind('Stmt_ClassMethod'));

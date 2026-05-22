@@ -19,7 +19,7 @@ examples/003-MiniWebApp/
 
 ```console
 ./phpc lint --all examples/003-MiniWebApp
-./phpc lint --all examples/003-MiniWebApp --json
+./phpc lint --all examples/003-MiniWebApp --json   # issue_url when diagnostics map to registry ([#484](https://github.com/PurHur/php-compiler/issues/484))
 ```
 
 During the skeleton phase this **must** exit `1` because of class/method blockers ([#58](https://github.com/PurHur/php-compiler/issues/58), [#145](https://github.com/PurHur/php-compiler/issues/145)). `__DIR__` + literal `include`/`require` paths are followed by lint ([#462](https://github.com/PurHur/php-compiler/issues/462)); stderr should not list `dynamic include/require` for this tree. When [#67](https://github.com/PurHur/php-compiler/issues/67) is done, `phpc lint --all` should exit `0` and `make web-smoke` may treat this tree as a green gate ([#455](https://github.com/PurHur/php-compiler/issues/455)):

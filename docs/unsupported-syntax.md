@@ -10,6 +10,8 @@
 ./phpc lint --json path/to/entry.php
 ```
 
+With `--json`, each issue includes `issue` (GitHub issue number from `UnsupportedRegistry`) and `issue_url` (stable tracker URL, e.g. `https://github.com/PurHur/php-compiler/issues/115`) when mapped.
+
 Exit code `0` when the entry (and best-effort `include`/`require` targets with string literals) compiles; `1` when any unsupported construct is found.
 
 ## Include / require graph

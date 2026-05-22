@@ -42,6 +42,7 @@ php-compiler CLI
   phpc lint [-r 'code'] [--json] <entry.php>    Report unsupported syntax (line-accurate)
   phpc lint --project <entry.php> [--json]    Entry + literal include/require chain
   phpc lint --all <dir-or-file> [--json]      All .php under a tree (aggregated)
+      --json fields: file, line, kind, message, issue, issue_url (when tracked)
   phpc init [--force] [target-dir]              Scaffold phpc.json + public/index.php
   phpc test [--fast] [args...]                  Run ci-local.sh (full) or ci-fast.sh (no LLVM)
   phpc doctor                                   Probe environment for full local CI
