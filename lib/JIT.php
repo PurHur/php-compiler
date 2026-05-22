@@ -98,6 +98,12 @@ class JIT {
                     case 'bool':
                         $callbackType = 'bool';
                         break;
+                    case 'object':
+                        $callbackType = '__object__*';
+                        break;
+                    case 'array':
+                        $callbackType = '__hashtable__*';
+                        break;
                     default:
                         $callbackType = '__value__';
                         break;
@@ -748,37 +754,7 @@ class JIT {
                         $return->addref();
                         $retval = $this->context->helper->loadValue($return);
                         $expected = $this->context->functionReturnType[$this->context->activeFunction] ?? null;
-                        if (Variable::TYPE_VALUE === $return->type) {
-                            $valuePtr = Variable::KIND_VARIABLE === $return->kind
-                                ? $return->value
-                                : $this->context->builder->alloca(
-                                    $this->context->getTypeFromString('__value__'),
-                                    1,
-                                    'return_value_box'
-                                );
-                            if (Variable::KIND_VALUE === $return->kind) {
-                                $this->context->builder->store($retval, $valuePtr);
-                            }
-                            if ('__string__*' === $expected) {
-                                $retval = $this->context->builder->call(
-                                    $this->context->lookupFunction('__value__readString'),
-                                    $valuePtr
-                                );
-                            } elseif ('long long' === $expected) {
-                                $retval = $this->context->builder->call(
-                                    $this->context->lookupFunction('__value__readLong'),
-                                    $valuePtr
-                                );
-                            } elseif ('bool' === $expected) {
-                                $retval = $this->context->builder->truncOrBitCast(
-                                    $this->context->builder->call(
-                                        $this->context->lookupFunction('__value__readLong'),
-                                        $valuePtr
-                                    ),
-                                    $this->context->getTypeFromString('int1')
-                                );
-                            }
-                        }
+                        $retval = $this->coerceReturnValue($return, $retval, $expected);
                         $this->context->builder->returnValue($retval);
                     }
     
@@ -855,11 +831,9 @@ class JIT {
                     $nameOp = $block->getOperand($op->arg2);
                     assert($nameOp instanceof Operand\Literal);
                     assert($receiverOp->type->type === Type::TYPE_OBJECT);
-                    $proxyName = strtolower($receiverOp->type->userType).'::'.strtolower($nameOp->value);
-                    if (!isset($this->context->functionProxies[$proxyName])) {
-                        throw new \RuntimeException("Call to undefined method $proxyName");
-                    }
-                    $this->context->scope->toCall = $this->context->functionProxies[$proxyName];
+                    $className = $receiverOp->type->userType ?? 'object';
+                    $proxyName = strtolower($className).'::'.strtolower($nameOp->value);
+                    $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
                     $this->context->scope->args = [$this->context->getVariableFromOp($receiverOp)];
                     break;
                 case OpCode::TYPE_PROPERTY_FETCH:
@@ -880,6 +854,58 @@ class JIT {
         }
 
         return $builder->getInsertBlock();
+    }
+
+    private function coerceReturnValue(Variable $return, PHPLLVM\Value $retval, ?string $expected): PHPLLVM\Value
+    {
+        if (null === $expected || '__value__' === $expected || Variable::TYPE_VALUE !== $return->type) {
+            return $retval;
+        }
+        $valuePtr = Variable::KIND_VARIABLE === $return->kind
+            ? $return->value
+            : $this->context->builder->alloca(
+                $this->context->getTypeFromString('__value__'),
+                1,
+                'return_value_box'
+            );
+        if (Variable::KIND_VALUE === $return->kind) {
+            $this->context->builder->store($retval, $valuePtr);
+        }
+        if ('__string__*' === $expected) {
+            return $this->context->builder->call(
+                $this->context->lookupFunction('__value__readString'),
+                $valuePtr
+            );
+        }
+        if ('long long' === $expected) {
+            return $this->context->builder->call(
+                $this->context->lookupFunction('__value__readLong'),
+                $valuePtr
+            );
+        }
+        if ('bool' === $expected) {
+            return $this->context->builder->truncOrBitCast(
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__readLong'),
+                    $valuePtr
+                ),
+                $this->context->getTypeFromString('int1')
+            );
+        }
+        if ('__object__*' === $expected) {
+            return $this->context->builder->call(
+                $this->context->lookupFunction('__value__readObject'),
+                $valuePtr
+            );
+        }
+        if ('__hashtable__*' === $expected) {
+            return $this->context->builder->call(
+                $this->context->lookupFunction('__value__readHashtable'),
+                $valuePtr
+            );
+        }
+
+        return $retval;
     }
 
     private function isVoidCfgFunction(Block $block): bool
