@@ -825,6 +825,54 @@ final class VmString
     }
 
     /**
+     * Count non-overlapping occurrences of $needle in $haystack (byte-safe subset of PHP).
+     */
+    public static function substr_count(
+        string $haystack,
+        string $needle,
+        int $offset = 0,
+        ?int $length = null
+    ): int {
+        if ('' === $needle) {
+            throw new \LogicException('substr_count(): Argument #2 ($needle) cannot be empty');
+        }
+        $hayLen = self::byteLength($haystack);
+        $needleLen = self::byteLength($needle);
+        if ($offset < 0) {
+            $offset = 0;
+        }
+        if ($offset >= $hayLen) {
+            return 0;
+        }
+        $end = $hayLen;
+        if (null !== $length) {
+            if ($length < 0) {
+                return 0;
+            }
+            $end = $offset + $length;
+            if ($end > $hayLen) {
+                $end = $hayLen;
+            }
+        }
+        $limit = $end - $needleLen;
+        if ($limit < $offset) {
+            return 0;
+        }
+        $count = 0;
+        $pos = $offset;
+        while ($pos <= $limit) {
+            $found = self::findSubstring($haystack, $needle, $pos);
+            if (false === $found || $found > $limit) {
+                break;
+            }
+            ++$count;
+            $pos = $found + $needleLen;
+        }
+
+        return $count;
+    }
+
+    /**
      * @return int|false
      */
     public static function stripos(string $haystack, string $needle, int $offset = 0)

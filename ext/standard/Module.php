@@ -71,6 +71,7 @@ class Module extends ModuleAbstract
             new strpos(),
             new stripos(),
             new strrpos(),
+            new substr_count(),
             new str_contains(),
             new str_starts_with(),
             new str_ends_with(),
