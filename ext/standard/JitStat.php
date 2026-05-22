@@ -40,6 +40,9 @@ final class JitStat
     /** W_OK for access(2) — write permission (POSIX) */
     private const ACCESS_W_OK = 2;
 
+    /** X_OK for access(2) — execute permission (POSIX) */
+    private const ACCESS_X_OK = 1;
+
     private static int $blockSerial = 0;
 
     public static function pathExists(Context $context, Value $str): Value
@@ -65,6 +68,11 @@ final class JitStat
     public static function pathIsWritable(Context $context, Value $str): Value
     {
         return self::pathAccessOk($context, $str, self::ACCESS_W_OK);
+    }
+
+    public static function pathIsExecutable(Context $context, Value $str): Value
+    {
+        return self::pathAccessOk($context, $str, self::ACCESS_X_OK);
     }
 
     private static function pathAccessOk(Context $context, Value $str, int $mode): Value
