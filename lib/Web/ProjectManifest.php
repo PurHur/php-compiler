@@ -199,6 +199,34 @@ final class ProjectManifest
         return $publicDir;
     }
 
+    /**
+     * Static assets directory beside public docroot (issue #594).
+     *
+     * @return string|null absolute directory when manifest "assets" is set and exists
+     */
+    public static function resolveAssetsDir(string $startDir, ?array $manifest = null): ?string
+    {
+        $dir = realpath($startDir);
+        if (false === $dir) {
+            return null;
+        }
+
+        $projectDir = self::resolveProjectDir($dir);
+        if (null === $projectDir) {
+            return null;
+        }
+
+        $manifest ??= self::loadManifest($projectDir);
+        if (null === $manifest || !isset($manifest['assets']) || !is_string($manifest['assets']) || '' === $manifest['assets']) {
+            return null;
+        }
+
+        $assetsDir = self::resolveRelativePath($projectDir, $manifest['assets']);
+        $assetsReal = realpath($assetsDir);
+
+        return false !== $assetsReal && is_dir($assetsReal) ? $assetsReal : null;
+    }
+
     public static function resolveRelativePath(string $baseDir, string $path): string
     {
         if ('/' === $path[0]) {

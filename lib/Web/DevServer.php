@@ -100,7 +100,11 @@ final class DevServer
         }
 
         if (!str_ends_with(strtolower($path), '.php')) {
-            $static = self::resolveDocrootFile($docroot, $path);
+            $assetsDir = null;
+            if (null !== $projectDir) {
+                $assetsDir = ProjectManifest::resolveAssetsDir($projectDir, $manifest);
+            }
+            $static = self::resolveStaticFile($docroot, $path, $assetsDir);
             if (null !== $static) {
                 $bytes = file_get_contents($static);
                 if (false === $bytes) {
@@ -521,15 +525,56 @@ final class DevServer
         return true;
     }
 
+    public static function resolveStaticFile(string $docroot, string $urlPath, ?string $assetsDir = null): ?string
+    {
+        $static = self::resolveDocrootFile($docroot, $urlPath);
+        if (null !== $static) {
+            return $static;
+        }
+        if (null === $assetsDir) {
+            return null;
+        }
+
+        return self::resolveAssetsFile($assetsDir, $urlPath);
+    }
+
     public static function resolveDocrootFile(string $docroot, string $urlPath): ?string
     {
-        $candidate = $docroot.$urlPath;
+        return self::resolveFileUnderRoot($docroot, $urlPath);
+    }
+
+    /**
+     * Map /assets/* URLs to files under the manifest assets directory (issue #594).
+     */
+    public static function resolveAssetsFile(string $assetsDir, string $urlPath): ?string
+    {
+        $prefix = '/assets';
+        if (!str_starts_with($urlPath, $prefix.'/') && $urlPath !== $prefix) {
+            return null;
+        }
+
+        $relative = substr($urlPath, strlen($prefix));
+        if ('' === $relative) {
+            $relative = '/';
+        }
+
+        return self::resolveFileUnderRoot($assetsDir, $relative);
+    }
+
+    private static function resolveFileUnderRoot(string $root, string $urlPath): ?string
+    {
+        $rootReal = realpath($root);
+        if (false === $rootReal) {
+            return null;
+        }
+
+        $candidate = $rootReal.$urlPath;
         $real = realpath($candidate);
         if (false === $real || !is_file($real)) {
             return null;
         }
-        $prefix = $docroot.DIRECTORY_SEPARATOR;
-        if ($real !== $docroot && !str_starts_with($real, $prefix)) {
+        $prefix = $rootReal.DIRECTORY_SEPARATOR;
+        if ($real !== $rootReal && !str_starts_with($real, $prefix)) {
             return null;
         }
 
