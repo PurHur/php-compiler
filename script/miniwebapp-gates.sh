@@ -28,7 +28,8 @@ Probes phpc lint --all by default; use --no-lint to report env/repo state only.
 Environment (enable next gates):
   MINIWEBAPP_LINT_GATE=0      skeleton: web-smoke continues on lint failure (default gate on — #621)
   MINIWEBAPP_VM_CLI_GATE=1    run MiniWebApp*VmCli in ci-fast (default on; #597)
-  MINIWEBAPP_SERVE_GATE=1     enforce ServeTest MiniWebApp routes (#470)
+  MINIWEBAPP_SERVE_GATE=1     ServeTest MiniWebApp routes (default on in ci-local — #641)
+  MINIWEBAPP_SERVE_GATE=0     skip ServeTest miniwebapp during fast iteration
   MINIWEBAPP_WEB_SMOKE_GATE=1 run 003 PATH_INFO curls in ci-local (#633)
 
 See: examples/003-MiniWebApp/README.md, issue #472
@@ -60,7 +61,11 @@ fi
 
 lint_gate="${MINIWEBAPP_LINT_GATE:-1}"
 vm_cli_gate="${MINIWEBAPP_VM_CLI_GATE:-1}"
-serve_gate="${MINIWEBAPP_SERVE_GATE:-}"
+serve_gate="${MINIWEBAPP_SERVE_GATE:-1}"
+serve_gate_explicit=0
+if [[ -n "${MINIWEBAPP_SERVE_GATE+x}" ]]; then
+  serve_gate_explicit=1
+fi
 web_smoke_gate="${MINIWEBAPP_WEB_SMOKE_GATE:-}"
 
 stage0=0
@@ -87,9 +92,9 @@ if grep -q 'MINIWEBAPP_VM_CLI_GATE' "${ROOT}/script/ci-fast.sh" 2>/dev/null \
   stage1b=1
 fi
 
-# Stage 2: ServeTest gate env + ci-local/ci-fast hook (#470, #622).
+# Stage 2: ServeTest gate default on in ci-local/ci-fast (#641, #470, #622).
 if [[ "${serve_gate}" == "1" ]] \
-  && grep -q 'MINIWEBAPP_SERVE_GATE' "${ROOT}/script/ci-local.sh" 2>/dev/null; then
+  && grep -q 'MINIWEBAPP_SERVE_GATE:-1' "${ROOT}/script/ci-local.sh" 2>/dev/null; then
   stage2=1
 fi
 
@@ -155,7 +160,13 @@ echo "       ${REPO_URL}/issues/621"
 echo "$(mark "${stage1b}") Stage 1b VM CLI — MINIWEBAPP_VM_CLI_GATE=1 in ci-fast (#597)"
 echo "       ${REPO_URL}/issues/597  (unset or =0 to skip MiniWebApp*VmCli)"
 
-echo "$(mark "${stage2}") Stage 2 ServeTest — export MINIWEBAPP_SERVE_GATE=1 for ci-local/ci-fast (#470, #622)"
+echo "$(mark "${stage2}") Stage 2 ServeTest — MINIWEBAPP_SERVE_GATE=1 default in ci-local/ci-fast (#641, #470, #622)"
+if [[ "${serve_gate_explicit}" -eq 1 ]]; then
+  echo "       env: MINIWEBAPP_SERVE_GATE=${MINIWEBAPP_SERVE_GATE} (explicit)"
+else
+  echo "       env: default on (unset → 1 via ci-defaults.env / ci-local.sh)"
+fi
+echo "       ${REPO_URL}/issues/641"
 echo "       ${REPO_URL}/issues/470"
 echo "       ${REPO_URL}/issues/622"
 
@@ -175,7 +186,8 @@ echo "  make examples-web-smoke     phpc serve + curl (#298)"
 echo "  make web-smoke              lint gate on by default (#621)"
 echo "  MINIWEBAPP_LINT_GATE=0 make web-smoke"
 echo "  MINIWEBAPP_VM_CLI_GATE=1 ./script/ci-fast.sh"
-echo "  MINIWEBAPP_SERVE_GATE=1 ./script/ci-local.sh --filter ServeTest"
+echo "  ./script/ci-local.sh --filter ServeTest   # MINIWEBAPP_SERVE_GATE=1 by default (#641)"
+echo "  MINIWEBAPP_SERVE_GATE=0 ./script/ci-local.sh   # skip miniwebapp ServeTest"
 echo "  MINIWEBAPP_WEB_SMOKE_GATE=1 ./script/ci-local.sh"
 echo
 echo "Tracking: ${REPO_URL}/issues/472 (gate ladder spec)"
@@ -188,7 +200,7 @@ elif [[ "${lint_exit}" -ne 0 && "${lint_gate}" == "0" ]]; then
 elif [[ "${lint_exit}" -eq 0 && "${vm_cli_gate}" != "1" ]]; then
   echo "Next: export MINIWEBAPP_VM_CLI_GATE=1 (lint green; enable VM CLI in ci-fast — #597)"
 elif [[ "${serve_gate}" != "1" ]]; then
-  echo "Next: export MINIWEBAPP_SERVE_GATE=1 when ServeTest routes land (#470)"
+  echo "Next: unset MINIWEBAPP_SERVE_GATE=0 or export =1 for stage 2 ServeTest (#641)"
 elif [[ "${web_smoke_gate}" != "1" ]]; then
   echo "Next: export MINIWEBAPP_WEB_SMOKE_GATE=1 for ci-local shell PATH_INFO curls (#633)"
 elif [[ "${stage3}" -eq 0 ]]; then
