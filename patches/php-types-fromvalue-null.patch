@@ -1,0 +1,15 @@
+--- vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
+@@ -373,6 +373,9 @@
+      */
+     public static function fromValue($value): self
+     {
++        if (is_null($value)) {
++            return self::null();
++        }
+         if (is_int($value)) {
+             return new self(self::TYPE_LONG);
+         }
+         if (is_bool($value)) {
+             return new self(self::TYPE_BOOLEAN);
+         }
