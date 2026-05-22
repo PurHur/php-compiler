@@ -10,7 +10,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 |--------|------:|
 | PHP files on vm.php path | 324 |
 | Source constructs flagged (blockers) | 10 |
-| Source constructs flagged (warnings) | 869 |
+| Source constructs flagged (warnings) | 870 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -344,7 +344,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `lib/Web/ProjectDeploy.php` | 0 | 3 |
 | `lib/Web/ProjectManifest.php` | 0 | 1 |
 | `lib/Web/ResponseContext.php` | 0 | 2 |
-| `lib/Web/SourceBundler.php` | 0 | 1 |
+| `lib/Web/SourceBundler.php` | 0 | 2 |
 | `lib/Web/Superglobals.php` | 0 | 6 |
 | `src/macro_functions.php` | 0 | 1 |
 
@@ -1887,7 +1887,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/JIT/Builtin/PendingHeaders.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Builtin/Refcount.php`
 
@@ -2064,10 +2064,10 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new Call\ExternalMethod (line 140)
 - new Builtin\IsNullFn (line 195)
 - new Builtin\IsNullFn (line 196)
-- new Result (line 238)
-- new Variable (line 314)
-- new Variable (line 547)
-- new Variable (line 582)
+- new Result (line 241)
+- new Variable (line 317)
+- new Variable (line 550)
+- new Variable (line 585)
 - 34 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/HashTableHelper.php`
@@ -2421,12 +2421,12 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/Web/ConstStringFolder.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 7 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/Web/DeployRoot.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/Web/DevServer.php`
 
@@ -2476,7 +2476,8 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/Web/SourceBundler.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 7 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 1 closure(s)
 
 ### `lib/Web/Superglobals.php`
 

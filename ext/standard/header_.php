@@ -62,6 +62,9 @@ final class header_ extends Internal
             ResponseContext::setStatus($responseCode);
         } else {
             \header($line, $replace);
+            if (0 === strncasecmp($line, 'Location:', 9) && 200 === ResponseContext::getStatus()) {
+                ResponseContext::setStatus(302);
+            }
         }
         ResponseContext::addHeader($line, $replace);
     }
@@ -93,7 +96,6 @@ final class header_ extends Internal
             }
             $replaceI32 = $context->builder->zExt($context->helper->loadValue($args[1]), $i32);
         }
-        JitHeader::emit($context, $line);
         JitPendingHeaders::add($context, $line, $replaceI32);
 
         return $context->getTypeFromString('int32')->constInt(0, false);
