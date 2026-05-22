@@ -59,15 +59,14 @@ final class substr extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('substr() requires two or three arguments');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type
-            || JITVariable::TYPE_NATIVE_LONG !== $args[1]->type) {
+        if (JITVariable::TYPE_NATIVE_LONG !== $args[1]->type) {
             throw new \LogicException('substr() requires a string and integer offset in this compiler build');
         }
         if (3 === $argc && JITVariable::TYPE_NATIVE_LONG !== $args[2]->type) {
             throw new \LogicException('substr() length must be an integer in this compiler build');
         }
 
-        $str = $context->helper->loadValue($args[0]);
+        $str = self::jitStringArg($context, $args[0]);
         $structName = $str->typeOf()->getElementType()->getName();
         $map = $context->structFieldMap[$structName];
         $len = $context->builder->load(
@@ -90,5 +89,20 @@ final class substr extends Internal
         }
 
         return string_trim::jitCopySlice($context, $str, $charPtr, $start, $sliceLen);
+    }
+
+    private static function jitStringArg(Context $context, JITVariable $arg): Value
+    {
+        if (JITVariable::TYPE_STRING === $arg->type) {
+            return $context->helper->loadValue($arg);
+        }
+        if (JITVariable::TYPE_VALUE === $arg->type) {
+            return $context->builder->call(
+                $context->lookupFunction('__value__readString'),
+                $arg->value
+            );
+        }
+
+        throw new \LogicException('substr() only supports strings in this compiler build');
     }
 }

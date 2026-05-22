@@ -62,19 +62,31 @@ final class strpos extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('strpos() requires two or three arguments');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type || JITVariable::TYPE_STRING !== $args[1]->type) {
-            throw new \LogicException('strpos() only supports strings in this compiler build');
-        }
         if (3 === $argc && JITVariable::TYPE_NATIVE_LONG !== $args[2]->type) {
             throw new \LogicException('strpos() offset must be an integer in this compiler build');
         }
 
-        $hay = $context->helper->loadValue($args[0]);
-        $needle = $context->helper->loadValue($args[1]);
+        $hay = self::jitStringArg($context, $args[0]);
+        $needle = self::jitStringArg($context, $args[1]);
         $offset = 3 === $argc
             ? $context->builder->truncOrBitCast($context->helper->loadValue($args[2]), $context->getTypeFromString('int64'))
             : null;
 
         return JitStrpos::find($context, $hay, $needle, $offset);
+    }
+
+    private static function jitStringArg(Context $context, JITVariable $arg): Value
+    {
+        if (JITVariable::TYPE_STRING === $arg->type) {
+            return $context->helper->loadValue($arg);
+        }
+        if (JITVariable::TYPE_VALUE === $arg->type) {
+            return $context->builder->call(
+                $context->lookupFunction('__value__readString'),
+                $arg->value
+            );
+        }
+
+        throw new \LogicException('strpos() only supports strings in this compiler build');
     }
 }

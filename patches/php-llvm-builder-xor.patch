@@ -1,0 +1,13 @@
+--- vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php
++++ vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php
+@@ -222,6 +222,10 @@
+     public function bitwiseXor(CoreValue $left, CoreValue $right): CoreValue {
+         return $this->llvm->factory->value($this->context, $this->llvm->lib->LLVMBuildXor($this->builder, $left->value, $right->value, ''));
+     }
++
++    public function xor(CoreValue $left, CoreValue $right): CoreValue {
++        return $this->bitwiseXor($left, $right);
++    }
+ 
+     public function negate(CoreValue $value): CoreValue {
+         return $this->llvm->factory->value($this->context, $this->llvm->lib->LLVMBuildNeg($this->builder, $value->value, ''));
