@@ -55,7 +55,7 @@ Deprecated query dispatch (still supported):
 | Shell smoke (ci-local) | opt-in | `MINIWEBAPP_WEB_SMOKE_GATE=1` in `../../script/ci-local.sh` (#633) |
 | PHPUnit serve | ✅ | `ServeTest` `@group miniwebapp` (#470) |
 | JIT | partial | [#207](https://github.com/PurHur/php-compiler/issues/207) |
-| AOT | ❌ blocked | `../../phpc build --project .` ([#454](https://github.com/PurHur/php-compiler/issues/454)) |
+| AOT | ❌ blocked | `../../phpc build --project .` — stderr trailer points to [#568](https://github.com/PurHur/php-compiler/issues/568) / [#454](https://github.com/PurHur/php-compiler/issues/454) |
 
 ### curl recipes (PATH_INFO)
 
