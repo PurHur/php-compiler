@@ -8,9 +8,9 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 307 |
+| PHP files on vm.php path | 308 |
 | Source constructs flagged (blockers) | 10 |
-| Source constructs flagged (warnings) | 827 |
+| Source constructs flagged (warnings) | 829 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -275,10 +275,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `lib/JIT/Builtin/Type/Value.php` | 0 | 4 |
 | `lib/JIT/Builtin/VarArg.php` | 0 | 1 |
 | `lib/JIT/Call.php` | 0 | 1 |
+| `lib/JIT/Call/ExternalMethod.php` | 0 | 1 |
 | `lib/JIT/Call/Native.php` | 0 | 1 |
 | `lib/JIT/Call/Vararg.php` | 0 | 2 |
 | `lib/JIT/CoalesceHelper.php` | 0 | 1 |
-| `lib/JIT/Context.php` | 0 | 15 |
+| `lib/JIT/Context.php` | 0 | 16 |
 | `lib/JIT/HashTableHelper.php` | 0 | 7 |
 | `lib/JIT/Helper.php` | 0 | 7 |
 | `lib/JIT/IncludeHelper.php` | 0 | 1 |
@@ -1695,21 +1696,21 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/JIT.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 153)
-- new JIT\Call\Vararg (line 161)
-- new JIT\Call\Native (line 164)
-- new ext\standard\boolval (line 328)
-- new Variable (line 551)
-- new OpCode (line 618)
-- new Variable (line 843)
-- new Variable (line 949)
-- new Variable (line 1153)
-- new Operand\Literal (line 1240)
-- new Operand\Literal (line 1244)
-- new Operand\Literal (line 1248)
-- new Variable (line 1252)
-- new Variable (line 1272)
-- 16 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new Variable (line 159)
+- new JIT\Call\Vararg (line 167)
+- new JIT\Call\Native (line 170)
+- new ext\standard\boolval (line 334)
+- new Variable (line 557)
+- new OpCode (line 624)
+- new Variable (line 816)
+- new Variable (line 972)
+- new Variable (line 1176)
+- new Operand\Literal (line 1263)
+- new Operand\Literal (line 1267)
+- new Operand\Literal (line 1271)
+- new Variable (line 1275)
+- new Variable (line 1295)
+- 17 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Analyzer.php`
 
@@ -1905,15 +1906,15 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/JIT/Builtin/Type/Object_.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 358)
-- new Variable (line 390)
+- new Variable (line 366)
 - new Variable (line 398)
-- new Literal (line 415)
-- new Literal (line 420)
-- new Literal (line 425)
-- new Variable (line 436)
-- new Variable (line 502)
-- 22 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new Variable (line 406)
+- new Literal (line 423)
+- new Literal (line 428)
+- new Literal (line 433)
+- new Variable (line 444)
+- new Variable (line 510)
+- 23 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 - 1 closure(s)
 
 ### `lib/JIT/Builtin/Type/String_.php`
@@ -1939,6 +1940,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 **Warnings** (review for bootstrap subset):
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `lib/JIT/Call/ExternalMethod.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `lib/JIT/Call/Native.php`
 
 **Warnings** (review for bootstrap subset):
@@ -1958,21 +1964,22 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/JIT/Context.php`
 
 **Warnings** (review for bootstrap subset):
-- new Scope (line 84)
-- new Analyzer (line 103)
-- new Helper (line 104)
-- new Builtin\Refcount (line 106)
-- new Builtin\Output (line 108)
-- new Builtin\Type (line 109)
-- new Builtin\Internal (line 110)
-- new Builtin\VarArg (line 111)
-- new Builtin\ErrorHandler (line 112)
-- new Scope (line 127)
-- new Result (line 220)
-- new Variable (line 296)
-- new Variable (line 529)
-- new Variable (line 564)
-- 32 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new Scope (line 86)
+- new Analyzer (line 105)
+- new Helper (line 106)
+- new Builtin\Refcount (line 108)
+- new Builtin\Output (line 110)
+- new Builtin\Type (line 111)
+- new Builtin\Internal (line 112)
+- new Builtin\VarArg (line 113)
+- new Builtin\ErrorHandler (line 114)
+- new Scope (line 129)
+- new Call\ExternalMethod (line 140)
+- new Result (line 236)
+- new Variable (line 312)
+- new Variable (line 545)
+- new Variable (line 580)
+- 34 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/HashTableHelper.php`
 
