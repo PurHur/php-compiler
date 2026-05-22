@@ -14,6 +14,12 @@ final class Linker
         __DIR__.'/runtime/superglobals_refresh.c',
         __DIR__.'/runtime/hash_crypto.c',
         __DIR__.'/runtime/filter_validate.c',
+        __DIR__.'/runtime/phpc_fs_dir.c',
+    ];
+
+    /** Runtime units that need host libc headers (glob/scandir; llvm sysroot lacks linux/limits.h). */
+    private const RUNTIME_HOST_LIBC_BASENAMES = [
+        'phpc_fs_dir.c',
     ];
 
     public static function link(string $objectFile, string $executable): void
@@ -88,7 +94,6 @@ final class Linker
     {
         $objects = [];
         $compiler = self::resolveRuntimeCompiler();
-        $includeFlags = self::runtimeCIncludeFlags();
         $llvmDir = getenv('PHP_COMPILER_LLVM_PATH');
         $env = (false !== $llvmDir && '' !== $llvmDir)
             ? self::toolchainEnvironment($llvmDir)
@@ -100,7 +105,8 @@ final class Linker
             }
             $runtimeObject = $objectFile.'.runtime'.$index.'.o';
             ++$index;
-            $cmd = escapeshellarg($compiler).' -c -fPIC -O2'.$includeFlags.' '
+            $sourceFlags = self::runtimeCIncludeFlagsFor(basename($source));
+            $cmd = escapeshellarg($compiler).' -c -fPIC -O2'.$sourceFlags.' '
                 .escapeshellarg($source).' -o '.escapeshellarg($runtimeObject);
             $descriptor = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
             $proc = proc_open($cmd, $descriptor, $pipes, null, $env);
@@ -162,6 +168,15 @@ final class Linker
         throw new \LogicException('No C compiler found for AOT runtime (clang/gcc).');
     }
 
+    private static function runtimeCIncludeFlagsFor(string $basename): string
+    {
+        if (in_array($basename, self::RUNTIME_HOST_LIBC_BASENAMES, true)) {
+            return self::runtimeCHostLibcIncludeFlags();
+        }
+
+        return self::runtimeCIncludeFlags();
+    }
+
     private static function runtimeCIncludeFlags(): string
     {
         $llvmDir = getenv('PHP_COMPILER_LLVM_PATH');
@@ -172,9 +187,17 @@ final class Linker
             }
         }
 
+        return self::runtimeCHostLibcIncludeFlags();
+    }
+
+    private static function runtimeCHostLibcIncludeFlags(): string
+    {
         $flags = '';
         foreach (self::discoverSystemIncludeDirs() as $dir) {
             $flags .= ' -isystem '.escapeshellarg($dir);
+        }
+        if ('' === $flags && is_file('/usr/include/stdio.h')) {
+            $flags = ' -isystem /usr/include';
         }
 
         return $flags;

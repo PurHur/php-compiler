@@ -242,6 +242,16 @@ class Type extends Builtin {
             $this->context->context->functionType($htPtr, false)
         );
         $this->context->registerFunction('__phpc_pending_header_list', $fnPendingList);
+        $fnGlob = $this->context->module->addFunction(
+            '__phpc_glob',
+            $this->context->context->functionType($htPtr, false, $strPtr, $i32)
+        );
+        $this->context->registerFunction('__phpc_glob', $fnGlob);
+        $fnScandir = $this->context->module->addFunction(
+            '__phpc_scandir',
+            $this->context->context->functionType($htPtr, false, $strPtr, $i32)
+        );
+        $this->context->registerFunction('__phpc_scandir', $fnScandir);
         $fnPendingFlush = $this->context->module->addFunction(
             '__phpc_response_headers_flush',
             $this->context->context->functionType($void, false)
