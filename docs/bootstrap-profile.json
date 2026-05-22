@@ -330,9 +330,9 @@
         "test/bootstrap-aot/echo_hello.php"
     ],
     "totals": {
-        "inventory_files": 295,
+        "inventory_files": 296,
         "excluded": 2,
-        "eligible": 293,
+        "eligible": 294,
         "aot_lint_targets": 2
     }
 }
