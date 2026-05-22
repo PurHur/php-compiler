@@ -37,6 +37,7 @@ final class WebSmokeScriptTest extends TestCase
         if (is_dir($repoRoot.'/examples/003-MiniWebApp/public')) {
             $this->assertStringContainsString('web-smoke: lint --all examples/003-MiniWebApp', $combined);
             $this->assertStringContainsString('web-smoke: 003-MiniWebApp:', $combined);
+            $this->assertStringContainsString('lint gate ok', $combined);
         }
         $this->assertStringContainsString('web-smoke: ok', $combined);
     }

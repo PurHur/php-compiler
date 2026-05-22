@@ -21,10 +21,10 @@ examples/003-MiniWebApp/
 ./phpc lint --all examples/003-MiniWebApp
 ```
 
-Exits `0` (class methods, includes, `break`, and superglobals are accepted). Optional strict gate:
+Exits `0` (class methods, includes, `break`, and superglobals are accepted). `make web-smoke` fails when lint regresses (gate on by default — [#621](https://github.com/PurHur/php-compiler/issues/621)). Skeleton debugging only:
 
 ```console
-MINIWEBAPP_LINT_GATE=1 make web-smoke
+MINIWEBAPP_LINT_GATE=0 make web-smoke
 ```
 
 ## Routes

@@ -37,7 +37,8 @@ final class MiniWebAppGatesScriptTest extends TestCase
         $this->assertStringContainsString('MiniWebApp CI gates', $combined);
         $this->assertStringContainsString('Stage 0 skeleton', $combined);
         $this->assertStringContainsString('Stage 1 lint green', $combined);
-        $this->assertStringContainsString('MINIWEBAPP_LINT_GATE=1', $combined);
+        $this->assertStringContainsString('lint gate on by default', $combined);
+        $this->assertStringContainsString('issues/621', $combined);
         $this->assertStringContainsString('MINIWEBAPP_VM_CLI_GATE', $combined);
         $this->assertStringContainsString('Stage 1b VM CLI', $combined);
         $this->assertStringContainsString('issues/597', $combined);

@@ -102,6 +102,15 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('MINIWEBAPP_VM_CLI_GATE', $body);
         $this->assertStringContainsString('issues/461', $body);
         $this->assertStringContainsString('issues/597', $body);
+        $this->assertStringContainsString('issues/621', $body);
+    }
+
+    public function testWebSmokeDefaultsMiniWebAppLintGateOn(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/web-smoke.sh');
+        $this->assertStringContainsString('MINIWEBAPP_LINT_GATE:-1}', $body);
+        $this->assertStringContainsString('MINIWEBAPP_LINT_GATE=0', $body);
+        $this->assertStringContainsString('#621', $body);
     }
 
     public function testRunVmGuardedScriptExists(): void
