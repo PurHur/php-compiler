@@ -34,6 +34,9 @@ final class JitStat
     /** R_OK for access(2) — read permission (POSIX) */
     private const ACCESS_R_OK = 4;
 
+    /** W_OK for access(2) — write permission (POSIX) */
+    private const ACCESS_W_OK = 2;
+
     private static int $blockSerial = 0;
 
     public static function pathExists(Context $context, Value $str): Value
@@ -53,13 +56,23 @@ final class JitStat
 
     public static function pathIsReadable(Context $context, Value $str): Value
     {
+        return self::pathAccessOk($context, $str, self::ACCESS_R_OK);
+    }
+
+    public static function pathIsWritable(Context $context, Value $str): Value
+    {
+        return self::pathAccessOk($context, $str, self::ACCESS_W_OK);
+    }
+
+    private static function pathAccessOk(Context $context, Value $str, int $mode): Value
+    {
         $map = $context->structFieldMap['__string__'];
         $pathPtr = $context->builder->structGep($str, $map['value']);
         $i32 = $context->getTypeFromString('int32');
         $ret = $context->builder->call(
             $context->lookupFunction('access'),
             $pathPtr,
-            $i32->constInt(self::ACCESS_R_OK, false)
+            $i32->constInt($mode, false)
         );
         $zero = $i32->constInt(0, false);
 
