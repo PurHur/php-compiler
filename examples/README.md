@@ -121,10 +121,13 @@ make examples-web-smoke     # phpc serve + curl GET/POST (001-SimpleWeb, 002-Sta
 make examples-aot-smoke     # phpc build + CLI execute (000–004; skips when LLVM missing; 003 skipped #568)
 ```
 
+Full CI (`./script/ci-local.sh`) runs `examples-aot-smoke.sh` after PHPUnit `@group aot-link` when LLVM is available (`EXAMPLES_AOT_SMOKE_GATE=1` default in `script/ci-defaults.env`; set `EXAMPLES_AOT_SMOKE_GATE=0` to skip during iteration — [#674](https://github.com/PurHur/php-compiler/issues/674)). Not run in `ci-fast.sh`.
+
 Full suite on the host (after `composer install`):
 
 ```console
 ./script/ci-local.sh
+EXAMPLES_AOT_SMOKE_GATE=0 ./script/ci-local.sh   # skip 000–004 CLI AOT execute smoke (#674)
 ```
 
 In Docker (preferred on harness hosts without host PHP/LLVM):

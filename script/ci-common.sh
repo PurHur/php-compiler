@@ -169,11 +169,11 @@ ci_run_examples_web_smoke_aot() {
   "$_CI_SCRIPT_DIR/examples-web-smoke.sh" --aot
 }
 
-# CLI AOT build + execute smoke (issue #667); opt-in via EXAMPLES_AOT_SMOKE_GATE=1.
+# CLI AOT build + execute smoke (issue #667); default on via EXAMPLES_AOT_SMOKE_GATE=1 (#674).
 ci_run_examples_aot_smoke() {
-  if [[ "${EXAMPLES_AOT_SMOKE_GATE:-}" != "1" ]]; then
+  if [[ "${EXAMPLES_AOT_SMOKE_GATE:-1}" != "1" ]]; then
     return 0
   fi
-  echo "examples-aot-smoke: CLI build + execute (EXAMPLES_AOT_SMOKE_GATE=1, #667)..."
+  echo "examples-aot-smoke: CLI build + execute (EXAMPLES_AOT_SMOKE_GATE=1 default, #667, #674)..."
   "$_CI_SCRIPT_DIR/examples-aot-smoke.sh"
 }
