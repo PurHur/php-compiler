@@ -1,0 +1,184 @@
+<?php
+
+/*
+ * This file is part of PHP-Compiler, a PHP CFG Compiler for PHP code
+ *
+ * @copyright 2015 Anthony Ferrara. All rights reserved
+ * @license MIT See LICENSE at the root of the project for more info
+ */
+
+namespace PHPCompiler;
+
+/**
+ * Opcode name lookup (VM / Printer). Kept out of lib/OpCode.php so Phase D AOT link
+ * does not JIT-compile a large switch (issue #540).
+ */
+function opcode_type_name(int $type): string
+{
+    switch ($type) {
+        case 1:
+            return 'TYPE_ECHO';
+        case 2:
+            return 'TYPE_ASSIGN';
+        case 3:
+            return 'TYPE_CONCAT';
+        case 4:
+            return 'TYPE_JUMP';
+        case 5:
+            return 'TYPE_CONST_FETCH';
+        case 6:
+            return 'TYPE_JUMPIF';
+        case 7:
+            return 'TYPE_PLUS';
+        case 8:
+            return 'TYPE_SMALLER';
+        case 9:
+            return 'TYPE_RETURN_VOID';
+        case 10:
+            return 'TYPE_FUNCDEF';
+        case 11:
+            return 'TYPE_FUNCCALL_INIT';
+        case 12:
+            return 'TYPE_ARG_SEND';
+        case 13:
+            return 'TYPE_ARG_RECV';
+        case 14:
+            return 'TYPE_FUNCCALL_EXEC_RETURN';
+        case 15:
+            return 'TYPE_FUNCCALL_EXEC_NORETURN';
+        case 16:
+            return 'TYPE_IDENTICAL';
+        case 17:
+            return 'TYPE_RETURN';
+        case 18:
+            return 'TYPE_MINUS';
+        case 19:
+            return 'TYPE_DECLARE_CLASS';
+        case 20:
+            return 'TYPE_NEW';
+        case 21:
+            return 'TYPE_MUL';
+        case 22:
+            return 'TYPE_DIV';
+        case 23:
+            return 'TYPE_GREATER';
+        case 24:
+            return 'TYPE_DECLARE_PROPERTY';
+        case 25:
+            return 'TYPE_PROPERTY_FETCH';
+        case 26:
+            return 'TYPE_UNARY_MINUS';
+        case 27:
+            return 'TYPE_UNARY_PLUS';
+        case 28:
+            return 'TYPE_BITWISE_NOT';
+        case 29:
+            return 'TYPE_BOOLEAN_NOT';
+        case 30:
+            return 'TYPE_PRINT';
+        case 31:
+            return 'TYPE_CLONE';
+        case 32:
+            return 'TYPE_EMPTY';
+        case 33:
+            return 'TYPE_EVAL';
+        case 34:
+            return 'TYPE_EXIT';
+        case 35:
+            return 'TYPE_SMALLER_OR_EQUAL';
+        case 36:
+            return 'TYPE_GREATER_OR_EQUAL';
+        case 37:
+            return 'TYPE_CAST_ARRAY';
+        case 38:
+            return 'TYPE_CAST_BOOL';
+        case 39:
+            return 'TYPE_CAST_FLOAT';
+        case 40:
+            return 'TYPE_CAST_INT';
+        case 41:
+            return 'TYPE_CAST_OBJECT';
+        case 42:
+            return 'TYPE_CAST_STRING';
+        case 43:
+            return 'TYPE_CAST_UNSET';
+        case 44:
+            return 'TYPE_EQUAL';
+        case 45:
+            return 'TYPE_ARRAY_DIM_FETCH';
+        case 46:
+            return 'TYPE_MODULO';
+        case 47:
+            return 'TYPE_SWITCH';
+        case 48:
+            return 'TYPE_CASE';
+        case 49:
+            return 'TYPE_BITWISE_AND';
+        case 50:
+            return 'TYPE_BITWISE_OR';
+        case 51:
+            return 'TYPE_BITWISE_XOR';
+        case 52:
+            return 'TYPE_TYPE_ASSERT';
+        case 53:
+            return 'TYPE_INIT_ARRAY';
+        case 54:
+            return 'TYPE_ADD_ARRAY_ELEMENT';
+        case 55:
+            return 'TYPE_STATICCALL_INIT';
+        case 56:
+            return 'TYPE_INCLUDE';
+        case 57:
+            return 'TYPE_ISSET';
+        case 58:
+            return 'TYPE_POW';
+        case 59:
+            return 'TYPE_NOT_EQUAL';
+        case 60:
+            return 'TYPE_NOT_IDENTICAL';
+        case 61:
+            return 'TYPE_SPACESHIP';
+        case 62:
+            return 'TYPE_COALESCE';
+        case 63:
+            return 'TYPE_NULLSAFE';
+        case 64:
+            return 'TYPE_ITER_RESET';
+        case 65:
+            return 'TYPE_ITER_VALID';
+        case 66:
+            return 'TYPE_ITER_KEY';
+        case 67:
+            return 'TYPE_ITER_VALUE';
+        case 68:
+            return 'TYPE_SHIFT_LEFT';
+        case 69:
+            return 'TYPE_SHIFT_RIGHT';
+        case 83:
+            return 'TYPE_ARRAY_DIM_FETCH_WRITE';
+        case 84:
+            return 'TYPE_DECLARE_METHOD';
+        case 85:
+            return 'TYPE_METHODCALL_INIT';
+        case 86:
+            return 'TYPE_DECLARE_CLASS_CONST';
+        case 87:
+            return 'TYPE_CLASS_CONST_FETCH';
+        case 88:
+            return 'TYPE_THROW';
+        case 89:
+            return 'TYPE_INSTANCEOF';
+        case 90:
+            return 'TYPE_STATIC_PROPERTY_FETCH';
+        case 91:
+            return 'TYPE_UNSET';
+        case 92:
+            return 'TYPE_TRY';
+        case 93:
+            return 'TYPE_CATCH';
+        case 94:
+            return 'TYPE_FINALLY';
+        default:
+            return 'unknown opcode';
+    }
+}

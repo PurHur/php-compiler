@@ -8,7 +8,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+require_once __DIR__.'/../OpCodeNames.php';
+
 use PHPCompiler\OpCode;
+use function PHPCompiler\opcode_type_name;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -32,7 +35,7 @@ final class JitStringCompare
                 return $context->builder->xor($same, $i1->constInt(1, false));
             default:
                 throw new \LogicException(
-                    'String/string comparison opcode not implemented for JIT: '.$opcode->getType()
+                    'String/string comparison opcode not implemented for JIT: '.opcode_type_name($opcode->type)
                 );
         }
     }

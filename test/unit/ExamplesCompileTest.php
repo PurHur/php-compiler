@@ -42,7 +42,7 @@ final class ExamplesCompileTest extends TestCase
             );
         }
         $this->markTestSkipped(
-            'MiniWebApp AOT link in progress — literal include JIT landed (#485); full project binary next'
+            'MiniWebApp AOT link blocked on JIT class method dispatch (#58); PATH_INFO strict-compare PHPT covers index.php subset'
         );
     }
 

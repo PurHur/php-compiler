@@ -9,6 +9,8 @@
 
 namespace PHPCompiler;
 
+require_once __DIR__.'/OpCodeNames.php';
+
 use PHPCfg\Operand;
 
 
@@ -30,7 +32,7 @@ class Printer {
         $return = "block_$id:\n";
         $append = '';
         foreach ($block->opCodes as $op) {
-            $return .= '  ' . $op->getType() . '(';
+            $return .= '  ' . opcode_type_name($op->type) . '(';
             $return .= $this->renderArg($op->arg1, $block);
             $return .= ', ' . $this->renderArg($op->arg2, $block);
             $return .= ', ' . $this->renderArg($op->arg3, $block);
