@@ -81,6 +81,12 @@ curl -s 'http://127.0.0.1:8080/?route=api/status'
 
 ## CI hooks (follow-ups)
 
+```console
+make miniwebapp-gates   # print gate ladder status (#503)
+```
+
+- [#503](https://github.com/PurHur/php-compiler/issues/503) — `make miniwebapp-gates` / `script/miniwebapp-gates.sh`
+- [#472](https://github.com/PurHur/php-compiler/issues/472) — progressive gate ladder spec
 - [#454](https://github.com/PurHur/php-compiler/issues/454) — `ExamplesCompileTest` `@group miniwebapp` (skipped until green)
 - [#455](https://github.com/PurHur/php-compiler/issues/455) — `make web-smoke` runs `phpc lint --all` when `public/` exists (shipped)
 - [#298](https://github.com/PurHur/php-compiler/issues/298) — extend `examples-web-smoke.sh` for 003 when serve is green

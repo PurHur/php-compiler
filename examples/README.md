@@ -81,6 +81,10 @@ make web-smoke   # also runs lint --all when public/ exists; JSON -> /tmp/miniwe
 
 During the skeleton phase `make web-smoke` **continues** when 003 lint exits `1` (blockers logged with tracking issue links). After [#67](https://github.com/PurHur/php-compiler/issues/67), set `MINIWEBAPP_LINT_GATE=1` so `make web-smoke` fails if `phpc lint --all` regresses.
 
+```console
+make miniwebapp-gates   # print gate ladder status without full CI ([#503](https://github.com/PurHur/php-compiler/issues/503))
+```
+
 See [003-MiniWebApp/README.md](003-MiniWebApp/README.md) for the blocker matrix and curl recipes (VM serve expected to fail until language gaps close).
 
 ### 002-StaticWeb
