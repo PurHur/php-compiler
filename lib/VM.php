@@ -491,7 +491,20 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_INCLUDE:
-                    $file = $frame->scope[$op->arg1]->toString();
+                    $file = null;
+                    if (null !== $op->arg3 && isset($frame->block->literalIncludePaths[$op->arg3])) {
+                        $file = $frame->block->literalIncludePaths[$op->arg3];
+                    } elseif (null !== $op->arg3 && isset($frame->block->deployIncludePaths[$op->arg3])) {
+                        $spec = $frame->block->deployIncludePaths[$op->arg3];
+                        $file = $spec['compile'] ?? \PHPCompiler\Web\DeployRoot::resolvePathWithSuffix(
+                            $spec['rel'],
+                            $spec['fallback'],
+                            $spec['suffix']
+                        );
+                    }
+                    if (null === $file) {
+                        $file = $frame->scope[$op->arg1]->toString();
+                    }
                     $resolved = VM\ScriptStack::normalize($file);
                     if ('' === $resolved || !is_file($resolved)) {
                         return $this->raise('Failed opening required \''.$file.'\' for inclusion', $frame);
