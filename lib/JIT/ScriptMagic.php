@@ -9,6 +9,7 @@ use PHPCompiler\OpCode;
 
 /**
  * Compile-time __DIR__ / __FILE__ for JIT using the unit's script path (#707).
+ * __LINE__ uses per-site line on TYPE_SCRIPT_MAGIC arg2 (#715).
  */
 final class ScriptMagic
 {

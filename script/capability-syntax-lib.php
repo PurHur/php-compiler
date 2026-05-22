@@ -114,9 +114,9 @@ function syntaxRowDefinitions(): array
         [
             'id' => 'magic_const_line',
             'construct' => 'Magic constant `__LINE__`',
-            'opcodes' => [],
-            'issue' => 707,
-            'notes' => ['Lowered at parse time via php-cfg MagicStringResolver (best effort)'],
+            'opcodes' => ['TYPE_SCRIPT_MAGIC', 'TYPE_INCLUDE'],
+            'issue' => 715,
+            'notes' => ['Per-site line on TYPE_SCRIPT_MAGIC; include stack for multi-file units'],
             'probe' => null,
         ],
     ];
@@ -247,6 +247,8 @@ function collectSyntaxPhptCoverage(string $root, array $definitions): array
         'arrow_functions' => '/\bfn\s*\(/',
         'magic_const_class_method' => '/__CLASS__|__FUNCTION__|__METHOD__/',
         'magic_const_namespace' => '/__NAMESPACE__/',
+        'magic_const_dir_file' => '/__DIR__|__FILE__/',
+        'magic_const_line' => '/__LINE__/',
     ];
 
     $scan = [];
