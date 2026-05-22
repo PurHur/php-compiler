@@ -61,6 +61,14 @@ final class ExampleWebAotTest extends TestCase
         $outBob = $this->runBinary($binary, $envBob);
         $this->assertStringContainsString('<h1>Hello Bob</h1>', $outBob);
 
+        $envPost = $env;
+        $envPost['REQUEST_METHOD'] = 'POST';
+        $envPost['REQUEST_BODY'] = 'name=PostDev';
+        $envPost['SCRIPT_NAME'] = '/example.php';
+        $envPost['REQUEST_URI'] = '/example.php';
+        $outPost = $this->runBinary($binary, $envPost);
+        $this->assertStringContainsString('<h1>Hello PostDev</h1>', $outPost);
+
         @unlink($binary);
     }
 
