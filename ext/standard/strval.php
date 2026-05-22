@@ -15,6 +15,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
@@ -70,6 +71,11 @@ final class strval extends Internal
 
     public function valueToString(Context $context, Value $valuePtr): Value
     {
+        if ('__value__' === $context->getStringFromType($valuePtr->typeOf())) {
+            $slot = $context->builder->alloca($context->getTypeFromString('__value__'), 1, 'strval_value_box');
+            $context->builder->store($valuePtr, $slot);
+            $valuePtr = JitValueBox::pointer($context, $slot);
+        }
         $map = $context->structFieldMap['__value__'];
         $typeByte = $context->builder->load(
             $context->builder->structGep($valuePtr, $map['type'])

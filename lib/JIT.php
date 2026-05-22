@@ -553,10 +553,10 @@ class JIT {
                     }
                     switch ($arg->type) {
                         case Variable::TYPE_VALUE:
-                            $valuePtr = Variable::KIND_VARIABLE === $arg->kind
-                                ? JIT\JitValueBox::pointer($this->context, $arg->value)
-                                : $arg->value;
-                            JIT\ValueEchoHelper::echo($this->context, $valuePtr);
+                            JIT\ValueEchoHelper::echo(
+                                $this->context,
+                                JIT\JitValueBox::valuePtrFromVariable($this->context, $arg)
+                            );
                             break;
                         case Variable::TYPE_STRING:
                             if ($arg->kind === Variable::KIND_VALUE
@@ -860,7 +860,7 @@ class JIT {
                     } else {
                         $return->addref();
                         $retval = $this->context->helper->loadValue($return);
-                        $expected = $this->context->functionReturnType[$this->context->activeFunction] ?? null;
+                        $expected = $this->cfgFunctionReturnCallbackType($block->func);
                         $retval = $this->coerceReturnValue($return, $retval, $expected);
                         $this->context->builder->returnValue($retval);
                     }
@@ -990,6 +990,12 @@ class JIT {
         if (null === $expected || '__value__' === $expected || Variable::TYPE_VALUE !== $return->type) {
             return $retval;
         }
+        if ('__string__*' === $expected) {
+            return $this->context->builder->call(
+                $this->context->lookupFunction('__value__readString'),
+                JIT\JitValueBox::valuePtrFromVariable($this->context, $return)
+            );
+        }
         $valuePtr = Variable::KIND_VARIABLE === $return->kind
             ? JIT\JitValueBox::pointer($this->context, $return->value)
             : $this->context->builder->alloca(
@@ -999,12 +1005,6 @@ class JIT {
             );
         if (Variable::KIND_VALUE === $return->kind) {
             $this->context->builder->store($retval, $valuePtr);
-        }
-        if ('__string__*' === $expected) {
-            return $this->context->builder->call(
-                $this->context->lookupFunction('__value__readString'),
-                $valuePtr
-            );
         }
         if ('long long' === $expected) {
             return $this->context->builder->call(
@@ -1039,18 +1039,40 @@ class JIT {
 
     private function isVoidCfgFunction(Block $block): bool
     {
-        $cfgFunc = $block->func;
+        return 'void' === $this->cfgFunctionReturnCallbackType($block->func);
+    }
+
+    /**
+     * LLVM return type tag for a CFG function (must match compileBlock() signature lowering).
+     */
+    private function cfgFunctionReturnCallbackType(?\PHPCfg\Func $cfgFunc): ?string
+    {
         if (null === $cfgFunc) {
-            return false;
+            return null;
         }
         if ($cfgFunc->returnType instanceof Op\Type\Void_) {
-            return true;
+            return 'void';
         }
         if ($cfgFunc->returnType instanceof Op\Type\Literal) {
-            return 'void' === $cfgFunc->returnType->name;
+            switch ($cfgFunc->returnType->name) {
+                case 'void':
+                    return 'void';
+                case 'int':
+                    return 'long long';
+                case 'string':
+                    return '__string__*';
+                case 'bool':
+                    return 'bool';
+                case 'object':
+                    return '__object__*';
+                case 'array':
+                    return '__hashtable__*';
+                default:
+                    return '__value__';
+            }
         }
 
-        return false;
+        return '__value__';
     }
 
     private function compileClass(?Block $block, int $classId) {
@@ -1350,14 +1372,7 @@ class JIT {
 
     private function valueBoxPointer(Variable $value): PHPLLVM\Value
     {
-        if (Variable::TYPE_VALUE !== $value->type) {
-            throw new \LogicException('valueBoxPointer requires TYPE_VALUE');
-        }
-        if (Variable::KIND_VARIABLE === $value->kind) {
-            return JIT\JitValueBox::pointer($this->context, $value->value);
-        }
-
-        return $value->value;
+        return JIT\JitValueBox::valuePtrFromVariable($this->context, $value);
     }
 
     private function assignOperandValue(Operand $result, PHPLLVM\Value $value): void {

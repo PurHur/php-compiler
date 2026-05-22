@@ -36,6 +36,26 @@ final class JitValueBox
         );
     }
 
+    /**
+     * {@see __value__*} for a boxed {@see Variable::TYPE_VALUE} (by-value or alloca slot).
+     */
+    public static function valuePtrFromVariable(Context $context, Variable $var): Value
+    {
+        if (Variable::TYPE_VALUE !== $var->type) {
+            throw new \LogicException('valuePtrFromVariable requires TYPE_VALUE');
+        }
+        if (Variable::KIND_VARIABLE === $var->kind) {
+            return self::pointer($context, $var->value);
+        }
+        if ('__value__*' === $context->getStringFromType($var->value->typeOf())) {
+            return $var->value;
+        }
+        $slot = $context->builder->alloca($context->getTypeFromString('__value__'), 1, 'value_rvalue_box');
+        $context->builder->store($var->value, $slot);
+
+        return self::pointer($context, $slot);
+    }
+
     public static function writeLong(Context $context, Value $slot, Value $long): void
     {
         $context->builder->call(

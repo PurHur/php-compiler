@@ -23,7 +23,10 @@ final class JitNativeString
                 $context,
                 Variable::TYPE_STRING,
                 Variable::KIND_VALUE,
-                (new \PHPCompiler\ext\standard\strval())->valueToString($context, $var->value)
+                (new \PHPCompiler\ext\standard\strval())->valueToString(
+                    $context,
+                    JitValueBox::valuePtrFromVariable($context, $var)
+                )
             );
         }
 

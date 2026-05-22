@@ -109,7 +109,7 @@ final class htmlspecialchars extends Internal
         if (JITVariable::TYPE_VALUE === $arg->type) {
             return $context->builder->call(
                 $context->lookupFunction('__value__readString'),
-                $arg->value
+                \PHPCompiler\JIT\JitValueBox::valuePtrFromVariable($context, $arg)
             );
         }
 
