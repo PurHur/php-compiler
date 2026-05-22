@@ -26,8 +26,9 @@ Prints the progressive MiniWebApp CI gate ladder for examples/003-MiniWebApp.
 Probes phpc lint --all by default; use --no-lint to report env/repo state only.
 
 Environment (enable next gates):
-  MINIWEBAPP_LINT_GATE=1   fail make web-smoke when lint regresses (#539, #455)
-  MINIWEBAPP_SERVE_GATE=1  enforce ServeTest MiniWebApp routes (#470)
+  MINIWEBAPP_LINT_GATE=1      fail make web-smoke when lint regresses (#539, #455)
+  MINIWEBAPP_VM_CLI_GATE=1    run MiniWebApp*VmCli in ci-fast (default on; #597)
+  MINIWEBAPP_SERVE_GATE=1     enforce ServeTest MiniWebApp routes (#470)
 
 See: examples/003-MiniWebApp/README.md, issue #472
 EOF
@@ -57,10 +58,12 @@ if [[ "${RUN_LINT}" -eq 1 ]]; then
 fi
 
 lint_gate="${MINIWEBAPP_LINT_GATE:-}"
+vm_cli_gate="${MINIWEBAPP_VM_CLI_GATE:-1}"
 serve_gate="${MINIWEBAPP_SERVE_GATE:-}"
 
 stage0=0
 stage1=0
+stage1b=0
 stage2=0
 stage3=0
 stage4=0
@@ -73,6 +76,12 @@ fi
 # Stage 1: phpc lint --all green (#539).
 if [[ "${lint_exit}" -eq 0 ]]; then
   stage1=1
+fi
+
+# Stage 1b: ci-fast runs VM CLI route matrix (#597).
+if grep -q 'MINIWEBAPP_VM_CLI_GATE' "${ROOT}/script/ci-fast.sh" 2>/dev/null \
+  && [[ "${vm_cli_gate}" == "1" ]]; then
+  stage1b=1
 fi
 
 # Stage 2: ServeTest gate env enabled (#470); routes land in ServeTest when green.
@@ -132,6 +141,9 @@ fi
 echo "$(mark "${stage1}") Stage 1 lint green — export MINIWEBAPP_LINT_GATE=1 (#539)"
 echo "       ${REPO_URL}/issues/539"
 
+echo "$(mark "${stage1b}") Stage 1b VM CLI — MINIWEBAPP_VM_CLI_GATE=1 in ci-fast (#597)"
+echo "       ${REPO_URL}/issues/597  (unset or =0 to skip MiniWebApp*VmCli)"
+
 echo "$(mark "${stage2}") Stage 2 ServeTest — export MINIWEBAPP_SERVE_GATE=1 (#470)"
 echo "       ${REPO_URL}/issues/470"
 
@@ -146,6 +158,7 @@ echo "Commands:"
 echo "  make web-smoke              lint + VM smoke (#455)"
 echo "  make examples-web-smoke     phpc serve + curl (#298)"
 echo "  MINIWEBAPP_LINT_GATE=1 make web-smoke"
+echo "  MINIWEBAPP_VM_CLI_GATE=1 ./script/ci-fast.sh"
 echo
 echo "Tracking: ${REPO_URL}/issues/472 (gate ladder spec)"
 
@@ -154,6 +167,8 @@ if [[ "${lint_exit}" -ne 0 && "${lint_gate}" != "1" ]]; then
   echo "Next: close lint blockers (#539), then export MINIWEBAPP_LINT_GATE=1"
 elif [[ "${lint_exit}" -eq 0 && "${lint_gate}" != "1" ]]; then
   echo "Next: export MINIWEBAPP_LINT_GATE=1 (lint is green)"
+elif [[ "${lint_exit}" -eq 0 && "${vm_cli_gate}" != "1" ]]; then
+  echo "Next: export MINIWEBAPP_VM_CLI_GATE=1 (lint green; enable VM CLI in ci-fast — #597)"
 elif [[ "${lint_exit}" -ne 0 && "${lint_gate}" == "1" ]]; then
   echo "Next: fix lint regressions (MINIWEBAPP_LINT_GATE=1 is set)"
 elif [[ "${serve_gate}" != "1" ]]; then

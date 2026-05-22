@@ -27,4 +27,10 @@ fi
 echo "PHPUnit (fast): MiniWebApp project lint (PhpcLintProjectTest)..."
 "$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit --filter PhpcLintProjectTest
 
+# VM CLI route matrix without TCP (issues #586, #595, #597). Default on while green.
+if [[ "${MINIWEBAPP_VM_CLI_GATE:-1}" == "1" ]]; then
+  echo "PHPUnit (fast): MiniWebApp VM CLI gates (MiniWebApp*VmCli)..."
+  "$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit --filter 'MiniWebApp.*VmCli'
+fi
+
 echo "Fast CI finished. Full LLVM compile gate: ./script/ci-local.sh (issue #436)."

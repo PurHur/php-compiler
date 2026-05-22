@@ -77,6 +77,15 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('ci_prepare_test_runtime', $body);
     }
 
+    public function testCiFastRunsMiniWebAppVmCliGateByDefault(): void
+    {
+        $fast = dirname(__DIR__, 2).'/script/ci-fast.sh';
+        $body = (string) file_get_contents($fast);
+        $this->assertStringContainsString('MINIWEBAPP_VM_CLI_GATE', $body);
+        $this->assertStringContainsString("MiniWebApp.*VmCli", $body);
+        $this->assertStringContainsString('PhpcLintProjectTest', $body);
+    }
+
     public function testAotLinkGroupTaggedOnAotTest(): void
     {
         $source = (string) file_get_contents(dirname(__DIR__).'/aot/AotTest.php');
@@ -90,7 +99,9 @@ final class CiScriptsTest extends TestCase
         $this->assertTrue(is_executable($script));
         $body = (string) file_get_contents($script);
         $this->assertStringContainsString('MINIWEBAPP_LINT_GATE', $body);
+        $this->assertStringContainsString('MINIWEBAPP_VM_CLI_GATE', $body);
         $this->assertStringContainsString('issues/461', $body);
+        $this->assertStringContainsString('issues/597', $body);
     }
 
     public function testRunVmGuardedScriptExists(): void
