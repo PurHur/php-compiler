@@ -20,7 +20,7 @@ $outFile = $root . '/docs/capabilities-syntax.md';
 
 $handlers = collectOpcodeHandlers($root);
 $syntax = collectSyntaxCapabilities($root, syntaxRowDefinitions(), $handlers);
-$markdown = renderSyntaxMarkdown($syntax);
+$markdown = renderSyntaxMarkdown($syntax) . renderWebNorthStarMarkdown(webNorthStarDefinitions());
 
 if ($check) {
     if (!is_file($outFile)) {

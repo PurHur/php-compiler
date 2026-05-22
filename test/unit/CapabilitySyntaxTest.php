@@ -28,6 +28,12 @@ final class CapabilitySyntaxTest extends TestCase
         $this->assertStringContainsString('Native user-class link', $body);
         $this->assertStringContainsString('Magic constants', $body);
         $this->assertStringContainsString('| Construct | VM | JIT | AOT | Issue | Notes |', $body);
+        $this->assertStringContainsString('## Web north-star', $body);
+        $this->assertStringContainsString('PATH_INFO / `?route=` fallback', $body);
+        $this->assertStringContainsString('`phpc_deploy_path()` + `PHPC_DEPLOY_ROOT`', $body);
+        $this->assertStringContainsString('CGI/1.1 driver', $body);
+        $this->assertStringContainsString('#489', $body);
+        $this->assertStringContainsString('#173', $body);
     }
 
     public function testCapabilitiesMdLinksToSyntaxMatrix(): void

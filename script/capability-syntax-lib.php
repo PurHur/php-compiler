@@ -315,3 +315,107 @@ function capabilityYesNo(bool $value): string
 {
     return $value ? 'yes' : 'no';
 }
+
+/**
+ * Web north-star constructs for examples/003-MiniWebApp (issue #655).
+ *
+ * Status values are curated from closed/open ROADMAP issues, not compile probes.
+ *
+ * @return list<array{
+ *   construct: string,
+ *   vm: string,
+ *   jit: string,
+ *   aot: string,
+ *   issue: int,
+ *   notes: list<string>
+ * }>
+ */
+function webNorthStarDefinitions(): array
+{
+    return [
+        [
+            'construct' => 'PATH_INFO / `?route=` fallback',
+            'vm' => 'yes',
+            'jit' => 'partial',
+            'aot' => 'blocked',
+            'issue' => 489,
+            'notes' => ['#489 VM closed; AOT blocked #568'],
+        ],
+        [
+            'construct' => '`phpc_deploy_path()` + `PHPC_DEPLOY_ROOT`',
+            'vm' => 'yes',
+            'jit' => 'partial',
+            'aot' => 'blocked',
+            'issue' => 585,
+            'notes' => ['#585 closed; runtime deploy #623'],
+        ],
+        [
+            'construct' => 'Runtime template `include` from deploy tree',
+            'vm' => 'yes',
+            'jit' => 'no',
+            'aot' => 'blocked',
+            'issue' => 623,
+            'notes' => ['#623 VM/AOT lint; execute blocked #568'],
+        ],
+        [
+            'construct' => 'CGI/1.1 driver (`bin/cgi.php`)',
+            'vm' => 'no',
+            'jit' => 'no',
+            'aot' => 'no',
+            'issue' => 50,
+            'notes' => [],
+        ],
+        [
+            'construct' => 'FastCGI loop',
+            'vm' => 'no',
+            'jit' => 'no',
+            'aot' => 'no',
+            'issue' => 173,
+            'notes' => [],
+        ],
+    ];
+}
+
+/** @param 'yes'|'no'|'partial'|'blocked' $status */
+function capabilityStatusLabel(string $status): string
+{
+    return $status;
+}
+
+/**
+ * @param list<array{construct: string, vm: string, jit: string, aot: string, issue: int, notes: list<string>}> $web
+ */
+function renderWebNorthStarMarkdown(array $web): string
+{
+    $lines = [
+        '## Web north-star (`examples/003-MiniWebApp`)',
+        '',
+        'PATH_INFO routing, deploy-root includes, and CGI drivers for the reference web app.',
+        'ROADMAP Phase 3/4: [#78](' . CAPABILITY_ISSUE_URL_BASE . '78), runtime tracker [#539]('
+        . CAPABILITY_ISSUE_URL_BASE . '539). Builtin matrix: [capabilities.md](capabilities.md).',
+        '',
+        '| Construct | VM | JIT | AOT | Issue | Notes |',
+        '|-----------|:--:|:---:|:---:|-------|-------|',
+    ];
+
+    foreach ($web as $row) {
+        $lines[] = sprintf(
+            '| %s | %s | %s | %s | [#%d](%s%d) | %s |',
+            $row['construct'],
+            capabilityStatusLabel($row['vm']),
+            capabilityStatusLabel($row['jit']),
+            capabilityStatusLabel($row['aot']),
+            $row['issue'],
+            CAPABILITY_ISSUE_URL_BASE,
+            $row['issue'],
+            $row['notes'] === [] ? '' : implode('; ', $row['notes'])
+        );
+    }
+
+    $lines[] = '';
+    $lines[] = '_Web rows are curated from ROADMAP issue state; AOT execute for user classes remains blocked by [#568]('
+        . CAPABILITY_ISSUE_URL_BASE . '568)._';
+    $lines[] = '';
+
+    return implode("\n", $lines);
+}
