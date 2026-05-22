@@ -13,6 +13,41 @@ use PHPLLVM\Value;
 
 final class HashTableHelper
 {
+    /**
+     * Stable string key for SplObjectStorage object offsets (pointer identity, issue #601).
+     */
+    public static function objectPointerAsStringKey(Context $context, Variable $keyObject): Variable
+    {
+        if (Variable::TYPE_OBJECT !== $keyObject->type) {
+            throw new \LogicException('SplObjectStorage keys must be objects in this compiler build');
+        }
+        $objPtr = $context->helper->loadValue($keyObject);
+        $sizeT = $context->getTypeFromString('size_t');
+        $i8p = $context->getTypeFromString('int8*');
+        $ptrInt = $context->builder->ptrToInt($objPtr, $sizeT);
+        $buf = $context->builder->alloca($context->getTypeFromString('int8'), $sizeT->constInt(32, false), 'spl_key_buf');
+        $bufC = $context->builder->pointerCast($buf, $i8p);
+        $fmt = $context->builder->pointerCast($context->constantFromString('%zu'), $i8p);
+        $context->builder->call($context->lookupFunction('sprintf'), $bufC, $fmt, $ptrInt);
+        $len = $context->builder->call($context->lookupFunction('strlen'), $bufC);
+        $lenI64 = $context->getTypeFromString('int64');
+        $lenForInit = $len->typeOf() === $lenI64
+            ? $len
+            : $context->builder->zExt($len, $lenI64);
+        $str = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $lenForInit,
+            $bufC
+        );
+
+        return new Variable(
+            $context,
+            Variable::TYPE_STRING,
+            Variable::KIND_VALUE,
+            $str
+        );
+    }
+
     public static function alloc(Context $context): Value
     {
         return $context->builder->call($context->lookupFunction('__hashtable__alloc'));

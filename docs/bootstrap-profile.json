@@ -360,6 +360,7 @@
         "test/bootstrap-aot/namespace_hello.php",
         "test/bootstrap-aot/nullable_types.php",
         "test/bootstrap-aot/require_chain/main.php",
+        "test/bootstrap-aot/spl_object_storage_dim.php",
         "test/bootstrap-aot/throw_logic.php",
         "test/bootstrap-aot/try_catch.php"
     ],
@@ -375,6 +376,7 @@
         "test/bootstrap-aot/namespace_hello.php",
         "test/bootstrap-aot/nullable_types.php",
         "test/bootstrap-aot/require_chain/main.php",
+        "test/bootstrap-aot/spl_object_storage_dim.php",
         "test/bootstrap-aot/throw_logic.php",
         "test/bootstrap-aot/try_catch.php"
     ],
@@ -385,8 +387,8 @@
         "inventory_files": 318,
         "excluded": 2,
         "eligible": 316,
-        "aot_lint_targets": 14,
-        "aot_link_targets": 13,
+        "aot_lint_targets": 15,
+        "aot_link_targets": 14,
         "aot_link_lib_targets": 1
     }
 }

@@ -13,6 +13,7 @@ use PHPCfg\Operand;
 use PHPCfg\Operand\Literal;
 use PHPCompiler\JIT\Builtin\Refcount;
 use PHPCompiler\JIT\Builtin\Type;
+use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
 use PHPCompiler\VM\Variable as VMVariable;
@@ -27,6 +28,8 @@ class Object_ extends Type {
     private array $methodVisibility = [];
     /** @var array<int, array<string, array{type: int, value: int|float|bool|string|null}>> */
     private array $classConstants = [];
+
+    private ?int $splObjectStorageClassId = null;
 
     public function register(): void
     {
@@ -210,7 +213,49 @@ class Object_ extends Type {
             $this->initPropertySlots($obj, $propCount);
         }
 
+        if ($this->isSplObjectStorageClass($classId)) {
+            $ht = HashTableHelper::alloc($this->context);
+            $voidPtr = $this->context->getTypeFromString('void*');
+            $this->context->builder->store(
+                $this->context->builder->pointerCast($ht, $voidPtr),
+                $this->propertySlotPtr($obj, 0)
+            );
+        }
+
         return $obj;
+    }
+
+    public function splObjectStorageClassId(): ?int
+    {
+        return $this->splObjectStorageClassId;
+    }
+
+    public function isSplObjectStorageClass(int $classId): bool
+    {
+        return null !== $this->splObjectStorageClassId && $classId === $this->splObjectStorageClassId;
+    }
+
+    /**
+     * SplObjectStorage stores entries in a backing __hashtable__ (issue #601).
+     */
+    public function splBackingHashtable(Variable $obj): Variable
+    {
+        if (Variable::TYPE_OBJECT !== $obj->type) {
+            throw new \LogicException('splBackingHashtable requires __object__*');
+        }
+        $objPtr = $this->context->helper->loadValue($obj);
+        $loaded = $this->context->builder->load($this->propertySlotPtr($objPtr, 0));
+        $htPtr = $this->context->builder->pointerCast(
+            $loaded,
+            $this->context->getTypeFromString('__hashtable__*')
+        );
+
+        return new Variable(
+            $this->context,
+            Variable::TYPE_HASHTABLE,
+            Variable::KIND_VALUE,
+            $htPtr
+        );
     }
 
     private function initPropertySlots(PHPLLVM\Value $obj, int $propCount): void
@@ -299,6 +344,10 @@ class Object_ extends Type {
         $this->properties[$id] = [];
         $this->classConstants[$id] = [];
         $this->classes[$lcname] = $id;
+        if ('splobjectstorage' === $lcname) {
+            $this->splObjectStorageClassId = $id;
+            $this->defineProperty($id, '__spl_ht', Variable::TYPE_HASHTABLE);
+        }
     }
 
     public function defineMethodVisibility(int $classId, string $methodLc, int $visibilityFlags): void

@@ -277,6 +277,33 @@ class JIT {
                     }
                     $dimOp = $block->getOperand($op->arg3);
                     $dim = $this->context->getVariableFromOp($dimOp);
+                    $containerOp = $block->getOperand($op->arg2);
+                    $containerUserType = $containerOp->type->userType ?? '';
+                    if (
+                        $value->type === Variable::TYPE_OBJECT
+                        && 'splobjectstorage' === strtolower($containerUserType)
+                    ) {
+                        $ht = $this->context->type->object->splBackingHashtable($value);
+                        $keyStr = JIT\HashTableHelper::objectPointerAsStringKey($this->context, $dim);
+                        $htVal = $this->context->helper->loadValue($ht);
+                        $keyVal = $this->context->helper->loadValue($keyStr);
+                        if ($forWrite) {
+                            $fetched = JIT\HashTableHelper::writableStringKeyValueBox(
+                                $this->context,
+                                $htVal,
+                                $keyVal
+                            );
+                            $this->context->setVariableOp($resultOp, $fetched);
+                        } else {
+                            $fetched = JIT\HashTableHelper::readStringKeyToValueBox(
+                                $this->context,
+                                $htVal,
+                                $keyVal
+                            );
+                            $this->assignOperand($resultOp, $fetched);
+                        }
+                        break;
+                    }
                     if ($value->type === Variable::TYPE_STRING) {
                         $charPtr = StringOffsetHelper::dimFetch(
                             $this->context,
