@@ -217,7 +217,11 @@ abstract class BaseTest extends TestCase {
                 if ($expected === null) {
                     throw new \LogicException("No PHPT expectation found");
                 }
-                $this->$selectedAssertion($expected, $actual);
+                if ('EXPECTREGEX' === $action && method_exists($this, 'assertMatchesRegularExpression')) {
+                    $this->assertMatchesRegularExpression($expected, $actual);
+                } else {
+                    $this->$selectedAssertion($expected, $actual);
+                }
                 return;
             }
         }
