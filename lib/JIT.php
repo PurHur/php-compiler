@@ -785,10 +785,7 @@ class JIT {
                         throw new \LogicException('Static call class must be a literal');
                     }
                     $proxyName = strtolower($classOp->value).'::'.strtolower($nameOp->value);
-                    if (!isset($this->context->functionProxies[$proxyName])) {
-                        throw new \RuntimeException("Call to undefined static method $proxyName");
-                    }
-                    $this->context->scope->toCall = $this->context->functionProxies[$proxyName];
+                    $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
                     $this->context->scope->args = [];
                     break;
                 case OpCode::TYPE_ARG_SEND:
