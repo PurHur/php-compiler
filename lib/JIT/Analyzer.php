@@ -55,6 +55,10 @@ class Analyzer
                 || $usage instanceof Op\Expr\NsFuncCall
                 || $usage instanceof Op\Expr\ConcatList
                 || $usage instanceof Op\Expr\Assertion
+                || $usage instanceof Op\Expr\New_
+                || $usage instanceof Op\Expr\MethodCall
+                || $usage instanceof Op\Expr\PropertyFetch
+                || $usage instanceof Op\Expr\Include_
                 || $usage instanceof Op\Terminal\Return_) {
                 continue;
             } else {

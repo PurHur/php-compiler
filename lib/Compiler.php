@@ -743,11 +743,14 @@ class Compiler {
             if (null !== $resolved) {
                 $literal = new Operand\Literal($resolved);
                 $literal->type = Type::string();
+                $pathIndex = count($block->literalIncludePaths);
+                $block->literalIncludePaths[$pathIndex] = $resolved;
 
                 return new OpCode(
                     OpCode::TYPE_INCLUDE,
                     $this->compileOperand($literal, $block, true),
                     $resultSlot,
+                    $pathIndex,
                 );
             }
         }
