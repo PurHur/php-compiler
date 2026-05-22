@@ -350,12 +350,7 @@
         "inventory_files": 299,
         "excluded": 2,
         "eligible": 297,
-<<<<<<< Updated upstream
         "aot_lint_targets": 8,
-        "aot_link_targets": 6
-=======
-        "aot_lint_targets": 8,
-        "aot_link_targets": 7
->>>>>>> Stashed changes
+        "aot_link_targets": 8
     }
 }

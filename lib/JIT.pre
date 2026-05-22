@@ -539,6 +539,18 @@ class JIT {
                     $funcName = $this->context->scope->className.'::'.strtolower($name->value);
                     $this->compileBlock($op->block1, $funcName);
                     break;
+                case OpCode::TYPE_DECLARE_CLASS_CONST:
+                    $name = $block->getOperand($op->arg1);
+                    assert($name instanceof Operand\Literal);
+                    if (!isset($block->constants[$op->arg2])) {
+                        throw new \LogicException('Class constant value must be a compile-time constant');
+                    }
+                    $this->context->type->object->defineClassConst(
+                        $classId,
+                        $name->value,
+                        $block->constants[$op->arg2]
+                    );
+                    break;
                 default:
                     throw new \LogicException('Other class body types are not jittable for now');
             }

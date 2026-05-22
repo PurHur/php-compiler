@@ -234,6 +234,9 @@ restart:
                     }
                     $frame->scope[$op->arg1]->copyFrom($value);
                     break;
+                case OpCode::TYPE_CLASS_CONST_FETCH:
+                    // Recorded at compile time; VM does not resolve class constants yet.
+                    break;
                 case OpCode::TYPE_RETURN_VOID:
                     if (!is_null($frame->returnVar)) {
                         $frame->returnVar->null();

@@ -531,6 +531,8 @@ class Compiler {
                     $this->compileOperand($expr->name, $block, true),
                     $nsName
                 )];
+            case Op\Expr\ClassConstFetch::class:
+                return $this->compileClassConstFetch($expr, $block);
             case Op\Expr\FuncCall::class:
                 return $this->compileFuncCall(
                     $this->compileOperand($expr->name, $block, true),
@@ -1192,6 +1194,20 @@ class Compiler {
         }
     }
 
+
+
+    /**
+     * @return OpCode[]
+     */
+    protected function compileClassConstFetch(Op\Expr\ClassConstFetch $expr, Block $block): array
+    {
+        return [new OpCode(
+            OpCode::TYPE_CLASS_CONST_FETCH,
+            $this->compileOperand($expr->result, $block, false),
+            $this->compileOperand($expr->class, $block, true),
+            $this->compileOperand($expr->name, $block, true)
+        )];
+    }
 
     protected function compileFuncCall(?int $name, array $args, Operand $result, Block $block): array
     {
