@@ -41,6 +41,7 @@ php-compiler CLI
   phpc build [-o out] <entry.php>               AOT compile to a native binary
   phpc build --project [dir] [--dry-run]        Build from phpc.json entry + binary paths
       --dry-run                                 List entry + includes graph; exit before LLVM
+      --verbose                                 On failure, keep full LLVM stderr (default adds #568 trailer)
   phpc deploy [dir] -o <dist>                   Package AOT binary + manifest trees into dist/
       --from-build                              Require existing binary (skip phpc build --project)
   phpc lint [-r 'code'] [--json] <entry.php>    Report unsupported syntax (line-accurate)
@@ -93,10 +94,15 @@ switch ($command) {
         if ([] !== $args && '--project' === $args[0]) {
             array_shift($args);
             $dryRun = false;
+            $verbose = false;
             $projectDir = '.';
             foreach ($args as $arg) {
                 if ('--dry-run' === $arg) {
                     $dryRun = true;
+                    continue;
+                }
+                if ('--verbose' === $arg) {
+                    $verbose = true;
                     continue;
                 }
                 if (str_starts_with($arg, '-')) {
@@ -105,7 +111,7 @@ switch ($command) {
                 }
                 $projectDir = $arg;
             }
-            exit(buildFromProject($repoRoot, $php, $projectDir, $dryRun));
+            exit(buildFromProject($repoRoot, $php, $projectDir, $dryRun, $verbose));
         }
         if ([] === $args) {
             fwrite(STDERR, "phpc build: missing entry.php (or use: phpc build --project [dir])\n");
@@ -274,8 +280,13 @@ function deployFromProject(string $repoRoot, array $php, array $args): int
 /**
  * @param list<string> $php
  */
-function buildFromProject(string $repoRoot, array $php, string $projectDir, bool $dryRun = false): int
-{
+function buildFromProject(
+    string $repoRoot,
+    array $php,
+    string $projectDir,
+    bool $dryRun = false,
+    bool $verbose = false
+): int {
     if (!is_file($repoRoot.'/vendor/autoload.php')) {
         fwrite(STDERR, "phpc build --project: run composer install first\n");
         return 1;
@@ -308,14 +319,27 @@ function buildFromProject(string $repoRoot, array $php, string $projectDir, bool
     }
 
     $includes = \PHPCompiler\Web\ProjectManifest::resolveIncludePaths($projectDir);
-    $cmd = array_merge($php, [$repoRoot.'/bin/compile.php', '-o', $output]);
+    $compileArgv = ['-o', $output];
     foreach ($includes as $includePath) {
-        $cmd[] = '--include';
-        $cmd[] = $includePath;
+        $compileArgv[] = '--include';
+        $compileArgv[] = $includePath;
     }
-    $cmd[] = $entry;
+    $compileArgv[] = $entry;
 
-    return runProcess($cmd, $repoRoot);
+    $result = \PHPCompiler\Cli\PhpcBuild::runCompile(
+        $php,
+        $repoRoot,
+        $repoRoot.'/bin/compile.php',
+        $repoRoot,
+        $compileArgv
+    );
+    if ($verbose || 0 === $result['exit']) {
+        \PHPCompiler\Cli\PhpcBuild::emitBuildOutput($result, true);
+    } else {
+        \PHPCompiler\Cli\PhpcBuild::emitBuildOutput($result, false);
+    }
+
+    return $result['exit'];
 }
 
 /**
