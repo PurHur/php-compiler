@@ -28,6 +28,7 @@ Usage: script/examples-web-smoke.sh [--aot] [--miniwebapp-only]
 
 Environment:
   PHP_COMPILER_SKIP_SERVE_TESTS=1  exit 0 without running HTTP checks
+  PHP_COMPILER_MAX_BODY            optional; 003 oversized POST check uses 1024 when unset (#705)
 EOF
 }
 
@@ -147,6 +148,66 @@ curl_expect_200_post() {
   echo "examples-web-smoke: ${label}: ok"
 }
 
+curl_expect_post_not_200() {
+  local label="$1"
+  local url="$2"
+  local post_body="$3"
+  local body status
+  body="$(mktemp)"
+  status="$(curl -sS -o "$body" -w '%{http_code}' --connect-timeout 5 --max-time 15 \
+    -X POST -d "$post_body" "$url" || echo "000")"
+  if [[ "$status" == "200" ]]; then
+    echo "examples-web-smoke: ${label}: expected non-200 (413 or reset), got 200" >&2
+    echo "  url: ${url}" >&2
+    cat "$body" >&2 || true
+    rm -f "$body"
+    return 1
+  fi
+  rm -f "$body"
+  echo "examples-web-smoke: ${label}: ok (HTTP ${status})"
+}
+
+run_miniwebapp_oversized_post_smoke() {
+  local docroot="${ROOT}/${MINIWEBAPP}"
+  if [[ ! -d "${docroot}/public" ]]; then
+    return 0
+  fi
+
+  local max_body="${PHP_COMPILER_MAX_BODY:-1024}"
+  local port pid
+  port="$(find_free_port)"
+  echo "examples-web-smoke: 003-MiniWebApp oversized POST (PHP_COMPILER_MAX_BODY=${max_body})"
+  PHP_COMPILER_MAX_BODY="${max_body}" "${PHPC}" serve "127.0.0.1:${port}" "$docroot" >/dev/null 2>&1 &
+  pid=$!
+
+  stop_serve() {
+    kill "$pid" 2>/dev/null || true
+    local waited=0
+    while kill -0 "$pid" 2>/dev/null && ((waited < 40)); do
+      sleep 0.05
+      waited=$((waited + 1))
+    done
+    if kill -0 "$pid" 2>/dev/null; then
+      kill -9 "$pid" 2>/dev/null || true
+    fi
+    wait "$pid" 2>/dev/null || true
+  }
+  trap stop_serve RETURN
+
+  wait_for_serve "$port"
+
+  local limit=$((max_body + 1))
+  local oversized_post
+  oversized_post="$(printf "%${limit}s" '' | tr ' ' 'x')"
+  curl_expect_post_not_200 \
+    "003-MiniWebApp / oversized POST contact" \
+    "http://127.0.0.1:${port}/index.php/contact" \
+    "$oversized_post"
+
+  stop_serve
+  trap - RETURN
+}
+
 run_docroot_smoke() {
   local name="$1"
   local docroot="${ROOT}/${2}"
@@ -257,6 +318,7 @@ if [[ -d "${ROOT}/${MINIWEBAPP}/public" ]]; then
       'GET|api/status PATH_INFO|/index.php/api/status|-|"ok":true;003-MiniWebApp' \
       'GET|home query fallback|/index.php?route=home|-|MiniWebApp' \
       'GET|assets style.css|/assets/style.css|-|body {'
+    run_miniwebapp_oversized_post_smoke
   fi
 fi
 
