@@ -934,6 +934,22 @@ final class VmString
     /**
      * @return string|false
      */
+    public static function strrchr(string $haystack, string $needle)
+    {
+        if ('' === $needle) {
+            throw new \LogicException('strrchr(): Argument #2 ($needle) cannot be empty');
+        }
+        $pos = self::strrpos($haystack, $needle[0], 0);
+        if (false === $pos) {
+            return false;
+        }
+
+        return self::byteSlice($haystack, $pos);
+    }
+
+    /**
+     * @return string|false
+     */
     public static function stristr(string $haystack, string $needle, bool $beforeNeedle = false)
     {
         if ('' === $needle) {
