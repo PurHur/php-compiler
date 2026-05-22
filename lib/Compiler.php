@@ -199,6 +199,17 @@ class Compiler {
                     $declare->block1 = $methodBlock;
                     $result->addOpCode($declare);
                     break;
+                case Op\Terminal\Const_::class:
+                    if ($type !== OpCode::TYPE_DECLARE_CLASS) {
+                        throw new \LogicException('Class constants are only supported on classes for now');
+                    }
+                    $this->compileOps($child->valueBlock->children, $result);
+                    $result->addOpCode(new OpCode(
+                        OpCode::TYPE_DECLARE_CLASS_CONST,
+                        $this->compileOperand($child->name, $result, true),
+                        $this->compileOperand($child->value, $result, true)
+                    ));
+                    break;
                 default:
                     throw new \LogicException('Unsupported class body element: ' . get_class($child));
             }

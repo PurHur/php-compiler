@@ -83,6 +83,7 @@ class OpCode {
     const TYPE_SHIFT_RIGHT = 69;
     const TYPE_DECLARE_METHOD = 84;
     const TYPE_METHODCALL_INIT = 85;
+    const TYPE_DECLARE_CLASS_CONST = 86;
 
     public int $type;
     public ?int $arg1;
