@@ -36,6 +36,10 @@ final class LintCompiler extends Compiler
      */
     protected function compileExpr(Op\Expr $expr, Block $block): array
     {
+        if ($expr instanceof Op\Expr\ClassConstFetch) {
+            return $this->compileClassConstFetch($expr, $block);
+        }
+
         try {
             return parent::compileExpr($expr, $block);
         } catch (\LogicException $e) {

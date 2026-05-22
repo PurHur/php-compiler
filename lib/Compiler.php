@@ -236,7 +236,6 @@ class Compiler {
 
     protected function compileParam(Op\Expr\Param $param, Block $block, int $paramIdx): OpCode {
         assert(false === $param->byRef);
-        assert(false === $param->variadic);
         $defaultConst = null;
         if (null !== $param->defaultVar) {
             $defaultConst = $this->compileOperand($param->defaultVar, $block, true);
@@ -532,6 +531,8 @@ class Compiler {
                     $this->compileOperand($expr->name, $block, true),
                     $nsName
                 )];
+            case Op\Expr\ClassConstFetch::class:
+                return $this->compileClassConstFetch($expr, $block);
             case Op\Expr\FuncCall::class:
                 return $this->compileFuncCall(
                     $this->compileOperand($expr->name, $block, true),
@@ -1183,11 +1184,30 @@ class Compiler {
                     OpCode::TYPE_ITER_RESET,
                     $this->compileOperand($terminal->var, $block, true)
                 );
+            case 'Terminal_Throw':
+                return new OpCode(
+                    OpCode::TYPE_THROW,
+                    $this->compileOperand($terminal->expr, $block, true)
+                );
             default:
                 throw new \LogicException("Unknown Terminal Type: " . $terminal->getType());
         }
     }
 
+
+
+    /**
+     * @return OpCode[]
+     */
+    protected function compileClassConstFetch(Op\Expr\ClassConstFetch $expr, Block $block): array
+    {
+        return [new OpCode(
+            OpCode::TYPE_CLASS_CONST_FETCH,
+            $this->compileOperand($expr->result, $block, false),
+            $this->compileOperand($expr->class, $block, true),
+            $this->compileOperand($expr->name, $block, true)
+        )];
+    }
 
     protected function compileFuncCall(?int $name, array $args, Operand $result, Block $block): array
     {

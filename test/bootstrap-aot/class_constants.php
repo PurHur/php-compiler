@@ -14,5 +14,5 @@ class Codes
     public const LABEL = 'ok';
 }
 
-// Lint gate: declare only (ClassConstFetch is separate from Const_ lowering).
+// Lint gate: declare only; see class_const_fetch.php for self::CONST reads.
 echo "ok\n";

@@ -234,6 +234,9 @@ restart:
                     }
                     $frame->scope[$op->arg1]->copyFrom($value);
                     break;
+                case OpCode::TYPE_CLASS_CONST_FETCH:
+                    // Recorded at compile time; VM does not resolve class constants yet.
+                    break;
                 case OpCode::TYPE_RETURN_VOID:
                     if (!is_null($frame->returnVar)) {
                         $frame->returnVar->null();
@@ -444,6 +447,18 @@ restart:
                         $container->toArray()->iterCurrentValue($byRef)
                     );
                     break;
+                case OpCode::TYPE_THROW:
+                    $thrown = $frame->scope[$op->arg1]->resolveIndirect();
+                    if (Variable::TYPE_OBJECT === $thrown->type) {
+                        $entry = $thrown->toObject();
+                        try {
+                            $message = $entry->getProperty('message')->toString();
+                        } catch (\LogicException) {
+                            $message = 'Exception';
+                        }
+                        throw new \Exception($message);
+                    }
+                    throw new \Exception($thrown->toString());
                 default:
                     throw new \LogicException("VM OpCode Not Implemented: " . $op->getType());
             }
