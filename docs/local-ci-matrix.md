@@ -1,0 +1,54 @@
+# Local CI matrix
+
+How to run the php-compiler test gate on a developer machine or Runforge harness **without GitHub Actions** ([#245](https://github.com/PurHur/php-compiler/issues/245), [#394](https://github.com/PurHur/php-compiler/issues/394)).
+
+## Defaults
+
+Repository defaults live in [`script/ci-defaults.env`](../script/ci-defaults.env):
+
+| Variable | Default | Role |
+|----------|---------|------|
+| `PHP_COMPILER_MEMORY_LIMIT` | `1536M` | PHP heap for PHPUnit and `bin/vm.php` children |
+| `PHP_COMPILER_LLVM_MEMORY_LIMIT` | `4096M` | LLVM compile phases in `ci-local.sh` |
+| `PHP_COMPILER_CI_RAM_GB` | `8` | `ulimit -v` for the CI shell |
+| `PHP_COMPILER_DOCKER_MEM` | `10g` | Docker cgroup RAM cap |
+| `PHP_COMPILER_VM_PEAK_RSS_MB` | `2048` | Kill VM subprocess if RSS exceeds this (when guard enabled) |
+| `PHP_COMPILER_VM_RSS_GUARD` | `1` in CI | Wrap PHPT `vm.php` spawns with `run-vm-guarded.sh` |
+
+## Entry points
+
+| Goal | Host PHP + LLVM | Docker (recommended on harness) |
+|------|-----------------|-------------------------------|
+| Full gate (VM + JIT + AOT) | `./script/ci-local.sh` | `make test` or `./script/docker-ci-local.sh` |
+| Fast gate (no LLVM compile) | `./script/ci-fast.sh` | `make test-fast` or `./script/docker-ci-local.sh fast` |
+| Explicit memory-capped Docker | — | `./script/ci-docker-safe.sh ci-local.sh` or `make test-docker-safe` |
+| Single PHPUnit filter | Append args: `./script/ci-fast.sh --filter VMTest` | Same inside Docker wrappers |
+
+## Memory safety
+
+- **One full CI container at a time.** Parallel `make test` runs can exhaust RAM ([#497](https://github.com/PurHur/php-compiler/issues/497)).
+- All Docker CI paths use `script/ci-docker-run.sh` (`-m 10g` + env from `ci-defaults.env`).
+- PHPT compliance tests monitor `bin/vm.php` RSS in `BaseTest` when `PHP_COMPILER_VM_RSS_GUARD=1` (default); manual profiling uses `script/run-vm-guarded.sh` ([#500](https://github.com/PurHur/php-compiler/issues/500)).
+- Profile PHPT peak RSS locally: `./script/scan-vm-phpt-peak-rss.sh [dir] [limit]`.
+
+## Environment overrides
+
+```bash
+export PHP_COMPILER_MEMORY_LIMIT=4G
+export PHP_COMPILER_CI_RAM_GB=16
+export PHP_COMPILER_DOCKER_MEM=16g
+export PHP_COMPILER_VM_PEAK_RSS_MB=4096
+export PHP_COMPILER_VM_RSS_GUARD=0   # disable RSS killer (debug only)
+make test
+```
+
+## Serve tests
+
+Set `PHP_COMPILER_SKIP_SERVE_TESTS=1` only when loopback TCP bind is unavailable. Harness Docker CI should **not** set this by default.
+
+## Related issues
+
+- [#436](https://github.com/PurHur/php-compiler/issues/436) — tiered CI (`ci-fast` vs `ci-local`)
+- [#497](https://github.com/PurHur/php-compiler/issues/497) — memory incident (closed)
+- [#500](https://github.com/PurHur/php-compiler/issues/500) — VM RSS profiling
+- [#501](https://github.com/PurHur/php-compiler/issues/501) — land CI caps (closed via PR)

@@ -8,9 +8,9 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 298 |
+| PHP files on vm.php path | 299 |
 | Source constructs flagged (blockers) | 10 |
-| Source constructs flagged (warnings) | 782 |
+| Source constructs flagged (warnings) | 786 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -223,6 +223,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/types/mb_strlen.php` | 0 | 1 |
 | `ext/types/strlen.php` | 0 | 1 |
 | `lib/AOT/Linker.php` | 8 | 1 |
+| `lib/AOT/ProjectGraph.php` | 0 | 4 |
 | `lib/Block.php` | 0 | 4 |
 | `lib/Cli/PhpcInit.php` | 0 | 1 |
 | `lib/Compiler.php` | 0 | 93 |
@@ -1491,6 +1492,14 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 **Warnings** (review for bootstrap subset):
 - 11 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `lib/AOT/ProjectGraph.php`
+
+**Warnings** (review for bootstrap subset):
+- new Runtime (line 41)
+- new Runtime (line 145)
+- 6 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 1 closure(s)
+
 ### `lib/Block.php`
 
 **Warnings** (review for bootstrap subset):
@@ -2241,7 +2250,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/Web/LiteralIncludeDiscovery.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 - 1 closure(s)
 
 ### `lib/Web/ManifestValidator.php`

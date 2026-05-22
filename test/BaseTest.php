@@ -187,21 +187,16 @@ abstract class BaseTest extends TestCase {
             if (false === $runPath) {
                 $this->fail("RUNFILE not found: {$runfile}");
             }
-            $cmd = array_merge(self::llvmEnvPrefix(), $this->phpCommand(), [$this->BIN, $runPath]);
+            $vmCmd = array_merge($this->phpCommand(), [$this->BIN, $runPath]);
             $cwd = dirname($runPath);
+            $stdin = null;
         } else {
-            $cmd = array_merge(self::llvmEnvPrefix(), $this->phpCommand(), [$this->BIN]);
+            $vmCmd = array_merge($this->phpCommand(), [$this->BIN]);
             $cwd = $repoRoot;
+            $stdin = $code;
         }
-        $proc = proc_open($cmd, $descriptorSepc, $pipes, $cwd, $env);
-        if ('' === $runfile) {
-            fwrite($pipes[0], $code);
-        } else {
-            fclose($pipes[0]);
-        }
-        $result = stream_get_contents($pipes[1]);
-        fclose($pipes[1]);
-        proc_close($proc);
+        $cmd = array_merge(self::llvmEnvPrefix(), $vmCmd);
+        $result = self::runVmSubprocess($cmd, $cwd, $env, $stdin, $name);
         $this->assertExpect($result, $sections);
     }
 
@@ -272,6 +267,121 @@ abstract class BaseTest extends TestCase {
     protected static function llvmEnvPrefix(): array
     {
         return LlvmToolchain::envPrefix(dirname(__DIR__));
+    }
+
+    /**
+     * @param list<string>  $cmd
+     * @param array<string, string> $env
+     */
+    protected static function runVmSubprocess(array $cmd, string $cwd, array $env, ?string $stdin, string $testName): string
+    {
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $pipes = [];
+        $proc = proc_open($cmd, $descriptorSpec, $pipes, $cwd, $env);
+        if (!\is_resource($proc)) {
+            throw new \RuntimeException("Failed to spawn VM for test: {$testName}");
+        }
+        if (null !== $stdin) {
+            fwrite($pipes[0], $stdin);
+        }
+        fclose($pipes[0]);
+
+        $guard = '1' === getenv('PHP_COMPILER_VM_RSS_GUARD');
+        $maxMb = (int) (getenv('PHP_COMPILER_VM_PEAK_RSS_MB') ?: '2048');
+        $maxKb = $maxMb * 1024;
+        $peakKb = 0;
+
+        while (true) {
+            $status = proc_get_status($proc);
+            if ($guard && isset($status['pid'])) {
+                $peakKb = max($peakKb, self::peakRssKbForTree((int) $status['pid']));
+                if ($peakKb > $maxKb) {
+                    proc_terminate($proc, 9);
+                    proc_close($proc);
+                    fclose($pipes[1]);
+                    fclose($pipes[2]);
+                    throw new \RuntimeException(sprintf(
+                        'VM RSS guard: test "%s" exceeded %d MiB (peak %d MiB)',
+                        $testName,
+                        $maxMb,
+                        (int) ceil($peakKb / 1024)
+                    ));
+                }
+            }
+            if (!$status['running']) {
+                break;
+            }
+            usleep(150000);
+        }
+
+        $result = stream_get_contents($pipes[1]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        proc_close($proc);
+
+        if ($guard && $peakKb > 0) {
+            fwrite(STDERR, sprintf(
+                "vm-rss-guard: test=%s peak_rss_mb=%d\n",
+                $testName,
+                (int) ceil($peakKb / 1024)
+            ));
+        }
+
+        return $result;
+    }
+
+    private static function peakRssKbForTree(int $rootPid): int
+    {
+        $peak = 0;
+        foreach (self::processTreePids($rootPid) as $pid) {
+            $statusFile = "/proc/{$pid}/status";
+            if (!is_readable($statusFile)) {
+                continue;
+            }
+            $lines = file($statusFile, FILE_IGNORE_NEW_LINES);
+            if (false === $lines) {
+                continue;
+            }
+            foreach ($lines as $line) {
+                if (0 === strpos($line, 'VmRSS:')) {
+                    $parts = preg_split('/\s+/', trim($line));
+                    if (isset($parts[1])) {
+                        $peak = max($peak, (int) $parts[1]);
+                    }
+                    break;
+                }
+            }
+        }
+
+        return $peak;
+    }
+
+    /**
+     * @return list<int>
+     */
+    private static function processTreePids(int $rootPid): array
+    {
+        $pids = [$rootPid];
+        $offset = 0;
+        while ($offset < count($pids)) {
+            $parent = $pids[$offset];
+            $offset++;
+            $children = @file("/proc/{$parent}/task/{$parent}/children", FILE_IGNORE_NEW_LINES);
+            if (false === $children || '' === $children[0]) {
+                continue;
+            }
+            foreach (preg_split('/\s+/', trim($children[0])) as $child) {
+                if ('' !== $child) {
+                    $pids[] = (int) $child;
+                }
+            }
+        }
+
+        return $pids;
     }
 
 }
