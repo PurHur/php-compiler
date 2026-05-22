@@ -14,19 +14,20 @@ use PHPCompiler\JIT\Builtin;
 class Type extends Builtin {
 
     public Type\String_ $string;
+    public Type\Object_ $object;
     public Type\HashTable $hashtable;
     protected array $fields;
 
     public function register(): void {
         $this->string = new Type\String_($this->context, $this->loadType);
-        // $this->object = new Type\Object_($this->context, $this->loadType);
+        $this->object = new Type\Object_($this->context, $this->loadType);
         $this->value = new Type\Value($this->context, $this->loadType);
         $this->hashtable = new Type\HashTable($this->context, $this->loadType);
         // $this->maskedarray = new Type\MaskedArray($this->context, $this->loadType);
         // $this->nativearray = new Type\NativeArray($this->context, $this->loadType);
         $this->string->register();
-        // $this->object->register();
         $this->value->register();
+        $this->object->register();
         $fntypeGetenv = $this->context->context->functionType(
             $this->context->getTypeFromString('void'),
             false,

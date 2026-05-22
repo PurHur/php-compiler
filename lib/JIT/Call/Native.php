@@ -58,6 +58,12 @@ class Native implements Call {
         $typeName = $context->getStringFromType($type);
         $value = $context->helper->loadValue($arg);
         switch ($typeName) {
+            case '__object__*':
+                switch ($arg->type) {
+                    case Variable::TYPE_OBJECT:
+                        return $value;
+                }
+                break;
             case '__string__*':
                 switch ($arg->type) {
                     case Variable::TYPE_STRING:

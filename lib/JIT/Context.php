@@ -41,6 +41,7 @@ class Context {
     public array $functions = [];
     public array $functionProxies = [];
     public array $functionReturnType = [];
+    public string $activeFunction = '';
     public array $functionScope = [];
     private array $typeMap = [];
     public array $structFieldMap = [];
