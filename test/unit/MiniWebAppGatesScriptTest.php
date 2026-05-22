@@ -45,6 +45,9 @@ final class MiniWebAppGatesScriptTest extends TestCase
         $this->assertStringContainsString('issues/472', $combined);
         $this->assertStringContainsString('Stage 4a AOT dry-run', $combined);
         $this->assertStringContainsString('issues/624', $combined);
+        $this->assertStringContainsString('Stage 4c AOT smoke', $combined);
+        $this->assertStringContainsString('issues/683', $combined);
+        $this->assertStringContainsString('issues/485', $combined);
         $this->assertStringContainsString('Stage 4b AOT link', $combined);
         $this->assertStringContainsString('issues/454', $combined);
         $this->assertStringContainsString('issues/568', $combined);

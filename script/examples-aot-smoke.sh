@@ -6,6 +6,7 @@
 #
 # Usage:
 #   ./script/examples-aot-smoke.sh
+#   EXAMPLES_AOT_SMOKE_ONLY=003 ./script/examples-aot-smoke.sh   # 003 slice only (#683)
 #
 # Docker:
 #   docker run --rm -v "$(pwd):/compiler" -w /compiler php-compiler:22.04-dev make examples-aot-smoke
@@ -17,6 +18,8 @@ cd "$(dirname "$0")/.."
 ROOT="$PWD"
 PHPC="${ROOT}/phpc"
 SMOKE_ROOT="${ROOT}/.phpc/smoke"
+MINIWEBAPP="${ROOT}/examples/003-MiniWebApp"
+SMOKE_ONLY="${EXAMPLES_AOT_SMOKE_ONLY:-}"
 
 resolve_llvm_dir() {
   if [[ -n "${PHP_COMPILER_LLVM_PATH:-}" ]]; then
@@ -116,6 +119,42 @@ run_binary() {
   printf '%s' "$stdout"
 }
 
+# 003-MiniWebApp project AOT + CLI execute (issue #485, #683).
+# Exit 0 + stderr "skip" until #568; exit 0 + "ok" when green; exit 1 on failure.
+smoke_003_miniwebapp() {
+  if [[ ! -d "${MINIWEBAPP}/public" ]]; then
+    echo "examples-aot-smoke: 003-MiniWebApp: skip (tree missing #246)" >&2
+    return 0
+  fi
+
+  # Blocked: native user-class AOT link (#568). Remove this block when #485 is green.
+  echo "examples-aot-smoke: 003-MiniWebApp: skip (AOT link blocked #568; see #485)" >&2
+  return 0
+
+  # --- unblocked path (enable when #568 lands) ---
+  # local outfile="${SMOKE_ROOT}/003-MiniWebApp/app"
+  # echo "examples-aot-smoke: 003-MiniWebApp: phpc build --project -> ${outfile}"
+  # "$PHPC" build --project "${MINIWEBAPP}" -o "$outfile"
+  # local out
+  # out="$(run_binary '003-MiniWebApp' "$outfile" \
+  #   'QUERY_STRING=route=home' \
+  #   'SCRIPT_NAME=/index.php' \
+  #   'REQUEST_URI=/index.php?route=home')"
+  # assert_needles '003-MiniWebApp' "$out" 'MiniWebApp'
+  # echo "examples-aot-smoke: 003-MiniWebApp: ok"
+}
+
+if [[ "${SMOKE_ONLY}" == "003" ]]; then
+  echo "examples-aot-smoke: 003 slice (LLVM at ${LLVM_DIR})"
+  smoke_003_miniwebapp
+  exit $?
+fi
+
+if [[ -n "${SMOKE_ONLY}" ]]; then
+  echo "examples-aot-smoke: unknown EXAMPLES_AOT_SMOKE_ONLY=${SMOKE_ONLY}" >&2
+  exit 1
+fi
+
 echo "examples-aot-smoke: starting (LLVM at ${LLVM_DIR})"
 
 # 000-HelloWorld — single script, no phpc.json
@@ -153,6 +192,6 @@ out="$(run_binary '004-ApiJson' "${SMOKE_ROOT}/004-ApiJson/app")"
 assert_needles '004-ApiJson' "$out" 'Content-Type: application/json' 'Status: 200' '"ok":true' 'php-compiler'
 echo "examples-aot-smoke: 004-ApiJson: ok"
 
-echo "examples-aot-smoke: 003-MiniWebApp: skip (AOT link blocked #568; see #485)" >&2
+smoke_003_miniwebapp
 
 echo "examples-aot-smoke: ok"

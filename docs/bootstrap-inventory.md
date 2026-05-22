@@ -8,9 +8,9 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 339 |
+| PHP files on vm.php path | 340 |
 | Source constructs flagged (blockers) | 10 |
-| Source constructs flagged (warnings) | 917 |
+| Source constructs flagged (warnings) | 920 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -78,7 +78,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/JitSubstrCount.php` | 0 | 1 |
 | `ext/standard/JitUrlencode.php` | 0 | 1 |
 | `ext/standard/JitWebParams.php` | 0 | 15 |
-| `ext/standard/Module.php` | 0 | 154 |
+| `ext/standard/Module.php` | 0 | 155 |
 | `ext/standard/SetcookieLine.php` | 0 | 1 |
 | `ext/standard/VmDate.php` | 0 | 1 |
 | `ext/standard/VmExit.php` | 0 | 2 |
@@ -170,6 +170,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/is_infinite.php` | 0 | 1 |
 | `ext/standard/is_nan.php` | 0 | 1 |
 | `ext/standard/is_numeric.php` | 0 | 1 |
+| `ext/standard/is_readable.php` | 0 | 1 |
 | `ext/standard/is_scalar.php` | 0 | 1 |
 | `ext/standard/json_encode.php` | 0 | 1 |
 | `ext/standard/lcfirst.php` | 0 | 1 |
@@ -252,7 +253,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `lib/AOT/Linker.php` | 8 | 1 |
 | `lib/AOT/ProjectGraph.php` | 0 | 4 |
 | `lib/Block.php` | 0 | 4 |
-| `lib/Cli/PhpcBuild.php` | 0 | 1 |
+| `lib/Cli/PhpcBuild.php` | 0 | 2 |
 | `lib/Cli/PhpcInit.php` | 0 | 1 |
 | `lib/Compiler.php` | 0 | 114 |
 | `lib/Doctor.php` | 0 | 1 |
@@ -518,7 +519,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `ext/standard/JitStat.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 8 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/JitStrPad.php`
 
@@ -749,22 +750,23 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new filesize (line 156)
 - new is_file (line 157)
 - new is_dir (line 158)
-- new fopen (line 159)
-- new fread (line 160)
-- new fwrite (line 161)
-- new fclose (line 162)
-- new getenv_ (line 163)
-- new putenv_ (line 164)
-- new define_ (line 165)
-- new defined_ (line 166)
-- new phpc_deploy_path (line 167)
-- new extract_ (line 168)
-- new compact_ (line 169)
-- new scandir (line 170)
-- new glob_ (line 171)
-- new time (line 172)
-- new date (line 173)
-- new gmdate (line 174)
+- new is_readable (line 159)
+- new fopen (line 160)
+- new fread (line 161)
+- new fwrite (line 162)
+- new fclose (line 163)
+- new getenv_ (line 164)
+- new putenv_ (line 165)
+- new define_ (line 166)
+- new defined_ (line 167)
+- new phpc_deploy_path (line 168)
+- new extract_ (line 169)
+- new compact_ (line 170)
+- new scandir (line 171)
+- new glob_ (line 172)
+- new time (line 173)
+- new date (line 174)
+- new gmdate (line 175)
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/SetcookieLine.php`
@@ -1256,6 +1258,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 **Warnings** (review for bootstrap subset):
 - 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `ext/standard/is_readable.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `ext/standard/is_scalar.php`
 
 **Warnings** (review for bootstrap subset):
@@ -1709,7 +1716,8 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/Cli/PhpcBuild.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new Linter (line 127)
+- 9 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/Cli/PhpcInit.php`
 
@@ -2361,7 +2369,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/Lint/UnsupportedRegistry.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 5 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/MethodVisibility.php`
 

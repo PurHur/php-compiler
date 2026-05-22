@@ -74,6 +74,23 @@ Query fallback:
 curl -s 'http://127.0.0.1:8080/index.php?route=home'
 ```
 
+## CI gate ladder
+
+Progressive stages from `script/miniwebapp-gates.sh` / `make miniwebapp-gates`:
+
+| Stage | Check | Status |
+|-------|--------|--------|
+| 1 | `phpc lint --all` | ✅ green |
+| 1b | `MINIWEBAPP_VM_CLI_GATE=1` in ci-fast | ✅ default on |
+| 2 | `ServeTest` `@group miniwebapp` | ✅ default on |
+| 3 | `examples-web-smoke.sh` 003 curls | ✅ wired |
+| 3b | `MINIWEBAPP_WEB_SMOKE_GATE=1` shell smoke | ✅ default on |
+| 4a | `phpc build --project --dry-run` | probe (LLVM) |
+| 4c | `EXAMPLES_AOT_SMOKE_ONLY=003` smoke slice | skip until [#568](https://github.com/PurHur/php-compiler/issues/568) ([#683](https://github.com/PurHur/php-compiler/issues/683)) |
+| 4b | `ExamplesCompileTest` AOT execute unskipped | ❌ blocked [#454](https://github.com/PurHur/php-compiler/issues/454) |
+
+Stage **4c** runs only the 003 block of `script/examples-aot-smoke.sh` (same pass/skip/fail UX as 4a). Full examples smoke: `make examples-aot-smoke`.
+
 ## CI hooks
 
 ```console
@@ -103,6 +120,8 @@ Full CI runs `script/examples-web-smoke.sh --miniwebapp-only` after serve PHPUni
 - [#641](https://github.com/PurHur/php-compiler/issues/641) — default `MINIWEBAPP_SERVE_GATE=1` in full/fast CI
 - [#633](https://github.com/PurHur/php-compiler/issues/633) — `MINIWEBAPP_WEB_SMOKE_GATE` in `ci-local.sh`
 - [#664](https://github.com/PurHur/php-compiler/issues/664) — default `MINIWEBAPP_WEB_SMOKE_GATE=1` in full CI
+- [#675](https://github.com/PurHur/php-compiler/issues/675) — stage 4a AOT dry-run in gate ladder
+- [#683](https://github.com/PurHur/php-compiler/issues/683) — stage 4c `examples-aot-smoke` 003 slice probe
 
 ## Related
 

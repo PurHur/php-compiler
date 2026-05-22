@@ -62,4 +62,37 @@ final class UnsupportedRegistry
     {
         return self::KIND_TO_ISSUE;
     }
+
+    /**
+     * @param list<\PHPCompiler\Lint\Issue> $issues
+     *
+     * @return array<string, list<\PHPCompiler\Lint\Issue>> absolute file path => issues
+     */
+    public static function groupIssuesByFile(array $issues): array
+    {
+        $byFile = [];
+        foreach ($issues as $issue) {
+            $byFile[$issue->file][] = $issue;
+        }
+        ksort($byFile);
+
+        return $byFile;
+    }
+
+    /**
+     * @param list<\PHPCompiler\Lint\Issue> $issues
+     *
+     * @return list<string> unique unsupported CFG kinds
+     */
+    public static function uniqueKinds(array $issues): array
+    {
+        $kinds = [];
+        foreach ($issues as $issue) {
+            $kinds[$issue->kind] = true;
+        }
+        $list = array_keys($kinds);
+        sort($list);
+
+        return $list;
+    }
 }

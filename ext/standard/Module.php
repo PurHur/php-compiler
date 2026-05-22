@@ -156,6 +156,7 @@ class Module extends ModuleAbstract
             new filesize(),
             new is_file(),
             new is_dir(),
+            new is_readable(),
             new fopen(),
             new fread(),
             new fwrite(),
@@ -305,6 +306,15 @@ class Module extends ModuleAbstract
             $ft = $context->context->functionType($i32, false, $i8p, $i8p);
             $fn = $context->module->addFunction('stat', $ft);
             $context->registerFunction('stat', $fn);
+        }
+        try {
+            $context->lookupFunction('access');
+        } catch (\Throwable $e) {
+            $i8p = $context->getTypeFromString('int8*');
+            $i32 = $context->getTypeFromString('int32');
+            $ft = $context->context->functionType($i32, false, $i8p, $i32);
+            $fn = $context->module->addFunction('access', $ft);
+            $context->registerFunction('access', $fn);
         }
         $double = $context->getTypeFromString('double');
         try {

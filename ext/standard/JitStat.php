@@ -31,6 +31,9 @@ final class JitStat
     private const S_IFREG = 0x8000;
     private const S_IFDIR = 0x4000;
 
+    /** R_OK for access(2) — read permission (POSIX) */
+    private const ACCESS_R_OK = 4;
+
     private static int $blockSerial = 0;
 
     public static function pathExists(Context $context, Value $str): Value
@@ -46,6 +49,21 @@ final class JitStat
     public static function pathIsDir(Context $context, Value $str): Value
     {
         return self::modeMatches($context, $str, self::S_IFDIR);
+    }
+
+    public static function pathIsReadable(Context $context, Value $str): Value
+    {
+        $map = $context->structFieldMap['__string__'];
+        $pathPtr = $context->builder->structGep($str, $map['value']);
+        $i32 = $context->getTypeFromString('int32');
+        $ret = $context->builder->call(
+            $context->lookupFunction('access'),
+            $pathPtr,
+            $i32->constInt(self::ACCESS_R_OK, false)
+        );
+        $zero = $i32->constInt(0, false);
+
+        return $context->builder->icmp(Builder::INT_EQ, $ret, $zero);
     }
 
     /** @return Value __value__* (native long size, or boolean false when stat fails) */
