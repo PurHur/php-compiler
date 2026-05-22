@@ -117,15 +117,20 @@ class Block {
     }
 
     public function findSlot(Operand $op, Frame $frame): ?Variable {
+        $byName = self::findVariableInParentFrames($op, $frame);
+        if (null !== $byName) {
+            return $byName;
+        }
         if (!$this->scope->contains($op)) {
-            // check PHI vars
             if (!is_null($frame->parent)) {
                 return $frame->parent->block->findSlot($op, $frame->parent);
             }
+
             return null;
         }
         $idx = $this->scope[$op];
-        return $frame->scope[$idx];
+
+        return $frame->scope[$idx] ?? null;
     }
 
     public function slotIndexForVariableName(string $name): ?int
@@ -149,6 +154,9 @@ class Block {
             return null;
         }
         for ($f = $frame; null !== $f; $f = $f->parent) {
+            if ('this' === $name && !empty($f->calledArgs)) {
+                return $f->calledArgs[0];
+            }
             if (null === $f->block) {
                 continue;
             }
@@ -167,9 +175,15 @@ class Block {
         $scopeSize = $this->scope->count();
         foreach ($this->scope as $op) {
             $pos = $this->scope[$op];
-            if (null !== $frame && 'this' === self::resolveVariableName($op) && !empty($frame->callArgs)) {
-                $scope[$pos] = $frame->callArgs[0];
-                continue;
+            if (null !== $frame && 'this' === self::resolveVariableName($op)) {
+                if (!empty($frame->callArgs)) {
+                    $scope[$pos] = $frame->callArgs[0];
+                    continue;
+                }
+                if (!empty($frame->calledArgs)) {
+                    $scope[$pos] = $frame->calledArgs[0];
+                    continue;
+                }
             }
 
             if (isset($this->constants[$pos])) {
