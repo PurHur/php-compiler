@@ -3,10 +3,33 @@
 declare(strict_types=1);
 
 /**
+ * Contact name guard for VM (issue #697): use == and substr, not strlen compares.
+ *
+ * @return bool true when name is non-empty and at most 200 bytes
+ */
+function miniwebapp_contact_name_is_valid(): bool
+{
+    if (!isset($_REQUEST['name'])) {
+        return false;
+    }
+    $name = $_REQUEST['name'];
+    if ($name == '') {
+        return false;
+    }
+    if ($name != substr($name, 0, 200)) {
+        return false;
+    }
+
+    return true;
+}
+
+/**
  * Front-controller dispatch for MiniWebApp (issue #210).
  */
 class Router
 {
+    private const DEFAULT_CONTACT_NAME_MAX = 200;
+
     /** @var array<string, mixed> */
     private array $config;
 
@@ -25,7 +48,12 @@ class Router
         switch ($method) {
             case 'POST':
                 if ('contact' === $route) {
-                    $this->renderContactThankYou();
+                    if (!miniwebapp_contact_name_is_valid()) {
+                        $this->rejectContactInput();
+
+                        return;
+                    }
+                    $this->renderContactThankYou($_REQUEST['name']);
 
                     return;
                 }
@@ -54,6 +82,12 @@ class Router
         }
     }
 
+    private function rejectContactInput(): void
+    {
+        http_response_code(400);
+        echo "Invalid contact name\n";
+    }
+
     private function renderHome(): void
     {
         $appName = $this->resolveAppName();
@@ -79,8 +113,9 @@ class Router
         include __DIR__ . '/../templates/layout.php';
     }
 
-    private function renderContactThankYou(): void
+    private function renderContactThankYou($contactName): void
     {
+        $name = $contactName;
         $appName = $this->resolveAppName();
         $title = 'Thank you';
         include __DIR__ . '/../templates/layout.php';

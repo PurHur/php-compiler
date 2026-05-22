@@ -33,7 +33,7 @@ MINIWEBAPP_LINT_GATE=0 make web-smoke
 |--------|-----|----------|
 | GET | `/index.php` or `/` | Home |
 | GET | `/index.php/hello?name=` | Greet |
-| POST | `/index.php/contact` | Form thank-you |
+| POST | `/index.php/contact` | Form thank-you (`name` required, max 200 chars — [#697](https://github.com/PurHur/php-compiler/issues/697)) |
 | GET | `/index.php/api/status` | JSON status |
 
 Deprecated query dispatch (still supported):

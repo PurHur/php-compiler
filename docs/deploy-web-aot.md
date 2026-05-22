@@ -128,11 +128,26 @@ On harness hosts with an empty mount, use:
 ./script/docker-ci-local.sh fast --filter PhpcDeployTest
 ```
 
+## Request body limits (VM / `phpc serve`)
+
+`phpc serve` and `bin/cgi.php` cap decoded POST bodies at **8 MiB** by default (`DevServer::MAX_REQUEST_BODY`, issue [#77](https://github.com/PurHur/php-compiler/issues/77)). Oversized `Content-Length` values are rejected with **HTTP 413** before the script runs.
+
+Operators may lower the cap for dev or edge deploys:
+
+```bash
+export PHP_COMPILER_MAX_BODY=65536   # bytes; capped at 8 MiB
+./phpc serve 127.0.0.1:8080 examples/003-MiniWebApp
+```
+
+`examples/003-MiniWebApp` validates the contact `name` field (non-empty, max 200 chars, configurable via `config.php` `contact_name_max`) and returns **400** with plain text on invalid input ([#697](https://github.com/PurHur/php-compiler/issues/697)). Put nginx `client_max_body_size` in front of the app for production hardening ([#445](https://github.com/PurHur/php-compiler/issues/445)).
+
 ## Related issues
 
 | Issue | Topic |
 |-------|--------|
 | [#445](https://github.com/PurHur/php-compiler/issues/445) | Full production deployment guide |
+| [#697](https://github.com/PurHur/php-compiler/issues/697) | MiniWebApp contact POST validation |
+| [#77](https://github.com/PurHur/php-compiler/issues/77) | CGI body limits and header sanitization |
 | [#50](https://github.com/PurHur/php-compiler/issues/50) | Web runtime / serve |
 | [#173](https://github.com/PurHur/php-compiler/issues/173) | FastCGI adapter |
 | [#568](https://github.com/PurHur/php-compiler/issues/568) | User-class AOT for MiniWebApp binary |

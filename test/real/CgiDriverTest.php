@@ -123,6 +123,63 @@ final class CgiDriverTest extends TestCase
     }
 
     /**
+     * @group miniwebapp
+     */
+    public function testMiniWebAppContactPostViaCgiDriver(): void
+    {
+        $script = $this->miniWebAppIndexScript();
+        $body = 'name=CgiPost';
+        $env = $this->miniWebAppBaseEnv($script);
+        $env['REQUEST_METHOD'] = 'POST';
+        $env['PATH_INFO'] = '/contact';
+        $env['CONTENT_LENGTH'] = (string) strlen($body);
+        $env['CONTENT_TYPE'] = 'application/x-www-form-urlencoded';
+        $env['REQUEST_URI'] = '/index.php/contact';
+
+        $out = $this->runCgi($script, $env, $body);
+        $this->assertStringContainsString('Status: 200', $out);
+        $this->assertStringContainsString('Thank you, CgiPost', $this->cgiBody($out));
+    }
+
+    /**
+     * @group miniwebapp
+     */
+    public function testMiniWebAppContactPostRejectsEmptyNameViaCgiDriver(): void
+    {
+        $script = $this->miniWebAppIndexScript();
+        $body = 'name=';
+        $env = $this->miniWebAppBaseEnv($script);
+        $env['REQUEST_METHOD'] = 'POST';
+        $env['PATH_INFO'] = '/contact';
+        $env['CONTENT_LENGTH'] = (string) strlen($body);
+        $env['CONTENT_TYPE'] = 'application/x-www-form-urlencoded';
+        $env['REQUEST_URI'] = '/index.php/contact';
+
+        $out = $this->runCgi($script, $env, $body);
+        $this->assertStringContainsString('Status: 400', $out);
+        $this->assertStringContainsString('Invalid contact name', $this->cgiBody($out));
+    }
+
+    public function testCgiDriverRejectsOversizedContentLength(): void
+    {
+        $script = $this->repoRoot.'/examples/001-SimpleWeb/example.php';
+        $this->assertFileExists($script);
+
+        $env = $this->baseEnv();
+        $env['REQUEST_METHOD'] = 'POST';
+        $env['CONTENT_LENGTH'] = '99999999';
+        $env['CONTENT_TYPE'] = 'application/x-www-form-urlencoded';
+        $env['SCRIPT_NAME'] = '/example.php';
+        $env['SCRIPT_FILENAME'] = $script;
+        $env['REQUEST_URI'] = '/example.php';
+        $env['PHP_COMPILER_MAX_BODY'] = '1024';
+
+        $out = $this->runCgi($script, $env);
+        $this->assertStringContainsString('Status: 413', $out);
+        $this->assertStringContainsString('Payload Too Large', $this->cgiBody($out));
+    }
+
+    /**
      * 001-SimpleWeb AOT binary via cgi-aot wrapper (issue #665).
      *
      * @group llvm
