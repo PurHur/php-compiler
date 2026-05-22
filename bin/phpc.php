@@ -44,6 +44,7 @@ php-compiler CLI
       --dry-run                                 List entry + includes graph; exit before LLVM
       --verbose                                 Print compile-unit graph; keep full LLVM stderr on failure
       PHPC_BUILD_VERBOSE=1                      Same as --verbose
+      PHPC_INVOKE_CWD=<dir>                     Set by ./phpc wrapper; relative paths use this base
   phpc deploy [dir] -o <dist>                   Package AOT binary + manifest trees into dist/
       --from-build                              Require existing binary (skip phpc build --project)
   phpc cgi [binary]                             Run AOT binary under CGI env (stdin → REQUEST_BODY)
@@ -66,6 +67,11 @@ $command = array_shift($args);
 
 switch ($command) {
     case 'serve':
+        if (!is_file($repoRoot.'/vendor/autoload.php')) {
+            fwrite(STDERR, "phpc serve: run composer install first\n");
+            exit(1);
+        }
+        require $repoRoot.'/vendor/autoload.php';
         $aot = false;
         $serveArgs = [];
         while ([] !== $args) {
@@ -74,7 +80,18 @@ switch ($command) {
                 $aot = true;
                 continue;
             }
+            if ('--binary' === $arg && [] !== $args) {
+                $serveArgs[] = $arg;
+                $serveArgs[] = \PHPCompiler\Cli\InvokeCwd::resolve(array_shift($args));
+                continue;
+            }
             $serveArgs[] = $arg;
+        }
+        if ([] !== $serveArgs) {
+            $last = array_key_last($serveArgs);
+            if (is_int($last) && !str_contains((string) $serveArgs[$last], ':')) {
+                $serveArgs[$last] = \PHPCompiler\Cli\InvokeCwd::resolve((string) $serveArgs[$last]);
+            }
         }
         $script = $aot ? $repoRoot.'/bin/serve-aot.php' : $repoRoot.'/bin/serve.php';
         exit(runProcess(array_merge($php, array_merge([$script], $serveArgs)), $repoRoot));
@@ -184,8 +201,8 @@ switch ($command) {
             exit(1);
         }
         require $repoRoot.'/vendor/autoload.php';
-        $targetDir = $args[0] ?? getcwd();
-        if (false === $targetDir || '' === $targetDir) {
+        $targetDir = \PHPCompiler\Cli\InvokeCwd::resolve($args[0] ?? '.');
+        if ('' === $targetDir) {
             fwrite(STDERR, "phpc validate-manifest: cannot resolve target directory\n");
             exit(1);
         }
@@ -271,6 +288,8 @@ function deployFromProject(string $repoRoot, array $php, array $args): int
         return 1;
     }
 
+    $projectDir = \PHPCompiler\Cli\InvokeCwd::resolve($projectDir);
+    $outputDir = \PHPCompiler\Cli\InvokeCwd::resolve($outputDir);
     $projectReal = realpath($projectDir);
     if (false === $projectReal) {
         fwrite(STDERR, "phpc deploy: project directory not found: {$projectDir}\n");
@@ -327,6 +346,7 @@ function buildFromProject(
         return 1;
     }
     require $repoRoot.'/vendor/autoload.php';
+    $projectDir = \PHPCompiler\Cli\InvokeCwd::resolve($projectDir);
 
     $verbose = \PHPCompiler\Cli\PhpcBuild::verboseEnabled($verbose);
 

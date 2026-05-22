@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # php-compiler unified CLI (see bin/phpc.php).
 set -euo pipefail
+export PHPC_INVOKE_CWD="${PWD}"
 cd "$(dirname "$0")"
 exec ./script/php-local.sh bin/phpc.php "$@"
