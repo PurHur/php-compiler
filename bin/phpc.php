@@ -11,7 +11,7 @@ declare(strict_types=1);
  *   phpc serve --aot [host:port] [docroot] [--binary path]
  *   phpc run [-q 'name=World'] [-p 'field=val'] script.php [args...]
  *   phpc build [-o outfile] entry.php
- *   phpc build --project [dir]                 AOT compile from phpc.json entry/binary
+ *   phpc build --project [dir] [--dry-run]     AOT compile from phpc.json entry/binary
  *   phpc lint [-r 'code'] [--json] entry.php
  *   phpc lint --project <entry.php> [--json]
  *   phpc lint --all <dir-or-file> [--json]
@@ -38,7 +38,8 @@ php-compiler CLI
       -p 'field=value'                         CGI-style POST body → $_POST
       Example: phpc run -q 'name=Dev' examples/001-SimpleWeb/example.php
   phpc build [-o out] <entry.php>               AOT compile to a native binary
-  phpc build --project [dir]                    Build from phpc.json entry + binary paths
+  phpc build --project [dir] [--dry-run]        Build from phpc.json entry + binary paths
+      --dry-run                                 List entry + includes graph; exit before LLVM
   phpc lint [-r 'code'] [--json] <entry.php>    Report unsupported syntax (line-accurate)
   phpc lint --project <entry.php> [--json]    Entry + literal include/require chain
   phpc lint --all <dir-or-file> [--json]      All .php under a tree (aggregated)
@@ -79,8 +80,20 @@ switch ($command) {
     case 'build':
         if ([] !== $args && '--project' === $args[0]) {
             array_shift($args);
-            $projectDir = $args[0] ?? '.';
-            exit(buildFromProject($repoRoot, $php, $projectDir));
+            $dryRun = false;
+            $projectDir = '.';
+            foreach ($args as $arg) {
+                if ('--dry-run' === $arg) {
+                    $dryRun = true;
+                    continue;
+                }
+                if (str_starts_with($arg, '-')) {
+                    fwrite(STDERR, "phpc build --project: unknown option: {$arg}\n");
+                    exit(1);
+                }
+                $projectDir = $arg;
+            }
+            exit(buildFromProject($repoRoot, $php, $projectDir, $dryRun));
         }
         if ([] === $args) {
             fwrite(STDERR, "phpc build: missing entry.php (or use: phpc build --project [dir])\n");
@@ -168,13 +181,17 @@ function phpCommand(): array
 /**
  * @param list<string> $php
  */
-function buildFromProject(string $repoRoot, array $php, string $projectDir): int
+function buildFromProject(string $repoRoot, array $php, string $projectDir, bool $dryRun = false): int
 {
     if (!is_file($repoRoot.'/vendor/autoload.php')) {
         fwrite(STDERR, "phpc build --project: run composer install first\n");
         return 1;
     }
     require $repoRoot.'/vendor/autoload.php';
+
+    if ($dryRun) {
+        return \PHPCompiler\AOT\ProjectGraph::preflight($projectDir);
+    }
 
     $errors = \PHPCompiler\Web\ManifestValidator::validateForBuild($projectDir);
     if ([] !== $errors) {

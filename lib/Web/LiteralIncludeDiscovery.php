@@ -19,6 +19,32 @@ final class LiteralIncludeDiscovery
     /**
      * @return list<string> absolute paths to bundle before the entry (dependency order)
      */
+    /**
+     * Literal include/require targets referenced directly in $entryFile (no transitive walk).
+     *
+     * @return list<string> absolute paths
+     */
+    public static function discoverDirectAbsolutePaths(Runtime $runtime, string $entryFile): array
+    {
+        $entryFile = realpath($entryFile) ?: $entryFile;
+        if (!is_file($entryFile)) {
+            return [];
+        }
+        $code = (string) file_get_contents($entryFile);
+        $script = $runtime->parser->parse($code, $entryFile);
+        $runtime->preprocessor->traverse($script);
+
+        $paths = [];
+        foreach (self::pathsFromScript($script, $entryFile) as $includePath) {
+            $resolved = IncludePathResolver::resolve($includePath, $entryFile);
+            if (null !== $resolved) {
+                $paths[] = $resolved;
+            }
+        }
+
+        return array_values(array_unique($paths));
+    }
+
     public static function discoverAbsolutePaths(Runtime $runtime, string $entryFile): array
     {
         $entryFile = realpath($entryFile) ?: $entryFile;
