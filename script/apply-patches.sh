@@ -43,6 +43,9 @@ patch_already_applied() {
     php-types-readfile-int-false.patch)
       grep -q "'readfile' => \['int|false'" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php" 2>/dev/null
       ;;
+    php-llvm-builder-xor.patch)
+      grep -q 'function xor(' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php" 2>/dev/null
+      ;;
     php-cfg-nullsafe.patch)
       [[ -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/NullsafePropertyFetch.php" ]]
       ;;
@@ -89,6 +92,7 @@ apply_patch "$PATCH_DIR/php-llvm-builder-select.patch"
 apply_patch "$PATCH_DIR/php-llvm-value-addincoming.patch"
 apply_patch "$PATCH_DIR/php-llvm-llvmabstract-value-addincoming.patch"
 apply_patch "$PATCH_DIR/php-llvm-builder-and-or.patch"
+apply_patch "$PATCH_DIR/php-llvm-builder-xor.patch"
 apply_patch "$PATCH_DIR/php-llvm-x86-posix-fallback.patch"
 
 # php-cfg before php-types: php-types-mixed-reserved.patch references Op\Type\Mixed_.
