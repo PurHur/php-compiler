@@ -143,6 +143,7 @@ class JIT {
 
         if (!is_null($funcName)) {
             $lcname = strtolower($funcName);
+            $this->context->activeFunction = $lcname;
             $this->context->functions[$lcname] = $func;
             if ($isVarArgs) {
                 $this->context->functionProxies[$lcname] = new JIT\Call\Vararg($func, $funcName, count($args));
@@ -654,6 +655,26 @@ class JIT {
                     } else {
                         $return->addref();
                         $retval = $this->context->helper->loadValue($return);
+                        $expected = $this->context->functionReturnType[$this->context->activeFunction] ?? null;
+                        if (
+                            '__string__*' === $expected
+                            && Variable::TYPE_VALUE === $return->type
+                        ) {
+                            $valuePtr = Variable::KIND_VARIABLE === $return->kind
+                                ? $return->value
+                                : $this->context->builder->alloca(
+                                    $this->context->getTypeFromString('__value__'),
+                                    1,
+                                    'return_value_box'
+                                );
+                            if (Variable::KIND_VALUE === $return->kind) {
+                                $this->context->builder->store($retval, $valuePtr);
+                            }
+                            $retval = $this->context->builder->call(
+                                $this->context->lookupFunction('__value__readString'),
+                                $valuePtr
+                            );
+                        }
                         $this->context->builder->returnValue($retval);
                     }
     
@@ -690,34 +711,51 @@ class JIT {
                     $result = $this->context->scope->toCall->call($this->context, ...$this->context->scope->args);
                     $this->assignOperandValue($block->getOperand($op->arg1), $result);
                     break;
-                // case OpCode::TYPE_DECLARE_CLASS:
-                //     $this->context->pushScope();
-                //     $this->context->scope->classId = $this->context->type->object->declareClass($block->getOperand($op->arg1));
-                //     $this->compileClass($op->block1, $this->context->scope->classId);
-                //     $this->context->popScope();
-                //     break;
-                // case OpCode::TYPE_NEW:
-                //     $class = $this->context->type->object->lookupOperand($block->getOperand($op->arg2));
-                //     $this->context->helper->assign(
-                //         $gccBlock,
-                //         $this->context->getVariableFromOp($block->getOperand($op->arg1))->lvalue,
-                //         $this->context->type->object->allocate($class)
-                //     );
-                //     $this->context->scope->toCall = null;
-                //     $this->context->scope->args = [];
-                //     break;
-                // case OpCode::TYPE_PROPERTY_FETCH:
-                //     $result = $block->getOperand($op->arg1);
-                //     $obj = $block->getOperand($op->arg2);
-                //     $name = $block->getOperand($op->arg3);
-                //     assert($name instanceof Operand\Literal);
-                //     assert($obj->type->type === Type::TYPE_OBJECT);
-                //     $this->context->scope->variables[$result] = $this->context->type->object->propertyFetch(
-                //         $this->context->getVariableFromOp($obj)->rvalue,
-                //         $obj->type->userType,
-                //         $name->value
-                //     );
-                //     break;
+                case OpCode::TYPE_DECLARE_CLASS:
+                    $nameOp = $block->getOperand($op->arg1);
+                    assert($nameOp instanceof Operand\Literal);
+                    $this->context->pushScope();
+                    $this->context->scope->classId = $this->context->type->object->declareClass($nameOp);
+                    $this->context->scope->className = strtolower($nameOp->value);
+                    $this->compileClass($op->block1, $this->context->scope->classId);
+                    $this->context->popScope();
+                    break;
+                case OpCode::TYPE_NEW:
+                    $class = $this->context->type->object->lookupOperand($block->getOperand($op->arg2));
+                    $obj = new Variable(
+                        $this->context,
+                        Variable::TYPE_OBJECT,
+                        Variable::KIND_VALUE,
+                        $this->context->type->object->allocate($class)
+                    );
+                    $this->assignOperand($block->getOperand($op->arg1), $obj, true);
+                    $this->context->scope->toCall = null;
+                    $this->context->scope->args = [];
+                    break;
+                case OpCode::TYPE_METHODCALL_INIT:
+                    $receiverOp = $block->getOperand($op->arg1);
+                    $nameOp = $block->getOperand($op->arg2);
+                    assert($nameOp instanceof Operand\Literal);
+                    assert($receiverOp->type->type === Type::TYPE_OBJECT);
+                    $proxyName = strtolower($receiverOp->type->userType).'::'.strtolower($nameOp->value);
+                    if (!isset($this->context->functionProxies[$proxyName])) {
+                        throw new \RuntimeException("Call to undefined method $proxyName");
+                    }
+                    $this->context->scope->toCall = $this->context->functionProxies[$proxyName];
+                    $this->context->scope->args = [$this->context->getVariableFromOp($receiverOp)];
+                    break;
+                case OpCode::TYPE_PROPERTY_FETCH:
+                    $result = $block->getOperand($op->arg1);
+                    $obj = $block->getOperand($op->arg2);
+                    $name = $block->getOperand($op->arg3);
+                    assert($name instanceof Operand\Literal);
+                    assert($obj->type->type === Type::TYPE_OBJECT);
+                    $this->context->scope->variables[$result] = $this->context->type->object->propertyFetch(
+                        $this->context->helper->loadValue($this->context->getVariableFromOp($obj)),
+                        $obj->type->userType,
+                        $name->value
+                    );
+                    break;
                 default:
                     throw new \LogicException("Unknown JIT opcode: ". $op->getType());
             }
@@ -751,12 +789,19 @@ class JIT {
                 case OpCode::TYPE_DECLARE_PROPERTY:
                     $name = $block->getOperand($op->arg1);
                     assert($name instanceof Operand\Literal);
-                    assert(is_null($op->arg2)); // no defaults for now
                     $type = Variable::getTypeFromType($block->getOperand($op->arg3)->type);
                     $this->context->type->object->defineProperty($classId, $name->value, $type);
                     break;
+                case OpCode::TYPE_CONST_FETCH:
+                    // Default property values are initialized in __object__ allocation.
+                    break;
+                case OpCode::TYPE_DECLARE_METHOD:
+                    $name = $block->getOperand($op->arg1);
+                    assert($name instanceof Operand\Literal);
+                    $funcName = $this->context->scope->className.'::'.strtolower($name->value);
+                    $this->compileBlock($op->block1, $funcName);
+                    break;
                 default:
-                    var_dump($op);
                     throw new \LogicException('Other class body types are not jittable for now');
             }
             
@@ -985,6 +1030,8 @@ class JIT {
                 return Variable::TYPE_NATIVE_LONG;
             case '__string__*':
                 return Variable::TYPE_STRING;
+            case '__object__*':
+                return Variable::TYPE_OBJECT;
             case '__hashtable__*':
                 return Variable::TYPE_HASHTABLE;
             case '__value__*':

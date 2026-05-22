@@ -11,6 +11,7 @@ namespace PHPCompiler\JIT;
 
 class Scope {
     public int $classId = 0;
+    public string $className = '';
     public \SplObjectStorage $blockStorage;
     public \SplObjectStorage $variables;
     public ?Call $toCall = null;

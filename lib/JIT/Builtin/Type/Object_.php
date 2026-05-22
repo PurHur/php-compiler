@@ -11,336 +11,235 @@ namespace PHPCompiler\JIT\Builtin\Type;
 
 use PHPCfg\Operand;
 use PHPCfg\Operand\Literal;
+use PHPCompiler\JIT\Builtin\Refcount;
 use PHPCompiler\JIT\Builtin\Type;
-// use PHPCompiler\JIT\Builtin\Refcount;
 use PHPCompiler\JIT\Variable;
+use PHPLLVM;
 
 class Object_ extends Type {
-    private \gcc_jit_struct_ptr $struct;
-    public \gcc_jit_type_ptr $pointer;
-    private \gcc_jit_lvalue_ptr $size;
-    protected array $fields;
+    public PHPLLVM\Type $pointer;
     private array $classes = [];
     private array $properties = [];
     private array $propNameMap = [];
 
-    public function register(): void {
-	/*
-        $this->struct = \gcc_jit_context_new_opaque_struct(
-            $this->context->context,
-            null,
-            '__object__'
+    public function register(): void
+    {
+        $struct = $this->context->context->namedStructType('__object__');
+        $this->context->registerType('__object__', $struct);
+        $this->context->registerType('__object__*', $struct->pointerType(0));
+        $struct->setBody(
+            false,
+            $this->context->getTypeFromString('__ref__'),
+            $this->context->getTypeFromString('int64'),
         );
-        $this->context->registerType(
-            '__object__',
-            \gcc_jit_struct_as_type($this->struct)
-        );
-        $this->pointer = \gcc_jit_type_get_pointer($this->context->getTypeFromString('__object__'));
-        $this->context->registerType(
-            '__object__*',
-            $this->pointer
-        );
-        $this->context->registerFunction(
-            '__object__alloc',
-            $this->context->helper->createNativeFunction(
-                \GCC_JIT_FUNCTION_ALWAYS_INLINE,
-                '__object__alloc',
-                '__object__*',
-                false,
-                'long long',
-                'size_t'
-            )
-        );
-        $this->context->registerFunction(
-            '__object__propfetch',
-            $this->context->helper->createNativeFunction(
-                \GCC_JIT_FUNCTION_ALWAYS_INLINE,
-                '__object__propfetch',
-                'void*',
-                false,
-                '__object__*',
-                'size_t'
-            )
-        );
-        */
-    }
-
-    public function implement(): void {
-	/*
-        $this->size = \gcc_jit_context_new_global(
-            $this->context->context,
-            null,
-            \GCC_JIT_GLOBAL_INTERNAL,
-            $this->context->getTypeFromString('size_t'),
-            '__object_size'
-        );
-        $this->fields = [
-            'refcount' => $this->context->refcount->asField('refcount'),
-            'class_id' => $this->context->helper->createField('class_id', 'long long'),
+        $this->context->structFieldMap['__object__'] = [
+            'ref' => 0,
+            'class_id' => 1,
         ];
-        \gcc_jit_struct_set_fields(
-            $this->struct,
-            null,
-            count($this->fields),
-            \gcc_jit_field_ptr_ptr::fromArray(...array_values($this->fields))
-        );
-        $this->implementAlloc();
-         */
+        $this->pointer = $this->context->getTypeFromString('__object__*');
+
+        $this->registerFn('__object__load_value_slot', 'void', ['void**', '__value__*']);
     }
 
-    private function implementAlloc(): void {
-        /*
-        $alloc = $this->context->lookupFunction('__object__alloc');
-        $block = \gcc_jit_function_new_block($alloc->func, 'main');
-        $return = \gcc_jit_function_new_block($alloc->func, 'return');
-        $conditional = \gcc_jit_function_new_block($alloc->func, 'cond');
-        $loop = \gcc_jit_function_new_block($alloc->func, 'loop');
-        $local = \gcc_jit_function_new_local($alloc->func, null, $this->pointer, 'result');
-        $allocSize = $this->context->helper->binaryOp(
-            GCC_JIT_BINARY_OP_PLUS,
-            'size_t',
-            $this->size->asRValue(),
-            $this->context->helper->binaryOp(
-                GCC_JIT_BINARY_OP_MULT,
-                'size_t',
-                $alloc->params[1]->asRValue(),
-                $this->context->constantFromInteger(8, 'size_t')
-            )
+    /**
+     * @param list<string> $paramTypes
+     */
+    private function registerFn(string $name, string $returnType, array $paramTypes): void
+    {
+        $params = array_map(fn (string $t) => $this->context->getTypeFromString($t), $paramTypes);
+        $ft = $this->context->context->functionType(
+            $this->context->getTypeFromString($returnType),
+            false,
+            ...$params
         );
-        $this->context->helper->assign(
-            $block, 
-            $local,
-            $this->context->memory->malloc($allocSize, $this->pointer) 
-        );
-        $this->context->helper->assign(
-            $block,
-            $this->writeField('class_id', $local->asRValue()),
-            $alloc->params[0]->asRValue()
-        );
-        $this->context->refcount->init(
-            $block, 
-            $local->asRValue(),
-            Refcount::TYPE_INFO_REFCOUNTED | Refcount::TYPE_INFO_TYPE_OBJECT
-        );
-        \gcc_jit_block_end_with_conditional(
-            $conditional,
-            $this->context->location(),
-            \gcc_jit_context_new_comparison(
-                $this->context->context,
-                $this->context->location(),
-                \GCC_JIT_COMPARISON_GT,
-                $alloc->params[1]->asRValue(),
-                $this->context->constantFromInteger(0, 'size_t')
-            ),
-            $loop,
-            $return
-        );
-        //todo: initialize pointers
-        $cast = $this->context->helper->cast($local->asRValue(), 'char*');
-        $property = \gcc_jit_lvalue_get_address(   
-            \gcc_jit_context_new_array_access(
-                $this->context->context,
-                $this->context->location(),
-                $cast,
-                $this->context->helper->binaryOp(
-                    GCC_JIT_BINARY_OP_PLUS,
-                    'size_t',
-                    $this->size->asRValue(),
-                    $this->context->helper->binaryOp(
-                        \GCC_JIT_BINARY_OP_MULT,
-                        'size_t',
-                        $this->context->constantFromInteger(8, 'size_t'),
-                        $alloc->params[1]->asRValue()
-                    )
-                )
-            ),
-            $this->context->location()
-        );
-        \gcc_jit_block_add_assignment(
-            $loop,
-            $this->context->location(),
-            \gcc_jit_context_new_array_access(
-                $this->context->context,
-                $this->context->location(),
-                \gcc_jit_context_new_cast(
-                    $this->context->context,
-                    $this->context->location(),
-                    $property,
-                    $this->context->getTypeFromString('void**')
-                ),
-                $this->context->constantFromInteger(0, 'size_t')
-            ),
-            \gcc_jit_context_null($this->context->context, $this->context->getTypeFromString('void*'))
-        );
-
-        \gcc_jit_block_add_assignment_op(
-            $loop, 
-            $this->context->location(),
-            $alloc->params[1]->asLValue(),
-            \GCC_JIT_BINARY_OP_MINUS,
-            $this->context->constantFromInteger(1, 'size_t')
-        );
-        \gcc_jit_block_end_with_jump($block, $this->context->location(), $conditional);
-        \gcc_jit_block_end_with_jump($loop, $this->context->location(), $conditional);
-        \gcc_jit_block_end_with_return($return,  null, $local->asRValue());
-        */
+        $fn = $this->context->module->addFunction($name, $ft);
+        $fn->addAttributeAtIndex(PHPLLVM\Attribute::INDEX_FUNCTION, $this->context->attributes['alwaysinline']);
+        $this->context->registerFunction($name, $fn);
     }
 
-    public function initialize(): void {
-        /*
-        \gcc_jit_block_add_assignment(
-            $this->context->initBlock,
-            null,
-            $this->size,
-            $this->sizeof($this->context->getTypeFromString('__object__'))
-        );
-        */
+    public function implement(): void
+    {
+        $this->implementLoadValueSlot();
     }
 
-    public function shutdown(): void {
-        $this->implementPropFetch();        
+    public function shutdown(): void
+    {
     }
 
-    private function implementPropFetch(): void {
-        /*
-        $fetch = $this->context->lookupFunction('__object__propfetch');
-        $block = \gcc_jit_function_new_block($fetch->func, 'main');
-        $defaultBlock = \gcc_jit_function_new_block($fetch->func, 'default_');
-        \gcc_jit_block_end_with_return(
-            $defaultBlock,
-            $this->context->location(), 
-            \gcc_jit_context_null($this->context->context, $this->context->getTypeFromString('void*'))
+    private function implementLoadValueSlot(): void
+    {
+        $fn = $this->context->lookupFunction('__object__load_value_slot');
+        $entry = $fn->appendBasicBlock('entry');
+        $nullBlock = $fn->appendBasicBlock('null');
+        $loadBlock = $fn->appendBasicBlock('load');
+        $done = $fn->appendBasicBlock('done');
+        $this->context->builder->positionAtEnd($entry);
+
+        $slot = $fn->getParam(0);
+        $dest = $fn->getParam(1);
+        $loaded = $this->context->builder->load($slot);
+        $voidPtr = $this->context->getTypeFromString('void*');
+        $isNull = $this->context->builder->icmp(
+            PHPLLVM\Builder::INT_EQ,
+            $loaded,
+            $voidPtr->constNull()
         );
-        $cases = [];
-        foreach ($this->properties as $classId => $properties) {
-            $classBlock = \gcc_jit_function_new_block($fetch->func, 'class_' . $classId);
-            $constId = $this->context->constantFromInteger($classId);
-            $cases[] = \gcc_jit_context_new_case(
-                $this->context->context,
-                $constId,
-                $constId,
-                $classBlock
-            );
-            $this->implementPropFetchForPropset($fetch->func, $classBlock, $fetch->params[0]->asRValue(), $fetch->params[1]->asRValue(), $classId, $properties)
-;        }
-        \gcc_jit_block_end_with_switch(
-            $block,
-            $this->context->location(),
-            $this->readField('class_id', $fetch->params[0]->asRValue()),
-            $defaultBlock,
-            count($cases),
-            \gcc_jit_case_ptr_ptr::fromArray(...$cases)
+        $this->context->builder->branchIf($isNull, $nullBlock, $loadBlock);
+
+        $this->context->builder->positionAtEnd($nullBlock);
+        $this->context->builder->call(
+            $this->context->lookupFunction('__value__writeNull'),
+            $dest
         );
-        */
+        $this->context->builder->branch($done);
+
+        $this->context->builder->positionAtEnd($loadBlock);
+        $valPtr = $this->context->builder->pointerCast(
+            $loaded,
+            $this->context->getTypeFromString('__value__*')
+        );
+        $this->context->builder->store(
+            $this->context->builder->load($valPtr),
+            $dest
+        );
+        $this->context->builder->branch($done);
+
+        $this->context->builder->positionAtEnd($done);
+        $this->context->builder->returnVoid();
+        $this->context->builder->clearInsertionPosition();
     }
 
-    /*
-    private function implementPropFetchForPropset(\gcc_jit_function_ptr $func, \gcc_jit_block_ptr $block, \gcc_jit_rvalue_ptr $obj, \gcc_jit_rvalue_ptr $param, int $classId, array $properties): void {
-        $cast = $this->context->helper->cast($obj, 'char*');
-        $defaultBlock = \gcc_jit_function_new_block($func, 'default_' . $classId);
-        \gcc_jit_block_end_with_return(
-            $defaultBlock,
-            $this->context->location(), 
-            \gcc_jit_context_null($this->context->context, $this->context->getTypeFromString('void*'))
-        );
-        $cases = [];
-        foreach ($properties as $prop) {
-            $propBlock = \gcc_jit_function_new_block($func, 'class_' . $classId . '_' . $prop[0]);
-            \gcc_jit_block_end_with_return(
-                $propBlock,
-                $this->context->location(),
-                $this->context->helper->cast(
-                    \gcc_jit_lvalue_get_address(
-                        gcc_jit_context_new_array_access(
-                            $this->context->context,
-                            $this->context->location(),
-                            $cast,
-                            $this->context->helper->binaryOp(
-                                GCC_JIT_BINARY_OP_PLUS,
-                                'size_t',
-                                $this->size->asRValue(),
-                                $this->context->constantFromInteger(8 * $prop[3], 'size_t')
-                            )
-                        ),
-                        $this->context->location()
-                    ),
-                    'void*'
-                )
-            );
-            $offset = $prop[3];
-            $constId = \gcc_jit_context_new_rvalue_from_long(
-                $this->context->context,
-                $this->context->getTypeFromString('size_t'),
-                $prop[0]
-            );
-            $cases[] = \gcc_jit_context_new_case(
-                $this->context->context,
-                $constId,
-                $constId,
-                $propBlock
+    public function allocate(int $classId): PHPLLVM\Value
+    {
+        $objType = $this->context->getTypeFromString('__object__');
+        $propCount = count($this->properties[$classId]);
+        if (0 === $propCount) {
+            $obj = $this->context->memory->malloc($objType);
+        } else {
+            $obj = $this->context->memory->mallocWithExtra(
+                $objType,
+                $this->context->constantFromInteger(8 * $propCount, 'size_t')
             );
         }
-        \gcc_jit_block_end_with_switch(
-            $block,
-            $this->context->location(),
-            $param,
-            $defaultBlock,
-            count($cases),
-            \gcc_jit_case_ptr_ptr::fromArray(...$cases)
-        );
-    }
 
-    public function allocate(
-        int $classId
-    ): \gcc_jit_rvalue_ptr {
-        return $this->context->helper->call(
-            '__object__alloc',
+        $map = $this->context->structFieldMap['__object__'];
+        $this->context->builder->store(
             $this->context->constantFromInteger($classId),
-            $this->getSize($classId)
+            $this->context->builder->structGep($obj, $map['class_id'])
         );
 
-    }
-    */
+        $typeinfo = $this->context->getTypeFromString('int32')->constInt(
+            Refcount::TYPE_INFO_TYPE_OBJECT | Refcount::TYPE_INFO_REFCOUNTED,
+            false
+        );
+        $ref = $this->context->builder->pointerCast(
+            $obj,
+            $this->context->getTypeFromString('__ref__virtual*')
+        );
+        $this->context->builder->call(
+            $this->context->lookupFunction('__ref__init'),
+            $typeinfo,
+            $ref
+        );
 
-    public function declareClass(Operand $name): int {
+        if ($propCount > 0) {
+            $this->initPropertySlots($obj, $propCount);
+        }
+
+        return $obj;
+    }
+
+    private function initPropertySlots(PHPLLVM\Value $obj, int $propCount): void
+    {
+        $sizeT = $this->context->getTypeFromString('size_t');
+        $headerBytes = $this->objectHeaderSize();
+        $i8p = $this->context->getTypeFromString('int8*');
+        $voidpp = $this->context->getTypeFromString('void**');
+        $cast = $this->context->builder->pointerCast($obj, $i8p);
+        $nullPtr = $voidpp->getElementType()->constNull();
+
+        for ($slot = 0; $slot < $propCount; ++$slot) {
+            $slotOff = $this->context->builder->add(
+                $headerBytes,
+                $this->context->constantFromInteger(8 * $slot, 'size_t')
+            );
+            $slotPtr = $this->context->builder->pointerCast(
+                $this->context->builder->gep($cast, $slotOff),
+                $voidpp
+            );
+            $this->context->builder->store($nullPtr, $slotPtr);
+        }
+    }
+
+    private function objectHeaderSize(): PHPLLVM\Value
+    {
+        return $this->context->builder->ptrToInt(
+            $this->context->builder->gep(
+                $this->context->getTypeFromString('__object__')->pointerType(0)->constNull(),
+                $this->context->context->int32Type()->constInt(1, false)
+            ),
+            $this->context->getTypeFromString('size_t')
+        );
+    }
+
+    private function propertySlotPtr(PHPLLVM\Value $obj, int $slotIndex): PHPLLVM\Value
+    {
+        $i8p = $this->context->getTypeFromString('int8*');
+        $voidpp = $this->context->getTypeFromString('void**');
+        $cast = $this->context->builder->pointerCast($obj, $i8p);
+        $slotOff = $this->context->builder->add(
+            $this->objectHeaderSize(),
+            $this->context->constantFromInteger(8 * $slotIndex, 'size_t')
+        );
+
+        return $this->context->builder->pointerCast(
+            $this->context->builder->gep($cast, $slotOff),
+            $voidpp
+        );
+    }
+
+    public function declareClass(Operand $name): int
+    {
         if (!$name instanceof Literal) {
             throw new \LogicException('JIT only supports constant named classes');
         }
         $id = count($this->classes);
         $this->properties[$id] = [];
+
         return $this->classes[strtolower($name->value)] = $id;
     }
 
-    public function getSize(int $classId): \gcc_jit_rvalue_ptr {
-        return $this->context->constantFromInteger(count($this->properties[$classId]), 'size_t');
-    }
-
-    public function lookupOperand(Operand $name): int {
+    public function lookupOperand(Operand $name): int
+    {
         if (!$name instanceof Literal) {
-            
             throw new \LogicException('JIT only supports constant named classes');
         }
+
         return $this->lookup($name->value);
     }
 
-    public function lookup(string $name): int {
+    public function lookup(string $name): int
+    {
         $lcname = strtolower($name);
         if (!isset($this->classes[$lcname])) {
             throw new \LogicException("Unknown class lookup: $name");
         }
+
         return $this->classes[$lcname];
     }
 
-    public function defineProperty(int $classId, string $name, int $type): void {
+    public function defineProperty(int $classId, string $name, int $type): void
+    {
         if (!isset($this->propNameMap[$name])) {
             $this->propNameMap[$name] = count($this->propNameMap);
         }
         $this->properties[$classId][] = [
-            $this->propNameMap[$name], $name, $type, count($this->properties[$classId])
+            $this->propNameMap[$name], $name, $type, count($this->properties[$classId]),
         ];
     }
 
-    public function propertyFetch(\gcc_jit_rvalue_ptr $obj, string $class, string $name): Variable {
+    public function propertyFetch(PHPLLVM\Value $obj, string $class, string $name): Variable
+    {
         if (!isset($this->propNameMap[$name])) {
             throw new \LogicException('Attempting to fetch unknown property');
         }
@@ -348,39 +247,34 @@ class Object_ extends Type {
         $nameId = $this->propNameMap[$name];
         foreach ($this->properties[$classId] as $propset) {
             if ($propset[0] === $nameId) {
-                $prop = $this->fetchAndCast($obj, $nameId, $propset[2]);
+                $slot = $this->propertySlotPtr($obj, $propset[3]);
+                $loaded = $this->context->builder->load($slot);
+                if (Variable::TYPE_VALUE === $propset[2]) {
+                    $valueType = $this->context->getTypeFromString('__value__');
+                    $storage = $this->context->builder->alloca($valueType, 1, 'prop_'.$name);
+                    $this->context->builder->call(
+                        $this->context->lookupFunction('__object__load_value_slot'),
+                        $slot,
+                        $storage
+                    );
+                } else {
+                    $stringType = Variable::getStringType($propset[2]);
+                    $ptrType = $this->context->getTypeFromString($stringType.'*');
+                    $storage = $this->context->builder->alloca($ptrType->getElementType(), 1, 'prop_'.$name);
+                    $this->context->builder->store(
+                        $this->context->builder->pointerCast($loaded, $ptrType),
+                        $storage
+                    );
+                }
+
                 return new Variable(
                     $this->context,
                     $propset[2],
                     Variable::KIND_VARIABLE,
-                    $prop->asRValue(),
+                    $storage,
                 );
             }
         }
         throw new \LogicException("Could not find property $name for class $classId");
     }
-
-    /*
-    private function fetchAndCast(\gcc_jit_rvalue_ptr $obj, int $nameId, int $type): \gcc_jit_lvalue_ptr {
-        $void = $this->context->helper->call(
-            '__object__propfetch',
-            $obj,
-            $this->context->constantFromInteger($nameId, 'size_t')
-        );
-        $stringType = Variable::getStringType($type);
-        return \gcc_jit_context_new_array_access(
-            $this->context->context,
-            $this->context->location(),
-            \gcc_jit_context_new_cast(
-                $this->context->context,
-                $this->context->location(),
-                $void,
-                $this->context->getTypeFromString($stringType . '*')
-            ),
-            $this->context->constantFromInteger(0, 'size_t')
-        );
-    }
-    */
-
-
 }

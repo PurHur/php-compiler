@@ -358,6 +358,12 @@ final class Variable {
                 // assign to null
                 $this->context->builder->store($this->context->type->string->pointer->constNull(), $this->value);
                 break;
+            case self::TYPE_OBJECT:
+                $this->context->builder->store(
+                    $this->context->type->object->pointer->constNull(),
+                    $this->value
+                );
+                break;
             case self::TYPE_VALUE:
                 $map = $this->context->structFieldMap['__value__'];
                 $this->context->builder->store(
