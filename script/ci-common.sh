@@ -168,3 +168,12 @@ ci_run_examples_web_smoke_aot() {
   echo "examples-web-smoke (AOT): HTTP harness via phpc serve --aot..."
   "$_CI_SCRIPT_DIR/examples-web-smoke.sh" --aot
 }
+
+# CLI AOT build + execute smoke (issue #667); opt-in via EXAMPLES_AOT_SMOKE_GATE=1.
+ci_run_examples_aot_smoke() {
+  if [[ "${EXAMPLES_AOT_SMOKE_GATE:-}" != "1" ]]; then
+    return 0
+  fi
+  echo "examples-aot-smoke: CLI build + execute (EXAMPLES_AOT_SMOKE_GATE=1, #667)..."
+  "$_CI_SCRIPT_DIR/examples-aot-smoke.sh"
+}

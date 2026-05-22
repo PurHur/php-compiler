@@ -68,4 +68,5 @@ if ci_llvm_ready; then
   fi
 
   ci_run_examples_web_smoke_aot
+  ci_run_examples_aot_smoke
 fi
