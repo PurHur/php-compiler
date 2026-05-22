@@ -20,9 +20,9 @@ Or in Docker (preferred on harness hosts without host PHP/LLVM):
 
 ```bash
 make docker-build-22   # once
-make test              # full CI
+make test              # full CI (Docker -m 10g + PHP 1536M default)
 make test-fast         # fast CI (no LLVM compile)
-# or: ./script/docker-ci-local.sh
+# or: ./script/docker-ci-local.sh  # same memory defaults
 ```
 
 Image: `php-compiler:22.04-dev` (`Docker/dev/ubuntu-22.04/Dockerfile`).
@@ -44,4 +44,4 @@ If `-v "$(pwd):/compiler"` shows an empty tree, use:
 
 ## Before merge
 
-Run `./script/ci-local.sh` (full LLVM phases). Use `ci-fast.sh` only for iteration. Raise `PHP_COMPILER_CI_RAM_GB` (default 30) if LLVM phases hit the cap (#436).
+Run `./script/ci-local.sh` (full LLVM phases). Use `ci-fast.sh` only for iteration. Defaults: `script/ci-defaults.env` (`1536M` PHP, `8` GiB ulimit, `10g` Docker). Raise caps only on large hosts (#497).

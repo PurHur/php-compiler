@@ -43,19 +43,31 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('phpc build --project', $body);
     }
 
-    public function testCiResourceLimitsDefaultEightGib(): void
+    public function testCiResourceLimitsSourcesDefaults(): void
     {
         $limits = dirname(__DIR__, 2).'/script/ci-resource-limits.sh';
         $body = (string) file_get_contents($limits);
-        $this->assertStringContainsString('PHP_COMPILER_CI_RAM_GB:-8}', $body);
+        $this->assertStringContainsString('ci-defaults.env', $body);
+        $this->assertStringContainsString('PHP_COMPILER_CI_RAM_GB', $body);
     }
 
-    public function testCiMemoryEnvDefaults(): void
+    public function testCiDefaultsEnvDefinesRepositoryDefaults(): void
     {
-        $mem = dirname(__DIR__, 2).'/script/ci-memory-env.sh';
-        $body = (string) file_get_contents($mem);
-        $this->assertStringContainsString('PHP_COMPILER_MEMORY_LIMIT:-1536M}', $body);
-        $this->assertStringContainsString('PHP_COMPILER_LLVM_MEMORY_LIMIT:-4096M}', $body);
+        $defaults = dirname(__DIR__, 2).'/script/ci-defaults.env';
+        $this->assertFileExists($defaults);
+        $body = (string) file_get_contents($defaults);
+        $this->assertStringContainsString('PHP_COMPILER_CI_RAM_GB="${PHP_COMPILER_CI_RAM_GB:-8}"', $body);
+        $this->assertStringContainsString('PHP_COMPILER_MEMORY_LIMIT="${PHP_COMPILER_MEMORY_LIMIT:-1536M}"', $body);
+        $this->assertStringContainsString('PHP_COMPILER_DOCKER_MEM="${PHP_COMPILER_DOCKER_MEM:-10g}"', $body);
+    }
+
+    public function testDockerCiLocalUsesMemoryCappedRun(): void
+    {
+        $local = dirname(__DIR__, 2).'/script/docker-ci-local.sh';
+        $body = (string) file_get_contents($local);
+        $this->assertStringContainsString('ci-docker-run.sh', $body);
+        $this->assertStringContainsString('ci_docker_run', $body);
+        $this->assertStringContainsString('ci-defaults.env', $body);
     }
 
     public function testCiFastPreparesRuntimeLimits(): void

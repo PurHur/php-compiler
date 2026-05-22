@@ -128,10 +128,10 @@ LOCAL_DEV_IMAGE ?= php-compiler:22.04-dev
 docker-build-22:
 	docker build -f Docker/dev/ubuntu-22.04/Dockerfile -t $(LOCAL_DEV_IMAGE) -t $(PHP_COMPILER_DEV_IMAGE) .
 
-# Run full local CI inside Docker (mount repo; harness hosts may need: tar | docker run -i …)
+# Run full local CI inside Docker (memory-capped; see script/ci-defaults.env)
 .PHONY: test-docker
 test-docker: docker-build-22
-	docker run --rm -v $(shell pwd):/compiler -w /compiler $(LOCAL_DEV_IMAGE) ./script/ci-local.sh
+	./script/ci-docker-safe.sh ci-local.sh
 
 # Runforge / harness CI: uses docker-ci-local.sh tar fallback when bind-mount is empty (#272).
 # Optional: make test-harness ARGS='--filter VMTest'
