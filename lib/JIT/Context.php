@@ -230,6 +230,16 @@ class Context {
         unlink($objectFile);
     }
 
+    public function jitResult(): ?Result
+    {
+        return $this->result;
+    }
+
+    public function refreshSuperglobals(): void
+    {
+        SuperglobalInit::refreshFromVm($this);
+    }
+
     public function compileInPlace() {
         if (is_null($this->result)) {
             $this->compileCommon();
