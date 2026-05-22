@@ -144,6 +144,14 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('PhpcLintProjectTest', $body);
     }
 
+    public function testCiFastRunsCgiDriverTest(): void
+    {
+        $fast = dirname(__DIR__, 2).'/script/ci-fast.sh';
+        $body = (string) file_get_contents($fast);
+        $this->assertStringContainsString('CgiDriverTest', $body);
+        $this->assertStringContainsString('exclude-group llvm,serve,cgi', $body);
+    }
+
     public function testAotLinkGroupTaggedOnAotTest(): void
     {
         $source = (string) file_get_contents(dirname(__DIR__).'/aot/AotTest.php');

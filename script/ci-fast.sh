@@ -15,8 +15,11 @@ ci_run_inventory_checks
 ci_report_llvm_status
 ci_configure_serve_tests
 
-echo "PHPUnit (fast): VM, compliance, real-world — excluding @group llvm..."
-"$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit --exclude-group llvm,serve "$@"
+echo "PHPUnit (fast): VM, compliance, real-world — excluding @group llvm,serve,cgi..."
+"$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit --exclude-group llvm,serve,cgi "$@"
+
+echo "PHPUnit (fast): CGI driver (bin/cgi.php, no TCP, #656, #666)..."
+"$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit --filter CgiDriverTest "$@"
 
 if [[ "${MINIWEBAPP_SERVE_GATE:-1}" == "1" && -n "${PHP_COMPILER_SKIP_SERVE_TESTS:-}" ]]; then
   echo "MINIWEBAPP_SERVE_GATE=1 (default) requires serve tests; unset PHP_COMPILER_SKIP_SERVE_TESTS (#622, #641)" >&2

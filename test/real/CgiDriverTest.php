@@ -7,7 +7,7 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * VM smoke for bin/cgi.php with CGI env only (no TCP, issues #50, #656).
+ * VM smoke for bin/cgi.php with CGI env only (no TCP, issues #50, #656, #666).
  *
  * @group cgi
  */
@@ -67,6 +67,86 @@ final class CgiDriverTest extends TestCase
         $out = $this->runCgi($script, $env, $body);
         $this->assertStringContainsString('Status: 200', $out);
         $this->assertStringContainsString('PostCgi', $this->cgiBody($out));
+    }
+
+    /**
+     * 003-MiniWebApp PATH_INFO routes via bin/cgi.php (issue #666, mirrors ServeTest #470).
+     *
+     * @group miniwebapp
+     */
+    public function testMiniWebAppHomeViaCgiDriver(): void
+    {
+        $script = $this->miniWebAppIndexScript();
+        $env = $this->miniWebAppBaseEnv($script);
+        $env['PATH_INFO'] = '';
+        $env['REQUEST_URI'] = '/index.php';
+
+        $out = $this->runCgi($script, $env);
+        $this->assertStringContainsString('Status: 200', $out);
+        $this->assertStringContainsString('Content-Type: text/html', $out);
+        $this->assertStringContainsString('MiniWebApp', $this->cgiBody($out));
+    }
+
+    /**
+     * @group miniwebapp
+     */
+    public function testMiniWebAppHelloViaCgiDriver(): void
+    {
+        $script = $this->miniWebAppIndexScript();
+        $env = $this->miniWebAppBaseEnv($script);
+        $env['PATH_INFO'] = '/hello';
+        $env['QUERY_STRING'] = 'name=CgiPath';
+        $env['REQUEST_URI'] = '/index.php/hello?name=CgiPath';
+
+        $out = $this->runCgi($script, $env);
+        $this->assertStringContainsString('Status: 200', $out);
+        $this->assertStringContainsString('CgiPath', $this->cgiBody($out));
+    }
+
+    /**
+     * @group miniwebapp
+     */
+    public function testMiniWebAppApiStatusViaCgiDriver(): void
+    {
+        $script = $this->miniWebAppIndexScript();
+        $env = $this->miniWebAppBaseEnv($script);
+        $env['PATH_INFO'] = '/api/status';
+        $env['REQUEST_URI'] = '/index.php/api/status';
+
+        $out = $this->runCgi($script, $env);
+        $this->assertStringContainsString('Status: 200', $out);
+        $this->assertStringContainsString('Content-Type: application/json', $out);
+        $this->assertStringContainsString('"ok":true', $this->cgiBody($out));
+    }
+
+    private function miniWebAppIndexScript(): string
+    {
+        $script = $this->repoRoot.'/examples/003-MiniWebApp/public/index.php';
+        if (!is_file($script)) {
+            $this->markTestSkipped('examples/003-MiniWebApp/public/index.php missing (#246)');
+        }
+
+        return $script;
+    }
+
+    /**
+     * CGI env aligned with DevServer front-controller conventions (#666).
+     *
+     * @return array<string, string>
+     */
+    private function miniWebAppBaseEnv(string $script): array
+    {
+        $project = dirname(dirname($script));
+        $public = dirname($script);
+        $env = $this->baseEnv();
+        $env['REQUEST_METHOD'] = 'GET';
+        $env['QUERY_STRING'] = '';
+        $env['SCRIPT_NAME'] = '/index.php';
+        $env['SCRIPT_FILENAME'] = $script;
+        $env['DOCUMENT_ROOT'] = $public;
+        $env['PHPC_DEPLOY_ROOT'] = $project;
+
+        return $env;
     }
 
     /**
