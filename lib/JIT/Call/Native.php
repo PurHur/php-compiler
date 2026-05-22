@@ -91,6 +91,45 @@ class Native implements Call {
                         );
 
                         return $context->builder->load($slot);
+                    case Variable::TYPE_NATIVE_BOOL:
+                        $slot = \PHPCompiler\JIT\JitValueBox::alloc($context);
+                        $long = $context->builder->zExt(
+                            $value,
+                            $context->getTypeFromString('int64')
+                        );
+                        $context->builder->call(
+                            $context->lookupFunction('__value__writeLong'),
+                            \PHPCompiler\JIT\JitValueBox::pointer($context, $slot),
+                            $long
+                        );
+
+                        return $context->builder->load($slot);
+                    case Variable::TYPE_NATIVE_LONG:
+                        $slot = \PHPCompiler\JIT\JitValueBox::alloc($context);
+                        $context->builder->call(
+                            $context->lookupFunction('__value__writeLong'),
+                            \PHPCompiler\JIT\JitValueBox::pointer($context, $slot),
+                            $value
+                        );
+
+                        return $context->builder->load($slot);
+                    case Variable::TYPE_NULL:
+                        $slot = \PHPCompiler\JIT\JitValueBox::alloc($context);
+                        $context->builder->call(
+                            $context->lookupFunction('__value__writeNull'),
+                            \PHPCompiler\JIT\JitValueBox::pointer($context, $slot)
+                        );
+
+                        return $context->builder->load($slot);
+                    case Variable::TYPE_HASHTABLE:
+                        $slot = \PHPCompiler\JIT\JitValueBox::alloc($context);
+                        $context->builder->call(
+                            $context->lookupFunction('__value__writeHashtable'),
+                            \PHPCompiler\JIT\JitValueBox::pointer($context, $slot),
+                            $value
+                        );
+
+                        return $context->builder->load($slot);
                 }
                 break;
             case 'int64':
