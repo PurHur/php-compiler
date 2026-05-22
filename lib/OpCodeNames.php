@@ -180,6 +180,10 @@ function opcode_type_name(int $type): string
             return 'TYPE_FINALLY';
         case 95:
             return 'TYPE_DECLARE_GLOBAL_CONST';
+        case 96:
+            return 'TYPE_MAGIC_DIR';
+        case 97:
+            return 'TYPE_MAGIC_FILE';
         default:
             return 'unknown opcode';
     }

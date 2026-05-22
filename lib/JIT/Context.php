@@ -612,4 +612,43 @@ class Context {
         );
     }
 
+    /** @var list<string> */
+    private array $scriptPathStack = [];
+
+    public function pushScriptPath(string $path): void
+    {
+        $resolved = realpath($path);
+        $this->scriptPathStack[] = false !== $resolved ? $resolved : $path;
+    }
+
+    public function popScriptPath(): void
+    {
+        if ([] !== $this->scriptPathStack) {
+            array_pop($this->scriptPathStack);
+        }
+    }
+
+    public function currentMagicDir(): string
+    {
+        $file = [] !== $this->scriptPathStack
+            ? $this->scriptPathStack[array_key_last($this->scriptPathStack)]
+            : null;
+        if (null === $file || '' === $file) {
+            return '.';
+        }
+        $resolved = realpath($file);
+        $base = false !== $resolved ? $resolved : $file;
+
+        return dirname($base);
+    }
+
+    public function currentMagicFile(): string
+    {
+        if ([] === $this->scriptPathStack) {
+            return '';
+        }
+
+        return $this->scriptPathStack[array_key_last($this->scriptPathStack)];
+    }
+
 }

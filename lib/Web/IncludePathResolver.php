@@ -22,6 +22,11 @@ final class IncludePathResolver
 
             return false !== $resolved ? $resolved : $path;
         }
+        if (is_file($path)) {
+            $resolved = realpath($path);
+
+            return false !== $resolved ? $resolved : $path;
+        }
         $base = dirname($fromFile);
         $candidate = $base.'/'.$path;
         if (!is_file($candidate)) {

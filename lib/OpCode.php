@@ -94,6 +94,10 @@ class OpCode {
     const TYPE_CATCH = 93;
     const TYPE_FINALLY = 94;
     const TYPE_DECLARE_GLOBAL_CONST = 95;
+    /** Runtime __DIR__ from script path stack (issue #85, #707). */
+    const TYPE_MAGIC_DIR = 96;
+    /** Runtime __FILE__ from script path stack (issue #85, #707). */
+    const TYPE_MAGIC_FILE = 97;
 
     public int $type;
     public ?int $arg1;

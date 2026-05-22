@@ -72,6 +72,9 @@ final class IncludeHelper
 
         $included->inheritScopeFrom($callerBlock);
         $included->inheritUndefinedLocals = true;
+        if ('' === $included->entryScriptPath) {
+            $included->entryScriptPath = $path;
+        }
 
         $localBindings = self::collectCalleeLocalBindings($context, $callerBlock, $included);
         $context->pushScope();

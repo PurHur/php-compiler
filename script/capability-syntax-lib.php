@@ -103,6 +103,22 @@ function syntaxRowDefinitions(): array
             'notes' => ['Requires `namespace` declaration (#84)'],
             'probe' => null,
         ],
+        [
+            'id' => 'magic_const_dir_file',
+            'construct' => 'Magic constants `__DIR__`, `__FILE__`',
+            'opcodes' => ['TYPE_MAGIC_DIR', 'TYPE_MAGIC_FILE', 'TYPE_INCLUDE'],
+            'issue' => 707,
+            'notes' => ['Runtime script path stack; compile-time fold when path known (#85)'],
+            'probe' => null,
+        ],
+        [
+            'id' => 'magic_const_line',
+            'construct' => 'Magic constant `__LINE__`',
+            'opcodes' => ['TYPE_CONST_FETCH'],
+            'issue' => 707,
+            'notes' => ['Lowered at parse time via php-cfg (best-effort line)'],
+            'probe' => null,
+        ],
     ];
 }
 
@@ -231,6 +247,8 @@ function collectSyntaxPhptCoverage(string $root, array $definitions): array
         'arrow_functions' => '/\bfn\s*\(/',
         'magic_const_class_method' => '/__CLASS__|__FUNCTION__|__METHOD__/',
         'magic_const_namespace' => '/__NAMESPACE__/',
+        'magic_const_dir_file' => '/__DIR__|__FILE__/',
+        'magic_const_line' => '/__LINE__/',
     ];
 
     $scan = [];

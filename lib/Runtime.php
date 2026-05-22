@@ -43,6 +43,9 @@ class Runtime {
     public int $mode;
     public ?string $debugFile = null;
 
+    /** Set by parse() for compile() to attach entry script path to the main Block. */
+    private string $lastParsedScriptPath = '';
+
     public TypeReconstructor $typeReconstructor;
 
     public function __construct(int $mode = self::MODE_NORMAL) {
@@ -126,6 +129,8 @@ class Runtime {
     }
 
     public function parse(string $code, string $filename): Script {
+        $filename = self::normalizeScriptPath($filename);
+        $this->lastParsedScriptPath = $filename;
         $script = $this->parser->parse($code, $filename);
         $this->preprocessor->traverse($script);
         $state = new State($script);
@@ -137,8 +142,39 @@ class Runtime {
 
     public function compile(Script $script): ?Block {
         $block = $this->compiler->compile($script);
+        if (null !== $block && '' !== $this->lastParsedScriptPath) {
+            $block->entryScriptPath = $this->lastParsedScriptPath;
+        }
         $this->assignOpResolver->optimize($block);
         return $block;
+    }
+
+    /**
+     * Resolve CLI / lint paths so __DIR__ include folding and literal includes work (issue #707).
+     */
+    public static function normalizeScriptPath(string $filename): string
+    {
+        if ('' === $filename || '-' === $filename || 'Command line code' === $filename) {
+            return $filename;
+        }
+        $resolved = realpath($filename);
+        if (false !== $resolved) {
+            return $resolved;
+        }
+        if ($filename[0] !== '/' && !preg_match('/^[A-Za-z]:[\\\\\\/]/', $filename)) {
+            $cwd = getcwd();
+            if (false !== $cwd) {
+                $candidate = $cwd.DIRECTORY_SEPARATOR.$filename;
+                if (is_file($candidate)) {
+                    $resolved = realpath($candidate);
+                    if (false !== $resolved) {
+                        return $resolved;
+                    }
+                }
+            }
+        }
+
+        return $filename;
     }
 
     public function compileFunc(string $name, CfgFunc $func): Func {

@@ -26,6 +26,10 @@ final class ConstStringFolder
         if (null !== $literal) {
             return $literal;
         }
+        $magicDir = self::foldMagicDir($operand, $sourceFile);
+        if (null !== $magicDir) {
+            return $magicDir;
+        }
         if ($operand instanceof Operand\Temporary) {
             $original = $operand->original;
             if ($original instanceof Op\Expr\BinaryOp\Concat) {
@@ -50,8 +54,8 @@ final class ConstStringFolder
             return null;
         }
         $dir = self::sourceDir($sourceFile);
-        $leftLit = self::literalStringValue($concat->left);
-        $rightLit = self::literalStringValue($concat->right);
+        $leftLit = self::literalStringValue($concat->left) ?? self::foldMagicDir($concat->left, $sourceFile);
+        $rightLit = self::literalStringValue($concat->right) ?? self::foldMagicDir($concat->right, $sourceFile);
         if (null !== $leftLit && null !== $rightLit) {
             return $leftLit.$rightLit;
         }
@@ -296,7 +300,26 @@ final class ConstStringFolder
     private static function literalStringValue(Operand $operand): ?string
     {
         if ($operand instanceof Operand\Literal && is_string($operand->value)) {
+            if (\PHPCompiler\MagicLiteral::isMagicString($operand->value)) {
+                return null;
+            }
+
             return $operand->value;
+        }
+
+        return null;
+    }
+
+    /**
+     * Fold __DIR__ sentinel in concat when the including file path is known.
+     */
+    private static function foldMagicDir(Operand $operand, string $sourceFile): ?string
+    {
+        if ('' === $sourceFile) {
+            return null;
+        }
+        if ($operand instanceof Operand\Literal && \PHPCompiler\MagicLiteral::isDir($operand->value)) {
+            return self::sourceDir($sourceFile);
         }
 
         return null;

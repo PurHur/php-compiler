@@ -20,6 +20,9 @@ class Context {
     private ?RunStackEntry $runStack = null;
     public array $constants = [];
 
+    /** @var list<string> absolute paths for runtime __DIR__ / __FILE__ (issue #707) */
+    private array $scriptPathStack = [];
+
     /** @var array<string, Variable> */
     private array $superglobalVars = [];
 
@@ -150,6 +153,47 @@ class Context {
             return $return->frame;
         }
         return null;;
+    }
+
+    public function pushScriptPath(string $path): void
+    {
+        $resolved = realpath($path);
+        $this->scriptPathStack[] = false !== $resolved ? $resolved : $path;
+    }
+
+    public function popScriptPath(): void
+    {
+        if ([] !== $this->scriptPathStack) {
+            array_pop($this->scriptPathStack);
+        }
+    }
+
+    public function currentScriptPath(): ?string
+    {
+        if ([] === $this->scriptPathStack) {
+            return null;
+        }
+
+        return $this->scriptPathStack[array_key_last($this->scriptPathStack)];
+    }
+
+    public function currentMagicDir(): string
+    {
+        $file = $this->currentScriptPath();
+        if (null === $file || '' === $file) {
+            return '.';
+        }
+        $resolved = realpath($file);
+        $base = false !== $resolved ? $resolved : $file;
+
+        return dirname($base);
+    }
+
+    public function currentMagicFile(): string
+    {
+        $file = $this->currentScriptPath();
+
+        return null !== $file ? $file : '';
     }
 }
 

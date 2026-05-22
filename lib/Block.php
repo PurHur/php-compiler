@@ -56,6 +56,9 @@ class Block {
     /** File-level declare(strict_types=1) for this function body (issue #156). */
     public bool $strictTypes = false;
 
+    /** Absolute path of the entry script for runtime __DIR__/__FILE__ (issue #707). */
+    public string $entryScriptPath = '';
+
     /** @var array<int, int> scope slot index => Variable::TYPE_* for typed parameters */
     public array $paramTypeConstraints = [];
 

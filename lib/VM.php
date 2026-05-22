@@ -34,9 +34,19 @@ class VM {
             return self::SUCCESS;
         }
 
+        $pushedEntry = false;
+        if ('' !== $block->entryScriptPath) {
+            $this->context->pushScriptPath($block->entryScriptPath);
+            $pushedEntry = true;
+        }
         $this->context->push($block->getFrame($this->context));
 
-        return $this->runFrames();
+        $status = $this->runFrames();
+        if ($pushedEntry) {
+            $this->context->popScriptPath();
+        }
+
+        return $status;
     }
 
     private function runFrames(): int
@@ -460,9 +470,19 @@ restart:
                         && Variable::TYPE_NULL !== $value->type
                     );
                     break;
+                case OpCode::TYPE_MAGIC_DIR:
+                    $frame->scope[$op->arg1]->string($this->context->currentMagicDir());
+                    break;
+                case OpCode::TYPE_MAGIC_FILE:
+                    $frame->scope[$op->arg1]->string($this->context->currentMagicFile());
+                    break;
                 case OpCode::TYPE_INCLUDE:
                     $file = $frame->scope[$op->arg1]->toString();
+                    $this->context->pushScriptPath($file);
                     $parsed = $this->context->runtime->parseAndCompileFile($file);
+                    if (null !== $parsed && '' !== $parsed->entryScriptPath) {
+                        $parsed->entryScriptPath = $file;
+                    }
                     $new = $parsed->getFrame($this->context, $frame);
                     $new->ephemeral = true;
                     $new->parent = $frame;
@@ -531,6 +551,7 @@ restart:
         }
         if ($frame->ephemeral) {
             if (null !== $frame->parent) {
+                $this->context->popScriptPath();
                 $frame = $frame->parent;
                 goto restart;
             }

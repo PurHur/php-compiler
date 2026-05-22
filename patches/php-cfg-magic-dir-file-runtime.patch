@@ -1,0 +1,15 @@
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
+@@ -1455,10 +1455,10 @@ class Parser
+             case 'Scalar_MagicConst_Class':
+                 // TODO
+                 return new Literal('__CLASS__');
+             case 'Scalar_MagicConst_Dir':
+-                return new Literal(dirname($this->fileName));
++                return new Literal("\0PHPC_MAGIC_DIR\0");
+             case 'Scalar_MagicConst_File':
+-                return new Literal($this->fileName);
++                return new Literal("\0PHPC_MAGIC_FILE\0");
+             case 'Scalar_MagicConst_Namespace':
+                 // TODO
+                 return new Literal('__NAMESPACE__');

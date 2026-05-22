@@ -65,6 +65,9 @@ patch_already_applied() {
     php-cfg-magic-constants.patch)
       grep -q 'namespaceStack' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/MagicStringResolver.php" 2>/dev/null
       ;;
+    php-cfg-magic-dir-file-runtime.patch)
+      grep -q 'PHPC_MAGIC_DIR' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
+      ;;
     *)
       return 1
       ;;
@@ -112,6 +115,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-strict-types.patch"
   apply_patch "$PATCH_DIR/php-cfg-trycatch.patch"
   apply_patch "$PATCH_DIR/php-cfg-magic-constants.patch"
+  apply_patch "$PATCH_DIR/php-cfg-magic-dir-file-runtime.patch"
 fi
 
 if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then

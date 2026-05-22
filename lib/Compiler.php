@@ -41,8 +41,24 @@ class Compiler {
         $this->seen = new SplObjectStorage;
 
         $funcBlock = $this->compileCfgBlock($func->cfg, $func->params, $func);
+        $unitPath = $this->resolveCfgUnitPath($func->cfg);
+        if ('' !== $unitPath) {
+            $funcBlock->entryScriptPath = $unitPath;
+        }
         $this->seen = null;
         return new Func\PHP($name, $funcBlock);
+    }
+
+    protected function resolveCfgUnitPath(CfgBlock $cfg): string
+    {
+        foreach ($cfg->children as $child) {
+            $file = $child->getFile();
+            if ('' !== $file && 'unknown' !== $file) {
+                return Runtime::normalizeScriptPath($file);
+            }
+        }
+
+        return '';
     }
 
     protected function compileCfgBlock(CfgBlock $block, array $params = [], ?CfgFunc $func = null): Block {
@@ -1267,6 +1283,18 @@ class Compiler {
             return null;
         } elseif ($operand instanceof Operand\Literal) {
             assert($isRead === true);
+            if (MagicLiteral::isDir($operand->value)) {
+                $slot = $block->getVarSlot($operand, true);
+                $block->addOpCode(new OpCode(OpCode::TYPE_MAGIC_DIR, $slot));
+
+                return $slot;
+            }
+            if (MagicLiteral::isFile($operand->value)) {
+                $slot = $block->getVarSlot($operand, true);
+                $block->addOpCode(new OpCode(OpCode::TYPE_MAGIC_FILE, $slot));
+
+                return $slot;
+            }
             $mappedType = null !== $operand->type
                 ? Variable::mapFromType($operand->type)
                 : Variable::TYPE_UNDEFINED;

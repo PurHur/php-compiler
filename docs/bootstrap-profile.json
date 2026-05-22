@@ -332,6 +332,7 @@
         "lib/Lint/Linter.php",
         "lib/Lint/SwitchDetector.php",
         "lib/Lint/UnsupportedRegistry.php",
+        "lib/MagicLiteral.php",
         "lib/MethodVisibility.php",
         "lib/Module.php",
         "lib/ModuleAbstract.php",
@@ -409,9 +410,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 344,
+        "inventory_files": 345,
         "excluded": 2,
-        "eligible": 342,
+        "eligible": 343,
         "aot_lint_targets": 15,
         "aot_link_targets": 13,
         "aot_link_lib_targets": 1

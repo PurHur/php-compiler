@@ -47,6 +47,32 @@ final class IncludeLiteralTest extends TestCase
         $this->assertSame("hello from helper\n", $exit['stdout']);
     }
 
+    public function testVmMagicDirNestedInclude(): void
+    {
+        $entry = realpath(__DIR__.'/../compliance/cases/language/magic_dir_nested/entry.php');
+        $this->assertNotFalse($entry);
+        $exit = $this->runVm([$entry]);
+        $this->assertSame(0, $exit['code'], $exit['stderr']);
+        $this->assertSame("magic_dir_nested\nhelper.php\n", $exit['stdout']);
+    }
+
+    /**
+     * Relative CLI paths must resolve literal includes at compile time (issue #707).
+     */
+    public function testCompileFoldsLiteralIncludeForRelativeScriptPath(): void
+    {
+        $rel = 'test/compliance/cases/language/include_dir_literal/entry.php';
+        $repoRoot = dirname(__DIR__, 2);
+        chdir($repoRoot);
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile((string) file_get_contents($rel), $rel);
+        $this->assertNotNull($block);
+        $this->assertNotEmpty($block->literalIncludePaths);
+        $helper = realpath(__DIR__.'/../compliance/cases/language/include_dir_literal/helper.php');
+        $this->assertNotFalse($helper);
+        $this->assertContains($helper, $block->literalIncludePaths);
+    }
+
     /**
      * require expression captures return value (MiniWebApp config.php pattern, issue #67).
      */

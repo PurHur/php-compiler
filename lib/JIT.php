@@ -187,6 +187,7 @@ class JIT {
         if ($callbackType === 'void(*)()') {
             $this->context->addExport($internalName, $callbackType, $block);
         }
+
         return $func;
     }
 
@@ -444,6 +445,22 @@ class JIT {
                     $array = $this->context->getVariableFromOp($block->getOperand($op->arg2));
                     $value = JIT\IteratorHelper::compileValue($this->context, $array);
                     $this->assignOperand($block->getOperand($op->arg1), $value);
+                    break;
+                case OpCode::TYPE_MAGIC_DIR:
+                    $dirVar = $this->context->helper->loadValue(
+                        $this->context->builder->load(
+                            $this->context->constantStringFromString($this->magicDirForBlock($block))
+                        )
+                    );
+                    $this->assignOperand($block->getOperand($op->arg1), $dirVar);
+                    break;
+                case OpCode::TYPE_MAGIC_FILE:
+                    $fileVar = $this->context->helper->loadValue(
+                        $this->context->builder->load(
+                            $this->context->constantStringFromString($this->magicFileForBlock($block))
+                        )
+                    );
+                    $this->assignOperand($block->getOperand($op->arg1), $fileVar);
                     break;
                 case OpCode::TYPE_INCLUDE:
                     JIT\IncludeHelper::compileLiteral(
@@ -1552,6 +1569,26 @@ class JIT {
         }
 
         return $var;
+    }
+
+    private function magicFileForBlock(Block $block): string
+    {
+        if ('' !== $block->entryScriptPath) {
+            return $block->entryScriptPath;
+        }
+
+        return $this->context->currentMagicFile();
+    }
+
+    private function magicDirForBlock(Block $block): string
+    {
+        $file = $this->magicFileForBlock($block);
+        if ('' === $file) {
+            return '.';
+        }
+        $resolved = realpath($file);
+
+        return dirname(false !== $resolved ? $resolved : $file);
     }
 
 }
