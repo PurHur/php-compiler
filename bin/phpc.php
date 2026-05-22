@@ -18,7 +18,7 @@ declare(strict_types=1);
  *   phpc lint --all <dir-or-file> [--json]
  *   phpc init [--profile default|miniwebapp] [--force] [target-dir]
  *   phpc test [--fast] [-- phpunit/ci-local args...]
- *   phpc doctor                                  Probe PHP, LLVM, deps, loopback (issue #253)
+ *   phpc doctor [--gates] [--no-lint]             Probe env; --gates prints MiniWebApp ladder (#657)
  *   phpc validate-manifest [dir]                 Validate phpc.json schema and paths (issue #263)
  */
 
@@ -51,7 +51,7 @@ php-compiler CLI
   phpc init [--profile default|miniwebapp] [--force] [target-dir]
                                               Scaffold web project (default hello or miniwebapp)
   phpc test [--fast] [args...]                  Run ci-local.sh (full) or ci-fast.sh (no LLVM)
-  phpc doctor                                   Probe environment for full local CI
+  phpc doctor [--gates] [--no-lint]             Probe environment; --gates: MiniWebApp CI ladder
   phpc validate-manifest [dir]                  Validate phpc.json (default: cwd)
 
 HELP);
@@ -144,6 +144,23 @@ switch ($command) {
             exit(1);
         }
         require $repoRoot.'/vendor/autoload.php';
+        $gates = false;
+        $noLint = false;
+        foreach ($args as $arg) {
+            if ('--gates' === $arg) {
+                $gates = true;
+                continue;
+            }
+            if ('--no-lint' === $arg) {
+                $noLint = true;
+                continue;
+            }
+            fwrite(STDERR, "phpc doctor: unknown option: {$arg}\n");
+            exit(1);
+        }
+        if ($gates) {
+            exit(\PHPCompiler\Doctor::runGates($repoRoot, $noLint));
+        }
         exit(\PHPCompiler\Doctor::run($repoRoot));
 
     case 'validate-manifest':

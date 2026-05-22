@@ -77,6 +77,7 @@ curl -s 'http://127.0.0.1:8080/index.php?route=home'
 ## CI hooks
 
 ```console
+../../phpc doctor --gates          # same ladder as miniwebapp-gates.sh (#657)
 make miniwebapp-gates
 ../../script/examples-web-smoke.sh
 MINIWEBAPP_VM_CLI_GATE=1 ../../script/ci-fast.sh --filter 'MiniWebApp.*VmCli'

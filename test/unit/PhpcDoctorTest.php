@@ -27,6 +27,17 @@ final class PhpcDoctorTest extends TestCase
         $this->assertStringContainsString('Environment ready for full local CI', $result['stdout']);
     }
 
+    public function testDoctorGatesPrintsMiniWebAppLadder(): void
+    {
+        $result = $this->runPhpc(['doctor', '--gates', '--no-lint']);
+        $this->assertSame(0, $result['exit'], $result['stdout']."\n".$result['stderr']);
+        $this->assertStringContainsString('MiniWebApp CI gates', $result['stdout']);
+        $this->assertMatchesRegularExpression('/Stage [0-4]/', $result['stdout']);
+        $this->assertStringContainsString('MINIWEBAPP_LINT_GATE', $result['stdout']);
+        $this->assertStringContainsString('MINIWEBAPP_SERVE_GATE', $result['stdout']);
+        $this->assertStringContainsString('MINIWEBAPP_WEB_SMOKE_GATE', $result['stdout']);
+    }
+
     /**
      * @param list<string> $phpcArgs
      *

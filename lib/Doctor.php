@@ -58,6 +58,69 @@ final class Doctor
     }
 
     /**
+     * Print MiniWebApp CI gate ladder (delegates to script/miniwebapp-gates.sh — issues #472, #657).
+     */
+    public static function runGates(string $repoRoot, bool $noLint = false): int
+    {
+        $script = $repoRoot.'/script/miniwebapp-gates.sh';
+        if (!is_executable($script)) {
+            fwrite(STDERR, "phpc doctor --gates: {$script} missing or not executable\n");
+
+            return 1;
+        }
+
+        $miniwebappPublic = $repoRoot.'/examples/003-MiniWebApp/public';
+        if (!is_dir($miniwebappPublic)) {
+            fwrite(STDERR, "phpc doctor --gates: {$miniwebappPublic} missing (#246)\n");
+
+            return 1;
+        }
+
+        $cmd = [$script];
+        if ($noLint) {
+            $cmd[] = '--no-lint';
+        }
+
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open($cmd, $descriptorSpec, $pipes, $repoRoot);
+        if (!is_resource($proc)) {
+            fwrite(STDERR, "phpc doctor --gates: failed to start miniwebapp-gates.sh\n");
+
+            return 1;
+        }
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+        if (false !== $stdout && '' !== $stdout) {
+            fwrite(STDOUT, $stdout);
+        }
+        if (false !== $stderr && '' !== $stderr) {
+            fwrite(STDERR, $stderr);
+        }
+
+        $loopback = self::checkLoopback($repoRoot);
+        if ($loopback['ok']) {
+            $serveGate = getenv('MINIWEBAPP_SERVE_GATE');
+            if (false !== $serveGate && '0' === $serveGate) {
+                fwrite(STDOUT, "\nLoopback bind OK: unset MINIWEBAPP_SERVE_GATE=0 or export =1 for ServeTest in ci-local (#641)\n");
+            }
+            $webSmokeGate = getenv('MINIWEBAPP_WEB_SMOKE_GATE');
+            if (false === $webSmokeGate || '' === $webSmokeGate) {
+                fwrite(STDOUT, "Loopback bind OK: export MINIWEBAPP_WEB_SMOKE_GATE=1 for ci-local PATH_INFO curls (#633)\n");
+            }
+        }
+
+        return is_int($exit) ? $exit : 1;
+    }
+
+    /**
      * @return list<array{name: string, ok: bool, required: bool, detail: string, hint: string}>
      */
     private static function collectChecks(string $repoRoot): array
