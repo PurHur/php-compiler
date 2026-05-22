@@ -207,6 +207,22 @@ final class VmString
         return $count;
     }
 
+    public static function strpbrk(string $str, string $mask): string|false
+    {
+        if ('' === $mask) {
+            throw new \ValueError('strpbrk(): Argument #2 ($characters) must not be empty');
+        }
+        $slen = self::byteLength($str);
+        $mlen = self::byteLength($mask);
+        for ($i = 0; $i < $slen; ++$i) {
+            if (self::byteInSet($str[$i], $mask, $mlen)) {
+                return self::byteSlice($str, $i);
+            }
+        }
+
+        return false;
+    }
+
     private static function byteInSet(string $byte, string $mask, int $maskLen): bool
     {
         for ($j = 0; $j < $maskLen; ++$j) {

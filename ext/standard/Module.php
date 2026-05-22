@@ -55,6 +55,7 @@ class Module extends ModuleAbstract
             new strncasecmp(),
             new strspn(),
             new strcspn(),
+            new strpbrk(),
             new dechex(),
             new hexdec(),
             new decoct(),
@@ -220,6 +221,14 @@ class Module extends ModuleAbstract
                 $fn = $context->module->addFunction($name, $ft);
                 $context->registerFunction($name, $fn);
             }
+        }
+        try {
+            $context->lookupFunction('strpbrk');
+        } catch (\Throwable $e) {
+            $i8p = $context->getTypeFromString('int8*');
+            $ft = $context->context->functionType($i8p, false, $i8p, $i8p);
+            $fn = $context->module->addFunction('strpbrk', $ft);
+            $context->registerFunction('strpbrk', $fn);
         }
         try {
             $context->lookupFunction('strstr');
