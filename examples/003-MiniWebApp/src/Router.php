@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 /**
  * Front-controller dispatch for MiniWebApp (issue #210).
- *
- * Class methods are intentional lint blockers until #145 lands; routes use switch + includes.
  */
 class Router
 {
@@ -58,28 +56,43 @@ class Router
 
     private function renderHome(): void
     {
-        $appName = $this->config['app_name'] ?? 'MiniWebApp';
+        $appName = $this->resolveAppName();
         $title = 'Home';
         include __DIR__ . '/../templates/layout.php';
     }
 
     private function renderHello(): void
     {
-        $name = $_GET['name'] ?? 'World';
+        $appName = $this->resolveAppName();
+        $guestName = 'World';
+        if (isset($_REQUEST['name'])) {
+            $guestName = $_REQUEST['name'];
+        }
         $title = 'Hello';
         include __DIR__ . '/../templates/layout.php';
     }
 
     private function renderContactForm(): void
     {
+        $appName = $this->resolveAppName();
         $title = 'Contact';
         include __DIR__ . '/../templates/layout.php';
     }
 
     private function renderContactThankYou(): void
     {
+        $appName = $this->resolveAppName();
         $title = 'Thank you';
         include __DIR__ . '/../templates/layout.php';
+    }
+
+    private function resolveAppName(): string
+    {
+        if (isset($this->config['app_name'])) {
+            return $this->config['app_name'];
+        }
+
+        return 'MiniWebApp';
     }
 
     private function renderApiStatus(): void
@@ -89,7 +102,7 @@ class Router
         echo json_encode([
             'ok' => true,
             'service' => '003-MiniWebApp',
-            'app' => $this->config['app_name'] ?? 'MiniWebApp',
+            'app' => $this->resolveAppName(),
         ]);
     }
 }

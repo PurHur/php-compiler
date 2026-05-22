@@ -23,6 +23,8 @@ class ClassEntry {
     public array $properties = [];
     /** @var array<string, Func\PHP> method name (lowercase) => callable */
     public array $methods = [];
+    /** @var array<string, Variable> constant name (lowercase) => value */
+    public array $constants = [];
 
     public function __construct(string $name) {
         $this->name = $name;

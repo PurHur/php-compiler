@@ -231,8 +231,7 @@ function bootstrapDefaultAotLintTargets(string $root): array
 function bootstrapDefaultAotLinkTargets(array $lintTargets): array
 {
     $pendingUserFunc = [
-        'test/bootstrap-aot/class_const_fetch.php', // needs Expr_ClassConstFetch JIT (#84)
-        'test/bootstrap-aot/instanceof_check.php', // instanceof JIT pending
+        'test/bootstrap-aot/try_catch.php', // try/catch CFG link (#57); VM unwind pending
     ];
 
     return array_values(array_filter(

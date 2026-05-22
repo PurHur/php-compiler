@@ -320,6 +320,27 @@ class Compiler {
             $op->block1 = $this->compileCfgBranch($stmt->if, $block);
             $op->block2 = $this->compileCfgBranch($stmt->else, $block);
             $block->addOpCode($op);
+        } elseif ($stmt instanceof Op\Stmt\TryCatch) {
+            $merge = $this->compileCfgBranch($stmt->end, $block);
+            $try = $this->compileCfgBranch($stmt->try, $block);
+            $tryOp = new OpCode(OpCode::TYPE_TRY);
+            $tryOp->block1 = $try;
+            $tryOp->block2 = $merge;
+            $block->addOpCode($tryOp);
+            foreach ($stmt->catches as $catchBlock) {
+                $compiledCatch = $this->compileCfgBranch($catchBlock, $block);
+                $catchOp = new OpCode(OpCode::TYPE_CATCH);
+                $catchOp->block1 = $compiledCatch;
+                $catchOp->block2 = $merge;
+                $block->addOpCode($catchOp);
+            }
+            if (null !== $stmt->finally) {
+                $compiledFinally = $this->compileCfgBranch($stmt->finally, $block);
+                $finallyOp = new OpCode(OpCode::TYPE_FINALLY);
+                $finallyOp->block1 = $compiledFinally;
+                $finallyOp->block2 = $merge;
+                $block->addOpCode($finallyOp);
+            }
         } elseif ($stmt instanceof Op\Stmt\Switch_) {
             $canBeSwitch = true;
             $type = null;

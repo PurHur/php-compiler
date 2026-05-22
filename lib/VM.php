@@ -235,10 +235,32 @@ restart:
                     $frame->scope[$op->arg1]->copyFrom($value);
                     break;
                 case OpCode::TYPE_CLASS_CONST_FETCH:
-                    // Recorded at compile time; VM does not resolve class constants yet.
+                    $className = $frame->scope[$op->arg2]->toString();
+                    $lcClass = strtolower($className);
+                    if ('self' === $lcClass || 'static' === $lcClass) {
+                        if (null === $frame->block->func?->class) {
+                            return $this->raise('self:: used outside of class scope', $frame);
+                        }
+                        $lcClass = strtolower($frame->block->func->class->name);
+                    }
+                    if (!isset($this->context->classes[$lcClass])) {
+                        return $this->raise("Unknown class for constant fetch: {$className}", $frame);
+                    }
+                    $constName = strtolower($frame->scope[$op->arg3]->toString());
+                    $classEntry = $this->context->classes[$lcClass];
+                    if (!isset($classEntry->constants[$constName])) {
+                        return $this->raise("Undefined class constant {$className}::{$constName}", $frame);
+                    }
+                    $frame->scope[$op->arg1]->copyFrom($classEntry->constants[$constName]);
                     break;
                 case OpCode::TYPE_INSTANCEOF:
-                    // Recorded at compile time; VM instanceof is not implemented yet.
+                    $value = $frame->scope[$op->arg2]->resolveIndirect();
+                    $className = strtolower($frame->scope[$op->arg3]->toString());
+                    $matches = false;
+                    if (Variable::TYPE_OBJECT === $value->type) {
+                        $matches = strtolower($value->toObject()->class->name) === $className;
+                    }
+                    $frame->scope[$op->arg1]->bool($matches);
                     break;
                 case OpCode::TYPE_STATIC_PROPERTY_FETCH:
                     // Recorded at compile time; VM static property fetch is not implemented yet.
@@ -458,6 +480,16 @@ restart:
                         $container->toArray()->iterCurrentValue($byRef)
                     );
                     break;
+                case OpCode::TYPE_TRY:
+                    $frame = $op->block1->getFrame($this->context, $frame);
+                    goto restart;
+                case OpCode::TYPE_CATCH:
+                case OpCode::TYPE_FINALLY:
+                    if (null !== $op->block2) {
+                        $frame = $op->block2->getFrame($this->context, $frame);
+                        goto restart;
+                    }
+                    break;
                 case OpCode::TYPE_THROW:
                     $thrown = $frame->scope[$op->arg1]->resolveIndirect();
                     if (Variable::TYPE_OBJECT === $thrown->type) {
@@ -514,7 +546,11 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_DECLARE_CLASS_CONST:
-                    // Recorded at compile time; VM does not resolve class constants yet.
+                    $name = strtolower($frame->scope[$op->arg1]->toString());
+                    if (!isset($block->constants[$op->arg2])) {
+                        throw new \LogicException('Class constant value must be a compile-time constant');
+                    }
+                    $entry->constants[$name] = $block->constants[$op->arg2];
                     break;
                 default:
                     var_dump($op);

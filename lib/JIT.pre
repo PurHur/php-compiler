@@ -396,6 +396,13 @@ class JIT {
                     $this->context->freeDeadVariables($func, $branchBlock, $block);
                     $builder->branchIf($condition, $if, $else);
                     return $origBasicBlock;
+                case OpCode::TYPE_TRY:
+                case OpCode::TYPE_CATCH:
+                case OpCode::TYPE_FINALLY:
+                    if (null !== $op->block1) {
+                        $this->compileBlockInternal($func, $op->block1, ...$args);
+                    }
+                    return $origBasicBlock;
                 case OpCode::TYPE_THROW:
                     $throwBlock = $builder->getInsertBlock();
                     $builder->positionAtEnd($throwBlock);
@@ -722,8 +729,15 @@ class JIT {
                 $lit = new Operand\Literal($vm->toBool());
                 $lit->type = Type::bool();
                 return Variable::fromLiteral($this->context, $lit);
+            case VM\Variable::TYPE_NULL:
+                return new Variable(
+                    $this->context,
+                    Variable::TYPE_NULL,
+                    Variable::KIND_VALUE,
+                    $this->context->getTypeFromString('__value__*')->constNull()
+                );
             default:
-                throw new \LogicException('Unsupported default parameter type for JIT');
+                throw new \LogicException('Unsupported default parameter type for JIT (vm type ' . $vm->type . ')');
         }
     }
 

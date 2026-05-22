@@ -1,0 +1,108 @@
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
+@@ -672,8 +672,52 @@
+ 
+     protected function parseStmt_TryCatch(Stmt\TryCatch $node)
+     {
+-        // TODO: implement this!!!
++        $attrs = $this->mapAttributes($node);
++        $endBlock = new Block();
++        $tryBlock = new Block($this->block);
++        $catchBlocks = [];
++        foreach ($node->catches as $catch) {
++            $catchBlocks[] = new Block($this->block);
++        }
++        $finallyBlock = null !== $node->finally ? new Block($this->block) : null;
++
++        $this->block->children[] = new Op\Stmt\TryCatch(
++            $tryBlock,
++            $catchBlocks,
++            $finallyBlock,
++            $endBlock,
++            $attrs
++        );
++
++        $this->block->children[] = new Jump($tryBlock, $attrs);
++        $tryBlock->addParent($this->block);
++
++        $this->block = $this->parseNodes($node->stmts, $tryBlock);
++        $this->block->children[] = new Jump($endBlock, $attrs);
++        $endBlock->addParent($this->block);
++
++        foreach ($node->catches as $i => $catch) {
++            $this->block = $catchBlocks[$i];
++            if (null !== $catch->var) {
++                $this->block->children[] = new Op\Expr\Assign(
++                    $this->writeVariable($this->parseExprNode($catch->var)),
++                    new Literal(null),
++                    $attrs
++                );
++            }
++            $this->block = $this->parseNodes($catch->stmts, $catchBlocks[$i]);
++            $this->block->children[] = new Jump($endBlock, $attrs);
++            $endBlock->addParent($this->block);
++        }
++
++        if (null !== $finallyBlock) {
++            $this->block = $this->parseNodes($node->finally->stmts, $finallyBlock);
++            $this->block->children[] = new Jump($endBlock, $attrs);
++            $endBlock->addParent($this->block);
++        }
++
++        $this->block = $endBlock;
+     }
+ 
+     protected function parseStmt_Unset(Stmt\Unset_ $node)
+--- /dev/null
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/TryCatch.php
+@@ -0,0 +1,52 @@
++<?php
++
++declare(strict_types=1);
++
++namespace PHPCfg\Op\Stmt;
++
++use PHPCfg\Block;
++use PHPCfg\Op\Stmt;
++
++class TryCatch extends Stmt
++{
++    /** @var Block */
++    public $try;
++
++    /** @var Block[] */
++    public $catches;
++
++    /** @var Block|null */
++    public $finally;
++
++    /** @var Block */
++    public $end;
++
++    /**
++     * @param Block[] $catches
++     */
++    public function __construct(
++        Block $try,
++        array $catches,
++        ?Block $finally,
++        Block $end,
++        array $attributes = []
++    ) {
++        parent::__construct($attributes);
++        $this->try = $try;
++        $this->catches = $catches;
++        $this->finally = $finally;
++        $this->end = $end;
++    }
++
++    public function getSubBlocks(): array
++    {
++        return ['try', 'catches', 'finally', 'end'];
++    }
++
++    public function getType(): string
++    {
++        return 'Stmt_TryCatch';
++    }
++}
