@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ScopeBuiltinHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -28,7 +29,11 @@ final class extract_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        // LLVM scope import for dynamic string keys is tracked in issue #275 (VM path is complete).
-        throw new \LogicException('extract() is not implemented for JIT in this compiler build');
+        if (\count($args) < 1 || \count($args) > 2) {
+            throw new \LogicException('extract() requires one or two arguments in this compiler build');
+        }
+        $flags = 2 === \count($args) ? $args[1] : null;
+
+        return ScopeBuiltinHelper::extract($context, $args[0], $flags);
     }
 }

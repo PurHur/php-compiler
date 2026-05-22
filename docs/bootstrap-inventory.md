@@ -281,6 +281,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `lib/JIT/NullsafeHelper.php` | 0 | 1 |
 | `lib/JIT/OperandName.php` | 0 | 1 |
 | `lib/JIT/Result.php` | 0 | 3 |
+| `lib/JIT/ScopeBuiltinHelper.php` | 0 | 1 |
 | `lib/JIT/StringOffsetHelper.php` | 0 | 1 |
 | `lib/JIT/SuperglobalInit.php` | 0 | 3 |
 | `lib/JIT/ValueEchoHelper.php` | 0 | 1 |
@@ -1958,6 +1959,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new Func\JIT (line 41)
 - new Func\JIT (line 49)
 - 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/JIT/ScopeBuiltinHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 8 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/StringOffsetHelper.php`
 
