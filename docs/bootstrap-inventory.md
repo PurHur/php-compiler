@@ -307,6 +307,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `lib/ModuleAbstract.php` | 0 | 1 |
 | `lib/NullSafeLivenessDetector.php` | 0 | 1 |
 | `lib/OpCode.php` | 0 | 1 |
+| `lib/OpCodeNames.php` | 0 | 0 |
 | `lib/Printer.php` | 0 | 1 |
 | `lib/Runtime.php` | 0 | 21 |
 | `lib/VM.php` | 0 | 10 |
@@ -2176,6 +2177,10 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/OpCodeNames.php`
+
+(No blockers or warnings.)
 
 ### `lib/Printer.php`
 

@@ -71,7 +71,7 @@ On harness hosts with an empty bind-mount, use `./script/docker-ci-local.sh` or 
 | Phase B fixture lint | `php script/bootstrap-aot-lint.php` | ✅ **11** procedural targets |
 | Phase C native link | `make bootstrap-aot-link` | ✅ **11** link targets ([#538](https://github.com/PurHur/php-compiler/pull/538), [#545](https://github.com/PurHur/php-compiler/pull/545)) |
 | Bundled compiler lint | `./script/bootstrap-selfhost-lint.sh` | ✅ `lib/Compiler.php` closure **lint**; native run not yet |
-| Phase D `lib/` link | `make bootstrap-aot-link-lib` | ❌ tracked in [#540](https://github.com/PurHur/php-compiler/issues/540) |
+| Phase D `lib/` link | `make bootstrap-aot-link-lib` | ✅ `lib/OpCode.php` bundle ([#540](https://github.com/PurHur/php-compiler/issues/540)) |
 
 # Installation
 

@@ -12,6 +12,8 @@
 
 namespace PHPCompiler;
 
+require_once __DIR__.'/OpCodeNames.php';
+
 use PHPCfg\Operand;
 use PHPCfg\Op;
 use PHPTypes\Type;
@@ -846,7 +848,7 @@ class JIT {
                     );
                     break;
                 default:
-                    throw new \LogicException("Unknown JIT opcode: ". $op->getType());
+                    throw new \LogicException("Unknown JIT opcode: ". opcode_type_name($op->type));
             }
         }
 
@@ -941,7 +943,12 @@ class JIT {
                 case OpCode::TYPE_DECLARE_METHOD:
                     $name = $block->getOperand($op->arg1);
                     assert($name instanceof Operand\Literal);
-                    $funcName = $this->context->scope->className.'::'.strtolower($name->value);
+                    $methodLc = strtolower($name->value);
+                    // Constructors are lowered at new; skip JIT until user-class model is complete (#568).
+                    if ('__construct' === $methodLc) {
+                        break;
+                    }
+                    $funcName = $this->context->scope->className.'::'.$methodLc;
                     if (null !== $op->block1) {
                         $this->compileBlock($op->block1, $funcName);
                     }

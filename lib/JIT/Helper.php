@@ -12,7 +12,10 @@
 
 namespace PHPCompiler\JIT;
 
+require_once __DIR__.'/../OpCodeNames.php';
+
 use PHPCompiler\OpCode;
+use function PHPCompiler\opcode_type_name;
 use PHPLLVM;
 use PHPLLVM\Builder;
 
@@ -42,7 +45,7 @@ class Helper {
                 }
                 break;
         }
-        $type = $opcode->getType();
+        $type = opcode_type_name($opcode->type);
         throw new \LogicException("Reached end of switch, can't handle unary operation yet: $type for type {$var->type}");
 return_double:
         return new Variable($this->context, Variable::TYPE_NATIVE_DOUBLE, Variable::KIND_VALUE, $result);
@@ -670,7 +673,7 @@ restart:
                 goto return_bool;
             }
         }
-        $type = $opcode->getType();
+        $type = opcode_type_name($opcode->type);
         throw new \LogicException("Reached end of switch, can't handle binary operation yet: $type for type pair {$leftType} and {$rightType}");
 return_double:
         return new Variable($this->context, Variable::TYPE_NATIVE_DOUBLE, Variable::KIND_VALUE, $result);

@@ -9,6 +9,8 @@
 
 namespace PHPCompiler;
 
+require_once __DIR__.'/OpCodeNames.php';
+
 use PHPCompiler\Func;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ClassEntry;
@@ -503,7 +505,7 @@ restart:
                     }
                     throw new \Exception($thrown->toString());
                 default:
-                    throw new \LogicException("VM OpCode Not Implemented: " . $op->getType());
+                    throw new \LogicException("VM OpCode Not Implemented: " . opcode_type_name($op->type));
             }
         }
         if ($frame->ephemeral) {
