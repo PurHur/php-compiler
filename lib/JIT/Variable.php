@@ -394,6 +394,7 @@ final class Variable {
                 if (
                     !$forWrite
                     && null !== $this->superglobalName
+                    && '_FILES' !== $this->superglobalName
                     && self::TYPE_STRING === $dim->type
                     && (null === $expectedType || Type::TYPE_ARRAY !== $expectedType->type)
                 ) {
