@@ -183,17 +183,6 @@ final class HttpResponseCode
         $code32 = $context->builder->trunc($code64, $i32);
         $context->builder->store($code32, self::$global);
 
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            $fmt = $context->builder->pointerCast(
-                $context->constantFromString("Status: %d\r\n"),
-                $context->getTypeFromString('char*')
-            );
-            $context->builder->call(
-                $context->lookupFunction('printf'),
-                $fmt,
-                $code32
-            );
-        }
         $context->builder->branch($sDone);
 
         $context->builder->positionAtEnd($sDone);
@@ -226,17 +215,6 @@ final class HttpResponseCode
         $prev = $context->builder->load(self::$global);
         $context->builder->store($code32, self::$global);
 
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            $fmt = $context->builder->pointerCast(
-                $context->constantFromString("Status: %d\r\n"),
-                $context->getTypeFromString('char*')
-            );
-            $context->builder->call(
-                $context->lookupFunction('printf'),
-                $fmt,
-                $code32
-            );
-        }
         $prev64 = $context->builder->zExt($prev, $i64);
         $context->builder->call(
             $context->lookupFunction('__value__writeLong'),

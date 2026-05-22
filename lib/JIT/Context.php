@@ -211,6 +211,9 @@ class Context {
                 $this->builder->call($this->lookupFunction('__superglobals__refresh'));
             }
             $this->builder->call($this->main);
+            if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
+                Builtin\PendingHeaders::emitFlushForStandalone($this);
+            }
             $this->builder->call($this->shutdownFunc);
             $this->builder->returnValue($i32->constInt(0, false));
         }

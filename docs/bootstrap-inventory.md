@@ -1918,7 +1918,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/JIT/Builtin/PendingHeaders.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Builtin/Refcount.php`
 
@@ -2095,10 +2095,10 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new Call\ExternalMethod (line 140)
 - new Builtin\IsNullFn (line 195)
 - new Builtin\IsNullFn (line 196)
-- new Result (line 238)
-- new Variable (line 314)
-- new Variable (line 547)
-- new Variable (line 582)
+- new Result (line 241)
+- new Variable (line 317)
+- new Variable (line 550)
+- new Variable (line 585)
 - 34 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/HashTableHelper.php`
