@@ -335,7 +335,8 @@
         "test/bootstrap-aot/echo_hello.php",
         "test/bootstrap-aot/minimal_class.php",
         "test/bootstrap-aot/namespace_hello.php",
-        "test/bootstrap-aot/nullable_types.php"
+        "test/bootstrap-aot/nullable_types.php",
+        "test/bootstrap-aot/throw_logic.php"
     ],
     "aot_link_targets": [
         "examples/000-HelloWorld/example.php",
@@ -349,7 +350,12 @@
         "inventory_files": 299,
         "excluded": 2,
         "eligible": 297,
-        "aot_lint_targets": 7,
+<<<<<<< Updated upstream
+        "aot_lint_targets": 8,
         "aot_link_targets": 6
+=======
+        "aot_lint_targets": 8,
+        "aot_link_targets": 7
+>>>>>>> Stashed changes
     }
 }

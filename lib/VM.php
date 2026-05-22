@@ -444,6 +444,18 @@ restart:
                         $container->toArray()->iterCurrentValue($byRef)
                     );
                     break;
+                case OpCode::TYPE_THROW:
+                    $thrown = $frame->scope[$op->arg1]->resolveIndirect();
+                    if (Variable::TYPE_OBJECT === $thrown->type) {
+                        $entry = $thrown->toObject();
+                        try {
+                            $message = $entry->getProperty('message')->toString();
+                        } catch (\LogicException) {
+                            $message = 'Exception';
+                        }
+                        throw new \Exception($message);
+                    }
+                    throw new \Exception($thrown->toString());
                 default:
                     throw new \LogicException("VM OpCode Not Implemented: " . $op->getType());
             }

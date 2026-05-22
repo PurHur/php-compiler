@@ -236,7 +236,6 @@ class Compiler {
 
     protected function compileParam(Op\Expr\Param $param, Block $block, int $paramIdx): OpCode {
         assert(false === $param->byRef);
-        assert(false === $param->variadic);
         $defaultConst = null;
         if (null !== $param->defaultVar) {
             $defaultConst = $this->compileOperand($param->defaultVar, $block, true);
@@ -1182,6 +1181,11 @@ class Compiler {
                 return new OpCode(
                     OpCode::TYPE_ITER_RESET,
                     $this->compileOperand($terminal->var, $block, true)
+                );
+            case 'Terminal_Throw':
+                return new OpCode(
+                    OpCode::TYPE_THROW,
+                    $this->compileOperand($terminal->expr, $block, true)
                 );
             default:
                 throw new \LogicException("Unknown Terminal Type: " . $terminal->getType());
