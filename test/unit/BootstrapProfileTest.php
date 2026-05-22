@@ -27,12 +27,8 @@ final class BootstrapProfileTest extends TestCase
         $this->assertContains('test/bootstrap-aot/namespace_hello.php', $profile['aot_lint_targets']);
         $this->assertContains('test/bootstrap-aot/minimal_class.php', $profile['aot_lint_targets']);
         $this->assertContains('test/bootstrap-aot/class_nullable_property.php', $profile['aot_lint_targets']);
-<<<<<<< Updated upstream
-=======
         $this->assertContains('test/bootstrap-aot/class_constants.php', $profile['aot_lint_targets']);
-        $this->assertNotContains('test/bootstrap-aot/minimal_class.php', $profile['aot_link_targets']);
-        $this->assertSame(3, $profile['totals']['aot_link_targets']);
->>>>>>> Stashed changes
+        $this->assertContains('test/bootstrap-aot/throw_logic.php', $profile['aot_lint_targets']);
         $this->assertContains('lib/AOT/Linker.php', $profile['excluded_files']);
     }
 

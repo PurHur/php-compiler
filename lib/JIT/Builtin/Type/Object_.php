@@ -14,6 +14,7 @@ use PHPCfg\Operand\Literal;
 use PHPCompiler\JIT\Builtin\Refcount;
 use PHPCompiler\JIT\Builtin\Type;
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\VM\Variable as VMVariable;
 use PHPLLVM;
 
 class Object_ extends Type {
@@ -21,6 +22,8 @@ class Object_ extends Type {
     private array $classes = [];
     private array $properties = [];
     private array $propNameMap = [];
+    /** @var array<int, array<string, array{type: int, value: int|float|bool|string|null}>> */
+    private array $classConstants = [];
 
     public function register(): void
     {
@@ -205,6 +208,7 @@ class Object_ extends Type {
         }
         $id = count($this->classes);
         $this->properties[$id] = [];
+        $this->classConstants[$id] = [];
 
         return $this->classes[strtolower($name->value)] = $id;
     }
@@ -236,6 +240,36 @@ class Object_ extends Type {
         $this->properties[$classId][] = [
             $this->propNameMap[$name], $name, $type, count($this->properties[$classId]),
         ];
+    }
+
+    public function defineClassConst(int $classId, string $name, VMVariable $value): void
+    {
+        $key = strtolower($name);
+        $this->classConstants[$classId][$key] = [
+            'type' => Variable::fromVMVariable($value->type),
+            'value' => $this->compileTimeValueFromVm($value),
+        ];
+    }
+
+    /**
+     * @return int|float|bool|string|null
+     */
+    private function compileTimeValueFromVm(VMVariable $value): int|float|bool|string|null
+    {
+        switch ($value->type) {
+            case VMVariable::TYPE_NULL:
+                return null;
+            case VMVariable::TYPE_INTEGER:
+                return $value->toInt();
+            case VMVariable::TYPE_FLOAT:
+                return $value->toFloat();
+            case VMVariable::TYPE_BOOLEAN:
+                return $value->toBool();
+            case VMVariable::TYPE_STRING:
+                return $value->toString();
+            default:
+                throw new \LogicException('Class constant value must be a scalar compile-time constant');
+        }
     }
 
     public function propertyFetch(PHPLLVM\Value $obj, string $class, string $name): Variable
