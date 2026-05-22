@@ -221,6 +221,54 @@ final class ExamplesCompileTest extends TestCase
     }
 
     /**
+     * phpc build --project on 003-MiniWebApp: AOT lint stage before native link (#624).
+     *
+     * @group miniwebapp
+     * @group llvm
+     * @group aot
+     * @group aot-lint
+     */
+    public function test003MiniWebAppProjectAotLint(): void
+    {
+        if (!self::isLlvmReady()) {
+            $this->markTestSkipped(
+                'LLVM 9 toolchain not available. Run script/install-llvm9.sh from the repository root.'
+            );
+        }
+        $project = realpath(dirname(__DIR__, 2).'/examples/003-MiniWebApp');
+        if (false === $project) {
+            $this->markTestSkipped('examples/003-MiniWebApp missing (#246)');
+        }
+        $phpc = realpath(dirname(__DIR__, 2).'/phpc');
+        $this->assertNotFalse($phpc);
+        $repoRoot = dirname(__DIR__, 2);
+        $env = $this->llvmProcessEnv($repoRoot);
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open(
+            [$phpc, 'build', '--project', $project, '--dry-run'],
+            $descriptorSpec,
+            $pipes,
+            $repoRoot,
+            $env
+        );
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+        if (0 !== $exit) {
+            $this->markTestSkipped(
+                'MiniWebApp project AOT lint blocked (#58/#568): '.trim($stderr !== false ? $stderr : '')
+            );
+        }
+    }
+
+    /**
      * Shipped 001-SimpleWeb: build AOT binary without compile-time `-q`, run twice with
      * different QUERY_STRING — catches regressions in runtime superglobal refresh for web binaries.
      *

@@ -61,7 +61,7 @@ final class ConstStringFolder
         if (null !== $leftLit && $leftLit === $dir && null !== $rightLit) {
             return $dir.$rightLit;
         }
-        $deploy = self::foldDeployPathConcat($concat->left, $concat->right);
+        $deploy = self::foldDeployPathConcat($concat->left, $concat->right, $sourceFile);
         if (null !== $deploy) {
             return $deploy;
         }
@@ -72,7 +72,26 @@ final class ConstStringFolder
     /**
      * @return ?array{0: string, 1: string} rel, fallback dir
      */
-    private static function parseDeployPathCall(Operand $operand): ?array
+    private static function parseDeployPathCall(CfgBlock $cfg, Operand $operand, string $sourceFile = ''): ?array
+    {
+        $call = self::findFuncCallForOperand($cfg, $operand);
+        if (null === $call) {
+            return null;
+        }
+        $name = self::literalStringValue($call->name) ?? self::fold($call->name, $sourceFile);
+        if ('phpc_deploy_path' !== $name || 2 !== count($call->args)) {
+            return null;
+        }
+        $rel = self::literalStringValue($call->args[0]) ?? self::fold($call->args[0], $sourceFile);
+        $fallback = self::literalStringValue($call->args[1]) ?? self::fold($call->args[1], $sourceFile);
+        if (null === $rel || null === $fallback) {
+            return null;
+        }
+
+        return [$rel, $fallback];
+    }
+
+    private static function parseDeployPathCallFromOperand(Operand $operand, string $sourceFile = ''): ?array
     {
         $call = null;
         if ($operand instanceof Operand\Temporary && $operand->original instanceof Op\Expr\FuncCall) {
@@ -83,12 +102,12 @@ final class ConstStringFolder
         if (null === $call) {
             return null;
         }
-        $name = self::literalStringValue($call->name);
+        $name = self::literalStringValue($call->name) ?? self::fold($call->name, $sourceFile);
         if ('phpc_deploy_path' !== $name || 2 !== count($call->args)) {
             return null;
         }
-        $rel = self::literalStringValue($call->args[0]);
-        $fallback = self::literalStringValue($call->args[1]);
+        $rel = self::literalStringValue($call->args[0]) ?? self::fold($call->args[0], $sourceFile);
+        $fallback = self::literalStringValue($call->args[1]) ?? self::fold($call->args[1], $sourceFile);
         if (null === $rel || null === $fallback) {
             return null;
         }
@@ -96,13 +115,58 @@ final class ConstStringFolder
         return [$rel, $fallback];
     }
 
-    private static function foldDeployPathConcat(Operand $left, Operand $right): ?string
+    private static function findFuncCallForOperand(CfgBlock $cfg, Operand $operand): ?Op\Expr\FuncCall
+    {
+        if ($operand instanceof Op\Expr\FuncCall) {
+            return $operand;
+        }
+        if ($operand instanceof Operand\Temporary && $operand->original instanceof Op\Expr\FuncCall) {
+            return $operand->original;
+        }
+        foreach ($cfg->children as $child) {
+            if ($child instanceof Op\Expr\FuncCall && $child->result === $operand) {
+                return $child;
+            }
+        }
+        foreach (self::collectFuncCalls($cfg) as $call) {
+            if ($call->result === $operand) {
+                return $call;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return list<Op\Expr\FuncCall>
+     */
+    private static function collectFuncCalls(CfgBlock $block): array
+    {
+        $calls = [];
+        foreach ($block->children as $child) {
+            if ($child instanceof Op\Expr\FuncCall) {
+                $calls[] = $child;
+            }
+            foreach ($child->getSubBlocks() as $sub) {
+                if ($sub instanceof CfgBlock) {
+                    foreach (self::collectFuncCalls($sub) as $nested) {
+                        $calls[] = $nested;
+                    }
+                }
+            }
+        }
+
+        return $calls;
+    }
+
+    private static function foldDeployPathConcat(Operand $left, Operand $right, string $sourceFile = ''): ?string
     {
         $suffix = self::literalStringValue($right);
         if (null === $suffix) {
             return null;
         }
-        $parsed = self::parseDeployPathCall($left);
+        // foldDeployPathConcat is used without cfg from foldConcat; only literal deploy calls fold here.
+        $parsed = self::parseDeployPathCallFromOperand($left, $sourceFile);
         if (null === $parsed) {
             return null;
         }
@@ -111,23 +175,122 @@ final class ConstStringFolder
     }
 
     /**
+     * Recognize include phpc_deploy_path('rel', fallback) . '/suffix' for runtime deploy resolution (#623).
+     *
+     * @return ?array{rel: string, fallback: string, suffix: string, compile: ?string}
+     */
+    public static function tryParseDeployInclude(CfgBlock $cfg, Operand $operand, string $sourceFile = ''): ?array
+    {
+        $concat = self::findConcatForOperand($cfg, $operand);
+        if (null !== $concat) {
+            return self::specFromDeployConcat($concat, $cfg, $sourceFile);
+        }
+        foreach ($cfg->children as $child) {
+            if (!$child instanceof Op\Expr\Include_ || $child->expr !== $operand) {
+                continue;
+            }
+            $specs = [];
+            foreach (self::collectConcatOps($cfg) as $candidate) {
+                $spec = self::specFromDeployConcat($candidate, $cfg, $sourceFile);
+                if (null !== $spec) {
+                    $specs[] = $spec;
+                }
+            }
+            if (1 === count($specs)) {
+                return $specs[0];
+            }
+
+            return null;
+        }
+
+        return null;
+    }
+
+    /**
+     * @return ?array{rel: string, fallback: string, suffix: string, compile: ?string}
+     */
+    private static function specFromDeployConcat(
+        Op\Expr\BinaryOp\Concat $concat,
+        CfgBlock $cfg,
+        string $sourceFile = ''
+    ): ?array {
+        $suffix = self::literalStringValue($concat->right);
+        if (null === $suffix) {
+            return null;
+        }
+        $parsed = self::parseDeployPathCall($cfg, $concat->left, $sourceFile);
+        if (null === $parsed) {
+            return null;
+        }
+        [$rel, $fallback] = $parsed;
+
+        return [
+            'rel' => $rel,
+            'fallback' => $fallback,
+            'suffix' => $suffix,
+            'compile' => DeployRoot::resolvePathWithSuffix($rel, $fallback, $suffix),
+        ];
+    }
+
+    /**
      * Fold include/require path operands (often a Concat temp with cleared original).
      */
     public static function foldForInclude(CfgBlock $cfg, Operand $operand, string $sourceFile = ''): ?string
     {
+        if (null !== self::tryParseDeployInclude($cfg, $operand, $sourceFile)) {
+            return null;
+        }
         $direct = self::fold($operand, $sourceFile);
         if (null !== $direct) {
             return $direct;
         }
         if ($operand instanceof Operand\Temporary) {
-            foreach ($cfg->children as $child) {
-                if ($child instanceof Op\Expr\BinaryOp\Concat && $child->result === $operand) {
-                    return self::foldConcat($child, $sourceFile);
-                }
+            $concat = self::findConcatForOperand($cfg, $operand);
+            if (null !== $concat) {
+                return self::foldConcat($concat, $sourceFile);
             }
         }
 
         return null;
+    }
+
+    private static function findConcatForOperand(CfgBlock $cfg, Operand $operand): ?Op\Expr\BinaryOp\Concat
+    {
+        if ($operand instanceof Op\Expr\BinaryOp\Concat) {
+            return $operand;
+        }
+        if ($operand instanceof Operand\Temporary && $operand->original instanceof Op\Expr\BinaryOp\Concat) {
+            return $operand->original;
+        }
+        foreach (self::collectConcatOps($cfg) as $concat) {
+            if ($concat->result === $operand) {
+                return $concat;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return list<Op\Expr\BinaryOp\Concat>
+     */
+    private static function collectConcatOps(CfgBlock $block): array
+    {
+        $concats = [];
+        foreach ($block->children as $child) {
+            if ($child instanceof Op\Expr\BinaryOp\Concat) {
+                $concats[] = $child;
+            }
+            foreach ($child->getSubBlocks() as $sub) {
+                if ($sub instanceof CfgBlock) {
+                    foreach (self::collectConcatOps($sub) as $nested) {
+                        $concats[] = $nested;
+                    }
+                }
+            }
+        }
+
+        return $concats;
     }
 
     private static function literalStringValue(Operand $operand): ?string

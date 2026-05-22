@@ -62,6 +62,13 @@ class Block {
     /** Resolved absolute paths for TYPE_INCLUDE opcodes (arg3 index, issue #54). */
     public array $literalIncludePaths = [];
 
+    /**
+     * phpc_deploy_path() + suffix includes (arg3 index, issue #623).
+     *
+     * @var array<int, array{rel: string, fallback: string, suffix: string, compile: ?string}>
+     */
+    public array $deployIncludePaths = [];
+
     public function __construct(?CfgBlock $block) {
         $this->orig = $block;
         $this->scope = new \SplObjectStorage;
@@ -138,6 +145,9 @@ class Block {
         }
         if ([] !== $parent->literalIncludePaths) {
             $this->literalIncludePaths = $parent->literalIncludePaths;
+        }
+        if ([] !== $parent->deployIncludePaths) {
+            $this->deployIncludePaths = $parent->deployIncludePaths;
         }
         if (null !== $parent->func) {
             $this->func = $parent->func;

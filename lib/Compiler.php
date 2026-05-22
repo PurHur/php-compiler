@@ -819,7 +819,24 @@ class Compiler {
             $resultSlot = $this->compileOperand($expr->result, $block, false);
         }
 
-        $includePath = ConstStringFolder::foldForInclude($block->orig, $expr->expr, $expr->getFile());
+        $sourceFile = $expr->getFile() ?? '';
+        $deploySpec = ConstStringFolder::tryParseDeployInclude($block->orig, $expr->expr, $sourceFile);
+        if (null !== $deploySpec) {
+            $pathIndex = count($block->deployIncludePaths);
+            $block->deployIncludePaths[$pathIndex] = $deploySpec;
+            $compilePath = $deploySpec['compile'] ?? '';
+            $pathOperand = new Operand\Literal('' !== $compilePath ? $compilePath : ' ');
+            $pathOperand->type = Type::string();
+
+            return new OpCode(
+                OpCode::TYPE_INCLUDE,
+                $this->compileOperand($pathOperand, $block, true),
+                $resultSlot,
+                $pathIndex,
+            );
+        }
+
+        $includePath = ConstStringFolder::foldForInclude($block->orig, $expr->expr, $sourceFile);
         if (null !== $includePath) {
             $resolved = IncludePathResolver::resolve($includePath, $expr->getFile());
             if (null !== $resolved) {
