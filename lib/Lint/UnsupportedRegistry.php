@@ -17,9 +17,10 @@ final class UnsupportedRegistry
     private const KIND_TO_ISSUE = [
         'Expr_Throw' => 195,
         'Expr_New' => 136,
-        'Stmt_Try' => 195,
-        'Stmt_Catch' => 195,
-        'Stmt_Finally' => 195,
+        'Stmt_Try' => 57,
+        'Stmt_TryCatch' => 57,
+        'Stmt_Catch' => 57,
+        'Stmt_Finally' => 57,
         'Expr_AssignOp_Coalesce' => 99,
         'Expr_Match' => 143,
         'Expr_Yield' => 167,

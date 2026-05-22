@@ -89,6 +89,10 @@ class OpCode {
     const TYPE_INSTANCEOF = 89;
     const TYPE_STATIC_PROPERTY_FETCH = 90;
     const TYPE_UNSET = 91;
+    /** AOT lint: try/catch CFG lowering; VM/JIT exception model deferred (issue #57). */
+    const TYPE_TRY = 92;
+    const TYPE_CATCH = 93;
+    const TYPE_FINALLY = 94;
 
     public int $type;
     public ?int $arg1;
