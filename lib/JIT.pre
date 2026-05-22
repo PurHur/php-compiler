@@ -397,8 +397,11 @@ class JIT {
                     $builder->branchIf($condition, $if, $else);
                     return $origBasicBlock;
                 case OpCode::TYPE_THROW:
-                    // AOT lint: throw terminal lowering only; no JIT emission yet (issue #57).
-                    break;
+                    $throwBlock = $builder->getInsertBlock();
+                    $builder->positionAtEnd($throwBlock);
+                    $this->context->freeDeadVariables($func, $throwBlock, $block);
+                    compile { abort(); }
+                    return $origBasicBlock;
                 case OpCode::TYPE_RETURN_VOID:
                     $returnBlock = $builder->getInsertBlock();
                     $builder->positionAtEnd($returnBlock);

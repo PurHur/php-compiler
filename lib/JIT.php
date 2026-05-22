@@ -427,6 +427,13 @@ class JIT {
                     $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));
                     $this->assignOperand($block->getOperand($op->arg1), $value->castTo(Variable::TYPE_NATIVE_BOOL));
                     break;
+                case OpCode::TYPE_CAST_STRING:
+                    $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));
+                    $this->assignOperand(
+                        $block->getOperand($op->arg1),
+                        JIT\JitNativeString::coerce($this->context, $value)
+                    );
+                    break;
                 case OpCode::TYPE_ECHO:
                 case OpCode::TYPE_PRINT:
                     $argOffset = $op->type === OpCode::TYPE_ECHO ? $op->arg1 : $op->arg2;
@@ -685,8 +692,12 @@ class JIT {
                     $builder->branchIf($condition, $if, $else);
                     return $origBasicBlock;
                 case OpCode::TYPE_THROW:
-                    // AOT lint: throw terminal lowering only; no JIT emission yet (issue #57).
-                    break;
+                    $throwBlock = $builder->getInsertBlock();
+                    $builder->positionAtEnd($throwBlock);
+                    $this->context->freeDeadVariables($func, $throwBlock, $block);
+                    $this->context->builder->call($this->context->lookupFunction('abort'));
+                    $this->context->llvm->lib->LLVMBuildUnreachable($this->context->builder->builder);
+                    return $origBasicBlock;
                 case OpCode::TYPE_RETURN_VOID:
                     $returnBlock = $builder->getInsertBlock();
                     $builder->positionAtEnd($returnBlock);

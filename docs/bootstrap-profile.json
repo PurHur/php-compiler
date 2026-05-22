@@ -349,13 +349,15 @@
         "test/bootstrap-aot/echo_hello.php",
         "test/bootstrap-aot/minimal_class.php",
         "test/bootstrap-aot/namespace_hello.php",
-        "test/bootstrap-aot/nullable_types.php"
+        "test/bootstrap-aot/nullable_types.php",
+        "test/bootstrap-aot/require_chain/main.php",
+        "test/bootstrap-aot/throw_logic.php"
     ],
     "totals": {
         "inventory_files": 300,
         "excluded": 2,
         "eligible": 298,
         "aot_lint_targets": 11,
-        "aot_link_targets": 7
+        "aot_link_targets": 9
     }
 }
