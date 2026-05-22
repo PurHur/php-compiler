@@ -237,6 +237,9 @@ restart:
                 case OpCode::TYPE_CLASS_CONST_FETCH:
                     // Recorded at compile time; VM does not resolve class constants yet.
                     break;
+                case OpCode::TYPE_INSTANCEOF:
+                    // Recorded at compile time; VM instanceof is not implemented yet.
+                    break;
                 case OpCode::TYPE_RETURN_VOID:
                     if (!is_null($frame->returnVar)) {
                         $frame->returnVar->null();

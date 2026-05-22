@@ -86,6 +86,7 @@ class OpCode {
     const TYPE_DECLARE_CLASS_CONST = 86;
     const TYPE_CLASS_CONST_FETCH = 87;
     const TYPE_THROW = 88;
+    const TYPE_INSTANCEOF = 89;
 
     public int $type;
     public ?int $arg1;
