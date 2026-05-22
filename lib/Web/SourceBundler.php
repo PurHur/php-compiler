@@ -14,7 +14,7 @@ final class SourceBundler
      *
      * @return array{0: string, 1: string} bundled source and logical filename (entry)
      */
-    public static function bundleForAot(string $entryPath, array $includePaths): array
+    public static function bundleForAot(string $entryPath, array $includePaths, ?string $projectRoot = null): array
     {
         $entryRaw = file_get_contents($entryPath);
         if (false === $entryRaw) {
@@ -29,7 +29,7 @@ final class SourceBundler
             if (false === $raw) {
                 throw new \RuntimeException('cannot read include: '.$path);
             }
-            $body = self::rewriteDirConstant(self::stripOpenTag($raw), $path);
+            $body = self::rewriteDirConstant(self::stripOpenTag($raw), $path, $projectRoot);
             $base = basename($path);
             if (isset($requireTargets[$base])) {
                 $body = self::rewriteReturnOnlyInclude($body, $requireTargets[$base]);
@@ -97,11 +97,16 @@ final class SourceBundler
     /**
      * Preserve per-file directory semantics when sources are concatenated (issue #485).
      */
-    private static function rewriteDirConstant(string $code, string $sourceFile): string
+    private static function rewriteDirConstant(string $code, string $sourceFile, ?string $projectRoot = null): string
     {
         $dir = dirname(realpath($sourceFile) ?: $sourceFile);
+        if (null === $projectRoot) {
+            return str_replace('__DIR__', var_export($dir, true), $code);
+        }
+        $rel = DeployRoot::relativeDirFromProject($dir, $projectRoot);
+        $expr = 'phpc_deploy_path('.var_export($rel, true).', '.var_export($dir, true).')';
 
-        return str_replace('__DIR__', var_export($dir, true), $code);
+        return str_replace('__DIR__', $expr, $code);
     }
 
     private static function stripOpenTag(string $code): string

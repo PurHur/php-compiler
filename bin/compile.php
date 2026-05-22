@@ -10,6 +10,7 @@ declare(strict_types=1);
  */
 
 use PHPCompiler\Runtime;
+use PHPCompiler\Web\DeployRoot;
 use PHPCompiler\Web\LiteralIncludeDiscovery;
 use PHPCompiler\Web\SourceBundler;
 use PHPCompiler\Web\Superglobals;
@@ -26,7 +27,8 @@ function run(string $filename, string $code, array $options): void
         $includes = LiteralIncludeDiscovery::discoverAbsolutePaths($runtime, $filename);
     }
     if ([] !== $includes) {
-        [$code, $filename] = SourceBundler::bundleForAot($filename, $includes);
+        $projectRoot = DeployRoot::findProjectRootForPath($filename);
+        [$code, $filename] = SourceBundler::bundleForAot($filename, $includes, $projectRoot);
     }
 
     $runtime = new Runtime(Runtime::MODE_AOT);
