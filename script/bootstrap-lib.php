@@ -232,12 +232,25 @@ function bootstrapDefaultAotLinkTargets(array $lintTargets): array
 {
     $pendingUserFunc = [
         'test/bootstrap-aot/try_catch.php', // try/catch CFG link (#57); VM unwind pending
+        'test/bootstrap-aot/lib_opcode/main.php', // Phase D namespaced lib/ link (#540)
     ];
 
     return array_values(array_filter(
         $lintTargets,
         static fn (string $rel): bool => !in_array($rel, $pendingUserFunc, true),
     ));
+}
+
+/**
+ * Phase D link+execute targets: first namespaced lib/ translation unit (issue #540).
+ *
+ * @return list<string> repo-relative paths
+ */
+function bootstrapDefaultAotLinkLibTargets(): array
+{
+    return [
+        'test/bootstrap-aot/lib_opcode/main.php',
+    ];
 }
 
 /**
@@ -261,6 +274,7 @@ function bootstrapBuildProfile(array $inventory, string $root): array
 
     $lintTargets = bootstrapDefaultAotLintTargets($root);
     $linkTargets = bootstrapDefaultAotLinkTargets($lintTargets);
+    $linkLibTargets = bootstrapDefaultAotLinkLibTargets();
     foreach ($lintTargets as $rel) {
         if (!is_file($root.'/'.$rel)) {
             throw new RuntimeException("bootstrap profile lint target missing: {$rel}");
@@ -280,12 +294,14 @@ function bootstrapBuildProfile(array $inventory, string $root): array
         'eligible_files' => $eligible,
         'aot_lint_targets' => $lintTargets,
         'aot_link_targets' => $linkTargets,
+        'aot_link_lib_targets' => $linkLibTargets,
         'totals' => [
             'inventory_files' => $inventory['totals']['files'],
             'excluded' => count($excluded),
             'eligible' => count($eligible),
             'aot_lint_targets' => count($lintTargets),
             'aot_link_targets' => count($linkTargets),
+            'aot_link_lib_targets' => count($linkLibTargets),
         ],
     ];
 }

@@ -1207,6 +1207,16 @@ class JIT {
                 $lit = new Operand\Literal($vm->toBool());
                 $lit->type = Type::bool();
                 return Variable::fromLiteral($this->context, $lit);
+            case VM\Variable::TYPE_NULL:
+                $nullVar = new Variable(
+                    $this->context,
+                    Variable::TYPE_NULL,
+                    Variable::KIND_VALUE,
+                    $this->context->getTypeFromString('__value__*')->constNull()
+                );
+                $nullVar->isNullConstant = true;
+
+                return $nullVar;
             default:
                 throw new \LogicException('Unsupported default parameter type for JIT');
         }

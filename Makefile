@@ -153,7 +153,7 @@ test-harness:
 .PHONY: test-docker-quick
 test-docker-quick: test-docker-fast
 
-.PHONY: bootstrap-inventory bootstrap-profile bootstrap-aot-lint bootstrap-aot-link
+.PHONY: bootstrap-inventory bootstrap-profile bootstrap-aot-lint bootstrap-aot-link bootstrap-aot-link-lib
 bootstrap-inventory:
 	php script/bootstrap-inventory.php
 bootstrap-profile: bootstrap-inventory
@@ -162,3 +162,5 @@ bootstrap-aot-lint: bootstrap-profile
 	php script/bootstrap-aot-lint.php
 bootstrap-aot-link: bootstrap-profile
 	./script/bootstrap-aot-link.sh
+bootstrap-aot-link-lib: bootstrap-profile
+	./script/bootstrap-aot-link-lib.sh

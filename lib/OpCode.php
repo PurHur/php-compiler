@@ -98,9 +98,12 @@ class OpCode {
     public ?int $arg1;
     public ?int $arg2;
     public ?int $arg3;
-    public ?Block $block1 = null;
-    public ?Block $block2 = null;
-    public ?Block $block3 = null;
+    /** @var ?Block */
+    public $block1 = null;
+    /** @var ?Block */
+    public $block2 = null;
+    /** @var ?Block */
+    public $block3 = null;
 
     public function __construct(int $type, ?int $arg1 = null, ?int $arg2 = null, ?int $arg3 = null) {
         $this->type = $type;

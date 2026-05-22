@@ -1,9 +1,6 @@
 --- vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
 +++ vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
-@@ -728,10 +728,10 @@
-         if ($type instanceof Op\Type\Mixed_) {
-             return Type::mixed();
-         }
+@@ -731,8 +731,8 @@
          if ($type instanceof Op\Type\Nullable) {
 -            (new Type(Type::TYPE_UNION, [
 +            return (new Type(Type::TYPE_UNION, [
