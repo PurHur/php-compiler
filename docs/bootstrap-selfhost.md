@@ -58,6 +58,8 @@ Incremental growth toward `bin/vm.php` inventory path ([#559](https://github.com
 
 Native link of the bundle is **not** claimed yet (`script/bootstrap-selfhost-link.sh` may fail until VM/JIT closure grows). Undefined vendor/`Class::method` calls in the bundle are JIT-stubbed to null at compile time ([#579](https://github.com/PurHur/php-compiler/issues/579)); see PR notes for `externalMethodStubs`.
 
+**#557 progress (2026-05-22):** `bootstrap-selfhost-lint` passes on rebased `master` (incl. #578–#580). Native `-o build/selfhost` lowers the full `compiler_minimal` closure but can **segfault in LLVM emit** after JIT lowering; remaining work: stable `__value__` isset/dim-fetch lowering without crashing the code generator, then README “Achieved (minimal subset)”.
+
 ## Non-goals (initial bootstrap)
 
 - Compiling `vendor/` (nikic/php-parser, php-llvm, …)

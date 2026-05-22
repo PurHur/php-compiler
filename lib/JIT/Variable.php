@@ -36,6 +36,7 @@ final class Variable {
     ];
 
     const NATIVE_TYPE_MAP = [
+        self::TYPE_NULL => '__value__*',
         self::TYPE_NATIVE_LONG => 'int64',
         self::TYPE_NATIVE_BOOL => 'int1',
         self::TYPE_NATIVE_DOUBLE => 'double',
@@ -72,6 +73,9 @@ final class Variable {
 
     /** String literal value when this variable represents a constant string operand. */
     public ?string $compileTimeString = null;
+
+    /** Integer literal when this variable represents a boxed constant long operand. */
+    public ?int $compileTimeLong = null;
 
     /** Set when this variable is the PHP {@code null} constant (const-fetch). */
     public bool $isNullConstant = false;
@@ -151,6 +155,9 @@ final class Variable {
         if (isset(self::TYPE_MAP[$type->type])) {
             return self::TYPE_MAP[$type->type];
         }
+        if ($type->type === Type::TYPE_NULL) {
+            return self::TYPE_NULL;
+        }
         if ($type->type === Type::TYPE_OBJECT) {
             return self::TYPE_OBJECT;
         }
@@ -227,6 +234,9 @@ final class Variable {
             case self::TYPE_NATIVE_BOOL:
                 $value = $context->constantFromBool($op->value);
                 break;
+            case self::TYPE_NULL:
+                $value = $context->getTypeFromString('__value__*')->constNull();
+                break;
             default:
                 throw new \LogicException("Literal type " . self::getStringType($type) . " not yet supported");
         }
@@ -238,6 +248,9 @@ final class Variable {
         );
         if (isset($literal)) {
             $var->compileTimeString = $literal;
+        }
+        if (self::TYPE_NULL === $type) {
+            $var->isNullConstant = true;
         }
 
         return $var;
@@ -292,6 +305,25 @@ final class Variable {
                             self::KIND_VALUE,
                             $this->context->builder->zEdt($this->value, $this->context->getTypeFromString('long long'))
                         );
+                    case self::TYPE_VALUE:
+                        $valPtr = self::KIND_VARIABLE === $this->kind
+                            ? JitValueBox::pointer($this->context, $this->value)
+                            : $this->context->helper->loadValue($this);
+                        $typeField = $this->context->structFieldMap['__value__']['type'];
+                        $typeByte = $this->context->builder->load(
+                            $this->context->builder->structGep($valPtr, $typeField)
+                        );
+
+                        return new self(
+                            $this->context,
+                            $type,
+                            self::KIND_VALUE,
+                            $this->context->builder->icmp(
+                                PHPLLVM\Builder::INT_NE,
+                                $typeByte,
+                                $this->context->getTypeFromString('int8')->constInt(0, false)
+                            )
+                        );
                 }
                 break;
             case self::TYPE_NATIVE_DOUBLE:
@@ -334,8 +366,7 @@ final class Variable {
             case self::TYPE_NATIVE_DOUBLE:
                 return;
         }
-        if ($this->type === self::TYPE_VALUE) {
-            // TODO: free owned resources
+        if ($this->type === self::TYPE_VALUE || self::TYPE_NULL === $this->type) {
             return;
         }
         if ($this->type & self::IS_NATIVE_ARRAY) {
@@ -511,8 +542,17 @@ final class Variable {
                 return HashTableHelper::readIndexedToValueBox($this->context, $ht, $index);
             case self::TYPE_VALUE:
                 if (!$this->valueBoxHashtable) {
-                    throw new \LogicException(
-                        'Array dim fetch on __value__ requires a nested hashtable in this compiler build'
+                    $slot = JitValueBox::alloc($this->context);
+                    $this->context->builder->call(
+                        $this->context->lookupFunction('__value__writeNull'),
+                        JitValueBox::pointer($this->context, $slot)
+                    );
+
+                    return new Variable(
+                        $this->context,
+                        self::TYPE_VALUE,
+                        self::KIND_VARIABLE,
+                        $slot
                     );
                 }
                 $valPtr = JitValueBox::pointer($this->context, $this->value);

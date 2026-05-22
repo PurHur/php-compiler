@@ -277,7 +277,7 @@ class JIT {
                     $dimOp = $block->getOperand($op->arg3);
                     $dim = $this->context->getVariableFromOp($dimOp);
                     if ($value->type === Variable::TYPE_STRING) {
-                        $charPtr = StringOffsetHelper::dimFetch(
+                        $charPtr = JIT\StringOffsetHelper::dimFetch(
                             $this->context,
                             $value->value,
                             $dim
@@ -772,11 +772,7 @@ class JIT {
                         throw new \LogicException("Variable function calls not yet supported");
                     }
                     $lcname = strtolower($nameOp->value);
-                    if (isset($this->context->functionProxies[$lcname])) {
-                        $this->context->scope->toCall = $this->context->functionProxies[$lcname];
-                    } else {
-                        throw new \RuntimeException("Call to undefined function $lcname");
-                    }
+                    $this->context->scope->toCall = $this->context->resolveFunctionProxy($lcname);
                     $this->context->scope->args = [];
                     break;
                 case OpCode::TYPE_STATICCALL_INIT:
@@ -1026,8 +1022,11 @@ class JIT {
             return;
         }
         $result = $this->context->getVariableFromOp($result);
+        if (Variable::TYPE_NULL === $result->type && Variable::KIND_VARIABLE === $result->kind) {
+            $result->type = Variable::TYPE_VALUE;
+        }
         if ($result->kind === Variable::KIND_VALUE && $result->type === Variable::TYPE_STRING) {
-            StringOffsetHelper::dimAssign($this->context, $result->value, $value);
+            JIT\StringOffsetHelper::dimAssign($this->context, $result->value, $value);
 
             return;
         }
@@ -1066,7 +1065,10 @@ class JIT {
                     , $valueFrom
                     
                 );
-    
+                    if (Variable::KIND_VALUE === $value->kind && null !== $value->compileTimeLong) {
+                        $result->compileTimeLong = $value->compileTimeLong;
+                    }
+
                     return;
                 case Variable::TYPE_NATIVE_DOUBLE:
                     $this->context->builder->call(
@@ -1131,6 +1133,9 @@ class JIT {
                         $valueRef,
                         $this->context->helper->loadValue($value)
                     );
+                    $result->compileTimeLong = $value->compileTimeLong;
+                    $result->compileTimeString = $value->compileTimeString;
+                    $result->valueBoxHashtable = $value->valueBoxHashtable;
 
                     return;
                 default:
@@ -1187,6 +1192,15 @@ class JIT {
             );
             $result->free();
             $this->context->builder->store($str, $result->value);
+            $result->addref();
+
+            return;
+        } elseif (Variable::TYPE_OBJECT === $result->type && Variable::TYPE_VALUE === $value->type) {
+            $result->free();
+            $this->context->builder->store(
+                $this->context->getTypeFromString('__object__*')->constNull(),
+                $result->value
+            );
             $result->addref();
 
             return;
@@ -1248,6 +1262,7 @@ class JIT {
             case '__hashtable__*':
                 return Variable::TYPE_HASHTABLE;
             case '__value__*':
+            case '__value__':
                 return Variable::TYPE_VALUE;
             default:
                 throw new \LogicException(

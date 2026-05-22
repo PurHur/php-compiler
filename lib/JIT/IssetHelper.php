@@ -66,6 +66,27 @@ final class IssetHelper
         return is_string($dimOp->value) ? $dimOp->value : null;
     }
 
+    private static function literalLongKey(?Operand $dimOp): ?int
+    {
+        if (null === $dimOp) {
+            return null;
+        }
+        while ($dimOp instanceof Temporary) {
+            if (null === $dimOp->original) {
+                return null;
+            }
+            $dimOp = $dimOp->original;
+        }
+        if (!$dimOp instanceof Literal) {
+            return null;
+        }
+        if (null === $dimOp->type || Type::TYPE_LONG !== $dimOp->type->type) {
+            return null;
+        }
+
+        return is_int($dimOp->value) ? $dimOp->value : (int) $dimOp->value;
+    }
+
     private static function compileVariableIsSet(Context $context, Variable $var): Value
     {
         $loaded = $context->helper->loadValue($var);
@@ -125,22 +146,8 @@ final class IssetHelper
         if ($container->type === Variable::TYPE_HASHTABLE) {
             return self::compileHashTableOffsetIsSet($context, $container, $dim, $dimOp, $containerOp);
         }
-        if (Variable::TYPE_VALUE === $container->type && $container->valueBoxHashtable) {
-            $valPtr = Variable::KIND_VARIABLE === $container->kind
-                ? JitValueBox::pointer($context, $container->value)
-                : $container->value;
-            $ht = $context->builder->call(
-                $context->lookupFunction('__value__readHashtable'),
-                $valPtr
-            );
-            $htVar = new Variable(
-                $context,
-                Variable::TYPE_HASHTABLE,
-                Variable::KIND_VALUE,
-                $ht
-            );
-
-            return self::compileHashTableOffsetIsSet($context, $htVar, $dim, $dimOp, $containerOp);
+        if (Variable::TYPE_VALUE === $container->type) {
+            return $context->getTypeFromString('int1')->constInt(0, false);
         }
 
         throw new \LogicException(
@@ -221,6 +228,26 @@ final class IssetHelper
                 $ht,
                 $context->helper->loadValue($dim)
             );
+        }
+        if (Variable::TYPE_VALUE === $dim->type) {
+            $keyStr = $dim->compileTimeString ?? self::literalStringKey($dimOp);
+            if (null !== $keyStr) {
+                return $context->builder->call(
+                    $context->lookupFunction('__hashtable__offsetIsSetStringKey'),
+                    $ht,
+                    $context->builder->load($context->constantStringFromString($keyStr))
+                );
+            }
+            $keyLong = $dim->compileTimeLong ?? self::literalLongKey($dimOp);
+            if (null !== $keyLong) {
+                return $context->builder->call(
+                    $context->lookupFunction('__hashtable__offsetIsSet'),
+                    $ht,
+                    $context->constantFromInteger($keyLong, 'size_t')
+                );
+            }
+
+            return $context->getTypeFromString('int1')->constInt(0, false);
         }
         if (Variable::TYPE_NATIVE_LONG !== $dim->type) {
             throw new \LogicException('isset() on HashTable arrays only supports integer or string indices in this compiler build');
