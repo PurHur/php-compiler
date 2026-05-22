@@ -1,0 +1,12 @@
+--- vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
+@@ -281,6 +281,8 @@ class TypeReconstructor
+             case 'Expr_Yield':
+             case 'Expr_Include':
+                 // TODO: we may be able to determine these...
+                 return false;
++            case 'Expr_MagicScriptConst':
++                return [Type::string()];
+         }
+ 
+         throw new \LogicException('Unknown variable op found: '.$op->getType());

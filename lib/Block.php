@@ -12,12 +12,14 @@ namespace PHPCompiler;
 // used as a property type.
 // @phan-suppress-next-line PhanUnreferencedUseNormal
 use PHPCfg\Func;
+use PHPCfg\Op;
 use PHPCfg\Block as CfgBlock;
 use PHPCfg\Operand;
 use PHPCfg\Operand\Literal;
 use PHPCfg\Operand\Temporary;
 use PHPCfg\Operand\Variable as VarOperand;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\ScriptStack;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\Web\Superglobals;
 
@@ -69,10 +71,44 @@ class Block {
      */
     public array $deployIncludePaths = [];
 
+    /** Absolute entry script path when CFG filename attribute is missing (issue #707). */
+    private string $scriptPathOverride = '';
+
     public function __construct(?CfgBlock $block) {
         $this->orig = $block;
         $this->scope = new \SplObjectStorage;
         $this->args = new \SplObjectStorage;
+    }
+
+    public function setScriptPath(string $path): void
+    {
+        $this->scriptPathOverride = ScriptStack::normalize($path);
+    }
+
+    /** Absolute path of the PHP source unit for this block (issue #707). */
+    public function scriptPath(): string
+    {
+        if ('' !== $this->scriptPathOverride) {
+            return $this->scriptPathOverride;
+        }
+        if (null !== $this->func) {
+            $file = $this->func->getFile();
+            if ('' !== $file && 'unknown' !== $file) {
+                return ScriptStack::normalize($file);
+            }
+        }
+        if (null !== $this->orig) {
+            foreach ($this->orig->children as $child) {
+                if ($child instanceof Op) {
+                    $file = $child->getFile();
+                    if ('' !== $file && 'unknown' !== $file) {
+                        return ScriptStack::normalize($file);
+                    }
+                }
+            }
+        }
+
+        return '';
     }
 
     public function getOperand(int $offset): Operand {
@@ -285,6 +321,7 @@ class Block {
         }
 
         $return = new Frame(null, $this, $frame, ...$scope);
+        $return->scriptPath = $this->scriptPath();
         if (!is_null($frame) && !is_null($frame->returnVar)) {
             $return->returnVar = $frame->returnVar;
         }

@@ -159,11 +159,26 @@ class Runtime {
     }
 
     public function parseAndCompile(string $code, string $filename): ?Block {
-        return $this->compile($this->parse($code, $filename));
+        $block = $this->compile($this->parse($code, $filename));
+        if (null !== $block) {
+            $block->setScriptPath($filename);
+        }
+
+        return $block;
     }
 
     public function parseAndCompileFile(string $filename): ?Block {
-        return $this->compile($this->parse(file_get_contents($filename), $filename));
+        $normalized = VM\ScriptStack::normalize($filename);
+        if ('' !== $normalized) {
+            $filename = $normalized;
+        }
+
+        $block = $this->compile($this->parse(file_get_contents($filename), $filename));
+        if (null !== $block) {
+            $block->setScriptPath($filename);
+        }
+
+        return $block;
     }
 
     /**

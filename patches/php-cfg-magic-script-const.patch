@@ -1,0 +1,52 @@
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/MagicScriptConst.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/MagicScriptConst.php
+@@ -0,0 +1,31 @@
++<?php
++
++declare(strict_types=1);
++
++namespace PHPCfg\Op\Expr;
++
++use PHPCfg\Op\Expr;
++
++/**
++ * Runtime __DIR__ / __FILE__ (issue #707). Lowered to TYPE_SCRIPT_MAGIC in the compiler.
++ */
++class MagicScriptConst extends Expr
++{
++    public const KIND_DIR = 1;
++
++    public const KIND_FILE = 2;
++
++    public int $kind;
++
++    public function __construct(int $kind, array $attributes = [])
++    {
++        parent::__construct($attributes);
++        $this->kind = $kind;
++    }
++
++    public function getVariableNames(): array
++    {
++        return ['result'];
++    }
++}
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
+@@ -1455,10 +1455,14 @@ class Parser
+             case 'Scalar_MagicConst_Class':
+                 // TODO
+                 return new Literal('__CLASS__');
+             case 'Scalar_MagicConst_Dir':
+-                return new Literal(dirname($this->fileName));
++                $op = new Op\Expr\MagicScriptConst(Op\Expr\MagicScriptConst::KIND_DIR, $this->mapAttributes($scalar));
++                $this->block->children[] = $op;
++                return $op->result;
+             case 'Scalar_MagicConst_File':
+-                return new Literal($this->fileName);
++                $op = new Op\Expr\MagicScriptConst(Op\Expr\MagicScriptConst::KIND_FILE, $this->mapAttributes($scalar));
++                $this->block->children[] = $op;
++                return $op->result;
+             case 'Scalar_MagicConst_Namespace':
+                 // TODO
+                 return new Literal('__NAMESPACE__');
