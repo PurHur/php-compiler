@@ -188,6 +188,48 @@ final class ProjectManifestTest extends TestCase
         }
     }
 
+    public function testResolveAssetsDirUsesManifestAssetsKey(): void
+    {
+        $dir = sys_get_temp_dir().'/phpc_manifest_'.bin2hex(random_bytes(6));
+        $this->assertTrue(mkdir($dir));
+        $this->assertTrue(mkdir($dir.'/public', 0777, true));
+        $this->assertTrue(mkdir($dir.'/assets', 0777, true));
+        try {
+            file_put_contents($dir.'/public/index.php', '<?php');
+            file_put_contents($dir.'/assets/style.css', 'body {}');
+            file_put_contents(
+                $dir.'/phpc.json',
+                json_encode([
+                    'entry' => 'public/index.php',
+                    'binary' => '.phpc/bin/app',
+                    'public' => 'public',
+                    'assets' => 'assets',
+                ], JSON_THROW_ON_ERROR)
+            );
+            $assets = ProjectManifest::resolveAssetsDir($dir);
+            $this->assertNotNull($assets);
+            $this->assertSame(realpath($dir.'/assets'), $assets);
+            $this->assertNull(ProjectManifest::resolveAssetsDir($dir, ['public' => 'public']));
+        } finally {
+            $this->removeTree($dir);
+        }
+    }
+
+    public function testValidateAssetsRequiresDirectory(): void
+    {
+        $dir = sys_get_temp_dir().'/phpc_manifest_'.bin2hex(random_bytes(6));
+        $this->assertTrue(mkdir($dir));
+        $this->assertTrue(mkdir($dir.'/.phpc/bin', 0777, true));
+        try {
+            touch($dir.'/.phpc/bin/app');
+            file_put_contents($dir.'/phpc.json', '{"binary": ".phpc/bin/app", "assets": "missing"}');
+            $errors = ManifestValidator::validate($dir);
+            $this->assertContains('assets directory not found: missing', $errors);
+        } finally {
+            $this->removeTree($dir);
+        }
+    }
+
     public function testValidatePublicRequiresIndexPhp(): void
     {
         $dir = sys_get_temp_dir().'/phpc_manifest_'.bin2hex(random_bytes(6));

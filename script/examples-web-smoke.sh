@@ -247,7 +247,8 @@ if [[ -d "${ROOT}/${MINIWEBAPP}/public" ]]; then
       'GET|hello PATH_INFO|/index.php/hello?name=Dev|-|Hello — MiniWebApp;Hello Dev' \
       'POST|contact PATH_INFO|/index.php/contact|name=PostDev|Thank you, PostDev' \
       'GET|api/status PATH_INFO|/index.php/api/status|-|"ok":true;003-MiniWebApp' \
-      'GET|home query fallback|/index.php?route=home|-|MiniWebApp'
+      'GET|home query fallback|/index.php?route=home|-|MiniWebApp' \
+      'GET|assets style.css|/assets/style.css|-|body {'
   fi
 fi
 
