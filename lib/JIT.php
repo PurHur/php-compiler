@@ -927,6 +927,7 @@ class JIT {
                     $valueRef
                     
                 );
+                    $result->isNullConstant = $value->isNullConstant;
     
                     return;
                 case Variable::TYPE_NATIVE_LONG:
