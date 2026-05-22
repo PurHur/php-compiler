@@ -710,6 +710,13 @@ class JIT {
                     $builder->branchIf($condition, $if, $else);
                     return $origBasicBlock;
                 case OpCode::TYPE_TRY:
+                    $branchBlock = $builder->getInsertBlock();
+                    $builder->positionAtEnd($branchBlock);
+                    $tryBb = $this->compileBlockInternal($func, $op->block1, null, null, ...$args);
+                    $builder->positionAtEnd($branchBlock);
+                    $this->context->freeDeadVariables($func, $branchBlock, $block);
+                    $builder->branch($tryBb);
+                    return $origBasicBlock;
                 case OpCode::TYPE_CATCH:
                 case OpCode::TYPE_FINALLY:
                     if (null !== $op->block1) {
