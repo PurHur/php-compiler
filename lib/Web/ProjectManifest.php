@@ -104,6 +104,29 @@ final class ProjectManifest
         return $paths;
     }
 
+    /**
+     * Ordered compile units for phpc build --project: manifest includes[] then entry (issue #729).
+     *
+     * @return list<string>|null absolute paths; null when project dir or entry is missing
+     */
+    public static function resolveCompileUnitPaths(string $startDir, ?array $manifest = null): ?array
+    {
+        $projectDir = self::resolveProjectDir($startDir);
+        if (null === $projectDir) {
+            return null;
+        }
+
+        $entry = self::resolveEntryPath($projectDir, $manifest);
+        if (null === $entry) {
+            return null;
+        }
+
+        $paths = self::resolveIncludePaths($projectDir, $manifest);
+        $paths[] = $entry;
+
+        return $paths;
+    }
+
     public static function resolveBinaryOutputPath(string $startDir, ?array $manifest = null): ?string
     {
         $projectDir = self::resolveProjectDir($startDir);
