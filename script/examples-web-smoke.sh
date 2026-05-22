@@ -233,4 +233,22 @@ run_docroot_smoke "002-StaticWeb" "examples/002-StaticWeb" \
 run_docroot_smoke "004-ApiJson" "examples/004-ApiJson" \
   'GET|GET example.php|/example.php|-|"ok":true;php-compiler'
 
+MINIWEBAPP=examples/003-MiniWebApp
+if [[ -d "${ROOT}/${MINIWEBAPP}/public" ]]; then
+  miniwebapp_lint=0
+  if ! "${PHPC}" lint --all "${MINIWEBAPP}" >/dev/null 2>&1; then
+    miniwebapp_lint=$?
+  fi
+  if [[ "${miniwebapp_lint}" -ne 0 ]]; then
+    echo "examples-web-smoke: 003-MiniWebApp: skip (lint exit ${miniwebapp_lint}; see ${MINIWEBAPP}/README.md)"
+  else
+    run_docroot_smoke "003-MiniWebApp" "${MINIWEBAPP}" \
+      'GET|home PATH_INFO|/index.php|-|MiniWebApp;PATH_INFO' \
+      'GET|hello PATH_INFO|/index.php/hello?name=Dev|-|Hello — MiniWebApp;Hello Dev' \
+      'POST|contact PATH_INFO|/index.php/contact|name=PostDev|Thank you, PostDev' \
+      'GET|api/status PATH_INFO|/index.php/api/status|-|"ok":true;003-MiniWebApp' \
+      'GET|home query fallback|/index.php?route=home|-|MiniWebApp'
+  fi
+fi
+
 echo "examples-web-smoke: ok"
