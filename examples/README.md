@@ -78,7 +78,7 @@ Reference front controller with PATH_INFO routes ([#489](https://github.com/PurH
 ./phpc serve 127.0.0.1:8080 examples/003-MiniWebApp
 curl -s 'http://127.0.0.1:8080/index.php/hello?name=Dev'
 ./script/examples-web-smoke.sh
-MINIWEBAPP_LINT_GATE=1 make web-smoke
+make web-smoke
 ```
 
 See [003-MiniWebApp/README.md](003-MiniWebApp/README.md) for routes and gate ladder (`make miniwebapp-gates`).

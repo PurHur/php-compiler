@@ -4,7 +4,7 @@
 #
 #   ./script/miniwebapp-gates.sh
 #   ./script/miniwebapp-gates.sh --run-lint    # alias (lint probe is default)
-#   MINIWEBAPP_LINT_GATE=1 ./script/miniwebapp-gates.sh
+#   MINIWEBAPP_LINT_GATE=0 ./script/miniwebapp-gates.sh   # skeleton opt-out
 #
 # See examples/003-MiniWebApp/README.md and make miniwebapp-gates.
 set -euo pipefail
@@ -26,7 +26,7 @@ Prints the progressive MiniWebApp CI gate ladder for examples/003-MiniWebApp.
 Probes phpc lint --all by default; use --no-lint to report env/repo state only.
 
 Environment (enable next gates):
-  MINIWEBAPP_LINT_GATE=1      fail make web-smoke when lint regresses (#539, #455)
+  MINIWEBAPP_LINT_GATE=0      skeleton: web-smoke continues on lint failure (default gate on — #621)
   MINIWEBAPP_VM_CLI_GATE=1    run MiniWebApp*VmCli in ci-fast (default on; #597)
   MINIWEBAPP_SERVE_GATE=1     enforce ServeTest MiniWebApp routes (#470)
 
@@ -57,7 +57,7 @@ if [[ "${RUN_LINT}" -eq 1 ]]; then
   rm -f "${lint_stderr}"
 fi
 
-lint_gate="${MINIWEBAPP_LINT_GATE:-}"
+lint_gate="${MINIWEBAPP_LINT_GATE:-1}"
 vm_cli_gate="${MINIWEBAPP_VM_CLI_GATE:-1}"
 serve_gate="${MINIWEBAPP_SERVE_GATE:-}"
 
@@ -68,8 +68,8 @@ stage2=0
 stage3=0
 stage4=0
 
-# Stage 0: skeleton — web-smoke does not fail on lint exit 1 (default).
-if [[ "${lint_gate}" != "1" ]]; then
+# Stage 0: skeleton opt-out — MINIWEBAPP_LINT_GATE=0 skips lint failure in web-smoke.
+if [[ "${lint_gate}" == "0" ]]; then
   stage0=1
 fi
 
@@ -127,19 +127,20 @@ if [[ "${RUN_LINT}" -eq 1 ]]; then
   else
     echo "  Lint probe: exit ${lint_exit} (phpc lint --all)"
   fi
-  if [[ "${lint_gate}" == "1" && "${lint_exit}" -ne 0 ]]; then
-    echo "  MINIWEBAPP_LINT_GATE=1: web-smoke would fail (#539)"
+  if [[ "${lint_gate}" != "0" && "${lint_exit}" -ne 0 ]]; then
+    echo "  lint gate on (default): web-smoke would fail (#621)"
   fi
   echo
 fi
 
-echo "$(mark "${stage0}") Stage 0 skeleton — web-smoke continues on lint exit 1 (default; #455)"
-if [[ "${stage0}" -eq 0 ]]; then
-  echo "       unset MINIWEBAPP_LINT_GATE to return to skeleton mode"
+echo "$(mark "${stage0}") Stage 0 skeleton — MINIWEBAPP_LINT_GATE=0 skips lint failure in web-smoke (#621)"
+if [[ "${stage0}" -eq 1 ]]; then
+  echo "       unset or =1 to restore default lint gate in make web-smoke"
 fi
 
-echo "$(mark "${stage1}") Stage 1 lint green — export MINIWEBAPP_LINT_GATE=1 (#539)"
+echo "$(mark "${stage1}") Stage 1 lint green — make web-smoke fails on lint regression by default (#539, #621)"
 echo "       ${REPO_URL}/issues/539"
+echo "       ${REPO_URL}/issues/621"
 
 echo "$(mark "${stage1b}") Stage 1b VM CLI — MINIWEBAPP_VM_CLI_GATE=1 in ci-fast (#597)"
 echo "       ${REPO_URL}/issues/597  (unset or =0 to skip MiniWebApp*VmCli)"
@@ -157,20 +158,19 @@ echo
 echo "Commands:"
 echo "  make web-smoke              lint + VM smoke (#455)"
 echo "  make examples-web-smoke     phpc serve + curl (#298)"
-echo "  MINIWEBAPP_LINT_GATE=1 make web-smoke"
+echo "  make web-smoke              lint gate on by default (#621)"
+echo "  MINIWEBAPP_LINT_GATE=0 make web-smoke"
 echo "  MINIWEBAPP_VM_CLI_GATE=1 ./script/ci-fast.sh"
 echo
 echo "Tracking: ${REPO_URL}/issues/472 (gate ladder spec)"
 
 # Current focus
-if [[ "${lint_exit}" -ne 0 && "${lint_gate}" != "1" ]]; then
-  echo "Next: close lint blockers (#539), then export MINIWEBAPP_LINT_GATE=1"
-elif [[ "${lint_exit}" -eq 0 && "${lint_gate}" != "1" ]]; then
-  echo "Next: export MINIWEBAPP_LINT_GATE=1 (lint is green)"
+if [[ "${lint_exit}" -ne 0 && "${lint_gate}" != "0" ]]; then
+  echo "Next: fix lint regressions (web-smoke lint gate is on by default — #621)"
+elif [[ "${lint_exit}" -ne 0 && "${lint_gate}" == "0" ]]; then
+  echo "Next: close lint blockers (#539); default gate will fail web-smoke when lint is fixed"
 elif [[ "${lint_exit}" -eq 0 && "${vm_cli_gate}" != "1" ]]; then
   echo "Next: export MINIWEBAPP_VM_CLI_GATE=1 (lint green; enable VM CLI in ci-fast — #597)"
-elif [[ "${lint_exit}" -ne 0 && "${lint_gate}" == "1" ]]; then
-  echo "Next: fix lint regressions (MINIWEBAPP_LINT_GATE=1 is set)"
 elif [[ "${serve_gate}" != "1" ]]; then
   echo "Next: export MINIWEBAPP_SERVE_GATE=1 when ServeTest routes land (#470)"
 elif [[ "${stage3}" -eq 0 ]]; then
@@ -183,7 +183,7 @@ fi
 
 # Lint JSON blockers when gate enforced or lint still failing
 if [[ "${RUN_LINT}" -eq 1 && -s "${LINT_JSON}" && "${lint_exit}" -ne 0 ]]; then
-  if [[ "${lint_gate}" == "1" || "${lint_exit}" -ne 0 ]]; then
+  if [[ "${lint_gate}" != "0" || "${lint_exit}" -ne 0 ]]; then
     echo
     echo "Lint blockers (phpc lint --all --json):"
     "${ROOT}/script/php-local.sh" -r '
