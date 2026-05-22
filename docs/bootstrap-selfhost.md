@@ -23,7 +23,7 @@ Regenerate: `make bootstrap-profile` (inventory + profile + optional `bootstrap-
 
 ## Bootstrap AOT lint ladder
 
-Add scripts under `test/bootstrap-aot/*.php` — picked up automatically by `script/bootstrap-profile.php` ([#514](https://github.com/PurHur/php-compiler/issues/514)):
+Add scripts under `test/bootstrap-aot/*.php` — picked up automatically by `script/bootstrap-profile.php` ([#514](https://github.com/PurHur/php-compiler/issues/514)). Multi-file `require_once` chains: `test/bootstrap-aot/<name>/main.php` (helpers alongside; issue [#120](https://github.com/PurHur/php-compiler/issues/120)):
 
 - `echo_hello.php` — baseline procedural
 - `nullable_types.php` — `?string` parameters (self-host typing)
@@ -31,8 +31,9 @@ Add scripts under `test/bootstrap-aot/*.php` — picked up automatically by `scr
 - `minimal_class.php` — one public method (ClassMethod lowering)
 - `class_nullable_property.php` — nullable property with `= null` default
 - `class_constants.php` — class `Const_` declarations (issue #84)
+- `require_chain/main.php` — `require_once` helper with shared functions (issue #120)
 
-`php bin/compile.php -l lib/OpCode.php` passes after `TYPE_DECLARE_CLASS_CONST` lowering; `lib/Frame.php` still needs namespaces. Next: `require_once` chain ([#120](https://github.com/PurHur/php-compiler/issues/120)).
+`php bin/compile.php -l lib/OpCode.php` passes after `TYPE_DECLARE_CLASS_CONST` lowering; `lib/Frame.php` still needs namespaces.
 
 ## Non-goals (initial bootstrap)
 
