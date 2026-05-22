@@ -162,6 +162,9 @@ switch ($command) {
             fwrite(STDOUT, "phpc.json OK: {$targetDir}\n");
             exit(0);
         }
+        $resolved = realpath($targetDir);
+        $manifestLabel = false !== $resolved ? $resolved.'/phpc.json' : $targetDir.'/phpc.json';
+        fwrite(STDERR, "phpc.json: {$manifestLabel}\n");
         foreach ($errors as $message) {
             fwrite(STDERR, $message."\n");
         }
