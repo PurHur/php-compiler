@@ -530,11 +530,33 @@ class JIT {
                     break;
                 case OpCode::TYPE_ECHO:
                 case OpCode::TYPE_PRINT:
+                    JIT\Builtin\PendingHeaders::emitFlushForStandalone($this->context);
                     $argOffset = $op->type === OpCode::TYPE_ECHO ? $op->arg1 : $op->arg2;
                     $arg = $this->context->getVariableFromOp($block->getOperand($argOffset));
+                    if (Variable::KIND_VARIABLE === $arg->kind) {
+                        $slotType = $this->context->getStringFromType($arg->value->typeOf());
+                        if ('__value__' === $slotType) {
+                            JIT\ValueEchoHelper::echo(
+                                $this->context,
+                                JIT\JitValueBox::pointer($this->context, $arg->value)
+                            );
+                            break;
+                        }
+                        if ('__string__' === $slotType && Variable::TYPE_STRING !== $arg->type) {
+                            $arg = new Variable(
+                                $this->context,
+                                Variable::TYPE_STRING,
+                                Variable::KIND_VARIABLE,
+                                $arg->value
+                            );
+                        }
+                    }
                     switch ($arg->type) {
                         case Variable::TYPE_VALUE:
-                            JIT\ValueEchoHelper::echo($this->context, $arg->value);
+                            $valuePtr = Variable::KIND_VARIABLE === $arg->kind
+                                ? JIT\JitValueBox::pointer($this->context, $arg->value)
+                                : $arg->value;
+                            JIT\ValueEchoHelper::echo($this->context, $valuePtr);
                             break;
                         case Variable::TYPE_STRING:
                             if ($arg->kind === Variable::KIND_VALUE
@@ -618,7 +640,22 @@ class JIT {
                             $this->context->builder->positionAtEnd($doneBlock);
                             break;
 
-                        default: 
+                        default:
+                            if (Variable::KIND_VARIABLE === $arg->kind
+                                && '__value__' === $this->context->getStringFromType($arg->value->typeOf())
+                            ) {
+                                JIT\ValueEchoHelper::echo(
+                                    $this->context,
+                                    JIT\JitValueBox::pointer($this->context, $arg->value)
+                                );
+                                break;
+                            }
+                            if (Variable::KIND_VALUE === $arg->kind
+                                && '__value__*' === $this->context->getStringFromType($arg->value->typeOf())
+                            ) {
+                                JIT\ValueEchoHelper::echo($this->context, $arg->value);
+                                break;
+                            }
                             throw new \LogicException("Echo for type $arg->type not implemented");
                     }
                     if ($op->type === OpCode::TYPE_PRINT) {

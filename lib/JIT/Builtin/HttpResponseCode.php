@@ -21,6 +21,9 @@ final class HttpResponseCode
 
     public const GLOBAL_NAME = '__phpc_http_response_status';
 
+    /** Set when http_response_code($code) stores a valid status (emit Status: 200 on flush). */
+    public const GLOBAL_EXPLICIT_NAME = '__phpc_http_response_status_explicit';
+
     public const APPLY_GET = 0;
 
     public const APPLY_SET_LONG = 1;
@@ -29,6 +32,9 @@ final class HttpResponseCode
 
     /** @var \PHPLLVM\Value|null */
     public static $global = null;
+
+    /** @var \PHPLLVM\Value|null */
+    public static $explicitGlobal = null;
 
     public static function implement(Context $context): void
     {
@@ -39,6 +45,9 @@ final class HttpResponseCode
 
         self::$global = $context->module->addGlobal($i32, self::GLOBAL_NAME);
         self::$global->setInitializer($i32->constInt(200, false));
+
+        self::$explicitGlobal = $context->module->addGlobal($i32, self::GLOBAL_EXPLICIT_NAME);
+        self::$explicitGlobal->setInitializer($i32->constInt(0, false));
 
         $sig = $context->context->functionType(
             $void,
@@ -141,6 +150,9 @@ final class HttpResponseCode
         }
         $i32 = $context->getTypeFromString('int32');
         $context->builder->store($i32->constInt(200, false), self::$global);
+        if (null !== self::$explicitGlobal) {
+            $context->builder->store($i32->constInt(0, false), self::$explicitGlobal);
+        }
     }
 
     private static function emitWriteCurrentAsLong(Context $context, \PHPLLVM\Value $outPtr): void
@@ -182,6 +194,9 @@ final class HttpResponseCode
         $context->builder->positionAtEnd($sValid);
         $code32 = $context->builder->trunc($code64, $i32);
         $context->builder->store($code32, self::$global);
+        if (null !== self::$explicitGlobal) {
+            $context->builder->store($i32->constInt(1, false), self::$explicitGlobal);
+        }
 
         $context->builder->branch($sDone);
 
@@ -214,6 +229,9 @@ final class HttpResponseCode
         $code32 = $context->builder->trunc($code64, $i32);
         $prev = $context->builder->load(self::$global);
         $context->builder->store($code32, self::$global);
+        if (null !== self::$explicitGlobal) {
+            $context->builder->store($i32->constInt(1, false), self::$explicitGlobal);
+        }
 
         $prev64 = $context->builder->zExt($prev, $i64);
         $context->builder->call(

@@ -186,12 +186,13 @@ final class filter_input extends Internal
         $filtered = $context->builder->phi($intFiltered->typeOf());
         $filtered->addIncoming($intFiltered, $intFilterTail);
         $filtered->addIncoming($emailFiltered, $emailFilterTail);
+        $filterDoneTail = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
         $phi = $context->builder->phi($filtered->typeOf());
         $phi->addIncoming($nullResult, $missingBlock);
-        $phi->addIncoming($filtered, $presentBlock);
+        $phi->addIncoming($filtered, $filterDoneTail);
 
         return $phi;
     }

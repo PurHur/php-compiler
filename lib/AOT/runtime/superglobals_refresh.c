@@ -2123,8 +2123,9 @@ static __phpc_header_node *phpc_pending_head = NULL;
 static __phpc_header_node *phpc_pending_tail = NULL;
 static int phpc_response_headers_flushed = 0;
 
-/** LLVM module global (HttpResponseCode::GLOBAL_NAME); defined in generated .o */
+/** LLVM module globals (HttpResponseCode); defined in generated .o */
 extern int __phpc_http_response_status;
+extern int __phpc_http_response_status_explicit;
 
 static int phpc_header_name_from_line(__string__ *line, char *buf, size_t bufsz)
 {
@@ -2205,7 +2206,7 @@ void __phpc_response_headers_flush(void)
         return;
     }
     phpc_response_headers_flushed = 1;
-    if (__phpc_http_response_status != 200) {
+    if (__phpc_http_response_status != 200 || __phpc_http_response_status_explicit) {
         printf("Status: %d\r\n", __phpc_http_response_status);
     }
     cur = phpc_pending_head;

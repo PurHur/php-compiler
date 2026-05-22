@@ -8,7 +8,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
-use PHPCompiler\JIT\Builtin\PendingHeaders;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -16,7 +15,6 @@ final class ValueEchoHelper
 {
     public static function echo(Context $context, Value $valuePtr): void
     {
-        PendingHeaders::emitFlushForStandalone($context);
         $map = $context->structFieldMap['__value__'];
         $typeByte = $context->builder->load(
             $context->builder->structGep($valuePtr, $map['type'])

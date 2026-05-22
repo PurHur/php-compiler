@@ -46,6 +46,9 @@ patch_already_applied() {
     php-types-readfile-int-false.patch)
       grep -q "'readfile' => \['int|false'" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php" 2>/dev/null
       ;;
+    php-types-strpbrk-string-false.patch)
+      grep -q "'strpbrk' => \['string|false'" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php" 2>/dev/null
+      ;;
     php-llvm-builder-xor.patch)
       grep -q 'function xor(' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php" 2>/dev/null
       ;;
@@ -118,6 +121,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-str-bool-fns.patch"
   apply_patch "$PATCH_DIR/php-types-str-split-string-array.patch"
   apply_patch "$PATCH_DIR/php-types-readfile-int-false.patch"
+  apply_patch "$PATCH_DIR/php-types-strpbrk-string-false.patch"
   apply_patch "$PATCH_DIR/php-types-dollars-brace.patch"
   apply_patch "$PATCH_DIR/php-types-mixed-reserved.patch"
   apply_patch "$PATCH_DIR/php-types-nullsafe.patch"

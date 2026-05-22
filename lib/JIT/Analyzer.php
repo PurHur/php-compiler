@@ -65,7 +65,8 @@ class Analyzer
                 || $usage instanceof Op\Iterator\Valid
                 || $usage instanceof Op\Iterator\Key
                 || $usage instanceof Op\Iterator\Value
-                || $usage instanceof Op\Iterator\Next) {
+                || $usage instanceof Op\Iterator\Next
+                || $usage instanceof Op\Terminal\Echo_) {
                 continue;
             } else {
                 throw new \LogicException('Not implemented escape operand '.get_class($usage));
