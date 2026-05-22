@@ -501,6 +501,20 @@ final class HashTableHelper
         return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $entry);
     }
 
+    /**
+     * Copy a string into an owned heap value before storing in a hashtable.
+     * Temporary native-array literals and compile-time strings must not be stored by pointer alone.
+     */
+    private static function ownedString(Context $context, Variable $element): Value
+    {
+        $str = $context->helper->loadValue($element);
+
+        return $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $str
+        );
+    }
+
     public static function setAtIndex(Context $context, Value $ht, Value $index, Variable $element): void
     {
         switch ($element->type) {
@@ -517,7 +531,7 @@ final class HashTableHelper
                     $context->lookupFunction('__hashtable__setStringAt'),
                     $ht,
                     $index,
-                    $context->helper->loadValue($element)
+                    self::ownedString($context, $element)
                 );
                 break;
             default:
@@ -540,7 +554,7 @@ final class HashTableHelper
                     $context->lookupFunction('__hashtable__setStringKeyString'),
                     $ht,
                     $keyPtr,
-                    $context->helper->loadValue($element)
+                    self::ownedString($context, $element)
                 );
                 break;
             case Variable::TYPE_NATIVE_LONG:
