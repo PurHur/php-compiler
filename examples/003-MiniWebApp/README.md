@@ -2,6 +2,16 @@
 
 Reference web app: skeleton [#67](https://github.com/PurHur/php-compiler/issues/67) closed ([#246](https://github.com/PurHur/php-compiler/issues/246)); VM/runtime tracker [#539](https://github.com/PurHur/php-compiler/issues/539); routing [#210](https://github.com/PurHur/php-compiler/issues/210). `phpc serve` and lint are green; PATH_INFO URLs in [#489](https://github.com/PurHur/php-compiler/issues/489); AOT execute [#454](https://github.com/PurHur/php-compiler/issues/454). VM/JIT/AOT matrix for PATH_INFO, deploy includes, and CGI: [capabilities-syntax.md § Web north-star](../../docs/capabilities-syntax.md#web-north-star-examples003-miniwebapp) ([#655](https://github.com/PurHur/php-compiler/issues/655)).
 
+## Init template parity
+
+`phpc init --profile miniwebapp` scaffolds from `templates/init-miniwebapp/`. Key app files (`public/index.php`, `src/Router.php`, `config.php`, `phpc.json`, templates, `assets/style.css`) must stay **byte-identical** to this directory ([#695](https://github.com/PurHur/php-compiler/issues/695)).
+
+```console
+./script/check-init-miniwebapp-parity.sh   # wired into ci-fast inventory checks
+```
+
+Update both trees in one PR when changing routes or templates. Rare intentional drift: use `// miniwebapp-parity: intentional divergence — <reason>` in **both** files.
+
 ## Layout
 
 ```

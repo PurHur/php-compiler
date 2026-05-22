@@ -2471,10 +2471,10 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new Func\PHP (line 315)
 - new ClassEntry (line 407)
 - new ObjectEntry (line 419)
-- new Exception (line 560)
-- new Exception (line 562)
-- new VM\ClassProperty (line 592)
-- new Func\PHP (line 606)
+- new Exception (line 573)
+- new Exception (line 575)
+- new VM\ClassProperty (line 605)
+- new Func\PHP (line 619)
 - 5 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/VM/ClassEntry.php`

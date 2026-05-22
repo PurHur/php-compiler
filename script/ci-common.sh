@@ -52,6 +52,7 @@ ci_install_deps() {
 
 ci_run_inventory_checks() {
   script/check-no-unlimited-memory.sh
+  script/check-init-miniwebapp-parity.sh
   "$PHP_BIN" "${PHP_OPTS[@]}" script/capability-matrix.php --check
   "$PHP_BIN" "${PHP_OPTS[@]}" script/capability-syntax.php --check
   "$PHP_BIN" "${PHP_OPTS[@]}" script/bootstrap-inventory.php --check

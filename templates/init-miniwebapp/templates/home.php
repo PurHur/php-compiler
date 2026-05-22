@@ -1,2 +1,2 @@
 <h1><?php echo htmlspecialchars($appName); ?></h1>
-<p>MiniWebApp scaffold from <code>phpc init --profile miniwebapp</code>. Extend routes in <code>src/Router.php</code>; see <code>examples/003-MiniWebApp/</code> for the full reference app.</p>
+<p>Reference app (skeleton #67 closed; runtime #539). Routes use <code>PATH_INFO</code> after <code>index.php</code> (#489); <code>?route=</code> remains as a deprecated fallback.</p>
