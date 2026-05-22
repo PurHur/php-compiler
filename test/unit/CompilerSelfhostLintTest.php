@@ -65,6 +65,7 @@ final class CompilerSelfhostLintTest extends TestCase
             'lib/Func/PHP.php',
             'lib/Module.php',
             'lib/OpCode.php',
+            'lib/OpCodeNames.php',
             'lib/Runtime.php',
             'lib/VM.php',
             'lib/Web/ConstStringFolder.php',
