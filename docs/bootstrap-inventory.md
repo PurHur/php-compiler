@@ -1488,14 +1488,14 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/AOT/Linker.php`
 
 **Blockers** (likely prevent AOT bootstrap compile):
-- shell_exec() (line 133)
-- shell_exec() (line 154)
-- shell_exec() (line 188)
-- shell_exec() (line 192)
-- shell_exec() (line 235)
-- shell_exec() (line 245)
-- shell_exec() (line 315)
-- exec() (line 321)
+- shell_exec() (line 134)
+- shell_exec() (line 155)
+- shell_exec() (line 189)
+- shell_exec() (line 193)
+- shell_exec() (line 236)
+- shell_exec() (line 246)
+- shell_exec() (line 316)
+- exec() (line 322)
 
 **Warnings** (review for bootstrap subset):
 - 11 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler

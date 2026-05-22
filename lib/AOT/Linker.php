@@ -50,6 +50,7 @@ final class Linker
                 escapeshellarg('/usr/lib/x86_64-linux-gnu/crti.o'),
                 implode(' ', $objects),
                 '-lc',
+                '-lm',
                 escapeshellarg($libgcc),
                 escapeshellarg($crtend),
                 escapeshellarg('/usr/lib/x86_64-linux-gnu/crtn.o'),
@@ -69,7 +70,7 @@ final class Linker
             foreach ($runtimeObjects as $runtimeObject) {
                 $objects .= ' '.escapeshellarg($runtimeObject);
             }
-            $cmd = escapeshellarg($clang).' '.$objects.' -o '.escapeshellarg($executable);
+            $cmd = escapeshellarg($clang).' '.$objects.' -lm -o '.escapeshellarg($executable);
             self::run($cmd, $env);
             self::unlinkIfTemp($runtimeObjects);
 
@@ -317,7 +318,7 @@ final class Linker
                 continue;
             }
             $cmd = escapeshellarg($path) . ' '
-                . $objects . ' -o ' . escapeshellarg($executable);
+                . $objects . ' -lm -o ' . escapeshellarg($executable);
             exec($cmd, $output, $code);
             if (0 === $code) {
                 self::unlinkIfTemp($runtimeObjects);

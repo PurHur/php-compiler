@@ -1,7 +1,6 @@
 --- vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
 +++ vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
-@@ -405,7 +405,35 @@
-         // we can't resolve the function
+@@ -406,6 +406,35 @@
          return false;
      }
  
@@ -37,3 +36,4 @@
      protected function resolveOp_Expr_New(Operand $var, Op\Expr\New_ $op, SplObjectStorage $resolved)
      {
          $type = $this->getClassType($op->class, $resolved);
+         if ($type) {
