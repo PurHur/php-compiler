@@ -9,6 +9,9 @@ declare(strict_types=1);
 
 class VendorLike
 {
+    public function addVisitor(mixed $visitor): void
+    {
+    }
 }
 
 $receiver = new VendorLike();

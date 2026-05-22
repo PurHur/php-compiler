@@ -37,6 +37,23 @@ class HashTable extends Type
             'next' => 3,
         ];
 
+        $objNodeStruct = $this->context->context->namedStructType('__objkey_node__');
+        $this->context->registerType('__objkey_node__', $objNodeStruct);
+        $this->context->registerType('__objkey_node__*', $objNodeStruct->pointerType(0));
+        $objNodeStruct->setBody(
+            false,
+            $this->context->getTypeFromString('__ref__'),
+            $this->context->getTypeFromString('__object__*'),
+            $this->context->getTypeFromString('__value__'),
+            $objNodeStruct->pointerType(0),
+        );
+        $this->context->structFieldMap['__objkey_node__'] = [
+            'ref' => 0,
+            'key' => 1,
+            'value' => 2,
+            'next' => 3,
+        ];
+
         $struct = $this->context->context->namedStructType('__hashtable__');
         $this->context->registerType('__hashtable__', $struct);
         $this->context->registerType('__hashtable__*', $struct->pointerType(0));
@@ -48,6 +65,7 @@ class HashTable extends Type
             $this->context->getTypeFromString('size_t'),
             $this->context->getTypeFromString('__value__')->pointerType(0),
             $this->context->getTypeFromString('__strkey_node__*'),
+            $this->context->getTypeFromString('__objkey_node__*'),
         );
         $this->context->structFieldMap['__hashtable__'] = [
             'ref' => 0,
@@ -56,6 +74,7 @@ class HashTable extends Type
             'capacity' => 3,
             'values' => 4,
             'strKeys' => 5,
+            'objKeys' => 6,
         ];
 
         $this->registerFn('__hashtable__alloc', '__hashtable__*', []);
@@ -75,6 +94,10 @@ class HashTable extends Type
         $this->registerFn('__hashtable__offsetIsSetStringKey', 'int1', ['__hashtable__*', '__string__*']);
         $this->registerFn('__hashtable__readStringKeyValue', '__value__*', ['__hashtable__*', '__string__*']);
         $this->registerFn('__hashtable__readStringKeyHashtable', '__hashtable__*', ['__hashtable__*', '__string__*']);
+        $this->registerFn('__hashtable__readObjectKeyValue', '__value__*', ['__hashtable__*', '__object__*']);
+        $this->registerFn('__hashtable__setObjectKeyLong', 'void', ['__hashtable__*', '__object__*', 'int64']);
+        $this->registerFn('__hashtable__setObjectKeyObject', 'void', ['__hashtable__*', '__object__*', '__object__*']);
+        $this->registerFn('__hashtable__offsetIsSetObjectKey', 'int1', ['__hashtable__*', '__object__*']);
         $this->registerFn('__value__readHashtable', '__hashtable__*', ['__value__*']);
         $this->registerFn('__value__writeHashtable', 'void', ['__value__*', '__hashtable__*']);
         $this->registerFn('__hashtable__sortPacked', 'void', ['__hashtable__*']);
@@ -116,6 +139,10 @@ class HashTable extends Type
         $this->implementOffsetIsSetStringKey();
         $this->implementReadStringKeyValue();
         $this->implementReadStringKeyHashtable();
+        $this->implementReadObjectKeyValue();
+        $this->implementSetObjectKeyLong();
+        $this->implementSetObjectKeyObject();
+        $this->implementOffsetIsSetObjectKey();
         $this->implementValueReadHashtable();
         $this->implementValueWriteHashtable();
         $this->implementSortPacked();
@@ -158,6 +185,11 @@ class HashTable extends Type
         $this->context->builder->store(
             $nullStrKeys,
             $this->context->builder->structGep($ht, $map['strKeys'])
+        );
+        $nullObjKeys = $this->context->getTypeFromString('__objkey_node__*')->constNull();
+        $this->context->builder->store(
+            $nullObjKeys,
+            $this->context->builder->structGep($ht, $map['objKeys'])
         );
         $typeinfo = $this->context->getTypeFromString('int32')->constInt(
             Refcount::TYPE_INFO_TYPE_MASKED_ARRAY | Refcount::TYPE_INFO_REFCOUNTED,
@@ -942,6 +974,249 @@ class HashTable extends Type
         $result->addIncoming($child, $read);
         $result->addIncoming($htPtr->constNull(), $empty);
         $this->context->builder->returnValue($result);
+    }
+
+    private function implementReadObjectKeyValue(): void
+    {
+        $fn = $this->context->lookupFunction('__hashtable__readObjectKeyValue');
+        $block = $fn->appendBasicBlock('main');
+        $this->context->builder->positionAtEnd($block);
+        $ht = $fn->getParam(0);
+        $key = $fn->getParam(1);
+        $valPtr = $this->lookupObjectKeyValue($fn, $block, $ht, $key);
+        $afterLookup = $fn->appendBasicBlock('objkey_read_val_after_lookup');
+        $this->context->builder->branch($afterLookup);
+        $this->context->builder->positionAtEnd($afterLookup);
+        $this->context->builder->returnValue($valPtr);
+    }
+
+    private function implementSetObjectKeyLong(): void
+    {
+        $fn = $this->context->lookupFunction('__hashtable__setObjectKeyLong');
+        $block = $fn->appendBasicBlock('main');
+        $this->context->builder->positionAtEnd($block);
+        $ht = $fn->getParam(0);
+        $key = $fn->getParam(1);
+        $long = $fn->getParam(2);
+
+        $htMap = $this->context->structFieldMap['__hashtable__'];
+        $nodeMap = $this->context->structFieldMap['__objkey_node__'];
+        $headSlot = $this->context->builder->structGep($ht, $htMap['objKeys']);
+        $head = $this->context->builder->load($headSlot);
+
+        $done = $fn->appendBasicBlock('objkey_long_done');
+        $prepend = $fn->appendBasicBlock('objkey_long_prepend');
+        $loopHead = $fn->appendBasicBlock('objkey_long_head');
+        $loopBody = $fn->appendBasicBlock('objkey_long_body');
+        $this->context->builder->branch($loopHead);
+
+        $this->context->builder->positionAtEnd($loopHead);
+        $node = $this->context->builder->phi($head->typeOf());
+        $node->addIncoming($head, $block);
+        $isNull = $this->context->builder->icmp(Builder::INT_EQ, $node, $node->typeOf()->constNull());
+        $this->context->builder->branchIf($isNull, $prepend, $loopBody);
+
+        $this->context->builder->positionAtEnd($loopBody);
+        $nodeKey = $this->context->builder->load($this->context->builder->structGep($node, $nodeMap['key']));
+        $isMatch = $this->context->builder->icmp(Builder::INT_EQ, $nodeKey, $key);
+        $update = $fn->appendBasicBlock('objkey_long_update');
+        $next = $fn->appendBasicBlock('objkey_long_next');
+        $this->context->builder->branchIf($isMatch, $update, $next);
+
+        $this->context->builder->positionAtEnd($update);
+        $valField = $this->context->builder->structGep($node, $nodeMap['value']);
+        $this->context->builder->call(
+            $this->context->lookupFunction('__value__writeLong'),
+            $valField,
+            $long
+        );
+        $this->context->builder->branch($done);
+
+        $this->context->builder->positionAtEnd($next);
+        $nextNode = $this->context->builder->load($this->context->builder->structGep($node, $nodeMap['next']));
+        $this->context->builder->branch($loopHead);
+        $node->addIncoming($nextNode, $next);
+
+        $this->context->builder->positionAtEnd($prepend);
+        $nodeType = $this->context->getTypeFromString('__objkey_node__');
+        $newNode = $this->context->memory->malloc($nodeType);
+        $typeinfo = $this->context->getTypeFromString('int32')->constInt(
+            Refcount::TYPE_INFO_TYPE_OBJECT | Refcount::TYPE_INFO_REFCOUNTED,
+            false
+        );
+        $ref = $this->context->builder->pointerCast(
+            $newNode,
+            $this->context->getTypeFromString('__ref__virtual*')
+        );
+        $this->context->builder->call($this->context->lookupFunction('__ref__init'), $typeinfo, $ref);
+        $this->context->builder->store($key, $this->context->builder->structGep($newNode, $nodeMap['key']));
+        $this->context->builder->call(
+            $this->context->lookupFunction('__value__writeLong'),
+            $this->context->builder->structGep($newNode, $nodeMap['value']),
+            $long
+        );
+        $this->context->builder->store($head, $this->context->builder->structGep($newNode, $nodeMap['next']));
+        $this->context->builder->store($newNode, $headSlot);
+        $this->incrementNumElements($ht);
+        $this->context->builder->branch($done);
+
+        $this->context->builder->positionAtEnd($done);
+        $this->context->builder->returnVoid();
+    }
+
+    private function implementSetObjectKeyObject(): void
+    {
+        $fn = $this->context->lookupFunction('__hashtable__setObjectKeyObject');
+        $block = $fn->appendBasicBlock('main');
+        $this->context->builder->positionAtEnd($block);
+        $ht = $fn->getParam(0);
+        $key = $fn->getParam(1);
+        $object = $fn->getParam(2);
+
+        $htMap = $this->context->structFieldMap['__hashtable__'];
+        $nodeMap = $this->context->structFieldMap['__objkey_node__'];
+        $headSlot = $this->context->builder->structGep($ht, $htMap['objKeys']);
+        $head = $this->context->builder->load($headSlot);
+
+        $done = $fn->appendBasicBlock('objkey_obj_done');
+        $prepend = $fn->appendBasicBlock('objkey_obj_prepend');
+        $loopHead = $fn->appendBasicBlock('objkey_obj_head');
+        $loopBody = $fn->appendBasicBlock('objkey_obj_body');
+        $this->context->builder->branch($loopHead);
+
+        $this->context->builder->positionAtEnd($loopHead);
+        $node = $this->context->builder->phi($head->typeOf());
+        $node->addIncoming($head, $block);
+        $isNull = $this->context->builder->icmp(Builder::INT_EQ, $node, $node->typeOf()->constNull());
+        $this->context->builder->branchIf($isNull, $prepend, $loopBody);
+
+        $this->context->builder->positionAtEnd($loopBody);
+        $nodeKey = $this->context->builder->load($this->context->builder->structGep($node, $nodeMap['key']));
+        $isMatch = $this->context->builder->icmp(Builder::INT_EQ, $nodeKey, $key);
+        $update = $fn->appendBasicBlock('objkey_obj_update');
+        $next = $fn->appendBasicBlock('objkey_obj_next');
+        $this->context->builder->branchIf($isMatch, $update, $next);
+
+        $this->context->builder->positionAtEnd($update);
+        $valField = $this->context->builder->structGep($node, $nodeMap['value']);
+        $this->context->builder->call(
+            $this->context->lookupFunction('__value__writeObject'),
+            $valField,
+            $object
+        );
+        $this->context->builder->branch($done);
+
+        $this->context->builder->positionAtEnd($next);
+        $nextNode = $this->context->builder->load($this->context->builder->structGep($node, $nodeMap['next']));
+        $this->context->builder->branch($loopHead);
+        $node->addIncoming($nextNode, $next);
+
+        $this->context->builder->positionAtEnd($prepend);
+        $nodeType = $this->context->getTypeFromString('__objkey_node__');
+        $newNode = $this->context->memory->malloc($nodeType);
+        $typeinfo = $this->context->getTypeFromString('int32')->constInt(
+            Refcount::TYPE_INFO_TYPE_OBJECT | Refcount::TYPE_INFO_REFCOUNTED,
+            false
+        );
+        $ref = $this->context->builder->pointerCast(
+            $newNode,
+            $this->context->getTypeFromString('__ref__virtual*')
+        );
+        $this->context->builder->call($this->context->lookupFunction('__ref__init'), $typeinfo, $ref);
+        $this->context->builder->store($key, $this->context->builder->structGep($newNode, $nodeMap['key']));
+        $this->context->builder->call(
+            $this->context->lookupFunction('__value__writeObject'),
+            $this->context->builder->structGep($newNode, $nodeMap['value']),
+            $object
+        );
+        $this->context->builder->store($head, $this->context->builder->structGep($newNode, $nodeMap['next']));
+        $this->context->builder->store($newNode, $headSlot);
+        $this->incrementNumElements($ht);
+        $this->context->builder->branch($done);
+
+        $this->context->builder->positionAtEnd($done);
+        $this->context->builder->returnVoid();
+    }
+
+    private function implementOffsetIsSetObjectKey(): void
+    {
+        $fn = $this->context->lookupFunction('__hashtable__offsetIsSetObjectKey');
+        $block = $fn->appendBasicBlock('main');
+        $this->context->builder->positionAtEnd($block);
+        $ht = $fn->getParam(0);
+        $key = $fn->getParam(1);
+        $valPtr = $this->lookupObjectKeyValue($fn, $block, $ht, $key);
+        $afterLookup = $fn->appendBasicBlock('objkey_isset_after_lookup');
+        $this->context->builder->branch($afterLookup);
+        $this->context->builder->positionAtEnd($afterLookup);
+        $i1 = $this->context->getTypeFromString('int1');
+        $isNull = $this->context->builder->icmp(Builder::INT_EQ, $valPtr, $valPtr->typeOf()->constNull());
+        $nullType = $this->context->getTypeFromString('int8')->constInt(0, false);
+        $check = $fn->appendBasicBlock('objkey_isset_check');
+        $notFound = $fn->appendBasicBlock('objkey_isset_not_found');
+        $this->context->builder->branchIf($isNull, $notFound, $check);
+        $this->context->builder->positionAtEnd($check);
+        $typeByte = $this->context->builder->load(
+            $this->context->builder->structGep($valPtr, $this->context->structFieldMap['__value__']['type'])
+        );
+        $hasValue = $this->context->builder->icmp(Builder::INT_NE, $typeByte, $nullType);
+        $this->context->builder->returnValue($hasValue);
+        $this->context->builder->positionAtEnd($notFound);
+        $this->context->builder->returnValue($i1->constInt(0, false));
+    }
+
+    private function lookupObjectKeyValue(
+        PHPLLVM\Value\Function_ $fn,
+        PHPLLVM\BasicBlock $block,
+        PHPLLVM\Value $ht,
+        PHPLLVM\Value $key
+    ): PHPLLVM\Value {
+        $htMap = $this->context->structFieldMap['__hashtable__'];
+        $nodeMap = $this->context->structFieldMap['__objkey_node__'];
+        $head = $this->context->builder->load($this->context->builder->structGep($ht, $htMap['objKeys']));
+        $valuePtrType = $this->context->getTypeFromString('__value__*');
+        $nodePtrType = $head->typeOf();
+
+        $currentSlot = $this->context->builder->alloca($nodePtrType, 1, 'objkey_current');
+        $this->context->builder->store($head, $currentSlot);
+
+        $resultSlot = $this->context->builder->alloca($valuePtrType, 1, 'objkey_lookup_result');
+        $this->context->builder->store($valuePtrType->constNull(), $resultSlot);
+
+        $notFound = $fn->appendBasicBlock('objkey_lookup_not_found');
+        $loopHead = $fn->appendBasicBlock('objkey_lookup_head');
+        $loopBody = $fn->appendBasicBlock('objkey_lookup_body');
+        $found = $fn->appendBasicBlock('objkey_lookup_found');
+        $done = $fn->appendBasicBlock('objkey_lookup_done');
+        $this->context->builder->branch($loopHead);
+
+        $this->context->builder->positionAtEnd($loopHead);
+        $node = $this->context->builder->load($currentSlot);
+        $isNull = $this->context->builder->icmp(Builder::INT_EQ, $node, $nodePtrType->constNull());
+        $this->context->builder->branchIf($isNull, $notFound, $loopBody);
+
+        $this->context->builder->positionAtEnd($loopBody);
+        $nodeKey = $this->context->builder->load($this->context->builder->structGep($node, $nodeMap['key']));
+        $isMatch = $this->context->builder->icmp(Builder::INT_EQ, $nodeKey, $key);
+        $next = $fn->appendBasicBlock('objkey_lookup_next');
+        $this->context->builder->branchIf($isMatch, $found, $next);
+
+        $this->context->builder->positionAtEnd($found);
+        $valField = $this->context->builder->structGep($node, $nodeMap['value']);
+        $this->context->builder->store($valField, $resultSlot);
+        $this->context->builder->branch($done);
+
+        $this->context->builder->positionAtEnd($next);
+        $nextNode = $this->context->builder->load($this->context->builder->structGep($node, $nodeMap['next']));
+        $this->context->builder->store($nextNode, $currentSlot);
+        $this->context->builder->branch($loopHead);
+
+        $this->context->builder->positionAtEnd($notFound);
+        $this->context->builder->branch($done);
+
+        $this->context->builder->positionAtEnd($done);
+
+        return $this->context->builder->load($resultSlot);
     }
 
     private function implementValueReadHashtable(): void

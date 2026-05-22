@@ -70,6 +70,9 @@ final class Variable {
     /** @var \PHPLLVM\Value|null */
     public ?\PHPLLVM\Value $writableStringKey = null;
 
+    /** @var \PHPLLVM\Value|null */
+    public ?\PHPLLVM\Value $writableObjectKey = null;
+
     /** String literal value when this variable represents a constant string operand. */
     public ?string $compileTimeString = null;
 
@@ -143,11 +146,20 @@ final class Variable {
         if (isset(self::NATIVE_TYPE_MAP[$type])) {
             return self::NATIVE_TYPE_MAP[$type];
         }
+        if (self::TYPE_NULL === $type || self::TYPE_VALUE === $type) {
+            return '__value__';
+        }
 
         return 'unknown(type='.$type.')';
     }
 
-    public static function getTypeFromType(Type $type): int {
+    public static function getTypeFromType(?Type $type): int {
+        if (null === $type) {
+            return self::TYPE_VALUE;
+        }
+        if (null !== $type->userType && 0 === strcasecmp($type->userType, 'SplObjectStorage')) {
+            return self::TYPE_HASHTABLE;
+        }
         if (isset(self::TYPE_MAP[$type->type])) {
             return self::TYPE_MAP[$type->type];
         }
@@ -156,6 +168,9 @@ final class Variable {
         }
         if ($type->type === Type::TYPE_ARRAY) {
             return self::TYPE_HASHTABLE;
+        }
+        if ($type->type === Type::TYPE_NULL) {
+            return self::TYPE_NULL;
         }
         return self::TYPE_VALUE;
     }
@@ -171,6 +186,16 @@ final class Variable {
         Operand $op
     ): Variable {
         $type = self::getTypeFromType($op->type);
+        if ($type === self::TYPE_NULL) {
+            $slot = JitValueBox::alloc($context);
+
+            return new Variable(
+                $context,
+                self::TYPE_VALUE,
+                self::KIND_VARIABLE,
+                $slot
+            );
+        }
         $stringType = self::getStringType($type);
         if ($type === self::TYPE_HASHTABLE) {
             // see if it can be converted into a native array
@@ -227,6 +252,18 @@ final class Variable {
             case self::TYPE_NATIVE_BOOL:
                 $value = $context->constantFromBool($op->value);
                 break;
+            case self::TYPE_NULL:
+                $slot = JitValueBox::alloc($context);
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeNull'),
+                    JitValueBox::pointer($context, $slot)
+                );
+                return new Variable(
+                    $context,
+                    self::TYPE_VALUE,
+                    Variable::KIND_VARIABLE,
+                    $slot
+                );
             default:
                 throw new \LogicException("Literal type " . self::getStringType($type) . " not yet supported");
         }
@@ -334,7 +371,7 @@ final class Variable {
             case self::TYPE_NATIVE_DOUBLE:
                 return;
         }
-        if ($this->type === self::TYPE_VALUE) {
+        if ($this->type === self::TYPE_VALUE || $this->type === self::TYPE_NULL) {
             // TODO: free owned resources
             return;
         }
@@ -368,6 +405,7 @@ final class Variable {
                 );
                 break;
             case self::TYPE_VALUE:
+            case self::TYPE_NULL:
                 $map = $this->context->structFieldMap['__value__'];
                 $this->context->builder->store(
                     $this->context->getTypeFromString('int8')->constInt(self::TYPE_NULL, false),
@@ -433,6 +471,21 @@ final class Variable {
                     }
                 }
                 $ht = $this->context->helper->loadValue($this);
+                if (self::TYPE_VALUE === $dim->type || self::TYPE_OBJECT === $dim->type) {
+                    $keyObj = self::TYPE_OBJECT === $dim->type
+                        ? $this->context->helper->loadValue($dim)
+                        : $this->context->builder->call(
+                            $this->context->lookupFunction('__value__readObject'),
+                            self::KIND_VARIABLE === $dim->kind
+                                ? JitValueBox::pointer($this->context, $dim->value)
+                                : $this->context->helper->loadValue($dim)
+                        );
+                    if ($forWrite) {
+                        return HashTableHelper::writableObjectKeyValueBox($this->context, $ht, $keyObj);
+                    }
+
+                    return HashTableHelper::readObjectKeyToValueBox($this->context, $ht, $keyObj);
+                }
                 if (self::TYPE_STRING === $dim->type) {
                     $key = $this->context->helper->loadValue($dim);
                     if ($forWrite && (null === $expectedType || Type::TYPE_ARRAY !== $expectedType->type)) {
