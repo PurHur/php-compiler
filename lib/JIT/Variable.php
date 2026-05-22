@@ -412,6 +412,14 @@ final class Variable {
                                 $baked
                             );
                         }
+                        $ht = $this->context->helper->loadValue($this);
+                        $keyVal = $this->context->helper->loadValue($dim);
+
+                        return HashTableHelper::readSuperglobalStringKeyToValueBox(
+                            $this->context,
+                            $ht,
+                            $keyVal
+                        );
                     }
                 }
                 $ht = $this->context->helper->loadValue($this);

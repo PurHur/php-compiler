@@ -252,6 +252,44 @@ final class HashTableHelper
         return $var;
     }
 
+    /**
+     * Read a CGI superglobal string slot without multi-block type dispatch (issue #273).
+     * Avoids LLVM dominance failures on ?? left branches when the key is absent at compile time.
+     */
+    public static function readSuperglobalStringKeyToValueBox(
+        Context $context,
+        Value $ht,
+        Value $keyStr
+    ): Variable {
+        $slot = JitValueBox::alloc($context);
+        $destPtr = JitValueBox::pointer($context, $slot);
+        $valPtr = $context->builder->call(
+            $context->lookupFunction('__hashtable__readStringKeyValue'),
+            $ht,
+            $keyStr
+        );
+        $str = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $valPtr
+        );
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $str
+        );
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $destPtr,
+            $owned
+        );
+
+        return new Variable(
+            $context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VARIABLE,
+            $slot
+        );
+    }
+
     public static function readStringKeyToValueBox(Context $context, Value $ht, Value $keyStr): Variable
     {
         static $seq = 0;
