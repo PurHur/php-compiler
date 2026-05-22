@@ -79,9 +79,12 @@ curl -s 'http://127.0.0.1:8080/index.php?route=home'
 make miniwebapp-gates
 ../../script/examples-web-smoke.sh
 MINIWEBAPP_VM_CLI_GATE=1 ../../script/ci-fast.sh --filter 'MiniWebApp.*VmCli'
+MINIWEBAPP_SERVE_GATE=1 ../../script/ci-local.sh --filter ServeTest
 ```
 
 Fast CI runs `MiniWebAppVmCliTest` and `MiniWebAppPathInfoVmCliTest` when `MINIWEBAPP_VM_CLI_GATE=1` (default). Set `MINIWEBAPP_VM_CLI_GATE=0` to skip the VM CLI matrix during iteration.
+
+Full CI runs `ServeTest` `@group miniwebapp` with `--fail-on-skipped` when `MINIWEBAPP_SERVE_GATE=1` (opt-in; default off until promoted in docs).
 
 - [#503](https://github.com/PurHur/php-compiler/issues/503) — gate ladder
 - [#597](https://github.com/PurHur/php-compiler/issues/597) — `MINIWEBAPP_VM_CLI_GATE` in `ci-fast.sh`
@@ -90,6 +93,7 @@ Fast CI runs `MiniWebAppVmCliTest` and `MiniWebAppPathInfoVmCliTest` when `MINIW
 - [#454](https://github.com/PurHur/php-compiler/issues/454) — `ExamplesCompileTest` AOT execute (still skipped)
 - [#461](https://github.com/PurHur/php-compiler/issues/461) — `examples-web-smoke.sh` curls
 - [#470](https://github.com/PurHur/php-compiler/issues/470) — `ServeTest` `@group miniwebapp`
+- [#622](https://github.com/PurHur/php-compiler/issues/622) — `MINIWEBAPP_SERVE_GATE` in `ci-local.sh`
 
 ## Related
 
