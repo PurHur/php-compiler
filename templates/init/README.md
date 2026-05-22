@@ -1,6 +1,6 @@
 # php-compiler web app
 
-Minimal project scaffold from `phpc init`.
+Minimal project scaffold from `phpc init`. For Router + templates layout use `phpc init --profile miniwebapp` (see `examples/003-MiniWebApp/`).
 
 ## Commands
 
