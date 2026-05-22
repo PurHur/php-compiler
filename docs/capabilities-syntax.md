@@ -20,7 +20,7 @@ Tracking issues: [#58](https://github.com/PurHur/php-compiler/issues/58), [#145]
 | Magic constants `__CLASS__`, `__METHOD__`, `__FUNCTION__` | yes | yes | yes | [#199](https://github.com/PurHur/php-compiler/issues/199) | Lowered at parse time via php-cfg MagicStringResolver; compliance PHPT |
 | Magic constant `__NAMESPACE__` | yes | yes | yes | [#199](https://github.com/PurHur/php-compiler/issues/199) | Requires `namespace` declaration (#84); compliance PHPT |
 | Magic constants `__DIR__`, `__FILE__` | yes | yes | yes | [#707](https://github.com/PurHur/php-compiler/issues/707) | VM script stack on include; JIT uses per-unit script path |
-| Magic constant `__LINE__` | no | no | no | [#707](https://github.com/PurHur/php-compiler/issues/707) | Lowered at parse time via php-cfg MagicStringResolver (best effort) |
+| Magic constant `__LINE__` | yes | yes | yes | [#715](https://github.com/PurHur/php-compiler/issues/715) | Per-compile-unit line in TYPE_SCRIPT_MAGIC arg2; include keeps helper lines; compliance PHPT |
 
 _Syntax AOT column reflects `Runtime::MODE_AOT` compile probes unless a row pins AOT (e.g. #568 native link)._
 ## Web north-star (`examples/003-MiniWebApp`)

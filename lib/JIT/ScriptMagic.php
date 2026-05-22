@@ -8,7 +8,7 @@ use PHPCompiler\Block;
 use PHPCompiler\OpCode;
 
 /**
- * Compile-time __DIR__ / __FILE__ for JIT using the unit's script path (#707).
+ * Compile-time __DIR__ / __FILE__ / __LINE__ for JIT (#707, #715).
  */
 final class ScriptMagic
 {
@@ -20,5 +20,10 @@ final class ScriptMagic
         }
 
         return $path;
+    }
+
+    public static function lineFromOpcode(int $line): int
+    {
+        return max(1, $line);
     }
 }

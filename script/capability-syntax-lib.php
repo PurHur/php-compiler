@@ -114,10 +114,10 @@ function syntaxRowDefinitions(): array
         [
             'id' => 'magic_const_line',
             'construct' => 'Magic constant `__LINE__`',
-            'opcodes' => [],
-            'issue' => 707,
-            'notes' => ['Lowered at parse time via php-cfg MagicStringResolver (best effort)'],
-            'probe' => null,
+            'opcodes' => ['TYPE_SCRIPT_MAGIC', 'TYPE_INCLUDE'],
+            'issue' => 715,
+            'notes' => ['Per-compile-unit line in TYPE_SCRIPT_MAGIC arg2; include keeps helper lines'],
+            'probe' => 'function f(): int { return __LINE__; } echo f();',
         ],
     ];
 }
@@ -247,6 +247,7 @@ function collectSyntaxPhptCoverage(string $root, array $definitions): array
         'arrow_functions' => '/\bfn\s*\(/',
         'magic_const_class_method' => '/__CLASS__|__FUNCTION__|__METHOD__/',
         'magic_const_namespace' => '/__NAMESPACE__/',
+        'magic_const_line' => '/__LINE__/',
     ];
 
     $scan = [];

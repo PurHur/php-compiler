@@ -764,10 +764,14 @@ class Compiler {
                 }
                 return $return;
             case Op\Expr\MagicScriptConst::class:
+                $lineArg = Op\Expr\MagicScriptConst::KIND_LINE === $expr->kind
+                    ? max(1, $expr->getLine())
+                    : null;
+
                 return [new OpCode(
                     OpCode::TYPE_SCRIPT_MAGIC,
                     $this->compileOperand($expr->result, $block, false),
-                    null,
+                    $lineArg,
                     $expr->kind,
                 )];
             case Op\Expr\Include_::class:

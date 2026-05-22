@@ -477,13 +477,17 @@ restart:
                     );
                     break;
                 case OpCode::TYPE_SCRIPT_MAGIC:
+                    $dst = $frame->scope[$op->arg1];
+                    if (OpCode::SCRIPT_MAGIC_LINE === $op->arg3) {
+                        $dst->int($op->arg2 ?? 1);
+                        break;
+                    }
                     $script = '' !== $frame->scriptPath
                         ? $frame->scriptPath
                         : $this->context->scriptStack->current();
                     if ('' === $script) {
                         return $this->raise('__DIR__/__FILE__ used without script context', $frame);
                     }
-                    $dst = $frame->scope[$op->arg1];
                     if (OpCode::SCRIPT_MAGIC_DIR === $op->arg3) {
                         $dst->string(dirname($script));
                     } else {

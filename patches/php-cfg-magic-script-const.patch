@@ -10,13 +10,15 @@
 +use PHPCfg\Op\Expr;
 +
 +/**
-+ * Runtime __DIR__ / __FILE__ (issue #707). Lowered to TYPE_SCRIPT_MAGIC in the compiler.
++ * Runtime __DIR__ / __FILE__ / __LINE__ (issues #707, #715). Lowered to TYPE_SCRIPT_MAGIC in the compiler.
 + */
 +class MagicScriptConst extends Expr
 +{
 +    public const KIND_DIR = 1;
 +
 +    public const KIND_FILE = 2;
++
++    public const KIND_LINE = 3;
 +
 +    public int $kind;
 +
@@ -46,6 +48,11 @@
 -                return new Literal($this->fileName);
 +                $op = new Op\Expr\MagicScriptConst(Op\Expr\MagicScriptConst::KIND_FILE, $this->mapAttributes($scalar));
 +                $this->block->children[] = $op;
++                return $op->result;
++            case 'Scalar_MagicConst_Line':
++                $op = new Op\Expr\MagicScriptConst(Op\Expr\MagicScriptConst::KIND_LINE, $this->mapAttributes($scalar));
++                $this->block->children[] = $op;
++
 +                return $op->result;
              case 'Scalar_MagicConst_Namespace':
                  // TODO
