@@ -91,4 +91,15 @@ if ($failures !== []) {
 }
 
 fwrite(STDOUT, 'bootstrap-aot-lint: '.count($profile['aot_lint_targets'])." target(s) OK\n");
+
+if (in_array('--link', $argv, true) || '1' === getenv('PHP_COMPILER_BOOTSTRAP_AOT_LINK')) {
+    $linkScript = $root.'/script/bootstrap-aot-link.sh';
+    if (!is_file($linkScript)) {
+        fwrite(STDERR, "Missing {$linkScript}\n");
+        exit(1);
+    }
+    passthru('bash '.escapeshellarg($linkScript), $linkCode);
+    exit(is_int($linkCode) ? $linkCode : 1);
+}
+
 exit(0);

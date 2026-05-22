@@ -8,27 +8,29 @@ North star: compile a **subset** of php-compiler with itself (native AOT), then 
 |------|---------|--------|
 | Phase A inventory | `php script/bootstrap-inventory.php --check` | ✅ 299 files on `bin/vm.php` path; **10** source blockers (only `lib/AOT/Linker.php`, `lib/VM/HashTable.php` — both excluded) |
 | Phase B AOT lint | `php script/bootstrap-aot-lint.php` | ✅ Procedural targets under `test/bootstrap-aot/` + `examples/000-HelloWorld` |
-| Phase C native run | `bin/compile.php -o …` + execute | ❌ Not started |
+| Phase C native run | `make bootstrap-aot-link` or `./script/bootstrap-aot-link.sh` | ✅ Link + execute `aot_link_targets` (stdout vs Zend PHP) |
 
-Regenerate: `make bootstrap-profile` (inventory + profile + optional `bootstrap-aot-lint`).
+Regenerate: `make bootstrap-profile` (inventory + profile + optional `bootstrap-aot-lint`). Phase C: `make bootstrap-aot-link` (or `php script/bootstrap-aot-lint.php --link`).
 
 ## Blockers to compile `lib/Compiler.php` (priority order)
 
 1. **Namespaces** ([#84](https://github.com/PurHur/php-compiler/issues/84)) — every `lib/` unit uses `namespace PHPCompiler;`
 2. **Class methods** ([#58](https://github.com/PurHur/php-compiler/issues/58), [#145](https://github.com/PurHur/php-compiler/issues/145)) — inventory warns on `Op\Stmt\ClassMethod` across `lib/`
-3. **Nullable typed properties** — `?Type` on fields (e.g. `lib/Frame.php`); nullable **parameters** ✅ (`php-types-nullable-return.patch`, `test/bootstrap-aot/nullable_types.php`)
+3. **Nullable typed properties** — `?Type` on fields with `= null` defaults ✅ (`php-types-fromvalue-null.patch`, `test/bootstrap-aot/class_nullable_property.php`); nullable **parameters** ✅ (`php-types-nullable-return.patch`, `test/bootstrap-aot/nullable_types.php`)
 4. **Try/catch** ([#57](https://github.com/PurHur/php-compiler/issues/57)) — `lib/Runtime.php`, error paths
 5. **LLVM linker** — `lib/AOT/Linker.php` uses `shell_exec` (excluded from profile; keep external `clang` for now)
 6. **Generators** — `lib/VM/HashTable.php` (excluded)
 
 ## Bootstrap AOT lint ladder
 
-Add scripts under `test/bootstrap-aot/*.php` (procedural, no classes) — picked up automatically by `script/bootstrap-profile.php`:
+Add scripts under `test/bootstrap-aot/*.php` — picked up automatically by `script/bootstrap-profile.php` ([#514](https://github.com/PurHur/php-compiler/issues/514)):
 
-- `echo_hello.php` — baseline
+- `echo_hello.php` — baseline procedural
 - `nullable_types.php` — `?string` parameters (self-host typing)
+- `minimal_class.php` — one public method (ClassMethod lowering)
+- `class_nullable_property.php` — nullable property with `= null` default
 
-Next candidates (open issues): typed properties-only fixture, `require_once` chain ([#120](https://github.com/PurHur/php-compiler/issues/120)), single-class smoke after **#58**.
+`php bin/compile.php -l lib/OpCode.php` still fails on class constants (`Const_`); `lib/Frame.php` needs namespaces. Next: `require_once` chain ([#120](https://github.com/PurHur/php-compiler/issues/120)).
 
 ## Non-goals (initial bootstrap)
 
