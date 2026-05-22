@@ -39,6 +39,9 @@ final class LintCompiler extends Compiler
         if ($expr instanceof Op\Expr\ClassConstFetch) {
             return $this->compileClassConstFetch($expr, $block);
         }
+        if ($expr instanceof Op\Expr\InstanceOf_) {
+            return $this->compileInstanceOf($expr, $block);
+        }
 
         try {
             return parent::compileExpr($expr, $block);

@@ -669,6 +669,8 @@ class Compiler {
                     $this->compileOperand($expr->var, $block, true),
                     $expr->byRef ? 1 : 0
                 )];
+            case Op\Expr\InstanceOf_::class:
+                return $this->compileInstanceOf($expr, $block);
         }
         throw new \LogicException("Unsupported expression: " . $expr->getType());
     }
@@ -1195,6 +1197,19 @@ class Compiler {
     }
 
 
+
+    /**
+     * @return OpCode[]
+     */
+    protected function compileInstanceOf(Op\Expr\InstanceOf_ $expr, Block $block): array
+    {
+        return [new OpCode(
+            OpCode::TYPE_INSTANCEOF,
+            $this->compileOperand($expr->result, $block, false),
+            $this->compileOperand($expr->expr, $block, true),
+            $this->compileOperand($expr->class, $block, true)
+        )];
+    }
 
     /**
      * @return OpCode[]

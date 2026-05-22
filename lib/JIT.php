@@ -414,6 +414,9 @@ class JIT {
                 case OpCode::TYPE_CLASS_CONST_FETCH:
                     // Recorded at compile time; JIT does not resolve class constants yet.
                     break;
+                case OpCode::TYPE_INSTANCEOF:
+                    // Recorded at compile time; JIT instanceof is not implemented yet.
+                    break;
                 case OpCode::TYPE_CAST_BOOL:
                     $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));
                     $this->assignOperand($block->getOperand($op->arg1), $value->castTo(Variable::TYPE_NATIVE_BOOL));
