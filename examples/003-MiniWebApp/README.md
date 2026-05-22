@@ -109,6 +109,12 @@ Full CI runs `ServeTest` `@group miniwebapp` with `--fail-on-skipped` when `MINI
 
 Full CI runs `script/examples-web-smoke.sh --miniwebapp-only` after serve PHPUnit when `MINIWEBAPP_WEB_SMOKE_GATE=1` (default on in `ci-local.sh`; set `MINIWEBAPP_WEB_SMOKE_GATE=0` to skip during iteration — [#664](https://github.com/PurHur/php-compiler/issues/664)). Not run in `ci-fast.sh`. Skips when `PHP_COMPILER_SKIP_SERVE_TESTS=1` or loopback bind fails (same as `ServeTest`).
 
+Oversized POST body limit (stage 3, [#705](https://github.com/PurHur/php-compiler/issues/705)): after PATH_INFO curls, `examples-web-smoke.sh` starts `phpc serve` with `PHP_COMPILER_MAX_BODY=1024` (override via env) and POSTs a body larger than the limit to `/index.php/contact`; the step fails if HTTP status is `200` (expect `413` or connection reset). Manual probe:
+
+```console
+PHP_COMPILER_MAX_BODY=1024 ../../script/examples-web-smoke.sh --miniwebapp-only
+```
+
 - [#503](https://github.com/PurHur/php-compiler/issues/503) — gate ladder
 - [#597](https://github.com/PurHur/php-compiler/issues/597) — `MINIWEBAPP_VM_CLI_GATE` in `ci-fast.sh`
 - [#586](https://github.com/PurHur/php-compiler/issues/586) — `?route=` VM CLI matrix
@@ -120,6 +126,7 @@ Full CI runs `script/examples-web-smoke.sh --miniwebapp-only` after serve PHPUni
 - [#641](https://github.com/PurHur/php-compiler/issues/641) — default `MINIWEBAPP_SERVE_GATE=1` in full/fast CI
 - [#633](https://github.com/PurHur/php-compiler/issues/633) — `MINIWEBAPP_WEB_SMOKE_GATE` in `ci-local.sh`
 - [#664](https://github.com/PurHur/php-compiler/issues/664) — default `MINIWEBAPP_WEB_SMOKE_GATE=1` in full CI
+- [#705](https://github.com/PurHur/php-compiler/issues/705) — oversized POST check in `examples-web-smoke.sh`
 - [#675](https://github.com/PurHur/php-compiler/issues/675) — stage 4a AOT dry-run in gate ladder
 - [#683](https://github.com/PurHur/php-compiler/issues/683) — stage 4c `examples-aot-smoke` 003 slice probe
 
