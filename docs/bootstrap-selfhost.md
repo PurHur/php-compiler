@@ -30,8 +30,9 @@ Add scripts under `test/bootstrap-aot/*.php` — picked up automatically by `scr
 - `namespace_hello.php` — single-file `namespace` + unqualified calls ([#513](https://github.com/PurHur/php-compiler/issues/513), [#84](https://github.com/PurHur/php-compiler/issues/84))
 - `minimal_class.php` — one public method (ClassMethod lowering)
 - `class_nullable_property.php` — nullable property with `= null` default
+- `class_constants.php` — class `Const_` declarations (issue #84)
 
-`php bin/compile.php -l lib/OpCode.php` still fails on class constants (`Const_`); `lib/Frame.php` needs namespaces. Next: `require_once` chain ([#120](https://github.com/PurHur/php-compiler/issues/120)).
+`php bin/compile.php -l lib/OpCode.php` passes after `TYPE_DECLARE_CLASS_CONST` lowering; `lib/Frame.php` still needs namespaces. Next: `require_once` chain ([#120](https://github.com/PurHur/php-compiler/issues/120)).
 
 ## Non-goals (initial bootstrap)
 

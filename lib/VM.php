@@ -485,6 +485,9 @@ restart:
                         $entry->constructor = $method;
                     }
                     break;
+                case OpCode::TYPE_DECLARE_CLASS_CONST:
+                    // Recorded at compile time; VM does not resolve class constants yet.
+                    break;
                 default:
                     var_dump($op);
                     throw new \LogicException('Other class body types are not jittable for now');
