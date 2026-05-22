@@ -12,6 +12,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -22,6 +23,9 @@ final class JitStat
 
     /** offsetof(struct stat, st_mode) on Linux x86_64 glibc */
     private const STAT_MODE_OFFSET = 24;
+
+    /** offsetof(struct stat, st_size) on Linux x86_64 glibc */
+    private const STAT_SIZE_OFFSET = 48;
 
     private const S_IFMT = 0xF000;
     private const S_IFREG = 0x8000;
@@ -42,6 +46,51 @@ final class JitStat
     public static function pathIsDir(Context $context, Value $str): Value
     {
         return self::modeMatches($context, $str, self::S_IFDIR);
+    }
+
+    /** @return Value __value__* (native long size, or boolean false when stat fails) */
+    public static function pathFileSizeBoxed(Context $context, Value $str): Value
+    {
+        $map = $context->structFieldMap['__string__'];
+        $pathPtr = $context->builder->structGep($str, $map['value']);
+        $i8 = $context->getTypeFromString('int8');
+        $bufType = $i8->arrayType(self::STAT_BUF_SIZE);
+        $buf = $context->builder->alloca($bufType, 1, 'filesize_stat_buf');
+        $i8p = $context->getTypeFromString('int8*');
+        $bufPtr = $context->builder->pointerCast($buf, $i8p);
+        $ret = $context->builder->call(
+            $context->lookupFunction('stat'),
+            $pathPtr,
+            $bufPtr
+        );
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i32->constInt(0, false);
+        $failed = $context->builder->icmp(Builder::INT_NE, $ret, $zero);
+
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $id = (string) (++self::$blockSerial);
+        $failBlock = BasicBlockHelper::append($context, 'filesize_fail_'.$id);
+        $okBlock = BasicBlockHelper::append($context, 'filesize_ok_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, 'filesize_done_'.$id);
+        $context->builder->branchIf($failed, $failBlock, $okBlock);
+
+        $context->builder->positionAtEnd($failBlock);
+        $i1 = $context->getTypeFromString('int1');
+        JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($okBlock);
+        $bytePtr = $context->builder->gep($bufPtr, $i64->constInt(self::STAT_SIZE_OFFSET, false));
+        $sizePtr = $context->builder->pointerCast($bytePtr, $i64->pointerType(0));
+        $size64 = $context->builder->load($sizePtr);
+        JitValueBox::writeLong($context, $slot, $size64);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+
+        return $ptr;
     }
 
     private static function statSucceeded(Context $context, Value $str): Value

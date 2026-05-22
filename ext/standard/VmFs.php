@@ -30,6 +30,16 @@ final class VmFs
         return $ht;
     }
 
+    public static function fileSize(string $path): int|false
+    {
+        $stat = @stat($path);
+        if (false === $stat) {
+            return false;
+        }
+
+        return (int) $stat['size'];
+    }
+
     public static function fileGetContents(string $path): string|false
     {
         if ('php://input' === $path) {
