@@ -29,7 +29,8 @@ Some constructs (for example `break`/`continue`, `list()` / short-list destructu
 
 | CFG kind | Tracking |
 |----------|----------|
-| `Expr_Throw`, `Stmt_Try`, `Stmt_Catch`, `Stmt_Finally` | [#195](https://github.com/PurHur/php-compiler/issues/195) |
+| `Expr_Throw` | [#195](https://github.com/PurHur/php-compiler/issues/195) |
+| `Stmt_Try`, `Stmt_TryCatch`, `Stmt_Catch`, `Stmt_Finally` | [#57](https://github.com/PurHur/php-compiler/issues/57) (AOT lint lowering; VM unwind follow-up) |
 | `Expr_AssignOp_Coalesce` (`??=`) | [#99](https://github.com/PurHur/php-compiler/issues/99) |
 | `Expr_Match` | [#143](https://github.com/PurHur/php-compiler/issues/143) |
 | `Expr_Yield`, `Expr_YieldFrom` | [#167](https://github.com/PurHur/php-compiler/issues/167) |

@@ -95,6 +95,9 @@ class JIT {
                     case 'string':
                         $callbackType = '__string__*';
                         break;
+                    case 'bool':
+                        $callbackType = 'bool';
+                        break;
                     default:
                         throw new \LogicException("Non-void return types not supported yet");
                 }
@@ -412,10 +415,19 @@ class JIT {
                     $this->assignOperand($block->getOperand($op->arg1), $value);
                     break;
                 case OpCode::TYPE_CLASS_CONST_FETCH:
-                    // Recorded at compile time; JIT does not resolve class constants yet.
+                    $classOp = $block->getOperand($op->arg2);
+                    $nameOp = $block->getOperand($op->arg3);
+                    assert($nameOp instanceof Operand\Literal);
+                    $classId = $this->context->type->object->resolveClassId($classOp);
+                    $value = $this->context->type->object->classConstFetch($classId, $nameOp->value);
+                    $this->assignOperand($block->getOperand($op->arg1), $value);
                     break;
                 case OpCode::TYPE_INSTANCEOF:
-                    // Recorded at compile time; JIT instanceof is not implemented yet.
+                    $classOp = $block->getOperand($op->arg3);
+                    assert($classOp instanceof Operand\Literal);
+                    $expr = $this->context->getVariableFromOp($block->getOperand($op->arg2));
+                    $result = $this->context->type->object->emitInstanceOf($expr, $classOp->value);
+                    $this->assignOperand($block->getOperand($op->arg1), $result);
                     break;
                 case OpCode::TYPE_STATIC_PROPERTY_FETCH:
                     // Recorded at compile time; JIT static property fetch is not implemented yet.
@@ -426,13 +438,6 @@ class JIT {
                 case OpCode::TYPE_CAST_BOOL:
                     $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));
                     $this->assignOperand($block->getOperand($op->arg1), $value->castTo(Variable::TYPE_NATIVE_BOOL));
-                    break;
-                case OpCode::TYPE_CAST_STRING:
-                    $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));
-                    $this->assignOperand(
-                        $block->getOperand($op->arg1),
-                        JIT\JitNativeString::coerce($this->context, $value)
-                    );
                     break;
                 case OpCode::TYPE_ECHO:
                 case OpCode::TYPE_PRINT:
@@ -691,13 +696,16 @@ class JIT {
                     $this->context->freeDeadVariables($func, $branchBlock, $block);
                     $builder->branchIf($condition, $if, $else);
                     return $origBasicBlock;
-                case OpCode::TYPE_THROW:
-                    $throwBlock = $builder->getInsertBlock();
-                    $builder->positionAtEnd($throwBlock);
-                    $this->context->freeDeadVariables($func, $throwBlock, $block);
-                    $this->context->builder->call($this->context->lookupFunction('abort'));
-                    $this->context->llvm->lib->LLVMBuildUnreachable($this->context->builder->builder);
+                case OpCode::TYPE_TRY:
+                case OpCode::TYPE_CATCH:
+                case OpCode::TYPE_FINALLY:
+                    if (null !== $op->block1) {
+                        $this->compileBlockInternal($func, $op->block1, null, null, ...$args);
+                    }
                     return $origBasicBlock;
+                case OpCode::TYPE_THROW:
+                    // AOT lint: throw terminal lowering only; no JIT emission yet (issue #57).
+                    break;
                 case OpCode::TYPE_RETURN_VOID:
                     $returnBlock = $builder->getInsertBlock();
                     $builder->positionAtEnd($returnBlock);
@@ -716,10 +724,7 @@ class JIT {
                         $return->addref();
                         $retval = $this->context->helper->loadValue($return);
                         $expected = $this->context->functionReturnType[$this->context->activeFunction] ?? null;
-                        if (
-                            '__string__*' === $expected
-                            && Variable::TYPE_VALUE === $return->type
-                        ) {
+                        if (Variable::TYPE_VALUE === $return->type) {
                             $valuePtr = Variable::KIND_VARIABLE === $return->kind
                                 ? $return->value
                                 : $this->context->builder->alloca(
@@ -730,10 +735,25 @@ class JIT {
                             if (Variable::KIND_VALUE === $return->kind) {
                                 $this->context->builder->store($retval, $valuePtr);
                             }
-                            $retval = $this->context->builder->call(
-                                $this->context->lookupFunction('__value__readString'),
-                                $valuePtr
-                            );
+                            if ('__string__*' === $expected) {
+                                $retval = $this->context->builder->call(
+                                    $this->context->lookupFunction('__value__readString'),
+                                    $valuePtr
+                                );
+                            } elseif ('long long' === $expected) {
+                                $retval = $this->context->builder->call(
+                                    $this->context->lookupFunction('__value__readLong'),
+                                    $valuePtr
+                                );
+                            } elseif ('bool' === $expected) {
+                                $retval = $this->context->builder->truncOrBitCast(
+                                    $this->context->builder->call(
+                                        $this->context->lookupFunction('__value__readLong'),
+                                        $valuePtr
+                                    ),
+                                    $this->context->getTypeFromString('int1')
+                                );
+                            }
                         }
                         $this->context->builder->returnValue($retval);
                     }
@@ -985,6 +1005,14 @@ class JIT {
                         $this->context->helper->loadValue($value)
                     );
                     $result->valueBoxHashtable = true;
+
+                    return;
+                case Variable::TYPE_OBJECT:
+                    $this->context->builder->call(
+                        $this->context->lookupFunction('__value__writeObject'),
+                        $valueRef,
+                        $this->context->helper->loadValue($value)
+                    );
 
                     return;
                 case Variable::TYPE_VALUE:

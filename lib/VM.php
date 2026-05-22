@@ -458,6 +458,16 @@ restart:
                         $container->toArray()->iterCurrentValue($byRef)
                     );
                     break;
+                case OpCode::TYPE_TRY:
+                    $frame = $op->block1->getFrame($this->context, $frame);
+                    goto restart;
+                case OpCode::TYPE_CATCH:
+                case OpCode::TYPE_FINALLY:
+                    if (null !== $op->block2) {
+                        $frame = $op->block2->getFrame($this->context, $frame);
+                        goto restart;
+                    }
+                    break;
                 case OpCode::TYPE_THROW:
                     $thrown = $frame->scope[$op->arg1]->resolveIndirect();
                     if (Variable::TYPE_OBJECT === $thrown->type) {
