@@ -932,6 +932,25 @@ final class VmString
     }
 
     /**
+     * @return string|false
+     */
+    public static function stristr(string $haystack, string $needle, bool $beforeNeedle = false)
+    {
+        if ('' === $needle) {
+            throw new \LogicException('stristr(): Argument #2 ($needle) cannot be empty');
+        }
+        $pos = self::findSubstringCaseInsensitive($haystack, $needle, 0);
+        if (false === $pos) {
+            return false;
+        }
+        if ($beforeNeedle) {
+            return self::byteSlice($haystack, 0, $pos);
+        }
+
+        return self::byteSlice($haystack, $pos);
+    }
+
+    /**
      * Count non-overlapping occurrences of $needle in $haystack (byte-safe subset of PHP).
      */
     public static function substr_count(
