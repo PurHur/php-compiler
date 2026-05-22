@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\VM;
 
 /**
- * Tracks the currently executing script path for __DIR__ / __FILE__ (issue #707, #85).
+ * Tracks the currently executing script path for __DIR__ / __FILE__ (issues #707, #85, #715).
  */
 final class ScriptStack
 {

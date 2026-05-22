@@ -446,13 +446,24 @@ class JIT {
                     $this->assignOperand($block->getOperand($op->arg1), $value);
                     break;
                 case OpCode::TYPE_SCRIPT_MAGIC:
-                    $magicStr = JIT\ScriptMagic::stringForBlock($block, (int) $op->arg3);
-                    $lit = new Operand\Literal($magicStr);
-                    $lit->type = \PHPTypes\Type::string();
-                    $this->assignOperand(
-                        $block->getOperand($op->arg1),
-                        JIT\Variable::fromLiteral($this->context, $lit)
-                    );
+                    if (OpCode::SCRIPT_MAGIC_LINE === (int) $op->arg3) {
+                        $line = null !== $op->arg2 ? (int) $op->arg2 : 1;
+                        if ($line < 1) {
+                            $line = 1;
+                        }
+                        $this->assignOperand(
+                            $block->getOperand($op->arg1),
+                            JIT\Variable::fromConstantInt($this->context, $line)
+                        );
+                    } else {
+                        $magicStr = JIT\ScriptMagic::stringForBlock($block, (int) $op->arg3);
+                        $lit = new Operand\Literal($magicStr);
+                        $lit->type = \PHPTypes\Type::string();
+                        $this->assignOperand(
+                            $block->getOperand($op->arg1),
+                            JIT\Variable::fromLiteral($this->context, $lit)
+                        );
+                    }
                     break;
                 case OpCode::TYPE_INCLUDE:
                     JIT\IncludeHelper::compileLiteral(

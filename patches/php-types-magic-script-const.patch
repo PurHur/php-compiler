@@ -6,6 +6,10 @@
                  // TODO: we may be able to determine these...
                  return false;
 +            case 'Expr_MagicScriptConst':
++                if (\PHPCfg\Op\Expr\MagicScriptConst::KIND_LINE === $op->kind) {
++                    return [Type::int()];
++                }
++
 +                return [Type::string()];
          }
  
