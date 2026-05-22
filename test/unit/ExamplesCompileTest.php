@@ -23,10 +23,12 @@ final class ExamplesCompileTest extends TestCase
     private static ?bool $llvmReady = null;
 
     /**
-     * MiniWebApp progress gate — skipped until #67 (class/method blockers).
+     * MiniWebApp AOT execute gate — blocked on JIT class opcodes (#58); bundle/lint green (#452, #485).
      *
      * @group miniwebapp
      * @group llvm
+     * @group aot
+     * @group aot-link
      */
     public function test003MiniWebAppEventuallyRuns(): void
     {
@@ -34,8 +36,13 @@ final class ExamplesCompileTest extends TestCase
         if (!is_file($index)) {
             $this->markTestSkipped('examples/003-MiniWebApp/public/index.php missing (#246)');
         }
+        if (!self::isLlvmReady()) {
+            $this->markTestSkipped(
+                'LLVM 9 toolchain not available. Run script/install-llvm9.sh from the repository root.'
+            );
+        }
         $this->markTestSkipped(
-            'Blocked by #58/#145 (class methods) — see examples/003-MiniWebApp/README.md'
+            'Blocked by #58 (JIT TYPE_DECLARE_CLASS / method calls) — AOT bundle fixed in #452'
         );
     }
 

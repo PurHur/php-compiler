@@ -646,12 +646,16 @@ class JIT {
                     return $origBasicBlock;
                 case OpCode::TYPE_RETURN:
                     $return = $this->context->getVariableFromOp($block->getOperand($op->arg1));
-                    $return->addref();
-                    $retval = $this->context->helper->loadValue($return);
                     $returnBlock = $builder->getInsertBlock();
                     $builder->positionAtEnd($returnBlock);
                     $this->context->freeDeadVariables($func, $returnBlock, $block);
-                    $this->context->builder->returnValue($retval);
+                    if ($this->isVoidCfgFunction($block)) {
+                        $this->context->builder->returnVoid();
+                    } else {
+                        $return->addref();
+                        $retval = $this->context->helper->loadValue($return);
+                        $this->context->builder->returnValue($retval);
+                    }
     
                     return $origBasicBlock;
                 case OpCode::TYPE_FUNCDEF:
@@ -720,6 +724,22 @@ class JIT {
         }
 
         return $builder->getInsertBlock();
+    }
+
+    private function isVoidCfgFunction(Block $block): bool
+    {
+        $cfgFunc = $block->func;
+        if (null === $cfgFunc) {
+            return false;
+        }
+        if ($cfgFunc->returnType instanceof Op\Type\Void_) {
+            return true;
+        }
+        if ($cfgFunc->returnType instanceof Op\Type\Literal) {
+            return 'void' === $cfgFunc->returnType->name;
+        }
+
+        return false;
     }
 
     private function compileClass(?Block $block, int $classId) {

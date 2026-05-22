@@ -53,7 +53,8 @@ class Analyzer
                 || $usage instanceof Op\Phi
                 || $usage instanceof Op\Expr\FuncCall
                 || $usage instanceof Op\Expr\ConcatList
-                || $usage instanceof Op\Expr\Assertion) {
+                || $usage instanceof Op\Expr\Assertion
+                || $usage instanceof Op\Terminal\Return_) {
                 continue;
             } else {
                 throw new \LogicException('Not implemented escape operand '.get_class($usage));
