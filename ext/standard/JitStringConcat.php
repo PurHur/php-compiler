@@ -61,6 +61,9 @@ final class JitStringConcat
         $result = $context->builder->phi($dest->typeOf());
         $result->addIncoming($emptyStr, $emptyBlock);
         $result->addIncoming($dest, $workBlock);
+        $restBlock = BasicBlockHelper::append($context, 'concat_rest');
+        $context->builder->branch($restBlock);
+        $context->builder->positionAtEnd($restBlock);
 
         return $result;
     }

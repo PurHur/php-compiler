@@ -175,6 +175,9 @@ final class strval extends Internal
         $phi->addIncoming($doubleStr, $doubleEndBlock);
         $phi->addIncoming($stringVal, $stringBlock);
         $phi->addIncoming($fallbackEmpty, $fallbackBlock);
+        $restBlock = BasicBlockHelper::append($context, 'strval_value_rest');
+        $context->builder->branch($restBlock);
+        $context->builder->positionAtEnd($restBlock);
 
         return $phi;
     }

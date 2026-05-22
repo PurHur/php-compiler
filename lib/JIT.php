@@ -169,6 +169,8 @@ class JIT {
             $argVars[] = new Variable($this->context, Variable::getTypeFromType($rawTypes[$idx]), Variable::KIND_VALUE, $func->getParam($idx));
         }
 
+        $lcname = strtolower($internalName);
+        $this->context->functions[$lcname] = $func;
         if (!is_null($funcName)) {
             $lcname = strtolower($funcName);
             $this->context->activeFunction = $lcname;

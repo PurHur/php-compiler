@@ -84,6 +84,9 @@ final class IncludeHelper
             $context->popScope();
         }
         $context->builder->positionAtEnd($exitBb);
+        if (null === $exitBb->getTerminator()) {
+            $context->builder->returnVoid();
+        }
 
         if (null !== $resultOperand) {
             $jit->assignIncludeResult($resultOperand);

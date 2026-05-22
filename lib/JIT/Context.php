@@ -273,6 +273,17 @@ class Context {
         if (!is_null($this->debugFile)) {
             $this->module->printToFile($this->debugFile . '.bc');
         }
+        $function = $this->module->getFirstFunction();
+        while (null !== $function) {
+            if ($function instanceof PHPLLVM\Value\Function_) {
+                BasicBlockHelper::sealFunction($this, $function);
+            }
+            $next = $function->getNext();
+            if (null === $next) {
+                break;
+            }
+            $function = $next;
+        }
         $this->module->verify($this->module::VERIFY_ACTION_THROW, $message);   
     }
 
