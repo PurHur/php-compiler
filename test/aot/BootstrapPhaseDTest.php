@@ -25,11 +25,6 @@ final class BootstrapPhaseDTest extends TestCase
                 'LLVM 9 toolchain not available. Run script/install-llvm9.sh from the repository root.'
             );
         }
-        if (getenv('PHP_COMPILER_BOOTSTRAP_PHASE_D') !== '1') {
-            $this->markTestSkipped(
-                'Phase D lib/OpCode link pending ReflectionClass JIT (#540); export PHP_COMPILER_BOOTSTRAP_PHASE_D=1 to run.'
-            );
-        }
         $root = dirname(__DIR__, 2);
         $source = $root.'/test/bootstrap-aot/lib_opcode/main.php';
         $this->assertFileExists($source);
@@ -67,7 +62,7 @@ final class BootstrapPhaseDTest extends TestCase
         $expected = shell_exec(escapeshellarg(PHP_BINARY).' '.escapeshellarg($source).' 2>/dev/null');
         $actual = shell_exec(escapeshellarg($binary).' 2>/dev/null');
         $this->assertSame($expected, $actual);
-        $this->assertStringContainsString("1\n2\n", (string) $actual);
+        $this->assertStringContainsString("ok\n", (string) $actual);
 
         @unlink($binary);
     }
@@ -77,11 +72,6 @@ final class BootstrapPhaseDTest extends TestCase
         if (!self::isLlvmReady()) {
             $this->markTestSkipped(
                 'LLVM 9 toolchain not available. Run script/install-llvm9.sh from the repository root.'
-            );
-        }
-        if (getenv('PHP_COMPILER_BOOTSTRAP_PHASE_D') !== '1') {
-            $this->markTestSkipped(
-                'Phase D lib/OpCode link pending ReflectionClass JIT (#540); export PHP_COMPILER_BOOTSTRAP_PHASE_D=1 to run.'
             );
         }
         $root = dirname(__DIR__, 2);

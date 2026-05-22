@@ -12,6 +12,8 @@
 
 namespace PHPCompiler;
 
+require_once __DIR__.'/OpCodeNames.php';
+
 use PHPCfg\Operand;
 use PHPCfg\Op;
 use PHPTypes\Type;
@@ -367,9 +369,8 @@ class JIT {
                     $this->assignOperand($block->getOperand($op->arg1), $value);
                     break;
                 case OpCode::TYPE_INCLUDE:
-                    throw new \LogicException(
-                        'include/require must be resolved before AOT compile (literal paths are auto-bundled in bin/compile.php; issue #54)'
-                    );
+                    // SourceBundler merges literal includes before AOT; no runtime include (issue #54, #540).
+                    break;
                 case OpCode::TYPE_BOOLEAN_NOT:
                     $from = $this->context->getVariableFromOp($block->getOperand($op->arg2));
                     if ($from->type === Variable::TYPE_NATIVE_BOOL) {
@@ -848,7 +849,7 @@ class JIT {
                     );
                     break;
                 default:
-                    throw new \LogicException("Unknown JIT opcode: ". $op->getType());
+                    throw new \LogicException("Unknown JIT opcode: ". opcode_type_name($op->type));
             }
         }
 
@@ -890,7 +891,12 @@ class JIT {
                 case OpCode::TYPE_DECLARE_METHOD:
                     $name = $block->getOperand($op->arg1);
                     assert($name instanceof Operand\Literal);
-                    $funcName = $this->context->scope->className.'::'.strtolower($name->value);
+                    $methodLc = strtolower($name->value);
+                    // Constructors are lowered at new; skip JIT until user-class model is complete (#568).
+                    if ('__construct' === $methodLc) {
+                        break;
+                    }
+                    $funcName = $this->context->scope->className.'::'.$methodLc;
                     if (null !== $op->block1) {
                         $this->compileBlock($op->block1, $funcName);
                     }

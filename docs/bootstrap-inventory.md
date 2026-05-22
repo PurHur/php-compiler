@@ -8,7 +8,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 302 |
+| PHP files on vm.php path | 303 |
 | Source constructs flagged (blockers) | 10 |
 | Source constructs flagged (warnings) | 816 |
 
@@ -301,6 +301,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `lib/ModuleAbstract.php` | 0 | 1 |
 | `lib/NullSafeLivenessDetector.php` | 0 | 1 |
 | `lib/OpCode.php` | 0 | 1 |
+| `lib/OpCodeNames.php` | 0 | 0 |
 | `lib/Printer.php` | 0 | 1 |
 | `lib/Runtime.php` | 0 | 21 |
 | `lib/VM.php` | 0 | 10 |
@@ -2133,6 +2134,10 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/OpCodeNames.php`
+
+(No blockers or warnings.)
 
 ### `lib/Printer.php`
 

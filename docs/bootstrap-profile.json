@@ -1,4 +1,3 @@
-Wrote /compiler/docs/bootstrap-profile.json (13 AOT lint targets, 2 excluded files)
 {
     "phase": "B",
     "issue": 212,
@@ -301,6 +300,7 @@ Wrote /compiler/docs/bootstrap-profile.json (13 AOT lint targets, 2 excluded fil
         "lib/ModuleAbstract.php",
         "lib/NullSafeLivenessDetector.php",
         "lib/OpCode.php",
+        "lib/OpCodeNames.php",
         "lib/Printer.php",
         "lib/Runtime.php",
         "lib/VM.php",
@@ -364,9 +364,9 @@ Wrote /compiler/docs/bootstrap-profile.json (13 AOT lint targets, 2 excluded fil
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 302,
+        "inventory_files": 303,
         "excluded": 2,
-        "eligible": 300,
+        "eligible": 301,
         "aot_lint_targets": 13,
         "aot_link_targets": 11,
         "aot_link_lib_targets": 1

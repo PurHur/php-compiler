@@ -9,6 +9,8 @@
 
 namespace PHPCompiler;
 
+require_once __DIR__.'/OpCodeNames.php';
+
 use SplObjectStorage;
 use PHPCfg\Func as CfgFunc;
 use PHPCfg\Op;
@@ -306,7 +308,7 @@ class Compiler {
                 $block->addOpCode($terminalOp);
             }
         } else {
-            throw new \LogicException("Unknown Op Type: " . $op->getType());
+            throw new \LogicException("Unknown Op Type: " . opcode_type_name($op->type));
         }
     }
 

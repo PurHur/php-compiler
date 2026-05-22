@@ -232,7 +232,7 @@ function bootstrapDefaultAotLinkTargets(array $lintTargets): array
 {
     $pendingUserFunc = [
         'test/bootstrap-aot/try_catch.php', // try/catch CFG link (#57); VM unwind pending
-        'test/bootstrap-aot/lib_opcode/main.php', // Phase D namespaced lib/ link (#540)
+        'test/bootstrap-aot/lib_opcode/main.php', // Phase D: aot_link_lib_targets only (#540)
     ];
 
     return array_values(array_filter(

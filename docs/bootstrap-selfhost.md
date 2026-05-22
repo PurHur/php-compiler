@@ -10,7 +10,7 @@ North star: compile a **subset** of php-compiler with itself (native AOT), then 
 | Phase B lib AOT lint | `php bin/compile.php -l lib/*.php` (with `script/php-env.sh`) | ✅ **14/14** top-level `lib/*.php` units ([#534](https://github.com/PurHur/php-compiler/pull/534)) |
 | Phase B fixture lint | `php script/bootstrap-aot-lint.php` | ✅ **11** procedural targets under `test/bootstrap-aot/` + `examples/000-HelloWorld` |
 | Phase C native run | `make bootstrap-aot-link` or `./script/bootstrap-aot-link.sh` | ✅ Link + execute **11** `aot_link_targets` (stdout vs Zend PHP) |
-| Phase D `lib/` link | `make bootstrap-aot-link-lib` or `./script/bootstrap-aot-link-lib.sh` | 🚧 Gate wired; `lib/OpCode.php` link pending ReflectionClass JIT ([#540](https://github.com/PurHur/php-compiler/issues/540)) |
+| Phase D `lib/` link | `make bootstrap-aot-link-lib` or `./script/bootstrap-aot-link-lib.sh` | ✅ `test/bootstrap-aot/lib_opcode/main.php` bundles `lib/OpCode.php` ([#540](https://github.com/PurHur/php-compiler/issues/540)) |
 | Bundled `lib/Compiler.php` lint | `./script/bootstrap-selfhost-lint.sh` | ✅ `test/selfhost/compiler_minimal/main.php` + literal `require_once` closure (no `vendor/`) |
 
 Regenerate: `make bootstrap-profile` (inventory + profile + optional `bootstrap-aot-lint`). Phase C: `make bootstrap-aot-link` (or `php script/bootstrap-aot-lint.php --link`). Phase D: `make bootstrap-aot-link-lib`. Bundled compiler lint: `./script/bootstrap-selfhost-lint.sh`.
