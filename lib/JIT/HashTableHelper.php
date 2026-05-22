@@ -531,4 +531,92 @@ final class HashTableHelper
                 );
         }
     }
+
+    /**
+     * SplObjectStorage-style map: object identity keys (issue #600 / self-host Compiler.php).
+     */
+    public static function readObjectKeyToValueBox(Context $context, Value $ht, Value $keyObj): Variable
+    {
+        $slot = JitValueBox::alloc($context);
+        $destPtr = JitValueBox::pointer($context, $slot);
+        $valPtr = $context->builder->call(
+            $context->lookupFunction('__hashtable__readObjectKeyValue'),
+            $ht,
+            $keyObj
+        );
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            $destPtr
+        );
+        $nullType = $context->getTypeFromString('int8')->constInt(0, false);
+        $isNullPtr = $context->builder->icmp(
+            Builder::INT_EQ,
+            $valPtr,
+            $valPtr->typeOf()->constNull()
+        );
+        $copy = BasicBlockHelper::append($context, 'ht_ok_copy');
+        $done = BasicBlockHelper::append($context, 'ht_ok_done');
+        $context->builder->branchIf($isNullPtr, $done, $copy);
+        $context->builder->positionAtEnd($copy);
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valPtr, $context->structFieldMap['__value__']['type'])
+        );
+        $isSet = $context->builder->icmp(
+            Builder::INT_NE,
+            $typeByte,
+            $nullType
+        );
+        $doCopy = BasicBlockHelper::append($context, 'ht_ok_do_copy');
+        $context->builder->branchIf($isSet, $doCopy, $done);
+        $context->builder->positionAtEnd($doCopy);
+        JitValueBox::copyFromPointer($context, $destPtr, $valPtr);
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($done);
+
+        return new Variable(
+            $context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VARIABLE,
+            $slot
+        );
+    }
+
+    public static function writableObjectKeyValueBox(Context $context, Value $ht, Value $keyObj): Variable
+    {
+        $i1 = $context->getTypeFromString('int1');
+        $isSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSetObjectKey'),
+            $ht,
+            $keyObj
+        );
+        $create = BasicBlockHelper::append($context, 'ht_ok_write_create');
+        $ready = BasicBlockHelper::append($context, 'ht_ok_write_ready');
+        $context->builder->branchIf($isSet, $ready, $create);
+
+        $context->builder->positionAtEnd($create);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setObjectKeyLong'),
+            $ht,
+            $keyObj,
+            $context->constantFromInteger(0, 'int64')
+        );
+        $context->builder->branch($ready);
+
+        $context->builder->positionAtEnd($ready);
+        $valPtr = $context->builder->call(
+            $context->lookupFunction('__hashtable__readObjectKeyValue'),
+            $ht,
+            $keyObj
+        );
+        $var = new Variable(
+            $context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VARIABLE,
+            $valPtr
+        );
+        $var->writableHt = $ht;
+        $var->writableObjectKey = $keyObj;
+
+        return $var;
+    }
 }

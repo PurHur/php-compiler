@@ -191,6 +191,9 @@ class Context {
         if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
             SuperglobalInit::declareRefresh($this);
         }
+
+        $this->functionProxies['is_null'] = new Builtin\IsNullFn();
+        $this->functionProxies['phpcompiler\\is_null'] = new Builtin\IsNullFn();
     }
 
     public function compileToFile(string $file) {
@@ -212,7 +215,6 @@ class Context {
             $this->builder->returnValue($i32->constInt(0, false));
         }
         $this->compileCommon();
-
 
         $engine = $this->module->createExecutionEngine();
         $machine = $engine->getTargetMachine();

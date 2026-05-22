@@ -49,7 +49,8 @@ class Analyzer
                 if ($this->canEscape($usage->var, $seen) || $this->canEscape($usage->result, $seen)) {
                     return true;
                 }
-            } elseif ($usage instanceof Op\Expr\ArrayDimFetch
+            } elseif ($usage instanceof Op\Expr\BinaryOp
+                || $usage instanceof Op\Expr\ArrayDimFetch
                 || $usage instanceof Op\Phi
                 || $usage instanceof Op\Expr\FuncCall
                 || $usage instanceof Op\Expr\NsFuncCall
@@ -110,7 +111,8 @@ class Analyzer
                         return true;
                     }
                 }
-            } elseif ($usage instanceof Op\Phi
+            } elseif ($usage instanceof Op\Expr\BinaryOp
+                || $usage instanceof Op\Phi
                 || $usage instanceof Op\Expr\ConcatList
                 || $usage instanceof Op\Expr\Assertion
                 || $usage instanceof Op\Expr\New_
@@ -168,7 +170,10 @@ class Analyzer
                     return null;
                 }
                 $size = max($size, $newSize);
-            } elseif ($op instanceof Op\Expr\FuncCall
+            } elseif ($op instanceof Op\Expr\BinaryOp
+                || $op instanceof Op\Expr\ArrayDimFetch
+                || $op instanceof Op\Expr\New_
+                || $op instanceof Op\Expr\FuncCall
                 || $op instanceof Op\Expr\NsFuncCall
                 || $op instanceof Op\Expr\MethodCall
                 || $op instanceof Op\Expr\PropertyFetch

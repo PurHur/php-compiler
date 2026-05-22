@@ -53,7 +53,12 @@ class JIT {
 
     public function compileFunc(CoreFunc $func): void {
         if ($func instanceof CoreFunc\PHP) {
-            $this->compileBlock($func->block, $func->getName());
+            $name = $func->getName();
+            // Large switch crashes LLVM during JIT (issue #540); VM uses host PHP for this helper.
+            if ('opcode_type_name' === $name || str_ends_with($name, '\\opcode_type_name')) {
+                return;
+            }
+            $this->compileBlock($func->block, $name);
             $this->runQueue();
             return;
         } elseif ($func instanceof CoreFunc\JIT) {
@@ -78,6 +83,9 @@ class JIT {
             $internalName = $funcName;
         } else {
             $internalName = "internal_" . (++self::$functionNumber);
+        }
+        if (str_contains($internalName, 'opcode_type_name')) {
+            return $this->compileSkippedOpcodeNameStub($internalName, $block);
         }
         $args = [];
         $rawTypes = [];
@@ -177,6 +185,38 @@ class JIT {
         if ($callbackType === 'void(*)()') {
             $this->context->addExport($internalName, $callbackType, $block);
         }
+        return $func;
+    }
+
+    /**
+     * Stub out opcode_type_name() — the real implementation is a large switch that crashes LLVM 9 JIT (#540).
+     */
+    private function compileSkippedOpcodeNameStub(string $internalName, Block $block): PHPLLVM\Value
+    {
+        $lcname = strtolower($internalName);
+        if (isset($this->context->functions[$lcname])) {
+            return $this->context->functions[$lcname];
+        }
+        $mangled = preg_replace('/[^a-zA-Z0-9_]/', '_', $internalName) ?? 'opcode_type_name_stub';
+        $func = $this->context->module->addFunction(
+            $mangled,
+            $this->context->context->functionType(
+                $this->context->getTypeFromString('__string__*'),
+                false,
+                $this->context->getTypeFromString('int64')
+            )
+        );
+        $bb = $func->appendBasicBlock('stub');
+        $saved = $this->context->builder;
+        $this->context->builder = $this->context->context->builderCreate();
+        $this->context->builder->positionAtEnd($bb);
+        $this->context->builder->returnValue(
+            $this->context->builder->load($this->context->constantStringFromString('TYPE_UNKNOWN'))
+        );
+        $this->context->builder->clearInsertionPosition();
+        $this->context->builder = $saved;
+        $this->context->functions[$lcname] = $func;
+
         return $func;
     }
 
@@ -772,11 +812,7 @@ class JIT {
                         throw new \LogicException("Variable function calls not yet supported");
                     }
                     $lcname = strtolower($nameOp->value);
-                    if (isset($this->context->functionProxies[$lcname])) {
-                        $this->context->scope->toCall = $this->context->functionProxies[$lcname];
-                    } else {
-                        throw new \RuntimeException("Call to undefined function $lcname");
-                    }
+                    $this->context->scope->toCall = $this->context->resolveFunctionProxy($lcname);
                     $this->context->scope->args = [];
                     break;
                 case OpCode::TYPE_STATICCALL_INIT:
@@ -814,14 +850,25 @@ class JIT {
                     $this->context->popScope();
                     break;
                 case OpCode::TYPE_NEW:
-                    $class = $this->context->type->object->lookupOperand($block->getOperand($op->arg2));
-                    $obj = new Variable(
-                        $this->context,
-                        Variable::TYPE_OBJECT,
-                        Variable::KIND_VALUE,
-                        $this->context->type->object->allocate($class)
-                    );
-                    $this->assignOperand($block->getOperand($op->arg1), $obj, true);
+                    $classOp = $block->getOperand($op->arg2);
+                    if ($classOp instanceof Operand\Literal && 0 === strcasecmp($classOp->value, 'SplObjectStorage')) {
+                        $ht = new Variable(
+                            $this->context,
+                            Variable::TYPE_HASHTABLE,
+                            Variable::KIND_VALUE,
+                            JIT\HashTableHelper::alloc($this->context)
+                        );
+                        $this->assignOperand($block->getOperand($op->arg1), $ht, true);
+                    } else {
+                        $class = $this->context->type->object->lookupOperand($classOp);
+                        $obj = new Variable(
+                            $this->context,
+                            Variable::TYPE_OBJECT,
+                            Variable::KIND_VALUE,
+                            $this->context->type->object->allocate($class)
+                        );
+                        $this->assignOperand($block->getOperand($op->arg1), $obj, true);
+                    }
                     $this->context->scope->toCall = null;
                     $this->context->scope->args = [];
                     break;
@@ -1060,6 +1107,16 @@ class JIT {
     
                     return;
                 case Variable::TYPE_NATIVE_LONG:
+                    if (null !== $result->writableHt && null !== $result->writableObjectKey) {
+                        $this->context->builder->call(
+                            $this->context->lookupFunction('__hashtable__setObjectKeyLong'),
+                            $result->writableHt,
+                            $result->writableObjectKey,
+                            $valueFrom
+                        );
+
+                        return;
+                    }
                     $this->context->builder->call(
                     $this->context->lookupFunction('__value__writeLong') , 
                     $valueRef
@@ -1118,10 +1175,21 @@ class JIT {
 
                     return;
                 case Variable::TYPE_OBJECT:
+                    $objVal = $this->context->helper->loadValue($value);
+                    if (null !== $result->writableHt && null !== $result->writableObjectKey) {
+                        $this->context->builder->call(
+                            $this->context->lookupFunction('__hashtable__setObjectKeyObject'),
+                            $result->writableHt,
+                            $result->writableObjectKey,
+                            $objVal
+                        );
+
+                        return;
+                    }
                     $this->context->builder->call(
                         $this->context->lookupFunction('__value__writeObject'),
                         $valueRef,
-                        $this->context->helper->loadValue($value)
+                        $objVal
                     );
 
                     return;
@@ -1190,6 +1258,13 @@ class JIT {
             $result->addref();
 
             return;
+        } elseif (Variable::TYPE_NATIVE_BOOL === $result->type && Variable::TYPE_VALUE === $value->type) {
+            $boolVal = $this->context->castToBool($this->context->helper->loadValue($value));
+            $result->free();
+            $this->context->builder->store($boolVal, $result->value);
+            $result->addref();
+
+            return;
         }
         throw new \LogicException("Cannot assign operands of different types (yet): {$value->type}, {$result->type}");
     }
@@ -1247,6 +1322,7 @@ class JIT {
                 return Variable::TYPE_OBJECT;
             case '__hashtable__*':
                 return Variable::TYPE_HASHTABLE;
+            case '__value__':
             case '__value__*':
                 return Variable::TYPE_VALUE;
             default:
