@@ -19,4 +19,4 @@ require_once __DIR__.'/../../../lib/Module.php';
 require_once __DIR__.'/../../../lib/VM.php';
 require_once __DIR__.'/../../../lib/Compiler.php';
 
-echo "compiler_minimal bundle OK\n";
+echo "selfhost\n";

@@ -61,10 +61,12 @@ class is_type extends Internal {
             case JITVariable::TYPE_HASHTABLE:
                 return $this->context->constantFromBool($this->type === Variable::TYPE_ARRAY);
             case JITVariable::TYPE_VALUE:
-                $loaded = $context->helper->loadValue($args[0]);
+                $valuePtr = JITVariable::KIND_VARIABLE === $args[0]->kind
+                    ? \PHPCompiler\JIT\JitValueBox::pointer($context, $args[0]->value)
+                    : $context->helper->loadValue($args[0]);
                 $typeField = $context->structFieldMap['__value__']['type'];
                 $typeByte = $context->builder->load(
-                    $context->builder->structGep($loaded, $typeField)
+                    $context->builder->structGep($valuePtr, $typeField)
                 );
                 $expected = $context->getTypeFromString('int8')->constInt(
                     JITVariable::jitTypeByteFromVmType($this->type),

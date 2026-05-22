@@ -155,9 +155,13 @@ final class HashTableHelper
         $slot = JitValueBox::alloc($context);
         $destPtr = JitValueBox::pointer($context, $slot);
         $entryPtr = self::listEntryPointer($context, $ht, $index);
+        $valuePtr = $context->builder->pointerCast(
+            $entryPtr,
+            $context->getTypeFromString('__value__*')
+        );
         $valueMap = $context->structFieldMap['__value__'];
         $typeByte = $context->builder->load(
-            $context->builder->structGep($entryPtr, $valueMap['type'])
+            $context->builder->structGep($valuePtr, $valueMap['type'])
         );
         $i8 = $context->getTypeFromString('int8');
 
@@ -175,7 +179,7 @@ final class HashTableHelper
         $context->builder->positionAtEnd($stringBlock);
         $str = $context->builder->call(
             $context->lookupFunction('__value__readString'),
-            $entryPtr
+            $valuePtr
         );
         $owned = $context->builder->call(
             $context->lookupFunction('__string__separate'),
@@ -192,11 +196,32 @@ final class HashTableHelper
         $context->builder->call(
             $context->lookupFunction('__value__writeLong'),
             $destPtr,
-            $context->builder->call($context->lookupFunction('__value__readLong'), $entryPtr)
+            $context->builder->call($context->lookupFunction('__value__readLong'), $valuePtr)
         );
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($done);
+
+        return new Variable(
+            $context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VARIABLE,
+            $slot
+        );
+    }
+
+    /**
+     * Writable packed-list element as a stack {@see __value__} slot.
+     */
+    public static function writableIndexedValueBox(Context $context, Value $ht, Value $index): Variable
+    {
+        $entryPtr = self::listEntryPointer($context, $ht, $index);
+        $valuePtr = $context->builder->pointerCast(
+            $entryPtr,
+            $context->getTypeFromString('__value__*')
+        );
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::copyFromPointer($context, $slot, $valuePtr);
 
         return new Variable(
             $context,
@@ -240,11 +265,13 @@ final class HashTableHelper
             $ht,
             $keyStr
         );
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::copyFromPointer($context, $slot, $valPtr);
         $var = new Variable(
             $context,
             Variable::TYPE_VALUE,
             Variable::KIND_VARIABLE,
-            $valPtr
+            $slot
         );
         $var->writableHt = $ht;
         $var->writableStringKey = $keyStr;
@@ -420,8 +447,38 @@ final class HashTableHelper
      *
      * Returns a {@see Variable::TYPE_VALUE} lvalue pointing at the new __value__ entry.
      */
+    private static function asHashtable(Context $context, Variable $array): Variable
+    {
+        if (Variable::TYPE_HASHTABLE === $array->type) {
+            return $array;
+        }
+        if (Variable::TYPE_VALUE === $array->type && $array->valueBoxHashtable) {
+            $valPtr = Variable::KIND_VARIABLE === $array->kind
+                ? JitValueBox::pointer($context, $array->value)
+                : $context->helper->loadValue($array);
+            $ht = $context->builder->call(
+                $context->lookupFunction('__value__readHashtable'),
+                $valPtr
+            );
+
+            return new Variable(
+                $context,
+                Variable::TYPE_HASHTABLE,
+                Variable::KIND_VALUE,
+                $ht
+            );
+        }
+
+        throw new \LogicException(
+            'Expected an array, got '.Variable::getStringType($array->type)
+        );
+    }
+
     public static function reserveAppendSlot(Context $context, Variable $array): Variable
     {
+        if (Variable::TYPE_VALUE === $array->type) {
+            $array = self::asHashtable($context, $array);
+        }
         if ($array->type & Variable::IS_NATIVE_ARRAY) {
             $sizeT = $context->getTypeFromString('size_t');
             $index = $context->constantFromInteger($array->nextFreeElement, 'size_t');
@@ -442,7 +499,13 @@ final class HashTableHelper
         $need = $context->builder->addNoSignedWrap($index, $one);
         $context->builder->call($context->lookupFunction('__hashtable__grow'), $ht, $need);
         $entry = self::listEntryPointer($context, $ht, $index);
-        $context->builder->call($context->lookupFunction('__value__writeNull'), $entry);
+        $valuePtr = $context->builder->pointerCast(
+            $entry,
+            $context->getTypeFromString('__value__*')
+        );
+        $context->builder->call($context->lookupFunction('__value__writeNull'), $valuePtr);
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::copyFromPointer($context, $slot, $valuePtr);
 
         $nextFree = $context->builder->load(
             $context->builder->structGep($ht, $map['nextFreeElement'])
@@ -463,7 +526,7 @@ final class HashTableHelper
             $context->builder->structGep($ht, $map['numElements'])
         );
 
-        return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $entry);
+        return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
     }
 
     public static function setAtIndex(Context $context, Value $ht, Value $index, Variable $element): void

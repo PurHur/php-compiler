@@ -114,6 +114,23 @@ class Context {
         $this->error = new Builtin\ErrorHandler($this, $loadType);
 
         $this->defineBuiltins($loadType);
+        $this->functionProxies['phpcompiler\\web\\superglobals::issuperglobalname']
+            = new Builtin\SuperglobalNameCheck();
+        $this->functionProxies['phpcompiler\\vm\\context::getsuperglobal']
+            = new Builtin\VmContextGetSuperglobal();
+        $this->functionProxies['phpcompiler\\vm\\context::ensuresuperglobal']
+            = new Builtin\VmContextEnsureSuperglobal();
+        $this->functionProxies['phpcompiler\\vm\\variable::mapfromtype']
+            = new Builtin\VmVariableMapFromType();
+        $this->functionProxies['is_string'] = new Builtin\IsStringFn();
+        $this->functionProxies['phpcompiler\\is_string'] = new Builtin\IsStringFn();
+        $this->functionProxies['is_null'] = new Builtin\IsNullFn();
+        $this->functionProxies['phpcompiler\\is_null'] = new Builtin\IsNullFn();
+        // Instance methods on VM Context (Block::getFrame).
+        $this->functionProxies['phpcompiler\\jit\\context::getsuperglobal']
+            = $this->functionProxies['phpcompiler\\vm\\context::getsuperglobal'];
+        $this->functionProxies['phpcompiler\\jit\\context::ensuresuperglobal']
+            = $this->functionProxies['phpcompiler\\vm\\context::ensuresuperglobal'];
     }
 
     public function setMain(PHPLLVM\Value\Function_ $func): void {

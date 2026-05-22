@@ -43,6 +43,7 @@ class Module extends ModuleAbstract
             new intval(),
             new floatval(),
             new boolval(),
+            new EmptyFunction(),
             new gettype(),
             new strval(),
             new int_min(),

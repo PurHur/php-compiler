@@ -23,7 +23,7 @@ final class JitValueCompare
         }
 
         $valuePtr = Variable::KIND_VARIABLE === $boxed->kind
-            ? $boxed->value
+            ? JitValueBox::pointer($context, $boxed->value)
             : $context->helper->loadValue($boxed);
         $map = $context->structFieldMap['__value__'];
         $typeByte = $context->builder->load(
@@ -86,7 +86,7 @@ final class JitValueCompare
         $same = self::identicalToNative($context, $boxed, $native);
         $i1 = $context->getTypeFromString('int1');
 
-        return $context->builder->xor($same, $i1->constInt(1, false));
+        return $context->builder->icmp(Builder::INT_NE, $same, $i1->constInt(1, false));
     }
 
     public static function notIdenticalNativeToValue(
@@ -107,10 +107,10 @@ final class JitValueCompare
         }
 
         $leftPtr = Variable::KIND_VARIABLE === $left->kind
-            ? $left->value
+            ? JitValueBox::pointer($context, $left->value)
             : $context->helper->loadValue($left);
         $rightPtr = Variable::KIND_VARIABLE === $right->kind
-            ? $right->value
+            ? JitValueBox::pointer($context, $right->value)
             : $context->helper->loadValue($right);
         $map = $context->structFieldMap['__value__'];
         $leftType = $context->builder->load($context->builder->structGep($leftPtr, $map['type']));
@@ -235,6 +235,6 @@ final class JitValueCompare
         $same = self::identicalValueToValue($context, $left, $right);
         $i1 = $context->getTypeFromString('int1');
 
-        return $context->builder->xor($same, $i1->constInt(1, false));
+        return $context->builder->icmp(Builder::INT_NE, $same, $i1->constInt(1, false));
     }
 }

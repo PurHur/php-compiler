@@ -43,7 +43,7 @@ class Native implements Call {
             } elseif (isset($this->defaultArgs[$index])) {
                 $arg = $this->defaultArgs[$index];
             } else {
-                throw new \LogicException("Missing required argument {$index} for {$this->name}()");
+                $arg = self::defaultArgForType($context, $this->argTypes[$index], $this->name, $index);
             }
             $argValues[] = $this->compileArg($context, $arg, $index);
         }
@@ -62,6 +62,17 @@ class Native implements Call {
                 switch ($arg->type) {
                     case Variable::TYPE_OBJECT:
                         return $value;
+                    case Variable::TYPE_STRING:
+                        return $context->getTypeFromString('__object__*')->constNull();
+                    case Variable::TYPE_VALUE:
+                        $valPtr = Variable::KIND_VARIABLE === $arg->kind
+                            ? \PHPCompiler\JIT\JitValueBox::pointer($context, $arg->value)
+                            : $value;
+
+                        return $context->builder->call(
+                            $context->lookupFunction('__value__readObject'),
+                            $valPtr
+                        );
                 }
                 break;
             case '__string__*':
@@ -69,12 +80,14 @@ class Native implements Call {
                     case Variable::TYPE_STRING:
                         return $value;
                     case Variable::TYPE_VALUE:
-                        $str = $this->context->builder->call(
-                        $this->context->lookupFunction('__value__readString') , 
-                        $value
-                        
-                    );
-    
+                        $valPtr = Variable::KIND_VARIABLE === $arg->kind
+                            ? \PHPCompiler\JIT\JitValueBox::pointer($context, $arg->value)
+                            : $value;
+                        $str = $context->builder->call(
+                            $context->lookupFunction('__value__readString'),
+                            $valPtr
+                        );
+
                         return $str;
                 }
                 break;
@@ -244,6 +257,59 @@ class Native implements Call {
                 break;
         }
         throw new \LogicException("Unsupported cast for arg type $typeName from " . Variable::getStringType($arg->type));
+    }
+
+    private static function defaultArgForType(
+        Context $context,
+        \PHPLLVM\Type $type,
+        string $name,
+        int $index
+    ): Variable {
+        $typeName = $context->getStringFromType($type);
+        switch ($typeName) {
+            case '__value__':
+                $slot = \PHPCompiler\JIT\JitValueBox::alloc($context);
+
+                return new Variable(
+                    $context,
+                    Variable::TYPE_VALUE,
+                    Variable::KIND_VARIABLE,
+                    $slot
+                );
+            case '__object__*':
+                return new Variable(
+                    $context,
+                    Variable::TYPE_OBJECT,
+                    Variable::KIND_VALUE,
+                    $context->getTypeFromString('__object__*')->constNull()
+                );
+            case '__string__*':
+                return new Variable(
+                    $context,
+                    Variable::TYPE_STRING,
+                    Variable::KIND_VALUE,
+                    $context->getTypeFromString('__string__*')->constNull()
+                );
+            case 'int64':
+                return Variable::fromConstantInt($context, 0);
+            case 'double':
+                $lit = new \PHPCfg\Operand\Literal(0.0);
+                $lit->type = \PHPTypes\Type::float();
+
+                return Variable::fromLiteral($context, $lit);
+            case 'bool':
+            case 'int1':
+                return new Variable(
+                    $context,
+                    Variable::TYPE_NATIVE_BOOL,
+                    Variable::KIND_VALUE,
+                    $context->constantFromBool(false)
+                );
+            default:
+                throw new \LogicException(
+                    "Missing required argument {$index} for {$name}() (type {$typeName})"
+                );
+        }
     }
 
 }

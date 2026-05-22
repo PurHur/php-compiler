@@ -32,7 +32,7 @@ final class JitStringCompare
                 $same = self::identical($context, $leftStr, $rightStr);
                 $i1 = $context->getTypeFromString('int1');
 
-                return $context->builder->xor($same, $i1->constInt(1, false));
+                return $context->builder->icmp(Builder::INT_NE, $same, $i1->constInt(1, false));
             default:
                 throw new \LogicException(
                     'String/string comparison opcode not implemented for JIT: '.opcode_type_name($opcode->type)

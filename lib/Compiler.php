@@ -70,7 +70,9 @@ class Compiler {
             $new->inheritScopeFrom($parent);
             $this->compileBlock($new);
         } else {
-            $this->seen[$block]->inheritScopeFrom($parent);
+            if (0 === $this->seen[$block]->nOpCodes) {
+                $this->seen[$block]->inheritScopeFrom($parent);
+            }
         }
         $child = $this->seen[$block];
         $child->parents[] = $parent;

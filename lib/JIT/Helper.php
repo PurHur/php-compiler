@@ -571,6 +571,16 @@ restart:
                 goto return_bool;
             }
         }
+        if (Variable::TYPE_HASHTABLE === $leftType && Variable::TYPE_HASHTABLE === $rightType) {
+            if (OpCode::TYPE_IDENTICAL === $opcode->type || OpCode::TYPE_EQUAL === $opcode->type) {
+                $result = $this->context->builder->icmp(Builder::INT_EQ, $leftValue, $rightValue);
+                goto return_bool;
+            }
+            if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                $result = $this->context->builder->icmp(Builder::INT_NE, $leftValue, $rightValue);
+                goto return_bool;
+            }
+        }
         if (Variable::TYPE_VALUE === $leftType && Variable::TYPE_VALUE === $rightType) {
             if (OpCode::TYPE_IDENTICAL === $opcode->type) {
                 $result = JitValueCompare::identicalValueToValue($this->context, $left, $right);

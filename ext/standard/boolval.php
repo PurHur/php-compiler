@@ -62,10 +62,12 @@ final class boolval extends Internal
             case JITVariable::TYPE_NULL:
                 return $context->constantFromBool(false);
             case JITVariable::TYPE_VALUE:
-                $loaded = $context->helper->loadValue($args[0]);
+                $valuePtr = JITVariable::KIND_VARIABLE === $args[0]->kind
+                    ? \PHPCompiler\JIT\JitValueBox::pointer($context, $args[0]->value)
+                    : $context->helper->loadValue($args[0]);
                 $map = $context->structFieldMap['__value__'];
                 $typeByte = $context->builder->load(
-                    $context->builder->structGep($loaded, $map['type'])
+                    $context->builder->structGep($valuePtr, $map['type'])
                 );
                 $i8 = $context->getTypeFromString('int8');
                 $nullType = $i8->constInt(Variable::TYPE_NULL, false);
@@ -74,7 +76,7 @@ final class boolval extends Internal
                 $isBool = $context->builder->icmp(Builder::INT_EQ, $typeByte, $boolType);
                 $boolByte = $context->builder->load(
                     $context->builder->gep(
-                        $context->builder->structGep($loaded, $map['value']),
+                        $context->builder->structGep($valuePtr, $map['value']),
                         $i8->constInt(0, false)
                     )
                 );

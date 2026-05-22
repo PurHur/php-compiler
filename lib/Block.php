@@ -21,7 +21,7 @@ use PHPCompiler\VM\Context;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\Web\Superglobals;
 
-class Block { 
+class Block {
 
     /**
      * @var OpCode[] $opCodes
@@ -39,24 +39,26 @@ class Block {
 
     public ?CfgBlock $orig;
 
-    private \SplObjectStorage $scope;
+    /** @var array<int, Operand> */
+    public array $scopeOperandBySlot = [];
 
-    /** 
+    public int $scopeSlotCount = 0;
+
+    /** @var array<int, true> */
+    public array $argSlots = [];
+
+    /**
      * @var Variable[] $constants
      */
     public array $constants = [];
 
-    public \SplObjectStorage $args;
-
     public ?Handler $handler = null;
 
-    /** When true, unresolved local reads in child frames become undefined (isset chains). */
     public bool $inheritUndefinedLocals = false;
 
-    /** File-level declare(strict_types=1) for this function body (issue #156). */
     public bool $strictTypes = false;
 
-    /** @var array<int, int> scope slot index => Variable::TYPE_* for typed parameters */
+    /** @var array<int, int> */
     public array $paramTypeConstraints = [];
 
     /** Resolved absolute paths for TYPE_INCLUDE opcodes (arg3 index, issue #54). */
@@ -64,17 +66,12 @@ class Block {
 
     public function __construct(?CfgBlock $block) {
         $this->orig = $block;
-        $this->scope = new \SplObjectStorage;
-        $this->args = new \SplObjectStorage;
     }
 
     public function getOperand(int $offset): Operand {
-        foreach ($this->scope as $operand) {
-            if ($this->scope[$operand] === $offset) {
-                return $operand;
-            }
-        }
+        return $this->scopeOperandBySlot[$offset];
     }
+
 
     /**
      * @return list<Operand>
@@ -82,8 +79,8 @@ class Block {
     public function scopedOperands(): array
     {
         $operands = [];
-        foreach ($this->scope as $operand) {
-            $operands[] = $operand;
+        for ($slot = 0; $slot < $this->scopeSlotCount; ++$slot) {
+            $operands[] = $this->scopeOperandBySlot[$slot];
         }
 
         return $operands;
@@ -95,55 +92,52 @@ class Block {
     public function argOperands(): array
     {
         $operands = [];
-        foreach ($this->args as $operand) {
-            $operands[] = $operand;
+        for ($slot = 0; $slot < $this->scopeSlotCount; ++$slot) {
+            if (isset($this->argSlots[$slot])) {
+                $operands[] = $this->scopeOperandBySlot[$slot];
+            }
         }
 
         return $operands;
     }
 
     public function getVarSlot(Operand $operand, bool $isRead): int {
-        if (!$this->scope->contains($operand)) {
-            $this->scope[$operand] = $this->scope->count();
-            if ($isRead) {
-                $this->args[$operand] = $this->scope[$operand];
+        for ($slot = 0; $slot < $this->scopeSlotCount; ++$slot) {
+            if ($this->scopeOperandBySlot[$slot] === $operand) {
+                return $slot;
             }
         }
-        return $this->scope[$operand];
+        $slot = $this->scopeSlotCount++;
+        $this->scopeOperandBySlot[$slot] = $operand;
+        if ($isRead) {
+            $this->argSlots[$slot] = true;
+        }
+
+        return $slot;
     }
 
     public function registerConstant(Operand $operand, Variable $const): int {
         $slot = $this->getVarSlot($operand, false);
         $this->constants[$slot] = $const;
+
         return $slot;
     }
 
-    /**
-     * Copy variable slot mappings from a parent block (for synthetic CFG branches).
-     */
     public function inheritScopeFrom(Block $parent): void
     {
-        foreach ($parent->scope as $operand) {
-            if ($this->scope->contains($operand)) {
-                continue;
-            }
-            $slot = $parent->scope[$operand];
-            $this->scope[$operand] = $slot;
-            if ($parent->args->contains($operand)) {
-                $this->args[$operand] = $slot;
-            }
-            if (isset($parent->constants[$slot])) {
-                $this->constants[$slot] = $parent->constants[$slot];
-            }
-        }
+        $this->scopeOperandBySlot = $parent->scopeOperandBySlot;
+        $this->scopeSlotCount = $parent->scopeSlotCount;
+        $this->argSlots = $parent->argSlots;
+        $this->constants = $parent->constants;
         if ([] !== $parent->literalIncludePaths) {
             $this->literalIncludePaths = $parent->literalIncludePaths;
         }
     }
 
-    public function addOpCode(OpCode ...$ops): void {
+    public function addOpCode(OpCode ...$ops): void
+    {
         foreach ($ops as $op) {
-            $this->nOpCodes++;
+            ++$this->nOpCodes;
             $this->opCodes[] = $op;
         }
     }
@@ -153,32 +147,29 @@ class Block {
         if (null !== $byName) {
             return $byName;
         }
-        if (!$this->scope->contains($op)) {
-            if (!is_null($frame->parent)) {
-                return $frame->parent->block->findSlot($op, $frame->parent);
+        for ($slot = 0; $slot < $this->scopeSlotCount; ++$slot) {
+            if ($this->scopeOperandBySlot[$slot] === $op) {
+                return $frame->scope[$slot] ?? null;
             }
-
-            return null;
         }
-        $idx = $this->scope[$op];
+        if (!\is_null($frame->parent)) {
+            return $frame->parent->block->findSlot($op, $frame->parent);
+        }
 
-        return $frame->scope[$idx] ?? null;
+        return null;
     }
 
     public function slotIndexForVariableName(string $name): ?int
     {
-        foreach ($this->scope as $operand) {
-            if (self::resolveVariableName($operand) === $name) {
-                return $this->scope[$operand];
+        for ($slot = 0; $slot < $this->scopeSlotCount; ++$slot) {
+            if (self::resolveVariableName($this->scopeOperandBySlot[$slot]) === $name) {
+                return $slot;
             }
         }
 
         return null;
     }
 
-    /**
-     * Zend include/require: included file shares caller locals by name (issue #471).
-     */
     private static function findVariableInParentFrames(Operand $op, Frame $frame): ?Variable
     {
         $name = self::resolveVariableName($op);
@@ -186,7 +177,7 @@ class Block {
             return null;
         }
         for ($f = $frame; null !== $f; $f = $f->parent) {
-            if ('this' === $name && !empty($f->calledArgs)) {
+            if ('this' === $name && !\empty($f->calledArgs)) {
                 return $f->calledArgs[0];
             }
             if (null === $f->block) {
@@ -202,17 +193,15 @@ class Block {
     }
 
     public function getFrame(Context $context, ?Frame $frame = null): Frame {
-        // Todo: build scope
         $scope = [];
-        $scopeSize = $this->scope->count();
-        foreach ($this->scope as $op) {
-            $pos = $this->scope[$op];
+        for ($pos = 0; $pos < $this->scopeSlotCount; ++$pos) {
+            $op = $this->scopeOperandBySlot[$pos];
             if (null !== $frame && 'this' === self::resolveVariableName($op)) {
-                if (!empty($frame->callArgs)) {
+                if (!\empty($frame->callArgs)) {
                     $scope[$pos] = $frame->callArgs[0];
                     continue;
                 }
-                if (!empty($frame->calledArgs)) {
+                if (!\empty($frame->calledArgs)) {
                     $scope[$pos] = $frame->calledArgs[0];
                     continue;
                 }
@@ -220,14 +209,14 @@ class Block {
 
             if (isset($this->constants[$pos])) {
                 $scope[$pos] = $this->constants[$pos];
-            } elseif ($this->args->contains($op)) {
-                if (is_null($frame)) {
+            } elseif (isset($this->argSlots[$pos])) {
+                if (\is_null($frame)) {
                     $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
                     continue;
                 }
                 $found = false;
                 $parent = $frame->block->findSlot($op, $frame);
-                if (!is_null($parent)) {
+                if (!\is_null($parent)) {
                     $scope[$pos] = $parent;
                     $found = true;
                 }
@@ -271,9 +260,10 @@ class Block {
         }
 
         $return = new Frame(null, $this, $frame, ...$scope);
-        if (!is_null($frame) && !is_null($frame->returnVar)) {
+        if (!\is_null($frame) && !\is_null($frame->returnVar)) {
             $return->returnVar = $frame->returnVar;
         }
+
         return $return;
     }
 
@@ -325,6 +315,4 @@ class Block {
 
         return $nameOp->value;
     }
-
-
 }
