@@ -24,7 +24,32 @@ final class PhpcDoctorTest extends TestCase
         $this->assertSame(0, $result['exit'], $result['stdout']."\n".$result['stderr']);
         $this->assertStringContainsString('[ok] PHP:', $result['stdout']);
         $this->assertStringContainsString('[ok] Composer deps:', $result['stdout']);
+        $this->assertStringContainsString('LLVM 9:', $result['stdout']);
+        $this->assertStringContainsString('libLLVM-9.so.1:', $result['stdout']);
+        $this->assertStringContainsString('JIT compliance:', $result['stdout']);
         $this->assertStringContainsString('Environment ready for full local CI', $result['stdout']);
+    }
+
+    public function testHelpDocumentsJitProbe(): void
+    {
+        $result = $this->runPhpc(['help']);
+        $this->assertSame(0, $result['exit']);
+        $this->assertStringContainsString('--jit-probe', $result['stdout']);
+    }
+
+    public function testDoctorJitProbeWhenLlvmPresent(): void
+    {
+        $repoRoot = dirname(__DIR__, 2);
+        if (!is_file('/opt/llvm9/libLLVM-9.so.1') && !is_file($repoRoot.'/.llvm/libLLVM-9.so.1')) {
+            $this->markTestSkipped('LLVM 9 not available in this environment');
+        }
+        $result = $this->runPhpc(['doctor', '--jit-probe']);
+        $combined = $result['stdout']."\n".$result['stderr'];
+        if (!str_contains($combined, 'jit-runtime-probe OK')) {
+            $this->markTestSkipped('MCJIT probe not runnable here (ci-local may skip @group jit): '.$combined);
+        }
+        $this->assertSame(0, $result['exit'], $combined);
+        $this->assertStringContainsString('jit-runtime-probe OK', $result['stdout']);
     }
 
     public function testDoctorGatesPrintsMiniWebAppLadder(): void

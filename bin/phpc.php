@@ -19,7 +19,7 @@ declare(strict_types=1);
  *   phpc lint --all <dir-or-file> [--json]
  *   phpc init [--profile default|miniwebapp] [--force] [target-dir]
  *   phpc test [--fast] [-- phpunit/ci-local args...]
- *   phpc doctor [--gates] [--no-lint]             Probe env; --gates prints MiniWebApp ladder (#657)
+ *   phpc doctor [--gates] [--no-lint] [--jit-probe]  Probe env; LLVM/JIT readiness (#717)
  *   phpc validate-manifest [dir]                 Validate phpc.json schema and paths (issue #263)
  */
 
@@ -56,7 +56,8 @@ php-compiler CLI
   phpc init [--profile default|miniwebapp] [--force] [target-dir]
                                               Scaffold web project (default hello or miniwebapp)
   phpc test [--fast] [args...]                  Run ci-local.sh (full) or ci-fast.sh (no LLVM)
-  phpc doctor [--gates] [--no-lint]             Probe environment; --gates: MiniWebApp CI ladder
+  phpc doctor [--gates] [--no-lint] [--jit-probe]  Probe environment; LLVM/JIT readiness (#717)
+      --jit-probe                                 Run MCJIT smoke (script/jit-runtime-probe.php)
   phpc validate-manifest [dir]                  Validate phpc.json (default: cwd)
 
 HELP);
@@ -178,6 +179,7 @@ switch ($command) {
         require $repoRoot.'/vendor/autoload.php';
         $gates = false;
         $noLint = false;
+        $jitProbe = false;
         foreach ($args as $arg) {
             if ('--gates' === $arg) {
                 $gates = true;
@@ -187,13 +189,17 @@ switch ($command) {
                 $noLint = true;
                 continue;
             }
+            if ('--jit-probe' === $arg) {
+                $jitProbe = true;
+                continue;
+            }
             fwrite(STDERR, "phpc doctor: unknown option: {$arg}\n");
             exit(1);
         }
         if ($gates) {
             exit(\PHPCompiler\Doctor::runGates($repoRoot, $noLint));
         }
-        exit(\PHPCompiler\Doctor::run($repoRoot));
+        exit(\PHPCompiler\Doctor::run($repoRoot, $jitProbe));
 
     case 'validate-manifest':
         if (!is_file($repoRoot.'/vendor/autoload.php')) {
