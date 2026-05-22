@@ -52,6 +52,7 @@ class Analyzer
             } elseif ($usage instanceof Op\Expr\ArrayDimFetch
                 || $usage instanceof Op\Phi
                 || $usage instanceof Op\Expr\FuncCall
+                || $usage instanceof Op\Expr\NsFuncCall
                 || $usage instanceof Op\Expr\ConcatList
                 || $usage instanceof Op\Expr\Assertion
                 || $usage instanceof Op\Terminal\Return_) {
@@ -92,9 +93,10 @@ class Analyzer
                 } else {
                     return true;
                 }
-            } elseif ($usage instanceof Op\Expr\FuncCall) {
-                if ($usage->name instanceof Operand\Literal) {
-                    $fn = strtolower($usage->name->value);
+            } elseif ($usage instanceof Op\Expr\FuncCall || $usage instanceof Op\Expr\NsFuncCall) {
+                $fnOperand = $usage instanceof Op\Expr\NsFuncCall ? $usage->nsName : $usage->name;
+                if ($fnOperand instanceof Operand\Literal) {
+                    $fn = strtolower($fnOperand->value);
                     if (in_array($fn, ['array_push', 'array_pop', 'array_shift', 'array_unshift'], true)) {
                         return true;
                     }
@@ -147,7 +149,7 @@ class Analyzer
                     return null;
                 }
                 $size = max($size, $newSize);
-            } elseif ($op instanceof Op\Expr\FuncCall) {
+            } elseif ($op instanceof Op\Expr\FuncCall || $op instanceof Op\Expr\NsFuncCall) {
                 return null;
             } else {
                 throw new \LogicException('Unknown array write op: '.get_class($op));

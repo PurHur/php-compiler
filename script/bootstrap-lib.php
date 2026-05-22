@@ -218,6 +218,25 @@ function bootstrapDefaultAotLintTargets(string $root): array
 }
 
 /**
+ * Phase C link+execute targets (issue #512). Subset of lint targets that fully AOT-compile today.
+ *
+ * @param list<string> $lintTargets
+ *
+ * @return list<string>
+ */
+function bootstrapDefaultAotLinkTargets(array $lintTargets): array
+{
+    $pendingUserFunc = [
+        'test/bootstrap-aot/nullable_types.php',
+    ];
+
+    return array_values(array_filter(
+        $lintTargets,
+        static fn (string $rel): bool => !in_array($rel, $pendingUserFunc, true),
+    ));
+}
+
+/**
  * @param array<string, mixed> $inventory
  *
  * @return array<string, mixed>
@@ -237,6 +256,7 @@ function bootstrapBuildProfile(array $inventory, string $root): array
     sort($eligible, SORT_STRING);
 
     $lintTargets = bootstrapDefaultAotLintTargets($root);
+    $linkTargets = bootstrapDefaultAotLinkTargets($lintTargets);
     foreach ($lintTargets as $rel) {
         if (!is_file($root.'/'.$rel)) {
             throw new RuntimeException("bootstrap profile lint target missing: {$rel}");
@@ -255,11 +275,13 @@ function bootstrapBuildProfile(array $inventory, string $root): array
         'excluded_files' => $excluded,
         'eligible_files' => $eligible,
         'aot_lint_targets' => $lintTargets,
+        'aot_link_targets' => $linkTargets,
         'totals' => [
             'inventory_files' => $inventory['totals']['files'],
             'excluded' => count($excluded),
             'eligible' => count($eligible),
             'aot_lint_targets' => count($lintTargets),
+            'aot_link_targets' => count($linkTargets),
         ],
     ];
 }
