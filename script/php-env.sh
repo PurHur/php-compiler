@@ -45,3 +45,7 @@ if [[ -d "$EXT_DIR" ]]; then
     fi
   done
 fi
+if [[ -f "$(dirname "${BASH_SOURCE[0]}")/ci-memory-env.sh" ]]; then
+  # shellcheck source=ci-memory-env.sh
+  source "$(dirname "${BASH_SOURCE[0]}")/ci-memory-env.sh"
+fi

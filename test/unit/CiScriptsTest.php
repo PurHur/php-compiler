@@ -43,11 +43,26 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('phpc build --project', $body);
     }
 
-    public function testCiResourceLimitsDefaultThirtyGib(): void
+    public function testCiResourceLimitsDefaultEightGib(): void
     {
         $limits = dirname(__DIR__, 2).'/script/ci-resource-limits.sh';
         $body = (string) file_get_contents($limits);
-        $this->assertStringContainsString('PHP_COMPILER_CI_RAM_GB:-30}', $body);
+        $this->assertStringContainsString('PHP_COMPILER_CI_RAM_GB:-8}', $body);
+    }
+
+    public function testCiMemoryEnvDefaults(): void
+    {
+        $mem = dirname(__DIR__, 2).'/script/ci-memory-env.sh';
+        $body = (string) file_get_contents($mem);
+        $this->assertStringContainsString('PHP_COMPILER_MEMORY_LIMIT:-1536M}', $body);
+        $this->assertStringContainsString('PHP_COMPILER_LLVM_MEMORY_LIMIT:-4096M}', $body);
+    }
+
+    public function testCiFastPreparesRuntimeLimits(): void
+    {
+        $fast = dirname(__DIR__, 2).'/script/ci-fast.sh';
+        $body = (string) file_get_contents($fast);
+        $this->assertStringContainsString('ci_prepare_test_runtime', $body);
     }
 
     public function testAotLinkGroupTaggedOnAotTest(): void
