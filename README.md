@@ -42,6 +42,19 @@ make test    # builds php-compiler:22.04-dev if needed, then memory-safe CI in D
 
 `make test` is the same CI path as `make test-docker` when the bind-mount works; on harness hosts it falls back to `script/docker-ci-local.sh` (tar copy) like `make test-harness`.
 
+## Self-host status (compile php-compiler with php-compiler)
+
+**Not yet achieved** — the compiler does not fully compile its own `lib/` tree to a runnable native binary. Progress is tracked in [docs/bootstrap-selfhost.md](docs/bootstrap-selfhost.md) ([#212](https://github.com/PurHur/php-compiler/issues/212), [#78](https://github.com/PurHur/php-compiler/issues/78)).
+
+| Milestone | Command | Status |
+|-----------|---------|--------|
+| Per-file AOT lint | `php bin/compile.php -l lib/*.php` | ✅ All **14** top-level `lib/*.php` units ([#534](https://github.com/PurHur/php-compiler/pull/534)) |
+| Bootstrap fixture lint | `php script/bootstrap-aot-lint.php` | ✅ **11** procedural lint targets |
+| Bootstrap native link | `make bootstrap-aot-link` | ✅ **7** native link targets (incl. `class_constants.php`, [#520](https://github.com/PurHur/php-compiler/issues/520)) |
+| **Compiler self-compile** | `php bin/compile.php -l` on bundled compiler subset | 🚧 In progress (namespaces + inventory blockers) |
+
+When the compiler successfully compiles itself, this section will be updated with the exact gate command, date, and PR reference.
+
 # Installation
 
 ## Host requirements
