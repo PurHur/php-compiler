@@ -37,7 +37,15 @@ foreach ($it as $file) {
 }
 usort($exampleDirs, static fn (string $a, string $b): int => strcmp(basename($a), basename($b)));
 
+$miniIndex = $repoRoot.'/examples/003-MiniWebApp/public/index.php';
+$benchMiniWebApp = shouldBenchMiniWebApp($repoRoot) && is_file($miniIndex);
+
 foreach ($exampleDirs as $dir) {
+    if ($benchMiniWebApp && '004-ApiJson' === basename($dir)) {
+        echo " - Benchmarking 003-MiniWebApp (public/index.php)\n";
+        $benchmarks .= "\n".benchmarkExample($miniIndex, $phpCmd, $benchEnv, $repoRoot, $llvmReady);
+    }
+
     $example = $dir.'/example.php';
     echo ' - Building Example '.basename($dir)."\n";
 
@@ -46,6 +54,11 @@ foreach ($exampleDirs as $dir) {
     file_put_contents($dir.'/example.output', '');
 
     $benchmarks .= "\n".benchmarkExample($example, $phpCmd, $benchEnv, $repoRoot, $llvmReady);
+}
+
+if ($benchMiniWebApp && !str_contains($benchmarks, '003-MiniWebApp')) {
+    echo " - Benchmarking 003-MiniWebApp (public/index.php)\n";
+    $benchmarks .= "\n".benchmarkExample($miniIndex, $phpCmd, $benchEnv, $repoRoot, $llvmReady);
 }
 
 $readme = file_get_contents($repoRoot.'/examples/README.md');
@@ -59,33 +72,113 @@ file_put_contents($repoRoot.'/examples/README.md', $readme);
 echo "Done\n";
 
 /**
+ * Include 003-MiniWebApp when lint is green (issue #491, #621).
+ *
+ * BENCH_MINIWEBAPP=1 forces inclusion; MINIWEBAPP_LINT_GATE=0 skips the lint probe.
+ */
+function shouldBenchMiniWebApp(string $repoRoot): bool
+{
+    $index = $repoRoot.'/examples/003-MiniWebApp/public/index.php';
+    if (!is_file($index)) {
+        return false;
+    }
+    if ('1' === getenv('BENCH_MINIWEBAPP')) {
+        return true;
+    }
+    if ('0' === getenv('MINIWEBAPP_LINT_GATE')) {
+        return false;
+    }
+
+    return miniWebAppLintPasses($repoRoot);
+}
+
+function miniWebAppLintPasses(string $repoRoot): bool
+{
+    $phpc = $repoRoot.'/phpc';
+    if (!is_executable($phpc)) {
+        return false;
+    }
+    $descriptorSpec = [
+        0 => ['pipe', 'r'],
+        1 => ['pipe', 'w'],
+        2 => ['pipe', 'w'],
+    ];
+    $proc = proc_open(
+        [$phpc, 'lint', '--all', $repoRoot.'/examples/003-MiniWebApp'],
+        $descriptorSpec,
+        $pipes,
+        $repoRoot
+    );
+    if (!is_resource($proc)) {
+        return false;
+    }
+    fclose($pipes[0]);
+    stream_get_contents($pipes[1]);
+    stream_get_contents($pipes[2]);
+    fclose($pipes[1]);
+    fclose($pipes[2]);
+
+    return 0 === proc_close($proc);
+}
+
+function exampleDisplayName(string $example): string
+{
+    if (str_contains($example, '/examples/003-MiniWebApp/')) {
+        return '003-MiniWebApp';
+    }
+
+    return basename(dirname($example));
+}
+
+/**
  * Per-example benchmark inputs.
  *
  * @return array{
  *     query: ?string,
+ *     cgi_env: array<string, string>,
  *     aot_compile_time_query: bool,
- *     aot_run_env: array<string, string>
+ *     aot_run_env: array<string, string>,
+ *     skip_aot: bool
  * }
  */
-function exampleProfile(string $exampleBasename): array
+function exampleProfile(string $example): array
 {
-    if ('001-SimpleWeb' === $exampleBasename) {
+    if (str_contains($example, '/examples/003-MiniWebApp/')) {
+        return [
+            'query' => null,
+            'cgi_env' => [
+                'REQUEST_METHOD' => 'GET',
+                'PATH_INFO' => '/home',
+                'SCRIPT_NAME' => '/index.php',
+                'REQUEST_URI' => '/index.php/home',
+            ],
+            'aot_compile_time_query' => false,
+            'aot_run_env' => [],
+            'skip_aot' => true,
+        ];
+    }
+
+    if ('001-SimpleWeb' === exampleDisplayName($example)) {
         // Runtime superglobals (#201): compile once without -q; benchmark run uses QUERY_STRING.
         return [
             'query' => 'name=World',
+            'cgi_env' => [],
             'aot_compile_time_query' => false,
             'aot_run_env' => [
                 'QUERY_STRING' => 'name=World',
                 'SCRIPT_NAME' => '/example.php',
                 'REQUEST_URI' => '/example.php?name=World',
             ],
+            'skip_aot' => false,
         ];
     }
 
     return [
         'query' => null,
+        'cgi_env' => [],
         'aot_compile_time_query' => true,
         'aot_run_env' => [],
+        'skip_aot' => false,
     ];
 }
 
@@ -206,36 +299,50 @@ function runIterations(array $argv, array $env, string $cwd, int $iterations): f
 function benchmarkExample(string $example, array $phpCmd, array $benchEnv, string $repoRoot, bool $llvmReady): string
 {
     $iterations = 10;
-    $profile = exampleProfile(basename(dirname($example)));
+    $profile = exampleProfile($example);
+    $runCwd = str_contains($example, '/examples/003-MiniWebApp/')
+        ? dirname($example)
+        : $repoRoot;
     echo "Benchmarking {$example}\n";
 
     $nativeEnv = $benchEnv;
     if (null !== $profile['query']) {
         $nativeEnv['QUERY_STRING'] = $profile['query'];
     }
+    foreach ($profile['cgi_env'] as $key => $value) {
+        $nativeEnv[$key] = $value;
+    }
 
     $nativeArgv = array_merge($phpCmd, [$example]);
-    $nativeTime = runIterations($nativeArgv, $nativeEnv, $repoRoot, $iterations) / $iterations;
+    $nativeTime = runIterations($nativeArgv, $nativeEnv, $runCwd, $iterations) / $iterations;
 
+    $vmEnv = $benchEnv;
+    foreach ($profile['cgi_env'] as $key => $value) {
+        $vmEnv[$key] = $value;
+    }
     $vmArgv = array_merge($phpCmd, [$repoRoot.'/bin/vm.php']);
     if (null !== $profile['query']) {
         $vmArgv[] = '-q';
         $vmArgv[] = $profile['query'];
     }
     $vmArgv[] = $example;
-    $vmTime = runIterations($vmArgv, $benchEnv, $repoRoot, $iterations) / $iterations;
+    $vmTime = runIterations($vmArgv, $vmEnv, $runCwd, $iterations) / $iterations;
 
+    $jitEnv = $benchEnv;
+    foreach ($profile['cgi_env'] as $key => $value) {
+        $jitEnv[$key] = $value;
+    }
     $jitArgv = array_merge($phpCmd, [$repoRoot.'/bin/jit.php']);
     if (null !== $profile['query']) {
         $jitArgv[] = '-q';
         $jitArgv[] = $profile['query'];
     }
     $jitArgv[] = $example;
-    $jitTime = runIterations($jitArgv, $benchEnv, $repoRoot, $iterations) / $iterations;
+    $jitTime = runIterations($jitArgv, $jitEnv, $runCwd, $iterations) / $iterations;
 
     $compileTime = null;
     $compiledTime = null;
-    if ($llvmReady) {
+    if ($llvmReady && !$profile['skip_aot']) {
         $binary = str_replace('.php', '', $example);
         $compileArgv = array_merge($phpCmd, [$repoRoot.'/bin/compile.php']);
         if (null !== $profile['query'] && $profile['aot_compile_time_query']) {
@@ -258,7 +365,7 @@ function benchmarkExample(string $example, array $phpCmd, array $benchEnv, strin
         }
     }
 
-    $result = sprintf('| %20s |', basename(dirname($example)));
+    $result = sprintf('| %20s |', exampleDisplayName($example));
     $result .= sprintf('         %0.5f |', $nativeTime);
     $result .= sprintf('         %0.5f |', $vmTime);
     $result .= sprintf('         %0.5f |', $jitTime);

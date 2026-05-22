@@ -143,14 +143,22 @@ Root README quick start and local CI matrix: [#48](https://github.com/PurHur/php
 
 Each example includes a benchmark that compares VM, JIT, and (when LLVM is present) AOT against native `php`. Regenerate this table with `script/rebuild-examples.php` ([#60](https://github.com/PurHur/php-compiler/issues/60)).
 
+```console
+MINIWEBAPP_LINT_GATE=1 ./script/rebuild-examples.php
+# or: BENCH_MINIWEBAPP=1 ./script/rebuild-examples.php
+```
+
 For **001-SimpleWeb**, `bin/compile.php` is timed **without** compile-time `-q`; the `./compiled` column runs the binary with runtime `QUERY_STRING` (and related CGI env), matching production AOT web binaries.
+
+For **003-MiniWebApp**, VM/JIT/native columns run `public/index.php` with `PATH_INFO=/home` (and related CGI env) from the example `public/` directory ([#491](https://github.com/PurHur/php-compiler/issues/491), runtime [#539](https://github.com/PurHur/php-compiler/issues/539)). AOT columns stay **n/a** until `phpc build --project` link is green ([#568](https://github.com/PurHur/php-compiler/issues/568), [#624](https://github.com/PurHur/php-compiler/issues/624)). The row is omitted when `phpc lint --all examples/003-MiniWebApp` fails unless `BENCH_MINIWEBAPP=1`.
 
 <!-- benchmark table start -->
 
 |         Example Name |      Native PHP |      bin/vm.php |     bin/jit.php | bin/compile.php |      ./compiled |
 |----------------------|-----------------|-----------------|-----------------|-----------------|-----------------|
-|       000-HelloWorld |         0.01465 |         0.06149 |         0.11364 |         9.42664 |         0.00163 |
-|        001-SimpleWeb |         0.01439 |         0.06331 |         0.10672 |         2.82886 |         0.00165 |
-|        002-StaticWeb |         0.01651 |         0.06435 |         0.12040 |         0.62562 |         0.00139 |
-|          004-ApiJson |         0.01357 |         0.06180 |         0.11049 |         0.62714 |         0.00118 |
+|       000-HelloWorld |         0.00778 |         0.04055 |         0.16935 |         0.55685 |         0.00092 |
+|        001-SimpleWeb |         0.01024 |         0.04413 |         0.16994 |         0.53688 |         0.00092 |
+|        002-StaticWeb |         0.01098 |         0.04485 |         0.16732 |         0.55200 |         0.00118 |
+|       003-MiniWebApp |         0.00878 |         0.09707 |         0.11338 |             n/a |             n/a |
+|          004-ApiJson |         0.00752 |         0.04128 |         0.16942 |         0.55373 |         0.00104 |
 <!-- benchmark table end -->
