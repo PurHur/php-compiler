@@ -280,6 +280,7 @@
         "lib/JIT/OperandName.php",
         "lib/JIT/Result.php",
         "lib/JIT/Scope.php",
+        "lib/JIT/ScopeBuiltinHelper.php",
         "lib/JIT/StringOffsetHelper.php",
         "lib/JIT/SuperglobalInit.php",
         "lib/JIT/ValueEchoHelper.php",

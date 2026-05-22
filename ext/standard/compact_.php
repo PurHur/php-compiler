@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ScopeBuiltinHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -33,6 +34,10 @@ final class compact_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('compact() is not implemented for JIT in this compiler build');
+        if (0 === \count($args)) {
+            throw new \LogicException('compact() requires at least one argument in this compiler build');
+        }
+
+        return ScopeBuiltinHelper::compact($context, ...$args);
     }
 }
