@@ -82,12 +82,12 @@ foreach ($issues as $issue) {
 
   if [[ "${MINIWEBAPP_LINT_GATE:-}" == "1" ]]; then
     if [[ "${miniwebapp_lint_exit}" -ne 0 ]]; then
-      echo "web-smoke: 003-MiniWebApp lint gate failed (MINIWEBAPP_LINT_GATE=1; expected green after #67)" >&2
+      echo "web-smoke: 003-MiniWebApp lint gate failed (MINIWEBAPP_LINT_GATE=1; expected green — #539)" >&2
       exit 1
     fi
     echo "web-smoke: 003-MiniWebApp lint gate ok"
   elif [[ "${miniwebapp_lint_exit}" -ne 0 ]]; then
-    echo "web-smoke: 003-MiniWebApp lint exit ${miniwebapp_lint_exit} (skeleton — not failing web-smoke; set MINIWEBAPP_LINT_GATE=1 when #67 is green)"
+    echo "web-smoke: 003-MiniWebApp lint exit ${miniwebapp_lint_exit} (skeleton — not failing web-smoke; set MINIWEBAPP_LINT_GATE=1 when lint is green — #539)"
   else
     echo "web-smoke: 003-MiniWebApp lint green"
   fi

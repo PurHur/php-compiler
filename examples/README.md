@@ -38,7 +38,7 @@ Legacy entrypoints still work: `php bin/vm.php`, `php bin/jit.php`, `php bin/com
 | [001-SimpleWeb](001-SimpleWeb/) | ✅ `-q` / `-p` / env / `phpc serve` | ✅ `bin/jit.php` | ✅ `phpc build` | runtime `QUERY_STRING` / POST ([#201](https://github.com/PurHur/php-compiler/issues/201), [#257](https://github.com/PurHur/php-compiler/issues/257), [#259](https://github.com/PurHur/php-compiler/issues/259)) |
 | [002-StaticWeb](002-StaticWeb/) | ✅ `./phpc run` | ✅ `bin/jit.php` | ✅ recommended | no superglobals — [#247](https://github.com/PurHur/php-compiler/issues/247) execute smoke |
 | [004-ApiJson](004-ApiJson/) | ✅ `./phpc run` | ✅ `bin/jit.php` | ✅ `phpc build` | JSON + `http_response_code` — [#270](https://github.com/PurHur/php-compiler/issues/270), [#61](https://github.com/PurHur/php-compiler/issues/61) |
-| [003-MiniWebApp](003-MiniWebApp/) | ✅ `phpc serve` | partial | ❌ blocked | PATH_INFO front controller — [#489](https://github.com/PurHur/php-compiler/issues/489), [#67](https://github.com/PurHur/php-compiler/issues/67) |
+| [003-MiniWebApp](003-MiniWebApp/) | ✅ `phpc serve` | partial | ❌ blocked | PATH_INFO front controller — [#489](https://github.com/PurHur/php-compiler/issues/489), runtime [#539](https://github.com/PurHur/php-compiler/issues/539), AOT [#454](https://github.com/PurHur/php-compiler/issues/454) |
 
 ### 000-HelloWorld
 

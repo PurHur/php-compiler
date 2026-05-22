@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * MiniWebApp front controller (issues #67, #210, #489).
+ * MiniWebApp front controller (skeleton #67 closed; #210, #489, runtime #539).
  *
  * Primary routing: PATH_INFO after index.php (DevServer #276).
  * Deprecated fallback: ?route= for skeleton-era URLs.
