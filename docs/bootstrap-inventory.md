@@ -8,9 +8,9 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 333 |
+| PHP files on vm.php path | 334 |
 | Source constructs flagged (blockers) | 10 |
-| Source constructs flagged (warnings) | 902 |
+| Source constructs flagged (warnings) | 904 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -343,6 +343,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `lib/VM/Refcount.php` | 0 | 1 |
 | `lib/VM/TypeCheck.php` | 0 | 1 |
 | `lib/VM/Variable.php` | 0 | 4 |
+| `lib/Web/CgiDriver.php` | 0 | 2 |
 | `lib/Web/ConstStringFolder.php` | 0 | 1 |
 | `lib/Web/DeployRoot.php` | 0 | 1 |
 | `lib/Web/DevServer.php` | 0 | 1 |
@@ -2137,11 +2138,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new Call\ExternalMethod (line 140)
 - new Builtin\IsNullFn (line 195)
 - new Builtin\IsNullFn (line 196)
-- new Result (line 241)
-- new Variable (line 317)
-- new Variable (line 551)
-- new Variable (line 586)
-- 34 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new Result (line 251)
+- new Variable (line 327)
+- new Variable (line 561)
+- new Variable (line 596)
+- 36 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/HashTableHelper.php`
 
@@ -2242,9 +2243,9 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/JIT/SuperglobalInit.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 132)
-- new VMVariable (line 159)
-- 7 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new Variable (line 148)
+- new VMVariable (line 175)
+- 8 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/ValueEchoHelper.php`
 
@@ -2254,25 +2255,25 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/JIT/Variable.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 198)
-- new Variable (line 220)
-- new Variable (line 248)
-- new Variable (line 278)
-- new Variable (line 287)
-- new Variable (line 301)
-- new self (line 316)
-- new self (line 323)
-- new self (line 336)
-- new self (line 343)
-- new self (line 356)
-- new self (line 363)
-- new Variable (line 451)
-- new Variable (line 473)
-- new Variable (line 519)
-- new Variable (line 533)
-- new Variable (line 574)
-- new Variable (line 593)
-- new Variable (line 614)
+- new Variable (line 199)
+- new Variable (line 221)
+- new Variable (line 249)
+- new Variable (line 279)
+- new Variable (line 288)
+- new Variable (line 302)
+- new self (line 317)
+- new self (line 324)
+- new self (line 337)
+- new self (line 344)
+- new self (line 357)
+- new self (line 364)
+- new Variable (line 452)
+- new Variable (line 476)
+- new Variable (line 522)
+- new Variable (line 536)
+- new Variable (line 577)
+- new Variable (line 596)
+- new Variable (line 617)
 - 15 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/Lint/IncrementDetector.php`
@@ -2357,27 +2358,27 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/Runtime.php`
 
 **Warnings** (review for bootstrap subset):
-- new NodeTraverser (line 49)
-- new NodeVisitor\NameResolver (line 51)
-- new Parser (line 53)
-- new ParserFactory (line 54)
-- new Traverser (line 58)
-- new Visitor\Simplifier (line 59)
-- new Visitor\DeadBlockEliminator (line 60)
-- new Traverser (line 61)
-- new Visitor\PhiResolver (line 62)
-- new NullSafeLivenessDetector (line 63)
-- new Optimizer\AssignOp (line 64)
-- new TypeReconstructor (line 66)
-- new Compiler (line 67)
-- new VMContext (line 69)
-- new VM (line 70)
-- new ext\types\Module (line 85)
-- new ext\standard\Module (line 86)
-- new JIT (line 91)
-- new JITContext (line 105)
-- new State (line 130)
-- 14 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new NodeTraverser (line 50)
+- new NodeVisitor\NameResolver (line 52)
+- new Parser (line 54)
+- new ParserFactory (line 55)
+- new Traverser (line 59)
+- new Visitor\Simplifier (line 60)
+- new Visitor\DeadBlockEliminator (line 61)
+- new Traverser (line 62)
+- new Visitor\PhiResolver (line 63)
+- new NullSafeLivenessDetector (line 64)
+- new Optimizer\AssignOp (line 65)
+- new TypeReconstructor (line 67)
+- new Compiler (line 68)
+- new VMContext (line 70)
+- new VM (line 71)
+- new ext\types\Module (line 86)
+- new ext\standard\Module (line 87)
+- new JIT (line 92)
+- new JITContext (line 106)
+- new State (line 131)
+- 15 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/VM.php`
 
@@ -2496,6 +2497,12 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new HashTable (line 106)
 - 39 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `lib/Web/CgiDriver.php`
+
+**Warnings** (review for bootstrap subset):
+- new Runtime (line 78)
+- 5 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `lib/Web/ConstStringFolder.php`
 
 **Warnings** (review for bootstrap subset):
@@ -2559,11 +2566,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/Web/Superglobals.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 773)
-- new Variable (line 774)
-- new Variable (line 793)
-- new Variable (line 868)
-- 40 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new HashTable (line 801)
+- new Variable (line 802)
+- new Variable (line 821)
+- new Variable (line 896)
+- 41 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 - 1 closure(s)
 
 ### `src/macro_functions.php`
