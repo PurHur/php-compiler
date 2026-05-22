@@ -87,6 +87,8 @@ class OpCode {
     const TYPE_CLASS_CONST_FETCH = 87;
     const TYPE_THROW = 88;
     const TYPE_INSTANCEOF = 89;
+    const TYPE_STATIC_PROPERTY_FETCH = 90;
+    const TYPE_UNSET = 91;
 
     public int $type;
     public ?int $arg1;

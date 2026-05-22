@@ -1,0 +1,22 @@
+--- vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
+@@ -369,6 +369,19 @@
+ 
+             return new self(self::TYPE_ARRAY, [$type]);
+         }
++        $pseudo = strtolower(trim($decl));
++        if (in_array($pseudo, [
++            'non-empty-string', 'literal-string', 'lowercase-string', 'uppercase-string',
++            'class-string', 'interface-string', 'trait-string', 'html-escaped-string',
++        ], true)) {
++            return new self(self::TYPE_STRING);
++        }
++        if (in_array($pseudo, ['non-empty-array'], true)) {
++            return new self(self::TYPE_ARRAY);
++        }
++        if (preg_match('/^(positive|negative|non-zero)-int$/', $pseudo)) {
++            return new self(self::TYPE_LONG);
++        }
+         $regex = '(^([a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*\\\\)*[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*$)';
+         if (! preg_match($regex, $decl)) {
+             throw new \RuntimeException("Unknown type declaration found: ${decl}");
