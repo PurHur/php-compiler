@@ -102,12 +102,16 @@ miniwebapp-gates:
 	./script/miniwebapp-gates.sh
 
 # HTTP smoke: phpc serve + curl for 001-SimpleWeb and 002-StaticWeb (issue #298)
-.PHONY: examples-web-smoke examples-web-smoke-prebuild
+.PHONY: examples-web-smoke examples-web-smoke-prebuild examples-aot-smoke
 examples-web-smoke:
 	./script/examples-web-smoke.sh
 
 examples-web-smoke-prebuild:
 	./script/examples-web-smoke-prebuild.sh
+
+# AOT build + CLI execute for 000-004 (issue #667); skips when LLVM missing
+examples-aot-smoke:
+	./script/examples-aot-smoke.sh
 
 # Local HTTP dev server (see bin/serve.php)
 SERVE_ADDR ?= 127.0.0.1:8080

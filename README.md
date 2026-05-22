@@ -26,6 +26,7 @@ mkdir my-app && ./phpc init my-app   # phpc.json + public/index.php scaffold
 ./phpc run -q 'name=Dev' examples/001-SimpleWeb/example.php   # web example without TCP
 make web-smoke                 # lint shipped examples + 003-MiniWebApp tree, VM smoke 001-SimpleWeb
 make examples-web-smoke        # phpc serve + curl for 001-SimpleWeb, 002-StaticWeb, and 004-ApiJson
+make examples-aot-smoke        # phpc build + CLI execute for 000–004 when LLVM ready (#667)
 ./phpc serve examples/001-SimpleWeb   # http://127.0.0.1:8080/ (or: make serve)
 ```
 

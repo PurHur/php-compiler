@@ -118,6 +118,7 @@ Before a PR that touches examples or `bin/serve.php`:
 ```console
 make web-smoke              # lint examples/*/example.php + 003 lint --all + VM ?name= smoke
 make examples-web-smoke     # phpc serve + curl GET/POST (001-SimpleWeb, 002-StaticWeb, 004-ApiJson)
+make examples-aot-smoke     # phpc build + CLI execute (000–004; skips when LLVM missing; 003 skipped #568)
 ```
 
 Full suite on the host (after `composer install`):

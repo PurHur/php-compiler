@@ -80,6 +80,27 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('phpc build --project', $body);
     }
 
+    public function testExamplesAotSmokeScriptExists(): void
+    {
+        $script = dirname(__DIR__, 2).'/script/examples-aot-smoke.sh';
+        $this->assertFileExists($script);
+        $this->assertTrue(is_executable($script));
+        $body = (string) file_get_contents($script);
+        $this->assertStringContainsString('000-HelloWorld', $body);
+        $this->assertStringContainsString('QUERY_STRING=name=Smoke', $body);
+        $this->assertStringContainsString('.phpc/smoke', $body);
+    }
+
+    public function testCiLocalHonorsExamplesAotSmokeGate(): void
+    {
+        $local = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-local.sh');
+        $this->assertStringContainsString('ci_run_examples_aot_smoke', $local);
+
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('EXAMPLES_AOT_SMOKE_GATE', $common);
+        $this->assertStringContainsString('examples-aot-smoke.sh', $common);
+    }
+
     public function testCiResourceLimitsSourcesDefaults(): void
     {
         $limits = dirname(__DIR__, 2).'/script/ci-resource-limits.sh';
