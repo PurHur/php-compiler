@@ -8,9 +8,9 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 336 |
+| PHP files on vm.php path | 337 |
 | Source constructs flagged (blockers) | 10 |
-| Source constructs flagged (warnings) | 907 |
+| Source constructs flagged (warnings) | 908 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -345,6 +345,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `lib/VM/Refcount.php` | 0 | 1 |
 | `lib/VM/TypeCheck.php` | 0 | 1 |
 | `lib/VM/Variable.php` | 0 | 4 |
+| `lib/Web/CgiAotDriver.php` | 0 | 1 |
 | `lib/Web/CgiDriver.php` | 0 | 2 |
 | `lib/Web/ConstStringFolder.php` | 0 | 1 |
 | `lib/Web/DeployRoot.php` | 0 | 1 |
@@ -1863,14 +1864,14 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new OpCode (line 731)
 - new Variable (line 920)
 - new Variable (line 929)
-- new Variable (line 1118)
-- new Variable (line 1376)
-- new Operand\Literal (line 1474)
-- new Operand\Literal (line 1478)
-- new Operand\Literal (line 1482)
-- new Variable (line 1486)
-- new Variable (line 1506)
-- 20 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new Variable (line 1140)
+- new Variable (line 1391)
+- new Operand\Literal (line 1489)
+- new Operand\Literal (line 1493)
+- new Operand\Literal (line 1497)
+- new Variable (line 1501)
+- new Variable (line 1521)
+- 21 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Analyzer.php`
 
@@ -2206,9 +2207,9 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 22)
-- new Variable (line 33)
-- new Variable (line 40)
-- new Variable (line 62)
+- new Variable (line 36)
+- new Variable (line 43)
+- new Variable (line 65)
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/JitStringCompare.php`
@@ -2219,7 +2220,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/JIT/JitValueBox.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 6 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/JitValueCompare.php`
 
@@ -2510,6 +2511,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new HashTable (line 106)
 - 39 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `lib/Web/CgiAotDriver.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `lib/Web/CgiDriver.php`
 
 **Warnings** (review for bootstrap subset):
@@ -2556,8 +2562,8 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/Web/ProjectDeploy.php`
 
 **Warnings** (review for bootstrap subset):
-- new RecursiveIteratorIterator (line 205)
-- new RecursiveDirectoryIterator (line 206)
+- new RecursiveIteratorIterator (line 220)
+- new RecursiveDirectoryIterator (line 221)
 - 6 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/Web/ProjectManifest.php`

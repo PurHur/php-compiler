@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
+use PHPCompiler\Web\CgiAotDriver;
 use PHPCompiler\Web\ProjectDeploy;
 
 /**
@@ -48,7 +49,11 @@ final class PhpcDeployTest extends TestCase
             $this->assertFileExists($out.'/assets/app.css');
             $this->assertFileExists($out.'/templates/layout.php');
             $this->assertFileExists($out.'/'.ProjectDeploy::README_DEPLOY);
-            $this->assertStringContainsString('PHPC_DEPLOY_ROOT', (string) file_get_contents($out.'/'.ProjectDeploy::README_DEPLOY));
+            $this->assertFileExists($out.'/'.CgiAotDriver::WRAPPER_NAME);
+            $this->assertTrue(is_executable($out.'/'.CgiAotDriver::WRAPPER_NAME));
+            $readme = (string) file_get_contents($out.'/'.ProjectDeploy::README_DEPLOY);
+            $this->assertStringContainsString('PHPC_DEPLOY_ROOT', $readme);
+            $this->assertStringContainsString('cgi-wrapper', $readme);
         } finally {
             $this->removeTree($project);
             $this->removeTree($out);

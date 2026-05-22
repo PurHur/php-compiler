@@ -97,6 +97,16 @@ final class ProjectDeploy
             }
         }
 
+        $wrapperSrc = dirname(__DIR__, 2).'/bin/cgi-aot.sh';
+        if (!is_file($wrapperSrc)) {
+            return ['cgi-aot.sh missing in repository (issue #665)'];
+        }
+        $wrapperDest = $outReal.'/'.CgiAotDriver::WRAPPER_NAME;
+        if (!copy($wrapperSrc, $wrapperDest)) {
+            return ['failed to copy '.CgiAotDriver::WRAPPER_NAME];
+        }
+        @chmod($wrapperDest, 0755);
+
         $readme = self::readmeDeployContent();
         if (false === file_put_contents($outReal.'/'.self::README_DEPLOY, $readme)) {
             return ['failed to write '.self::README_DEPLOY];
@@ -119,10 +129,15 @@ Run the AOT binary behind nginx/CGI/FastCGI with the document root set to public
   QUERY_STRING       CGI query string (e.g. name=value&page=1)
   PHP_COMPILER_DEBUG Set to 1 for serve/build diagnostics
 
-Example:
+Example (direct binary):
 
   export PHPC_DEPLOY_ROOT=/var/www/myapp
   ./bin/app
+
+Production CGI (nginx ScriptAlias → cgi-wrapper):
+
+  export PHPC_DEPLOY_ROOT=/var/www/myapp
+  ./cgi-wrapper
 
 See docs/deploy-web-aot.md (quickstart), docs/local-ci-matrix.md, and the production deployment guide (issue #445).
 
