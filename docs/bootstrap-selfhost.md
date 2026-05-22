@@ -8,7 +8,9 @@ North star: compile a **subset** of php-compiler with itself (native AOT), then 
 |------|---------|--------|
 | Phase A inventory | `php script/bootstrap-inventory.php --check` | ✅ 299 files on `bin/vm.php` path; **10** source blockers (only `lib/AOT/Linker.php`, `lib/VM/HashTable.php` — both excluded) |
 | Phase B AOT lint | `php script/bootstrap-aot-lint.php` | ✅ Procedural targets under `test/bootstrap-aot/` + `examples/000-HelloWorld` |
-| Phase C native run | `make bootstrap-aot-link` or `./script/bootstrap-aot-link.sh` | ✅ Link + execute `aot_link_targets` (stdout vs Zend PHP) |
+| Phase C native run | `make bootstrap-aot-link` or `./script/bootstrap-aot-link.sh` | ✅ Link + execute procedural `aot_link_targets` (stdout vs Zend PHP) |
+
+Class fixtures (`minimal_class.php`, `class_nullable_property.php`) and `nullable_types.php` are **lint-only** until [#520](https://github.com/PurHur/php-compiler/issues/520) (`new` / `__object__`, user-defined calls).
 
 Regenerate: `make bootstrap-profile` (inventory + profile + optional `bootstrap-aot-lint`). Phase C: `make bootstrap-aot-link` (or `php script/bootstrap-aot-lint.php --link`).
 

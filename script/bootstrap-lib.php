@@ -226,13 +226,16 @@ function bootstrapDefaultAotLintTargets(string $root): array
  */
 function bootstrapDefaultAotLinkTargets(array $lintTargets): array
 {
-    $pendingUserFunc = [
+    // Lint-only until AOT can link these (see JIT __object__ / user-defined calls).
+    $linkPending = [
         'test/bootstrap-aot/nullable_types.php',
+        'test/bootstrap-aot/minimal_class.php',
+        'test/bootstrap-aot/class_nullable_property.php',
     ];
 
     return array_values(array_filter(
         $lintTargets,
-        static fn (string $rel): bool => !in_array($rel, $pendingUserFunc, true),
+        static fn (string $rel): bool => !in_array($rel, $linkPending, true),
     ));
 }
 
