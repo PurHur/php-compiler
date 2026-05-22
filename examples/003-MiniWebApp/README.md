@@ -37,7 +37,7 @@ MINIWEBAPP_LINT_GATE=1 make web-smoke   # fail if lint --all regresses
 | `require __DIR__ . '/../config.php'` | [#54](https://github.com/PurHur/php-compiler/issues/54) runtime | ✅ lint follows ([#462](https://github.com/PurHur/php-compiler/issues/462)) |
 | `include __DIR__ . '/../templates/...'` | [#54](https://github.com/PurHur/php-compiler/issues/54) runtime | ✅ lint follows ([#462](https://github.com/PurHur/php-compiler/issues/462)); VM scope ✅ ([#471](https://github.com/PurHur/php-compiler/issues/471)) |
 | `foreach ($knownRoutes as $known)` | — | ✅ accepted (was [#53](https://github.com/PurHur/php-compiler/issues/53)) |
-| `break` in route scan | [#115](https://github.com/PurHur/php-compiler/issues/115) | `Stmt_Break` (when lint follows index includes) |
+| `break` in route scan | — | ✅ accepted ([#115](https://github.com/PurHur/php-compiler/issues/115), [#483](https://github.com/PurHur/php-compiler/issues/483)) |
 | `$_GET['route'] ?? 'home'` | — | ✅ accepted (was [#99](https://github.com/PurHur/php-compiler/issues/99)) |
 | `switch ($route)` in Router | — | ✅ accepted in VM (JIT case stubs [#96](https://github.com/PurHur/php-compiler/issues/96)) |
 | `json_encode` / `http_response_code` API route | [#61](https://github.com/PurHur/php-compiler/issues/61), [#270](https://github.com/PurHur/php-compiler/issues/270) | blocked by class/method lint above |

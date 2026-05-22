@@ -21,8 +21,6 @@ final class UnsupportedRegistryTest extends TestCase
     {
         return [
             'assign coalesce' => ['Expr_AssignOp_Coalesce', 99],
-            'break' => ['Stmt_Break', 115],
-            'continue' => ['Stmt_Continue', 115],
             'match' => ['Expr_Match', 143],
             'yield' => ['Expr_Yield', 167],
             'yield from' => ['Expr_YieldFrom', 167],
@@ -51,8 +49,8 @@ final class UnsupportedRegistryTest extends TestCase
     public function testIssueUrl(): void
     {
         $this->assertSame(
-            'https://github.com/PurHur/php-compiler/issues/115',
-            UnsupportedRegistry::issueUrl(115)
+            'https://github.com/PurHur/php-compiler/issues/99',
+            UnsupportedRegistry::issueUrl(99)
         );
     }
 

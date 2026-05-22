@@ -21,8 +21,6 @@ final class UnsupportedRegistry
         'Stmt_Catch' => 195,
         'Stmt_Finally' => 195,
         'Expr_AssignOp_Coalesce' => 99,
-        'Stmt_Break' => 115,
-        'Stmt_Continue' => 115,
         'Expr_Match' => 143,
         'Expr_Yield' => 167,
         'Expr_YieldFrom' => 167,
