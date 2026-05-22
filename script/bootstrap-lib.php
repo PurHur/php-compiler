@@ -232,6 +232,7 @@ function bootstrapDefaultAotLinkTargets(array $lintTargets): array
 {
     $pendingUserFunc = [
         'test/bootstrap-aot/lib_opcode/main.php', // Phase D: aot_link_lib_targets only (#540)
+        'test/bootstrap-aot/spl_object_storage_dim.php', // lint OK; LLVM verify on link (#601)
     ];
 
     return array_values(array_filter(
