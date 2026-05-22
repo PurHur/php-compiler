@@ -8,9 +8,9 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 302 |
+| PHP files on vm.php path | 304 |
 | Source constructs flagged (blockers) | 10 |
-| Source constructs flagged (warnings) | 816 |
+| Source constructs flagged (warnings) | 819 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -68,9 +68,10 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/JitStripTags.php` | 0 | 1 |
 | `ext/standard/JitStrpos.php` | 0 | 1 |
 | `ext/standard/JitStrrpos.php` | 0 | 1 |
+| `ext/standard/JitSubstrCount.php` | 0 | 1 |
 | `ext/standard/JitUrlencode.php` | 0 | 1 |
 | `ext/standard/JitWebParams.php` | 0 | 15 |
-| `ext/standard/Module.php` | 0 | 137 |
+| `ext/standard/Module.php` | 0 | 138 |
 | `ext/standard/SetcookieLine.php` | 0 | 1 |
 | `ext/standard/VmDate.php` | 0 | 1 |
 | `ext/standard/VmExit.php` | 0 | 2 |
@@ -209,6 +210,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/strtoupper.php` | 0 | 1 |
 | `ext/standard/strval.php` | 0 | 1 |
 | `ext/standard/substr.php` | 0 | 1 |
+| `ext/standard/substr_count.php` | 0 | 1 |
 | `ext/standard/tan.php` | 0 | 1 |
 | `ext/standard/time.php` | 0 | 1 |
 | `ext/standard/ucfirst.php` | 0 | 1 |
@@ -510,6 +512,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 **Warnings** (review for bootstrap subset):
 - 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `ext/standard/JitSubstrCount.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `ext/standard/JitUrlencode.php`
 
 **Warnings** (review for bootstrap subset):
@@ -589,90 +596,91 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new strpos (line 71)
 - new stripos (line 72)
 - new strrpos (line 73)
-- new str_contains (line 74)
-- new str_starts_with (line 75)
-- new str_ends_with (line 76)
-- new strncmp (line 77)
-- new array_count (line 78)
+- new substr_count (line 74)
+- new str_contains (line 75)
+- new str_starts_with (line 76)
+- new str_ends_with (line 77)
+- new strncmp (line 78)
 - new array_count (line 79)
-- new array_key_exists (line 80)
-- new in_array (line 81)
-- new array_push (line 82)
-- new array_pop (line 83)
-- new array_shift (line 84)
-- new sort_ (line 85)
-- new sprintf_ (line 86)
-- new array_values (line 87)
-- new array_keys (line 88)
-- new array_merge (line 89)
-- new array_slice (line 90)
-- new explode (line 91)
-- new implode (line 92)
-- new str_replace (line 93)
-- new nl2br (line 94)
-- new array_reverse (line 95)
-- new array_search (line 96)
-- new array_sum (line 97)
-- new array_product (line 98)
-- new array_flip (line 99)
-- new array_unique (line 100)
-- new array_fill (line 101)
-- new array_combine (line 102)
-- new array_map (line 103)
-- new array_filter (line 104)
-- new range (line 105)
-- new bin2hex (line 106)
-- new hex2bin (line 107)
-- new hash_ (line 108)
-- new hash_hmac (line 109)
-- new password_hash (line 110)
-- new password_verify (line 111)
-- new random_bytes (line 112)
-- new str_pad (line 113)
-- new str_split (line 114)
-- new htmlspecialchars (line 115)
-- new strip_tags (line 116)
-- new header_ (line 117)
-- new setcookie (line 118)
-- new header_remove (line 119)
-- new header_list (line 120)
-- new getallheaders_ (line 121)
-- new ob_start (line 122)
-- new ob_get_clean (line 123)
-- new ob_end_flush (line 124)
-- new ob_get_level (line 125)
-- new http_response_code (line 126)
-- new json_encode (line 127)
-- new web_int (line 128)
-- new web_string (line 129)
-- new web_bool (line 130)
-- new urlencode (line 131)
-- new rawurlencode (line 132)
-- new urldecode (line 133)
-- new rawurldecode (line 134)
-- new parse_url (line 135)
-- new dirname (line 136)
-- new basename (line 137)
-- new realpath (line 138)
-- new file_get_contents (line 139)
-- new readfile (line 140)
-- new file_put_contents (line 141)
-- new file_exists (line 142)
-- new is_file (line 143)
-- new is_dir (line 144)
-- new fopen (line 145)
-- new fread (line 146)
-- new fwrite (line 147)
-- new fclose (line 148)
-- new getenv_ (line 149)
-- new putenv_ (line 150)
-- new extract_ (line 151)
-- new compact_ (line 152)
-- new scandir (line 153)
-- new glob_ (line 154)
-- new time (line 155)
-- new date (line 156)
-- new gmdate (line 157)
+- new array_count (line 80)
+- new array_key_exists (line 81)
+- new in_array (line 82)
+- new array_push (line 83)
+- new array_pop (line 84)
+- new array_shift (line 85)
+- new sort_ (line 86)
+- new sprintf_ (line 87)
+- new array_values (line 88)
+- new array_keys (line 89)
+- new array_merge (line 90)
+- new array_slice (line 91)
+- new explode (line 92)
+- new implode (line 93)
+- new str_replace (line 94)
+- new nl2br (line 95)
+- new array_reverse (line 96)
+- new array_search (line 97)
+- new array_sum (line 98)
+- new array_product (line 99)
+- new array_flip (line 100)
+- new array_unique (line 101)
+- new array_fill (line 102)
+- new array_combine (line 103)
+- new array_map (line 104)
+- new array_filter (line 105)
+- new range (line 106)
+- new bin2hex (line 107)
+- new hex2bin (line 108)
+- new hash_ (line 109)
+- new hash_hmac (line 110)
+- new password_hash (line 111)
+- new password_verify (line 112)
+- new random_bytes (line 113)
+- new str_pad (line 114)
+- new str_split (line 115)
+- new htmlspecialchars (line 116)
+- new strip_tags (line 117)
+- new header_ (line 118)
+- new setcookie (line 119)
+- new header_remove (line 120)
+- new header_list (line 121)
+- new getallheaders_ (line 122)
+- new ob_start (line 123)
+- new ob_get_clean (line 124)
+- new ob_end_flush (line 125)
+- new ob_get_level (line 126)
+- new http_response_code (line 127)
+- new json_encode (line 128)
+- new web_int (line 129)
+- new web_string (line 130)
+- new web_bool (line 131)
+- new urlencode (line 132)
+- new rawurlencode (line 133)
+- new urldecode (line 134)
+- new rawurldecode (line 135)
+- new parse_url (line 136)
+- new dirname (line 137)
+- new basename (line 138)
+- new realpath (line 139)
+- new file_get_contents (line 140)
+- new readfile (line 141)
+- new file_put_contents (line 142)
+- new file_exists (line 143)
+- new is_file (line 144)
+- new is_dir (line 145)
+- new fopen (line 146)
+- new fread (line 147)
+- new fwrite (line 148)
+- new fclose (line 149)
+- new getenv_ (line 150)
+- new putenv_ (line 151)
+- new extract_ (line 152)
+- new compact_ (line 153)
+- new scandir (line 154)
+- new glob_ (line 155)
+- new time (line 156)
+- new date (line 157)
+- new gmdate (line 158)
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/SetcookieLine.php`
@@ -742,7 +750,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 **Warnings** (review for bootstrap subset):
 - new Exception (line 207)
 - new Exception (line 215)
-- 59 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 60 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 - 1 closure(s)
 
 ### `ext/standard/abs.php`
@@ -1399,6 +1407,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - 5 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/substr.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/substr_count.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
