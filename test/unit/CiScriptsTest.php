@@ -38,6 +38,7 @@ final class CiScriptsTest extends TestCase
         $local = dirname(__DIR__, 2).'/script/ci-local.sh';
         $body = (string) file_get_contents($local);
         $this->assertStringContainsString('MINIWEBAPP_SERVE_GATE', $body);
+        $this->assertStringContainsString('MINIWEBAPP_SERVE_GATE:-1', $body);
         $this->assertStringContainsString('--group miniwebapp', $body);
         $this->assertStringContainsString('--fail-on-skipped', $body);
     }
@@ -58,8 +59,15 @@ final class CiScriptsTest extends TestCase
         $fast = dirname(__DIR__, 2).'/script/ci-fast.sh';
         $body = (string) file_get_contents($fast);
         $this->assertStringContainsString('MINIWEBAPP_SERVE_GATE', $body);
+        $this->assertStringContainsString('MINIWEBAPP_SERVE_GATE:-1', $body);
         $this->assertStringContainsString('--group miniwebapp', $body);
         $this->assertStringContainsString('--fail-on-skipped', $body);
+    }
+
+    public function testCiDefaultsEnvDefinesMiniWebAppServeGateOn(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString('MINIWEBAPP_SERVE_GATE="${MINIWEBAPP_SERVE_GATE:-1}"', $defaults);
     }
 
     public function testExamplesWebSmokePrebuildScriptExists(): void
@@ -134,6 +142,8 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('issues/597', $body);
         $this->assertStringContainsString('issues/621', $body);
         $this->assertStringContainsString('issues/622', $body);
+        $this->assertStringContainsString('issues/641', $body);
+        $this->assertStringContainsString('MINIWEBAPP_SERVE_GATE:-1', $body);
         $this->assertStringContainsString('MINIWEBAPP_WEB_SMOKE_GATE', $body);
         $this->assertStringContainsString('issues/633', $body);
     }

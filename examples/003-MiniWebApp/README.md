@@ -80,13 +80,14 @@ curl -s 'http://127.0.0.1:8080/index.php?route=home'
 make miniwebapp-gates
 ../../script/examples-web-smoke.sh
 MINIWEBAPP_VM_CLI_GATE=1 ../../script/ci-fast.sh --filter 'MiniWebApp.*VmCli'
-MINIWEBAPP_SERVE_GATE=1 ../../script/ci-local.sh --filter ServeTest
+../../script/ci-local.sh --filter ServeTest
+MINIWEBAPP_SERVE_GATE=0 ../../script/ci-local.sh   # skip miniwebapp ServeTest while iterating
 MINIWEBAPP_WEB_SMOKE_GATE=1 ../../script/ci-local.sh
 ```
 
 Fast CI runs `MiniWebAppVmCliTest` and `MiniWebAppPathInfoVmCliTest` when `MINIWEBAPP_VM_CLI_GATE=1` (default). Set `MINIWEBAPP_VM_CLI_GATE=0` to skip the VM CLI matrix during iteration.
 
-Full CI runs `ServeTest` `@group miniwebapp` with `--fail-on-skipped` when `MINIWEBAPP_SERVE_GATE=1` (opt-in; default off until promoted in docs).
+Full CI runs `ServeTest` `@group miniwebapp` with `--fail-on-skipped` when `MINIWEBAPP_SERVE_GATE=1` (default on in `ci-local.sh` / `ci-fast.sh`; set `MINIWEBAPP_SERVE_GATE=0` to skip during iteration — [#641](https://github.com/PurHur/php-compiler/issues/641)).
 
 Full CI runs `script/examples-web-smoke.sh --miniwebapp-only` after serve PHPUnit when `MINIWEBAPP_WEB_SMOKE_GATE=1` (opt-in; default off). Skips when `PHP_COMPILER_SKIP_SERVE_TESTS=1` or loopback bind fails (same as `ServeTest`).
 
@@ -98,6 +99,7 @@ Full CI runs `script/examples-web-smoke.sh --miniwebapp-only` after serve PHPUni
 - [#461](https://github.com/PurHur/php-compiler/issues/461) — `examples-web-smoke.sh` curls
 - [#470](https://github.com/PurHur/php-compiler/issues/470) — `ServeTest` `@group miniwebapp`
 - [#622](https://github.com/PurHur/php-compiler/issues/622) — `MINIWEBAPP_SERVE_GATE` in `ci-local.sh`
+- [#641](https://github.com/PurHur/php-compiler/issues/641) — default `MINIWEBAPP_SERVE_GATE=1` in full/fast CI
 - [#633](https://github.com/PurHur/php-compiler/issues/633) — `MINIWEBAPP_WEB_SMOKE_GATE` in `ci-local.sh`
 
 ## Related

@@ -15,8 +15,8 @@ ci_configure_serve_tests
 echo "PHPUnit: VM, compliance (no LLVM), real-world (includes ExamplesCompileTest VM lint/smoke)..."
 "$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit --exclude-group llvm,serve "$@"
 
-if [[ -n "${MINIWEBAPP_SERVE_GATE:-}" && "${MINIWEBAPP_SERVE_GATE}" == "1" && -n "${PHP_COMPILER_SKIP_SERVE_TESTS:-}" ]]; then
-  echo "MINIWEBAPP_SERVE_GATE=1 requires serve tests; unset PHP_COMPILER_SKIP_SERVE_TESTS (#622)" >&2
+if [[ "${MINIWEBAPP_SERVE_GATE:-1}" == "1" && -n "${PHP_COMPILER_SKIP_SERVE_TESTS:-}" ]]; then
+  echo "MINIWEBAPP_SERVE_GATE=1 (default) requires serve tests; unset PHP_COMPILER_SKIP_SERVE_TESTS (#622, #641)" >&2
   exit 1
 fi
 
@@ -27,14 +27,14 @@ fi
 
 if [[ -z "${PHP_COMPILER_SKIP_SERVE_TESTS:-}" ]]; then
   serve_groups=(--group serve)
-  if [[ "${MINIWEBAPP_SERVE_GATE:-}" == "1" ]]; then
+  if [[ "${MINIWEBAPP_SERVE_GATE:-1}" == "1" ]]; then
     serve_groups+=(--exclude-group miniwebapp)
   fi
   echo "PHPUnit: HTTP serve (bin/serve.php, phpc serve --aot)..."
   "$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit "${serve_groups[@]}" "$@"
 
-  if [[ "${MINIWEBAPP_SERVE_GATE:-}" == "1" ]]; then
-    echo "PHPUnit: MiniWebApp ServeTest (MINIWEBAPP_SERVE_GATE=1, #470)..."
+  if [[ "${MINIWEBAPP_SERVE_GATE:-1}" == "1" ]]; then
+    echo "PHPUnit: MiniWebApp ServeTest (MINIWEBAPP_SERVE_GATE=1 default, #470, #641)..."
     "$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit --filter ServeTest --group miniwebapp --fail-on-skipped "$@"
   fi
 
