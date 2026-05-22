@@ -160,6 +160,7 @@ class Module extends ModuleAbstract
             new is_readable(),
             new is_writable(),
             new is_executable(),
+            new is_link(),
             new fopen(),
             new fread(),
             new fwrite(),
@@ -318,6 +319,15 @@ class Module extends ModuleAbstract
             $ft = $context->context->functionType($i32, false, $i8p, $i32);
             $fn = $context->module->addFunction('access', $ft);
             $context->registerFunction('access', $fn);
+        }
+        try {
+            $context->lookupFunction('lstat');
+        } catch (\Throwable $e) {
+            $i8p = $context->getTypeFromString('int8*');
+            $i32 = $context->getTypeFromString('int32');
+            $ft = $context->context->functionType($i32, false, $i8p, $i8p);
+            $fn = $context->module->addFunction('lstat', $ft);
+            $context->registerFunction('lstat', $fn);
         }
         $double = $context->getTypeFromString('double');
         try {
