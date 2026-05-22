@@ -5,6 +5,8 @@ set -euo pipefail
 _CI_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 _CI_REPO_ROOT="$(cd "$_CI_SCRIPT_DIR/.." && pwd)"
 
+# shellcheck source=ci-defaults.env
+source "$_CI_SCRIPT_DIR/ci-defaults.env"
 # shellcheck source=php-env.sh
 source "$_CI_SCRIPT_DIR/php-env.sh"
 # shellcheck source=ci-resource-limits.sh

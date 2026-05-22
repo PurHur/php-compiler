@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
-# Apply virtual-memory cap for LLVM compile phases (issue #436).
-# Child processes (compile.php, jit.php) inherit the shell ulimit at fork time.
-#
-# PHP_COMPILER_CI_RAM_GB — virtual-memory cap via ulimit -v (default 8 GiB per CI shell).
-# Set to 0 to disable. Raise for LLVM-heavy hosts; do not run multiple full CI containers in parallel.
+# Apply virtual-memory cap for CI shells (issue #436, #497).
+# Child processes (compile.php, jit.php, vm.php) inherit the shell ulimit at fork time.
+# Default PHP_COMPILER_CI_RAM_GB is in script/ci-defaults.env.
+
+_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=ci-defaults.env
+source "$_SCRIPT_DIR/ci-defaults.env"
+
 ci_apply_resource_limits() {
-  local gb="${PHP_COMPILER_CI_RAM_GB:-8}"
+  local gb="${PHP_COMPILER_CI_RAM_GB}"
   if [[ "$gb" == "0" ]]; then
     echo "CI resource limits disabled (PHP_COMPILER_CI_RAM_GB=0)."
     return 0

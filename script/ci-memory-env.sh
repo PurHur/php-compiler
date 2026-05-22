@@ -1,23 +1,21 @@
 #!/usr/bin/env bash
 # Per-process PHP memory_limit for CI and spawned bin/vm.php children (via PHP_COMPILER_MEMORY_LIMIT).
-#
-# PHP_COMPILER_MEMORY_LIMIT — PHPUnit + scripts (default 1536M).
-# PHP_COMPILER_LLVM_MEMORY_LIMIT — used during @group llvm phases (default 4096M).
-# Export PHP_COMPILER_MEMORY_LIMIT=-1 only for local debugging (not in CI).
+# Defaults live in script/ci-defaults.env. Set PHP_COMPILER_MEMORY_LIMIT=-1 only for local debugging.
+
+_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=ci-defaults.env
+source "$_SCRIPT_DIR/ci-defaults.env"
 
 php_compiler_apply_memory_php_opt() {
-  local limit="${PHP_COMPILER_MEMORY_LIMIT:-1536M}"
-  export PHP_COMPILER_MEMORY_LIMIT="$limit"
-  PHP_OPTS+=(-d "memory_limit=${limit}")
+  PHP_OPTS+=(-d "memory_limit=${PHP_COMPILER_MEMORY_LIMIT}")
 }
 
 ci_apply_default_memory_env() {
-  export PHP_COMPILER_MEMORY_LIMIT="${PHP_COMPILER_MEMORY_LIMIT:-1536M}"
   php_compiler_apply_memory_php_opt
 }
 
 ci_apply_llvm_memory_env() {
-  export PHP_COMPILER_MEMORY_LIMIT="${PHP_COMPILER_LLVM_MEMORY_LIMIT:-4096M}"
+  export PHP_COMPILER_MEMORY_LIMIT="${PHP_COMPILER_LLVM_MEMORY_LIMIT}"
   PHP_OPTS+=(-d "memory_limit=${PHP_COMPILER_MEMORY_LIMIT}")
 }
 

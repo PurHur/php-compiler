@@ -37,7 +37,7 @@ On a host with **only Docker** (no system PHP or LLVM):
 ```console
 git clone https://github.com/PurHur/php-compiler.git
 cd php-compiler
-make test    # builds php-compiler:22.04-dev if needed, then script/ci-local.sh in the container
+make test    # builds php-compiler:22.04-dev if needed, then memory-safe CI in Docker (see script/ci-defaults.env)
 ```
 
 `make test` is the same CI path as `make test-docker` when the bind-mount works; on harness hosts it falls back to `script/docker-ci-local.sh` (tar copy) like `make test-harness`.
