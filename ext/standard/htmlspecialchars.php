@@ -19,7 +19,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * htmlspecialchars() for strings (subset of PHP; JIT supports default ENT_QUOTES).
+ * htmlspecialchars() for strings (subset of PHP; JIT supports flags for ENT_QUOTES / ENT_COMPAT).
  */
 final class htmlspecialchars extends Internal
 {
@@ -73,15 +73,32 @@ final class htmlspecialchars extends Internal
         if ($argc < 1 || $argc > 4) {
             throw new \LogicException('htmlspecialchars() requires one to four arguments');
         }
-        if ($argc >= 2) {
+        if ($argc >= 3) {
             throw new \LogicException(
-                'htmlspecialchars() JIT only supports the default flags (ENT_QUOTES) in this compiler build'
+                'htmlspecialchars() JIT only supports string and optional flags in this compiler build'
+            );
+        }
+
+        if ($argc >= 2 && JITVariable::TYPE_NATIVE_LONG !== $args[1]->type) {
+            throw new \LogicException('htmlspecialchars() flags must be an integer in this compiler build');
+        }
+
+        $literal = $args[0]->compileTimeString ?? null;
+        if (null !== $literal && 1 === $argc) {
+            return $context->builder->load(
+                $context->constantStringFromString(
+                    VmString::htmlspecialchars($literal, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8', true)
+                )
             );
         }
 
         $str = self::jitStringArg($context, $args[0]);
+        $flags = $context->getTypeFromString('int64')->constInt(ENT_QUOTES | ENT_SUBSTITUTE, false);
+        if ($argc >= 2) {
+            $flags = $context->helper->loadValue($args[1]);
+        }
 
-        return JitHtmlspecialchars::escape($context, $str);
+        return JitHtmlspecialchars::escape($context, $str, $flags);
     }
 
     private static function jitStringArg(Context $context, JITVariable $arg): Value
