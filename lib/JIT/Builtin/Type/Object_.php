@@ -484,7 +484,7 @@ class Object_ extends Type {
             if ($propset[0] === $nameId) {
                 $slot = $this->propertySlotPtr($obj, $propset[3]);
                 $loaded = $this->context->builder->load($slot);
-                if (Variable::TYPE_VALUE === $propset[2]) {
+                if (Variable::TYPE_VALUE === $propset[2] || Variable::TYPE_HASHTABLE === $propset[2]) {
                     $valueType = $this->context->getTypeFromString('__value__');
                     $storage = $this->context->builder->alloca($valueType, 1, 'prop_'.$name);
                     $valueMap = $this->context->structFieldMap['__value__'];
@@ -507,12 +507,20 @@ class Object_ extends Type {
                     );
                 }
 
-                return new Variable(
+                $jitType = Variable::TYPE_VALUE === $propset[2] || Variable::TYPE_HASHTABLE === $propset[2]
+                    ? Variable::TYPE_VALUE
+                    : $propset[2];
+                $var = new Variable(
                     $this->context,
-                    $propset[2],
+                    $jitType,
                     Variable::KIND_VARIABLE,
                     $storage,
                 );
+                if (Variable::TYPE_HASHTABLE === $propset[2]) {
+                    $var->valueBoxHashtable = true;
+                }
+
+                return $var;
             }
         }
         throw new \LogicException("Could not find property $name for class $classId");

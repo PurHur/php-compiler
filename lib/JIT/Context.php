@@ -304,6 +304,7 @@ class Context {
             Type::TYPE_LONG => 'long long',
             Type::TYPE_STRING => '__string__*',
             Type::TYPE_OBJECT => '__object__*',
+            Type::TYPE_ARRAY => '__hashtable__*',
         ];
         if (isset($map[$type->type])) {
             return $this->getTypeFromString($map[$type->type]);

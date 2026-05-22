@@ -767,6 +767,60 @@ class JIT {
                                     $this->context->getTypeFromString('int1')
                                 );
                             }
+                        } elseif ('__value__' === $expected && Variable::TYPE_VALUE !== $return->type) {
+                            $slot = JIT\JitValueBox::alloc($this->context);
+                            $ptr = JIT\JitValueBox::pointer($this->context, $slot);
+                            switch ($return->type) {
+                                case Variable::TYPE_NULL:
+                                    $this->context->builder->call(
+                                        $this->context->lookupFunction('__value__writeNull'),
+                                        $ptr
+                                    );
+                                    break;
+                                case Variable::TYPE_NATIVE_LONG:
+                                    $this->context->builder->call(
+                                        $this->context->lookupFunction('__value__writeLong'),
+                                        $ptr,
+                                        $retval
+                                    );
+                                    break;
+                                case Variable::TYPE_NATIVE_DOUBLE:
+                                    $this->context->builder->call(
+                                        $this->context->lookupFunction('__value__writeDouble'),
+                                        $ptr,
+                                        $retval
+                                    );
+                                    break;
+                                case Variable::TYPE_NATIVE_BOOL:
+                                    JIT\JitValueBox::writeBool($this->context, $ptr, $retval);
+                                    break;
+                                case Variable::TYPE_STRING:
+                                    $this->context->builder->call(
+                                        $this->context->lookupFunction('__value__writeString'),
+                                        $ptr,
+                                        $retval
+                                    );
+                                    break;
+                                case Variable::TYPE_HASHTABLE:
+                                    $this->context->builder->call(
+                                        $this->context->lookupFunction('__value__writeHashtable'),
+                                        $ptr,
+                                        $retval
+                                    );
+                                    break;
+                                case Variable::TYPE_OBJECT:
+                                    $this->context->builder->call(
+                                        $this->context->lookupFunction('__value__writeObject'),
+                                        $ptr,
+                                        $retval
+                                    );
+                                    break;
+                                default:
+                                    throw new \LogicException(
+                                        'Cannot box return type '.Variable::getStringType($return->type).' for __value__'
+                                    );
+                            }
+                            $retval = $this->context->builder->load($slot);
                         }
                         $this->context->builder->returnValue($retval);
                     }

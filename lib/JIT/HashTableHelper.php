@@ -18,6 +18,33 @@ final class HashTableHelper
         return $context->builder->call($context->lookupFunction('__hashtable__alloc'));
     }
 
+    private static function asHashtable(Context $context, Variable $array): Variable
+    {
+        if (Variable::TYPE_HASHTABLE === $array->type) {
+            return $array;
+        }
+        if (Variable::TYPE_VALUE === $array->type && $array->valueBoxHashtable) {
+            $valPtr = Variable::KIND_VARIABLE === $array->kind
+                ? JitValueBox::pointer($context, $array->value)
+                : $array->value;
+            $ht = $context->builder->call(
+                $context->lookupFunction('__value__readHashtable'),
+                $valPtr
+            );
+
+            return new Variable(
+                $context,
+                Variable::TYPE_HASHTABLE,
+                Variable::KIND_VALUE,
+                $ht
+            );
+        }
+
+        throw new \LogicException(
+            'Expected an array, got '.Variable::getStringType($array->type)
+        );
+    }
+
     public static function buildIntegerRange(
         Context $context,
         Value $start,
@@ -359,6 +386,16 @@ final class HashTableHelper
             return;
         }
         $ht = self::alloc($context);
+        if (Variable::TYPE_VALUE === $result->type) {
+            $context->builder->call(
+                $context->lookupFunction('__value__writeHashtable'),
+                JitValueBox::pointer($context, $result->value),
+                $ht
+            );
+            $result->valueBoxHashtable = true;
+
+            return;
+        }
         $context->builder->store($ht, $result->value);
     }
 
@@ -373,6 +410,7 @@ final class HashTableHelper
 
             return;
         }
+        $array = self::asHashtable($context, $array);
         $ht = $context->helper->loadValue($array);
         $sizeT = $context->getTypeFromString('size_t');
         if (null === $key) {
@@ -422,6 +460,9 @@ final class HashTableHelper
      */
     public static function reserveAppendSlot(Context $context, Variable $array): Variable
     {
+        if (Variable::TYPE_VALUE === $array->type) {
+            $array = self::asHashtable($context, $array);
+        }
         if ($array->type & Variable::IS_NATIVE_ARRAY) {
             $sizeT = $context->getTypeFromString('size_t');
             $index = $context->constantFromInteger($array->nextFreeElement, 'size_t');

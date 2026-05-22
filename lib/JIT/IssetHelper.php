@@ -84,8 +84,9 @@ final class IssetHelper
                 return $context->builder->icmp(Builder::INT_NE, $loaded, $null);
             case Variable::TYPE_VALUE:
                 $typeField = $context->structFieldMap['__value__']['type'];
+                $valuePtr = Variable::KIND_VARIABLE === $var->kind ? $var->value : $loaded;
                 $typeByte = $context->builder->load(
-                    $context->builder->structGep($loaded, $typeField)
+                    $context->builder->structGep($valuePtr, $typeField)
                 );
                 $nullType = $context->getTypeFromString('int8')->constInt(0, false);
 
@@ -121,6 +122,23 @@ final class IssetHelper
         }
         if ($container->type === Variable::TYPE_HASHTABLE) {
             return self::compileHashTableOffsetIsSet($context, $container, $dim, $dimOp, $containerOp);
+        }
+        if (Variable::TYPE_VALUE === $container->type && $container->valueBoxHashtable) {
+            $valPtr = Variable::KIND_VARIABLE === $container->kind
+                ? JitValueBox::pointer($context, $container->value)
+                : $container->value;
+            $ht = $context->builder->call(
+                $context->lookupFunction('__value__readHashtable'),
+                $valPtr
+            );
+            $htVar = new Variable(
+                $context,
+                Variable::TYPE_HASHTABLE,
+                Variable::KIND_VALUE,
+                $ht
+            );
+
+            return self::compileHashTableOffsetIsSet($context, $htVar, $dim, $dimOp, $containerOp);
         }
 
         throw new \LogicException(
