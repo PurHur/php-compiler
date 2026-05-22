@@ -252,6 +252,11 @@ class Object_ extends Type {
                 if (Variable::TYPE_VALUE === $propset[2]) {
                     $valueType = $this->context->getTypeFromString('__value__');
                     $storage = $this->context->builder->alloca($valueType, 1, 'prop_'.$name);
+                    $valueMap = $this->context->structFieldMap['__value__'];
+                    $this->context->builder->store(
+                        $this->context->getTypeFromString('int8')->constInt(Variable::TYPE_NULL, false),
+                        $this->context->builder->structGep($storage, $valueMap['type'])
+                    );
                     $this->context->builder->call(
                         $this->context->lookupFunction('__object__load_value_slot'),
                         $slot,

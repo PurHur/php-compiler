@@ -228,8 +228,7 @@ function bootstrapDefaultAotLinkTargets(array $lintTargets): array
 {
     $pendingUserFunc = [
         'test/bootstrap-aot/nullable_types.php',
-        // Nullable property ternary still mismatches Zend (VALUE identical); see issue #520.
-        'test/bootstrap-aot/class_nullable_property.php',
+        'test/bootstrap-aot/class_constants.php', // lint OK; DECLARE_CLASS_CONST not in JIT yet
     ];
 
     return array_values(array_filter(
