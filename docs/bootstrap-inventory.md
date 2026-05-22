@@ -1664,13 +1664,13 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new JIT\Call\Vararg (line 160)
 - new JIT\Call\Native (line 163)
 - new ext\standard\boolval (line 327)
-- new Variable (line 538)
-- new OpCode (line 605)
-- new Variable (line 805)
-- new Variable (line 1100)
-- new Operand\Literal (line 1187)
-- new Operand\Literal (line 1191)
-- new Operand\Literal (line 1195)
+- new Variable (line 545)
+- new OpCode (line 612)
+- new Variable (line 816)
+- new Variable (line 1111)
+- new Operand\Literal (line 1198)
+- new Operand\Literal (line 1202)
+- new Operand\Literal (line 1206)
 - 14 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Analyzer.php`
@@ -2153,13 +2153,13 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 **Warnings** (review for bootstrap subset):
 - new Variable (line 78)
 - new Variable (line 83)
-- new Func\PHP (line 275)
-- new ClassEntry (line 346)
-- new ObjectEntry (line 358)
-- new Exception (line 480)
-- new Exception (line 482)
-- new VM\ClassProperty (line 510)
-- new Func\PHP (line 519)
+- new Func\PHP (line 297)
+- new ClassEntry (line 368)
+- new ObjectEntry (line 380)
+- new Exception (line 502)
+- new Exception (line 504)
+- new VM\ClassProperty (line 532)
+- new Func\PHP (line 541)
 - 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/VM/ClassEntry.php`

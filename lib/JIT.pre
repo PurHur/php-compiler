@@ -729,8 +729,15 @@ class JIT {
                 $lit = new Operand\Literal($vm->toBool());
                 $lit->type = Type::bool();
                 return Variable::fromLiteral($this->context, $lit);
+            case VM\Variable::TYPE_NULL:
+                return new Variable(
+                    $this->context,
+                    Variable::TYPE_NULL,
+                    Variable::KIND_VALUE,
+                    $this->context->getTypeFromString('__value__*')->constNull()
+                );
             default:
-                throw new \LogicException('Unsupported default parameter type for JIT');
+                throw new \LogicException('Unsupported default parameter type for JIT (vm type ' . $vm->type . ')');
         }
     }
 

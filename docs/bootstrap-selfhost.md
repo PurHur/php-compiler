@@ -9,7 +9,7 @@ North star: compile a **subset** of php-compiler with itself (native AOT), then 
 | Phase A inventory | `php script/bootstrap-inventory.php --check` | ✅ **300** files on `bin/vm.php` path; **10** source blockers (only `lib/AOT/Linker.php`, `lib/VM/HashTable.php` — both excluded) |
 | Phase B lib AOT lint | `php bin/compile.php -l lib/*.php` (with `script/php-env.sh`) | ✅ **14/14** top-level `lib/*.php` units ([#534](https://github.com/PurHur/php-compiler/pull/534)) |
 | Phase B fixture lint | `php script/bootstrap-aot-lint.php` | ✅ **11** procedural targets under `test/bootstrap-aot/` + `examples/000-HelloWorld` |
-| Phase C native run | `make bootstrap-aot-link` or `./script/bootstrap-aot-link.sh` | ✅ Link + execute **9** `aot_link_targets` (stdout vs Zend PHP) |
+| Phase C native run | `make bootstrap-aot-link` or `./script/bootstrap-aot-link.sh` | ✅ Link + execute **11** `aot_link_targets` (stdout vs Zend PHP) |
 | Bundled `lib/Compiler.php` lint | `./script/bootstrap-selfhost-lint.sh` | ✅ `test/selfhost/compiler_minimal/main.php` + literal `require_once` closure (no `vendor/`) |
 
 Regenerate: `make bootstrap-profile` (inventory + profile + optional `bootstrap-aot-lint`). Phase C: `make bootstrap-aot-link` (or `php script/bootstrap-aot-lint.php --link`). Bundled compiler lint: `./script/bootstrap-selfhost-lint.sh`.
@@ -18,15 +18,14 @@ Regenerate: `make bootstrap-profile` (inventory + profile + optional `bootstrap-
 
 These fixtures pass `compile.php -l` but are excluded from `aot_link_targets` in `script/bootstrap-lib.php` until JIT/link gaps close:
 
-- `test/bootstrap-aot/class_const_fetch.php` — `Expr_ClassConstFetch` runtime fetch ([#84](https://github.com/PurHur/php-compiler/issues/84))
-- `test/bootstrap-aot/instanceof_check.php` — `instanceof` lowering ([#530](https://github.com/PurHur/php-compiler/issues/530) partial)
+- `test/bootstrap-aot/try_catch.php` — try/catch CFG link + VM unwind ([#57](https://github.com/PurHur/php-compiler/issues/57))
 
 ## Blockers to compile `lib/Compiler.php` (priority order)
 
 1. **Namespaces** ([#84](https://github.com/PurHur/php-compiler/issues/84)) — every `lib/` unit uses `namespace PHPCompiler;` (per-file and bundled minimal subset `-l` pass; native link/run pending)
 2. **Class methods** ([#58](https://github.com/PurHur/php-compiler/issues/58), [#145](https://github.com/PurHur/php-compiler/issues/145)) — inventory warns on `Op\Stmt\ClassMethod` across `lib/`
 3. **Nullable typed properties** — `?Type` on fields with `= null` defaults ✅ (`php-types-fromvalue-null.patch`, `test/bootstrap-aot/class_nullable_property.php`); nullable **parameters** ✅ (`php-types-nullable-return.patch`, `test/bootstrap-aot/nullable_types.php`)
-4. **Try/catch** ([#57](https://github.com/PurHur/php-compiler/issues/57)) — `lib/Runtime.php`, error paths (`throw` terminal lint ✅; catch paths pending)
+4. **Try/catch** ([#57](https://github.com/PurHur/php-compiler/issues/57)) — `lib/Runtime.php`, error paths (`throw` terminal link ✅ [#538](https://github.com/PurHur/php-compiler/pull/538); catch/unwind link pending)
 5. **LLVM linker** — `lib/AOT/Linker.php` uses `shell_exec` (excluded from profile; keep external `clang` for now)
 6. **Generators** — `lib/VM/HashTable.php` (excluded)
 
@@ -40,10 +39,11 @@ Add scripts under `test/bootstrap-aot/*.php` — picked up automatically by `scr
 - `minimal_class.php` — one public method (ClassMethod lowering)
 - `class_nullable_property.php` — nullable property with `= null` default
 - `class_constants.php` — class `Const_` declarations; Phase C link ✅ ([#520](https://github.com/PurHur/php-compiler/issues/520), [#536](https://github.com/PurHur/php-compiler/pull/536))
-- `class_const_fetch.php` — `ClassName::CONST` fetch (lint ✅; link pending)
-- `instanceof_check.php` — `instanceof` expression (lint ✅; link pending)
-- `throw_logic.php` — `throw` terminal (lint ✅; link pending)
-- `require_chain/main.php` — `require_once` helper with shared functions (lint ✅; link pending)
+- `class_const_fetch.php` — `ClassName::CONST` fetch; Phase C link ✅ ([#545](https://github.com/PurHur/php-compiler/pull/545))
+- `instanceof_check.php` — `instanceof` expression; Phase C link ✅ ([#545](https://github.com/PurHur/php-compiler/pull/545))
+- `throw_logic.php` — `throw` terminal; Phase C link ✅ ([#538](https://github.com/PurHur/php-compiler/pull/538))
+- `require_chain/main.php` — `require_once` helper with shared functions; Phase C link ✅ ([#538](https://github.com/PurHur/php-compiler/pull/538))
+- `try_catch.php` — try/catch CFG (lint ✅; link pending)
 
 Per-file `php bin/compile.php -l lib/*.php` passes for all 14 top-level units after class-const and throw lowering ([#520](https://github.com/PurHur/php-compiler/issues/520), [#529](https://github.com/PurHur/php-compiler/issues/529)). **Bundled** minimal compiler closure: `test/selfhost/compiler_minimal/main.php` (gate: `./script/bootstrap-selfhost-lint.sh`).
 
