@@ -9,15 +9,16 @@ declare(strict_types=1);
  * @see https://github.com/PurHur/php-compiler/issues/250
  * @see https://github.com/PurHur/php-compiler/issues/98
  * @see https://github.com/PurHur/php-compiler/issues/717
+ * @see https://github.com/PurHur/php-compiler/issues/728
  */
-if ($argc >= 2 && '--probe' === $argv[1]) {
+if ($argc >= 2 && ('--probe' === $argv[1] || '--preflight' === $argv[1])) {
     $repoRoot = isset($argv[2]) && '' !== $argv[2] ? $argv[2] : dirname(__DIR__);
     exit(probeJitReadiness($repoRoot));
 }
 
 if ($argc < 2) {
     fwrite(STDERR, "Usage: {$argv[0]} <junit-xml> [llvm-dir]\n");
-    fwrite(STDERR, "       {$argv[0]} --probe [repo-root]\n");
+    fwrite(STDERR, "       {$argv[0]} --probe|--preflight [repo-root]\n");
     exit(2);
 }
 
@@ -68,7 +69,7 @@ if (0 === $executed) {
     fwrite(STDERR, "  Fix: export PHP_COMPILER_LLVM_PATH to a tree containing libLLVM-9.so.1\n");
     fwrite(STDERR, "       and prepend that directory to LD_LIBRARY_PATH and PATH.\n");
     fwrite(STDERR, "  Docker: use /opt/llvm9 (image #237) — avoid a broken host .llvm/ bind-mount override.\n");
-    fwrite(STDERR, "  Preflight: phpc doctor  or  {$argv[0]} --probe\n");
+    fwrite(STDERR, "  Preflight: phpc doctor --jit-probe  or  {$argv[0]} --preflight\n");
     fwrite(STDERR, "  Override (broken dev env only): PHP_COMPILER_ALLOW_JIT_SKIP=1\n");
     exit(1);
 }

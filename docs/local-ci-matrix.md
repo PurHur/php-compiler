@@ -21,6 +21,7 @@ Repository defaults live in [`script/ci-defaults.env`](../script/ci-defaults.env
 |------|-----------------|-------------------------------|
 | Full gate (VM + JIT + AOT) | `./script/ci-local.sh` | `make test` or `./script/docker-ci-local.sh` |
 | Fast gate (no LLVM compile) | `./script/ci-fast.sh` | `make test-fast` or `./script/docker-ci-local.sh fast` |
+| Fast gate + JIT preflight (optional) | `JIT_PREFLIGHT_GATE=1 ./script/ci-fast.sh` | `make test-fast-jit-preflight` or `make test-docker-fast-jit-preflight` |
 | Explicit memory-capped Docker | — | `./script/ci-docker-safe.sh ci-local.sh` or `make test-docker-safe` |
 | Single PHPUnit filter | Append args: `./script/ci-fast.sh --filter VMTest` | Same inside Docker wrappers |
 
@@ -41,6 +42,24 @@ export PHP_COMPILER_VM_PEAK_RSS_MB=4096
 export PHP_COMPILER_VM_RSS_GUARD=0   # disable RSS killer (debug only)
 make test
 ```
+
+### JIT preflight on fast CI ([#728](https://github.com/PurHur/php-compiler/issues/728))
+
+`ci-fast` skips `@group llvm` tests, so a broken `LD_LIBRARY_PATH` with LLVM present may only surface at the end of `ci-local` ([#250](https://github.com/PurHur/php-compiler/issues/250)). Enable an early MCJIT probe after `composer install`:
+
+```bash
+JIT_PREFLIGHT_GATE=1 ./script/ci-fast.sh
+# or: make test-fast-jit-preflight
+# Docker: JIT_PREFLIGHT_GATE=1 ./script/docker-ci-local.sh fast
+```
+
+Standalone probe (same logic as `phpc doctor --jit-probe`):
+
+```bash
+php script/check-jit-compliance-ran.php --preflight
+```
+
+Exits **0** when LLVM 9 is missing (nothing to guard). Exits **non-zero** when LLVM is present but PHPLLVM/MCJIT cannot bootstrap ([#98](https://github.com/PurHur/php-compiler/issues/98)). Default **off** until contributors opt in.
 
 **Unlimited memory is blocked:** `PHP_COMPILER_MEMORY_LIMIT=-1` and `memory_limit=-1` in tracked files fail `script/check-no-unlimited-memory.sh` (run at CI start).
 
@@ -67,6 +86,7 @@ Harness hosts and contributors without host PHP/LLVM should use the **22.04 dev 
 ## Related issues
 
 - [#436](https://github.com/PurHur/php-compiler/issues/436) — tiered CI (`ci-fast` vs `ci-local`)
+- [#728](https://github.com/PurHur/php-compiler/issues/728) — optional `JIT_PREFLIGHT_GATE` on `ci-fast`
 - [#497](https://github.com/PurHur/php-compiler/issues/497) — memory incident (closed)
 - [#500](https://github.com/PurHur/php-compiler/issues/500) — VM RSS profiling
 - [#501](https://github.com/PurHur/php-compiler/issues/501) — land CI caps (closed via PR)

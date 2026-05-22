@@ -74,6 +74,15 @@ ci_report_llvm_status() {
   fi
 }
 
+# Optional early JIT bootstrap check for ci-fast (issue #728; default off).
+ci_jit_preflight_gate() {
+  if [[ "${JIT_PREFLIGHT_GATE:-}" != "1" ]]; then
+    return 0
+  fi
+  echo "JIT preflight gate (JIT_PREFLIGHT_GATE=1, issue #728)..."
+  "$PHP_BIN" "${PHP_OPTS[@]}" script/check-jit-compliance-ran.php --preflight "$_CI_REPO_ROOT"
+}
+
 ci_can_bind_loopback() {
   "$PHP_BIN" "${PHP_OPTS[@]}" script/can-bind-loopback.php
 }
