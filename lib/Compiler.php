@@ -1284,13 +1284,17 @@ class Compiler {
         } elseif ($operand instanceof Operand\Literal) {
             assert($isRead === true);
             if (MagicLiteral::isDir($operand->value)) {
-                $slot = $block->getVarSlot($operand, true);
+                $slot = $operand instanceof Operand\Temporary
+                    ? $this->compileOperand($operand, $block, false)
+                    : $block->getVarSlot($operand, false);
                 $block->addOpCode(new OpCode(OpCode::TYPE_MAGIC_DIR, $slot));
 
                 return $slot;
             }
             if (MagicLiteral::isFile($operand->value)) {
-                $slot = $block->getVarSlot($operand, true);
+                $slot = $operand instanceof Operand\Temporary
+                    ? $this->compileOperand($operand, $block, false)
+                    : $block->getVarSlot($operand, false);
                 $block->addOpCode(new OpCode(OpCode::TYPE_MAGIC_FILE, $slot));
 
                 return $slot;
