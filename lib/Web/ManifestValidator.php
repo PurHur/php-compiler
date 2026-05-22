@@ -13,6 +13,7 @@ final class ManifestValidator
     private const TOP_LEVEL_KEYS = [
         'binary',
         'public',
+        'assets',
         'entry',
         'index',
         'includes',
@@ -71,6 +72,10 @@ final class ManifestValidator
 
         if (isset($data['includes'])) {
             $errors = array_merge($errors, self::validateIncludesOnDisk($dir, $data['includes']));
+        }
+
+        if (isset($data['assets'])) {
+            $errors = array_merge($errors, self::validateAssetsOnDisk($dir, $data['assets']));
         }
 
         return $errors;
@@ -164,11 +169,32 @@ final class ManifestValidator
             $errors = array_merge($errors, self::validateIncludesOnDisk($dir, $data['includes']));
         }
 
+        if (isset($data['assets'])) {
+            $errors = array_merge($errors, self::validateAssetsOnDisk($dir, $data['assets']));
+        }
+
         if (isset($data['autoload'])) {
             $errors = array_merge($errors, self::validateAutoload($data['autoload']));
         }
 
         return $errors;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function validateAssetsOnDisk(string $projectDir, mixed $assets): array
+    {
+        if (!is_string($assets) || '' === $assets) {
+            return ['assets must be a non-empty string'];
+        }
+
+        $assetsDir = ProjectManifest::resolveRelativePath($projectDir, $assets);
+        if (!is_dir($assetsDir)) {
+            return ['assets directory not found: '.$assets];
+        }
+
+        return [];
     }
 
     /**

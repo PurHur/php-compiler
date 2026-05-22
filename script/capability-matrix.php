@@ -87,7 +87,7 @@ function syntaxRowDefinitions(): array
             'construct' => 'Private methods',
             'opcodes' => ['TYPE_DECLARE_METHOD', 'TYPE_METHODCALL_INIT'],
             'issue' => 145,
-            'notes' => ['compiled; visibility rules not enforced'],
+            'notes' => [],
             'probe' => 'class C { private function f(): string { return "ok"; } public function g(): string { return $this->f(); } } echo (new C())->g();',
         ],
         [

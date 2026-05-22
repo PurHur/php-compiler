@@ -170,7 +170,7 @@ User-defined classes, methods, property access, and `instanceof`. Tracking issue
 |-----------|:--:|:---:|:---:|-------|-------|
 | `class` / `new` | yes | yes | yes | [#58](https://github.com/PurHur/php-compiler/issues/58) | compliance PHPT; bootstrap AOT |
 | Instance methods | yes | yes | yes | [#58](https://github.com/PurHur/php-compiler/issues/58) | compliance PHPT; bootstrap AOT |
-| Private methods | yes | yes | yes | [#145](https://github.com/PurHur/php-compiler/issues/145) | compiled; visibility rules not enforced; compliance PHPT; bootstrap AOT |
+| Private methods | yes | yes | yes | [#145](https://github.com/PurHur/php-compiler/issues/145) | compliance PHPT; bootstrap AOT |
 | Property fetch `$this->x` | yes | yes | yes | [#58](https://github.com/PurHur/php-compiler/issues/58) | compliance PHPT; bootstrap AOT |
 | `instanceof` | yes | yes | yes | [#138](https://github.com/PurHur/php-compiler/issues/138) | bootstrap AOT |
 
