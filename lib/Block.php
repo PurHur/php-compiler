@@ -139,6 +139,10 @@ class Block {
         if ([] !== $parent->literalIncludePaths) {
             $this->literalIncludePaths = $parent->literalIncludePaths;
         }
+        if (null !== $parent->func) {
+            $this->func = $parent->func;
+            $this->strictTypes = $parent->strictTypes;
+        }
     }
 
     public function addOpCode(OpCode ...$ops): void {
