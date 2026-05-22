@@ -73,6 +73,7 @@ class Module extends ModuleAbstract
             new substr(),
             new strrev(),
             new strpos(),
+            new strstr(),
             new stripos(),
             new strrpos(),
             new substr_count(),

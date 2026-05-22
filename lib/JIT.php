@@ -232,7 +232,8 @@ class JIT {
                     break;
                 }
             }
-            if (null !== $block->func) {
+            // Only the CFG entry block receives LLVM arguments; branch blocks share the same func (#210).
+            if (null !== $block->func && $block->orig === $block->func->cfg) {
                 foreach ($block->func->params as $idx => $param) {
                     $argIdx = $thisParamOffset + $idx;
                     if ($argIdx >= count($args)) {
