@@ -32,6 +32,10 @@ final class CapabilitySyntaxTest extends TestCase
         $this->assertStringContainsString('PATH_INFO / `?route=` fallback', $body);
         $this->assertStringContainsString('`phpc_deploy_path()` + `PHPC_DEPLOY_ROOT`', $body);
         $this->assertStringContainsString('CGI/1.1 driver', $body);
+        $this->assertStringContainsString('| CGI/1.1 driver (`bin/cgi.php`) | yes | n/a | n/a |', $body);
+        $this->assertStringContainsString('AOT CGI (`cgi-wrapper` + `phpc cgi`)', $body);
+        $this->assertStringContainsString('| AOT CGI (`cgi-wrapper` + `phpc cgi`) | n/a | n/a | partial |', $body);
+        $this->assertStringContainsString('#665', $body);
         $this->assertStringContainsString('#489', $body);
         $this->assertStringContainsString('#173', $body);
     }

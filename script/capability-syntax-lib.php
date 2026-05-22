@@ -320,6 +320,7 @@ function capabilityYesNo(bool $value): string
  * Web north-star constructs for examples/003-MiniWebApp (issue #655).
  *
  * Status values are curated from closed/open ROADMAP issues, not compile probes.
+ * VM/JIT/AOT cells use yes|no|partial|blocked|n/a.
  *
  * @return list<array{
  *   construct: string,
@@ -359,11 +360,19 @@ function webNorthStarDefinitions(): array
         ],
         [
             'construct' => 'CGI/1.1 driver (`bin/cgi.php`)',
-            'vm' => 'no',
-            'jit' => 'no',
-            'aot' => 'no',
+            'vm' => 'yes',
+            'jit' => 'n/a',
+            'aot' => 'n/a',
             'issue' => 50,
-            'notes' => [],
+            'notes' => ['#50 VM closed; #656 CgiDriverTest; #666 MiniWebApp PATH_INFO'],
+        ],
+        [
+            'construct' => 'AOT CGI (`cgi-wrapper` + `phpc cgi`)',
+            'vm' => 'n/a',
+            'jit' => 'n/a',
+            'aot' => 'partial',
+            'issue' => 665,
+            'notes' => ['#665 closed; 001 green; 003 blocked #568; #682'],
         ],
         [
             'construct' => 'FastCGI loop',
