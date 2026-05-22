@@ -28,6 +28,9 @@ final class PhpcInitMiniWebAppTest extends TestCase
                 'src/Router.php',
                 'templates/layout.php',
                 'templates/home.php',
+                'templates/hello.php',
+                'templates/contact.php',
+                'templates/thankyou.php',
                 'assets/style.css',
                 'README.md',
             ];

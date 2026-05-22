@@ -16,11 +16,19 @@ $scriptBase = $_SERVER['SCRIPT_NAME'] ?? '/index.php';
 <body>
 <nav>
     <a href="<?php echo htmlspecialchars($scriptBase); ?>">Home</a>
+    <a href="<?php echo htmlspecialchars($scriptBase); ?>/hello?name=Dev">Hello</a>
+    <a href="<?php echo htmlspecialchars($scriptBase); ?>/contact">Contact</a>
 </nav>
 <main>
 <?php
 if ('Home' === $title) {
     include __DIR__ . '/home.php';
+} elseif ('Hello' === $title) {
+    include __DIR__ . '/hello.php';
+} elseif ('Contact' === $title) {
+    include __DIR__ . '/contact.php';
+} elseif ('Thank you' === $title) {
+    include __DIR__ . '/thankyou.php';
 }
 ?>
 </main>

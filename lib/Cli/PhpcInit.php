@@ -27,6 +27,9 @@ final class PhpcInit
             'src/Router.php',
             'templates/layout.php',
             'templates/home.php',
+            'templates/hello.php',
+            'templates/contact.php',
+            'templates/thankyou.php',
             'assets/style.css',
             'README.md',
         ],
@@ -116,7 +119,7 @@ final class PhpcInit
         if (self::PROFILE_MINIWEBAPP === $profile) {
             fwrite(STDOUT, "  phpc lint --all .\n");
             fwrite(STDOUT, "  phpc serve 127.0.0.1:8080 .\n");
-            fwrite(STDOUT, "  curl -s 'http://127.0.0.1:8080/index.php?route=home'\n");
+            fwrite(STDOUT, "  curl -s 'http://127.0.0.1:8080/index.php/hello?name=Dev'\n");
         } else {
             fwrite(STDOUT, "  phpc lint public/index.php\n");
             fwrite(STDOUT, "  phpc run public/index.php\n");

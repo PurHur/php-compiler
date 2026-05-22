@@ -3,14 +3,14 @@
 declare(strict_types=1);
 
 /**
- * MiniWebApp-style front controller (phpc init --profile miniwebapp).
+ * MiniWebApp front controller (skeleton #67 closed; #210, #489, runtime #539).
  *
- * Primary routing: PATH_INFO after index.php.
- * Fallback: ?route= for quick curls without PATH_INFO.
+ * Primary routing: PATH_INFO after index.php (DevServer #276).
+ * Deprecated fallback: ?route= for skeleton-era URLs.
  *
- *   phpc lint --all .
- *   phpc serve 127.0.0.1:8080 .
- *   curl -s 'http://127.0.0.1:8080/index.php?route=home'
+ *   ./phpc lint --all examples/003-MiniWebApp
+ *   ./phpc serve 127.0.0.1:8080 examples/003-MiniWebApp
+ *   curl -s 'http://127.0.0.1:8080/index.php/hello?name=Dev'
  */
 
 $config = require __DIR__ . '/../config.php';
