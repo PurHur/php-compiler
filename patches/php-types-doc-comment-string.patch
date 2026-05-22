@@ -1,0 +1,12 @@
+--- vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
+@@ -242,6 +242,9 @@
+     public static function extractTypeFromComment($kind, $comment, $name = ''): self
+     {
+         $match = [];
++        if ($comment instanceof \PhpParser\Comment) {
++            $comment = $comment->getText();
++        }
+         if (null === $comment) {
+             return self::mixed();
+         }
