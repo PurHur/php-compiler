@@ -171,6 +171,53 @@ final class VmString
         return 0;
     }
 
+    public static function strspn(string $str, string $mask): int
+    {
+        if ('' === $mask) {
+            throw new \ValueError('strspn(): Argument #2 ($characters) must not be empty');
+        }
+        $slen = self::byteLength($str);
+        $mlen = self::byteLength($mask);
+        $count = 0;
+        for ($i = 0; $i < $slen; ++$i) {
+            if (!self::byteInSet($str[$i], $mask, $mlen)) {
+                break;
+            }
+            ++$count;
+        }
+
+        return $count;
+    }
+
+    public static function strcspn(string $str, string $mask): int
+    {
+        if ('' === $mask) {
+            throw new \ValueError('strcspn(): Argument #2 ($characters) must not be empty');
+        }
+        $slen = self::byteLength($str);
+        $mlen = self::byteLength($mask);
+        $count = 0;
+        for ($i = 0; $i < $slen; ++$i) {
+            if (self::byteInSet($str[$i], $mask, $mlen)) {
+                break;
+            }
+            ++$count;
+        }
+
+        return $count;
+    }
+
+    private static function byteInSet(string $byte, string $mask, int $maskLen): bool
+    {
+        for ($j = 0; $j < $maskLen; ++$j) {
+            if ($byte === $mask[$j]) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public static function bin2hex(string $data): string
     {
         $hex = '0123456789abcdef';
