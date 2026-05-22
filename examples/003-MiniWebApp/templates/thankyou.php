@@ -1,5 +1,8 @@
 <?php
 
-$name = $_POST['name'] ?? $_REQUEST['name'] ?? 'friend';
+$name = 'friend';
+if (isset($_REQUEST['name'])) {
+    $name = $_REQUEST['name'];
+}
 ?>
 <h1>Thank you, <?php echo htmlspecialchars($name); ?></h1>

@@ -1,2 +1,2 @@
 <h1><?php echo htmlspecialchars($appName); ?></h1>
-<p>Reference app skeleton (issue #246). Routes use <code>?route=</code> until PATH_INFO routing is ready (#210, #276).</p>
+<p>Reference app (issue #67). Routes use <code>PATH_INFO</code> after <code>index.php</code> (#489); <code>?route=</code> remains as a deprecated fallback.</p>

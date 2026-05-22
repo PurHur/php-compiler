@@ -38,7 +38,7 @@ Legacy entrypoints still work: `php bin/vm.php`, `php bin/jit.php`, `php bin/com
 | [001-SimpleWeb](001-SimpleWeb/) | ✅ `-q` / `-p` / env / `phpc serve` | ✅ `bin/jit.php` | ✅ `phpc build` | runtime `QUERY_STRING` / POST ([#201](https://github.com/PurHur/php-compiler/issues/201), [#257](https://github.com/PurHur/php-compiler/issues/257), [#259](https://github.com/PurHur/php-compiler/issues/259)) |
 | [002-StaticWeb](002-StaticWeb/) | ✅ `./phpc run` | ✅ `bin/jit.php` | ✅ recommended | no superglobals — [#247](https://github.com/PurHur/php-compiler/issues/247) execute smoke |
 | [004-ApiJson](004-ApiJson/) | ✅ `./phpc run` | ✅ `bin/jit.php` | ✅ `phpc build` | JSON + `http_response_code` — [#270](https://github.com/PurHur/php-compiler/issues/270), [#61](https://github.com/PurHur/php-compiler/issues/61) |
-| [003-MiniWebApp](003-MiniWebApp/) | ❌ lint-first | ❌ blocked | ❌ blocked | Reference skeleton — [#246](https://github.com/PurHur/php-compiler/issues/246), [#67](https://github.com/PurHur/php-compiler/issues/67) |
+| [003-MiniWebApp](003-MiniWebApp/) | ✅ `phpc serve` | partial | ❌ blocked | PATH_INFO front controller — [#489](https://github.com/PurHur/php-compiler/issues/489), [#67](https://github.com/PurHur/php-compiler/issues/67) |
 
 ### 000-HelloWorld
 
@@ -71,21 +71,17 @@ AOT binaries refresh `$_GET` / `$_POST` / `$_REQUEST` from CGI env on each reque
 
 ### 003-MiniWebApp
 
-Lint-first reference app (front controller + templates). **Not** in `ExamplesCompileTest` until green ([#454](https://github.com/PurHur/php-compiler/issues/454)).
+Reference front controller with PATH_INFO routes ([#489](https://github.com/PurHur/php-compiler/issues/489)). VM serve and `examples-web-smoke.sh` curls are green; AOT execute remains in `ExamplesCompileTest` skip until [#454](https://github.com/PurHur/php-compiler/issues/454).
 
 ```console
 ./phpc lint --all examples/003-MiniWebApp
-./phpc lint --all examples/003-MiniWebApp --json   # expect issues until #67
-make web-smoke   # also runs lint --all when public/ exists; JSON -> /tmp/miniwebapp-lint.json
+./phpc serve 127.0.0.1:8080 examples/003-MiniWebApp
+curl -s 'http://127.0.0.1:8080/index.php/hello?name=Dev'
+./script/examples-web-smoke.sh
+MINIWEBAPP_LINT_GATE=1 make web-smoke
 ```
 
-During the skeleton phase `make web-smoke` **continues** when 003 lint exits `1` (blockers logged with tracking issue links). After [#67](https://github.com/PurHur/php-compiler/issues/67), set `MINIWEBAPP_LINT_GATE=1` so `make web-smoke` fails if `phpc lint --all` regresses.
-
-```console
-make miniwebapp-gates   # print gate ladder status without full CI ([#503](https://github.com/PurHur/php-compiler/issues/503))
-```
-
-See [003-MiniWebApp/README.md](003-MiniWebApp/README.md) for the blocker matrix and curl recipes (VM serve expected to fail until language gaps close).
+See [003-MiniWebApp/README.md](003-MiniWebApp/README.md) for routes and gate ladder (`make miniwebapp-gates`).
 
 ### 002-StaticWeb
 

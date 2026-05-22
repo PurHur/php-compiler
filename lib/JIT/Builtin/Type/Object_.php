@@ -13,6 +13,7 @@ use PHPCfg\Operand;
 use PHPCfg\Operand\Literal;
 use PHPCompiler\JIT\Builtin\Refcount;
 use PHPCompiler\JIT\Builtin\Type;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
 use PHPCompiler\VM\Variable as VMVariable;
 use PHPLLVM;
@@ -42,6 +43,8 @@ class Object_ extends Type {
         $this->pointer = $this->context->getTypeFromString('__object__*');
 
         $this->registerFn('__object__load_value_slot', 'void', ['void**', '__value__*']);
+        $this->registerFn('__value__readObject', '__object__*', ['__value__*']);
+        $this->registerFn('__value__writeObject', 'void', ['__value__*', '__object__*']);
     }
 
     /**
@@ -63,6 +66,8 @@ class Object_ extends Type {
     public function implement(): void
     {
         $this->implementLoadValueSlot();
+        $this->implementValueReadObject();
+        $this->implementValueWriteObject();
     }
 
     public function shutdown(): void
@@ -108,6 +113,60 @@ class Object_ extends Type {
         $this->context->builder->branch($done);
 
         $this->context->builder->positionAtEnd($done);
+        $this->context->builder->returnVoid();
+        $this->context->builder->clearInsertionPosition();
+    }
+
+    private function implementValueReadObject(): void
+    {
+        $fn = $this->context->lookupFunction('__value__readObject');
+        $block = $fn->appendBasicBlock('main');
+        $this->context->builder->positionAtEnd($block);
+        $value = $fn->getParam(0);
+        $map = $this->context->structFieldMap['__value__'];
+        $objPtr = $this->context->getTypeFromString('__object__*');
+        $typeByte = $this->context->builder->load($this->context->builder->structGep($value, $map['type']));
+        $expected = $this->context->getTypeFromString('int8')->constInt(Variable::TYPE_OBJECT, false);
+        $isObject = $this->context->builder->icmp(PHPLLVM\Builder::INT_EQ, $typeByte, $expected);
+        $ok = $fn->appendBasicBlock('read_obj_ok');
+        $empty = $fn->appendBasicBlock('read_obj_empty');
+        $merge = $fn->appendBasicBlock('read_obj_merge');
+        $this->context->builder->branchIf($isObject, $ok, $empty);
+        $this->context->builder->positionAtEnd($ok);
+        $ptrField = $this->context->builder->structGep($value, $map['value']);
+        $objSlot = $this->context->builder->pointerCast($ptrField, $objPtr->pointerType(0));
+        $stored = $this->context->builder->load($objSlot);
+        $this->context->builder->branch($merge);
+        $this->context->builder->positionAtEnd($empty);
+        $this->context->builder->branch($merge);
+        $this->context->builder->positionAtEnd($merge);
+        $result = $this->context->builder->phi($objPtr);
+        $result->addIncoming($stored, $ok);
+        $result->addIncoming($objPtr->constNull(), $empty);
+        $this->context->builder->returnValue($result);
+        $this->context->builder->clearInsertionPosition();
+    }
+
+    private function implementValueWriteObject(): void
+    {
+        $fn = $this->context->lookupFunction('__value__writeObject');
+        $block = $fn->appendBasicBlock('main');
+        $this->context->builder->positionAtEnd($block);
+        $value = $fn->getParam(0);
+        $object = $fn->getParam(1);
+        $map = $this->context->structFieldMap['__value__'];
+        $objPtr = $this->context->getTypeFromString('__object__*');
+        $this->context->builder->call(
+            $this->context->lookupFunction('__value__valueDelref'),
+            $value
+        );
+        $this->context->builder->store(
+            $this->context->getTypeFromString('int8')->constInt(Variable::TYPE_OBJECT, false),
+            $this->context->builder->structGep($value, $map['type'])
+        );
+        $ptrField = $this->context->builder->structGep($value, $map['value']);
+        $objSlot = $this->context->builder->pointerCast($ptrField, $objPtr->pointerType(0));
+        $this->context->builder->store($object, $objSlot);
         $this->context->builder->returnVoid();
         $this->context->builder->clearInsertionPosition();
     }
@@ -249,6 +308,140 @@ class Object_ extends Type {
             'type' => Variable::fromVMVariable($value->type),
             'value' => $this->compileTimeValueFromVm($value),
         ];
+    }
+
+    public function resolveClassId(Operand $classOp): int
+    {
+        if (!$classOp instanceof Literal) {
+            throw new \LogicException('JIT only supports constant named classes for class const fetch');
+        }
+        $name = strtolower($classOp->value);
+        if ('self' === $name || 'static' === $name) {
+            if (null === $this->context->scope->className) {
+                throw new \LogicException('self:: used outside of class scope');
+            }
+
+            return $this->lookup($this->context->scope->className);
+        }
+
+        return $this->lookup($classOp->value);
+    }
+
+    public function classConstFetch(int $classId, string $constName): Variable
+    {
+        $key = strtolower($constName);
+        if (!isset($this->classConstants[$classId][$key])) {
+            throw new \LogicException("Undefined class constant: {$constName}");
+        }
+
+        return $this->jitConstantFromEntry($this->classConstants[$classId][$key]);
+    }
+
+    public function emitInstanceOf(Variable $expr, string $className): Variable
+    {
+        $expectedId = $this->lookup($className);
+        $falseVal = $this->context->getTypeFromString('int1')->constInt(0, false);
+        $objMap = $this->context->structFieldMap['__object__'];
+        $expectedClassId = $this->context->constantFromInteger($expectedId);
+
+        if (Variable::TYPE_OBJECT === $expr->type) {
+            $obj = $this->context->helper->loadValue($expr);
+            $classId = $this->context->builder->load(
+                $this->context->builder->structGep($obj, $objMap['class_id'])
+            );
+            $match = $this->context->builder->icmp(
+                PHPLLVM\Builder::INT_EQ,
+                $classId,
+                $expectedClassId
+            );
+
+            return new Variable(
+                $this->context,
+                Variable::TYPE_NATIVE_BOOL,
+                Variable::KIND_VALUE,
+                $match
+            );
+        }
+
+        if (Variable::TYPE_VALUE === $expr->type) {
+            $valuePtr = Variable::KIND_VARIABLE === $expr->kind
+                ? $expr->value
+                : $this->context->helper->loadValue($expr);
+            $obj = $this->context->builder->call(
+                $this->context->lookupFunction('__value__readObject'),
+                $valuePtr
+            );
+            $objType = $this->context->getTypeFromString('__object__*');
+            $isObject = $this->context->builder->icmp(
+                PHPLLVM\Builder::INT_NE,
+                $obj,
+                $objType->constNull()
+            );
+            $classId = $this->context->builder->load(
+                $this->context->builder->structGep($obj, $objMap['class_id'])
+            );
+            $matches = $this->context->builder->icmp(
+                PHPLLVM\Builder::INT_EQ,
+                $classId,
+                $expectedClassId
+            );
+            $match = $this->context->builder->and($isObject, $matches);
+
+            return new Variable(
+                $this->context,
+                Variable::TYPE_NATIVE_BOOL,
+                Variable::KIND_VALUE,
+                $match
+            );
+        }
+
+        return new Variable(
+            $this->context,
+            Variable::TYPE_NATIVE_BOOL,
+            Variable::KIND_VALUE,
+            $falseVal
+        );
+    }
+
+    /**
+     * @param array{type: int, value: int|float|bool|string|null} $entry
+     */
+    private function jitConstantFromEntry(array $entry): Variable
+    {
+        switch ($entry['type']) {
+            case Variable::TYPE_NATIVE_LONG:
+                return Variable::fromConstantInt($this->context, (int) $entry['value']);
+            case Variable::TYPE_NATIVE_DOUBLE:
+                $lit = new Literal($entry['value']);
+                $lit->type = \PHPTypes\Type::float();
+
+                return Variable::fromLiteral($this->context, $lit);
+            case Variable::TYPE_NATIVE_BOOL:
+                $lit = new Literal($entry['value']);
+                $lit->type = \PHPTypes\Type::bool();
+
+                return Variable::fromLiteral($this->context, $lit);
+            case Variable::TYPE_STRING:
+                $lit = new Literal($entry['value']);
+                $lit->type = \PHPTypes\Type::string();
+
+                return Variable::fromLiteral($this->context, $lit);
+            case Variable::TYPE_NULL:
+                $slot = JitValueBox::alloc($this->context);
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__writeNull'),
+                    JitValueBox::pointer($this->context, $slot)
+                );
+
+                return new Variable(
+                    $this->context,
+                    Variable::TYPE_VALUE,
+                    Variable::KIND_VARIABLE,
+                    $slot
+                );
+            default:
+                throw new \LogicException('Unsupported class constant type for JIT');
+        }
     }
 
     /**

@@ -29,6 +29,7 @@ final class BootstrapProfileTest extends TestCase
         $this->assertContains('test/bootstrap-aot/class_nullable_property.php', $profile['aot_lint_targets']);
         $this->assertContains('test/bootstrap-aot/class_constants.php', $profile['aot_lint_targets']);
         $this->assertContains('test/bootstrap-aot/throw_logic.php', $profile['aot_lint_targets']);
+        $this->assertContains('test/bootstrap-aot/require_chain/main.php', $profile['aot_lint_targets']);
         $this->assertContains('lib/AOT/Linker.php', $profile['excluded_files']);
     }
 

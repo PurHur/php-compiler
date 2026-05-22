@@ -158,6 +158,9 @@ class Type extends Builtin {
         $fntypeExit = $this->context->context->functionType($void, false, $i32);
         $fnExit = $this->context->module->addFunction('exit', $fntypeExit);
         $this->context->registerFunction('exit', $fnExit);
+        $fntypeAbort = $this->context->context->functionType($void, false);
+        $fnAbort = $this->context->module->addFunction('abort', $fntypeAbort);
+        $this->context->registerFunction('abort', $fnAbort);
         $fntypeFormatDt = $this->context->context->functionType(
             $this->context->getTypeFromString('__string__*'),
             false,

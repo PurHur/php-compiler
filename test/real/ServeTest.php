@@ -419,6 +419,76 @@ PHP,
   }
 
   /**
+   * North-star example: PATH_INFO routes + deprecated ?route= (issues #489, #470).
+   *
+   * @group miniwebapp
+   */
+  public function testServes003MiniWebAppPathInfoRoutes(): void
+  {
+    $project = $this->repoRoot.'/examples/003-MiniWebApp';
+    if (!is_file($project.'/public/index.php')) {
+      $this->markTestSkipped('examples/003-MiniWebApp missing (#246)');
+    }
+    if (!$this->miniWebAppLintGreen($project)) {
+      $this->markTestSkipped('003-MiniWebApp lint not green (#67)');
+    }
+
+    $home = $this->httpGet($project, '/index.php');
+    $this->assertStringContainsString('HTTP/1.1 200', $home);
+    $this->assertStringContainsString('MiniWebApp', $this->responseBody($home));
+
+    $hello = $this->httpGet($project, '/index.php/hello?name=Dev');
+    $this->assertStringContainsString('HTTP/1.1 200', $hello);
+    $body = $this->responseBody($hello);
+    $this->assertStringContainsString('Hello Dev', $body);
+
+    $api = $this->httpGet($project, '/index.php/api/status');
+    $this->assertStringContainsString('HTTP/1.1 200', $api);
+    $this->assertStringContainsString('"ok":true', $this->responseBody($api));
+
+    $legacy = $this->httpGet($project, '/index.php?route=home');
+    $this->assertStringContainsString('HTTP/1.1 200', $legacy);
+    $this->assertStringContainsString('MiniWebApp', $this->responseBody($legacy));
+  }
+
+  /**
+   * @group miniwebapp
+   */
+  public function testServes003MiniWebAppContactPost(): void
+  {
+    $project = $this->repoRoot.'/examples/003-MiniWebApp';
+    if (!is_file($project.'/public/index.php')) {
+      $this->markTestSkipped('examples/003-MiniWebApp missing (#246)');
+    }
+    if (!$this->miniWebAppLintGreen($project)) {
+      $this->markTestSkipped('003-MiniWebApp lint not green (#67)');
+    }
+
+    $response = $this->httpPost($project, '/index.php/contact', 'name=PostDev');
+    $this->assertStringContainsString('HTTP/1.1 200', $response);
+    $this->assertStringContainsString('Thank you, PostDev', $this->responseBody($response));
+  }
+
+  private function miniWebAppLintGreen(string $projectDir): bool
+  {
+    $descriptorSpec = [
+      0 => ['pipe', 'r'],
+      1 => ['pipe', 'w'],
+      2 => ['pipe', 'w'],
+    ];
+    $cmd = array_merge($this->phpCmd, [$this->repoRoot.'/bin/lint.php', '--all', $projectDir]);
+    $proc = proc_open($cmd, $descriptorSpec, $pipes, $this->repoRoot);
+    if (!is_resource($proc)) {
+      return false;
+    }
+    fclose($pipes[0]);
+    fclose($pipes[1]);
+    fclose($pipes[2]);
+
+    return 0 === proc_close($proc);
+  }
+
+  /**
    * @param array<string, string> $extraEnv
    * @param list<string>          $extraRequestHeaders
    */

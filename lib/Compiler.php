@@ -188,16 +188,18 @@ class Compiler {
                     ));
                     break;
                 case Op\Stmt\ClassMethod::class:
-                    $methodBlock = $this->compileCfgBlock($child->func->cfg, $child->func->params);
-                    $methodBlock->func = $child->func;
-                    $methodBlock->strictTypes = isset($child->func->strictTypes) ? (bool) $child->func->strictTypes : false;
                     $methodName = new Operand\Literal($child->func->name);
                     $methodName->type = Type::string();
                     $declare = new OpCode(
                         OpCode::TYPE_DECLARE_METHOD,
                         $this->compileOperand($methodName, $result, true)
                     );
-                    $declare->block1 = $methodBlock;
+                    if (null !== $child->func->cfg) {
+                        $methodBlock = $this->compileCfgBlock($child->func->cfg, $child->func->params);
+                        $methodBlock->func = $child->func;
+                        $methodBlock->strictTypes = isset($child->func->strictTypes) ? (bool) $child->func->strictTypes : false;
+                        $declare->block1 = $methodBlock;
+                    }
                     $result->addOpCode($declare);
                     break;
                 case Op\Terminal\Const_::class:
@@ -299,7 +301,10 @@ class Compiler {
         } elseif ($op instanceof Op\Stmt) {
             $this->compileStmt($op, $block);
         } elseif ($op instanceof Op\Terminal) {
-            $block->addOpCode($this->compileTerminal($op, $block));
+            $terminalOps = $this->compileTerminal($op, $block);
+            foreach ($terminalOps as $terminalOp) {
+                $block->addOpCode($terminalOp);
+            }
         } else {
             throw new \LogicException("Unknown Op Type: " . $op->getType());
         }
@@ -315,6 +320,27 @@ class Compiler {
             $op->block1 = $this->compileCfgBranch($stmt->if, $block);
             $op->block2 = $this->compileCfgBranch($stmt->else, $block);
             $block->addOpCode($op);
+        } elseif ($stmt instanceof Op\Stmt\TryCatch) {
+            $merge = $this->compileCfgBranch($stmt->end, $block);
+            $try = $this->compileCfgBranch($stmt->try, $block);
+            $tryOp = new OpCode(OpCode::TYPE_TRY);
+            $tryOp->block1 = $try;
+            $tryOp->block2 = $merge;
+            $block->addOpCode($tryOp);
+            foreach ($stmt->catches as $catchBlock) {
+                $compiledCatch = $this->compileCfgBranch($catchBlock, $block);
+                $catchOp = new OpCode(OpCode::TYPE_CATCH);
+                $catchOp->block1 = $compiledCatch;
+                $catchOp->block2 = $merge;
+                $block->addOpCode($catchOp);
+            }
+            if (null !== $stmt->finally) {
+                $compiledFinally = $this->compileCfgBranch($stmt->finally, $block);
+                $finallyOp = new OpCode(OpCode::TYPE_FINALLY);
+                $finallyOp->block1 = $compiledFinally;
+                $finallyOp->block2 = $merge;
+                $block->addOpCode($finallyOp);
+            }
         } elseif ($stmt instanceof Op\Stmt\Switch_) {
             $canBeSwitch = true;
             $type = null;
@@ -449,8 +475,8 @@ class Compiler {
             return [new OpCode(
                 $this->getOpCodeTypeFromBinaryOp($expr),
                 $this->compileOperand($expr->result, $block, false),
-                $this->compileOperand($expr->left, $block, true),
-                $this->compileOperand($expr->right, $block, true),
+                null !== $expr->left ? $this->compileOperand($expr->left, $block, true) : null,
+                null !== $expr->right ? $this->compileOperand($expr->right, $block, true) : null,
             )];
         } elseif ($expr instanceof Op\Expr\Cast) {
             return [new OpCode(
@@ -534,6 +560,13 @@ class Compiler {
                 )];
             case Op\Expr\ClassConstFetch::class:
                 return $this->compileClassConstFetch($expr, $block);
+            case Op\Expr\StaticPropertyFetch::class:
+                return [new OpCode(
+                    OpCode::TYPE_STATIC_PROPERTY_FETCH,
+                    $this->compileOperand($expr->result, $block, false),
+                    $this->compileOperand($expr->class, $block, true),
+                    $this->compileOperand($expr->name, $block, true)
+                )];
             case Op\Expr\FuncCall::class:
                 return $this->compileFuncCall(
                     $this->compileOperand($expr->name, $block, true),
@@ -837,30 +870,9 @@ class Compiler {
 
     protected function compileNullsafePropertyFetch(Op\Expr\NullsafePropertyFetch $expr, Block $block): Block
     {
-        return $this->compileNullsafe(
-            $block,
-            $this->compileOperand($expr->result, $block, false),
-            $this->compileOperand($expr->var, $block, true),
-            function (Block $fetchBlock) use ($expr): void {
-                $fetchBlock->addOpCode(new OpCode(
-                    OpCode::TYPE_PROPERTY_FETCH,
-                    $this->compileOperand($expr->result, $fetchBlock, false),
-                    $this->compileOperand($expr->var, $fetchBlock, true),
-                    $this->compileOperand($expr->name, $fetchBlock, true)
-                ));
-            }
-        );
-    }
+        $resultSlot = $this->compileOperand($expr->result, $block, false);
+        $receiverSlot = $this->compileOperand($expr->var, $block, true);
 
-    /**
-     * @param callable(Block): void $compileAccess
-     */
-    protected function compileNullsafe(
-        Block $block,
-        int $resultSlot,
-        int $receiverSlot,
-        callable $compileAccess
-    ): Block {
         $endBlock = new Block($block->orig);
         $endBlock->inheritUndefinedLocals = true;
         $endBlock->inheritScopeFrom($block);
@@ -884,7 +896,12 @@ class Compiler {
         $fetchBlock = new Block($block->orig);
         $fetchBlock->inheritUndefinedLocals = true;
         $fetchBlock->inheritScopeFrom($block);
-        $compileAccess($fetchBlock);
+        $fetchBlock->addOpCode(new OpCode(
+            OpCode::TYPE_PROPERTY_FETCH,
+            $this->compileOperand($expr->result, $fetchBlock, false),
+            $this->compileOperand($expr->var, $fetchBlock, true),
+            $this->compileOperand($expr->name, $fetchBlock, true)
+        ));
         $fetchJump = new OpCode(OpCode::TYPE_JUMP);
         $fetchJump->block1 = $endBlock;
         $fetchBlock->addOpCode($fetchJump);
@@ -1115,7 +1132,10 @@ class Compiler {
         return null;
     }
 
-    protected function compileOperand(Operand $operand, Block $block, bool $isRead): ?int {
+    protected function compileOperand(?Operand $operand, Block $block, bool $isRead): ?int {
+        if (null === $operand) {
+            return null;
+        }
         if ($operand instanceof Operand\NullOperand) {
             return null;
         } elseif ($operand instanceof Operand\Literal) {
@@ -1164,34 +1184,49 @@ class Compiler {
         throw new \LogicException("Unknown Operand Type: " . $operand->getType());
     }
 
-    protected function compileTerminal(Op\Terminal $terminal, Block $block): OpCode {
+    /**
+     * @return list<OpCode>
+     */
+    protected function compileTerminal(Op\Terminal $terminal, Block $block): array {
         switch ($terminal->getType()) {
             case 'Terminal_Echo':
                 $var = $this->compileOperand($terminal->expr, $block, true);
-                return new OpCode(
+
+                return [new OpCode(
                     OpCode::TYPE_ECHO,
                     $var
-                );
+                )];
             case 'Terminal_Return':
                 if (is_null($terminal->expr)) {
-                    return new OpCode(
+                    return [new OpCode(
                         OpCode::TYPE_RETURN_VOID
-                    );    
+                    )];
                 }
-                return new OpCode(
+
+                return [new OpCode(
                     OpCode::TYPE_RETURN,
                     $this->compileOperand($terminal->expr, $block, true)
-                );
+                )];
             case 'Iterator_Reset':
-                return new OpCode(
+                return [new OpCode(
                     OpCode::TYPE_ITER_RESET,
                     $this->compileOperand($terminal->var, $block, true)
-                );
+                )];
             case 'Terminal_Throw':
-                return new OpCode(
+                return [new OpCode(
                     OpCode::TYPE_THROW,
                     $this->compileOperand($terminal->expr, $block, true)
-                );
+                )];
+            case 'Terminal_Unset':
+                $ops = [];
+                foreach ($terminal->exprs as $unsetExpr) {
+                    $ops[] = new OpCode(
+                        OpCode::TYPE_UNSET,
+                        $this->compileOperand($unsetExpr, $block, true)
+                    );
+                }
+
+                return $ops;
             default:
                 throw new \LogicException("Unknown Terminal Type: " . $terminal->getType());
         }

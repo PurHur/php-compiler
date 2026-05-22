@@ -396,9 +396,19 @@ class JIT {
                     $this->context->freeDeadVariables($func, $branchBlock, $block);
                     $builder->branchIf($condition, $if, $else);
                     return $origBasicBlock;
+                case OpCode::TYPE_TRY:
+                case OpCode::TYPE_CATCH:
+                case OpCode::TYPE_FINALLY:
+                    if (null !== $op->block1) {
+                        $this->compileBlockInternal($func, $op->block1, ...$args);
+                    }
+                    return $origBasicBlock;
                 case OpCode::TYPE_THROW:
-                    // AOT lint: throw terminal lowering only; no JIT emission yet (issue #57).
-                    break;
+                    $throwBlock = $builder->getInsertBlock();
+                    $builder->positionAtEnd($throwBlock);
+                    $this->context->freeDeadVariables($func, $throwBlock, $block);
+                    compile { abort(); }
+                    return $origBasicBlock;
                 case OpCode::TYPE_RETURN_VOID:
                     $returnBlock = $builder->getInsertBlock();
                     $builder->positionAtEnd($returnBlock);
@@ -719,8 +729,15 @@ class JIT {
                 $lit = new Operand\Literal($vm->toBool());
                 $lit->type = Type::bool();
                 return Variable::fromLiteral($this->context, $lit);
+            case VM\Variable::TYPE_NULL:
+                return new Variable(
+                    $this->context,
+                    Variable::TYPE_NULL,
+                    Variable::KIND_VALUE,
+                    $this->context->getTypeFromString('__value__*')->constNull()
+                );
             default:
-                throw new \LogicException('Unsupported default parameter type for JIT');
+                throw new \LogicException('Unsupported default parameter type for JIT (vm type ' . $vm->type . ')');
         }
     }
 

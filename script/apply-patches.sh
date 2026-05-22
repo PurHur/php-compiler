@@ -28,6 +28,12 @@ patch_already_applied() {
     php-types-doc-comment-string.patch)
       grep -q 'instanceof \\PhpParser\\Comment' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
       ;;
+    php-types-array-shape.patch)
+      grep -q "preg_match('/^array\\{/'" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
+      ;;
+    php-types-generics-fallback.patch)
+      grep -q "preg_match('/^(list|array)\\s*</'" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
+      ;;
     php-types-ns-func-call.patch)
       grep -q 'function resolveOp_Expr_NsFuncCall' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
       ;;
@@ -42,6 +48,9 @@ patch_already_applied() {
       ;;
     php-cfg-strict-types.patch)
       grep -q 'public \$strictTypes' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Func.php" 2>/dev/null
+      ;;
+    php-cfg-trycatch.patch)
+      [[ -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/TryCatch.php" ]]
       ;;
     *)
       return 1
@@ -87,6 +96,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-mixed-reserved.patch"
   apply_patch "$PATCH_DIR/php-cfg-nullsafe.patch"
   apply_patch "$PATCH_DIR/php-cfg-strict-types.patch"
+  apply_patch "$PATCH_DIR/php-cfg-trycatch.patch"
 fi
 
 if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
@@ -102,6 +112,8 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-nullable-return.patch"
   apply_patch "$PATCH_DIR/php-types-fromvalue-null.patch"
   apply_patch "$PATCH_DIR/php-types-doc-comment-string.patch"
+  apply_patch "$PATCH_DIR/php-types-array-shape.patch"
+  apply_patch "$PATCH_DIR/php-types-generics-fallback.patch"
   apply_patch "$PATCH_DIR/php-types-ns-func-call.patch"
 fi
 

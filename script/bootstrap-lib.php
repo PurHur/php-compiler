@@ -212,6 +212,10 @@ function bootstrapDefaultAotLintTargets(string $root): array
     foreach (glob($root.'/test/bootstrap-aot/*.php') ?: [] as $path) {
         $targets[] = substr($path, strlen($root) + 1);
     }
+    // Multi-file chains: test/bootstrap-aot/<name>/main.php (issue #120).
+    foreach (glob($root.'/test/bootstrap-aot/*/main.php') ?: [] as $path) {
+        $targets[] = substr($path, strlen($root) + 1);
+    }
     sort($targets, SORT_STRING);
 
     return array_values(array_unique($targets));
@@ -227,6 +231,7 @@ function bootstrapDefaultAotLintTargets(string $root): array
 function bootstrapDefaultAotLinkTargets(array $lintTargets): array
 {
     $pendingUserFunc = [
+        'test/bootstrap-aot/try_catch.php', // try/catch CFG link (#57); VM unwind pending
     ];
 
     return array_values(array_filter(
