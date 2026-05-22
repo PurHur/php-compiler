@@ -70,6 +70,9 @@ class Context {
     /** ?? result operands that must receive branch assigns even when php-cfg marks them dead (#99). */
     public \SplObjectStorage $coalesceAssignTargets;
 
+    /** Nested compile-time include inlining depth (issue #568). */
+    public int $inlineIncludeDepth = 0;
+
     private array $exports = [];
     public Runtime $runtime;
 
