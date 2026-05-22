@@ -53,6 +53,8 @@ class Module extends ModuleAbstract
             new strcmp(),
             new strcasecmp(),
             new strncasecmp(),
+            new strspn(),
+            new strcspn(),
             new dechex(),
             new hexdec(),
             new decoct(),
@@ -200,6 +202,17 @@ class Module extends ModuleAbstract
             $ft = $context->context->functionType($i32, false, $i8p, $i8p, $sizeT);
             $fn = $context->module->addFunction('strncasecmp', $ft);
             $context->registerFunction('strncasecmp', $fn);
+        }
+        foreach (['strspn', 'strcspn'] as $name) {
+            try {
+                $context->lookupFunction($name);
+            } catch (\Throwable $e) {
+                $i8p = $context->getTypeFromString('int8*');
+                $sizeT = $context->getTypeFromString('size_t');
+                $ft = $context->context->functionType($sizeT, false, $i8p, $i8p);
+                $fn = $context->module->addFunction($name, $ft);
+                $context->registerFunction($name, $fn);
+            }
         }
         try {
             $context->lookupFunction('strstr');
