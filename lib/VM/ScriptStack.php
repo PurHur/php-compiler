@@ -39,7 +39,7 @@ final class ScriptStack
 
     public static function normalize(string $path): string
     {
-        if ('' === $path) {
+        if ('' === $path || str_contains($path, "\0")) {
             return '';
         }
         $resolved = realpath($path);

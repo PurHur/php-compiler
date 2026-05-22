@@ -66,7 +66,7 @@ patch_already_applied() {
       grep -q 'namespaceStack' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/MagicStringResolver.php" 2>/dev/null
       ;;
     php-cfg-magic-script-const.patch)
-      [[ -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/MagicScriptConst.php" ]]
+      grep -q 'Op\\Expr\\MagicScriptConst' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
       ;;
     php-types-magic-script-const.patch)
       grep -q "case 'Expr_MagicScriptConst':" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
