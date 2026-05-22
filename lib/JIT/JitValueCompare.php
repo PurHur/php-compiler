@@ -119,11 +119,75 @@ final class JitValueCompare
         $falseVal = $context->getTypeFromString('int1')->constInt(0, false);
         $sameType = $context->builder->icmp(Builder::INT_EQ, $leftType, $rightType);
 
+        $nullTag = $i8->constInt(Variable::TYPE_NULL, false);
+        $bothNull = $context->builder->and(
+            $context->builder->icmp(Builder::INT_EQ, $leftType, $nullTag),
+            $context->builder->icmp(Builder::INT_EQ, $rightType, $nullTag)
+        );
+
+        $entry = $context->builder->getInsertBlock();
+        $i1 = $context->getTypeFromString('int1');
+        $trueVal = $i1->constInt(1, false);
+        $mergeBlock = BasicBlockHelper::append($context, 'identical_value_merge');
+        $typedBlock = BasicBlockHelper::append($context, 'identical_value_typed');
+
+        $context->builder->branchIf($bothNull, $mergeBlock, $typedBlock);
+
+        $context->builder->positionAtEnd($typedBlock);
+        [$typedMatch, $typedDone] = self::identicalValueToValueTyped(
+            $context,
+            $leftPtr,
+            $rightPtr,
+            $leftType,
+            $rightType,
+            $mergeBlock
+        );
+
+        $context->builder->positionAtEnd($mergeBlock);
+        $matchPhi = $context->builder->phi($i1);
+        $matchPhi->addIncoming($trueVal, $entry);
+        $matchPhi->addIncoming($typedMatch, $typedDone);
+
+        return $context->builder->and($sameType, $matchPhi);
+    }
+
+    /**
+     * Compare two boxed values of the same non-null type tag (caller skips dual-null).
+     */
+    private static function identicalValueToValueTyped(
+        Context $context,
+        Value $leftPtr,
+        Value $rightPtr,
+        Value $leftType,
+        Value $rightType,
+        \PHPLLVM\BasicBlock $exitBlock
+    ): array {
+        $i8 = $context->getTypeFromString('int8');
+        $falseVal = $context->getTypeFromString('int1')->constInt(0, false);
+
         $stringTag = $i8->constInt(Variable::TYPE_STRING, false);
         $bothString = $context->builder->and(
             $context->builder->icmp(Builder::INT_EQ, $leftType, $stringTag),
             $context->builder->icmp(Builder::INT_EQ, $rightType, $stringTag)
         );
+
+        $longTag = $i8->constInt(Variable::TYPE_NATIVE_LONG, false);
+        $bothLong = $context->builder->and(
+            $context->builder->icmp(Builder::INT_EQ, $leftType, $longTag),
+            $context->builder->icmp(Builder::INT_EQ, $rightType, $longTag)
+        );
+
+        $entry = $context->builder->getInsertBlock();
+        $i1 = $context->getTypeFromString('int1');
+        $stringBlock = BasicBlockHelper::append($context, 'identical_value_string');
+        $longCheckBlock = BasicBlockHelper::append($context, 'identical_value_long_check');
+        $longBlock = BasicBlockHelper::append($context, 'identical_value_long');
+        $typedFalseBlock = BasicBlockHelper::append($context, 'identical_value_typed_false');
+        $doneBlock = BasicBlockHelper::append($context, 'identical_value_typed_done');
+
+        $context->builder->branchIf($bothString, $stringBlock, $longCheckBlock);
+
+        $context->builder->positionAtEnd($stringBlock);
         $leftStr = $context->builder->call(
             $context->lookupFunction('__value__readString'),
             $leftPtr
@@ -139,32 +203,28 @@ final class JitValueCompare
             $context->builder->structGep($rightStr, $stringMap['value'])
         );
         $stringsMatch = $context->builder->icmp(Builder::INT_EQ, $cmp, $cmp->typeOf()->constInt(0, false));
-        $stringIdentical = $context->builder->and($bothString, $stringsMatch);
+        $context->builder->branch($doneBlock);
 
-        $longTag = $i8->constInt(Variable::TYPE_NATIVE_LONG, false);
-        $bothLong = $context->builder->and(
-            $context->builder->icmp(Builder::INT_EQ, $leftType, $longTag),
-            $context->builder->icmp(Builder::INT_EQ, $rightType, $longTag)
-        );
+        $context->builder->positionAtEnd($longCheckBlock);
+        $context->builder->branchIf($bothLong, $longBlock, $typedFalseBlock);
+
+        $context->builder->positionAtEnd($longBlock);
         $leftLong = $context->builder->call($context->lookupFunction('__value__readLong'), $leftPtr);
         $rightLong = $context->builder->call($context->lookupFunction('__value__readLong'), $rightPtr);
-        $longIdentical = $context->builder->and(
-            $bothLong,
-            $context->builder->icmp(Builder::INT_EQ, $leftLong, $rightLong)
-        );
+        $longMatch = $context->builder->icmp(Builder::INT_EQ, $leftLong, $rightLong);
+        $context->builder->branch($doneBlock);
 
-        $nullTag = $i8->constInt(Variable::TYPE_NULL, false);
-        $bothNull = $context->builder->and(
-            $context->builder->icmp(Builder::INT_EQ, $leftType, $nullTag),
-            $context->builder->icmp(Builder::INT_EQ, $rightType, $nullTag)
-        );
+        $context->builder->positionAtEnd($typedFalseBlock);
+        $context->builder->branch($doneBlock);
 
-        $typedMatch = $context->builder->or(
-            $stringIdentical,
-            $context->builder->or($longIdentical, $bothNull)
-        );
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($i1);
+        $phi->addIncoming($stringsMatch, $stringBlock);
+        $phi->addIncoming($longMatch, $longBlock);
+        $phi->addIncoming($falseVal, $typedFalseBlock);
+        $context->builder->branch($exitBlock);
 
-        return $context->builder->select($sameType, $typedMatch, $falseVal);
+        return [$phi, $doneBlock];
     }
 
     public static function notIdenticalValueToValue(

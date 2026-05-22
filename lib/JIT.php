@@ -67,7 +67,7 @@ class JIT {
     private function runQueue(): void {
         while (!empty($this->queue)) {
             $run = array_shift($this->queue);
-            $this->compileBlockInternal($run[0], $run[1], ...$run[2]);
+            $this->compileBlockInternal($run[0], $run[1], null, null, ...$run[2]);
         }
     }
 
@@ -104,8 +104,16 @@ class JIT {
             $returnType = $this->context->getTypeFromString($callbackType);
             $this->context->functionReturnType[strtolower($internalName)] = $callbackType;
 
+            if ($this->blockUsesThis($block)) {
+                $rawTypes[] = Type::object();
+                $args[] = $this->context->getTypeFromString('__object__*');
+            }
             $callbackType .= '(*)(';
             $callbackSep = '';
+            foreach ($args as $type) {
+                $callbackType .= $callbackSep . $this->context->getStringFromType($type);
+                $callbackSep = ', ';
+            }
             foreach ($block->func->params as $idx => $param) {
                 if (empty($param->result->usages)) {
                     // only compile for param
@@ -200,11 +208,37 @@ class JIT {
             $this->context->makeVariableFromOp($func, $basicBlock, $block, $operand);
         }
 
+        $thisParamOffset = 0;
+        if ([] !== $args) {
+            foreach ($block->orig->hoistedOperands as $hoisted) {
+                if ('this' === JIT\OperandName::resolve($hoisted)) {
+                    if (!$this->context->hasVariableOp($hoisted)) {
+                        $this->context->makeVariableFromOp($func, $basicBlock, $block, $hoisted);
+                    }
+                    $this->assignOperand($hoisted, $args[0], true);
+                    $thisParamOffset = 1;
+                    break;
+                }
+            }
+            if (null !== $block->func) {
+                foreach ($block->func->params as $idx => $param) {
+                    $argIdx = $thisParamOffset + $idx;
+                    if ($argIdx >= count($args)) {
+                        break;
+                    }
+                    if (!$this->context->hasVariableOp($param->result)) {
+                        $this->context->makeVariableFromOp($func, $basicBlock, $block, $param->result);
+                    }
+                    $this->assignOperand($param->result, $args[$argIdx], true);
+                }
+            }
+        }
+
         for ($i = 0, $length = null !== $limit ? $limit : count($block->opCodes); $i < $length; $i++) {
             $op = $block->opCodes[$i];
             switch ($op->type) {
                 case OpCode::TYPE_ARG_RECV:
-                    $this->assignOperand($block->getOperand($op->arg1), $args[$op->arg2]);
+                    $this->assignOperand($block->getOperand($op->arg1), $args[$op->arg2 + $thisParamOffset]);
                     break;
                 case OpCode::TYPE_ASSIGN:
                     $value = $this->context->getVariableFromOp($block->getOperand($op->arg3));
@@ -547,7 +581,7 @@ class JIT {
                     $equalOp = new OpCode(OpCode::TYPE_EQUAL);
                     $matchVar = $this->context->helper->binaryOp($equalOp, $switchVar, $caseVar);
                     $match = $this->context->helper->loadValue($matchVar);
-                    $caseBb = $this->compileBlockInternal($func, $op->block1, ...$args);
+                    $caseBb = $this->compileBlockInternal($func, $op->block1, null, null, ...$args);
                     $nextBb = JIT\BasicBlockHelper::append($this->context, 'switch_next_case');
                     $builder->positionAtEnd($branchBlock);
                     $this->context->freeDeadVariables($func, $branchBlock, $block);
@@ -557,7 +591,7 @@ class JIT {
                 case OpCode::TYPE_JUMP:
                     $branchBlock = $builder->getInsertBlock();
                     $builder->positionAtEnd($branchBlock);
-                    $newBlock = $this->compileBlockInternal($func, $op->block1, ...$args);
+                    $newBlock = $this->compileBlockInternal($func, $op->block1, null, null, ...$args);
                     $builder->positionAtEnd($branchBlock);
                     $this->context->freeDeadVariables($func, $branchBlock, $block);
                     $builder->branch($newBlock);
@@ -632,8 +666,8 @@ class JIT {
                     $condition = $this->context->castToBool(
                         $this->context->helper->loadValue($this->context->getVariableFromOp($block->getOperand($op->arg1)))
                     );
-                    $if = $this->compileBlockInternal($func, $op->block1, ...$args);
-                    $else = $this->compileBlockInternal($func, $op->block2, ...$args);
+                    $if = $this->compileBlockInternal($func, $op->block1, null, null, ...$args);
+                    $else = $this->compileBlockInternal($func, $op->block2, null, null, ...$args);
                     $builder->positionAtEnd($branchBlock);
                     $this->context->freeDeadVariables($func, $branchBlock, $block);
                     $builder->branchIf($condition, $if, $else);
@@ -1047,6 +1081,17 @@ class JIT {
     /**
      * @return array<int, Variable>
      */
+    private function blockUsesThis(Block $block): bool
+    {
+        foreach ($block->orig->hoistedOperands as $hoisted) {
+            if ('this' === JIT\OperandName::resolve($hoisted)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private function collectParamDefaults(Block $block): array {
         $defaults = [];
         foreach ($block->opCodes as $op) {
@@ -1056,7 +1101,11 @@ class JIT {
             if (!isset($block->constants[$op->arg3])) {
                 continue;
             }
-            $defaults[$op->arg2] = $this->jitVariableFromVmConstant($block->constants[$op->arg3]);
+            $defaultIdx = $op->arg2;
+            if ($this->blockUsesThis($block)) {
+                ++$defaultIdx;
+            }
+            $defaults[$defaultIdx] = $this->jitVariableFromVmConstant($block->constants[$op->arg3]);
         }
         return $defaults;
     }
