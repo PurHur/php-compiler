@@ -231,9 +231,7 @@ function bootstrapDefaultAotLintTargets(string $root): array
 function bootstrapDefaultAotLinkTargets(array $lintTargets): array
 {
     $pendingUserFunc = [
-        'test/bootstrap-aot/require_chain/main.php', // multi-file require_once (#120)
-        'test/bootstrap-aot/throw_logic.php', // throw terminal lowering (#57)
-        'test/bootstrap-aot/try_catch.php', // try/catch CFG lint (#57); VM unwind pending
+        'test/bootstrap-aot/try_catch.php', // try/catch CFG link (#57); VM unwind pending
     ];
 
     return array_values(array_filter(
