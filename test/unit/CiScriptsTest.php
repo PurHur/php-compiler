@@ -172,11 +172,42 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('ci-defaults.env', $body);
     }
 
+    public function testCiDockerRunPassesJitPreflightGateEnv(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');
+        $this->assertStringContainsString('JIT_PREFLIGHT_GATE', $body);
+    }
+
     public function testCiFastPreparesRuntimeLimits(): void
     {
         $fast = dirname(__DIR__, 2).'/script/ci-fast.sh';
         $body = (string) file_get_contents($fast);
         $this->assertStringContainsString('ci_prepare_test_runtime', $body);
+    }
+
+    public function testCiFastSupportsOptionalJitPreflightGate(): void
+    {
+        $fast = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-fast.sh');
+        $this->assertStringContainsString('ci_jit_preflight_gate', $fast);
+
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('JIT_PREFLIGHT_GATE', $common);
+        $this->assertStringContainsString('check-jit-compliance-ran.php --preflight', $common);
+
+        $probe = (string) file_get_contents(dirname(__DIR__, 2).'/script/check-jit-compliance-ran.php');
+        $this->assertStringContainsString('--preflight', $probe);
+
+        $makefile = (string) file_get_contents(dirname(__DIR__, 2).'/Makefile');
+        $this->assertStringContainsString('test-fast-jit-preflight:', $makefile);
+        $this->assertStringContainsString('JIT_PREFLIGHT_GATE=1', $makefile);
+    }
+
+    public function testLocalCiMatrixDocumentsJitPreflightGate(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('JIT_PREFLIGHT_GATE', $doc);
+        $this->assertStringContainsString('test-fast-jit-preflight', $doc);
+        $this->assertStringContainsString('--preflight', $doc);
     }
 
     public function testCiFastRunsMiniWebAppVmCliGateByDefault(): void

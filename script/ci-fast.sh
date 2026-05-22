@@ -11,6 +11,7 @@ source "$(dirname "$0")/ci-common.sh"
 ci_cd_repo
 ci_prepare_test_runtime
 ci_install_deps
+ci_jit_preflight_gate
 ci_run_inventory_checks
 ci_report_llvm_status
 ci_configure_serve_tests
