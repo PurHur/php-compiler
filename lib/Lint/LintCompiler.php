@@ -6,9 +6,14 @@ namespace PHPCompiler\Lint;
 
 use PHPCfg\Block as CfgBlock;
 use PHPCfg\Op;
+use PHPCfg\Operand;
+use PHPCfg\Operand\Temporary;
+use PHPTypes\Type;
 use PHPCompiler\Block;
 use PHPCompiler\Compiler;
+use PHPCompiler\MethodVisibility;
 use PHPCompiler\OpCode;
+use PHPCompiler\VM\Variable;
 
 /**
  * Compiler that records unsupported CFG nodes instead of throwing.
@@ -105,9 +110,16 @@ final class LintCompiler extends Compiler
                     try {
                         $methodName = new Operand\Literal($child->func->name);
                         $methodName->type = Type::string();
+                        $visVar = new Variable(Variable::TYPE_INTEGER);
+                        $visVar->int(MethodVisibility::mask($child->func->flags));
+                        $visOperand = new Temporary;
+                        $visOperand->type = Type::int();
+                        $visIdx = $result->registerConstant($visOperand, $visVar);
                         $declare = new OpCode(
                             OpCode::TYPE_DECLARE_METHOD,
-                            $this->compileOperand($methodName, $result, true)
+                            $this->compileOperand($methodName, $result, true),
+                            null,
+                            $visIdx
                         );
                         if (null !== $child->func->cfg) {
                             $methodBlock = $this->compileCfgBlock($child->func->cfg, $child->func->params);

@@ -317,6 +317,18 @@ restart:
                     if (!isset($class->methods[$methodName])) {
                         throw new \LogicException("Call to undefined method {$class->name}::{$methodName}()");
                     }
+                    $vis = $class->methodVisibility[$methodName] ?? \PHPCfg\Func::FLAG_PUBLIC;
+                    $callerClassLc = null;
+                    if (null !== $frame->block->func?->class) {
+                        $callerClassLc = strtolower($frame->block->func->class->value);
+                    }
+                    MethodVisibility::assertCallable(
+                        $vis,
+                        $callerClassLc,
+                        strtolower($class->name),
+                        $class->name,
+                        $frame->scope[$op->arg2]->toString()
+                    );
                     $frame->call = $class->methods[$methodName];
                     $frame->callArgs = [$receiver];
                     break;
@@ -539,6 +551,11 @@ restart:
                     break;
                 case OpCode::TYPE_DECLARE_METHOD:
                     $name = strtolower($frame->scope[$op->arg1]->toString());
+                    $vis = \PHPCfg\Func::FLAG_PUBLIC;
+                    if (null !== $op->arg3 && isset($block->constants[$op->arg3])) {
+                        $vis = MethodVisibility::mask($block->constants[$op->arg3]->toInt());
+                    }
+                    $entry->methodVisibility[$name] = $vis;
                     if (null !== $op->block1) {
                         $method = new Func\PHP($entry->name.'::'.$name, $op->block1);
                         $entry->methods[$name] = $method;

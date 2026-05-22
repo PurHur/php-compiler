@@ -23,6 +23,8 @@ class Object_ extends Type {
     private array $classes = [];
     private array $properties = [];
     private array $propNameMap = [];
+    /** @var array<int, array<string, int>> class id => method lc => visibility flags */
+    private array $methodVisibility = [];
     /** @var array<int, array<string, array{type: int, value: int|float|bool|string|null}>> */
     private array $classConstants = [];
 
@@ -297,6 +299,16 @@ class Object_ extends Type {
         $this->properties[$id] = [];
         $this->classConstants[$id] = [];
         $this->classes[$lcname] = $id;
+    }
+
+    public function defineMethodVisibility(int $classId, string $methodLc, int $visibilityFlags): void
+    {
+        $this->methodVisibility[$classId][strtolower($methodLc)] = $visibilityFlags;
+    }
+
+    public function methodVisibility(int $classId, string $methodLc): int
+    {
+        return $this->methodVisibility[$classId][strtolower($methodLc)] ?? \PHPCfg\Func::FLAG_PUBLIC;
     }
 
     public function defineProperty(int $classId, string $name, int $type): void
