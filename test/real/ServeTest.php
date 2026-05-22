@@ -430,7 +430,7 @@ PHP,
       $this->markTestSkipped('examples/003-MiniWebApp missing (#246)');
     }
     if (!$this->miniWebAppLintGreen($project)) {
-      $this->markTestSkipped('003-MiniWebApp lint not green (#67)');
+      $this->markTestSkipped('003-MiniWebApp lint not green (#539)');
     }
 
     $home = $this->httpGet($project, '/index.php');
@@ -461,7 +461,7 @@ PHP,
       $this->markTestSkipped('examples/003-MiniWebApp missing (#246)');
     }
     if (!$this->miniWebAppLintGreen($project)) {
-      $this->markTestSkipped('003-MiniWebApp lint not green (#67)');
+      $this->markTestSkipped('003-MiniWebApp lint not green (#539)');
     }
 
     $response = $this->httpPost($project, '/index.php/contact', 'name=PostDev');

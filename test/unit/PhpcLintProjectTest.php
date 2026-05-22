@@ -70,7 +70,11 @@ final class PhpcLintProjectTest extends TestCase
     {
         $tree = dirname(__DIR__, 2).'/examples/003-MiniWebApp';
         $exit = $this->runLint(['--all', $tree]);
-        $this->assertSame(0, $exit['code'], $exit['stderr']."\n".$exit['stdout']);
+        $this->assertSame(
+            0,
+            $exit['code'],
+            '003-MiniWebApp lint failed (see #539): '.$exit['stderr']."\n".$exit['stdout']
+        );
         $this->assertStringNotContainsString(
             'dynamic include/require',
             $exit['stderr'],

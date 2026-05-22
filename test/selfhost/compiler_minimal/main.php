@@ -15,6 +15,8 @@ require_once __DIR__.'/../../../lib/Func/PHP.php';
 require_once __DIR__.'/../../../lib/Runtime.php';
 require_once __DIR__.'/../../../lib/Web/ConstStringFolder.php';
 require_once __DIR__.'/../../../lib/Web/IncludePathResolver.php';
+require_once __DIR__.'/../../../lib/Module.php';
+require_once __DIR__.'/../../../lib/VM.php';
 require_once __DIR__.'/../../../lib/Compiler.php';
 
 echo "compiler_minimal bundle OK\n";

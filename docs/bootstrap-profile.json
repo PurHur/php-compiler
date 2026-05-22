@@ -66,6 +66,7 @@
         "ext/standard/JitStripTags.php",
         "ext/standard/JitStrpos.php",
         "ext/standard/JitStrrpos.php",
+        "ext/standard/JitSubstrCount.php",
         "ext/standard/JitUrlencode.php",
         "ext/standard/JitWebParams.php",
         "ext/standard/Module.php",
@@ -193,12 +194,14 @@
         "ext/standard/str_replace.php",
         "ext/standard/str_split.php",
         "ext/standard/str_starts_with.php",
+        "ext/standard/strcasecmp.php",
         "ext/standard/strcmp.php",
         "ext/standard/string_ltrim.php",
         "ext/standard/string_rtrim.php",
         "ext/standard/string_trim.php",
         "ext/standard/strip_tags.php",
         "ext/standard/stripos.php",
+        "ext/standard/strncasecmp.php",
         "ext/standard/strncmp.php",
         "ext/standard/strpos.php",
         "ext/standard/strrev.php",
@@ -207,6 +210,7 @@
         "ext/standard/strtoupper.php",
         "ext/standard/strval.php",
         "ext/standard/substr.php",
+        "ext/standard/substr_count.php",
         "ext/standard/tan.php",
         "ext/standard/time.php",
         "ext/standard/ucfirst.php",
@@ -275,6 +279,7 @@
         "lib/JIT/Context.php",
         "lib/JIT/HashTableHelper.php",
         "lib/JIT/Helper.php",
+        "lib/JIT/IncludeHelper.php",
         "lib/JIT/IssetHelper.php",
         "lib/JIT/IteratorHelper.php",
         "lib/JIT/JitNativeString.php",
@@ -358,17 +363,18 @@
         "test/bootstrap-aot/namespace_hello.php",
         "test/bootstrap-aot/nullable_types.php",
         "test/bootstrap-aot/require_chain/main.php",
-        "test/bootstrap-aot/throw_logic.php"
+        "test/bootstrap-aot/throw_logic.php",
+        "test/bootstrap-aot/try_catch.php"
     ],
     "aot_link_lib_targets": [
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 303,
+        "inventory_files": 308,
         "excluded": 2,
-        "eligible": 301,
+        "eligible": 306,
         "aot_lint_targets": 13,
-        "aot_link_targets": 11,
+        "aot_link_targets": 12,
         "aot_link_lib_targets": 1
     }
 }

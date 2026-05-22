@@ -92,8 +92,18 @@ class JIT {
                     case 'string':
                         $callbackType = '__string__*';
                         break;
+                    case 'bool':
+                        $callbackType = 'bool';
+                        break;
+                    case 'object':
+                        $callbackType = '__object__*';
+                        break;
+                    case 'array':
+                        $callbackType = '__hashtable__*';
+                        break;
                     default:
-                        throw new \LogicException("Non-void return types not supported yet");
+                        $callbackType = '__value__';
+                        break;
                 }
             } else {
                 $callbackType = '__value__';
@@ -397,6 +407,13 @@ class JIT {
                     $builder->branchIf($condition, $if, $else);
                     return $origBasicBlock;
                 case OpCode::TYPE_TRY:
+                    $branchBlock = $builder->getInsertBlock();
+                    $builder->positionAtEnd($branchBlock);
+                    $tryBb = $this->compileBlockInternal($func, $op->block1, ...$args);
+                    $builder->positionAtEnd($branchBlock);
+                    $this->context->freeDeadVariables($func, $branchBlock, $block);
+                    $builder->branch($tryBb);
+                    return $origBasicBlock;
                 case OpCode::TYPE_CATCH:
                 case OpCode::TYPE_FINALLY:
                     if (null !== $op->block1) {
@@ -487,10 +504,7 @@ class JIT {
                     assert($nameOp instanceof Operand\Literal);
                     assert($receiverOp->type->type === Type::TYPE_OBJECT);
                     $proxyName = strtolower($receiverOp->type->userType).'::'.strtolower($nameOp->value);
-                    if (!isset($this->context->functionProxies[$proxyName])) {
-                        throw new \RuntimeException("Call to undefined method $proxyName");
-                    }
-                    $this->context->scope->toCall = $this->context->functionProxies[$proxyName];
+                    $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
                     $this->context->scope->args = [$this->context->getVariableFromOp($receiverOp)];
                     break;
                 case OpCode::TYPE_PROPERTY_FETCH:

@@ -125,7 +125,12 @@ final class AotTest extends BaseTest
         }
         $includeFile = null;
         $entryFile = null;
-        if (isset($sections['INCLUDE'])) {
+        $runfile = isset($sections['RUNFILE']) ? trim($sections['RUNFILE']) : '';
+        if ('' !== $runfile) {
+            $runPath = realpath(($sections['__phpt_dir'] ?? $repoRoot).'/'.$runfile);
+            $this->assertNotFalse($runPath, "RUNFILE not found: {$runfile}");
+            $compileArgv[] = $runPath;
+        } elseif (isset($sections['INCLUDE'])) {
             $includeFile = tempnam(sys_get_temp_dir(), 'phpc_inc_');
             $this->assertNotFalse($includeFile);
             file_put_contents($includeFile, $sections['INCLUDE']);
@@ -146,7 +151,7 @@ final class AotTest extends BaseTest
             $repoRoot,
             $compileEnv
         );
-        if (!isset($sections['INCLUDE'])) {
+        if ('' === $runfile && !isset($sections['INCLUDE'])) {
             fwrite($pipes[0], $code);
         }
         fclose($pipes[0]);

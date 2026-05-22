@@ -130,6 +130,94 @@ final class VmString
         return 0;
     }
 
+    public static function strcasecmp(string $a, string $b): int
+    {
+        $lenA = self::byteLength($a);
+        $lenB = self::byteLength($b);
+        $min = $lenA < $lenB ? $lenA : $lenB;
+        for ($i = 0; $i < $min; ++$i) {
+            $ordA = self::byteOrd(self::asciiLowerByte($a[$i]));
+            $ordB = self::byteOrd(self::asciiLowerByte($b[$i]));
+            if ($ordA !== $ordB) {
+                return $ordA <=> $ordB;
+            }
+        }
+
+        return $lenA <=> $lenB;
+    }
+
+    public static function strncasecmp(string $a, string $b, int $length): int
+    {
+        if ($length <= 0) {
+            return 0;
+        }
+        $lenA = self::byteLength($a);
+        $lenB = self::byteLength($b);
+        $compare = $length;
+        if ($compare > $lenA) {
+            $compare = $lenA;
+        }
+        if ($compare > $lenB) {
+            $compare = $lenB;
+        }
+        for ($i = 0; $i < $compare; ++$i) {
+            $ordA = self::byteOrd(self::asciiLowerByte($a[$i]));
+            $ordB = self::byteOrd(self::asciiLowerByte($b[$i]));
+            if ($ordA !== $ordB) {
+                return $ordA <=> $ordB;
+            }
+        }
+
+        return 0;
+    }
+
+    public static function strspn(string $str, string $mask): int
+    {
+        if ('' === $mask) {
+            throw new \ValueError('strspn(): Argument #2 ($characters) must not be empty');
+        }
+        $slen = self::byteLength($str);
+        $mlen = self::byteLength($mask);
+        $count = 0;
+        for ($i = 0; $i < $slen; ++$i) {
+            if (!self::byteInSet($str[$i], $mask, $mlen)) {
+                break;
+            }
+            ++$count;
+        }
+
+        return $count;
+    }
+
+    public static function strcspn(string $str, string $mask): int
+    {
+        if ('' === $mask) {
+            throw new \ValueError('strcspn(): Argument #2 ($characters) must not be empty');
+        }
+        $slen = self::byteLength($str);
+        $mlen = self::byteLength($mask);
+        $count = 0;
+        for ($i = 0; $i < $slen; ++$i) {
+            if (self::byteInSet($str[$i], $mask, $mlen)) {
+                break;
+            }
+            ++$count;
+        }
+
+        return $count;
+    }
+
+    private static function byteInSet(string $byte, string $mask, int $maskLen): bool
+    {
+        for ($j = 0; $j < $maskLen; ++$j) {
+            if ($byte === $mask[$j]) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public static function bin2hex(string $data): string
     {
         $hex = '0123456789abcdef';
@@ -822,6 +910,54 @@ final class VmString
         $pos = self::findSubstring($haystack, $needle, $offset);
 
         return false === $pos ? false : $pos;
+    }
+
+    /**
+     * Count non-overlapping occurrences of $needle in $haystack (byte-safe subset of PHP).
+     */
+    public static function substr_count(
+        string $haystack,
+        string $needle,
+        int $offset = 0,
+        ?int $length = null
+    ): int {
+        if ('' === $needle) {
+            throw new \LogicException('substr_count(): Argument #2 ($needle) cannot be empty');
+        }
+        $hayLen = self::byteLength($haystack);
+        $needleLen = self::byteLength($needle);
+        if ($offset < 0) {
+            $offset = 0;
+        }
+        if ($offset >= $hayLen) {
+            return 0;
+        }
+        $end = $hayLen;
+        if (null !== $length) {
+            if ($length < 0) {
+                return 0;
+            }
+            $end = $offset + $length;
+            if ($end > $hayLen) {
+                $end = $hayLen;
+            }
+        }
+        $limit = $end - $needleLen;
+        if ($limit < $offset) {
+            return 0;
+        }
+        $count = 0;
+        $pos = $offset;
+        while ($pos <= $limit) {
+            $found = self::findSubstring($haystack, $needle, $pos);
+            if (false === $found || $found > $limit) {
+                break;
+            }
+            ++$count;
+            $pos = $found + $needleLen;
+        }
+
+        return $count;
     }
 
     /**

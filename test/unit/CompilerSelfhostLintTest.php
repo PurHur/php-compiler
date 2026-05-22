@@ -9,6 +9,9 @@ use PHPUnit\Framework\TestCase;
 /**
  * Bundled Compiler.php self-host AOT lint (issues #212, #78).
  *
+ * JIT compile-time parameter defaults covered for the minimal bundle (#556):
+ * null, int, float, bool, string, and array (including empty []).
+ *
  * @group aot-lint
  */
 final class CompilerSelfhostLintTest extends TestCase
@@ -60,8 +63,10 @@ final class CompilerSelfhostLintTest extends TestCase
             'lib/Frame.php',
             'lib/Func.php',
             'lib/Func/PHP.php',
+            'lib/Module.php',
             'lib/OpCode.php',
             'lib/Runtime.php',
+            'lib/VM.php',
             'lib/Web/ConstStringFolder.php',
             'lib/Web/IncludePathResolver.php',
         ];

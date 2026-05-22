@@ -100,8 +100,15 @@ class JIT {
                     case 'bool':
                         $callbackType = 'bool';
                         break;
+                    case 'object':
+                        $callbackType = '__object__*';
+                        break;
+                    case 'array':
+                        $callbackType = '__hashtable__*';
+                        break;
                     default:
-                        throw new \LogicException("Non-void return types not supported yet");
+                        $callbackType = '__value__';
+                        break;
                 }
             } else {
                 $callbackType = '__value__';
@@ -369,7 +376,13 @@ class JIT {
                     $this->assignOperand($block->getOperand($op->arg1), $value);
                     break;
                 case OpCode::TYPE_INCLUDE:
-                    // SourceBundler merges literal includes before AOT; no runtime include (issue #54, #540).
+                    JIT\IncludeHelper::compileLiteral(
+                        $this,
+                        $func,
+                        $block,
+                        $op,
+                        null !== $op->arg2 ? $block->getOperand($op->arg2) : null
+                    );
                     break;
                 case OpCode::TYPE_BOOLEAN_NOT:
                     $from = $this->context->getVariableFromOp($block->getOperand($op->arg2));
@@ -705,6 +718,13 @@ class JIT {
                     $builder->branchIf($condition, $if, $else);
                     return $origBasicBlock;
                 case OpCode::TYPE_TRY:
+                    $branchBlock = $builder->getInsertBlock();
+                    $builder->positionAtEnd($branchBlock);
+                    $tryBb = $this->compileBlockInternal($func, $op->block1, null, null, ...$args);
+                    $builder->positionAtEnd($branchBlock);
+                    $this->context->freeDeadVariables($func, $branchBlock, $block);
+                    $builder->branch($tryBb);
+                    return $origBasicBlock;
                 case OpCode::TYPE_CATCH:
                 case OpCode::TYPE_FINALLY:
                     if (null !== $op->block1) {
@@ -736,37 +756,7 @@ class JIT {
                         $return->addref();
                         $retval = $this->context->helper->loadValue($return);
                         $expected = $this->context->functionReturnType[$this->context->activeFunction] ?? null;
-                        if (Variable::TYPE_VALUE === $return->type) {
-                            $valuePtr = Variable::KIND_VARIABLE === $return->kind
-                                ? $return->value
-                                : $this->context->builder->alloca(
-                                    $this->context->getTypeFromString('__value__'),
-                                    1,
-                                    'return_value_box'
-                                );
-                            if (Variable::KIND_VALUE === $return->kind) {
-                                $this->context->builder->store($retval, $valuePtr);
-                            }
-                            if ('__string__*' === $expected) {
-                                $retval = $this->context->builder->call(
-                                    $this->context->lookupFunction('__value__readString'),
-                                    $valuePtr
-                                );
-                            } elseif ('long long' === $expected) {
-                                $retval = $this->context->builder->call(
-                                    $this->context->lookupFunction('__value__readLong'),
-                                    $valuePtr
-                                );
-                            } elseif ('bool' === $expected) {
-                                $retval = $this->context->builder->truncOrBitCast(
-                                    $this->context->builder->call(
-                                        $this->context->lookupFunction('__value__readLong'),
-                                        $valuePtr
-                                    ),
-                                    $this->context->getTypeFromString('int1')
-                                );
-                            }
-                        }
+                        $retval = $this->coerceReturnValue($return, $retval, $expected);
                         $this->context->builder->returnValue($retval);
                     }
     
@@ -787,6 +777,17 @@ class JIT {
                     } else {
                         throw new \RuntimeException("Call to undefined function $lcname");
                     }
+                    $this->context->scope->args = [];
+                    break;
+                case OpCode::TYPE_STATICCALL_INIT:
+                    $classOp = $block->getOperand($op->arg1);
+                    $nameOp = $block->getOperand($op->arg2);
+                    assert($nameOp instanceof Operand\Literal);
+                    if (!$classOp instanceof Operand\Literal) {
+                        throw new \LogicException('Static call class must be a literal');
+                    }
+                    $proxyName = strtolower($classOp->value).'::'.strtolower($nameOp->value);
+                    $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
                     $this->context->scope->args = [];
                     break;
                 case OpCode::TYPE_ARG_SEND:
@@ -829,11 +830,9 @@ class JIT {
                     $nameOp = $block->getOperand($op->arg2);
                     assert($nameOp instanceof Operand\Literal);
                     assert($receiverOp->type->type === Type::TYPE_OBJECT);
-                    $proxyName = strtolower($receiverOp->type->userType).'::'.strtolower($nameOp->value);
-                    if (!isset($this->context->functionProxies[$proxyName])) {
-                        throw new \RuntimeException("Call to undefined method $proxyName");
-                    }
-                    $this->context->scope->toCall = $this->context->functionProxies[$proxyName];
+                    $className = $receiverOp->type->userType ?? 'object';
+                    $proxyName = strtolower($className).'::'.strtolower($nameOp->value);
+                    $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
                     $this->context->scope->args = [$this->context->getVariableFromOp($receiverOp)];
                     break;
                 case OpCode::TYPE_PROPERTY_FETCH:
@@ -854,6 +853,58 @@ class JIT {
         }
 
         return $builder->getInsertBlock();
+    }
+
+    private function coerceReturnValue(Variable $return, PHPLLVM\Value $retval, ?string $expected): PHPLLVM\Value
+    {
+        if (null === $expected || '__value__' === $expected || Variable::TYPE_VALUE !== $return->type) {
+            return $retval;
+        }
+        $valuePtr = Variable::KIND_VARIABLE === $return->kind
+            ? $return->value
+            : $this->context->builder->alloca(
+                $this->context->getTypeFromString('__value__'),
+                1,
+                'return_value_box'
+            );
+        if (Variable::KIND_VALUE === $return->kind) {
+            $this->context->builder->store($retval, $valuePtr);
+        }
+        if ('__string__*' === $expected) {
+            return $this->context->builder->call(
+                $this->context->lookupFunction('__value__readString'),
+                $valuePtr
+            );
+        }
+        if ('long long' === $expected) {
+            return $this->context->builder->call(
+                $this->context->lookupFunction('__value__readLong'),
+                $valuePtr
+            );
+        }
+        if ('bool' === $expected) {
+            return $this->context->builder->truncOrBitCast(
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__readLong'),
+                    $valuePtr
+                ),
+                $this->context->getTypeFromString('int1')
+            );
+        }
+        if ('__object__*' === $expected) {
+            return $this->context->builder->call(
+                $this->context->lookupFunction('__value__readObject'),
+                $valuePtr
+            );
+        }
+        if ('__hashtable__*' === $expected) {
+            return $this->context->builder->call(
+                $this->context->lookupFunction('__value__readHashtable'),
+                $valuePtr
+            );
+        }
+
+        return $retval;
     }
 
     private function isVoidCfgFunction(Block $block): bool
@@ -886,6 +937,7 @@ class JIT {
                     break;
                 case OpCode::TYPE_CONST_FETCH:
                 case OpCode::TYPE_CLASS_CONST_FETCH:
+                case OpCode::TYPE_INIT_ARRAY:
                     // Default property values are initialized in __object__ allocation.
                     break;
                 case OpCode::TYPE_DECLARE_METHOD:
@@ -918,6 +970,19 @@ class JIT {
             }
             
         }
+    }
+
+    public function assignIncludeResult(Operand $result): void
+    {
+        $this->assignOperand(
+            $result,
+            new Variable(
+                $this->context,
+                Variable::TYPE_NATIVE_LONG,
+                Variable::KIND_VALUE,
+                $this->context->constantFromInteger(1)
+            )
+        );
     }
 
     private function assignOperand(Operand $result, Variable $value, bool $force = false): void {
@@ -1223,9 +1288,36 @@ class JIT {
                 $nullVar->isNullConstant = true;
 
                 return $nullVar;
+            case VM\Variable::TYPE_ARRAY:
+                return $this->jitVariableFromVmArray($vm);
             default:
-                throw new \LogicException('Unsupported default parameter type for JIT');
+                throw new \LogicException('Unsupported default parameter type for JIT (vm type ' . $vm->type . ')');
         }
+    }
+
+    private function jitVariableFromVmArray(VM\Variable $vm): Variable
+    {
+        $ht = $vm->toArray();
+        $jitHt = JIT\HashTableHelper::alloc($this->context);
+        $var = new Variable(
+            $this->context,
+            Variable::TYPE_HASHTABLE,
+            Variable::KIND_VALUE,
+            $jitHt
+        );
+        if (0 === $ht->getNumElements()) {
+            return $var;
+        }
+        foreach ($ht->iterateKeyed(true) as [$key, $value]) {
+            JIT\HashTableHelper::addElement(
+                $this->context,
+                $var,
+                $this->jitVariableFromVmConstant($value),
+                $this->jitVariableFromVmConstant($key)
+            );
+        }
+
+        return $var;
     }
 
 }

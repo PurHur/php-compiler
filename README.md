@@ -329,7 +329,7 @@ block_0:
 
 Development targets a **web-capable PHP subset**: CGI/superglobals, stdlib for small apps, JIT/AOT deployment, and a reference MiniWebApp. See open [GitHub issues](https://github.com/PurHur/php-compiler/issues) for phase labels (`phase-0:Foundation` through `phase-5:reference-app`).
 
-The compiler still supports a limited language subset compared to Zend PHP; many builtins and constructs are VM-only or in progress. See the generated [builtin capability matrix](docs/capabilities.md) (VM / JIT / AOT per function).
+The compiler still supports a limited language subset compared to Zend PHP; many builtins and constructs are VM-only or in progress. See the generated [capability matrix](docs/capabilities.md) (builtin functions plus [language constructs](docs/capabilities.md#language-constructs): classes, methods, visibility, `instanceof`).
 
 # Troubleshooting
 

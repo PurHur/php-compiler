@@ -1,6 +1,6 @@
 --- vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
 +++ vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
-@@ -731,8 +731,8 @@
+@@ -731,7 +731,7 @@
          if ($type instanceof Op\Type\Nullable) {
 -            (new Type(Type::TYPE_UNION, [
 +            return (new Type(Type::TYPE_UNION, [
