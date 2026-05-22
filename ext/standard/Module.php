@@ -148,6 +148,7 @@ class Module extends ModuleAbstract
             new dirname(),
             new basename(),
             new realpath(),
+            new pathinfo(),
             new file_get_contents(),
             new readfile(),
             new file_put_contents(),
