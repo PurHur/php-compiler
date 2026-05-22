@@ -27,6 +27,7 @@ Add scripts under `test/bootstrap-aot/*.php` — picked up automatically by `scr
 
 - `echo_hello.php` — baseline procedural
 - `nullable_types.php` — `?string` parameters (self-host typing)
+- `namespace_hello.php` — single-file `namespace` + unqualified calls ([#513](https://github.com/PurHur/php-compiler/issues/513), [#84](https://github.com/PurHur/php-compiler/issues/84))
 - `minimal_class.php` — one public method (ClassMethod lowering)
 - `class_nullable_property.php` — nullable property with `= null` default
 
