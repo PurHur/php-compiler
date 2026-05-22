@@ -22,6 +22,7 @@
         <testsuite name="PHPCompiler Compliance Test Suites">
             <file>./test/compliance/JITTest.php</file>
             <file>./test/compliance/VMTest.php</file>
+            <file>./test/compliance/IncludeScopeVMTest.php</file>
         </testsuite>
         <testsuite name="PHPCompiler Unit Test Suites">
             <directory suffix=".php">./test/unit</directory>
