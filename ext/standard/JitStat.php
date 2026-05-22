@@ -225,16 +225,19 @@ final class JitStat
         $i8 = $context->getTypeFromString('int8');
         $bufType = $i8->arrayType(self::STAT_BUF_SIZE);
         $buf = $context->builder->alloca($bufType, 1, 'stat_buf');
-        $bufPtr = $context->builder->gep($buf, $context->getTypeFromString('int64')->constInt(0, false));
+        $i8p = $context->getTypeFromString('int8*');
+        $bufPtr = $context->builder->pointerCast($buf, $i8p);
         $ret = $context->builder->call(
             $context->lookupFunction('stat'),
             $pathPtr,
             $bufPtr
         );
         $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
         $zero = $i32->constInt(0, false);
         $failed = $context->builder->icmp(Builder::INT_NE, $ret, $zero);
-        $modePtr = $context->builder->gep($buf, $i32->constInt(self::STAT_MODE_OFFSET, false));
+        $bytePtr = $context->builder->gep($bufPtr, $i64->constInt(self::STAT_MODE_OFFSET, false));
+        $modePtr = $context->builder->pointerCast($bytePtr, $i32->pointerType(0));
         $mode = $context->builder->load($modePtr);
         $minusOne = $i32->constInt(-1, true);
 
