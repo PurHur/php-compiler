@@ -208,6 +208,9 @@ class JIT {
             if ($this->context->coalesceAssignTargets->contains($operand)) {
                 continue;
             }
+            if ($this->context->hasVariableOp($operand)) {
+                continue;
+            }
             $this->context->makeVariableFromOp($func, $basicBlock, $block, $operand);
         }
 
@@ -367,9 +370,14 @@ class JIT {
                     $this->assignOperand($block->getOperand($op->arg1), $value);
                     break;
                 case OpCode::TYPE_INCLUDE:
-                    throw new \LogicException(
-                        'include/require must be resolved before AOT compile (literal paths are auto-bundled in bin/compile.php; issue #54)'
+                    JIT\IncludeHelper::compileLiteral(
+                        $this,
+                        $func,
+                        $block,
+                        $op,
+                        null !== $op->arg2 ? $block->getOperand($op->arg2) : null
                     );
+                    break;
                 case OpCode::TYPE_BOOLEAN_NOT:
                     $from = $this->context->getVariableFromOp($block->getOperand($op->arg2));
                     if ($from->type === Variable::TYPE_NATIVE_BOOL) {
@@ -912,6 +920,19 @@ class JIT {
             }
             
         }
+    }
+
+    public function assignIncludeResult(Operand $result): void
+    {
+        $this->assignOperand(
+            $result,
+            new Variable(
+                $this->context,
+                Variable::TYPE_NATIVE_LONG,
+                Variable::KIND_VALUE,
+                $this->context->constantFromInteger(1)
+            )
+        );
     }
 
     private function assignOperand(Operand $result, Variable $value, bool $force = false): void {

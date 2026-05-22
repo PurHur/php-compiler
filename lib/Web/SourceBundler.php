@@ -29,7 +29,7 @@ final class SourceBundler
             if (false === $raw) {
                 throw new \RuntimeException('cannot read include: '.$path);
             }
-            $body = self::stripOpenTag($raw);
+            $body = self::rewriteDirConstant(self::stripOpenTag($raw), $path);
             $base = basename($path);
             if (isset($requireTargets[$base])) {
                 $body = self::rewriteReturnOnlyInclude($body, $requireTargets[$base]);
@@ -94,6 +94,16 @@ final class SourceBundler
         return $body;
     }
 
+    /**
+     * Preserve per-file directory semantics when sources are concatenated (issue #485).
+     */
+    private static function rewriteDirConstant(string $code, string $sourceFile): string
+    {
+        $dir = dirname(realpath($sourceFile) ?: $sourceFile);
+
+        return str_replace('__DIR__', var_export($dir, true), $code);
+    }
+
     private static function stripOpenTag(string $code): string
     {
         $code = ltrim($code);
@@ -120,7 +130,7 @@ final class SourceBundler
         }
         $kept = [];
         foreach ($lines as $line) {
-            if (preg_match('/^\s*(require|include)(?:_once)?\s+/i', $line)) {
+            if (preg_match('/\b(require|include)(?:_once)?\s+/i', $line)) {
                 $remove = false;
                 foreach ($drop as $base => $_) {
                     if (str_contains($line, $base)) {

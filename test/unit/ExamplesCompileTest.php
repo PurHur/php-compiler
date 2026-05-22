@@ -42,7 +42,7 @@ final class ExamplesCompileTest extends TestCase
             );
         }
         $this->markTestSkipped(
-            'Blocked by #58 (JIT TYPE_DECLARE_CLASS / method calls) — AOT bundle fixed in #452'
+            'MiniWebApp AOT link in progress — literal include JIT landed (#485); full project binary next'
         );
     }
 

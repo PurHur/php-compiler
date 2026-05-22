@@ -59,6 +59,9 @@ class Block {
     /** @var array<int, int> scope slot index => Variable::TYPE_* for typed parameters */
     public array $paramTypeConstraints = [];
 
+    /** Resolved absolute paths for TYPE_INCLUDE opcodes (arg3 index, issue #54). */
+    public array $literalIncludePaths = [];
+
     public function __construct(?CfgBlock $block) {
         $this->orig = $block;
         $this->scope = new \SplObjectStorage;
@@ -71,6 +74,32 @@ class Block {
                 return $operand;
             }
         }
+    }
+
+    /**
+     * @return list<Operand>
+     */
+    public function scopedOperands(): array
+    {
+        $operands = [];
+        foreach ($this->scope as $operand) {
+            $operands[] = $operand;
+        }
+
+        return $operands;
+    }
+
+    /**
+     * @return list<Operand>
+     */
+    public function argOperands(): array
+    {
+        $operands = [];
+        foreach ($this->args as $operand) {
+            $operands[] = $operand;
+        }
+
+        return $operands;
     }
 
     public function getVarSlot(Operand $operand, bool $isRead): int {
@@ -106,6 +135,9 @@ class Block {
             if (isset($parent->constants[$slot])) {
                 $this->constants[$slot] = $parent->constants[$slot];
             }
+        }
+        if ([] !== $parent->literalIncludePaths) {
+            $this->literalIncludePaths = $parent->literalIncludePaths;
         }
     }
 
