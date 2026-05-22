@@ -206,6 +206,8 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('MINIWEBAPP_WEB_SMOKE_GATE:-1', $body);
         $this->assertStringContainsString('issues/633', $body);
         $this->assertStringContainsString('issues/664', $body);
+        $this->assertStringContainsString('Stage 4a AOT dry-run', $body);
+        $this->assertStringContainsString('issues/624', $body);
     }
 
     public function testWebSmokeDefaultsMiniWebAppLintGateOn(): void

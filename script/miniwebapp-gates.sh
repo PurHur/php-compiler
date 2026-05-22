@@ -79,7 +79,29 @@ stage1b=0
 stage2=0
 stage3=0
 stage3b=0
+stage4a=0
 stage4=0
+aot_dry_run_exit=-1
+aot_dry_run_skipped=0
+
+resolve_llvm_dir() {
+  if [[ -n "${PHP_COMPILER_LLVM_PATH:-}" ]]; then
+    if [[ -f "${PHP_COMPILER_LLVM_PATH}/libLLVM-9.so.1" ]]; then
+      echo "${PHP_COMPILER_LLVM_PATH}"
+      return 0
+    fi
+    return 1
+  fi
+  if [[ -f "${ROOT}/.llvm/libLLVM-9.so.1" ]]; then
+    echo "${ROOT}/.llvm"
+    return 0
+  fi
+  if [[ -f /opt/llvm9/libLLVM-9.so.1 ]]; then
+    echo /opt/llvm9
+    return 0
+  fi
+  return 1
+}
 
 # Stage 0: skeleton opt-out — MINIWEBAPP_LINT_GATE=0 skips lint failure in web-smoke.
 if [[ "${lint_gate}" == "0" ]]; then
@@ -114,7 +136,28 @@ if [[ "${web_smoke_gate}" == "1" ]] \
   stage3b=1
 fi
 
-# Stage 4: ExamplesCompileTest @group miniwebapp unskipped (#454).
+# Stage 4a: phpc build --project --dry-run (#624, #675).
+LLVM_DIR=""
+AOT_DRY_RUN_STDERR=""
+if LLVM_DIR="$(resolve_llvm_dir)"; then
+  export PHP_COMPILER_LLVM_PATH="${LLVM_DIR}"
+  aot_stderr="$(mktemp)"
+  set +e
+  "${ROOT}/phpc" build --project "${ROOT}/${MINIWEBAPP}" --dry-run 2>"${aot_stderr}" >/dev/null
+  aot_dry_run_exit=$?
+  set -e
+  if [[ -s "${aot_stderr}" ]]; then
+    AOT_DRY_RUN_STDERR="$(tail -n 8 "${aot_stderr}")"
+  fi
+  if [[ "${aot_dry_run_exit}" -eq 0 ]]; then
+    stage4a=1
+  fi
+  rm -f "${aot_stderr}"
+else
+  aot_dry_run_skipped=1
+fi
+
+# Stage 4b: ExamplesCompileTest @group miniwebapp unskipped (#454).
 compile_test="${ROOT}/test/unit/ExamplesCompileTest.php"
 if [[ -f "${compile_test}" ]]; then
   if "${ROOT}/script/php-local.sh" -r '
@@ -187,8 +230,22 @@ fi
 echo "       ${REPO_URL}/issues/664"
 echo "       ${REPO_URL}/issues/633"
 
-echo "$(mark "${stage4}") Stage 4 AOT — ExamplesCompileTest @group miniwebapp unskipped (#454)"
+echo "$(mark "${stage4a}") Stage 4a AOT dry-run — phpc build --project --dry-run (#624, #675)"
+echo "       ${REPO_URL}/issues/624"
+if [[ "${aot_dry_run_skipped}" -eq 1 ]]; then
+  echo "       LLVM 9 not available (script/install-llvm9.sh or .llvm/)"
+elif [[ "${aot_dry_run_exit}" -eq 0 ]]; then
+  echo "       AOT dry-run probe: green"
+elif [[ "${aot_dry_run_exit}" -ge 0 ]]; then
+  echo "       AOT dry-run probe: exit ${aot_dry_run_exit} (see #58/#568)"
+  if [[ -n "${AOT_DRY_RUN_STDERR}" ]]; then
+    echo "${AOT_DRY_RUN_STDERR}" | sed 's/^/         /'
+  fi
+fi
+
+echo "$(mark "${stage4}") Stage 4b AOT link — ExamplesCompileTest @group miniwebapp unskipped (#454, #568)"
 echo "       ${REPO_URL}/issues/454"
+echo "       ${REPO_URL}/issues/568"
 
 echo
 echo "Commands:"
@@ -201,6 +258,8 @@ echo "  ./script/ci-local.sh --filter ServeTest   # MINIWEBAPP_SERVE_GATE=1 by d
 echo "  MINIWEBAPP_SERVE_GATE=0 ./script/ci-local.sh   # skip miniwebapp ServeTest"
 echo "  ./script/ci-local.sh   # MINIWEBAPP_WEB_SMOKE_GATE=1 by default (#664)"
 echo "  MINIWEBAPP_WEB_SMOKE_GATE=0 ./script/ci-local.sh   # skip 003 shell curls"
+echo "  ./phpc build --project examples/003-MiniWebApp --dry-run   # stage 4a (#624)"
+echo "  ./script/ci-local.sh --filter test003MiniWebAppProjectAotLint"
 echo
 echo "Tracking: ${REPO_URL}/issues/472 (gate ladder spec)"
 
@@ -217,8 +276,12 @@ elif [[ "${web_smoke_gate}" != "1" ]]; then
   echo "Next: unset MINIWEBAPP_WEB_SMOKE_GATE=0 or export =1 for ci-local shell PATH_INFO curls (#664)"
 elif [[ "${stage3}" -eq 0 ]]; then
   echo "Next: extend script/examples-web-smoke.sh for 003 (#461)"
+elif [[ "${stage4a}" -eq 0 && "${aot_dry_run_skipped}" -eq 0 && "${aot_dry_run_exit}" -ne 0 ]]; then
+  echo "Next: fix MiniWebApp AOT dry-run blockers (#58) — stage 4a (#624)"
+elif [[ "${stage4a}" -eq 0 && "${aot_dry_run_skipped}" -eq 1 ]]; then
+  echo "Next: install LLVM 9 for stage 4a AOT dry-run (script/install-llvm9.sh)"
 elif [[ "${stage4}" -eq 0 ]]; then
-  echo "Next: unskip test003MiniWebAppEventuallyRuns in ExamplesCompileTest (#454)"
+  echo "Next: unskip test003MiniWebAppEventuallyRuns in ExamplesCompileTest (#454, #568)"
 else
   echo "All documented gates are enabled in this tree."
 fi
