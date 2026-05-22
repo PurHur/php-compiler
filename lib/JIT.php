@@ -1168,6 +1168,8 @@ class JIT {
                 $result->value
             );
             $result->addref();
+            $this->copyValueBoxJitFlags($result, $value);
+
             return;
         } elseif ($result->type === Variable::TYPE_VALUE) {
             // wrap
@@ -1276,6 +1278,7 @@ class JIT {
                         $valueRef,
                         $this->context->helper->loadValue($value)
                     );
+                    $this->copyValueBoxJitFlags($result, $value);
 
                     return;
                 default:
@@ -1311,6 +1314,7 @@ class JIT {
                 $result->value,
                 $this->valueBoxPointer($value)
             );
+            $this->copyValueBoxJitFlags($result, $value);
 
             return;
         } elseif (Variable::TYPE_HASHTABLE === $result->type && Variable::TYPE_VALUE === $value->type) {
@@ -1383,10 +1387,20 @@ class JIT {
             }
             $this->context->builder->store($toStore, $dest->value);
             $dest->addref();
+            $this->copyValueBoxJitFlags($dest, $source);
 
             return;
         }
         $this->assignOperand($result, $source);
+    }
+
+    private function copyValueBoxJitFlags(Variable $dest, Variable $src): void
+    {
+        if (Variable::TYPE_VALUE !== $dest->type || Variable::TYPE_VALUE !== $src->type) {
+            return;
+        }
+        $dest->valueBoxHashtable = $src->valueBoxHashtable;
+        $dest->isNullConstant = $src->isNullConstant;
     }
 
     private function jitTypeFromLlvmValue(PHPLLVM\Value $value): int
