@@ -31,9 +31,7 @@ class Compiler {
     public function compile(Script $script): ?Block {
         $this->seen = new SplObjectStorage;
 
-        $main = $this->compileCfgBlock($script->main->cfg, $script->main->params);
-        $main->func = $script->main;
-        $main->strictTypes = isset($script->main->strictTypes) ? (bool) $script->main->strictTypes : false;
+        $main = $this->compileCfgBlock($script->main->cfg, $script->main->params, $script->main);
 
         $this->seen = null;
         return $main;
@@ -42,16 +40,18 @@ class Compiler {
     public function compileFunc(string $name, CfgFunc $func): Func {
         $this->seen = new SplObjectStorage;
 
-        $funcBlock = $this->compileCfgBlock($func->cfg, $func->params);
-        $funcBlock->func = $func;
-        $funcBlock->strictTypes = isset($func->strictTypes) ? (bool) $func->strictTypes : false;
+        $funcBlock = $this->compileCfgBlock($func->cfg, $func->params, $func);
         $this->seen = null;
         return new Func\PHP($name, $funcBlock);
     }
 
-    protected function compileCfgBlock(CfgBlock $block, array $params = []): Block {
+    protected function compileCfgBlock(CfgBlock $block, array $params = [], ?CfgFunc $func = null): Block {
         if (!$this->seen->contains($block)) {
             $this->seen[$block] = $new = new Block($block);
+            if (null !== $func) {
+                $new->func = $func;
+                $new->strictTypes = isset($func->strictTypes) ? (bool) $func->strictTypes : false;
+            }
             $paramIdx = 0;
             foreach ($params as $param) {
                 $new->addOpCode($this->compileParam($param, $new, $paramIdx++));                
@@ -236,9 +236,7 @@ class Compiler {
                         $visIdx
                     );
                     if (null !== $child->func->cfg) {
-                        $methodBlock = $this->compileCfgBlock($child->func->cfg, $child->func->params);
-                        $methodBlock->func = $child->func;
-                        $methodBlock->strictTypes = isset($child->func->strictTypes) ? (bool) $child->func->strictTypes : false;
+                        $methodBlock = $this->compileCfgBlock($child->func->cfg, $child->func->params, $child->func);
                         $declare->block1 = $methodBlock;
                     }
                     $result->addOpCode($declare);
@@ -302,9 +300,7 @@ class Compiler {
     }
 
     protected function compileFunction(Op\Stmt\Function_ $function, Block $block): OpCode {
-        $funcBlock = $this->compileCfgBlock($function->func->cfg, $function->func->params);
-        $funcBlock->func = $function->func;
-        $funcBlock->strictTypes = isset($function->func->strictTypes) ? (bool) $function->func->strictTypes : false;
+        $funcBlock = $this->compileCfgBlock($function->func->cfg, $function->func->params, $function->func);
         $operand = new Operand\Literal($function->func->name);
         $operand->type = Type::string();
         $return = new OpCode(
