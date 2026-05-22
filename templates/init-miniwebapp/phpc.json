@@ -1,0 +1,7 @@
+{
+    "entry": "public/index.php",
+    "binary": ".phpc/bin/app",
+    "public": "public",
+    "assets": "assets",
+    "includes": ["src/Router.php", "config.php"]
+}

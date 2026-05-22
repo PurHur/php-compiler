@@ -21,6 +21,7 @@ composer install
 ./phpc test --fast             # VM/compliance only (no LLVM compile)
 ./phpc test                    # full suite (VM, JIT, AOT lint + link)
 mkdir my-app && ./phpc init my-app   # phpc.json + public/index.php scaffold
+./phpc init --profile miniwebapp my-app   # Router + templates (see examples/003-MiniWebApp/)
 ./phpc run -r 'echo 1;'        # VM mode (or: php bin/vm.php -r 'echo 1;')
 ./phpc run -q 'name=Dev' examples/001-SimpleWeb/example.php   # web example without TCP
 make web-smoke                 # lint shipped examples + 003-MiniWebApp tree, VM smoke 001-SimpleWeb

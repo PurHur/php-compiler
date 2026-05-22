@@ -1651,7 +1651,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/Cli/PhpcInit.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/Compiler.php`
 
