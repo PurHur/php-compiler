@@ -20,4 +20,16 @@ final class RebuildExamplesTest extends TestCase
         $this->assertStringContainsString('$profile[\'aot_compile_time_query\']', $script);
         $this->assertStringContainsString('$profile[\'aot_run_env\']', $script);
     }
+
+    public function testRebuildExamplesDocumentsMiniWebAppBenchmarkGate(): void
+    {
+        $script = file_get_contents(dirname(__DIR__, 2).'/script/rebuild-examples.php');
+        $this->assertNotFalse($script);
+        $this->assertStringContainsString('shouldBenchMiniWebApp', $script);
+        $this->assertStringContainsString('BENCH_MINIWEBAPP', $script);
+        $this->assertStringContainsString('MINIWEBAPP_LINT_GATE', $script);
+        $this->assertStringContainsString("'PATH_INFO' => '/home'", $script);
+        $this->assertStringContainsString("'skip_aot' => true", $script);
+        $this->assertStringContainsString('003-MiniWebApp/public/index.php', $script);
+    }
 }
