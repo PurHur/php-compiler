@@ -21,6 +21,8 @@ final class PhpcCliTest extends TestCase
         $this->assertStringContainsString('phpc build', $result['stdout']);
         $this->assertStringContainsString('phpc build --project', $result['stdout']);
         $this->assertStringContainsString('--dry-run', $result['stdout']);
+        $this->assertStringContainsString('--verbose', $result['stdout']);
+        $this->assertStringContainsString('PHPC_BUILD_VERBOSE', $result['stdout']);
         $this->assertStringContainsString('phpc deploy', $result['stdout']);
         $this->assertStringContainsString('phpc cgi', $result['stdout']);
         $this->assertStringContainsString('--from-build', $result['stdout']);
