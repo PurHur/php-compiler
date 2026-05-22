@@ -62,6 +62,11 @@ class Native implements Call {
                 switch ($arg->type) {
                     case Variable::TYPE_OBJECT:
                         return $value;
+                    case Variable::TYPE_VALUE:
+                        return $context->builder->call(
+                            $context->lookupFunction('__value__readObject'),
+                            $value
+                        );
                 }
                 break;
             case '__string__*':
@@ -69,8 +74,8 @@ class Native implements Call {
                     case Variable::TYPE_STRING:
                         return $value;
                     case Variable::TYPE_VALUE:
-                        $str = $this->context->builder->call(
-                        $this->context->lookupFunction('__value__readString') , 
+                        $str = $context->builder->call(
+                        $context->lookupFunction('__value__readString') , 
                         $value
                         
                     );
@@ -91,6 +96,36 @@ class Native implements Call {
                         );
 
                         return $context->builder->load($slot);
+                    case Variable::TYPE_NATIVE_BOOL:
+                        $slot = \PHPCompiler\JIT\JitValueBox::alloc($context);
+                        $long = $context->builder->zExt(
+                            $value,
+                            $context->getTypeFromString('int64')
+                        );
+                        $context->builder->call(
+                            $context->lookupFunction('__value__writeLong'),
+                            \PHPCompiler\JIT\JitValueBox::pointer($context, $slot),
+                            $long
+                        );
+
+                        return $context->builder->load($slot);
+                    case Variable::TYPE_NATIVE_LONG:
+                        $slot = \PHPCompiler\JIT\JitValueBox::alloc($context);
+                        $context->builder->call(
+                            $context->lookupFunction('__value__writeLong'),
+                            \PHPCompiler\JIT\JitValueBox::pointer($context, $slot),
+                            $value
+                        );
+
+                        return $context->builder->load($slot);
+                    case Variable::TYPE_NULL:
+                        $slot = \PHPCompiler\JIT\JitValueBox::alloc($context);
+                        $context->builder->call(
+                            $context->lookupFunction('__value__writeNull'),
+                            \PHPCompiler\JIT\JitValueBox::pointer($context, $slot)
+                        );
+
+                        return $context->builder->load($slot);
                 }
                 break;
             case 'int64':
@@ -98,8 +133,8 @@ class Native implements Call {
                     case Variable::TYPE_NATIVE_LONG:
                         return $value;
                     case Variable::TYPE_VALUE:
-                        $int = $this->context->builder->call(
-                        $this->context->lookupFunction('__value__readLong') , 
+                        $int = $context->builder->call(
+                        $context->lookupFunction('__value__readLong') , 
                         $value
                         
                     );
@@ -112,7 +147,7 @@ class Native implements Call {
                     case Variable::TYPE_NATIVE_DOUBLE:
                         return $value;
                     case Variable::TYPE_NATIVE_LONG:
-                        $__type = $this->context->context->doubleType();
+                        $__type = $context->context->doubleType();
                         
                         
                     
@@ -128,19 +163,19 @@ class Native implements Call {
                             switch ($__other_type->getKind()) {
                                 case \PHPLLVM\Type::KIND_INTEGER:
                                     if ($__other_type->getWidth() >= $__type->getWidth()) {
-                                        $double = $this->context->builder->truncOrBitCast($__value, $__type);
+                                        $double = $context->builder->truncOrBitCast($__value, $__type);
                                     } else {
-                                        $double = $this->context->builder->zExtOrBitCast($__value, $__type);
+                                        $double = $context->builder->zExtOrBitCast($__value, $__type);
                                     }
                                     break;
                                 case \PHPLLVM\Type::KIND_DOUBLE:
                                     
-                                    $double = $this->context->builder->fpToSi($__value, $__type);
+                                    $double = $context->builder->fpToSi($__value, $__type);
                                     
                                     break;
                                 case \PHPLLVM\Type::KIND_ARRAY:
                                 case \PHPLLVM\Type::KIND_POINTER:
-                                    $double = $this->context->builder->ptrToInt($__value, $__type);
+                                    $double = $context->builder->ptrToInt($__value, $__type);
                                     break;
                                 default:
                                     throw new \LogicException("Unknown how to handle type pair (int, " . $__other_type->toString() . ")");
@@ -155,11 +190,11 @@ class Native implements Call {
                             switch ($__other_type->getKind()) {
                                 case \PHPLLVM\Type::KIND_INTEGER:
                                     
-                                    $double = $this->context->builder->siToFp($__value, $__type);
+                                    $double = $context->builder->siToFp($__value, $__type);
                                     
                                     break;
                                 case \PHPLLVM\Type::KIND_DOUBLE:
-                                    $double = $this->context->builder->fpCast($__value, $__type);
+                                    $double = $context->builder->fpCast($__value, $__type);
                                     break;
                                 default:
                                     throw new \LogicException("Unknown how to handle type pair (double, " . $__other_type->toString() . ")");
@@ -175,14 +210,14 @@ class Native implements Call {
                             $__other_type = $__value->typeOf();
                             switch ($__other_type->getKind()) {
                                 case \PHPLLVM\Type::KIND_INTEGER:
-                                    $double = $this->context->builder->intToPtr($__value, $__type);
+                                    $double = $context->builder->intToPtr($__value, $__type);
                                     break;
                                 case \PHPLLVM\Type::KIND_ARRAY:
-                                    // $__tmp = $this->context->builder->($__value, $this->context->context->int64Type());
-                                    // $(result) = $this->context->builder->intToPtr($__tmp, $__type);
+                                    // $__tmp = $context->builder->($__value, $context->context->int64Type());
+                                    // $(result) = $context->builder->intToPtr($__tmp, $__type);
                                     // break;
                                 case \PHPLLVM\Type::KIND_POINTER:
-                                    $double = $this->context->builder->pointerCast($__value, $__type);
+                                    $double = $context->builder->pointerCast($__value, $__type);
                                     break;
                                 default:
                                     throw new \LogicException("Unknown how to handle type pair (double, " . $__other_type->toString() . ")");
@@ -194,8 +229,8 @@ class Native implements Call {
     
                         return $double;
                     case Variable::TYPE_VALUE:
-                        $double = $this->context->builder->call(
-                        $this->context->lookupFunction('__value__readDouble') , 
+                        $double = $context->builder->call(
+                        $context->lookupFunction('__value__readDouble') , 
                         $value
                         
                     );

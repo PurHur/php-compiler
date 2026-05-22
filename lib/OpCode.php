@@ -110,12 +110,6 @@ class OpCode {
     }
 
     public function getType(): string {
-        $r = new \ReflectionClass(__CLASS__);
-        foreach ($r->getConstants() as $name => $value) {
-            if ($value === $this->type) {
-                return $name;
-            }
-        }
-        return 'unknown opcode';
+        return 'TYPE_' . $this->type;
     }
 }

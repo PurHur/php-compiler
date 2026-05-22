@@ -55,7 +55,12 @@ class Analyzer
                 || $usage instanceof Op\Expr\NsFuncCall
                 || $usage instanceof Op\Expr\ConcatList
                 || $usage instanceof Op\Expr\Assertion
-                || $usage instanceof Op\Terminal\Return_) {
+                || $usage instanceof Op\Terminal\Return_
+                || $usage instanceof Op\Iterator\Reset
+                || $usage instanceof Op\Iterator\Valid
+                || $usage instanceof Op\Iterator\Key
+                || $usage instanceof Op\Iterator\Value
+                || $usage instanceof Op\Iterator\Next) {
                 continue;
             } else {
                 throw new \LogicException('Not implemented escape operand '.get_class($usage));
@@ -103,7 +108,12 @@ class Analyzer
                 }
             } elseif ($usage instanceof Op\Phi
                 || $usage instanceof Op\Expr\ConcatList
-                || $usage instanceof Op\Expr\Assertion) {
+                || $usage instanceof Op\Expr\Assertion
+                || $usage instanceof Op\Iterator\Reset
+                || $usage instanceof Op\Iterator\Valid
+                || $usage instanceof Op\Iterator\Key
+                || $usage instanceof Op\Iterator\Value
+                || $usage instanceof Op\Iterator\Next) {
                 // not a dynamic packed-array append
             } else {
                 throw new \LogicException('Not implemented dynamic append operand '.get_class($usage));
@@ -149,7 +159,11 @@ class Analyzer
                     return null;
                 }
                 $size = max($size, $newSize);
-            } elseif ($op instanceof Op\Expr\FuncCall || $op instanceof Op\Expr\NsFuncCall) {
+            } elseif ($op instanceof Op\Expr\FuncCall
+                || $op instanceof Op\Expr\NsFuncCall
+                || $op instanceof Op\Expr\MethodCall
+                || $op instanceof Op\Expr\PropertyFetch
+                || $op instanceof Op\Expr\Param) {
                 return null;
             } else {
                 throw new \LogicException('Unknown array write op: '.get_class($op));

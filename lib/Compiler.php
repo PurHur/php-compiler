@@ -297,7 +297,9 @@ class Compiler {
                 ));
             }
         } elseif ($op instanceof Op\Expr) {
-            $block->addOpCode(...$this->compileExpr($op, $block));
+            foreach ($this->compileExpr($op, $block) as $compiledOp) {
+                $block->addOpCode($compiledOp);
+            }
         } elseif ($op instanceof Op\Stmt) {
             $this->compileStmt($op, $block);
         } elseif ($op instanceof Op\Terminal) {

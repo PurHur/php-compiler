@@ -17,4 +17,4 @@ require_once __DIR__.'/../../../lib/Web/ConstStringFolder.php';
 require_once __DIR__.'/../../../lib/Web/IncludePathResolver.php';
 require_once __DIR__.'/../../../lib/Compiler.php';
 
-echo "compiler_minimal bundle OK\n";
+echo "selfhost\n";

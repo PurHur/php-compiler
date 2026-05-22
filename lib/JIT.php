@@ -99,7 +99,9 @@ class JIT {
                         $callbackType = 'bool';
                         break;
                     default:
-                        throw new \LogicException("Non-void return types not supported yet");
+                        // array, object, and inferred PHPTypes names compile as boxed values
+                        $callbackType = '__value__';
+                        break;
                 }
             } else {
                 $callbackType = '__value__';
@@ -788,6 +790,20 @@ class JIT {
                     }
                     $this->context->scope->args = [];
                     break;
+                case OpCode::TYPE_STATICCALL_INIT:
+                    $classOp = $block->getOperand($op->arg1);
+                    $nameOp = $block->getOperand($op->arg2);
+                    assert($nameOp instanceof Operand\Literal);
+                    if (!$classOp instanceof Operand\Literal) {
+                        throw new \LogicException('Static call class must be a literal');
+                    }
+                    $proxyName = strtolower($classOp->value).'::'.strtolower($nameOp->value);
+                    if (!isset($this->context->functionProxies[$proxyName])) {
+                        throw new \RuntimeException("Call to undefined static method $proxyName");
+                    }
+                    $this->context->scope->toCall = $this->context->functionProxies[$proxyName];
+                    $this->context->scope->args = [];
+                    break;
                 case OpCode::TYPE_ARG_SEND:
                     $this->context->scope->args[] = $this->context->getVariableFromOp($block->getOperand($op->arg1));
                     break;
@@ -885,6 +901,7 @@ class JIT {
                     break;
                 case OpCode::TYPE_CONST_FETCH:
                 case OpCode::TYPE_CLASS_CONST_FETCH:
+                case OpCode::TYPE_INIT_ARRAY:
                     // Default property values are initialized in __object__ allocation.
                     break;
                 case OpCode::TYPE_DECLARE_METHOD:
@@ -1149,6 +1166,7 @@ class JIT {
             case '__hashtable__*':
                 return Variable::TYPE_HASHTABLE;
             case '__value__*':
+            case '__value__':
                 return Variable::TYPE_VALUE;
             default:
                 throw new \LogicException(
@@ -1206,8 +1224,15 @@ class JIT {
                 $lit = new Operand\Literal($vm->toBool());
                 $lit->type = Type::bool();
                 return Variable::fromLiteral($this->context, $lit);
+            case VM\Variable::TYPE_NULL:
+                return new Variable(
+                    $this->context,
+                    Variable::TYPE_NULL,
+                    Variable::KIND_VALUE,
+                    $this->context->getTypeFromString('__value__*')->constNull()
+                );
             default:
-                throw new \LogicException('Unsupported default parameter type for JIT');
+                throw new \LogicException('Unsupported default parameter type for JIT (vm type ' . $vm->type . ')');
         }
     }
 

@@ -11,16 +11,35 @@ use PHPLLVM\Builder;
  */
 final class IteratorHelper
 {
-    private static function requireHashtable(Variable $array): void
+    private static function asHashtable(Context $context, Variable $array): Variable
     {
-        if (Variable::TYPE_HASHTABLE !== $array->type) {
-            throw new \LogicException('foreach requires an array');
+        if (Variable::TYPE_HASHTABLE === $array->type) {
+            return $array;
         }
+        if (Variable::TYPE_VALUE === $array->type) {
+            $valPtr = Variable::KIND_VARIABLE === $array->kind
+                ? JitValueBox::pointer($context, $array->value)
+                : $array->value;
+            $ht = $context->builder->call(
+                $context->lookupFunction('__value__readHashtable'),
+                $valPtr
+            );
+
+            return new Variable(
+                $context,
+                Variable::TYPE_HASHTABLE,
+                Variable::KIND_VALUE,
+                $ht
+            );
+        }
+        throw new \LogicException(
+            'foreach requires an array, got '.Variable::getStringType($array->type)
+        );
     }
 
     private static function indexSlot(Context $context, Variable $array): \PHPLLVM\Value
     {
-        $key = spl_object_id($array);
+        $key = \spl_object_id($array);
         if (isset($context->foreachIndexSlots[$key])) {
             return $context->foreachIndexSlots[$key];
         }
@@ -43,7 +62,7 @@ final class IteratorHelper
 
     public static function compileReset(Context $context, Variable $array): void
     {
-        self::requireHashtable($array);
+        $array = self::asHashtable($context, $array);
         $sizeT = $context->getTypeFromString('size_t');
         $zero = $sizeT->constInt(0, false);
         $one = $sizeT->constInt(1, false);
@@ -53,7 +72,7 @@ final class IteratorHelper
 
     public static function compileValid(Context $context, Variable $array): \PHPLLVM\Value
     {
-        self::requireHashtable($array);
+        $array = self::asHashtable($context, $array);
         $ht = $context->helper->loadValue($array);
         $map = $context->structFieldMap['__hashtable__'];
         $nodeMap = $context->structFieldMap['__strkey_node__'];
@@ -127,7 +146,7 @@ final class IteratorHelper
 
     public static function compileKey(Context $context, Variable $array): Variable
     {
-        self::requireHashtable($array);
+        $array = self::asHashtable($context, $array);
         $slot = JitValueBox::alloc($context);
         $destPtr = JitValueBox::pointer($context, $slot);
         $ht = $context->helper->loadValue($array);
@@ -165,7 +184,7 @@ final class IteratorHelper
 
     public static function compileValue(Context $context, Variable $array): Variable
     {
-        self::requireHashtable($array);
+        $array = self::asHashtable($context, $array);
         $slot = JitValueBox::alloc($context);
         $destPtr = JitValueBox::pointer($context, $slot);
         $ht = $context->helper->loadValue($array);

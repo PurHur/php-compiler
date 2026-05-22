@@ -224,6 +224,17 @@ final class Variable {
             case self::TYPE_NATIVE_BOOL:
                 $value = $context->constantFromBool($op->value);
                 break;
+            case self::TYPE_NULL:
+            case self::TYPE_VALUE:
+                if (null !== $op->value) {
+                    throw new \LogicException('Only null literals are supported for ' . self::getStringType($type));
+                }
+                return new Variable(
+                    $context,
+                    self::TYPE_NULL,
+                    self::KIND_VALUE,
+                    $context->getTypeFromString('__value__*')->constNull()
+                );
             default:
                 throw new \LogicException("Literal type " . self::getStringType($type) . " not yet supported");
         }

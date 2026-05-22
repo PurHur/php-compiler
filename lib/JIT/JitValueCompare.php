@@ -84,9 +84,8 @@ final class JitValueCompare
         Variable $native
     ): Value {
         $same = self::identicalToNative($context, $boxed, $native);
-        $i1 = $context->getTypeFromString('int1');
 
-        return $context->builder->xor($same, $i1->constInt(1, false));
+        return $context->builder->not($same);
     }
 
     public static function notIdenticalNativeToValue(
@@ -233,8 +232,7 @@ final class JitValueCompare
         Variable $right
     ): Value {
         $same = self::identicalValueToValue($context, $left, $right);
-        $i1 = $context->getTypeFromString('int1');
 
-        return $context->builder->xor($same, $i1->constInt(1, false));
+        return $context->builder->not($same);
     }
 }
