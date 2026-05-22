@@ -149,7 +149,7 @@ ci_run_miniwebapp_web_smoke() {
     echo "examples-web-smoke (003): skipped (cannot bind loopback TCP)"
     return 0
   fi
-  echo "examples-web-smoke (003): MiniWebApp PATH_INFO curls (MINIWEBAPP_WEB_SMOKE_GATE=1, #633)..."
+  echo "examples-web-smoke (003): MiniWebApp PATH_INFO curls (MINIWEBAPP_WEB_SMOKE_GATE=1 default, #633, #664)..."
   "$_CI_SCRIPT_DIR/examples-web-smoke.sh" --miniwebapp-only
 }
 

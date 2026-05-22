@@ -48,10 +48,19 @@ final class CiScriptsTest extends TestCase
         $local = dirname(__DIR__, 2).'/script/ci-local.sh';
         $body = (string) file_get_contents($local);
         $this->assertStringContainsString('MINIWEBAPP_WEB_SMOKE_GATE', $body);
+        $this->assertStringContainsString('MINIWEBAPP_WEB_SMOKE_GATE:-1', $body);
         $this->assertStringContainsString('ci_run_miniwebapp_web_smoke', $body);
 
         $smoke = (string) file_get_contents(dirname(__DIR__, 2).'/script/examples-web-smoke.sh');
         $this->assertStringContainsString('--miniwebapp-only', $smoke);
+    }
+
+    public function testCiFastDoesNotRunMiniWebAppWebSmokeGate(): void
+    {
+        $fast = dirname(__DIR__, 2).'/script/ci-fast.sh';
+        $body = (string) file_get_contents($fast);
+        $this->assertStringNotContainsString('ci_run_miniwebapp_web_smoke', $body);
+        $this->assertStringNotContainsString('examples-web-smoke.sh', $body);
     }
 
     public function testCiFastHonorsMiniWebAppServeGate(): void
@@ -68,6 +77,12 @@ final class CiScriptsTest extends TestCase
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
         $this->assertStringContainsString('MINIWEBAPP_SERVE_GATE="${MINIWEBAPP_SERVE_GATE:-1}"', $defaults);
+    }
+
+    public function testCiDefaultsEnvDefinesMiniWebAppWebSmokeGateOn(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString('MINIWEBAPP_WEB_SMOKE_GATE="${MINIWEBAPP_WEB_SMOKE_GATE:-1}"', $defaults);
     }
 
     public function testExamplesWebSmokePrebuildScriptExists(): void
@@ -174,7 +189,9 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('issues/641', $body);
         $this->assertStringContainsString('MINIWEBAPP_SERVE_GATE:-1', $body);
         $this->assertStringContainsString('MINIWEBAPP_WEB_SMOKE_GATE', $body);
+        $this->assertStringContainsString('MINIWEBAPP_WEB_SMOKE_GATE:-1', $body);
         $this->assertStringContainsString('issues/633', $body);
+        $this->assertStringContainsString('issues/664', $body);
     }
 
     public function testWebSmokeDefaultsMiniWebAppLintGateOn(): void
