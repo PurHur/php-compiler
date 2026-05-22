@@ -46,6 +46,42 @@ final class ExamplesAotSmokeScriptTest extends TestCase
         $this->assertStringContainsString('003-MiniWebApp', $body);
         $this->assertStringContainsString('#568', $body);
         $this->assertStringContainsString('.phpc/smoke', $body);
+        $this->assertStringContainsString('EXAMPLES_AOT_SMOKE_ONLY=003', $body);
+        $this->assertStringContainsString('smoke_003_miniwebapp', $body);
+    }
+
+    public function testExamplesAotSmokeOnly003SliceSkipsWhenBlocked(): void
+    {
+        if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
+            $this->markTestSkipped(
+                'LLVM 9 toolchain not available. Run script/install-llvm9.sh from the repository root.'
+            );
+        }
+
+        $repoRoot = dirname(__DIR__, 2);
+        $script = $repoRoot.'/script/examples-aot-smoke.sh';
+        $env = $this->baseEnv();
+        $env['EXAMPLES_AOT_SMOKE_ONLY'] = '003';
+
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open(['bash', $script], $descriptorSpec, $pipes, $repoRoot, $env);
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+
+        $combined = trim(($stdout !== false ? $stdout : '')."\n".($stderr !== false ? $stderr : ''));
+        $this->assertSame(0, $exit, $combined);
+        $this->assertStringContainsString('003 slice', $combined);
+        $this->assertStringContainsString('003-MiniWebApp: skip', $combined);
+        $this->assertStringNotContainsString('003-MiniWebApp: ok', $combined);
     }
 
     public function testExamplesAotSmokeScriptPassesWhenLlvmReady(): void
