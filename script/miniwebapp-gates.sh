@@ -272,6 +272,10 @@ fi
 echo "$(mark "${stage4c}") Stage 4c AOT smoke — examples-aot-smoke 003 slice (#683, #485)"
 echo "       ${REPO_URL}/issues/683"
 echo "       ${REPO_URL}/issues/485"
+echo "$(mark 0) Stage 4d deploy-smoke — make deploy-smoke / PHPC_DEPLOY_ROOT (#718; 003 blocked #568, PHPUnit #612)"
+echo "       ${REPO_URL}/issues/718"
+echo "       ${REPO_URL}/issues/612"
+echo "       make deploy-smoke   # 001/002 when LLVM ready; not wired into ci-local until 003 green"
 if [[ "${aot_dry_run_skipped}" -eq 1 && -z "${LLVM_DIR}" ]]; then
   echo "       LLVM 9 not available (script/install-llvm9.sh or .llvm/)"
 elif [[ "${aot_smoke_003_skipped}" -eq 1 ]]; then
@@ -305,6 +309,7 @@ echo "  ./script/ci-local.sh   # MINIWEBAPP_WEB_SMOKE_GATE=1 by default (#664)"
 echo "  MINIWEBAPP_WEB_SMOKE_GATE=0 ./script/ci-local.sh   # skip 003 shell curls"
 echo "  ./phpc build --project examples/003-MiniWebApp --dry-run   # stage 4a (#624)"
 echo "  EXAMPLES_AOT_SMOKE_ONLY=003 ./script/examples-aot-smoke.sh   # stage 4c (#683)"
+echo "  make deploy-smoke             # stage 4d shell gate 001/002 (#718)"
 echo "  ./script/ci-local.sh --filter test003MiniWebAppProjectAotLint"
 echo
 echo "Tracking: ${REPO_URL}/issues/472 (gate ladder spec)"
