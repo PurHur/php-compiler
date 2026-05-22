@@ -29,7 +29,9 @@ final class SourceBundler
             if (false === $raw) {
                 throw new \RuntimeException('cannot read include: '.$path);
             }
-            $body = self::rewriteDirConstant(self::stripOpenTag($raw), $path, $projectRoot);
+            $body = self::rewriteDeployPathIncludes(
+                self::rewriteDirConstant(self::stripOpenTag($raw), $path, $projectRoot)
+            );
             $base = basename($path);
             if (isset($requireTargets[$base])) {
                 $body = self::rewriteReturnOnlyInclude($body, $requireTargets[$base]);
@@ -40,7 +42,7 @@ final class SourceBundler
         if ([] !== $includePaths) {
             $entryRaw = self::stripResolvedRequires($entryRaw, $includePaths);
         }
-        $parts[] = self::stripOpenTag($entryRaw);
+        $parts[] = self::rewriteDeployPathIncludes(self::stripOpenTag($entryRaw));
 
         return ['<?php'."\n".implode("\n", $parts), $entryPath];
     }
@@ -151,5 +153,27 @@ final class SourceBundler
         }
 
         return implode("\n", $kept);
+    }
+
+    /**
+     * Fold phpc_deploy_path('rel', fallbackDir) . '/suffix' to a literal path for AOT includes.
+     */
+    private static function rewriteDeployPathIncludes(string $code): string
+    {
+        return (string) preg_replace_callback(
+            '/\b(include|require)(?:_once)?\s+phpc_deploy_path\(\s*(\'[^\']*\'|"[^"]*")\s*,\s*(\'[^\']*\'|"[^"]*")\s*\)\s*\.\s*(\'[^\']*\'|"[^"]*")\s*;/i',
+            static function (array $m): string {
+                $rel = stripcslashes(substr($m[2], 1, -1));
+                $fallback = stripcslashes(substr($m[3], 1, -1));
+                $suffix = stripcslashes(substr($m[4], 1, -1));
+                $resolved = DeployRoot::resolvePathWithSuffix($rel, $fallback, $suffix);
+                if (null === $resolved) {
+                    return $m[0];
+                }
+
+                return $m[1].' '.var_export($resolved, true).';';
+            },
+            $code
+        );
     }
 }

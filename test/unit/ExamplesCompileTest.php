@@ -23,7 +23,8 @@ final class ExamplesCompileTest extends TestCase
     private static ?bool $llvmReady = null;
 
     /**
-     * MiniWebApp AOT execute gate — blocked on JIT class opcodes (#58); bundle/lint green (#452, #485).
+     * Shipped 003-MiniWebApp: AOT link blocked on LLVM verify for $this->config['key'] in methods (#58).
+     * Include bundling and deploy-path literal folding are covered by SourceBundlerTest + PHPT.
      *
      * @group miniwebapp
      * @group llvm
@@ -42,7 +43,8 @@ final class ExamplesCompileTest extends TestCase
             );
         }
         $this->markTestSkipped(
-            'MiniWebApp AOT link blocked on JIT class method dispatch (#58); PATH_INFO strict-compare PHPT covers index.php subset'
+            'MiniWebApp AOT link blocked on LLVM verify for array property reads in class methods (#58);'
+            .' deploy-path bundle folding is tested in SourceBundlerTest'
         );
     }
 
@@ -194,6 +196,28 @@ final class ExamplesCompileTest extends TestCase
         }
         $name = basename(dirname($examplePath));
         $this->runCli('compile.php', array_merge(self::vmExtraArgs($name), ['-l', $examplePath]), true);
+    }
+
+    /**
+     * 003-MiniWebApp entry: AOT lint via direct-include bundle (issue #54, #585).
+     *
+     * @group miniwebapp
+     * @group llvm
+     * @group aot
+     * @group aot-lint
+     */
+    public function testAotLintMiniWebAppPublicIndex(): void
+    {
+        if (!self::isLlvmReady()) {
+            $this->markTestSkipped(
+                'LLVM 9 toolchain not available. Run script/install-llvm9.sh from the repository root.'
+            );
+        }
+        $index = realpath(dirname(__DIR__, 2).'/examples/003-MiniWebApp/public/index.php');
+        if (false === $index) {
+            $this->markTestSkipped('examples/003-MiniWebApp/public/index.php missing (#246)');
+        }
+        $this->runCli('compile.php', ['-l', $index], true);
     }
 
     /**

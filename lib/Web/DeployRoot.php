@@ -70,4 +70,25 @@ final class DeployRoot
 
         return $root.'/'.$relFromProjectRoot;
     }
+
+    /**
+     * Resolve phpc_deploy_path() . '/suffix' at compile/bundle time (issue #54, #585).
+     */
+    public static function resolvePathWithSuffix(
+        string $relFromProjectRoot,
+        string $fallbackAbsoluteDir,
+        string $suffix
+    ): ?string {
+        $base = self::resolvePath($relFromProjectRoot, $fallbackAbsoluteDir);
+        $candidate = $base.$suffix;
+        $resolved = realpath($candidate);
+        if (false !== $resolved && is_file($resolved)) {
+            return $resolved;
+        }
+        if (is_file($candidate)) {
+            return $candidate;
+        }
+
+        return null;
+    }
 }

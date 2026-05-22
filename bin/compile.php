@@ -24,7 +24,7 @@ function run(string $filename, string $code, array $options): void
     /** @var list<string> $includes */
     if ([] === $includes && '-' !== $filename && is_file($filename)) {
         $runtime = new Runtime(Runtime::MODE_AOT);
-        $includes = LiteralIncludeDiscovery::discoverAbsolutePaths($runtime, $filename);
+        $includes = LiteralIncludeDiscovery::discoverDirectAbsolutePaths($runtime, $filename);
     }
     if ([] !== $includes) {
         $projectRoot = DeployRoot::findProjectRootForPath($filename);

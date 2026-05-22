@@ -68,4 +68,14 @@ final class ConstStringFolderTest extends TestCase
             'expected Router.php path in: '.implode(', ', $paths)
         );
     }
+
+    public function testFoldDeployPathConcatResolvesLayoutInclude(): void
+    {
+        $rel = 'src';
+        $fallback = realpath(__DIR__.'/../../../examples/003-MiniWebApp/src');
+        $this->assertNotFalse($fallback);
+        $resolved = DeployRoot::resolvePathWithSuffix($rel, $fallback, '/../templates/layout.php');
+        $this->assertNotNull($resolved);
+        $this->assertStringEndsWith('/templates/layout.php', $resolved);
+    }
 }

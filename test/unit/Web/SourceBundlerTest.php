@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
+use PHPCompiler\Web\DeployRoot;
 use PHPCompiler\Web\SourceBundler;
 
 /**
@@ -41,5 +42,19 @@ final class SourceBundlerTest extends TestCase
             @rmdir($dir.'/public');
             @rmdir($dir);
         }
+    }
+
+    public function testBundleMiniWebAppRewritesDeployPathIncludesToLiterals(): void
+    {
+        $entry = realpath(dirname(__DIR__, 3).'/examples/003-MiniWebApp/public/index.php');
+        $this->assertNotFalse($entry);
+        $runtime = new \PHPCompiler\Runtime(\PHPCompiler\Runtime::MODE_AOT);
+        $includes = \PHPCompiler\Web\LiteralIncludeDiscovery::discoverDirectAbsolutePaths($runtime, $entry);
+        $root = DeployRoot::findProjectRootForPath($entry);
+        [$bundled] = SourceBundler::bundleForAot($entry, $includes, $root);
+
+        $this->assertStringNotContainsString('phpc_deploy_path(', $bundled);
+        $this->assertStringContainsString("include '", $bundled);
+        $this->assertStringContainsString('/templates/layout.php', $bundled);
     }
 }
