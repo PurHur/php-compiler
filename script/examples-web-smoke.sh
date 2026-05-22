@@ -20,10 +20,11 @@ PHPC="${ROOT}/phpc"
 
 usage() {
   cat <<'EOF'
-Usage: script/examples-web-smoke.sh [--aot]
+Usage: script/examples-web-smoke.sh [--aot] [--miniwebapp-only]
 
   VM mode (default): phpc serve per example docroot.
   --aot: use phpc serve --aot when <docroot>/.phpc/bin/app exists; skip otherwise.
+  --miniwebapp-only: curl only examples/003-MiniWebApp (MINIWEBAPP_WEB_SMOKE_GATE — #633).
 
 Environment:
   PHP_COMPILER_SKIP_SERVE_TESTS=1  exit 0 without running HTTP checks
@@ -31,9 +32,11 @@ EOF
 }
 
 AOT=0
+MINIWEBAPP_ONLY=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --aot) AOT=1; shift ;;
+    --miniwebapp-only) MINIWEBAPP_ONLY=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "examples-web-smoke: unknown argument: $1" >&2; usage >&2; exit 1 ;;
   esac
@@ -219,19 +222,24 @@ run_docroot_smoke() {
   trap - RETURN
 }
 
-echo "examples-web-smoke: starting ($( [[ "$AOT" -eq 1 ]] && echo --aot || echo VM ))"
+mode_label="VM"
+[[ "$AOT" -eq 1 ]] && mode_label="--aot"
+[[ "$MINIWEBAPP_ONLY" -eq 1 ]] && mode_label="${mode_label}; --miniwebapp-only"
+echo "examples-web-smoke: starting (${mode_label})"
 
-run_docroot_smoke "001-SimpleWeb" "examples/001-SimpleWeb" \
-  "GET|GET example.php?name=Smoke|/example.php?name=Smoke|-|Hello;Smoke" \
-  "POST|POST example.php|/example.php|name=PostDev|Hello;PostDev" \
-  "GET|static style.css|/style.css|-|body {"
+if [[ "${MINIWEBAPP_ONLY}" -eq 0 ]]; then
+  run_docroot_smoke "001-SimpleWeb" "examples/001-SimpleWeb" \
+    "GET|GET example.php?name=Smoke|/example.php?name=Smoke|-|Hello;Smoke" \
+    "POST|POST example.php|/example.php|name=PostDev|Hello;PostDev" \
+    "GET|static style.css|/style.css|-|body {"
 
-run_docroot_smoke "002-StaticWeb" "examples/002-StaticWeb" \
-  "GET|GET example.php|/example.php|-|Hello;World" \
-  "GET|GET / (example.php fallback)|/|-|Hello;World"
+  run_docroot_smoke "002-StaticWeb" "examples/002-StaticWeb" \
+    "GET|GET example.php|/example.php|-|Hello;World" \
+    "GET|GET / (example.php fallback)|/|-|Hello;World"
 
-run_docroot_smoke "004-ApiJson" "examples/004-ApiJson" \
-  'GET|GET example.php|/example.php|-|"ok":true;php-compiler'
+  run_docroot_smoke "004-ApiJson" "examples/004-ApiJson" \
+    'GET|GET example.php|/example.php|-|"ok":true;php-compiler'
+fi
 
 MINIWEBAPP=examples/003-MiniWebApp
 if [[ -d "${ROOT}/${MINIWEBAPP}/public" ]]; then

@@ -20,6 +20,11 @@ if [[ -n "${MINIWEBAPP_SERVE_GATE:-}" && "${MINIWEBAPP_SERVE_GATE}" == "1" && -n
   exit 1
 fi
 
+if [[ -n "${MINIWEBAPP_WEB_SMOKE_GATE:-}" && "${MINIWEBAPP_WEB_SMOKE_GATE}" == "1" && -n "${PHP_COMPILER_SKIP_SERVE_TESTS:-}" ]]; then
+  echo "MINIWEBAPP_WEB_SMOKE_GATE=1 requires serve tests; unset PHP_COMPILER_SKIP_SERVE_TESTS (#633)" >&2
+  exit 1
+fi
+
 if [[ -z "${PHP_COMPILER_SKIP_SERVE_TESTS:-}" ]]; then
   serve_groups=(--group serve)
   if [[ "${MINIWEBAPP_SERVE_GATE:-}" == "1" ]]; then
@@ -31,6 +36,10 @@ if [[ -z "${PHP_COMPILER_SKIP_SERVE_TESTS:-}" ]]; then
   if [[ "${MINIWEBAPP_SERVE_GATE:-}" == "1" ]]; then
     echo "PHPUnit: MiniWebApp ServeTest (MINIWEBAPP_SERVE_GATE=1, #470)..."
     "$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit --filter ServeTest --group miniwebapp --fail-on-skipped "$@"
+  fi
+
+  if [[ "${MINIWEBAPP_WEB_SMOKE_GATE:-}" == "1" ]]; then
+    ci_run_miniwebapp_web_smoke
   fi
 fi
 

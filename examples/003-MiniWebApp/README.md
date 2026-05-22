@@ -52,6 +52,7 @@ Deprecated query dispatch (still supported):
 | Lint | ✅ | `./phpc lint --all .` |
 | VM serve | ✅ | `./phpc serve 127.0.0.1:8080 .` from this directory |
 | Shell smoke | ✅ | `../../script/examples-web-smoke.sh` (after lint green) |
+| Shell smoke (ci-local) | opt-in | `MINIWEBAPP_WEB_SMOKE_GATE=1` in `../../script/ci-local.sh` (#633) |
 | PHPUnit serve | ✅ | `ServeTest` `@group miniwebapp` (#470) |
 | JIT | partial | [#207](https://github.com/PurHur/php-compiler/issues/207) |
 | AOT | ❌ blocked | `../../phpc build --project .` ([#454](https://github.com/PurHur/php-compiler/issues/454)) |
@@ -80,11 +81,14 @@ make miniwebapp-gates
 ../../script/examples-web-smoke.sh
 MINIWEBAPP_VM_CLI_GATE=1 ../../script/ci-fast.sh --filter 'MiniWebApp.*VmCli'
 MINIWEBAPP_SERVE_GATE=1 ../../script/ci-local.sh --filter ServeTest
+MINIWEBAPP_WEB_SMOKE_GATE=1 ../../script/ci-local.sh
 ```
 
 Fast CI runs `MiniWebAppVmCliTest` and `MiniWebAppPathInfoVmCliTest` when `MINIWEBAPP_VM_CLI_GATE=1` (default). Set `MINIWEBAPP_VM_CLI_GATE=0` to skip the VM CLI matrix during iteration.
 
 Full CI runs `ServeTest` `@group miniwebapp` with `--fail-on-skipped` when `MINIWEBAPP_SERVE_GATE=1` (opt-in; default off until promoted in docs).
+
+Full CI runs `script/examples-web-smoke.sh --miniwebapp-only` after serve PHPUnit when `MINIWEBAPP_WEB_SMOKE_GATE=1` (opt-in; default off). Skips when `PHP_COMPILER_SKIP_SERVE_TESTS=1` or loopback bind fails (same as `ServeTest`).
 
 - [#503](https://github.com/PurHur/php-compiler/issues/503) — gate ladder
 - [#597](https://github.com/PurHur/php-compiler/issues/597) — `MINIWEBAPP_VM_CLI_GATE` in `ci-fast.sh`
@@ -94,6 +98,7 @@ Full CI runs `ServeTest` `@group miniwebapp` with `--fail-on-skipped` when `MINI
 - [#461](https://github.com/PurHur/php-compiler/issues/461) — `examples-web-smoke.sh` curls
 - [#470](https://github.com/PurHur/php-compiler/issues/470) — `ServeTest` `@group miniwebapp`
 - [#622](https://github.com/PurHur/php-compiler/issues/622) — `MINIWEBAPP_SERVE_GATE` in `ci-local.sh`
+- [#633](https://github.com/PurHur/php-compiler/issues/633) — `MINIWEBAPP_WEB_SMOKE_GATE` in `ci-local.sh`
 
 ## Related
 

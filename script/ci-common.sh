@@ -139,6 +139,20 @@ ci_guard_jit_compliance() {
   "$PHP_BIN" "${PHP_OPTS[@]}" script/check-jit-compliance-ran.php "$junit_path" "$llvm_dir"
 }
 
+# Shell curl harness for 003-MiniWebApp PATH_INFO routes (issue #633).
+ci_run_miniwebapp_web_smoke() {
+  if [[ -n "${PHP_COMPILER_SKIP_SERVE_TESTS:-}" ]]; then
+    echo "examples-web-smoke (003): skipped (PHP_COMPILER_SKIP_SERVE_TESTS is set)"
+    return 0
+  fi
+  if ! ci_can_bind_loopback; then
+    echo "examples-web-smoke (003): skipped (cannot bind loopback TCP)"
+    return 0
+  fi
+  echo "examples-web-smoke (003): MiniWebApp PATH_INFO curls (MINIWEBAPP_WEB_SMOKE_GATE=1, #633)..."
+  "$_CI_SCRIPT_DIR/examples-web-smoke.sh" --miniwebapp-only
+}
+
 # HTTP curl harness for shipped web examples via phpc serve --aot (issue #444).
 ci_run_examples_web_smoke_aot() {
   if [[ -n "${PHP_COMPILER_SKIP_SERVE_TESTS:-}" ]]; then
