@@ -153,6 +153,7 @@ class Module extends ModuleAbstract
             new readfile(),
             new file_put_contents(),
             new file_exists(),
+            new filesize(),
             new is_file(),
             new is_dir(),
             new fopen(),
