@@ -36,6 +36,7 @@
         "ext/standard/JitEnv.php",
         "ext/standard/JitExplode.php",
         "ext/standard/JitFileGetContents.php",
+        "ext/standard/JitFilePutContents.php",
         "ext/standard/JitGetallheaders.php",
         "ext/standard/JitHash.php",
         "ext/standard/JitHeader.php",
@@ -249,6 +250,7 @@
         "lib/JIT/Builtin/ScriptExit.php",
         "lib/JIT/Builtin/StringDateTime.php",
         "lib/JIT/Builtin/StringFileGetContents.php",
+        "lib/JIT/Builtin/StringFilePutContents.php",
         "lib/JIT/Builtin/StringGetenv.php",
         "lib/JIT/Builtin/StringHtmlspecialchars.php",
         "lib/JIT/Builtin/StringJsonEncode.php",
@@ -357,9 +359,9 @@
         "test/bootstrap-aot/throw_logic.php"
     ],
     "totals": {
-        "inventory_files": 300,
+        "inventory_files": 302,
         "excluded": 2,
-        "eligible": 298,
+        "eligible": 300,
         "aot_lint_targets": 12,
         "aot_link_targets": 11
     }

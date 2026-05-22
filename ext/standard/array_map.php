@@ -13,6 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
@@ -20,7 +21,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * array_map() for list arrays with null or string builtin callbacks (subset of PHP; VM only).
+ * array_map() for list arrays with null or string builtin callbacks (subset of PHP).
  */
 final class array_map extends Internal
 {
@@ -63,7 +64,15 @@ final class array_map extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('array_map() is not implemented for JIT in this compiler build');
+        if (2 !== \count($args)) {
+            throw new \LogicException('array_map() requires exactly two arguments in this compiler build');
+        }
+        if (JITVariable::TYPE_HASHTABLE !== ($args[1]->type & ~JITVariable::IS_NATIVE_ARRAY)
+            && !ArrayBuiltinHelper::isNativeArray($args[1]->type)) {
+            throw new \LogicException('array_map() second argument must be an array in this compiler build');
+        }
+
+        return ArrayBuiltinHelper::buildMapArray($context, $args[0], $args[1]);
     }
 
     private static function copyKeyed(HashTable $src, HashTable $out): void

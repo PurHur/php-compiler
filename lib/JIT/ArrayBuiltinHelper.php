@@ -9,6 +9,17 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\ext\standard\boolval;
+use PHPCompiler\ext\standard\floatval;
+use PHPCompiler\ext\standard\intval;
+use PHPCompiler\ext\standard\strval;
+use PHPCompiler\ext\standard\string_ltrim;
+use PHPCompiler\ext\standard\string_rtrim;
+use PHPCompiler\ext\standard\string_trim;
+use PHPCompiler\ext\standard\strtolower;
+use PHPCompiler\ext\standard\strtoupper;
+use PHPCompiler\ext\standard\VmInternalCall;
+use PHPCompiler\ext\types\strlen;
+use PHPCompiler\Func\Internal;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -263,6 +274,373 @@ final class ArrayBuiltinHelper
         }
 
         return self::buildFilterFromHashTable($context, self::loadHashTable($context, $array));
+    }
+
+    /**
+     * array_map() with null or compile-time string builtin callback (subset of PHP).
+     */
+    public static function buildMapArray(Context $context, Variable $callback, Variable $array): Value
+    {
+        if (Variable::TYPE_NULL === $callback->type || $callback->isNullConstant) {
+            if (self::isNativeArray($array->type)) {
+                return self::buildMapNullFromNativeArray($context, $array);
+            }
+
+            return self::buildMapNullFromHashTable($context, self::loadHashTable($context, $array));
+        }
+
+        $handler = self::resolveMapCallback($callback);
+        if (self::isNativeArray($array->type)) {
+            return self::buildMapFromNativeArray($context, $handler, $array);
+        }
+
+        return self::buildMapFromHashTable($context, $handler, self::loadHashTable($context, $array));
+    }
+
+    /** @var array<class-string<Internal>, int> */
+    private const MAP_CALLBACK_RESULT_TYPE = [
+        strval::class => Variable::TYPE_STRING,
+        intval::class => Variable::TYPE_NATIVE_LONG,
+        floatval::class => Variable::TYPE_NATIVE_DOUBLE,
+        boolval::class => Variable::TYPE_NATIVE_BOOL,
+        strtolower::class => Variable::TYPE_STRING,
+        strtoupper::class => Variable::TYPE_STRING,
+        string_trim::class => Variable::TYPE_STRING,
+        string_ltrim::class => Variable::TYPE_STRING,
+        string_rtrim::class => Variable::TYPE_STRING,
+        strlen::class => Variable::TYPE_NATIVE_LONG,
+    ];
+
+    private static function resolveMapCallback(Variable $callback): Internal
+    {
+        $name = $callback->compileTimeString ?? null;
+        if (null === $name) {
+            throw new \LogicException(
+                'array_map() callback must be a compile-time string builtin name in this compiler build'
+            );
+        }
+
+        return VmInternalCall::resolveStringCallback($name);
+    }
+
+    private static function mapCallbackResultType(Internal $handler): int
+    {
+        $type = self::MAP_CALLBACK_RESULT_TYPE[$handler::class] ?? null;
+        if (null === $type) {
+            throw new \LogicException(
+                'array_map() callback is not supported by the JIT compiler in this build'
+            );
+        }
+
+        return $type;
+    }
+
+    private static function buildMapNullFromHashTable(Context $context, Value $src): Value
+    {
+        $map = $context->structFieldMap['__hashtable__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $nextFree = $context->builder->load(
+            $context->builder->structGep($src, $map['nextFreeElement'])
+        );
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $nextFree, $zero);
+        $emptyBlock = BasicBlockHelper::append($context, 'array_map_null_empty');
+        $workBlock = BasicBlockHelper::append($context, 'array_map_null_work');
+        $doneBlock = BasicBlockHelper::append($context, 'array_map_null_done');
+        $context->builder->branchIf($isEmpty, $emptyBlock, $workBlock);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        $emptyHt = HashTableHelper::alloc($context);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($workBlock);
+        $dest = HashTableHelper::alloc($context);
+        $srcIdxSlot = $context->builder->alloca($sizeT, 1, 'array_map_null_src');
+        $context->builder->store($zero, $srcIdxSlot);
+        $head = BasicBlockHelper::append($context, 'array_map_null_head');
+        $check = BasicBlockHelper::append($context, 'array_map_null_check');
+        $copyBlock = BasicBlockHelper::append($context, 'array_map_null_copy');
+        $skip = BasicBlockHelper::append($context, 'array_map_null_skip');
+        $advance = BasicBlockHelper::append($context, 'array_map_null_advance');
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $srcIdx = $context->builder->load($srcIdxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $srcIdx, $nextFree);
+        $context->builder->branchIf($atEnd, $doneBlock, $check);
+
+        $context->builder->positionAtEnd($check);
+        $isSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $src,
+            $srcIdx
+        );
+        $context->builder->branchIf($isSet, $copyBlock, $skip);
+
+        $context->builder->positionAtEnd($copyBlock);
+        self::copyMapNullListEntry($context, $src, $srcIdx, $dest, $srcIdx);
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($skip);
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($advance);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($srcIdx, $one),
+            $srcIdxSlot
+        );
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($emptyHt->typeOf());
+        $phi->addIncoming($emptyHt, $emptyBlock);
+        $phi->addIncoming($dest, $head);
+
+        return $phi;
+    }
+
+    /**
+     * Identity copy for array_map(null, …): long and string elements only (AOT-safe linker subset).
+     */
+    private static function copyMapNullListEntry(
+        Context $context,
+        Value $src,
+        Value $srcIndex,
+        Value $dest,
+        Value $destIndex
+    ): void {
+        static $seq = 0;
+        $tag = 'mn'.(string) ++$seq;
+        $srcEntry = self::listEntryAt($context, $src, $srcIndex);
+        $valueMap = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($srcEntry, $valueMap['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $stringBlock = BasicBlockHelper::append($context, 'array_map_null_copy_str_'.$tag);
+        $longBlock = BasicBlockHelper::append($context, 'array_map_null_copy_long_'.$tag);
+        $done = BasicBlockHelper::append($context, 'array_map_null_copy_done_'.$tag);
+
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_STRING & 0xff, false)
+        );
+        $context->builder->branchIf($isString, $stringBlock, $longBlock);
+
+        $context->builder->positionAtEnd($stringBlock);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringAt'),
+            $dest,
+            $destIndex,
+            $context->builder->call($context->lookupFunction('__value__readString'), $srcEntry)
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($longBlock);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setLongAt'),
+            $dest,
+            $destIndex,
+            $context->builder->call($context->lookupFunction('__value__readLong'), $srcEntry)
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+    }
+
+    private static function buildMapNullFromNativeArray(Context $context, Variable $array): Value
+    {
+        return self::buildMapNullFromHashTable($context, self::nativeListToHashTable($context, $array));
+    }
+
+    private static function buildMapFromHashTable(Context $context, Internal $handler, Value $src): Value
+    {
+        $resultType = self::mapCallbackResultType($handler);
+        $map = $context->structFieldMap['__hashtable__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $nextFree = $context->builder->load(
+            $context->builder->structGep($src, $map['nextFreeElement'])
+        );
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $nextFree, $zero);
+        $emptyBlock = BasicBlockHelper::append($context, 'array_map_empty');
+        $workBlock = BasicBlockHelper::append($context, 'array_map_work');
+        $doneBlock = BasicBlockHelper::append($context, 'array_map_done');
+        $context->builder->branchIf($isEmpty, $emptyBlock, $workBlock);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        $emptyHt = HashTableHelper::alloc($context);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($workBlock);
+        $dest = HashTableHelper::alloc($context);
+        $srcIdxSlot = $context->builder->alloca($sizeT, 1, 'array_map_src');
+        $context->builder->store($zero, $srcIdxSlot);
+        $head = BasicBlockHelper::append($context, 'array_map_head');
+        $check = BasicBlockHelper::append($context, 'array_map_check');
+        $mapBlock = BasicBlockHelper::append($context, 'array_map_map');
+        $skip = BasicBlockHelper::append($context, 'array_map_skip');
+        $advance = BasicBlockHelper::append($context, 'array_map_advance');
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $srcIdx = $context->builder->load($srcIdxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $srcIdx, $nextFree);
+        $context->builder->branchIf($atEnd, $doneBlock, $check);
+
+        $context->builder->positionAtEnd($check);
+        $isSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $src,
+            $srcIdx
+        );
+        $context->builder->branchIf($isSet, $mapBlock, $skip);
+
+        $context->builder->positionAtEnd($mapBlock);
+        $elem = HashTableHelper::readIndexedToValueBox($context, $src, $srcIdx);
+        $mapped = $handler->call($context, $elem);
+        self::storeMappedAtIndex(
+            $context,
+            $dest,
+            $srcIdx,
+            new Variable($context, $resultType, Variable::KIND_VALUE, $mapped),
+            $resultType
+        );
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($skip);
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($advance);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($srcIdx, $one),
+            $srcIdxSlot
+        );
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($emptyHt->typeOf());
+        $phi->addIncoming($emptyHt, $emptyBlock);
+        $phi->addIncoming($dest, $head);
+
+        return $phi;
+    }
+
+    private static function buildMapFromNativeArray(Context $context, Internal $handler, Variable $array): Value
+    {
+        $resultType = self::mapCallbackResultType($handler);
+        $elemType = $array->type & ~Variable::IS_NATIVE_ARRAY;
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $count = $context->constantFromInteger($array->nextFreeElement, 'size_t');
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $count, $zero);
+        $emptyBlock = BasicBlockHelper::append($context, 'array_map_native_empty');
+        $workBlock = BasicBlockHelper::append($context, 'array_map_native_work');
+        $doneBlock = BasicBlockHelper::append($context, 'array_map_native_done');
+        $context->builder->branchIf($isEmpty, $emptyBlock, $workBlock);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        $emptyHt = HashTableHelper::alloc($context);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($workBlock);
+        $dest = HashTableHelper::alloc($context);
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'array_map_native_idx');
+        $context->builder->store($zero, $idxSlot);
+        $head = BasicBlockHelper::append($context, 'array_map_native_head');
+        $body = BasicBlockHelper::append($context, 'array_map_native_body');
+        $advance = BasicBlockHelper::append($context, 'array_map_native_advance');
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $count);
+        $context->builder->branchIf($atEnd, $doneBlock, $body);
+
+        $context->builder->positionAtEnd($body);
+        $slot = $context->builder->inBoundsGep($array->value, $zero, $idx);
+        if (Variable::TYPE_STRING === $elemType) {
+            $elem = new Variable($context, $elemType, Variable::KIND_VARIABLE, $slot);
+        } else {
+            $elem = new Variable(
+                $context,
+                $elemType,
+                Variable::KIND_VALUE,
+                $context->builder->load($slot)
+            );
+        }
+        $mapped = $handler->call($context, $elem);
+        self::storeMappedAtIndex(
+            $context,
+            $dest,
+            $idx,
+            new Variable($context, $resultType, Variable::KIND_VALUE, $mapped),
+            $resultType
+        );
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($advance);
+        $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($emptyHt->typeOf());
+        $phi->addIncoming($emptyHt, $emptyBlock);
+        $phi->addIncoming($dest, $head);
+
+        return $phi;
+    }
+
+    private static function storeMappedAtIndex(
+        Context $context,
+        Value $dest,
+        Value $index,
+        Variable $element,
+        int $resultType
+    ): void {
+        switch ($resultType) {
+            case Variable::TYPE_NATIVE_LONG:
+                $context->builder->call(
+                    $context->lookupFunction('__hashtable__setLongAt'),
+                    $dest,
+                    $index,
+                    $context->helper->loadValue($element)
+                );
+                break;
+            case Variable::TYPE_STRING:
+                $context->builder->call(
+                    $context->lookupFunction('__hashtable__setStringAt'),
+                    $dest,
+                    $index,
+                    $context->helper->loadValue($element)
+                );
+                break;
+            case Variable::TYPE_NATIVE_BOOL:
+                $context->builder->call(
+                    $context->lookupFunction('__hashtable__setBoolAt'),
+                    $dest,
+                    $index,
+                    $context->helper->loadValue($element)
+                );
+                break;
+            case Variable::TYPE_NATIVE_DOUBLE:
+                $context->builder->call(
+                    $context->lookupFunction('__hashtable__setDoubleAt'),
+                    $dest,
+                    $index,
+                    $context->helper->loadValue($element)
+                );
+                break;
+            default:
+                throw new \LogicException(
+                    'array_map() mapped value type not supported for JIT: '
+                    .Variable::getStringType($resultType)
+                );
+        }
     }
 
     /**

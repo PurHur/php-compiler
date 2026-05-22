@@ -73,6 +73,9 @@ final class Variable {
     /** String literal value when this variable represents a constant string operand. */
     public ?string $compileTimeString = null;
 
+    /** Set when this variable is the PHP {@code null} constant (const-fetch). */
+    public bool $isNullConstant = false;
+
     /** {@see __value__} slot holds a nested {@see __hashtable__} (e.g. $_FILES['field']). */
     public bool $valueBoxHashtable = false;
 

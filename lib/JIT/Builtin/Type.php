@@ -89,6 +89,15 @@ class Type extends Builtin {
         $ftOpen = $this->context->context->functionType($i32, false, $i8p, $i32);
         $fnOpen = $this->context->module->addFunction('open', $ftOpen);
         $this->context->registerFunction('open', $fnOpen);
+        $ftFopen = $this->context->context->functionType($i8p, false, $i8p, $i8p);
+        $fnFopen = $this->context->module->addFunction('fopen', $ftFopen);
+        $this->context->registerFunction('fopen', $fnFopen);
+        $ftFwrite = $this->context->context->functionType($sizeT, false, $i8p, $sizeT, $sizeT, $i8p);
+        $fnFwrite = $this->context->module->addFunction('fwrite', $ftFwrite);
+        $this->context->registerFunction('fwrite', $fnFwrite);
+        $ftFclose = $this->context->context->functionType($i32, false, $i8p);
+        $fnFclose = $this->context->module->addFunction('fclose', $ftFclose);
+        $this->context->registerFunction('fclose', $fnFclose);
         $ftRead = $this->context->context->functionType($i64, false, $i32, $i8p, $sizeT);
         $fnRead = $this->context->module->addFunction('read', $ftRead);
         $this->context->registerFunction('read', $fnRead);
@@ -115,6 +124,18 @@ class Type extends Builtin {
             $fntypeFileGetContents
         );
         $this->context->registerFunction('__compiler_file_get_contents', $fnFileGetContents);
+        $fntypeFilePutContents = $this->context->context->functionType(
+            $i64,
+            false,
+            $this->context->getTypeFromString('__string__*'),
+            $this->context->getTypeFromString('__string__*'),
+            $i64
+        );
+        $fnFilePutContents = $this->context->module->addFunction(
+            '__compiler_file_put_contents',
+            $fntypeFilePutContents
+        );
+        $this->context->registerFunction('__compiler_file_put_contents', $fnFilePutContents);
         $void = $this->context->getTypeFromString('void');
         $fntypeRandomBytes = $this->context->context->functionType(
             $this->context->getTypeFromString('__string__*'),

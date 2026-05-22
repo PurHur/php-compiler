@@ -42,18 +42,36 @@ make test    # builds php-compiler:22.04-dev if needed, then memory-safe CI in D
 
 `make test` is the same CI path as `make test-docker` when the bind-mount works; on harness hosts it falls back to `script/docker-ci-local.sh` (tar copy) like `make test-harness`.
 
-## Self-host status (compile php-compiler with php-compiler)
+## Self-host bootstrap (experimental)
 
-**Not yet achieved** — the compiler does not fully compile its own `lib/` tree to a runnable native binary. Progress is tracked in [docs/bootstrap-selfhost.md](docs/bootstrap-selfhost.md) ([#212](https://github.com/PurHur/php-compiler/issues/212), [#78](https://github.com/PurHur/php-compiler/issues/78)).
+Compile a **subset** of php-compiler with itself (native AOT), separate from the **web-app** north star ([`examples/003-MiniWebApp`](examples/003-MiniWebApp/) — [#521](https://github.com/PurHur/php-compiler/issues/521), [#539](https://github.com/PurHur/php-compiler/issues/539)). Full ladder, blockers, and Phase A–D gates: [docs/bootstrap-selfhost.md](docs/bootstrap-selfhost.md). Per-file inventory and CFG gaps: [docs/bootstrap-inventory.md](docs/bootstrap-inventory.md) (regenerate with `php script/bootstrap-inventory.php`). ROADMAP Phase 0 stretch: [#78](https://github.com/PurHur/php-compiler/issues/78) ([#540](https://github.com/PurHur/php-compiler/issues/540) namespaced `lib/` link).
+
+**Not yet achieved** — no runnable native binary built from the full `lib/` tree ([#212](https://github.com/PurHur/php-compiler/issues/212)).
+
+**Local** (after `composer install`; Phase C needs LLVM 9 — `./script/install-llvm9.sh` or `.llvm/` from a prior `ci-local.sh` run):
+
+```console
+make bootstrap-profile          # Phase A inventory + docs/bootstrap-profile.json + fixture lint
+make bootstrap-aot-link         # Phase C: link + run bootstrap fixtures (stdout vs Zend)
+./script/bootstrap-selfhost-lint.sh   # bundled lib/Compiler.php AOT lint only
+```
+
+**Docker** (LLVM 9 in `php-compiler:22.04-dev`; build once with `make docker-build-22`):
+
+```console
+docker run --rm -v "$(pwd):/compiler" -w /compiler php-compiler:22.04-dev bash -lc 'make bootstrap-profile && make bootstrap-aot-link'
+```
+
+On harness hosts with an empty bind-mount, use `./script/docker-ci-local.sh` or tar-copy the tree before the commands above (see [Troubleshooting](#troubleshooting)).
 
 | Milestone | Command | Status |
 |-----------|---------|--------|
-| Per-file AOT lint | `php bin/compile.php -l lib/*.php` | ✅ All **14** top-level `lib/*.php` units ([#534](https://github.com/PurHur/php-compiler/pull/534)) |
-| Bootstrap fixture lint | `php script/bootstrap-aot-lint.php` | ✅ **11** procedural lint targets |
-| Bootstrap native link | `make bootstrap-aot-link` | ✅ **11** native link targets (incl. `require_chain`, `throw_logic`, [#538](https://github.com/PurHur/php-compiler/pull/538), [#545](https://github.com/PurHur/php-compiler/pull/545)) |
-| **Compiler self-compile** | `./script/bootstrap-selfhost-lint.sh` | ✅ Bundled `lib/Compiler.php` AOT **lint** passes ([#212](https://github.com/PurHur/php-compiler/issues/212), [#78](https://github.com/PurHur/php-compiler/issues/78)); native `-o` run not yet |
-
-When the compiler successfully compiles itself, this section will be updated with the exact gate command, date, and PR reference.
+| Phase A inventory | `php script/bootstrap-inventory.php --check` | ✅ vm.php path scan |
+| Phase B lib AOT lint | `php bin/compile.php -l lib/*.php` | ✅ **14** top-level `lib/*.php` ([#534](https://github.com/PurHur/php-compiler/pull/534)) |
+| Phase B fixture lint | `php script/bootstrap-aot-lint.php` | ✅ **11** procedural targets |
+| Phase C native link | `make bootstrap-aot-link` | ✅ **11** link targets ([#538](https://github.com/PurHur/php-compiler/pull/538), [#545](https://github.com/PurHur/php-compiler/pull/545)) |
+| Bundled compiler lint | `./script/bootstrap-selfhost-lint.sh` | ✅ `lib/Compiler.php` closure **lint**; native run not yet |
+| Phase D `lib/` link | `make bootstrap-aot-link-lib` | ❌ tracked in [#540](https://github.com/PurHur/php-compiler/issues/540) |
 
 # Installation
 
