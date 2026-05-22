@@ -25,7 +25,8 @@ final class JitStrstr
         Context $context,
         Value $haystack,
         Value $needle,
-        ?Value $beforeNeedle = null
+        ?Value $beforeNeedle = null,
+        bool $caseInsensitive = false
     ): Value {
         $id = (string) (++self::$blockSerial);
         $map = $context->structFieldMap['__string__'];
@@ -34,8 +35,9 @@ final class JitStrstr
         );
         $hayPtr = $context->builder->structGep($haystack, $map['value']);
         $needlePtr = $context->builder->structGep($needle, $map['value']);
+        $searchFn = $caseInsensitive ? 'strcasestr' : 'strstr';
         $found = $context->builder->call(
-            $context->lookupFunction('strstr'),
+            $context->lookupFunction($searchFn),
             $hayPtr,
             $needlePtr
         );

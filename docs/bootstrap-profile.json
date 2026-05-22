@@ -205,6 +205,7 @@
         "ext/standard/string_trim.php",
         "ext/standard/strip_tags.php",
         "ext/standard/stripos.php",
+        "ext/standard/stristr.php",
         "ext/standard/strncasecmp.php",
         "ext/standard/strncmp.php",
         "ext/standard/strpos.php",
@@ -384,9 +385,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 318,
+        "inventory_files": 319,
         "excluded": 2,
-        "eligible": 316,
+        "eligible": 317,
         "aot_lint_targets": 15,
         "aot_link_targets": 14,
         "aot_link_lib_targets": 1
