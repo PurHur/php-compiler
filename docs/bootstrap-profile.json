@@ -252,6 +252,7 @@
         "ext/types/strlen.php",
         "lib/AOT/ProjectGraph.php",
         "lib/Block.php",
+        "lib/Cli/InvokeCwd.php",
         "lib/Cli/PhpcBuild.php",
         "lib/Cli/PhpcInit.php",
         "lib/Compiler.php",
@@ -406,9 +407,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 341,
+        "inventory_files": 342,
         "excluded": 2,
-        "eligible": 339,
+        "eligible": 340,
         "aot_lint_targets": 15,
         "aot_link_targets": 13,
         "aot_link_lib_targets": 1

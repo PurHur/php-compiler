@@ -26,9 +26,9 @@ final class CgiDriver
         if ($len <= 0) {
             return;
         }
-        if ($len > DevServer::MAX_REQUEST_BODY) {
-            fwrite(STDERR, "CGI: CONTENT_LENGTH exceeds limit\n");
-            exit(1);
+        if ($len > DevServer::maxRequestBody()) {
+            fwrite(STDOUT, self::formatResponse(413, 'text/plain', "Payload Too Large\n"));
+            exit(0);
         }
         $body = '';
         while (strlen($body) < $len && !feof(STDIN)) {
@@ -163,6 +163,7 @@ final class CgiDriver
             403 => 'Forbidden',
             404 => 'Not Found',
             405 => 'Method Not Allowed',
+            413 => 'Payload Too Large',
             422 => 'Unprocessable Entity',
             500 => 'Internal Server Error',
             502 => 'Bad Gateway',

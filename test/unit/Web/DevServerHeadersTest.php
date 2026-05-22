@@ -203,4 +203,52 @@ final class DevServerHeadersTest extends TestCase
         $this->assertSame('{"ok":true}', $body);
         $this->assertSame([], $extraHeaders);
     }
+
+    public function testMaxRequestBodyHonorsEnvOverride(): void
+    {
+        $previous = getenv('PHP_COMPILER_MAX_BODY');
+        putenv('PHP_COMPILER_MAX_BODY=65536');
+        try {
+            $this->assertSame(65536, DevServer::maxRequestBody());
+        } finally {
+            if (false === $previous) {
+                putenv('PHP_COMPILER_MAX_BODY');
+            } else {
+                putenv('PHP_COMPILER_MAX_BODY='.$previous);
+            }
+        }
+    }
+
+    public function testReadRequestRejectsOversizedContentLength(): void
+    {
+        $pair = stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP);
+        if (false === $pair) {
+            $this->markTestSkipped('stream_socket_pair unavailable');
+        }
+        [$server, $client] = $pair;
+        $previous = getenv('PHP_COMPILER_MAX_BODY');
+        putenv('PHP_COMPILER_MAX_BODY=1024');
+        try {
+            $raw = "POST /index.php/contact HTTP/1.1\r\n"
+                ."Host: 127.0.0.1\r\n"
+                ."Content-Type: application/x-www-form-urlencoded\r\n"
+                ."Content-Length: 5000\r\n"
+                ."Connection: close\r\n\r\n";
+            fwrite($client, $raw);
+            stream_socket_shutdown($client, STREAM_SHUT_WR);
+            fclose($client);
+
+            $parsed = DevServer::readRequest($server);
+            fclose($server);
+
+            $this->assertNull($parsed);
+            $this->assertSame(413, DevServer::$readRequestRejectStatus);
+        } finally {
+            if (false === $previous) {
+                putenv('PHP_COMPILER_MAX_BODY');
+            } else {
+                putenv('PHP_COMPILER_MAX_BODY='.$previous);
+            }
+        }
+    }
 }

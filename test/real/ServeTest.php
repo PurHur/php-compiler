@@ -483,6 +483,48 @@ PHP,
     $this->assertStringContainsString('Thank you, PostDev', $this->responseBody($response));
   }
 
+  /**
+   * @group miniwebapp
+   */
+  public function testServes003MiniWebAppContactPostRejectsEmptyName(): void
+  {
+    $project = $this->repoRoot.'/examples/003-MiniWebApp';
+    if (!is_file($project.'/public/index.php')) {
+      $this->markTestSkipped('examples/003-MiniWebApp missing (#246)');
+    }
+    if (!$this->miniWebAppLintGreen($project)) {
+      $this->markTestSkipped('003-MiniWebApp lint not green (#539)');
+    }
+
+    $response = $this->httpPost($project, '/index.php/contact', 'name=');
+    $this->assertStringContainsString('HTTP/1.1 400', $response);
+    $this->assertStringContainsString('Invalid contact name', $this->responseBody($response));
+  }
+
+  /**
+   * @group miniwebapp
+   */
+  public function testServes003MiniWebAppRejectsOversizedPostBody(): void
+  {
+    $project = $this->repoRoot.'/examples/003-MiniWebApp';
+    if (!is_file($project.'/public/index.php')) {
+      $this->markTestSkipped('examples/003-MiniWebApp missing (#246)');
+    }
+    if (!$this->miniWebAppLintGreen($project)) {
+      $this->markTestSkipped('003-MiniWebApp lint not green (#539)');
+    }
+
+    $body = str_repeat('x', 100_000);
+    $response = $this->httpPost(
+      $project,
+      '/index.php/contact',
+      $body,
+      ['PHP_COMPILER_MAX_BODY' => '65536']
+    );
+    $this->assertStringContainsString('HTTP/1.1 413', $response);
+    $this->assertStringContainsString('Payload Too Large', $response);
+  }
+
   private function miniWebAppLintGreen(string $projectDir): bool
   {
     $descriptorSpec = [

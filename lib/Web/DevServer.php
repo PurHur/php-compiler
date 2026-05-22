@@ -18,6 +18,28 @@ final class DevServer
     /** Maximum decoded request body size (issue #77, #287). */
     public const MAX_REQUEST_BODY = 8_388_608;
 
+    /** HTTP status from the last failed {@see readRequest()} (400 or 413). */
+    public static int $readRequestRejectStatus = 400;
+
+    /**
+     * Effective POST/body byte limit (issue #77, #697).
+     *
+     * Override with {@code PHP_COMPILER_MAX_BODY} (positive integer, capped at MAX_REQUEST_BODY).
+     */
+    public static function maxRequestBody(): int
+    {
+        $raw = getenv('PHP_COMPILER_MAX_BODY');
+        if (false === $raw || '' === $raw) {
+            return self::MAX_REQUEST_BODY;
+        }
+        $n = (int) $raw;
+        if ($n <= 0) {
+            return self::MAX_REQUEST_BODY;
+        }
+
+        return min($n, self::MAX_REQUEST_BODY);
+    }
+
     public static function run(
         string $listen,
         string $docroot,
@@ -82,7 +104,9 @@ final class DevServer
 
         $raw = self::readRequest($conn);
         if (null === $raw) {
-            self::respond($conn, 400, 'text/plain', "Bad Request\n");
+            $status = self::$readRequestRejectStatus;
+            $message = 413 === $status ? "Payload Too Large\n" : "Bad Request\n";
+            self::respond($conn, $status, 'text/plain', $message);
 
             return;
         }
@@ -210,6 +234,8 @@ final class DevServer
      */
     public static function readRequest($conn): ?array
     {
+        self::$readRequestRejectStatus = 400;
+        $maxBody = self::maxRequestBody();
         $buf = '';
         while (!feof($conn)) {
             $chunk = fread($conn, 8192);
@@ -265,7 +291,9 @@ final class DevServer
             $body = $decoded;
         } elseif (isset($headers['content-length'])) {
             $len = (int) $headers['content-length'];
-            if ($len > self::MAX_REQUEST_BODY) {
+            if ($len > $maxBody) {
+                self::$readRequestRejectStatus = 413;
+
                 return null;
             }
             while (strlen($body) < $len && !feof($conn)) {
@@ -280,10 +308,12 @@ final class DevServer
             }
         } elseif (self::methodMayHaveBody($method) && 'HTTP/1.0' === $serverProtocol) {
             while (!feof($conn)) {
-                if (strlen($body) >= self::MAX_REQUEST_BODY) {
+                if (strlen($body) >= $maxBody) {
+                    self::$readRequestRejectStatus = 413;
+
                     return null;
                 }
-                $chunk = fread($conn, min(8192, self::MAX_REQUEST_BODY - strlen($body)));
+                $chunk = fread($conn, min(8192, $maxBody - strlen($body)));
                 if (false === $chunk || '' === $chunk) {
                     break;
                 }
@@ -347,7 +377,12 @@ final class DevServer
                 return null;
             }
             $chunkSize = (int) hexdec($line);
-            if ($chunkSize < 0 || $chunkSize > self::MAX_REQUEST_BODY || strlen($result) + $chunkSize > self::MAX_REQUEST_BODY) {
+            $maxBody = self::maxRequestBody();
+            if ($chunkSize < 0 || $chunkSize > $maxBody || strlen($result) + $chunkSize > $maxBody) {
+                if ($chunkSize > $maxBody || strlen($result) + $chunkSize > $maxBody) {
+                    self::$readRequestRejectStatus = 413;
+                }
+
                 return null;
             }
             if (0 === $chunkSize) {
@@ -632,6 +667,7 @@ final class DevServer
             403 => 'Forbidden',
             404 => 'Not Found',
             405 => 'Method Not Allowed',
+            413 => 'Payload Too Large',
             422 => 'Unprocessable Entity',
             500 => 'Internal Server Error',
             502 => 'Bad Gateway',
