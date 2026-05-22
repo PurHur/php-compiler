@@ -3,28 +3,38 @@
 declare(strict_types=1);
 
 /**
- * MiniWebApp front controller (issues #67, #210, #246).
+ * MiniWebApp front controller (issues #67, #210, #489).
  *
- * Lint-first skeleton: class dispatch blockers (#58); __DIR__ includes lint-followed (#462).
- * VM/JIT/AOT serve recipes below expect failure until #67.
+ * Primary routing: PATH_INFO after index.php (DevServer #276).
+ * Deprecated fallback: ?route= for skeleton-era URLs.
  *
  *   ./phpc lint --all examples/003-MiniWebApp
  *   ./phpc serve 127.0.0.1:8080 examples/003-MiniWebApp
- *   curl -s 'http://127.0.0.1:8080/?route=home'
+ *   curl -s 'http://127.0.0.1:8080/index.php/hello?name=Dev'
  */
 
 $config = require __DIR__ . '/../config.php';
 require __DIR__ . '/../src/Router.php';
 
-$route = $_GET['route'] ?? 'home';
-$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-
-$knownRoutes = ['home', 'hello', 'contact', 'api/status'];
-foreach ($knownRoutes as $known) {
-    if ($known === $route) {
-        break;
+$route = 'home';
+if (isset($_SERVER['PATH_INFO'])) {
+    $pathInfo = $_SERVER['PATH_INFO'];
+    if ('' !== $pathInfo) {
+        if (0 === strpos($pathInfo, '/')) {
+            $pathInfo = substr($pathInfo, 1);
+        }
+        if ('' !== $pathInfo) {
+            $route = $pathInfo;
+        }
+    }
+} elseif (isset($_GET['route'])) {
+    $queryRoute = $_GET['route'];
+    if ('' !== $queryRoute) {
+        $route = $queryRoute;
     }
 }
+
+$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
 $router = new Router($config);
 $router->dispatch($method, $route);

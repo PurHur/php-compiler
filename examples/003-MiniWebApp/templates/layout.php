@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 /** @var string $title */
 /** @var string $appName */
+$scriptBase = $_SERVER['SCRIPT_NAME'] ?? '/index.php';
 ?>
 <!DOCTYPE html>
 <html>
@@ -14,9 +15,9 @@ declare(strict_types=1);
 </head>
 <body>
 <nav>
-    <a href="?route=home">Home</a>
-    <a href="?route=hello&amp;name=Dev">Hello</a>
-    <a href="?route=contact">Contact</a>
+    <a href="<?php echo htmlspecialchars($scriptBase); ?>">Home</a>
+    <a href="<?php echo htmlspecialchars($scriptBase); ?>/hello?name=Dev">Hello</a>
+    <a href="<?php echo htmlspecialchars($scriptBase); ?>/contact">Contact</a>
 </nav>
 <main>
 <?php
