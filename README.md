@@ -126,6 +126,8 @@ make examples-web-smoke   # HTTP serve + curl (skipped when loopback bind fails)
 
 ### Developing web apps locally
 
+**AOT deploy quickstart** (build → `phpc deploy` → `PHPC_DEPLOY_ROOT` → nginx CGI sketch): [docs/deploy-web-aot.md](docs/deploy-web-aot.md).
+
 ```console
 make serve
 curl 'http://127.0.0.1:8080/example.php?name=Dev'

@@ -124,7 +124,7 @@ Example:
   export PHPC_DEPLOY_ROOT=/var/www/myapp
   ./bin/app
 
-See docs/local-ci-matrix.md and the production deployment guide (issue #445).
+See docs/deploy-web-aot.md (quickstart), docs/local-ci-matrix.md, and the production deployment guide (issue #445).
 
 TXT;
     }
