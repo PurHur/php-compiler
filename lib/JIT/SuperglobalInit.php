@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\JIT\Builtin;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable as VMVariable;
 use PHPCompiler\Web\Superglobals;
@@ -37,9 +38,24 @@ final class SuperglobalInit
 
     public static function declareRefresh(Context $context): void
     {
+        if (Builtin::LOAD_TYPE_IMPORT === $context->loadType) {
+            return;
+        }
         $signature = $context->context->functionType($context->context->voidType(), false);
         $fn = $context->module->addFunction('__superglobals__refresh', $signature);
         $context->registerFunction('__superglobals__refresh', $fn);
+    }
+
+    /**
+     * Re-copy VM superglobals into LLVM sg_* globals (MCJIT embed, issue #642).
+     */
+    public static function refreshFromVm(Context $context): void
+    {
+        if (null === $context->jitResult()) {
+            return;
+        }
+        $init = $context->jitResult()->getCallable('__init__', 'void(*)()');
+        $init();
     }
 
     public static function initialize(Context $context): void

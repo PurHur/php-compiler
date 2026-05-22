@@ -17,10 +17,20 @@ function run(string $filename, string $code, array $options): void
     $runtime = new Runtime();
     $queryString = $options['-q'] ?? null;
     $postBody = $options['-p'] ?? null;
+    $scriptFilename = null;
+    if ('-' !== $filename && 'Command line code' !== $filename) {
+        $resolved = realpath($filename);
+        if (false !== $resolved) {
+            $scriptFilename = $resolved;
+        }
+    }
+    $queryArg = is_string($queryString) ? $queryString : null;
+    $postArg = is_string($postBody) ? $postBody : null;
     Superglobals::populateFromEnvironment(
         $runtime->vmContext,
-        is_string($queryString) ? $queryString : null,
-        is_string($postBody) ? $postBody : null
+        $queryArg,
+        $postArg,
+        $scriptFilename
     );
 
     $debugFile = null;
@@ -39,6 +49,7 @@ function run(string $filename, string $code, array $options): void
     $runtime->jit($block);
 
     if (! isset($options['-l'])) {
+        $runtime->syncJitSuperglobals($queryArg, $postArg, $scriptFilename);
         $runtime->run($block);
     }
 }

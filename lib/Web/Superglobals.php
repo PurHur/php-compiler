@@ -66,6 +66,36 @@ final class Superglobals
         return false === $fromEnv ? '' : $fromEnv;
     }
 
+    /**
+     * Mirror CLI -q / -p / script path into CGI env for native superglobal refresh (issues #201, #642).
+     */
+    public static function exportCgiEnvironment(
+        ?string $queryString = null,
+        ?string $postBody = null,
+        ?string $scriptFilename = null
+    ): void {
+        if (null !== $queryString) {
+            putenv('QUERY_STRING='.$queryString);
+            $_ENV['QUERY_STRING'] = $queryString;
+            $_SERVER['QUERY_STRING'] = $queryString;
+        }
+        if (null !== $postBody) {
+            putenv('REQUEST_BODY='.$postBody);
+            $_ENV['REQUEST_BODY'] = $postBody;
+            $_SERVER['REQUEST_BODY'] = $postBody;
+            if ('' !== $postBody) {
+                putenv('REQUEST_METHOD=POST');
+                $_ENV['REQUEST_METHOD'] = 'POST';
+                $_SERVER['REQUEST_METHOD'] = 'POST';
+            }
+        }
+        if (null !== $scriptFilename && '' !== $scriptFilename) {
+            putenv('SCRIPT_FILENAME='.$scriptFilename);
+            $_ENV['SCRIPT_FILENAME'] = $scriptFilename;
+            $_SERVER['SCRIPT_FILENAME'] = $scriptFilename;
+        }
+    }
+
     public static function populateFromEnvironment(
         Context $context,
         ?string $queryString = null,
@@ -73,9 +103,7 @@ final class Superglobals
         ?string $scriptFilename = null
     ): void {
         self::$activeContext = $context;
-        if (null !== $scriptFilename && '' !== $scriptFilename) {
-            putenv('SCRIPT_FILENAME='.$scriptFilename);
-        }
+        self::exportCgiEnvironment($queryString, $postBody, $scriptFilename);
         if (null === $queryString) {
             $fromEnv = getenv('QUERY_STRING');
             $queryString = false === $fromEnv ? '' : $fromEnv;

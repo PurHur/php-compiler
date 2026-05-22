@@ -9,6 +9,7 @@
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\JIT\Builtin;
 use PHPCompiler\Block;
 use PHPCfg\Operand;
 use PHPTypes\Type;
@@ -453,11 +454,13 @@ final class Variable {
                 ) {
                     $key = $dim->compileTimeString;
                     if (null !== $key) {
-                        $baked = SuperglobalInit::compileTimeReadString(
-                            $this->context,
-                            $this->superglobalName,
-                            $key
-                        );
+                        $baked = Builtin::LOAD_TYPE_EMBED === $this->context->loadType
+                            ? null
+                            : SuperglobalInit::compileTimeReadString(
+                                $this->context,
+                                $this->superglobalName,
+                                $key
+                            );
                         if (null !== $baked) {
                             return new Variable(
                                 $this->context,

@@ -23,6 +23,7 @@ use PHPTypes\State;
 use PHPCompiler\VM\Optimizer;
 use PHPCompiler\VM\Context as VMContext;
 use PHPCompiler\JIT\Context as JITContext;
+use PHPCompiler\Web\Superglobals;
 
 class Runtime {
     const MODE_NORMAL   = 0b0001;
@@ -163,6 +164,25 @@ class Runtime {
 
     public function parseAndCompileFile(string $filename): ?Block {
         return $this->compile($this->parse(file_get_contents($filename), $filename));
+    }
+
+    /**
+     * Refresh JIT sg_* tables from VM / CGI env before each run (issue #642).
+     */
+    public function syncJitSuperglobals(
+        ?string $queryString = null,
+        ?string $postBody = null,
+        ?string $scriptFilename = null
+    ): void {
+        Superglobals::populateFromEnvironment(
+            $this->vmContext,
+            $queryString,
+            $postBody,
+            $scriptFilename
+        );
+        if (null !== $this->jitContext) {
+            $this->jitContext->refreshSuperglobals();
+        }
     }
 
     public function run(?Block $block) {
