@@ -10,7 +10,7 @@ North star: compile a **subset** of php-compiler with itself (native AOT), then 
 | Phase B lib AOT lint | `php bin/compile.php -l lib/*.php` (with `script/php-env.sh`) | ✅ **14/14** top-level `lib/*.php` units ([#534](https://github.com/PurHur/php-compiler/pull/534)) |
 | Phase B fixture lint | `php script/bootstrap-aot-lint.php` | ✅ **11** procedural targets under `test/bootstrap-aot/` + `examples/000-HelloWorld` |
 | Phase C native run | `make bootstrap-aot-link` or `./script/bootstrap-aot-link.sh` | ✅ Link + execute **11** `aot_link_targets` (stdout vs Zend PHP) |
-| Bundled `lib/Compiler.php` lint | `./script/bootstrap-selfhost-lint.sh` | ✅ `test/selfhost/compiler_minimal/main.php` + literal `require_once` closure (no `vendor/`) |
+| Bundled `lib/Compiler.php` lint | `./script/bootstrap-selfhost-lint.sh` | ✅ `test/selfhost/compiler_minimal/main.php` + **11** literal `require_once` units toward `bin/vm.php` (no `vendor/`) ([#559](https://github.com/PurHur/php-compiler/issues/559)) |
 
 Regenerate: `make bootstrap-profile` (inventory + profile + optional `bootstrap-aot-lint`). Phase C: `make bootstrap-aot-link` (or `php script/bootstrap-aot-lint.php --link`). Bundled compiler lint: `./script/bootstrap-selfhost-lint.sh`.
 
@@ -46,6 +46,21 @@ Add scripts under `test/bootstrap-aot/*.php` — picked up automatically by `scr
 - `try_catch.php` — try/catch CFG (lint ✅; link pending)
 
 Per-file `php bin/compile.php -l lib/*.php` passes for all 14 top-level units after class-const and throw lowering ([#520](https://github.com/PurHur/php-compiler/issues/520), [#529](https://github.com/PurHur/php-compiler/issues/529)). **Bundled** minimal compiler closure: `test/selfhost/compiler_minimal/main.php` (gate: `./script/bootstrap-selfhost-lint.sh`).
+
+### `compiler_minimal` bundle (literal `require_once`)
+
+Incremental growth toward `bin/vm.php` inventory path ([#559](https://github.com/PurHur/php-compiler/issues/559)). Regenerate inventory: `php script/bootstrap-inventory.php`.
+
+| File | Role |
+|------|------|
+| `lib/OpCode.php`, `lib/Block.php`, `lib/Frame.php`, `lib/Func.php`, `lib/Func/PHP.php` | CFG / call graph |
+| `lib/Runtime.php` | compile + run entry |
+| `lib/Web/ConstStringFolder.php`, `lib/Web/IncludePathResolver.php` | literal include discovery for `-l` bundle |
+| `lib/Module.php` | extension module interface (vm.php path) |
+| `lib/VM.php` | interpreter loop (next step toward vm echo path) |
+| `lib/Compiler.php` | CFG → opcodes |
+
+Native link of the bundle is **not** claimed yet (`script/bootstrap-selfhost-link.sh` may fail until VM/JIT closure grows).
 
 ## Non-goals (initial bootstrap)
 
