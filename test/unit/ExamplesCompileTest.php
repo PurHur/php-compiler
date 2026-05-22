@@ -261,11 +261,12 @@ final class ExamplesCompileTest extends TestCase
         fclose($pipes[1]);
         fclose($pipes[2]);
         $exit = proc_close($proc);
-        if (0 !== $exit) {
-            $this->markTestSkipped(
-                'MiniWebApp project AOT lint blocked (#58/#568): '.trim($stderr !== false ? $stderr : '')
-            );
-        }
+        $this->assertSame(
+            0,
+            $exit,
+            'phpc build --project 003-MiniWebApp --dry-run failed (#624): '
+            .trim($stderr !== false ? $stderr : '(no stderr)')
+        );
     }
 
     /**
