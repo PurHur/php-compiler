@@ -74,7 +74,9 @@ class Module extends ModuleAbstract
             new strrev(),
             new strpos(),
             new strstr(),
+            new strchr(),
             new stristr(),
+            new strrchr(),
             new stripos(),
             new strrpos(),
             new substr_count(),
@@ -232,6 +234,15 @@ class Module extends ModuleAbstract
             $ft = $context->context->functionType($i8p, false, $i8p, $i8p);
             $fn = $context->module->addFunction('strcasestr', $ft);
             $context->registerFunction('strcasestr', $fn);
+        }
+        try {
+            $context->lookupFunction('strrchr');
+        } catch (\Throwable $e) {
+            $i8p = $context->getTypeFromString('int8*');
+            $i32 = $context->getTypeFromString('int32');
+            $ft = $context->context->functionType($i8p, false, $i8p, $i32);
+            $fn = $context->module->addFunction('strrchr', $ft);
+            $context->registerFunction('strrchr', $fn);
         }
         try {
             $context->lookupFunction('strtol');
