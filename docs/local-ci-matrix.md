@@ -42,6 +42,8 @@ export PHP_COMPILER_VM_RSS_GUARD=0   # disable RSS killer (debug only)
 make test
 ```
 
+**Unlimited memory is blocked:** `PHP_COMPILER_MEMORY_LIMIT=-1` and `memory_limit=-1` in tracked files fail `script/check-no-unlimited-memory.sh` (run at CI start).
+
 ## Serve tests
 
 Set `PHP_COMPILER_SKIP_SERVE_TESTS=1` only when loopback TCP bind is unavailable. Harness Docker CI should **not** set this by default.

@@ -1,12 +1,20 @@
 #!/usr/bin/env bash
 # Per-process PHP memory_limit for CI and spawned bin/vm.php children (via PHP_COMPILER_MEMORY_LIMIT).
-# Defaults live in script/ci-defaults.env. Set PHP_COMPILER_MEMORY_LIMIT=-1 only for local debugging.
+# Defaults live in script/ci-defaults.env. Unlimited memory_limit=-1 is blocked repo-wide.
 
 _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=ci-defaults.env
 source "$_SCRIPT_DIR/ci-defaults.env"
 
+php_compiler_reject_unlimited_memory() {
+  if [[ "${PHP_COMPILER_MEMORY_LIMIT}" == "-1" || "${PHP_COMPILER_LLVM_MEMORY_LIMIT}" == "-1" ]]; then
+    echo "CI: PHP_COMPILER_MEMORY_LIMIT/LLVM_MEMORY_LIMIT=-1 is not allowed (issue #497)." >&2
+    exit 1
+  fi
+}
+
 php_compiler_apply_memory_php_opt() {
+  php_compiler_reject_unlimited_memory
   PHP_OPTS+=(-d "memory_limit=${PHP_COMPILER_MEMORY_LIMIT}")
 }
 

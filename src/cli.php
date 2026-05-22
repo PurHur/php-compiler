@@ -18,9 +18,11 @@ $memoryLimit = getenv('PHP_COMPILER_MEMORY_LIMIT');
 if (false === $memoryLimit || '' === $memoryLimit) {
     $memoryLimit = '2G';
 }
-if ('-1' !== $memoryLimit) {
-    ini_set('memory_limit', $memoryLimit);
+if ('-1' === $memoryLimit) {
+    fwrite(STDERR, "PHP_COMPILER_MEMORY_LIMIT=-1 is not allowed in this repository (use a finite value, e.g. 2G).\n");
+    exit(1);
 }
+ini_set('memory_limit', $memoryLimit);
 error_reporting(~0);
 
 $opts = $argv;
