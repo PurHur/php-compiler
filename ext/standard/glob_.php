@@ -52,6 +52,22 @@ final class glob_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('glob() is not supported in JIT in this compiler build');
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 2) {
+            throw new \LogicException('glob() requires one or two arguments in this compiler build');
+        }
+        if (JITVariable::TYPE_STRING !== $args[0]->type) {
+            throw new \LogicException('glob() pattern must be a string in this compiler build');
+        }
+        $i32 = $context->getTypeFromString('int32');
+        $flags = $i32->constInt(0, false);
+        if (2 === $argc) {
+            if (JITVariable::TYPE_INTEGER !== $args[1]->type) {
+                throw new \LogicException('glob() flags must be an integer in this compiler build');
+            }
+            $flags = $context->helper->loadValue($args[1]);
+        }
+
+        return JitFsGlob::glob($context, $context->helper->loadValue($args[0]), $flags);
     }
 }

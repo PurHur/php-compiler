@@ -8,9 +8,9 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 348 |
+| PHP files on vm.php path | 349 |
 | Source constructs flagged (blockers) | 10 |
-| Source constructs flagged (warnings) | 935 |
+| Source constructs flagged (warnings) | 936 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -43,6 +43,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/JitFilemtime.php` | 0 | 1 |
 | `ext/standard/JitFilesize.php` | 0 | 1 |
 | `ext/standard/JitFilter.php` | 0 | 1 |
+| `ext/standard/JitFsGlob.php` | 0 | 1 |
 | `ext/standard/JitGetallheaders.php` | 0 | 1 |
 | `ext/standard/JitHash.php` | 0 | 1 |
 | `ext/standard/JitHeader.php` | 0 | 1 |
@@ -428,6 +429,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 
 **Warnings** (review for bootstrap subset):
 - 8 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/JitFsGlob.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/JitGetallheaders.php`
 
@@ -1722,17 +1728,17 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/AOT/Linker.php`
 
 **Blockers** (likely prevent AOT bootstrap compile):
-- shell_exec() (line 135)
-- shell_exec() (line 156)
-- shell_exec() (line 190)
-- shell_exec() (line 194)
-- shell_exec() (line 237)
-- shell_exec() (line 247)
-- shell_exec() (line 317)
-- exec() (line 323)
+- shell_exec() (line 141)
+- shell_exec() (line 162)
+- shell_exec() (line 213)
+- shell_exec() (line 217)
+- shell_exec() (line 260)
+- shell_exec() (line 270)
+- shell_exec() (line 340)
+- exec() (line 346)
 
 **Warnings** (review for bootstrap subset):
-- 11 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 13 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/AOT/ProjectGraph.php`
 
@@ -1888,7 +1894,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/Doctor.php`
 
 **Warnings** (review for bootstrap subset):
-- 12 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 18 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/Frame.php`
 

@@ -47,6 +47,22 @@ final class scandir extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('scandir() is not supported in JIT in this compiler build');
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 2) {
+            throw new \LogicException('scandir() requires one or two arguments in this compiler build');
+        }
+        if (JITVariable::TYPE_STRING !== $args[0]->type) {
+            throw new \LogicException('scandir() directory must be a string in this compiler build');
+        }
+        $i32 = $context->getTypeFromString('int32');
+        $sort = $i32->constInt(0, false);
+        if (2 === $argc) {
+            if (JITVariable::TYPE_INTEGER !== $args[1]->type) {
+                throw new \LogicException('scandir() sorting_order must be an integer in this compiler build');
+            }
+            $sort = $context->helper->loadValue($args[1]);
+        }
+
+        return JitFsGlob::scandir($context, $context->helper->loadValue($args[0]), $sort);
     }
 }
