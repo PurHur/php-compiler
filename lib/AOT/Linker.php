@@ -13,6 +13,7 @@ final class Linker
     private const RUNTIME_C_SOURCES = [
         __DIR__.'/runtime/superglobals_refresh.c',
         __DIR__.'/runtime/hash_crypto.c',
+        __DIR__.'/runtime/filter_validate.c',
     ];
 
     public static function link(string $objectFile, string $executable): void

@@ -8,9 +8,9 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 324 |
+| PHP files on vm.php path | 328 |
 | Source constructs flagged (blockers) | 10 |
-| Source constructs flagged (warnings) | 870 |
+| Source constructs flagged (warnings) | 885 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -40,6 +40,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/JitExplode.php` | 0 | 1 |
 | `ext/standard/JitFileGetContents.php` | 0 | 1 |
 | `ext/standard/JitFilePutContents.php` | 0 | 1 |
+| `ext/standard/JitFilter.php` | 0 | 1 |
 | `ext/standard/JitGetallheaders.php` | 0 | 1 |
 | `ext/standard/JitHash.php` | 0 | 1 |
 | `ext/standard/JitHeader.php` | 0 | 1 |
@@ -74,10 +75,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/JitSubstrCount.php` | 0 | 1 |
 | `ext/standard/JitUrlencode.php` | 0 | 1 |
 | `ext/standard/JitWebParams.php` | 0 | 15 |
-| `ext/standard/Module.php` | 0 | 147 |
+| `ext/standard/Module.php` | 0 | 149 |
 | `ext/standard/SetcookieLine.php` | 0 | 1 |
 | `ext/standard/VmDate.php` | 0 | 1 |
 | `ext/standard/VmExit.php` | 0 | 2 |
+| `ext/standard/VmFilter.php` | 0 | 3 |
 | `ext/standard/VmFs.php` | 0 | 3 |
 | `ext/standard/VmHash.php` | 0 | 1 |
 | `ext/standard/VmInternalCall.php` | 0 | 3 |
@@ -128,6 +130,8 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/file_exists.php` | 0 | 1 |
 | `ext/standard/file_get_contents.php` | 0 | 1 |
 | `ext/standard/file_put_contents.php` | 0 | 1 |
+| `ext/standard/filter_input.php` | 0 | 4 |
+| `ext/standard/filter_var.php` | 0 | 1 |
 | `ext/standard/floatval.php` | 0 | 1 |
 | `ext/standard/floor.php` | 0 | 1 |
 | `ext/standard/fmod.php` | 0 | 1 |
@@ -324,7 +328,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `lib/VM.php` | 0 | 10 |
 | `lib/VM/ClassEntry.php` | 0 | 1 |
 | `lib/VM/ClassProperty.php` | 0 | 1 |
-| `lib/VM/Context.php` | 0 | 12 |
+| `lib/VM/Context.php` | 0 | 16 |
 | `lib/VM/ErrorReporter.php` | 0 | 1 |
 | `lib/VM/HashTable.php` | 2 | 22 |
 | `lib/VM/ObjectEntry.php` | 0 | 1 |
@@ -389,6 +393,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/JitFilter.php`
+
+**Warnings** (review for bootstrap subset):
+- 8 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/JitGetallheaders.php`
 
@@ -695,34 +704,36 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new web_int (line 137)
 - new web_string (line 138)
 - new web_bool (line 139)
-- new urlencode (line 140)
-- new rawurlencode (line 141)
-- new urldecode (line 142)
-- new rawurldecode (line 143)
-- new parse_url (line 144)
-- new dirname (line 145)
-- new basename (line 146)
-- new realpath (line 147)
-- new file_get_contents (line 148)
-- new readfile (line 149)
-- new file_put_contents (line 150)
-- new file_exists (line 151)
-- new is_file (line 152)
-- new is_dir (line 153)
-- new fopen (line 154)
-- new fread (line 155)
-- new fwrite (line 156)
-- new fclose (line 157)
-- new getenv_ (line 158)
-- new putenv_ (line 159)
-- new phpc_deploy_path (line 160)
-- new extract_ (line 161)
-- new compact_ (line 162)
-- new scandir (line 163)
-- new glob_ (line 164)
-- new time (line 165)
-- new date (line 166)
-- new gmdate (line 167)
+- new filter_var (line 140)
+- new filter_input (line 141)
+- new urlencode (line 142)
+- new rawurlencode (line 143)
+- new urldecode (line 144)
+- new rawurldecode (line 145)
+- new parse_url (line 146)
+- new dirname (line 147)
+- new basename (line 148)
+- new realpath (line 149)
+- new file_get_contents (line 150)
+- new readfile (line 151)
+- new file_put_contents (line 152)
+- new file_exists (line 153)
+- new is_file (line 154)
+- new is_dir (line 155)
+- new fopen (line 156)
+- new fread (line 157)
+- new fwrite (line 158)
+- new fclose (line 159)
+- new getenv_ (line 160)
+- new putenv_ (line 161)
+- new phpc_deploy_path (line 162)
+- new extract_ (line 163)
+- new compact_ (line 164)
+- new scandir (line 165)
+- new glob_ (line 166)
+- new time (line 167)
+- new date (line 168)
+- new gmdate (line 169)
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/SetcookieLine.php`
@@ -740,6 +751,13 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 **Warnings** (review for bootstrap subset):
 - new ScriptExit (line 15)
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/VmFilter.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 46)
+- new Variable (line 75)
+- 11 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/VmFs.php`
 
@@ -1012,6 +1030,19 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/file_put_contents.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/filter_input.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 56)
+- new array_key_exists (line 140)
+- new JITVariable (line 162)
+- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/filter_var.php`
 
 **Warnings** (review for bootstrap subset):
 - 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
@@ -1589,14 +1620,14 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/AOT/Linker.php`
 
 **Blockers** (likely prevent AOT bootstrap compile):
-- shell_exec() (line 134)
-- shell_exec() (line 155)
-- shell_exec() (line 189)
-- shell_exec() (line 193)
-- shell_exec() (line 236)
-- shell_exec() (line 246)
-- shell_exec() (line 316)
-- exec() (line 322)
+- shell_exec() (line 135)
+- shell_exec() (line 156)
+- shell_exec() (line 190)
+- shell_exec() (line 194)
+- shell_exec() (line 237)
+- shell_exec() (line 247)
+- shell_exec() (line 317)
+- exec() (line 323)
 
 **Warnings** (review for bootstrap subset):
 - 11 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
@@ -2339,10 +2370,14 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new Variable (line 48)
 - new Variable (line 52)
 - new Variable (line 57)
-- new Variable (line 78)
-- new HashTable (line 79)
-- new RunStackEntry (line 106)
-- new RunStackEntry (line 108)
+- new Variable (line 61)
+- new Variable (line 65)
+- new Variable (line 69)
+- new Variable (line 73)
+- new Variable (line 94)
+- new HashTable (line 95)
+- new RunStackEntry (line 122)
+- new RunStackEntry (line 124)
 - 8 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/VM/ErrorReporter.php`

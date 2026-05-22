@@ -57,6 +57,22 @@ class Context {
                 $var = new Variable(Variable::TYPE_INTEGER);
                 $var->int(\PHPCompiler\ext\standard\VmPassword::PASSWORD_DEFAULT);
                 return $var;
+            case 'filter_validate_int':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(\PHPCompiler\ext\standard\VmFilter::FILTER_VALIDATE_INT);
+                return $var;
+            case 'filter_validate_email':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(\PHPCompiler\ext\standard\VmFilter::FILTER_VALIDATE_EMAIL);
+                return $var;
+            case 'input_get':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(\PHPCompiler\ext\standard\VmFilter::INPUT_GET);
+                return $var;
+            case 'input_post':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(\PHPCompiler\ext\standard\VmFilter::INPUT_POST);
+                return $var;
         }
         if (isset($this->constants[$name])) {
             return $this->constants[$name];

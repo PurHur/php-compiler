@@ -38,6 +38,7 @@
         "ext/standard/JitExplode.php",
         "ext/standard/JitFileGetContents.php",
         "ext/standard/JitFilePutContents.php",
+        "ext/standard/JitFilter.php",
         "ext/standard/JitGetallheaders.php",
         "ext/standard/JitHash.php",
         "ext/standard/JitHeader.php",
@@ -76,6 +77,7 @@
         "ext/standard/SetcookieLine.php",
         "ext/standard/VmDate.php",
         "ext/standard/VmExit.php",
+        "ext/standard/VmFilter.php",
         "ext/standard/VmFs.php",
         "ext/standard/VmHash.php",
         "ext/standard/VmInternalCall.php",
@@ -126,6 +128,8 @@
         "ext/standard/file_exists.php",
         "ext/standard/file_get_contents.php",
         "ext/standard/file_put_contents.php",
+        "ext/standard/filter_input.php",
+        "ext/standard/filter_var.php",
         "ext/standard/floatval.php",
         "ext/standard/floor.php",
         "ext/standard/fmod.php",
@@ -389,9 +393,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 324,
+        "inventory_files": 328,
         "excluded": 2,
-        "eligible": 322,
+        "eligible": 326,
         "aot_lint_targets": 15,
         "aot_link_targets": 13,
         "aot_link_lib_targets": 1
