@@ -157,6 +157,7 @@ class Module extends ModuleAbstract
             new is_file(),
             new is_dir(),
             new is_readable(),
+            new is_writable(),
             new fopen(),
             new fread(),
             new fwrite(),
