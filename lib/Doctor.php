@@ -9,6 +9,8 @@ namespace PHPCompiler;
  */
 final class Doctor
 {
+    private static ?int $jitRuntimeProbeExit = null;
+
     /** @var list<string> */
     private const REQUIRED_EXTENSIONS = [
         'ffi',
@@ -23,8 +25,10 @@ final class Doctor
 
     /**
      * Run all checks; print human-readable report to STDOUT.
+     *
+     * @param bool $jitProbe When true, run script/jit-runtime-probe.php after checks (#717).
      */
-    public static function run(string $repoRoot): int
+    public static function run(string $repoRoot, bool $jitProbe = false): int
     {
         $checks = self::collectChecks($repoRoot);
         $failed = 0;
@@ -39,6 +43,13 @@ final class Doctor
                 }
             } elseif (!$check['ok'] && '' !== $check['hint']) {
                 fwrite(STDOUT, '      → '.$check['hint']."\n");
+            }
+        }
+
+        if ($jitProbe) {
+            $probeExit = self::runJitRuntimeProbe($repoRoot);
+            if (0 !== $probeExit) {
+                return $failed > 0 ? 1 : $probeExit;
             }
         }
 
@@ -135,6 +146,7 @@ final class Doctor
         $checks = array_merge($checks, self::checkExtensions());
         $checks[] = self::checkVendor($repoRoot);
         $checks[] = self::checkLlvm($repoRoot);
+        $checks[] = self::checkJitCompliance($repoRoot);
         $checks[] = self::checkLoopback($repoRoot);
         $checks[] = self::checkDockerImage();
         $checks[] = self::checkPhpcJsonManifest($repoRoot);
@@ -205,13 +217,16 @@ final class Doctor
      */
     private static function checkLlvm(string $repoRoot): array
     {
-        $dir = self::resolveLlvmDir($repoRoot);
-        if (null === $dir) {
+        $info = self::resolveLlvmInfo($repoRoot);
+        if (null === $info['dir']) {
+            $envHint = getenv('PHP_COMPILER_LLVM_PATH');
+            $envSet = false !== $envHint && '' !== $envHint ? $envHint : '(unset)';
+
             return [
                 'name' => 'LLVM 9',
                 'ok' => false,
                 'required' => true,
-                'detail' => 'libLLVM-9.so.1 not found',
+                'detail' => 'libLLVM-9.so.1: no (PHP_COMPILER_LLVM_PATH='.$envSet.')',
                 'hint' => 'script/install-llvm9.sh  or  docker run php-compiler:22.04-dev (has /opt/llvm9)',
             ];
         }
@@ -220,9 +235,131 @@ final class Doctor
             'name' => 'LLVM 9',
             'ok' => true,
             'required' => true,
-            'detail' => $dir,
+            'detail' => 'libLLVM-9.so.1: yes at '.$info['dir'].' (from '.$info['source'].')',
             'hint' => '',
         ];
+    }
+
+    /**
+     * @return array{name: string, ok: bool, required: bool, detail: string, hint: string}
+     */
+    private static function checkJitCompliance(string $repoRoot): array
+    {
+        $info = self::resolveLlvmInfo($repoRoot);
+        if (null === $info['dir']) {
+            return [
+                'name' => 'JIT compliance',
+                'ok' => false,
+                'required' => false,
+                'detail' => 'LLVM missing — JITTest @group llvm skipped in ci-local',
+                'hint' => 'Use ./script/ci-fast.sh or phpc test --fast for VM-only iteration',
+            ];
+        }
+
+        self::applyLlvmProcessEnv($info['dir']);
+        if (!self::probePhpllvmChooser()) {
+            return [
+                'name' => 'JIT compliance',
+                'ok' => false,
+                'required' => false,
+                'detail' => 'LLVM present but PHPLLVM bootstrap failed',
+                'hint' => 'issue #98 — export PHP_COMPILER_LLVM_PATH; prepend LLVM dir to LD_LIBRARY_PATH and PATH; avoid broken host .llvm bind-mount',
+            ];
+        }
+
+        $probeExit = self::jitRuntimeProbeExit($repoRoot);
+        if (0 !== $probeExit) {
+            return [
+                'name' => 'JIT compliance',
+                'ok' => false,
+                'required' => false,
+                'detail' => 'MCJIT probe failed (bin/jit.php trivial compile)',
+                'hint' => 'issue #98 — same LLVM PATH/LD_LIBRARY_PATH fix; phpc doctor --jit-probe for details',
+            ];
+        }
+
+        return [
+            'name' => 'JIT compliance',
+            'ok' => true,
+            'required' => false,
+            'detail' => 'ready — JITTest should execute in ci-local.sh (not 100% skipped)',
+            'hint' => '',
+        ];
+    }
+
+    private static function jitRuntimeProbeExit(string $repoRoot): int
+    {
+        if (null !== self::$jitRuntimeProbeExit) {
+            return self::$jitRuntimeProbeExit;
+        }
+        self::$jitRuntimeProbeExit = self::runJitRuntimeProbe($repoRoot, false);
+
+        return self::$jitRuntimeProbeExit;
+    }
+
+    /**
+     * Run script/jit-runtime-probe.php (MCJIT smoke). Returns probe exit code.
+     */
+    public static function runJitRuntimeProbe(string $repoRoot, bool $echoOutput = true): int
+    {
+        if (!$echoOutput && null !== self::$jitRuntimeProbeExit) {
+            return self::$jitRuntimeProbeExit;
+        }
+        $script = $repoRoot.'/script/jit-runtime-probe.php';
+        if (!is_file($script)) {
+            if ($echoOutput) {
+                fwrite(STDERR, "JIT probe: {$script} missing\n");
+            }
+
+            return 2;
+        }
+
+        $info = self::resolveLlvmInfo($repoRoot);
+        if (null === $info['dir']) {
+            if ($echoOutput) {
+                fwrite(STDOUT, "JIT probe skipped: LLVM 9 not found\n");
+            }
+
+            return 0;
+        }
+
+        $cmd = array_merge(self::phpBinary(), [$script]);
+        $env = $_ENV;
+        self::applyLlvmProcessEnvToArray($info['dir'], $env);
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open($cmd, $descriptorSpec, $pipes, $repoRoot, $env);
+        if (!is_resource($proc)) {
+            if ($echoOutput) {
+                fwrite(STDERR, "JIT probe: failed to start jit-runtime-probe.php\n");
+            }
+
+            return 2;
+        }
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+        if ($echoOutput) {
+            if (false !== $stdout && '' !== $stdout) {
+                fwrite(STDOUT, $stdout);
+            }
+            if (false !== $stderr && '' !== $stderr) {
+                fwrite(STDERR, $stderr);
+            }
+        }
+
+        $code = is_int($exit) ? $exit : 1;
+        if (!$echoOutput) {
+            self::$jitRuntimeProbeExit = $code;
+        }
+
+        return $code;
     }
 
     /**
@@ -345,26 +482,70 @@ final class Doctor
     }
 
     /**
-     * @return non-empty-string|null
+     * @return array{dir: non-empty-string|null, source: string}
      */
-    private static function resolveLlvmDir(string $repoRoot): ?string
+    private static function resolveLlvmInfo(string $repoRoot): array
     {
-        $candidates = [$repoRoot.'/.llvm'];
+        $candidates = [];
         $fromEnv = getenv('PHP_COMPILER_LLVM_PATH');
         if (false !== $fromEnv && '' !== $fromEnv) {
-            $candidates[] = $fromEnv;
+            $candidates[] = ['dir' => $fromEnv, 'source' => 'PHP_COMPILER_LLVM_PATH'];
         }
-        $candidates[] = '/opt/llvm9';
+        $candidates[] = ['dir' => $repoRoot.'/.llvm', 'source' => '.llvm/'];
+        $candidates[] = ['dir' => '/opt/llvm9', 'source' => '/opt/llvm9'];
 
-        foreach ($candidates as $dir) {
+        foreach ($candidates as $candidate) {
+            $dir = $candidate['dir'];
             if (is_file($dir.'/libLLVM-9.so.1')) {
                 $resolved = realpath($dir);
+                $resolvedDir = false !== $resolved ? $resolved : $dir;
 
-                return false !== $resolved ? $resolved : $dir;
+                return ['dir' => $resolvedDir, 'source' => $candidate['source']];
             }
         }
 
-        return null;
+        return ['dir' => null, 'source' => ''];
+    }
+
+    private static function applyLlvmProcessEnv(string $llvmDir): void
+    {
+        if ('' === getenv('PHP_COMPILER_LLVM_PATH')) {
+            putenv('PHP_COMPILER_LLVM_PATH='.$llvmDir);
+            $_ENV['PHP_COMPILER_LLVM_PATH'] = $llvmDir;
+            $_SERVER['PHP_COMPILER_LLVM_PATH'] = $llvmDir;
+        }
+        $ld = getenv('LD_LIBRARY_PATH');
+        $ldVal = false === $ld || '' === $ld ? $llvmDir : $llvmDir.':'.$ld;
+        putenv('LD_LIBRARY_PATH='.$ldVal);
+        $path = getenv('PATH');
+        $pathVal = false === $path || '' === $path ? $llvmDir : $llvmDir.':'.$path;
+        putenv('PATH='.$pathVal);
+    }
+
+    /**
+     * @param array<string, string> $env
+     */
+    private static function applyLlvmProcessEnvToArray(string $llvmDir, array &$env): void
+    {
+        $env['PHP_COMPILER_LLVM_PATH'] = $llvmDir;
+        $ld = $env['LD_LIBRARY_PATH'] ?? getenv('LD_LIBRARY_PATH') ?: '';
+        $env['LD_LIBRARY_PATH'] = '' === $ld ? $llvmDir : $llvmDir.':'.$ld;
+        $path = $env['PATH'] ?? getenv('PATH') ?: '';
+        $env['PATH'] = '' === $path ? $llvmDir : $llvmDir.':'.$path;
+    }
+
+    private static function probePhpllvmChooser(): bool
+    {
+        if (!class_exists(\PHPLLVM\Chooser::class)) {
+            return false;
+        }
+        try {
+            \PHPLLVM\Chooser::choose();
+
+            return true;
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 
     /**
