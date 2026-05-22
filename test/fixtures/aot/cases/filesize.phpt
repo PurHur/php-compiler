@@ -9,5 +9,11 @@ if ($size === false) {
 } else {
     echo $size, "\n";
 }
+if (filesize('/no/such/phpc-filesize-path')) {
+    echo 'bad', "\n";
+} else {
+    echo 'gone', "\n";
+}
 --EXPECT--
 15
+gone
