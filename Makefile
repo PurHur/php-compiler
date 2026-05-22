@@ -1,4 +1,6 @@
 #!make
+# Primary dev image: make docker-build-22 → php-compiler:22.04-dev (issues #73, #202).
+# Legacy ircmaxell/php-compiler:* targets below are deprecated (Docker Hub 404).
 
 .PHONY: composer-install
 composer-install:
@@ -132,9 +134,13 @@ test-18: test-legacy-18
 PHP_COMPILER_DEV_IMAGE ?= ghcr.io/PurHur/php-compiler:dev
 LOCAL_DEV_IMAGE ?= php-compiler:22.04-dev
 
-.PHONY: docker-build-22
+.PHONY: docker-build-22 docker-publish-dev
 docker-build-22:
 	docker build -f Docker/dev/ubuntu-22.04/Dockerfile -t $(LOCAL_DEV_IMAGE) -t $(PHP_COMPILER_DEV_IMAGE) .
+
+# Maintainer: push dev image to ghcr.io (issue #202; requires docker login ghcr.io)
+docker-publish-dev:
+	./script/docker-publish-dev.sh --push
 
 # Run full local CI inside Docker (memory-capped; see script/ci-defaults.env)
 .PHONY: test-docker test-docker-safe
