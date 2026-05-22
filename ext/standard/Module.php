@@ -137,6 +137,8 @@ class Module extends ModuleAbstract
             new web_int(),
             new web_string(),
             new web_bool(),
+            new filter_var(),
+            new filter_input(),
             new urlencode(),
             new rawurlencode(),
             new urldecode(),
