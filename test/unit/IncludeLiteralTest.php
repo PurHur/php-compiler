@@ -47,6 +47,18 @@ final class IncludeLiteralTest extends TestCase
         $this->assertSame("hello from helper\n", $exit['stdout']);
     }
 
+    /**
+     * require expression captures return value (MiniWebApp config.php pattern, issue #67).
+     */
+    public function testVmRequireReturnValue(): void
+    {
+        $entry = realpath(__DIR__.'/../compliance/cases/language/require_return/entry.php');
+        $this->assertNotFalse($entry);
+        $exit = $this->runVm([$entry]);
+        $this->assertSame(0, $exit['code'], $exit['stderr']);
+        $this->assertSame("TestApp\n", $exit['stdout']);
+    }
+
     public function testLintFollowsDirRelativeInclude(): void
     {
         $entry = realpath(__DIR__.'/../compliance/cases/language/include_dir_literal/entry.php');

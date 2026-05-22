@@ -633,24 +633,7 @@ class Compiler {
                 }
                 return $return;
             case Op\Expr\Include_::class:
-                $includePath = ConstStringFolder::foldForInclude($block->orig, $expr->expr, $expr->getFile());
-                if (null !== $includePath) {
-                    $resolved = IncludePathResolver::resolve($includePath, $expr->getFile());
-                    if (null !== $resolved) {
-                        $literal = new Operand\Literal($resolved);
-                        $literal->type = Type::string();
-
-                        return [new OpCode(
-                            OpCode::TYPE_INCLUDE,
-                            $this->compileOperand($literal, $block, true),
-                        )];
-                    }
-                }
-
-                return [new OpCode(
-                    OpCode::TYPE_INCLUDE,
-                    $this->compileOperand($expr->expr, $block, true),
-                )];
+                return [$this->compileIncludeOp($expr, $block)];
             case Op\Expr\Isset_::class:
                 return $this->compileIsset($expr, $block);
             case Op\Iterator\Valid::class:
@@ -691,6 +674,39 @@ class Compiler {
             $containerSlot,
             $dimSlot
         )];
+    }
+
+    protected function compileIncludeOp(Op\Expr\Include_ $expr, Block $block): OpCode
+    {
+        $resultSlot = null;
+        if ($expr->result instanceof Operand\Temporary) {
+            if ([] !== $expr->result->usages) {
+                $resultSlot = $this->compileOperand($expr->result, $block, false);
+            }
+        } else {
+            $resultSlot = $this->compileOperand($expr->result, $block, false);
+        }
+
+        $includePath = ConstStringFolder::foldForInclude($block->orig, $expr->expr, $expr->getFile());
+        if (null !== $includePath) {
+            $resolved = IncludePathResolver::resolve($includePath, $expr->getFile());
+            if (null !== $resolved) {
+                $literal = new Operand\Literal($resolved);
+                $literal->type = Type::string();
+
+                return new OpCode(
+                    OpCode::TYPE_INCLUDE,
+                    $this->compileOperand($literal, $block, true),
+                    $resultSlot,
+                );
+            }
+        }
+
+        return new OpCode(
+            OpCode::TYPE_INCLUDE,
+            $this->compileOperand($expr->expr, $block, true),
+            $resultSlot,
+        );
     }
 
     protected function compileCoalesce(Op\Expr\BinaryOp\Coalesce $expr, Block $block): Block

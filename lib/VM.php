@@ -235,6 +235,9 @@ restart:
                     $frame->scope[$op->arg1]->copyFrom($value);
                     break;
                 case OpCode::TYPE_RETURN_VOID:
+                    if (!is_null($frame->returnVar)) {
+                        $frame->returnVar->null();
+                    }
                     if ($frame->ephemeral && null !== $frame->parent) {
                         $frame = $frame->parent;
                         goto restart;
@@ -404,6 +407,10 @@ restart:
                     $new = $parsed->getFrame($this->context, $frame);
                     $new->ephemeral = true;
                     $new->parent = $frame;
+                    if (null !== $op->arg2) {
+                        $new->returnVar = $frame->scope[$op->arg2];
+                        $new->returnVar->int(1);
+                    }
                     $frame = $new;
                     goto restart;
                 case OpCode::TYPE_ITER_RESET:

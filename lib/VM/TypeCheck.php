@@ -60,8 +60,13 @@ final class TypeCheck
             case Variable::TYPE_STRING:
                 $dest->string($value->toString());
                 return;
+            case Variable::TYPE_ARRAY:
+                if (Variable::TYPE_ARRAY === $value->type) {
+                    return;
+                }
+                break;
         }
-        throw new \TypeError(self::strictMessage($constraint, $value, 'Argument'));
+        throw new \TypeError(self::strictMessage($constraint, $value, $kind));
     }
 
     private static function coerceToInt(Variable $value): int
