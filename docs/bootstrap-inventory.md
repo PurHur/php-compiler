@@ -2588,7 +2588,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/Web/DevServer.php`
 
 **Warnings** (review for bootstrap subset):
-- 23 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 24 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/Web/IncludePathResolver.php`
 

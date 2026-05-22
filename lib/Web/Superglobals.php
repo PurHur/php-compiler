@@ -335,7 +335,7 @@ final class Superglobals
      */
     private static function populateMultipart(HashTable $post, HashTable $files, string $body): void
     {
-        if ('' === $body || strlen($body) > DevServer::MAX_REQUEST_BODY) {
+        if ('' === $body || strlen($body) > DevServer::maxRequestBody()) {
             return;
         }
         $body = str_replace("\r\n", "\n", str_replace("\r", "\n", $body));
@@ -496,7 +496,7 @@ final class Superglobals
         if ('' === $body) {
             return;
         }
-        if (strlen($body) > DevServer::MAX_REQUEST_BODY) {
+        if (strlen($body) > DevServer::maxRequestBody()) {
             return;
         }
         try {
