@@ -24,7 +24,9 @@ final class CapabilitySyntaxTest extends TestCase
         $body = (string) file_get_contents($doc);
         $this->assertStringContainsString('#58', $body);
         $this->assertStringContainsString('#568', $body);
+        $this->assertStringContainsString('#199', $body);
         $this->assertStringContainsString('Native user-class link', $body);
+        $this->assertStringContainsString('Magic constants', $body);
         $this->assertStringContainsString('| Construct | VM | JIT | AOT | Issue | Notes |', $body);
     }
 
