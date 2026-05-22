@@ -254,6 +254,7 @@ final class ProjectManifestTest extends TestCase
             file_put_contents($dir.'/phpc.json', '{"binary": "missing"}');
             $result = $this->runPhpcValidateManifest($dir);
             $this->assertSame(1, $result['exit']);
+            $this->assertStringContainsString('phpc.json:', $result['stderr']);
             $this->assertStringContainsString('binary path not found: missing', $result['stderr']);
         } finally {
             $this->removeTree($dir);
