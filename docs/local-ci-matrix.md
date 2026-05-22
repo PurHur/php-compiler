@@ -48,9 +48,26 @@ make test
 
 Set `PHP_COMPILER_SKIP_SERVE_TESTS=1` only when loopback TCP bind is unavailable. Harness Docker CI should **not** set this by default.
 
+## Docker dev image (issue [#202](https://github.com/PurHur/php-compiler/issues/202))
+
+Harness hosts and contributors without host PHP/LLVM should use the **22.04 dev image**, not legacy `ircmaxell/php-compiler:*` tags (Docker Hub 404).
+
+| Step | Command |
+|------|---------|
+| Build locally | `make docker-build-22` → `php-compiler:22.04-dev` |
+| Smoke | `docker run --rm php-compiler:22.04-dev php -v` |
+| Full CI in container | `make test-docker` or `./script/docker-ci-local.sh` |
+| Harness empty bind-mount | `./script/docker-ci-local.sh` (tar fallback, [#272](https://github.com/PurHur/php-compiler/issues/272)) |
+| Fast CI in container | `./script/docker-ci-local.sh fast` |
+| Pull (optional) | `docker pull ghcr.io/PurHur/php-compiler:dev` then `export PHP_COMPILER_DEV_IMAGE=ghcr.io/PurHur/php-compiler:dev` |
+| Publish (maintainer) | `docker login ghcr.io` then `./script/docker-publish-dev.sh --push` or `make docker-publish-dev` |
+
+`make docker-build-22` tags both `php-compiler:22.04-dev` and `ghcr.io/PurHur/php-compiler:dev`. CI wrappers default to the local tag unless `PHP_COMPILER_DEV_IMAGE` is set.
+
 ## Related issues
 
 - [#436](https://github.com/PurHur/php-compiler/issues/436) — tiered CI (`ci-fast` vs `ci-local`)
 - [#497](https://github.com/PurHur/php-compiler/issues/497) — memory incident (closed)
 - [#500](https://github.com/PurHur/php-compiler/issues/500) — VM RSS profiling
 - [#501](https://github.com/PurHur/php-compiler/issues/501) — land CI caps (closed via PR)
+- [#202](https://github.com/PurHur/php-compiler/issues/202) — Docker dev image docs + optional ghcr.io publish

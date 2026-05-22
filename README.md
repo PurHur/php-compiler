@@ -192,9 +192,18 @@ If the container runs out of memory while running the full suite (process exit c
 
 On sandboxes that cannot bind TCP ports, set `PHP_COMPILER_SKIP_SERVE_TESTS=1` before running CI.
 
-Published tag (when available): `ghcr.io/PurHur/php-compiler:dev`. Override with `PHP_COMPILER_DEV_IMAGE`.
+Published tag (when available): `ghcr.io/PurHur/php-compiler:dev`. Override with `PHP_COMPILER_DEV_IMAGE`. If `docker pull` fails, build locally with `make docker-build-22` (canonical on harness hosts).
 
-Legacy Makefile targets use Ubuntu 16.04 / 18.04 images with PHP 7.4 (`make test-legacy-16`, `make test-legacy-18`; `make test-18` is a deprecated alias). For day-to-day development, prefer `make test` or host `make test-local` above.
+Maintainers can publish after `docker login ghcr.io`:
+
+```console
+./script/docker-publish-dev.sh --push
+# or: make docker-publish-dev
+```
+
+See [docs/local-ci-matrix.md](docs/local-ci-matrix.md#docker-dev-image-issue-202) for the full Docker-only matrix.
+
+Legacy Makefile targets use Ubuntu 16.04 / 18.04 images with PHP 7.4 (`ircmaxell/php-compiler:*` on Docker Hub often 404s; `make test-legacy-16`, `make test-legacy-18`; `make test-18` is a deprecated alias). For day-to-day development, prefer `make test` or host `make test-local` above.
 
 To build legacy images, use make:
 

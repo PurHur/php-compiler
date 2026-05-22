@@ -235,6 +235,27 @@ final class CiScriptsTest extends TestCase
         $makefile = (string) file_get_contents(dirname(__DIR__, 2).'/Makefile');
         $this->assertStringContainsString('test-docker-safe:', $makefile);
         $this->assertStringContainsString('ci-docker-safe.sh', $makefile);
+        $this->assertStringContainsString('docker-build-22', $makefile);
+        $this->assertStringContainsString('docker-publish-dev', $makefile);
+    }
+
+    public function testDockerPublishDevScriptExists(): void
+    {
+        $script = dirname(__DIR__, 2).'/script/docker-publish-dev.sh';
+        $this->assertFileExists($script);
+        $this->assertTrue(is_executable($script));
+        $body = (string) file_get_contents($script);
+        $this->assertStringContainsString('ghcr.io/PurHur/php-compiler:dev', $body);
+        $this->assertStringContainsString('php-compiler:22.04-dev', $body);
+        $this->assertStringContainsString('Docker/dev/ubuntu-22.04/Dockerfile', $body);
+    }
+
+    public function testLocalCiMatrixDocumentsDockerDevImage(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('make docker-build-22', $doc);
+        $this->assertStringContainsString('docker-publish-dev.sh', $doc);
+        $this->assertStringContainsString('ghcr.io/PurHur/php-compiler:dev', $doc);
     }
 
     public function testLocalCiMatrixDocExists(): void
