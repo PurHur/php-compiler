@@ -87,6 +87,22 @@ function syntaxRowDefinitions(): array
             'notes' => [],
             'probe' => '$f = fn () => 1; echo $f();',
         ],
+        [
+            'id' => 'magic_const_class_method',
+            'construct' => 'Magic constants `__CLASS__`, `__METHOD__`, `__FUNCTION__`',
+            'opcodes' => ['TYPE_CONST_FETCH'],
+            'issue' => 199,
+            'notes' => ['Lowered at parse time via php-cfg MagicStringResolver'],
+            'probe' => 'class C { public function id(): string { return __CLASS__ . "::" . __FUNCTION__; } } echo (new C)->id();',
+        ],
+        [
+            'id' => 'magic_const_namespace',
+            'construct' => 'Magic constant `__NAMESPACE__`',
+            'opcodes' => ['TYPE_CONST_FETCH'],
+            'issue' => 199,
+            'notes' => ['Requires `namespace` declaration (#84)'],
+            'probe' => null,
+        ],
     ];
 }
 
@@ -213,6 +229,8 @@ function collectSyntaxPhptCoverage(string $root, array $definitions): array
         'instanceof' => '/\binstanceof\b/',
         'match_expr' => '/\bmatch\s*\(/',
         'arrow_functions' => '/\bfn\s*\(/',
+        'magic_const_class_method' => '/__CLASS__|__FUNCTION__|__METHOD__/',
+        'magic_const_namespace' => '/__NAMESPACE__/',
     ];
 
     $scan = [];
@@ -265,7 +283,8 @@ function renderSyntaxMarkdown(array $syntax): string
         '',
         'Tracking issues: [#58](' . CAPABILITY_ISSUE_URL_BASE . '58), [#145](' . CAPABILITY_ISSUE_URL_BASE
         . '145), [#138](' . CAPABILITY_ISSUE_URL_BASE . '138), [#568](' . CAPABILITY_ISSUE_URL_BASE
-        . '568), [#143](' . CAPABILITY_ISSUE_URL_BASE . '143), [#142](' . CAPABILITY_ISSUE_URL_BASE . '142).',
+        . '568), [#143](' . CAPABILITY_ISSUE_URL_BASE . '143), [#142](' . CAPABILITY_ISSUE_URL_BASE . '142), [#199]('
+        . CAPABILITY_ISSUE_URL_BASE . '199).',
         '',
         '| Construct | VM | JIT | AOT | Issue | Notes |',
         '|-----------|:--:|:---:|:---:|-------|-------|',

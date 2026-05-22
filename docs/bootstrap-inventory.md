@@ -2080,9 +2080,9 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new Variable (line 382)
 - new Variable (line 468)
 - new Variable (line 501)
-- new Variable (line 611)
-- new Variable (line 646)
-- 18 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new Variable (line 625)
+- new Variable (line 660)
+- 19 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Helper.php`
 
