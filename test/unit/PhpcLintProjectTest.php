@@ -66,16 +66,16 @@ final class PhpcLintProjectTest extends TestCase
     /**
      * @see https://github.com/PurHur/php-compiler/issues/462
      */
-    public function testLintMiniWebAppHasNoDynamicIncludeWarnings(): void
+    public function testLintMiniWebAppExitsZero(): void
     {
         $tree = dirname(__DIR__, 2).'/examples/003-MiniWebApp';
         $exit = $this->runLint(['--all', $tree]);
+        $this->assertSame(0, $exit['code'], $exit['stderr']."\n".$exit['stdout']);
         $this->assertStringNotContainsString(
             'dynamic include/require',
             $exit['stderr'],
             $exit['stderr']."\n".$exit['stdout']
         );
-        $this->assertStringContainsString('ClassMethod', $exit['stderr']."\n".$exit['stdout']);
     }
 
     public function testDynamicIncludeEmitsWarning(): void

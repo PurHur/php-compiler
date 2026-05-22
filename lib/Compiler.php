@@ -59,6 +59,23 @@ class Compiler {
         return $this->seen[$block];
     }
 
+    /**
+     * CFG branch target within the current function: inherit parent locals ($this, params).
+     */
+    protected function compileCfgBranch(CfgBlock $block, Block $parent): Block {
+        if (!$this->seen->contains($block)) {
+            $this->seen[$block] = $new = new Block($block);
+            $new->inheritScopeFrom($parent);
+            $this->compileBlock($new);
+        } else {
+            $this->seen[$block]->inheritScopeFrom($parent);
+        }
+        $child = $this->seen[$block];
+        $child->parents[] = $parent;
+
+        return $child;
+    }
+
     protected function compileBlock(Block $block) {
         $this->compileOps($block->orig->children, $block);
     }
@@ -280,15 +297,12 @@ class Compiler {
     protected function compileStmt(Op\Stmt $stmt, Block $block) {
         if ($stmt instanceof Op\Stmt\Jump) {
             $op = new OpCode(OpCode::TYPE_JUMP);
-            $op->block1 = $this->compileCfgBlock($stmt->target);
-            $op->block1->parents[] = $block;
+            $op->block1 = $this->compileCfgBranch($stmt->target, $block);
             $block->addOpCode($op);
         } elseif ($stmt instanceof Op\Stmt\JumpIf) {
             $op = new OpCode(OpCode::TYPE_JUMPIF, $this->compileOperand($stmt->cond, $block, true));
-            $op->block1 = $this->compileCfgBlock($stmt->if);
-            $op->block2 = $this->compileCfgBlock($stmt->else);
-            $op->block1->parents[] = $block;
-            $op->block2->parents[] = $block;
+            $op->block1 = $this->compileCfgBranch($stmt->if, $block);
+            $op->block2 = $this->compileCfgBranch($stmt->else, $block);
             $block->addOpCode($op);
         } elseif ($stmt instanceof Op\Stmt\Switch_) {
             $canBeSwitch = true;
@@ -322,13 +336,11 @@ class Compiler {
                 $op,
                 $this->compileOperand($case, $block, true)
             );
-            $caseOp->block1 = $this->compileCfgBlock($switch->targets[$key]);
-            $caseOp->block1->parents[] = $block;
+            $caseOp->block1 = $this->compileCfgBranch($switch->targets[$key], $block);
             $block->addOpCode($caseOp);
         }
         $defaultOp = new OpCode(OpCode::TYPE_JUMP);
-        $defaultOp->block1 = $this->compileCfgBlock($switch->default);
-        $defaultOp->block1->parents[] = $block;
+        $defaultOp->block1 = $this->compileCfgBranch($switch->default, $block);
         $block->addOpCode($defaultOp);
     }
 
