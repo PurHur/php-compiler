@@ -112,8 +112,8 @@ final class Doctor
                 fwrite(STDOUT, "\nLoopback bind OK: unset MINIWEBAPP_SERVE_GATE=0 or export =1 for ServeTest in ci-local (#641)\n");
             }
             $webSmokeGate = getenv('MINIWEBAPP_WEB_SMOKE_GATE');
-            if (false === $webSmokeGate || '' === $webSmokeGate) {
-                fwrite(STDOUT, "Loopback bind OK: export MINIWEBAPP_WEB_SMOKE_GATE=1 for ci-local PATH_INFO curls (#633)\n");
+            if (false !== $webSmokeGate && '0' === $webSmokeGate) {
+                fwrite(STDOUT, "Loopback bind OK: unset MINIWEBAPP_WEB_SMOKE_GATE=0 for ci-local PATH_INFO curls (#664)\n");
             }
         }
 
