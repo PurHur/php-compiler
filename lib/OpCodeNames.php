@@ -178,6 +178,8 @@ function opcode_type_name(int $type): string
             return 'TYPE_CATCH';
         case 94:
             return 'TYPE_FINALLY';
+        case 95:
+            return 'TYPE_DECLARE_GLOBAL_CONST';
         default:
             return 'unknown opcode';
     }

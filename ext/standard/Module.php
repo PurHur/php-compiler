@@ -162,6 +162,8 @@ class Module extends ModuleAbstract
             new fclose(),
             new getenv_(),
             new putenv_(),
+            new define_(),
+            new defined_(),
             new phpc_deploy_path(),
             new extract_(),
             new compact_(),

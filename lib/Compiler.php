@@ -104,6 +104,9 @@ class Compiler {
                 case Op\Stmt\Class_::class:
                     $block->addOpCode($this->compileClassLike($child, $block));
                     break;
+                case Op\Terminal\Const_::class:
+                    $block->addOpCode($this->compileGlobalConst($child, $block));
+                    break;
                 case Op\Stmt\Interface_::class:
                 case Op\Stmt\Trait_::class:
                     break;
@@ -115,6 +118,7 @@ class Compiler {
             switch (get_class($child)) {
                 case Op\Stmt\Function_::class:
                 case Op\Stmt\Class_::class:
+                case Op\Terminal\Const_::class:
                 case Op\Stmt\Interface_::class:
                 case Op\Stmt\Trait_::class:
                     break;
@@ -1383,8 +1387,24 @@ class Compiler {
         )];
     }
 
+    protected function compileGlobalConst(Op\Terminal\Const_ $const, Block $block): OpCode
+    {
+        $this->compileOps($const->valueBlock->children, $block);
+
+        return new OpCode(
+            OpCode::TYPE_DECLARE_GLOBAL_CONST,
+            $this->compileOperand($const->name, $block, true),
+            $this->compileOperand($const->value, $block, true)
+        );
+    }
+
     protected function compileFuncCall(?int $name, array $args, Operand $result, Block $block): array
     {
+        $folded = $this->tryCompileDefineAsGlobalConst($name, $args, $result, $block);
+        if (null !== $folded) {
+            return $folded;
+        }
+
         $return = [new OpCode(OpCode::TYPE_FUNCCALL_INIT, $name)];
         foreach ($args as $arg) {
             $return[] = new OpCode(OpCode::TYPE_ARG_SEND, $this->compileOperand($arg, $block, true));
@@ -1395,6 +1415,62 @@ class Compiler {
             $return[] = new OpCode(OpCode::TYPE_FUNCCALL_EXEC_NORETURN);
         }
         return $return;
+    }
+
+    /**
+     * Lower define('NAME', literal) to compile-time global constant registration (issue #204).
+     *
+     * @return list<OpCode>|null
+     */
+    protected function tryCompileDefineAsGlobalConst(
+        ?int $name,
+        array $args,
+        Operand $result,
+        Block $block
+    ): ?array {
+        if (null === $name) {
+            return null;
+        }
+        $nameOp = $block->getOperand($name);
+        if (!$nameOp instanceof Operand\Literal || 'define' !== $nameOp->value) {
+            return null;
+        }
+        if (count($args) < 2) {
+            return null;
+        }
+        $constNameArg = $args[0];
+        $valueArg = $args[1];
+        if (!$constNameArg instanceof Operand\Literal || !$valueArg instanceof Operand\Literal) {
+            return null;
+        }
+        if (Variable::TYPE_STRING !== Variable::mapFromType($constNameArg->type)) {
+            return null;
+        }
+        $constNameSlot = $this->compileOperand($constNameArg, $block, true);
+        $valueSlot = $this->compileOperand($valueArg, $block, true);
+        if (!isset($block->constants[$constNameSlot], $block->constants[$valueSlot])) {
+            return null;
+        }
+        $ops = [new OpCode(
+            OpCode::TYPE_DECLARE_GLOBAL_CONST,
+            $constNameSlot,
+            $valueSlot
+        )];
+        if (!empty($result->usages)) {
+            $trueVar = new Variable(Variable::TYPE_BOOLEAN);
+            $trueVar->bool(true);
+            $trueOperand = new Temporary;
+            $trueOperand->type = Type::bool();
+            $trueSlot = $block->registerConstant($trueOperand, $trueVar);
+            $ops[] = new OpCode(
+                OpCode::TYPE_ASSIGN,
+                $this->compileOperand($result, $block, false),
+                $this->compileOperand($result, $block, false),
+                $trueSlot
+            );
+        }
+
+        return $ops;
     }
 
 }

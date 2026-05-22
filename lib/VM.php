@@ -373,6 +373,15 @@ restart:
                         : $frame->block->strictTypes;
                     TypeCheck::coerceParameter($arg1, $strict);
                     break;
+                case OpCode::TYPE_DECLARE_GLOBAL_CONST:
+                    $name = $frame->scope[$op->arg1]->toString();
+                    if (!isset($frame->block->constants[$op->arg2])) {
+                        throw new \LogicException('Global constant value must be a compile-time constant');
+                    }
+                    if (!$this->context->defineConstant($name, $frame->block->constants[$op->arg2])) {
+                        throw new \LogicException("Cannot redefine constant {$name}");
+                    }
+                    break;
                 case OpCode::TYPE_DECLARE_CLASS:
                     $name = $frame->scope[$op->arg1]->toString();
                     $lcname = strtolower($name);
