@@ -26,7 +26,7 @@ abstract class BaseTest extends TestCase {
     ];
 
     const REQUIRED_SECTIONS = [
-        'FILE',
+        ['FILE', 'RUNFILE'],
         self::EXPECTATIONS,
     ];
 
@@ -48,7 +48,7 @@ abstract class BaseTest extends TestCase {
         yield from self::providePHPTestsFromDir(static::$DIR . '/cases');
     }
 
-    private static function providePHPTestsFromDir(string $dir): \Generator {
+    protected static function providePHPTestsFromDir(string $dir): \Generator {
         foreach (new \DirectoryIterator($dir) as $path) {
             if (!$path->isDir() || $path->isDot()) {
                 continue;
@@ -60,7 +60,7 @@ abstract class BaseTest extends TestCase {
         }
     }
 
-    private static function parsePHPT(string $filename, string $basename): array {
+    protected static function parsePHPT(string $filename, string $basename): array {
         $sections = [];
         $section = '';
         foreach (file($filename) as $line) {
@@ -90,9 +90,12 @@ abstract class BaseTest extends TestCase {
                 throw new \LogicException("PHPT $section sections are not supported");
             }
         }
+        $sections['__phpt_dir'] = dirname($filename);
+        $fileSection = $sections['FILE'] ?? '';
+
         return [
             trim($sections["TEST"]),
-            $sections['FILE'],
+            $fileSection,
             $sections,
         ];
     }
@@ -173,15 +176,24 @@ abstract class BaseTest extends TestCase {
         self::applyLlvmToolchainEnv($env);
         self::applyEnvSection($env, $sections);
         PhptWebSections::applyToEnv($env, $sections);
-        $proc = proc_open(
-            array_merge(self::llvmEnvPrefix(), $this->phpCommand(), [$this->BIN]),
-            $descriptorSepc,
-            $pipes,
-            $repoRoot,
-            $env
-        );
-        fwrite($pipes[0], $code);
-        fclose($pipes[0]);
+        $runfile = isset($sections['RUNFILE']) ? trim($sections['RUNFILE']) : '';
+        if ('' !== $runfile) {
+            $runPath = realpath(($sections['__phpt_dir'] ?? $repoRoot) . '/' . $runfile);
+            if (false === $runPath) {
+                $this->fail("RUNFILE not found: {$runfile}");
+            }
+            $cmd = array_merge(self::llvmEnvPrefix(), $this->phpCommand(), [$this->BIN, $runPath]);
+            $cwd = dirname($runPath);
+        } else {
+            $cmd = array_merge(self::llvmEnvPrefix(), $this->phpCommand(), [$this->BIN]);
+            $cwd = $repoRoot;
+        }
+        $proc = proc_open($cmd, $descriptorSepc, $pipes, $cwd, $env);
+        if ('' === $runfile) {
+            fwrite($pipes[0], $code);
+        } else {
+            fclose($pipes[0]);
+        }
         $result = stream_get_contents($pipes[1]);
         fclose($pipes[1]);
         proc_close($proc);
