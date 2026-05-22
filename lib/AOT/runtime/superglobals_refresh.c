@@ -2109,3 +2109,154 @@ void __compiler_undefined_array_key_warning_long(long long key)
 {
     fprintf(stderr, "Warning: Undefined array key %lld\n", key);
 }
+
+/*
+ * Pending response headers for header_list() / header_remove() JIT/AOT (#311).
+ * Mirrors PHPCompiler\Web\ResponseContext (insertion order, case-insensitive names).
+ */
+typedef struct __phpc_header_node {
+    __string__ *line;
+    struct __phpc_header_node *next;
+} __phpc_header_node;
+
+static __phpc_header_node *phpc_pending_head = NULL;
+static __phpc_header_node *phpc_pending_tail = NULL;
+
+static int phpc_header_name_from_line(__string__ *line, char *buf, size_t bufsz)
+{
+    const char *s;
+    size_t len;
+    size_t i = 0;
+
+    if (line == NULL) {
+        return 0;
+    }
+    s = nf_strdata(line);
+    len = nf_strlen(line);
+    if (len >= 5 && strncasecmp(s, "HTTP/", 5) == 0) {
+        return 0;
+    }
+    while (i < len && s[i] != ':') {
+        i++;
+    }
+    if (i >= len) {
+        return 0;
+    }
+    {
+        size_t n = i;
+        while (n > 0 && (s[n - 1] == ' ' || s[n - 1] == '\t')) {
+            n--;
+        }
+        if (n >= bufsz) {
+            n = bufsz - 1;
+        }
+        memcpy(buf, s, n);
+        buf[n] = '\0';
+
+        return 1;
+    }
+}
+
+static int phpc_header_name_match(__string__ *line, __string__ *name)
+{
+    char line_name[256];
+    const char *needle;
+    size_t nlen;
+
+    if (!phpc_header_name_from_line(line, line_name, sizeof line_name)) {
+        return 0;
+    }
+    needle = nf_strdata(name);
+    nlen = nf_strlen(name);
+
+    (void) nlen;
+
+    return 0 == strcasecmp(line_name, needle);
+}
+
+static void phpc_pending_free_nodes(void)
+{
+    __phpc_header_node *cur = phpc_pending_head;
+
+    while (cur != NULL) {
+        __phpc_header_node *next = cur->next;
+        free(cur);
+        cur = next;
+    }
+    phpc_pending_head = NULL;
+    phpc_pending_tail = NULL;
+}
+
+void __phpc_pending_header_reset(void)
+{
+    phpc_pending_free_nodes();
+}
+
+void __phpc_pending_header_remove(__string__ *name)
+{
+    __phpc_header_node **pp;
+
+    if (name == NULL || nf_strlen(name) == 0) {
+        phpc_pending_free_nodes();
+
+        return;
+    }
+    pp = &phpc_pending_head;
+    while (*pp != NULL) {
+        if (phpc_header_name_match((*pp)->line, name)) {
+            __phpc_header_node *dead = *pp;
+            *pp = dead->next;
+            if (phpc_pending_tail == dead) {
+                phpc_pending_tail = NULL;
+            }
+            free(dead);
+        } else {
+            pp = &(*pp)->next;
+        }
+    }
+    if (phpc_pending_head == NULL) {
+        phpc_pending_tail = NULL;
+    }
+}
+
+void __phpc_pending_header_add(__string__ *line, int replace)
+{
+    __phpc_header_node *node;
+    char name_buf[256];
+
+    if (line == NULL) {
+        return;
+    }
+    if (replace && phpc_header_name_from_line(line, name_buf, sizeof name_buf)) {
+        __string__ *name = cstr_to_string(name_buf);
+        __phpc_pending_header_remove(name);
+    }
+    node = (__phpc_header_node *) malloc(sizeof(*node));
+    if (node == NULL) {
+        return;
+    }
+    node->line = line;
+    node->next = NULL;
+    if (phpc_pending_tail == NULL) {
+        phpc_pending_head = node;
+        phpc_pending_tail = node;
+    } else {
+        phpc_pending_tail->next = node;
+        phpc_pending_tail = node;
+    }
+}
+
+__hashtable__ *__phpc_pending_header_list(void)
+{
+    __hashtable__ *ht = __hashtable__alloc();
+    __phpc_header_node *cur = phpc_pending_head;
+    size_t idx = 0;
+
+    while (cur != NULL) {
+        __hashtable__setStringAt(ht, idx, cur->line);
+        idx++;
+        cur = cur->next;
+    }
+
+    return ht;
+}

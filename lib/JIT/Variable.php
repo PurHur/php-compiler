@@ -501,7 +501,7 @@ final class Variable {
                 }
                 return HashTableHelper::readIndexedToValueBox($this->context, $ht, $index);
             case self::TYPE_VALUE:
-                if (!$this->valueBoxHashtable || self::TYPE_STRING !== $dim->type) {
+                if (!$this->valueBoxHashtable) {
                     throw new \LogicException(
                         'Array dim fetch on __value__ requires a nested hashtable in this compiler build'
                     );

@@ -176,6 +176,30 @@ class Type extends Builtin {
             $this->context->registerFunction($libcName, $fn);
         }
         $this->hashtable->register();
+        $void = $this->context->getTypeFromString('void');
+        $strPtr = $this->context->getTypeFromString('__string__*');
+        $i32 = $this->context->getTypeFromString('int32');
+        $htPtr = $this->context->getTypeFromString('__hashtable__*');
+        $fnPendingReset = $this->context->module->addFunction(
+            '__phpc_pending_header_reset',
+            $this->context->context->functionType($void, false)
+        );
+        $this->context->registerFunction('__phpc_pending_header_reset', $fnPendingReset);
+        $fnPendingAdd = $this->context->module->addFunction(
+            '__phpc_pending_header_add',
+            $this->context->context->functionType($void, false, $strPtr, $i32)
+        );
+        $this->context->registerFunction('__phpc_pending_header_add', $fnPendingAdd);
+        $fnPendingRemove = $this->context->module->addFunction(
+            '__phpc_pending_header_remove',
+            $this->context->context->functionType($void, false, $strPtr)
+        );
+        $this->context->registerFunction('__phpc_pending_header_remove', $fnPendingRemove);
+        $fnPendingList = $this->context->module->addFunction(
+            '__phpc_pending_header_list',
+            $this->context->context->functionType($htPtr, false)
+        );
+        $this->context->registerFunction('__phpc_pending_header_list', $fnPendingList);
         $fntypeJsonEncode = $this->context->context->functionType(
             $this->context->getTypeFromString('__string__*'),
             false,

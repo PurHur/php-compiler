@@ -8,9 +8,9 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 296 |
+| PHP files on vm.php path | 298 |
 | Source constructs flagged (blockers) | 10 |
-| Source constructs flagged (warnings) | 780 |
+| Source constructs flagged (warnings) | 782 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -50,6 +50,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/JitNumberFormat.php` | 0 | 1 |
 | `ext/standard/JitParseUrl.php` | 0 | 1 |
 | `ext/standard/JitPath.php` | 0 | 1 |
+| `ext/standard/JitPendingHeaders.php` | 0 | 1 |
 | `ext/standard/JitRandomBytes.php` | 0 | 1 |
 | `ext/standard/JitReadfile.php` | 0 | 1 |
 | `ext/standard/JitRealpath.php` | 0 | 1 |
@@ -244,6 +245,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `lib/JIT/Builtin/MemoryManager/Native.php` | 0 | 1 |
 | `lib/JIT/Builtin/MemoryManager/PHP.php` | 0 | 1 |
 | `lib/JIT/Builtin/Output.php` | 0 | 1 |
+| `lib/JIT/Builtin/PendingHeaders.php` | 0 | 1 |
 | `lib/JIT/Builtin/Refcount.php` | 0 | 1 |
 | `lib/JIT/Builtin/ScriptExit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringDateTime.php` | 0 | 1 |
@@ -413,6 +415,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 
 **Warnings** (review for bootstrap subset):
 - 9 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/JitPendingHeaders.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/JitRandomBytes.php`
 
@@ -1546,52 +1553,52 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new OpCode (line 615)
 - new OpCode (line 620)
 - new OpCode (line 627)
-- new Operand\Literal (line 640)
-- new OpCode (line 643)
-- new OpCode (line 650)
-- new OpCode (line 657)
-- new OpCode (line 663)
-- new OpCode (line 669)
-- new OpCode (line 688)
-- new Block (line 704)
-- new Block (line 708)
-- new OpCode (line 712)
-- new Block (line 719)
-- new OpCode (line 730)
-- new OpCode (line 739)
-- new OpCode (line 747)
-- new OpCode (line 756)
-- new OpCode (line 762)
-- new OpCode (line 770)
-- new OpCode (line 773)
-- new OpCode (line 779)
-- new OpCode (line 797)
-- new OpCode (line 812)
-- new Block (line 831)
-- new Block (line 835)
-- new Operand\Literal (line 838)
-- new OpCode (line 841)
-- new OpCode (line 847)
+- new OpCode (line 640)
+- new OpCode (line 646)
+- new OpCode (line 652)
+- new OpCode (line 671)
+- new Operand\Literal (line 694)
+- new OpCode (line 697)
+- new OpCode (line 705)
+- new Block (line 720)
+- new Block (line 724)
+- new OpCode (line 728)
+- new Block (line 735)
+- new OpCode (line 746)
+- new OpCode (line 755)
+- new OpCode (line 763)
+- new OpCode (line 772)
+- new OpCode (line 778)
+- new OpCode (line 786)
+- new OpCode (line 789)
+- new OpCode (line 795)
+- new OpCode (line 813)
+- new OpCode (line 828)
+- new Block (line 847)
 - new Block (line 851)
-- new OpCode (line 855)
-- new OpCode (line 861)
-- new Block (line 945)
-- new Block (line 948)
-- new OpCode (line 951)
-- new OpCode (line 957)
-- new OpCode (line 971)
-- new Block (line 978)
-- new OpCode (line 981)
-- new OpCode (line 991)
-- new Temporary (line 1001)
-- new Variable (line 1011)
-- new Operand\Temporary (line 1013)
-- new Variable (line 1106)
-- new OpCode (line 1138)
-- new OpCode (line 1144)
-- new OpCode (line 1148)
-- new OpCode (line 1153)
-- 35 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new Operand\Literal (line 854)
+- new OpCode (line 857)
+- new OpCode (line 863)
+- new Block (line 867)
+- new OpCode (line 871)
+- new OpCode (line 877)
+- new Block (line 961)
+- new Block (line 964)
+- new OpCode (line 967)
+- new OpCode (line 973)
+- new OpCode (line 987)
+- new Block (line 994)
+- new OpCode (line 997)
+- new OpCode (line 1007)
+- new Temporary (line 1017)
+- new Variable (line 1027)
+- new Operand\Temporary (line 1029)
+- new Variable (line 1122)
+- new OpCode (line 1154)
+- new OpCode (line 1160)
+- new OpCode (line 1164)
+- new OpCode (line 1169)
+- 36 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 - 1 closure(s)
 
 ### `lib/Doctor.php`
@@ -1729,6 +1736,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Builtin/Output.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/JIT/Builtin/PendingHeaders.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
@@ -1880,10 +1892,10 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new Builtin\VarArg (line 110)
 - new Builtin\ErrorHandler (line 111)
 - new Scope (line 126)
-- new Result (line 218)
-- new Variable (line 294)
-- new Variable (line 527)
-- new Variable (line 559)
+- new Result (line 219)
+- new Variable (line 295)
+- new Variable (line 528)
+- new Variable (line 560)
 - 32 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/HashTableHelper.php`
@@ -2053,7 +2065,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/Lint/UnsupportedRegistry.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/Module.php`
 
@@ -2105,11 +2117,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 **Warnings** (review for bootstrap subset):
 - new Variable (line 78)
 - new Variable (line 83)
-- new Func\PHP (line 258)
-- new ClassEntry (line 329)
-- new ObjectEntry (line 341)
-- new VM\ClassProperty (line 467)
-- new Func\PHP (line 475)
+- new Func\PHP (line 261)
+- new ClassEntry (line 332)
+- new ObjectEntry (line 344)
+- new VM\ClassProperty (line 474)
+- new Func\PHP (line 482)
 - 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/VM/ClassEntry.php`

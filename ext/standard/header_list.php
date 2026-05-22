@@ -12,7 +12,7 @@ use PHPCompiler\Web\ResponseContext;
 use PHPLLVM\Value;
 
 /**
- * header_list() — list pending response headers (VM only; issue #311).
+ * header_list() — list pending response headers (issue #311).
  */
 final class header_list extends Internal
 {
@@ -34,6 +34,10 @@ final class header_list extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('header_list() is not implemented for JIT in this compiler build');
+        if (\count($args) > 0) {
+            throw new \LogicException('header_list() takes no arguments');
+        }
+
+        return JitPendingHeaders::list($context);
     }
 }
