@@ -15,6 +15,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -59,6 +60,14 @@ final class array_count extends Internal
                 $context,
                 ArrayBuiltinHelper::loadHashTable($context, $args[0])
             );
+        }
+        if (JITVariable::TYPE_VALUE === $args[0]->type) {
+            $ht = $context->builder->call(
+                $context->lookupFunction('__value__readHashtable'),
+                JitValueBox::pointer($context, $args[0]->value)
+            );
+
+            return ArrayBuiltinHelper::getNumElements($context, $ht);
         }
         throw new \LogicException('count() only supports native arrays in this compiler build');
     }

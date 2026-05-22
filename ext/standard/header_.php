@@ -85,7 +85,16 @@ final class header_ extends Internal
             }
             HttpResponseCode::emitStandaloneStatusLine($context, $context->helper->loadValue($args[2]));
         }
+        $i32 = $context->getTypeFromString('int32');
+        $replaceI32 = $i32->constInt(1, false);
+        if ($argc >= 2) {
+            if (JITVariable::TYPE_NATIVE_BOOL !== $args[1]->type) {
+                throw new \LogicException('header() replace argument must be a boolean in this compiler build');
+            }
+            $replaceI32 = $context->builder->zExt($context->helper->loadValue($args[1]), $i32);
+        }
         JitHeader::emit($context, $line);
+        JitPendingHeaders::add($context, $line, $replaceI32);
 
         return $context->getTypeFromString('int32')->constInt(0, false);
     }

@@ -13,7 +13,7 @@ use PHPCompiler\Web\ResponseContext;
 use PHPLLVM\Value;
 
 /**
- * header_remove() — remove pending response headers (VM only; issue #311).
+ * header_remove() — remove pending response headers (issue #311).
  */
 final class header_remove extends Internal
 {
@@ -49,6 +49,16 @@ final class header_remove extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('header_remove() is not implemented for JIT in this compiler build');
+        $argc = \count($args);
+        if ($argc > 1) {
+            throw new \LogicException('header_remove() accepts at most one argument');
+        }
+        if (0 === $argc) {
+            JitPendingHeaders::remove($context);
+        } else {
+            JitPendingHeaders::remove($context, $args[0]);
+        }
+
+        return $context->getTypeFromString('int32')->constInt(0, false);
     }
 }
