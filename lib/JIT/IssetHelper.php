@@ -162,8 +162,12 @@ final class IssetHelper
                     $superglobalName,
                     $key
                 );
-
-                return $context->getTypeFromString('int1')->constInt($known ? 1 : 0, false);
+                // Only fold isset to true when the key is present at compile time.
+                // Missing keys must use runtime hashtable checks so ?? and refresh see
+                // QUERY_STRING/REQUEST_BODY updates (issues #99, #273, #291).
+                if (true === $known) {
+                    return $context->getTypeFromString('int1')->constInt(1, false);
+                }
             }
             $ht = $context->helper->loadValue($container);
             if (Variable::TYPE_STRING === $dim->type) {
