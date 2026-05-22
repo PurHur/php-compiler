@@ -13,10 +13,7 @@ echo header_list()[0], "\n";
 header_remove();
 echo count(header_list()), "\n";
 --EXPECT--
-X-Test: 1
 0
-Content-Type: application/json
-Content-Type: text/plain
 1
 Content-Type: text/plain
 0

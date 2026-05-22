@@ -233,7 +233,18 @@ final class Variable {
         PHPLLVM\Value $value,
         Operand $op
     ): Variable {
-        $type = self::getTypeFromType($op->type);
+        $llvmType = $context->getStringFromType($value->typeOf());
+        if ('__value__*' === $llvmType || '__value__' === $llvmType) {
+            $type = self::TYPE_VALUE;
+        } elseif ('__hashtable__*' === $llvmType) {
+            $type = self::TYPE_HASHTABLE;
+        } elseif ('__string__*' === $llvmType) {
+            $type = self::TYPE_STRING;
+        } elseif ('__object__*' === $llvmType) {
+            $type = self::TYPE_OBJECT;
+        } else {
+            $type = self::getTypeFromType($op->type);
+        }
         return new Variable(
             $context,
             $type,
