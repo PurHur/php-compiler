@@ -228,6 +228,7 @@ function bootstrapDefaultAotLinkTargets(array $lintTargets): array
 {
     $pendingUserFunc = [
         'test/bootstrap-aot/nullable_types.php',
+        'test/bootstrap-aot/class_constants.php', // lint OK; DECLARE_CLASS_CONST not in JIT yet
     ];
 
     return array_values(array_filter(
