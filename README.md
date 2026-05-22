@@ -153,7 +153,7 @@ When the bind-mount works normally, `make test`, `make test-harness`, and `make 
 
 If the container runs out of memory while running the full suite (process exit code **137**), increase the limit (for example `docker run -m 8g`).
 
-**Do not run several full CI containers at once** — each `vm.php` subprocess can grow large without caps; use `./script/ci-docker-safe.sh` (default `10g` cgroup + `1536M` PHP limit) and keep a single CI run. Set `PHP_COMPILER_MEMORY_LIMIT=-1` only when debugging locally.
+**Do not run several full CI containers at once** — each `vm.php` subprocess can grow large without caps; use `./script/ci-docker-safe.sh` (default `10g` cgroup + `1536M` PHP limit) and keep a single CI run. **`memory_limit=-1` is blocked** in this repo (`script/check-no-unlimited-memory.sh`).
 
 On sandboxes that cannot bind TCP ports, set `PHP_COMPILER_SKIP_SERVE_TESTS=1` before running CI.
 

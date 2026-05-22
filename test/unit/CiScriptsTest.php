@@ -120,4 +120,24 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('PHP_COMPILER_VM_PEAK_RSS_MB', $body);
         $this->assertStringContainsString('PHP_COMPILER_VM_RSS_GUARD', $body);
     }
+
+    public function testCheckNoUnlimitedMemoryScriptExists(): void
+    {
+        $check = dirname(__DIR__, 2).'/script/check-no-unlimited-memory.sh';
+        $this->assertFileExists($check);
+        $this->assertTrue(is_executable($check));
+    }
+
+    public function testCheckNoUnlimitedMemoryPassesInRepo(): void
+    {
+        $check = dirname(__DIR__, 2).'/script/check-no-unlimited-memory.sh';
+        exec('bash '.escapeshellarg($check).' 2>&1', $out, $code);
+        $this->assertSame(0, $code, implode("\n", $out));
+    }
+
+    public function testCiInventoryRunsUnlimitedMemoryCheck(): void
+    {
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('check-no-unlimited-memory.sh', $common);
+    }
 }
