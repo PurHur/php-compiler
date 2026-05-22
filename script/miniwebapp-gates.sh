@@ -80,9 +80,13 @@ stage2=0
 stage3=0
 stage3b=0
 stage4a=0
+stage4c=0
 stage4=0
 aot_dry_run_exit=-1
 aot_dry_run_skipped=0
+aot_smoke_003_exit=-1
+aot_smoke_003_skipped=0
+AOT_SMOKE_003_STDERR=""
 
 resolve_llvm_dir() {
   if [[ -n "${PHP_COMPILER_LLVM_PATH:-}" ]]; then
@@ -155,6 +159,28 @@ if LLVM_DIR="$(resolve_llvm_dir)"; then
   rm -f "${aot_stderr}"
 else
   aot_dry_run_skipped=1
+fi
+
+# Stage 4c: examples-aot-smoke 003 slice (#683, #485; blocked #568).
+if [[ -n "${LLVM_DIR}" ]]; then
+  aot_smoke_stderr="$(mktemp)"
+  set +e
+  EXAMPLES_AOT_SMOKE_ONLY=003 "${ROOT}/script/examples-aot-smoke.sh" 2>"${aot_smoke_stderr}" >/dev/null
+  aot_smoke_003_exit=$?
+  set -e
+  if [[ -s "${aot_smoke_stderr}" ]]; then
+    AOT_SMOKE_003_STDERR="$(tail -n 8 "${aot_smoke_stderr}")"
+  fi
+  if [[ "${aot_smoke_003_exit}" -eq 0 ]] \
+    && grep -q '003-MiniWebApp: skip' "${aot_smoke_stderr}" 2>/dev/null; then
+    aot_smoke_003_skipped=1
+  elif [[ "${aot_smoke_003_exit}" -eq 0 ]] \
+    && grep -q '003-MiniWebApp: ok' "${aot_smoke_stderr}" 2>/dev/null; then
+    stage4c=1
+  fi
+  rm -f "${aot_smoke_stderr}"
+elif [[ "${aot_dry_run_skipped}" -eq 1 ]]; then
+  aot_smoke_003_skipped=1
 fi
 
 # Stage 4b: ExamplesCompileTest @group miniwebapp unskipped (#454).
@@ -243,6 +269,25 @@ elif [[ "${aot_dry_run_exit}" -ge 0 ]]; then
   fi
 fi
 
+echo "$(mark "${stage4c}") Stage 4c AOT smoke — examples-aot-smoke 003 slice (#683, #485)"
+echo "       ${REPO_URL}/issues/683"
+echo "       ${REPO_URL}/issues/485"
+if [[ "${aot_dry_run_skipped}" -eq 1 && -z "${LLVM_DIR}" ]]; then
+  echo "       LLVM 9 not available (script/install-llvm9.sh or .llvm/)"
+elif [[ "${aot_smoke_003_skipped}" -eq 1 ]]; then
+  echo "       003 slice probe: skipped (#568)"
+  if [[ -n "${AOT_SMOKE_003_STDERR}" ]]; then
+    echo "${AOT_SMOKE_003_STDERR}" | sed 's/^/         /'
+  fi
+elif [[ "${aot_smoke_003_exit}" -eq 0 && "${stage4c}" -eq 1 ]]; then
+  echo "       003 slice probe: green"
+elif [[ "${aot_smoke_003_exit}" -ge 0 ]]; then
+  echo "       003 slice probe: exit ${aot_smoke_003_exit} (see #568/#485)"
+  if [[ -n "${AOT_SMOKE_003_STDERR}" ]]; then
+    echo "${AOT_SMOKE_003_STDERR}" | sed 's/^/         /'
+  fi
+fi
+
 echo "$(mark "${stage4}") Stage 4b AOT link — ExamplesCompileTest @group miniwebapp unskipped (#454, #568)"
 echo "       ${REPO_URL}/issues/454"
 echo "       ${REPO_URL}/issues/568"
@@ -259,6 +304,7 @@ echo "  MINIWEBAPP_SERVE_GATE=0 ./script/ci-local.sh   # skip miniwebapp ServeTe
 echo "  ./script/ci-local.sh   # MINIWEBAPP_WEB_SMOKE_GATE=1 by default (#664)"
 echo "  MINIWEBAPP_WEB_SMOKE_GATE=0 ./script/ci-local.sh   # skip 003 shell curls"
 echo "  ./phpc build --project examples/003-MiniWebApp --dry-run   # stage 4a (#624)"
+echo "  EXAMPLES_AOT_SMOKE_ONLY=003 ./script/examples-aot-smoke.sh   # stage 4c (#683)"
 echo "  ./script/ci-local.sh --filter test003MiniWebAppProjectAotLint"
 echo
 echo "Tracking: ${REPO_URL}/issues/472 (gate ladder spec)"
@@ -280,6 +326,10 @@ elif [[ "${stage4a}" -eq 0 && "${aot_dry_run_skipped}" -eq 0 && "${aot_dry_run_e
   echo "Next: fix MiniWebApp AOT dry-run blockers (#58) — stage 4a (#624)"
 elif [[ "${stage4a}" -eq 0 && "${aot_dry_run_skipped}" -eq 1 ]]; then
   echo "Next: install LLVM 9 for stage 4a AOT dry-run (script/install-llvm9.sh)"
+elif [[ "${stage4c}" -eq 0 && "${aot_smoke_003_skipped}" -eq 1 ]]; then
+  echo "Next: native user-class AOT (#568) to green stage 4c examples-aot-smoke 003 (#683, #485)"
+elif [[ "${stage4c}" -eq 0 && "${aot_smoke_003_exit}" -ne 0 ]]; then
+  echo "Next: fix examples-aot-smoke 003 slice failures (#485, #683)"
 elif [[ "${stage4}" -eq 0 ]]; then
   echo "Next: unskip test003MiniWebAppEventuallyRuns in ExamplesCompileTest (#454, #568)"
 else
