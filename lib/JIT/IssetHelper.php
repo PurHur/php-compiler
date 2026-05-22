@@ -122,6 +122,23 @@ final class IssetHelper
         if ($container->type === Variable::TYPE_HASHTABLE) {
             return self::compileHashTableOffsetIsSet($context, $container, $dim, $dimOp, $containerOp);
         }
+        if (Variable::TYPE_VALUE === $container->type && $container->valueBoxHashtable) {
+            $valPtr = Variable::KIND_VARIABLE === $container->kind
+                ? JitValueBox::pointer($context, $container->value)
+                : $context->helper->loadValue($container);
+            $ht = $context->builder->call(
+                $context->lookupFunction('__value__readHashtable'),
+                $valPtr
+            );
+            $htVar = new Variable(
+                $context,
+                Variable::TYPE_HASHTABLE,
+                Variable::KIND_VALUE,
+                $ht
+            );
+
+            return self::compileHashTableOffsetIsSet($context, $htVar, $dim, $dimOp, $containerOp);
+        }
 
         throw new \LogicException(
             'isset() with array offset is not supported for this container type in JIT mode'
