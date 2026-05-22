@@ -29,6 +29,7 @@ Environment (enable next gates):
   MINIWEBAPP_LINT_GATE=0      skeleton: web-smoke continues on lint failure (default gate on — #621)
   MINIWEBAPP_VM_CLI_GATE=1    run MiniWebApp*VmCli in ci-fast (default on; #597)
   MINIWEBAPP_SERVE_GATE=1     enforce ServeTest MiniWebApp routes (#470)
+  MINIWEBAPP_WEB_SMOKE_GATE=1 run 003 PATH_INFO curls in ci-local (#633)
 
 See: examples/003-MiniWebApp/README.md, issue #472
 EOF
@@ -60,12 +61,14 @@ fi
 lint_gate="${MINIWEBAPP_LINT_GATE:-1}"
 vm_cli_gate="${MINIWEBAPP_VM_CLI_GATE:-1}"
 serve_gate="${MINIWEBAPP_SERVE_GATE:-}"
+web_smoke_gate="${MINIWEBAPP_WEB_SMOKE_GATE:-}"
 
 stage0=0
 stage1=0
 stage1b=0
 stage2=0
 stage3=0
+stage3b=0
 stage4=0
 
 # Stage 0: skeleton opt-out — MINIWEBAPP_LINT_GATE=0 skips lint failure in web-smoke.
@@ -93,6 +96,12 @@ fi
 # Stage 3: examples-web-smoke curls 003 routes (#461).
 if grep -q '003-MiniWebApp' "${ROOT}/script/examples-web-smoke.sh" 2>/dev/null; then
   stage3=1
+fi
+
+# Stage 3b: ci-local shell web-smoke gate (#633).
+if [[ "${web_smoke_gate}" == "1" ]] \
+  && grep -q 'MINIWEBAPP_WEB_SMOKE_GATE' "${ROOT}/script/ci-local.sh" 2>/dev/null; then
+  stage3b=1
 fi
 
 # Stage 4: ExamplesCompileTest @group miniwebapp unskipped (#454).
@@ -153,6 +162,9 @@ echo "       ${REPO_URL}/issues/622"
 echo "$(mark "${stage3}") Stage 3 web-smoke — make examples-web-smoke includes 003 (#461)"
 echo "       ${REPO_URL}/issues/461"
 
+echo "$(mark "${stage3b}") Stage 3b ci-local shell smoke — export MINIWEBAPP_WEB_SMOKE_GATE=1 (#633)"
+echo "       ${REPO_URL}/issues/633"
+
 echo "$(mark "${stage4}") Stage 4 AOT — ExamplesCompileTest @group miniwebapp unskipped (#454)"
 echo "       ${REPO_URL}/issues/454"
 
@@ -164,6 +176,7 @@ echo "  make web-smoke              lint gate on by default (#621)"
 echo "  MINIWEBAPP_LINT_GATE=0 make web-smoke"
 echo "  MINIWEBAPP_VM_CLI_GATE=1 ./script/ci-fast.sh"
 echo "  MINIWEBAPP_SERVE_GATE=1 ./script/ci-local.sh --filter ServeTest"
+echo "  MINIWEBAPP_WEB_SMOKE_GATE=1 ./script/ci-local.sh"
 echo
 echo "Tracking: ${REPO_URL}/issues/472 (gate ladder spec)"
 
@@ -176,6 +189,8 @@ elif [[ "${lint_exit}" -eq 0 && "${vm_cli_gate}" != "1" ]]; then
   echo "Next: export MINIWEBAPP_VM_CLI_GATE=1 (lint green; enable VM CLI in ci-fast — #597)"
 elif [[ "${serve_gate}" != "1" ]]; then
   echo "Next: export MINIWEBAPP_SERVE_GATE=1 when ServeTest routes land (#470)"
+elif [[ "${web_smoke_gate}" != "1" ]]; then
+  echo "Next: export MINIWEBAPP_WEB_SMOKE_GATE=1 for ci-local shell PATH_INFO curls (#633)"
 elif [[ "${stage3}" -eq 0 ]]; then
   echo "Next: extend script/examples-web-smoke.sh for 003 (#461)"
 elif [[ "${stage4}" -eq 0 ]]; then

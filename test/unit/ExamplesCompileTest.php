@@ -23,8 +23,8 @@ final class ExamplesCompileTest extends TestCase
     private static ?bool $llvmReady = null;
 
     /**
-     * Shipped 003-MiniWebApp: AOT link blocked on LLVM verify for $this->config['key'] in methods (#58).
-     * Include bundling and deploy-path literal folding are covered by SourceBundlerTest + PHPT.
+     * Shipped 003-MiniWebApp: AOT link still blocked on template includes in render* (#58).
+     * Typed array property compile is covered by ObjectPropertyArrayAotCompileTest.
      *
      * @group miniwebapp
      * @group llvm
@@ -43,8 +43,8 @@ final class ExamplesCompileTest extends TestCase
             );
         }
         $this->markTestSkipped(
-            'MiniWebApp AOT link blocked on LLVM verify for array property reads in class methods (#58);'
-            .' deploy-path bundle folding is tested in SourceBundlerTest'
+            'MiniWebApp AOT link blocked on include/layout templates and render* CFG (#58);'
+            .' see ObjectPropertyArrayAotCompileTest for array property compile'
         );
     }
 

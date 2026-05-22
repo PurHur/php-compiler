@@ -37,6 +37,14 @@ final class ExamplesWebSmokeScriptTest extends TestCase
         $this->assertStringContainsString('skipped (PHP_COMPILER_SKIP_SERVE_TESTS', $combined);
     }
 
+    public function testExamplesWebSmokeScriptSupportsMiniWebAppOnlyFlag(): void
+    {
+        $script = dirname(__DIR__, 2).'/script/examples-web-smoke.sh';
+        $body = (string) file_get_contents($script);
+        $this->assertStringContainsString('--miniwebapp-only', $body);
+        $this->assertStringContainsString('003-MiniWebApp', $body);
+    }
+
     public function testExamplesWebSmokeScriptPassesWhenLoopbackAvailable(): void
     {
         if (false !== getenv('PHP_COMPILER_SKIP_SERVE_TESTS') && '' !== getenv('PHP_COMPILER_SKIP_SERVE_TESTS')) {

@@ -548,11 +548,41 @@ class Compiler {
                     $this->compileOperand($expr->expr, $block, true) 
                 )];
             case Op\Expr\Assign::class:
+                $propertyFetch = $this->unwrapPropertyFetch($expr->var);
+                if (null !== $propertyFetch) {
+                    $fetchSlot = $this->compileOperand($propertyFetch->result, $block, false);
+                    $rhsSlot = $this->compileOperand($expr->expr, $block, true);
+                    $ops = [
+                        new OpCode(
+                            OpCode::TYPE_PROPERTY_FETCH,
+                            $fetchSlot,
+                            $this->compileOperand($propertyFetch->var, $block, true),
+                            $this->compileOperand($propertyFetch->name, $block, true)
+                        ),
+                        new OpCode(
+                            OpCode::TYPE_ASSIGN,
+                            $fetchSlot,
+                            $fetchSlot,
+                            $rhsSlot
+                        ),
+                    ];
+                    if ([] !== $expr->result->usages) {
+                        $ops[] = new OpCode(
+                            OpCode::TYPE_ASSIGN,
+                            $this->compileOperand($expr->result, $block, false),
+                            $fetchSlot,
+                            $rhsSlot
+                        );
+                    }
+
+                    return $ops;
+                }
+
                 return [new OpCode(
                     OpCode::TYPE_ASSIGN,
-                    $this->compileOperand($expr->result, $block, false),   
+                    $this->compileOperand($expr->result, $block, false),
                     $this->compileOperand($expr->var, $block, false),
-                    $this->compileOperand($expr->expr, $block, true) 
+                    $this->compileOperand($expr->expr, $block, true)
                 )];
             case Op\Expr\Exit_::class:
                 $exitExpr = null !== $expr->expr
@@ -1201,6 +1231,24 @@ class Compiler {
             $operand = $operand->original;
         }
         if ($operand instanceof Op\Expr\ArrayDimFetch) {
+            return $operand;
+        }
+
+        return null;
+    }
+
+    protected function unwrapPropertyFetch(Operand $operand): ?Op\Expr\PropertyFetch
+    {
+        while ($operand instanceof Temporary) {
+            if ($operand->original instanceof Op\Expr\PropertyFetch) {
+                return $operand->original;
+            }
+            if (null === $operand->original) {
+                return null;
+            }
+            $operand = $operand->original;
+        }
+        if ($operand instanceof Op\Expr\PropertyFetch) {
             return $operand;
         }
 

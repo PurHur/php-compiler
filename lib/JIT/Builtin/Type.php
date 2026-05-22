@@ -163,6 +163,12 @@ class Type extends Builtin {
         $fntypeHashHmac = $this->context->context->functionType($strPtr, false, $strPtr, $strPtr, $strPtr, $i1);
         $fnHashHmac = $this->context->module->addFunction('__compiler_hash_hmac', $fntypeHashHmac);
         $this->context->registerFunction('__compiler_hash_hmac', $fnHashHmac);
+        $fntypeFilterEmail = $this->context->context->functionType($strPtr, false, $strPtr);
+        $fnFilterEmail = $this->context->module->addFunction(
+            '__compiler_filter_validate_email',
+            $fntypeFilterEmail
+        );
+        $this->context->registerFunction('__compiler_filter_validate_email', $fnFilterEmail);
         $fntypeGetrandom = $this->context->context->functionType($i64, false, $i8p, $sizeT, $i32);
         $fnGetrandom = $this->context->module->addFunction('getrandom', $fntypeGetrandom);
         $this->context->registerFunction('getrandom', $fnGetrandom);

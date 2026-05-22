@@ -64,6 +64,19 @@ class Native implements Call {
                         return $value;
                 }
                 break;
+            case '__hashtable__*':
+                switch ($arg->type) {
+                    case Variable::TYPE_HASHTABLE:
+                        return $value;
+                    case Variable::TYPE_VALUE:
+                        return $context->builder->call(
+                            $context->lookupFunction('__value__readHashtable'),
+                            Variable::KIND_VARIABLE === $arg->kind
+                                ? \PHPCompiler\JIT\JitValueBox::pointer($context, $arg->value)
+                                : $value
+                        );
+                }
+                break;
             case '__string__*':
                 switch ($arg->type) {
                     case Variable::TYPE_STRING:
