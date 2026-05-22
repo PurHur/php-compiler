@@ -411,6 +411,9 @@ class JIT {
                     }
                     $this->assignOperand($block->getOperand($op->arg1), $value);
                     break;
+                case OpCode::TYPE_CLASS_CONST_FETCH:
+                    // Recorded at compile time; JIT does not resolve class constants yet.
+                    break;
                 case OpCode::TYPE_CAST_BOOL:
                     $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));
                     $this->assignOperand($block->getOperand($op->arg1), $value->castTo(Variable::TYPE_NATIVE_BOOL));
@@ -672,6 +675,9 @@ class JIT {
                     $this->context->freeDeadVariables($func, $branchBlock, $block);
                     $builder->branchIf($condition, $if, $else);
                     return $origBasicBlock;
+                case OpCode::TYPE_THROW:
+                    // AOT lint: throw terminal lowering only; no JIT emission yet (issue #57).
+                    break;
                 case OpCode::TYPE_RETURN_VOID:
                     $returnBlock = $builder->getInsertBlock();
                     $builder->positionAtEnd($returnBlock);
@@ -827,6 +833,7 @@ class JIT {
                     $this->context->type->object->defineProperty($classId, $name->value, $type);
                     break;
                 case OpCode::TYPE_CONST_FETCH:
+                case OpCode::TYPE_CLASS_CONST_FETCH:
                     // Default property values are initialized in __object__ allocation.
                     break;
                 case OpCode::TYPE_DECLARE_METHOD:
@@ -834,6 +841,18 @@ class JIT {
                     assert($name instanceof Operand\Literal);
                     $funcName = $this->context->scope->className.'::'.strtolower($name->value);
                     $this->compileBlock($op->block1, $funcName);
+                    break;
+                case OpCode::TYPE_DECLARE_CLASS_CONST:
+                    $name = $block->getOperand($op->arg1);
+                    assert($name instanceof Operand\Literal);
+                    if (!isset($block->constants[$op->arg2])) {
+                        throw new \LogicException('Class constant value must be a compile-time constant');
+                    }
+                    $this->context->type->object->defineClassConst(
+                        $classId,
+                        $name->value,
+                        $block->constants[$op->arg2]
+                    );
                     break;
                 default:
                     throw new \LogicException('Other class body types are not jittable for now');

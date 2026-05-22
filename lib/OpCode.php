@@ -84,6 +84,8 @@ class OpCode {
     const TYPE_DECLARE_METHOD = 84;
     const TYPE_METHODCALL_INIT = 85;
     const TYPE_DECLARE_CLASS_CONST = 86;
+    const TYPE_CLASS_CONST_FETCH = 87;
+    const TYPE_THROW = 88;
 
     public int $type;
     public ?int $arg1;
