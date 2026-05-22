@@ -38,6 +38,9 @@ final class MiniWebAppGatesScriptTest extends TestCase
         $this->assertStringContainsString('Stage 0 skeleton', $combined);
         $this->assertStringContainsString('Stage 1 lint green', $combined);
         $this->assertStringContainsString('MINIWEBAPP_LINT_GATE=1', $combined);
+        $this->assertStringContainsString('MINIWEBAPP_VM_CLI_GATE', $combined);
+        $this->assertStringContainsString('Stage 1b VM CLI', $combined);
+        $this->assertStringContainsString('issues/597', $combined);
         $this->assertStringContainsString('issues/472', $combined);
         $this->assertStringContainsString('issues/454', $combined);
         $this->assertStringContainsString('issues/539', $combined);
