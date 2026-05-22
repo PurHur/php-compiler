@@ -558,24 +558,138 @@ class Object_ extends Type {
                         $slot,
                         $storage
                     );
-                } else {
-                    $stringType = Variable::getStringType($propset[2]);
-                    $ptrType = $this->context->getTypeFromString($stringType.'*');
-                    $storage = $this->context->builder->alloca($ptrType->getElementType(), 1, 'prop_'.$name);
-                    $this->context->builder->store(
-                        $this->context->builder->pointerCast($loaded, $ptrType),
-                        $storage
+                    $var = new Variable(
+                        $this->context,
+                        $propset[2],
+                        Variable::KIND_VARIABLE,
+                        $storage,
                     );
-                }
+                    $var->objectPropertySlot = $slot;
+                    $var->objectPropertyType = $propset[2];
 
-                return new Variable(
+                    return $var;
+                }
+                if (Variable::TYPE_HASHTABLE === $propset[2]) {
+                    $htPtr = $this->context->builder->pointerCast(
+                        $loaded,
+                        $this->context->getTypeFromString('__hashtable__*')
+                    );
+                    $var = new Variable(
+                        $this->context,
+                        Variable::TYPE_HASHTABLE,
+                        Variable::KIND_VALUE,
+                        $htPtr
+                    );
+                    $var->objectPropertySlot = $slot;
+                    $var->objectPropertyType = $propset[2];
+
+                    return $var;
+                }
+                $llvmType = Variable::getStringType($propset[2]);
+                $typed = $this->context->builder->pointerCast(
+                    $loaded,
+                    $this->context->getTypeFromString($llvmType)
+                );
+                $var = new Variable(
                     $this->context,
                     $propset[2],
-                    Variable::KIND_VARIABLE,
-                    $storage,
+                    Variable::KIND_VALUE,
+                    $typed,
                 );
+                $var->objectPropertySlot = $slot;
+                $var->objectPropertyType = $propset[2];
+
+                return $var;
             }
         }
         throw new \LogicException("Could not find property $name for class $classId");
+    }
+
+    /**
+     * Persist assignment to an instance property slot (void** on the object, issue #58).
+     */
+    public function propertyStore(PHPLLVM\Value $slot, Variable $value, int $propertyType): void
+    {
+        $voidPtr = $this->context->getTypeFromString('void*');
+
+        if (Variable::TYPE_HASHTABLE === $propertyType && Variable::TYPE_HASHTABLE === $value->type) {
+            $stored = $this->context->builder->pointerCast(
+                $this->context->helper->loadValue($value),
+                $voidPtr
+            );
+            $this->context->builder->store($stored, $slot);
+            $value->addref();
+
+            return;
+        }
+
+        $valueType = $this->context->getTypeFromString('__value__');
+        $heapVal = $this->context->memory->malloc($valueType);
+        $heapPtr = $this->context->builder->pointerCast(
+            $heapVal,
+            $this->context->getTypeFromString('__value__*')
+        );
+        $valueMap = $this->context->structFieldMap['__value__'];
+        $this->context->builder->store(
+            $this->context->getTypeFromString('int8')->constInt(Variable::TYPE_NULL, false),
+            $this->context->builder->structGep($heapVal, $valueMap['type'])
+        );
+
+        if (Variable::TYPE_VALUE === $value->type) {
+            $valuePtr = Variable::KIND_VARIABLE === $value->kind
+                ? JitValueBox::pointer($this->context, $value->value)
+                : $value->value;
+            JitValueBox::copyFromPointer($this->context, $heapVal, $valuePtr);
+            $value->addref();
+
+            $this->context->builder->store(
+                $this->context->builder->pointerCast($heapPtr, $voidPtr),
+                $slot
+            );
+
+            return;
+        }
+
+        if (Variable::TYPE_STRING === $value->type) {
+            $str = $this->context->helper->loadValue($value);
+            $owned = $this->context->builder->call(
+                $this->context->lookupFunction('__string__separate'),
+                $str
+            );
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeString'),
+                $heapPtr,
+                $owned
+            );
+            $value->addref();
+            $this->context->builder->store(
+                $this->context->builder->pointerCast($heapPtr, $voidPtr),
+                $slot
+            );
+
+            return;
+        }
+
+        if (Variable::TYPE_OBJECT === $value->type) {
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeObject'),
+                $heapPtr,
+                $this->context->helper->loadValue($value)
+            );
+            $value->addref();
+            $this->context->builder->store(
+                $this->context->builder->pointerCast($heapPtr, $voidPtr),
+                $slot
+            );
+
+            return;
+        }
+
+        throw new \LogicException(
+            'Unsupported property store from '
+            .Variable::getStringType($value->type)
+            .' to '
+            .Variable::getStringType($propertyType)
+        );
     }
 }

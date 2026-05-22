@@ -82,6 +82,12 @@ final class Variable {
     /** {@see __value__} slot holds a nested {@see __hashtable__} (e.g. $_FILES['field']). */
     public bool $valueBoxHashtable = false;
 
+    /** void** property slot on {@see __object__} when this variable is a property lvalue (#58). */
+    public ?\PHPLLVM\Value $objectPropertySlot = null;
+
+    /** Declared JIT property type when {@see $objectPropertySlot} is set. */
+    public ?int $objectPropertyType = null;
+
     private static int $lvalueCounter = 0;
     public int $nextFreeElement = 0;
 

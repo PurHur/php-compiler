@@ -954,7 +954,7 @@ class JIT {
             return $retval;
         }
         $valuePtr = Variable::KIND_VARIABLE === $return->kind
-            ? $return->value
+            ? JIT\JitValueBox::pointer($this->context, $return->value)
             : $this->context->builder->alloca(
                 $this->context->getTypeFromString('__value__'),
                 1,
@@ -1101,6 +1101,18 @@ class JIT {
             return;
         }
         $result = $this->context->getVariableFromOp($result);
+        if (null !== $result->objectPropertySlot) {
+            if (null === $result->objectPropertyType) {
+                throw new \LogicException('objectPropertySlot requires objectPropertyType');
+            }
+            $this->context->type->object->propertyStore(
+                $result->objectPropertySlot,
+                $value,
+                $result->objectPropertyType
+            );
+
+            return;
+        }
         if ($result->kind === Variable::KIND_VALUE && $result->type === Variable::TYPE_STRING) {
             StringOffsetHelper::dimAssign($this->context, $result->value, $value);
 
@@ -1235,7 +1247,7 @@ class JIT {
         } elseif ($result->type === Variable::TYPE_NATIVE_LONG && Variable::TYPE_VALUE === $value->type) {
             $longVal = $this->context->builder->call(
                 $this->context->lookupFunction('__value__readLong'),
-                $this->context->helper->loadValue($value)
+                $this->valueBoxPointer($value)
             );
             $this->context->builder->store($longVal, $result->value);
 
@@ -1260,15 +1272,14 @@ class JIT {
             JIT\JitValueBox::copyFromPointer(
                 $this->context,
                 $result->value,
-                $this->context->helper->loadValue($value)
+                $this->valueBoxPointer($value)
             );
 
             return;
         } elseif (Variable::TYPE_HASHTABLE === $result->type && Variable::TYPE_VALUE === $value->type) {
-            $valuePtr = $this->context->helper->loadValue($value);
             $ht = $this->context->builder->call(
                 $this->context->lookupFunction('__value__readHashtable'),
-                $valuePtr
+                $this->valueBoxPointer($value)
             );
             $result->free();
             $this->context->builder->store($ht, $result->value);
@@ -1276,10 +1287,9 @@ class JIT {
 
             return;
         } elseif (Variable::TYPE_STRING === $result->type && Variable::TYPE_VALUE === $value->type) {
-            $valuePtr = $this->context->helper->loadValue($value);
             $str = $this->context->builder->call(
                 $this->context->lookupFunction('__value__readString'),
-                $valuePtr
+                $this->valueBoxPointer($value)
             );
             $result->free();
             $this->context->builder->store($str, $result->value);
@@ -1295,6 +1305,18 @@ class JIT {
             return;
         }
         throw new \LogicException("Cannot assign operands of different types (yet): {$value->type}, {$result->type}");
+    }
+
+    private function valueBoxPointer(Variable $value): PHPLLVM\Value
+    {
+        if (Variable::TYPE_VALUE !== $value->type) {
+            throw new \LogicException('valueBoxPointer requires TYPE_VALUE');
+        }
+        if (Variable::KIND_VARIABLE === $value->kind) {
+            return JIT\JitValueBox::pointer($this->context, $value->value);
+        }
+
+        return $value->value;
     }
 
     private function assignOperandValue(Operand $result, PHPLLVM\Value $value): void {
