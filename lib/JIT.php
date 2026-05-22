@@ -830,8 +830,26 @@ class JIT {
                     $nameOp = $block->getOperand($op->arg2);
                     assert($nameOp instanceof Operand\Literal);
                     assert($receiverOp->type->type === Type::TYPE_OBJECT);
-                    $className = $receiverOp->type->userType ?? 'object';
-                    $proxyName = strtolower($className).'::'.strtolower($nameOp->value);
+                    $className = $receiverOp->type->userType
+                        ?? ($this->context->scope->className !== '' ? $this->context->scope->className : 'object');
+                    $declaringClassLc = strtolower($className);
+                    $methodLc = strtolower($nameOp->value);
+                    $declaringClassId = $this->context->type->object->lookup($className);
+                    $visFlags = $this->context->type->object->methodVisibility($declaringClassId, $methodLc);
+                    $callerClassLc = null;
+                    if (null !== $block->func?->class) {
+                        $callerClassLc = strtolower($block->func->class->value);
+                    } elseif ($this->context->scope->className !== '') {
+                        $callerClassLc = $this->context->scope->className;
+                    }
+                    MethodVisibility::assertCallable(
+                        $visFlags,
+                        $callerClassLc,
+                        $declaringClassLc,
+                        $className,
+                        $nameOp->value
+                    );
+                    $proxyName = $declaringClassLc.'::'.$methodLc;
                     $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
                     $this->context->scope->args = [$this->context->getVariableFromOp($receiverOp)];
                     break;
@@ -944,6 +962,15 @@ class JIT {
                     $name = $block->getOperand($op->arg1);
                     assert($name instanceof Operand\Literal);
                     $methodLc = strtolower($name->value);
+                    $visFlags = \PHPCfg\Func::FLAG_PUBLIC;
+                    if (null !== $op->arg3 && isset($block->constants[$op->arg3])) {
+                        $visFlags = MethodVisibility::mask($block->constants[$op->arg3]->toInt());
+                    }
+                    $this->context->type->object->defineMethodVisibility(
+                        $this->context->scope->classId,
+                        $methodLc,
+                        $visFlags
+                    );
                     // Constructors are lowered at new; skip JIT until user-class model is complete (#568).
                     if ('__construct' === $methodLc) {
                         break;

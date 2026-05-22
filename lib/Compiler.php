@@ -224,9 +224,16 @@ class Compiler {
                 case Op\Stmt\ClassMethod::class:
                     $methodName = new Operand\Literal($child->func->name);
                     $methodName->type = Type::string();
+                    $visVar = new Variable(Variable::TYPE_INTEGER);
+                    $visVar->int(MethodVisibility::mask($child->func->flags));
+                    $visOperand = new Operand\Temporary;
+                    $visOperand->type = Type::int();
+                    $visIdx = $result->registerConstant($visOperand, $visVar);
                     $declare = new OpCode(
                         OpCode::TYPE_DECLARE_METHOD,
-                        $this->compileOperand($methodName, $result, true)
+                        $this->compileOperand($methodName, $result, true),
+                        null,
+                        $visIdx
                     );
                     if (null !== $child->func->cfg) {
                         $methodBlock = $this->compileCfgBlock($child->func->cfg, $child->func->params);
