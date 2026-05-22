@@ -1329,6 +1329,74 @@ final class VmString
         return '' === $joined ? '.' : $joined;
     }
 
+    /**
+     * @return array<string, string>|string
+     */
+    public static function pathinfo(string $path, int $flags = 15)
+    {
+        $dirname = self::dirname($path);
+        $basename = self::basename($path);
+        $extension = self::pathExtension($path);
+        $filename = self::pathFilename($path);
+
+        if (15 === $flags) {
+            return [
+                'dirname' => $dirname,
+                'basename' => $basename,
+                'extension' => $extension,
+                'filename' => $filename,
+            ];
+        }
+
+        return match ($flags) {
+            1 => $dirname,
+            2 => $basename,
+            4 => $extension,
+            8 => $filename,
+            default => throw new \LogicException(
+                'pathinfo() flags not supported in this compiler build (use 1, 2, 4, 8, or 15)'
+            ),
+        };
+    }
+
+    public static function pathExtension(string $path): string
+    {
+        $base = self::basename($path);
+        $len = self::byteLength($base);
+        if (0 === $len) {
+            return '';
+        }
+        $start = '.' === $base[0] ? 1 : 0;
+        $lastDot = -1;
+        for ($i = $len - 1; $i >= $start; --$i) {
+            if ('.' === $base[$i]) {
+                $lastDot = $i;
+                break;
+            }
+        }
+        if (-1 === $lastDot || $lastDot >= $len - 1) {
+            return '';
+        }
+
+        return self::byteSlice($base, $lastDot + 1, $len - $lastDot - 1);
+    }
+
+    public static function pathFilename(string $path): string
+    {
+        $base = self::basename($path);
+        $ext = self::pathExtension($path);
+        if ('' === $ext) {
+            return $base;
+        }
+        $extLen = self::byteLength($ext);
+        $baseLen = self::byteLength($base);
+        if ($baseLen <= $extLen + 1) {
+            return '';
+        }
+
+        return self::byteSlice($base, 0, $baseLen - $extLen - 1);
+    }
+
     private static function byteOrd(string $byte): int
     {
         return ord($byte);
