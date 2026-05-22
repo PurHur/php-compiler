@@ -36,6 +36,17 @@ class Type extends Builtin {
         );
         $fnGetenv = $this->context->module->addFunction('__compiler_getenv', $fntypeGetenv);
         $this->context->registerFunction('__compiler_getenv', $fnGetenv);
+        $fntypeDeployPath = $this->context->context->functionType(
+            $this->context->getTypeFromString('__string__*'),
+            false,
+            $this->context->getTypeFromString('__string__*'),
+            $this->context->getTypeFromString('__string__*')
+        );
+        $fnDeployPath = $this->context->module->addFunction(
+            '__compiler_phpc_deploy_path',
+            $fntypeDeployPath
+        );
+        $this->context->registerFunction('__compiler_phpc_deploy_path', $fnDeployPath);
         $fntypeNumberFormat = $this->context->context->functionType(
             $this->context->getTypeFromString('__string__*'),
             false,

@@ -153,6 +153,7 @@ class Module extends ModuleAbstract
             new fclose(),
             new getenv_(),
             new putenv_(),
+            new phpc_deploy_path(),
             new extract_(),
             new compact_(),
             new scandir(),
