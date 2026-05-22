@@ -70,6 +70,14 @@ class Native implements Call {
                 switch ($arg->type) {
                     case Variable::TYPE_VALUE:
                         return $value;
+                    case Variable::TYPE_OBJECT:
+                        $slot = \PHPCompiler\JIT\JitValueBox::alloc($context);
+                        $context->builder->call(
+                            $context->lookupFunction('__value__writeObject'),
+                            \PHPCompiler\JIT\JitValueBox::pointer($context, $slot),
+                            $value
+                        );
+                        return $context->builder->load($slot);
                 }
                 break;
             case 'int64':
