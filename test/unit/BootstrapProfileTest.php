@@ -24,6 +24,7 @@ final class BootstrapProfileTest extends TestCase
         $this->assertContains('examples/000-HelloWorld/example.php', $profile['aot_lint_targets']);
         $this->assertContains('test/bootstrap-aot/echo_hello.php', $profile['aot_lint_targets']);
         $this->assertContains('test/bootstrap-aot/nullable_types.php', $profile['aot_lint_targets']);
+        $this->assertContains('test/bootstrap-aot/namespace_hello.php', $profile['aot_lint_targets']);
         $this->assertContains('lib/AOT/Linker.php', $profile['excluded_files']);
     }
 

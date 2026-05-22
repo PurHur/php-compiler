@@ -22,6 +22,15 @@ patch_already_applied() {
     php-types-nullable-return.patch)
       grep -q 'return (new Type(Type::TYPE_UNION' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
       ;;
+    php-types-ns-func-call.patch)
+      grep -q 'resolveOp_Expr_NsFuncCall' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
+      ;;
+    php-types-fromvalue-null.patch)
+      grep -q 'is_null($value)' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
+      ;;
+    php-types-ns-func-call.patch)
+      grep -q 'function resolveOp_Expr_NsFuncCall' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
+      ;;
     php-types-str-split-string-array.patch)
       grep -q "'str_split' => \['string\[\]'" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php" 2>/dev/null
       ;;
@@ -91,6 +100,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-mixed-reserved.patch"
   apply_patch "$PATCH_DIR/php-types-nullsafe.patch"
   apply_patch "$PATCH_DIR/php-types-nullable-return.patch"
+  apply_patch "$PATCH_DIR/php-types-ns-func-call.patch"
 fi
 
 if [[ -d "$ROOT/vendor/pre/plugin" ]]; then

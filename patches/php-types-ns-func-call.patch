@@ -1,0 +1,39 @@
+--- vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
+@@ -405,7 +405,35 @@
+         // we can't resolve the function
+         return false;
+     }
+ 
++    protected function resolveOp_Expr_NsFuncCall(Operand $var, Op\Expr\NsFuncCall $op, SplObjectStorage $resolved)
++    {
++        if ($op->nsName instanceof Operand\Literal) {
++            $name = strtolower($op->nsName->value);
++            if (isset($this->state->functionLookup[$name])) {
++                $result = [];
++                foreach ($this->state->functionLookup[$name] as $func) {
++                    if ($func->returnType) {
++                        $result[] = Type::fromTypeDecl($func->returnType);
++                    } else {
++                        $result[] = Type::extractTypeFromComment('return', $func->getAttribute('doccomment'));
++                    }
++                }
++
++                return $result;
++            }
++            if (isset($this->state->internalTypeInfo->functions[$name])) {
++                $type = $this->state->internalTypeInfo->functions[$name];
++                if (empty($type['return'])) {
++                    return false;
++                }
++
++                return [Type::fromDecl($type['return'])];
++            }
++        }
++
++        return false;
++    }
++
+     protected function resolveOp_Expr_New(Operand $var, Op\Expr\New_ $op, SplObjectStorage $resolved)
+     {
+         $type = $this->getClassType($op->class, $resolved);

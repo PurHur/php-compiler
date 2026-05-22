@@ -522,29 +522,19 @@ class Compiler {
                     $nsName
                 )];
             case Op\Expr\FuncCall::class:
-                $return = [
-                    new OpCode(
-                        OpCode::TYPE_FUNCCALL_INIT,
-                        $this->compileOperand($expr->name, $block, true)
-                    )
-                ];
-                foreach ($expr->args as $arg) {
-                    $return[] = new OpCode(
-                        OpCode::TYPE_ARG_SEND,
-                        $this->compileOperand($arg, $block, true)
-                    );
-                }
-                if (!empty($expr->result->usages)) {
-                    $return[] = new OpCode(
-                        OpCode::TYPE_FUNCCALL_EXEC_RETURN,
-                        $this->compileOperand($expr->result, $block, false)
-                    );
-                } else {
-                    $return[] = new OpCode(
-                        OpCode::TYPE_FUNCCALL_EXEC_NORETURN,
-                    );
-                }
-                return $return;
+                return $this->compileFuncCall(
+                    $this->compileOperand($expr->name, $block, true),
+                    $expr->args,
+                    $expr->result,
+                    $block
+                );
+            case Op\Expr\NsFuncCall::class:
+                return $this->compileFuncCall(
+                    $this->compileOperand($expr->nsName, $block, true),
+                    $expr->args,
+                    $expr->result,
+                    $block
+                );
             case Op\Expr\StaticCall::class:
                 $return = [
                     new OpCode(
@@ -1185,6 +1175,21 @@ class Compiler {
             default:
                 throw new \LogicException("Unknown Terminal Type: " . $terminal->getType());
         }
+    }
+
+
+    protected function compileFuncCall(?int $name, array $args, Operand $result, Block $block): array
+    {
+        $return = [new OpCode(OpCode::TYPE_FUNCCALL_INIT, $name)];
+        foreach ($args as $arg) {
+            $return[] = new OpCode(OpCode::TYPE_ARG_SEND, $this->compileOperand($arg, $block, true));
+        }
+        if (!empty($result->usages)) {
+            $return[] = new OpCode(OpCode::TYPE_FUNCCALL_EXEC_RETURN, $this->compileOperand($result, $block, false));
+        } else {
+            $return[] = new OpCode(OpCode::TYPE_FUNCCALL_EXEC_NORETURN);
+        }
+        return $return;
     }
 
 }
