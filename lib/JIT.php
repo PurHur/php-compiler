@@ -200,6 +200,7 @@ class JIT {
         }
 
         for ($i = 0, $length = null !== $limit ? $limit : count($block->opCodes); $i < $length; $i++) {
+            $this->context->compilingBlock = $block;
             $op = $block->opCodes[$i];
             switch ($op->type) {
                 case OpCode::TYPE_ARG_RECV:

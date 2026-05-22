@@ -8,9 +8,9 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 295 |
-| Source constructs flagged (blockers) | 10 |
-| Source constructs flagged (warnings) | 778 |
+| PHP files on vm.php path | 296 |
+| Source constructs flagged (blockers) | 11 |
+| Source constructs flagged (warnings) | 781 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -222,7 +222,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/types/mb_strlen.php` | 0 | 1 |
 | `ext/types/strlen.php` | 0 | 1 |
 | `lib/AOT/Linker.php` | 8 | 1 |
-| `lib/Block.php` | 0 | 4 |
+| `lib/Block.php` | 1 | 4 |
 | `lib/Cli/PhpcInit.php` | 0 | 1 |
 | `lib/Compiler.php` | 0 | 93 |
 | `lib/Doctor.php` | 0 | 1 |
@@ -281,6 +281,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `lib/JIT/NullsafeHelper.php` | 0 | 1 |
 | `lib/JIT/OperandName.php` | 0 | 1 |
 | `lib/JIT/Result.php` | 0 | 3 |
+| `lib/JIT/ScopeBuiltinHelper.php` | 0 | 3 |
 | `lib/JIT/StringOffsetHelper.php` | 0 | 1 |
 | `lib/JIT/SuperglobalInit.php` | 0 | 3 |
 | `lib/JIT/ValueEchoHelper.php` | 0 | 1 |
@@ -1485,11 +1486,14 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 
 ### `lib/Block.php`
 
+**Blockers** (likely prevent AOT bootstrap compile):
+- generator yield (line 150)
+
 **Warnings** (review for bootstrap subset):
-- new Variable (line 202)
-- new Frame (line 227)
-- new Variable (line 250)
-- 11 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new Variable (line 215)
+- new Frame (line 240)
+- new Variable (line 263)
+- 12 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/Cli/PhpcInit.php`
 
@@ -1636,13 +1640,13 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new Variable (line 141)
 - new JIT\Call\Vararg (line 148)
 - new JIT\Call\Native (line 151)
-- new ext\standard\boolval (line 289)
-- new Variable (line 479)
-- new OpCode (line 546)
-- new Variable (line 932)
-- new Operand\Literal (line 1002)
-- new Operand\Literal (line 1006)
-- new Operand\Literal (line 1010)
+- new ext\standard\boolval (line 290)
+- new Variable (line 480)
+- new OpCode (line 547)
+- new Variable (line 933)
+- new Operand\Literal (line 1003)
+- new Operand\Literal (line 1007)
+- new Operand\Literal (line 1011)
 - 12 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Analyzer.php`
@@ -1869,20 +1873,20 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/JIT/Context.php`
 
 **Warnings** (review for bootstrap subset):
-- new Scope (line 83)
-- new Analyzer (line 102)
-- new Helper (line 103)
-- new Builtin\Refcount (line 105)
-- new Builtin\Output (line 107)
-- new Builtin\Type (line 108)
-- new Builtin\Internal (line 109)
-- new Builtin\VarArg (line 110)
-- new Builtin\ErrorHandler (line 111)
-- new Scope (line 126)
-- new Result (line 218)
-- new Variable (line 294)
-- new Variable (line 527)
-- new Variable (line 559)
+- new Scope (line 86)
+- new Analyzer (line 105)
+- new Helper (line 106)
+- new Builtin\Refcount (line 108)
+- new Builtin\Output (line 110)
+- new Builtin\Type (line 111)
+- new Builtin\Internal (line 112)
+- new Builtin\VarArg (line 113)
+- new Builtin\ErrorHandler (line 114)
+- new Scope (line 129)
+- new Result (line 221)
+- new Variable (line 297)
+- new Variable (line 530)
+- new Variable (line 562)
 - 32 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/HashTableHelper.php`
@@ -1958,6 +1962,13 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new Func\JIT (line 41)
 - new Func\JIT (line 49)
 - 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/JIT/ScopeBuiltinHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 97)
+- new Variable (line 339)
+- 8 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/StringOffsetHelper.php`
 

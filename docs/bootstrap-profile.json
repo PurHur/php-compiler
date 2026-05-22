@@ -27,6 +27,7 @@
     ],
     "excluded_files": [
         "lib/AOT/Linker.php",
+        "lib/Block.php",
         "lib/VM/HashTable.php"
     ],
     "eligible_files": [
@@ -220,7 +221,6 @@
         "ext/types/is_type.php",
         "ext/types/mb_strlen.php",
         "ext/types/strlen.php",
-        "lib/Block.php",
         "lib/Cli/PhpcInit.php",
         "lib/Compiler.php",
         "lib/Doctor.php",
@@ -280,6 +280,7 @@
         "lib/JIT/OperandName.php",
         "lib/JIT/Result.php",
         "lib/JIT/Scope.php",
+        "lib/JIT/ScopeBuiltinHelper.php",
         "lib/JIT/StringOffsetHelper.php",
         "lib/JIT/SuperglobalInit.php",
         "lib/JIT/ValueEchoHelper.php",
@@ -329,8 +330,8 @@
         "test/bootstrap-aot/echo_hello.php"
     ],
     "totals": {
-        "inventory_files": 295,
-        "excluded": 2,
+        "inventory_files": 296,
+        "excluded": 3,
         "eligible": 293,
         "aot_lint_targets": 2
     }

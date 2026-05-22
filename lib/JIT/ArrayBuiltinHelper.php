@@ -1990,7 +1990,7 @@ final class ArrayBuiltinHelper
         $context->builder->positionAtEnd($done);
     }
 
-    private static function storeValueEntryAtStringKey(
+    public static function storeValueEntryAtStringKey(
         Context $context,
         Value $dest,
         Value $keyStr,

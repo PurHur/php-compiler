@@ -64,6 +64,9 @@ class Context {
 
     public Scope $scope;
 
+    /** Compiler block currently being lowered (for extract()/compact() scope import). */
+    public ?Block $compilingBlock = null;
+
     /** ?? result operands that must receive branch assigns even when php-cfg marks them dead (#99). */
     public \SplObjectStorage $coalesceAssignTargets;
 

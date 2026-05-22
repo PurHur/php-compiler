@@ -140,6 +140,19 @@ class Block {
     }
 
     /**
+     * @return iterable<string, Operand> variable name => CFG operand
+     */
+    public function namedOperands(): iterable
+    {
+        foreach ($this->scope as $operand) {
+            $name = self::resolveVariableName($operand);
+            if (null !== $name) {
+                yield $name => $operand;
+            }
+        }
+    }
+
+    /**
      * Zend include/require: included file shares caller locals by name (issue #471).
      */
     private static function findVariableInParentFrames(Operand $op, Frame $frame): ?Variable
