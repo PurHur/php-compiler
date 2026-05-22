@@ -61,8 +61,53 @@ final class ConstStringFolder
         if (null !== $leftLit && $leftLit === $dir && null !== $rightLit) {
             return $dir.$rightLit;
         }
+        $deploy = self::foldDeployPathConcat($concat->left, $concat->right);
+        if (null !== $deploy) {
+            return $deploy;
+        }
 
         return null;
+    }
+
+    /**
+     * @return ?array{0: string, 1: string} rel, fallback dir
+     */
+    private static function parseDeployPathCall(Operand $operand): ?array
+    {
+        $call = null;
+        if ($operand instanceof Operand\Temporary && $operand->original instanceof Op\Expr\FuncCall) {
+            $call = $operand->original;
+        } elseif ($operand instanceof Op\Expr\FuncCall) {
+            $call = $operand;
+        }
+        if (null === $call) {
+            return null;
+        }
+        $name = self::literalStringValue($call->name);
+        if ('phpc_deploy_path' !== $name || 2 !== count($call->args)) {
+            return null;
+        }
+        $rel = self::literalStringValue($call->args[0]);
+        $fallback = self::literalStringValue($call->args[1]);
+        if (null === $rel || null === $fallback) {
+            return null;
+        }
+
+        return [$rel, $fallback];
+    }
+
+    private static function foldDeployPathConcat(Operand $left, Operand $right): ?string
+    {
+        $suffix = self::literalStringValue($right);
+        if (null === $suffix) {
+            return null;
+        }
+        $parsed = self::parseDeployPathCall($left);
+        if (null === $parsed) {
+            return null;
+        }
+
+        return DeployRoot::resolvePathWithSuffix($parsed[0], $parsed[1], $suffix);
     }
 
     /**
