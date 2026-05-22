@@ -951,6 +951,22 @@ final class VmString
     }
 
     /**
+     * @return string|false
+     */
+    public static function strrchr(string $haystack, string $needle)
+    {
+        if ('' === $needle) {
+            throw new \LogicException('strrchr(): Argument #2 ($needle) cannot be empty');
+        }
+        $pos = self::findRSubstring($haystack, $needle[0], 0);
+        if (false === $pos) {
+            return false;
+        }
+
+        return self::byteSlice($haystack, $pos);
+    }
+
+    /**
      * Count non-overlapping occurrences of $needle in $haystack (byte-safe subset of PHP).
      */
     public static function substr_count(

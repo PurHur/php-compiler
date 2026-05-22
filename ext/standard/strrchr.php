@@ -1,0 +1,53 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\ext\standard;
+
+use PHPCompiler\Frame;
+use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\Variable;
+use PHPLLVM\Value;
+
+/** strrchr() — last byte occurrence (LLVM via libc strrchr + haystack slice). */
+final class strrchr extends Internal
+{
+    public function execute(Frame $frame): void
+    {
+        if (2 !== \count($frame->calledArgs)) {
+            throw new \LogicException('strrchr() requires exactly two arguments in this compiler build');
+        }
+        $haystack = $frame->calledArgs[0]->resolveIndirect();
+        $needle = $frame->calledArgs[1]->resolveIndirect();
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (Variable::TYPE_STRING !== $haystack->type || Variable::TYPE_STRING !== $needle->type) {
+            throw new \LogicException('strrchr() only supports strings in this compiler build');
+        }
+        $result = VmString::strrchr($haystack->toString(), $needle->toString());
+        if (false === $result) {
+            $frame->returnVar->bool(false);
+        } else {
+            $frame->returnVar->string($result);
+        }
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        if (2 !== \count($args)) {
+            throw new \LogicException('strrchr() requires exactly two arguments in this compiler build');
+        }
+        if (JITVariable::TYPE_STRING !== $args[0]->type || JITVariable::TYPE_STRING !== $args[1]->type) {
+            throw new \LogicException('strrchr() only supports strings in this compiler build');
+        }
+
+        return JitStrstr::findLast(
+            $context,
+            $context->helper->loadValue($args[0]),
+            $context->helper->loadValue($args[1])
+        );
+    }
+}
