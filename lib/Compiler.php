@@ -114,9 +114,12 @@ class Compiler {
                     } elseif (
                         $child instanceof Op\Expr\ArrayDimFetch
                         && $i + 1 < $opCount
-                        && $this->isArrayDimFetchOnlyCoalesceLeft($child, $ops[$i + 1])
+                        && (
+                            $this->isArrayDimFetchOnlyCoalesceLeft($child, $ops[$i + 1])
+                            || $this->isArrayDimFetchOnlyIssetVar($child, $ops[$i + 1])
+                        )
                     ) {
-                        // Lowered by compileCoalesce via isset(container, dim) — no eager fetch (#99, #273).
+                        // Lowered by compileCoalesce/compileIsset via isset(container, dim) — no eager fetch (#99, #273, #539).
                         break;
                     } else {
                         $this->compileOp($child, $block);
@@ -147,6 +150,35 @@ class Compiler {
         }
 
         return $left === $fetch->result;
+    }
+
+    /**
+     * php-cfg emits ArrayDimFetch as its own stmt before Isset_; skip duplicate lowering.
+     */
+    private function isArrayDimFetchOnlyIssetVar(
+        Op\Expr\ArrayDimFetch $fetch,
+        Op $next
+    ): bool {
+        if (!$next instanceof Op\Expr\Isset_) {
+            return false;
+        }
+        foreach ($next->vars as $var) {
+            $target = $var;
+            while ($target instanceof Temporary) {
+                if ($target === $fetch->result) {
+                    return true;
+                }
+                if (null === $target->original) {
+                    break;
+                }
+                $target = $target->original;
+            }
+            if ($target === $fetch->result) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     protected function compileClassLike(Op\Stmt\ClassLike $class, Block $block): OpCode {
@@ -716,7 +748,10 @@ class Compiler {
     {
         assert(1 === count($expr->vars));
         $resultSlot = $this->compileOperand($expr->result, $block, false);
-        [$containerSlot, $dimSlot] = $this->resolveIssetTarget($expr->vars[0], $block);
+        $dimFetch = $this->findCoalesceArrayDimFetch($expr->vars[0], $block);
+        [$containerSlot, $dimSlot] = null !== $dimFetch
+            ? $this->resolveIssetTargetFromArrayDimFetch($dimFetch, $block)
+            : $this->resolveIssetTarget($expr->vars[0], $block);
 
         return [new OpCode(
             OpCode::TYPE_ISSET,
@@ -1016,7 +1051,10 @@ class Compiler {
         $vars = $expr->vars;
         $last = count($vars) - 1;
         foreach ($vars as $i => $var) {
-            [$containerSlot, $dimSlot] = $this->resolveIssetTarget($var, $block);
+            $dimFetch = $this->findCoalesceArrayDimFetch($var, $block);
+            [$containerSlot, $dimSlot] = null !== $dimFetch
+                ? $this->resolveIssetTargetFromArrayDimFetch($dimFetch, $block)
+                : $this->resolveIssetTarget($var, $block);
             $checkSlot = $resultSlot;
             if ($i < $last) {
                 $checkSlot = $this->compileBoolTemporary($current);

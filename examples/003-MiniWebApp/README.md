@@ -1,6 +1,6 @@
 # 003-MiniWebApp
 
-Reference web app for [issue #67](https://github.com/PurHur/php-compiler/issues/67) and routing spec [#210](https://github.com/PurHur/php-compiler/issues/210). VM `phpc serve` is green; PATH_INFO front-controller URLs landed in [#489](https://github.com/PurHur/php-compiler/issues/489).
+Reference web app: skeleton [#67](https://github.com/PurHur/php-compiler/issues/67) closed ([#246](https://github.com/PurHur/php-compiler/issues/246)); VM/runtime tracker [#539](https://github.com/PurHur/php-compiler/issues/539); routing [#210](https://github.com/PurHur/php-compiler/issues/210). `phpc serve` and lint are green; PATH_INFO URLs in [#489](https://github.com/PurHur/php-compiler/issues/489); AOT execute [#454](https://github.com/PurHur/php-compiler/issues/454).
 
 ## Layout
 

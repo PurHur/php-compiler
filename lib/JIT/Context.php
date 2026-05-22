@@ -40,6 +40,8 @@ class Context {
     public array $constants = [];
     public array $functions = [];
     public array $functionProxies = [];
+    /** @var array<string, true> JIT stubs registered for external Class::method (issue #579). */
+    public array $externalMethodStubs = [];
     public array $functionReturnType = [];
     public string $activeFunction = '';
     public array $functionScope = [];
@@ -130,6 +132,20 @@ class Context {
     public function popScope(): void {
         assert(!empty($this->scopeStack));
         $this->scope = array_pop($this->scopeStack);
+    }
+
+    public function resolveFunctionProxy(string $proxyName): Call
+    {
+        if (!isset($this->functionProxies[$proxyName])) {
+            $this->functionProxies[$proxyName] = new Call\ExternalMethod($proxyName);
+        }
+
+        return $this->functionProxies[$proxyName];
+    }
+
+    public function recordExternalMethodStub(string $proxyName): void
+    {
+        $this->externalMethodStubs[strtolower($proxyName)] = true;
     }
 
     public function registerModule(Module $module): void {

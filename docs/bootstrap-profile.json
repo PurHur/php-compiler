@@ -194,12 +194,14 @@
         "ext/standard/str_replace.php",
         "ext/standard/str_split.php",
         "ext/standard/str_starts_with.php",
+        "ext/standard/strcasecmp.php",
         "ext/standard/strcmp.php",
         "ext/standard/string_ltrim.php",
         "ext/standard/string_rtrim.php",
         "ext/standard/string_trim.php",
         "ext/standard/strip_tags.php",
         "ext/standard/stripos.php",
+        "ext/standard/strncasecmp.php",
         "ext/standard/strncmp.php",
         "ext/standard/strpos.php",
         "ext/standard/strrev.php",
@@ -363,9 +365,9 @@
         "test/bootstrap-aot/try_catch.php"
     ],
     "totals": {
-        "inventory_files": 305,
+        "inventory_files": 307,
         "excluded": 2,
-        "eligible": 303,
+        "eligible": 305,
         "aot_lint_targets": 12,
         "aot_link_targets": 12
     }

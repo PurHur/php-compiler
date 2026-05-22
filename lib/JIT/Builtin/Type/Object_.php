@@ -285,10 +285,18 @@ class Object_ extends Type {
     {
         $lcname = strtolower($name);
         if (!isset($this->classes[$lcname])) {
-            throw new \LogicException("Unknown class lookup: $name");
+            $this->registerExternalClass($lcname);
         }
 
         return $this->classes[$lcname];
+    }
+
+    private function registerExternalClass(string $lcname): void
+    {
+        $id = count($this->classes);
+        $this->properties[$id] = [];
+        $this->classConstants[$id] = [];
+        $this->classes[$lcname] = $id;
     }
 
     public function defineProperty(int $classId, string $name, int $type): void

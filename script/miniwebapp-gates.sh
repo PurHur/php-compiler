@@ -26,7 +26,7 @@ Prints the progressive MiniWebApp CI gate ladder for examples/003-MiniWebApp.
 Probes phpc lint --all by default; use --no-lint to report env/repo state only.
 
 Environment (enable next gates):
-  MINIWEBAPP_LINT_GATE=1   fail make web-smoke when lint regresses (#67, #455)
+  MINIWEBAPP_LINT_GATE=1   fail make web-smoke when lint regresses (#539, #455)
   MINIWEBAPP_SERVE_GATE=1  enforce ServeTest MiniWebApp routes (#470)
 
 See: examples/003-MiniWebApp/README.md, issue #472
@@ -70,7 +70,7 @@ if [[ "${lint_gate}" != "1" ]]; then
   stage0=1
 fi
 
-# Stage 1: phpc lint --all green (#67).
+# Stage 1: phpc lint --all green (#539).
 if [[ "${lint_exit}" -eq 0 ]]; then
   stage1=1
 fi
@@ -119,7 +119,7 @@ if [[ "${RUN_LINT}" -eq 1 ]]; then
     echo "  Lint probe: exit ${lint_exit} (phpc lint --all)"
   fi
   if [[ "${lint_gate}" == "1" && "${lint_exit}" -ne 0 ]]; then
-    echo "  MINIWEBAPP_LINT_GATE=1: web-smoke would fail (#67)"
+    echo "  MINIWEBAPP_LINT_GATE=1: web-smoke would fail (#539)"
   fi
   echo
 fi
@@ -129,8 +129,8 @@ if [[ "${stage0}" -eq 0 ]]; then
   echo "       unset MINIWEBAPP_LINT_GATE to return to skeleton mode"
 fi
 
-echo "$(mark "${stage1}") Stage 1 lint green — export MINIWEBAPP_LINT_GATE=1 after #67"
-echo "       ${REPO_URL}/issues/67"
+echo "$(mark "${stage1}") Stage 1 lint green — export MINIWEBAPP_LINT_GATE=1 (#539)"
+echo "       ${REPO_URL}/issues/539"
 
 echo "$(mark "${stage2}") Stage 2 ServeTest — export MINIWEBAPP_SERVE_GATE=1 (#470)"
 echo "       ${REPO_URL}/issues/470"
@@ -151,7 +151,7 @@ echo "Tracking: ${REPO_URL}/issues/472 (gate ladder spec)"
 
 # Current focus
 if [[ "${lint_exit}" -ne 0 && "${lint_gate}" != "1" ]]; then
-  echo "Next: close lint blockers (#67), then export MINIWEBAPP_LINT_GATE=1"
+  echo "Next: close lint blockers (#539), then export MINIWEBAPP_LINT_GATE=1"
 elif [[ "${lint_exit}" -eq 0 && "${lint_gate}" != "1" ]]; then
   echo "Next: export MINIWEBAPP_LINT_GATE=1 (lint is green)"
 elif [[ "${lint_exit}" -ne 0 && "${lint_gate}" == "1" ]]; then
