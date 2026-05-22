@@ -11,7 +11,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** file_put_contents() — VM only (issue #194). */
+/** file_put_contents() — string data; flags 0 or FILE_APPEND (8) in JIT (issue #194). */
 final class file_put_contents extends Internal
 {
     public function execute(Frame $frame): void
@@ -48,7 +48,39 @@ final class file_put_contents extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('file_put_contents() is not implemented for JIT in this compiler build');
+        $argc = \count($args);
+        if ($argc < 2 || $argc > 3) {
+            throw new \LogicException('file_put_contents() requires two or three arguments in this compiler build');
+        }
+        if (JITVariable::TYPE_STRING !== $args[0]->type) {
+            throw new \LogicException('file_put_contents() filename must be a string in this compiler build');
+        }
+        if (JITVariable::TYPE_STRING !== $args[1]->type) {
+            throw new \LogicException('file_put_contents() data must be a string in this compiler build');
+        }
+        $flags = 0;
+        if (3 === $argc) {
+            if (JITVariable::TYPE_NATIVE_LONG !== $args[2]->type) {
+                throw new \LogicException('file_put_contents() flags must be an integer in this compiler build');
+            }
+            $flagsVal = $args[2]->compileTimeLong ?? null;
+            if (null !== $flagsVal && 0 !== $flagsVal && 8 !== $flagsVal) {
+                throw new \LogicException('file_put_contents() flags must be 0 or FILE_APPEND (8) in this compiler build');
+            }
+            $flags = $context->builder->truncOrBitCast(
+                $context->helper->loadValue($args[2]),
+                $context->getTypeFromString('int64')
+            );
+        } else {
+            $flags = $context->getTypeFromString('int64')->constInt(0, false);
+        }
+
+        return JitFilePutContents::invoke(
+            $context,
+            $context->helper->loadValue($args[0]),
+            $context->helper->loadValue($args[1]),
+            $flags
+        );
     }
 
     /**
