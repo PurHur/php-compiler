@@ -105,13 +105,20 @@ Production AOT CGI wrapper for nginx spawn: [#665](https://github.com/PurHur/php
 
 | Step | Command |
 |------|---------|
-| Deploy smoke | `phpc deploy examples/002-StaticWeb -o /tmp/static-dist` → executable `bin/app` |
+| Deploy smoke | `make deploy-smoke` or `./script/deploy-smoke.sh` (001/002; skips without LLVM — [#718](https://github.com/PurHur/php-compiler/issues/718)) |
+| Manual deploy | `phpc deploy examples/002-StaticWeb -o /tmp/static-dist` → executable `bin/app` |
 | Deploy root env | `grep PHPC_DEPLOY_ROOT /tmp/static-dist/README.deploy` |
 | CGI one-shot | `PHPC_DEPLOY_ROOT=/tmp/static-dist QUERY_STRING= ./bin/app` (002 prints HTML) |
 | HTTP harness | `make examples-web-smoke` (001, 002, 004; 003 when lint green) |
 | Full gate | `./script/ci-local.sh` or `make test` in Docker |
 
-Docker one-liner (bind-mount OK on a normal dev machine):
+Docker (preferred on harness hosts):
+
+```bash
+docker run --rm -v "$(pwd):/compiler" -w /compiler php-compiler:22.04-dev make deploy-smoke
+```
+
+Manual one-liner (bind-mount OK on a normal dev machine):
 
 ```bash
 docker run --rm -v "$(pwd):/compiler" -w /compiler php-compiler:22.04-dev bash -lc '

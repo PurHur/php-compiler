@@ -106,6 +106,21 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('.phpc/smoke', $body);
     }
 
+    public function testDeploySmokeScriptExists(): void
+    {
+        $script = dirname(__DIR__, 2).'/script/deploy-smoke.sh';
+        $this->assertFileExists($script);
+        $this->assertTrue(is_executable($script));
+        $body = (string) file_get_contents($script);
+        $this->assertStringContainsString('phpc deploy', $body);
+        $this->assertStringContainsString('PHPC_DEPLOY_ROOT', $body);
+        $this->assertStringContainsString('002-StaticWeb', $body);
+
+        $makefile = (string) file_get_contents(dirname(__DIR__, 2).'/Makefile');
+        $this->assertStringContainsString('deploy-smoke:', $makefile);
+        $this->assertStringContainsString('deploy-smoke.sh', $makefile);
+    }
+
     public function testCiLocalHonorsExamplesAotSmokeGate(): void
     {
         $local = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-local.sh');
@@ -211,6 +226,8 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('Stage 4c AOT smoke', $body);
         $this->assertStringContainsString('EXAMPLES_AOT_SMOKE_ONLY=003', $body);
         $this->assertStringContainsString('issues/683', $body);
+        $this->assertStringContainsString('Stage 4d deploy-smoke', $body);
+        $this->assertStringContainsString('issues/718', $body);
     }
 
     public function testWebSmokeDefaultsMiniWebAppLintGateOn(): void
