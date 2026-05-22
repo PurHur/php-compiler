@@ -449,8 +449,8 @@ class Compiler {
             return [new OpCode(
                 $this->getOpCodeTypeFromBinaryOp($expr),
                 $this->compileOperand($expr->result, $block, false),
-                $this->compileOperand($expr->left, $block, true),
-                $this->compileOperand($expr->right, $block, true),
+                $this->compileOperand($expr->left ?? new Operand\NullOperand(), $block, true),
+                $this->compileOperand($expr->right ?? new Operand\NullOperand(), $block, true),
             )];
         } elseif ($expr instanceof Op\Expr\Cast) {
             return [new OpCode(
