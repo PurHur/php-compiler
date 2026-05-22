@@ -42,7 +42,8 @@ php-compiler CLI
   phpc build [-o out] <entry.php>               AOT compile to a native binary
   phpc build --project [dir] [--dry-run]        Build from phpc.json entry + binary paths
       --dry-run                                 List entry + includes graph; exit before LLVM
-      --verbose                                 On failure, keep full LLVM stderr (default adds #568 trailer)
+      --verbose                                 Print compile-unit graph; keep full LLVM stderr on failure
+      PHPC_BUILD_VERBOSE=1                      Same as --verbose
   phpc deploy [dir] -o <dist>                   Package AOT binary + manifest trees into dist/
       --from-build                              Require existing binary (skip phpc build --project)
   phpc cgi [binary]                             Run AOT binary under CGI env (stdin → REQUEST_BODY)
@@ -327,6 +328,8 @@ function buildFromProject(
     }
     require $repoRoot.'/vendor/autoload.php';
 
+    $verbose = \PHPCompiler\Cli\PhpcBuild::verboseEnabled($verbose);
+
     if ($dryRun) {
         return \PHPCompiler\AOT\ProjectGraph::preflight($projectDir);
     }
@@ -352,6 +355,10 @@ function buildFromProject(
         return 1;
     }
 
+    if ($verbose) {
+        \PHPCompiler\Cli\PhpcBuild::emitVerboseProjectGraph($projectDir);
+    }
+
     $includes = \PHPCompiler\Web\ProjectManifest::resolveIncludePaths($projectDir);
     $compileArgv = ['-o', $output];
     foreach ($includes as $includePath) {
@@ -367,11 +374,7 @@ function buildFromProject(
         $repoRoot,
         $compileArgv
     );
-    if ($verbose || 0 === $result['exit']) {
-        \PHPCompiler\Cli\PhpcBuild::emitBuildOutput($result, true);
-    } else {
-        \PHPCompiler\Cli\PhpcBuild::emitBuildOutput($result, false);
-    }
+    \PHPCompiler\Cli\PhpcBuild::emitBuildOutput($result, $verbose);
 
     return $result['exit'];
 }

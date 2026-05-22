@@ -10,7 +10,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 |--------|------:|
 | PHP files on vm.php path | 337 |
 | Source constructs flagged (blockers) | 10 |
-| Source constructs flagged (warnings) | 908 |
+| Source constructs flagged (warnings) | 909 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -250,7 +250,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `lib/AOT/Linker.php` | 8 | 1 |
 | `lib/AOT/ProjectGraph.php` | 0 | 4 |
 | `lib/Block.php` | 0 | 4 |
-| `lib/Cli/PhpcBuild.php` | 0 | 1 |
+| `lib/Cli/PhpcBuild.php` | 0 | 2 |
 | `lib/Cli/PhpcInit.php` | 0 | 1 |
 | `lib/Compiler.php` | 0 | 109 |
 | `lib/Doctor.php` | 0 | 1 |
@@ -1695,7 +1695,8 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/Cli/PhpcBuild.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new Linter (line 127)
+- 9 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/Cli/PhpcInit.php`
 
@@ -2342,7 +2343,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/Lint/UnsupportedRegistry.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 5 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/MethodVisibility.php`
 
