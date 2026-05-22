@@ -13,6 +13,7 @@ declare(strict_types=1);
  *   phpc build [-o outfile] entry.php
  *   phpc build --project [dir] [--dry-run]     AOT compile from phpc.json entry/binary
  *   phpc deploy [dir] -o <dist> [--from-build]  Bundle binary, public/, assets/, phpc.json
+ *   phpc cgi [binary]                           CGI wrapper for AOT binary (issue #665)
  *   phpc lint [-r 'code'] [--json] entry.php
  *   phpc lint --project <entry.php> [--json]
  *   phpc lint --all <dir-or-file> [--json]
@@ -44,6 +45,8 @@ php-compiler CLI
       --verbose                                 On failure, keep full LLVM stderr (default adds #568 trailer)
   phpc deploy [dir] -o <dist>                   Package AOT binary + manifest trees into dist/
       --from-build                              Require existing binary (skip phpc build --project)
+  phpc cgi [binary]                             Run AOT binary under CGI env (stdin → REQUEST_BODY)
+      PHPC_DEPLOY_ROOT=<dist>                   Resolve bin/app from deploy bundle when binary omitted
   phpc lint [-r 'code'] [--json] <entry.php>    Report unsupported syntax (line-accurate)
   phpc lint --project <entry.php> [--json]    Entry + literal include/require chain
   phpc lint --all <dir-or-file> [--json]      All .php under a tree (aggregated)
@@ -89,6 +92,17 @@ switch ($command) {
         }
         require $repoRoot.'/vendor/autoload.php';
         exit(deployFromProject($repoRoot, phpCommand(), $args));
+
+    case 'cgi':
+        if (!is_file($repoRoot.'/vendor/autoload.php')) {
+            fwrite(STDERR, "phpc cgi: run composer install first\n");
+            exit(1);
+        }
+        $cgiArgs = [];
+        while ([] !== $args) {
+            $cgiArgs[] = array_shift($args);
+        }
+        exit(runProcess(array_merge($php, array_merge([$repoRoot.'/bin/cgi-aot.php'], $cgiArgs)), $repoRoot));
 
     case 'build':
         if ([] !== $args && '--project' === $args[0]) {

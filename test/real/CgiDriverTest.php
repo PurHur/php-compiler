@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * VM smoke for bin/cgi.php with CGI env only (no TCP, issues #50, #656, #666).
+ * AOT wrapper smoke for bin/cgi-aot.php (issue #665).
  *
  * @group cgi
  */
@@ -19,6 +20,8 @@ final class CgiDriverTest extends TestCase
     private array $phpCmd = [];
 
     private string $cgiBin;
+
+    private static ?bool $llvmReady = null;
 
     protected function setUp(): void
     {
@@ -119,6 +122,87 @@ final class CgiDriverTest extends TestCase
         $this->assertStringContainsString('"ok":true', $this->cgiBody($out));
     }
 
+    /**
+     * 001-SimpleWeb AOT binary via cgi-aot wrapper (issue #665).
+     *
+     * @group llvm
+     * @group aot-link
+     */
+    public function testSimpleWebGetViaAotCgiWrapper(): void
+    {
+        if (!self::isLlvmReady()) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+        $cgiAot = realpath($this->repoRoot.'/bin/cgi-aot.php');
+        if (false === $cgiAot) {
+            $this->markTestSkipped('bin/cgi-aot.php missing (#665)');
+        }
+
+        $source = $this->repoRoot.'/examples/001-SimpleWeb/example.php';
+        $this->assertFileExists($source);
+        $binaryDir = sys_get_temp_dir().'/phpc_cgi_aot_'.bin2hex(random_bytes(4));
+        $this->assertTrue(mkdir($binaryDir));
+        $binary = $binaryDir.'/app';
+        try {
+            $this->compileAotBinary($source, $binary);
+
+            $env = $this->baseEnv();
+            $env['REQUEST_METHOD'] = 'GET';
+            $env['QUERY_STRING'] = 'name=AotCgi';
+            $env['SCRIPT_NAME'] = '/example.php';
+            $env['SCRIPT_FILENAME'] = $source;
+            $env['REQUEST_URI'] = '/example.php?name=AotCgi';
+
+            $out = $this->runCgiAot($cgiAot, $binary, $env);
+            $this->assertStringContainsString('Status: 200', $out);
+            $this->assertStringContainsString('Content-Type: text/html', $out);
+            $this->assertStringContainsString('AotCgi', $this->cgiBody($out));
+        } finally {
+            @unlink($binary);
+            @rmdir($binaryDir);
+        }
+    }
+
+    /**
+     * Deploy dist cgi-wrapper shell script (issue #665).
+     *
+     * @group llvm
+     * @group aot-link
+     */
+    public function testDeployCgiWrapperRunsSimpleWebBinary(): void
+    {
+        if (!self::isLlvmReady()) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+        $wrapper = realpath($this->repoRoot.'/bin/cgi-aot.sh');
+        if (false === $wrapper) {
+            $this->markTestSkipped('bin/cgi-aot.sh missing (#665)');
+        }
+
+        $source = $this->repoRoot.'/examples/001-SimpleWeb/example.php';
+        $dist = sys_get_temp_dir().'/phpc_cgi_deploy_'.bin2hex(random_bytes(4));
+        $this->assertTrue(mkdir($dist.'/bin', 0777, true));
+        $binary = $dist.'/bin/app';
+        try {
+            $this->compileAotBinary($source, $binary);
+            copy($wrapper, $dist.'/cgi-wrapper');
+            chmod($dist.'/cgi-wrapper', 0755);
+
+            $env = $this->baseEnv();
+            $env['PHPC_DEPLOY_ROOT'] = $dist;
+            $env['REQUEST_METHOD'] = 'GET';
+            $env['QUERY_STRING'] = 'name=DeployCgi';
+            $env['SCRIPT_NAME'] = '/example.php';
+            $env['REQUEST_URI'] = '/example.php?name=DeployCgi';
+
+            $out = $this->runCgiShell($dist.'/cgi-wrapper', $env);
+            $this->assertStringContainsString('Status: 200', $out);
+            $this->assertStringContainsString('DeployCgi', $this->cgiBody($out));
+        } finally {
+            $this->removeTree($dist);
+        }
+    }
+
     private function miniWebAppIndexScript(): string
     {
         $script = $this->repoRoot.'/examples/003-MiniWebApp/public/index.php';
@@ -149,12 +233,61 @@ final class CgiDriverTest extends TestCase
         return $env;
     }
 
+    private function compileAotBinary(string $source, string $outfile): void
+    {
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $env = $this->baseEnv();
+        LlvmToolchain::applyProcessEnv($env, $this->repoRoot);
+        $compile = proc_open(
+            array_merge(
+                LlvmToolchain::envPrefix($this->repoRoot),
+                $this->phpCmd,
+                [$this->repoRoot.'/bin/compile.php', '-o', $outfile, $source]
+            ),
+            $descriptorSpec,
+            $pipes,
+            $this->repoRoot,
+            $env
+        );
+        $this->assertIsResource($compile);
+        fclose($pipes[0]);
+        $err = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exitCode = proc_close($compile);
+        $this->assertSame(0, $exitCode, 'compile.php failed: '.trim($err !== false ? $err : ''));
+        $this->assertFileExists($outfile);
+        $this->assertTrue(is_executable($outfile));
+    }
+
     /**
      * @param array<string, string> $env
      */
-    private function runCgi(string $script, array $env, string $stdin = ''): string
+    private function runCgiAot(string $cgiAot, string $binary, array $env, string $stdin = ''): string
     {
-        $cmd = array_merge($this->phpCmd, [$this->cgiBin, $script]);
+        $cmd = array_merge($this->phpCmd, [$cgiAot, $binary]);
+
+        return $this->runCgiProcess($cmd, $env, $stdin);
+    }
+
+    /**
+     * @param array<string, string> $env
+     */
+    private function runCgiShell(string $wrapper, array $env, string $stdin = ''): string
+    {
+        return $this->runCgiProcess([$wrapper], $env, $stdin);
+    }
+
+    /**
+     * @param list<string> $cmd
+     * @param array<string, string> $env
+     */
+    private function runCgiProcess(array $cmd, array $env, string $stdin = ''): string
+    {
         $descriptor = [
             0 => ['pipe', 'r'],
             1 => ['pipe', 'w'],
@@ -172,6 +305,16 @@ final class CgiDriverTest extends TestCase
         $this->assertSame(0, $code, trim((false !== $stderr ? $stderr : '')."\n".(false !== $stdout ? $stdout : '')));
 
         return false !== $stdout ? $stdout : '';
+    }
+
+    /**
+     * @param array<string, string> $env
+     */
+    private function runCgi(string $script, array $env, string $stdin = ''): string
+    {
+        $cmd = array_merge($this->phpCmd, [$this->cgiBin, $script]);
+
+        return $this->runCgiProcess($cmd, $env, $stdin);
     }
 
     private function cgiBody(string $output): string
@@ -194,6 +337,36 @@ final class CgiDriverTest extends TestCase
         }
 
         return $env;
+    }
+
+    private static function isLlvmReady(): bool
+    {
+        if (null === self::$llvmReady) {
+            self::$llvmReady = LlvmToolchain::isReady(dirname(__DIR__, 2));
+        }
+
+        return self::$llvmReady;
+    }
+
+    private function removeTree(string $path): void
+    {
+        if (!is_dir($path)) {
+            @unlink($path);
+
+            return;
+        }
+        $it = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($path, \FilesystemIterator::SKIP_DOTS),
+            \RecursiveIteratorIterator::CHILD_FIRST
+        );
+        foreach ($it as $item) {
+            if ($item->isDir()) {
+                @rmdir($item->getPathname());
+            } else {
+                @unlink($item->getPathname());
+            }
+        }
+        @rmdir($path);
     }
 
     /**
