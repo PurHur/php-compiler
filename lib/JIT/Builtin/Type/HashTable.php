@@ -235,8 +235,11 @@ class HashTable extends Type
         $afterBb = $fn->appendBasicBlock('grow_after');
         $this->context->builder->branchIf($isNull, $mallocBb, $reallocBb);
 
+        $zeroI8 = $this->context->getTypeFromString('int8')->constInt(0, false);
+
         $this->context->builder->positionAtEnd($mallocBb);
         $malloced = $this->context->builder->call($this->context->lookupFunction('__mm__malloc'), $bytes);
+        $this->context->intrinsic->memset($malloced, $zeroI8, $bytes, false);
         $this->context->builder->branch($afterBb);
 
         $this->context->builder->positionAtEnd($reallocBb);
@@ -245,6 +248,10 @@ class HashTable extends Type
             $this->context->builder->pointerCast($valuesPtr, $i8p),
             $bytes
         );
+        $oldBytes = $this->context->builder->mulNoSignedWrap($cap, $valueSize);
+        $tailBytes = $this->context->builder->subNoSignedWrap($bytes, $oldBytes);
+        $tailStart = $this->context->builder->inBoundsGEP($realloced, $oldBytes);
+        $this->context->intrinsic->memset($tailStart, $zeroI8, $tailBytes, false);
         $this->context->builder->branch($afterBb);
 
         $this->context->builder->positionAtEnd($afterBb);

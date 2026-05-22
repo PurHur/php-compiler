@@ -7,9 +7,7 @@ $ca = $c['a'];
 $cb = $c['b'];
 echo $ca, '|', $cb, "\n";
 $d = array_combine(array(0, 1), array('x', 'y'));
-$dx = $d[0];
-$dy = $d[1];
-echo $dx, '|', $dy, "\n";
+echo $d[0], '|', $d[1], "\n";
 --EXPECT--
 1|2
 x|y
