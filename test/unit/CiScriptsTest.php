@@ -29,7 +29,7 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('--group aot-lint', $body);
         $this->assertStringContainsString('--group jit', $body);
         $this->assertStringContainsString('--group aot-link', $body);
-        $this->assertStringContainsString('ci_apply_resource_limits', $body);
+        $this->assertStringContainsString('ci_prepare_test_runtime', $body);
         $this->assertStringContainsString('ci_run_examples_web_smoke_aot', $body);
     }
 
