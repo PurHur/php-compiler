@@ -175,6 +175,20 @@ PHP,
     $this->assertStringContainsString('Nope', $response);
   }
 
+  public function testHeaderLocationRedirect302(): void
+  {
+    $docroot = $this->makeDocroot([
+      'redirect.php' => <<<'PHP'
+<?php
+header('Location: /done');
+http_response_code(302);
+PHP,
+    ]);
+    $response = $this->httpGet($docroot, '/redirect.php');
+    $this->assertStringContainsString('HTTP/1.1 302', $response);
+    $this->assertStringContainsString('Location: /done', $response);
+  }
+
   public function testPopulatesHttpServerHeaders(): void
   {
     $docroot = $this->makeDocroot([

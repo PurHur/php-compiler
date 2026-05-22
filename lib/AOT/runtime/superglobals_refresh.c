@@ -2121,6 +2121,10 @@ typedef struct __phpc_header_node {
 
 static __phpc_header_node *phpc_pending_head = NULL;
 static __phpc_header_node *phpc_pending_tail = NULL;
+static int phpc_response_headers_flushed = 0;
+
+/** LLVM module global (HttpResponseCode::GLOBAL_NAME); defined in generated .o */
+extern int __phpc_http_response_status;
 
 static int phpc_header_name_from_line(__string__ *line, char *buf, size_t bufsz)
 {
@@ -2190,6 +2194,28 @@ static void phpc_pending_free_nodes(void)
 void __phpc_pending_header_reset(void)
 {
     phpc_pending_free_nodes();
+    phpc_response_headers_flushed = 0;
+}
+
+void __phpc_response_headers_flush(void)
+{
+    __phpc_header_node *cur;
+
+    if (phpc_response_headers_flushed) {
+        return;
+    }
+    phpc_response_headers_flushed = 1;
+    if (__phpc_http_response_status != 200) {
+        printf("Status: %d\r\n", __phpc_http_response_status);
+    }
+    cur = phpc_pending_head;
+    while (cur != NULL) {
+        __string__ *line = cur->line;
+        if (line != NULL) {
+            printf("%.*s\r\n", (int) nf_strlen(line), nf_strdata(line));
+        }
+        cur = cur->next;
+    }
 }
 
 void __phpc_pending_header_remove(__string__ *name)
@@ -2223,9 +2249,16 @@ void __phpc_pending_header_add(__string__ *line, int replace)
 {
     __phpc_header_node *node;
     char name_buf[256];
+    const char *s;
+    size_t len;
 
     if (line == NULL) {
         return;
+    }
+    s = nf_strdata(line);
+    len = nf_strlen(line);
+    if (__phpc_http_response_status == 200 && len >= 9 && strncasecmp(s, "Location:", 9) == 0) {
+        __phpc_http_response_status = 302;
     }
     if (replace && phpc_header_name_from_line(line, name_buf, sizeof name_buf)) {
         __string__ *name = cstr_to_string(name_buf);

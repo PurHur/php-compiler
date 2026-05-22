@@ -236,6 +236,11 @@ class Type extends Builtin {
             $this->context->context->functionType($htPtr, false)
         );
         $this->context->registerFunction('__phpc_pending_header_list', $fnPendingList);
+        $fnPendingFlush = $this->context->module->addFunction(
+            '__phpc_response_headers_flush',
+            $this->context->context->functionType($void, false)
+        );
+        $this->context->registerFunction('__phpc_response_headers_flush', $fnPendingFlush);
         $fntypeJsonEncode = $this->context->context->functionType(
             $this->context->getTypeFromString('__string__*'),
             false,

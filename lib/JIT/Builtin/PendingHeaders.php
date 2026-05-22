@@ -20,4 +20,15 @@ final class PendingHeaders
         }
         $context->builder->call($context->lookupFunction('__phpc_pending_header_reset'));
     }
+
+    /**
+     * Emit CGI Status + queued header() lines once (issue #634).
+     */
+    public static function emitFlushForStandalone(Context $context): void
+    {
+        if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
+            return;
+        }
+        $context->builder->call($context->lookupFunction('__phpc_response_headers_flush'));
+    }
 }
