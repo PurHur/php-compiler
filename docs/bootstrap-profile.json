@@ -165,6 +165,7 @@
         "ext/standard/intdiv.php",
         "ext/standard/intval.php",
         "ext/standard/is_dir.php",
+        "ext/standard/is_executable.php",
         "ext/standard/is_file.php",
         "ext/standard/is_finite.php",
         "ext/standard/is_infinite.php",
@@ -322,6 +323,7 @@
         "lib/JIT/Result.php",
         "lib/JIT/Scope.php",
         "lib/JIT/ScopeBuiltinHelper.php",
+        "lib/JIT/ScriptMagic.php",
         "lib/JIT/StringOffsetHelper.php",
         "lib/JIT/SuperglobalInit.php",
         "lib/JIT/ValueEchoHelper.php",
@@ -351,6 +353,7 @@
         "lib/VM/OutputBuffer.php",
         "lib/VM/Refcount.php",
         "lib/VM/ScriptExit.php",
+        "lib/VM/ScriptStack.php",
         "lib/VM/TypeCheck.php",
         "lib/VM/Variable.php",
         "lib/Web/CgiAotDriver.php",
@@ -409,9 +412,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 344,
+        "inventory_files": 347,
         "excluded": 2,
-        "eligible": 342,
+        "eligible": 345,
         "aot_lint_targets": 15,
         "aot_link_targets": 13,
         "aot_link_lib_targets": 1
