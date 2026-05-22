@@ -230,14 +230,7 @@ function bootstrapDefaultAotLintTargets(string $root): array
  */
 function bootstrapDefaultAotLinkTargets(array $lintTargets): array
 {
-    $pendingUserFunc = [
-        'test/bootstrap-aot/try_catch.php', // try/catch CFG link (#57); VM unwind pending
-    ];
-
-    return array_values(array_filter(
-        $lintTargets,
-        static fn (string $rel): bool => !in_array($rel, $pendingUserFunc, true),
-    ));
+    return $lintTargets;
 }
 
 /**
