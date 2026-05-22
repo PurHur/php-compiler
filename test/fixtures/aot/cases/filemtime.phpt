@@ -10,5 +10,11 @@ if ($t1 === false || $t2 === false || $t1 !== $t2) {
 } else {
     echo 'ok', "\n";
 }
+if (filemtime('/no/such/phpc-filemtime-path')) {
+    echo 'bad', "\n";
+} else {
+    echo 'gone', "\n";
+}
 --EXPECT--
 ok
+gone
