@@ -117,6 +117,11 @@ final class Doctor
             }
         }
 
+        $aotSmokeGate = getenv('EXAMPLES_AOT_SMOKE_GATE');
+        if (false !== $aotSmokeGate && '0' === $aotSmokeGate) {
+            fwrite(STDOUT, "LLVM ready: unset EXAMPLES_AOT_SMOKE_GATE=0 for ci-local examples-aot-smoke (#674)\n");
+        }
+
         return is_int($exit) ? $exit : 1;
     }
 

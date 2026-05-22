@@ -113,7 +113,21 @@ final class CiScriptsTest extends TestCase
 
         $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
         $this->assertStringContainsString('EXAMPLES_AOT_SMOKE_GATE', $common);
+        $this->assertStringContainsString('EXAMPLES_AOT_SMOKE_GATE:-1', $common);
         $this->assertStringContainsString('examples-aot-smoke.sh', $common);
+    }
+
+    public function testCiDefaultsEnvDefinesExamplesAotSmokeGateOn(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString('EXAMPLES_AOT_SMOKE_GATE="${EXAMPLES_AOT_SMOKE_GATE:-1}"', $defaults);
+    }
+
+    public function testCiFastDoesNotRunExamplesAotSmokeGate(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-fast.sh');
+        $this->assertStringNotContainsString('ci_run_examples_aot_smoke', $body);
+        $this->assertStringNotContainsString('examples-aot-smoke.sh', $body);
     }
 
     public function testCiResourceLimitsSourcesDefaults(): void
