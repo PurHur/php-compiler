@@ -68,14 +68,26 @@ class Compiler {
         if (!$this->seen->contains($block)) {
             $this->seen[$block] = $new = new Block($block);
             $new->inheritScopeFrom($parent);
+            $this->inheritFuncFromParent($new, $parent);
             $this->compileBlock($new);
         } else {
-            $this->seen[$block]->inheritScopeFrom($parent);
+            $child = $this->seen[$block];
+            $child->inheritScopeFrom($parent);
+            $this->inheritFuncFromParent($child, $parent);
         }
         $child = $this->seen[$block];
         $child->parents[] = $parent;
 
         return $child;
+    }
+
+    /** Switch/if/loop targets need enclosing Func for JIT visibility (#210, #588). */
+    private function inheritFuncFromParent(Block $child, Block $parent): void
+    {
+        if (null !== $parent->func) {
+            $child->func = $parent->func;
+            $child->strictTypes = $parent->strictTypes;
+        }
     }
 
     protected function compileBlock(Block $block) {
