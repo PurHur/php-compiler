@@ -61,6 +61,7 @@ class Analyzer
                 || $usage instanceof Op\Expr\PropertyFetch
                 || $usage instanceof Op\Expr\Include_
                 || $usage instanceof Op\Terminal\Return_
+                || $usage instanceof Op\Terminal\Echo_
                 || $usage instanceof Op\Iterator\Reset
                 || $usage instanceof Op\Iterator\Valid
                 || $usage instanceof Op\Iterator\Key

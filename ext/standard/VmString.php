@@ -207,6 +207,25 @@ final class VmString
         return $count;
     }
 
+    /**
+     * @return string|false
+     */
+    public static function strpbrk(string $haystack, string $charList)
+    {
+        if ('' === $charList) {
+            throw new \ValueError('strpbrk(): Argument #2 ($characters) must not be empty');
+        }
+        $slen = self::byteLength($haystack);
+        $mlen = self::byteLength($charList);
+        for ($i = 0; $i < $slen; ++$i) {
+            if (self::byteInSet($haystack[$i], $charList, $mlen)) {
+                return self::byteSlice($haystack, $i);
+            }
+        }
+
+        return false;
+    }
+
     private static function byteInSet(string $byte, string $mask, int $maskLen): bool
     {
         for ($j = 0; $j < $maskLen; ++$j) {

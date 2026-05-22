@@ -1,0 +1,7 @@
+--- vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php
+@@ -7553,7 +7553,7 @@
+         'str_pad' => ['string', 'input' => 'string', 'pad_length' => 'int', 'pad_string=' => 'string', 'pad_type=' => 'int'],
+-        'strpbrk' => ['array', 'haystack' => 'string', 'char_list' => 'string'],
++        'strpbrk' => ['string', 'haystack' => 'string', 'char_list' => 'string'],
+         'strpos' => ['int', 'haystack' => 'string', 'needle' => 'string', 'offset=' => 'int'],
