@@ -16,6 +16,7 @@ ci_prepare_test_runtime() {
   ci_guard_parallel_ci
   ci_apply_resource_limits
   ci_apply_default_memory_env
+  export PHP_COMPILER_VM_RUNNER="${PHP_COMPILER_VM_RUNNER:-${_CI_REPO_ROOT}/script/run-vm-guarded.sh}"
 }
 
 ci_repo_root() {

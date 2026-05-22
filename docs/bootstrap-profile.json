@@ -221,6 +221,7 @@
         "ext/types/is_type.php",
         "ext/types/mb_strlen.php",
         "ext/types/strlen.php",
+        "lib/AOT/ProjectGraph.php",
         "lib/Block.php",
         "lib/Cli/PhpcInit.php",
         "lib/Compiler.php",
@@ -332,9 +333,9 @@
         "test/bootstrap-aot/echo_hello.php"
     ],
     "totals": {
-        "inventory_files": 298,
+        "inventory_files": 299,
         "excluded": 2,
-        "eligible": 296,
+        "eligible": 297,
         "aot_lint_targets": 2
     }
 }

@@ -92,4 +92,32 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('MINIWEBAPP_LINT_GATE', $body);
         $this->assertStringContainsString('issues/461', $body);
     }
+
+    public function testRunVmGuardedScriptExists(): void
+    {
+        $guard = dirname(__DIR__, 2).'/script/run-vm-guarded.sh';
+        $this->assertFileExists($guard);
+        $this->assertTrue(is_executable($guard));
+        $body = (string) file_get_contents($guard);
+        $this->assertStringContainsString('PHP_COMPILER_VM_PEAK_RSS_MB', $body);
+    }
+
+    public function testMakefileHasTestDockerSafeAlias(): void
+    {
+        $makefile = (string) file_get_contents(dirname(__DIR__, 2).'/Makefile');
+        $this->assertStringContainsString('test-docker-safe:', $makefile);
+        $this->assertStringContainsString('ci-docker-safe.sh', $makefile);
+    }
+
+    public function testLocalCiMatrixDocExists(): void
+    {
+        $this->assertFileExists(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+    }
+
+    public function testCiDefaultsVmRssGuard(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString('PHP_COMPILER_VM_PEAK_RSS_MB', $body);
+        $this->assertStringContainsString('PHP_COMPILER_VM_RSS_GUARD', $body);
+    }
 }

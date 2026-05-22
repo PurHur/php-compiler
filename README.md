@@ -149,7 +149,7 @@ make test-harness
 make test-harness ARGS='--filter VMTest'
 ```
 
-When the bind-mount works normally, `make test`, `make test-harness`, and `make test-docker` all run `script/ci-local.sh` in `php-compiler:22.04-dev`. See issue [#245](https://github.com/PurHur/php-compiler/issues/245) for the full local CI matrix.
+When the bind-mount works normally, `make test`, `make test-harness`, and `make test-docker` all run `script/ci-local.sh` in `php-compiler:22.04-dev`. See [docs/local-ci-matrix.md](docs/local-ci-matrix.md) and issue [#245](https://github.com/PurHur/php-compiler/issues/245) for the full local CI matrix.
 
 If the container runs out of memory while running the full suite (process exit code **137**), increase the limit (for example `docker run -m 8g`).
 

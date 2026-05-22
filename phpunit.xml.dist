@@ -15,6 +15,8 @@
         <env name="PHP_COMPILER_CI_RAM_GB" value="8"/>
         <env name="PHP_COMPILER_MEMORY_LIMIT" value="1536M"/>
         <env name="PHP_COMPILER_LLVM_MEMORY_LIMIT" value="4096M"/>
+        <env name="PHP_COMPILER_VM_RSS_GUARD" value="1"/>
+        <env name="PHP_COMPILER_VM_PEAK_RSS_MB" value="2048"/>
     </php>
     <coverage>
         <include>
