@@ -33,6 +33,7 @@ final class JitStat
     private const S_IFMT = 0xF000;
     private const S_IFREG = 0x8000;
     private const S_IFDIR = 0x4000;
+    private const S_IFLNK = 0xA000;
 
     /** R_OK for access(2) — read permission (POSIX) */
     private const ACCESS_R_OK = 4;
@@ -58,6 +59,11 @@ final class JitStat
     public static function pathIsDir(Context $context, Value $str): Value
     {
         return self::modeMatches($context, $str, self::S_IFDIR);
+    }
+
+    public static function pathIsLink(Context $context, Value $str): Value
+    {
+        return self::modeMatches($context, $str, self::S_IFLNK, 'lstat');
     }
 
     public static function pathIsReadable(Context $context, Value $str): Value
@@ -189,9 +195,9 @@ final class JitStat
         return $context->builder->not($failed);
     }
 
-    private static function modeMatches(Context $context, Value $str, int $fileType): Value
+    private static function modeMatches(Context $context, Value $str, int $fileType, string $statFn = 'stat'): Value
     {
-        $mode = self::loadModeOrFail($context, $str);
+        $mode = self::loadModeOrFail($context, $str, $statFn);
         $i32 = $context->getTypeFromString('int32');
         $failed = $context->builder->icmp(Builder::INT_SLT, $mode, $i32->constInt(0, true));
 
@@ -226,17 +232,17 @@ final class JitStat
     }
 
     /** @return Value i32 mode on success, or i32 -1 on failure */
-    private static function loadModeOrFail(Context $context, Value $str): Value
+    private static function loadModeOrFail(Context $context, Value $str, string $statFn = 'stat'): Value
     {
         $map = $context->structFieldMap['__string__'];
         $pathPtr = $context->builder->structGep($str, $map['value']);
         $i8 = $context->getTypeFromString('int8');
         $bufType = $i8->arrayType(self::STAT_BUF_SIZE);
-        $buf = $context->builder->alloca($bufType, 1, 'stat_buf');
+        $buf = $context->builder->alloca($bufType, 1, $statFn.'_buf');
         $i8p = $context->getTypeFromString('int8*');
         $bufPtr = $context->builder->pointerCast($buf, $i8p);
         $ret = $context->builder->call(
-            $context->lookupFunction('stat'),
+            $context->lookupFunction($statFn),
             $pathPtr,
             $bufPtr
         );
