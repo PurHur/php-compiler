@@ -837,30 +837,9 @@ class Compiler {
 
     protected function compileNullsafePropertyFetch(Op\Expr\NullsafePropertyFetch $expr, Block $block): Block
     {
-        return $this->compileNullsafe(
-            $block,
-            $this->compileOperand($expr->result, $block, false),
-            $this->compileOperand($expr->var, $block, true),
-            function (Block $fetchBlock) use ($expr): void {
-                $fetchBlock->addOpCode(new OpCode(
-                    OpCode::TYPE_PROPERTY_FETCH,
-                    $this->compileOperand($expr->result, $fetchBlock, false),
-                    $this->compileOperand($expr->var, $fetchBlock, true),
-                    $this->compileOperand($expr->name, $fetchBlock, true)
-                ));
-            }
-        );
-    }
+        $resultSlot = $this->compileOperand($expr->result, $block, false);
+        $receiverSlot = $this->compileOperand($expr->var, $block, true);
 
-    /**
-     * @param callable(Block): void $compileAccess
-     */
-    protected function compileNullsafe(
-        Block $block,
-        int $resultSlot,
-        int $receiverSlot,
-        callable $compileAccess
-    ): Block {
         $endBlock = new Block($block->orig);
         $endBlock->inheritUndefinedLocals = true;
         $endBlock->inheritScopeFrom($block);
@@ -884,7 +863,12 @@ class Compiler {
         $fetchBlock = new Block($block->orig);
         $fetchBlock->inheritUndefinedLocals = true;
         $fetchBlock->inheritScopeFrom($block);
-        $compileAccess($fetchBlock);
+        $fetchBlock->addOpCode(new OpCode(
+            OpCode::TYPE_PROPERTY_FETCH,
+            $this->compileOperand($expr->result, $fetchBlock, false),
+            $this->compileOperand($expr->var, $fetchBlock, true),
+            $this->compileOperand($expr->name, $fetchBlock, true)
+        ));
         $fetchJump = new OpCode(OpCode::TYPE_JUMP);
         $fetchJump->block1 = $endBlock;
         $fetchBlock->addOpCode($fetchJump);
