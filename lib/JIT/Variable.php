@@ -146,11 +146,17 @@ final class Variable {
         if (isset(self::NATIVE_TYPE_MAP[$type])) {
             return self::NATIVE_TYPE_MAP[$type];
         }
+        if (self::TYPE_NULL === $type || self::TYPE_VALUE === $type) {
+            return '__value__';
+        }
 
         return 'unknown(type='.$type.')';
     }
 
-    public static function getTypeFromType(Type $type): int {
+    public static function getTypeFromType(?Type $type): int {
+        if (null === $type) {
+            return self::TYPE_VALUE;
+        }
         if (null !== $type->userType && 0 === strcasecmp($type->userType, 'SplObjectStorage')) {
             return self::TYPE_HASHTABLE;
         }
@@ -180,6 +186,16 @@ final class Variable {
         Operand $op
     ): Variable {
         $type = self::getTypeFromType($op->type);
+        if ($type === self::TYPE_NULL) {
+            $slot = JitValueBox::alloc($context);
+
+            return new Variable(
+                $context,
+                self::TYPE_VALUE,
+                self::KIND_VARIABLE,
+                $slot
+            );
+        }
         $stringType = self::getStringType($type);
         if ($type === self::TYPE_HASHTABLE) {
             // see if it can be converted into a native array
@@ -355,7 +371,7 @@ final class Variable {
             case self::TYPE_NATIVE_DOUBLE:
                 return;
         }
-        if ($this->type === self::TYPE_VALUE) {
+        if ($this->type === self::TYPE_VALUE || $this->type === self::TYPE_NULL) {
             // TODO: free owned resources
             return;
         }
@@ -389,6 +405,7 @@ final class Variable {
                 );
                 break;
             case self::TYPE_VALUE:
+            case self::TYPE_NULL:
                 $map = $this->context->structFieldMap['__value__'];
                 $this->context->builder->store(
                     $this->context->getTypeFromString('int8')->constInt(self::TYPE_NULL, false),
