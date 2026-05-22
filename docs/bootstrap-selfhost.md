@@ -54,7 +54,7 @@ Incremental growth toward `bin/vm.php` inventory path ([#559](https://github.com
 | `lib/VM.php` | interpreter loop (next step toward vm echo path) |
 | `lib/Compiler.php` | CFG → opcodes |
 
-Native link of the bundle is **not** claimed yet (`script/bootstrap-selfhost-link.sh` may fail until VM/JIT closure grows).
+Native link of the bundle is **not** claimed yet (`script/bootstrap-selfhost-link.sh` may fail until VM/JIT closure grows). Undefined vendor/`Class::method` calls in the bundle are JIT-stubbed to null at compile time ([#579](https://github.com/PurHur/php-compiler/issues/579)); see PR notes for `externalMethodStubs`.
 
 ## Non-goals (initial bootstrap)
 
