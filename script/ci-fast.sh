@@ -18,9 +18,23 @@ ci_configure_serve_tests
 echo "PHPUnit (fast): VM, compliance, real-world — excluding @group llvm..."
 "$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit --exclude-group llvm,serve "$@"
 
+if [[ -n "${MINIWEBAPP_SERVE_GATE:-}" && "${MINIWEBAPP_SERVE_GATE}" == "1" && -n "${PHP_COMPILER_SKIP_SERVE_TESTS:-}" ]]; then
+  echo "MINIWEBAPP_SERVE_GATE=1 requires serve tests; unset PHP_COMPILER_SKIP_SERVE_TESTS (#622)" >&2
+  exit 1
+fi
+
 if [[ -z "${PHP_COMPILER_SKIP_SERVE_TESTS:-}" ]]; then
+  serve_groups=(--group serve --exclude-group llvm)
+  if [[ "${MINIWEBAPP_SERVE_GATE:-}" == "1" ]]; then
+    serve_groups+=(--exclude-group miniwebapp)
+  fi
   echo "PHPUnit (fast): HTTP serve (bin/serve.php, no AOT compile)..."
-  "$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit --group serve --exclude-group llvm "$@"
+  "$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit "${serve_groups[@]}" "$@"
+
+  if [[ "${MINIWEBAPP_SERVE_GATE:-}" == "1" ]]; then
+    echo "PHPUnit (fast): MiniWebApp ServeTest (MINIWEBAPP_SERVE_GATE=1, #470)..."
+    "$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit --filter ServeTest --group miniwebapp --fail-on-skipped "$@"
+  fi
 fi
 
 # Always lint 003-MiniWebApp even when callers pass --filter (issue #570, #539).

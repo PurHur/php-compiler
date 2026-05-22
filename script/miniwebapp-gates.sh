@@ -84,8 +84,9 @@ if grep -q 'MINIWEBAPP_VM_CLI_GATE' "${ROOT}/script/ci-fast.sh" 2>/dev/null \
   stage1b=1
 fi
 
-# Stage 2: ServeTest gate env enabled (#470); routes land in ServeTest when green.
-if [[ "${serve_gate}" == "1" ]]; then
+# Stage 2: ServeTest gate env + ci-local/ci-fast hook (#470, #622).
+if [[ "${serve_gate}" == "1" ]] \
+  && grep -q 'MINIWEBAPP_SERVE_GATE' "${ROOT}/script/ci-local.sh" 2>/dev/null; then
   stage2=1
 fi
 
@@ -145,8 +146,9 @@ echo "       ${REPO_URL}/issues/621"
 echo "$(mark "${stage1b}") Stage 1b VM CLI — MINIWEBAPP_VM_CLI_GATE=1 in ci-fast (#597)"
 echo "       ${REPO_URL}/issues/597  (unset or =0 to skip MiniWebApp*VmCli)"
 
-echo "$(mark "${stage2}") Stage 2 ServeTest — export MINIWEBAPP_SERVE_GATE=1 (#470)"
+echo "$(mark "${stage2}") Stage 2 ServeTest — export MINIWEBAPP_SERVE_GATE=1 for ci-local/ci-fast (#470, #622)"
 echo "       ${REPO_URL}/issues/470"
+echo "       ${REPO_URL}/issues/622"
 
 echo "$(mark "${stage3}") Stage 3 web-smoke — make examples-web-smoke includes 003 (#461)"
 echo "       ${REPO_URL}/issues/461"
@@ -161,6 +163,7 @@ echo "  make examples-web-smoke     phpc serve + curl (#298)"
 echo "  make web-smoke              lint gate on by default (#621)"
 echo "  MINIWEBAPP_LINT_GATE=0 make web-smoke"
 echo "  MINIWEBAPP_VM_CLI_GATE=1 ./script/ci-fast.sh"
+echo "  MINIWEBAPP_SERVE_GATE=1 ./script/ci-local.sh --filter ServeTest"
 echo
 echo "Tracking: ${REPO_URL}/issues/472 (gate ladder spec)"
 
