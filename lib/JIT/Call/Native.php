@@ -84,7 +84,7 @@ class Native implements Call {
                     case Variable::TYPE_VALUE:
                         return $context->builder->call(
                             $context->lookupFunction('__value__readString'),
-                            $value
+                            \PHPCompiler\JIT\JitValueBox::valuePtrFromVariable($context, $arg)
                         );
                 }
                 break;

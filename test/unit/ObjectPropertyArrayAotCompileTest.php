@@ -41,6 +41,37 @@ class ConfigHolder {
 (new ConfigHolder())->run();
 PHP;
 
+        $this->assertCompileExitZero($source, 'typed array property echo');
+    }
+
+    public function testObjectPropertyArrayReturnStringMethodCompiles(): void
+    {
+        if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
+            $this->markTestSkipped(
+                'LLVM 9 toolchain not available. Run script/install-llvm9.sh from the repository root.'
+            );
+        }
+
+        $source = <<<'PHP'
+<?php
+class ConfigHolder {
+    private array $config;
+    public function run(): void {
+        $this->config = ['app_name' => 'AOT'];
+        echo $this->name(), "\n";
+    }
+    private function name(): string {
+        return $this->config['app_name'];
+    }
+}
+(new ConfigHolder())->run();
+PHP;
+
+        $this->assertCompileExitZero($source, 'array property return string method');
+    }
+
+    private function assertCompileExitZero(string $source, string $label): void
+    {
         $tmpPhp = tempnam(sys_get_temp_dir(), 'phpc_prop_src_');
         $this->assertNotFalse($tmpPhp);
         $sourcePath = $tmpPhp.'.php';
@@ -81,7 +112,7 @@ PHP;
         $this->assertSame(
             0,
             $exitCode,
-            'typed array property AOT compile failed: '.trim($stderr !== false ? $stderr : '')
+            $label.' AOT compile failed: '.trim($stderr !== false ? $stderr : '')
         );
     }
 }
