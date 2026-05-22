@@ -31,6 +31,9 @@ patch_already_applied() {
     php-types-array-shape.patch)
       grep -q "preg_match('/^array\\{/'" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
       ;;
+    php-types-generics-fallback.patch)
+      grep -q "preg_match('/^(list|array)\\s*</'" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
+      ;;
     php-types-ns-func-call.patch)
       grep -q 'function resolveOp_Expr_NsFuncCall' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
       ;;
@@ -106,6 +109,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-fromvalue-null.patch"
   apply_patch "$PATCH_DIR/php-types-doc-comment-string.patch"
   apply_patch "$PATCH_DIR/php-types-array-shape.patch"
+  apply_patch "$PATCH_DIR/php-types-generics-fallback.patch"
   apply_patch "$PATCH_DIR/php-types-ns-func-call.patch"
 fi
 

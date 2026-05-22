@@ -36,6 +36,14 @@ final class LintCompiler extends Compiler
      */
     protected function compileExpr(Op\Expr $expr, Block $block): array
     {
+        if ($expr instanceof Op\Expr\StaticPropertyFetch) {
+            return [new OpCode(
+                OpCode::TYPE_STATIC_PROPERTY_FETCH,
+                $this->compileOperand($expr->result, $block, false),
+                $this->compileOperand($expr->class, $block, true),
+                $this->compileOperand($expr->name, $block, true)
+            )];
+        }
         if ($expr instanceof Op\Expr\ClassConstFetch) {
             return $this->compileClassConstFetch($expr, $block);
         }
@@ -95,15 +103,17 @@ final class LintCompiler extends Compiler
                     break;
                 case Op\Stmt\ClassMethod::class:
                     try {
-                        $methodBlock = $this->compileCfgBlock($child->func->cfg, $child->func->params);
-                        $methodBlock->func = $child->func;
                         $methodName = new Operand\Literal($child->func->name);
                         $methodName->type = Type::string();
                         $declare = new OpCode(
                             OpCode::TYPE_DECLARE_METHOD,
                             $this->compileOperand($methodName, $result, true)
                         );
-                        $declare->block1 = $methodBlock;
+                        if (null !== $child->func->cfg) {
+                            $methodBlock = $this->compileCfgBlock($child->func->cfg, $child->func->params);
+                            $methodBlock->func = $child->func;
+                            $declare->block1 = $methodBlock;
+                        }
                         $result->addOpCode($declare);
                     } catch (\LogicException $e) {
                         if (!$this->recordIfUnsupported($child, $e)) {
@@ -142,13 +152,16 @@ final class LintCompiler extends Compiler
         return $result;
     }
 
-    protected function compileTerminal(Op\Terminal $terminal, Block $block): OpCode
+    /**
+     * @return list<OpCode>
+     */
+    protected function compileTerminal(Op\Terminal $terminal, Block $block): array
     {
         try {
             return parent::compileTerminal($terminal, $block);
         } catch (\LogicException $e) {
             if ($this->recordIfUnsupported($terminal, $e)) {
-                return new OpCode(OpCode::TYPE_RETURN_VOID);
+                return [new OpCode(OpCode::TYPE_RETURN_VOID)];
             }
             throw $e;
         }

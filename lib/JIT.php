@@ -417,6 +417,12 @@ class JIT {
                 case OpCode::TYPE_INSTANCEOF:
                     // Recorded at compile time; JIT instanceof is not implemented yet.
                     break;
+                case OpCode::TYPE_STATIC_PROPERTY_FETCH:
+                    // Recorded at compile time; JIT static property fetch is not implemented yet.
+                    break;
+                case OpCode::TYPE_UNSET:
+                    // Recorded at compile time; JIT unset is not implemented yet.
+                    break;
                 case OpCode::TYPE_CAST_BOOL:
                     $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));
                     $this->assignOperand($block->getOperand($op->arg1), $value->castTo(Variable::TYPE_NATIVE_BOOL));
@@ -843,7 +849,9 @@ class JIT {
                     $name = $block->getOperand($op->arg1);
                     assert($name instanceof Operand\Literal);
                     $funcName = $this->context->scope->className.'::'.strtolower($name->value);
-                    $this->compileBlock($op->block1, $funcName);
+                    if (null !== $op->block1) {
+                        $this->compileBlock($op->block1, $funcName);
+                    }
                     break;
                 case OpCode::TYPE_DECLARE_CLASS_CONST:
                     $name = $block->getOperand($op->arg1);

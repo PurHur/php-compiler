@@ -240,6 +240,14 @@ restart:
                 case OpCode::TYPE_INSTANCEOF:
                     // Recorded at compile time; VM instanceof is not implemented yet.
                     break;
+                case OpCode::TYPE_STATIC_PROPERTY_FETCH:
+                    // Recorded at compile time; VM static property fetch is not implemented yet.
+                    break;
+                case OpCode::TYPE_UNSET:
+                    if (null !== $op->arg1 && isset($frame->scope[$op->arg1])) {
+                        $frame->scope[$op->arg1]->null();
+                    }
+                    break;
                 case OpCode::TYPE_RETURN_VOID:
                     if (!is_null($frame->returnVar)) {
                         $frame->returnVar->null();
@@ -497,10 +505,12 @@ restart:
                     break;
                 case OpCode::TYPE_DECLARE_METHOD:
                     $name = strtolower($frame->scope[$op->arg1]->toString());
-                    $method = new Func\PHP($entry->name.'::'.$name, $op->block1);
-                    $entry->methods[$name] = $method;
-                    if ('__construct' === $name) {
-                        $entry->constructor = $method;
+                    if (null !== $op->block1) {
+                        $method = new Func\PHP($entry->name.'::'.$name, $op->block1);
+                        $entry->methods[$name] = $method;
+                        if ('__construct' === $name) {
+                            $entry->constructor = $method;
+                        }
                     }
                     break;
                 case OpCode::TYPE_DECLARE_CLASS_CONST:
