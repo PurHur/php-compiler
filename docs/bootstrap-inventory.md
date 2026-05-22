@@ -10,7 +10,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 |--------|------:|
 | PHP files on vm.php path | 305 |
 | Source constructs flagged (blockers) | 10 |
-| Source constructs flagged (warnings) | 824 |
+| Source constructs flagged (warnings) | 823 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -281,7 +281,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `lib/JIT/Helper.php` | 0 | 7 |
 | `lib/JIT/IncludeHelper.php` | 0 | 1 |
 | `lib/JIT/IssetHelper.php` | 0 | 1 |
-| `lib/JIT/IteratorHelper.php` | 0 | 4 |
+| `lib/JIT/IteratorHelper.php` | 0 | 3 |
 | `lib/JIT/JitNativeString.php` | 0 | 5 |
 | `lib/JIT/JitStringCompare.php` | 0 | 1 |
 | `lib/JIT/JitValueBox.php` | 0 | 1 |
@@ -1891,15 +1891,15 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/JIT/Builtin/Type/Object_.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 366)
+- new Variable (line 358)
+- new Variable (line 390)
 - new Variable (line 398)
-- new Variable (line 406)
-- new Literal (line 423)
-- new Literal (line 428)
-- new Literal (line 433)
-- new Variable (line 444)
-- new Variable (line 510)
-- 23 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new Literal (line 415)
+- new Literal (line 420)
+- new Literal (line 425)
+- new Variable (line 436)
+- new Variable (line 502)
+- 22 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 - 1 closure(s)
 
 ### `lib/JIT/Builtin/Type/String_.php`
@@ -1995,9 +1995,8 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/JIT/IteratorHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 28)
-- new Variable (line 182)
-- new Variable (line 214)
+- new Variable (line 163)
+- new Variable (line 195)
 - 8 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/JitNativeString.php`

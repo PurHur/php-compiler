@@ -153,7 +153,9 @@ class Analyzer
                     return null;
                 }
                 $size = max($size, $newSize);
-            } elseif ($op instanceof Op\Expr\FuncCall || $op instanceof Op\Expr\NsFuncCall) {
+            } elseif ($op instanceof Op\Expr\FuncCall
+                || $op instanceof Op\Expr\NsFuncCall
+                || $op instanceof Op\Expr\Param) {
                 return null;
             } else {
                 throw new \LogicException('Unknown array write op: '.get_class($op));
