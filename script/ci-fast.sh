@@ -23,4 +23,8 @@ if [[ -z "${PHP_COMPILER_SKIP_SERVE_TESTS:-}" ]]; then
   "$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit --group serve --exclude-group llvm "$@"
 fi
 
+# Always lint 003-MiniWebApp even when callers pass --filter (issue #570, #539).
+echo "PHPUnit (fast): MiniWebApp project lint (PhpcLintProjectTest)..."
+"$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit --filter PhpcLintProjectTest
+
 echo "Fast CI finished. Full LLVM compile gate: ./script/ci-local.sh (issue #436)."
