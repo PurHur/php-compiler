@@ -139,7 +139,8 @@ class String_ extends Type {
     $fntype___htmlspecialchars = $this->context->context->functionType(
                 $this->context->getTypeFromString('__string__*'),
                 false,
-                $this->context->getTypeFromString('__string__*')
+                $this->context->getTypeFromString('__string__*'),
+                $this->context->getTypeFromString('int64')
             );
             $fn___htmlspecialchars = $this->context->module->addFunction('__string__htmlspecialchars', $fntype___htmlspecialchars);
             $fn___htmlspecialchars->addAttributeAtIndex(\PHPLLVM\Attribute::INDEX_FUNCTION, $this->context->attributes['alwaysinline']);

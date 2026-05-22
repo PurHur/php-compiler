@@ -10,18 +10,19 @@ use PHPLLVM\LLVMAbstract\BasicBlock;
 use PHPLLVM\Value;
 
 /**
- * LLVM implementation of __string__htmlspecialchars (ENT_QUOTES subset).
+ * LLVM implementation of __string__htmlspecialchars (ENT_QUOTES / ENT_COMPAT subset; mirrors VmString).
  */
 final class StringHtmlspecialchars
 {
     /** @var array<int, array{0: string, 1: int}> */
-    private const SPECIAL = [
+    private const ALWAYS_ESCAPE = [
         38 => ['&amp;', 5],
         60 => ['&lt;', 4],
         62 => ['&gt;', 4],
-        34 => ['&quot;', 6],
-        39 => ['&#039;', 6],
     ];
+
+    private const QUOTE_DOUBLE = 34;
+    private const QUOTE_SINGLE = 39;
 
     public static function implement(Context $context): void
     {
@@ -30,6 +31,9 @@ final class StringHtmlspecialchars
         $context->builder->positionAtEnd($entry);
 
         $string = $fn->getParam(0);
+        $flags = $fn->getParam(1);
+        [$quoteBoth, $quoteDouble] = self::quoteFlags($context, $flags);
+
         $map = $context->structFieldMap['__string__'];
         $i64 = $context->getTypeFromString('int64');
         $charPtr = $context->getTypeFromString('char*');
@@ -45,7 +49,19 @@ final class StringHtmlspecialchars
         $iSlot = $context->builder->alloca($i64, 1);
         $context->builder->store($zero, $iSlot);
 
-        self::countLoop($context, $fn, $srcChars, $len, $iSlot, $outLenSlot, $i64, $zero, $one);
+        self::countLoop(
+            $context,
+            $fn,
+            $srcChars,
+            $len,
+            $iSlot,
+            $outLenSlot,
+            $quoteBoth,
+            $quoteDouble,
+            $i64,
+            $zero,
+            $one
+        );
 
         $outLen = $context->builder->load($outLenSlot);
         $dest = $context->builder->call($context->lookupFunction('__string__alloc'), $outLen);
@@ -56,10 +72,46 @@ final class StringHtmlspecialchars
         $context->builder->store($zero, $posSlot);
         $context->builder->store($zero, $iSlot);
 
-        self::writeLoop($context, $fn, $srcChars, $len, $destChars, $iSlot, $posSlot, $i64, $zero, $one, $charPtr);
+        self::writeLoop(
+            $context,
+            $fn,
+            $srcChars,
+            $len,
+            $destChars,
+            $iSlot,
+            $posSlot,
+            $quoteBoth,
+            $quoteDouble,
+            $i64,
+            $zero,
+            $one,
+            $charPtr
+        );
 
         $context->builder->returnValue($dest);
         $context->builder->clearInsertionPosition();
+    }
+
+    /**
+     * @return array{0: Value, 1: Value} i1 quoteBoth, i1 quoteDouble (VmString parity)
+     */
+    private static function quoteFlags(Context $context, Value $flags): array
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+        $entQuotes = $i64->constInt(3, false);
+        $entCompat = $i64->constInt(2, false);
+
+        $flagsAndQuotes = $context->builder->and($flags, $entQuotes);
+        $quoteBoth = $context->builder->icmp(Builder::INT_NE, $flagsAndQuotes, $zero);
+
+        $flagsAndCompat = $context->builder->and($flags, $entCompat);
+        $quoteDouble = $context->builder->and(
+            $context->builder->not($quoteBoth),
+            $context->builder->icmp(Builder::INT_NE, $flagsAndCompat, $zero)
+        );
+
+        return [$quoteBoth, $quoteDouble];
     }
 
     private static function countLoop(
@@ -69,6 +121,8 @@ final class StringHtmlspecialchars
         Value $len,
         Value $iSlot,
         Value $outLenSlot,
+        Value $quoteBoth,
+        Value $quoteDouble,
         $i64,
         Value $zero,
         Value $one
@@ -87,7 +141,7 @@ final class StringHtmlspecialchars
         $context->builder->positionAtEnd($body);
         $ch = $context->builder->load($context->builder->gep($srcChars, $i));
         $chI64 = $context->builder->zExt($ch, $i64);
-        $add = self::replacementLen($context, $chI64, $one);
+        $add = self::replacementLen($context, $chI64, $quoteBoth, $quoteDouble, $one);
         $outLen = $context->builder->load($outLenSlot);
         $context->builder->store($context->builder->addNoSignedWrap($outLen, $add), $outLenSlot);
         $context->builder->store($context->builder->addNoSignedWrap($i, $one), $iSlot);
@@ -104,6 +158,8 @@ final class StringHtmlspecialchars
         Value $destChars,
         Value $iSlot,
         Value $posSlot,
+        Value $quoteBoth,
+        Value $quoteDouble,
         $i64,
         Value $zero,
         Value $one,
@@ -126,9 +182,9 @@ final class StringHtmlspecialchars
         $pos = $context->builder->load($posSlot);
         $destAt = $context->builder->gep($destChars, $pos);
         $afterChar = $fn->appendBasicBlock('htmlspecialchars_write_after_char');
-        self::writeChar($context, $fn, $destAt, $ch, $chI64, $afterChar, $charPtr, $i64);
+        self::writeChar($context, $fn, $destAt, $ch, $chI64, $quoteBoth, $quoteDouble, $afterChar, $charPtr, $i64);
         $context->builder->positionAtEnd($afterChar);
-        $step = self::replacementLen($context, $chI64, $one);
+        $step = self::replacementLen($context, $chI64, $quoteBoth, $quoteDouble, $one);
         $context->builder->store($context->builder->addNoSignedWrap($pos, $step), $posSlot);
         $context->builder->store($context->builder->addNoSignedWrap($i, $one), $iSlot);
         $context->builder->branch($head);
@@ -136,21 +192,42 @@ final class StringHtmlspecialchars
         $context->builder->positionAtEnd($done);
     }
 
-    private static function replacementLen(Context $context, Value $chI64, Value $defaultLen): Value
-    {
+    private static function replacementLen(
+        Context $context,
+        Value $chI64,
+        Value $quoteBoth,
+        Value $quoteDouble,
+        Value $defaultLen
+    ): Value {
+        $i64 = $defaultLen->typeOf();
         $len = $defaultLen;
-        foreach (self::SPECIAL as $ord => [, $replLen]) {
+        foreach (self::ALWAYS_ESCAPE as $ord => [, $replLen]) {
             $match = $context->builder->icmp(
                 Builder::INT_EQ,
                 $chI64,
-                $chI64->typeOf()->constInt($ord, false)
+                $i64->constInt($ord, false)
             );
             $len = $context->builder->select(
                 $match,
-                $len->typeOf()->constInt($replLen, false),
+                $i64->constInt($replLen, false),
                 $len
             );
         }
+
+        $is34 = $context->builder->icmp(Builder::INT_EQ, $chI64, $i64->constInt(self::QUOTE_DOUBLE, false));
+        $escape34 = $context->builder->or($quoteBoth, $quoteDouble);
+        $len = $context->builder->select(
+            $context->builder->and($is34, $escape34),
+            $i64->constInt(6, false),
+            $len
+        );
+
+        $is39 = $context->builder->icmp(Builder::INT_EQ, $chI64, $i64->constInt(self::QUOTE_SINGLE, false));
+        $len = $context->builder->select(
+            $context->builder->and($is39, $quoteBoth),
+            $i64->constInt(6, false),
+            $len
+        );
 
         return $len;
     }
@@ -161,6 +238,8 @@ final class StringHtmlspecialchars
         Value $destAt,
         Value $ch,
         Value $chI64,
+        Value $quoteBoth,
+        Value $quoteDouble,
         BasicBlock $mergeBlock,
         $charPtr,
         $i64
@@ -168,11 +247,12 @@ final class StringHtmlspecialchars
         $resume = $context->builder->getInsertBlock();
         $entry = $fn->appendBasicBlock('htmlspecialchars_char_entry');
         $defaultBlock = $fn->appendBasicBlock('htmlspecialchars_char_default');
+        $escapeDouble = $context->builder->or($quoteBoth, $quoteDouble);
         $context->builder->positionAtEnd($resume);
         $context->builder->branch($entry);
 
         $fallthrough = $entry;
-        foreach (array_keys(self::SPECIAL) as $ord) {
+        foreach (array_keys(self::ALWAYS_ESCAPE) as $ord) {
             $matchBlock = $fn->appendBasicBlock('htmlspecialchars_char_match_'.$ord);
             $nextBlock = $fn->appendBasicBlock('htmlspecialchars_char_next_'.$ord);
 
@@ -184,7 +264,7 @@ final class StringHtmlspecialchars
             );
 
             $context->builder->positionAtEnd($matchBlock);
-            [$text, $textLen] = self::SPECIAL[$ord];
+            [$text, $textLen] = self::ALWAYS_ESCAPE[$ord];
             $src = $context->builder->pointerCast($context->constantFromString($text), $charPtr);
             $context->intrinsic->memcpy($destAt, $src, $i64->constInt($textLen, false), false);
             $context->builder->branch($mergeBlock);
@@ -192,11 +272,85 @@ final class StringHtmlspecialchars
             $fallthrough = $nextBlock;
         }
 
+        $fallthrough = self::writeConditionalQuote(
+            $context,
+            $fn,
+            $fallthrough,
+            $destAt,
+            $ch,
+            $chI64,
+            self::QUOTE_DOUBLE,
+            '&quot;',
+            6,
+            $escapeDouble,
+            $mergeBlock,
+            $charPtr,
+            $i64,
+            'double'
+        );
+
+        $fallthrough = self::writeConditionalQuote(
+            $context,
+            $fn,
+            $fallthrough,
+            $destAt,
+            $ch,
+            $chI64,
+            self::QUOTE_SINGLE,
+            '&#039;',
+            6,
+            $quoteBoth,
+            $mergeBlock,
+            $charPtr,
+            $i64,
+            'single'
+        );
+
         $context->builder->positionAtEnd($fallthrough);
         $context->builder->branch($defaultBlock);
 
         $context->builder->positionAtEnd($defaultBlock);
         $context->builder->store($ch, $destAt);
         $context->builder->branch($mergeBlock);
+    }
+
+    private static function writeConditionalQuote(
+        Context $context,
+        Value $fn,
+        BasicBlock $fallthrough,
+        Value $destAt,
+        Value $ch,
+        Value $chI64,
+        int $ord,
+        string $entity,
+        int $entityLen,
+        Value $escapeWhen,
+        BasicBlock $mergeBlock,
+        $charPtr,
+        $i64,
+        string $suffix
+    ): BasicBlock {
+        $matchBlock = $fn->appendBasicBlock('htmlspecialchars_char_quote_'.$suffix.'_match');
+        $entityBlock = $fn->appendBasicBlock('htmlspecialchars_char_quote_'.$suffix.'_entity');
+        $literalBlock = $fn->appendBasicBlock('htmlspecialchars_char_quote_'.$suffix.'_literal');
+        $nextBlock = $fn->appendBasicBlock('htmlspecialchars_char_quote_'.$suffix.'_next');
+
+        $context->builder->positionAtEnd($fallthrough);
+        $isQuote = $context->builder->icmp(Builder::INT_EQ, $chI64, $i64->constInt($ord, false));
+        $context->builder->branchIf($isQuote, $matchBlock, $nextBlock);
+
+        $context->builder->positionAtEnd($matchBlock);
+        $context->builder->branchIf($escapeWhen, $entityBlock, $literalBlock);
+
+        $context->builder->positionAtEnd($entityBlock);
+        $src = $context->builder->pointerCast($context->constantFromString($entity), $charPtr);
+        $context->intrinsic->memcpy($destAt, $src, $i64->constInt($entityLen, false), false);
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($literalBlock);
+        $context->builder->store($ch, $destAt);
+        $context->builder->branch($mergeBlock);
+
+        return $nextBlock;
     }
 }
