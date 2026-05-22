@@ -21,3 +21,17 @@ Tracking issues: [#58](https://github.com/PurHur/php-compiler/issues/58), [#145]
 | Magic constant `__NAMESPACE__` | yes | yes | yes | [#199](https://github.com/PurHur/php-compiler/issues/199) | Requires `namespace` declaration (#84); compliance PHPT |
 
 _Syntax AOT column reflects `Runtime::MODE_AOT` compile probes unless a row pins AOT (e.g. #568 native link)._
+## Web north-star (`examples/003-MiniWebApp`)
+
+PATH_INFO routing, deploy-root includes, and CGI drivers for the reference web app.
+ROADMAP Phase 3/4: [#78](https://github.com/PurHur/php-compiler/issues/78), runtime tracker [#539](https://github.com/PurHur/php-compiler/issues/539). Builtin matrix: [capabilities.md](capabilities.md).
+
+| Construct | VM | JIT | AOT | Issue | Notes |
+|-----------|:--:|:---:|:---:|-------|-------|
+| PATH_INFO / `?route=` fallback | yes | partial | blocked | [#489](https://github.com/PurHur/php-compiler/issues/489) | #489 VM closed; AOT blocked #568 |
+| `phpc_deploy_path()` + `PHPC_DEPLOY_ROOT` | yes | partial | blocked | [#585](https://github.com/PurHur/php-compiler/issues/585) | #585 closed; runtime deploy #623 |
+| Runtime template `include` from deploy tree | yes | no | blocked | [#623](https://github.com/PurHur/php-compiler/issues/623) | #623 VM/AOT lint; execute blocked #568 |
+| CGI/1.1 driver (`bin/cgi.php`) | no | no | no | [#50](https://github.com/PurHur/php-compiler/issues/50) |  |
+| FastCGI loop | no | no | no | [#173](https://github.com/PurHur/php-compiler/issues/173) |  |
+
+_Web rows are curated from ROADMAP issue state; AOT execute for user classes remains blocked by [#568](https://github.com/PurHur/php-compiler/issues/568)._
