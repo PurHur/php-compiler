@@ -60,10 +60,10 @@ class Native implements Call {
                     case Variable::TYPE_STRING:
                         return $value;
                     case Variable::TYPE_VALUE:
-                        compile {
-                            $str = __value__readString($value);
-                        }
-                        return $str;
+                        return $context->builder->call(
+                            $context->lookupFunction('__value__readString'),
+                            $value
+                        );
                 }
                 break;
             case '__value__':
@@ -85,10 +85,10 @@ class Native implements Call {
                     case Variable::TYPE_NATIVE_LONG:
                         return $value;
                     case Variable::TYPE_VALUE:
-                        compile {
-                            $int = __value__readLong($value);
-                        }
-                        return $int;
+                        return $context->builder->call(
+                            $context->lookupFunction('__value__readLong'),
+                            $value
+                        );
                 }
                 break;
             case 'double':
@@ -96,15 +96,15 @@ class Native implements Call {
                     case Variable::TYPE_NATIVE_DOUBLE:
                         return $value;
                     case Variable::TYPE_NATIVE_LONG:
-                        compile {
-                            $double = (double) $value;
-                        }
-                        return $double;
+                        return $context->builder->siToFp(
+                            $value,
+                            $context->getTypeFromString('double')
+                        );
                     case Variable::TYPE_VALUE:
-                        compile {
-                            $double = __value__readDouble($value);
-                        }
-                        return $double;
+                        return $context->builder->call(
+                            $context->lookupFunction('__value__readDouble'),
+                            $value
+                        );
                 }
                 break;
         }
