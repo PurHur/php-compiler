@@ -56,7 +56,8 @@ abstract class BaseTest extends TestCase {
             yield from self::providePHPTestsFromDir($path->getPathname());
         }
         foreach (new \GlobIterator($dir . '/*.phpt') as $test) {
-            yield self::parsePHPT($test->getPathname(), $test->getBasename());
+            $name = preg_replace('/\.phpt$/', '', $test->getBasename()) ?: $test->getBasename();
+            yield $name => self::parsePHPT($test->getPathname(), $test->getBasename());
         }
     }
 
@@ -371,7 +372,7 @@ abstract class BaseTest extends TestCase {
             $parent = $pids[$offset];
             $offset++;
             $children = @file("/proc/{$parent}/task/{$parent}/children", FILE_IGNORE_NEW_LINES);
-            if (false === $children || '' === $children[0]) {
+            if (false === $children || !isset($children[0]) || '' === $children[0]) {
                 continue;
             }
             foreach (preg_split('/\s+/', trim($children[0])) as $child) {
