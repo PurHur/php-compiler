@@ -17,7 +17,15 @@ final class JitValueBox
 
     public static function alloc(Context $context): Value
     {
-        return $context->builder->alloca($context->getTypeFromString('__value__'));
+        $slot = $context->builder->alloca($context->getTypeFromString('__value__'));
+        // LLVM alloca is uninitialized; __value__write* calls valueDelref first (issue #AOT heap).
+        $map = $context->structFieldMap['__value__'];
+        $context->builder->store(
+            $context->getTypeFromString('int8')->constInt(Variable::TYPE_NULL, false),
+            $context->builder->structGep($slot, $map['type'])
+        );
+
+        return $slot;
     }
 
     public static function pointer(Context $context, Value $slot): Value
