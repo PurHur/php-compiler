@@ -166,6 +166,7 @@
         "ext/standard/is_infinite.php",
         "ext/standard/is_nan.php",
         "ext/standard/is_numeric.php",
+        "ext/standard/is_readable.php",
         "ext/standard/is_scalar.php",
         "ext/standard/json_encode.php",
         "ext/standard/lcfirst.php",
@@ -401,9 +402,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 336,
+        "inventory_files": 337,
         "excluded": 2,
-        "eligible": 334,
+        "eligible": 335,
         "aot_lint_targets": 15,
         "aot_link_targets": 13,
         "aot_link_lib_targets": 1

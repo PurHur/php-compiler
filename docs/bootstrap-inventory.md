@@ -8,9 +8,9 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 336 |
+| PHP files on vm.php path | 337 |
 | Source constructs flagged (blockers) | 10 |
-| Source constructs flagged (warnings) | 907 |
+| Source constructs flagged (warnings) | 909 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -78,7 +78,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/JitSubstrCount.php` | 0 | 1 |
 | `ext/standard/JitUrlencode.php` | 0 | 1 |
 | `ext/standard/JitWebParams.php` | 0 | 15 |
-| `ext/standard/Module.php` | 0 | 152 |
+| `ext/standard/Module.php` | 0 | 153 |
 | `ext/standard/SetcookieLine.php` | 0 | 1 |
 | `ext/standard/VmDate.php` | 0 | 1 |
 | `ext/standard/VmExit.php` | 0 | 2 |
@@ -168,6 +168,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/is_infinite.php` | 0 | 1 |
 | `ext/standard/is_nan.php` | 0 | 1 |
 | `ext/standard/is_numeric.php` | 0 | 1 |
+| `ext/standard/is_readable.php` | 0 | 1 |
 | `ext/standard/is_scalar.php` | 0 | 1 |
 | `ext/standard/json_encode.php` | 0 | 1 |
 | `ext/standard/lcfirst.php` | 0 | 1 |
@@ -515,7 +516,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `ext/standard/JitStat.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 8 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/JitStrPad.php`
 
@@ -746,20 +747,21 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new filesize (line 156)
 - new is_file (line 157)
 - new is_dir (line 158)
-- new fopen (line 159)
-- new fread (line 160)
-- new fwrite (line 161)
-- new fclose (line 162)
-- new getenv_ (line 163)
-- new putenv_ (line 164)
-- new phpc_deploy_path (line 165)
-- new extract_ (line 166)
-- new compact_ (line 167)
-- new scandir (line 168)
-- new glob_ (line 169)
-- new time (line 170)
-- new date (line 171)
-- new gmdate (line 172)
+- new is_readable (line 159)
+- new fopen (line 160)
+- new fread (line 161)
+- new fwrite (line 162)
+- new fclose (line 163)
+- new getenv_ (line 164)
+- new putenv_ (line 165)
+- new phpc_deploy_path (line 166)
+- new extract_ (line 167)
+- new compact_ (line 168)
+- new scandir (line 169)
+- new glob_ (line 170)
+- new time (line 171)
+- new date (line 172)
+- new gmdate (line 173)
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/SetcookieLine.php`
@@ -1240,6 +1242,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 
 **Warnings** (review for bootstrap subset):
 - 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/is_readable.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/is_scalar.php`
 
