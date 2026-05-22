@@ -10,6 +10,12 @@ source "$_CI_SCRIPT_DIR/php-env.sh"
 # shellcheck source=ci-resource-limits.sh
 source "$_CI_SCRIPT_DIR/ci-resource-limits.sh"
 
+ci_prepare_test_runtime() {
+  ci_guard_parallel_ci
+  ci_apply_resource_limits
+  ci_apply_default_memory_env
+}
+
 ci_repo_root() {
   printf '%s\n' "$_CI_REPO_ROOT"
 }

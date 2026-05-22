@@ -6,6 +6,7 @@ set -euo pipefail
 source "$(dirname "$0")/ci-common.sh"
 
 ci_cd_repo
+ci_prepare_test_runtime
 ci_install_deps
 ci_run_inventory_checks
 ci_report_llvm_status
@@ -20,7 +21,7 @@ if [[ -z "${PHP_COMPILER_SKIP_SERVE_TESTS:-}" ]]; then
 fi
 
 if ci_llvm_ready; then
-  ci_apply_resource_limits
+  ci_apply_llvm_memory_env
   ci_run_bootstrap_aot_lint
 
   if ci_should_run_jit; then

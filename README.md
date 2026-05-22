@@ -73,7 +73,10 @@ composer install
 | `PHP_COMPILER_SKIP_SERVE_TESTS` | Skip `ServeTest` / `ServeAotTest` (use in sandboxes that cannot bind TCP) |
 | `PHP_COMPILER_RUN_SERVE_TESTS` | Force HTTP serve integration tests even when loopback bind probe fails |
 | `PHP_COMPILER_ALLOW_JIT_SKIP` | Do not fail `ci-local.sh` when LLVM is present but JIT compliance tests are 100% skipped (broken dev env only) |
-| `PHP_COMPILER_CI_RAM_GB` | Virtual-memory cap (`ulimit -v`) during LLVM phases in `ci-local.sh` (default `30`; set `0` to disable) |
+| `PHP_COMPILER_CI_RAM_GB` | Virtual-memory cap (`ulimit -v`) for the whole CI shell (default `8` GiB; set `0` to disable) |
+| `PHP_COMPILER_MEMORY_LIMIT` | PHP `memory_limit` for PHPUnit and spawned `bin/vm.php` children (default `1536M` in CI) |
+| `PHP_COMPILER_LLVM_MEMORY_LIMIT` | Higher limit during `@group llvm` phases in `ci-local.sh` (default `4096M`) |
+| `PHP_COMPILER_DOCKER_MEM` | Cgroup cap for `script/ci-docker-safe.sh` (default `10g`) |
 
 `script/ci-local.sh` sets LLVM paths automatically when `.llvm/libLLVM-9.so.1` exists. It runs LLVM work in phases (`aot-lint`, `jit`, `aot-link`) so compile subprocesses exit between stages ([#436](https://github.com/PurHur/php-compiler/issues/436)). Use `script/ci-fast.sh` (or `phpc test --fast`) while iterating — same VM/compliance gate without JIT/AOT. It probes `127.0.0.1` bind capability and runs `@group serve` tests when allowed. **Local and Docker CI** (`make test-docker`, `./script/docker-ci-local.sh`) should run those tests — only set `PHP_COMPILER_SKIP_SERVE_TESTS=1` when loopback bind is unavailable.
 
@@ -149,6 +152,8 @@ make test-harness ARGS='--filter VMTest'
 When the bind-mount works normally, `make test`, `make test-harness`, and `make test-docker` all run `script/ci-local.sh` in `php-compiler:22.04-dev`. See issue [#245](https://github.com/PurHur/php-compiler/issues/245) for the full local CI matrix.
 
 If the container runs out of memory while running the full suite (process exit code **137**), increase the limit (for example `docker run -m 8g`).
+
+**Do not run several full CI containers at once** — each `vm.php` subprocess can grow large without caps; use `./script/ci-docker-safe.sh` (default `10g` cgroup + `1536M` PHP limit) and keep a single CI run. Set `PHP_COMPILER_MEMORY_LIMIT=-1` only when debugging locally.
 
 On sandboxes that cannot bind TCP ports, set `PHP_COMPILER_SKIP_SERVE_TESTS=1` before running CI.
 

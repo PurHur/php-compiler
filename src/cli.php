@@ -14,7 +14,13 @@ require __DIR__.'/yay-php8-compat.php';
 require __DIR__.'/llvm-env.php';
 require __DIR__.'/../vendor/autoload.php';
 
-ini_set('memory_limit', '-1');
+$memoryLimit = getenv('PHP_COMPILER_MEMORY_LIMIT');
+if (false === $memoryLimit || '' === $memoryLimit) {
+    $memoryLimit = '2G';
+}
+if ('-1' !== $memoryLimit) {
+    ini_set('memory_limit', $memoryLimit);
+}
 error_reporting(~0);
 
 $opts = $argv;
