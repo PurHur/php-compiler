@@ -99,7 +99,8 @@ class JIT {
                         $callbackType = 'bool';
                         break;
                     default:
-                        throw new \LogicException("Non-void return types not supported yet");
+                        $callbackType = '__value__';
+                        break;
                 }
             } else {
                 $callbackType = '__value__';
@@ -206,9 +207,6 @@ class JIT {
         // Handle hoisted variables
         foreach ($block->orig->hoistedOperands as $operand) {
             if ($this->context->coalesceAssignTargets->contains($operand)) {
-                continue;
-            }
-            if ($this->context->hasVariableOp($operand)) {
                 continue;
             }
             $this->context->makeVariableFromOp($func, $basicBlock, $block, $operand);
@@ -796,6 +794,20 @@ class JIT {
                     }
                     $this->context->scope->args = [];
                     break;
+                case OpCode::TYPE_STATICCALL_INIT:
+                    $classOp = $block->getOperand($op->arg1);
+                    $nameOp = $block->getOperand($op->arg2);
+                    assert($nameOp instanceof Operand\Literal);
+                    if (!$classOp instanceof Operand\Literal) {
+                        throw new \LogicException('Static call class must be a literal');
+                    }
+                    $proxyName = strtolower($classOp->value).'::'.strtolower($nameOp->value);
+                    if (!isset($this->context->functionProxies[$proxyName])) {
+                        throw new \RuntimeException("Call to undefined static method $proxyName");
+                    }
+                    $this->context->scope->toCall = $this->context->functionProxies[$proxyName];
+                    $this->context->scope->args = [];
+                    break;
                 case OpCode::TYPE_ARG_SEND:
                     $this->context->scope->args[] = $this->context->getVariableFromOp($block->getOperand($op->arg1));
                     break;
@@ -893,6 +905,7 @@ class JIT {
                     break;
                 case OpCode::TYPE_CONST_FETCH:
                 case OpCode::TYPE_CLASS_CONST_FETCH:
+                case OpCode::TYPE_INIT_ARRAY:
                     // Default property values are initialized in __object__ allocation.
                     break;
                 case OpCode::TYPE_DECLARE_METHOD:
@@ -1228,9 +1241,46 @@ class JIT {
                 $lit = new Operand\Literal($vm->toBool());
                 $lit->type = Type::bool();
                 return Variable::fromLiteral($this->context, $lit);
+            case VM\Variable::TYPE_NULL:
+                $nullVar = new Variable(
+                    $this->context,
+                    Variable::TYPE_NULL,
+                    Variable::KIND_VALUE,
+                    $this->context->getTypeFromString('__value__*')->constNull()
+                );
+                $nullVar->isNullConstant = true;
+
+                return $nullVar;
+            case VM\Variable::TYPE_ARRAY:
+                return $this->jitVariableFromVmArray($vm);
             default:
-                throw new \LogicException('Unsupported default parameter type for JIT');
+                throw new \LogicException('Unsupported default parameter type for JIT (vm type ' . $vm->type . ')');
         }
+    }
+
+    private function jitVariableFromVmArray(VM\Variable $vm): Variable
+    {
+        $ht = $vm->toArray();
+        $jitHt = JIT\HashTableHelper::alloc($this->context);
+        $var = new Variable(
+            $this->context,
+            Variable::TYPE_HASHTABLE,
+            Variable::KIND_VALUE,
+            $jitHt
+        );
+        if (0 === $ht->getNumElements()) {
+            return $var;
+        }
+        foreach ($ht->iterateKeyed(true) as [$key, $value]) {
+            JIT\HashTableHelper::addElement(
+                $this->context,
+                $var,
+                $this->jitVariableFromVmConstant($value),
+                $this->jitVariableFromVmConstant($key)
+            );
+        }
+
+        return $var;
     }
 
 }
