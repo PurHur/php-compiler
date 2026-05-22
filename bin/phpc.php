@@ -12,6 +12,7 @@ declare(strict_types=1);
  *   phpc run [-q 'name=World'] [-p 'field=val'] script.php [args...]
  *   phpc build [-o outfile] entry.php
  *   phpc build --project [dir] [--dry-run]     AOT compile from phpc.json entry/binary
+ *   phpc build --project [dir] [--print-includes]  Manifest link order (no LLVM)
  *   phpc deploy [dir] -o <dist> [--from-build]  Bundle binary, public/, assets/, phpc.json
  *   phpc cgi [binary]                           CGI wrapper for AOT binary (issue #665)
  *   phpc lint [-r 'code'] [--json] entry.php
@@ -42,6 +43,7 @@ php-compiler CLI
   phpc build [-o out] <entry.php>               AOT compile to a native binary
   phpc build --project [dir] [--dry-run]        Build from phpc.json entry + binary paths
       --dry-run                                 List entry + includes graph; exit before LLVM
+      --print-includes                          Print includes[] then entry (absolute paths); no LLVM
       --verbose                                 Print compile-unit graph; keep full LLVM stderr on failure
       PHPC_BUILD_VERBOSE=1                      Same as --verbose
       PHPC_INVOKE_CWD=<dir>                     Set by ./phpc wrapper; relative paths use this base
@@ -127,11 +129,16 @@ switch ($command) {
         if ([] !== $args && '--project' === $args[0]) {
             array_shift($args);
             $dryRun = false;
+            $printIncludes = false;
             $verbose = false;
             $projectDir = '.';
             foreach ($args as $arg) {
                 if ('--dry-run' === $arg) {
                     $dryRun = true;
+                    continue;
+                }
+                if ('--print-includes' === $arg) {
+                    $printIncludes = true;
                     continue;
                 }
                 if ('--verbose' === $arg) {
@@ -143,6 +150,16 @@ switch ($command) {
                     exit(1);
                 }
                 $projectDir = $arg;
+            }
+            if ($printIncludes) {
+                if (!is_file($repoRoot.'/vendor/autoload.php')) {
+                    fwrite(STDERR, "phpc build --project: run composer install first\n");
+                    exit(1);
+                }
+                require $repoRoot.'/vendor/autoload.php';
+                exit(\PHPCompiler\Cli\PhpcBuild::printIncludes(
+                    \PHPCompiler\Cli\InvokeCwd::resolve($projectDir)
+                ));
             }
             exit(buildFromProject($repoRoot, $php, $projectDir, $dryRun, $verbose));
         }

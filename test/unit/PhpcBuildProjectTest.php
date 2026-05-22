@@ -74,6 +74,34 @@ ERR;
         $this->assertStringContainsString('#568', $out);
     }
 
+    public function testPrintIncludesMiniWebAppManifestLinkOrder(): void
+    {
+        $repoRoot = dirname(__DIR__, 2);
+        $project = $repoRoot.'/examples/003-MiniWebApp';
+        $result = $this->runPhpcBuild(
+            ['--project', $project, '--print-includes'],
+            $repoRoot
+        );
+        $this->assertSame(0, $result['exit'], $result['stderr']);
+        $lines = array_values(array_filter(explode("\n", trim($result['stdout'])), static fn (string $line): bool => '' !== $line));
+        $this->assertGreaterThanOrEqual(3, count($lines));
+        foreach ($lines as $line) {
+            $this->assertStringStartsWith('/', $line, 'expected absolute path: '.$line);
+        }
+        $joined = implode("\n", $lines);
+        $this->assertStringContainsString('src/Router.php', $joined);
+        $this->assertStringContainsString('config.php', $joined);
+        $this->assertStringContainsString('public/index.php', $joined);
+        $routerPos = strpos($joined, 'Router.php');
+        $configPos = strpos($joined, 'config.php');
+        $entryPos = strpos($joined, 'index.php');
+        $this->assertNotFalse($routerPos);
+        $this->assertNotFalse($configPos);
+        $this->assertNotFalse($entryPos);
+        $this->assertLessThan($configPos, $routerPos, 'includes[] order: Router before config');
+        $this->assertLessThan($entryPos, $configPos, 'entry is last');
+    }
+
     public function testVerboseMiniWebAppBuildPrintsCompileUnitGraph(): void
     {
         $repoRoot = dirname(__DIR__, 2);

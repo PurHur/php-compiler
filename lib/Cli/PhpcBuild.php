@@ -59,6 +59,38 @@ final class PhpcBuild
         ];
     }
 
+    /**
+     * Print manifest link order (includes[] then entry) as absolute paths; no LLVM (issue #729).
+     */
+    public static function printIncludes(string $projectDir): int
+    {
+        $root = ProjectManifest::resolveProjectDir($projectDir);
+        if (null === $root) {
+            fwrite(STDERR, "phpc build --project --print-includes: phpc.json not found in {$projectDir}\n");
+
+            return 1;
+        }
+
+        $paths = ProjectManifest::resolveCompileUnitPaths($projectDir);
+        if (null === $paths) {
+            fwrite(STDERR, "phpc build --project --print-includes: could not resolve entry from phpc.json\n");
+
+            return 1;
+        }
+
+        foreach ($paths as $path) {
+            if (!is_file($path)) {
+                fwrite(STDERR, 'phpc build --project --print-includes: file not found: '.$path."\n");
+
+                return 1;
+            }
+            $absolute = realpath($path);
+            fwrite(STDOUT, (false !== $absolute ? $absolute : $path)."\n");
+        }
+
+        return 0;
+    }
+
     public static function verboseEnabled(bool $cliFlag): bool
     {
         if ($cliFlag) {
