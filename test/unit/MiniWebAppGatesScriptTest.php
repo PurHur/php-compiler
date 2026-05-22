@@ -40,6 +40,8 @@ final class MiniWebAppGatesScriptTest extends TestCase
         $this->assertStringContainsString('MINIWEBAPP_LINT_GATE=1', $combined);
         $this->assertStringContainsString('issues/472', $combined);
         $this->assertStringContainsString('issues/454', $combined);
+        $this->assertStringContainsString('issues/539', $combined);
+        $this->assertStringNotContainsString('issues/67', $combined);
     }
 
     public function testMakefileDeclaresMiniWebAppGatesTarget(): void
