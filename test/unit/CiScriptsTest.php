@@ -82,4 +82,14 @@ final class CiScriptsTest extends TestCase
         $source = (string) file_get_contents(dirname(__DIR__).'/aot/AotTest.php');
         $this->assertStringContainsString('@group aot-link', $source);
     }
+
+    public function testMiniWebAppGatesScriptExists(): void
+    {
+        $script = dirname(__DIR__, 2).'/script/miniwebapp-gates.sh';
+        $this->assertFileExists($script);
+        $this->assertTrue(is_executable($script));
+        $body = (string) file_get_contents($script);
+        $this->assertStringContainsString('MINIWEBAPP_LINT_GATE', $body);
+        $this->assertStringContainsString('issues/461', $body);
+    }
 }

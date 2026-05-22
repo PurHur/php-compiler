@@ -93,9 +93,13 @@ test-docker-fast: docker-build-22
 	./script/docker-ci-local.sh fast
 
 # VM smoke: examples/001-SimpleWeb with ?name=Test
-.PHONY: web-smoke
+.PHONY: web-smoke miniwebapp-gates
 web-smoke:
 	./script/web-smoke.sh
+
+# MiniWebApp CI gate ladder status (issue #503; no full CI)
+miniwebapp-gates:
+	./script/miniwebapp-gates.sh
 
 # HTTP smoke: phpc serve + curl for 001-SimpleWeb and 002-StaticWeb (issue #298)
 .PHONY: examples-web-smoke examples-web-smoke-prebuild
