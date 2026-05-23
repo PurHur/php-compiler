@@ -4,7 +4,7 @@
 declare(strict_types=1);
 
 /**
- * Self-host compile probe (issue #816).
+ * Self-host compile probe (issue #816, #853).
  *
  * Bundles test/selfhost/compiler_minimal via bin/compile.php (LiteralIncludeDiscovery),
  * runs -l then -o build/selfhost, and prints the first fatal / LogicException line as
@@ -46,6 +46,15 @@ if (is_file($outBinary)) {
     unlink($outBinary);
 }
 
+$progressFile = getenv('PHP_COMPILER_JIT_PROGRESS_FILE');
+if (false === $progressFile || '' === $progressFile) {
+    $progressFile = $root.'/build/.last-jit-func';
+    putenv('PHP_COMPILER_JIT_PROGRESS_FILE='.$progressFile);
+}
+if (is_file($progressFile)) {
+    unlink($progressFile);
+}
+
 $steps = [
     ['-l'],
     ['-o', $outBinary],
@@ -60,7 +69,12 @@ foreach ($steps as $args) {
         continue;
     }
     if (139 === $exit) {
+        $lastJit = bootstrapSelfhostProbeLastJitFunc($progressFile);
         $next = 'LLVM segfault during native compile (exit 139)';
+        if (null !== $lastJit) {
+            $next .= ' (last JIT: '.$lastJit.')';
+            fwrite(STDOUT, 'LAST_JIT_FUNC: '.$lastJit."\n");
+        }
     } else {
         $next = bootstrapSelfhostProbeExtractNextLower($combined);
     }
