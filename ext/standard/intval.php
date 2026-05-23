@@ -22,7 +22,7 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * intval() for integer or float arguments (truncates toward zero; subset of PHP).
+ * intval() for scalar arguments (subset of PHP standard library).
  */
 final class intval extends Internal
 {
@@ -81,12 +81,7 @@ final class intval extends Internal
             case JITVariable::TYPE_NATIVE_BOOL:
                 return $context->builder->zExt($v, $i64);
             case JITVariable::TYPE_STRING:
-                $ptr = $this->stringDataPtr($context, $v);
-                $endPtr = $context->getTypeFromString('int8**')->constNull();
-                $base = $context->getTypeFromString('int32')->constInt(10, false);
-                $raw = $context->builder->call($context->lookupFunction('strtol'), $ptr, $endPtr, $base);
-
-                return $context->builder->trunc($raw, $i64);
+                return $this->stringToInt($context, $v);
             case JITVariable::TYPE_NULL:
                 return $i64->constInt(0, false);
             case JITVariable::TYPE_VALUE:
@@ -174,11 +169,7 @@ final class intval extends Internal
 
         $context->builder->positionAtEnd($stringBlock);
         $stringVal = $context->builder->call($context->lookupFunction('__value__readString'), $valuePtr);
-        $ptr = $this->stringDataPtr($context, $stringVal);
-        $endPtr = $context->getTypeFromString('int8**')->constNull();
-        $base = $context->getTypeFromString('int32')->constInt(10, false);
-        $raw = $context->builder->call($context->lookupFunction('strtol'), $ptr, $endPtr, $base);
-        $stringInt = $context->builder->trunc($raw, $i64);
+        $stringInt = $this->stringToInt($context, $stringVal);
         $stringEndBlock = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
@@ -195,6 +186,17 @@ final class intval extends Internal
         $phi->addIncoming($zero, $fallbackBlock);
 
         return $phi;
+    }
+
+    private function stringToInt(Context $context, Value $strPtr): Value
+    {
+        $ptr = $this->stringDataPtr($context, $strPtr);
+        $endPtr = $context->getTypeFromString('int8**')->constNull();
+        $base = $context->getTypeFromString('int32')->constInt(10, false);
+        $raw = $context->builder->call($context->lookupFunction('strtol'), $ptr, $endPtr, $base);
+        $i64 = $context->getTypeFromString('int64');
+
+        return $context->builder->trunc($raw, $i64);
     }
 
     private function stringDataPtr(Context $context, Value $strPtr): Value

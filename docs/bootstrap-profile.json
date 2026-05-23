@@ -452,6 +452,7 @@
         "test/bootstrap-aot/ns_nullable_return.php",
         "test/bootstrap-aot/nullable_types.php",
         "test/bootstrap-aot/parent_construct.php",
+        "test/bootstrap-aot/preg_quote_value_path.php",
         "test/bootstrap-aot/require_chain/main.php",
         "test/bootstrap-aot/spl_object_storage_dim.php",
         "test/bootstrap-aot/throw_logic.php",
@@ -480,6 +481,7 @@
         "test/bootstrap-aot/ns_func.php",
         "test/bootstrap-aot/nullable_types.php",
         "test/bootstrap-aot/parent_construct.php",
+        "test/bootstrap-aot/preg_quote_value_path.php",
         "test/bootstrap-aot/require_chain/main.php",
         "test/bootstrap-aot/throw_logic.php",
         "test/bootstrap-aot/try_catch.php"
@@ -491,8 +493,8 @@
         "inventory_files": 391,
         "excluded": 3,
         "eligible": 388,
-        "aot_lint_targets": 35,
-        "aot_link_targets": 25,
+        "aot_lint_targets": 36,
+        "aot_link_targets": 26,
         "aot_link_lib_targets": 1
     }
 }

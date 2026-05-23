@@ -49,7 +49,7 @@ make test    # builds php-compiler:22.04-dev if needed, then memory-safe CI in D
 
 Compile a **subset** of php-compiler with itself (native AOT), separate from the **web-app** north star ([`examples/003-MiniWebApp`](examples/003-MiniWebApp/) — [#521](https://github.com/PurHur/php-compiler/issues/521), [#539](https://github.com/PurHur/php-compiler/issues/539)). Full ladder, blockers, and Phase A–D gates: [docs/bootstrap-selfhost.md](docs/bootstrap-selfhost.md). Per-file inventory and CFG gaps: [docs/bootstrap-inventory.md](docs/bootstrap-inventory.md) (regenerate with `php script/bootstrap-inventory.php`). ROADMAP Phase 0 stretch: [#78](https://github.com/PurHur/php-compiler/issues/78) ([#540](https://github.com/PurHur/php-compiler/issues/540) namespaced `lib/` link).
 
-**Not yet achieved** — no runnable native binary built from the full `lib/` tree ([#212](https://github.com/PurHur/php-compiler/issues/212)).
+**Achieved (minimal subset, 2026-05-23)** — `./script/bootstrap-selfhost-link.sh` builds and runs `test/selfhost/compiler_minimal` (`compiler_minimal bundle OK`); full `lib/` tree native self-host still open ([#212](https://github.com/PurHur/php-compiler/issues/212), [#557](https://github.com/PurHur/php-compiler/issues/557)).
 
 **Local** (after `composer install`; Phase C needs LLVM 9 — `./script/install-llvm9.sh` or `.llvm/` from a prior `ci-local.sh` run):
 
@@ -57,6 +57,8 @@ Compile a **subset** of php-compiler with itself (native AOT), separate from the
 make bootstrap-profile          # Phase A inventory + docs/bootstrap-profile.json + fixture lint
 make bootstrap-aot-link         # Phase C: link + run bootstrap fixtures (stdout vs Zend)
 ./script/bootstrap-selfhost-lint.sh   # bundled lib/Compiler.php AOT lint only
+make bootstrap-selfhost-probe   # compile probe (-l / -o build/selfhost)
+./script/bootstrap-selfhost-link.sh   # native link + run gate (minimal bundle)
 ```
 
 **Docker** (LLVM 9 in `php-compiler:22.04-dev`; build once with `make docker-build-22`):
@@ -73,7 +75,9 @@ On harness hosts with an empty bind-mount, use `./script/docker-ci-local.sh` or 
 | Phase B lib AOT lint | `php bin/compile.php -l lib/*.php` | ✅ **14** top-level `lib/*.php` ([#534](https://github.com/PurHur/php-compiler/pull/534)) |
 | Phase B fixture lint | `php script/bootstrap-aot-lint.php` | ✅ **11** procedural targets |
 | Phase C native link | `make bootstrap-aot-link` | ✅ **11** link targets ([#538](https://github.com/PurHur/php-compiler/pull/538), [#545](https://github.com/PurHur/php-compiler/pull/545)) |
-| Bundled compiler lint | `./script/bootstrap-selfhost-lint.sh` | ✅ `lib/Compiler.php` closure **lint**; native run not yet |
+| Bundled compiler lint | `./script/bootstrap-selfhost-lint.sh` | ✅ `compiler_minimal` closure **lint** ([#559](https://github.com/PurHur/php-compiler/issues/559)) |
+| Self-host compile probe | `make bootstrap-selfhost-probe` | ✅ `-l` + `-o build/selfhost` ([#816](https://github.com/PurHur/php-compiler/issues/816), [#913](https://github.com/PurHur/php-compiler/issues/913)) |
+| Self-host native link | `./script/bootstrap-selfhost-link.sh` | ✅ `build/selfhost` → `compiler_minimal bundle OK` ([#557](https://github.com/PurHur/php-compiler/issues/557), [#913](https://github.com/PurHur/php-compiler/issues/913)) |
 | Phase D `lib/` link | `make bootstrap-aot-link-lib` | ✅ `lib/OpCode.php` bundle ([#540](https://github.com/PurHur/php-compiler/issues/540)) |
 
 # Installation

@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -44,17 +45,15 @@ final class preg_quote extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('preg_quote() requires one or two arguments in this compiler build');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type) {
-            throw new \LogicException('preg_quote() subject must be a string in this compiler build');
-        }
-        $subject = $context->helper->loadValue($args[0]);
+        $subject = JitStringArg::lower($context, $args[0], 'preg_quote() subject');
         if (1 === $argc) {
             return JitPregQuote::quote($context, $subject, null);
         }
-        if (JITVariable::TYPE_STRING !== $args[1]->type) {
-            throw new \LogicException('preg_quote() delimiter must be a string in this compiler build');
-        }
 
-        return JitPregQuote::quote($context, $subject, $context->helper->loadValue($args[1]));
+        return JitPregQuote::quote(
+            $context,
+            $subject,
+            JitStringArg::lower($context, $args[1], 'preg_quote() delimiter')
+        );
     }
 }

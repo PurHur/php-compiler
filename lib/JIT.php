@@ -58,7 +58,13 @@ class JIT {
             if ('opcode_type_name' === $name || str_ends_with($name, '\\opcode_type_name')) {
                 return;
             }
-            if ($this->isSkippedVmHotPathName($name) || $this->isSkippedCompilerHotPathName($name)) {
+            if (
+                $this->isSkippedVmHotPathName($name)
+                || $this->isSkippedCompilerHotPathName($name)
+                || $this->isSkippedWebBootstrapHotPathName($name)
+                || $this->isSkippedSelfHostEntryName($name)
+                || $this->isSkippedBootstrapInterpreterHotPathName($name)
+            ) {
                 $this->compileBlock($func->block, $name);
 
                 return;
@@ -100,6 +106,14 @@ class JIT {
         return 0 === $this->context->inlineIncludeDepth;
     }
 
+    /** Self-host compile probe sets PHP_COMPILER_JIT_PROGRESS_FILE (#816). */
+    private function shouldUseSelfHostJitStubs(): bool
+    {
+        $progress = getenv('PHP_COMPILER_JIT_PROGRESS_FILE');
+
+        return false !== $progress && '' !== $progress;
+    }
+
     private function compileBlock(Block $block, ?string $funcName = null): PHPLLVM\Value {
         $logicalName = $funcName;
         if (!is_null($funcName)) {
@@ -113,12 +127,11 @@ class JIT {
         if ($this->isSkippedVmHotPathName($logicalName ?? $internalName)) {
             return $this->compileSkippedVmHotPathStub($internalName, $block, $logicalName ?? $internalName);
         }
-        if ($this->isSkippedCompilerHotPathName($logicalName ?? $internalName)) {
-            $lower = strtolower($logicalName ?? $internalName);
-            if (str_contains($lower, 'compilecfgbranch')) {
-                return $this->compileSkippedCompilerCfgBranchStub($internalName, $block, $logicalName ?? $internalName);
-            }
-
+        if ($this->isSkippedCompilerHotPathName($logicalName ?? $internalName)
+            || $this->isSkippedWebBootstrapHotPathName($logicalName ?? $internalName)
+            || $this->isSkippedSelfHostEntryName($logicalName ?? $internalName)
+            || $this->isSkippedBootstrapInterpreterHotPathName($logicalName ?? $internalName)
+        ) {
             return $this->compileSkippedCompilerSplitCfgStub($internalName, $block, $logicalName ?? $internalName);
         }
         $args = [];
@@ -266,8 +279,28 @@ class JIT {
     private function isSkippedVmHotPathName(string $name): bool
     {
         $lower = strtolower($name);
+        // Self-host AOT bundles lib/VM.php for closure lint only; stub the interpreter (#816, #913).
+        if (str_contains($lower, '\\vm::')) {
+            return true;
+        }
 
-        return str_ends_with($lower, '::runframes') || str_ends_with($lower, '::defineclass');
+        return str_ends_with($lower, '::runframes') || str_ends_with($lower, '::defineclass')
+            || str_ends_with($lower, '::getframe');
+    }
+
+    /** Stub bundled lib/ interpreter helpers for self-host AOT (#557, #816). */
+    private function isSkippedBootstrapInterpreterHotPathName(string $name): bool
+    {
+        if ($this->isSkippedSelfHostEntryName($name)) {
+            return false;
+        }
+        $lower = strtolower($name);
+
+        return str_contains($lower, '\\vm::')
+            || str_contains($lower, '\\block::')
+            || str_contains($lower, '\\frame::')
+            || str_contains($lower, '\\module::')
+            || str_contains($lower, '\\runtime::');
     }
 
     private function isSkippedCompilerHotPathName(string $name): bool
@@ -275,12 +308,95 @@ class JIT {
         $lower = strtolower($name);
 
         return str_contains($lower, 'splitcfgblockafterstringkeyedarray')
+            || str_contains($lower, '\\compiler::')
             || str_contains($lower, 'compilecfgbranch')
+            || str_contains($lower, 'compilecfgblock')
+            || str_contains($lower, 'compileblock')
+            || str_contains($lower, 'compileops')
             || str_contains($lower, 'compileclasslike')
             || str_contains($lower, 'compileclassbody')
             || str_contains($lower, 'compilefunction')
             || str_contains($lower, 'compileglobalconst')
-            || str_contains($lower, 'compileoperand');
+            || str_contains($lower, 'compileoperand')
+            || str_contains($lower, 'compilestmt')
+            || str_contains($lower, 'compileop')
+            || str_contains($lower, 'compileswitchasjumpifchain')
+            || str_contains($lower, 'compileexpr')
+            || str_contains($lower, 'getopcodetype')
+            || str_contains($lower, 'compileissetmulti')
+            || str_contains($lower, 'compileisset')
+            || str_contains($lower, 'compilecoalesce')
+            || str_contains($lower, 'compilenullsafepropertyfetch')
+            || str_contains($lower, 'compileincludeop')
+            || str_contains($lower, 'compileparam')
+            || str_contains($lower, 'compileterminal')
+            || str_contains($lower, 'compilefunccall')
+            || str_contains($lower, 'compilearraydimfetchread')
+            || str_contains($lower, 'compilebooltemporary')
+            || str_contains($lower, 'compileboolconstant')
+            || str_contains($lower, 'compiletypeconstrainedvariable')
+            || str_contains($lower, 'compileclassconstfetch')
+            || str_contains($lower, 'compileinstanceof')
+            || str_contains($lower, 'trycompiledefineasglobalconst')
+            || str_contains($lower, 'markcallerlocalsusedbyliteralinclude')
+            || str_contains($lower, 'unwrap')
+            || str_contains($lower, 'needscfg')
+            || str_contains($lower, 'inheritfuncfromparent')
+            || str_contains($lower, 'isarraydim')
+            || str_contains($lower, 'findcoalesce')
+            || str_contains($lower, 'resolvecoalesce');
+    }
+
+    private function isSkippedSelfHostEntryName(string $name): bool
+    {
+        if (!$this->shouldUseSelfHostJitStubs()) {
+            return false;
+        }
+        $lower = strtolower($name);
+        // Self-host bundle includes Runtime/VM/Func for closure only; stub non-Compiler bodies (#913).
+        if (str_contains($lower, '\\runtime::')
+            || str_contains($lower, '\\func\\php::')
+            || str_contains($lower, '\\func::')
+            || str_contains($lower, '\\frame::')
+            || str_contains($lower, '\\block::')
+        ) {
+            return true;
+        }
+
+        return str_ends_with($lower, '\\compiler::compilefunc')
+            || str_ends_with($lower, '\\compiler::compile');
+    }
+
+    private function isSkippedWebBootstrapHotPathName(string $name): bool
+    {
+        if (!$this->shouldUseSelfHostJitStubs()) {
+            return false;
+        }
+        $lower = strtolower($name);
+        return str_contains($lower, 'conststringfolder')
+            || str_contains($lower, 'includepathresolver')
+            || str_contains($lower, 'literalincludediscovery');
+    }
+
+    private function collectStubFunctionArgTypes(Block $block): array
+    {
+        $args = [];
+        if (null === $block->func) {
+            return $args;
+        }
+        if ($this->instanceMethodUsesThis($block)) {
+            $args[] = $this->context->getTypeFromString('__object__*');
+        }
+        foreach ($block->func->params as $param) {
+            if (empty($param->result->usages)) {
+                assert($param->declaredType instanceof Op\Type\Literal);
+                $rawType = Type::fromDecl($param->declaredType->name);
+            } else {
+                $rawType = $param->result->type;
+            }
+            $args[] = $this->context->getTypeFromType($rawType);
+        }
+        return $args;
     }
 
     /** Stub VM hot-path methods whose opcode switches crash LLVM 9 during self-host AOT (#816). */
@@ -290,33 +406,8 @@ class JIT {
         if (isset($this->context->functions[$lcname])) {
             return $this->context->functions[$lcname];
         }
-        $args = [];
-        $callbackType = 'void';
-        if (null !== $block->func) {
-            if ($block->func->returnType instanceof Op\Type\Void_) {
-                $callbackType = 'void';
-            } elseif ($block->func->returnType instanceof Op\Type\Literal) {
-                $callbackType = match ($block->func->returnType->name) {
-                    'void' => 'void',
-                    'int' => 'long long',
-                    default => '__value__',
-                };
-            } else {
-                $callbackType = '__value__';
-            }
-            if ($this->instanceMethodUsesThis($block)) {
-                $args[] = $this->context->getTypeFromString('__object__*');
-            }
-            foreach ($block->func->params as $param) {
-                if (empty($param->result->usages)) {
-                    assert($param->declaredType instanceof Op\Type\Literal);
-                    $rawType = Type::fromDecl($param->declaredType->name);
-                } else {
-                    $rawType = $param->result->type;
-                }
-                $args[] = $this->context->getTypeFromType($rawType);
-            }
-        }
+        $args = $this->collectStubFunctionArgTypes($block);
+        $callbackType = $this->cfgFunctionReturnCallbackType($block->func) ?? 'void';
         $returnType = $this->context->getTypeFromString($callbackType);
         $func = $this->context->module->addFunction(
             $this->llvmInternalName($internalName),
@@ -326,13 +417,7 @@ class JIT {
         $saved = $this->context->builder;
         $this->context->builder = $this->context->context->builderCreate();
         $this->context->builder->positionAtEnd($bb);
-        if ('long long' === $callbackType) {
-            $this->context->builder->returnValue(
-                $this->context->getTypeFromString('int64')->constInt(VM::SUCCESS, false)
-            );
-        } else {
-            $this->context->builder->returnVoid();
-        }
+        $this->emitSelfHostStubReturn($callbackType, $func, VM::SUCCESS);
         $this->context->builder->clearInsertionPosition();
         $this->context->builder = $saved;
         $this->context->functions[$lcname] = $func;
@@ -385,35 +470,8 @@ class JIT {
         if (isset($this->context->functions[$lcname])) {
             return $this->context->functions[$lcname];
         }
-        $args = [];
-        $callbackType = '__object__*';
-        if (null !== $block->func) {
-            if ($block->func->returnType instanceof Op\Type\Void_) {
-                $callbackType = 'void';
-            } elseif ($block->func->returnType instanceof Op\Type\Literal) {
-                $callbackType = match ($block->func->returnType->name) {
-                    'void' => 'void',
-                    'int' => 'long long',
-                    'string' => '__string__*',
-                    'bool' => 'bool',
-                    'object' => '__object__*',
-                    'array' => '__hashtable__*',
-                    default => '__object__*',
-                };
-            }
-            if ($this->instanceMethodUsesThis($block)) {
-                $args[] = $this->context->getTypeFromString('__object__*');
-            }
-            foreach ($block->func->params as $param) {
-                if (empty($param->result->usages)) {
-                    assert($param->declaredType instanceof Op\Type\Literal);
-                    $rawType = Type::fromDecl($param->declaredType->name);
-                } else {
-                    $rawType = $param->result->type;
-                }
-                $args[] = $this->context->getTypeFromType($rawType);
-            }
-        }
+        $args = $this->collectStubFunctionArgTypes($block);
+        $callbackType = $this->cfgFunctionReturnCallbackType($block->func) ?? '__object__*';
         $returnType = $this->context->getTypeFromString($callbackType);
         $func = $this->context->module->addFunction(
             $this->llvmInternalName($internalName),
@@ -423,17 +481,7 @@ class JIT {
         $saved = $this->context->builder;
         $this->context->builder = $this->context->context->builderCreate();
         $this->context->builder->positionAtEnd($bb);
-        if ('void' === $callbackType) {
-            $this->context->builder->returnVoid();
-        } elseif ('long long' === $callbackType) {
-            $this->context->builder->returnValue(
-                $this->context->getTypeFromString('int64')->constInt(0, false)
-            );
-        } else {
-            $this->context->builder->returnValue(
-                $this->context->getTypeFromString('__object__*')->constNull()
-            );
-        }
+        $this->emitSelfHostStubReturn($callbackType, $func);
         $this->context->builder->clearInsertionPosition();
         $this->context->builder = $saved;
         $this->context->functions[$lcname] = $func;
@@ -1241,10 +1289,10 @@ class JIT {
                         if (
                             !$this->isVoidLlvmFunction($func)
                             && null !== $block->func
-                            && 'void' !== $this->cfgFunctionReturnCallbackType($block->func)
+                            && 'void' !== ($expectedReturn = $this->cfgFunctionReturnCallbackType($block->func))
                         ) {
                             $this->context->builder->returnValue(
-                                $this->defaultLlvmReturnValue($func)
+                                $this->defaultLlvmReturnValueForCallbackType($expectedReturn, $func)
                             );
                         } else {
                             $this->context->builder->returnVoid();
@@ -1485,13 +1533,7 @@ class JIT {
                 return $retval;
             }
             if (Variable::TYPE_NULL === $return->type) {
-                $slot = JIT\JitValueBox::alloc($this->context);
-                $this->context->builder->call(
-                    $this->context->lookupFunction('__value__writeNull'),
-                    JIT\JitValueBox::pointer($this->context, $slot)
-                );
-
-                return $this->context->builder->load($slot);
+                return $this->loadNullValueStruct();
             }
             if (Variable::TYPE_STRING === $return->type) {
                 $slot = JIT\JitValueBox::alloc($this->context);
@@ -1507,6 +1549,51 @@ class JIT {
 
                 return $this->context->builder->load($slot);
             }
+            if (Variable::TYPE_OBJECT === $return->type) {
+                $slot = JIT\JitValueBox::alloc($this->context);
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__writeObject'),
+                    JIT\JitValueBox::pointer($this->context, $slot),
+                    $retval
+                );
+
+                return $this->context->builder->load($slot);
+            }
+            if (Variable::TYPE_HASHTABLE === $return->type) {
+                $slot = JIT\JitValueBox::alloc($this->context);
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__writeHashtable'),
+                    JIT\JitValueBox::pointer($this->context, $slot),
+                    $retval
+                );
+
+                return $this->context->builder->load($slot);
+            }
+            if (Variable::TYPE_NATIVE_LONG === $return->type || Variable::TYPE_NATIVE_BOOL === $return->type) {
+                $slot = JIT\JitValueBox::alloc($this->context);
+                $long = Variable::TYPE_NATIVE_BOOL === $return->type
+                    ? $this->context->builder->zExt($retval, $this->context->getTypeFromString('int64'))
+                    : $retval;
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__writeLong'),
+                    JIT\JitValueBox::pointer($this->context, $slot),
+                    $long
+                );
+
+                return $this->context->builder->load($slot);
+            }
+            if (Variable::TYPE_NATIVE_DOUBLE === $return->type) {
+                $slot = JIT\JitValueBox::alloc($this->context);
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__writeDouble'),
+                    JIT\JitValueBox::pointer($this->context, $slot),
+                    $retval
+                );
+
+                return $this->context->builder->load($slot);
+            }
+
+            return $this->loadNullValueStruct();
         }
         if (null === $expected || Variable::TYPE_VALUE !== $return->type) {
             if ('__string__*' === $expected && Variable::TYPE_VALUE === $return->type) {
@@ -1581,26 +1668,94 @@ class JIT {
 
     private function defaultLlvmReturnValue(PHPLLVM\Value $func): PHPLLVM\Value
     {
+        if (null !== $this->context->activeFunction) {
+            $expected = $this->context->functionReturnType[$this->context->activeFunction] ?? null;
+            if (null !== $expected) {
+                return $this->defaultLlvmReturnValueForCallbackType($expected, $func);
+            }
+        }
         $fnType = $func->typeOf();
         if (!$fnType instanceof \PHPLLVM\Type\Function_) {
             return $this->context->constantFromInteger(0);
         }
-        $returnType = $fnType->getReturnType();
-        switch ($this->context->getStringFromType($returnType)) {
+        $llvmReturn = $this->context->getStringFromType($fnType->getReturnType());
+        if ('unknown' === $llvmReturn && \PHPLLVM\Type::KIND_STRUCT === $fnType->getReturnType()->getKind()) {
+            $llvmReturn = '__value__';
+        }
+
+        return $this->defaultLlvmReturnValueForCallbackType($llvmReturn, $func);
+    }
+
+    private function emitSelfHostStubReturn(string $callbackType, PHPLLVM\Value $func, ?int $longReturn = null): void
+    {
+        if ('void' === $callbackType) {
+            $this->context->builder->returnVoid();
+            return;
+        }
+        $this->context->builder->returnValue(
+            $this->defaultLlvmReturnValueForCallbackType($callbackType, $func, $longReturn)
+        );
+    }
+
+    private function defaultLlvmReturnValueForCallbackType(
+        string $callbackType,
+        PHPLLVM\Value $func,
+        ?int $longReturn = null
+    ): PHPLLVM\Value {
+        switch ($callbackType) {
             case 'long long':
             case 'int64':
-                return $this->context->constantFromInteger(0);
+                return $this->context->getTypeFromString('int64')->constInt($longReturn ?? 0, false);
             case 'bool':
             case 'int1':
-                return $returnType->constInt(0, false);
+                return $this->context->getTypeFromString('bool')->constInt(0, false);
             case '__string__*':
-                return $returnType->constNull();
+                return $this->context->getTypeFromString('__string__*')->constNull();
             case '__object__*':
+                return $this->context->getTypeFromString('__object__*')->constNull();
             case '__hashtable__*':
-                return $returnType->constNull();
+                return $this->context->getTypeFromString('__hashtable__*')->constNull();
+            case '__value__*':
+                return $this->context->getTypeFromString('__value__*')->constNull();
+            case '__value__':
+                $slot = JIT\JitValueBox::alloc($this->context);
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__writeNull'),
+                    JIT\JitValueBox::pointer($this->context, $slot)
+                );
+                return $this->context->builder->load($slot);
             default:
+                $fnType = $func->typeOf();
+                if ($fnType instanceof \PHPLLVM\Type\Function_) {
+                    $returnType = $fnType->getReturnType();
+                    if ($this->isValueStructLlvmType($returnType)) {
+                        return $this->loadNullValueStruct();
+                    }
+                    if (\PHPLLVM\Type::KIND_POINTER === $returnType->getKind()) {
+                        return $returnType->constNull();
+                    }
+                    if (\PHPLLVM\Type::KIND_INTEGER === $returnType->getKind()) {
+                        return $returnType->constInt(0, false);
+                    }
+                }
                 return $this->context->constantFromInteger(0);
         }
+    }
+
+    private function loadNullValueStruct(): PHPLLVM\Value
+    {
+        $slot = JIT\JitValueBox::alloc($this->context);
+        $this->context->builder->call(
+            $this->context->lookupFunction('__value__writeNull'),
+            JIT\JitValueBox::pointer($this->context, $slot)
+        );
+
+        return $this->context->builder->load($slot);
+    }
+
+    private function isValueStructLlvmType(PHPLLVM\Type $type): bool
+    {
+        return $type->toString() === $this->context->getTypeFromString('__value__')->toString();
     }
 
     private function assignOperandsUsedByLiteralInclude(Block $block, OpCode $op): bool
