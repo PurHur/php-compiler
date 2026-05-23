@@ -20,7 +20,7 @@ Tracking issues: [#58](https://github.com/PurHur/php-compiler/issues/58), [#145]
 | `ClassName::class` / `static::class` | yes | yes | yes | [#740](https://github.com/PurHur/php-compiler/issues/740) | Compile-time class name string; related to __CLASS__ (#199); compliance PHPT |
 | Magic constants `__CLASS__`, `__METHOD__`, `__FUNCTION__` | yes | yes | yes | [#199](https://github.com/PurHur/php-compiler/issues/199) | Lowered at parse time via php-cfg MagicStringResolver; compliance PHPT |
 | Magic constant `__NAMESPACE__` | yes | yes | yes | [#199](https://github.com/PurHur/php-compiler/issues/199) | Requires `namespace` declaration (#84); compliance PHPT |
-| Magic constants `__DIR__`, `__FILE__` | yes | yes | yes | [#707](https://github.com/PurHur/php-compiler/issues/707) | VM script stack on include; JIT uses per-unit script path; compliance PHPT |
+| Magic constants `__DIR__`, `__FILE__` | yes | yes | yes | [#707](https://github.com/PurHur/php-compiler/issues/707) | VM script stack on include; JIT uses per-unit script path; compliance PHPT; bootstrap AOT |
 | Magic constant `__LINE__` | yes | yes | yes | [#715](https://github.com/PurHur/php-compiler/issues/715) | Per-site line on TYPE_SCRIPT_MAGIC; include stack for multi-file units; compliance PHPT |
 
 _Syntax AOT column reflects `Runtime::MODE_AOT` compile probes unless a row pins AOT (e.g. native user-class link)._
