@@ -85,6 +85,11 @@ final class VmFs
         return @rmdir($path);
     }
 
+    public static function chmod(string $path, int $permissions): bool
+    {
+        return @chmod($path, $permissions);
+    }
+
     private static function modeToFiletype(int $mode): string
     {
         $type = $mode & 0xF000;
