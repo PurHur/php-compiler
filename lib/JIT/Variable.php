@@ -169,10 +169,16 @@ final class Variable {
         }
         if (Type::TYPE_UNION === $type->type && [] !== ($type->subTypes ?? [])) {
             $nonNull = [];
+            $hasNull = false;
             foreach ($type->subTypes as $sub) {
-                if (Type::TYPE_NULL !== $sub->type) {
+                if (Type::TYPE_NULL === $sub->type) {
+                    $hasNull = true;
+                } else {
                     $nonNull[] = $sub;
                 }
+            }
+            if ($hasNull) {
+                return self::TYPE_VALUE;
             }
             if (1 === count($nonNull)) {
                 return self::getTypeFromType($nonNull[0]);

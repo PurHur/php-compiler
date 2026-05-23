@@ -15,7 +15,5 @@ function resolve(string $path, string $fromFile): ?string
     return is_file($candidate) ? $candidate : null;
 }
 
-$from = __DIR__.'/deploy_path_data/templates/marker.php';
-$r = resolve('marker.php', $from);
-echo null === $r ? 'null' : 'ok';
-echo "\n";
+$from = 'test/bootstrap-aot/deploy_path_data/templates/marker.php';
+echo resolve('marker.php', $from) !== null ? "ok\n" : "null\n";

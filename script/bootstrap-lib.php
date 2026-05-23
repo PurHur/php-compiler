@@ -238,6 +238,8 @@ function bootstrapDefaultAotLinkTargets(array $lintTargets): array
         'test/bootstrap-aot/block_orig_children_foreach.php', // lint OK; LLVM verify on link (#848)
         'test/bootstrap-aot/isset_object_typed_property.php', // lint OK; LLVM verify on link (#764)
         'test/bootstrap-aot/const_string_folder_deploy_path.php', // lint OK; vendor autoload inline on link (#816)
+        'test/bootstrap-aot/const_string_folder_magic_dir.php', // lint OK; bundled Composer autoload calls fwrite (#816)
+        'test/bootstrap-aot/const_string_folder_func_call_args.php', // lint OK; bundled Composer autoload (#816)
         'test/bootstrap-aot/deploy_path_fold.php', // lint OK; DeployRoot bundle verify on link (#816)
         'test/bootstrap-aot/file_get_contents_concat.php', // lint OK; LLVM verify on link (addrspacecast)
         'test/bootstrap-aot/ns_nullable_return.php', // lint OK; nullable NsFuncCall return JIT pending

@@ -167,7 +167,7 @@ class JIT {
             }
             foreach ($block->func->params as $idx => $param) {
                 $rawType = $this->rawTypeFromCfgParam($param);
-                $type = $this->context->getTypeFromType($rawType);
+                $type = $this->llvmTypeForCfgParam($param);
                 $callbackType .= $callbackSep . $this->context->getStringFromType($type);
                 $callbackSep = ', ';
                 $rawTypes[] = $rawType;
@@ -379,9 +379,20 @@ class JIT {
             $args[] = $this->context->getTypeFromString('__object__*');
         }
         foreach ($block->func->params as $param) {
-            $args[] = $this->context->getTypeFromType($this->rawTypeFromCfgParam($param));
+            $args[] = $this->llvmTypeForCfgParam($param);
         }
         return $args;
+    }
+
+    private function llvmTypeForCfgParam(\PHPCfg\Op\Expr\Param $param): PHPLLVM\Type
+    {
+        $rawType = $this->rawTypeFromCfgParam($param);
+        $callback = $this->callbackTypeFromPhptype($rawType);
+        if (null !== $callback) {
+            return $this->context->getTypeFromString($callback);
+        }
+
+        return $this->context->getTypeFromType($rawType);
     }
 
     /** Stub VM hot-path methods whose opcode switches crash LLVM 9 during self-host AOT (#816). */
@@ -872,7 +883,15 @@ class JIT {
                         $value = $this->context->constantFetch($block->getOperand($op->arg2));
                     }
                     if (is_null($value)) {
-                        throw new \RuntimeException('Unknown constant fetch');
+                        $name = $block->getOperand($op->arg2);
+                        $label = $name instanceof Operand\Literal ? (string) $name->value : get_class($name);
+                        if (null !== $op->arg3) {
+                            $ns = $block->getOperand($op->arg3);
+                            if ($ns instanceof Operand\Literal) {
+                                $label = (string) $ns->value.'\\'.$label;
+                            }
+                        }
+                        throw new \RuntimeException('Unknown constant fetch: '.$label);
                     }
                     $this->assignOperand($block->getOperand($op->arg1), $value);
                     break;
@@ -962,9 +981,15 @@ class JIT {
                     }
                     switch ($arg->type) {
                         case Variable::TYPE_VALUE:
+                            $echoSlot = JIT\JitValueBox::alloc($this->context);
+                            JIT\JitValueBox::copyFromPointer(
+                                $this->context,
+                                $echoSlot,
+                                JIT\JitValueBox::valuePtrFromVariable($this->context, $arg)
+                            );
                             JIT\ValueEchoHelper::echo(
                                 $this->context,
-                                JIT\JitValueBox::valuePtrFromVariable($this->context, $arg)
+                                JIT\JitValueBox::pointer($this->context, $echoSlot)
                             );
                             break;
                         case Variable::TYPE_STRING:
@@ -1545,6 +1570,30 @@ class JIT {
 
     private function coerceReturnValue(Variable $return, PHPLLVM\Value $retval, ?string $expected): PHPLLVM\Value
     {
+        if ('__value__*' === $expected) {
+            if (Variable::TYPE_VALUE === $return->type) {
+                return JIT\JitValueBox::valuePtrFromVariable($this->context, $return);
+            }
+            if (Variable::TYPE_NULL === $return->type) {
+                return $this->context->getTypeFromString('__value__*')->constNull();
+            }
+            if (Variable::TYPE_STRING === $return->type) {
+                $slot = JIT\JitValueBox::alloc($this->context);
+                $owned = $this->context->builder->call(
+                    $this->context->lookupFunction('__string__separate'),
+                    $retval
+                );
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__writeString'),
+                    JIT\JitValueBox::pointer($this->context, $slot),
+                    $owned
+                );
+
+                return JIT\JitValueBox::pointer($this->context, $slot);
+            }
+
+            return $this->context->getTypeFromString('__value__*')->constNull();
+        }
         if ('__value__' === $expected) {
             if (Variable::TYPE_VALUE === $return->type) {
                 if (Variable::KIND_VARIABLE === $return->kind) {
@@ -1893,7 +1942,7 @@ class JIT {
             default => null,
         };
         if ($allowsNull && null !== $callback && '__value__' !== $callback) {
-            return '__value__';
+            return '__value__*';
         }
 
         return $callback;
@@ -2381,6 +2430,13 @@ class JIT {
                 return;
             }
         }
+        if ('__value__*' === $valueTy && Variable::TYPE_VALUE === $dest->type) {
+            $dest->free();
+            JIT\JitValueBox::copyFromPointer($this->context, $dest->value, $value);
+            $dest->addref();
+
+            return;
+        }
         $source = new Variable(
             $this->context,
             $this->jitTypeFromLlvmValue($value),
@@ -2398,6 +2454,13 @@ class JIT {
                     && '__value__' === $this->context->getStringFromType($destLlvm->getElementType())
                 ) {
                     $destPointsAtStruct = true;
+                }
+                if ('__value__' === $valueTy && $destPointsAtStruct) {
+                    $this->context->builder->store($value, $dest->value);
+                    $dest->addref();
+                    $this->copyValueBoxJitFlags($dest, $source);
+
+                    return;
                 }
                 $ptr = '__value__*' === $valueTy
                     ? $value

@@ -107,10 +107,41 @@ class Native implements Call {
                     $arg,
                     "argument {$argNum} for {$this->name}()"
                 );
+            case '__value__*':
+                switch ($arg->type) {
+                    case Variable::TYPE_VALUE:
+                        return \PHPCompiler\JIT\JitValueBox::valuePtrFromVariable($context, $arg);
+                    case Variable::TYPE_NULL:
+                        $slot = \PHPCompiler\JIT\JitValueBox::alloc($context);
+                        $context->builder->call(
+                            $context->lookupFunction('__value__writeNull'),
+                            \PHPCompiler\JIT\JitValueBox::pointer($context, $slot)
+                        );
+
+                        return \PHPCompiler\JIT\JitValueBox::pointer($context, $slot);
+                    case Variable::TYPE_STRING:
+                        $slot = \PHPCompiler\JIT\JitValueBox::alloc($context);
+                        $owned = $context->builder->call(
+                            $context->lookupFunction('__string__separate'),
+                            $value
+                        );
+                        $context->builder->call(
+                            $context->lookupFunction('__value__writeString'),
+                            \PHPCompiler\JIT\JitValueBox::pointer($context, $slot),
+                            $owned
+                        );
+
+                        return \PHPCompiler\JIT\JitValueBox::pointer($context, $slot);
+                }
+                break;
             case '__value__':
                 switch ($arg->type) {
                     case Variable::TYPE_VALUE:
-                        return $value;
+                        if ('__value__*' === $context->getStringFromType($value->typeOf())) {
+                            return $value;
+                        }
+
+                        return $context->builder->load($value);
                     case Variable::TYPE_OBJECT:
                         $slot = \PHPCompiler\JIT\JitValueBox::alloc($context);
                         $context->builder->call(
