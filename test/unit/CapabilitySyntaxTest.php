@@ -55,6 +55,9 @@ final class CapabilitySyntaxTest extends TestCase
     public function testCiInventoryRunsCapabilitySyntaxCheck(): void
     {
         $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('ci_run_capability_syntax_check', $common);
         $this->assertStringContainsString('capability-syntax.php --check', $common);
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString('CAPABILITY_SYNTAX_CHECK="${CAPABILITY_SYNTAX_CHECK:-1}"', $defaults);
     }
 }
