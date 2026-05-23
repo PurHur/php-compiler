@@ -38,13 +38,16 @@ fi
 unset _REPO_ROOT _REPO_LLVM _LLVM_DIR
 EXT_DIR="$PHP_COMPILER_EXT_DIR"
 PHP_OPTS=()
+# Docker dev images often preload extensions; loading .so again breaks LLVM FFI (#764).
+_PHP_LOADED_MODULES=$("$PHP_BIN" -m 2>/dev/null || true)
 if [[ -d "$EXT_DIR" ]]; then
   for ext in tokenizer mbstring dom xml xmlwriter ffi posix phar; do
-    if [[ -f "$EXT_DIR/${ext}.so" ]]; then
+    if [[ -f "$EXT_DIR/${ext}.so" ]] && ! grep -qxi "^${ext}$" <<< "$_PHP_LOADED_MODULES"; then
       PHP_OPTS+=(-d "extension=$EXT_DIR/${ext}.so")
     fi
   done
 fi
+unset _PHP_LOADED_MODULES
 if [[ -f "$(dirname "${BASH_SOURCE[0]}")/ci-memory-env.sh" ]]; then
   # shellcheck source=ci-memory-env.sh
   source "$(dirname "${BASH_SOURCE[0]}")/ci-memory-env.sh"

@@ -23,14 +23,18 @@ final class SourceBundler
 
         $requireTargets = self::requireAssignmentTargets($entryRaw, $includePaths);
 
-        $parts = [];
+        $parts = ['declare(strict_types=1);'];
         foreach ($includePaths as $path) {
             $raw = file_get_contents($path);
             if (false === $raw) {
                 throw new \RuntimeException('cannot read include: '.$path);
             }
             $body = self::rewriteDeployPathIncludes(
-                self::rewriteDirConstant(self::stripOpenTag($raw), $path, $projectRoot)
+                self::rewriteDirConstant(
+                    self::stripStrictTypesDeclare(self::stripOpenTag($raw)),
+                    $path,
+                    $projectRoot
+                )
             );
             $base = basename($path);
             if (isset($requireTargets[$base])) {
@@ -42,7 +46,9 @@ final class SourceBundler
         if ([] !== $includePaths) {
             $entryRaw = self::stripResolvedRequires($entryRaw, $includePaths);
         }
-        $parts[] = self::rewriteDeployPathIncludes(self::stripOpenTag($entryRaw));
+        $parts[] = self::rewriteDeployPathIncludes(
+            self::stripStrictTypesDeclare(self::stripOpenTag($entryRaw))
+        );
 
         return ['<?php'."\n".implode("\n", $parts), $entryPath];
     }
@@ -143,6 +149,21 @@ final class SourceBundler
         }
 
         return ltrim($code, " \t\n\r\0\x0B");
+    }
+
+    /**
+     * Concatenated AOT units keep one file-level strict_types (#764 MiniWebApp bundle).
+     */
+    private static function stripStrictTypesDeclare(string $code): string
+    {
+        $trimmed = ltrim($code);
+        if (preg_match('/^declare\s*\(\s*strict_types\s*=\s*1\s*\)\s*;/', $trimmed)) {
+            $trimmed = preg_replace('/^declare\s*\(\s*strict_types\s*=\s*1\s*\)\s*;\s*/', '', $trimmed) ?? $trimmed;
+
+            return ltrim($trimmed, " \t\n\r\0\x0B");
+        }
+
+        return $code;
     }
 
     /**
