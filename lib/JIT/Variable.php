@@ -86,6 +86,9 @@ final class Variable {
     /** void** property slot on {@see __object__} when this variable is a property lvalue (#58). */
     public ?\PHPLLVM\Value $objectPropertySlot = null;
 
+    /** Callee slot for a literal-include caller local; skip delref in unrelated assigns (#866). */
+    public bool $includeBinding = false;
+
     /** Declared JIT property type when {@see $objectPropertySlot} is set. */
     public ?int $objectPropertyType = null;
 
@@ -421,6 +424,9 @@ final class Variable {
     }
 
     public function free(): void {
+        if ($this->includeBinding) {
+            return;
+        }
         if ($this->kind === self::KIND_VALUE) {
             return;
         }
