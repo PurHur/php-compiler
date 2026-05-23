@@ -457,8 +457,11 @@ class JIT {
     /** ConstStringFolder methods with safe LLVM 9 lowering during self-host AOT (#816). */
     private function isConstStringFolderRealLoweringMethod(string $lower): bool
     {
-        // ConstStringFolder real lowering hits ICmp type mismatches in full self-host probe (#1097).
-        return false;
+        return str_ends_with($lower, '::literalstringvalue')
+            || str_ends_with($lower, '::sourcedir')
+            || str_ends_with($lower, '::fold')
+            || str_ends_with($lower, '::funccallhasarity')
+            || str_ends_with($lower, '::foldcallargstring');
     }
 
     private function collectStubFunctionArgTypes(Block $block): array

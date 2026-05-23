@@ -72,12 +72,10 @@ final class JitStringCompare
         Variable $boxed,
         Value $nativeStr
     ): Value {
-        if (Variable::TYPE_VALUE !== $boxed->type) {
+        if (!JitValueBox::isValueOperand($boxed)) {
             throw new \LogicException('Expected boxed __value__ operand');
         }
-        $valuePtr = Variable::KIND_VARIABLE === $boxed->kind
-            ? $boxed->value
-            : $context->helper->loadValue($boxed);
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $boxed);
         $map = $context->structFieldMap['__value__'];
         $typeByte = $context->builder->load(
             $context->builder->structGep($valuePtr, $map['type'])

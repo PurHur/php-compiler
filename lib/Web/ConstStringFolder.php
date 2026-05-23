@@ -411,7 +411,7 @@ final class ConstStringFolder
         if (2 === $magic->kind) {
             $resolved = realpath($sourceFile);
 
-            return false !== $resolved ? $resolved : $sourceFile;
+            return '' !== $resolved ? $resolved : $sourceFile;
         }
 
         return null;
@@ -446,10 +446,7 @@ final class ConstStringFolder
     private static function sourceDir(string $sourceFile): string
     {
         $resolved = realpath($sourceFile);
-        if (is_string($resolved)) {
-            return dirname($resolved);
-        }
 
-        return dirname($sourceFile);
+        return dirname('' !== $resolved ? $resolved : $sourceFile);
     }
 }
