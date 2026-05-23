@@ -27,7 +27,7 @@ Matches [`script/miniwebapp-gates.sh`](../script/miniwebapp-gates.sh) output ord
 | 4a | AOT dry-run | `phpc build --project examples/003-MiniWebApp --dry-run` | probe (LLVM 9) | `@group aot-lint` in `ci-local.sh` | [#624](https://github.com/PurHur/php-compiler/issues/624), [#675](https://github.com/PurHur/php-compiler/issues/675) |
 | 4b | AOT link | `MINIWEBAPP_AOT_LINK_GATE=1` (default) | ✅ | `ci-local.sh` → `ExamplesCompileTest` `@group aot-link` / `@group miniwebapp` | [#754](https://github.com/PurHur/php-compiler/issues/754), [#454](https://github.com/PurHur/php-compiler/issues/454) |
 | 4b2 | AOT bisect ladder | `MINIWEBAPP_AOT_BISECT_GATE=1` | opt-in (default off) | `miniwebapp-gates.sh` probe; `ci-local.sh --group miniwebapp-bisect` | [#879](https://github.com/PurHur/php-compiler/issues/879), [#764](https://github.com/PurHur/php-compiler/issues/764) |
-| 4b2 execute | AOT CLI execute | `MINIWEBAPP_AOT_EXECUTE_GATE=1` | opt-in (default off) | `ci-local.sh` → `ci_run_miniwebapp_aot_execute` after `@group aot-link` | [#791](https://github.com/PurHur/php-compiler/issues/791), [#764](https://github.com/PurHur/php-compiler/issues/764), [#775](https://github.com/PurHur/php-compiler/issues/775) |
+| 4b2 execute | AOT CLI execute | `MINIWEBAPP_AOT_EXECUTE_GATE=1` | default on | `ci-local.sh` → `ci_run_miniwebapp_aot_execute` after `@group aot-link` | [#747](https://github.com/PurHur/php-compiler/issues/747), [#791](https://github.com/PurHur/php-compiler/issues/791) |
 | 4c | AOT shell smoke (003 slice) | `EXAMPLES_AOT_SMOKE_GATE=1`, `EXAMPLES_AOT_SMOKE_ONLY=003` | ❌ (blocked on execute) | `ci-local.sh` → `examples-aot-smoke.sh` | [#683](https://github.com/PurHur/php-compiler/issues/683), [#485](https://github.com/PurHur/php-compiler/issues/485) |
 | 4d | Deploy smoke | `DEPLOY_SMOKE_GATE=1` (default) | 001/002 only | `ci-local.sh` → `deploy-smoke.sh`; 003 not enabled until [#612](https://github.com/PurHur/php-compiler/issues/612) | [#718](https://github.com/PurHur/php-compiler/issues/718) |
 
@@ -59,8 +59,8 @@ MINIWEBAPP_WEB_SMOKE_GATE=0 ./script/ci-local.sh
 ./script/ci-local.sh --filter test003MiniWebAppBuildLinks
 MINIWEBAPP_AOT_LINK_GATE=0 ./script/ci-local.sh --filter ExamplesCompileTest   # skip link during iteration (#754)
 
-# Stage 4b2 execute (opt-in while #764 open)
-MINIWEBAPP_AOT_EXECUTE_GATE=1 ./script/ci-local.sh --filter MiniWebAppAotExecuteTest
+# Stage 4b2 execute (default on; skip with MINIWEBAPP_AOT_EXECUTE_GATE=0)
+./script/ci-local.sh --filter MiniWebAppAotExecuteTest
 
 # Stage 4c
 EXAMPLES_AOT_SMOKE_ONLY=003 ./script/examples-aot-smoke.sh

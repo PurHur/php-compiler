@@ -52,16 +52,11 @@ final class IssetHelper
     ): Value {
         $ht = $context->helper->loadValue($container);
         $keyStr = $context->helper->loadValue($dim);
-        $valPtr = $context->builder->call(
-            $context->lookupFunction('__hashtable__readStringKeyValue'),
+
+        return $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSetStringKey'),
             $ht,
             $keyStr
-        );
-
-        return $context->builder->icmp(
-            Builder::INT_NE,
-            $valPtr,
-            $valPtr->typeOf()->constNull()
         );
     }
 

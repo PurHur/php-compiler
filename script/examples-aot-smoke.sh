@@ -120,7 +120,7 @@ run_binary() {
 }
 
 # 003-MiniWebApp project AOT + CLI execute (issue #485, #683, #809).
-# Link is attempted; empty stdout skips with #764 unless MINIWEBAPP_AOT_EXECUTE_GATE=1.
+# Link + execute; empty stdout fails when MINIWEBAPP_AOT_EXECUTE_GATE=1 (default).
 smoke_003_miniwebapp() {
   if [[ ! -d "${MINIWEBAPP}/public" ]]; then
     echo "examples-aot-smoke: 003-MiniWebApp: skip (tree missing #246)" >&2
@@ -160,12 +160,12 @@ smoke_003_miniwebapp() {
   fi
 
   if [[ -z "$out" ]] || [[ "$out" != *'MiniWebApp'* ]]; then
-    if [[ "${MINIWEBAPP_AOT_EXECUTE_GATE:-0}" == "1" ]]; then
-      echo "examples-aot-smoke: 003-MiniWebApp: FAILED (empty or wrong stdout; blocked #764)" >&2
+    if [[ "${MINIWEBAPP_AOT_EXECUTE_GATE:-1}" == "1" ]]; then
+      echo "examples-aot-smoke: 003-MiniWebApp: FAILED (empty or wrong stdout)" >&2
       [[ -n "$out" ]] && echo "--- stdout ---" >&2 && echo "$out" >&2 && echo "--- end ---" >&2
       return 1
     fi
-    echo "examples-aot-smoke: 003-MiniWebApp: skip (empty stdout; blocked #764)" >&2
+    echo "examples-aot-smoke: 003-MiniWebApp: skip (empty stdout; MINIWEBAPP_AOT_EXECUTE_GATE=0)" >&2
     return 0
   fi
 

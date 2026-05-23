@@ -53,6 +53,7 @@ final class MiniWebAppCgiEnv
         return array_merge(self::queryRouteHome(), [
             'SCRIPT_NAME' => '/index.php',
             'REQUEST_URI' => '/index.php?route=home',
+            'PATH_INFO' => '',
         ]);
     }
 
