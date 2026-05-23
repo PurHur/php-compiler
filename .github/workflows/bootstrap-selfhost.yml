@@ -32,7 +32,7 @@ jobs:
         if: steps.plan.outputs.strategy == 'docker'
         run: |
           if ! docker image inspect php-compiler:22.04-dev >/dev/null 2>&1; then
-            make docker-build-22
+            docker build -f Docker/dev/ubuntu-22.04/Dockerfile -t php-compiler:22.04-dev .
           fi
 
       - name: Bootstrap gates (Docker)

@@ -30,7 +30,7 @@ Workflow: [`.github/workflows/bootstrap-selfhost.yml`](../.github/workflows/boot
 
 | Path | When | Setup |
 |------|------|-------|
-| Docker (default on `ubuntu-22.04` runners) | `docker info` succeeds | Build or reuse `php-compiler:22.04-dev` (`make docker-build-22`), then bind-mount repo |
+| Docker (default on `ubuntu-22.04` runners) | `docker info` succeeds | Build or reuse `php-compiler:22.04-dev` (`docker build -f Docker/dev/ubuntu-22.04/Dockerfile -t php-compiler:22.04-dev .` in GHA; local devs may use `make docker-build-22`) |
 | Host fallback | Docker unavailable | Ubuntu 22.04 + `ppa:ondrej/php` PHP 8.2 + `./script/install-llvm9.sh` |
 
 Both paths run `composer install`, `script/apply-patches.sh`, then the three bootstrap gates above. This workflow does **not** change default `ci-local.sh` / `ci-fast.sh` behavior locally.
