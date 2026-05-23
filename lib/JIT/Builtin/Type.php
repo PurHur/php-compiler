@@ -185,6 +185,9 @@ class Type extends Builtin {
         $fntypeFtell = $this->context->context->functionType($i64, false, $i64);
         $fnFtell = $this->context->module->addFunction('__compiler_ftell', $fntypeFtell);
         $this->context->registerFunction('__compiler_ftell', $fnFtell);
+        $fntypeFseek = $this->context->context->functionType($i64, false, $i64, $i64, $i32);
+        $fnFseek = $this->context->module->addFunction('__compiler_fseek', $fntypeFseek);
+        $this->context->registerFunction('__compiler_fseek', $fnFseek);
         $fntypeFgetc = $this->context->context->functionType($strPtr, false, $i64);
         $fnFgetc = $this->context->module->addFunction('__compiler_fgetc', $fntypeFgetc);
         $this->context->registerFunction('__compiler_fgetc', $fnFgetc);

@@ -206,6 +206,7 @@ class Module extends ModuleAbstract
             new feof_(),
             new fflush_(),
             new ftell_(),
+            new fseek_(),
             new fwrite(),
             new fclose(),
             new getenv_(),

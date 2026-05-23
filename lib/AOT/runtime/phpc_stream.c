@@ -171,6 +171,20 @@ int __compiler_fflush(int64_t handle)
     return fflush(fp) == 0 ? 1 : 0;
 }
 
+int64_t __compiler_fseek(int64_t handle, int64_t offset, int32_t whence)
+{
+    FILE *fp = phpc_resolve_stream(handle);
+
+    if (NULL == fp) {
+        return -1;
+    }
+    if (0 != fseek(fp, (long) offset, whence)) {
+        return -1;
+    }
+
+    return 0;
+}
+
 int64_t __compiler_ftell(int64_t handle)
 {
     FILE *fp = phpc_resolve_stream(handle);

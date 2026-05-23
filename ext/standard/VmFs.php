@@ -268,6 +268,16 @@ final class VmFs
         return @\fflush($fp);
     }
 
+    public static function fseek(int $handle, int $offset, int $whence = \SEEK_SET): int
+    {
+        $fp = self::lookup($handle);
+        if (null === $fp) {
+            return -1;
+        }
+
+        return 0 === @\fseek($fp, $offset, $whence) ? 0 : -1;
+    }
+
     public static function ftell(int $handle): int|false
     {
         $fp = self::lookup($handle);
