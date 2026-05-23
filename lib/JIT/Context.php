@@ -190,6 +190,15 @@ class Context {
                 return $this->functionProxies[$shortKey];
             }
         }
+        // NsFuncCall lowers unqualified calls to the current namespace (e.g.
+        // PHPCompiler\Web\dirname); fall back to the global builtin when no
+        // namespaced function exists in the bundle.
+        if (str_contains($lc, '\\') && !str_contains($lc, '::')) {
+            $globalFn = substr($lc, strrpos($lc, '\\') + 1);
+            if (isset($this->functionProxies[$globalFn])) {
+                return $this->functionProxies[$globalFn];
+            }
+        }
         if (!isset($this->functionProxies[$lc])) {
             $this->functionProxies[$lc] = new Call\ExternalMethod($proxyName);
         }
