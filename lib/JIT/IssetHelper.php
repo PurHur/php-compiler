@@ -83,13 +83,21 @@ final class IssetHelper
 
                 return $context->builder->icmp(Builder::INT_NE, $loaded, $null);
             case Variable::TYPE_VALUE:
+                $valuePtr = JitValueBox::valuePtrFromVariable($context, $var);
                 $typeField = $context->structFieldMap['__value__']['type'];
                 $typeByte = $context->builder->load(
-                    $context->builder->structGep($loaded, $typeField)
+                    $context->builder->structGep($valuePtr, $typeField)
                 );
                 $nullType = $context->getTypeFromString('int8')->constInt(0, false);
 
                 return $context->builder->icmp(Builder::INT_NE, $typeByte, $nullType);
+            case Variable::TYPE_OBJECT:
+                $objPtr = Variable::KIND_VALUE === $var->kind
+                    ? $var->value
+                    : $context->builder->load($var->value);
+                $null = $context->getTypeFromString('__object__*')->constNull();
+
+                return $context->builder->icmp(Builder::INT_NE, $objPtr, $null);
             case Variable::TYPE_HASHTABLE:
                 $null = $context->getTypeFromString('__hashtable__*')->constNull();
 
