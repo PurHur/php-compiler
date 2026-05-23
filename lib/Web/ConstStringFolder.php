@@ -87,7 +87,7 @@ final class ConstStringFolder
             return null;
         }
         $name = self::literalStringValue($call->name) ?? self::fold($call->name, $sourceFile);
-        if ('phpc_deploy_path' !== $name || 2 !== count($call->args)) {
+        if ('phpc_deploy_path' !== $name || !self::funcCallHasArity($call, 2)) {
             return null;
         }
         $rel = self::foldCallArgString($cfg, $call->args[0], $sourceFile);
@@ -114,7 +114,7 @@ final class ConstStringFolder
             return null;
         }
         $name = self::literalStringValue($call->name) ?? self::fold($call->name, $sourceFile);
-        if ('phpc_deploy_path' !== $name || 2 !== count($call->args)) {
+        if ('phpc_deploy_path' !== $name || !self::funcCallHasArity($call, 2)) {
             return null;
         }
         $rel = self::foldCallArgString($cfg, $call->args[0], $sourceFile);
@@ -124,6 +124,15 @@ final class ConstStringFolder
         }
 
         return [$rel, $fallback];
+    }
+
+    private static function funcCallHasArity(Op\Expr\FuncCall $call, int $expected): bool
+    {
+        if (!isset($call->args[$expected - 1])) {
+            return false;
+        }
+
+        return !isset($call->args[$expected]);
     }
 
     private static function foldCallArgString(?CfgBlock $cfg, Operand $operand, string $sourceFile = ''): ?string
@@ -195,12 +204,26 @@ final class ConstStringFolder
         if (null === $suffix) {
             return null;
         }
-        $parsed = self::parseDeployPathCallFromOperand($left, $sourceFile, $cfg);
-        if (null === $parsed) {
+        $call = null;
+        if ($left instanceof Operand\Temporary && $left->original instanceof Op\Expr\FuncCall) {
+            $call = $left->original;
+        } elseif ($left instanceof Op\Expr\FuncCall) {
+            $call = $left;
+        }
+        if (null === $call) {
+            return null;
+        }
+        $name = self::literalStringValue($call->name) ?? self::fold($call->name, $sourceFile);
+        if ('phpc_deploy_path' !== $name || !self::funcCallHasArity($call, 2)) {
+            return null;
+        }
+        $rel = self::foldCallArgString($cfg, $call->args[0], $sourceFile);
+        $fallback = self::foldCallArgString($cfg, $call->args[1], $sourceFile);
+        if (null === $rel || null === $fallback) {
             return null;
         }
 
-        return DeployRoot::resolvePathWithSuffix($parsed[0], $parsed[1], $suffix);
+        return DeployRoot::resolvePathWithSuffix($rel, $fallback, $suffix);
     }
 
     /**
