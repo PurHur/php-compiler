@@ -72,4 +72,21 @@ final class VmPreg
 
         return $result;
     }
+
+    /**
+     * @return list<string>|false
+     */
+    public static function pregSplit(string $pattern, string $subject): array|false
+    {
+        if (strlen($pattern) > self::MAX_PATTERN_BYTES) {
+            return false;
+        }
+
+        $result = \preg_split($pattern, $subject);
+        if (false === $result) {
+            return false;
+        }
+
+        return $result;
+    }
 }

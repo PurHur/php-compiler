@@ -263,6 +263,10 @@ class Type extends Builtin {
         );
         $fnPregReplace = $this->context->module->addFunction('__compiler_preg_replace', $fntypePregReplace);
         $this->context->registerFunction('__compiler_preg_replace', $fnPregReplace);
+        $htPtr = $this->context->getTypeFromString('__hashtable__*');
+        $fntypePregSplit = $this->context->context->functionType($htPtr, false, $strPtr, $strPtr);
+        $fnPregSplit = $this->context->module->addFunction('__compiler_preg_split', $fntypePregSplit);
+        $this->context->registerFunction('__compiler_preg_split', $fnPregSplit);
         $fntypePregLastError = $this->context->context->functionType($i64, false);
         $fnPregLastError = $this->context->module->addFunction('__compiler_preg_last_error', $fntypePregLastError);
         $this->context->registerFunction('__compiler_preg_last_error', $fnPregLastError);
