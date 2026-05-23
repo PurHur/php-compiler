@@ -107,6 +107,7 @@ class Module extends ModuleAbstract
             new array_keys(),
             new array_merge(),
             new array_slice(),
+            new array_splice(),
             new array_chunk(),
             new array_column(),
             new explode(),

@@ -24,6 +24,7 @@ static const char *phpc_builtin_functions[] = {
     "array_search",
     "array_shift",
     "array_slice",
+    "array_splice",
     "array_sum",
     "array_unique",
     "array_unshift",

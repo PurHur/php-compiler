@@ -87,7 +87,7 @@ final class SelfHostBuiltinPolicy
     /** @var array<string, string> */
     private const CATEGORY_ARRAY = [
         'array_merge' => 'array', 'array_keys' => 'array', 'array_values' => 'array',
-        'in_array' => 'array', 'array_search' => 'array', 'array_fill' => 'array', 'array_slice' => 'array',
+        'in_array' => 'array', 'array_search' => 'array', 'array_fill' => 'array', 'array_slice' => 'array', 'array_splice' => 'array',
         'array_key_exists' => 'array', 'array_map' => 'array', 'array_count' => 'array',
         // array_map: null + compile-time string builtins only; closures deferred (#1154)
         'array_push' => 'array', 'array_pop' => 'array', 'array_shift' => 'array', 'array_unshift' => 'array',
