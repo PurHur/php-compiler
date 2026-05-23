@@ -1024,6 +1024,14 @@ final class HashTableHelper
                     $context->helper->loadValue($element)
                 );
                 break;
+            case Variable::TYPE_HASHTABLE:
+                $context->builder->call(
+                    $context->lookupFunction('__hashtable__setHashtableAt'),
+                    $ht,
+                    $index,
+                    $context->helper->loadValue($element)
+                );
+                break;
             case Variable::TYPE_VALUE:
                 self::setValueBoxAtIndex($context, $ht, $index, $element);
                 break;

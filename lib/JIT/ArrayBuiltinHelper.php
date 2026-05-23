@@ -568,6 +568,26 @@ final class ArrayBuiltinHelper
     }
 
     /**
+     * array_column() for a list of associative arrays with a compile-time string column key.
+     */
+    public static function buildColumnArray(Context $context, Variable $array, Value $columnKeyStr): Value
+    {
+        if (self::isNativeArray($array->type)) {
+            return self::buildColumnFromHashTable(
+                $context,
+                self::nativeListToHashTable($context, $array),
+                $columnKeyStr
+            );
+        }
+
+        return self::buildColumnFromHashTable(
+            $context,
+            self::loadHashTable($context, $array),
+            $columnKeyStr
+        );
+    }
+
+    /**
      * array_filter() default mask: copy elements that are truthy, preserving keys (subset of PHP).
      */
     public static function buildFilterArray(Context $context, Variable $array): Value
@@ -1673,6 +1693,130 @@ final class ArrayBuiltinHelper
         $phi->addIncoming($dest, $head);
 
         return $phi;
+    }
+
+    private static function buildColumnFromHashTable(
+        Context $context,
+        Value $src,
+        Value $columnKeyStr
+    ): Value {
+        static $seq = 0;
+        $tag = (string) ++$seq;
+        $map = $context->structFieldMap['__hashtable__'];
+        $valueMap = $context->structFieldMap['__value__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $nextFree = $context->builder->load(
+            $context->builder->structGep($src, $map['nextFreeElement'])
+        );
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $nextFree, $zero);
+        $emptyBlock = BasicBlockHelper::append($context, 'array_column_empty_'.$tag);
+        $workBlock = BasicBlockHelper::append($context, 'array_column_work_'.$tag);
+        $doneBlock = BasicBlockHelper::append($context, 'array_column_done_'.$tag);
+        $context->builder->branchIf($isEmpty, $emptyBlock, $workBlock);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        $emptyHt = HashTableHelper::alloc($context);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($workBlock);
+        $dest = HashTableHelper::alloc($context);
+        $srcIdxSlot = $context->builder->alloca($sizeT, 1, 'array_column_src');
+        $destIdxSlot = $context->builder->alloca($sizeT, 1, 'array_column_dest');
+        $context->builder->store($zero, $srcIdxSlot);
+        $context->builder->store($zero, $destIdxSlot);
+
+        $head = BasicBlockHelper::append($context, 'array_column_head_'.$tag);
+        $check = BasicBlockHelper::append($context, 'array_column_check_'.$tag);
+        $copyBlock = BasicBlockHelper::append($context, 'array_column_copy_'.$tag);
+        $skip = BasicBlockHelper::append($context, 'array_column_skip_'.$tag);
+        $rowHtBlock = BasicBlockHelper::append($context, 'array_column_row_ht_'.$tag);
+        $rowNullBlock = BasicBlockHelper::append($context, 'array_column_row_null_'.$tag);
+        $rowDone = BasicBlockHelper::append($context, 'array_column_row_done_'.$tag);
+        $advance = BasicBlockHelper::append($context, 'array_column_advance_'.$tag);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $srcIdx = $context->builder->load($srcIdxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $srcIdx, $nextFree);
+        $context->builder->branchIf($atEnd, $doneBlock, $check);
+
+        $context->builder->positionAtEnd($check);
+        $isSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $src,
+            $srcIdx
+        );
+        $context->builder->branchIf($isSet, $copyBlock, $skip);
+
+        $context->builder->positionAtEnd($copyBlock);
+        $destIdx = $context->builder->load($destIdxSlot);
+        $rowEntry = self::listEntryAt($context, $src, $srcIdx);
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($rowEntry, $valueMap['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $isHt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_HASHTABLE, false)
+        );
+        $context->builder->branchIf($isHt, $rowHtBlock, $rowNullBlock);
+
+        $context->builder->positionAtEnd($rowHtBlock);
+        $rowHt = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $rowEntry
+        );
+        $cell = HashTableHelper::readStringKeyToValueBox($context, $rowHt, $columnKeyStr);
+        HashTableHelper::setAtIndex($context, $dest, $destIdx, $cell);
+        $context->builder->branch($rowDone);
+
+        $context->builder->positionAtEnd($rowNullBlock);
+        self::appendNullAtIndex($context, $dest, $destIdx);
+        $context->builder->branch($rowDone);
+
+        $context->builder->positionAtEnd($rowDone);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($destIdx, $one),
+            $destIdxSlot
+        );
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($skip);
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($advance);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($srcIdx, $one),
+            $srcIdxSlot
+        );
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($emptyHt->typeOf());
+        $phi->addIncoming($emptyHt, $emptyBlock);
+        $phi->addIncoming($dest, $head);
+
+        return $phi;
+    }
+
+    private static function appendNullAtIndex(Context $context, Value $dest, Value $destIdx): void
+    {
+        $slot = JitValueBox::alloc($context);
+        $destPtr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            $destPtr
+        );
+        $nullVar = new Variable(
+            $context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VARIABLE,
+            $slot
+        );
+        HashTableHelper::setAtIndex($context, $dest, $destIdx, $nullVar);
     }
 
     private static function buildFilterFromNativeArray(Context $context, Variable $array): Value
