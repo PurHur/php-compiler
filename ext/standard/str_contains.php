@@ -64,5 +64,4 @@ final class str_contains extends Internal
 
         return $context->builder->not($isNull);
     }
-
 }

@@ -49,5 +49,4 @@ final class strcmp extends Internal
 
         return $context->builder->sExt($raw, $i64);
     }
-
 }

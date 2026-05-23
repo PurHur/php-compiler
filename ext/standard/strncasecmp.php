@@ -67,5 +67,4 @@ final class strncasecmp extends Internal
 
         return $context->builder->sExt($raw, $i64);
     }
-
 }

@@ -15,6 +15,8 @@ namespace PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\JitBoolArg;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable;
 

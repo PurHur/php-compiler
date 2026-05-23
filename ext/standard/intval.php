@@ -198,5 +198,4 @@ final class intval extends Internal
 
         return $context->builder->trunc($raw, $i64);
     }
-
 }

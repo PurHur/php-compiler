@@ -7,6 +7,8 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitBoolArg;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -56,14 +58,8 @@ final class hash_hmac extends Internal
             throw new \LogicException('hash_hmac() requires three or four arguments in this compiler build');
         }
         $raw = $context->getTypeFromString('int1')->constInt(0, false);
-        if (isset($args[3])) {
-            if (JITVariable::TYPE_BOOL !== $args[3]->type) {
-                throw new \LogicException('hash_hmac() raw_output must be boolean in this compiler build');
-            }
-            $raw = $context->helper->loadValue($args[3]);
-        }
-
-        return JitHash::hashHmac(
+        if (isset($args[3])) { $raw = JitBoolArg::lower($context, $args[3], 'hash_hmac() raw_output'); }
+        return JitHash::hashHmac($context, JitStringArg::lower($context, $args[0], 'hash_hmac() algorithm'), JitStringArg::lower($context, $args[1], 'hash_hmac() data'), JitStringArg::lower($context, $args[2], 'hash_hmac() key'), $raw);hashHmac(
             $context,
             self::jitStringArg($context, $args[0]),
             self::jitStringArg($context, $args[1]),

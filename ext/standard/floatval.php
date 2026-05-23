@@ -192,5 +192,4 @@ final class floatval extends Internal
 
         return $phi;
     }
-
 }

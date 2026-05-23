@@ -13,6 +13,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 
 use PHPLLVM\Builder;
@@ -75,11 +76,7 @@ class is_type extends Internal {
 
                 return $context->constantFromBool(false);
             case JITVariable::TYPE_VALUE:
-                $loaded = $context->helper->loadValue($args[0]);
-                $loaded = $context->builder->pointerCast(
-                    $loaded,
-                    $context->getTypeFromString('__value__*')
-                );
+                $loaded = JitValueBox::valuePtrFromVariable($context, $args[0]);
                 $typeField = $context->structFieldMap['__value__']['type'];
                 $typeByte = $context->builder->load(
                     $context->builder->structGep($loaded, $typeField)

@@ -51,5 +51,4 @@ final class strcasecmp extends Internal
 
         return $context->builder->sExt($raw, $i64);
     }
-
 }

@@ -44,5 +44,4 @@ final class strcspn extends Internal
 
         return $context->builder->zExt($raw, $i64);
     }
-
 }

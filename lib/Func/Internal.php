@@ -9,6 +9,8 @@ use PHPCompiler\Func;
 use PHPCompiler\Handler;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context as JITContext;
+use PHPCompiler\JIT\JitBoolArg;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Context;
@@ -35,6 +37,16 @@ abstract class Internal extends Func implements Handler, Call
         return JitStringArg::lower($context, $arg, $contextLabel);
     }
 
+    protected function jitLong(JITContext $context, JITVariable $arg, string $contextLabel = 'argument'): Value
+    {
+        return JitLongArg::lower($context, $arg, $contextLabel);
+    }
+
+    protected function jitBool(JITContext $context, JITVariable $arg, string $contextLabel = 'argument'): Value
+    {
+        return JitBoolArg::lower($context, $arg, $contextLabel);
+    }
+
     protected function requireStringArgs(JITContext $context, array $args, int $n, string $contextLabel = 'argument'): void
     {
         for ($i = 0; $i < $n; ++$i) {
@@ -56,6 +68,7 @@ abstract class Internal extends Func implements Handler, Call
     {
         $structName = $strPtr->typeOf()->getElementType()->getName();
         $off = $context->structFieldMap[$structName]['value'];
+
         return $context->builder->structGep($strPtr, $off);
     }
 }
