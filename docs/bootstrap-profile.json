@@ -78,6 +78,7 @@
         "ext/standard/JitStrrpos.php",
         "ext/standard/JitStrstr.php",
         "ext/standard/JitSubstrCount.php",
+        "ext/standard/JitUnlink.php",
         "ext/standard/JitUrlencode.php",
         "ext/standard/JitWebParams.php",
         "ext/standard/Module.php",
@@ -248,6 +249,7 @@
         "ext/standard/time.php",
         "ext/standard/ucfirst.php",
         "ext/standard/ucwords.php",
+        "ext/standard/unlink.php",
         "ext/standard/urldecode.php",
         "ext/standard/urlencode.php",
         "ext/standard/var_dump.php",
@@ -418,9 +420,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 353,
+        "inventory_files": 355,
         "excluded": 2,
-        "eligible": 351,
+        "eligible": 353,
         "aot_lint_targets": 15,
         "aot_link_targets": 13,
         "aot_link_lib_targets": 1
