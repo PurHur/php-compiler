@@ -17,6 +17,7 @@ static const char *phpc_builtin_functions[] = {
     "array_pop",
     "array_product",
     "array_push",
+    "array_replace",
     "array_reverse",
     "array_search",
     "array_shift",
