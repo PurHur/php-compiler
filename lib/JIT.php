@@ -1394,6 +1394,11 @@ class JIT {
                 case OpCode::TYPE_FUNCCALL_INIT:
                     $nameOp = $block->getOperand($op->arg1);
                     if (!$nameOp instanceof Operand\Literal) {
+                        if ($this->shouldUseSelfHostJitStubs()) {
+                            $this->context->scope->toCall = null;
+                            $this->context->scope->args = [];
+                            break;
+                        }
                         throw new \LogicException("Variable function calls not yet supported");
                     }
                     $lcname = strtolower($nameOp->value);
@@ -1442,6 +1447,9 @@ class JIT {
                     $nameOp = $block->getOperand($op->arg1);
                     assert($nameOp instanceof Operand\Literal);
                     if (!isset($block->constants[$op->arg2])) {
+                        if ($this->shouldUseSelfHostJitStubs()) {
+                            break;
+                        }
                         throw new \LogicException('Global constant value must be a compile-time constant');
                     }
                     if (!$this->context->runtime->vmContext->defineConstant(

@@ -466,7 +466,8 @@
         "test/bootstrap-aot/spl_object_storage_dim.php",
         "test/bootstrap-aot/switch_jumpif_chain.php",
         "test/bootstrap-aot/throw_logic.php",
-        "test/bootstrap-aot/try_catch.php"
+        "test/bootstrap-aot/try_catch.php",
+        "test/bootstrap-aot/value_bitwise_shift.php"
     ],
     "aot_link_targets": [
         "examples/000-HelloWorld/example.php",
@@ -510,7 +511,7 @@
         "inventory_files": 395,
         "excluded": 0,
         "eligible": 395,
-        "aot_lint_targets": 46,
+        "aot_lint_targets": 47,
         "aot_link_targets": 33,
         "aot_link_lib_targets": 1
     }

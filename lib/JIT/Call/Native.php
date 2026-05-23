@@ -132,6 +132,15 @@ class Native implements Call {
                         );
 
                         return \PHPCompiler\JIT\JitValueBox::pointer($context, $slot);
+                    case Variable::TYPE_OBJECT:
+                        $slot = \PHPCompiler\JIT\JitValueBox::alloc($context);
+                        $context->builder->call(
+                            $context->lookupFunction('__value__writeObject'),
+                            \PHPCompiler\JIT\JitValueBox::pointer($context, $slot),
+                            $value
+                        );
+
+                        return \PHPCompiler\JIT\JitValueBox::pointer($context, $slot);
                 }
                 break;
             case '__value__':

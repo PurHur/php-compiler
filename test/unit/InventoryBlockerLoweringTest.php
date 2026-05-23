@@ -5,6 +5,7 @@ final class InventoryBlockerLoweringTest extends TestCase {
     public function testNullsafeMethodCallLint(): void { $this->assertSame(0, $this->lint('test/bootstrap-aot/nullsafe_method_call.php')); }
     public function testAssignRefLint(): void { $this->assertSame(0, $this->lint('test/bootstrap-aot/assign_ref_alias.php')); }
     public function testGlobalVarLint(): void { $this->assertSame(0, $this->lint('test/bootstrap-aot/global_var_link.php')); }
+    public function testValueBitwiseShiftLint(): void { $this->assertSame(0, $this->lint('test/bootstrap-aot/value_bitwise_shift.php')); }
     public function testShellExecLint(): void { $this->assertSame(0, $this->lint('test/bootstrap-aot/shell_exec_echo.php')); }
     public function testShiftRightLint(): void { $this->assertSame(0, $this->lint('test/bootstrap-aot/shift_right.php')); }
     public function testTryCatchLint(): void { $this->assertSame(0, $this->lint('test/bootstrap-aot/try_catch.php')); }
