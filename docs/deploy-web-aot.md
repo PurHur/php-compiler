@@ -73,6 +73,35 @@ After `phpc deploy -o <dist>`:
 
 `002-StaticWeb` dist is typically `bin/app`, `phpc.json`, and `README.deploy` only. `003-MiniWebApp` adds `public/`, `assets/`, and `templates/`.
 
+### `003-MiniWebApp` dist tree (typical)
+
+After `phpc deploy examples/003-MiniWebApp -o /var/www/miniwebapp`:
+
+```
+$PHPC_DEPLOY_ROOT/
+  README.deploy
+  bin/app                 # native CGI entry (dynamic HTML routes)
+  phpc.json
+  public/index.php        # front controller (PATH_INFO + ?route= fallback)
+  assets/style.css        # static CSS — serve via nginx, not bin/app
+  templates/              # PHP templates — not web-exposed; app reads via includes
+```
+
+Implementation: [`lib/Web/ProjectDeploy.php`](../lib/Web/ProjectDeploy.php) copies `public/`, manifest `assets/`, and project `templates/` into the dist. The AOT binary generates HTML for app routes; it does **not** replace a static file server for `/assets/*` in v1 ([#696](https://github.com/PurHur/php-compiler/issues/696)).
+
+Local file-on-disk smoke (no nginx):
+
+```bash
+./phpc build --project examples/003-MiniWebApp
+./phpc deploy examples/003-MiniWebApp -o /tmp/miniwebapp-dist
+test -f /tmp/miniwebapp-dist/assets/style.css
+test -f /tmp/miniwebapp-dist/public/index.php
+test -f /tmp/miniwebapp-dist/README.deploy
+grep -q PHPC_DEPLOY_ROOT /tmp/miniwebapp-dist/README.deploy
+```
+
+For HTTP CSS from the native binary, use `phpc serve --aot` (PHPUnit: [#610](https://github.com/PurHur/php-compiler/issues/610), [#478](https://github.com/PurHur/php-compiler/issues/478)). Production nginx should offload static files with `alias` (below).
+
 ## 3. `PHPC_DEPLOY_ROOT`
 
 Set to the **absolute path of the dist directory** before running `bin/app`. Required when the binary uses `phpc_deploy_path()` or runtime includes under the deploy tree ([#585](https://github.com/PurHur/php-compiler/issues/585), runtime include follow-up [#623](https://github.com/PurHur/php-compiler/issues/623)).
@@ -96,15 +125,84 @@ export REQUEST_METHOD=GET
 
 ## 4. nginx (illustrative)
 
-Not exercised in CI — adapt to your host paths and socket.
+Not exercised in CI — adapt to your host paths and socket. Validate with `nginx -t` before reload.
 
-**CGI spawn** (binary as CGI script; docroot for static files when `public/` exists):
+### Who serves what
+
+| URL prefix | Served by | Notes |
+|------------|-----------|-------|
+| `/assets/*` | nginx `alias` → dist `assets/` | CSS/JS/images; **not** handled by `bin/app` |
+| `/public/*` or docroot files | nginx `root` + `try_files` | Static files under `public/` when present |
+| `*.php` / front controller | CGI/FastCGI → `bin/app` or `cgi-wrapper` | Dynamic routes only |
+| `templates/` | **not** web-exposed | App reads via PHP includes at runtime |
+
+`phpc serve` (VM) and `phpc serve --aot` serve `/assets/` from the project tree for local dev ([#594](https://github.com/PurHur/php-compiler/issues/594)). AOT deploy dist expects nginx (or another static server) for the same URLs in production.
+
+### Static assets + front controller (`003-MiniWebApp`)
+
+Copy-paste starting point — replace `/var/www/miniwebapp` with your dist path:
+
+```nginx
+server {
+    listen 80;
+    server_name miniwebapp.example.test;
+
+    # Dist root (PHPC_DEPLOY_ROOT) — not the nginx document root
+    set $phpc_deploy_root /var/www/miniwebapp;
+
+    root $phpc_deploy_root/public;
+
+    # Static CSS/JS — offload from bin/app (#696)
+    location ^~ /assets/ {
+        alias $phpc_deploy_root/assets/;
+        try_files $uri =404;
+        expires 7d;
+        add_header Cache-Control "public";
+    }
+
+    # Optional: other static files under public/ (favicon, robots.txt)
+    location / {
+        try_files $uri @app;
+    }
+
+    # Front controller: PHP requests → native binary (#489 PATH_INFO)
+    location @app {
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $phpc_deploy_root/bin/app;
+        fastcgi_param PHPC_DEPLOY_ROOT $phpc_deploy_root;
+        fastcgi_param DOCUMENT_ROOT $document_root;
+        fastcgi_pass unix:/run/fcgiwrap.socket;   # or cgi-wrapper (#665)
+    }
+
+    # Alternative: only *.php hits CGI (index.php + PATH_INFO)
+    location ~ \.php$ {
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $phpc_deploy_root/bin/app;
+        fastcgi_param PHPC_DEPLOY_ROOT $phpc_deploy_root;
+        fastcgi_param DOCUMENT_ROOT $document_root;
+        fastcgi_pass unix:/run/fcgiwrap.socket;
+    }
+}
+```
+
+Use **either** the `@app` + `try_files` pattern **or** the `location ~ \.php$` block — not both on the same server without adjusting precedence. PATH_INFO must reach `bin/app` for `/index.php/hello` style URLs ([#489](https://github.com/PurHur/php-compiler/issues/489), [#682](https://github.com/PurHur/php-compiler/issues/682)).
+
+Local verify after deploy (file exists; HTTP via nginx is manual):
+
+```bash
+curl -sI "http://miniwebapp.example.test/assets/style.css"   # expect 200 once nginx is up
+head -1 /var/www/miniwebapp/assets/style.css                  # offline: file on disk
+```
+
+### Minimal dist without `public/` (`002-StaticWeb`)
+
+**CGI spawn** (binary as CGI script; no separate static tree):
 
 ```nginx
 server {
     listen 80;
     server_name static.example.test;
-    root /var/www/static-dist/public;   # omit or use dist root if no public/
+    root /var/www/static-dist;   # dist root; no public/ subtree
 
     location / {
         try_files $uri @app;
@@ -129,6 +227,7 @@ Production AOT CGI wrapper for nginx spawn: [#665](https://github.com/PurHur/php
 |------|---------|
 | Deploy smoke | `make deploy-smoke` or `./script/deploy-smoke.sh` (001/002; 003 execute when `DEPLOY_SMOKE_003_EXECUTE=1` or `MINIWEBAPP_AOT_EXECUTE_GATE=1` — [#718](https://github.com/PurHur/php-compiler/issues/718), [#745](https://github.com/PurHur/php-compiler/issues/745)) |
 | Manual deploy | `phpc deploy examples/002-StaticWeb -o /tmp/static-dist` → executable `bin/app` |
+| Static assets on disk | `test -f /tmp/miniwebapp-dist/assets/style.css` after 003 deploy ([#696](https://github.com/PurHur/php-compiler/issues/696)) |
 | Deploy root env | `grep PHPC_DEPLOY_ROOT /tmp/static-dist/README.deploy` |
 | CGI one-shot | `PHPC_DEPLOY_ROOT=/tmp/static-dist QUERY_STRING= ./bin/app` (002 prints HTML) |
 | HTTP harness | `make examples-web-smoke` (001, 002, 004; 003 when lint green) |
@@ -184,3 +283,6 @@ export PHP_COMPILER_MAX_BODY=65536   # bytes; capped at 8 MiB
 | [#676](https://github.com/PurHur/php-compiler/issues/676) | MiniWebApp AOT execute parity / unskip matrix |
 | [#623](https://github.com/PurHur/php-compiler/issues/623) | Runtime `include` under deploy root |
 | [#612](https://github.com/PurHur/php-compiler/issues/612) | MiniWebApp dist-layout E2E smoke |
+| [#696](https://github.com/PurHur/php-compiler/issues/696) | nginx static assets (`alias`) for deploy dist |
+| [#610](https://github.com/PurHur/php-compiler/issues/610) | ServeAotTest — assets via `phpc serve --aot` |
+| [#478](https://github.com/PurHur/php-compiler/issues/478) | ServeAotTest routes via `phpc serve --aot` |
