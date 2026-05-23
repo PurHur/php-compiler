@@ -76,7 +76,14 @@ class JIT {
             // No need to do anything, already compiled
             return;
         } elseif ($func instanceof CoreFunc\Internal) {
-            $this->context->functionProxies[strtolower($func->getName())] = $func;
+            $name = strtolower($func->getName());
+            if (SelfHostBuiltinPolicy::shouldExternalStub($name)) {
+                $this->context->functionProxies[$name] = new JIT\Call\ExternalMethod($func->getName());
+
+                return;
+            }
+            $this->context->functionProxies[$name] = $func;
+
             return;
         }
         throw new \LogicException("Unknown func type encountered: " . get_class($func));
@@ -290,7 +297,9 @@ class JIT {
         return str_contains($lower, '\\vm\\')
             || str_contains($lower, '\\vm\\variable::')
             || str_contains($lower, '\\printer::')
-            || str_contains($lower, '\\jit\\operandname::');
+            || str_contains($lower, '\\jit\\operandname::')
+            || str_contains($lower, '\\jit::')
+            || str_contains($lower, '\\jit\\context::');
     }
 
     private function isSkippedCompilerHotPathName(string $name): bool
@@ -1953,15 +1962,29 @@ class JIT {
     {
         $allowsNull = $this->typeIncludesNull($type);
         $type = $this->context->unwrapNullableUnionType($type);
-        $callback = match ($type->type) {
-            Type::TYPE_LONG => 'long long',
-            Type::TYPE_BOOLEAN => 'bool',
-            Type::TYPE_STRING => '__string__*',
-            Type::TYPE_OBJECT => '__object__*',
-            Type::TYPE_ARRAY => '__hashtable__*',
-            Type::TYPE_NULL => '__value__',
-            default => null,
-        };
+        switch ($type->type) {
+            case Type::TYPE_LONG:
+                $callback = 'long long';
+                break;
+            case Type::TYPE_BOOLEAN:
+                $callback = 'bool';
+                break;
+            case Type::TYPE_STRING:
+                $callback = '__string__*';
+                break;
+            case Type::TYPE_OBJECT:
+                $callback = '__object__*';
+                break;
+            case Type::TYPE_ARRAY:
+                $callback = '__hashtable__*';
+                break;
+            case Type::TYPE_NULL:
+                $callback = '__value__';
+                break;
+            default:
+                $callback = null;
+                break;
+        }
         if ($allowsNull && null !== $callback && '__value__' !== $callback) {
             return '__value__*';
         }

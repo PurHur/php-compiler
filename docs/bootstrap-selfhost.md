@@ -11,7 +11,7 @@ North star: compile a **subset** of php-compiler with itself (native AOT), then 
 | Phase B fixture lint | `php script/bootstrap-aot-lint.php` | ✅ **12** procedural targets under `test/bootstrap-aot/` + `examples/000-HelloWorld` |
 | Phase C native run | `make bootstrap-aot-link` or `./script/bootstrap-aot-link.sh` | ✅ Link + execute **12** `aot_link_targets` (stdout vs Zend PHP) |
 | Phase D `lib/` link | `make bootstrap-aot-link-lib` or `./script/bootstrap-aot-link-lib.sh` | ✅ `test/bootstrap-aot/lib_opcode/main.php` bundles `lib/OpCode.php` ([#540](https://github.com/PurHur/php-compiler/issues/540)) |
-| Bundled `lib/Compiler.php` lint | `./script/bootstrap-selfhost-lint.sh` | ✅ `test/selfhost/compiler_minimal/main.php` + **40** literal `require_once` units toward `bin/vm.php` (no `vendor/`) ([#559](https://github.com/PurHur/php-compiler/issues/559)) |
+| Bundled `lib/Compiler.php` lint | `./script/bootstrap-selfhost-lint.sh` | ✅ `test/selfhost/compiler_minimal/main.php` + **48** literal `require_once` units toward `bin/vm.php` (no `vendor/`) ([#559](https://github.com/PurHur/php-compiler/issues/559)) |
 | Self-host compile probe | `make bootstrap-selfhost-probe` | ⚠️ `-l` OK; native `-o` pending (`HashTableHelper` string-key arrays) — best-effort ([#816](https://github.com/PurHur/php-compiler/issues/816)) |
 | Self-host probe in full CI | `BOOTSTRAP_SELFHOST_PROBE_GATE=1 ./script/ci-local.sh` | ✅ runs after bootstrap AOT lint when LLVM 9 present ([#829](https://github.com/PurHur/php-compiler/issues/829)); off in `ci-fast.sh` unless env set |
 | Self-host native link | `./script/bootstrap-selfhost-link.sh` | ✅ `build/selfhost` prints `compiler_minimal bundle OK` ([#557](https://github.com/PurHur/php-compiler/issues/557), [#913](https://github.com/PurHur/php-compiler/issues/913)) |
@@ -78,7 +78,7 @@ Incremental growth toward `bin/vm.php` inventory path ([#559](https://github.com
 | `lib/Web/Superglobals.php` | CGI superglobals (`bin/vm.php`); `array_map` uses named static method (no arrow/closure in bundle) |
 | `lib/Compiler.php` | CFG → opcodes |
 
-**Next toward `bin/vm.php`** (`php script/bootstrap-selfhost-next-includes.php`): `lib/JIT.php` (`match`→`switch` in `callbackTypeFromPhptype`), `lib/JIT/Context.php` (`static $map`), `lib/NullSafeLivenessDetector.php` (extends `PHPCfg\LivenessDetector`), `lib/JIT/Helper.php`, `lib/JIT/Analyzer.php`, …
+**Next toward `bin/vm.php`** (`php script/bootstrap-selfhost-next-includes.php`): `lib/JIT/Progress.php` (`??=`), `lib/JIT/IncludeHelper.php`, `lib/JIT/CoalesceHelper.php`, `lib/JIT/Call/Native.php`, …
 
 Native link + run of `compiler_minimal` is gated by `./script/bootstrap-selfhost-link.sh` (LLVM 9; stdout `compiler_minimal bundle OK`). Runtime helpers in the bundle (`VM`, `Runtime`, `Block`, …) are JIT-stubbed for verify; `Compiler` hot paths use existing skip patterns ([#579](https://github.com/PurHur/php-compiler/issues/579), [#913](https://github.com/PurHur/php-compiler/issues/913)). Full `lib/` native self-host remains open.
 

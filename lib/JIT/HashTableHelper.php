@@ -14,6 +14,13 @@ use PHPLLVM\Value;
 
 final class HashTableHelper
 {
+    private static int $seq = 0;
+
+    private static function nextSeq(): int
+    {
+        return ++self::$seq;
+    }
+
     /**
      * HashTable view without objectPropertySlot — isset()/dim on $this->props['k'] (#764).
      */
@@ -125,8 +132,7 @@ final class HashTableHelper
         Value $count,
         Variable $value
     ): Value {
-        static $seq = 0;
-        $tag = 'af'.(string) ++$seq;
+        $tag = 'af'.(string) self::nextSeq();
         $ht = self::alloc($context);
         $sizeT = $context->getTypeFromString('size_t');
         $iSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
@@ -221,8 +227,7 @@ final class HashTableHelper
      */
     public static function readIndexedToValueBox(Context $context, Value $ht, Value $index): Variable
     {
-        static $seq = 0;
-        $tag = 'rb'.(string) ++$seq;
+        $tag = 'rb'.(string) self::nextSeq();
         $slot = JitValueBox::alloc($context);
         $destPtr = JitValueBox::pointer($context, $slot);
         $entryPtr = self::listEntryPointer($context, $ht, $index);
@@ -356,8 +361,7 @@ final class HashTableHelper
         Value $ht,
         Value $keyStr
     ): Variable {
-        static $seq = 0;
-        $tag = 'sg'.(string) ++$seq;
+        $tag = 'sg'.(string) self::nextSeq();
         $slot = JitValueBox::alloc($context);
         $destPtr = JitValueBox::pointer($context, $slot);
         $valPtr = $context->builder->call(
@@ -407,8 +411,7 @@ final class HashTableHelper
 
     public static function readStringKeyToValueBox(Context $context, Value $ht, Value $keyStr): Variable
     {
-        static $seq = 0;
-        $tag = 'sk'.(string) ++$seq;
+        $tag = 'sk'.(string) self::nextSeq();
         $slot = JitValueBox::alloc($context);
         $destPtr = JitValueBox::pointer($context, $slot);
         $valPtr = $context->builder->call(
@@ -645,9 +648,7 @@ final class HashTableHelper
         Value $index,
         Variable $element
     ): void {
-        static $seq = 0;
-        ++$seq;
-        $tag = (string) $seq;
+        $tag = (string) self::nextSeq();
         $valuePtr = Variable::KIND_VARIABLE === $element->kind
             ? JitValueBox::pointer($context, $element->value)
             : $element->value;
