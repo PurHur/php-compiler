@@ -91,6 +91,37 @@ final class MiniWebAppCgiEnv
         ];
     }
 
+    /** HTTP path for serve / serve-aot curls (issues #478, #610). */
+    public static function httpPathQueryRouteHome(): string
+    {
+        return '/index.php?route=home';
+    }
+
+    public static function httpPathQueryRouteHello(string $name = 'Dev'): string
+    {
+        return '/index.php?route=hello&name='.$name;
+    }
+
+    public static function httpPathPathInfoHello(string $name = 'Dev'): string
+    {
+        return '/index.php/hello?name='.$name;
+    }
+
+    public static function httpPathPostQueryRouteContact(): string
+    {
+        return '/index.php?route=contact';
+    }
+
+    public static function httpPathQueryRouteApiStatus(): string
+    {
+        return '/index.php?route=api/status';
+    }
+
+    public static function httpPathStaticCss(): string
+    {
+        return '/assets/style.css';
+    }
+
     /**
      * @return array<string, string>
      */

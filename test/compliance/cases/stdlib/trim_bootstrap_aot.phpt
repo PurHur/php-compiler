@@ -1,0 +1,10 @@
+--TEST--
+stdlib trim() bootstrap AOT parity (nested trim + strlen)
+--FILE--
+<?php
+declare(strict_types=1);
+$s = '  ' . trim(' hello ') . '  ';
+echo strlen(trim($s)) >= 5 ? '1' : '0';
+echo "\n";
+--EXPECT--
+1

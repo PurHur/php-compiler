@@ -884,12 +884,18 @@ restart:
             }
         }
         if (Variable::TYPE_OBJECT === $leftType && $leftType === $rightType) {
+            $voidp = $this->context->getTypeFromString('void')->pointerType(0);
+            $leftNorm = $this->context->builder->pointerCast($leftValue, $voidp);
+            $rightNorm = $this->context->builder->pointerCast($rightValue, $voidp);
+            $sizeT = $this->context->getTypeFromString('size_t');
+            $leftPtr = $this->context->builder->ptrToInt($leftNorm, $sizeT);
+            $rightPtr = $this->context->builder->ptrToInt($rightNorm, $sizeT);
             if (OpCode::TYPE_IDENTICAL === $opcode->type) {
-                $result = $this->context->builder->icmp(Builder::INT_EQ, $leftValue, $rightValue);
+                $result = $this->context->builder->icmp(Builder::INT_EQ, $leftPtr, $rightPtr);
                 goto return_bool;
             }
             if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
-                $result = $this->context->builder->icmp(Builder::INT_NE, $leftValue, $rightValue);
+                $result = $this->context->builder->icmp(Builder::INT_NE, $leftPtr, $rightPtr);
                 goto return_bool;
             }
         }
@@ -978,16 +984,38 @@ return_bool:
                     $this->context->getTypeFromString('__hashtable__*')
                 );
             }
+            if (Variable::TYPE_OBJECT === $variable->objectPropertyType) {
+                return $this->context->builder->pointerCast(
+                    $loaded,
+                    $this->context->getTypeFromString('__object__*')
+                );
+            }
             if (Variable::TYPE_STRING === $variable->objectPropertyType) {
                 return $this->context->builder->pointerCast(
                     $loaded,
                     $this->context->getTypeFromString('__string__*')
                 );
             }
+            if (Variable::TYPE_VALUE === $variable->objectPropertyType) {
+                $valuePtr = $this->context->builder->pointerCast(
+                    $loaded,
+                    $this->context->getTypeFromString('__value__*')
+                );
+                if (Variable::TYPE_OBJECT === $variable->type) {
+                    return $this->context->builder->call(
+                        $this->context->lookupFunction('__value__readObject'),
+                        $valuePtr
+                    );
+                }
+
+                return $valuePtr;
+            }
+
+            $llvmType = Variable::getStringType($variable->objectPropertyType);
 
             return $this->context->builder->pointerCast(
                 $loaded,
-                $this->context->getTypeFromString('__value__*')
+                $this->context->getTypeFromString($llvmType)
             );
         }
         if ($variable->kind === Variable::KIND_VALUE) {
@@ -1007,14 +1035,11 @@ return_bool:
     private function operandJitType(Variable $var): int
     {
         if (null !== $var->objectPropertySlot && null !== $var->objectPropertyType) {
-            if (Variable::TYPE_HASHTABLE === $var->objectPropertyType) {
-                return Variable::TYPE_HASHTABLE;
-            }
-            if (Variable::TYPE_STRING === $var->objectPropertyType) {
-                return Variable::TYPE_STRING;
+            if (Variable::TYPE_VALUE === $var->objectPropertyType) {
+                return Variable::TYPE_VALUE;
             }
 
-            return Variable::TYPE_VALUE;
+            return $var->objectPropertyType;
         }
 
         return $var->type;

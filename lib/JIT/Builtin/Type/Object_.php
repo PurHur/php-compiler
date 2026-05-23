@@ -304,6 +304,9 @@ class Object_ extends Type {
 
     private function initEmptyHashtableProperties(PHPLLVM\Value $obj, int $classId): void
     {
+        if ($this->isSplObjectStorageClass($classId)) {
+            return;
+        }
         if (!isset($this->properties[$classId])) {
             return;
         }
@@ -725,7 +728,7 @@ class Object_ extends Type {
         $expectedId = $this->lookup($className);
         $falseVal = $this->context->getTypeFromString('int1')->constInt(0, false);
         $objMap = $this->context->structFieldMap['__object__'];
-        $expectedClassId = $this->context->constantFromInteger($expectedId);
+        $expectedClassId = $this->context->constantFromInteger($expectedId, 'int64');
 
         if (Variable::TYPE_OBJECT === $expr->type) {
             $obj = $this->context->helper->loadValue($expr);
@@ -747,9 +750,7 @@ class Object_ extends Type {
         }
 
         if (Variable::TYPE_VALUE === $expr->type) {
-            $valuePtr = Variable::KIND_VARIABLE === $expr->kind
-                ? $expr->value
-                : $this->context->helper->loadValue($expr);
+            $valuePtr = JitValueBox::valuePtrFromVariable($this->context, $expr);
             $obj = $this->context->builder->call(
                 $this->context->lookupFunction('__value__readObject'),
                 $valuePtr

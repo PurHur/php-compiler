@@ -34,6 +34,7 @@ final class fread extends Internal
         $data = VmFs::fread($handleVar->toInt(), $lenVar->toInt());
         if (false === $data) {
             $frame->returnVar->bool(false);
+
             return;
         }
         $frame->returnVar->string($data);
@@ -44,9 +45,19 @@ final class fread extends Internal
         if (2 !== \count($args)) {
             throw new \LogicException('fread() requires exactly two arguments in this compiler build');
         }
+
         $i64 = $context->getTypeFromString('int64');
-        $handle = $context->builder->truncOrBitCast(JitLongArg::lower($context, $args[0], 'fread() handle'), $i64);
-        $length = $context->builder->truncOrBitCast(JitLongArg::lower($context, $args[1], 'fread() length'), $i64);
-        return JitFread::invoke($context, $handle, $length);
+
+        return JitFread::invoke(
+            $context,
+            $context->builder->truncOrBitCast(
+                JitLongArg::lower($context, $args[0], 'fread() handle'),
+                $i64
+            ),
+            $context->builder->truncOrBitCast(
+                JitLongArg::lower($context, $args[1], 'fread() length'),
+                $i64
+            )
+        );
     }
 }

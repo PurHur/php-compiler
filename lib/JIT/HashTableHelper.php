@@ -141,7 +141,7 @@ final class HashTableHelper
      */
     public static function asDetachedHashtable(Context $context, Variable $container): Variable
     {
-        if (Variable::TYPE_HASHTABLE !== $container->type || null === $container->objectPropertySlot) {
+        if (null === $container->objectPropertySlot) {
             return $container;
         }
 
@@ -149,7 +149,7 @@ final class HashTableHelper
             $context,
             Variable::TYPE_HASHTABLE,
             Variable::KIND_VALUE,
-            $context->helper->loadValue($container)
+            self::loadHashtablePointer($context, $container)
         );
         $detached->superglobalName = $container->superglobalName;
 
@@ -203,6 +203,16 @@ final class HashTableHelper
 
     public static function loadHashtablePointer(Context $context, Variable $array): Value
     {
+        if (null !== $array->objectPropertySlot) {
+            if (Variable::TYPE_HASHTABLE === ($array->objectPropertyType ?? null)) {
+                return $context->builder->pointerCast(
+                    $context->builder->load($array->objectPropertySlot),
+                    $context->getTypeFromString('__hashtable__*')
+                );
+            }
+
+            return self::ensureHashtablePointer($context, $array);
+        }
         if (Variable::TYPE_HASHTABLE === $array->type) {
             return $context->helper->loadValue($array);
         }

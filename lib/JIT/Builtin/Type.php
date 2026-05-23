@@ -156,25 +156,26 @@ class Type extends Builtin {
         );
         $fnCompilerFwrite = $this->context->module->addFunction('__compiler_fwrite', $fntypeFwrite);
         $this->context->registerFunction('__compiler_fwrite', $fnCompilerFwrite);
+        $strPtr = $this->context->getTypeFromString('__string__*');
         $fntypeFopen = $this->context->context->functionType(
             $i64,
             false,
-            $this->context->getTypeFromString('__string__*'),
-            $this->context->getTypeFromString('__string__*')
+            $strPtr,
+            $strPtr
         );
-        $fnCompilerFopen = $this->context->module->addFunction('__compiler_fopen', $fntypeFopen);
-        $this->context->registerFunction('__compiler_fopen', $fnCompilerFopen);
+        $fnFopen = $this->context->module->addFunction('__compiler_fopen', $fntypeFopen);
+        $this->context->registerFunction('__compiler_fopen', $fnFopen);
         $fntypeFread = $this->context->context->functionType(
-            $this->context->getTypeFromString('__string__*'),
+            $strPtr,
             false,
             $i64,
             $i64
         );
-        $fnCompilerFread = $this->context->module->addFunction('__compiler_fread', $fntypeFread);
-        $this->context->registerFunction('__compiler_fread', $fnCompilerFread);
+        $fnFread = $this->context->module->addFunction('__compiler_fread', $fntypeFread);
+        $this->context->registerFunction('__compiler_fread', $fnFread);
         $fntypeFclose = $this->context->context->functionType($i32, false, $i64);
-        $fnCompilerFclose = $this->context->module->addFunction('__compiler_fclose', $fntypeFclose);
-        $this->context->registerFunction('__compiler_fclose', $fnCompilerFclose);
+        $fnFclose = $this->context->module->addFunction('__compiler_fclose', $fntypeFclose);
+        $this->context->registerFunction('__compiler_fclose', $fnFclose);
         $fntypeMkdir = $this->context->context->functionType(
             $i32,
             false,

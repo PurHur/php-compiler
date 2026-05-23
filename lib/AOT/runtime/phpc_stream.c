@@ -1,11 +1,12 @@
 /*
- * Stream handle helpers for AOT/JIT fwrite()/fopen()/fread()/fclose() (issues #1070, #1117).
+ * Stream handle helpers for AOT/JIT fwrite() (issue #1070).
  */
 
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
 
 typedef struct __string__ __string__;
 
@@ -39,6 +40,9 @@ static FILE *phpc_resolve_stream(int64_t handle)
         return stdout;
     }
     if (2 == handle) {
+        return stderr;
+    }
+    if (0 == handle) {
         return stderr;
     }
     if (handle > 0 && handle < PHPC_MAX_STREAM_HANDLES && NULL != phpc_stream_handles[handle]) {

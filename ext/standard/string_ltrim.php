@@ -63,11 +63,11 @@ final class string_ltrim extends Internal
 
         $startSlot = $context->builder->alloca($i64, 1, 'ltrim_start');
         $context->builder->store($zero, $startSlot);
-        string_trim::advanceWhileTrimByte($context, $charPtr, $len, $startSlot, true);
+        string_trim::advanceWhileTrimByte($context, $charPtr, $len, $startSlot, true, 'ltrim');
 
         $start = $context->builder->load($startSlot);
         $sliceLen = $context->builder->sub($len, $start);
 
-        return string_trim::jitCopySlice($context, $str, $charPtr, $start, $sliceLen);
+        return string_trim::jitCopySlice($context, $str, $charPtr, $start, $sliceLen, 'ltrim');
     }
 }

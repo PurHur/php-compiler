@@ -846,12 +846,15 @@ class Context {
                     throw new \LogicException("Non-implemented constant fetch type: " . $phpVar->type);
             }       
         }
-        return new Variable(
+        $var = new Variable(
             $this,
             $this->constants[$name][0],
             Variable::KIND_VALUE,
             $this->builder->load($this->constants[$name][1])
         );
+        $var->compileTimeConstantName = $name;
+
+        return $var;
     }
 
 }

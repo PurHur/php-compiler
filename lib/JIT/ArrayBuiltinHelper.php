@@ -111,7 +111,6 @@ final class ArrayBuiltinHelper
 
         $emptyBlock = BasicBlockHelper::append($context, 'array_unshift_empty');
         $shiftBlock = BasicBlockHelper::append($context, 'array_unshift_shift');
-        $prependBlock = BasicBlockHelper::append($context, 'array_unshift_prepend');
         $doneBlock = BasicBlockHelper::append($context, 'array_unshift_done');
         $context->builder->branchIf($isEmpty, $emptyBlock, $shiftBlock);
 
@@ -122,11 +121,26 @@ final class ArrayBuiltinHelper
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($shiftBlock);
+        $nextFree = $context->builder->load(
+            $context->builder->structGep($ht, $map['nextFreeElement'])
+        );
+        $hasPacked = $context->builder->icmp(Builder::INT_NE, $nextFree, $zero);
+        $prependBlock = BasicBlockHelper::append($context, 'array_unshift_prepend');
+        $loopSetup = BasicBlockHelper::append($context, 'array_unshift_setup');
+        $loopHead = BasicBlockHelper::append($context, 'array_unshift_head');
+        $context->builder->branchIf($hasPacked, $loopSetup, $prependBlock);
+
+        $context->builder->positionAtEnd($loopSetup);
+        $minCap = $context->builder->addNoSignedWrap($num, $offset);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__grow'),
+            $ht,
+            $minCap
+        );
         $one = $sizeT->constInt(1, false);
         $lastIdx = $context->builder->sub($num, $one);
         $idxSlot = $context->builder->alloca($sizeT, 1, 'array_unshift_idx');
         $context->builder->store($lastIdx, $idxSlot);
-        $loopHead = BasicBlockHelper::append($context, 'array_unshift_head');
         $loopBody = BasicBlockHelper::append($context, 'array_unshift_body');
         $context->builder->branch($loopHead);
 
@@ -139,15 +153,7 @@ final class ArrayBuiltinHelper
         $destIdx = $context->builder->addNoSignedWrap($idx, $offset);
         $fromEntry = self::listEntryAt($context, $ht, $idx);
         $toEntry = self::listEntryAt($context, $ht, $destIdx);
-        $movedLong = $context->builder->call(
-            $context->lookupFunction('__value__readLong'),
-            $fromEntry
-        );
-        $context->builder->call(
-            $context->lookupFunction('__value__writeLong'),
-            $toEntry,
-            $movedLong
-        );
+        self::copyValueEntrySlot($context, $fromEntry, $toEntry);
         $context->builder->store(
             $context->builder->sub($idx, $one),
             $idxSlot
@@ -178,6 +184,9 @@ final class ArrayBuiltinHelper
         $context->builder->positionAtEnd($doneBlock);
 
         HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
+        if (0 !== ($array->type & Variable::IS_NATIVE_ARRAY)) {
+            $array->nextFreeElement += $k;
+        }
 
         return self::getNumElements($context, $ht);
     }
@@ -246,6 +255,188 @@ final class ArrayBuiltinHelper
         return $resultPtr;
     }
 
+    private static function copyValueEntryToBox(Context $context, Value $destPtr, Value $entry): void
+    {
+        static $seq = 0;
+        $tag = 'vb'.(string) ++$seq;
+        $valueMap = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($entry, $valueMap['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+
+        $stringBlock = BasicBlockHelper::append($context, 'value_box_str_'.$tag);
+        $longBlock = BasicBlockHelper::append($context, 'value_box_long_'.$tag);
+        $doubleBlock = BasicBlockHelper::append($context, 'value_box_double_'.$tag);
+        $boolBlock = BasicBlockHelper::append($context, 'value_box_bool_'.$tag);
+        $nullBlock = BasicBlockHelper::append($context, 'value_box_null_'.$tag);
+        $doneBlock = BasicBlockHelper::append($context, 'value_box_done_'.$tag);
+
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_STRING, false)
+        );
+        $afterString = BasicBlockHelper::append($context, 'value_box_after_str_'.$tag);
+        $context->builder->branchIf($isString, $stringBlock, $afterString);
+
+        $context->builder->positionAtEnd($stringBlock);
+        $str = $context->builder->call($context->lookupFunction('__value__readString'), $entry);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $destPtr,
+            $context->builder->call($context->lookupFunction('__string__separate'), $str)
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($afterString);
+        $isLong = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
+        );
+        $afterLong = BasicBlockHelper::append($context, 'value_box_after_long_'.$tag);
+        $context->builder->branchIf($isLong, $longBlock, $afterLong);
+
+        $context->builder->positionAtEnd($longBlock);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeLong'),
+            $destPtr,
+            $context->builder->call($context->lookupFunction('__value__readLong'), $entry)
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($afterLong);
+        $isDouble = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
+        );
+        $afterDouble = BasicBlockHelper::append($context, 'value_box_after_double_'.$tag);
+        $context->builder->branchIf($isDouble, $doubleBlock, $afterDouble);
+
+        $context->builder->positionAtEnd($doubleBlock);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeDouble'),
+            $destPtr,
+            $context->builder->call($context->lookupFunction('__value__readDouble'), $entry)
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($afterDouble);
+        $isBool = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)
+        );
+        $context->builder->branchIf($isBool, $boolBlock, $nullBlock);
+
+        $context->builder->positionAtEnd($boolBlock);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeLong'),
+            $destPtr,
+            $context->builder->call($context->lookupFunction('__value__readLong'), $entry)
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($nullBlock);
+        $context->builder->call($context->lookupFunction('__value__writeNull'), $destPtr);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+    }
+
+    private static function copyValueEntrySlot(Context $context, Value $fromEntry, Value $toEntry): void
+    {
+        static $seq = 0;
+        $tag = 'vs'.(string) ++$seq;
+        $valueMap = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($fromEntry, $valueMap['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+
+        $stringBlock = BasicBlockHelper::append($context, 'value_slot_str_'.$tag);
+        $longBlock = BasicBlockHelper::append($context, 'value_slot_long_'.$tag);
+        $doubleBlock = BasicBlockHelper::append($context, 'value_slot_double_'.$tag);
+        $boolBlock = BasicBlockHelper::append($context, 'value_slot_bool_'.$tag);
+        $nullBlock = BasicBlockHelper::append($context, 'value_slot_null_'.$tag);
+        $doneBlock = BasicBlockHelper::append($context, 'value_slot_done_'.$tag);
+
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_STRING, false)
+        );
+        $afterString = BasicBlockHelper::append($context, 'value_slot_after_str_'.$tag);
+        $context->builder->branchIf($isString, $stringBlock, $afterString);
+
+        $context->builder->positionAtEnd($stringBlock);
+        $str = $context->builder->call($context->lookupFunction('__value__readString'), $fromEntry);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $toEntry,
+            $context->builder->call($context->lookupFunction('__string__separate'), $str)
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($afterString);
+        $isLong = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
+        );
+        $afterLong = BasicBlockHelper::append($context, 'value_slot_after_long_'.$tag);
+        $context->builder->branchIf($isLong, $longBlock, $afterLong);
+
+        $context->builder->positionAtEnd($longBlock);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeLong'),
+            $toEntry,
+            $context->builder->call($context->lookupFunction('__value__readLong'), $fromEntry)
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($afterLong);
+        $isDouble = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
+        );
+        $afterDouble = BasicBlockHelper::append($context, 'value_slot_after_double_'.$tag);
+        $context->builder->branchIf($isDouble, $doubleBlock, $afterDouble);
+
+        $context->builder->positionAtEnd($doubleBlock);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeDouble'),
+            $toEntry,
+            $context->builder->call($context->lookupFunction('__value__readDouble'), $fromEntry)
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($afterDouble);
+        $isBool = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)
+        );
+        $context->builder->branchIf($isBool, $boolBlock, $nullBlock);
+
+        $context->builder->positionAtEnd($boolBlock);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeLong'),
+            $toEntry,
+            $context->builder->call($context->lookupFunction('__value__readLong'), $fromEntry)
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($nullBlock);
+        $context->builder->call($context->lookupFunction('__value__writeNull'), $toEntry);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+    }
+
     /**
      * @return Value __value__* (null when the array is empty)
      */
@@ -253,6 +444,7 @@ final class ArrayBuiltinHelper
     {
         $ht = self::loadHashTable($context, $array);
         $map = $context->structFieldMap['__hashtable__'];
+        $nodeMap = $context->structFieldMap['__strkey_node__'];
         $sizeT = $context->getTypeFromString('size_t');
         $num = $context->builder->call(
             $context->lookupFunction('__hashtable__getNumElements'),
@@ -278,16 +470,17 @@ final class ArrayBuiltinHelper
         $context->builder->positionAtEnd($shiftBlock);
         $one = $sizeT->constInt(1, false);
         $zeroIndex = $sizeT->constInt(0, false);
+        $nextFree = $context->builder->load(
+            $context->builder->structGep($ht, $map['nextFreeElement'])
+        );
+        $hasPacked = $context->builder->icmp(Builder::INT_NE, $nextFree, $zero);
+        $packedShift = BasicBlockHelper::append($context, 'array_shift_packed');
+        $stringShift = BasicBlockHelper::append($context, 'array_shift_string');
+        $context->builder->branchIf($hasPacked, $packedShift, $stringShift);
+
+        $context->builder->positionAtEnd($packedShift);
         $firstEntry = self::listEntryAt($context, $ht, $zeroIndex);
-        $firstLong = $context->builder->call(
-            $context->lookupFunction('__value__readLong'),
-            $firstEntry
-        );
-        $context->builder->call(
-            $context->lookupFunction('__value__writeLong'),
-            $resultPtr,
-            $firstLong
-        );
+        self::copyValueEntryToBox($context, $resultPtr, $firstEntry);
 
         $idxSlot = $context->builder->alloca($sizeT, 1, 'array_shift_idx');
         $context->builder->store($zeroIndex, $idxSlot);
@@ -304,16 +497,10 @@ final class ArrayBuiltinHelper
 
         $context->builder->positionAtEnd($loopBody);
         $nextIdx = $context->builder->addNoSignedWrap($idx, $one);
-        $fromEntry = self::listEntryAt($context, $ht, $nextIdx);
-        $toEntry = self::listEntryAt($context, $ht, $idx);
-        $movedLong = $context->builder->call(
-            $context->lookupFunction('__value__readLong'),
-            $fromEntry
-        );
-        $context->builder->call(
-            $context->lookupFunction('__value__writeLong'),
-            $toEntry,
-            $movedLong
+        self::copyValueEntrySlot(
+            $context,
+            self::listEntryAt($context, $ht, $nextIdx),
+            self::listEntryAt($context, $ht, $idx)
         );
         $context->builder->store($nextIdx, $idxSlot);
         $context->builder->branch($loopHead);
@@ -332,6 +519,22 @@ final class ArrayBuiltinHelper
         $context->builder->store(
             $context->builder->sub($context->builder->load($nextFreePtr), $one),
             $nextFreePtr
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($stringShift);
+        $headPtr = $context->builder->structGep($ht, $map['strKeys']);
+        $head = $context->builder->load($headPtr);
+        $valField = $context->builder->structGep($head, $nodeMap['value']);
+        self::copyValueEntryToBox($context, $resultPtr, $valField);
+        $nextNode = $context->builder->load(
+            $context->builder->structGep($head, $nodeMap['next'])
+        );
+        $context->builder->store($nextNode, $headPtr);
+        $numPtr = $context->builder->structGep($ht, $map['numElements']);
+        $context->builder->store(
+            $context->builder->sub($context->builder->load($numPtr), $one),
+            $numPtr
         );
         $context->builder->branch($doneBlock);
 
@@ -2727,7 +2930,6 @@ final class ArrayBuiltinHelper
         $context->builder->positionAtEnd($strInit);
         $ptrSize = $sizeT->constInt(8, false);
         $strCountSlot = $context->builder->alloca($sizeT, 1, 'array_search_str_count');
-        $strRemainSlot = $context->builder->alloca($sizeT, 1, 'array_search_str_remain');
         $nodesSlot = $context->builder->alloca($nodePtrType->pointerType(0), 1, 'array_search_str_nodes');
         $walkSlot = $context->builder->alloca($nodePtrType, 1, 'array_search_walk');
         $head = $context->builder->load($context->builder->structGep($ht, $map['strKeys']));
@@ -2779,17 +2981,18 @@ final class ArrayBuiltinHelper
         $context->builder->store($nextFill, $walkSlot);
         $context->builder->branch($fillHead);
         $context->builder->positionAtEnd($fillDone);
-        $context->builder->store($numStrKeys, $strRemainSlot);
+        $strIdxSlot = $context->builder->alloca($sizeT, 1, 'array_search_str_idx');
+        $context->builder->store($zero, $strIdxSlot);
         $strBody = BasicBlockHelper::append($context, 'array_search_str_body');
         $strFound = BasicBlockHelper::append($context, 'array_search_str_found');
         $strNext = BasicBlockHelper::append($context, 'array_search_str_next');
         $context->builder->branch($strHead);
 
         $context->builder->positionAtEnd($strHead);
-        $remain = $context->builder->load($strRemainSlot);
-        $remainZero = $context->builder->icmp(Builder::INT_EQ, $remain, $zero);
+        $nodeIdx = $context->builder->load($strIdxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $nodeIdx, $numStrKeys);
         $strDrain = BasicBlockHelper::append($context, 'array_search_str_drain');
-        $context->builder->branchIf($remainZero, $strDrain, $strBody);
+        $context->builder->branchIf($atEnd, $strDrain, $strBody);
 
         $context->builder->positionAtEnd($strDrain);
         $nodesArray = $context->builder->load($nodesSlot);
@@ -2798,7 +3001,6 @@ final class ArrayBuiltinHelper
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($strBody);
-        $nodeIdx = $context->builder->subNoSignedWrap($remain, $one);
         $nodesArray = $context->builder->load($nodesSlot);
         $node = $context->builder->load($context->builder->inBoundsGEP($nodesArray, $nodeIdx));
         $valEntry = $context->builder->structGep($node, $nodeMap['value']);
@@ -2819,7 +3021,7 @@ final class ArrayBuiltinHelper
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($strNext);
-        $context->builder->store($nodeIdx, $strRemainSlot);
+        $context->builder->store($context->builder->addNoSignedWrap($nodeIdx, $one), $strIdxSlot);
         $context->builder->branch($strHead);
 
         $retBlock = BasicBlockHelper::append($context, 'array_search_return');

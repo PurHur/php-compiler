@@ -31,6 +31,7 @@ final class fopen extends Internal
         $handle = VmFs::fopen($pathVar->toString(), $modeVar->toString());
         if (false === $handle) {
             $frame->returnVar->bool(false);
+
             return;
         }
         $frame->returnVar->int($handle);
@@ -41,6 +42,7 @@ final class fopen extends Internal
         if (2 !== \count($args)) {
             throw new \LogicException('fopen() requires exactly two arguments in this compiler build');
         }
+
         return JitFopen::invoke(
             $context,
             JitStringArg::lower($context, $args[0], 'fopen() path'),

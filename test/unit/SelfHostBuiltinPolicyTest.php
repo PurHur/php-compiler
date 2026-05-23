@@ -17,7 +17,7 @@ final class SelfHostBuiltinPolicyTest extends TestCase
         parent::tearDown();
     }
 
-    public function testAutoStubBatchCountIsThirty(): void
+    public function testAutoStubBatchCount(): void
     {
         $this->assertSame(32, SelfHostBuiltinPolicy::autoStubBatchCount());
     }
@@ -31,6 +31,7 @@ final class SelfHostBuiltinPolicyTest extends TestCase
         $this->assertFalse(SelfHostBuiltinPolicy::shouldExternalStub('dirname'));
         $this->assertFalse(SelfHostBuiltinPolicy::shouldExternalStub('mkdir'));
         $this->assertFalse(SelfHostBuiltinPolicy::shouldExternalStub('file_put_contents'));
+        $this->assertFalse(SelfHostBuiltinPolicy::shouldExternalStub('fopen'));
     }
 
     public function testCompileFuncRegistersExternalMethodStub(): void

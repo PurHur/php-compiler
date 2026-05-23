@@ -35,10 +35,13 @@ final class fclose extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('fclose() requires exactly one argument in this compiler build');
         }
-        $handle = $context->builder->truncOrBitCast(
-            JitLongArg::lower($context, $args[0], 'fclose() handle'),
-            $context->getTypeFromString('int64')
+
+        return JitFclose::invoke(
+            $context,
+            $context->builder->truncOrBitCast(
+                JitLongArg::lower($context, $args[0], 'fclose() handle'),
+                $context->getTypeFromString('int64')
+            )
         );
-        return JitFclose::invoke($context, $handle);
     }
 }

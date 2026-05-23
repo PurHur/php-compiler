@@ -64,6 +64,25 @@ class Native implements Call {
         $value = $context->helper->loadValue($arg);
         switch ($typeName) {
             case '__object__*':
+                if (
+                    null !== $arg->objectPropertySlot
+                    && Variable::TYPE_VALUE === $arg->objectPropertyType
+                ) {
+                    return $context->builder->call(
+                        $context->lookupFunction('__value__readObject'),
+                        $value
+                    );
+                }
+                $valueTy = $value->typeOf();
+                if (
+                    \PHPLLVM\Type::KIND_POINTER === $valueTy->getKind()
+                    && '__value__' === $context->getStringFromType($valueTy->getElementType())
+                ) {
+                    return $context->builder->call(
+                        $context->lookupFunction('__value__readObject'),
+                        $value
+                    );
+                }
                 switch ($arg->type) {
                     case Variable::TYPE_OBJECT:
                         return $value;
