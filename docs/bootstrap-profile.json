@@ -436,6 +436,7 @@
         "test/bootstrap-aot/class_nullable_property.php",
         "test/bootstrap-aot/coalesce_array_dim.php",
         "test/bootstrap-aot/const_string_folder_deploy_path.php",
+        "test/bootstrap-aot/const_string_folder_func_call_args.php",
         "test/bootstrap-aot/const_string_folder_magic_dir.php",
         "test/bootstrap-aot/deploy_path_fold.php",
         "test/bootstrap-aot/deploy_path_include.php",
@@ -506,7 +507,7 @@
         "inventory_files": 393,
         "excluded": 2,
         "eligible": 391,
-        "aot_lint_targets": 43,
+        "aot_lint_targets": 44,
         "aot_link_targets": 30,
         "aot_link_lib_targets": 1
     }
