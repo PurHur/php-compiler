@@ -38,6 +38,11 @@ final class compact_ extends Internal
             throw new \LogicException('compact() requires at least one argument in this compiler build');
         }
 
+        foreach ($args as $i => $arg) {
+            if (JITVariable::TYPE_STRING === $arg->type || JITVariable::TYPE_VALUE === $arg->type) {
+                $this->jitString($context, $arg, 'compact() variable name #'.((int) $i + 1));
+            }
+        }
         return ScopeBuiltinHelper::compact($context, ...$args);
     }
 }

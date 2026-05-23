@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -50,6 +51,15 @@ final class fwrite extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        $argc = \count($args);
+        if ($argc < 2 || $argc > 3) {
+            throw new \LogicException('fwrite() requires two or three arguments in this compiler build');
+        }
+        JitLongArg::lower($context, $args[0], 'fwrite() handle');
+        $this->jitString($context, $args[1], 'fwrite() data');
+        if (3 === $argc) {
+            JitLongArg::lower($context, $args[2], 'fwrite() length');
+        }
         throw new \LogicException('fwrite() is not implemented for JIT in this compiler build');
     }
 }

@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -41,6 +42,11 @@ final class fread extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        if (2 !== \count($args)) {
+            throw new \LogicException('fread() requires exactly two arguments in this compiler build');
+        }
+        JitLongArg::lower($context, $args[0], 'fread() handle');
+        JitLongArg::lower($context, $args[1], 'fread() length');
         throw new \LogicException('fread() is not implemented for JIT in this compiler build');
     }
 }

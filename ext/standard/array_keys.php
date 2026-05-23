@@ -47,6 +47,11 @@ final class array_keys extends Internal
             throw new \LogicException('array_keys() requires exactly one argument');
         }
 
+        foreach ($args as $i => $arg) {
+            if (JITVariable::TYPE_STRING === $arg->type || JITVariable::TYPE_VALUE === $arg->type) {
+                $this->jitString($context, $arg, 'array_keys() argument #'.((int) $i + 1));
+            }
+        }
         return ArrayBuiltinHelper::buildKeysArrayFromVariable($context, $args[0]);
     }
 }

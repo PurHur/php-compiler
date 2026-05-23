@@ -481,6 +481,8 @@
         "test/bootstrap-aot/shell_exec_echo.php",
         "test/bootstrap-aot/shift_right.php",
         "test/bootstrap-aot/spl_object_storage_dim.php",
+        "test/bootstrap-aot/stdlib_array_ops.php",
+        "test/bootstrap-aot/stdlib_filesystem.php",
         "test/bootstrap-aot/stdlib_hash.php",
         "test/bootstrap-aot/stdlib_json.php",
         "test/bootstrap-aot/stdlib_numeric.php",
@@ -530,6 +532,8 @@
         "test/bootstrap-aot/require_chain/main.php",
         "test/bootstrap-aot/shell_exec_echo.php",
         "test/bootstrap-aot/shift_right.php",
+        "test/bootstrap-aot/stdlib_array_ops.php",
+        "test/bootstrap-aot/stdlib_filesystem.php",
         "test/bootstrap-aot/stdlib_hash.php",
         "test/bootstrap-aot/stdlib_json.php",
         "test/bootstrap-aot/stdlib_numeric.php",
@@ -552,8 +556,8 @@
         "inventory_files": 409,
         "excluded": 0,
         "eligible": 409,
-        "aot_lint_targets": 60,
-        "aot_link_targets": 47,
+        "aot_lint_targets": 62,
+        "aot_link_targets": 49,
         "aot_link_lib_targets": 1
     }
 }

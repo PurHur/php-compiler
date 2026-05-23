@@ -53,6 +53,11 @@ final class array_shift extends Internal
             throw new \LogicException('array_shift() requires exactly one argument');
         }
 
+        foreach ($args as $i => $arg) {
+            if (JITVariable::TYPE_STRING === $arg->type || JITVariable::TYPE_VALUE === $arg->type) {
+                $this->jitString($context, $arg, 'array_shift() argument #'.((int) $i + 1));
+            }
+        }
         return ArrayBuiltinHelper::shiftFirst($context, $args[0]);
     }
 }

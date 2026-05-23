@@ -48,6 +48,6 @@ final class getenv_ extends Internal
             throw new \LogicException('getenv() requires a string name in this compiler build');
         }
 
-        return JitEnv::getenv($context, $context->helper->loadValue($args[0]));
+        return JitEnv::getenv($context, $this->jitString($context, $args[0], 'getenv() name'));
     }
 }

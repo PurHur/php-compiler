@@ -66,6 +66,11 @@ final class array_flip extends Internal
             throw new \LogicException('array_flip() argument must be an array in this compiler build');
         }
 
+        foreach ($args as $i => $arg) {
+            if (JITVariable::TYPE_STRING === $arg->type || JITVariable::TYPE_VALUE === $arg->type) {
+                $this->jitString($context, $arg, 'array_flip() argument #'.((int) $i + 1));
+            }
+        }
         return ArrayBuiltinHelper::buildFlipArray($context, $args[0]);
     }
 }

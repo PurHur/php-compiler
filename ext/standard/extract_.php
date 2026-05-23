@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\ScopeBuiltinHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;

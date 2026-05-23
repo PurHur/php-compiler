@@ -44,6 +44,9 @@ final class is_scalar extends Internal
         if (1 !== count($args)) {
             throw new \LogicException('is_scalar() requires exactly one argument');
         }
+        if (JITVariable::TYPE_STRING === $args[0]->type) {
+            $this->jitString($context, $args[0], 'is_scalar() argument #1');
+        }
         switch ($args[0]->type) {
             case JITVariable::TYPE_NATIVE_LONG:
             case JITVariable::TYPE_NATIVE_DOUBLE:

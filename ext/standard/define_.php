@@ -40,6 +40,9 @@ final class define_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        if (\count($args) >= 1 && (JITVariable::TYPE_STRING === $args[0]->type || JITVariable::TYPE_VALUE === $args[0]->type)) {
+            $this->jitString($context, $args[0], 'define() constant name');
+        }
         throw new \LogicException(
             'define() is not implemented for JIT; use literal name and value (folded at compile time)'
         );

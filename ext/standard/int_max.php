@@ -14,6 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
@@ -65,8 +66,8 @@ final class int_max extends Internal
             throw new \LogicException('This max() implementation requires exactly two arguments');
         }
         if (JITVariable::TYPE_NATIVE_LONG === $args[0]->type && JITVariable::TYPE_NATIVE_LONG === $args[1]->type) {
-            $l = $context->helper->loadValue($args[0]);
-            $r = $context->helper->loadValue($args[1]);
+            $l = JitLongArg::lower($context, $args[0], 'max() argument #1');
+            $r = JitLongArg::lower($context, $args[1], 'max() argument #2');
             $cmp = $context->builder->icmp(Builder::INT_SGT, $l, $r);
 
             return $context->builder->select($cmp, $l, $r);

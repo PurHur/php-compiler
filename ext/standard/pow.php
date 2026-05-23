@@ -14,6 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -65,7 +66,7 @@ final class pow extends Internal
 
     public static function toJitDouble(Context $context, JITVariable $arg, $double): Value
     {
-        $v = $context->helper->loadValue($arg);
+        $v = JitLongArg::lower($context, $arg, 'pow() argument');
         switch ($arg->type) {
             case JITVariable::TYPE_NATIVE_LONG:
                 return $context->builder->siToFp($v, $double);

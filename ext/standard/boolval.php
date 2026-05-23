@@ -14,6 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
@@ -46,7 +47,7 @@ final class boolval extends Internal
         }
         switch ($args[0]->type) {
             case JITVariable::TYPE_NATIVE_LONG:
-                $v = $context->helper->loadValue($args[0]);
+                $v = JitLongArg::lower($context, $args[0], 'boolval() argument #1');
                 $zero = $v->typeOf()->constInt(0, false);
 
                 return $context->builder->icmp(Builder::INT_NE, $v, $zero);
@@ -58,7 +59,7 @@ final class boolval extends Internal
             case JITVariable::TYPE_NATIVE_BOOL:
                 return $context->helper->loadValue($args[0]);
             case JITVariable::TYPE_STRING:
-                return self::stringTruthy($context, $context->helper->loadValue($args[0]));
+                return self::stringTruthy($context, $this->jitString($context, $args[0], 'boolval() argument #1'));
             case JITVariable::TYPE_NULL:
                 return $context->constantFromBool(false);
             case JITVariable::TYPE_VALUE:

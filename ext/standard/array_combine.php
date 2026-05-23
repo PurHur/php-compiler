@@ -84,6 +84,11 @@ final class array_combine extends Internal
             throw new \LogicException('array_combine() requires two arrays in this compiler build');
         }
 
+        foreach ($args as $i => $arg) {
+            if (JITVariable::TYPE_STRING === $arg->type || JITVariable::TYPE_VALUE === $arg->type) {
+                $this->jitString($context, $arg, 'array_combine() argument #'.((int) $i + 1));
+            }
+        }
         return ArrayBuiltinHelper::combine($context, $args[0], $args[1]);
     }
 }

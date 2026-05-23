@@ -14,6 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
@@ -60,7 +61,7 @@ final class is_nan extends Internal
         if (JITVariable::TYPE_NATIVE_DOUBLE !== $args[0]->type) {
             throw new \LogicException('is_nan() only supports integers and floats in this compiler build');
         }
-        $asFloat = $context->helper->loadValue($args[0]);
+        $asFloat = JitLongArg::lower($context, $args[0], 'is_nan() argument #1');
         $fn = $context->lookupFunction('isnan');
         $raw = $context->builder->call($fn, $asFloat);
         $zero = $raw->typeOf()->constInt(0, false);

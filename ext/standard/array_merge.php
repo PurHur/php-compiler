@@ -55,6 +55,11 @@ final class array_merge extends Internal
             throw new \LogicException('array_merge() requires at least two arguments');
         }
 
+        foreach ($args as $i => $arg) {
+            if (JITVariable::TYPE_STRING === $arg->type || JITVariable::TYPE_VALUE === $arg->type) {
+                $this->jitString($context, $arg, 'array_merge() argument #'.((int) $i + 1));
+            }
+        }
         return ArrayBuiltinHelper::merge($context, ...$args);
     }
 }

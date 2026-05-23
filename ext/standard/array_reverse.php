@@ -47,6 +47,11 @@ final class array_reverse extends Internal
             throw new \LogicException('array_reverse() requires exactly one argument');
         }
 
+        foreach ($args as $i => $arg) {
+            if (JITVariable::TYPE_STRING === $arg->type || JITVariable::TYPE_VALUE === $arg->type) {
+                $this->jitString($context, $arg, 'array_reverse() argument #'.((int) $i + 1));
+            }
+        }
         return ArrayBuiltinHelper::buildReverseArray($context, $args[0]);
     }
 }
