@@ -87,6 +87,9 @@ class Context {
     /** @var array<int, PHPLLVM\Value> foreach index alloca slots keyed by array Variable id */
     public array $foreachIndexSlots = [];
 
+    /** @var array<int, PHPLLVM\Value> foreach object-key walk slots keyed by array Variable id */
+    public array $foreachObjNodeSlots = [];
+
     public function __construct(Runtime $runtime, int $loadType) {
         $this->runtime = $runtime;
         $this->scope = new Scope;

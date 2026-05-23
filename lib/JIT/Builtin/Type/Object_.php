@@ -374,6 +374,8 @@ class Object_ extends Type {
                 'blocks' => true,
                 'parents' => true,
                 'opcodes' => true,
+                'scope' => true,
+                'args' => true,
             ],
             'phpcfg\\script' => [
                 'functions' => true,

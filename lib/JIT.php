@@ -464,25 +464,45 @@ class JIT {
                     $this->assignOperandValue($block->getOperand($op->arg1), $issetResult);
                     break;
                 case OpCode::TYPE_ITER_RESET:
-                    $array = $this->context->getVariableFromOp($block->getOperand($op->arg1));
-                    JIT\IteratorHelper::compileReset($this->context, $array);
+                    $arrayOp = $block->getOperand($op->arg1);
+                    $array = $this->context->getVariableFromOp($arrayOp);
+                    JIT\IteratorHelper::compileReset(
+                        $this->context,
+                        $array,
+                        self::foreachContainerUserType($arrayOp)
+                    );
                     break;
                 case OpCode::TYPE_ITER_VALID:
-                    $array = $this->context->getVariableFromOp($block->getOperand($op->arg2));
-                    $valid = JIT\IteratorHelper::compileValid($this->context, $array);
+                    $arrayOp = $block->getOperand($op->arg2);
+                    $array = $this->context->getVariableFromOp($arrayOp);
+                    $valid = JIT\IteratorHelper::compileValid(
+                        $this->context,
+                        $array,
+                        self::foreachContainerUserType($arrayOp)
+                    );
                     $this->assignOperandValue($block->getOperand($op->arg1), $valid);
                     break;
                 case OpCode::TYPE_ITER_KEY:
-                    $array = $this->context->getVariableFromOp($block->getOperand($op->arg2));
-                    $key = JIT\IteratorHelper::compileKey($this->context, $array);
+                    $arrayOp = $block->getOperand($op->arg2);
+                    $array = $this->context->getVariableFromOp($arrayOp);
+                    $key = JIT\IteratorHelper::compileKey(
+                        $this->context,
+                        $array,
+                        self::foreachContainerUserType($arrayOp)
+                    );
                     $this->assignOperand($block->getOperand($op->arg1), $key);
                     break;
                 case OpCode::TYPE_ITER_VALUE:
                     if ($op->arg3) {
                         throw new \LogicException('foreach by-reference is not implemented');
                     }
-                    $array = $this->context->getVariableFromOp($block->getOperand($op->arg2));
-                    $value = JIT\IteratorHelper::compileValue($this->context, $array);
+                    $arrayOp = $block->getOperand($op->arg2);
+                    $array = $this->context->getVariableFromOp($arrayOp);
+                    $value = JIT\IteratorHelper::compileValue(
+                        $this->context,
+                        $array,
+                        self::foreachContainerUserType($arrayOp)
+                    );
                     $this->assignOperand($block->getOperand($op->arg1), $value);
                     break;
                 case OpCode::TYPE_SCRIPT_MAGIC:
@@ -1789,6 +1809,22 @@ class JIT {
         }
 
         return $var;
+    }
+
+    private static function foreachContainerUserType(Operand $arrayOp): ?string
+    {
+        $userType = $arrayOp->type->userType ?? null;
+        if (null !== $userType && '' !== $userType) {
+            return $userType;
+        }
+        if (null !== $arrayOp->type && Variable::TYPE_HASHTABLE === Variable::getTypeFromType($arrayOp->type)) {
+            $decl = $arrayOp->type->userType ?? null;
+            if (null !== $decl && 0 === strcasecmp($decl, 'SplObjectStorage')) {
+                return 'SplObjectStorage';
+            }
+        }
+
+        return null;
     }
 
 }
