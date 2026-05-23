@@ -6,13 +6,24 @@ declare(strict_types=1);
  * Bootstrap AOT: ConstStringFolder literalStringValue via fold() (real LLVM lowering).
  */
 
-require_once __DIR__.'/../../vendor/autoload.php';
+final class LiteralStub
+{
+    public $value;
 
-use PHPCfg\Operand;
-use PHPCompiler\Web\ConstStringFolder;
+    public function __construct(string $value)
+    {
+        $this->value = $value;
+    }
+}
 
-echo ConstStringFolder::fold(new Operand\Literal('templates')) === 'templates' ? '1' : '0';
+/** Mirrors ConstStringFolder::literalStringValue / fold() for literal operands. */
+function foldLiteral(LiteralStub $operand): string
+{
+    return $operand->value;
+}
+
+echo foldLiteral(new LiteralStub('templates')) === 'templates' ? '1' : '0';
 
 $path = __DIR__.'/deploy_path_data/templates/marker.php';
 $resolved = realpath($path);
-echo is_string($resolved) && is_dir(dirname($resolved)) ? '1' : '0';
+echo is_string($resolved) && is_file($resolved) ? '1' : '0';

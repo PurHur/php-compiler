@@ -63,10 +63,10 @@ final class string_rtrim extends Internal
 
         $endSlot = $context->builder->alloca($i64, 1, 'rtrim_end');
         $context->builder->store($len, $endSlot);
-        string_trim::advanceWhileTrimByte($context, $charPtr, $len, $endSlot, false);
+        string_trim::advanceWhileTrimByte($context, $charPtr, $len, $endSlot, false, 'rtrim');
 
         $end = $context->builder->load($endSlot);
 
-        return string_trim::jitCopySlice($context, $str, $charPtr, $zero, $end);
+        return string_trim::jitCopySlice($context, $str, $charPtr, $zero, $end, 'rtrim');
     }
 }

@@ -35,6 +35,13 @@ final class urlencode extends Internal
             throw new \LogicException('urlencode() requires exactly one argument');
         }
 
+        $literal = $args[0]->compileTimeString ?? null;
+        if (null !== $literal) {
+            return $context->builder->load(
+                $context->constantStringFromString(VmString::urlencode($literal))
+            );
+        }
+
         return JitUrlencode::urlencode($context, $this->jitString($context, $args[0], 'urlencode() argument #1'));
     }
 

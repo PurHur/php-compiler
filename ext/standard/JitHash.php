@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -16,7 +17,7 @@ final class JitHash
 
     public static function hash(Context $context, Value $algo, Value $data, Value $raw): Value
     {
-        return self::digestToString($context, $context->builder->call(
+        return self::digestToValue($context, $context->builder->call(
             $context->lookupFunction('__compiler_hash'),
             $algo,
             $data,
@@ -26,7 +27,7 @@ final class JitHash
 
     public static function hashHmac(Context $context, Value $algo, Value $data, Value $key, Value $raw): Value
     {
-        return self::digestToString($context, $context->builder->call(
+        return self::digestToValue($context, $context->builder->call(
             $context->lookupFunction('__compiler_hash_hmac'),
             $algo,
             $data,
@@ -35,29 +36,35 @@ final class JitHash
         ));
     }
 
-    private static function digestToString(Context $context, Value $digest): Value
+    /** @return Value __value__* (string digest or boolean false on failure) */
+    private static function digestToValue(Context $context, Value $digest): Value
     {
         $id = (string) (++self::$blockSerial);
         $strPtr = $context->getTypeFromString('__string__*');
         $isNull = $context->builder->icmp(Builder::INT_EQ, $digest, $strPtr->constNull());
 
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+
         $failBlock = BasicBlockHelper::append($context, 'hash_fail_'.$id);
         $okBlock = BasicBlockHelper::append($context, 'hash_ok_'.$id);
-        $mergeBlock = BasicBlockHelper::append($context, 'hash_merge_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, 'hash_done_'.$id);
         $context->builder->branchIf($isNull, $failBlock, $okBlock);
 
         $context->builder->positionAtEnd($failBlock);
-        $emptyStr = $context->builder->load($context->constantStringFromString(''));
-        $context->builder->branch($mergeBlock);
+        JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
+        $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($okBlock);
-        $context->builder->branch($mergeBlock);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $ptr,
+            $digest
+        );
+        $context->builder->branch($doneBlock);
 
-        $context->builder->positionAtEnd($mergeBlock);
-        $phi = $context->builder->phi($strPtr);
-        $phi->addIncoming($emptyStr, $failBlock);
-        $phi->addIncoming($digest, $okBlock);
+        $context->builder->positionAtEnd($doneBlock);
 
-        return $phi;
+        return $ptr;
     }
 }

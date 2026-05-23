@@ -279,7 +279,7 @@ ci_run_deploy_smoke() {
 
 # @group aot-link PHPUnit (link-only; execute is ci_run_miniwebapp_aot_execute — #775).
 ci_run_aot_link_phpunit() {
-  local -a aot_link_args=(--group aot-link --exclude-group serve --exclude-group miniwebapp-aot-execute)
+  local -a aot_link_args=(--group aot-link --exclude-group serve --exclude-group miniwebapp-aot-execute --exclude-group miniwebapp-aot-serve)
   echo "PHPUnit: AOT link (@group aot-link)..."
   ci_run_phpunit "${aot_link_args[@]}" "$@"
 }
@@ -295,4 +295,26 @@ ci_run_miniwebapp_aot_execute() {
   fi
   echo "PHPUnit: MiniWebApp AOT execute (@group miniwebapp-aot-execute; MINIWEBAPP_AOT_EXECUTE_GATE=1, #747, #775)..."
   ci_run_phpunit --group miniwebapp-aot-execute "$@"
+}
+
+# 003-MiniWebApp phpc serve --aot HTTP integration (issues #478, #610); opt-in MINIWEBAPP_SERVE_AOT_GATE=1
+# or when MINIWEBAPP_AOT_EXECUTE_GATE=1 (default).
+ci_run_miniwebapp_serve_aot() {
+  if [[ "${MINIWEBAPP_SERVE_AOT_GATE:-0}" != "1" && "${MINIWEBAPP_AOT_EXECUTE_GATE:-1}" != "1" ]]; then
+    return 0
+  fi
+  if [[ -n "${PHP_COMPILER_SKIP_SERVE_TESTS:-}" ]]; then
+    echo "PHPUnit: MiniWebApp serve-aot skipped (PHP_COMPILER_SKIP_SERVE_TESTS is set)"
+    return 0
+  fi
+  if ! ci_can_bind_loopback; then
+    echo "PHPUnit: MiniWebApp serve-aot skipped (cannot bind loopback TCP)"
+    return 0
+  fi
+  if ! ci_llvm_ready; then
+    echo "PHPUnit: MiniWebApp serve-aot skipped (LLVM 9 not available)"
+    return 0
+  fi
+  echo "PHPUnit: MiniWebApp serve-aot (@group miniwebapp-aot-serve; MINIWEBAPP_SERVE_AOT_GATE or MINIWEBAPP_AOT_EXECUTE_GATE, #478, #610)..."
+  ci_run_phpunit --group miniwebapp-aot-serve "$@"
 }

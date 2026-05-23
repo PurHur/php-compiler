@@ -11,6 +11,18 @@ use PHPLLVM\Builder;
  */
 final class IteratorHelper
 {
+    private static function icmpUltSizeT(Context $context, \PHPLLVM\Value $left, \PHPLLVM\Value $right): \PHPLLVM\Value
+    {
+        $sizeT = $context->getTypeFromString('size_t');
+        if ('size_t' !== $context->getStringFromType($left->typeOf())) {
+            $left = $context->builder->truncOrBitCast($left, $sizeT);
+        }
+        if ('size_t' !== $context->getStringFromType($right->typeOf())) {
+            $right = $context->builder->truncOrBitCast($right, $sizeT);
+        }
+        return $context->builder->icmp(Builder::INT_ULT, $left, $right);
+    }
+
     private static function usesObjectKeys(?string $containerUserType): bool
     {
         return null !== $containerUserType
@@ -265,7 +277,7 @@ final class IteratorHelper
         $context->builder->store($nextIdx, $slot);
 
         $nextFree = $context->builder->load($context->builder->structGep($ht, $map['nextFreeElement']));
-        $inPacked = $context->builder->icmp(Builder::INT_ULT, $nextIdx, $nextFree);
+        $inPacked = self::icmpUltSizeT($context, $nextIdx, $nextFree);
         $fn = $context->builder->getInsertBlock()->getParent();
         $packedBody = $fn->appendBasicBlock('foreach_packed_body');
         $strInit = $fn->appendBasicBlock('foreach_str_init');
@@ -367,7 +379,7 @@ final class IteratorHelper
         $sizeT = $context->getTypeFromString('size_t');
         $idx = $context->builder->load(self::indexSlot($context, $slotKey));
         $nextFree = $context->builder->load($context->builder->structGep($ht, $map['nextFreeElement']));
-        $inPacked = $context->builder->icmp(Builder::INT_ULT, $idx, $nextFree);
+        $inPacked = self::icmpUltSizeT($context, $idx, $nextFree);
         $fn = $context->builder->getInsertBlock()->getParent();
         $packed = $fn->appendBasicBlock('foreach_key_packed');
         $str = $fn->appendBasicBlock('foreach_key_str');
@@ -432,7 +444,7 @@ final class IteratorHelper
         $valueMap = $context->structFieldMap['__value__'];
         $idx = $context->builder->load(self::indexSlot($context, $slotKey));
         $nextFree = $context->builder->load($context->builder->structGep($ht, $map['nextFreeElement']));
-        $inPacked = $context->builder->icmp(Builder::INT_ULT, $idx, $nextFree);
+        $inPacked = self::icmpUltSizeT($context, $idx, $nextFree);
         $fn = $context->builder->getInsertBlock()->getParent();
         $packed = $fn->appendBasicBlock('foreach_val_packed');
         $str = $fn->appendBasicBlock('foreach_val_str');

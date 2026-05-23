@@ -61,19 +61,4 @@ final class hash_ extends Internal
         if (isset($args[2])) { $raw = JitBoolArg::lower($context, $args[2], 'hash() raw_output'); }
         return JitHash::hash($context, JitStringArg::lower($context, $args[0], 'hash() algorithm'), JitStringArg::lower($context, $args[1], 'hash() data'), $raw);
     }
-
-    private static function jitStringArg(Context $context, JITVariable $arg): Value
-    {
-        if (JITVariable::TYPE_STRING === $arg->type) {
-            return $context->helper->loadValue($arg);
-        }
-        if (JITVariable::TYPE_VALUE === $arg->type) {
-            return $context->builder->call(
-                $context->lookupFunction('__value__readString'),
-                $arg->value
-            );
-        }
-
-        throw new \LogicException('hash() only supports strings in this compiler build');
-    }
 }

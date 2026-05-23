@@ -381,7 +381,8 @@ class JIT {
             || str_contains($lower, 'findcoalesce')
             || str_contains($lower, 'resolvecoalesce')
             || str_contains($lower, 'resolveisset')
-            || str_contains($lower, 'operandschainequal');
+            || str_contains($lower, 'operandschainequal')
+            || str_contains($lower, 'isredundantcoalescetailassign');
     }
 
     private function isSkippedSelfHostEntryName(string $name): bool
@@ -416,7 +417,7 @@ class JIT {
             || str_contains($lower, 'deployroot')
             || str_contains($lower, 'sourcebundler')
             || (str_contains($lower, '\\web\\conststringfolder::') && !$this->isConstStringFolderRealLoweringMethod($lower))
-            || (str_contains($lower, '\\web\\superglobals::') && !str_ends_with($lower, '::issuperglobalname'));
+            || str_contains($lower, '\\web\\superglobals::');
     }
 
 
@@ -439,6 +440,11 @@ class JIT {
     /** IncludePathResolver methods with safe LLVM 9 lowering during self-host AOT (#816). */
     private function isIncludePathResolverRealLoweringMethod(string $lower): bool
     {
+        // resolve() nullable return still hits ICmp type mismatch in full self-host probe (#1097).
+        if ($this->shouldUseSelfHostJitStubs()) {
+            return false;
+        }
+
         return str_ends_with($lower, '::resolve');
     }
 
@@ -452,7 +458,10 @@ class JIT {
     private function isConstStringFolderRealLoweringMethod(string $lower): bool
     {
         return str_ends_with($lower, '::literalstringvalue')
-            || str_ends_with($lower, '::sourcedir');
+            || str_ends_with($lower, '::sourcedir')
+            || str_ends_with($lower, '::fold')
+            || str_ends_with($lower, '::funccallhasarity')
+            || str_ends_with($lower, '::foldcallargstring');
     }
 
     private function collectStubFunctionArgTypes(Block $block): array
@@ -528,8 +537,8 @@ class JIT {
 
             return Type::fromDecl($param->declaredType->name);
         }
-        if ($param->declaredType instanceof Op\Type\Reference && null !== $param->declaredType->type) {
-            return Type::fromTypeDecl($param->declaredType->type);
+        if ($param->declaredType instanceof Op\Type\Reference && null !== $param->declaredType->declaration) {
+            return Type::fromTypeDecl($param->declaredType);
         }
         if (null !== $param->declaredType) {
             try {
@@ -544,6 +553,11 @@ class JIT {
 
     private function llvmTypeForCfgParam(\PHPCfg\Op\Expr\Param $param): PHPLLVM\Type
     {
+        if ($param->declaredType instanceof Op\Type\Literal
+            && 'mixed' === strtolower($param->declaredType->name)
+        ) {
+            return $this->context->getTypeFromString('__value__*');
+        }
         if ($param->declaredType instanceof Op\Type\Literal
             && $this->isCfgOperandDeclaredName($param->declaredType->name)
         ) {
@@ -1936,6 +1950,12 @@ class JIT {
             return $this->loadNullValueStruct();
         }
         if (null === $expected || Variable::TYPE_VALUE !== $return->type) {
+            if ('__string__*' === $expected && Variable::TYPE_NULL === $return->type) {
+                return $this->context->getTypeFromString('__string__*')->constNull();
+            }
+            if ('__hashtable__*' === $expected && Variable::TYPE_NULL === $return->type) {
+                return $this->context->getTypeFromString('__hashtable__*')->constNull();
+            }
             if ('__string__*' === $expected && Variable::TYPE_VALUE === $return->type) {
                 return $this->context->builder->call(
                     $this->context->lookupFunction('__value__readString'),
@@ -2137,6 +2157,14 @@ class JIT {
     private function rawTypeFromCfgParam(\PHPCfg\Op\Expr\Param $param): Type
     {
         $declared = $this->declaredTypeFromCfgParam($param);
+        if ($param->declaredType instanceof Op\Type\Literal
+            && 'mixed' === strtolower($param->declaredType->name)
+        ) {
+            return Type::mixed();
+        }
+        if (null !== $declared && Type::TYPE_UNION === $declared->type) {
+            return $declared;
+        }
         if (null !== $param->result->type && Type::TYPE_NULL !== $param->result->type->type) {
             return $param->result->type;
         }
@@ -2158,8 +2186,8 @@ class JIT {
         if ($returnType instanceof Op\Type\Literal) {
             return Type::fromDecl($returnType->name);
         }
-        if ($returnType instanceof Op\Type\Reference && null !== $returnType->type) {
-            return Type::fromTypeDecl($returnType->type);
+        if ($returnType instanceof Op\Type\Reference && null !== $returnType->declaration) {
+            return Type::fromTypeDecl($returnType);
         }
         try {
             return Type::fromTypeDecl($returnType);
@@ -2283,6 +2311,14 @@ class JIT {
             || OpCode::TYPE_SHIFT_RIGHT === $type;
     }
 
+    /** Bootstrap fixture: compile only isSuperglobalName from bundled Web\\Superglobals (#816). */
+    private function isBundledSuperglobalsClass(int $classId): bool
+    {
+        $name = strtolower($this->context->scope->className ?? '');
+
+        return 'phpcompiler\\web\\superglobals' === $name || 'superglobals' === $name;
+    }
+
     private function compileClass(?Block $block, int $classId) {
         if ($block === null) {
             return;
@@ -2329,6 +2365,9 @@ class JIT {
                     $name = $block->getOperand($op->arg1);
                     assert($name instanceof Operand\Literal);
                     $methodLc = strtolower($name->value);
+                    if ($this->isBundledSuperglobalsClass($classId) && 'issuperglobalname' !== $methodLc) {
+                        break;
+                    }
                     $visFlags = \PHPCfg\Func::FLAG_PUBLIC;
                     if (null !== $op->arg3 && isset($block->constants[$op->arg3])) {
                         $visFlags = MethodVisibility::mask($block->constants[$op->arg3]->toInt());
@@ -2354,7 +2393,7 @@ class JIT {
                     $name = $block->getOperand($op->arg1);
                     assert($name instanceof Operand\Literal);
                     if (!isset($block->constants[$op->arg2])) {
-                        if ($this->shouldUseSelfHostJitStubs()) {
+                        if ($this->shouldUseSelfHostJitStubs() || $this->isBundledSuperglobalsClass($classId)) {
                             break;
                         }
                         throw new \LogicException('Class constant value must be a compile-time constant');
@@ -2366,7 +2405,7 @@ class JIT {
                     );
                     break;
                 default:
-                    if ($this->shouldUseSelfHostJitStubs()) {
+                    if ($this->shouldUseSelfHostJitStubs() || $this->isBundledSuperglobalsClass($classId)) {
                         break;
                     }
                     throw new \LogicException('Other class body types are not jittable for now');
@@ -2488,12 +2527,25 @@ class JIT {
                 $result->addref();
             }
             $this->copyValueBoxJitFlags($result, $value);
+            $result->compileTimeConstantName = $value->compileTimeConstantName;
 
             return;
         } elseif ($result->type === Variable::TYPE_VALUE) {
             // wrap
             $valueRef = $result->value;
             $valueFrom = $value->value;
+            if ($value->type & Variable::IS_NATIVE_ARRAY) {
+                $ht = JIT\HashTableHelper::materializeNativeArrayForCall($this->context, $value);
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__writeHashtable'),
+                    $valueRef,
+                    $ht
+                );
+                $this->context->refcount->addref($ht);
+                $result->valueBoxHashtable = true;
+
+                return;
+            }
             switch ($value->type) {
                 case Variable::TYPE_NULL:
                     $this->context->builder->call(
@@ -2695,6 +2747,7 @@ class JIT {
                 $this->valueBoxPointer($value)
             );
             $this->copyValueBoxJitFlags($result, $value);
+            $result->compileTimeConstantName = $value->compileTimeConstantName;
 
             return;
         } elseif (Variable::TYPE_HASHTABLE === $result->type && Variable::TYPE_VALUE === $value->type) {
@@ -2733,13 +2786,45 @@ class JIT {
 
             return;
         } elseif (Variable::TYPE_OBJECT === $result->type && Variable::TYPE_VALUE === $value->type) {
+            $valuePtr = $this->valueBoxPointer($value);
+            $map = $this->context->structFieldMap['__value__'];
+            $typeByte = $this->context->builder->load(
+                $this->context->builder->structGep($valuePtr, $map['type'])
+            );
+            $i8 = $this->context->getTypeFromString('int8');
+            $isLong = $this->context->builder->icmp(
+                PHPLLVM\Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
+            );
+            $isBool = $this->context->builder->icmp(
+                PHPLLVM\Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)
+            );
+            $isStreamHandle = $this->context->builder->bitwiseOr($isLong, $isBool);
+            $objectBlock = JIT\BasicBlockHelper::append($this->context, 'assign_object_from_value');
+            $handleBlock = JIT\BasicBlockHelper::append($this->context, 'assign_stream_handle_from_value');
+            $doneBlock = JIT\BasicBlockHelper::append($this->context, 'assign_object_from_value_done');
+            $this->context->builder->branchIf($isStreamHandle, $handleBlock, $objectBlock);
+            $this->context->builder->positionAtEnd($objectBlock);
             $obj = $this->context->builder->call(
                 $this->context->lookupFunction('__value__readObject'),
-                $this->valueBoxPointer($value)
+                $valuePtr
             );
             $result->free();
             $this->context->builder->store($obj, $result->value);
             $result->addref();
+            $this->context->builder->branch($doneBlock);
+            $this->context->builder->positionAtEnd($handleBlock);
+            $slot = JIT\JitValueBox::alloc($this->context);
+            JIT\JitValueBox::copyFromPointer($this->context, $slot, $valuePtr);
+            $result->free();
+            $result->type = Variable::TYPE_VALUE;
+            $result->value = $slot;
+            $result->addref();
+            $this->context->builder->branch($doneBlock);
+            $this->context->builder->positionAtEnd($doneBlock);
 
             return;
         }
@@ -2834,6 +2919,40 @@ class JIT {
 
                 return;
             }
+        }
+        if ('__string__*' === $valueTy && Variable::TYPE_VALUE === $dest->type) {
+            $dest->free();
+            $isNullPtr = $this->context->builder->icmp(
+                PHPLLVM\Builder::INT_EQ,
+                $value,
+                $value->typeOf()->constNull()
+            );
+            $nullBlock = JIT\BasicBlockHelper::append($this->context, 'assign_string_null_ptr');
+            $copyBlock = JIT\BasicBlockHelper::append($this->context, 'assign_string_copy_ptr');
+            $doneBlock = JIT\BasicBlockHelper::append($this->context, 'assign_string_ptr_done');
+            $this->context->builder->branchIf($isNullPtr, $nullBlock, $copyBlock);
+            $this->context->builder->positionAtEnd($nullBlock);
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeNull'),
+                JIT\JitValueBox::pointer($this->context, $dest->value)
+            );
+            $dest->isNullConstant = true;
+            $this->context->builder->branch($doneBlock);
+            $this->context->builder->positionAtEnd($copyBlock);
+            $owned = $this->context->builder->call(
+                $this->context->lookupFunction('__string__separate'),
+                $value
+            );
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeString'),
+                JIT\JitValueBox::pointer($this->context, $dest->value),
+                $owned
+            );
+            $this->context->builder->branch($doneBlock);
+            $this->context->builder->positionAtEnd($doneBlock);
+            $dest->addref();
+
+            return;
         }
         if ('__value__*' === $valueTy && Variable::TYPE_VALUE === $dest->type) {
             $dest->free();

@@ -20,6 +20,10 @@ final class JitStringArg
     {
         $literal = self::compileTimeLiteral($arg);
         if (null !== $literal) {
+            if (Variable::TYPE_STRING === $arg->type && Variable::KIND_VALUE === $arg->kind) {
+                return $context->helper->loadValue($arg);
+            }
+
             return $context->builder->load($context->constantStringFromString($literal));
         }
         if (Variable::TYPE_STRING === $arg->type) {

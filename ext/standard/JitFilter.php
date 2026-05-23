@@ -71,6 +71,10 @@ final class JitFilter
 
     public static function validateInt(Context $context, JITVariable $value): Value
     {
+        if (JITVariable::TYPE_VALUE === $value->type) {
+            return self::boxValueValidateInt($context, $value);
+        }
+
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
         $falseVal = $context->constantFromBool(false);
@@ -112,6 +116,10 @@ final class JitFilter
 
     public static function validateEmail(Context $context, JITVariable $value): Value
     {
+        if (JITVariable::TYPE_VALUE === $value->type) {
+            return self::boxValueValidateEmail($context, $value);
+        }
+
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
         $falseVal = $context->constantFromBool(false);
@@ -153,6 +161,77 @@ final class JitFilter
         $context->builder->positionAtEnd($mergeBlock);
 
         return $ptr;
+    }
+
+    private static function boxValueValidateInt(Context $context, JITVariable $arg): Value
+    {
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $strVal = $context->builder->call($context->lookupFunction('__value__readString'), $valuePtr);
+        $strPtrTy = $context->getTypeFromString('__string__*');
+        $hasString = $context->builder->icmp(Builder::INT_NE, $strVal, $strPtrTy->constNull());
+
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+
+        $stringBlock = BasicBlockHelper::append($context, 'fvi_box_string');
+        $failBlock = BasicBlockHelper::append($context, 'fvi_box_fail');
+        $doneBlock = BasicBlockHelper::append($context, 'fvi_box_done');
+
+        $context->builder->branchIf($hasString, $stringBlock, $failBlock);
+
+        $context->builder->positionAtEnd($stringBlock);
+        $strVar = new JITVariable($context, JITVariable::TYPE_STRING, JITVariable::KIND_VALUE, $strVal);
+        $stringResult = self::validateInt($context, $strVar);
+        $stringTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($failBlock);
+        $longVal = $context->builder->call($context->lookupFunction('__value__readLong'), $valuePtr);
+        JitValueBox::writeLong($context, $slot, $longVal);
+        $longTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($ptr->typeOf());
+        $phi->addIncoming($stringResult, $stringTail);
+        $phi->addIncoming($ptr, $longTail);
+
+        return $phi;
+    }
+
+    private static function boxValueValidateEmail(Context $context, JITVariable $arg): Value
+    {
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $strVal = $context->builder->call($context->lookupFunction('__value__readString'), $valuePtr);
+        $strPtrTy = $context->getTypeFromString('__string__*');
+        $hasString = $context->builder->icmp(Builder::INT_NE, $strVal, $strPtrTy->constNull());
+
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $falseVal = $context->constantFromBool(false);
+
+        $stringBlock = BasicBlockHelper::append($context, 'fve_box_string');
+        $failBlock = BasicBlockHelper::append($context, 'fve_box_fail');
+        $doneBlock = BasicBlockHelper::append($context, 'fve_box_done');
+
+        $context->builder->branchIf($hasString, $stringBlock, $failBlock);
+
+        $context->builder->positionAtEnd($stringBlock);
+        $strVar = new JITVariable($context, JITVariable::TYPE_STRING, JITVariable::KIND_VALUE, $strVal);
+        $stringResult = self::validateEmail($context, $strVar);
+        $stringTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($failBlock);
+        JitValueBox::writeBool($context, $slot, $falseVal);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($ptr->typeOf());
+        $phi->addIncoming($stringResult, $stringTail);
+        $phi->addIncoming($ptr, $failBlock);
+
+        return $phi;
     }
 
     private static function stringIsFullInteger(Context $context, Value $strPtr): Value

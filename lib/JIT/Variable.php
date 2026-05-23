@@ -80,6 +80,9 @@ final class Variable {
     /** String literal value when this variable represents a constant string operand. */
     public ?string $compileTimeString = null;
 
+    /** User/global constant name when this variable holds a compile-time const fetch. */
+    public ?string $compileTimeConstantName = null;
+
     /** Set when this variable is the PHP {@code null} constant (const-fetch). */
     public bool $isNullConstant = false;
 
@@ -213,6 +216,35 @@ final class Variable {
     }
 
     /**
+     * Element JIT type when a static array literal may use a homogeneous native LLVM array.
+     *
+     * @param list<Type> $subTypes
+     */
+    private static function homogeneousNativeElementType(array $subTypes): ?int
+    {
+        if ([] === $subTypes) {
+            return null;
+        }
+        $elemType = self::getTypeFromType($subTypes[0]);
+        if (!in_array($elemType, [
+            self::TYPE_NATIVE_LONG,
+            self::TYPE_NATIVE_BOOL,
+            self::TYPE_NATIVE_DOUBLE,
+            self::TYPE_STRING,
+            self::TYPE_OBJECT,
+        ], true)) {
+            return null;
+        }
+        foreach ($subTypes as $sub) {
+            if (self::getTypeFromType($sub) !== $elemType) {
+                return null;
+            }
+        }
+
+        return $elemType;
+    }
+
+    /**
      * Returns a writable variable (lvalue)
      */
     public static function fromOp(
@@ -240,8 +272,8 @@ final class Variable {
                 $size = $context->analyzer->computeStaticArraySize($op);
                 if (!is_null($size) && !$context->analyzer->hasDynamicArrayAppend($op, $size)) {
                     $subTypes = $op->type->subTypes ?? [];
-                    if ([] !== $subTypes) {
-                        $origType = self::getTypeFromType($subTypes[0]);
+                    $origType = self::homogeneousNativeElementType($subTypes);
+                    if (null !== $origType) {
                         $type = self::IS_NATIVE_ARRAY | $origType;
                         $stringType = self::getStringType($origType) . '[' . $size . ']';
                     }
@@ -579,7 +611,7 @@ final class Variable {
                                 $baked
                             );
                         }
-                        $ht = $this->context->helper->loadValue($container);
+                        $ht = HashTableHelper::loadHashtablePointer($this->context, $container);
                         $keyVal = $this->context->helper->loadValue($dim);
 
                         return HashTableHelper::readSuperglobalStringKeyToValueBox(
@@ -589,7 +621,7 @@ final class Variable {
                         );
                     }
                 }
-                $ht = $this->context->helper->loadValue($container);
+                $ht = HashTableHelper::loadHashtablePointer($this->context, $container);
                 if (self::TYPE_VALUE === $dim->type || self::TYPE_OBJECT === $dim->type) {
                     $keyObj = self::TYPE_OBJECT === $dim->type
                         ? $this->context->helper->loadValue($dim)

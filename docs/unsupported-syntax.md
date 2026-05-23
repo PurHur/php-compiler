@@ -23,7 +23,7 @@ Exit code `0` when the entry (and best-effort `include`/`require` targets with s
 
 Operands that are not foldable (variables, function calls, non-literal concatenation) emit a **stderr warning** (`dynamic include/require (not followed)`) and are not traversed. Runtime include for VM/JIT/AOT is tracked separately ([#54](https://github.com/PurHur/php-compiler/issues/54), [#85](https://github.com/PurHur/php-compiler/issues/85)).
 
-Some constructs (for example `break`/`continue`, `list()` / short-list destructuring, and prefix/postfix `++`/`--`) are lowered by php-cfg before the compiler sees them; lint still scans the AST for unsupported increment patterns and reports the **Expr\_\*** diagnostic kinds below.
+Some constructs (for example `break`/`continue`, `list()` / short-list destructuring, and prefix/postfix `++`/`--`) are lowered by php-cfg before the compiler sees them; they compile in VM/JIT/AOT like ordinary assign and arithmetic.
 
 ## Known gaps (tracking issues)
 
@@ -36,7 +36,6 @@ Some constructs (for example `break`/`continue`, `list()` / short-list destructu
 | `Expr_Yield`, `Expr_YieldFrom` | [#167](https://github.com/PurHur/php-compiler/issues/167) |
 | `Expr_Closure` | [#72](https://github.com/PurHur/php-compiler/issues/72) |
 | `Expr_ArrowFunction` | [#142](https://github.com/PurHur/php-compiler/issues/142) |
-| `Expr_PreInc`, `Expr_PostInc`, `Expr_PreDec`, `Expr_PostDec` (`++`/`--`) | [#137](https://github.com/PurHur/php-compiler/issues/137) |
 | `Expr_New` (non-trivial) | [#136](https://github.com/PurHur/php-compiler/issues/136) |
 | Named arguments, traits, enums | [#168](https://github.com/PurHur/php-compiler/issues/168), [#169](https://github.com/PurHur/php-compiler/issues/169) |
 | `Expr_MethodCall` | [#58](https://github.com/PurHur/php-compiler/issues/58) |

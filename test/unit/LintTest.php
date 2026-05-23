@@ -64,20 +64,18 @@ PHP;
         $this->assertStringNotContainsString('#114', $exit['stdout']);
     }
 
-    public function testLintPreIncReportsIssue137(): void
+    public function testLintPreIncExitsZero(): void
     {
         $exit = $this->runLint(['-r', '++$i;']);
-        $this->assertSame(1, $exit['code']);
-        $this->assertStringContainsString('#137', $exit['stdout']);
-        $this->assertStringContainsString('Expr_PreInc', $exit['stdout']);
+        $this->assertSame(0, $exit['code']);
+        $this->assertStringNotContainsString('Expr_PreInc', $exit['stdout']);
     }
 
-    public function testLintPostIncReportsIssue137(): void
+    public function testLintPostIncExitsZero(): void
     {
         $exit = $this->runLint(['-r', '$i++;']);
-        $this->assertSame(1, $exit['code']);
-        $this->assertStringContainsString('#137', $exit['stdout']);
-        $this->assertStringContainsString('Expr_PostInc', $exit['stdout']);
+        $this->assertSame(0, $exit['code']);
+        $this->assertStringNotContainsString('Expr_PostInc', $exit['stdout']);
     }
 
     public function testLintShortListDestructuringExitsZero(): void

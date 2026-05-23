@@ -23,6 +23,9 @@ function run(string $filename, string $code, array $options): void
             putenv('PHP_COMPILER_SELFHOST_AOT=1');
         }
     }
+    if ('-' !== $filename && str_contains(str_replace('\\', '/', $filename), 'jit_result_stub.php')) {
+        putenv('PHP_COMPILER_SELFHOST_AOT=1');
+    }
     $includes = $options['--include'] ?? [];
     if (!is_array($includes)) {
         $includes = [] === $includes || '' === $includes ? [] : [$includes];

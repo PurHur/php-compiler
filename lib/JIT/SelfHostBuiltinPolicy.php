@@ -54,7 +54,9 @@ final class SelfHostBuiltinPolicy
     private const CATEGORY_FILESYSTEM = [
         'dirname' => 'filesystem', 'basename' => 'filesystem', 'file_exists' => 'filesystem',
         'is_file' => 'filesystem', 'is_dir' => 'filesystem', 'is_readable' => 'filesystem',
-        'is_writable' => 'filesystem', 'file_get_contents' => 'filesystem', 'realpath' => 'filesystem',
+        'is_writable' => 'filesystem', 'file_get_contents' => 'filesystem', 'file_put_contents' => 'filesystem',
+        'mkdir' => 'filesystem', 'unlink' => 'filesystem', 'rmdir' => 'filesystem', 'realpath' => 'filesystem',
+        'fopen' => 'filesystem', 'fread' => 'filesystem', 'fclose' => 'filesystem',
     ];
 
     /** @var array<string, string> */

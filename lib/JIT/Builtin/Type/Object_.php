@@ -304,6 +304,9 @@ class Object_ extends Type {
 
     private function initEmptyHashtableProperties(PHPLLVM\Value $obj, int $classId): void
     {
+        if ($this->isSplObjectStorageClass($classId)) {
+            return;
+        }
         if (!isset($this->properties[$classId])) {
             return;
         }
@@ -446,6 +449,12 @@ class Object_ extends Type {
         if ('phptypes\\type' === $lcname || 'type' === $lcname) {
             $seed(['type_null'=>\PHPTypes\Type::TYPE_NULL,'type_boolean'=>\PHPTypes\Type::TYPE_BOOLEAN,'type_long'=>\PHPTypes\Type::TYPE_LONG,'type_double'=>\PHPTypes\Type::TYPE_DOUBLE,'type_string'=>\PHPTypes\Type::TYPE_STRING,'type_object'=>\PHPTypes\Type::TYPE_OBJECT,'type_array'=>\PHPTypes\Type::TYPE_ARRAY,'type_callable'=>\PHPTypes\Type::TYPE_CALLABLE,'type_union'=>\PHPTypes\Type::TYPE_UNION,'type_intersection'=>\PHPTypes\Type::TYPE_INTERSECTION]);
         }
+        if ('phpcompiler\\runtime' === $lcname || 'runtime' === $lcname) {
+            $seed([
+                'mode_normal' => \PHPCompiler\Runtime::MODE_NORMAL,
+                'mode_aot' => \PHPCompiler\Runtime::MODE_AOT,
+            ]);
+        }
     }
 
     private function registerExternalClass(string $lcname): void
@@ -546,6 +555,17 @@ class Object_ extends Type {
         if ('phptypes\\type' === $lcname || 'type' === $lcname) {
             foreach (['type_null'=>\PHPTypes\Type::TYPE_NULL,'type_boolean'=>\PHPTypes\Type::TYPE_BOOLEAN,'type_long'=>\PHPTypes\Type::TYPE_LONG,'type_double'=>\PHPTypes\Type::TYPE_DOUBLE,'type_string'=>\PHPTypes\Type::TYPE_STRING,'type_object'=>\PHPTypes\Type::TYPE_OBJECT,'type_array'=>\PHPTypes\Type::TYPE_ARRAY,'type_callable'=>\PHPTypes\Type::TYPE_CALLABLE,'type_union'=>\PHPTypes\Type::TYPE_UNION,'type_intersection'=>\PHPTypes\Type::TYPE_INTERSECTION] as $name=>$value) {
                 $this->classConstants[$id][$name] = ['type'=>Variable::TYPE_NATIVE_LONG,'value'=>$value];
+            }
+        }
+        if ('phpcompiler\\runtime' === $lcname || 'runtime' === $lcname) {
+            foreach ([
+                'mode_normal' => \PHPCompiler\Runtime::MODE_NORMAL,
+                'mode_aot' => \PHPCompiler\Runtime::MODE_AOT,
+            ] as $name => $value) {
+                $this->classConstants[$id][$name] = [
+                    'type' => Variable::TYPE_NATIVE_LONG,
+                    'value' => $value,
+                ];
             }
         }
     }
@@ -708,7 +728,7 @@ class Object_ extends Type {
         $expectedId = $this->lookup($className);
         $falseVal = $this->context->getTypeFromString('int1')->constInt(0, false);
         $objMap = $this->context->structFieldMap['__object__'];
-        $expectedClassId = $this->context->constantFromInteger($expectedId);
+        $expectedClassId = $this->context->constantFromInteger($expectedId, 'int64');
 
         if (Variable::TYPE_OBJECT === $expr->type) {
             $obj = $this->context->helper->loadValue($expr);
@@ -730,9 +750,7 @@ class Object_ extends Type {
         }
 
         if (Variable::TYPE_VALUE === $expr->type) {
-            $valuePtr = Variable::KIND_VARIABLE === $expr->kind
-                ? $expr->value
-                : $this->context->helper->loadValue($expr);
+            $valuePtr = JitValueBox::valuePtrFromVariable($this->context, $expr);
             $obj = $this->context->builder->call(
                 $this->context->lookupFunction('__value__readObject'),
                 $valuePtr

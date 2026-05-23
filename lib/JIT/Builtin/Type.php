@@ -156,6 +156,26 @@ class Type extends Builtin {
         );
         $fnCompilerFwrite = $this->context->module->addFunction('__compiler_fwrite', $fntypeFwrite);
         $this->context->registerFunction('__compiler_fwrite', $fnCompilerFwrite);
+        $strPtr = $this->context->getTypeFromString('__string__*');
+        $fntypeFopen = $this->context->context->functionType(
+            $i64,
+            false,
+            $strPtr,
+            $strPtr
+        );
+        $fnFopen = $this->context->module->addFunction('__compiler_fopen', $fntypeFopen);
+        $this->context->registerFunction('__compiler_fopen', $fnFopen);
+        $fntypeFread = $this->context->context->functionType(
+            $strPtr,
+            false,
+            $i64,
+            $i64
+        );
+        $fnFread = $this->context->module->addFunction('__compiler_fread', $fntypeFread);
+        $this->context->registerFunction('__compiler_fread', $fnFread);
+        $fntypeFclose = $this->context->context->functionType($i32, false, $i64);
+        $fnFclose = $this->context->module->addFunction('__compiler_fclose', $fntypeFclose);
+        $this->context->registerFunction('__compiler_fclose', $fnFclose);
         $fntypeMkdir = $this->context->context->functionType(
             $i32,
             false,
