@@ -466,6 +466,7 @@
         "test/bootstrap-aot/instanceof_check.php",
         "test/bootstrap-aot/isset_array_offset.php",
         "test/bootstrap-aot/isset_object_typed_property.php",
+        "test/bootstrap-aot/isset_superglobal.php",
         "test/bootstrap-aot/jit_result_stub.php",
         "test/bootstrap-aot/lib_opcode/main.php",
         "test/bootstrap-aot/minimal_class.php",

@@ -65,6 +65,7 @@ class JIT {
                 || $this->isSkippedWebBootstrapHotPathName($name)
                 || $this->isSkippedSelfHostEntryName($name)
                 || $this->isSkippedBootstrapInterpreterHotPathName($name)
+                || $this->isSkippedIssetHelperHotPathName($name)
             ) {
                 $this->compileBlock($func->block, $name);
 
@@ -149,6 +150,7 @@ class JIT {
             || $this->isSkippedWebBootstrapHotPathName($logicalName ?? $internalName)
             || $this->isSkippedSelfHostEntryName($logicalName ?? $internalName)
             || $this->isSkippedBootstrapInterpreterHotPathName($logicalName ?? $internalName)
+            || $this->isSkippedIssetHelperHotPathName($logicalName ?? $internalName)
         ) {
             return $this->compileSkippedCompilerSplitCfgStub($internalName, $block, $logicalName ?? $internalName);
         }
@@ -313,6 +315,16 @@ class JIT {
         }
 
         return str_contains($lowerName, '\\jit\\result::');
+    }
+
+    /** Stub IssetHelper (superglobalName OperandName walk crashes LLVM 9 during self-host AOT). */
+    private function isSkippedIssetHelperHotPathName(string $name): bool
+    {
+        if (!$this->shouldUseSelfHostJitStubs()) {
+            return false;
+        }
+
+        return str_contains(strtolower($name), '\\jit\\issethelper::');
     }
 
     private function isSkippedCompilerHotPathName(string $name): bool
