@@ -7,7 +7,7 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Shipped examples documented in examples/README.md (issues #160, #262).
+ * Shipped examples documented in examples/README.md (issues #160, #262, #753).
  */
 final class ExamplesReadmeTest extends TestCase
 {
@@ -30,5 +30,22 @@ final class ExamplesReadmeTest extends TestCase
         $this->assertStringContainsString('./phpc run', $readme);
         $this->assertStringContainsString('ExamplesCompileTest.php', $readme);
         $this->assertStringContainsString('make test-docker', $readme);
+    }
+
+    public function testMiniWebAppAotStatusReflectsLinkGreenExecute764(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $readme = (string) file_get_contents($root.'/examples/README.md');
+        $mini = (string) file_get_contents($root.'/examples/003-MiniWebApp/README.md');
+
+        foreach ([$readme, $mini] as $body) {
+            $this->assertStringNotContainsString('blocked #568', $body);
+            $this->assertStringNotContainsString('❌ blocked', $body);
+        }
+
+        $this->assertStringContainsString('#764', $readme);
+        $this->assertStringContainsString('phpc build --project', $readme);
+        $this->assertStringContainsString('AOT link', $mini);
+        $this->assertStringContainsString('#764', $mini);
     }
 }
