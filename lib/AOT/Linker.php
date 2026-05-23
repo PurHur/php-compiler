@@ -12,7 +12,6 @@ final class Linker
     /** @var list<string> */
     private const RUNTIME_C_SOURCES = [
         __DIR__.'/runtime/superglobals_refresh.c',
-        __DIR__.'/runtime/getenv.c',
         __DIR__.'/runtime/hash_crypto.c',
         __DIR__.'/runtime/crc32.c',
         __DIR__.'/runtime/strtr.c',
