@@ -621,6 +621,7 @@ final class ArrayBuiltinHelper
         if (null === $name) {
             throw new \LogicException(
                 'array_map() callback must be a compile-time string builtin name in this compiler build'
+                .' (closures and [class, method] callables are deferred; issue #1154)'
             );
         }
 

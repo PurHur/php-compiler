@@ -5,38 +5,47 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
  * LLVM JIT/AOT helpers for parse_url() (routing subset; mirrors VmString::parseUrl).
- *
- * JIT supports compile-time URL literals; dynamic URLs fall back to the same parser
- * when the argument is a separated string with known length (see parseUrl).
  */
 final class JitParseUrl
 {
     public static function parseUrl(Context $context, JITVariable $url, ?JITVariable $component = null): Value
     {
-        $urlLiteral = $url->compileTimeString ?? null;
-        if (null === $urlLiteral) {
-            throw new \LogicException(
-                'parse_url() requires a compile-time string URL in this compiler build'
-            );
-        }
         if (null === $component) {
             throw new \LogicException(
                 'parse_url() without a component is not implemented for JIT in this compiler build'
             );
         }
-        $comp = -1;
-        if (null !== $component) {
-            $comp = self::compileTimeLong($context, $component);
+        $comp = self::compileTimeLong($context, $component);
+        $urlLiteral = $url->compileTimeString ?? null;
+        if (null !== $urlLiteral) {
+            return self::materializeVmResult($context, VmString::parseUrl($urlLiteral, $comp));
         }
-        $result = VmString::parseUrl($urlLiteral, $comp);
 
-        return self::materializeVmResult($context, $result, true);
+        $urlStr = JitStringArg::lower($context, $url, 'parse_url() URL');
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $i64 = $context->getTypeFromString('int64');
+        $context->builder->call(
+            $context->lookupFunction('__phpc_parse_url_component'),
+            $urlStr,
+            $i64->constInt($comp, false),
+            $ptr
+        );
+        if (\in_array($comp, [\PHP_URL_SCHEME, \PHP_URL_HOST, \PHP_URL_PATH, \PHP_URL_QUERY, \PHP_URL_FRAGMENT], true)) {
+            return $context->builder->call(
+                $context->lookupFunction('__value__readString'),
+                $ptr
+            );
+        }
+
+        return $ptr;
     }
 
     private static function compileTimeLong(Context $context, JITVariable $var): int
