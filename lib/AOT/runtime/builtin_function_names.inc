@@ -60,6 +60,7 @@ static const char *phpc_builtin_functions[] = {
     "fclose",
     "feof",
     "fflush",
+    "ftell",
     "fgetc",
     "file_exists",
     "file_get_contents",

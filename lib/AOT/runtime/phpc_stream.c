@@ -171,6 +171,22 @@ int __compiler_fflush(int64_t handle)
     return fflush(fp) == 0 ? 1 : 0;
 }
 
+int64_t __compiler_ftell(int64_t handle)
+{
+    FILE *fp = phpc_resolve_stream(handle);
+    long pos;
+
+    if (NULL == fp) {
+        return -1;
+    }
+    pos = ftell(fp);
+    if (pos < 0) {
+        return -1;
+    }
+
+    return (int64_t) pos;
+}
+
 __string__ *__compiler_fgetc(int64_t handle)
 {
     FILE *fp;
