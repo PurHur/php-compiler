@@ -13,13 +13,16 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * intval() for integer or float arguments (truncates toward zero; subset of PHP).
+ * intval() for scalar arguments (subset of PHP standard library).
  */
 final class intval extends Internal
 {
@@ -52,7 +55,12 @@ final class intval extends Internal
 
             return;
         }
-        throw new \LogicException('intval() only supports integers, floats, booleans, and strings in this compiler build');
+        if (Variable::TYPE_NULL === $v->type) {
+            $frame->returnVar->int(0);
+
+            return;
+        }
+        throw new \LogicException('intval() only supports integers, floats, booleans, strings, and null in this compiler build');
     }
 
     public Context $context;
@@ -73,15 +81,122 @@ final class intval extends Internal
             case JITVariable::TYPE_NATIVE_BOOL:
                 return $context->builder->zExt($v, $i64);
             case JITVariable::TYPE_STRING:
-                $ptr = $this->stringDataPtr($context, $v);
-                $endPtr = $context->getTypeFromString('int8**')->constNull();
-                $base = $context->getTypeFromString('int32')->constInt(10, false);
-                $raw = $context->builder->call($context->lookupFunction('strtol'), $ptr, $endPtr, $base);
-
-                return $context->builder->trunc($raw, $i64);
+                return $this->stringToInt($context, $v);
+            case JITVariable::TYPE_NULL:
+                return $i64->constInt(0, false);
+            case JITVariable::TYPE_VALUE:
+                return $this->valueToInt($context, $args[0]);
             default:
-                throw new \LogicException('intval() only supports integers, floats, booleans, and strings in this compiler build');
+                throw new \LogicException('intval() only supports integers, floats, booleans, strings, and null in this compiler build');
         }
+    }
+
+    private function valueToInt(Context $context, JITVariable $arg): Value
+    {
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+
+        $nullBlock = BasicBlockHelper::append($context, 'intval_value_null');
+        $longBlock = BasicBlockHelper::append($context, 'intval_value_long');
+        $boolBlock = BasicBlockHelper::append($context, 'intval_value_bool');
+        $doubleBlock = BasicBlockHelper::append($context, 'intval_value_double');
+        $stringBlock = BasicBlockHelper::append($context, 'intval_value_string');
+        $doneBlock = BasicBlockHelper::append($context, 'intval_value_done');
+
+        $afterNull = BasicBlockHelper::append($context, 'intval_value_after_null');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_NULL, false)),
+            $nullBlock,
+            $afterNull
+        );
+        $context->builder->positionAtEnd($nullBlock);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($afterNull);
+        $afterLong = BasicBlockHelper::append($context, 'intval_value_after_long');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_NATIVE_LONG, false)),
+            $longBlock,
+            $afterLong
+        );
+
+        $context->builder->positionAtEnd($longBlock);
+        $longVal = $context->builder->call($context->lookupFunction('__value__readLong'), $valuePtr);
+        $longEndBlock = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($afterLong);
+        $afterBool = BasicBlockHelper::append($context, 'intval_value_after_bool');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_NATIVE_BOOL, false)),
+            $boolBlock,
+            $afterBool
+        );
+
+        $context->builder->positionAtEnd($boolBlock);
+        $boolVal = $context->builder->call($context->lookupFunction('__value__readLong'), $valuePtr);
+        $boolInt = $context->builder->zExt($boolVal, $i64);
+        $boolEndBlock = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($afterBool);
+        $afterDouble = BasicBlockHelper::append($context, 'intval_value_after_double');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_NATIVE_DOUBLE, false)),
+            $doubleBlock,
+            $afterDouble
+        );
+
+        $context->builder->positionAtEnd($doubleBlock);
+        $doubleVal = $context->builder->call($context->lookupFunction('__value__readDouble'), $valuePtr);
+        $doubleInt = $context->builder->fpToSi($doubleVal, $i64);
+        $doubleEndBlock = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($afterDouble);
+        $fallbackBlock = BasicBlockHelper::append($context, 'intval_value_fallback');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_STRING, false)),
+            $stringBlock,
+            $fallbackBlock
+        );
+
+        $context->builder->positionAtEnd($stringBlock);
+        $stringVal = $context->builder->call($context->lookupFunction('__value__readString'), $valuePtr);
+        $stringInt = $this->stringToInt($context, $stringVal);
+        $stringEndBlock = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($fallbackBlock);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($i64, 'intval_value_phi');
+        $phi->addIncoming($zero, $nullBlock);
+        $phi->addIncoming($longVal, $longEndBlock);
+        $phi->addIncoming($boolInt, $boolEndBlock);
+        $phi->addIncoming($doubleInt, $doubleEndBlock);
+        $phi->addIncoming($stringInt, $stringEndBlock);
+        $phi->addIncoming($zero, $fallbackBlock);
+
+        return $phi;
+    }
+
+    private function stringToInt(Context $context, Value $strPtr): Value
+    {
+        $ptr = $this->stringDataPtr($context, $strPtr);
+        $endPtr = $context->getTypeFromString('int8**')->constNull();
+        $base = $context->getTypeFromString('int32')->constInt(10, false);
+        $raw = $context->builder->call($context->lookupFunction('strtol'), $ptr, $endPtr, $base);
+        $i64 = $context->getTypeFromString('int64');
+
+        return $context->builder->trunc($raw, $i64);
     }
 
     private function stringDataPtr(Context $context, Value $strPtr): Value
