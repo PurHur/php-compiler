@@ -18,7 +18,7 @@ class Holder
     public $n = 1;
 
     /** @var mixed */
-    public $flag = true;
+    public $flag = 1;
 }
 
 $h = new Holder();

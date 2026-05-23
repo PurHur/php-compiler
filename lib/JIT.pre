@@ -617,8 +617,24 @@ class JIT {
                 case OpCode::TYPE_DECLARE_PROPERTY:
                     $name = $block->getOperand($op->arg1);
                     assert($name instanceof Operand\Literal);
-                    $type = Variable::getTypeFromType($block->getOperand($op->arg3)->type);
-                    $this->context->type->object->defineProperty($classId, $name->value, $type);
+                    $className = $this->context->scope->className ?? '';
+                    $declaredJitType = Variable::getTypeFromType($block->getOperand($op->arg3)->type);
+                    if (Variable::TYPE_HASHTABLE === $declaredJitType || Variable::TYPE_STRING === $declaredJitType) {
+                        $jitType = $declaredJitType;
+                    } else {
+                        $jitType = $this->context->type->object->externalPropertyJitType(
+                            $className,
+                            $name->value
+                        );
+                    }
+                    $this->context->type->object->defineProperty($classId, $name->value, $jitType);
+                    if (null !== $op->arg2 && isset($block->constants[$op->arg2])) {
+                        $this->context->type->object->definePropertyDefault(
+                            $classId,
+                            $name->value,
+                            $block->constants[$op->arg2]
+                        );
+                    }
                     break;
                 case OpCode::TYPE_CONST_FETCH:
                     // Default property values are initialized in __object__ allocation.

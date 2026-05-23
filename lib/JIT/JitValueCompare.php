@@ -100,7 +100,7 @@ final class JitValueCompare
     }
 
     /**
-     * Loose == between boxed __value__ and native long: true only when the box tag is long and payloads match.
+     * Loose == between boxed __value__ and native long (PHP scalar coercion rules).
      */
     public static function looseEqualValueToNativeLong(
         Context $context,
@@ -117,17 +117,39 @@ final class JitValueCompare
             $context->builder->structGep($valuePtr, $map['type'])
         );
         $i8 = $context->getTypeFromString('int8');
+        $i64 = $context->getTypeFromString('int64');
+        $falseVal = $context->getTypeFromString('int1')->constInt(0, false);
+        $__native = $context->builder->intCast($nativeLong, $i64);
+
         $longTag = $i8->constInt(Variable::TYPE_NATIVE_LONG, false);
         $isLong = $context->builder->icmp(Builder::INT_EQ, $typeByte, $longTag);
         $stored = $context->builder->call(
             $context->lookupFunction('__value__readLong'),
             $valuePtr
         );
-        $__native = $context->builder->intCast($nativeLong, $stored->typeOf());
-        $matches = $context->builder->icmp(Builder::INT_EQ, $stored, $__native);
-        $falseVal = $context->getTypeFromString('int1')->constInt(0, false);
+        $longMatches = $context->builder->icmp(Builder::INT_EQ, $stored, $__native);
 
-        return $context->builder->select($isLong, $matches, $falseVal);
+        $boolTag = $i8->constInt(Variable::TYPE_NATIVE_BOOL, false);
+        $isBool = $context->builder->icmp(Builder::INT_EQ, $typeByte, $boolTag);
+        $boolMatches = $context->builder->icmp(
+            Builder::INT_EQ,
+            $context->builder->zExt($stored, $i64),
+            $__native
+        );
+
+        $nullTag = $i8->constInt(Variable::TYPE_NULL, false);
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $typeByte, $nullTag);
+        $nullMatches = $context->builder->icmp(Builder::INT_EQ, $__native, $i64->constInt(0, false));
+
+        return $context->builder->select(
+            $isLong,
+            $longMatches,
+            $context->builder->select(
+                $isBool,
+                $boolMatches,
+                $context->builder->select($isNull, $nullMatches, $falseVal)
+            )
+        );
     }
 
     public static function looseEqualNativeLongToValue(
@@ -155,6 +177,43 @@ final class JitValueCompare
         Variable $boxed
     ): Value {
         return self::notLooseEqualValueToNativeLong($context, $boxed, $nativeLong);
+    }
+
+
+    /** True when a boxed operand is unset: null {@see __value__*} or a null-tagged box (#1086). */
+    public static function valueBoxIsNull(Context $context, Variable $boxed): Value
+    {
+        if (!JitValueBox::isValueOperand($boxed)) {
+            return $context->getTypeFromString('int1')->constInt(0, false);
+        }
+        $ptr = JitValueBox::valuePtrFromVariable($context, $boxed);
+        $ptrTy = $ptr->typeOf();
+        $i1 = $context->getTypeFromString('int1');
+        $trueVal = $i1->constInt(1, false);
+        $entry = $context->builder->getInsertBlock();
+        $isNullPtr = $context->builder->icmp(
+            Builder::INT_EQ,
+            $ptr,
+            $ptrTy->constNull()
+        );
+        $checkTag = BasicBlockHelper::append($context, 'value_box_null_check_tag');
+        $done = BasicBlockHelper::append($context, 'value_box_null_done');
+        $context->builder->branchIf($isNullPtr, $done, $checkTag);
+
+        $context->builder->positionAtEnd($checkTag);
+        $tag = $context->builder->load(
+            $context->builder->structGep($ptr, $context->structFieldMap['__value__']['type'])
+        );
+        $nullTag = $context->getTypeFromString('int8')->constInt(Variable::TYPE_NULL, false);
+        $isNullTag = $context->builder->icmp(Builder::INT_EQ, $tag, $nullTag);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+        $result = $context->builder->phi($i1);
+        $result->addIncoming($trueVal, $entry);
+        $result->addIncoming($isNullTag, $checkTag);
+
+        return $result;
     }
 
     public static function identicalValueToValue(

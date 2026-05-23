@@ -80,11 +80,6 @@ final class array_filter extends Internal
             );
         }
 
-        foreach ($args as $i => $arg) {
-            if (JITVariable::TYPE_STRING === $arg->type || JITVariable::TYPE_VALUE === $arg->type) {
-                $this->jitString($context, $arg, 'array_filter() argument #'.((int) $i + 1));
-            }
-        }
         return ArrayBuiltinHelper::buildFilterArray($context, $args[0]);
     }
 }

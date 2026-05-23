@@ -36,15 +36,13 @@ final class ArrayBuiltinHelper
     public static function loadHashTable(Context $context, Variable $array): Value
     {
         if (self::isNativeArray($array->type)) {
-            throw new \LogicException(
-                'This array builtin requires a dynamic array (hashtable), not a fixed native array'
-            );
+            return HashTableHelper::materializeNativeArrayForCall($context, $array);
         }
         if (Variable::TYPE_HASHTABLE === $array->type) {
             return $context->helper->loadValue($array);
         }
-        if (Variable::TYPE_VALUE === $array->type) {
-            return HashTableHelper::readHashtableFromValueBox($context, $array);
+        if (Variable::TYPE_VALUE === $array->type || JitValueBox::isValueOperand($array)) {
+            return HashTableHelper::ensureHashtablePointer($context, $array);
         }
         if (Variable::TYPE_STRING === $array->type) {
             throw new \LogicException(
@@ -86,6 +84,7 @@ final class ArrayBuiltinHelper
         foreach ($values as $value) {
             self::appendElement($context, $ht, $value);
         }
+        HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
 
         return self::getNumElements($context, $ht);
     }
@@ -177,6 +176,8 @@ final class ArrayBuiltinHelper
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
+
+        HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
 
         return self::getNumElements($context, $ht);
     }
@@ -1532,17 +1533,7 @@ final class ArrayBuiltinHelper
         Value $dest,
         Value $destIndex
     ): void {
-        $str = $context->builder->call(
-            $context->lookupFunction('__hashtable__readStringAt'),
-            $src,
-            $srcIndex
-        );
-        $context->builder->call(
-            $context->lookupFunction('__hashtable__setStringAt'),
-            $dest,
-            $destIndex,
-            $str
-        );
+        self::copyListEntry($context, $src, $srcIndex, $dest, $destIndex);
     }
 
     private static function listEntryTruthy(Context $context, Value $entry): Value
