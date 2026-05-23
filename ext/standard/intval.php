@@ -47,7 +47,12 @@ final class intval extends Internal
 
             return;
         }
-        throw new \LogicException('intval() only supports integers, floats, and booleans in this compiler build');
+        if (Variable::TYPE_STRING === $v->type) {
+            $frame->returnVar->int((int) $v->toString());
+
+            return;
+        }
+        throw new \LogicException('intval() only supports integers, floats, booleans, and strings in this compiler build');
     }
 
     public Context $context;
@@ -67,8 +72,23 @@ final class intval extends Internal
                 return $context->builder->fpToSi($v, $i64);
             case JITVariable::TYPE_NATIVE_BOOL:
                 return $context->builder->zExt($v, $i64);
+            case JITVariable::TYPE_STRING:
+                $ptr = $this->stringDataPtr($context, $v);
+                $endPtr = $context->getTypeFromString('int8**')->constNull();
+                $base = $context->getTypeFromString('int32')->constInt(10, false);
+                $raw = $context->builder->call($context->lookupFunction('strtol'), $ptr, $endPtr, $base);
+
+                return $context->builder->trunc($raw, $i64);
             default:
-                throw new \LogicException('intval() only supports integers, floats, and booleans in this compiler build');
+                throw new \LogicException('intval() only supports integers, floats, booleans, and strings in this compiler build');
         }
+    }
+
+    private function stringDataPtr(Context $context, Value $strPtr): Value
+    {
+        $structName = $strPtr->typeOf()->getElementType()->getName();
+        $off = $context->structFieldMap[$structName]['value'];
+
+        return $context->builder->structGep($strPtr, $off);
     }
 }

@@ -1,4 +1,5 @@
 <?php
 
 $a = ['k' => 1];
-var_export(isset($a['k']));
+// Ternary forces a CFG split after isset (same stdout as var_export(isset(...))).
+echo isset($a['k']) ? 'true' : 'false';

@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
@@ -89,25 +90,8 @@ final class var_export extends Internal
     {
         $charPtr = $context->getTypeFromString('char*');
         $printf = $context->lookupFunction('printf');
-        if (JITVariable::TYPE_NATIVE_BOOL === $arg->type) {
-            $boolVal = $context->helper->loadValue($arg);
-            $trueBlock = BasicBlockHelper::append($context, 'var_export_bool_true');
-            $falseBlock = BasicBlockHelper::append($context, 'var_export_bool_false');
-            $doneBlock = BasicBlockHelper::append($context, 'var_export_bool_done');
-            $context->builder->branchIf($boolVal, $trueBlock, $falseBlock);
-            $context->builder->positionAtEnd($trueBlock);
-            $context->builder->call(
-                $printf,
-                $context->builder->pointerCast($context->constantFromString('true'), $charPtr)
-            );
-            $context->builder->branch($doneBlock);
-            $context->builder->positionAtEnd($falseBlock);
-            $context->builder->call(
-                $printf,
-                $context->builder->pointerCast($context->constantFromString('false'), $charPtr)
-            );
-            $context->builder->branch($doneBlock);
-            $context->builder->positionAtEnd($doneBlock);
+        if (JITVariable::TYPE_VALUE === $arg->type || JITVariable::TYPE_NATIVE_BOOL === $arg->type) {
+            self::echoBoolJit($context, self::boolValForBranch($context, $arg));
 
             return;
         }
@@ -123,23 +107,65 @@ final class var_export extends Internal
         throw new \LogicException('var_export() does not support this value type in this compiler build');
     }
 
+    private static function boolValForBranch(Context $context, JITVariable $arg): Value
+    {
+        $boolVal = JITVariable::TYPE_VALUE === $arg->type
+            ? $context->castToBool(JitValueBox::valuePtrFromVariable($context, $arg))
+            : $context->helper->loadValue($arg);
+        if (JITVariable::KIND_VALUE !== $arg->kind) {
+            return $boolVal;
+        }
+        $i1 = $context->getTypeFromString('int1');
+        $slot = $context->builder->alloca($i1, 1, 'var_export_bool_tmp');
+        $context->builder->store($boolVal, $slot);
+
+        return $context->builder->load($slot);
+    }
+
+    private static function echoBoolJit(Context $context, Value $boolVal): void
+    {
+        $charPtr = $context->getTypeFromString('char*');
+        $printf = $context->lookupFunction('printf');
+        $trueBlock = BasicBlockHelper::append($context, 'var_export_bool_true');
+        $falseBlock = BasicBlockHelper::append($context, 'var_export_bool_false');
+        $doneBlock = BasicBlockHelper::append($context, 'var_export_bool_done');
+        $context->builder->branchIf($boolVal, $trueBlock, $falseBlock);
+        $context->builder->positionAtEnd($trueBlock);
+        $context->builder->call(
+            $printf,
+            $context->builder->pointerCast($context->constantFromString('true'), $charPtr)
+        );
+        $context->builder->branch($doneBlock);
+        $context->builder->positionAtEnd($falseBlock);
+        $context->builder->call(
+            $printf,
+            $context->builder->pointerCast($context->constantFromString('false'), $charPtr)
+        );
+        $context->builder->branch($doneBlock);
+        $context->builder->positionAtEnd($doneBlock);
+    }
+
     private static function exportJit(Context $context, JITVariable $arg): Value
     {
-        if (JITVariable::TYPE_NATIVE_BOOL === $arg->type) {
-            $boolVal = $context->helper->loadValue($arg);
-            $trueStr = $context->constantStringFromString('true');
-            $falseStr = $context->constantStringFromString('false');
-
-            return $context->builder->select(
-                $boolVal,
-                $context->builder->load($trueStr),
-                $context->builder->load($falseStr)
-            );
+        if (JITVariable::TYPE_VALUE === $arg->type || JITVariable::TYPE_NATIVE_BOOL === $arg->type) {
+            return self::exportBoolJit($context, self::boolValForBranch($context, $arg));
         }
         if (JITVariable::TYPE_NULL === $arg->type) {
             return $context->builder->load($context->constantStringFromString('NULL'));
         }
 
         throw new \LogicException('var_export() does not support this value type in this compiler build');
+    }
+
+    private static function exportBoolJit(Context $context, Value $boolVal): Value
+    {
+        $trueStr = $context->constantStringFromString('true');
+        $falseStr = $context->constantStringFromString('false');
+
+        return $context->builder->select(
+            $boolVal,
+            $context->builder->load($trueStr),
+            $context->builder->load($falseStr)
+        );
     }
 }
