@@ -93,12 +93,13 @@ make bootstrap-selfhost-link   <span class="php-cmt"># → compiler_minimal bund
           <p><a href="development-status.html#north-star-1-web-app">Full north-star doc →</a> · <a href="https://github.com/PurHur/php-compiler/issues/1044">#1044</a></p>
         </article>
         <article class="track-panel track-panel--selfhost">
-          <h3>🔄 Self-host north star</h3>
+          <h3>🔄 North Star 2 — Self-host</h3>
           <p>
-            Build a native binary from <code>lib/</code> (no <code>vendor/</code>), then compile PHP again.
-            Details in <a href="development-status.html#self-host-milestone-ladder">full status → Self-host ladder</a>.
+            <strong>Compiler fully compiles itself:</strong> native binary from <code>lib/</code> (no <code>vendor/</code>),
+            compiles PHP, then rebuilds the next compiler revision without Zend.
           </p>
-          <p><strong>Status:</strong> M0 ✅ · M1 🚧 · M2 ⬜.</p>
+          <p><strong>Status:</strong> M0 ✅ · M1 🚧 · M2 🚧 · M5 (full self-host) ⬜.</p>
+          <p><a href="development-status.html#north-star-2-self-host">Full north-star doc →</a> · <a href="https://github.com/PurHur/php-compiler/issues/1056">#1056</a></p>
         </article>
       </div>
     </section>
@@ -119,7 +120,7 @@ make bootstrap-selfhost-link   <span class="php-cmt"># → compiler_minimal bund
         </div>
         <p class="overall-progress__note">
           Strong on VM, CI, and AOT linking; North Star 1 home execute green; remaining 003 routes
-          and honest self-host (M2) still open.
+          open; North Star 2 M0 done, M1/M2 in progress, full self-compile (M5) is the stretch goal.
         </p>
       </div>
     </section>
@@ -164,7 +165,7 @@ make bootstrap-selfhost-link   <span class="php-cmt"># → compiler_minimal bund
         <article class="card">
           <span class="phase-num">Self-host</span>
           <h3><span class="status-dot status-dot--wip"></span> Compile-itself</h3>
-          <p>~109-file bundle; M1 in progress.</p>
+          <p>~109-file bundle today; ~413-file vm.php target; M5 = full self-host.</p>
           <div class="mini-progress"><div class="progress-track"><div class="progress-fill" data-width="35"></div></div></div>
         </article>
       </div>
