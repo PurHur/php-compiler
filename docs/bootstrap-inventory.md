@@ -8,9 +8,9 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 392 |
+| PHP files on vm.php path | 393 |
 | Source constructs flagged (blockers) | 14 |
-| Source constructs flagged (warnings) | 1055 |
+| Source constructs flagged (warnings) | 1056 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -297,6 +297,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `lib/Cli/InvokeCwd.php` | 0 | 1 |
 | `lib/Cli/PhpcBuild.php` | 0 | 3 |
 | `lib/Cli/PhpcInit.php` | 0 | 1 |
+| `lib/Cli/PhpcRun.php` | 0 | 1 |
 | `lib/Compiler.php` | 0 | 138 |
 | `lib/Doctor.php` | 0 | 1 |
 | `lib/Frame.php` | 0 | 1 |
@@ -2010,6 +2011,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 **Warnings** (review for bootstrap subset):
 - 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `lib/Cli/PhpcRun.php`
+
+**Warnings** (review for bootstrap subset):
+- 10 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `lib/Compiler.php`
 
 **Warnings** (review for bootstrap subset):
@@ -2210,14 +2216,14 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new Variable (line 1417)
 - new Variable (line 1429)
 - new Variable (line 1997)
-- new Variable (line 2298)
-- new Variable (line 2316)
-- new Operand\Literal (line 2514)
-- new Operand\Literal (line 2518)
-- new Operand\Literal (line 2522)
-- new Variable (line 2526)
-- new Variable (line 2546)
-- new Variable (line 2607)
+- new Variable (line 2317)
+- new Variable (line 2335)
+- new Operand\Literal (line 2556)
+- new Operand\Literal (line 2560)
+- new Operand\Literal (line 2564)
+- new Variable (line 2568)
+- new Variable (line 2588)
+- new Variable (line 2649)
 - 55 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Analyzer.php`
@@ -2954,7 +2960,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/Web/ConstStringFolder.php`
 
 **Warnings** (review for bootstrap subset):
-- 20 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 21 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/Web/DeployRoot.php`
 
