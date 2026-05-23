@@ -195,19 +195,22 @@ static const char *phpc_builtin_functions[] = {
     "strval",
     "substr",
     "substr_count",
+    "sys_get_temp_dir",
     "tan",
     "time",
     "touch",
+    "trigger_error",
     "trim",
     "ucfirst",
     "ucwords",
     "unlink",
     "urldecode",
     "urlencode",
+    "usort",
     "var_export",
     "web_bool",
     "web_int",
     "web_string",
     "wordwrap",
 };
-static const size_t phpc_builtin_functions_count = 209;
+static const size_t phpc_builtin_functions_count = 212;

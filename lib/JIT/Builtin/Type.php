@@ -374,6 +374,9 @@ class Type extends Builtin {
         $fntypeShellExec = $this->context->context->functionType($strPtr, false, $strPtr);
         $fnShellExec = $this->context->module->addFunction('__compiler_shell_exec', $fntypeShellExec);
         $this->context->registerFunction('__compiler_shell_exec', $fnShellExec);
+        $fntypeSysGetTempDir = $this->context->context->functionType($strPtr, false);
+        $fnSysGetTempDir = $this->context->module->addFunction('__compiler_sys_get_temp_dir', $fntypeSysGetTempDir);
+        $this->context->registerFunction('__compiler_sys_get_temp_dir', $fnSysGetTempDir);
         $fntypeHttpBuildQuery = $this->context->context->functionType(
             $strPtr,
             false,

@@ -199,6 +199,7 @@ class Module extends ModuleAbstract
             new fclose(),
             new getenv_(),
             new shell_exec(),
+            new sys_get_temp_dir(),
             new putenv_(),
             new define_(),
             new defined_(),

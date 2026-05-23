@@ -62,7 +62,7 @@ final class SelfHostBuiltinPolicy
         'mkdir' => 'filesystem', 'unlink' => 'filesystem', 'rmdir' => 'filesystem', 'realpath' => 'filesystem',
         'glob' => 'filesystem', 'scandir' => 'filesystem',
         'fopen' => 'filesystem', 'fread' => 'filesystem', 'fclose' => 'filesystem',
-        'getenv' => 'filesystem', 'putenv' => 'filesystem',
+        'getenv' => 'filesystem', 'putenv' => 'filesystem', 'sys_get_temp_dir' => 'filesystem',
     ];
 
     /** @var array<string, string> */

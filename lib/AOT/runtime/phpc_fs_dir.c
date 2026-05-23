@@ -7,11 +7,13 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <glob.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <utime.h>
+#include <unistd.h>
 
 typedef struct __hashtable__ __hashtable__;
 typedef struct __string__ __string__;
@@ -323,4 +325,26 @@ __hashtable__ *__phpc_scandir(__string__ *path, int sorting_order)
     free(namelist);
 
     return ht;
+}
+/** sys_get_temp_dir() — TMPDIR/TEMP/TMP or /tmp, realpath when possible (#1202). */
+__string__ *__compiler_sys_get_temp_dir(void)
+{
+    const char *dir;
+    char resolved[PATH_MAX];
+
+    dir = getenv("TMPDIR");
+    if (NULL == dir || '\0' == *dir) {
+        dir = getenv("TEMP");
+    }
+    if (NULL == dir || '\0' == *dir) {
+        dir = getenv("TMP");
+    }
+    if (NULL == dir || '\0' == *dir) {
+        dir = "/tmp";
+    }
+    if (NULL != realpath(dir, resolved)) {
+        return cstr_to_string(resolved);
+    }
+
+    return cstr_to_string(dir);
 }
