@@ -931,6 +931,18 @@ class JIT {
                         );
                         break;
                     }
+                    if ('native_type_map' === strtolower($nameOp->value) || 'type_map' === strtolower($nameOp->value)) {
+                        $classLabel = $classOp instanceof Operand\Literal
+                            ? strtolower($classOp->value)
+                            : '';
+                        if (str_contains($classLabel, 'variable')) {
+                            $mapVar = $this->jitVariableArrayClassConstant($nameOp->value);
+                            if (null !== $mapVar) {
+                                $this->assignOperand($block->getOperand($op->arg1), $mapVar);
+                                break;
+                            }
+                        }
+                    }
                     $classId = $this->context->type->object->resolveClassId($classOp);
                     $value = $this->context->type->object->classConstFetch($classId, $nameOp->value);
                     $this->assignOperand($block->getOperand($op->arg1), $value);
@@ -1161,7 +1173,7 @@ class JIT {
                     $this->maybeRefreshIncludeBindingsBeforeUse();
                     $this->assignOperand(
                         $this->operandAt($block, $op->arg1, opcode_type_name($op->type).' result'),
-                        $this->context->helper->binaryOp(
+                        $this->compileBinaryOp(
                             $op,
                             $this->context->getVariableFromOp($this->operandAt($block, $op->arg2, opcode_type_name($op->type).' left')),
                             $this->context->getVariableFromOp($this->operandAt($block, $op->arg3, opcode_type_name($op->type).' right'))
@@ -1174,7 +1186,7 @@ class JIT {
                     $this->maybeRefreshIncludeBindingsBeforeUse();
                     $this->assignOperand(
                         $this->operandAt($block, $op->arg1, opcode_type_name($op->type).' result'),
-                        $this->context->helper->binaryOp(
+                        $this->compileBinaryOp(
                             $op,
                             $this->context->getVariableFromOp($this->operandAt($block, $op->arg2, opcode_type_name($op->type).' left')),
                             $this->context->getVariableFromOp($this->operandAt($block, $op->arg3, opcode_type_name($op->type).' right'))
@@ -1182,6 +1194,7 @@ class JIT {
                     );
                     break;
                 case OpCode::TYPE_UNARY_MINUS:
+                case OpCode::TYPE_BITWISE_NOT:
                     $this->assignOperand(
                         $block->getOperand($op->arg1),
                         $this->context->helper->unaryOp(
@@ -2590,6 +2603,106 @@ class JIT {
                     .$this->context->getStringFromType($value->typeOf())
                 );
         }
+    }
+
+    private function compileBinaryOp(OpCode $op, Variable $left, Variable $right): Variable
+    {
+        if (Variable::TYPE_VALUE === $left->type && Variable::TYPE_VALUE === $right->type) {
+            switch ($op->type) {
+                case OpCode::TYPE_BITWISE_AND:
+                case OpCode::TYPE_BITWISE_OR:
+                case OpCode::TYPE_BITWISE_XOR:
+                    return $this->compileValueBoxedBitwiseOp($op->type, $left, $right);
+            }
+        }
+
+        return $this->context->helper->binaryOp($op, $left, $right);
+    }
+
+    private function compileValueBoxedBitwiseOp(int $opcodeType, Variable $left, Variable $right): Variable
+    {
+        $leftPtr = Variable::KIND_VARIABLE === $left->kind
+            ? $left->value
+            : $this->context->helper->loadValue($left);
+        $rightPtr = Variable::KIND_VARIABLE === $right->kind
+            ? $right->value
+            : $this->context->helper->loadValue($right);
+        $readLong = $this->context->lookupFunction('__value__readLong');
+        $leftLong = $this->context->builder->call($readLong, $leftPtr);
+        $rightLong = $this->context->builder->call($readLong, $rightPtr);
+        switch ($opcodeType) {
+            case OpCode::TYPE_BITWISE_AND:
+                $result = $this->context->builder->bitwiseAnd($leftLong, $rightLong);
+                break;
+            case OpCode::TYPE_BITWISE_OR:
+                $result = $this->context->builder->bitwiseOr($leftLong, $rightLong);
+                break;
+            case OpCode::TYPE_BITWISE_XOR:
+                $result = $this->context->builder->bitwiseXor($leftLong, $rightLong);
+                break;
+            default:
+                throw new \LogicException('Unsupported boxed bitwise opcode: '.opcode_type_name($opcodeType));
+        }
+
+        return new Variable($this->context, Variable::TYPE_NATIVE_LONG, Variable::KIND_VALUE, $result);
+    }
+
+    private function jitVariableArrayClassConstant(string $constName): ?Variable
+    {
+        switch (strtolower($constName)) {
+            case 'native_type_map':
+                return $this->jitVariableNativeTypeMapConstant();
+            case 'type_map':
+                return $this->jitVariableTypeMapConstant();
+            default:
+                return null;
+        }
+    }
+
+    private function jitVariableNativeTypeMapConstant(): Variable
+    {
+        $slot = JIT\BasicBlockHelper::entryAlloca(
+            $this->context,
+            $this->context->getTypeFromString('__hashtable__*')
+        );
+        $result = new Variable(
+            $this->context,
+            Variable::TYPE_HASHTABLE,
+            Variable::KIND_VARIABLE,
+            $slot
+        );
+        JIT\HashTableHelper::initArray($this->context, $result);
+        foreach (JIT\Variable::NATIVE_TYPE_MAP as $typeKey => $typeName) {
+            $key = Variable::fromConstantInt($this->context, $typeKey);
+            $lit = new Operand\Literal($typeName);
+            $lit->type = Type::string();
+            $element = Variable::fromLiteral($this->context, $lit);
+            JIT\HashTableHelper::addElement($this->context, $result, $element, $key);
+        }
+
+        return $result;
+    }
+
+    private function jitVariableTypeMapConstant(): Variable
+    {
+        $slot = JIT\BasicBlockHelper::entryAlloca(
+            $this->context,
+            $this->context->getTypeFromString('__hashtable__*')
+        );
+        $result = new Variable(
+            $this->context,
+            Variable::TYPE_HASHTABLE,
+            Variable::KIND_VARIABLE,
+            $slot
+        );
+        JIT\HashTableHelper::initArray($this->context, $result);
+        foreach (JIT\Variable::TYPE_MAP as $typeKey => $typeValue) {
+            $key = Variable::fromConstantInt($this->context, $typeKey);
+            $element = Variable::fromConstantInt($this->context, $typeValue);
+            JIT\HashTableHelper::addElement($this->context, $result, $element, $key);
+        }
+
+        return $result;
     }
 
     /**

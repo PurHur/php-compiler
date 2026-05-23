@@ -99,6 +99,35 @@ final class SourceBundlerTest extends TestCase
         }
     }
 
+    public function testBundleEmitsSingleStrictTypesDeclare(): void
+    {
+        $dir = sys_get_temp_dir().'/phpc_bundle_'.bin2hex(random_bytes(6));
+        $this->assertTrue(mkdir($dir));
+        $this->assertTrue(mkdir($dir.'/public', 0777, true));
+        try {
+            file_put_contents(
+                $dir.'/lib.php',
+                "<?php\ndeclare(strict_types=1);\n\nfunction lib_fn(): int { return 1; }\n"
+            );
+            file_put_contents(
+                $dir.'/public/index.php',
+                "<?php\ndeclare(strict_types=1);\n\nrequire __DIR__ . '/../lib.php';\necho lib_fn();\n"
+            );
+
+            [$bundled] = SourceBundler::bundleForAot(
+                $dir.'/public/index.php',
+                [realpath($dir.'/lib.php') ?: $dir.'/lib.php']
+            );
+
+            $this->assertSame(1, substr_count($bundled, 'declare(strict_types=1);'));
+        } finally {
+            @unlink($dir.'/lib.php');
+            @unlink($dir.'/public/index.php');
+            @rmdir($dir.'/public');
+            @rmdir($dir);
+        }
+    }
+
     public function testBundleMiniWebAppPreservesDeployPathIncludes(): void
     {
         $entry = realpath(dirname(__DIR__, 3).'/examples/003-MiniWebApp/public/index.php');

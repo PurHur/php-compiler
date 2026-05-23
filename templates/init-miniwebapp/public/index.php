@@ -34,7 +34,7 @@ if (isset($_SERVER['PATH_INFO'])) {
     }
 }
 
-$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+$method = (string) ($_SERVER['REQUEST_METHOD'] ?? 'GET');
 
 $router = new Router($config);
-$router->dispatch($method, $route);
+$router->dispatch($method, (string) $route);

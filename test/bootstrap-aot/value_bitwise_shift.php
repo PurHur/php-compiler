@@ -25,6 +25,7 @@ $h = new Holder();
 $pair = type_pair(1, 1);
 $shifted = $h->n << 4;
 $masked = $h->n & 15;
+$boxed = $h->n & $h->flag;
 $combined = $shifted | ($h->flag ? 1 : 0);
 
-echo (string) ($pair + $masked + $combined);
+echo (string) ($pair + $masked + $combined + $boxed);
