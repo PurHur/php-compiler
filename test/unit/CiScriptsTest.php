@@ -34,6 +34,8 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('ci_run_examples_web_smoke_aot', $body);
         $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
         $this->assertStringContainsString('--group aot-link', $common);
+        $this->assertStringContainsString('ci_run_phpunit', $common);
+        $this->assertStringContainsString('ci_export_llvm_env', $common);
     }
 
     public function testCiLocalHonorsMiniWebAppServeGate(): void

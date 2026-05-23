@@ -93,15 +93,6 @@ function probeJitReadiness(string $repoRoot): int
         fwrite(STDERR, "JIT probe: run composer install first\n");
         return 2;
     }
-    require $autoload;
-
-    applyLlvmEnv($llvmDir);
-
-    if (!probePhpllvmChooser()) {
-        fwrite(STDERR, "JIT probe FAILED: libLLVM at {$llvmDir} but PHPLLVM bootstrap failed (#98)\n");
-        fwrite(STDERR, "  Set PHP_COMPILER_LLVM_PATH and prepend LLVM dir to LD_LIBRARY_PATH and PATH.\n");
-        return 1;
-    }
 
     $probeScript = $repoRoot.'/script/jit-runtime-probe.php';
     if (!is_file($probeScript)) {
@@ -114,9 +105,12 @@ function probeJitReadiness(string $repoRoot): int
         1 => ['pipe', 'w'],
         2 => ['pipe', 'w'],
     ];
-    $env = $_ENV;
-    applyLlvmEnvToArray($llvmDir, $env);
-    $proc = proc_open([PHP_BINARY, $probeScript], $descriptorSpec, $pipes, $repoRoot, $env);
+    $proc = proc_open(
+        ['bash', '-lc', 'cd '.escapeshellarg($repoRoot).' && source script/php-env.sh && "$PHP_BIN" "${PHP_OPTS[@]}" script/jit-runtime-probe.php'],
+        $descriptorSpec,
+        $pipes,
+        $repoRoot
+    );
     if (!is_resource($proc)) {
         fwrite(STDERR, "JIT probe: could not start jit-runtime-probe.php\n");
         return 2;
@@ -135,6 +129,19 @@ function probeJitReadiness(string $repoRoot): int
     }
     if (0 !== $exit) {
         fwrite(STDERR, "JIT probe FAILED: MCJIT runtime probe failed (#98)\n");
+        return 1;
+    }
+
+    require $autoload;
+    require_once $repoRoot.'/test/LlvmToolchain.php';
+
+    if (!\PHPCompiler\LlvmToolchain::isReady($repoRoot)) {
+        $reason = \PHPCompiler\LlvmToolchain::readyFailureReason();
+        fwrite(STDERR, "JIT probe FAILED: libLLVM at {$llvmDir} but PHPLLVM bootstrap failed (#98)\n");
+        if (null !== $reason && '' !== $reason) {
+            fwrite(STDERR, "  {$reason}\n");
+        }
+        fwrite(STDERR, "  Set PHP_COMPILER_LLVM_PATH and prepend LLVM dir to LD_LIBRARY_PATH and PATH.\n");
         return 1;
     }
 
