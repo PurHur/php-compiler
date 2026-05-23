@@ -8,9 +8,9 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 351 |
+| PHP files on vm.php path | 353 |
 | Source constructs flagged (blockers) | 10 |
-| Source constructs flagged (warnings) | 939 |
+| Source constructs flagged (warnings) | 942 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -61,6 +61,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/JitPendingHeaders.php` | 0 | 1 |
 | `ext/standard/JitRandomBytes.php` | 0 | 1 |
 | `ext/standard/JitReadfile.php` | 0 | 1 |
+| `ext/standard/JitReadlink.php` | 0 | 1 |
 | `ext/standard/JitRealpath.php` | 0 | 1 |
 | `ext/standard/JitRequestBody.php` | 0 | 1 |
 | `ext/standard/JitSetcookie.php` | 0 | 1 |
@@ -81,7 +82,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/JitSubstrCount.php` | 0 | 1 |
 | `ext/standard/JitUrlencode.php` | 0 | 1 |
 | `ext/standard/JitWebParams.php` | 0 | 15 |
-| `ext/standard/Module.php` | 0 | 160 |
+| `ext/standard/Module.php` | 0 | 161 |
 | `ext/standard/SetcookieLine.php` | 0 | 1 |
 | `ext/standard/VmDate.php` | 0 | 1 |
 | `ext/standard/VmExit.php` | 0 | 2 |
@@ -205,6 +206,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/rawurldecode.php` | 0 | 1 |
 | `ext/standard/rawurlencode.php` | 0 | 1 |
 | `ext/standard/readfile.php` | 0 | 1 |
+| `ext/standard/readlink.php` | 0 | 1 |
 | `ext/standard/realpath.php` | 0 | 1 |
 | `ext/standard/round.php` | 0 | 1 |
 | `ext/standard/scandir.php` | 0 | 1 |
@@ -522,6 +524,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 **Warnings** (review for bootstrap subset):
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `ext/standard/JitReadlink.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `ext/standard/JitRealpath.php`
 
 **Warnings** (review for bootstrap subset):
@@ -781,23 +788,24 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new is_writable (line 161)
 - new is_executable (line 162)
 - new is_link (line 163)
-- new filetype (line 164)
-- new fopen (line 165)
-- new fread (line 166)
-- new fwrite (line 167)
-- new fclose (line 168)
-- new getenv_ (line 169)
-- new putenv_ (line 170)
-- new define_ (line 171)
-- new defined_ (line 172)
-- new phpc_deploy_path (line 173)
-- new extract_ (line 174)
-- new compact_ (line 175)
-- new scandir (line 176)
-- new glob_ (line 177)
-- new time (line 178)
-- new date (line 179)
-- new gmdate (line 180)
+- new readlink (line 164)
+- new filetype (line 165)
+- new fopen (line 166)
+- new fread (line 167)
+- new fwrite (line 168)
+- new fclose (line 169)
+- new getenv_ (line 170)
+- new putenv_ (line 171)
+- new define_ (line 172)
+- new defined_ (line 173)
+- new phpc_deploy_path (line 174)
+- new extract_ (line 175)
+- new compact_ (line 176)
+- new scandir (line 177)
+- new glob_ (line 178)
+- new time (line 179)
+- new date (line 180)
+- new gmdate (line 181)
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/SetcookieLine.php`
@@ -828,7 +836,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 **Warnings** (review for bootstrap subset):
 - new HashTable (line 23)
 - new Variable (line 25)
-- 13 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 14 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/VmHash.php`
 
@@ -1452,6 +1460,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/readfile.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/readlink.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler

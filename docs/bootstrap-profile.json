@@ -59,6 +59,7 @@
         "ext/standard/JitPendingHeaders.php",
         "ext/standard/JitRandomBytes.php",
         "ext/standard/JitReadfile.php",
+        "ext/standard/JitReadlink.php",
         "ext/standard/JitRealpath.php",
         "ext/standard/JitRequestBody.php",
         "ext/standard/JitSetcookie.php",
@@ -203,6 +204,7 @@
         "ext/standard/rawurldecode.php",
         "ext/standard/rawurlencode.php",
         "ext/standard/readfile.php",
+        "ext/standard/readlink.php",
         "ext/standard/realpath.php",
         "ext/standard/round.php",
         "ext/standard/scandir.php",
@@ -416,9 +418,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 351,
+        "inventory_files": 353,
         "excluded": 2,
-        "eligible": 349,
+        "eligible": 351,
         "aot_lint_targets": 15,
         "aot_link_targets": 13,
         "aot_link_lib_targets": 1

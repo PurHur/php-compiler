@@ -60,6 +60,16 @@ final class VmFs
         return self::modeToFiletype((int) ($stat['mode'] ?? 0));
     }
 
+    public static function readlink(string $path): string|false
+    {
+        $target = @readlink($path);
+        if (false === $target) {
+            return false;
+        }
+
+        return $target;
+    }
+
     private static function modeToFiletype(int $mode): string
     {
         $type = $mode & 0xF000;
