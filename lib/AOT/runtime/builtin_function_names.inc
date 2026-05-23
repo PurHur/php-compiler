@@ -3,6 +3,8 @@ static const char *phpc_builtin_functions[] = {
     "__compiler_is_superglobal_name",
     "abs",
     "addslashes",
+    "array_chunk",
+    "array_column",
     "array_combine",
     "array_diff",
     "array_fill",
@@ -116,6 +118,7 @@ static const char *phpc_builtin_functions[] = {
     "is_subclass_of",
     "is_writable",
     "join",
+    "json_decode",
     "json_encode",
     "lcfirst",
     "log",
@@ -197,6 +200,7 @@ static const char *phpc_builtin_functions[] = {
     "strval",
     "substr",
     "substr_count",
+    "sys_get_temp_dir",
     "tan",
     "time",
     "touch",
@@ -214,4 +218,4 @@ static const char *phpc_builtin_functions[] = {
     "web_string",
     "wordwrap",
 };
-static const size_t phpc_builtin_functions_count = 213;
+static const size_t phpc_builtin_functions_count = 217;

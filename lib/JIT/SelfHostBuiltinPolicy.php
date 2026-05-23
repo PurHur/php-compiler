@@ -62,7 +62,7 @@ final class SelfHostBuiltinPolicy
         'mkdir' => 'filesystem', 'unlink' => 'filesystem', 'rmdir' => 'filesystem', 'realpath' => 'filesystem',
         'glob' => 'filesystem', 'scandir' => 'filesystem',
         'fopen' => 'filesystem', 'fread' => 'filesystem', 'fclose' => 'filesystem',
-        'getenv' => 'filesystem', 'putenv' => 'filesystem',
+        'getenv' => 'filesystem', 'putenv' => 'filesystem', 'sys_get_temp_dir' => 'filesystem',
     ];
 
     /** @var array<string, string> */
@@ -85,6 +85,7 @@ final class SelfHostBuiltinPolicy
         // array_map: null + compile-time string builtins only; closures deferred (#1154)
         'array_push' => 'array', 'array_pop' => 'array', 'array_shift' => 'array', 'array_unshift' => 'array',
         'array_reverse' => 'array', 'array_filter' => 'array', 'array_combine' => 'array', 'array_flip' => 'array',
+        'array_chunk' => 'array', 'array_column' => 'array',
         'array_product' => 'array', 'array_unique' => 'array', 'array_diff' => 'array', 'array_sum' => 'array', 'sort' => 'array',
         'usort' => 'array',
         'compact' => 'array', 'extract' => 'array', 'defined' => 'array', 'define' => 'array',
@@ -103,7 +104,7 @@ final class SelfHostBuiltinPolicy
     private const CATEGORY_FILTER = ['filter_var' => 'filter', 'filter_input' => 'filter'];
 
     /** @var array<string, string> */
-    private const CATEGORY_JSON = ['json_encode' => 'json'];
+    private const CATEGORY_JSON = ['json_encode' => 'json', 'json_decode' => 'json'];
 
     /** @var list<string> */
     public const AUTO_STUB_BATCH = [

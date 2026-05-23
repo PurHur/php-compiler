@@ -262,4 +262,9 @@ final class VmFs
     {
         return self::$handles[$handle] ?? null;
     }
+
+    public static function tempDir(): string
+    {
+        return \sys_get_temp_dir();
+    }
 }
