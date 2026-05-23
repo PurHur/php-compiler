@@ -1,4 +1,4 @@
-# Bootstrap self-host gates: probe → native link → wave-check (wave 6 agent D).
+# Bootstrap self-host gates: probe → native link → wave-check + compile-smoke (wave 7D).
 # Complements CircleCI / local ci-local.sh; does not replace the full test matrix.
 name: Bootstrap self-host
 
@@ -49,7 +49,7 @@ jobs:
               script/apply-patches.sh || true
               make bootstrap-selfhost-probe
               ./script/bootstrap-selfhost-link.sh
-              ./script/bootstrap-wave-check.sh --fail-fast
+              ./script/bootstrap-wave-check.sh --with-compile-smoke --fail-fast
             '
 
       - name: Install host PHP + LLVM 9 (fallback)
@@ -75,4 +75,4 @@ jobs:
           ./script/install-llvm9.sh
           make bootstrap-selfhost-probe
           ./script/bootstrap-selfhost-link.sh
-          ./script/bootstrap-wave-check.sh --fail-fast
+          ./script/bootstrap-wave-check.sh --with-compile-smoke --fail-fast
