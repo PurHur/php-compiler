@@ -133,9 +133,9 @@ final class IteratorHelper
         );
     }
 
-    private static function indexSlot(Context $context, Variable $array): \PHPLLVM\Value
+    private static function indexSlot(Context $context, Variable $slotKey): \PHPLLVM\Value
     {
-        $key = \spl_object_id($array);
+        $key = \spl_object_id($slotKey);
         if (isset($context->foreachIndexSlots[$key])) {
             return $context->foreachIndexSlots[$key];
         }
@@ -146,9 +146,9 @@ final class IteratorHelper
         return $slot;
     }
 
-    private static function objNodeSlot(Context $context, Variable $array): \PHPLLVM\Value
+    private static function objNodeSlot(Context $context, Variable $slotKey): \PHPLLVM\Value
     {
-        $key = \spl_object_id($array);
+        $key = \spl_object_id($slotKey);
         if (isset($context->foreachObjNodeSlots[$key])) {
             return $context->foreachObjNodeSlots[$key];
         }
@@ -161,12 +161,13 @@ final class IteratorHelper
 
     public static function compileReset(Context $context, Variable $array, ?string $containerUserType = null): void
     {
+        $slotKey = $array;
         $array = self::asHashtable($context, $array, $containerUserType);
         if (self::usesObjectKeys($containerUserType)) {
             $nodePtrType = $context->getTypeFromString('__objkey_node__*');
             $context->builder->store(
                 $nodePtrType->constNull(),
-                self::objNodeSlot($context, $array)
+                self::objNodeSlot($context, $slotKey)
             );
 
             return;
@@ -175,7 +176,7 @@ final class IteratorHelper
         $zero = $sizeT->constInt(0, false);
         $one = $sizeT->constInt(1, false);
         $invalid = $context->builder->sub($zero, $one);
-        $context->builder->store($invalid, self::indexSlot($context, $array));
+        $context->builder->store($invalid, self::indexSlot($context, $slotKey));
     }
 
     public static function compileValid(
@@ -183,22 +184,26 @@ final class IteratorHelper
         Variable $array,
         ?string $containerUserType = null
     ): \PHPLLVM\Value {
+        $slotKey = $array;
         $array = self::asHashtable($context, $array, $containerUserType);
         if (self::usesObjectKeys($containerUserType)) {
-            return self::compileValidObjectKeys($context, $array);
+            return self::compileValidObjectKeys($context, $array, $slotKey);
         }
 
-        return self::compileValidHashtable($context, $array);
+        return self::compileValidHashtable($context, $array, $slotKey);
     }
 
-    private static function compileValidObjectKeys(Context $context, Variable $array): \PHPLLVM\Value
-    {
+    private static function compileValidObjectKeys(
+        Context $context,
+        Variable $array,
+        Variable $slotKey
+    ): \PHPLLVM\Value {
         $ht = $context->helper->loadValue($array);
         $map = $context->structFieldMap['__hashtable__'];
         $nodeMap = $context->structFieldMap['__objkey_node__'];
         $nodePtrType = $context->getTypeFromString('__objkey_node__*');
         $i1 = $context->getTypeFromString('int1');
-        $walkSlot = self::objNodeSlot($context, $array);
+        $walkSlot = self::objNodeSlot($context, $slotKey);
         $current = $context->builder->load($walkSlot);
         $fn = $context->builder->getInsertBlock()->getParent();
         $init = $fn->appendBasicBlock('foreach_obj_init');
@@ -245,7 +250,7 @@ final class IteratorHelper
         return $result;
     }
 
-    private static function compileValidHashtable(Context $context, Variable $array): \PHPLLVM\Value
+    private static function compileValidHashtable(Context $context, Variable $array, Variable $slotKey): \PHPLLVM\Value
     {
         $ht = $context->helper->loadValue($array);
         $map = $context->structFieldMap['__hashtable__'];
@@ -254,7 +259,7 @@ final class IteratorHelper
         $i1 = $context->getTypeFromString('int1');
         $zero = $sizeT->constInt(0, false);
         $one = $sizeT->constInt(1, false);
-        $slot = self::indexSlot($context, $array);
+        $slot = self::indexSlot($context, $slotKey);
         $idx = $context->builder->load($slot);
         $nextIdx = $context->builder->addNoSignedWrap($idx, $one);
         $context->builder->store($nextIdx, $slot);
@@ -327,20 +332,21 @@ final class IteratorHelper
         Variable $array,
         ?string $containerUserType = null
     ): Variable {
+        $slotKey = $array;
         $array = self::asHashtable($context, $array, $containerUserType);
         if (self::usesObjectKeys($containerUserType)) {
-            return self::compileKeyObject($context, $array);
+            return self::compileKeyObject($context, $slotKey);
         }
 
-        return self::compileKeyHashtable($context, $array);
+        return self::compileKeyHashtable($context, $array, $slotKey);
     }
 
-    private static function compileKeyObject(Context $context, Variable $array): Variable
+    private static function compileKeyObject(Context $context, Variable $slotKey): Variable
     {
         $slot = JitValueBox::alloc($context);
         $destPtr = JitValueBox::pointer($context, $slot);
         $nodeMap = $context->structFieldMap['__objkey_node__'];
-        $node = $context->builder->load(self::objNodeSlot($context, $array));
+        $node = $context->builder->load(self::objNodeSlot($context, $slotKey));
         $keyObj = $context->builder->load($context->builder->structGep($node, $nodeMap['key']));
         $context->builder->call(
             $context->lookupFunction('__value__writeObject'),
@@ -351,7 +357,7 @@ final class IteratorHelper
         return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
     }
 
-    private static function compileKeyHashtable(Context $context, Variable $array): Variable
+    private static function compileKeyHashtable(Context $context, Variable $array, Variable $slotKey): Variable
     {
         $slot = JitValueBox::alloc($context);
         $destPtr = JitValueBox::pointer($context, $slot);
@@ -359,7 +365,7 @@ final class IteratorHelper
         $map = $context->structFieldMap['__hashtable__'];
         $nodeMap = $context->structFieldMap['__strkey_node__'];
         $sizeT = $context->getTypeFromString('size_t');
-        $idx = $context->builder->load(self::indexSlot($context, $array));
+        $idx = $context->builder->load(self::indexSlot($context, $slotKey));
         $nextFree = $context->builder->load($context->builder->structGep($ht, $map['nextFreeElement']));
         $inPacked = $context->builder->icmp(Builder::INT_ULT, $idx, $nextFree);
         $fn = $context->builder->getInsertBlock()->getParent();
@@ -375,7 +381,7 @@ final class IteratorHelper
         );
         $context->builder->branch($done);
         $context->builder->positionAtEnd($str);
-        $node = self::stringKeyNodeAt($context, $ht, $map, $nodeMap, $array);
+        $node = self::stringKeyNodeAt($context, $ht, $map, $nodeMap, $slotKey);
         $keyStr = $context->builder->load($context->builder->structGep($node, $nodeMap['key']));
         $context->builder->call(
             $context->lookupFunction('__value__writeString'),
@@ -393,21 +399,22 @@ final class IteratorHelper
         Variable $array,
         ?string $containerUserType = null
     ): Variable {
+        $slotKey = $array;
         $array = self::asHashtable($context, $array, $containerUserType);
         if (self::usesObjectKeys($containerUserType)) {
-            return self::compileValueObject($context, $array);
+            return self::compileValueObject($context, $slotKey);
         }
 
-        return self::compileValueHashtable($context, $array);
+        return self::compileValueHashtable($context, $array, $slotKey);
     }
 
-    private static function compileValueObject(Context $context, Variable $array): Variable
+    private static function compileValueObject(Context $context, Variable $slotKey): Variable
     {
         $slot = JitValueBox::alloc($context);
         $destPtr = JitValueBox::pointer($context, $slot);
         $nodeMap = $context->structFieldMap['__objkey_node__'];
         $valueMap = $context->structFieldMap['__value__'];
-        $node = $context->builder->load(self::objNodeSlot($context, $array));
+        $node = $context->builder->load(self::objNodeSlot($context, $slotKey));
         $valField = $context->builder->structGep($node, $nodeMap['value']);
         $fn = $context->builder->getInsertBlock()->getParent();
         self::copyValueEntryToBox($context, $destPtr, $valField, $valueMap, $fn);
@@ -415,7 +422,7 @@ final class IteratorHelper
         return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
     }
 
-    private static function compileValueHashtable(Context $context, Variable $array): Variable
+    private static function compileValueHashtable(Context $context, Variable $array, Variable $slotKey): Variable
     {
         $slot = JitValueBox::alloc($context);
         $destPtr = JitValueBox::pointer($context, $slot);
@@ -423,7 +430,7 @@ final class IteratorHelper
         $map = $context->structFieldMap['__hashtable__'];
         $nodeMap = $context->structFieldMap['__strkey_node__'];
         $valueMap = $context->structFieldMap['__value__'];
-        $idx = $context->builder->load(self::indexSlot($context, $array));
+        $idx = $context->builder->load(self::indexSlot($context, $slotKey));
         $nextFree = $context->builder->load($context->builder->structGep($ht, $map['nextFreeElement']));
         $inPacked = $context->builder->icmp(Builder::INT_ULT, $idx, $nextFree);
         $fn = $context->builder->getInsertBlock()->getParent();
@@ -437,7 +444,7 @@ final class IteratorHelper
         self::copyValueEntryToBox($context, $destPtr, $entry, $valueMap, $fn);
         $context->builder->branch($done);
         $context->builder->positionAtEnd($str);
-        $node = self::stringKeyNodeAt($context, $ht, $map, $nodeMap, $array);
+        $node = self::stringKeyNodeAt($context, $ht, $map, $nodeMap, $slotKey);
         $valField = $context->builder->structGep($node, $nodeMap['value']);
         self::copyValueEntryToBox($context, $destPtr, $valField, $valueMap, $fn);
         $context->builder->branch($done);
@@ -455,12 +462,12 @@ final class IteratorHelper
         \PHPLLVM\Value $ht,
         array $map,
         array $nodeMap,
-        Variable $array
+        Variable $slotKey
     ): \PHPLLVM\Value {
         $sizeT = $context->getTypeFromString('size_t');
         $zero = $sizeT->constInt(0, false);
         $one = $sizeT->constInt(1, false);
-        $ord = $context->builder->load(self::indexSlot($context, $array));
+        $ord = $context->builder->load(self::indexSlot($context, $slotKey));
         $head = $context->builder->load($context->builder->structGep($ht, $map['strKeys']));
         $block = $context->builder->getInsertBlock();
         $fn = $block->getParent();

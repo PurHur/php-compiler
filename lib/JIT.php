@@ -143,7 +143,7 @@ class JIT {
             $returnType = $this->context->getTypeFromString($callbackType);
             $this->context->functionReturnType[strtolower($internalName)] = $callbackType;
 
-            if ($this->blockUsesThis($block)) {
+            if ($this->instanceMethodUsesThis($block)) {
                 $rawTypes[] = Type::object();
                 $args[] = $this->context->getTypeFromString('__object__*');
             }
@@ -297,6 +297,9 @@ class JIT {
         $this->context->scope->blockStorage[$block] = $basicBlock;
         $builder = $this->context->builder;
         $builder->positionAtEnd($basicBlock);
+        if ([] !== $args) {
+            $this->context->implicitThisArgument = null;
+        }
         // Handle hoisted variables
         foreach ($block->orig->hoistedOperands as $operand) {
             if ($this->context->coalesceAssignTargets->contains($operand)) {
@@ -307,7 +310,7 @@ class JIT {
 
         $thisParamOffset = 0;
         if ([] !== $args) {
-            if ($this->blockUsesThis($block)) {
+            if ($this->instanceMethodUsesThis($block)) {
                 $thisParamOffset = 1;
             }
             foreach ($block->orig->hoistedOperands as $hoisted) {
@@ -319,6 +322,11 @@ class JIT {
                     $thisParamOffset = 1;
                     break;
                 }
+            }
+            if (1 === $thisParamOffset) {
+                $this->context->implicitThisArgument = $args[0];
+            } else {
+                $this->context->implicitThisArgument = null;
             }
             // Only the CFG entry block receives LLVM arguments; branch blocks share the same func (#210).
             if (null !== $block->func && $block->orig === $block->func->cfg) {
@@ -1006,12 +1014,16 @@ class JIT {
                         $this->context->freeDeadVariables($func, $returnBlock, $block);
                     }
                     if (0 === $this->context->inlineIncludeDepth) {
-                        if ($this->isVoidLlvmFunction($func)) {
-                            $this->context->builder->returnVoid();
-                        } else {
+                        if (
+                            !$this->isVoidLlvmFunction($func)
+                            && null !== $block->func
+                            && 'void' !== $this->cfgFunctionReturnCallbackType($block->func)
+                        ) {
                             $this->context->builder->returnValue(
                                 $this->defaultLlvmReturnValue($func)
                             );
+                        } else {
+                            $this->context->builder->returnVoid();
                         }
                     } else {
                         $this->context->inlineIncludeExitBlock = $returnBlock;
@@ -1127,12 +1139,14 @@ class JIT {
                 case OpCode::TYPE_NEW:
                     $classOp = $block->getOperand($op->arg2);
                     if ($classOp instanceof Operand\Literal && 0 === strcasecmp($classOp->value, 'SplObjectStorage')) {
-                        $ht = new Variable(
+                        $classId = $this->context->type->object->lookup('SplObjectStorage');
+                        $obj = new Variable(
                             $this->context,
-                            Variable::TYPE_HASHTABLE,
+                            Variable::TYPE_OBJECT,
                             Variable::KIND_VALUE,
-                            JIT\HashTableHelper::alloc($this->context)
+                            $this->context->type->object->allocate($classId)
                         );
+                        $ht = $this->context->type->object->splBackingHashtable($obj);
                         $this->assignOperand($block->getOperand($op->arg1), $ht, true);
                         $this->context->scope->toCall = null;
                         $this->context->scope->args = [];
@@ -1831,6 +1845,18 @@ class JIT {
         return false;
     }
 
+    private function instanceMethodUsesThis(Block $block): bool
+    {
+        if (null === $block->func || null === $block->func->class) {
+            return false;
+        }
+        if (($block->func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC) {
+            return false;
+        }
+
+        return true;
+    }
+
     /**
      * Static parent::__construct() from an instance method passes only declared params;
      * the callee LLVM signature may still include implicit $this when blockUsesThis().
@@ -1888,6 +1914,10 @@ class JIT {
             return $this->context->getVariableFromOpInScopes($hoisted);
         }
 
+        if (null !== $this->context->implicitThisArgument) {
+            return $this->context->implicitThisArgument;
+        }
+
         return null;
     }
 
@@ -1901,7 +1931,7 @@ class JIT {
                 continue;
             }
             $defaultIdx = $op->arg2;
-            if ($this->blockUsesThis($block)) {
+            if ($this->instanceMethodUsesThis($block)) {
                 ++$defaultIdx;
             }
             $defaults[$defaultIdx] = $this->jitVariableFromVmConstant($block->constants[$op->arg3]);
