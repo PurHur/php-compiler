@@ -84,6 +84,9 @@ class Context {
     /** Require/include expression result slots while inlining (issue #783). */
     public array $inlineIncludeReturnOperands = [];
 
+    /** Last LLVM exit block from an inlined TU (if/elseif before nested include, #764). */
+    public ?\PHPLLVM\BasicBlock $inlineIncludeExitBlock = null;
+
     private array $exports = [];
     public Runtime $runtime;
 

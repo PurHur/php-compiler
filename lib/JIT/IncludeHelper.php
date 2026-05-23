@@ -151,6 +151,7 @@ final class IncludeHelper
             $context->builder->branch($bodyBb);
         }
         try {
+            $context->inlineIncludeExitBlock = null;
             $exitBb = $jit->compileIncludedAtEntry($func, $included, $bodyBb);
         } finally {
             --$context->inlineIncludeDepth;

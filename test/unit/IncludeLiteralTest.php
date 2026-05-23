@@ -50,9 +50,40 @@ final class IncludeLiteralTest extends TestCase
         }
         $entry = realpath(__DIR__.'/../compliance/cases/language/include_scope_inherit/nested_entry.php');
         $this->assertNotFalse($entry);
-        $this->markTestSkipped(
-            'AOT nested literal include execute segfaults (issue #764); VM parity is green'
+        $outfile = sys_get_temp_dir().'/phpc_nested_inc_aot_'.bin2hex(random_bytes(6));
+        $repoRoot = dirname(__DIR__, 2);
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $compile = proc_open(
+            array_merge(
+                LlvmToolchain::envPrefix($repoRoot),
+                self::phpCommand(),
+                [realpath($repoRoot.'/bin/compile.php'), '-o', $outfile, $entry]
+            ),
+            $descriptorSpec,
+            $pipes,
+            $repoRoot,
+            []
         );
+        $this->assertIsResource($compile);
+        fclose($pipes[0]);
+        fclose($pipes[1]);
+        $compileErr = stream_get_contents($pipes[2]);
+        fclose($pipes[2]);
+        $this->assertSame(0, proc_close($compile), trim($compileErr !== false ? $compileErr : ''));
+        $this->assertFileExists($outfile);
+        $run = proc_open([$outfile], $descriptorSpec, $runPipes, $repoRoot, []);
+        $this->assertIsResource($run);
+        $stdout = stream_get_contents($runPipes[1]);
+        fclose($runPipes[0]);
+        fclose($runPipes[1]);
+        fclose($runPipes[2]);
+        $this->assertSame(0, proc_close($run));
+        $this->assertSame("nested-scope\n", $stdout !== false ? $stdout : '');
+        @unlink($outfile);
     }
 
     public function testVmRequireDirRelative(): void
