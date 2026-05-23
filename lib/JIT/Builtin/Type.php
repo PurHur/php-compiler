@@ -337,6 +337,13 @@ class Type extends Builtin {
             $this->context->context->functionType($htPtr, false, $strPtr, $i32)
         );
         $this->context->registerFunction('__phpc_scandir', $fnScandir);
+        $valuePtr = $this->context->getTypeFromString('__value__*');
+        $i64 = $this->context->getTypeFromString('int64');
+        $fnParseUrl = $this->context->module->addFunction(
+            '__phpc_parse_url_component',
+            $this->context->context->functionType($void, false, $strPtr, $i64, $valuePtr)
+        );
+        $this->context->registerFunction('__phpc_parse_url_component', $fnParseUrl);
         $fnPendingFlush = $this->context->module->addFunction(
             '__phpc_response_headers_flush',
             $this->context->context->functionType($void, false)
