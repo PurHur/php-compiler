@@ -184,22 +184,25 @@ final class JitValueCompare
         );
         $stringMap = $context->structFieldMap['__string__'];
         $dataPtr = $context->builder->structGep($str, $stringMap['value']);
-        $i8pp = $context->getTypeFromString('int8*');
-        $endSlot = $context->builder->alloca($i8pp);
-        $context->builder->store($dataPtr, $endSlot);
-        $parsed = $context->builder->call(
-            $context->lookupFunction('strtol'),
-            $dataPtr,
-            $endSlot,
-            $context->getTypeFromString('int32')->constInt(10, false)
-        );
         $i64 = $context->getTypeFromString('int64');
-        $parsedI64 = $context->builder->sextOrBitCast($parsed, $i64);
-        $numericMatch = $context->builder->icmp(Builder::INT_EQ, $parsedI64, $nativeLong);
-        $endPtr = $context->builder->load($endSlot);
-        $consumed = $context->builder->icmp(Builder::INT_NE, $endPtr, $dataPtr);
+        $falseVal = $context->getTypeFromString('int1')->constInt(0, false);
+        $isZero = $context->builder->icmp(
+            Builder::INT_EQ,
+            $nativeLong,
+            $i64->constInt(0, false)
+        );
+        $zeroCstr = $context->builder->pointerCast(
+            $context->constantFromString('0'),
+            $context->getTypeFromString('char*')
+        );
+        $cmp = $context->builder->call(
+            $context->lookupFunction('strcmp'),
+            $dataPtr,
+            $zeroCstr
+        );
+        $zeroMatch = $context->builder->icmp(Builder::INT_EQ, $cmp, $cmp->typeOf()->constInt(0, false));
 
-        return $context->builder->and($consumed, $numericMatch);
+        return $context->builder->select($isZero, $zeroMatch, $falseVal);
     }
 
     public static function looseEqualNativeLongToValue(
