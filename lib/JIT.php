@@ -86,6 +86,15 @@ class JIT {
         }
     }
 
+    /**
+     * php-cfg dead operands before branchIf run before any successor; skip inside inlined
+     * includes so template locals survive layout title-branch partial includes (#784, #764).
+     */
+    private function shouldFreeDeadVariablesBeforeBranch(): bool
+    {
+        return 0 === $this->context->inlineIncludeDepth;
+    }
+
     private function compileBlock(Block $block, ?string $funcName = null): PHPLLVM\Value {
         if (!is_null($funcName)) {
             $internalName = $funcName;
@@ -799,7 +808,9 @@ class JIT {
                         $builder->branch($nextBb);
                     }
                     $builder->positionAtEnd($branchBlock);
-                    $this->context->freeDeadVariables($func, $branchBlock, $block);
+                    if ($this->shouldFreeDeadVariablesBeforeBranch()) {
+                        $this->context->freeDeadVariables($func, $branchBlock, $block);
+                    }
                     $builder->branchIf($match, $caseEntry, $nextBb);
                     $builder->positionAtEnd($nextBb);
                     break;
@@ -809,7 +820,9 @@ class JIT {
                     $this->compileBlockInternal($func, $op->block1, null, null, ...$args);
                     $targetEntry = $this->context->scope->blockStorage[$op->block1];
                     $builder->positionAtEnd($branchBlock);
-                    $this->context->freeDeadVariables($func, $branchBlock, $block);
+                    if ($this->shouldFreeDeadVariablesBeforeBranch()) {
+                        $this->context->freeDeadVariables($func, $branchBlock, $block);
+                    }
                     $builder->branch($targetEntry);
                     return $origBasicBlock;
                 case OpCode::TYPE_COALESCE:
@@ -868,7 +881,9 @@ class JIT {
                     $nullBb = JIT\NullsafeHelper::compileBranch($this, $func, $op->block1);
                     $fetchBb = JIT\NullsafeHelper::compileBranch($this, $func, $op->block2);
                     $builder->positionAtEnd($branchBlock);
-                    $this->context->freeDeadVariables($func, $branchBlock, $block);
+                    if ($this->shouldFreeDeadVariablesBeforeBranch()) {
+                        $this->context->freeDeadVariables($func, $branchBlock, $block);
+                    }
                     $builder->branchIf($isNull, $nullBb, $fetchBb);
                     if (null !== $op->block3) {
                         $mergeBb = JIT\BasicBlockHelper::append($this->context, 'nullsafe_merge');
@@ -893,7 +908,9 @@ class JIT {
                     $ifEntry = $this->context->scope->blockStorage[$op->block1];
                     $elseEntry = $this->context->scope->blockStorage[$op->block2];
                     $builder->positionAtEnd($branchBlock);
-                    $this->context->freeDeadVariables($func, $branchBlock, $block);
+                    if ($this->shouldFreeDeadVariablesBeforeBranch()) {
+                        $this->context->freeDeadVariables($func, $branchBlock, $block);
+                    }
                     $builder->branchIf($condition, $ifEntry, $elseEntry);
                     return $origBasicBlock;
                 case OpCode::TYPE_TRY:
@@ -901,7 +918,9 @@ class JIT {
                     $builder->positionAtEnd($branchBlock);
                     $tryBb = $this->compileBlockInternal($func, $op->block1, null, null, ...$args);
                     $builder->positionAtEnd($branchBlock);
-                    $this->context->freeDeadVariables($func, $branchBlock, $block);
+                    if ($this->shouldFreeDeadVariablesBeforeBranch()) {
+                        $this->context->freeDeadVariables($func, $branchBlock, $block);
+                    }
                     $builder->branch($tryBb);
                     return $origBasicBlock;
                 case OpCode::TYPE_CATCH:

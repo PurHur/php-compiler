@@ -38,6 +38,23 @@ final class IncludeLiteralTest extends TestCase
         $this->assertSame("nested-scope\n", $exit['stdout']);
     }
 
+    /**
+     * Second-tier literal include execute (layout → partial); tracked in #764 / #784.
+     *
+     * @group llvm
+     */
+    public function testAotNestedIncludeInheritsCallerScope(): void
+    {
+        if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM toolchain not available');
+        }
+        $entry = realpath(__DIR__.'/../compliance/cases/language/include_scope_inherit/nested_entry.php');
+        $this->assertNotFalse($entry);
+        $this->markTestSkipped(
+            'AOT nested literal include execute segfaults (issue #764); VM parity is green'
+        );
+    }
+
     public function testVmRequireDirRelative(): void
     {
         $entry = realpath(__DIR__.'/../compliance/cases/language/include_dir_literal/entry.php');

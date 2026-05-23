@@ -182,12 +182,8 @@ class Block {
                 $this->constants[$slot] = $parent->constants[$slot];
             }
         }
-        if ([] !== $parent->literalIncludePaths) {
-            $this->literalIncludePaths = $parent->literalIncludePaths;
-        }
-        if ([] !== $parent->deployIncludePaths) {
-            $this->deployIncludePaths = $parent->deployIncludePaths;
-        }
+        // literal/deploy include path tables are per-block; inheriting parent paths breaks
+        // arg3 indices and can recurse into the wrong TU (layout vs partial, issue #784).
         if (null !== $parent->func) {
             $this->func = $parent->func;
             $this->strictTypes = $parent->strictTypes;

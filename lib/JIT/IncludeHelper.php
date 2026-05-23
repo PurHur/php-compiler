@@ -44,9 +44,6 @@ final class IncludeHelper
         if (null !== $op->arg3 && isset($callerBlock->literalIncludePaths[$op->arg3])) {
             $path = $callerBlock->literalIncludePaths[$op->arg3];
         }
-        if (null === $path && [] !== $callerBlock->literalIncludePaths) {
-            $path = $callerBlock->literalIncludePaths[array_key_first($callerBlock->literalIncludePaths)];
-        }
         if (null === $path) {
             $pathOperand = $callerBlock->getOperand($op->arg1);
             $path = self::resolveLiteralPath($callerBlock, $op->arg1, $pathOperand, $context);
@@ -312,6 +309,13 @@ final class IncludeHelper
                         return $var;
                     }
                 }
+            }
+        }
+        $callerOp = self::callerOperandByName($callerBlock, $name);
+        if (null !== $callerOp && $context->hasVariableOpInScopes($callerOp)) {
+            $var = $context->getVariableFromOpInScopes($callerOp);
+            if (Variable::TYPE_VALUE === $var->type || Variable::TYPE_STRING === $var->type) {
+                return $var;
             }
         }
         $scoped = $context->variableForScopedName($name);
