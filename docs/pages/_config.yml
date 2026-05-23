@@ -1,0 +1,10 @@
+title: php-compiler
+description: Development status and progress toward a full PHP compiler
+url: "https://purhur.github.io"
+baseurl: "/php-compiler"
+markdown: kramdown
+kramdown:
+  input: GFM
+exclude:
+  - PAGES.md
+  - README.md

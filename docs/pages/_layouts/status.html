@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="{{ page.description | default: site.description }}">
+  <title>{{ page.title }} — php-compiler</title>
+  <link rel="stylesheet" href="{{ '/css/style.css' | relative_url }}">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><ellipse cx='50' cy='55' rx='42' ry='32' fill='%23777BB4'/><ellipse cx='50' cy='48' rx='38' ry='28' fill='%234F5B93'/><circle cx='35' cy='42' r='4' fill='%231a1a2e'/><circle cx='65' cy='42' r='4' fill='%231a1a2e'/></svg>">
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="logo" href="{{ '/' | relative_url }}">
+        <svg viewBox="0 0 48 48" aria-hidden="true" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <ellipse cx="24" cy="28" rx="20" ry="14" fill="#777BB4"/>
+          <ellipse cx="24" cy="24" rx="18" ry="12" fill="#4F5B93"/>
+          <circle cx="16" cy="22" r="2.5" fill="#0f0f1a"/>
+          <circle cx="32" cy="22" r="2.5" fill="#0f0f1a"/>
+          <path d="M18 32 Q24 36 30 32" stroke="#8892BF" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+        </svg>
+        php-compiler
+      </a>
+      <nav class="nav" aria-label="Primary">
+        <a href="{{ '/' | relative_url }}">Overview</a>
+        <a href="{{ '/development-status.html' | relative_url }}" aria-current="page">Full status</a>
+        <a href="https://github.com/PurHur/php-compiler">Repository</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="status-page">
+    <article class="status-prose">
+      <header class="status-prose__head">
+        <h1>{{ page.title }}</h1>
+      </header>
+      {{ content }}
+    </article>
+  </main>
+
+  <footer class="site-footer">
+    <p>
+      <a href="https://github.com/PurHur/php-compiler">PurHur/php-compiler</a>
+      — edit <code>docs/pages/development-status.md</code> to update this page.
+    </p>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Development status and roadmap for php-compiler — a PHP CFG compiler with VM, JIT, and AOT native deployment.">
+  <title>php-compiler — Development Status</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><ellipse cx='50' cy='55' rx='42' ry='32' fill='%23777BB4'/><ellipse cx='50' cy='48' rx='38' ry='28' fill='%234F5B93'/><circle cx='35' cy='42' r='4' fill='%231a1a2e'/><circle cx='65' cy='42' r='4' fill='%231a1a2e'/></svg>">
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="logo" href="index.html">
+        <svg viewBox="0 0 48 48" aria-hidden="true" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <ellipse cx="24" cy="28" rx="20" ry="14" fill="#777BB4"/>
+          <ellipse cx="24" cy="24" rx="18" ry="12" fill="#4F5B93"/>
+          <circle cx="16" cy="22" r="2.5" fill="#0f0f1a"/>
+          <circle cx="32" cy="22" r="2.5" fill="#0f0f1a"/>
+          <path d="M18 32 Q24 36 30 32" stroke="#8892BF" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+        </svg>
+        php-compiler
+      </a>
+      <nav class="nav" aria-label="Primary">
+        <a href="#overview">Overview</a>
+        <a href="#progress">Progress</a>
+        <a href="#phases">Phases</a>
+        <a href="#self-host">Self-host</a>
+        <a href="development-status.html">Full status</a>
+      </nav>
+    </div>
+  </header>
+
+  <div id="top" class="hero">
+    <div>
+      <span class="badge badge--live">Active development</span>
+      <span class="badge">Updated May 2026</span>
+      <h1>Where we are on the road to a full PHP compiler</h1>
+      <p class="lead">
+        <strong>php-compiler</strong> compiles PHP to an internal CFG, runs it on a VM,
+        JIT-compiles hot paths with LLVM, and can deploy <strong>AOT native binaries</strong>
+        for web apps — without requiring Zend PHP at runtime for deployed apps.
+      </p>
+      <div class="hero-badges">
+        <span class="badge badge--live">VM + JIT + AOT</span>
+        <span class="badge badge--wip">Self-host bootstrap</span>
+        <span class="badge badge--wip">MiniWebApp execute #764</span>
+      </div>
+      <div class="hero-actions">
+        <a class="btn btn--primary" href="development-status.html">Read full status (Markdown)</a>
+        <a class="btn btn--ghost" href="https://github.com/PurHur/php-compiler">GitHub repository</a>
+      </div>
+    </div>
+    <div class="code-window" aria-label="Example usage">
+      <div class="code-window__bar">
+        <span class="code-window__dot"></span>
+        <span class="code-window__dot"></span>
+        <span class="code-window__dot"></span>
+        <span class="code-window__title">quick-start.sh</span>
+      </div>
+      <pre><code><span class="php-cmt"># Host PHP builds; deployed app runs natively</span>
+<span class="php-tag">&lt;?php</span>
+<span class="php-fn">composer</span> install
+./phpc <span class="php-str">test</span> --fast          <span class="php-cmt"># VM compliance</span>
+./phpc <span class="php-str">test</span>                 <span class="php-cmt"># + LLVM JIT/AOT</span>
+./phpc <span class="php-str">build</span> --project my-app
+./phpc <span class="php-str">serve</span> examples/003-MiniWebApp
+
+<span class="php-cmt"># Self-host (experimental): compile a lib/ bundle with itself</span>
+make bootstrap-selfhost-link   <span class="php-cmt"># → compiler_minimal bundle OK</span></code></pre>
+    </div>
+  </div>
+
+  <main>
+    <section id="overview" class="reveal">
+      <h2>Overview</h2>
+      <p class="section-intro">
+        Visual snapshot for visitors. The authoritative written report is
+        <a href="development-status.html"><strong>development-status.md</strong></a>
+        (maintained for this site only). Repo technical docs stay on
+        <a href="https://github.com/PurHur/php-compiler/tree/master/docs">GitHub</a>.
+      </p>
+      <div class="dual-track">
+        <article class="track-panel track-panel--web">
+          <h3>🌐 Web-app north star</h3>
+          <p>
+            Ship a small multi-file PHP web app compiled to a native binary —
+            <a href="https://github.com/PurHur/php-compiler/tree/master/examples/003-MiniWebApp">003-MiniWebApp</a>.
+          </p>
+          <p><strong>Status:</strong> VM ✅ · AOT <strong>link</strong> ✅ · AOT <strong>execute</strong> blocked
+            <a href="https://github.com/PurHur/php-compiler/issues/764">#764</a>.</p>
+        </article>
+        <article class="track-panel track-panel--selfhost">
+          <h3>🔄 Self-host north star</h3>
+          <p>
+            Build a native binary from <code>lib/</code> (no <code>vendor/</code>), then compile PHP again.
+            Details in <a href="development-status.html#self-host-milestone-ladder">full status → Self-host ladder</a>.
+          </p>
+          <p><strong>Status:</strong> M0 ✅ · M1 🚧 · M2 ⬜.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="progress" class="reveal">
+      <h2>Overall progress</h2>
+      <p class="section-intro">
+        Indicative composite — tables and blockers in
+        <a href="development-status.html">development-status.md</a>.
+      </p>
+      <div class="overall-progress">
+        <div class="overall-progress__label">
+          <span>Toward a production-ready web-capable compiler</span>
+          <span class="overall-progress__pct" id="overall-pct">~42%</span>
+        </div>
+        <div class="progress-track" role="progressbar" aria-valuenow="42" aria-valuemin="0" aria-valuemax="100" aria-label="Overall project progress">
+          <div class="progress-fill" id="overall-progress-fill" data-width="42" style="width: 0"></div>
+        </div>
+        <p class="overall-progress__note">
+          Strong on VM, CI, and AOT linking; gaps in full PHP compatibility, MiniWebApp native
+          execution, and honest self-host (M2).
+        </p>
+      </div>
+    </section>
+
+    <section id="phases" class="reveal">
+      <h2>Development phases</h2>
+      <p class="section-intro">
+        Phases follow <a href="https://github.com/PurHur/php-compiler/issues/78">issue #78</a>.
+        Phase breakdown: <a href="development-status.html#development-phases-roadmap-78">full status</a>.
+      </p>
+      <div class="phase-grid phase-grid--phases">
+        <article class="card">
+          <span class="phase-num">Phase 0</span>
+          <h3><span class="status-dot status-dot--done"></span> Foundation</h3>
+          <p>CI, <code>phpc</code> CLI, Docker, bootstrap GHA.</p>
+          <div class="mini-progress"><div class="progress-track"><div class="progress-fill" data-width="88"></div></div></div>
+        </article>
+        <article class="card">
+          <span class="phase-num">Phase 1</span>
+          <h3><span class="status-dot status-dot--wip"></span> Language</h3>
+          <p>OOP VM/JIT; typed properties and <code>::class</code> evolving.</p>
+          <div class="mini-progress"><div class="progress-track"><div class="progress-fill" data-width="62"></div></div></div>
+        </article>
+        <article class="card">
+          <span class="phase-num">Phase 2</span>
+          <h3><span class="status-dot status-dot--wip"></span> Stdlib</h3>
+          <p>Web builtins; many VM-only paths remain.</p>
+          <div class="mini-progress"><div class="progress-track"><div class="progress-fill" data-width="55"></div></div></div>
+        </article>
+        <article class="card">
+          <span class="phase-num">Phase 3</span>
+          <h3><span class="status-dot status-dot--wip"></span> Web AOT</h3>
+          <p>Project link ✅; execute #764.</p>
+          <div class="mini-progress"><div class="progress-track"><div class="progress-fill" data-width="58"></div></div></div>
+        </article>
+        <article class="card">
+          <span class="phase-num">Phase 4</span>
+          <h3><span class="status-dot status-dot--wip"></span> Reference app</h3>
+          <p>MiniWebApp VM ✅; AOT HTTP smokes.</p>
+          <div class="mini-progress"><div class="progress-track"><div class="progress-fill" data-width="48"></div></div></div>
+        </article>
+        <article class="card">
+          <span class="phase-num">Self-host</span>
+          <h3><span class="status-dot status-dot--wip"></span> Compile-itself</h3>
+          <p>~109-file bundle; M1 in progress.</p>
+          <div class="mini-progress"><div class="progress-track"><div class="progress-fill" data-width="35"></div></div></div>
+        </article>
+      </div>
+    </section>
+
+    <section id="self-host" class="reveal">
+      <h2>Self-host bootstrap</h2>
+      <p class="section-intro">
+        Zend still runs <code>bin/compile.php</code> today; native output is a growing
+        <code>lib/</code> bundle. Gate table and M0–M2 definitions:
+        <a href="development-status.html#self-host-milestone-ladder">development-status.md</a>.
+      </p>
+      <ol class="ladder" aria-label="Self-host milestones">
+        <li class="is-done">
+          <span class="ladder__marker" aria-hidden="true">✓</span>
+          <h4>M0 — Bundled subset runs</h4>
+          <p><code>compiler_minimal bundle OK</code> ([#557](https://github.com/PurHur/php-compiler/issues/557)).</p>
+        </li>
+        <li class="is-wip">
+          <span class="ladder__marker" aria-hidden="true">…</span>
+          <h4>M1 — Compiler compiles itself</h4>
+          <p>Compile-smoke AOT echo; driver smoke ([#1025](https://github.com/PurHur/php-compiler/issues/1025)).</p>
+        </li>
+        <li class="is-todo">
+          <span class="ladder__marker" aria-hidden="true">2</span>
+          <h4>M2 — Full <code>lib/</code> self-host</h4>
+          <p>No Zend bootstrap — open.</p>
+        </li>
+      </ol>
+    </section>
+
+    <section id="contribute" class="reveal">
+      <h2>Contributing</h2>
+      <p class="section-intro">
+        Update <code>docs/pages/development-status.md</code> when user-visible milestones change.
+      </p>
+      <div class="hero-actions">
+        <a class="btn btn--primary" href="https://github.com/PurHur/php-compiler/issues">Open issues</a>
+        <a class="btn btn--ghost" href="development-status.html">Full status document</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>
+      <a href="https://github.com/PurHur/php-compiler">PurHur/php-compiler</a>
+      — GitHub Pages (<code>docs/pages/</code> only).
+    </p>
+    <p>
+      Status source: <a href="development-status.html">development-status.md</a> ·
+      Roadmap: <a href="https://github.com/PurHur/php-compiler/issues/78">#78</a>
+    </p>
+  </footer>
+
+  <script src="js/main.js" defer></script>
+</body>
+</html>
