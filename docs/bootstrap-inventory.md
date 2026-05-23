@@ -8,9 +8,9 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 361 |
+| PHP files on vm.php path | 363 |
 | Source constructs flagged (blockers) | 10 |
-| Source constructs flagged (warnings) | 955 |
+| Source constructs flagged (warnings) | 958 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -65,6 +65,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/JitReadfile.php` | 0 | 1 |
 | `ext/standard/JitReadlink.php` | 0 | 1 |
 | `ext/standard/JitRealpath.php` | 0 | 1 |
+| `ext/standard/JitRename.php` | 0 | 1 |
 | `ext/standard/JitRequestBody.php` | 0 | 1 |
 | `ext/standard/JitRmdir.php` | 0 | 1 |
 | `ext/standard/JitSetcookie.php` | 0 | 1 |
@@ -86,7 +87,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/JitUnlink.php` | 0 | 1 |
 | `ext/standard/JitUrlencode.php` | 0 | 1 |
 | `ext/standard/JitWebParams.php` | 0 | 15 |
-| `ext/standard/Module.php` | 0 | 165 |
+| `ext/standard/Module.php` | 0 | 166 |
 | `ext/standard/SetcookieLine.php` | 0 | 1 |
 | `ext/standard/VmDate.php` | 0 | 1 |
 | `ext/standard/VmExit.php` | 0 | 2 |
@@ -214,6 +215,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/readfile.php` | 0 | 1 |
 | `ext/standard/readlink.php` | 0 | 1 |
 | `ext/standard/realpath.php` | 0 | 1 |
+| `ext/standard/rename_.php` | 0 | 1 |
 | `ext/standard/rmdir_.php` | 0 | 1 |
 | `ext/standard/round.php` | 0 | 1 |
 | `ext/standard/scandir.php` | 0 | 1 |
@@ -552,6 +554,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 **Warnings** (review for bootstrap subset):
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `ext/standard/JitRename.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `ext/standard/JitRequestBody.php`
 
 **Warnings** (review for bootstrap subset):
@@ -821,23 +828,24 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new mkdir_ (line 166)
 - new rmdir_ (line 167)
 - new chmod_ (line 168)
-- new filetype (line 169)
-- new fopen (line 170)
-- new fread (line 171)
-- new fwrite (line 172)
-- new fclose (line 173)
-- new getenv_ (line 174)
-- new putenv_ (line 175)
-- new define_ (line 176)
-- new defined_ (line 177)
-- new phpc_deploy_path (line 178)
-- new extract_ (line 179)
-- new compact_ (line 180)
-- new scandir (line 181)
-- new glob_ (line 182)
-- new time (line 183)
-- new date (line 184)
-- new gmdate (line 185)
+- new rename_ (line 169)
+- new filetype (line 170)
+- new fopen (line 171)
+- new fread (line 172)
+- new fwrite (line 173)
+- new fclose (line 174)
+- new getenv_ (line 175)
+- new putenv_ (line 176)
+- new define_ (line 177)
+- new defined_ (line 178)
+- new phpc_deploy_path (line 179)
+- new extract_ (line 180)
+- new compact_ (line 181)
+- new scandir (line 182)
+- new glob_ (line 183)
+- new time (line 184)
+- new date (line 185)
+- new gmdate (line 186)
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/SetcookieLine.php`
@@ -868,7 +876,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 **Warnings** (review for bootstrap subset):
 - new HashTable (line 23)
 - new Variable (line 25)
-- 18 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 19 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/VmHash.php`
 
@@ -1512,6 +1520,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/realpath.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/rename_.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
