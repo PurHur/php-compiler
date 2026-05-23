@@ -76,17 +76,35 @@ class is_type extends Internal {
 
                 return $context->constantFromBool(false);
             case JITVariable::TYPE_VALUE:
+                if (Variable::TYPE_STRING === $this->type && JITVariable::KIND_VARIABLE === $args[0]->kind) {
+                    $slotTy = $context->getStringFromType($args[0]->value->typeOf());
+                    if ('__string__*' === $slotTy || '__string__**' === $slotTy) {
+                        return $context->constantFromBool(true);
+                    }
+                }
                 $loaded = JitValueBox::valuePtrFromVariable($context, $args[0]);
                 $typeField = $context->structFieldMap['__value__']['type'];
                 $typeByte = $context->builder->load(
                     $context->builder->structGep($loaded, $typeField)
                 );
-                $expected = $context->getTypeFromString('int8')->constInt(
+                $i8 = $context->getTypeFromString('int8');
+                $expectedFull = $i8->constInt(
                     JITVariable::jitTypeByteFromVmType($this->type),
                     false
                 );
+                $matchFull = $context->builder->icmp(Builder::INT_EQ, $typeByte, $expectedFull);
+                if (Variable::TYPE_STRING === $this->type) {
+                    $tag = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+                    $matchTag = $context->builder->icmp(
+                        Builder::INT_EQ,
+                        $tag,
+                        $i8->constInt(Variable::TYPE_STRING, false)
+                    );
 
-                return $context->builder->icmp(Builder::INT_EQ, $typeByte, $expected);
+                    return $context->builder->or($matchFull, $matchTag);
+                }
+
+                return $matchFull;
             default:
                 throw new \LogicException('Non-implemented type handled for ' . $this->name . '(): ' . JITVariable::getStringType($args[0]->type));
         }
