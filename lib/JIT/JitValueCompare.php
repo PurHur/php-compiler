@@ -100,7 +100,7 @@ final class JitValueCompare
     }
 
     /**
-     * Loose == between boxed __value__ and native long: true only when the box tag is long and payloads match.
+     * Loose == between boxed __value__ and native long (PHP scalar coercion rules).
      */
     public static function looseEqualValueToNativeLong(
         Context $context,
@@ -117,17 +117,89 @@ final class JitValueCompare
             $context->builder->structGep($valuePtr, $map['type'])
         );
         $i8 = $context->getTypeFromString('int8');
+        $i64 = $context->getTypeFromString('int64');
+        $falseVal = $context->getTypeFromString('int1')->constInt(0, false);
+        $__native = $context->builder->intCast($nativeLong, $i64);
+
         $longTag = $i8->constInt(Variable::TYPE_NATIVE_LONG, false);
         $isLong = $context->builder->icmp(Builder::INT_EQ, $typeByte, $longTag);
         $stored = $context->builder->call(
             $context->lookupFunction('__value__readLong'),
             $valuePtr
         );
-        $__native = $context->builder->intCast($nativeLong, $stored->typeOf());
-        $matches = $context->builder->icmp(Builder::INT_EQ, $stored, $__native);
-        $falseVal = $context->getTypeFromString('int1')->constInt(0, false);
+        $longMatches = $context->builder->icmp(Builder::INT_EQ, $stored, $__native);
 
-        return $context->builder->select($isLong, $matches, $falseVal);
+        $boolTag = $i8->constInt(Variable::TYPE_NATIVE_BOOL, false);
+        $isBool = $context->builder->icmp(Builder::INT_EQ, $typeByte, $boolTag);
+        $boolMatches = $context->builder->icmp(
+            Builder::INT_EQ,
+            $context->builder->zExt($stored, $i64),
+            $__native
+        );
+
+        $nullTag = $i8->constInt(Variable::TYPE_NULL, false);
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $typeByte, $nullTag);
+        $nullMatches = $context->builder->icmp(Builder::INT_EQ, $__native, $i64->constInt(0, false));
+
+        $doubleTag = $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false);
+        $isDouble = $context->builder->icmp(Builder::INT_EQ, $typeByte, $doubleTag);
+        $storedDouble = $context->builder->call(
+            $context->lookupFunction('__value__readDouble'),
+            $valuePtr
+        );
+        $nativeDouble = $context->builder->siToFp($__native, $storedDouble->typeOf());
+        $doubleMatches = $context->builder->fcmp(Builder::REAL_OEQ, $storedDouble, $nativeDouble);
+
+        $stringTag = $i8->constInt(Variable::TYPE_STRING, false);
+        $isString = $context->builder->icmp(Builder::INT_EQ, $typeByte, $stringTag);
+        $stringMatches = self::looseEqualBoxedStringToNativeLong($context, $valuePtr, $__native);
+
+        return $context->builder->select(
+            $isLong,
+            $longMatches,
+            $context->builder->select(
+                $isBool,
+                $boolMatches,
+                $context->builder->select(
+                    $isNull,
+                    $nullMatches,
+                    $context->builder->select(
+                        $isDouble,
+                        $doubleMatches,
+                        $context->builder->select($isString, $stringMatches, $falseVal)
+                    )
+                )
+            )
+        );
+    }
+
+    private static function looseEqualBoxedStringToNativeLong(
+        Context $context,
+        Value $valuePtr,
+        Value $nativeLong
+    ): Value {
+        $str = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $valuePtr
+        );
+        $stringMap = $context->structFieldMap['__string__'];
+        $dataPtr = $context->builder->structGep($str, $stringMap['value']);
+        $i8pp = $context->getTypeFromString('int8*');
+        $endSlot = $context->builder->alloca($i8pp);
+        $context->builder->store($dataPtr, $endSlot);
+        $parsed = $context->builder->call(
+            $context->lookupFunction('strtol'),
+            $dataPtr,
+            $endSlot,
+            $context->getTypeFromString('int32')->constInt(10, false)
+        );
+        $i64 = $context->getTypeFromString('int64');
+        $parsedI64 = $context->builder->sextOrBitCast($parsed, $i64);
+        $numericMatch = $context->builder->icmp(Builder::INT_EQ, $parsedI64, $nativeLong);
+        $endPtr = $context->builder->load($endSlot);
+        $consumed = $context->builder->icmp(Builder::INT_NE, $endPtr, $dataPtr);
+
+        return $context->builder->and($consumed, $numericMatch);
     }
 
     public static function looseEqualNativeLongToValue(

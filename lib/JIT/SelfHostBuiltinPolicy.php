@@ -39,6 +39,10 @@ final class SelfHostBuiltinPolicy
     ];
 
     /** @var array<string, string> */
+    private const CATEGORY_NUMERIC = [
+        'intval', 'floatval', 'boolval', 'is_int', 'is_float', 'is_bool', 'is_numeric',
+    ];
+
     private const CATEGORY_STRING = [
         'strtolower' => 'string', 'strtoupper' => 'string', 'strcmp' => 'string', 'strncmp' => 'string',
         'strcasecmp' => 'string', 'strncasecmp' => 'string', 'strlen' => 'string', 'count' => 'string',
