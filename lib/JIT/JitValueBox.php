@@ -17,7 +17,7 @@ final class JitValueBox
 
     public static function alloc(Context $context): Value
     {
-        $slot = $context->builder->alloca($context->getTypeFromString('__value__'));
+        $slot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__'));
         // LLVM alloca is uninitialized; __value__write* calls valueDelref first (issue #AOT heap).
         $map = $context->structFieldMap['__value__'];
         $context->builder->store(
@@ -45,12 +45,41 @@ final class JitValueBox
             throw new \LogicException('valuePtrFromVariable requires TYPE_VALUE');
         }
         if (Variable::KIND_VARIABLE === $var->kind) {
+            $llvmType = $context->getStringFromType($var->value->typeOf());
+            if ('__value__*' === $llvmType) {
+                return $var->value;
+            }
+            if ('__value__' === $llvmType) {
+                return self::pointer($context, $var->value);
+            }
+            if ('__string__**' === $llvmType) {
+                $str = $context->builder->load($var->value);
+                $slot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__'));
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeString'),
+                    self::pointer($context, $slot),
+                    $str
+                );
+
+                return self::pointer($context, $slot);
+            }
+            if ('__string__*' === $llvmType) {
+                $slot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__'));
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeString'),
+                    self::pointer($context, $slot),
+                    $var->value
+                );
+
+                return self::pointer($context, $slot);
+            }
+
             return self::pointer($context, $var->value);
         }
         if ('__value__*' === $context->getStringFromType($var->value->typeOf())) {
             return $var->value;
         }
-        $slot = $context->builder->alloca($context->getTypeFromString('__value__'), 1, 'value_rvalue_box');
+        $slot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__'));
         $context->builder->store($var->value, $slot);
 
         return self::pointer($context, $slot);
@@ -79,6 +108,8 @@ final class JitValueBox
 
         $tag = 'v'.(string) self::$copySeq++;
         $stringBlock = BasicBlockHelper::append($context, 'value_copy_string_'.$tag);
+        $hashtableBlock = BasicBlockHelper::append($context, 'value_copy_hashtable_'.$tag);
+        $objectBlock = BasicBlockHelper::append($context, 'value_copy_object_'.$tag);
         $longBlock = BasicBlockHelper::append($context, 'value_copy_long_'.$tag);
         $doubleBlock = BasicBlockHelper::append($context, 'value_copy_double_'.$tag);
         $boolBlock = BasicBlockHelper::append($context, 'value_copy_bool_'.$tag);
@@ -89,6 +120,16 @@ final class JitValueBox
             Builder::INT_EQ,
             $typeByte,
             $i8->constInt(Variable::TYPE_STRING, false)
+        );
+        $isHashtable = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_HASHTABLE, false)
+        );
+        $isObject = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_OBJECT, false)
         );
         $isLong = $context->builder->icmp(
             Builder::INT_EQ,
@@ -131,6 +172,38 @@ final class JitValueBox
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($afterString);
+        $afterHashtable = BasicBlockHelper::append($context, 'value_copy_after_hashtable_'.$tag);
+        $context->builder->branchIf($isHashtable, $hashtableBlock, $afterHashtable);
+
+        $context->builder->positionAtEnd($hashtableBlock);
+        $ht = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $srcPtr
+        );
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            $destPtr,
+            $ht
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterHashtable);
+        $afterObject = BasicBlockHelper::append($context, 'value_copy_after_object_'.$tag);
+        $context->builder->branchIf($isObject, $objectBlock, $afterObject);
+
+        $context->builder->positionAtEnd($objectBlock);
+        $obj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $srcPtr
+        );
+        $context->builder->call(
+            $context->lookupFunction('__value__writeObject'),
+            $destPtr,
+            $obj
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterObject);
         $afterLong = BasicBlockHelper::append($context, 'value_copy_after_long_'.$tag);
         $context->builder->branchIf($isLong, $longBlock, $afterLong);
 

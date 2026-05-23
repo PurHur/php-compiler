@@ -15,8 +15,11 @@ use PHPLLVM\Value;
 
 final class JitStringConcat
 {
+    private static int $seq = 0;
+
     public static function concat(Context $context, Value $left, Value $right): Value
     {
+        $tag = 'cc'.(string) ++self::$seq;
         $map = $context->structFieldMap['__string__'];
         $leftLen = $context->builder->load(
             $context->builder->structGep($left, $map['length'])
@@ -31,9 +34,9 @@ final class JitStringConcat
         $zero = $i64->constInt(0, false);
         $totalLen = $context->builder->add($leftLen, $rightLen);
 
-        $emptyBlock = BasicBlockHelper::append($context, 'concat_empty');
-        $workBlock = BasicBlockHelper::append($context, 'concat_work');
-        $doneBlock = BasicBlockHelper::append($context, 'concat_done');
+        $emptyBlock = BasicBlockHelper::append($context, 'concat_empty_'.$tag);
+        $workBlock = BasicBlockHelper::append($context, 'concat_work_'.$tag);
+        $doneBlock = BasicBlockHelper::append($context, 'concat_done_'.$tag);
         $isEmpty = $context->builder->icmp(Builder::INT_SLE, $totalLen, $zero);
         $context->builder->branchIf($isEmpty, $emptyBlock, $workBlock);
 
@@ -61,9 +64,8 @@ final class JitStringConcat
         $result = $context->builder->phi($dest->typeOf());
         $result->addIncoming($emptyStr, $emptyBlock);
         $result->addIncoming($dest, $workBlock);
-        $restBlock = BasicBlockHelper::append($context, 'concat_rest');
-        $context->builder->branch($restBlock);
-        $context->builder->positionAtEnd($restBlock);
+
+        BasicBlockHelper::branchToFreshContinue($context, 'concat_continue_'.$tag);
 
         return $result;
     }

@@ -285,6 +285,9 @@ class JIT {
         if ($this->context->scope->blockStorage->contains($block)) {
             return $this->context->scope->blockStorage[$block];
         }
+        if (null !== $block->func && $block->orig === $block->func->cfg) {
+            JIT\Progress::noteFunction($block->func->getName());
+        }
         if (null !== $entryBlock) {
             $origBasicBlock = $basicBlock = $entryBlock;
         } else {
@@ -606,6 +609,24 @@ class JIT {
                     $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));
                     $this->assignOperand($block->getOperand($op->arg1), $value->castTo(Variable::TYPE_NATIVE_BOOL));
                     break;
+                case OpCode::TYPE_CAST_INT:
+                    $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));
+                    if (Variable::TYPE_VALUE === $value->type) {
+                        $ptr = Variable::KIND_VARIABLE === $value->kind
+                            ? $value->value
+                            : $this->context->helper->loadValue($value);
+                        $long = $this->context->builder->call(
+                            $this->context->lookupFunction('__value__readLong'),
+                            $ptr
+                        );
+                        $this->assignOperandValue($block->getOperand($op->arg1), $long);
+                    } else {
+                        $this->assignOperand(
+                            $block->getOperand($op->arg1),
+                            $value->castTo(Variable::TYPE_NATIVE_LONG)
+                        );
+                    }
+                    break;
                 case OpCode::TYPE_CAST_STRING:
                     $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));
                     $this->assignOperand(
@@ -815,14 +836,12 @@ class JIT {
                     $caseVar = $this->context->getVariableFromOp($block->getOperand($op->arg2));
                     $equalOp = new OpCode(OpCode::TYPE_EQUAL);
                     $matchVar = $this->context->helper->binaryOp($equalOp, $switchVar, $caseVar);
-                    $match = $this->context->helper->loadValue($matchVar);
-                    $caseTail = $this->compileBlockInternal($func, $op->block1, null, null, ...$args);
+                    $match = $this->context->castToBool(
+                        $this->context->helper->loadValue($matchVar)
+                    );
+                    $this->compileBlockInternal($func, $op->block1, null, null, ...$args);
                     $caseEntry = $this->context->scope->blockStorage[$op->block1];
                     $nextBb = JIT\BasicBlockHelper::append($this->context, 'switch_next_case');
-                    $builder->positionAtEnd($caseTail);
-                    if (null === $caseTail->getTerminator()) {
-                        $builder->branch($nextBb);
-                    }
                     $builder->positionAtEnd($branchBlock);
                     if ($this->shouldFreeDeadVariablesBeforeBranch()) {
                         $this->context->freeDeadVariables($func, $branchBlock, $block);
@@ -978,19 +997,20 @@ class JIT {
                     $return = $this->context->getVariableFromOp($block->getOperand($op->arg1));
                     $returnBlock = $builder->getInsertBlock();
                     $builder->positionAtEnd($returnBlock);
-                    if ($this->shouldFreeDeadVariablesBeforeBranch()) {
-                        $this->context->freeDeadVariables($func, $returnBlock, $block);
-                    }
                     if ($this->context->inlineIncludeDepth > 0) {
                         if ([] !== $this->context->inlineIncludeReturnOperands) {
                             $holderOp = $this->context->inlineIncludeReturnOperands[
                                 array_key_last($this->context->inlineIncludeReturnOperands)
                             ];
+                            $return->addref();
                             $this->assignOperand($holderOp, $return, true);
                         }
                         $this->context->inlineIncludeExitBlock = $returnBlock;
 
                         return $returnBlock;
+                    }
+                    if ($this->shouldFreeDeadVariablesBeforeBranch()) {
+                        $this->context->freeDeadVariables($func, $returnBlock, $block);
                     }
                     if ($this->isVoidCfgFunction($block)) {
                         $this->context->builder->returnVoid();
@@ -1174,10 +1194,9 @@ class JIT {
         }
         $valuePtr = Variable::KIND_VARIABLE === $return->kind
             ? JIT\JitValueBox::pointer($this->context, $return->value)
-            : $this->context->builder->alloca(
-                $this->context->getTypeFromString('__value__'),
-                1,
-                'return_value_box'
+            : JIT\BasicBlockHelper::entryAlloca(
+                $this->context,
+                $this->context->getTypeFromString('__value__')
             );
         if (Variable::KIND_VALUE === $return->kind) {
             $this->context->builder->store($retval, $valuePtr);

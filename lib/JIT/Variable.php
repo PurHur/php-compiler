@@ -222,7 +222,7 @@ final class Variable {
             $context,
             $type,
             self::KIND_VARIABLE,
-            $context->builder->alloca($context->getTypeFromString($stringType))
+            BasicBlockHelper::entryAlloca($context, $context->getTypeFromString($stringType))
         );
     }
 
@@ -567,9 +567,6 @@ final class Variable {
 
                     $this->context->refcount->addref($ht);
                     $boxed = HashTableHelper::readStringKeyToValueBox($this->context, $ht, $key);
-                    if (null === $this->superglobalName) {
-                        $this->context->refcount->delref($ht);
-                    }
 
                     return $boxed;
                 }

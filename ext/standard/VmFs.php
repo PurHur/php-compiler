@@ -110,6 +110,15 @@ final class VmFs
         return @copy($from, $to);
     }
 
+    public static function touch(string $path, ?int $mtime = null): bool
+    {
+        if (null === $mtime) {
+            return @touch($path);
+        }
+
+        return @touch($path, $mtime);
+    }
+
     private static function modeToFiletype(int $mode): string
     {
         $type = $mode & 0xF000;

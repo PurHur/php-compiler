@@ -233,6 +233,9 @@ function bootstrapDefaultAotLinkTargets(array $lintTargets): array
     $pendingUserFunc = [
         'test/bootstrap-aot/lib_opcode/main.php', // Phase D: aot_link_lib_targets only (#540)
         'test/bootstrap-aot/spl_object_storage_dim.php', // lint OK; LLVM verify on link (#601)
+        'test/bootstrap-aot/class_int_property.php', // lint OK; LLVM verify on link
+        'test/bootstrap-aot/external_cfg_block_children.php', // lint OK; LLVM verify on link
+        'test/bootstrap-aot/isset_object_typed_property.php', // lint OK; LLVM verify on link (#764)
     ];
 
     return array_values(array_filter(
@@ -438,4 +441,38 @@ function bootstrapLlvmProcessEnv(string $llvmDir): array
     $env['PATH'] = '' === $path ? $llvmDir : $llvmDir.':'.$path;
 
     return $env;
+}
+
+/**
+ * First fatal / LogicException line from compile probe output (skips Notice/Deprecated).
+ */
+function bootstrapSelfhostProbeLastJitFunc(?string $progressFile = null): ?string
+{
+    $path = $progressFile ?? getenv('PHP_COMPILER_JIT_PROGRESS_FILE');
+    if (false === $path || '' === $path) {
+        return null;
+    }
+
+    return \PHPCompiler\JIT\Progress::readLast($path);
+}
+
+function bootstrapSelfhostProbeExtractNextLower(string $output): ?string
+{
+    foreach (preg_split('/\R/', $output) as $line) {
+        $line = trim($line);
+        if ('' === $line) {
+            continue;
+        }
+        if (preg_match('/\b(?:PHP )?(?:Notice|Deprecated):\s/i', $line)) {
+            continue;
+        }
+        if (preg_match('/\bLogicException:\s*(.+)$/i', $line, $m)) {
+            return trim($m[1]);
+        }
+        if (preg_match('/\b(?:PHP )?Fatal error:\s*(.+)$/i', $line, $m)) {
+            return trim($m[1]);
+        }
+    }
+
+    return null;
 }

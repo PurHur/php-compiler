@@ -164,6 +164,14 @@ class Type extends Builtin {
         );
         $fnCopy = $this->context->module->addFunction('__compiler_copy', $fntypeCopy);
         $this->context->registerFunction('__compiler_copy', $fnCopy);
+        $fntypeTouch = $this->context->context->functionType(
+            $i32,
+            false,
+            $this->context->getTypeFromString('__string__*'),
+            $i64
+        );
+        $fnTouch = $this->context->module->addFunction('__compiler_touch', $fntypeTouch);
+        $this->context->registerFunction('__compiler_touch', $fnTouch);
         $void = $this->context->getTypeFromString('void');
         $fntypeRandomBytes = $this->context->context->functionType(
             $this->context->getTypeFromString('__string__*'),

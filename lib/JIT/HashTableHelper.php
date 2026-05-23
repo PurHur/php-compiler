@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\ext\standard\string_trim;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -124,18 +125,20 @@ final class HashTableHelper
         Value $count,
         Variable $value
     ): Value {
+        static $seq = 0;
+        $tag = 'af'.(string) ++$seq;
         $ht = self::alloc($context);
         $sizeT = $context->getTypeFromString('size_t');
-        $iSlot = $context->builder->alloca($sizeT, 1, 'fill_i');
+        $iSlot = $context->builder->alloca($sizeT, 1, 'fill_i_'.$tag);
         $zero = $sizeT->constInt(0, false);
         $context->builder->store($zero, $iSlot);
 
         $setLong = $context->lookupFunction('__hashtable__setLongAt');
         $setString = $context->lookupFunction('__hashtable__setStringAt');
 
-        $done = BasicBlockHelper::append($context, 'fill_done');
-        $loopHead = BasicBlockHelper::append($context, 'fill_head');
-        $loopBody = BasicBlockHelper::append($context, 'fill_body');
+        $done = BasicBlockHelper::append($context, 'fill_done_'.$tag);
+        $loopHead = BasicBlockHelper::append($context, 'fill_head_'.$tag);
+        $loopBody = BasicBlockHelper::append($context, 'fill_body_'.$tag);
         $context->builder->branch($loopHead);
 
         $context->builder->positionAtEnd($loopHead);
@@ -155,11 +158,25 @@ final class HashTableHelper
                 );
                 break;
             case Variable::TYPE_STRING:
+                $str = $context->helper->loadValue($value);
+                $strMap = $context->structFieldMap['__string__'];
+                $hayPtr = $context->builder->structGep($str, $strMap['value']);
+                $len = $context->builder->load(
+                    $context->builder->structGep($str, $strMap['length'])
+                );
+                $owned = string_trim::jitCopySlice(
+                    $context,
+                    $str,
+                    $hayPtr,
+                    $context->getTypeFromString('int64')->constInt(0, false),
+                    $len,
+                    'fill_'.$tag
+                );
                 $context->builder->call(
                     $setString,
                     $ht,
                     $index,
-                    $context->helper->loadValue($value)
+                    $owned
                 );
                 break;
             default:
@@ -173,6 +190,8 @@ final class HashTableHelper
         $context->builder->branch($loopHead);
 
         $context->builder->positionAtEnd($done);
+
+        BasicBlockHelper::branchToFreshContinue($context, 'fill_continue_'.$tag);
 
         return $ht;
     }
@@ -271,6 +290,8 @@ final class HashTableHelper
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($done);
+
+        BasicBlockHelper::branchToFreshContinue($context, 'ht_rb_continue_'.$tag);
 
         return new Variable(
             $context,
@@ -396,16 +417,33 @@ final class HashTableHelper
             $keyStr
         );
         $valueMap = $context->structFieldMap['__value__'];
+        $i8 = $context->getTypeFromString('int8');
+        $done = BasicBlockHelper::append($context, 'ht_sk_done_'.$tag);
+        $isNullPtr = $context->builder->icmp(
+            Builder::INT_EQ,
+            $valPtr,
+            $valPtr->typeOf()->constNull()
+        );
+        $nullBlock = BasicBlockHelper::append($context, 'ht_sk_null_'.$tag);
+        $checkType = BasicBlockHelper::append($context, 'ht_sk_check_type_'.$tag);
+        $context->builder->branchIf($isNullPtr, $nullBlock, $checkType);
+
+        $context->builder->positionAtEnd($nullBlock);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            $destPtr
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($checkType);
         $typeByte = $context->builder->load(
             $context->builder->structGep($valPtr, $valueMap['type'])
         );
-        $i8 = $context->getTypeFromString('int8');
 
         $stringBlock = BasicBlockHelper::append($context, 'ht_sk_string_'.$tag);
         $htBlock = BasicBlockHelper::append($context, 'ht_sk_ht_'.$tag);
         $checkHt = BasicBlockHelper::append($context, 'ht_sk_check_ht_'.$tag);
         $longBlock = BasicBlockHelper::append($context, 'ht_sk_long_'.$tag);
-        $done = BasicBlockHelper::append($context, 'ht_sk_done_'.$tag);
 
         $isString = $context->builder->icmp(
             Builder::INT_EQ,

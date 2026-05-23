@@ -4,8 +4,9 @@ AOT: explode() splits string into indexed list
 <?php
 $parts = explode(',', 'a,b,c');
 echo count($parts), "\n";
-echo implode('|', $parts), "\n";
-echo count(explode(',', '')), "\n";
+echo $parts[0], '|', $parts[1], '|', $parts[2], "\n";
+$n = count(explode(',', ''));
+echo $n, "\n";
 --EXPECT--
 3
 a|b|c

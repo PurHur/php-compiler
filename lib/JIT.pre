@@ -278,6 +278,24 @@ class JIT {
                     $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));
                     $this->assignOperand($block->getOperand($op->arg1), $value->castTo(Variable::TYPE_NATIVE_BOOL));
                     break;
+                case OpCode::TYPE_CAST_INT:
+                    $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));
+                    if (Variable::TYPE_VALUE === $value->type) {
+                        $ptr = Variable::KIND_VARIABLE === $value->kind
+                            ? $value->value
+                            : $this->context->helper->loadValue($value);
+                        $long = $this->context->builder->call(
+                            $this->context->lookupFunction('__value__readLong'),
+                            $ptr
+                        );
+                        $this->assignOperandValue($block->getOperand($op->arg1), $long);
+                    } else {
+                        $this->assignOperand(
+                            $block->getOperand($op->arg1),
+                            $value->castTo(Variable::TYPE_NATIVE_LONG)
+                        );
+                    }
+                    break;
                 case OpCode::TYPE_ECHO:
                 case OpCode::TYPE_PRINT:
                     $argOffset = $op->type === OpCode::TYPE_ECHO ? $op->arg1 : $op->arg2;
@@ -385,7 +403,26 @@ class JIT {
                         )
                     );
                     break;
-                // case OpCode::TYPE_CASE:
+                case OpCode::TYPE_CASE:
+                    $branchBlock = $builder->getInsertBlock();
+                    $builder->positionAtEnd($branchBlock);
+                    $switchVar = $this->context->getVariableFromOp($block->getOperand($op->arg1));
+                    $caseVar = $this->context->getVariableFromOp($block->getOperand($op->arg2));
+                    $equalOp = new OpCode(OpCode::TYPE_EQUAL);
+                    $matchVar = $this->context->helper->binaryOp($equalOp, $switchVar, $caseVar);
+                    $match = $this->context->castToBool(
+                        $this->context->helper->loadValue($matchVar)
+                    );
+                    $this->compileBlockInternal($func, $op->block1, null, null, ...$args);
+                    $caseEntry = $this->context->scope->blockStorage[$op->block1];
+                    $nextBb = JIT\BasicBlockHelper::append($this->context, 'switch_next_case');
+                    $builder->positionAtEnd($branchBlock);
+                    if ($this->shouldFreeDeadVariablesBeforeBranch()) {
+                        $this->context->freeDeadVariables($func, $branchBlock, $block);
+                    }
+                    $builder->branchIf($match, $caseEntry, $nextBb);
+                    $builder->positionAtEnd($nextBb);
+                    break;
                 case OpCode::TYPE_JUMP:
                     $branchBlock = $builder->getInsertBlock();
                     $builder->positionAtEnd($branchBlock);

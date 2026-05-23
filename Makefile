@@ -186,4 +186,4 @@ bootstrap-aot-link: bootstrap-profile
 bootstrap-aot-link-lib: bootstrap-profile
 	./script/bootstrap-aot-link-lib.sh
 bootstrap-selfhost-probe:
-	php script/bootstrap-selfhost-compile-probe.php
+	./script/bootstrap-selfhost-compile-probe.sh

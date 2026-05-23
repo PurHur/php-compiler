@@ -59,7 +59,11 @@ foreach ($steps as $args) {
     if (0 === $exit) {
         continue;
     }
-    $next = bootstrapSelfhostProbeExtractNextLower($combined);
+    if (139 === $exit) {
+        $next = 'LLVM segfault during native compile (exit 139)';
+    } else {
+        $next = bootstrapSelfhostProbeExtractNextLower($combined);
+    }
     if (null === $next) {
         $next = trim($combined) !== '' ? trim($combined) : 'compile failed (exit '.$exit.')';
     }
@@ -97,6 +101,10 @@ function bootstrapSelfhostProbeRunCompile(
         1 => ['pipe', 'w'],
         2 => ['pipe', 'w'],
     ];
+    $progress = getenv('PHP_COMPILER_JIT_PROGRESS_FILE');
+    if (null !== $env && false !== $progress && '' !== $progress) {
+        $env['PHP_COMPILER_JIT_PROGRESS_FILE'] = $progress;
+    }
     $proc = proc_open(['bash', '-c', $bash], $descriptorSpec, $pipes, $root, $env);
     if (!is_resource($proc)) {
         return [1, 'proc_open failed'];
@@ -108,24 +116,6 @@ function bootstrapSelfhostProbeRunCompile(
     $exit = proc_close($proc);
 
     return [is_int($exit) ? $exit : 1, trim($combined !== false ? $combined : '')];
-}
-
-function bootstrapSelfhostProbeExtractNextLower(string $output): ?string
-{
-    foreach (preg_split('/\R/', $output) as $line) {
-        $line = trim($line);
-        if ('' === $line) {
-            continue;
-        }
-        if (preg_match('/\bLogicException:\s*(.+)$/i', $line, $m)) {
-            return trim($m[1]);
-        }
-        if (preg_match('/\b(?:PHP )?Fatal error:\s*(.+)$/i', $line, $m)) {
-            return trim($m[1]);
-        }
-    }
-
-    return null;
 }
 
 function bootstrapSelfhostProbeAppendInventory(string $inventoryFile, string $message): void

@@ -12,7 +12,7 @@ class Holder
 
     public function label(): string
     {
-        return null === $this->name ? 'anon' : $this->name;
+        return null === $this->name ? 'anon' : (string) $this->name;
     }
 }
 
