@@ -454,6 +454,10 @@ restart:
                         $ht->add($key->toString(), $frame->scope[$op->arg2]);
                     }
                     break;
+                case OpCode::TYPE_CLONE:
+                    // Stub: real clone not implemented yet; assign null so VM can proceed.
+                    $frame->scope[$op->arg1]->null();
+                    break;
                 case OpCode::TYPE_BOOLEAN_NOT:
                     $value = !($frame->scope[$op->arg2]->toBool());
                     $dst = $frame->scope[$op->arg1];

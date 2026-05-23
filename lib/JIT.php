@@ -502,6 +502,17 @@ class JIT {
                         null !== $op->arg2 ? $block->getOperand($op->arg2) : null
                     );
                     break;
+                case OpCode::TYPE_CLONE:
+                    // Stub: real clone not implemented yet; assign null so JIT/AOT can proceed.
+                    $nullVar = new JIT\Variable(
+                        $this->context,
+                        Variable::TYPE_NULL,
+                        Variable::KIND_VALUE,
+                        $this->context->getTypeFromString('__value__*')->constNull()
+                    );
+                    $nullVar->isNullConstant = true;
+                    $this->assignOperand($block->getOperand($op->arg1), $nullVar);
+                    break;
                 case OpCode::TYPE_BOOLEAN_NOT:
                     $from = $this->context->getVariableFromOp($block->getOperand($op->arg2));
                     if ($from->type === Variable::TYPE_NATIVE_BOOL) {
