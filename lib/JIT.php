@@ -2521,6 +2521,7 @@ class JIT {
                 $result->addref();
             }
             $this->copyValueBoxJitFlags($result, $value);
+            $result->compileTimeConstantName = $value->compileTimeConstantName;
 
             return;
         } elseif ($result->type === Variable::TYPE_VALUE) {
@@ -2740,6 +2741,7 @@ class JIT {
                 $this->valueBoxPointer($value)
             );
             $this->copyValueBoxJitFlags($result, $value);
+            $result->compileTimeConstantName = $value->compileTimeConstantName;
 
             return;
         } elseif (Variable::TYPE_HASHTABLE === $result->type && Variable::TYPE_VALUE === $value->type) {

@@ -80,6 +80,9 @@ final class Variable {
     /** String literal value when this variable represents a constant string operand. */
     public ?string $compileTimeString = null;
 
+    /** User/global constant name when this variable holds a compile-time const fetch. */
+    public ?string $compileTimeConstantName = null;
+
     /** Set when this variable is the PHP {@code null} constant (const-fetch). */
     public bool $isNullConstant = false;
 
