@@ -258,6 +258,34 @@ final class VmFs
         return \feof($fp);
     }
 
+    public static function fgetc(int $handle): string|false
+    {
+        $fp = self::lookup($handle);
+        if (null === $fp) {
+            return false;
+        }
+        $byte = @\fgetc($fp);
+        if (false === $byte) {
+            if (\feof($fp)) {
+                return '';
+            }
+
+            return false;
+        }
+
+        return $byte;
+    }
+
+    public static function tempnam(string $directory, string $prefix): string|false
+    {
+        $path = @\tempnam($directory, $prefix);
+        if (false === $path) {
+            return false;
+        }
+
+        return $path;
+    }
+
     private static function lookup(int $handle): mixed
     {
         return self::$handles[$handle] ?? null;

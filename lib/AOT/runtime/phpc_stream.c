@@ -159,3 +159,27 @@ int __compiler_feof(int64_t handle)
 
     return feof(fp) ? 1 : 0;
 }
+
+__string__ *__compiler_fgetc(int64_t handle)
+{
+    FILE *fp;
+    int c;
+    char buf[2];
+
+    fp = phpc_resolve_stream(handle);
+    if (NULL == fp) {
+        return NULL;
+    }
+    c = fgetc(fp);
+    if (EOF == c) {
+        if (feof(fp)) {
+            return __string__init(0, "");
+        }
+
+        return NULL;
+    }
+    buf[0] = (char) c;
+    buf[1] = '\0';
+
+    return __string__init(1, buf);
+}

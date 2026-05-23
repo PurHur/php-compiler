@@ -61,8 +61,8 @@ final class SelfHostBuiltinPolicy
         'is_writable' => 'filesystem', 'file_get_contents' => 'filesystem', 'file_put_contents' => 'filesystem',
         'mkdir' => 'filesystem', 'unlink' => 'filesystem', 'rmdir' => 'filesystem', 'realpath' => 'filesystem',
         'glob' => 'filesystem', 'scandir' => 'filesystem',
-        'fopen' => 'filesystem', 'fread' => 'filesystem', 'fclose' => 'filesystem',
-        'getenv' => 'filesystem', 'putenv' => 'filesystem', 'sys_get_temp_dir' => 'filesystem',
+        'fopen' => 'filesystem', 'fread' => 'filesystem', 'fgetc' => 'filesystem', 'fclose' => 'filesystem',
+        'getenv' => 'filesystem', 'putenv' => 'filesystem', 'sys_get_temp_dir' => 'filesystem', 'tempnam' => 'filesystem',
         'getcwd' => 'filesystem', 'chdir' => 'filesystem',
     ];
 
@@ -87,8 +87,8 @@ final class SelfHostBuiltinPolicy
         'array_push' => 'array', 'array_pop' => 'array', 'array_shift' => 'array', 'array_unshift' => 'array',
         'array_reverse' => 'array', 'array_filter' => 'array', 'array_combine' => 'array', 'array_flip' => 'array',
         'array_chunk' => 'array', 'array_column' => 'array',
-        'array_product' => 'array', 'array_unique' => 'array', 'array_diff' => 'array', 'array_replace' => 'array',
-        'array_sum' => 'array', 'sort' => 'array',
+        'array_product' => 'array', 'array_unique' => 'array', 'array_diff' => 'array', 'array_intersect' => 'array',
+        'array_replace' => 'array', 'array_sum' => 'array', 'sort' => 'array',
         'usort' => 'array',
         'compact' => 'array', 'extract' => 'array', 'defined' => 'array', 'define' => 'array',
         'class_exists' => 'array', 'function_exists' => 'array', 'method_exists' => 'array',

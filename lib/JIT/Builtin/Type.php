@@ -179,6 +179,9 @@ class Type extends Builtin {
         $fntypeFeof = $this->context->context->functionType($i32, false, $i64);
         $fnFeof = $this->context->module->addFunction('__compiler_feof', $fntypeFeof);
         $this->context->registerFunction('__compiler_feof', $fnFeof);
+        $fntypeFgetc = $this->context->context->functionType($strPtr, false, $i64);
+        $fnFgetc = $this->context->module->addFunction('__compiler_fgetc', $fntypeFgetc);
+        $this->context->registerFunction('__compiler_fgetc', $fnFgetc);
         $fntypeMkdir = $this->context->context->functionType(
             $i32,
             false,
@@ -385,6 +388,9 @@ class Type extends Builtin {
         $fntypeSysGetTempDir = $this->context->context->functionType($strPtr, false);
         $fnSysGetTempDir = $this->context->module->addFunction('__compiler_sys_get_temp_dir', $fntypeSysGetTempDir);
         $this->context->registerFunction('__compiler_sys_get_temp_dir', $fnSysGetTempDir);
+        $fntypeTempnam = $this->context->context->functionType($strPtr, false, $strPtr, $strPtr);
+        $fnTempnam = $this->context->module->addFunction('__compiler_tempnam', $fntypeTempnam);
+        $this->context->registerFunction('__compiler_tempnam', $fnTempnam);
         $fntypeHttpBuildQuery = $this->context->context->functionType(
             $strPtr,
             false,

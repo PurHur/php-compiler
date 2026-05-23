@@ -4742,4 +4742,267 @@ final class ArrayBuiltinHelper
 
         $context->builder->positionAtEnd($strDone);
     }
+
+    /**
+     * array_intersect() for arrays of scalar values (loose compare; issue #1207).
+     */
+    public static function arrayIntersect(Context $context, Variable $first, Variable ...$others): Value
+    {
+        if (\count($others) < 1) {
+            throw new \LogicException('array_intersect() requires at least two arguments');
+        }
+        $otherHts = [];
+        foreach ($others as $other) {
+            $otherHts[] = self::isNativeArray($other->type)
+                ? self::nativeListToHashTable($context, $other)
+                : self::loadHashTable($context, $other);
+        }
+        $src = self::isNativeArray($first->type)
+            ? self::nativeListToHashTable($context, $first)
+            : self::loadHashTable($context, $first);
+
+        return self::arrayIntersectHashTable($context, $src, $otherHts);
+    }
+
+    /**
+     * @param list<Value> $otherHts
+     */
+    private static function arrayIntersectHashTable(Context $context, Value $src, array $otherHts): Value
+    {
+        $dest = HashTableHelper::alloc($context);
+        $map = $context->structFieldMap['__hashtable__'];
+        $nodeMap = $context->structFieldMap['__strkey_node__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $nodePtrType = $context->getTypeFromString('__strkey_node__*');
+        $loose = $context->constantFromBool(false);
+
+        $nextFree = $context->builder->load($context->builder->structGep($src, $map['nextFreeElement']));
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'array_intersect_packed_idx');
+        $context->builder->store($zero, $idxSlot);
+
+        $packedHead = BasicBlockHelper::append($context, 'array_intersect_packed_head');
+        $packedBody = BasicBlockHelper::append($context, 'array_intersect_packed_body');
+        $packedKeep = BasicBlockHelper::append($context, 'array_intersect_packed_keep');
+        $packedSkip = BasicBlockHelper::append($context, 'array_intersect_packed_skip');
+        $packedAdd = BasicBlockHelper::append($context, 'array_intersect_packed_add');
+        $packedNext = BasicBlockHelper::append($context, 'array_intersect_packed_next');
+        $packedDone = BasicBlockHelper::append($context, 'array_intersect_packed_done');
+        $context->builder->branch($packedHead);
+
+        $context->builder->positionAtEnd($packedHead);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $nextFree);
+        $context->builder->branchIf($atEnd, $packedDone, $packedBody);
+
+        $context->builder->positionAtEnd($packedBody);
+        $isSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $src,
+            $idx
+        );
+        $context->builder->branchIf($isSet, $packedKeep, $packedNext);
+
+        $context->builder->positionAtEnd($packedKeep);
+        $valEntry = self::listEntryAt($context, $src, $idx);
+        $inAll = self::entryInAllHaystacks($context, $valEntry, $otherHts, $loose);
+        $context->builder->branchIf($inAll, $packedAdd, $packedSkip);
+
+        $context->builder->positionAtEnd($packedAdd);
+        self::storeValueEntryAtIndex(
+            $context,
+            $dest,
+            $idx,
+            self::listEntryAt($context, $src, $idx)
+        );
+        $context->builder->branch($packedNext);
+
+        $context->builder->positionAtEnd($packedSkip);
+        $context->builder->branch($packedNext);
+
+        $context->builder->positionAtEnd($packedNext);
+        $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+        $context->builder->branch($packedHead);
+
+        $strInit = BasicBlockHelper::append($context, 'array_intersect_str_init');
+        $strHead = BasicBlockHelper::append($context, 'array_intersect_str_head');
+        $context->builder->positionAtEnd($packedDone);
+        $context->builder->branch($strInit);
+
+        $context->builder->positionAtEnd($strInit);
+        $walkSlot = $context->builder->alloca($nodePtrType, 1, 'array_intersect_walk');
+        $head = $context->builder->load($context->builder->structGep($src, $map['strKeys']));
+        $context->builder->store($head, $walkSlot);
+        $strBody = BasicBlockHelper::append($context, 'array_intersect_str_body');
+        $strSkip = BasicBlockHelper::append($context, 'array_intersect_str_skip');
+        $strAdd = BasicBlockHelper::append($context, 'array_intersect_str_add');
+        $strNext = BasicBlockHelper::append($context, 'array_intersect_str_next');
+        $strDone = BasicBlockHelper::append($context, 'array_intersect_str_done');
+        $context->builder->branch($strHead);
+
+        $context->builder->positionAtEnd($strHead);
+        $node = $context->builder->load($walkSlot);
+        $nodeNull = $context->builder->icmp(Builder::INT_EQ, $node, $nodePtrType->constNull());
+        $context->builder->branchIf($nodeNull, $strDone, $strBody);
+
+        $context->builder->positionAtEnd($strBody);
+        $valEntry = $context->builder->structGep($node, $nodeMap['value']);
+        $inAll = self::entryInAllHaystacks($context, $valEntry, $otherHts, $loose);
+        $context->builder->branchIf($inAll, $strAdd, $strSkip);
+
+        $context->builder->positionAtEnd($strAdd);
+        $keyStr = $context->builder->load($context->builder->structGep($node, $nodeMap['key']));
+        self::storeValueEntryAtStringKey($context, $dest, $keyStr, $valEntry);
+        $context->builder->branch($strNext);
+
+        $context->builder->positionAtEnd($strSkip);
+        $context->builder->branch($strNext);
+
+        $context->builder->positionAtEnd($strNext);
+        $next = $context->builder->load($context->builder->structGep($node, $nodeMap['next']));
+        $context->builder->store($next, $walkSlot);
+        $context->builder->branch($strHead);
+
+        $context->builder->positionAtEnd($strDone);
+
+        return $dest;
+    }
+
+    /**
+     * @param list<Value> $otherHts
+     */
+    private static function entryInAllHaystacks(
+        Context $context,
+        Value $entry,
+        array $otherHts,
+        Value $strict
+    ): Value {
+        if ([] === $otherHts) {
+            return $context->constantFromBool(true);
+        }
+
+        $valueMap = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($entry, $valueMap['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $i1 = $context->getTypeFromString('int1');
+        $falseVal = $i1->constInt(0, false);
+        $foundSlot = $context->builder->alloca($i1, 1, 'array_intersect_in_all');
+        $context->builder->store($falseVal, $foundSlot);
+
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_STRING & 0xff, false)
+        );
+        $isLong = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
+        );
+
+        $stringBlock = BasicBlockHelper::append($context, 'array_intersect_in_all_string');
+        $longBlock = BasicBlockHelper::append($context, 'array_intersect_in_all_long');
+        $falseBlock = BasicBlockHelper::append($context, 'array_intersect_in_all_false');
+        $mergeBlock = BasicBlockHelper::append($context, 'array_intersect_in_all_merge');
+
+        $afterString = BasicBlockHelper::append($context, 'array_intersect_in_all_after_string');
+        $context->builder->branchIf($isString, $stringBlock, $afterString);
+
+        $context->builder->positionAtEnd($stringBlock);
+        $needle = new Variable(
+            $context,
+            Variable::TYPE_STRING,
+            Variable::KIND_VALUE,
+            $context->builder->call($context->lookupFunction('__value__readString'), $entry)
+        );
+        $context->builder->store(
+            self::entryInAllHaystacksNeedle($context, $needle, $otherHts, $strict),
+            $foundSlot
+        );
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($afterString);
+        $context->builder->branchIf($isLong, $longBlock, $falseBlock);
+
+        $context->builder->positionAtEnd($longBlock);
+        $needle = new Variable(
+            $context,
+            Variable::TYPE_NATIVE_LONG,
+            Variable::KIND_VALUE,
+            $context->builder->call($context->lookupFunction('__value__readLong'), $entry)
+        );
+        $context->builder->store(
+            self::entryInAllHaystacksNeedle($context, $needle, $otherHts, $strict),
+            $foundSlot
+        );
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($falseBlock);
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($mergeBlock);
+
+        return $context->builder->load($foundSlot);
+    }
+
+    /**
+     * @param list<Value> $otherHts
+     */
+    private static function entryInAllHaystacksNeedle(
+        Context $context,
+        Variable $needle,
+        array $otherHts,
+        Value $strict
+    ): Value {
+        $i1 = $context->getTypeFromString('int1');
+        $n = \count($otherHts);
+        if (0 === $n) {
+            return $i1->constInt(1, false);
+        }
+
+        $resultSlot = $context->builder->alloca($i1, 1, 'array_intersect_in_all_needle_result');
+        $failBlock = BasicBlockHelper::append($context, 'array_intersect_in_all_needle_fail');
+        $okBlock = BasicBlockHelper::append($context, 'array_intersect_in_all_needle_ok');
+        $mergeBlock = BasicBlockHelper::append($context, 'array_intersect_in_all_needle_merge');
+        $checkBlocks = [];
+        $nextBlocks = [];
+        for ($i = 0; $i < $n; ++$i) {
+            $checkBlocks[$i] = BasicBlockHelper::append($context, 'array_intersect_in_all_needle_ht_'.$i);
+            $nextBlocks[$i] = $i + 1 < $n
+                ? BasicBlockHelper::append($context, 'array_intersect_in_all_needle_next_'.$i)
+                : $okBlock;
+        }
+
+        $context->builder->branch($checkBlocks[0]);
+        for ($i = 0; $i < $n; ++$i) {
+            $haystack = new Variable(
+                $context,
+                Variable::TYPE_HASHTABLE,
+                Variable::KIND_VALUE,
+                $otherHts[$i]
+            );
+            $context->builder->positionAtEnd($checkBlocks[$i]);
+            $match = self::inArray($context, $needle, $haystack, $strict, 'intersect'.$i);
+            $context->builder->branchIf($match, $nextBlocks[$i], $failBlock);
+            if ($i + 1 < $n) {
+                $context->builder->positionAtEnd($nextBlocks[$i]);
+                $context->builder->branch($checkBlocks[$i + 1]);
+            }
+        }
+
+        $context->builder->positionAtEnd($okBlock);
+        $context->builder->store($i1->constInt(1, false), $resultSlot);
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($failBlock);
+        $context->builder->store($i1->constInt(0, false), $resultSlot);
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($mergeBlock);
+
+        return $context->builder->load($resultSlot);
+    }
 }
