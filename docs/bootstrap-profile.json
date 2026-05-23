@@ -410,6 +410,7 @@
     ],
     "aot_lint_targets": [
         "examples/000-HelloWorld/example.php",
+        "test/bootstrap-aot/cast_int.php",
         "test/bootstrap-aot/class_const_fetch.php",
         "test/bootstrap-aot/class_constants.php",
         "test/bootstrap-aot/class_int_property.php",
@@ -431,6 +432,7 @@
     ],
     "aot_link_targets": [
         "examples/000-HelloWorld/example.php",
+        "test/bootstrap-aot/cast_int.php",
         "test/bootstrap-aot/class_const_fetch.php",
         "test/bootstrap-aot/class_constants.php",
         "test/bootstrap-aot/class_nullable_property.php",
@@ -452,8 +454,8 @@
         "inventory_files": 379,
         "excluded": 3,
         "eligible": 376,
-        "aot_lint_targets": 19,
-        "aot_link_targets": 14,
+        "aot_lint_targets": 20,
+        "aot_link_targets": 15,
         "aot_link_lib_targets": 1
     }
 }
