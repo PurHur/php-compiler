@@ -29,7 +29,10 @@ final class RebuildExamplesTest extends TestCase
         $this->assertStringContainsString('BENCH_MINIWEBAPP', $script);
         $this->assertStringContainsString('MINIWEBAPP_LINT_GATE', $script);
         $this->assertStringContainsString("'PATH_INFO' => '/home'", $script);
-        $this->assertStringContainsString("'skip_aot' => true", $script);
+        $this->assertStringContainsString("'project_aot' => true", $script);
+        $this->assertStringContainsString('tryBenchmarkMiniWebAppProjectAot', $script);
+        $this->assertStringContainsString('resolveLlvmDir', $script);
+        $this->assertStringContainsString("'build', '--project'", $script);
         $this->assertStringContainsString('003-MiniWebApp/public/index.php', $script);
     }
 }

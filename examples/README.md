@@ -152,15 +152,15 @@ MINIWEBAPP_LINT_GATE=1 ./script/rebuild-examples.php
 
 For **001-SimpleWeb**, `bin/compile.php` is timed **without** compile-time `-q`; the `./compiled` column runs the binary with runtime `QUERY_STRING` (and related CGI env), matching production AOT web binaries.
 
-For **003-MiniWebApp**, VM/JIT/native columns run `public/index.php` with `PATH_INFO=/home` (and related CGI env) from the example `public/` directory ([#491](https://github.com/PurHur/php-compiler/issues/491), runtime [#539](https://github.com/PurHur/php-compiler/issues/539)). AOT execute columns stay **n/a** until native run is green ([#764](https://github.com/PurHur/php-compiler/issues/764); link [#568](https://github.com/PurHur/php-compiler/issues/568) closed, [#624](https://github.com/PurHur/php-compiler/issues/624)). The row is omitted when `phpc lint --all examples/003-MiniWebApp` fails unless `BENCH_MINIWEBAPP=1`.
+For **003-MiniWebApp**, VM/JIT/native columns run `public/index.php` with `PATH_INFO=/home` (and related CGI env) from the example `public/` directory ([#491](https://github.com/PurHur/php-compiler/issues/491), runtime [#539](https://github.com/PurHur/php-compiler/issues/539)). AOT columns time `phpc build --project` and `.phpc/bin/app` with the same CGI overlay when LLVM is ready and execute returns HTML ([#716](https://github.com/PurHur/php-compiler/issues/716); execute [#764](https://github.com/PurHur/php-compiler/issues/764) closed). The row is omitted when `phpc lint --all examples/003-MiniWebApp` fails unless `BENCH_MINIWEBAPP=1`.
 
 <!-- benchmark table start -->
 
 |         Example Name |      Native PHP |      bin/vm.php |     bin/jit.php | bin/compile.php |      ./compiled |
 |----------------------|-----------------|-----------------|-----------------|-----------------|-----------------|
-|       000-HelloWorld |         0.00778 |         0.04055 |         0.16935 |         0.55685 |         0.00092 |
-|        001-SimpleWeb |         0.01024 |         0.04413 |         0.16994 |         0.53688 |         0.00092 |
-|        002-StaticWeb |         0.01098 |         0.04485 |         0.16732 |         0.55200 |         0.00118 |
-|       003-MiniWebApp |         0.00878 |         0.09707 |         0.11338 |             n/a |             n/a |
-|          004-ApiJson |         0.00752 |         0.04128 |         0.16942 |         0.55373 |         0.00104 |
+|       000-HelloWorld |         0.01013 |         0.04243 |         0.17881 |         0.73837 |         0.00114 |
+|        001-SimpleWeb |         0.00853 |         0.04411 |         0.18525 |         0.72047 |         0.00124 |
+|        002-StaticWeb |         0.00879 |         0.04392 |         0.17811 |         0.71660 |         0.00105 |
+|       003-MiniWebApp |         0.00867 |         0.09493 |         0.55299 |         1.20217 |         0.00101 |
+|          004-ApiJson |         0.00824 |         0.04377 |         0.18179 |         0.73902 |         0.00112 |
 <!-- benchmark table end -->

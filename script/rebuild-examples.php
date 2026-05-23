@@ -138,7 +138,8 @@ function exampleDisplayName(string $example): string
  *     cgi_env: array<string, string>,
  *     aot_compile_time_query: bool,
  *     aot_run_env: array<string, string>,
- *     skip_aot: bool
+ *     skip_aot: bool,
+ *     project_aot: bool
  * }
  */
 function exampleProfile(string $example): array
@@ -154,7 +155,8 @@ function exampleProfile(string $example): array
             ],
             'aot_compile_time_query' => false,
             'aot_run_env' => [],
-            'skip_aot' => true,
+            'skip_aot' => false,
+            'project_aot' => true,
         ];
     }
 
@@ -170,6 +172,7 @@ function exampleProfile(string $example): array
                 'REQUEST_URI' => '/example.php?name=World',
             ],
             'skip_aot' => false,
+            'project_aot' => false,
         ];
     }
 
@@ -179,13 +182,35 @@ function exampleProfile(string $example): array
         'aot_compile_time_query' => true,
         'aot_run_env' => [],
         'skip_aot' => false,
+        'project_aot' => false,
     ];
+}
+
+function resolveLlvmDir(string $repoRoot): ?string
+{
+    $candidates = [];
+    $fromEnv = getenv('PHP_COMPILER_LLVM_PATH');
+    if (false !== $fromEnv && '' !== $fromEnv) {
+        $candidates[] = $fromEnv;
+    }
+    $candidates[] = $repoRoot.'/.llvm';
+    $candidates[] = '/opt/llvm9';
+
+    foreach ($candidates as $dir) {
+        if (is_file($dir.'/libLLVM-9.so.1')) {
+            $resolved = realpath($dir);
+
+            return false !== $resolved ? $resolved : $dir;
+        }
+    }
+
+    return null;
 }
 
 function isLlvmReady(string $repoRoot): bool
 {
-    $llvmDir = $repoRoot.'/.llvm';
-    if (!is_file($llvmDir.'/libLLVM-9.so.1')) {
+    $llvmDir = resolveLlvmDir($repoRoot);
+    if (null === $llvmDir) {
         return false;
     }
     if ('' === getenv('PHP_COMPILER_LLVM_PATH')) {
@@ -213,14 +238,13 @@ function benchmarkEnv(string $repoRoot): array
             $env[$key] = $value;
         }
     }
-    $llvmDir = $repoRoot.'/.llvm';
-    if (is_file($llvmDir.'/libLLVM-9.so.1')) {
-        $prefix = realpath($llvmDir) ?: $llvmDir;
-        $env['PHP_COMPILER_LLVM_PATH'] = $prefix;
+    $llvmDir = resolveLlvmDir($repoRoot);
+    if (null !== $llvmDir) {
+        $env['PHP_COMPILER_LLVM_PATH'] = $llvmDir;
         $ld = $env['LD_LIBRARY_PATH'] ?? '';
-        $env['LD_LIBRARY_PATH'] = '' === $ld ? $prefix : $prefix.':'.$ld;
+        $env['LD_LIBRARY_PATH'] = '' === $ld ? $llvmDir : $llvmDir.':'.$ld;
         $path = $env['PATH'] ?? '';
-        $env['PATH'] = '' === $path ? $prefix : $prefix.':'.$path;
+        $env['PATH'] = '' === $path ? $llvmDir : $llvmDir.':'.$path;
     }
 
     return $env;
@@ -261,6 +285,17 @@ function phpCommand(): array
  */
 function runProcess(array $argv, array $env, string $cwd): void
 {
+    runProcessCapturing($argv, $env, $cwd);
+}
+
+/**
+ * @param list<string> $argv
+ * @param array<string, string> $env
+ *
+ * @return array{exit: int, stdout: string, stderr: string}
+ */
+function runProcessCapturing(array $argv, array $env, string $cwd): array
+{
     $descriptorSpec = [
         0 => ['pipe', 'r'],
         1 => ['pipe', 'w'],
@@ -268,14 +303,113 @@ function runProcess(array $argv, array $env, string $cwd): void
     ];
     $proc = proc_open($argv, $descriptorSpec, $pipes, $cwd, $env);
     if (!is_resource($proc)) {
-        return;
+        return ['exit' => 1, 'stdout' => '', 'stderr' => 'proc_open failed'];
     }
     fclose($pipes[0]);
-    stream_get_contents($pipes[1]);
-    stream_get_contents($pipes[2]);
+    $stdout = stream_get_contents($pipes[1]);
+    $stderr = stream_get_contents($pipes[2]);
     fclose($pipes[1]);
     fclose($pipes[2]);
-    proc_close($proc);
+    $exit = proc_close($proc);
+
+    return [
+        'exit' => $exit,
+        'stdout' => false !== $stdout ? $stdout : '',
+        'stderr' => false !== $stderr ? $stderr : '',
+    ];
+}
+
+/**
+ * @param array<string, string> $cgiEnv VM column CGI overlay (PATH_INFO=/home, #491)
+ *
+ * @return array<string, string>
+ */
+function miniWebAppAotRunEnv(string $repoRoot, array $cgiEnv): array
+{
+    $publicDir = $repoRoot.'/examples/003-MiniWebApp/public';
+    $projectDir = $repoRoot.'/examples/003-MiniWebApp';
+
+    return array_merge([
+        'SCRIPT_FILENAME' => $publicDir.'/index.php',
+        'SCRIPT_NAME' => '/index.php',
+        'DOCUMENT_ROOT' => $publicDir,
+        'PHPC_DEPLOY_ROOT' => $projectDir,
+    ], $cgiEnv);
+}
+
+/**
+ * phpc build --project + native execute probe for 003-MiniWebApp (issues #716, #764).
+ *
+ * @param array<string, string> $benchEnv
+ * @param array{
+ *     query: ?string,
+ *     cgi_env: array<string, string>,
+ *     aot_compile_time_query: bool,
+ *     aot_run_env: array<string, string>,
+ *     skip_aot: bool,
+ *     project_aot: bool
+ * } $profile
+ *
+ * @return array{compile: float, compiled: float}|null
+ */
+function tryBenchmarkMiniWebAppProjectAot(string $repoRoot, array $benchEnv, array $profile): ?array
+{
+    $project = $repoRoot.'/examples/003-MiniWebApp';
+    $phpc = $repoRoot.'/phpc';
+    $binary = $project.'/.phpc/bin/app';
+
+    if (!is_executable($phpc)) {
+        echo "  003-MiniWebApp AOT: skip (phpc not executable)\n";
+
+        return null;
+    }
+
+    $compileStart = microtime(true);
+    $build = runProcessCapturing(
+        [$phpc, 'build', '--project', $project],
+        $benchEnv,
+        $repoRoot
+    );
+    $compileTime = microtime(true) - $compileStart;
+
+    if (0 !== $build['exit']) {
+        $stderr = $build['stderr'];
+        if (\PHPCompiler\Cli\PhpcBuild::isUserClassAotBlocked($stderr)) {
+            echo '  003-MiniWebApp AOT: skip (link blocked: '.trim(substr($stderr, 0, 120))."…)\n";
+        } else {
+            echo "  003-MiniWebApp AOT: skip (phpc build --project exit {$build['exit']})\n";
+        }
+
+        return null;
+    }
+
+    if (!is_executable($binary)) {
+        echo "  003-MiniWebApp AOT: skip (binary missing after link)\n";
+
+        return null;
+    }
+
+    $aotRunEnv = $benchEnv;
+    foreach (miniWebAppAotRunEnv($repoRoot, $profile['cgi_env']) as $key => $value) {
+        $aotRunEnv[$key] = $value;
+    }
+
+    $probe = runProcessCapturing([$binary], $aotRunEnv, $repoRoot);
+    if (0 !== $probe['exit'] || '' === trim($probe['stdout'])) {
+        echo "  003-MiniWebApp AOT: skip (execute empty stdout or non-zero exit)\n";
+
+        return null;
+    }
+    if (!str_contains($probe['stdout'], 'MiniWebApp')) {
+        echo "  003-MiniWebApp AOT: skip (execute stdout lacks app marker)\n";
+
+        return null;
+    }
+
+    $iterations = 10;
+    $compiledTime = runIterations([$binary], $aotRunEnv, $repoRoot, $iterations) / $iterations;
+
+    return ['compile' => $compileTime, 'compiled' => $compiledTime];
 }
 
 /**
@@ -342,7 +476,13 @@ function benchmarkExample(string $example, array $phpCmd, array $benchEnv, strin
 
     $compileTime = null;
     $compiledTime = null;
-    if ($llvmReady && !$profile['skip_aot']) {
+    if ($llvmReady && !empty($profile['project_aot'])) {
+        $projectAot = tryBenchmarkMiniWebAppProjectAot($repoRoot, $benchEnv, $profile);
+        if (null !== $projectAot) {
+            $compileTime = $projectAot['compile'];
+            $compiledTime = $projectAot['compiled'];
+        }
+    } elseif ($llvmReady && !$profile['skip_aot']) {
         $binary = str_replace('.php', '', $example);
         $compileArgv = array_merge($phpCmd, [$repoRoot.'/bin/compile.php']);
         if (null !== $profile['query'] && $profile['aot_compile_time_query']) {
