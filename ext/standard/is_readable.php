@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -34,10 +35,8 @@ final class is_readable extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('is_readable() requires exactly one argument in this compiler build');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type) {
-            throw new \LogicException('is_readable() requires a string path in this compiler build');
-        }
+        $path = JitStringArg::lower($context, $args[0], 'is_readable() path');
 
-        return JitStat::pathIsReadable($context, $context->helper->loadValue($args[0]));
+        return JitStat::pathIsReadable($context, $path);
     }
 }

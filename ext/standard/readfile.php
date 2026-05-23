@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -46,10 +47,8 @@ final class readfile extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('readfile() requires exactly one argument in this compiler build');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type) {
-            throw new \LogicException('readfile() requires a string path in this compiler build');
-        }
+        $path = JitStringArg::lower($context, $args[0], 'readfile() path');
 
-        return JitReadfile::invoke($context, $context->helper->loadValue($args[0]));
+        return JitReadfile::invoke($context, $path);
     }
 }

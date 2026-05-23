@@ -14,6 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -92,7 +93,7 @@ final class htmlspecialchars extends Internal
             );
         }
 
-        $str = self::jitStringArg($context, $args[0]);
+        $str = JitStringArg::lower($context, $args[0], 'htmlspecialchars() string');
         $flags = $context->getTypeFromString('int64')->constInt(ENT_QUOTES | ENT_SUBSTITUTE, false);
         if ($argc >= 2) {
             $flags = $context->helper->loadValue($args[1]);
@@ -101,18 +102,4 @@ final class htmlspecialchars extends Internal
         return JitHtmlspecialchars::escape($context, $str, $flags);
     }
 
-    private static function jitStringArg(Context $context, JITVariable $arg): Value
-    {
-        if (JITVariable::TYPE_STRING === $arg->type) {
-            return $context->helper->loadValue($arg);
-        }
-        if (JITVariable::TYPE_VALUE === $arg->type) {
-            return $context->builder->call(
-                $context->lookupFunction('__value__readString'),
-                \PHPCompiler\JIT\JitValueBox::valuePtrFromVariable($context, $arg)
-            );
-        }
-
-        throw new \LogicException('htmlspecialchars() only supports strings in this compiler build');
-    }
 }

@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -34,10 +35,8 @@ final class basename extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('basename() requires exactly one argument');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type) {
-            throw new \LogicException('basename() only supports strings in this compiler build');
-        }
+        $path = JitStringArg::lower($context, $args[0], 'basename() path');
 
-        return JitPath::basename($context, $context->helper->loadValue($args[0]));
+        return JitPath::basename($context, $path);
     }
 }

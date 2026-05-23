@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -34,10 +35,8 @@ final class file_exists extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('file_exists() requires exactly one argument');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type) {
-            throw new \LogicException('file_exists() requires a string path in this compiler build');
-        }
+        $path = JitStringArg::lower($context, $args[0], 'file_exists() path');
 
-        return JitStat::pathExists($context, $context->helper->loadValue($args[0]));
+        return JitStat::pathExists($context, $path);
     }
 }
