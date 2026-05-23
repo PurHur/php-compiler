@@ -11,6 +11,20 @@ use PHPUnit\Framework\TestCase;
  */
 final class BootstrapSelfhostCompileProbeTest extends TestCase
 {
+    public function testExtractNextLowerIgnoresNoticeAndDeprecated(): void
+    {
+        $root = dirname(__DIR__, 2);
+        require $root.'/script/bootstrap-lib.php';
+
+        $output = <<<'OUT'
+PHP Notice:  Undefined variable: x in /tmp/a.php on line 1
+PHP Deprecated:  Constant FOO is deprecated in /tmp/b.php on line 2
+LogicException: unsupported CFG op
+OUT;
+
+        $this->assertSame('unsupported CFG op', bootstrapSelfhostProbeExtractNextLower($output));
+    }
+
     public function testProbeScriptPrintsNextLowerOnFailure(): void
     {
         $root = dirname(__DIR__, 2);
