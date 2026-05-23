@@ -705,8 +705,39 @@ class HashTable extends Type
             $this->context->builder->structGep($newNode, $nodeMap['value']),
             $child
         );
-        $this->context->builder->store($head, $this->context->builder->structGep($newNode, $nodeMap['next']));
+        $this->context->builder->store(
+            $newNode->typeOf()->constNull(),
+            $this->context->builder->structGep($newNode, $nodeMap['next'])
+        );
+        $tail = $fn->appendBasicBlock('strkey_ht_tail');
+        $emptyHead = $fn->appendBasicBlock('strkey_ht_empty_head');
+        $tailWalk = $fn->appendBasicBlock('strkey_ht_tail_walk');
+        $tailDone = $fn->appendBasicBlock('strkey_ht_tail_done');
+        $this->context->builder->branch($tail);
+
+        $this->context->builder->positionAtEnd($tail);
+        $isEmpty = $this->context->builder->icmp(Builder::INT_EQ, $head, $head->typeOf()->constNull());
+        $this->context->builder->branchIf($isEmpty, $emptyHead, $tailWalk);
+
+        $this->context->builder->positionAtEnd($tailWalk);
+        $walkNode = $this->context->builder->phi($head->typeOf());
+        $walkNode->addIncoming($head, $tail);
+        $nextWalk = $this->context->builder->load($this->context->builder->structGep($walkNode, $nodeMap['next']));
+        $atEnd = $this->context->builder->icmp(Builder::INT_EQ, $nextWalk, $nextWalk->typeOf()->constNull());
+        $this->context->builder->branchIf($atEnd, $tailDone, $tailWalk);
+        $walkNode->addIncoming($nextWalk, $tailWalk);
+
+        $this->context->builder->positionAtEnd($tailDone);
+        $this->context->builder->store(
+            $newNode,
+            $this->context->builder->structGep($walkNode, $nodeMap['next'])
+        );
+        $this->incrementNumElements($ht);
+        $this->context->builder->branch($done);
+
+        $this->context->builder->positionAtEnd($emptyHead);
         $this->context->builder->store($newNode, $headSlot);
+        $this->incrementNumElements($ht);
         $this->context->builder->branch($done);
 
         $this->context->builder->positionAtEnd($done);
@@ -784,7 +815,37 @@ class HashTable extends Type
             $this->context->builder->structGep($newNode, $nodeMap['value']),
             $long
         );
-        $this->context->builder->store($head, $this->context->builder->structGep($newNode, $nodeMap['next']));
+        $this->context->builder->store(
+            $newNode->typeOf()->constNull(),
+            $this->context->builder->structGep($newNode, $nodeMap['next'])
+        );
+        $tail = $fn->appendBasicBlock('strkey_long_tail');
+        $emptyHead = $fn->appendBasicBlock('strkey_long_empty_head');
+        $tailWalk = $fn->appendBasicBlock('strkey_long_tail_walk');
+        $tailDone = $fn->appendBasicBlock('strkey_long_tail_done');
+        $this->context->builder->branch($tail);
+
+        $this->context->builder->positionAtEnd($tail);
+        $isEmpty = $this->context->builder->icmp(Builder::INT_EQ, $head, $head->typeOf()->constNull());
+        $this->context->builder->branchIf($isEmpty, $emptyHead, $tailWalk);
+
+        $this->context->builder->positionAtEnd($tailWalk);
+        $walkNode = $this->context->builder->phi($head->typeOf());
+        $walkNode->addIncoming($head, $tail);
+        $nextWalk = $this->context->builder->load($this->context->builder->structGep($walkNode, $nodeMap['next']));
+        $atEnd = $this->context->builder->icmp(Builder::INT_EQ, $nextWalk, $nextWalk->typeOf()->constNull());
+        $this->context->builder->branchIf($atEnd, $tailDone, $tailWalk);
+        $walkNode->addIncoming($nextWalk, $tailWalk);
+
+        $this->context->builder->positionAtEnd($tailDone);
+        $this->context->builder->store(
+            $newNode,
+            $this->context->builder->structGep($walkNode, $nodeMap['next'])
+        );
+        $this->incrementNumElements($ht);
+        $this->context->builder->branch($done);
+
+        $this->context->builder->positionAtEnd($emptyHead);
         $this->context->builder->store($newNode, $headSlot);
         $this->incrementNumElements($ht);
         $this->context->builder->branch($done);
@@ -860,8 +921,39 @@ class HashTable extends Type
             $this->context->builder->structGep($newNode, $nodeMap['value']),
             $bool
         );
-        $this->context->builder->store($head, $this->context->builder->structGep($newNode, $nodeMap['next']));
+        $this->context->builder->store(
+            $newNode->typeOf()->constNull(),
+            $this->context->builder->structGep($newNode, $nodeMap['next'])
+        );
+        $tail = $fn->appendBasicBlock('strkey_bool_tail');
+        $emptyHead = $fn->appendBasicBlock('strkey_bool_empty_head');
+        $tailWalk = $fn->appendBasicBlock('strkey_bool_tail_walk');
+        $tailDone = $fn->appendBasicBlock('strkey_bool_tail_done');
+        $this->context->builder->branch($tail);
+
+        $this->context->builder->positionAtEnd($tail);
+        $isEmpty = $this->context->builder->icmp(Builder::INT_EQ, $head, $head->typeOf()->constNull());
+        $this->context->builder->branchIf($isEmpty, $emptyHead, $tailWalk);
+
+        $this->context->builder->positionAtEnd($tailWalk);
+        $walkNode = $this->context->builder->phi($head->typeOf());
+        $walkNode->addIncoming($head, $tail);
+        $nextWalk = $this->context->builder->load($this->context->builder->structGep($walkNode, $nodeMap['next']));
+        $atEnd = $this->context->builder->icmp(Builder::INT_EQ, $nextWalk, $nextWalk->typeOf()->constNull());
+        $this->context->builder->branchIf($atEnd, $tailDone, $tailWalk);
+        $walkNode->addIncoming($nextWalk, $tailWalk);
+
+        $this->context->builder->positionAtEnd($tailDone);
+        $this->context->builder->store(
+            $newNode,
+            $this->context->builder->structGep($walkNode, $nodeMap['next'])
+        );
+        $this->incrementNumElements($ht);
+        $this->context->builder->branch($done);
+
+        $this->context->builder->positionAtEnd($emptyHead);
         $this->context->builder->store($newNode, $headSlot);
+        $this->incrementNumElements($ht);
         $this->context->builder->branch($done);
 
         $this->context->builder->positionAtEnd($done);
