@@ -31,6 +31,12 @@ static const char *pm_strdata(__string__ *s)
 
 #define PM_MAX_PATTERN 4096
 
+/* PHP PREG_* codes (subset); updated by __compiler_preg_match failures. */
+#define PHPC_PREG_NO_ERROR 0
+#define PHPC_PREG_BAD_REGEX 6
+
+static int phpc_preg_last_error = PHPC_PREG_NO_ERROR;
+
 static int pm_is_delim_invalid(char c)
 {
     if (c >= 'a' && c <= 'z') {
@@ -113,6 +119,11 @@ static int pm_extract_body(
     return pm_parse_modifiers(full + close + 1, full_len - close - 1, opts);
 }
 
+int64_t __compiler_preg_last_error(void)
+{
+    return (int64_t) phpc_preg_last_error;
+}
+
 int64_t __compiler_preg_match(__string__ *pattern, __string__ *subject)
 {
     const char *pat_full = pm_strdata(pattern);
@@ -120,13 +131,19 @@ int64_t __compiler_preg_match(__string__ *pattern, __string__ *subject)
     const char *subj = pm_strdata(subject);
     size_t subj_len = pm_strlen(subject);
 
+    phpc_preg_last_error = PHPC_PREG_NO_ERROR;
+
     if (pat_len > PM_MAX_PATTERN) {
+        phpc_preg_last_error = PHPC_PREG_BAD_REGEX;
+
         return -1;
     }
 
     char body[PM_MAX_PATTERN + 1];
     uint32_t opts = 0;
     if (0 != pm_extract_body(pat_full, pat_len, body, sizeof(body), &opts)) {
+        phpc_preg_last_error = PHPC_PREG_BAD_REGEX;
+
         return -1;
     }
 
@@ -141,12 +158,15 @@ int64_t __compiler_preg_match(__string__ *pattern, __string__ *subject)
         NULL
     );
     if (NULL == re) {
+        phpc_preg_last_error = PHPC_PREG_BAD_REGEX;
+
         return -1;
     }
 
     pcre2_match_data *match_data = pcre2_match_data_create_from_pattern(re, NULL);
     if (NULL == match_data) {
         pcre2_code_free(re);
+        phpc_preg_last_error = PHPC_PREG_BAD_REGEX;
 
         return -1;
     }
@@ -168,6 +188,8 @@ int64_t __compiler_preg_match(__string__ *pattern, __string__ *subject)
         if (PCRE2_ERROR_NOMATCH == rc) {
             return 0;
         }
+
+        phpc_preg_last_error = PHPC_PREG_BAD_REGEX;
 
         return -1;
     }
