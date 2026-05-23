@@ -174,6 +174,37 @@ final class JitStat
         return $ptr;
     }
 
+    /** @return Value __value__* (native long st_mode, or boolean false when stat fails) */
+    public static function pathFilePermsBoxed(Context $context, Value $str): Value
+    {
+        $mode = self::loadModeOrFail($context, $str);
+        $i32 = $context->getTypeFromString('int32');
+        $failed = $context->builder->icmp(Builder::INT_SLT, $mode, $i32->constInt(0, true));
+
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $id = (string) (++self::$blockSerial);
+        $failBlock = BasicBlockHelper::append($context, 'fileperms_fail_'.$id);
+        $okBlock = BasicBlockHelper::append($context, 'fileperms_ok_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, 'fileperms_done_'.$id);
+        $context->builder->branchIf($failed, $failBlock, $okBlock);
+
+        $context->builder->positionAtEnd($failBlock);
+        $i1 = $context->getTypeFromString('int1');
+        JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($okBlock);
+        $i64 = $context->getTypeFromString('int64');
+        $mode64 = $context->builder->zext($mode, $i64);
+        JitValueBox::writeLong($context, $slot, $mode64);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+
+        return $ptr;
+    }
+
     /** @return Value __value__* (native long mtime, or boolean false when stat fails) */
     public static function pathFileMtimeBoxed(Context $context, Value $str): Value
     {

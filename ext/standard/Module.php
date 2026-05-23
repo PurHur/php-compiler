@@ -155,6 +155,7 @@ class Module extends ModuleAbstract
             new file_exists(),
             new filesize(),
             new filemtime(),
+            new fileperms(),
             new is_file(),
             new is_dir(),
             new is_readable(),
