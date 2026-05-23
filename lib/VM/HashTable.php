@@ -258,6 +258,54 @@ final class HashTable {
     }
 
     /**
+     * Prepend one or more values to a packed list array (no holes).
+     * Returns the new element count.
+     */
+    public function unshiftPrepend(Variable ...$values): int
+    {
+        $this->assertConsistent();
+        $k = \count($values);
+        if (0 === $k) {
+            return $this->numElements;
+        }
+        if (!$this->isWithoutHoles()) {
+            throw new \LogicException('unshiftPrepend() only supports packed list arrays without holes');
+        }
+        $this->refcount->assertSeparated();
+        if (0 === $this->numElements) {
+            foreach ($values as $value) {
+                $copy = new Variable();
+                $copy->copyFrom($value);
+                $this->append($copy);
+            }
+
+            return $this->numElements;
+        }
+        while ($this->numUsed + $k > $this->indexes->size()) {
+            $this->resize();
+        }
+        for ($i = $this->numUsed - 1; $i >= 0; --$i) {
+            $src = $this->buckets->read($i);
+            $dst = $this->buckets->read($i + $k);
+            $dst->value->copyFrom($src->value);
+            $dst->hash = $i + $k;
+            $dst->key = null;
+        }
+        for ($j = 0; $j < $k; ++$j) {
+            $bucket = $this->buckets->read($j);
+            $bucket->value->copyFrom($values[$j]);
+            $bucket->hash = $j;
+            $bucket->key = null;
+        }
+        $this->numUsed += $k;
+        $this->numElements += $k;
+        $this->nextFreeElement += $k;
+        $this->rehash();
+
+        return $this->numElements;
+    }
+
+    /**
      * Replace packed list values in place (indices 0..n-1, no holes).
      *
      * @param list<Variable> $values

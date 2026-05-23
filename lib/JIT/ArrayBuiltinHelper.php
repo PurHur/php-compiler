@@ -91,6 +91,97 @@ final class ArrayBuiltinHelper
     }
 
     /**
+     * Prepend values to a packed list hashtable; returns new element count.
+     */
+    public static function unshift(Context $context, Variable $array, Variable ...$values): Value
+    {
+        $k = \count($values);
+        if (0 === $k) {
+            return self::getNumElements($context, self::loadHashTable($context, $array));
+        }
+        $ht = self::loadHashTable($context, $array);
+        $map = $context->structFieldMap['__hashtable__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $num = $context->builder->call(
+            $context->lookupFunction('__hashtable__getNumElements'),
+            $ht
+        );
+        $zero = $sizeT->constInt(0, false);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $num, $zero);
+        $offset = $sizeT->constInt($k, false);
+
+        $emptyBlock = BasicBlockHelper::append($context, 'array_unshift_empty');
+        $shiftBlock = BasicBlockHelper::append($context, 'array_unshift_shift');
+        $prependBlock = BasicBlockHelper::append($context, 'array_unshift_prepend');
+        $doneBlock = BasicBlockHelper::append($context, 'array_unshift_done');
+        $context->builder->branchIf($isEmpty, $emptyBlock, $shiftBlock);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        for ($i = 0; $i < $k; ++$i) {
+            self::appendElement($context, $ht, $values[$i]);
+        }
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($shiftBlock);
+        $one = $sizeT->constInt(1, false);
+        $lastIdx = $context->builder->sub($num, $one);
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'array_unshift_idx');
+        $context->builder->store($lastIdx, $idxSlot);
+        $loopHead = BasicBlockHelper::append($context, 'array_unshift_head');
+        $loopBody = BasicBlockHelper::append($context, 'array_unshift_body');
+        $context->builder->branch($loopHead);
+
+        $context->builder->positionAtEnd($loopHead);
+        $idx = $context->builder->load($idxSlot);
+        $belowZero = $context->builder->icmp(Builder::INT_SLT, $idx, $zero);
+        $context->builder->branchIf($belowZero, $prependBlock, $loopBody);
+
+        $context->builder->positionAtEnd($loopBody);
+        $destIdx = $context->builder->addNoSignedWrap($idx, $offset);
+        $fromEntry = self::listEntryAt($context, $ht, $idx);
+        $toEntry = self::listEntryAt($context, $ht, $destIdx);
+        $movedLong = $context->builder->call(
+            $context->lookupFunction('__value__readLong'),
+            $fromEntry
+        );
+        $context->builder->call(
+            $context->lookupFunction('__value__writeLong'),
+            $toEntry,
+            $movedLong
+        );
+        $context->builder->store(
+            $context->builder->sub($idx, $one),
+            $idxSlot
+        );
+        $context->builder->branch($loopHead);
+
+        $context->builder->positionAtEnd($prependBlock);
+        for ($i = 0; $i < $k; ++$i) {
+            HashTableHelper::setAtIndex(
+                $context,
+                $ht,
+                $sizeT->constInt($i, false),
+                $values[$i]
+            );
+        }
+        $numPtr = $context->builder->structGep($ht, $map['numElements']);
+        $nextPtr = $context->builder->structGep($ht, $map['nextFreeElement']);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($context->builder->load($numPtr), $offset),
+            $numPtr
+        );
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($context->builder->load($nextPtr), $offset),
+            $nextPtr
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+
+        return self::getNumElements($context, $ht);
+    }
+
+    /**
      * @return Value __value__* (null when the array is empty)
      */
     public static function popLast(Context $context, Variable $array): Value
