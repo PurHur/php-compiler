@@ -70,6 +70,11 @@ final class VmFs
         return $target;
     }
 
+    public static function unlink(string $path): bool
+    {
+        return @unlink($path);
+    }
+
     private static function modeToFiletype(int $mode): string
     {
         $type = $mode & 0xF000;

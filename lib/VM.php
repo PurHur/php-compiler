@@ -266,6 +266,10 @@ restart:
                     }
                     $constName = strtolower($frame->scope[$op->arg3]->toString());
                     $classEntry = $this->context->classes[$lcClass];
+                    if ('class' === $constName) {
+                        $frame->scope[$op->arg1]->str($classEntry->name);
+                        break;
+                    }
                     if (!isset($classEntry->constants[$constName])) {
                         return $this->raise("Undefined class constant {$className}::{$constName}", $frame);
                     }

@@ -162,6 +162,7 @@ class Module extends ModuleAbstract
             new is_executable(),
             new is_link(),
             new readlink(),
+            new unlink(),
             new filetype(),
             new fopen(),
             new fread(),
@@ -340,6 +341,15 @@ class Module extends ModuleAbstract
             $ft = $context->context->functionType($i64, false, $i8p, $i8p, $sizeT);
             $fn = $context->module->addFunction('readlink', $ft);
             $context->registerFunction('readlink', $fn);
+        }
+        try {
+            $context->lookupFunction('unlink');
+        } catch (\Throwable $e) {
+            $i8p = $context->getTypeFromString('int8*');
+            $i32 = $context->getTypeFromString('int32');
+            $ft = $context->context->functionType($i32, false, $i8p);
+            $fn = $context->module->addFunction('unlink', $ft);
+            $context->registerFunction('unlink', $fn);
         }
         $double = $context->getTypeFromString('double');
         try {
