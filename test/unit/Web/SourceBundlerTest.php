@@ -128,16 +128,19 @@ final class SourceBundlerTest extends TestCase
         }
     }
 
-    public function testBundleMiniWebAppPreservesDeployPathIncludes(): void
+    public function testBundleMiniWebAppFoldsResolvableLayoutIncludesToLiterals(): void
     {
         $entry = realpath(dirname(__DIR__, 3).'/examples/003-MiniWebApp/public/index.php');
         $this->assertNotFalse($entry);
         $runtime = new \PHPCompiler\Runtime(\PHPCompiler\Runtime::MODE_AOT);
         $includes = \PHPCompiler\Web\LiteralIncludeDiscovery::discoverDirectAbsolutePaths($runtime, $entry);
         $root = DeployRoot::findProjectRootForPath($entry);
+        $this->assertNotNull($root);
         [$bundled] = SourceBundler::bundleForAot($entry, $includes, $root);
 
-        $this->assertStringContainsString('phpc_deploy_path(', $bundled);
-        $this->assertStringContainsString('/templates/layout.php', $bundled);
+        $layout = realpath($root.'/templates/layout.php');
+        $this->assertNotFalse($layout);
+        $this->assertStringContainsString("include '{$layout}';", $bundled);
+        $this->assertStringNotContainsString("phpc_deploy_path('src'", $bundled);
     }
 }

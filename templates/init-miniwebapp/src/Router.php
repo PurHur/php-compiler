@@ -41,6 +41,63 @@ class Router
         $this->config = $config;
     }
 
+    /**
+     * Front-controller entry for index.php (PATH_INFO primary, ?route= fallback #489).
+     */
+    public function handleRequest(string $method): void
+    {
+        $this->dispatch($method, self::resolveRouteFromEnvironment());
+    }
+
+    public static function resolveRouteFromEnvironment(): string
+    {
+        $pathInfo = $_SERVER['PATH_INFO'] ?? '';
+        if (is_string($pathInfo) && '' !== $pathInfo) {
+            if (0 === strpos($pathInfo, '/')) {
+                $pathInfo = substr($pathInfo, 1);
+            }
+            if ('' !== $pathInfo) {
+                return $pathInfo;
+            }
+        }
+
+        $queryRoute = self::queryStringParam('route');
+        if (null !== $queryRoute && '' !== $queryRoute) {
+            return $queryRoute;
+        }
+
+        return 'home';
+    }
+
+    /**
+     * Read a query-string key without preg_match($matches) (unsupported in AOT #764).
+     */
+    public static function queryStringParam(string $name): ?string
+    {
+        return self::urlEncodedParam((string) ($_SERVER['QUERY_STRING'] ?? ''), $name);
+    }
+
+    /**
+     * Parse name=value from an application/x-www-form-urlencoded buffer (no preg_match in AOT).
+     */
+    private static function urlEncodedParam(string $buffer, string $name): ?string
+    {
+        if ('' === $buffer) {
+            return null;
+        }
+        foreach (explode('&', $buffer) as $pair) {
+            $eq = strpos($pair, '=');
+            if (false === $eq) {
+                continue;
+            }
+            if (substr($pair, 0, $eq) === $name) {
+                return substr($pair, $eq + 1);
+            }
+        }
+
+        return null;
+    }
+
     public function dispatch(string $method, string $route): void
     {
         if ('api/status' !== $route) {
@@ -100,9 +157,9 @@ class Router
     private function renderHello(): void
     {
         $appName = $this->resolveAppName();
-        $guestName = 'World';
-        if (isset($_REQUEST['name'])) {
-            $guestName = $_REQUEST['name'];
+        $guestName = self::queryStringParam('name');
+        if (null === $guestName || '' === $guestName) {
+            $guestName = 'World';
         }
         $title = 'Hello';
         include __DIR__ . '/../templates/layout.php';

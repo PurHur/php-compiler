@@ -16,25 +16,7 @@ declare(strict_types=1);
 $config = require __DIR__ . '/../config.php';
 require __DIR__ . '/../src/Router.php';
 
-$route = 'home';
-if (isset($_SERVER['PATH_INFO'])) {
-    $pathInfo = $_SERVER['PATH_INFO'];
-    if ('' !== $pathInfo) {
-        if (0 === strpos($pathInfo, '/')) {
-            $pathInfo = substr($pathInfo, 1);
-        }
-        if ('' !== $pathInfo) {
-            $route = $pathInfo;
-        }
-    }
-} elseif (isset($_GET['route'])) {
-    $queryRoute = $_GET['route'];
-    if ('' !== $queryRoute) {
-        $route = $queryRoute;
-    }
-}
-
 $method = (string) ($_SERVER['REQUEST_METHOD'] ?? 'GET');
 
 $router = new Router($config);
-$router->dispatch($method, (string) $route);
+$router->handleRequest($method);

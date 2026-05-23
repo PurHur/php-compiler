@@ -29,11 +29,13 @@ final class SourceBundler
             if (false === $raw) {
                 throw new \RuntimeException('cannot read include: '.$path);
             }
-            $body = self::rewriteDeployPathIncludes(
-                self::rewriteDirConstant(
-                    self::stripStrictTypesDeclare(self::stripOpenTag($raw)),
-                    $path,
-                    $projectRoot
+            $body = self::foldResolvedDeployPathIncludes(
+                self::rewriteDeployPathIncludes(
+                    self::rewriteDirConstant(
+                        self::stripStrictTypesDeclare(self::stripOpenTag($raw)),
+                        $path,
+                        $projectRoot
+                    )
                 )
             );
             $base = basename($path);
@@ -46,8 +48,10 @@ final class SourceBundler
         if ([] !== $includePaths) {
             $entryRaw = self::stripResolvedRequires($entryRaw, $includePaths);
         }
-        $parts[] = self::rewriteDeployPathIncludes(
-            self::stripStrictTypesDeclare(self::stripOpenTag($entryRaw))
+        $parts[] = self::foldResolvedDeployPathIncludes(
+            self::rewriteDeployPathIncludes(
+                self::stripStrictTypesDeclare(self::stripOpenTag($entryRaw))
+            )
         );
 
         return ['<?php'."\n".implode("\n", $parts), $entryPath];
@@ -204,5 +208,50 @@ final class SourceBundler
     private static function rewriteDeployPathIncludes(string $code): string
     {
         return $code;
+    }
+
+    /**
+     * Fold resolvable phpc_deploy_path() . suffix includes to literals for AOT JIT inlining (#764).
+     *
+     * tryParseDeployInclude often misses includes inside class methods; dynamic deploy-path
+     * includes then crash at native execute. When the compile-tree file exists, emit a literal.
+     */
+    private static function foldResolvedDeployPathIncludes(string $code): string
+    {
+        $pattern = '/\b(include|require)(?:_once)?\s+phpc_deploy_path\(\s*([^,]+)\s*,\s*([^)]+)\)\s*\.\s*(\'[^\']*\'|"[^"]*")\s*;/';
+
+        $folded = preg_replace_callback(
+            $pattern,
+            static function (array $m): string {
+                $rel = self::parseQuotedDeployArg($m[2]);
+                $fallback = self::parseQuotedDeployArg($m[3]);
+                $suffix = self::parseQuotedDeployArg($m[4]);
+                if (null === $rel || null === $fallback || null === $suffix) {
+                    return $m[0];
+                }
+                $resolved = DeployRoot::resolvePathWithSuffix($rel, $fallback, $suffix);
+                if (null === $resolved || '' === $resolved) {
+                    return $m[0];
+                }
+
+                return $m[1].' '.var_export($resolved, true).';';
+            },
+            $code
+        );
+
+        return is_string($folded) ? $folded : $code;
+    }
+
+    private static function parseQuotedDeployArg(string $raw): ?string
+    {
+        $raw = trim($raw);
+        if (preg_match('/^\'((?:\\\\.|[^\'])*)\'$/s', $raw, $m)) {
+            return stripcslashes($m[1]);
+        }
+        if (preg_match('/^"((?:\\\\.|[^"])*)"$/s', $raw, $m)) {
+            return stripcslashes($m[1]);
+        }
+
+        return null;
     }
 }

@@ -44,7 +44,8 @@ class strlen extends Internal {
         }
         $argValue = JitStringArg::lower($context, $args[0], 'strlen() string');
         $offset = $this->context->structFieldMap[$argValue->typeOf()->getElementType()->getName()]['length'];
-            $result = $this->context->builder->load($this->context->builder->structGep($argValue, $offset));
+
+        return $this->context->builder->load($this->context->builder->structGep($argValue, $offset));
     }
 
 }
