@@ -10,6 +10,10 @@ namespace PHPCompiler\VM;
 final class ErrorReporter
 {
     public const E_WARNING = 2;
+    public const E_USER_ERROR = 256;
+    public const E_USER_WARNING = 512;
+    public const E_USER_NOTICE = 1024;
+    public const E_USER_DEPRECATED = 16384;
 
     private int $errorReporting;
     private bool $displayErrors;
@@ -45,6 +49,31 @@ final class ErrorReporter
         $message .= "\n";
         if ($this->displayErrors) {
             fwrite(STDERR, $message);
+        }
+    }
+
+    public function triggerError(string $message, int $level, ?string $file = null): void
+    {
+        if (0 === ($this->errorReporting & $level)) {
+            return;
+        }
+        $prefix = match ($level) {
+            self::E_USER_ERROR => 'Fatal error',
+            self::E_USER_WARNING => 'Warning',
+            self::E_USER_NOTICE => 'Notice',
+            self::E_USER_DEPRECATED => 'Deprecated',
+            default => 'Unknown error',
+        };
+        $line = "{$prefix}: {$message}";
+        if (null !== $file && '' !== $file) {
+            $line .= " in {$file}";
+        }
+        $line .= "\n";
+        if ($this->displayErrors) {
+            fwrite(STDERR, $line);
+        }
+        if (self::E_USER_ERROR === $level) {
+            throw new \LogicException(rtrim($line));
         }
     }
 

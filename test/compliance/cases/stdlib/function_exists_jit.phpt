@@ -1,11 +1,24 @@
 --TEST--
-Stdlib: function_exists() (JIT, #1216)
+stdlib function_exists() JIT/AOT (issue #1216)
 --FILE--
 <?php
-function helper() { return 1; }
-echo function_exists('helper') ? '1' : '0';
-echo function_exists('strlen') ? '1' : '0';
-echo function_exists('missing_fn') ? '1' : '0';
-echo "\n";
+declare(strict_types=1);
+function jit_user_fn(): void
+{
+}
+function helper(): int
+{
+    return 1;
+}
+$name = 'header_remove';
+echo function_exists('strlen') ? "1\n" : "0\n";
+echo function_exists($name) ? "1\n" : "0\n";
+echo function_exists('jit_user_fn') ? "1\n" : "0\n";
+echo function_exists('helper') ? "1\n" : "0\n";
+echo function_exists('missing_fn_xyz') ? "1\n" : "0\n";
 --EXPECT--
-110
+1
+1
+1
+1
+0

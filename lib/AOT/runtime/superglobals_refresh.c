@@ -2165,6 +2165,32 @@ void __compiler_undefined_array_key_warning_long(long long key)
     fprintf(stderr, "Warning: Undefined array key %lld\n", key);
 }
 
+void __compiler_trigger_error(const char *message, size_t len, int level)
+{
+    if (!message) {
+        return;
+    }
+    const char *prefix = "Unknown error";
+    switch (level) {
+        case 256:
+            prefix = "Fatal error";
+            break;
+        case 512:
+            prefix = "Warning";
+            break;
+        case 1024:
+            prefix = "Notice";
+            break;
+        case 16384:
+            prefix = "Deprecated";
+            break;
+    }
+    fprintf(stderr, "%s: %.*s\n", prefix, (int) len, message);
+    if (256 == level) {
+        abort();
+    }
+}
+
 /*
  * Pending response headers for header_list() / header_remove() JIT/AOT (#311).
  * Mirrors PHPCompiler\Web\ResponseContext (insertion order, case-insensitive names).
