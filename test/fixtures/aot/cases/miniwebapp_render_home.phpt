@@ -1,5 +1,5 @@
 --TEST--
-AOT: miniwebapp renderHome resolveAppName + layout include (#764, issue #867)
+AOT: miniwebapp renderHome resolveAppName + layout include (#764, issue #867) @group miniwebapp-bisect
 --RUNFILE--
 miniwebapp_render_home/entry.php
 --EXPECT--

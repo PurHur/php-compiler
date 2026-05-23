@@ -284,6 +284,14 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('--list', $body);
     }
 
+    public function testCiLocalDocumentsMiniWebAppBisectGroup(): void
+    {
+        $ciLocal = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-local.sh');
+        $this->assertStringContainsString('miniwebapp-bisect', $ciLocal);
+        $bisectTest = (string) file_get_contents(dirname(__DIR__).'/aot/MiniWebAppBisectAotTest.php');
+        $this->assertStringContainsString('@group miniwebapp-bisect', $bisectTest);
+    }
+
     public function testMiniWebAppGatesScriptExists(): void
     {
         $script = dirname(__DIR__, 2).'/script/miniwebapp-gates.sh';

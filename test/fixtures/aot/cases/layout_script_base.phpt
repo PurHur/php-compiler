@@ -1,5 +1,5 @@
 --TEST--
-AOT: layout-style SCRIPT_NAME coalesce + htmlspecialchars (MiniWebApp nav)
+AOT: layout-style SCRIPT_NAME coalesce + htmlspecialchars (MiniWebApp nav) @group miniwebapp-bisect
 --ENV--
 SCRIPT_NAME=/index.php
 --FILE--
