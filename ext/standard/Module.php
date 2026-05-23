@@ -105,6 +105,8 @@ class Module extends ModuleAbstract
             new str_replace(),
             new preg_quote(),
             new quotemeta(),
+            new addslashes(),
+            new stripslashes(),
             new preg_match(),
             new nl2br(),
             new array_reverse(),

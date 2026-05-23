@@ -883,6 +883,47 @@ final class VmString
         return $out;
     }
 
+    public static function addslashes(string $string): string
+    {
+        $out = '';
+        $len = self::byteLength($string);
+        for ($i = 0; $i < $len; ++$i) {
+            $ch = $string[$i];
+            if (self::needsAddslashesEscape($ch)) {
+                $out .= '\\'.$ch;
+            } else {
+                $out .= $ch;
+            }
+        }
+
+        return $out;
+    }
+
+    public static function stripslashes(string $string): string
+    {
+        $out = '';
+        $len = self::byteLength($string);
+        for ($i = 0; $i < $len; ++$i) {
+            $ch = $string[$i];
+            if ('\\' === $ch && $i + 1 < $len) {
+                $next = $string[$i + 1];
+                if (self::needsAddslashesEscape($next)) {
+                    $out .= $next;
+                    ++$i;
+                    continue;
+                }
+            }
+            $out .= $ch;
+        }
+
+        return $out;
+    }
+
+    private static function needsAddslashesEscape(string $ch): bool
+    {
+        return '\\' === $ch || "'" === $ch || '"' === $ch || "\0" === $ch;
+    }
+
     public static function asciiLcfirst(string $string): string
     {
         if ('' === $string) {
