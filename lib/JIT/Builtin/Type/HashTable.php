@@ -608,12 +608,13 @@ class HashTable extends Type
         $this->context->builder->branch($tail);
 
         $this->context->builder->positionAtEnd($tail);
-        $isEmpty = $this->context->builder->icmp(Builder::INT_EQ, $head, $head->typeOf()->constNull());
+        $currentHead = $this->loadStrKeysHead($headSlot);
+        $isEmpty = $this->context->builder->icmp(Builder::INT_EQ, $currentHead, $currentHead->typeOf()->constNull());
         $this->context->builder->branchIf($isEmpty, $emptyHead, $tailWalk);
 
         $this->context->builder->positionAtEnd($tailWalk);
-        $walkNode = $this->context->builder->phi($head->typeOf());
-        $walkNode->addIncoming($head, $tail);
+        $walkNode = $this->context->builder->phi($currentHead->typeOf());
+        $walkNode->addIncoming($currentHead, $tail);
         $nextWalk = $this->context->builder->load($this->context->builder->structGep($walkNode, $nodeMap['next']));
         $atEnd = $this->context->builder->icmp(Builder::INT_EQ, $nextWalk, $nextWalk->typeOf()->constNull());
         $this->context->builder->branchIf($atEnd, $tailDone, $tailWalk);
@@ -718,12 +719,13 @@ class HashTable extends Type
         $this->context->builder->branch($tail);
 
         $this->context->builder->positionAtEnd($tail);
-        $isEmpty = $this->context->builder->icmp(Builder::INT_EQ, $head, $head->typeOf()->constNull());
+        $currentHead = $this->loadStrKeysHead($headSlot);
+        $isEmpty = $this->context->builder->icmp(Builder::INT_EQ, $currentHead, $currentHead->typeOf()->constNull());
         $this->context->builder->branchIf($isEmpty, $emptyHead, $tailWalk);
 
         $this->context->builder->positionAtEnd($tailWalk);
-        $walkNode = $this->context->builder->phi($head->typeOf());
-        $walkNode->addIncoming($head, $tail);
+        $walkNode = $this->context->builder->phi($currentHead->typeOf());
+        $walkNode->addIncoming($currentHead, $tail);
         $nextWalk = $this->context->builder->load($this->context->builder->structGep($walkNode, $nodeMap['next']));
         $atEnd = $this->context->builder->icmp(Builder::INT_EQ, $nextWalk, $nextWalk->typeOf()->constNull());
         $this->context->builder->branchIf($atEnd, $tailDone, $tailWalk);
@@ -828,12 +830,13 @@ class HashTable extends Type
         $this->context->builder->branch($tail);
 
         $this->context->builder->positionAtEnd($tail);
-        $isEmpty = $this->context->builder->icmp(Builder::INT_EQ, $head, $head->typeOf()->constNull());
+        $currentHead = $this->loadStrKeysHead($headSlot);
+        $isEmpty = $this->context->builder->icmp(Builder::INT_EQ, $currentHead, $currentHead->typeOf()->constNull());
         $this->context->builder->branchIf($isEmpty, $emptyHead, $tailWalk);
 
         $this->context->builder->positionAtEnd($tailWalk);
-        $walkNode = $this->context->builder->phi($head->typeOf());
-        $walkNode->addIncoming($head, $tail);
+        $walkNode = $this->context->builder->phi($currentHead->typeOf());
+        $walkNode->addIncoming($currentHead, $tail);
         $nextWalk = $this->context->builder->load($this->context->builder->structGep($walkNode, $nodeMap['next']));
         $atEnd = $this->context->builder->icmp(Builder::INT_EQ, $nextWalk, $nextWalk->typeOf()->constNull());
         $this->context->builder->branchIf($atEnd, $tailDone, $tailWalk);
@@ -934,12 +937,13 @@ class HashTable extends Type
         $this->context->builder->branch($tail);
 
         $this->context->builder->positionAtEnd($tail);
-        $isEmpty = $this->context->builder->icmp(Builder::INT_EQ, $head, $head->typeOf()->constNull());
+        $currentHead = $this->loadStrKeysHead($headSlot);
+        $isEmpty = $this->context->builder->icmp(Builder::INT_EQ, $currentHead, $currentHead->typeOf()->constNull());
         $this->context->builder->branchIf($isEmpty, $emptyHead, $tailWalk);
 
         $this->context->builder->positionAtEnd($tailWalk);
-        $walkNode = $this->context->builder->phi($head->typeOf());
-        $walkNode->addIncoming($head, $tail);
+        $walkNode = $this->context->builder->phi($currentHead->typeOf());
+        $walkNode->addIncoming($currentHead, $tail);
         $nextWalk = $this->context->builder->load($this->context->builder->structGep($walkNode, $nodeMap['next']));
         $atEnd = $this->context->builder->icmp(Builder::INT_EQ, $nextWalk, $nextWalk->typeOf()->constNull());
         $this->context->builder->branchIf($atEnd, $tailDone, $tailWalk);
@@ -1676,6 +1680,12 @@ class HashTable extends Type
     /**
      * @param array<string, int> $map
      */
+    /** Reload strKeys list head after earlier inserts in the same LLVM function. */
+    private function loadStrKeysHead(PHPLLVM\Value $headSlot): PHPLLVM\Value
+    {
+        return $this->context->builder->load($headSlot);
+    }
+
     private function incrementNumElements(PHPLLVM\Value $ht): void
     {
         $map = $this->context->structFieldMap['__hashtable__'];
