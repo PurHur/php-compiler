@@ -13,6 +13,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
+use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -31,9 +32,13 @@ final class JitStat
     private const STAT_MTIME_OFFSET = 88;
 
     private const S_IFMT = 0xF000;
-    private const S_IFREG = 0x8000;
+    private const S_IFIFO = 0x1000;
+    private const S_IFCHR = 0x2000;
     private const S_IFDIR = 0x4000;
+    private const S_IFBLK = 0x6000;
+    private const S_IFREG = 0x8000;
     private const S_IFLNK = 0xA000;
+    private const S_IFSOCK = 0xC000;
 
     /** R_OK for access(2) — read permission (POSIX) */
     private const ACCESS_R_OK = 4;
@@ -79,6 +84,34 @@ final class JitStat
     public static function pathIsExecutable(Context $context, Value $str): Value
     {
         return self::pathAccessOk($context, $str, self::ACCESS_X_OK);
+    }
+
+    /** @return Value __value__* (string label, or boolean false when lstat fails) */
+    public static function pathFiletypeBoxed(Context $context, Value $str): Value
+    {
+        $mode = self::loadModeOrFail($context, $str, 'lstat');
+        $i32 = $context->getTypeFromString('int32');
+        $failed = $context->builder->icmp(Builder::INT_SLT, $mode, $i32->constInt(0, true));
+
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $id = (string) (++self::$blockSerial);
+        $failBlock = BasicBlockHelper::append($context, 'filetype_fail_'.$id);
+        $okBlock = BasicBlockHelper::append($context, 'filetype_ok_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, 'filetype_done_'.$id);
+        $context->builder->branchIf($failed, $failBlock, $okBlock);
+
+        $context->builder->positionAtEnd($failBlock);
+        $i1 = $context->getTypeFromString('int1');
+        JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($okBlock);
+        self::writeFiletypeFromMode($context, $slot, $mode, $okBlock, $doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+
+        return $ptr;
     }
 
     private static function pathAccessOk(Context $context, Value $str, int $mode): Value
@@ -256,5 +289,57 @@ final class JitStat
         $minusOne = $i32->constInt(-1, true);
 
         return $context->builder->select($failed, $minusOne, $mode);
+    }
+
+    private static function writeFiletypeFromMode(Context $context, Value $slot, Value $mode, BasicBlock $startBlock, BasicBlock $mergeBlock): void
+    {
+        $ptr = JitValueBox::pointer($context, $slot);
+        $i32 = $context->getTypeFromString('int32');
+        $masked = $context->builder->and(
+            $mode,
+            $i32->constInt(self::S_IFMT, false)
+        );
+        $pairs = [
+            [self::S_IFLNK, 'link'],
+            [self::S_IFDIR, 'dir'],
+            [self::S_IFREG, 'file'],
+            [self::S_IFIFO, 'fifo'],
+            [self::S_IFCHR, 'char'],
+            [self::S_IFBLK, 'block'],
+            [self::S_IFSOCK, 'socket'],
+        ];
+        $id = (string) (++self::$blockSerial);
+        $unknown = BasicBlockHelper::append($context, 'filetype_unknown_'.$id);
+        $next = $startBlock;
+        foreach ($pairs as $index => [$ifmt, $label]) {
+            $match = BasicBlockHelper::append($context, 'filetype_match_'.$id.'_'.$index);
+            $tail = BasicBlockHelper::append($context, 'filetype_tail_'.$id.'_'.$index);
+            $context->builder->positionAtEnd($next);
+            $isMatch = $context->builder->icmp(
+                Builder::INT_EQ,
+                $masked,
+                $i32->constInt($ifmt, false)
+            );
+            $context->builder->branchIf($isMatch, $match, $tail);
+            $context->builder->positionAtEnd($match);
+            $str = $context->builder->load($context->constantStringFromString($label));
+            $context->builder->call(
+                $context->lookupFunction('__value__writeString'),
+                $ptr,
+                $str
+            );
+            $context->builder->branch($mergeBlock);
+            $next = $tail;
+        }
+        $context->builder->positionAtEnd($next);
+        $context->builder->branch($unknown);
+        $context->builder->positionAtEnd($unknown);
+        $str = $context->builder->load($context->constantStringFromString('unknown'));
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $ptr,
+            $str
+        );
+        $context->builder->branch($mergeBlock);
     }
 }

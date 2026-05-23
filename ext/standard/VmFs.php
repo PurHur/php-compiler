@@ -50,6 +50,32 @@ final class VmFs
         return (int) $stat['mtime'];
     }
 
+    public static function fileType(string $path): string|false
+    {
+        $stat = @lstat($path);
+        if (false === $stat) {
+            return false;
+        }
+
+        return self::modeToFiletype((int) ($stat['mode'] ?? 0));
+    }
+
+    private static function modeToFiletype(int $mode): string
+    {
+        $type = $mode & 0xF000;
+
+        return match ($type) {
+            0x1000 => 'fifo',
+            0x2000 => 'char',
+            0x4000 => 'dir',
+            0x6000 => 'block',
+            0x8000 => 'file',
+            0xA000 => 'link',
+            0xC000 => 'socket',
+            default => 'unknown',
+        };
+    }
+
     public static function fileGetContents(string $path): string|false
     {
         if ('php://input' === $path) {
