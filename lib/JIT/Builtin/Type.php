@@ -172,6 +172,14 @@ class Type extends Builtin {
         $fntypeHashHmac = $this->context->context->functionType($strPtr, false, $strPtr, $strPtr, $strPtr, $i1);
         $fnHashHmac = $this->context->module->addFunction('__compiler_hash_hmac', $fntypeHashHmac);
         $this->context->registerFunction('__compiler_hash_hmac', $fnHashHmac);
+        $fntypePregMatch = $this->context->context->functionType(
+            $i64,
+            false,
+            $strPtr,
+            $strPtr
+        );
+        $fnPregMatch = $this->context->module->addFunction('__compiler_preg_match', $fntypePregMatch);
+        $this->context->registerFunction('__compiler_preg_match', $fnPregMatch);
         $fntypeFilterEmail = $this->context->context->functionType($strPtr, false, $strPtr);
         $fnFilterEmail = $this->context->module->addFunction(
             '__compiler_filter_validate_email',
