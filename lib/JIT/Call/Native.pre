@@ -58,15 +58,27 @@ class Native implements Call {
         $typeName = $context->getStringFromType($type);
         $value = $context->helper->loadValue($arg);
         switch ($typeName) {
-            case '__string__*':
+            case '__object__*':
                 switch ($arg->type) {
-                    case Variable::TYPE_STRING:
+                    case Variable::TYPE_OBJECT:
                         return $value;
                     case Variable::TYPE_VALUE:
                         return $context->builder->call(
-                            $context->lookupFunction('__value__readString'),
-                            \PHPCompiler\JIT\JitValueBox::valuePtrFromVariable($context, $arg)
+                            $context->lookupFunction('__value__readObject'),
+                            Variable::KIND_VARIABLE === $arg->kind
+                                ? \PHPCompiler\JIT\JitValueBox::pointer($context, $arg->value)
+                                : $value
                         );
+                    case Variable::TYPE_NULL:
+                        return $context->getTypeFromString('__object__*')->constNull();
+                    case Variable::TYPE_HASHTABLE:
+                        // Scope arrays may store VM Variable handles as hashtable pointers (issue #816).
+                        return $context->builder->pointerCast(
+                            $value,
+                            $context->getTypeFromString('__object__*')
+                        );
+                    case Variable::TYPE_STRING:
+                        return $context->getTypeFromString('__object__*')->constNull();
                 }
                 break;
             case '__hashtable__*':
@@ -87,10 +99,15 @@ class Native implements Call {
                         );
                 }
                 break;
-            case '__object__*':
+            case '__string__*':
                 switch ($arg->type) {
-                    case Variable::TYPE_OBJECT:
+                    case Variable::TYPE_STRING:
                         return $value;
+                    case Variable::TYPE_VALUE:
+                        return $context->builder->call(
+                            $context->lookupFunction('__value__readString'),
+                            \PHPCompiler\JIT\JitValueBox::valuePtrFromVariable($context, $arg)
+                        );
                 }
                 break;
             case '__value__':
@@ -104,6 +121,46 @@ class Native implements Call {
                             \PHPCompiler\JIT\JitValueBox::pointer($context, $slot),
                             $value
                         );
+
+                        return $context->builder->load($slot);
+                    case Variable::TYPE_NATIVE_BOOL:
+                        $slot = \PHPCompiler\JIT\JitValueBox::alloc($context);
+                        $long = $context->builder->zExt(
+                            $value,
+                            $context->getTypeFromString('int64')
+                        );
+                        $context->builder->call(
+                            $context->lookupFunction('__value__writeLong'),
+                            \PHPCompiler\JIT\JitValueBox::pointer($context, $slot),
+                            $long
+                        );
+
+                        return $context->builder->load($slot);
+                    case Variable::TYPE_NATIVE_LONG:
+                        $slot = \PHPCompiler\JIT\JitValueBox::alloc($context);
+                        $context->builder->call(
+                            $context->lookupFunction('__value__writeLong'),
+                            \PHPCompiler\JIT\JitValueBox::pointer($context, $slot),
+                            $value
+                        );
+
+                        return $context->builder->load($slot);
+                    case Variable::TYPE_NULL:
+                        $slot = \PHPCompiler\JIT\JitValueBox::alloc($context);
+                        $context->builder->call(
+                            $context->lookupFunction('__value__writeNull'),
+                            \PHPCompiler\JIT\JitValueBox::pointer($context, $slot)
+                        );
+
+                        return $context->builder->load($slot);
+                    case Variable::TYPE_HASHTABLE:
+                        $slot = \PHPCompiler\JIT\JitValueBox::alloc($context);
+                        $context->builder->call(
+                            $context->lookupFunction('__value__writeHashtable'),
+                            \PHPCompiler\JIT\JitValueBox::pointer($context, $slot),
+                            $value
+                        );
+
                         return $context->builder->load($slot);
                     case Variable::TYPE_STRING:
                         $slot = \PHPCompiler\JIT\JitValueBox::alloc($context);
@@ -116,6 +173,7 @@ class Native implements Call {
                             \PHPCompiler\JIT\JitValueBox::pointer($context, $slot),
                             $owned
                         );
+
                         return $context->builder->load($slot);
                 }
                 break;
@@ -123,11 +181,24 @@ class Native implements Call {
                 switch ($arg->type) {
                     case Variable::TYPE_NATIVE_LONG:
                         return $value;
+                    case Variable::TYPE_NATIVE_BOOL:
+                        return $context->builder->zExt(
+                            $value,
+                            $context->getTypeFromString('int64')
+                        );
                     case Variable::TYPE_VALUE:
                         return $context->builder->call(
                             $context->lookupFunction('__value__readLong'),
-                            $value
+                            \PHPCompiler\JIT\JitValueBox::valuePtrFromVariable($context, $arg)
                         );
+                    case Variable::TYPE_OBJECT:
+                        // Self-host stubs may return Block/__object__* where int slots are expected (#816).
+                        return $context->builder->ptrToInt(
+                            $value,
+                            $context->getTypeFromString('int64')
+                        );
+                    case Variable::TYPE_NULL:
+                        return $context->getTypeFromString('int64')->constInt(0, true);
                 }
                 break;
             case 'double':
@@ -139,11 +210,26 @@ class Native implements Call {
                             $value,
                             $context->getTypeFromString('double')
                         );
+                    case Variable::TYPE_NATIVE_BOOL:
+                        return $context->builder->uiToFp(
+                            $value,
+                            $context->getTypeFromString('double')
+                        );
                     case Variable::TYPE_VALUE:
                         return $context->builder->call(
                             $context->lookupFunction('__value__readDouble'),
-                            $value
+                            \PHPCompiler\JIT\JitValueBox::valuePtrFromVariable($context, $arg)
                         );
+                    case Variable::TYPE_OBJECT:
+                        return $context->builder->siToFp(
+                            $context->builder->ptrToInt(
+                                $value,
+                                $context->getTypeFromString('int64')
+                            ),
+                            $context->getTypeFromString('double')
+                        );
+                    case Variable::TYPE_NULL:
+                        return $context->getTypeFromString('double')->constReal(0.0);
                 }
                 break;
         }

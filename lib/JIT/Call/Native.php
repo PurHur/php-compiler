@@ -182,11 +182,24 @@ class Native implements Call {
                 switch ($arg->type) {
                     case Variable::TYPE_NATIVE_LONG:
                         return $value;
+                    case Variable::TYPE_NATIVE_BOOL:
+                        return $context->builder->zExt(
+                            $value,
+                            $context->getTypeFromString('int64')
+                        );
                     case Variable::TYPE_VALUE:
                         return $context->builder->call(
                             $context->lookupFunction('__value__readLong'),
-                            $value
+                            \PHPCompiler\JIT\JitValueBox::valuePtrFromVariable($context, $arg)
                         );
+                    case Variable::TYPE_OBJECT:
+                        // Self-host stubs may return Block/__object__* where int slots are expected (#816).
+                        return $context->builder->ptrToInt(
+                            $value,
+                            $context->getTypeFromString('int64')
+                        );
+                    case Variable::TYPE_NULL:
+                        return $context->getTypeFromString('int64')->constInt(0, true);
                 }
                 break;
             case 'double':
@@ -198,11 +211,26 @@ class Native implements Call {
                             $value,
                             $context->getTypeFromString('double')
                         );
+                    case Variable::TYPE_NATIVE_BOOL:
+                        return $context->builder->uiToFp(
+                            $value,
+                            $context->getTypeFromString('double')
+                        );
                     case Variable::TYPE_VALUE:
                         return $context->builder->call(
                             $context->lookupFunction('__value__readDouble'),
-                            $value
+                            \PHPCompiler\JIT\JitValueBox::valuePtrFromVariable($context, $arg)
                         );
+                    case Variable::TYPE_OBJECT:
+                        return $context->builder->siToFp(
+                            $context->builder->ptrToInt(
+                                $value,
+                                $context->getTypeFromString('int64')
+                            ),
+                            $context->getTypeFromString('double')
+                        );
+                    case Variable::TYPE_NULL:
+                        return $context->getTypeFromString('double')->constReal(0.0);
                 }
                 break;
         }
