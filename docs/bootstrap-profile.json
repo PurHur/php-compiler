@@ -418,6 +418,7 @@
         "test/bootstrap-aot/block_getframe_args_contains.php",
         "test/bootstrap-aot/block_getframe_loop.php",
         "test/bootstrap-aot/block_getframe_scope_foreach.php",
+        "test/bootstrap-aot/block_orig_children_foreach.php",
         "test/bootstrap-aot/cast_int.php",
         "test/bootstrap-aot/class_const_fetch.php",
         "test/bootstrap-aot/class_constants.php",
@@ -433,6 +434,7 @@
         "test/bootstrap-aot/minimal_class.php",
         "test/bootstrap-aot/namespace_hello.php",
         "test/bootstrap-aot/nullable_types.php",
+        "test/bootstrap-aot/parent_construct.php",
         "test/bootstrap-aot/require_chain/main.php",
         "test/bootstrap-aot/spl_object_storage_dim.php",
         "test/bootstrap-aot/throw_logic.php",
@@ -454,6 +456,7 @@
         "test/bootstrap-aot/minimal_class.php",
         "test/bootstrap-aot/namespace_hello.php",
         "test/bootstrap-aot/nullable_types.php",
+        "test/bootstrap-aot/parent_construct.php",
         "test/bootstrap-aot/require_chain/main.php",
         "test/bootstrap-aot/throw_logic.php",
         "test/bootstrap-aot/try_catch.php"
@@ -465,8 +468,8 @@
         "inventory_files": 384,
         "excluded": 3,
         "eligible": 381,
-        "aot_lint_targets": 23,
-        "aot_link_targets": 18,
+        "aot_lint_targets": 25,
+        "aot_link_targets": 19,
         "aot_link_lib_targets": 1
     }
 }
