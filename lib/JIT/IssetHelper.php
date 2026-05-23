@@ -123,25 +123,91 @@ final class IssetHelper
             return self::compileHashTableOffsetIsSet($context, $container, $dim, $dimOp, $containerOp);
         }
         if (Variable::TYPE_VALUE === $container->type) {
-            $valPtr = Variable::KIND_VARIABLE === $container->kind
-                ? JitValueBox::pointer($context, $container->value)
-                : $context->helper->loadValue($container);
-            $ht = $context->builder->call(
-                $context->lookupFunction('__value__readHashtable'),
-                $valPtr
-            );
-            $htVar = new Variable(
-                $context,
-                Variable::TYPE_HASHTABLE,
-                Variable::KIND_VALUE,
-                $ht
-            );
+            $htVar = self::hashtableFromValueBox($context, $container);
+
+            return self::compileHashTableOffsetIsSet($context, $htVar, $dim, $dimOp, $containerOp);
+        }
+        if (Variable::TYPE_OBJECT === $container->type) {
+            $htVar = self::hashtableFromObjectContainer($context, $container, $containerOp);
+            $containerUserType = '';
+            if (null !== $containerOp && null !== $containerOp->type) {
+                $containerUserType = $containerOp->type->userType ?? '';
+            }
+            if (
+                'splobjectstorage' === strtolower($containerUserType)
+                && Variable::TYPE_OBJECT === $dim->type
+            ) {
+                $keyStr = HashTableHelper::objectPointerAsStringKey($context, $dim);
+
+                return self::compileHashTableOffsetIsSet($context, $htVar, $keyStr, $dimOp, $containerOp);
+            }
 
             return self::compileHashTableOffsetIsSet($context, $htVar, $dim, $dimOp, $containerOp);
         }
 
         throw new \LogicException(
             'isset() with array offset is not supported for this container type in JIT mode'
+        );
+    }
+
+    private static function hashtableFromValueBox(Context $context, Variable $container): Variable
+    {
+        $valPtr = Variable::KIND_VARIABLE === $container->kind
+            ? JitValueBox::pointer($context, $container->value)
+            : $context->helper->loadValue($container);
+        $ht = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $valPtr
+        );
+
+        return new Variable(
+            $context,
+            Variable::TYPE_HASHTABLE,
+            Variable::KIND_VALUE,
+            $ht
+        );
+    }
+
+    /**
+     * SplObjectStorage backing ht, or __value__ slot on object-typed properties (#764).
+     */
+    private static function hashtableFromObjectContainer(
+        Context $context,
+        Variable $container,
+        ?Operand $containerOp
+    ): Variable {
+        $containerUserType = '';
+        if (null !== $containerOp && null !== $containerOp->type) {
+            $containerUserType = $containerOp->type->userType ?? '';
+        }
+        if ('splobjectstorage' === strtolower($containerUserType)) {
+            return $context->type->object->splBackingHashtable($container);
+        }
+        if (null !== $container->objectPropertySlot) {
+            $valueType = $context->getTypeFromString('__value__');
+            $storage = $context->builder->alloca($valueType, 1, 'isset_obj_prop');
+            $valueMap = $context->structFieldMap['__value__'];
+            $context->builder->store(
+                $context->getTypeFromString('int8')->constInt(Variable::TYPE_NULL, false),
+                $context->builder->structGep($storage, $valueMap['type'])
+            );
+            $context->builder->call(
+                $context->lookupFunction('__object__load_value_slot'),
+                $container->objectPropertySlot,
+                $storage
+            );
+            $boxed = new Variable(
+                $context,
+                Variable::TYPE_VALUE,
+                Variable::KIND_VARIABLE,
+                $storage
+            );
+
+            return self::hashtableFromValueBox($context, $boxed);
+        }
+
+        throw new \LogicException(
+            'isset() with array offset on object containers only supports SplObjectStorage or typed object properties in this compiler build'
         );
     }
 
