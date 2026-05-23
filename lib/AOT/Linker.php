@@ -15,6 +15,7 @@ final class Linker
         __DIR__.'/runtime/hash_crypto.c',
         __DIR__.'/runtime/filter_validate.c',
         __DIR__.'/runtime/phpc_fs_dir.c',
+        __DIR__.'/runtime/phpc_process.c',
         __DIR__.'/runtime/preg_match.c',
     ];
 
@@ -348,7 +349,15 @@ final class Linker
             }
             $cmd = escapeshellarg($path) . ' '
                 . $objects . ' -lm '.self::RUNTIME_LINK_LIBS.' -o ' . escapeshellarg($executable);
-            exec($cmd, $output, $code);
+            $descriptor = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+            $proc = proc_open($cmd, $descriptor, $pipes, null, null);
+            if (!is_resource($proc)) {
+                continue;
+            }
+            fclose($pipes[0]);
+            fclose($pipes[1]);
+            fclose($pipes[2]);
+            $code = proc_close($proc);
             if (0 === $code) {
                 self::unlinkIfTemp($runtimeObjects);
 

@@ -3,13 +3,10 @@
     "issue": 212,
     "entry": "bin/vm.php",
     "unsupported_constructs": [
-        "try/catch",
         "generator yield",
         "enum",
         "eval()",
         "create_function()",
-        "shell_exec()",
-        "exec()",
         "passthru()"
     ],
     "compiler_cfg_gaps": [
@@ -25,10 +22,7 @@
         "Unknown Operand Type: ",
         "Unknown Terminal Type: "
     ],
-    "excluded_files": [
-        "lib/AOT/Linker.php",
-        "lib/JIT/Builtin/StringPregMatch.php"
-    ],
+    "excluded_files": [],
     "eligible_files": [
         "bin/vm.php",
         "ext/standard/JitAddslashes.php",
@@ -73,6 +67,7 @@
         "ext/standard/JitRequestBody.php",
         "ext/standard/JitRmdir.php",
         "ext/standard/JitSetcookie.php",
+        "ext/standard/JitShellExec.php",
         "ext/standard/JitSprintf.php",
         "ext/standard/JitStat.php",
         "ext/standard/JitStrPad.php",
@@ -235,6 +230,7 @@
         "ext/standard/round.php",
         "ext/standard/scandir.php",
         "ext/standard/setcookie.php",
+        "ext/standard/shell_exec.php",
         "ext/standard/sin.php",
         "ext/standard/sort_.php",
         "ext/standard/sprintf_.php",
@@ -290,6 +286,7 @@
         "ext/types/is_type.php",
         "ext/types/mb_strlen.php",
         "ext/types/strlen.php",
+        "lib/AOT/Linker.php",
         "lib/AOT/ProjectGraph.php",
         "lib/Block.php",
         "lib/Cli/InvokeCwd.php",
@@ -329,6 +326,7 @@
         "lib/JIT/Builtin/StringHtmlspecialchars.php",
         "lib/JIT/Builtin/StringJsonEncode.php",
         "lib/JIT/Builtin/StringNl2br.php",
+        "lib/JIT/Builtin/StringPregMatch.php",
         "lib/JIT/Builtin/StringPregQuote.php",
         "lib/JIT/Builtin/StringQuotemeta.php",
         "lib/JIT/Builtin/StringRandomBytes.php",
@@ -436,6 +434,7 @@
         "test/bootstrap-aot/class_nullable_property.php",
         "test/bootstrap-aot/coalesce_array_dim.php",
         "test/bootstrap-aot/const_string_folder_deploy_path.php",
+        "test/bootstrap-aot/const_string_folder_func_call_args.php",
         "test/bootstrap-aot/const_string_folder_magic_dir.php",
         "test/bootstrap-aot/deploy_path_fold.php",
         "test/bootstrap-aot/deploy_path_include.php",
@@ -462,6 +461,8 @@
         "test/bootstrap-aot/parent_construct.php",
         "test/bootstrap-aot/preg_quote_value_path.php",
         "test/bootstrap-aot/require_chain/main.php",
+        "test/bootstrap-aot/shell_exec_echo.php",
+        "test/bootstrap-aot/shift_right.php",
         "test/bootstrap-aot/spl_object_storage_dim.php",
         "test/bootstrap-aot/switch_jumpif_chain.php",
         "test/bootstrap-aot/throw_logic.php",
@@ -477,6 +478,8 @@
         "test/bootstrap-aot/class_constants.php",
         "test/bootstrap-aot/class_nullable_property.php",
         "test/bootstrap-aot/coalesce_array_dim.php",
+        "test/bootstrap-aot/const_string_folder_func_call_args.php",
+        "test/bootstrap-aot/const_string_folder_magic_dir.php",
         "test/bootstrap-aot/deploy_path_include.php",
         "test/bootstrap-aot/dirname_concat_isfile.php",
         "test/bootstrap-aot/dirname_value_path.php",
@@ -494,6 +497,8 @@
         "test/bootstrap-aot/parent_construct.php",
         "test/bootstrap-aot/preg_quote_value_path.php",
         "test/bootstrap-aot/require_chain/main.php",
+        "test/bootstrap-aot/shell_exec_echo.php",
+        "test/bootstrap-aot/shift_right.php",
         "test/bootstrap-aot/switch_jumpif_chain.php",
         "test/bootstrap-aot/throw_logic.php",
         "test/bootstrap-aot/try_catch.php"
@@ -502,11 +507,11 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 393,
-        "excluded": 2,
-        "eligible": 391,
-        "aot_lint_targets": 43,
-        "aot_link_targets": 29,
+        "inventory_files": 395,
+        "excluded": 0,
+        "eligible": 395,
+        "aot_lint_targets": 46,
+        "aot_link_targets": 33,
         "aot_link_lib_targets": 1
     }
 }
