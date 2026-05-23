@@ -22,7 +22,7 @@ $body .= "static const char *phpc_builtin_functions[] = {\n";
 foreach ($names as $name) {
     $body .= '    "'.addslashes($name)."\",\n";
 }
-$body .= '};\n';
+$body .= "};\n";
 $body .= 'static const size_t phpc_builtin_functions_count = '.count($names).";\n";
 
 file_put_contents($target, $body);

@@ -33,6 +33,7 @@ static const char *phpc_builtin_functions[] = {
     "chmod",
     "chr",
     "chunk_split",
+    "class_exists",
     "compact",
     "copy",
     "cos",
@@ -67,6 +68,8 @@ static const char *phpc_builtin_functions[] = {
     "fread",
     "function_exists",
     "fwrite",
+    "get_class",
+    "get_parent_class",
     "getallheaders",
     "getenv",
     "gettype",
@@ -87,6 +90,7 @@ static const char *phpc_builtin_functions[] = {
     "in_array",
     "intdiv",
     "intval",
+    "is_a",
     "is_array",
     "is_bool",
     "is_dir",
@@ -107,6 +111,7 @@ static const char *phpc_builtin_functions[] = {
     "is_readable",
     "is_scalar",
     "is_string",
+    "is_subclass_of",
     "is_writable",
     "join",
     "json_encode",
@@ -115,6 +120,7 @@ static const char *phpc_builtin_functions[] = {
     "ltrim",
     "max",
     "mb_strlen",
+    "method_exists",
     "min",
     "mkdir",
     "nl2br",
@@ -204,4 +210,4 @@ static const char *phpc_builtin_functions[] = {
     "web_string",
     "wordwrap",
 };
-static const size_t phpc_builtin_functions_count = 203;
+static const size_t phpc_builtin_functions_count = 209;

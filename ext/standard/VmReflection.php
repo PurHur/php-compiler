@@ -1,0 +1,84 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\ext\standard;
+
+use PHPCompiler\Frame;
+use PHPCompiler\VM\ClassEntry;
+use PHPCompiler\VM\Context;
+use PHPCompiler\VM\Variable;
+
+/**
+ * VM helpers for class / function introspection builtins (issues #1214–#1219).
+ */
+final class VmReflection
+{
+    public static function requireContext(Frame $frame): Context
+    {
+        if (null === $frame->vmContext) {
+            throw new \LogicException('Reflection builtins require VM context');
+        }
+
+        return $frame->vmContext;
+    }
+
+    public static function stringArg(Variable $var, string $label): string
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_STRING !== $var->type) {
+            throw new \LogicException("{$label} must be a string in this compiler build");
+        }
+
+        return $var->toString();
+    }
+
+    public static function resolveClassEntry(Context $ctx, string $className): ?ClassEntry
+    {
+        $lc = strtolower($className);
+
+        return $ctx->classes[$lc] ?? null;
+    }
+
+    public static function classExists(Context $ctx, string $className): bool
+    {
+        return null !== self::resolveClassEntry($ctx, $className);
+    }
+
+    public static function functionExists(Context $ctx, string $functionName): bool
+    {
+        return isset($ctx->functions[strtolower($functionName)]);
+    }
+
+    public static function methodExistsOnClass(ClassEntry $class, string $method): bool
+    {
+        return isset($class->methods[strtolower($method)]);
+    }
+
+    public static function resolveClassFromArg(Context $ctx, Variable $arg): ClassEntry
+    {
+        $arg = $arg->resolveIndirect();
+        if (Variable::TYPE_STRING === $arg->type) {
+            $entry = self::resolveClassEntry($ctx, $arg->toString());
+            if (null === $entry) {
+                throw new \LogicException('Unknown class name in this compiler build');
+            }
+
+            return $entry;
+        }
+        if (Variable::TYPE_OBJECT === $arg->type) {
+            return $arg->toObject()->class;
+        }
+        throw new \LogicException('Expected object or class name string in this compiler build');
+    }
+
+    public static function isSameClass(Variable $value, string $className): bool
+    {
+        $value = $value->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $value->type) {
+            return false;
+        }
+
+        return strtolower($value->toObject()->class->name) === strtolower($className);
+    }
+}

@@ -8,7 +8,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** function_exists() — whether a function is registered in this compile unit (issue #1216). */
@@ -27,20 +26,9 @@ final class function_exists extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $nameVar = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $nameVar->type) {
-            throw new \LogicException('function_exists() argument #1 must be a string in this compiler build');
-        }
-        if (null === $frame->vmContext) {
-            throw new \LogicException('function_exists() requires VM context');
-        }
-        $lc = strtolower($nameVar->toString());
-        $exists = isset($frame->vmContext->functions[$lc]);
-        if (!$exists) {
-            $short = substr($lc, strrpos($lc, '\\') + 1);
-            $exists = isset($frame->vmContext->functions[$short]);
-        }
-        $frame->returnVar->bool($exists);
+        $ctx = VmReflection::requireContext($frame);
+        $name = VmReflection::stringArg($frame->calledArgs[0], 'function_exists() argument #1');
+        $frame->returnVar->bool(VmReflection::functionExists($ctx, $name));
     }
 
     public function call(Context $context, JITVariable ...$args): Value

@@ -22,7 +22,6 @@ final class UnsupportedRegistry
         'Stmt_Catch' => 57,
         'Stmt_Finally' => 57,
         'Expr_AssignOp_Coalesce' => 99,
-        'Expr_Match' => 143,
         'Expr_Yield' => 167,
         'Expr_YieldFrom' => 167,
         'Stmt_Enum' => 169,
