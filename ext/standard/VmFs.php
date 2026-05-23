@@ -105,6 +105,11 @@ final class VmFs
         return @rename($from, $to);
     }
 
+    public static function copy(string $from, string $to): bool
+    {
+        return @copy($from, $to);
+    }
+
     private static function modeToFiletype(int $mode): string
     {
         $type = $mode & 0xF000;

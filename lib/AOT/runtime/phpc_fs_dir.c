@@ -6,6 +6,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <glob.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -99,6 +100,55 @@ static int phpc_mkdir_recursive(const char *path, mode_t mode)
     }
 
     return phpc_mkdir_one(buf, mode);
+}
+
+/** copy() runtime: returns 1 on success, 0 on failure. */
+int __compiler_copy(__string__ *from, __string__ *to)
+{
+    const char *src;
+    const char *dst;
+    FILE *in;
+    FILE *out;
+    char buf[8192];
+    size_t n;
+    int ok = 1;
+
+    if (NULL == from || NULL == to) {
+        return 0;
+    }
+    src = phpc_strdata(from);
+    dst = phpc_strdata(to);
+    in = fopen(src, "rb");
+    if (NULL == in) {
+        return 0;
+    }
+    out = fopen(dst, "wb");
+    if (NULL == out) {
+        fclose(in);
+
+        return 0;
+    }
+    while (1) {
+        n = fread(buf, 1, sizeof(buf), in);
+        if (n > 0 && fwrite(buf, 1, n, out) != n) {
+            ok = 0;
+            break;
+        }
+        if (n < sizeof(buf)) {
+            if (ferror(in)) {
+                ok = 0;
+            }
+            break;
+        }
+    }
+    if (fclose(out) != 0) {
+        ok = 0;
+    }
+    if (fclose(in) != 0) {
+        ok = 0;
+    }
+
+    return ok;
 }
 
 /** mkdir() runtime: returns 1 on success, 0 on failure (issue #757). */
