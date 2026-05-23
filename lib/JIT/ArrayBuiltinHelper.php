@@ -40,13 +40,21 @@ final class ArrayBuiltinHelper
                 'This array builtin requires a dynamic array (hashtable), not a fixed native array'
             );
         }
-        if (Variable::TYPE_HASHTABLE !== $array->type) {
+        if (Variable::TYPE_HASHTABLE === $array->type) {
+            return $context->helper->loadValue($array);
+        }
+        if (Variable::TYPE_VALUE === $array->type) {
+            return HashTableHelper::readHashtableFromValueBox($context, $array);
+        }
+        if (Variable::TYPE_STRING === $array->type) {
             throw new \LogicException(
-                'Expected array (hashtable), got '.Variable::getStringType($array->type)
+                'Expected array (hashtable), got string (path strings cannot be used as arrays in this compiler build)'
             );
         }
 
-        return $context->helper->loadValue($array);
+        throw new \LogicException(
+            'Expected array (hashtable), got '.Variable::getStringType($array->type)
+        );
     }
 
     public static function getNumElements(Context $context, Value $ht): Value
