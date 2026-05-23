@@ -315,8 +315,10 @@ class JIT {
                     $value = $this->context->getVariableFromOp($block->getOperand($op->arg3));
                     $destOp = $block->getOperand($op->arg1);
                     $forceCoalesce = $this->context->coalesceAssignTargets->contains($destOp);
-                    $this->assignOperand($block->getOperand($op->arg2), $value, $forceCoalesce);
-                    $this->assignOperand($destOp, $value, $forceCoalesce);
+                    $forceAssign = $forceCoalesce
+                        || $this->assignOperandsUsedByLiteralInclude($block, $op);
+                    $this->assignOperand($block->getOperand($op->arg2), $value, $forceAssign);
+                    $this->assignOperand($destOp, $value, $forceAssign);
                     break;  
                 case OpCode::TYPE_ARRAY_DIM_FETCH:
                 case OpCode::TYPE_ARRAY_DIM_FETCH_WRITE:
@@ -794,10 +796,11 @@ class JIT {
                 case OpCode::TYPE_JUMP:
                     $branchBlock = $builder->getInsertBlock();
                     $builder->positionAtEnd($branchBlock);
-                    $newBlock = $this->compileBlockInternal($func, $op->block1, null, null, ...$args);
+                    $this->compileBlockInternal($func, $op->block1, null, null, ...$args);
+                    $targetEntry = $this->context->scope->blockStorage[$op->block1];
                     $builder->positionAtEnd($branchBlock);
                     $this->context->freeDeadVariables($func, $branchBlock, $block);
-                    $builder->branch($newBlock);
+                    $builder->branch($targetEntry);
                     return $origBasicBlock;
                 case OpCode::TYPE_COALESCE:
                     $branchBlock = $builder->getInsertBlock();
@@ -1133,6 +1136,33 @@ class JIT {
     private function isVoidCfgFunction(Block $block): bool
     {
         return 'void' === $this->cfgFunctionReturnCallbackType($block->func);
+    }
+
+    private function assignOperandsUsedByLiteralInclude(Block $block, OpCode $op): bool
+    {
+        if ([] === $block->literalIncludePaths) {
+            return false;
+        }
+        foreach ($block->literalIncludePaths as $path) {
+            if (!is_file($path)) {
+                continue;
+            }
+            $code = file_get_contents($path);
+            if (false === $code || '' === $code) {
+                continue;
+            }
+            foreach ([$op->arg1, $op->arg2] as $slotIdx) {
+                $name = JIT\OperandName::resolve($block->getOperand($slotIdx));
+                if (null === $name || '' === $name) {
+                    continue;
+                }
+                if (preg_match('/\\$'.preg_quote($name, '/').'\\b/', $code)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /**

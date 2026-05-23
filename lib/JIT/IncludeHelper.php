@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCfg\Operand;
+use PHPCfg\Operand\Literal;
+use PHPCfg\Type;
 use PHPLLVM\BasicBlock;
 use PHPLLVM\Value\Function_;
 use PHPCompiler\Block;
@@ -76,7 +78,7 @@ final class IncludeHelper
         $included->inheritScopeFrom($callerBlock);
         $included->inheritUndefinedLocals = true;
 
-        $localBindings = self::collectCalleeLocalBindings($context, $jit, $func, $callerBlock, $included);
+        $localBindings = self::collectCalleeLocalBindings($context, $callerBlock, $included);
         $preIncludeBb = $context->builder->getInsertBlock();
         $entryBb = $func->appendBasicBlock('include_entry_'.(++self::$includeEntrySerial));
         if (null !== $preIncludeBb && null === $preIncludeBb->getTerminator()) {
@@ -88,8 +90,15 @@ final class IncludeHelper
         $context->pushScope();
         ++$context->inlineIncludeDepth;
         foreach ($localBindings as $operand) {
-            $context->setVariableOp($operand, $localBindings[$operand]);
-            $jit->assignOperandForced($operand, $localBindings[$operand]);
+            self::emitCalleeLocalBinding(
+                $context,
+                $jit,
+                $func,
+                $callerBlock,
+                $included,
+                $operand,
+                $localBindings[$operand]
+            );
         }
         try {
             $exitBb = $jit->compileIncludedAtEntry($func, $included, $entryBb);
@@ -135,12 +144,12 @@ final class IncludeHelper
     }
 
     /**
+     * Zend include/require: callee reads caller locals by variable name (issue #471).
+     *
      * @return \SplObjectStorage<Operand, Variable>
      */
     private static function collectCalleeLocalBindings(
         Context $context,
-        JIT $jit,
-        Function_ $func,
         Block $callerBlock,
         Block $includedBlock
     ): \SplObjectStorage {
@@ -157,7 +166,7 @@ final class IncludeHelper
             if (null === $name || Superglobals::isSuperglobalName($name)) {
                 continue;
             }
-            $callerVar = self::resolveCallerLocalBinding($context, $jit, $func, $callerBlock, $name);
+            $callerVar = self::callerVariableForName($context, $callerBlock, $name);
             if (null !== $callerVar) {
                 $bindings[$operand] = $callerVar;
             }
@@ -166,40 +175,107 @@ final class IncludeHelper
         return $bindings;
     }
 
-    private static function resolveCallerLocalBinding(
+    private static function emitCalleeLocalBinding(
         Context $context,
         JIT $jit,
         Function_ $func,
         Block $callerBlock,
+        Block $included,
+        Operand $calleeOp,
+        Variable $callerVar
+    ): void {
+        $bb = $context->builder->getInsertBlock();
+        if (null === $bb) {
+            return;
+        }
+        if (!$context->hasVariableOp($calleeOp)) {
+            $context->makeVariableFromOp($func, $bb, $included, $calleeOp);
+        }
+        $calleeVar = $context->getVariableFromOp($calleeOp);
+        $name = OperandName::resolve($calleeOp);
+        if (null !== $name) {
+            foreach ($callerBlock->opCodes as $op) {
+                if (OpCode::TYPE_ASSIGN !== $op->type) {
+                    continue;
+                }
+                $matches = false;
+                foreach ([$op->arg1, $op->arg2] as $slotIdx) {
+                    if (OperandName::resolve($callerBlock->getOperand($slotIdx)) === $name) {
+                        $matches = true;
+                        break;
+                    }
+                }
+                if (!$matches || !isset($callerBlock->constants[$op->arg3])) {
+                    continue;
+                }
+                $constant = $callerBlock->constants[$op->arg3];
+                if (!$constant instanceof VmVariable || VmVariable::TYPE_STRING !== $constant->type) {
+                    continue;
+                }
+                $native = $context->builder->load(
+                    $context->constantStringFromString($constant->toString())
+                );
+                $owned = $context->builder->call(
+                    $context->lookupFunction('__string__separate'),
+                    $native
+                );
+                $context->builder->store($owned, $calleeVar->value);
+                $calleeVar->addref();
+                $context->setVariableOp($calleeOp, $calleeVar);
+
+                return;
+            }
+        }
+        if (
+            Variable::TYPE_STRING === $callerVar->type
+            && Variable::KIND_VARIABLE === $callerVar->kind
+            && Variable::TYPE_STRING === $calleeVar->type
+            && Variable::KIND_VARIABLE === $calleeVar->kind
+        ) {
+            $context->builder->store(
+                $context->helper->loadValue($callerVar),
+                $calleeVar->value
+            );
+            $calleeVar->addref();
+            $context->setVariableOp($calleeOp, $calleeVar);
+
+            return;
+        }
+        $jit->assignOperandForced($calleeOp, $callerVar);
+    }
+
+    private static function callerVariableForName(
+        Context $context,
+        Block $callerBlock,
         string $name
     ): ?Variable {
         $callerOp = self::callerOperandByName($callerBlock, $name);
-        if (null === $callerOp) {
-            return null;
+        if (null !== $callerOp && $context->hasVariableOp($callerOp)) {
+            return $context->getVariableFromOp($callerOp);
+        }
+        foreach ($callerBlock->opCodes as $op) {
+            if (OpCode::TYPE_ASSIGN !== $op->type) {
+                continue;
+            }
+            foreach ([$op->arg1, $op->arg2] as $slotIdx) {
+                $dest = $callerBlock->getOperand($slotIdx);
+                if (OperandName::resolve($dest) !== $name) {
+                    continue;
+                }
+                if ($context->hasVariableOp($dest)) {
+                    return $context->getVariableFromOp($dest);
+                }
+            }
         }
 
-        $bb = $context->builder->getInsertBlock();
-        if (null === $bb) {
-            return null;
-        }
-        if (!$context->hasVariableOp($callerOp)) {
-            $context->makeVariableFromOp($func, $bb, $callerBlock, $callerOp);
-        }
-
-        self::applyPendingAssignForLocal($context, $jit, $callerBlock, $name, $callerOp);
-
-        return $context->hasVariableOp($callerOp) ? $context->getVariableFromOp($callerOp) : null;
+        return self::variableFromCallerAssignConstant($context, $callerBlock, $name);
     }
 
-    private static function applyPendingAssignForLocal(
+    private static function variableFromCallerAssignConstant(
         Context $context,
-        JIT $jit,
         Block $callerBlock,
-        string $name,
-        Operand $callerOp
-    ): void {
-        $callerSlot = $callerBlock->slotForOperand($callerOp);
-
+        string $name
+    ): ?Variable {
         foreach ($callerBlock->opCodes as $op) {
             if (OpCode::TYPE_ASSIGN !== $op->type) {
                 continue;
@@ -207,23 +283,25 @@ final class IncludeHelper
             $matches = false;
             foreach ([$op->arg1, $op->arg2] as $slotIdx) {
                 $dest = $callerBlock->getOperand($slotIdx);
-                if (null !== $callerSlot && $callerBlock->slotForOperand($dest) === $callerSlot) {
-                    $matches = true;
-                    break;
-                }
                 if (OperandName::resolve($dest) === $name) {
                     $matches = true;
                     break;
                 }
             }
-            if (!$matches) {
+            if (!$matches || !isset($callerBlock->constants[$op->arg3])) {
                 continue;
             }
-            $value = $context->getVariableFromOp($callerBlock->getOperand($op->arg3));
-            $jit->assignOperandForced($callerOp, $value);
+            $constant = $callerBlock->constants[$op->arg3];
+            if (!$constant instanceof VmVariable || VmVariable::TYPE_STRING !== $constant->type) {
+                continue;
+            }
+            $lit = new Literal($constant->toString());
+            $lit->type = Type::string();
 
-            return;
+            return Variable::fromLiteral($context, $lit);
         }
+
+        return null;
     }
 
     private static function callerOperandByName(Block $block, string $name): ?Operand
