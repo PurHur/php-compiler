@@ -12,7 +12,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** fwrite() — VM only (issue #194). */
+/** fwrite() — VM via VmFs; JIT/AOT via __compiler_fwrite (issue #1070). */
 final class fwrite extends Internal
 {
     public function execute(Frame $frame): void
@@ -55,11 +55,21 @@ final class fwrite extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('fwrite() requires two or three arguments in this compiler build');
         }
-        JitLongArg::lower($context, $args[0], 'fwrite() handle');
-        $this->jitString($context, $args[1], 'fwrite() data');
+        $i64 = $context->getTypeFromString('int64');
+        $handle = $context->builder->truncOrBitCast(
+            JitLongArg::lower($context, $args[0], 'fwrite() handle'),
+            $i64
+        );
+        $dataStr = $this->jitString($context, $args[1], 'fwrite() data');
         if (3 === $argc) {
-            JitLongArg::lower($context, $args[2], 'fwrite() length');
+            $length = $context->builder->truncOrBitCast(
+                JitLongArg::lower($context, $args[2], 'fwrite() length'),
+                $i64
+            );
+        } else {
+            $length = $i64->constInt(-1, true);
         }
-        throw new \LogicException('fwrite() is not implemented for JIT in this compiler build');
+
+        return JitFwrite::invoke($context, $handle, $dataStr, $length);
     }
 }

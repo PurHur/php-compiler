@@ -36,6 +36,9 @@ final class SourceBundler
                     $projectRoot
                 )
             );
+            if (self::isComposerAutoloadInclude($path)) {
+                $body = self::composerAutoloadAotStub();
+            }
             $base = basename($path);
             if (isset($requireTargets[$base])) {
                 $body = self::rewriteReturnOnlyInclude($body, $requireTargets[$base]);
@@ -201,5 +204,16 @@ final class SourceBundler
     private static function rewriteDeployPathIncludes(string $code): string
     {
         return $code;
+    }
+
+    private static function isComposerAutoloadInclude(string $path): bool
+    {
+        return str_ends_with(str_replace('\\', '/', $path), '/vendor/autoload.php');
+    }
+
+    /** Composer autoload stub for AOT bundle (#1070). */
+    private static function composerAutoloadAotStub(): string
+    {
+        return '// composer autoload stub for AOT bundle (issue #1070)';
     }
 }
