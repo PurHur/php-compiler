@@ -40,6 +40,7 @@ class Module extends ModuleAbstract
             new is_infinite(),
             new pow(),
             new fmod(),
+            new hypot(),
             new intval(),
             new floatval(),
             new doubleval(),
@@ -421,11 +422,11 @@ class Module extends ModuleAbstract
             $fn = $context->module->addFunction('fabs', $ft);
             $context->registerFunction('fabs', $fn);
         }
-        foreach (['ceil', 'floor', 'round', 'sqrt', 'log', 'exp', 'sin', 'cos', 'tan', 'pow', 'fmod'] as $name) {
+        foreach (['ceil', 'floor', 'round', 'sqrt', 'log', 'exp', 'sin', 'cos', 'tan', 'pow', 'fmod', 'hypot'] as $name) {
             try {
                 $context->lookupFunction($name);
             } catch (\Throwable $e) {
-                $params = in_array($name, ['pow', 'fmod'], true) ? [$double, $double] : [$double];
+                $params = in_array($name, ['pow', 'fmod', 'hypot'], true) ? [$double, $double] : [$double];
                 $ft = $context->context->functionType($double, false, ...$params);
                 $fn = $context->module->addFunction($name, $ft);
                 $context->registerFunction($name, $fn);

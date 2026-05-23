@@ -8,9 +8,9 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 413 |
+| PHP files on vm.php path | 416 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 1102 |
+| Source constructs flagged (warnings) | 1107 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -97,13 +97,14 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/JitStrrchr.php` | 0 | 1 |
 | `ext/standard/JitStrrpos.php` | 0 | 1 |
 | `ext/standard/JitStrstr.php` | 0 | 1 |
+| `ext/standard/JitStrtr.php` | 0 | 1 |
 | `ext/standard/JitSubstrCount.php` | 0 | 1 |
 | `ext/standard/JitTouch.php` | 0 | 1 |
 | `ext/standard/JitUnlink.php` | 0 | 1 |
 | `ext/standard/JitUrlencode.php` | 0 | 1 |
 | `ext/standard/JitWebParams.php` | 0 | 15 |
 | `ext/standard/JitWordwrap.php` | 0 | 1 |
-| `ext/standard/Module.php` | 0 | 187 |
+| `ext/standard/Module.php` | 0 | 189 |
 | `ext/standard/SetcookieLine.php` | 0 | 1 |
 | `ext/standard/VmCrc32.php` | 0 | 1 |
 | `ext/standard/VmDate.php` | 0 | 1 |
@@ -197,6 +198,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/hexdec.php` | 0 | 1 |
 | `ext/standard/htmlspecialchars.php` | 0 | 1 |
 | `ext/standard/http_response_code.php` | 0 | 1 |
+| `ext/standard/hypot.php` | 0 | 1 |
 | `ext/standard/implode.php` | 0 | 1 |
 | `ext/standard/in_array.php` | 0 | 1 |
 | `ext/standard/int_max.php` | 0 | 1 |
@@ -286,6 +288,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/strstr.php` | 0 | 1 |
 | `ext/standard/strtolower.php` | 0 | 1 |
 | `ext/standard/strtoupper.php` | 0 | 1 |
+| `ext/standard/strtr.php` | 0 | 1 |
 | `ext/standard/strval.php` | 0 | 1 |
 | `ext/standard/substr.php` | 0 | 1 |
 | `ext/standard/substr_count.php` | 0 | 1 |
@@ -765,6 +768,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 **Warnings** (review for bootstrap subset):
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `ext/standard/JitStrtr.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `ext/standard/JitSubstrCount.php`
 
 **Warnings** (review for bootstrap subset):
@@ -833,171 +841,173 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new is_infinite (line 40)
 - new pow (line 41)
 - new fmod (line 42)
-- new intval (line 43)
-- new floatval (line 44)
-- new doubleval (line 45)
-- new boolval (line 46)
-- new var_export (line 47)
-- new gettype (line 48)
-- new strval (line 49)
-- new int_min (line 50)
-- new int_max (line 51)
-- new intdiv (line 52)
-- new ord (line 53)
-- new chr (line 54)
-- new strcmp (line 55)
-- new strcasecmp (line 56)
-- new strncasecmp (line 57)
-- new strspn (line 58)
-- new strcspn (line 59)
-- new strpbrk (line 60)
-- new dechex (line 61)
-- new hexdec (line 62)
-- new decoct (line 63)
-- new octdec (line 64)
-- new bindec (line 65)
-- new is_numeric (line 66)
-- new is_scalar (line 67)
-- new lcfirst (line 68)
-- new ucfirst (line 69)
-- new ucwords (line 70)
-- new strtolower (line 71)
-- new strtoupper (line 72)
-- new string_trim (line 73)
-- new string_ltrim (line 74)
-- new string_rtrim (line 75)
-- new substr (line 76)
-- new strrev (line 77)
-- new str_rot13 (line 78)
-- new str_shuffle (line 79)
-- new strpos (line 80)
-- new strstr (line 81)
-- new strchr (line 82)
-- new stristr (line 83)
-- new strrchr (line 84)
-- new stripos (line 85)
-- new strrpos (line 86)
-- new substr_count (line 87)
-- new str_contains (line 88)
-- new str_starts_with (line 89)
-- new str_ends_with (line 90)
-- new strncmp (line 91)
-- new array_count (line 92)
+- new hypot (line 43)
+- new intval (line 44)
+- new floatval (line 45)
+- new doubleval (line 46)
+- new boolval (line 47)
+- new var_export (line 48)
+- new gettype (line 49)
+- new strval (line 50)
+- new int_min (line 51)
+- new int_max (line 52)
+- new intdiv (line 53)
+- new ord (line 54)
+- new chr (line 55)
+- new strcmp (line 56)
+- new strcasecmp (line 57)
+- new strncasecmp (line 58)
+- new strspn (line 59)
+- new strcspn (line 60)
+- new strpbrk (line 61)
+- new dechex (line 62)
+- new hexdec (line 63)
+- new decoct (line 64)
+- new octdec (line 65)
+- new bindec (line 66)
+- new is_numeric (line 67)
+- new is_scalar (line 68)
+- new lcfirst (line 69)
+- new ucfirst (line 70)
+- new ucwords (line 71)
+- new strtolower (line 72)
+- new strtoupper (line 73)
+- new string_trim (line 74)
+- new string_ltrim (line 75)
+- new string_rtrim (line 76)
+- new substr (line 77)
+- new strrev (line 78)
+- new str_rot13 (line 79)
+- new str_shuffle (line 80)
+- new strpos (line 81)
+- new strstr (line 82)
+- new strchr (line 83)
+- new stristr (line 84)
+- new strrchr (line 85)
+- new stripos (line 86)
+- new strrpos (line 87)
+- new substr_count (line 88)
+- new str_contains (line 89)
+- new str_starts_with (line 90)
+- new str_ends_with (line 91)
+- new strncmp (line 92)
 - new array_count (line 93)
-- new array_key_exists (line 94)
-- new in_array (line 95)
-- new array_push (line 96)
-- new array_pop (line 97)
-- new array_shift (line 98)
-- new array_unshift (line 99)
-- new sort_ (line 100)
-- new sprintf_ (line 101)
-- new array_values (line 102)
-- new array_keys (line 103)
-- new array_merge (line 104)
-- new array_slice (line 105)
-- new explode (line 106)
-- new implode (line 107)
+- new array_count (line 94)
+- new array_key_exists (line 95)
+- new in_array (line 96)
+- new array_push (line 97)
+- new array_pop (line 98)
+- new array_shift (line 99)
+- new array_unshift (line 100)
+- new sort_ (line 101)
+- new sprintf_ (line 102)
+- new array_values (line 103)
+- new array_keys (line 104)
+- new array_merge (line 105)
+- new array_slice (line 106)
+- new explode (line 107)
 - new implode (line 108)
-- new str_replace (line 109)
-- new preg_quote (line 110)
-- new quotemeta (line 111)
-- new addslashes (line 112)
-- new stripslashes (line 113)
-- new preg_match (line 114)
-- new nl2br (line 115)
-- new array_reverse (line 116)
-- new array_search (line 117)
-- new array_sum (line 118)
-- new array_product (line 119)
-- new array_flip (line 120)
-- new array_unique (line 121)
-- new array_fill (line 122)
-- new array_combine (line 123)
-- new array_map (line 124)
-- new array_filter (line 125)
-- new range (line 126)
-- new bin2hex (line 127)
-- new crc32 (line 128)
-- new hex2bin (line 129)
-- new base64_encode (line 130)
-- new base64_decode (line 131)
-- new hash_ (line 132)
-- new hash_hmac (line 133)
-- new crc32 (line 134)
-- new password_hash (line 135)
-- new password_verify (line 136)
-- new random_bytes (line 137)
-- new str_pad (line 138)
-- new str_split (line 139)
-- new chunk_split (line 140)
-- new wordwrap (line 141)
-- new htmlspecialchars (line 142)
-- new strip_tags (line 143)
-- new header_ (line 144)
-- new setcookie (line 145)
-- new header_remove (line 146)
-- new header_list (line 147)
-- new getallheaders_ (line 148)
-- new ob_start (line 149)
-- new ob_get_clean (line 150)
-- new ob_end_flush (line 151)
-- new ob_get_level (line 152)
-- new http_response_code (line 153)
-- new json_encode (line 154)
-- new web_int (line 155)
-- new web_string (line 156)
-- new web_bool (line 157)
-- new filter_var (line 158)
-- new filter_input (line 159)
-- new urlencode (line 160)
-- new rawurlencode (line 161)
-- new urldecode (line 162)
-- new rawurldecode (line 163)
-- new parse_url (line 164)
-- new dirname (line 165)
-- new basename (line 166)
-- new realpath (line 167)
-- new pathinfo (line 168)
-- new file_get_contents (line 169)
-- new readfile (line 170)
-- new file_put_contents (line 171)
-- new file_exists (line 172)
-- new filesize (line 173)
-- new filemtime (line 174)
-- new fileperms (line 175)
-- new is_file (line 176)
-- new is_dir (line 177)
-- new is_readable (line 178)
-- new is_writable (line 179)
-- new is_executable (line 180)
-- new is_link (line 181)
-- new readlink (line 182)
-- new unlink (line 183)
-- new mkdir_ (line 184)
-- new rmdir_ (line 185)
-- new chmod_ (line 186)
-- new rename_ (line 187)
-- new copy_ (line 188)
-- new touch_ (line 189)
-- new filetype (line 190)
-- new fopen (line 191)
-- new fread (line 192)
-- new fwrite (line 193)
-- new fclose (line 194)
-- new getenv_ (line 195)
-- new shell_exec (line 196)
-- new putenv_ (line 197)
-- new define_ (line 198)
-- new defined_ (line 199)
-- new phpc_deploy_path (line 200)
-- new extract_ (line 201)
-- new compact_ (line 202)
-- new scandir (line 203)
-- new glob_ (line 204)
-- new time (line 205)
-- new date (line 206)
-- new gmdate (line 207)
+- new implode (line 109)
+- new str_replace (line 110)
+- new strtr (line 111)
+- new preg_quote (line 112)
+- new quotemeta (line 113)
+- new addslashes (line 114)
+- new stripslashes (line 115)
+- new preg_match (line 116)
+- new nl2br (line 117)
+- new array_reverse (line 118)
+- new array_search (line 119)
+- new array_sum (line 120)
+- new array_product (line 121)
+- new array_flip (line 122)
+- new array_unique (line 123)
+- new array_fill (line 124)
+- new array_combine (line 125)
+- new array_map (line 126)
+- new array_filter (line 127)
+- new range (line 128)
+- new bin2hex (line 129)
+- new crc32 (line 130)
+- new hex2bin (line 131)
+- new base64_encode (line 132)
+- new base64_decode (line 133)
+- new hash_ (line 134)
+- new hash_hmac (line 135)
+- new crc32 (line 136)
+- new password_hash (line 137)
+- new password_verify (line 138)
+- new random_bytes (line 139)
+- new str_pad (line 140)
+- new str_split (line 141)
+- new chunk_split (line 142)
+- new wordwrap (line 143)
+- new htmlspecialchars (line 144)
+- new strip_tags (line 145)
+- new header_ (line 146)
+- new setcookie (line 147)
+- new header_remove (line 148)
+- new header_list (line 149)
+- new getallheaders_ (line 150)
+- new ob_start (line 151)
+- new ob_get_clean (line 152)
+- new ob_end_flush (line 153)
+- new ob_get_level (line 154)
+- new http_response_code (line 155)
+- new json_encode (line 156)
+- new web_int (line 157)
+- new web_string (line 158)
+- new web_bool (line 159)
+- new filter_var (line 160)
+- new filter_input (line 161)
+- new urlencode (line 162)
+- new rawurlencode (line 163)
+- new urldecode (line 164)
+- new rawurldecode (line 165)
+- new parse_url (line 166)
+- new dirname (line 167)
+- new basename (line 168)
+- new realpath (line 169)
+- new pathinfo (line 170)
+- new file_get_contents (line 171)
+- new readfile (line 172)
+- new file_put_contents (line 173)
+- new file_exists (line 174)
+- new filesize (line 175)
+- new filemtime (line 176)
+- new fileperms (line 177)
+- new is_file (line 178)
+- new is_dir (line 179)
+- new is_readable (line 180)
+- new is_writable (line 181)
+- new is_executable (line 182)
+- new is_link (line 183)
+- new readlink (line 184)
+- new unlink (line 185)
+- new mkdir_ (line 186)
+- new rmdir_ (line 187)
+- new chmod_ (line 188)
+- new rename_ (line 189)
+- new copy_ (line 190)
+- new touch_ (line 191)
+- new filetype (line 192)
+- new fopen (line 193)
+- new fread (line 194)
+- new fwrite (line 195)
+- new fclose (line 196)
+- new getenv_ (line 197)
+- new shell_exec (line 198)
+- new putenv_ (line 199)
+- new define_ (line 200)
+- new defined_ (line 201)
+- new phpc_deploy_path (line 202)
+- new extract_ (line 203)
+- new compact_ (line 204)
+- new scandir (line 205)
+- new glob_ (line 206)
+- new time (line 207)
+- new date (line 208)
+- new gmdate (line 209)
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/SetcookieLine.php`
@@ -1084,7 +1094,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 **Warnings** (review for bootstrap subset):
 - new Exception (line 552)
 - new Exception (line 560)
-- 86 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 87 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 - 1 closure(s)
 
 ### `ext/standard/abs.php`
@@ -1499,6 +1509,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/hypot.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/implode.php`
 
@@ -1958,6 +1973,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 **Warnings** (review for bootstrap subset):
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `ext/standard/strtr.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `ext/standard/strval.php`
 
 **Warnings** (review for bootstrap subset):
@@ -2314,23 +2334,23 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new Operand\Literal (line 967)
 - new ext\standard\intval (line 1020)
 - new Variable (line 1049)
-- new Variable (line 1173)
-- new OpCode (line 1253)
-- new Variable (line 1564)
-- new Variable (line 1576)
-- new Variable (line 2206)
-- new Variable (line 2546)
-- new Variable (line 2571)
-- new Variable (line 2708)
-- new Variable (line 2729)
-- new Operand\Literal (line 2738)
-- new Variable (line 2753)
-- new Operand\Literal (line 2899)
-- new Operand\Literal (line 2903)
-- new Operand\Literal (line 2907)
-- new Variable (line 2911)
-- new Variable (line 2931)
-- new Variable (line 2992)
+- new Variable (line 1184)
+- new OpCode (line 1264)
+- new Variable (line 1575)
+- new Variable (line 1587)
+- new Variable (line 2217)
+- new Variable (line 2557)
+- new Variable (line 2582)
+- new Variable (line 2719)
+- new Variable (line 2740)
+- new Operand\Literal (line 2749)
+- new Variable (line 2764)
+- new Operand\Literal (line 2910)
+- new Operand\Literal (line 2914)
+- new Operand\Literal (line 2918)
+- new Variable (line 2922)
+- new Variable (line 2942)
+- new Variable (line 3003)
 - 68 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Analyzer.php`
@@ -2569,17 +2589,17 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 256)
-- new Variable (line 626)
-- new Variable (line 658)
-- new Variable (line 666)
-- new Literal (line 683)
-- new Literal (line 688)
-- new Literal (line 693)
-- new Variable (line 704)
-- new Variable (line 770)
-- new Variable (line 786)
-- new Variable (line 802)
-- 33 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new Variable (line 647)
+- new Variable (line 679)
+- new Variable (line 687)
+- new Literal (line 704)
+- new Literal (line 709)
+- new Literal (line 714)
+- new Variable (line 725)
+- new Variable (line 791)
+- new Variable (line 807)
+- new Variable (line 823)
+- 35 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 - 2 closure(s)
 
 ### `lib/JIT/Builtin/Type/String_.php`
@@ -2666,19 +2686,19 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 48)
-- new Variable (line 106)
-- new Variable (line 339)
-- new Variable (line 356)
-- new Variable (line 374)
-- new Variable (line 417)
-- new Variable (line 478)
-- new Variable (line 578)
-- new Variable (line 679)
-- new Variable (line 712)
-- new Variable (line 985)
-- new Variable (line 1020)
-- new Variable (line 1062)
-- new Variable (line 1064)
+- new Variable (line 109)
+- new Variable (line 342)
+- new Variable (line 359)
+- new Variable (line 377)
+- new Variable (line 420)
+- new Variable (line 481)
+- new Variable (line 581)
+- new Variable (line 682)
+- new Variable (line 715)
+- new Variable (line 988)
+- new Variable (line 1023)
+- new Variable (line 1065)
+- new Variable (line 1067)
 - 27 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Helper.php`
@@ -2695,21 +2715,21 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/JIT/IncludeHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Temporary (line 101)
-- new Variable (line 105)
+- new Temporary (line 91)
+- new Variable (line 95)
 - new Variable (line 126)
-- new Variable (line 270)
-- new Variable (line 297)
-- new Literal (line 414)
-- 13 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new Variable (line 280)
+- new Variable (line 307)
+- new Literal (line 449)
+- 17 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/IssetHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 182)
-- new Variable (line 212)
-- new Variable (line 226)
-- 11 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new Variable (line 211)
+- new Variable (line 241)
+- new Variable (line 255)
+- 12 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/IteratorHelper.php`
 
@@ -2818,7 +2838,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/JIT/ValueEchoHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Variable.php`
 
