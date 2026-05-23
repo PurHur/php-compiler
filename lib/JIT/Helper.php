@@ -855,6 +855,16 @@ restart:
                 goto return_bool;
             }
         }
+        if (Variable::TYPE_OBJECT === $leftType && $leftType === $rightType) {
+            if (OpCode::TYPE_IDENTICAL === $opcode->type) {
+                $result = $this->context->builder->icmp(Builder::INT_EQ, $leftValue, $rightValue);
+                goto return_bool;
+            }
+            if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
+                $result = $this->context->builder->icmp(Builder::INT_NE, $leftValue, $rightValue);
+                goto return_bool;
+            }
+        }
         if (Variable::TYPE_HASHTABLE === $leftType && $leftType === $rightType) {
             $lhs = $this->loadValue($left);
             $rhs = $this->loadValue($right);

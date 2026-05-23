@@ -183,6 +183,9 @@ class JIT {
                 $rawTypes[] = $rawType;
                 $args[] = $type;
             }
+            if ($this->shouldUseSelfHostJitStubs() && null !== $logicalName) {
+                $args = $this->normalizeSelfHostNativeCallArgTypes($args, $logicalName);
+            }
             $callbackType .= ')';
         } else {
             $callbackType = 'void(*)()';
@@ -375,7 +378,8 @@ class JIT {
             || str_contains($lower, 'isarraydim')
             || str_contains($lower, 'findcoalesce')
             || str_contains($lower, 'resolvecoalesce')
-            || str_contains($lower, 'resolveisset');
+            || str_contains($lower, 'resolveisset')
+            || str_contains($lower, 'operandschainequal');
     }
 
     private function isSkippedSelfHostEntryName(string $name): bool
@@ -447,9 +451,93 @@ class JIT {
         return $args;
     }
 
+    /**
+     * Self-host: CFG Operand params must use __object__* at call sites (#1056).
+     *
+     * @param list<PHPLLVM\Type> $args
+     *
+     * @return list<PHPLLVM\Type>
+     */
+    private function normalizeSelfHostNativeCallArgTypes(array $args, string $logicalName): array
+    {
+        if (!$this->shouldUseSelfHostJitStubs()) {
+            return $args;
+        }
+        $lower = strtolower($logicalName);
+        if (!str_contains($lower, 'operandschainequal')) {
+            return $args;
+        }
+        $objectPtr = $this->context->getTypeFromString('__object__*');
+        foreach ($args as $i => $argType) {
+            if ('__value__*' === $this->context->getStringFromType($argType)) {
+                $args[$i] = $objectPtr;
+            }
+        }
+
+        return $args;
+    }
+
+    /**
+     * CFG/compiler Operand handles use native object pointers, not nullable __value__* (#1056).
+     */
+    private function isCfgObjectIdentityParamType(Type $type): bool
+    {
+        if (Type::TYPE_OBJECT !== $type->type) {
+            return false;
+        }
+        $name = strtolower($type->classname ?? '');
+
+        return str_contains($name, 'operand') || str_contains($name, '\\op\\');
+    }
+
+    private function isCfgOperandDeclaredName(string $name): bool
+    {
+        $lc = strtolower(ltrim($name, '\\'));
+
+        return 'operand' === $lc
+            || str_ends_with($lc, '\\operand')
+            || 'temporary' === $lc
+            || str_ends_with($lc, '\\temporary');
+    }
+
+    private function declaredTypeFromCfgParam(\PHPCfg\Op\Expr\Param $param): ?Type
+    {
+        if ($param->declaredType instanceof Op\Type\Literal) {
+            if ($this->isCfgOperandDeclaredName($param->declaredType->name)) {
+                return Type::object('PHPCfg\\Operand');
+            }
+
+            return Type::fromDecl($param->declaredType->name);
+        }
+        if ($param->declaredType instanceof Op\Type\Reference && null !== $param->declaredType->type) {
+            return Type::fromTypeDecl($param->declaredType->type);
+        }
+        if (null !== $param->declaredType) {
+            try {
+                return Type::fromTypeDecl($param->declaredType);
+            } catch (\LogicException) {
+                return null;
+            }
+        }
+
+        return null;
+    }
+
     private function llvmTypeForCfgParam(\PHPCfg\Op\Expr\Param $param): PHPLLVM\Type
     {
+        if ($param->declaredType instanceof Op\Type\Literal
+            && $this->isCfgOperandDeclaredName($param->declaredType->name)
+        ) {
+            return $this->context->getTypeFromString('__object__*');
+        }
+        $declared = $this->declaredTypeFromCfgParam($param);
+        if (null !== $declared && $this->isCfgObjectIdentityParamType($declared)) {
+            return $this->context->getTypeFromString('__object__*');
+        }
         $rawType = $this->rawTypeFromCfgParam($param);
+        if ($this->isCfgObjectIdentityParamType($rawType)) {
+            return $this->context->getTypeFromString('__object__*');
+        }
         $callback = $this->callbackTypeFromPhptype($rawType);
         if (null !== $callback) {
             return $this->context->getTypeFromString($callback);
@@ -529,7 +617,35 @@ class JIT {
         if (isset($this->context->functions[$lcname])) {
             return $this->context->functions[$lcname];
         }
-        $args = $this->collectStubFunctionArgTypes($block);
+        if ($this->shouldUseSelfHostJitStubs() && str_contains($lcname, 'operandschainequal')) {
+            $objectPtr = $this->context->getTypeFromString('__object__*');
+            $boolTy = $this->context->getTypeFromString('bool');
+            $func = $this->context->module->addFunction(
+                $this->llvmInternalName($internalName),
+                $this->context->context->functionType($boolTy, false, $objectPtr, $objectPtr, $objectPtr)
+            );
+            $bb = $func->appendBasicBlock('stub');
+            $saved = $this->context->builder;
+            $this->context->builder = $this->context->context->builderCreate();
+            $this->context->builder->positionAtEnd($bb);
+            $this->context->builder->returnValue($boolTy->constInt(0, false));
+            $this->context->builder->clearInsertionPosition();
+            $this->context->builder = $saved;
+            $this->context->functions[$lcname] = $func;
+            $this->context->functionReturnType[$lcname] = 'bool';
+            $this->context->functionProxies[$lcname] = new JIT\Call\Native(
+                $func,
+                $logicalName,
+                [$objectPtr, $objectPtr, $objectPtr],
+                []
+            );
+
+            return $func;
+        }
+        $args = $this->normalizeSelfHostNativeCallArgTypes(
+            $this->collectStubFunctionArgTypes($block),
+            $logicalName
+        );
         $callbackType = $this->cfgFunctionReturnCallbackType($block->func) ?? '__object__*';
         $returnType = $this->context->getTypeFromString($callbackType);
         $func = $this->context->module->addFunction(
@@ -1985,18 +2101,7 @@ class JIT {
 
     private function rawTypeFromCfgParam(\PHPCfg\Op\Expr\Param $param): Type
     {
-        $declared = null;
-        if ($param->declaredType instanceof Op\Type\Literal) {
-            $declared = Type::fromDecl($param->declaredType->name);
-        } elseif ($param->declaredType instanceof Op\Type\Reference && null !== $param->declaredType->type) {
-            $declared = Type::fromTypeDecl($param->declaredType->type);
-        } elseif (null !== $param->declaredType) {
-            try {
-                $declared = Type::fromTypeDecl($param->declaredType);
-            } catch (\LogicException) {
-                $declared = null;
-            }
-        }
+        $declared = $this->declaredTypeFromCfgParam($param);
         if (null !== $param->result->type && Type::TYPE_NULL !== $param->result->type->type) {
             return $param->result->type;
         }
@@ -2071,7 +2176,7 @@ class JIT {
                 $callback = null;
                 break;
         }
-        if ($allowsNull && null !== $callback && '__value__' !== $callback) {
+        if ($allowsNull && null !== $callback && '__value__' !== $callback && '__object__*' !== $callback) {
             return '__value__*';
         }
 

@@ -51,6 +51,7 @@ final class JitCompilerSelfHostStubTest extends TestCase
         'findcoalesce',
         'resolvecoalesce',
         'resolveisset',
+        'operandschainequal',
     ];
 
     /** @var list<string> */
@@ -97,7 +98,7 @@ final class JitCompilerSelfHostStubTest extends TestCase
     public function testCompilerSkipPatternCount(): void
     {
         $this->assertSame(self::COMPILER_SKIP_PATTERNS, $this->compilerSkipPatternsFromJit());
-        $this->assertCount(39, self::COMPILER_SKIP_PATTERNS);
+        $this->assertCount(40, self::COMPILER_SKIP_PATTERNS);
     }
 
     /**
