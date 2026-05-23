@@ -300,6 +300,37 @@ final class VmFs
         return $byte;
     }
 
+    public static function fgets(int $handle, ?int $length = null): string|false
+    {
+        $fp = self::lookup($handle);
+        if (null === $fp) {
+            return false;
+        }
+        if (null === $length) {
+            $line = @\fgets($fp);
+        } else {
+            if ($length <= 0) {
+                return false;
+            }
+            $line = @\fgets($fp, $length);
+        }
+        if (false === $line) {
+            return false;
+        }
+
+        return $line;
+    }
+
+    public static function fseek(int $handle, int $offset, int $whence = \SEEK_SET): int
+    {
+        $fp = self::lookup($handle);
+        if (null === $fp) {
+            return -1;
+        }
+
+        return 0 === @\fseek($fp, $offset, $whence) ? 0 : -1;
+    }
+
     public static function tempnam(string $directory, string $prefix): string|false
     {
         $path = @\tempnam($directory, $prefix);
