@@ -12,6 +12,7 @@ use PHPCfg\Operand;
 use PHPCfg\Operand\Literal;
 use PHPCfg\Operand\Temporary;
 use PHPTypes\Type;
+use PHPCompiler\JIT\Builtin;
 use PHPCompiler\Web\Superglobals;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -39,6 +40,31 @@ final class IssetHelper
         return self::compileOffsetIsSet($context, $container, $dim, $dimOp, $containerOp);
     }
 
+    /**
+     * Standalone AOT: test hashtable keys via readStringKeyValue + null check (#767, #784).
+     *
+     * offsetIsSetStringKey on refreshed sg_* can disagree with ?? / fetch in the same TU.
+     */
+    private static function compileSuperglobalNullReadIsset(
+        Context $context,
+        Variable $container,
+        Variable $dim
+    ): Value {
+        $ht = $context->helper->loadValue($container);
+        $keyStr = $context->helper->loadValue($dim);
+        $valPtr = $context->builder->call(
+            $context->lookupFunction('__hashtable__readStringKeyValue'),
+            $ht,
+            $keyStr
+        );
+
+        return $context->builder->icmp(
+            Builder::INT_NE,
+            $valPtr,
+            $valPtr->typeOf()->constNull()
+        );
+    }
+
     private static function superglobalName(Variable $container, ?Operand $containerOp): ?string
     {
         if (null !== $container->superglobalName) {
@@ -51,6 +77,9 @@ final class IssetHelper
         $name = OperandName::resolve($containerOp);
         if (null !== $name && Superglobals::isSuperglobalName($name)) {
             return $name;
+        }
+        if ($containerOp instanceof Literal && Superglobals::isSuperglobalName($containerOp->value)) {
+            return $containerOp->value;
         }
 
         return null;
@@ -264,6 +293,13 @@ final class IssetHelper
         ?Operand $containerOp
     ): Value {
         $container = HashTableHelper::asDetachedHashtable($context, $container);
+        if (
+            Builtin::LOAD_TYPE_STANDALONE === $context->loadType
+            && Variable::TYPE_HASHTABLE === $container->type
+            && Variable::TYPE_STRING === $dim->type
+        ) {
+            return self::compileSuperglobalNullReadIsset($context, $container, $dim);
+        }
         $superglobalName = self::superglobalName($container, $containerOp);
         if (null !== $superglobalName) {
             $key = $dim->compileTimeString ?? self::literalStringKey($dimOp);

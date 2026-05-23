@@ -109,6 +109,7 @@ final class IncludeHelper
         $context->builder->positionAtEnd($entryBb);
         // Materialize inherited locals at include_entry so if/elseif arms that assign
         // from $_REQUEST before this include are visible (#764, #747).
+        self::syncLocalBindingsFromScope($context, $localBindings);
         foreach ($localBindings as $operand) {
             $preparedBindings[$operand] = self::prepareCallerBinding(
                 $context,
@@ -142,7 +143,10 @@ final class IncludeHelper
             );
             $bindingName = OperandName::resolve($operand);
             $compileTimeString = null;
-            if (null !== $bindingName) {
+            if (
+                null !== $bindingName
+                && !self::hasMultipleAssignsInCaller($bindingCaller, $bindingName)
+            ) {
                 $literal = self::variableFromCallerAssignConstant($context, $bindingCaller, $bindingName);
                 $callerVar = $localBindings[$operand];
                 if (
@@ -372,29 +376,50 @@ final class IncludeHelper
                 return $var;
             }
         }
-        $lastAssign = null;
-        foreach ($callerBlock->opCodes as $op) {
-            if (OpCode::TYPE_ASSIGN !== $op->type) {
-                continue;
-            }
-            foreach ([$op->arg1, $op->arg2] as $slotIdx) {
-                $dest = $callerBlock->getOperand($slotIdx);
-                if (OperandName::resolve($dest) !== $name) {
-                    continue;
-                }
-                if ($context->hasVariableOpInScopes($dest)) {
-                    $var = $context->getVariableFromOpInScopes($dest);
-                    if (Variable::TYPE_VALUE === $var->type || Variable::TYPE_STRING === $var->type) {
-                        $lastAssign = $var;
-                    }
-                }
-            }
-        }
+        $lastAssign = self::lastAssignVariableForName($context, $callerBlock, $name);
         if (null !== $lastAssign) {
             return $lastAssign;
         }
 
         return self::variableFromCallerAssignConstant($context, $callerBlock, $name);
+    }
+
+    private static function lastAssignVariableForName(
+        Context $context,
+        Block $block,
+        string $name
+    ): ?Variable {
+        $lastAssign = null;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_ASSIGN === $op->type) {
+                foreach ([$op->arg1, $op->arg2] as $slotIdx) {
+                    $dest = $block->getOperand($slotIdx);
+                    if (OperandName::resolve($dest) !== $name) {
+                        continue;
+                    }
+                    if ($context->hasVariableOpInScopes($dest)) {
+                        $var = $context->getVariableFromOpInScopes($dest);
+                        if (Variable::TYPE_VALUE === $var->type || Variable::TYPE_STRING === $var->type) {
+                            $lastAssign = $var;
+                        }
+                    }
+                }
+            }
+            if (null !== $op->block1) {
+                $nested = self::lastAssignVariableForName($context, $op->block1, $name);
+                if (null !== $nested) {
+                    $lastAssign = $nested;
+                }
+            }
+            if (null !== $op->block2) {
+                $nested = self::lastAssignVariableForName($context, $op->block2, $name);
+                if (null !== $nested) {
+                    $lastAssign = $nested;
+                }
+            }
+        }
+
+        return $lastAssign;
     }
 
     private static function variableFromCallerAssignConstant(
@@ -444,6 +469,56 @@ final class IncludeHelper
         }
 
         return null;
+    }
+
+    /**
+     * Prefer JIT scope live values at the include site (renderHello $_REQUEST, #784).
+     *
+     * @param \SplObjectStorage<Operand, Variable> $localBindings
+     */
+    private static function syncLocalBindingsFromScope(Context $context, \SplObjectStorage $localBindings): void
+    {
+        foreach ($localBindings as $operand) {
+            $name = OperandName::resolve($operand);
+            if (null === $name) {
+                continue;
+            }
+            $live = $context->variableForScopedName($name);
+            if (
+                null !== $live
+                && (Variable::TYPE_VALUE === $live->type || Variable::TYPE_STRING === $live->type)
+            ) {
+                $localBindings[$operand] = $live;
+            }
+        }
+    }
+
+    private static function hasMultipleAssignsInCaller(Block $callerBlock, string $name): bool
+    {
+        $count = 0;
+        self::countAssignsToName($callerBlock, $name, $count);
+
+        return $count > 1;
+    }
+
+    private static function countAssignsToName(Block $block, string $name, int &$count): void
+    {
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_ASSIGN === $op->type) {
+                foreach ([$op->arg1, $op->arg2] as $slotIdx) {
+                    $dest = $block->getOperand($slotIdx);
+                    if (OperandName::resolve($dest) === $name) {
+                        ++$count;
+                    }
+                }
+            }
+            if (null !== $op->block1) {
+                self::countAssignsToName($op->block1, $name, $count);
+            }
+            if (null !== $op->block2) {
+                self::countAssignsToName($op->block2, $name, $count);
+            }
+        }
     }
 
     private static function appendIncludeResume(Context $context, Function_ $func): BasicBlock

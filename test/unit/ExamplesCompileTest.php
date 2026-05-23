@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler;
 
-use PHPCompiler\Cli\PhpcBuild;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -44,15 +43,19 @@ final class ExamplesCompileTest extends TestCase
     /**
      * 003 home route AOT execute (bundle literal __DIR__ for template includes, #764).
      *
+     * Opt-in via MINIWEBAPP_AOT_EXECUTE_GATE=1 — link-only gate is test003MiniWebAppBuildLinks (#754).
+     *
      * @group miniwebapp
      * @group llvm
      * @group aot
-     * @group aot-link
+     * @group miniwebapp-aot-execute
      */
     public function test003MiniWebAppHomeRouteAotExecutes(): void
     {
-        if (!self::miniWebAppAotLinkGateEnabled()) {
-            $this->markTestSkipped('MINIWEBAPP_AOT_LINK_GATE=0 — skip 003 project link gate (#754)');
+        if (!self::miniWebAppAotExecuteGateEnabled()) {
+            $this->markTestSkipped(
+                'MINIWEBAPP_AOT_EXECUTE_GATE=0 (default) — enable when #764 home route execute is green'
+            );
         }
         $project = $this->miniWebAppProjectPath();
         $binary = $this->build003MiniWebAppProject($project);
@@ -78,7 +81,6 @@ final class ExamplesCompileTest extends TestCase
      * @group miniwebapp
      * @group llvm
      * @group aot
-     * @group aot-link
      * @group miniwebapp-aot-execute
      */
     public function test003MiniWebAppExecutesWithCgiEnv(): void
@@ -932,11 +934,6 @@ final class ExamplesCompileTest extends TestCase
         fclose($pipes[2]);
         $exit = proc_close($proc);
         $stderrText = trim($stderr !== false ? $stderr : '');
-        if (0 !== $exit && PhpcBuild::isUserClassAotBlocked($stderrText)) {
-            $this->markTestSkipped(
-                '003-MiniWebApp native AOT execute blocked (#764): '.$stderrText
-            );
-        }
         $this->assertSame(
             0,
             $exit,

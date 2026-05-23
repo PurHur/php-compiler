@@ -15,6 +15,22 @@ final class ValueEchoHelper
 {
     private static int $seq = 0;
 
+    public static function echoLiteral(Context $context, string $literal): void
+    {
+        $charPtr = $context->getTypeFromString('char*');
+        $context->builder->call(
+            $context->lookupFunction('printf'),
+            $context->builder->pointerCast(
+                $context->constantFromString('%s'),
+                $charPtr
+            ),
+            $context->builder->pointerCast(
+                $context->constantFromString($literal),
+                $charPtr
+            )
+        );
+    }
+
     public static function echo(Context $context, Value $valuePtr): void
     {
         $tag = 'ev'.(string) ++self::$seq;
@@ -29,6 +45,8 @@ final class ValueEchoHelper
         $boolBlock = BasicBlockHelper::append($context, 'echo_value_bool_'.$tag);
         $doubleBlock = BasicBlockHelper::append($context, 'echo_value_double_'.$tag);
         $stringBlock = BasicBlockHelper::append($context, 'echo_value_string_'.$tag);
+        $arrayBlock = BasicBlockHelper::append($context, 'echo_value_array_'.$tag);
+        $objectBlock = BasicBlockHelper::append($context, 'echo_value_object_'.$tag);
         $doneBlock = BasicBlockHelper::append($context, 'echo_value_done_'.$tag);
 
         $type = $typeByte;
@@ -56,6 +74,16 @@ final class ValueEchoHelper
             Builder::INT_EQ,
             $type,
             $i8->constInt(Variable::TYPE_STRING, false)
+        );
+        $isHashtable = $context->builder->icmp(
+            Builder::INT_EQ,
+            $type,
+            $i8->constInt(Variable::TYPE_HASHTABLE, false)
+        );
+        $isObject = $context->builder->icmp(
+            Builder::INT_EQ,
+            $type,
+            $i8->constInt(Variable::TYPE_OBJECT, false)
         );
 
         $afterNull = BasicBlockHelper::append($context, 'echo_value_after_null_'.$tag);
@@ -132,6 +160,22 @@ final class ValueEchoHelper
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($afterDouble);
+        $afterArray = BasicBlockHelper::append($context, 'echo_value_after_array_'.$tag);
+        $context->builder->branchIf($isHashtable, $arrayBlock, $afterArray);
+
+        $context->builder->positionAtEnd($arrayBlock);
+        self::echoLiteral($context, 'Array');
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($afterArray);
+        $afterObject = BasicBlockHelper::append($context, 'echo_value_after_object_'.$tag);
+        $context->builder->branchIf($isObject, $objectBlock, $afterObject);
+
+        $context->builder->positionAtEnd($objectBlock);
+        self::echoLiteral($context, 'Object');
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($afterObject);
         $context->builder->branchIf($isString, $stringBlock, $doneBlock);
 
         $context->builder->positionAtEnd($stringBlock);
