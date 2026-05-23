@@ -279,6 +279,10 @@ class JIT {
     private function isSkippedVmHotPathName(string $name): bool
     {
         $lower = strtolower($name);
+        // Self-host AOT bundles lib/VM.php for closure lint only; stub the interpreter (#816, #913).
+        if (str_contains($lower, '\\vm::')) {
+            return true;
+        }
 
         return str_ends_with($lower, '::runframes') || str_ends_with($lower, '::defineclass')
             || str_ends_with($lower, '::getframe');
@@ -349,9 +353,17 @@ class JIT {
             return false;
         }
         $lower = strtolower($name);
-        return str_ends_with($lower, '\\runtime::compilefunc')
-            || str_ends_with($lower, '\\runtime::compile')
-            || str_ends_with($lower, '\\compiler::compilefunc')
+        // Self-host bundle includes Runtime/VM/Func for closure only; stub non-Compiler bodies (#913).
+        if (str_contains($lower, '\\runtime::')
+            || str_contains($lower, '\\func\\php::')
+            || str_contains($lower, '\\func::')
+            || str_contains($lower, '\\frame::')
+            || str_contains($lower, '\\block::')
+        ) {
+            return true;
+        }
+
+        return str_ends_with($lower, '\\compiler::compilefunc')
             || str_ends_with($lower, '\\compiler::compile');
     }
 
@@ -1277,10 +1289,10 @@ class JIT {
                         if (
                             !$this->isVoidLlvmFunction($func)
                             && null !== $block->func
-                            && 'void' !== $this->cfgFunctionReturnCallbackType($block->func)
+                            && 'void' !== ($expectedReturn = $this->cfgFunctionReturnCallbackType($block->func))
                         ) {
                             $this->context->builder->returnValue(
-                                $this->defaultLlvmReturnValue($func)
+                                $this->defaultLlvmReturnValueForCallbackType($expectedReturn, $func)
                             );
                         } else {
                             $this->context->builder->returnVoid();
@@ -1656,14 +1668,22 @@ class JIT {
 
     private function defaultLlvmReturnValue(PHPLLVM\Value $func): PHPLLVM\Value
     {
+        if (null !== $this->context->activeFunction) {
+            $expected = $this->context->functionReturnType[$this->context->activeFunction] ?? null;
+            if (null !== $expected) {
+                return $this->defaultLlvmReturnValueForCallbackType($expected, $func);
+            }
+        }
         $fnType = $func->typeOf();
         if (!$fnType instanceof \PHPLLVM\Type\Function_) {
             return $this->context->constantFromInteger(0);
         }
-        return $this->defaultLlvmReturnValueForCallbackType(
-            $this->context->getStringFromType($fnType->getReturnType()),
-            $func
-        );
+        $llvmReturn = $this->context->getStringFromType($fnType->getReturnType());
+        if ('unknown' === $llvmReturn && \PHPLLVM\Type::KIND_STRUCT === $fnType->getReturnType()->getKind()) {
+            $llvmReturn = '__value__';
+        }
+
+        return $this->defaultLlvmReturnValueForCallbackType($llvmReturn, $func);
     }
 
     private function emitSelfHostStubReturn(string $callbackType, PHPLLVM\Value $func, ?int $longReturn = null): void

@@ -19,7 +19,8 @@ if [[ -z "${PHP_COMPILER_LLVM_PATH:-}" || ! -f "${PHP_COMPILER_LLVM_PATH}/libLLV
 fi
 
 mkdir -p "${ROOT}/build"
-rm -f "${OUT}"
+export PHP_COMPILER_JIT_PROGRESS_FILE="${ROOT}/build/.last-jit-func"
+rm -f "${OUT}" "${PHP_COMPILER_JIT_PROGRESS_FILE}"
 if ! php "${ROOT}/bin/compile.php" -o "${OUT}" "${ENTRY}" 2>&1; then
   echo "bootstrap-selfhost-link: compile failed (progress gate; see stderr above)" >&2
   exit 1
