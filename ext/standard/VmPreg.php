@@ -35,4 +35,27 @@ final class VmPreg
 
         return \preg_match($pattern, $subject, $matches);
     }
+
+    /**
+     * @param-out array<int|string, list<string>>|array<int|string, string> $matches
+     */
+    public static function pregMatchAll(
+        string $pattern,
+        string $subject,
+        ?array &$matches = null,
+        int $flags = 0,
+        int $offset = 0
+    ): int|false {
+        if (strlen($pattern) > self::MAX_PATTERN_BYTES) {
+            return false;
+        }
+        if (0 !== $flags) {
+            throw new \LogicException('preg_match_all() flags are not supported in this compiler build');
+        }
+        if (0 !== $offset) {
+            throw new \LogicException('preg_match_all() offset is not supported in this compiler build');
+        }
+
+        return \preg_match_all($pattern, $subject, $matches);
+    }
 }

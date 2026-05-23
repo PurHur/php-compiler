@@ -157,6 +157,7 @@ static const char *phpc_builtin_functions[] = {
     "pi",
     "pow",
     "preg_match",
+    "preg_match_all",
     "preg_last_error",
     "preg_quote",
     "putenv",

@@ -119,6 +119,7 @@ class Module extends ModuleAbstract
             new addslashes(),
             new stripslashes(),
             new preg_match(),
+            new preg_match_all(),
             new preg_grep(),
             new preg_last_error_(),
             new nl2br(),
