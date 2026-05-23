@@ -29,6 +29,7 @@ make examples-web-smoke        # phpc serve + curl for 001-SimpleWeb, 002-Static
 make examples-aot-smoke        # phpc build + CLI execute for 000–004 when LLVM ready (#667)
 make deploy-smoke              # phpc deploy + PHPC_DEPLOY_ROOT CGI for 001/002 when LLVM ready (#718)
 ./phpc serve examples/001-SimpleWeb   # http://127.0.0.1:8080/ (or: make serve)
+./phpc lint --all examples/003-MiniWebApp && ./phpc serve examples/003-MiniWebApp   # VM green; AOT link ✅, native execute blocked #764
 ```
 
 The first `ci-local.sh` run downloads a bundled LLVM 9 toolchain into `.llvm/` (see `script/install-llvm9.sh`) and applies vendor patches. No Docker required.
@@ -44,6 +45,49 @@ make test    # builds php-compiler:22.04-dev if needed, then memory-safe CI in D
 ```
 
 `make test` is the same CI path as `make test-docker` when the bind-mount works; on harness hosts it falls back to `script/docker-ci-local.sh` (tar copy) like `make test-harness`.
+
+## North-star status (2026)
+
+Single-page snapshot for contributors; keep in sync with [examples/README.md](examples/README.md) ([#753](https://github.com/PurHur/php-compiler/issues/753)).
+
+### `phpc` CLI
+
+Unified wrapper (`./phpc` → `bin/phpc.php`); legacy `bin/vm.php`, `bin/jit.php`, and `bin/compile.php` still work.
+
+| Command | Purpose |
+|---------|---------|
+| `phpc serve` | HTTP dev server (VM); `phpc serve --aot` for precompiled binary |
+| `phpc run` | VM script; `-q` / `-p` for CGI superglobals; `--project` runs manifest binary |
+| `phpc build` | AOT compile; `phpc build --project` links from `phpc.json` |
+| `phpc deploy` | Package binary + `public/` + assets into deploy tree ([#635](https://github.com/PurHur/php-compiler/issues/635)) |
+| `phpc lint` | Unsupported syntax report; `--project` / `--all` for trees |
+| `phpc test` | `./script/ci-local.sh` (full) or `--fast` → `ci-fast.sh` |
+| `phpc init` | Scaffold `phpc.json`; `--profile miniwebapp` for Router + templates ([#632](https://github.com/PurHur/php-compiler/issues/632)) |
+
+Also: `phpc doctor` (env probe), `phpc validate-manifest`, `phpc cgi`. See `./phpc help`.
+
+### Shipped examples (000–004)
+
+| Example | VM | AOT link | AOT execute | Deploy smoke |
+|---------|----|----------|-------------|--------------|
+| [000–002](examples/000-HelloWorld/), [004-ApiJson](examples/004-ApiJson/) | ✅ `./phpc run` / `serve` | ✅ `phpc build` | ✅ CLI | 001/002 ✅ ([#718](https://github.com/PurHur/php-compiler/issues/718)) |
+| [003-MiniWebApp](examples/003-MiniWebApp/) | ✅ `phpc serve` ([#539](https://github.com/PurHur/php-compiler/issues/539)) | ✅ `phpc build --project` ([#752](https://github.com/PurHur/php-compiler/issues/752)) | ❌ [#764](https://github.com/PurHur/php-compiler/issues/764) (empty stdout) | blocked [#764](https://github.com/PurHur/php-compiler/issues/764) |
+
+`make examples-aot-smoke` links and executes 000–002 and 004; 003 **links** but skips native execute until [#764](https://github.com/PurHur/php-compiler/issues/764). Per-example commands: [examples/README.md](examples/README.md).
+
+### Capabilities
+
+Generated matrices (run `php script/capability-matrix.php` when builtins change): [docs/capabilities.md](docs/capabilities.md), [docs/capabilities-syntax.md](docs/capabilities-syntax.md). The compiler targets a **web-capable PHP subset** — many builtins and constructs are VM-only or in progress compared to Zend PHP.
+
+### CI
+
+| Gate | Command | Notes |
+|------|---------|-------|
+| Full local / Docker | `./script/ci-local.sh`, `make test`, `make test-docker` | VM + JIT + AOT lint/link + example smokes ([#436](https://github.com/PurHur/php-compiler/issues/436), [#245](https://github.com/PurHur/php-compiler/issues/245)) |
+| Fast iteration | `./script/ci-fast.sh`, `phpc test --fast`, `make test-fast` | VM/compliance only — no LLVM |
+| Bootstrap (GHA) | [`.github/workflows/bootstrap-selfhost.yml`](.github/workflows/bootstrap-selfhost.yml) | M0/M1 probe + link + wave-check on `master` ([#394](https://github.com/PurHur/php-compiler/issues/394); complements CircleCI, not a full matrix replacement) |
+
+Matrix details: [docs/local-ci-matrix.md](docs/local-ci-matrix.md).
 
 ## Self-host bootstrap (experimental)
 
@@ -240,31 +284,11 @@ Maintainers can publish after `docker login ghcr.io`:
 
 See [docs/local-ci-matrix.md](docs/local-ci-matrix.md#docker-dev-image-issue-202) for the full Docker-only matrix.
 
-Legacy Makefile targets use Ubuntu 16.04 / 18.04 images with PHP 7.4 (`ircmaxell/php-compiler:*` on Docker Hub often 404s; `make test-legacy-16`, `make test-legacy-18`; `make test-18` is a deprecated alias). For day-to-day development, prefer `make test` or host `make test-local` above.
-
-To build legacy images, use make:
-
-```console
-me@local:~$ make build
-```
-
-This will take a while (upwards of 10 minutes likely). It will install an Ubuntu container with a custom compile of PHP-7.4 and everything you need to get up and running. It will also composer install all dependencies as well as run the pre-processor. Once it's done, you can run legacy tests:
-
-```console
-me@local:~$ make test-legacy-16
-```
-
-This executes PHPUnit inside the 16.04 container. For current CI, use `make test` (22.04) instead.
-
-To run your own code or play with the compiler, you can open a shell using `make shell`:
-
-```console
-me@local:~$ make shell
-root@662c59ae4527:/compiler# php bin/jit.php -r 'echo "Hello World\n";'
-Hello World
-```
+**Legacy Docker (optional):** Ubuntu 16.04/18.04 images with PHP 7.4 (`make test-legacy-16`, `make test-legacy-18`; Hub tags often 404). Not used for current CI — prefer `make test` (22.04) or host `make test-local`. Interactive shell: `make shell` → `php bin/jit.php -r 'echo "Hello World\n";'`.
 
 # Running Code
+
+Prefer the unified **`phpc`** CLI (`serve`, `run`, `build`, `deploy`, `lint`, `test`, `init`) — see [North-star status (2026)](#north-star-status-2026). The low-level entrypoints below remain available for debugging and scripts.
 
 There are three main ways of using this compiler:
 
