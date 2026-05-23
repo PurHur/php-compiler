@@ -71,6 +71,9 @@ function analyzeInternal(PHPCompiler\Func\Internal $fn): array
     if ('usort' === $fn->getName() && preg_match('/callables are deferred/i', $source)) {
         $notes[] = 'callbacks: strcmp JIT; strcasecmp VM; closures deferred (#1210)';
     }
+    if ('array_reduce' === $fn->getName() && preg_match('/callables are deferred/i', $source)) {
+        $notes[] = 'callbacks: string user functions VM-only; closures deferred (#1213, #142)';
+    }
 
     $jit = false;
     if ($ref->hasMethod('call')) {
