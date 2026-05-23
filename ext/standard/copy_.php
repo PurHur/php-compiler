@@ -40,14 +40,9 @@ final class copy_ extends Internal
         if (2 !== \count($args)) {
             throw new \LogicException('copy() requires exactly two arguments in this compiler build');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type || JITVariable::TYPE_STRING !== $args[1]->type) {
-            throw new \LogicException('copy() requires string paths in this compiler build');
-        }
+        $a = $this->jitString($context, $args[0], 'copy() argument #1');
+        $b = $this->jitString($context, $args[1], 'copy() argument #2');
 
-        return JitCopy::invoke(
-            $context,
-            $context->helper->loadValue($args[0]),
-            $context->helper->loadValue($args[1])
-        );
+        return JitCopy::invoke($context, $a, $b);
     }
 }

@@ -53,7 +53,7 @@ final class is_numeric extends Internal
             case JITVariable::TYPE_NULL:
                 return $context->constantFromBool(false);
             case JITVariable::TYPE_STRING:
-                return $this->stringIsNumeric($context, $context->helper->loadValue($args[0]));
+                return $this->stringIsNumeric($context, $this->jitString($context, $args[0], 'is_numeric() argument #1'));
             case JITVariable::TYPE_VALUE:
                 return $this->valueIsNumeric($context, $args[0]);
             default:

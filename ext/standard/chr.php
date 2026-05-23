@@ -14,6 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
@@ -45,10 +46,7 @@ final class chr extends Internal
         if (1 !== count($args)) {
             throw new \LogicException('chr() requires exactly one argument');
         }
-        if (JITVariable::TYPE_NATIVE_LONG !== $args[0]->type) {
-            throw new \LogicException('chr() only supports integers in this compiler build');
-        }
-        $v = $context->helper->loadValue($args[0]);
+        $v = JitLongArg::lower($context, $args[0], 'chr() codepoint');
         $const256 = $v->typeOf()->constInt(256, false);
         $rem = $context->builder->signedRem($v, $const256);
         $zero = $v->typeOf()->constInt(0, false);

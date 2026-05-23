@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -52,12 +53,6 @@ final class file_put_contents extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('file_put_contents() requires two or three arguments in this compiler build');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type) {
-            throw new \LogicException('file_put_contents() filename must be a string in this compiler build');
-        }
-        if (JITVariable::TYPE_STRING !== $args[1]->type) {
-            throw new \LogicException('file_put_contents() data must be a string in this compiler build');
-        }
         $flags = 0;
         if (3 === $argc) {
             if (JITVariable::TYPE_NATIVE_LONG !== $args[2]->type) {
@@ -68,7 +63,7 @@ final class file_put_contents extends Internal
                 throw new \LogicException('file_put_contents() flags must be 0 or FILE_APPEND (8) in this compiler build');
             }
             $flags = $context->builder->truncOrBitCast(
-                $context->helper->loadValue($args[2]),
+                JitLongArg::lower($context, $args[2], 'file_put_contents() flags'),
                 $context->getTypeFromString('int64')
             );
         } else {

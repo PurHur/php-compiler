@@ -52,6 +52,6 @@ final class sprintf_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        return JitSprintf::format($context, ...$args);
+        return JitSprintf::formatWithFmt($context, $this->jitString($context, $args[0], 'sprintf() format'), ...\array_slice($args, 1));
     }
 }

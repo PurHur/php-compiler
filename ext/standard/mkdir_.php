@@ -53,38 +53,12 @@ final class mkdir_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 1 || $argc > 3) {
-            throw new \LogicException('mkdir() requires one to three arguments in this compiler build');
+        if (2 !== \count($args)) {
+            throw new \LogicException('mkdir() requires exactly two arguments in this compiler build');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type) {
-            throw new \LogicException('mkdir() directory must be a string in this compiler build');
-        }
-        $i64 = $context->getTypeFromString('int64');
-        $i1 = $context->getTypeFromString('int1');
-        $mode = $i64->constInt(0777, false);
-        if ($argc >= 2) {
-            if (JITVariable::TYPE_NATIVE_LONG !== $args[1]->type) {
-                throw new \LogicException('mkdir() mode must be an integer in this compiler build');
-            }
-            $mode = $context->builder->truncOrBitCast(
-                $context->helper->loadValue($args[1]),
-                $i64
-            );
-        }
-        $recursive = $i1->constInt(0, false);
-        if ($argc >= 3) {
-            if (JITVariable::TYPE_NATIVE_BOOL !== $args[2]->type) {
-                throw new \LogicException('mkdir() recursive flag must be a boolean in this compiler build');
-            }
-            $recursive = $context->helper->loadValue($args[2]);
-        }
+        $a = $this->jitString($context, $args[0], 'mkdir() argument #1');
+        $b = $this->jitString($context, $args[1], 'mkdir() argument #2');
 
-        return JitMkdir::invoke(
-            $context,
-            $context->helper->loadValue($args[0]),
-            $mode,
-            $recursive
-        );
+        return JitMkdir::invoke($context, $a, $b);
     }
 }

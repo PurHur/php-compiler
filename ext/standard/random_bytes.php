@@ -40,6 +40,7 @@ final class random_bytes extends Internal
             throw new \LogicException('random_bytes() only supports integers in this compiler build');
         }
 
+        $this->jitString($context, $args[0], 'randombytes() argument #1');
         return JitRandomBytes::generate($context, $context->helper->loadValue($args[0]));
     }
 }

@@ -53,6 +53,8 @@ final class web_bool extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        $this->jitString($context, $args[1], 'web_bool() key');
+
         return JitWebParams::webBool($context, ...$args);
     }
 }

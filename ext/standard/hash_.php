@@ -59,12 +59,7 @@ final class hash_ extends Internal
         }
         $raw = $context->getTypeFromString('int1')->constInt(0, false);
         if (isset($args[2])) { $raw = JitBoolArg::lower($context, $args[2], 'hash() raw_output'); }
-        return JitHash::hash($context, JitStringArg::lower($context, $args[0], 'hash() algorithm'), JitStringArg::lower($context, $args[1], 'hash() data'), $raw);hash(
-            $context,
-            self::jitStringArg($context, $args[0]),
-            self::jitStringArg($context, $args[1]),
-            $raw
-        );
+        return JitHash::hash($context, JitStringArg::lower($context, $args[0], 'hash() algorithm'), JitStringArg::lower($context, $args[1], 'hash() data'), $raw);
     }
 
     private static function jitStringArg(Context $context, JITVariable $arg): Value

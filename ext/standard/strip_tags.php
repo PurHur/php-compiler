@@ -51,6 +51,17 @@ final class strip_tags extends Internal
         }
         $allowed = 2 === $argc ? $args[1] : null;
 
-        return JitStripTags::stripTags($context, $args[0], $allowed);
+        $subject = $this->jitString($context, $args[0], 'strip_tags() string');
+        if (null === $allowed) {
+            $allowPtr = $context->builder->load($context->constantStringFromString(''));
+        } else {
+            $allowPtr = $this->jitString($context, $allowed, 'strip_tags() allowed_tags');
+        }
+
+        return $context->builder->call(
+            $context->lookupFunction('__compiler_strip_tags'),
+            $subject,
+            $allowPtr
+        );
     }
 }

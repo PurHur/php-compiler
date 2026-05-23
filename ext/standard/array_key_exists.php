@@ -14,6 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
@@ -58,7 +59,7 @@ final class array_key_exists extends Internal
                 return $context->builder->call(
                     $context->lookupFunction('__hashtable__offsetIsSetStringKey'),
                     $ht,
-                    $context->helper->loadValue($key)
+                    $this->jitString($context, $key, 'array_key_exists() key')
                 );
             }
             if (JITVariable::TYPE_NATIVE_LONG === $key->type) {
@@ -83,7 +84,7 @@ final class array_key_exists extends Internal
                     'array_key_exists() on native arrays only supports integer keys in this compiler build'
                 );
             }
-            $index = $context->helper->loadValue($key);
+            $index = JitLongArg::lower($context, $key, 'array_key_exists() key');
             $size = $context->constantFromInteger($array->nextFreeElement, 'int32');
             $i32 = $context->getTypeFromString('int32');
             $inRange = $context->builder->icmp(Builder::INT_SLT, $index, $size);

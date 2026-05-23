@@ -81,7 +81,7 @@ final class intval extends Internal
             case JITVariable::TYPE_NATIVE_BOOL:
                 return $context->builder->zExt($v, $i64);
             case JITVariable::TYPE_STRING:
-                return $this->stringToInt($context, $v);
+                return $this->stringToInt($context, $this->jitString($context, $args[0], 'intval() argument #1'));
             case JITVariable::TYPE_NULL:
                 return $i64->constInt(0, false);
             case JITVariable::TYPE_VALUE:

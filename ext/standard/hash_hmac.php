@@ -59,13 +59,7 @@ final class hash_hmac extends Internal
         }
         $raw = $context->getTypeFromString('int1')->constInt(0, false);
         if (isset($args[3])) { $raw = JitBoolArg::lower($context, $args[3], 'hash_hmac() raw_output'); }
-        return JitHash::hashHmac($context, JitStringArg::lower($context, $args[0], 'hash_hmac() algorithm'), JitStringArg::lower($context, $args[1], 'hash_hmac() data'), JitStringArg::lower($context, $args[2], 'hash_hmac() key'), $raw);hashHmac(
-            $context,
-            self::jitStringArg($context, $args[0]),
-            self::jitStringArg($context, $args[1]),
-            self::jitStringArg($context, $args[2]),
-            $raw
-        );
+        return JitHash::hashHmac($context, JitStringArg::lower($context, $args[0], 'hash_hmac() algorithm'), JitStringArg::lower($context, $args[1], 'hash_hmac() data'), JitStringArg::lower($context, $args[2], 'hash_hmac() key'), $raw);
     }
 
     private static function jitStringArg(Context $context, JITVariable $arg): Value

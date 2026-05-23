@@ -44,22 +44,8 @@ final class base64_decode extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('base64_decode() requires exactly one argument in this compiler build');
         }
+        $str = $this->jitString($context, $args[0], 'base64_decode() argument #1');
 
-        return JitBase64Decode::decode($context, self::jitStringArg($context, $args[0]));
-    }
-
-    private static function jitStringArg(Context $context, JITVariable $arg): Value
-    {
-        if (JITVariable::TYPE_STRING === $arg->type) {
-            return $context->helper->loadValue($arg);
-        }
-        if (JITVariable::TYPE_VALUE === $arg->type) {
-            return $context->builder->call(
-                $context->lookupFunction('__value__readString'),
-                $arg->value
-            );
-        }
-
-        throw new \LogicException('base64_decode() only supports strings in this compiler build');
+        return JitBase64Decode::decode($context, $str);
     }
 }

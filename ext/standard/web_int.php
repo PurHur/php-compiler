@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\Web\Params;
@@ -62,6 +63,9 @@ final class web_int extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        $this->jitString($context, $args[1], 'web_int() key');
+        JitLongArg::lower($context, $args[2], 'web_int() default');
+
         return JitWebParams::webInt($context, ...$args);
     }
 }

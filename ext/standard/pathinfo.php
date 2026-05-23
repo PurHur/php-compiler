@@ -63,6 +63,7 @@ final class pathinfo extends Internal
         }
         $flags = 2 === $argc ? $args[1] : null;
 
+        $this->jitString($context, $args[0], 'pathinfo() argument #1');
         return JitPathinfo::invoke($context, $args[0], $flags);
     }
 }

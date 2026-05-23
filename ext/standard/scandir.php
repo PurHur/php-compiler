@@ -63,6 +63,7 @@ final class scandir extends Internal
             $sort = $context->helper->loadValue($args[1]);
         }
 
+        $this->jitString($context, $args[0], 'scandir() argument #1');
         return JitFsGlob::scandir($context, $context->helper->loadValue($args[0]), $sort);
     }
 }

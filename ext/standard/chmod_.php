@@ -55,6 +55,7 @@ final class chmod_ extends Internal
             $i32
         );
 
+        $this->jitString($context, $args[0], 'chmod() argument #1');
         return JitChmod::invoke($context, $context->helper->loadValue($args[0]), $mode);
     }
 }

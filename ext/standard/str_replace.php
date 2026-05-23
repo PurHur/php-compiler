@@ -54,17 +54,11 @@ final class str_replace extends Internal
         if (3 !== \count($args)) {
             throw new \LogicException('str_replace() requires exactly three arguments in this compiler build');
         }
-        foreach ($args as $arg) {
-            if (JITVariable::TYPE_STRING !== $arg->type && JITVariable::TYPE_VALUE !== $arg->type) {
-                throw new \LogicException('str_replace() requires string arguments in this compiler build');
-            }
-        }
-
-        return JitStrReplace::replace(
+                return JitStrReplace::replace(
             $context,
-            self::jitStringArg($context, $args[0]),
-            self::jitStringArg($context, $args[1]),
-            self::jitStringArg($context, $args[2])
+            $this->jitString($context, $args[0], 'str_replace() search'),
+            $this->jitString($context, $args[1], 'str_replace() replace'),
+            $this->jitString($context, $args[2], 'str_replace() subject')
         );
     }
 

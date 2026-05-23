@@ -40,14 +40,9 @@ final class rename_ extends Internal
         if (2 !== \count($args)) {
             throw new \LogicException('rename() requires exactly two arguments in this compiler build');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type || JITVariable::TYPE_STRING !== $args[1]->type) {
-            throw new \LogicException('rename() requires string paths in this compiler build');
-        }
+        $a = $this->jitString($context, $args[0], 'rename() argument #1');
+        $b = $this->jitString($context, $args[1], 'rename() argument #2');
 
-        return JitRename::invoke(
-            $context,
-            $context->helper->loadValue($args[0]),
-            $context->helper->loadValue($args[1])
-        );
+        return JitRename::invoke($context, $a, $b);
     }
 }

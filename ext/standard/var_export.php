@@ -71,6 +71,7 @@ final class var_export extends Internal
         }
         self::echoJit($context, $args[0]);
 
+        $this->jitString($context, $args[0], 'varexport() argument #1');
         return $context->getTypeFromString('int32')->constInt(0, false);
     }
 

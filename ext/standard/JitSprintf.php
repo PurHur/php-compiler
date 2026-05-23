@@ -15,6 +15,13 @@ use PHPLLVM\Value;
  */
 final class JitSprintf
 {
+    public static function formatWithFmt(Context $context, Value $fmt, JITVariable ...$args): Value
+    {
+        $wrapped = [new JITVariable($context, JITVariable::TYPE_STRING, JITVariable::KIND_VALUE, $fmt)];
+
+        return self::format($context, ...array_merge($wrapped, $args));
+    }
+
     public static function format(Context $context, JITVariable ...$args): Value
     {
         $argc = \count($args);
