@@ -50,7 +50,7 @@ final class IssetHelper
         Variable $container,
         Variable $dim
     ): Value {
-        $ht = $context->helper->loadValue($container);
+        $ht = HashTableHelper::loadHashtablePointer($context, $container);
         $keyStr = $context->helper->loadValue($dim);
         $valPtr = $context->builder->call(
             $context->lookupFunction('__hashtable__peekStringKeyValue'),
@@ -297,6 +297,7 @@ final class IssetHelper
             Builtin::LOAD_TYPE_STANDALONE === $context->loadType
             && Variable::TYPE_HASHTABLE === $container->type
             && Variable::TYPE_STRING === $dim->type
+            && null !== $container->superglobalName
         ) {
             return self::compileSuperglobalNullReadIsset($context, $container, $dim);
         }
@@ -316,7 +317,7 @@ final class IssetHelper
                     return $context->getTypeFromString('int1')->constInt(1, false);
                 }
             }
-            $ht = $context->helper->loadValue($container);
+            $ht = HashTableHelper::loadHashtablePointer($context, $container);
             if (Variable::TYPE_STRING === $dim->type) {
                 return $context->builder->call(
                     $context->lookupFunction('__hashtable__offsetIsSetStringKey'),
@@ -341,7 +342,7 @@ final class IssetHelper
             );
         }
 
-        $ht = $context->helper->loadValue($container);
+        $ht = HashTableHelper::loadHashtablePointer($context, $container);
         if (Variable::TYPE_STRING === $dim->type) {
             return $context->builder->call(
                 $context->lookupFunction('__hashtable__offsetIsSetStringKey'),
