@@ -55,6 +55,14 @@ function syntaxRowDefinitions(): array
             'probe' => 'class C { public int $x = 1; public function f(): int { return $this->x; } } echo (new C())->f();',
         ],
         [
+            'id' => 'dynamic_property_fetch',
+            'construct' => 'Dynamic property access `$obj->$name`',
+            'opcodes' => ['TYPE_PROPERTY_FETCH', 'TYPE_DECLARE_PROPERTY'],
+            'issue' => 1227,
+            'notes' => ['JIT compares runtime name to declared properties; unknown names abort at runtime'],
+            'probe' => 'class C { public int $x = 1; } $c = new C(); $k = "x"; echo $c->$k;',
+        ],
+        [
             'id' => 'native_user_class',
             'construct' => 'Native user-class link (`phpc build --project`)',
             'opcodes' => ['TYPE_DECLARE_CLASS', 'TYPE_NEW', 'TYPE_METHODCALL_INIT'],
@@ -249,6 +257,7 @@ function collectSyntaxPhptCoverage(string $root, array $definitions): array
         'instance_methods' => '/function\s+\w+\s*\(/',
         'private_methods' => '/\bprivate\s+function\b/',
         'property_fetch' => '/\$this->\w+/',
+        'dynamic_property_fetch' => '/->\$/',
         'native_user_class' => '/\b(?:class\s+\w+|new\s+\w+)/',
         'instanceof' => '/\binstanceof\b/',
         'match_expr' => '/\bmatch\s*\(/',

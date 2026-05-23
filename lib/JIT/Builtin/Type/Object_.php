@@ -15,6 +15,8 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\Refcount;
 use PHPCompiler\JIT\Builtin\Type;
 use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\JitNativeString;
+use PHPCompiler\JIT\JitStringCompare;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
 use PHPCompiler\VM\Variable as VMVariable;
@@ -1075,6 +1077,142 @@ class Object_ extends Type {
             }
         }
         throw new \LogicException("Could not find property $name for class $classId");
+    }
+
+    /**
+     * Runtime property name from a variable (`$obj->$prop`, issue #1227).
+     */
+    public function propertyFetchDynamic(
+        PHPLLVM\Value $obj,
+        string $class,
+        Variable $nameVar
+    ): Variable {
+        $classId = $this->lookup('' !== $class ? $class : 'stdclass');
+        $props = $this->properties[$classId] ?? [];
+        if ([] === $props) {
+            throw new \LogicException('Dynamic property fetch requires at least one declared property on '.$class);
+        }
+
+        $nameStr = JitNativeString::coerce($this->context, $nameVar);
+        if (Variable::TYPE_STRING !== $nameStr->type) {
+            throw new \LogicException('Dynamic property name must coerce to string');
+        }
+        $runtimeName = $this->context->helper->loadValue($nameStr);
+
+        $fn = BasicBlockHelper::parentFunction($this->context);
+        $entry = $this->context->builder->getInsertBlock();
+        $done = $fn->appendBasicBlock('dyn_prop_done');
+        $exit = $fn->appendBasicBlock('dyn_prop_exit');
+        $fallback = $fn->appendBasicBlock('dyn_prop_undef');
+        $destSlot = JitValueBox::alloc($this->context);
+        $checkBlock = $entry;
+        foreach ($props as $i => $propset) {
+            $this->context->builder->positionAtEnd($checkBlock);
+            $propName = $propset[1];
+            $litLoaded = $this->context->builder->load($this->context->constantStringFromString($propName));
+            $match = JitStringCompare::identical($this->context, $runtimeName, $litLoaded);
+            $caseBlock = $fn->appendBasicBlock('dyn_prop_case_'.$classId.'_'.$i);
+            $nextCheck = $i + 1 < count($props)
+                ? $fn->appendBasicBlock('dyn_prop_try_'.$classId.'_'.($i + 1))
+                : $fallback;
+            $this->context->builder->branchIf($match, $caseBlock, $nextCheck);
+            $this->context->builder->positionAtEnd($caseBlock);
+            $fetched = $this->propertyFetch($obj, $class, $propName);
+            $this->boxFetchedPropertyIntoValue($destSlot, $fetched, $propset[2]);
+            $this->context->builder->branch($done);
+            $checkBlock = $nextCheck;
+        }
+        $this->context->builder->positionAtEnd($fallback);
+        $this->context->builder->call($this->context->lookupFunction('abort'));
+        $this->context->builder->positionAtEnd($done);
+        $this->context->builder->branch($exit);
+        $this->context->builder->positionAtEnd($exit);
+
+        return new Variable(
+            $this->context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VARIABLE,
+            $destSlot
+        );
+    }
+
+    private function boxFetchedPropertyIntoValue(
+        PHPLLVM\Value $destSlot,
+        Variable $fetched,
+        int $propertyType
+    ): void {
+        $destPtr = JitValueBox::pointer($this->context, $destSlot);
+        if (Variable::TYPE_VALUE === $propertyType) {
+            $this->context->builder->call(
+                $this->context->lookupFunction('__object__load_value_slot'),
+                $fetched->objectPropertySlot,
+                $destSlot
+            );
+
+            return;
+        }
+        if (Variable::TYPE_HASHTABLE === $propertyType) {
+            $htPtr = $this->context->builder->pointerCast(
+                $this->context->builder->load($fetched->objectPropertySlot),
+                $this->context->getTypeFromString('__hashtable__*')
+            );
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeHashtable'),
+                $destPtr,
+                $htPtr
+            );
+
+            return;
+        }
+        if (Variable::TYPE_NATIVE_LONG === $propertyType) {
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeLong'),
+                $destPtr,
+                $this->context->builder->load($fetched->value)
+            );
+
+            return;
+        }
+        if (Variable::TYPE_NATIVE_BOOL === $propertyType) {
+            JitValueBox::writeBool(
+                $this->context,
+                $destSlot,
+                $this->context->builder->load($fetched->value)
+            );
+
+            return;
+        }
+        if (Variable::TYPE_NATIVE_DOUBLE === $propertyType) {
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeDouble'),
+                $destPtr,
+                $this->context->builder->load($fetched->value)
+            );
+
+            return;
+        }
+        if (Variable::TYPE_STRING === $propertyType) {
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeString'),
+                $destPtr,
+                $this->context->builder->load($fetched->value)
+            );
+
+            return;
+        }
+        if (Variable::TYPE_OBJECT === $propertyType) {
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeObject'),
+                $destPtr,
+                $this->context->builder->load($fetched->value)
+            );
+
+            return;
+        }
+
+        throw new \LogicException(
+            'Dynamic property fetch JIT box unsupported type: '.Variable::getStringType($propertyType)
+        );
     }
 
     /**

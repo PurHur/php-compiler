@@ -1899,7 +1899,6 @@ class JIT {
                     $result = $block->getOperand($op->arg1);
                     $obj = $block->getOperand($op->arg2);
                     $name = $block->getOperand($op->arg3);
-                    assert($name instanceof Operand\Literal);
                     assert($obj->type->type === Type::TYPE_OBJECT);
                     $declaringClass = $obj->type->userType;
                     if (null === $declaringClass && null !== $block->func && null !== $block->func->class) {
@@ -1910,11 +1909,21 @@ class JIT {
                             ? $this->context->scope->className
                             : 'object';
                     }
-                    $this->context->scope->variables[$result] = $this->context->type->object->propertyFetch(
-                        $this->loadPropertyFetchReceiver($obj),
-                        $declaringClass,
-                        $name->value
-                    );
+                    $receiver = $this->loadPropertyFetchReceiver($obj);
+                    if ($name instanceof Operand\Literal) {
+                        $this->context->scope->variables[$result] = $this->context->type->object->propertyFetch(
+                            $receiver,
+                            $declaringClass,
+                            $name->value
+                        );
+                    } else {
+                        $nameVar = $this->context->getVariableFromOp($name);
+                        $this->context->scope->variables[$result] = $this->context->type->object->propertyFetchDynamic(
+                            $receiver,
+                            $declaringClass,
+                            $nameVar
+                        );
+                    }
                     break;
                 default:
                     throw new \LogicException("Unknown JIT opcode: ". opcode_type_name($op->type));
