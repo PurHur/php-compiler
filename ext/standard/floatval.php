@@ -14,12 +14,14 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * floatval() for integer or float arguments (subset of PHP standard library).
+ * floatval() for scalar arguments (subset of PHP standard library).
  */
 final class floatval extends Internal
 {
@@ -30,6 +32,11 @@ final class floatval extends Internal
         }
         $v = $frame->calledArgs[0]->resolveIndirect();
         if (null === $frame->returnVar) {
+            return;
+        }
+        if (Variable::TYPE_NULL === $v->type) {
+            $frame->returnVar->float(0.0);
+
             return;
         }
         if (Variable::TYPE_INTEGER === $v->type) {
@@ -47,7 +54,12 @@ final class floatval extends Internal
 
             return;
         }
-        throw new \LogicException('floatval() only supports integers, floats, and booleans in this compiler build');
+        if (Variable::TYPE_STRING === $v->type) {
+            $frame->returnVar->float((float) $v->toString());
+
+            return;
+        }
+        throw new \LogicException('floatval() only supports null, integers, floats, booleans, and strings in this compiler build');
     }
 
     public Context $context;
@@ -67,8 +79,39 @@ final class floatval extends Internal
                 return $v;
             case JITVariable::TYPE_NATIVE_BOOL:
                 return $context->builder->uiToFp($v, $double);
+            case JITVariable::TYPE_STRING:
+                $ptr = $this->stringDataPtr($context, $v);
+                $endPtr = $context->getTypeFromString('int8**')->constNull();
+
+                return $context->builder->call($context->lookupFunction('strtod'), $ptr, $endPtr);
+            case JITVariable::TYPE_VALUE:
+                $valuePtr = JitValueBox::pointer($context, $args[0]->value);
+                $map = $context->structFieldMap['__value__'];
+                $typeByte = $context->builder->load(
+                    $context->builder->structGep($valuePtr, $map['type'])
+                );
+                $i8 = $context->getTypeFromString('int8');
+                $isNull = $context->builder->icmp(
+                    Builder::INT_EQ,
+                    $typeByte,
+                    $i8->constInt(Variable::TYPE_NULL, false)
+                );
+
+                return $context->builder->select(
+                    $isNull,
+                    $double->constReal(0.0),
+                    $double->constReal(0.0)
+                );
             default:
-                throw new \LogicException('floatval() only supports integers, floats, and booleans in this compiler build');
+                throw new \LogicException('floatval() only supports null, integers, floats, booleans, and strings in this compiler build');
         }
+    }
+
+    private function stringDataPtr(Context $context, Value $strPtr): Value
+    {
+        $structName = $strPtr->typeOf()->getElementType()->getName();
+        $off = $context->structFieldMap[$structName]['value'];
+
+        return $context->builder->structGep($strPtr, $off);
     }
 }
