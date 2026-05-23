@@ -149,6 +149,7 @@
         "ext/standard/defined_.php",
         "ext/standard/deg2rad.php",
         "ext/standard/dirname.php",
+        "ext/standard/doubleval.php",
         "ext/standard/exp.php",
         "ext/standard/explode.php",
         "ext/standard/extract_.php",
@@ -431,6 +432,7 @@
         "test/bootstrap-aot/class_constants.php",
         "test/bootstrap-aot/class_int_property.php",
         "test/bootstrap-aot/class_nullable_property.php",
+        "test/bootstrap-aot/coalesce_array_dim.php",
         "test/bootstrap-aot/const_string_folder_deploy_path.php",
         "test/bootstrap-aot/deploy_path_fold.php",
         "test/bootstrap-aot/deploy_path_include.php",
@@ -448,6 +450,7 @@
         "test/bootstrap-aot/lib_opcode/main.php",
         "test/bootstrap-aot/minimal_class.php",
         "test/bootstrap-aot/namespace_hello.php",
+        "test/bootstrap-aot/native_int_param_call.php",
         "test/bootstrap-aot/ns_func.php",
         "test/bootstrap-aot/ns_nullable_return.php",
         "test/bootstrap-aot/nullable_types.php",
@@ -455,6 +458,7 @@
         "test/bootstrap-aot/preg_quote_value_path.php",
         "test/bootstrap-aot/require_chain/main.php",
         "test/bootstrap-aot/spl_object_storage_dim.php",
+        "test/bootstrap-aot/switch_jumpif_chain.php",
         "test/bootstrap-aot/throw_logic.php",
         "test/bootstrap-aot/try_catch.php"
     ],
@@ -467,6 +471,7 @@
         "test/bootstrap-aot/class_const_fetch.php",
         "test/bootstrap-aot/class_constants.php",
         "test/bootstrap-aot/class_nullable_property.php",
+        "test/bootstrap-aot/coalesce_array_dim.php",
         "test/bootstrap-aot/deploy_path_include.php",
         "test/bootstrap-aot/dirname_concat_isfile.php",
         "test/bootstrap-aot/dirname_value_path.php",
@@ -478,11 +483,13 @@
         "test/bootstrap-aot/isset_array_offset.php",
         "test/bootstrap-aot/minimal_class.php",
         "test/bootstrap-aot/namespace_hello.php",
+        "test/bootstrap-aot/native_int_param_call.php",
         "test/bootstrap-aot/ns_func.php",
         "test/bootstrap-aot/nullable_types.php",
         "test/bootstrap-aot/parent_construct.php",
         "test/bootstrap-aot/preg_quote_value_path.php",
         "test/bootstrap-aot/require_chain/main.php",
+        "test/bootstrap-aot/switch_jumpif_chain.php",
         "test/bootstrap-aot/throw_logic.php",
         "test/bootstrap-aot/try_catch.php"
     ],
@@ -490,11 +497,11 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 391,
+        "inventory_files": 392,
         "excluded": 3,
-        "eligible": 388,
-        "aot_lint_targets": 36,
-        "aot_link_targets": 26,
+        "eligible": 389,
+        "aot_lint_targets": 39,
+        "aot_link_targets": 29,
         "aot_link_lib_targets": 1
     }
 }

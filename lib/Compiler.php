@@ -456,7 +456,13 @@ class Compiler {
      */
     protected function compileSwitchAsJumpIfChain(Op\Stmt\Switch_ $switch, Block $block): void
     {
-        $condSlot = $this->compileOperand($switch->cond, $block, true);
+        if (!isset($switch->cond)) {
+            throw new \LogicException('Switch missing condition operand');
+        }
+        $condSlot = $this->requireOperandSlot(
+            $this->compileOperand($switch->cond, $block, true),
+            'switch condition'
+        );
         $caseCount = count($switch->cases);
         if (0 === $caseCount) {
             $defaultOp = new OpCode(OpCode::TYPE_JUMP);
@@ -468,12 +474,19 @@ class Compiler {
 
         $current = $block;
         for ($i = 0; $i < $caseCount; ++$i) {
-            $eqSlot = $this->compileBoolTemporary($current);
+            $eqSlot = $this->requireOperandSlot(
+                $this->compileBoolTemporary($current),
+                'switch equality temporary'
+            );
+            $caseSlot = $this->requireOperandSlot(
+                $this->compileOperand($switch->cases[$i], $current, true),
+                'switch case #'.$i
+            );
             $current->addOpCode(new OpCode(
                 OpCode::TYPE_EQUAL,
                 $eqSlot,
                 $condSlot,
-                $this->compileOperand($switch->cases[$i], $current, true)
+                $caseSlot
             ));
 
             $caseTarget = $this->compileCfgBranch($switch->targets[$i], $block);
@@ -482,6 +495,7 @@ class Compiler {
                 $elseTarget = $this->compileCfgBranch($switch->default, $block);
             } else {
                 $elseTarget = new Block($block->orig);
+                $elseTarget->syntheticCfgBranch = true;
                 $elseTarget->inheritUndefinedLocals = true;
                 $elseTarget->inheritScopeFrom($current);
                 $this->inheritFuncFromParent($elseTarget, $block);
@@ -1336,6 +1350,15 @@ class Compiler {
         }
 
         return null;
+    }
+
+    protected function requireOperandSlot(?int $slot, string $context): int
+    {
+        if (null === $slot) {
+            throw new \LogicException('Missing operand slot for '.$context);
+        }
+
+        return $slot;
     }
 
     protected function compileOperand(?Operand $operand, Block $block, bool $isRead): ?int {
