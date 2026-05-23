@@ -103,6 +103,18 @@ class Native implements Call {
                             $value
                         );
                         return $context->builder->load($slot);
+                    case Variable::TYPE_STRING:
+                        $slot = \PHPCompiler\JIT\JitValueBox::alloc($context);
+                        $owned = $context->builder->call(
+                            $context->lookupFunction('__string__separate'),
+                            $value
+                        );
+                        $context->builder->call(
+                            $context->lookupFunction('__value__writeString'),
+                            \PHPCompiler\JIT\JitValueBox::pointer($context, $slot),
+                            $owned
+                        );
+                        return $context->builder->load($slot);
                 }
                 break;
             case 'int64':
