@@ -2581,14 +2581,31 @@ class JIT {
 
                     return;
                 default:
+                    if ($value->type & Variable::IS_NATIVE_ARRAY) {
+                        $elemType = $value->type & ~Variable::IS_NATIVE_ARRAY;
+                        if (Variable::TYPE_STRING === $elemType || Variable::TYPE_NATIVE_LONG === $elemType) {
+                            $ht = JIT\HashTableHelper::materializeNativeArrayForCall($this->context, $value);
+                            $this->context->builder->call(
+                                $this->context->lookupFunction('__value__writeHashtable'),
+                                $valueRef,
+                                $ht
+                            );
+                            $result->valueBoxHashtable = true;
+
+                            return;
+                        }
+                    }
                     throw new \LogicException("Source type: {$value->type}");
             }
         } elseif ($result->type === Variable::TYPE_NATIVE_LONG && Variable::TYPE_VALUE === $value->type) {
-            $longVal = $this->context->builder->call(
-                $this->context->lookupFunction('__value__readLong'),
-                $this->valueBoxPointer($value)
+            $fp = $this->unboxValueToNativeDouble($value);
+            $longVal = $this->context->builder->fpToSi(
+                $fp,
+                $this->context->getTypeFromString('int64')
             );
+            $result->free();
             $this->context->builder->store($longVal, $result->value);
+            $result->addref();
 
             return;
         } elseif ($result->type === Variable::TYPE_NATIVE_LONG && Variable::TYPE_NATIVE_DOUBLE === $value->type) {
@@ -2603,6 +2620,13 @@ class JIT {
             $result->free();
             $long = $this->context->helper->loadValue($value);
             $fp = $this->context->builder->siToFp($long, $this->context->getTypeFromString('double'));
+            $this->context->builder->store($fp, $result->value);
+            $result->addref();
+
+            return;
+        } elseif ($result->type === Variable::TYPE_NATIVE_DOUBLE && Variable::TYPE_VALUE === $value->type) {
+            $fp = $this->unboxValueToNativeDouble($value);
+            $result->free();
             $this->context->builder->store($fp, $result->value);
             $result->addref();
 
@@ -2670,6 +2694,42 @@ class JIT {
         return JIT\JitValueBox::valuePtrFromVariable($this->context, $value);
     }
 
+    private function unboxValueToNativeDouble(Variable $value): PHPLLVM\Value
+    {
+        $valuePtr = $this->valueBoxPointer($value);
+        $map = $this->context->structFieldMap['__value__'];
+        $typeByte = $this->context->builder->load(
+            $this->context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $this->context->getTypeFromString('int8');
+        $doubleTy = $this->context->getTypeFromString('double');
+        $isDouble = $this->context->builder->icmp(
+            \PHPLLVM\Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
+        );
+        $isLong = $this->context->builder->icmp(
+            \PHPLLVM\Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
+        );
+        $readDouble = $this->context->builder->call(
+            $this->context->lookupFunction('__value__readDouble'),
+            $valuePtr
+        );
+        $readLong = $this->context->builder->call(
+            $this->context->lookupFunction('__value__readLong'),
+            $valuePtr
+        );
+        $fromLong = $this->context->builder->siToFp($readLong, $doubleTy);
+
+        return $this->context->builder->select(
+            $isDouble,
+            $readDouble,
+            $this->context->builder->select($isLong, $fromLong, $doubleTy->constReal(0.0))
+        );
+    }
+
     private function assignOperandValue(Operand $result, PHPLLVM\Value $value): void {
         if (empty($result->usages) && !$this->context->scope->variables->contains($result)) {
             return;
@@ -2701,6 +2761,19 @@ class JIT {
                 $dest->free();
                 $this->context->builder->store($value, $dest->value);
                 $dest->addref();
+
+                return;
+            }
+        }
+        if (Variable::TYPE_NATIVE_LONG === $dest->type || Variable::TYPE_NATIVE_DOUBLE === $dest->type) {
+            if ('__value__' === $valueTy || '__value__*' === $valueTy) {
+                $source = new Variable(
+                    $this->context,
+                    Variable::TYPE_VALUE,
+                    Variable::KIND_VALUE,
+                    $value
+                );
+                $this->assignOperand($result, $source);
 
                 return;
             }
