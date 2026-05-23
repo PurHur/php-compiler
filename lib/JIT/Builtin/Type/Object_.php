@@ -361,6 +361,8 @@ class Object_ extends Type {
                 'type_string' => \PHPCompiler\VM\Variable::TYPE_STRING,
                 'type_array' => \PHPCompiler\VM\Variable::TYPE_ARRAY,
                 'type_object' => \PHPCompiler\VM\Variable::TYPE_OBJECT,
+                'type_indirect' => \PHPCompiler\VM\Variable::TYPE_INDIRECT,
+                'type_string_offset' => \PHPCompiler\VM\Variable::TYPE_STRING_OFFSET,
             ] as $name => $value) {
                 $this->classConstants[$id][$name] = [
                     'type' => Variable::TYPE_NATIVE_LONG,
@@ -387,6 +389,23 @@ class Object_ extends Type {
                 'load_type_import' => \PHPCompiler\JIT\Builtin::LOAD_TYPE_IMPORT,
                 'load_type_embed' => \PHPCompiler\JIT\Builtin::LOAD_TYPE_EMBED,
                 'load_type_standalone' => \PHPCompiler\JIT\Builtin::LOAD_TYPE_STANDALONE,
+            ] as $name => $value) {
+                $this->classConstants[$id][$name] = [
+                    'type' => Variable::TYPE_NATIVE_LONG,
+                    'value' => $value,
+                ];
+            }
+        }
+        if ('phpcfg\\func' === $lcname) {
+            foreach ([
+                'flag_public' => \PHPCfg\Func::FLAG_PUBLIC,
+                'flag_protected' => \PHPCfg\Func::FLAG_PROTECTED,
+                'flag_private' => \PHPCfg\Func::FLAG_PRIVATE,
+                'flag_static' => \PHPCfg\Func::FLAG_STATIC,
+                'flag_abstract' => \PHPCfg\Func::FLAG_ABSTRACT,
+                'flag_final' => \PHPCfg\Func::FLAG_FINAL,
+                'flag_returns_ref' => \PHPCfg\Func::FLAG_RETURNS_REF,
+                'flag_closure' => \PHPCfg\Func::FLAG_CLOSURE,
             ] as $name => $value) {
                 $this->classConstants[$id][$name] = [
                     'type' => Variable::TYPE_NATIVE_LONG,
@@ -846,6 +865,57 @@ class Object_ extends Type {
                     $this->context->helper->loadValue($value)
                 );
                 $value->addref();
+                $this->context->builder->store(
+                    $this->context->builder->pointerCast($heapPtr, $voidPtr),
+                    $slot
+                );
+
+                return;
+            }
+            if (Variable::TYPE_NATIVE_LONG === $value->type) {
+                JitValueBox::writeLong(
+                    $this->context,
+                    $heapVal,
+                    $this->context->helper->loadValue($value)
+                );
+                $this->context->builder->store(
+                    $this->context->builder->pointerCast($heapPtr, $voidPtr),
+                    $slot
+                );
+
+                return;
+            }
+            if (Variable::TYPE_NATIVE_DOUBLE === $value->type) {
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__writeDouble'),
+                    $heapPtr,
+                    $this->context->helper->loadValue($value)
+                );
+                $this->context->builder->store(
+                    $this->context->builder->pointerCast($heapPtr, $voidPtr),
+                    $slot
+                );
+
+                return;
+            }
+            if (Variable::TYPE_NATIVE_BOOL === $value->type) {
+                JitValueBox::writeBool(
+                    $this->context,
+                    $heapVal,
+                    $this->context->helper->loadValue($value)
+                );
+                $this->context->builder->store(
+                    $this->context->builder->pointerCast($heapPtr, $voidPtr),
+                    $slot
+                );
+
+                return;
+            }
+            if (Variable::TYPE_NULL === $value->type) {
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__writeNull'),
+                    $heapPtr
+                );
                 $this->context->builder->store(
                     $this->context->builder->pointerCast($heapPtr, $voidPtr),
                     $slot

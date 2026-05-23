@@ -180,11 +180,21 @@ class Context {
 
     public function resolveFunctionProxy(string $proxyName): Call
     {
-        if (!isset($this->functionProxies[$proxyName])) {
-            $this->functionProxies[$proxyName] = new Call\ExternalMethod($proxyName);
+        $lc = strtolower($proxyName);
+        if (isset($this->functionProxies[$lc])) {
+            return $this->functionProxies[$lc];
+        }
+        if (preg_match('/^(.+)\\\\([^\\\\]+)::(.+)$/', $lc, $matches)) {
+            $shortKey = $matches[2].'::'.$matches[3];
+            if (isset($this->functionProxies[$shortKey])) {
+                return $this->functionProxies[$shortKey];
+            }
+        }
+        if (!isset($this->functionProxies[$lc])) {
+            $this->functionProxies[$lc] = new Call\ExternalMethod($proxyName);
         }
 
-        return $this->functionProxies[$proxyName];
+        return $this->functionProxies[$lc];
     }
 
     public function recordExternalMethodStub(string $proxyName): void

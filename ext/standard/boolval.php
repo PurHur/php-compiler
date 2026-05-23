@@ -63,10 +63,20 @@ final class boolval extends Internal
                 return $context->constantFromBool(false);
             case JITVariable::TYPE_VALUE:
                 $loaded = $context->helper->loadValue($args[0]);
-                $loaded = $context->builder->pointerCast(
-                    $loaded,
-                    $context->getTypeFromString('__value__*')
-                );
+                $loadedType = $context->getStringFromType($loaded->typeOf());
+                if ('__value__' === $loadedType) {
+                    $slot = \PHPCompiler\JIT\BasicBlockHelper::entryAlloca(
+                        $context,
+                        $loaded->typeOf()
+                    );
+                    $context->builder->store($loaded, $slot);
+                    $loaded = \PHPCompiler\JIT\JitValueBox::pointer($context, $slot);
+                } elseif ('__value__*' !== $loadedType) {
+                    $loaded = $context->builder->pointerCast(
+                        $loaded,
+                        $context->getTypeFromString('__value__*')
+                    );
+                }
                 $map = $context->structFieldMap['__value__'];
                 $typeByte = $context->builder->load(
                     $context->builder->structGep($loaded, $map['type'])
@@ -76,12 +86,13 @@ final class boolval extends Internal
                 $boolType = $i8->constInt(JITVariable::TYPE_NATIVE_BOOL, false);
                 $isNull = $context->builder->icmp(Builder::INT_EQ, $typeByte, $nullType);
                 $isBool = $context->builder->icmp(Builder::INT_EQ, $typeByte, $boolType);
-                $boolByte = $context->builder->load(
-                    $context->builder->gep(
-                        $context->builder->structGep($loaded, $map['value']),
-                        $i8->constInt(0, false)
-                    )
+                $valueField = $context->builder->structGep($loaded, $map['value']);
+                $firstByte = $context->builder->inBoundsGEP(
+                    $valueField,
+                    $context->getTypeFromString('int32')->constInt(0, false),
+                    $context->getTypeFromString('int64')->constInt(0, false)
                 );
+                $boolByte = $context->builder->load($firstByte);
                 $boolTruthy = $context->builder->icmp(Builder::INT_NE, $boolByte, $i8->constInt(0, false));
                 $nonNull = $context->builder->icmp(Builder::INT_NE, $typeByte, $nullType);
 
