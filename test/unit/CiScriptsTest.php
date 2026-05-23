@@ -149,6 +149,33 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('examples-aot-smoke.sh', $common);
     }
 
+    public function testCiLocalHonorsDeploySmokeGate(): void
+    {
+        $local = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-local.sh');
+        $this->assertStringContainsString('ci_run_deploy_smoke', $local);
+
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('DEPLOY_SMOKE_GATE', $common);
+        $this->assertStringContainsString('DEPLOY_SMOKE_GATE:-1', $common);
+        $this->assertStringContainsString('deploy-smoke.sh', $common);
+        $this->assertStringContainsString('--example 001', $common);
+        $this->assertStringContainsString('--example 002', $common);
+        $this->assertStringNotContainsString('--example 003', $common);
+    }
+
+    public function testCiDefaultsEnvDefinesDeploySmokeGateOn(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString('DEPLOY_SMOKE_GATE="${DEPLOY_SMOKE_GATE:-1}"', $defaults);
+    }
+
+    public function testCiFastDoesNotRunDeploySmokeGate(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-fast.sh');
+        $this->assertStringNotContainsString('ci_run_deploy_smoke', $body);
+        $this->assertStringNotContainsString('deploy-smoke.sh', $body);
+    }
+
     public function testCiDefaultsEnvDefinesExamplesAotSmokeGateOn(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
@@ -318,9 +345,11 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('MINIWEBAPP_AOT_EXECUTE_GATE', $doc);
         $this->assertStringContainsString('EXAMPLES_AOT_SMOKE_GATE', $doc);
         $this->assertStringContainsString('EXAMPLES_AOT_SMOKE_ONLY', $doc);
+        $this->assertStringContainsString('DEPLOY_SMOKE_GATE', $doc);
         $this->assertStringContainsString('MINIWEBAPP_AOT_EXECUTE_GATE=1', $doc);
         $this->assertStringContainsString('MINIWEBAPP_AOT_EXECUTE_GATE="${MINIWEBAPP_AOT_EXECUTE_GATE:-0}"', $defaults);
         $this->assertStringContainsString('EXAMPLES_AOT_SMOKE_GATE="${EXAMPLES_AOT_SMOKE_GATE:-1}"', $defaults);
+        $this->assertStringContainsString('DEPLOY_SMOKE_GATE="${DEPLOY_SMOKE_GATE:-1}"', $defaults);
     }
 
     public function testCiFastRunsMiniWebAppVmCliGateByDefault(): void
