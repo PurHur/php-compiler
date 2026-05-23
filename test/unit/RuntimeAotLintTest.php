@@ -55,6 +55,19 @@ final class RuntimeAotLintTest extends TestCase
         );
     }
 
+    public function testBootstrapCastStringFixture(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $path = $root.'/test/bootstrap-aot/cast_string.php';
+        $runtime = new Runtime(Runtime::MODE_AOT);
+        $block = $runtime->parseAndCompile((string) file_get_contents($path), $path);
+        $this->assertNotNull($block);
+        $this->assertTrue(
+            $this->blockTreeHasOpcode($block, OpCode::TYPE_CAST_STRING),
+            'expected TYPE_CAST_STRING lowering in bootstrap cast_string fixture'
+        );
+    }
+
     public function testLibRuntimeCompileLintExitZero(): void
     {
         $root = dirname(__DIR__, 2);
