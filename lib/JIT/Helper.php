@@ -706,6 +706,18 @@ restart:
                 $result = JitValueCompare::notIdenticalToNative($this->context, $left, $right);
                 goto return_bool;
             }
+            if (OpCode::TYPE_EQUAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                $identical = JitValueCompare::identicalToNative($this->context, $left, $right);
+                if (OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                    $result = $this->context->builder->xor(
+                        $identical,
+                        $this->context->getTypeFromString('int1')->constInt(1, false)
+                    );
+                } else {
+                    $result = $identical;
+                }
+                goto return_bool;
+            }
         }
         if (Variable::TYPE_VALUE === $rightType && Variable::TYPE_VALUE !== $leftType) {
             if (Variable::TYPE_NATIVE_LONG === $leftType || Variable::TYPE_NATIVE_BOOL === $leftType) {
@@ -791,6 +803,18 @@ restart:
                     goto return_bool;
                 }
                 $result = JitValueCompare::notIdenticalNativeToValue($this->context, $left, $right);
+                goto return_bool;
+            }
+            if (OpCode::TYPE_EQUAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                $identical = JitValueCompare::identicalNativeToValue($this->context, $left, $right);
+                if (OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                    $result = $this->context->builder->xor(
+                        $identical,
+                        $this->context->getTypeFromString('int1')->constInt(1, false)
+                    );
+                } else {
+                    $result = $identical;
+                }
                 goto return_bool;
             }
         }

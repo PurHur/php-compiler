@@ -11,10 +11,20 @@ final class SwitchJumpIfLoweringTest extends TestCase
 {
     public function testSwitchJumpIfChainBootstrapAotLint(): void
     {
+        $this->assertBootstrapAotLintPasses('switch_jumpif_chain.php');
+    }
+
+    public function testSwitchEqualValueLongBootstrapAotLint(): void
+    {
+        $this->assertBootstrapAotLintPasses('switch_equal_value_long.php');
+    }
+
+    private function assertBootstrapAotLintPasses(string $basename): void
+    {
         $root = dirname(__DIR__, 2);
         $bin = realpath($root.'/bin/compile.php');
         $this->assertNotFalse($bin);
-        $target = $root.'/test/bootstrap-aot/switch_jumpif_chain.php';
+        $target = $root.'/test/bootstrap-aot/'.$basename;
         $this->assertFileExists($target);
         $cmd = [PHP_BINARY, $bin, '-l', $target];
         $descriptorSpec = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
