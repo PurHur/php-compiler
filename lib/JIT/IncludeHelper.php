@@ -76,7 +76,14 @@ final class IncludeHelper
         $included->inheritScopeFrom($callerBlock);
         $included->inheritUndefinedLocals = true;
 
-        $localBindings = self::collectCalleeLocalBindings($context, $callerBlock, $included);
+        $context->inlineIncludeCallerBlocks[] = $callerBlock;
+        $bindingCaller = $callerBlock;
+        if (\count($context->inlineIncludeCallerBlocks) > 1) {
+            $bindingCaller = $context->inlineIncludeCallerBlocks[
+                \count($context->inlineIncludeCallerBlocks) - 2
+            ];
+        }
+        $localBindings = self::collectCalleeLocalBindings($context, $bindingCaller, $included);
         $preIncludeBb = $context->builder->getInsertBlock();
         $preparedBindings = new \SplObjectStorage();
         if (null !== $preIncludeBb) {
@@ -118,7 +125,7 @@ final class IncludeHelper
                     $context,
                     Variable::TYPE_STRING,
                     Variable::KIND_VARIABLE,
-                    $context->builder->alloca($context->getTypeFromString('__string__*'))
+                    BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__string__*'))
                 );
                 $calleeVar->initialize();
                 $context->setVariableOp($operand, $calleeVar);
@@ -148,6 +155,7 @@ final class IncludeHelper
         } finally {
             --$context->inlineIncludeDepth;
             $context->popScope();
+            array_pop($context->inlineIncludeCallerBlocks);
         }
 
         $resumeBb = self::appendIncludeResume($context, $func);
@@ -232,7 +240,7 @@ final class IncludeHelper
         }
         $saved = $context->builder->getInsertBlock();
         $context->builder->positionAtEnd($materializeBb);
-        $slot = $context->builder->alloca($context->getTypeFromString('__string__*'));
+        $slot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__string__*'));
         $stringVar = new Variable(
             $context,
             Variable::TYPE_STRING,

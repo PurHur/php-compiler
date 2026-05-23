@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPLLVM\BasicBlock;
+use PHPLLVM\Type;
+use PHPLLVM\Value;
 use PHPLLVM\Value\Function_;
 
 /**
@@ -29,6 +31,25 @@ final class BasicBlockHelper
     public static function append(Context $context, string $name): BasicBlock
     {
         return self::parentFunction($context)->appendBasicBlock($name);
+    }
+
+    /**
+     * Allocate stack space in the function entry block so the slot dominates all uses (#764).
+     */
+    public static function entryAlloca(Context $context, Type $type): Value
+    {
+        $entry = self::parentFunction($context)->getEntryBasicBlock();
+        $restore = $context->builder->getInsertBlock();
+        try {
+            $first = $entry->getFirstInstruction();
+            $context->builder->position($entry, $first);
+        } catch (\Throwable) {
+            $context->builder->positionAtEnd($entry);
+        }
+        $slot = $context->builder->alloca($type);
+        $context->builder->positionAtEnd($restore);
+
+        return $slot;
     }
 
     /**
