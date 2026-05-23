@@ -144,6 +144,17 @@ php script/check-jit-compliance-ran.php --preflight
 
 Exits **0** when LLVM 9 is missing (nothing to guard). Exits **non-zero** when LLVM is present but PHPLLVM/MCJIT cannot bootstrap ([#98](https://github.com/PurHur/php-compiler/issues/98)). Default **off** until contributors opt in.
 
+### AOT project preflight ([#746](https://github.com/PurHur/php-compiler/issues/746))
+
+Fast north-star check before a full `ci-local.sh` llvm phase — `phpc build --project` plus CGI execute on `examples/003-MiniWebApp` (or optional project dir):
+
+```bash
+phpc doctor --aot-project-probe
+# or: php script/aot-project-probe.php
+```
+
+Exits **0** with skip message when LLVM 9 is missing. Exits **0** when build succeeds and stdout contains the `app_name` needle (`MiniWebApp`). Exits **non-zero** on link failure or empty stdout (execute gap — was **#764**). Mirrors `MiniWebAppCgiEnv::queryRouteHome()` / stage 4b2 in `script/miniwebapp-gates.sh`.
+
 **Unlimited memory is blocked:** `PHP_COMPILER_MEMORY_LIMIT=-1` and `memory_limit=-1` in tracked files fail `script/check-no-unlimited-memory.sh` (run at CI start).
 
 **Stale closed-issue blockers:** `script/check-stale-issue-refs.sh` fails when closed issues (e.g. **#568**, **#67**) still appear as active blockers in `script/`, `lib/Cli/`, `examples/`, and `docs/deploy-web-aot.md`. Opt out per line with `# stale-issue-ok: <reason>`. Wired in `ci-fast.sh` / `ci-local.sh` inventory via `script/ci-common.sh` ([#802](https://github.com/PurHur/php-compiler/issues/802)).

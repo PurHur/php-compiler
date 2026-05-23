@@ -23,7 +23,7 @@ declare(strict_types=1);
  *   phpc lint --all <dir-or-file> [--json]
  *   phpc init [--profile default|miniwebapp] [--force] [target-dir]
  *   phpc test [--fast] [-- phpunit/ci-local args...]
- *   phpc doctor [--gates] [--no-lint] [--jit-probe]  Probe env; LLVM/JIT readiness (#717)
+ *   phpc doctor [--gates] [--no-lint] [--jit-probe] [--aot-project-probe [dir]]  Env probes (#717, #746)
  *   phpc validate-manifest [dir]                 Validate phpc.json schema and paths (issue #263)
  */
 
@@ -68,8 +68,10 @@ php-compiler CLI
   phpc init [--profile default|miniwebapp] [--force] [target-dir]
                                               Scaffold web project (default hello or miniwebapp)
   phpc test [--fast] [args...]                  Run ci-local.sh (full) or ci-fast.sh (no LLVM)
-  phpc doctor [--gates] [--no-lint] [--jit-probe]  Probe environment; LLVM/JIT readiness (#717)
+  phpc doctor [--gates] [--no-lint] [--jit-probe] [--aot-project-probe [dir]]
+                                              Probe environment; LLVM/JIT readiness (#717, #746)
       --jit-probe                                 Run MCJIT smoke (script/jit-runtime-probe.php)
+      --aot-project-probe [dir]                   AOT build + execute on 003-MiniWebApp (or dir)
   phpc validate-manifest [dir]                  Validate phpc.json (default: cwd)
 
 HELP);
@@ -220,6 +222,8 @@ switch ($command) {
         $gates = false;
         $noLint = false;
         $jitProbe = false;
+        $aotProjectProbe = false;
+        $aotProjectPath = null;
         foreach ($args as $arg) {
             if ('--gates' === $arg) {
                 $gates = true;
@@ -233,11 +237,28 @@ switch ($command) {
                 $jitProbe = true;
                 continue;
             }
+            if ('--aot-project-probe' === $arg) {
+                $aotProjectProbe = true;
+                continue;
+            }
+            if ($aotProjectProbe && null === $aotProjectPath && !str_starts_with($arg, '--')) {
+                $aotProjectPath = $arg;
+                continue;
+            }
             fwrite(STDERR, "phpc doctor: unknown option: {$arg}\n");
             exit(1);
         }
         if ($gates) {
             exit(\PHPCompiler\Doctor::runGates($repoRoot, $noLint));
+        }
+        if ($aotProjectProbe) {
+            $projectDir = null;
+            if (null !== $aotProjectPath) {
+                $projectDir = str_starts_with($aotProjectPath, '/')
+                    ? $aotProjectPath
+                    : $repoRoot.'/'.ltrim($aotProjectPath, '/');
+            }
+            exit(\PHPCompiler\Doctor::runAotProjectProbe($repoRoot, $projectDir));
         }
         exit(\PHPCompiler\Doctor::run($repoRoot, $jitProbe));
 

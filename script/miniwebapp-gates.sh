@@ -413,11 +413,13 @@ elif [[ "${stage4b2}" -eq 1 ]]; then
   echo "       AOT execute probe: green (${aot_execute_probe_bytes} stdout bytes)"
 elif [[ "${aot_execute_probe_exit}" -eq 0 && "${aot_execute_probe_bytes}" -eq 0 ]]; then
   echo "       AOT execute probe: empty stdout"
+  echo "       phpc doctor --aot-project-probe   # fast build+execute preflight (#746)"
   if [[ -n "${AOT_EXECUTE_PROBE_STDERR}" ]]; then
     echo "${AOT_EXECUTE_PROBE_STDERR}" | sed 's/^/         /'
   fi
 elif [[ "${aot_execute_probe_exit}" -ge 0 ]]; then
   echo "       AOT execute probe: exit ${aot_execute_probe_exit}"
+  echo "       phpc doctor --aot-project-probe   # fast build+execute preflight (#746)"
   if [[ -n "${AOT_EXECUTE_PROBE_STDERR}" ]]; then
     echo "${AOT_EXECUTE_PROBE_STDERR}" | sed 's/^/         /'
   fi
@@ -480,7 +482,7 @@ elif [[ "${stage4a}" -eq 0 && "${aot_dry_run_skipped}" -eq 0 && "${aot_dry_run_e
 elif [[ "${stage4a}" -eq 0 && "${aot_dry_run_skipped}" -eq 1 ]]; then
   echo "Next: install LLVM 9 for stage 4a AOT dry-run (script/install-llvm9.sh)"
 elif [[ "${stage4b2}" -eq 0 && "${aot_execute_probe_skipped}" -eq 0 ]]; then
-  echo "Next: green stage 4b2 AOT execute byte probe (#773)"
+  echo "Next: green stage 4b2 AOT execute byte probe (#773); try phpc doctor --aot-project-probe (#746)"
 elif [[ "${stage4c}" -eq 0 && "${aot_smoke_003_skipped}" -eq 1 ]]; then
   echo "Next: stage 4c examples-aot-smoke 003 with MINIWEBAPP_AOT_EXECUTE_GATE=1 (#683, #485)"
 elif [[ "${stage4c}" -eq 0 && "${aot_smoke_003_exit}" -ne 0 ]]; then

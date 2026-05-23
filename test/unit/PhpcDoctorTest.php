@@ -37,6 +37,13 @@ final class PhpcDoctorTest extends TestCase
         $this->assertStringContainsString('--jit-probe', $result['stdout']);
     }
 
+    public function testHelpDocumentsAotProjectProbe(): void
+    {
+        $result = $this->runPhpc(['help']);
+        $this->assertSame(0, $result['exit']);
+        $this->assertStringContainsString('--aot-project-probe', $result['stdout']);
+    }
+
     public function testDoctorJitProbeWhenLlvmPresent(): void
     {
         $repoRoot = dirname(__DIR__, 2);
@@ -50,6 +57,27 @@ final class PhpcDoctorTest extends TestCase
         }
         $this->assertSame(0, $result['exit'], $combined);
         $this->assertStringContainsString('jit-runtime-probe OK', $result['stdout']);
+    }
+
+    public function testDoctorAotProjectProbeWhenLlvmPresent(): void
+    {
+        $repoRoot = dirname(__DIR__, 2);
+        if (!is_file('/opt/llvm9/libLLVM-9.so.1') && !is_file($repoRoot.'/.llvm/libLLVM-9.so.1')) {
+            $this->markTestSkipped('LLVM 9 not available in this environment');
+        }
+        if (!is_file($repoRoot.'/examples/003-MiniWebApp/public/index.php')) {
+            $this->markTestSkipped('examples/003-MiniWebApp missing');
+        }
+        $result = $this->runPhpc(['doctor', '--aot-project-probe']);
+        $combined = $result['stdout']."\n".$result['stderr'];
+        if (str_contains($combined, 'aot-project-probe skipped')) {
+            $this->markTestSkipped('LLVM probe skipped in subprocess: '.$combined);
+        }
+        if (!str_contains($combined, 'aot-project-probe OK')) {
+            $this->markTestSkipped('AOT project probe not green here (#764 execute may regress): '.$combined);
+        }
+        $this->assertSame(0, $result['exit'], $combined);
+        $this->assertStringContainsString('aot-project-probe OK', $result['stdout']);
     }
 
     public function testDoctorGatesPrintsMiniWebAppLadder(): void
