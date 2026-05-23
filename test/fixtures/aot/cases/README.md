@@ -9,10 +9,11 @@ Ordered smallest → largest for **#764** triage (issues **#880**, **#879**). Sa
 | 1 | `isset_object_property_array` | #848 |
 | 2 | `require_return_config` | #806 |
 | 3 | `nested_include_two_tier` | #878 |
-| 4 | `miniwebapp_render_home` | #867 |
-| 5 | `layout_script_base` | #866 |
-| 6 | `layout_title_branch` | #784 |
-| 7 | `method_include_void_array_property` | #846 |
+| 4 | `deploy_path_layout_nested` | #878 / #764 |
+| 5 | `miniwebapp_render_home` | #867 |
+| 6 | `layout_script_base` | #866 |
+| 7 | `layout_title_branch` | #784 |
+| 8 | `method_include_void_array_property` | #846 |
 
 Run (LLVM 9 required):
 

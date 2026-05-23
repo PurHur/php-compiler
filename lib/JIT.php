@@ -497,9 +497,10 @@ class JIT {
             --$limit;
         }
 
+        $this->context->inlineIncludeExitBlock = null;
         $exit = $this->compileBlockInternal($func, $block, $limit, $entryBlock);
-        if ($this->context->inlineIncludeDepth > 0 && null !== $this->context->inlineIncludeExitBlock) {
-            return $this->context->inlineIncludeExitBlock;
+        if (null !== $this->context->inlineIncludeExitBlock) {
+            $exit = $this->context->inlineIncludeExitBlock;
         }
 
         return $exit;
