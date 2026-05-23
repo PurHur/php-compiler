@@ -2,6 +2,13 @@
 
 declare(strict_types=1);
 
+$root = dirname(__DIR__);
+
+$jitFsGlob = <<<'PHP'
+<?php
+
+declare(strict_types=1);
+
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
@@ -50,13 +57,12 @@ final class JitFsGlob
         $okSlot = JitValueBox::alloc($context);
         $okPtr = JitValueBox::pointer($context, $okSlot);
         $context->builder->call($context->lookupFunction('__value__writeHashtable'), $okPtr, $ht);
-        $okTail = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
         $context->builder->positionAtEnd($doneBlock);
         $valuePtrTy = $context->getTypeFromString('__value__*');
         $result = $context->builder->phi($valuePtrTy);
         $result->addIncoming($falsePtr, $failBlock);
-        $result->addIncoming($okPtr, $okTail);
+        $result->addIncoming($okPtr, $buildBlock);
 
         return $result;
     }
@@ -78,7 +84,7 @@ final class JitFsGlob
         $context->builder->branch($loopHead);
         $context->builder->positionAtEnd($loopHead);
         $i = $context->builder->load($iSlot);
-        $countSized = $context->builder->zExt($count, $sizeT);
+        $countSized = $context->builder->truncOrBitCast($count, $sizeT);
         $atEnd = $context->builder->icmp(Builder::INT_SGE, $i, $countSized);
         $context->builder->branchIf($atEnd, $loopDone, $loopBody);
         $context->builder->positionAtEnd($loopBody);
@@ -97,3 +103,99 @@ final class JitFsGlob
         return $ht;
     }
 }
+PHP;
+
+file_put_contents($root.'/ext/standard/JitFsGlob.php', $jitFsGlob);
+
+foreach (['glob_.php' => 'glob', 'scandir.php' => 'scandir'] as $file => $fn) {
+    $path = $root.'/ext/standard/'.$file;
+    $text = file_get_contents($path);
+    if (!str_contains($text, 'use PHPCompiler\\JIT\\JitLongArg;')) {
+        $text = str_replace(
+            'use PHPCompiler\\JIT\\Variable as JITVariable;',
+            "use PHPCompiler\\JIT\\JitLongArg;\nuse PHPCompiler\\JIT\\Variable as JITVariable;",
+            $text
+        );
+    }
+    $argLabel = 'glob' === $fn ? 'glob() flags' : 'scandir() sorting_order';
+    $pathLabel = 'glob' === $fn ? 'glob() argument #1' : 'scandir() argument #1';
+    $pattern = '/\$i32 = \$context->getTypeFromString\(\'int32\'\);\s*\$flags = \$i32->constInt\(0, false\);/s';
+    if ('scandir' === $fn) {
+        $text = preg_replace('/\$sort = \$i32->constInt\(0, false\);/', '$sort = $i32->constInt(0, false);', $text, 1);
+    }
+    $old = <<<'PHP'
+        $i32 = $context->getTypeFromString('int32');
+        $flags = $i32->constInt(0, false);
+PHP;
+    if ('scandir' === $fn) {
+        $old = str_replace('$flags', '$sort', $old);
+    }
+    // Replace call() tail generically
+    $text = preg_replace(
+        '/if \(2 === \$argc\) \{.*?loadValue\(\$args\[1\]\);\s*\}/s',
+        "if (2 === \$argc) {\n            if (JITVariable::TYPE_INTEGER !== \$args[1]->type\n                && JITVariable::TYPE_NATIVE_LONG !== \$args[1]->type) {\n                throw new \\LogicException('{$fn}() second argument must be an integer in this compiler build');\n            }\n            \$".('glob' === $fn ? 'flags' : 'sort')." = \$context->builder->truncOrBitCast(\n                JitLongArg::lower(\$context, \$args[1], '{$argLabel}'),\n                \$i32\n            );\n        }",
+        $text,
+        1
+    );
+    $text = preg_replace(
+        '/\$this->jitString\(\$context, \$args\[0\], \'[^\']+\'\);\s*return JitFsGlob::'.$fn.'\(\$context, \$context->helper->loadValue\(\$args\[0\]\), \$'.('glob' === $fn ? 'flags' : 'sort').'\);/s',
+        "\$".('glob' === $fn ? 'pattern' : 'path')." = \$this->jitString(\$context, \$args[0], '{$pathLabel}');\n\n        return JitFsGlob::{$fn}(\$context, \$".('glob' === $fn ? 'pattern' : 'path').", \$".('glob' === $fn ? 'flags' : 'sort').');',
+        $text,
+        1
+    );
+    file_put_contents($path, $text);
+}
+
+$cPath = $root.'/lib/AOT/runtime/phpc_fs_dir.c';
+$c = file_get_contents($cPath);
+if (!str_contains($c, '__phpc_glob_vec')) {
+    $insert = file_get_contents($root.'/script/apply-1153-phpc_fs_dir_snippet.c');
+    $c = str_replace('__hashtable__ *__phpc_glob(__string__ *pattern, int flags)', $insert.'__hashtable__ *__phpc_glob(__string__ *pattern, int flags)', $c);
+    file_put_contents($cPath, $c);
+}
+
+$tPath = $root.'/lib/JIT/Builtin/Type.php';
+$t = file_get_contents($tPath);
+if (!str_contains($t, '__phpc_glob_vec')) {
+    $t = str_replace(
+        "\$htPtr = \$this->context->getTypeFromString('__hashtable__*');\n",
+        "\$htPtr = \$this->context->getTypeFromString('__hashtable__*');\n        \$i8ppPtr = \$this->context->getTypeFromString('int8**');\n",
+        $t
+    );
+    $t = str_replace(
+        '        $fnGlob = $this->context->module->addFunction(',
+        <<<'PHP'
+        $fnGlobVec = $this->context->module->addFunction(
+            '__phpc_glob_vec',
+            $this->context->context->functionType($i32, false, $strPtr, $i32, $i8ppPtr)
+        );
+        $this->context->registerFunction('__phpc_glob_vec', $fnGlobVec);
+        $fnScandirVec = $this->context->module->addFunction(
+            '__phpc_scandir_vec',
+            $this->context->context->functionType($i32, false, $strPtr, $i32, $i8ppPtr)
+        );
+        $this->context->registerFunction('__phpc_scandir_vec', $fnScandirVec);
+        $fnStrvecFree = $this->context->module->addFunction(
+            '__phpc_strvec_free',
+            $this->context->context->functionType($void, false, $i8ppPtr, $i32)
+        );
+        $this->context->registerFunction('__phpc_strvec_free', $fnStrvecFree);
+        $fnGlob = $this->context->module->addFunction(
+PHP,
+        $t
+    );
+    file_put_contents($tPath, $t);
+}
+
+$pPath = $root.'/lib/JIT/SelfHostBuiltinPolicy.php';
+$p = file_get_contents($pPath);
+if (!str_contains($p, "'glob' => 'filesystem'")) {
+    $p = str_replace(
+        "'realpath' => 'filesystem',",
+        "'realpath' => 'filesystem',\n        'glob' => 'filesystem', 'scandir' => 'filesystem',",
+        $p
+    );
+    file_put_contents($pPath, $p);
+}
+
+echo "applied\n";
