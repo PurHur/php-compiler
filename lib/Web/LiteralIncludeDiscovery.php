@@ -102,7 +102,7 @@ final class LiteralIncludeDiscovery
      * Method and nested-function includes are JIT-inlined; bundling them prepends template
      * bodies at file scope and strips the include line, breaking caller-local inheritance.
      *
-     * @return list<string> relative or absolute literal path strings from CFG
+     * @return list<string>
      */
     private static function pathsFromMainScopeForBundle(Script $script, string $fromFile): array
     {
@@ -116,7 +116,7 @@ final class LiteralIncludeDiscovery
     }
 
     /**
-     * @return list<string> relative or absolute literal path strings from CFG
+     * @return list<string>
      */
     private static function pathsFromScript(Script $script, string $fromFile): array
     {

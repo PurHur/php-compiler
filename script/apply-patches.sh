@@ -22,6 +22,10 @@ patch_already_applied() {
     php-types-nullable-return.patch)
       grep -q 'CfgType\\Nullable' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
       ;;
+    php-types-nullable-optype-return.patch)
+      grep -A2 'instanceof Op\\Type\\Nullable' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null \
+        | grep -q 'return (new Type(Type::TYPE_UNION'
+      ;;
     php-types-fromvalue-null.patch)
       grep -q 'is_null($value)' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
       ;;
@@ -145,6 +149,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-mixed-reserved.patch"
   apply_patch "$PATCH_DIR/php-types-nullsafe.patch"
   apply_patch "$PATCH_DIR/php-types-nullable-return.patch"
+  apply_patch "$PATCH_DIR/php-types-nullable-optype-return.patch"
   apply_patch "$PATCH_DIR/php-types-fromvalue-null.patch"
   apply_patch "$PATCH_DIR/php-types-doc-comment-string.patch"
   apply_patch "$PATCH_DIR/php-types-array-shape.patch"

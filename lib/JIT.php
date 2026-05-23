@@ -1873,6 +1873,15 @@ class JIT {
         if ($cfgFunc->returnType instanceof Op\Type\Void_) {
             return 'void';
         }
+        if ($cfgFunc->returnType instanceof Op\Type\Nullable) {
+            $rawReturn = $this->rawTypeFromCfgReturn($cfgFunc->returnType->subtype);
+            if (null !== $rawReturn) {
+                $callback = $this->callbackTypeFromPhptype($rawReturn);
+                if (null !== $callback) {
+                    return $callback;
+                }
+            }
+        }
         $rawReturn = $this->rawTypeFromCfgReturn($cfgFunc->returnType);
         if (null !== $rawReturn) {
             $callback = $this->callbackTypeFromPhptype($rawReturn);

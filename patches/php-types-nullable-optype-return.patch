@@ -1,0 +1,12 @@
+--- vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
+@@ -757,7 +757,7 @@
+         if ($type instanceof Op\Type\Mixed_) {
+             return Type::mixed();
+         }
+         if ($type instanceof Op\Type\Nullable) {
+-            (new Type(Type::TYPE_UNION, [
++            return (new Type(Type::TYPE_UNION, [
+                 $this->resolveOpType($type->subtype),
+                 new Type(Type::TYPE_NULL),
+             ]))->simplify();
