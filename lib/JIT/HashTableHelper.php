@@ -45,12 +45,15 @@ final class HashTableHelper
             return $container;
         }
 
-        return new Variable(
+        $detached = new Variable(
             $context,
             Variable::TYPE_HASHTABLE,
             Variable::KIND_VALUE,
             $context->helper->loadValue($container)
         );
+        $detached->superglobalName = $container->superglobalName;
+
+        return $detached;
     }
 
     /**
