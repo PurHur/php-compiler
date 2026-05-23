@@ -238,6 +238,18 @@ class String_ extends Type {
             $fn___ucwords->addAttributeAtIndex(\PHPLLVM\Attribute::INDEX_FUNCTION, $this->context->attributes['alwaysinline']);
             $this->context->registerFunction('__string__ucwords', $fn___ucwords);
 
+        $fntype___wordwrap = $this->context->context->functionType(
+                $this->context->getTypeFromString('__string__*'),
+                false,
+                $this->context->getTypeFromString('__string__*'),
+                $this->context->getTypeFromString('int64'),
+                $this->context->getTypeFromString('__string__*'),
+                $this->context->getTypeFromString('int8')
+            );
+            $fn___wordwrap = $this->context->module->addFunction('__string__wordwrap', $fntype___wordwrap);
+            $fn___wordwrap->addAttributeAtIndex(\PHPLLVM\Attribute::INDEX_FUNCTION, $this->context->attributes['alwaysinline']);
+            $this->context->registerFunction('__string__wordwrap', $fn___wordwrap);
+
         $this->pointer = $this->context->getTypeFromString('__string__*');
     }
 
@@ -257,6 +269,7 @@ class String_ extends Type {
         \PHPCompiler\JIT\Builtin\StringUrldecode::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringNl2br::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringUcwords::implement($this->context);
+        \PHPCompiler\JIT\Builtin\StringWordwrap::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringRandomBytes::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringJsonEncode::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringGetenv::implement($this->context);

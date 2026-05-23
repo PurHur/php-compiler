@@ -145,6 +145,106 @@ final class VmString
         return $out;
     }
 
+    /** wordwrap() — wrap string to width at spaces (PHP semantics; byte-oriented subset). */
+    public static function wordwrap(string $text, int $width = 75, string $break = "\n", bool $cut = false): string
+    {
+        $len = self::byteLength($text);
+        if (0 === $len) {
+            return '';
+        }
+        $breakLen = self::byteLength($break);
+        if (0 === $breakLen) {
+            throw new \ValueError('wordwrap(): Argument #3 ($break) must be a non-empty string');
+        }
+        if (0 === $width && $cut) {
+            throw new \ValueError('wordwrap(): Argument #4 ($cut) cannot be true when argument #2 ($width) is 0');
+        }
+
+        if (1 === $breakLen && !$cut) {
+            $breakByte = $break[0];
+            $out = $text;
+            $laststart = 0;
+            $lastspace = 0;
+            for ($current = 0; $current < $len; ++$current) {
+                $ch = $text[$current];
+                if ($ch === $breakByte) {
+                    $laststart = $lastspace = $current + 1;
+                } elseif (' ' === $ch) {
+                    if ($current - $laststart >= $width) {
+                        $out = self::byteReplaceAt($out, $current, $breakByte);
+                        $laststart = $current + 1;
+                    }
+                    $lastspace = $current;
+                } elseif ($current - $laststart >= $width && $laststart !== $lastspace) {
+                    $out = self::byteReplaceAt($out, $lastspace, $breakByte);
+                    $laststart = $lastspace + 1;
+                }
+            }
+
+            return $out;
+        }
+
+        $pieces = [];
+        $newtextlen = 0;
+        $laststart = 0;
+        $lastspace = 0;
+        for ($current = 0; $current < $len; ++$current) {
+            if ($text[$current] === $break[0]
+                && $current + $breakLen < $len
+                && 0 === self::byteCompareN($text, $current, $break, 0, $breakLen)) {
+                $pieces[] = self::byteSlice($text, $laststart, $current - $laststart + $breakLen);
+                $newtextlen += $current - $laststart + $breakLen;
+                $current += $breakLen - 1;
+                $laststart = $lastspace = $current + 1;
+            } elseif (' ' === $text[$current]) {
+                if ($current - $laststart >= $width) {
+                    $pieces[] = self::byteSlice($text, $laststart, $current - $laststart);
+                    $pieces[] = $break;
+                    $newtextlen += $current - $laststart + $breakLen;
+                    $laststart = $current + 1;
+                }
+                $lastspace = $current;
+            } elseif ($current - $laststart >= $width && $cut && $laststart >= $lastspace) {
+                $pieces[] = self::byteSlice($text, $laststart, $current - $laststart);
+                $pieces[] = $break;
+                $newtextlen += $current - $laststart + $breakLen;
+                $laststart = $lastspace = $current;
+            } elseif ($current - $laststart >= $width && $laststart < $lastspace) {
+                $pieces[] = self::byteSlice($text, $laststart, $lastspace - $laststart);
+                $pieces[] = $break;
+                $newtextlen += $lastspace - $laststart + $breakLen;
+                $laststart = $lastspace = $lastspace + 1;
+            }
+        }
+        if ($laststart !== $current) {
+            $pieces[] = self::byteSlice($text, $laststart, $current - $laststart);
+        }
+
+        return \implode('', $pieces);
+    }
+
+    private static function byteReplaceAt(string $string, int $offset, string $byte): string
+    {
+        if ($offset < 0 || $offset >= self::byteLength($string)) {
+            return $string;
+        }
+        $prefix = 0 === $offset ? '' : self::byteSlice($string, 0, $offset);
+        $suffix = self::byteSlice($string, $offset + 1);
+
+        return $prefix . $byte . $suffix;
+    }
+
+    private static function byteCompareN(string $a, int $aOff, string $b, int $bOff, int $n): int
+    {
+        for ($i = 0; $i < $n; ++$i) {
+            if ($a[$aOff + $i] !== $b[$bOff + $i]) {
+                return 1;
+            }
+        }
+
+        return 0;
+    }
+
     public static function strcmp(string $a, string $b): int
     {
         $lenA = self::byteLength($a);
