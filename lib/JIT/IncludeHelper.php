@@ -89,6 +89,7 @@ final class IncludeHelper
         ++$context->inlineIncludeDepth;
         foreach ($localBindings as $operand) {
             $context->setVariableOp($operand, $localBindings[$operand]);
+            $jit->assignOperandForced($operand, $localBindings[$operand]);
         }
         try {
             $exitBb = $jit->compileIncludedAtEntry($func, $included, $entryBb);
@@ -228,6 +229,11 @@ final class IncludeHelper
     private static function callerOperandByName(Block $block, string $name): ?Operand
     {
         foreach ($block->scopedOperands() as $operand) {
+            if (OperandName::resolve($operand) === $name) {
+                return $operand;
+            }
+        }
+        foreach ($block->orig->hoistedOperands as $operand) {
             if (OperandName::resolve($operand) === $name) {
                 return $operand;
             }

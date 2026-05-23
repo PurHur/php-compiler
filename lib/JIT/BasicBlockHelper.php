@@ -70,9 +70,20 @@ final class BasicBlockHelper
         if (0 === $function->countBasicBlocks()) {
             return;
         }
+        $fnType = $function->typeOf();
+        $isVoid = $fnType instanceof \PHPLLVM\Type\Function_
+            && \PHPLLVM\Type::KIND_VOID === $fnType->getReturnType()->getKind();
         $block = $function->getFirstBasicBlock();
         while (null !== $block) {
             self::sealPhiMergeBlocks($context, $block);
+            if (null === $block->getTerminator()) {
+                $context->builder->positionAtEnd($block);
+                if ($isVoid) {
+                    $context->builder->returnVoid();
+                } else {
+                    self::sealOpenBlock($context, $block);
+                }
+            }
             $block = $block->getPrevious();
         }
     }

@@ -1062,15 +1062,13 @@ class JIT {
         }
 
         $tail = $builder->getInsertBlock();
-        $isEntryCfg = null !== $block->func
-            && $block->orig === $block->func->cfg
-            && !$block->syntheticCfgBranch;
         if (
             0 === $this->context->inlineIncludeDepth
-            && $isEntryCfg
+            && $this->isVoidCfgFunction($block)
+            && !$block->syntheticCfgBranch
+            && null !== $block->func
             && null !== $tail
             && null === $tail->getTerminator()
-            && $this->isVoidCfgFunction($block)
         ) {
             $builder->positionAtEnd($tail);
             $this->context->freeDeadVariables($func, $tail, $block);
