@@ -376,16 +376,33 @@ final class HashTableHelper
             $keyStr
         );
         $valueMap = $context->structFieldMap['__value__'];
+        $i8 = $context->getTypeFromString('int8');
+        $done = BasicBlockHelper::append($context, 'ht_sk_done_'.$tag);
+        $isNullPtr = $context->builder->icmp(
+            Builder::INT_EQ,
+            $valPtr,
+            $valPtr->typeOf()->constNull()
+        );
+        $nullBlock = BasicBlockHelper::append($context, 'ht_sk_null_'.$tag);
+        $checkType = BasicBlockHelper::append($context, 'ht_sk_check_type_'.$tag);
+        $context->builder->branchIf($isNullPtr, $nullBlock, $checkType);
+
+        $context->builder->positionAtEnd($nullBlock);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            $destPtr
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($checkType);
         $typeByte = $context->builder->load(
             $context->builder->structGep($valPtr, $valueMap['type'])
         );
-        $i8 = $context->getTypeFromString('int8');
 
         $stringBlock = BasicBlockHelper::append($context, 'ht_sk_string_'.$tag);
         $htBlock = BasicBlockHelper::append($context, 'ht_sk_ht_'.$tag);
         $checkHt = BasicBlockHelper::append($context, 'ht_sk_check_ht_'.$tag);
         $longBlock = BasicBlockHelper::append($context, 'ht_sk_long_'.$tag);
-        $done = BasicBlockHelper::append($context, 'ht_sk_done_'.$tag);
 
         $isString = $context->builder->icmp(
             Builder::INT_EQ,

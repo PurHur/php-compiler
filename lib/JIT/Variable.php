@@ -567,9 +567,6 @@ final class Variable {
 
                     $this->context->refcount->addref($ht);
                     $boxed = HashTableHelper::readStringKeyToValueBox($this->context, $ht, $key);
-                    if (null === $this->superglobalName) {
-                        $this->context->refcount->delref($ht);
-                    }
 
                     return $boxed;
                 }
