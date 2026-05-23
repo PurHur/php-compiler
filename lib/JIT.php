@@ -63,6 +63,7 @@ class JIT {
                 || $this->isSkippedCompilerHotPathName($name)
                 || $this->isSkippedWebBootstrapHotPathName($name)
                 || $this->isSkippedSelfHostEntryName($name)
+                || $this->isSkippedBootstrapInterpreterHotPathName($name)
             ) {
                 $this->compileBlock($func->block, $name);
 
@@ -105,6 +106,14 @@ class JIT {
         return 0 === $this->context->inlineIncludeDepth;
     }
 
+    /** Self-host compile probe sets PHP_COMPILER_JIT_PROGRESS_FILE (#816). */
+    private function shouldUseSelfHostJitStubs(): bool
+    {
+        $progress = getenv('PHP_COMPILER_JIT_PROGRESS_FILE');
+
+        return false !== $progress && '' !== $progress;
+    }
+
     private function compileBlock(Block $block, ?string $funcName = null): PHPLLVM\Value {
         $logicalName = $funcName;
         if (!is_null($funcName)) {
@@ -121,6 +130,7 @@ class JIT {
         if ($this->isSkippedCompilerHotPathName($logicalName ?? $internalName)
             || $this->isSkippedWebBootstrapHotPathName($logicalName ?? $internalName)
             || $this->isSkippedSelfHostEntryName($logicalName ?? $internalName)
+            || $this->isSkippedBootstrapInterpreterHotPathName($logicalName ?? $internalName)
         ) {
             return $this->compileSkippedCompilerSplitCfgStub($internalName, $block, $logicalName ?? $internalName);
         }
@@ -274,11 +284,27 @@ class JIT {
             || str_ends_with($lower, '::getframe');
     }
 
+    /** Stub bundled lib/ interpreter helpers for self-host AOT (#557, #816). */
+    private function isSkippedBootstrapInterpreterHotPathName(string $name): bool
+    {
+        if ($this->isSkippedSelfHostEntryName($name)) {
+            return false;
+        }
+        $lower = strtolower($name);
+
+        return str_contains($lower, '\\vm::')
+            || str_contains($lower, '\\block::')
+            || str_contains($lower, '\\frame::')
+            || str_contains($lower, '\\module::')
+            || str_contains($lower, '\\runtime::');
+    }
+
     private function isSkippedCompilerHotPathName(string $name): bool
     {
         $lower = strtolower($name);
 
         return str_contains($lower, 'splitcfgblockafterstringkeyedarray')
+            || str_contains($lower, '\\compiler::')
             || str_contains($lower, 'compilecfgbranch')
             || str_contains($lower, 'compilecfgblock')
             || str_contains($lower, 'compileblock')
@@ -314,12 +340,14 @@ class JIT {
             || str_contains($lower, 'inheritfuncfromparent')
             || str_contains($lower, 'isarraydim')
             || str_contains($lower, 'findcoalesce')
-            || str_contains($lower, 'resolvecoalesce')
-            || str_contains($lower, 'resolve');
+            || str_contains($lower, 'resolvecoalesce');
     }
 
     private function isSkippedSelfHostEntryName(string $name): bool
     {
+        if (!$this->shouldUseSelfHostJitStubs()) {
+            return false;
+        }
         $lower = strtolower($name);
         return str_ends_with($lower, '\\runtime::compilefunc')
             || str_ends_with($lower, '\\runtime::compile')
@@ -329,6 +357,9 @@ class JIT {
 
     private function isSkippedWebBootstrapHotPathName(string $name): bool
     {
+        if (!$this->shouldUseSelfHostJitStubs()) {
+            return false;
+        }
         $lower = strtolower($name);
         return str_contains($lower, 'conststringfolder')
             || str_contains($lower, 'includepathresolver')
@@ -1490,13 +1521,7 @@ class JIT {
                 return $retval;
             }
             if (Variable::TYPE_NULL === $return->type) {
-                $slot = JIT\JitValueBox::alloc($this->context);
-                $this->context->builder->call(
-                    $this->context->lookupFunction('__value__writeNull'),
-                    JIT\JitValueBox::pointer($this->context, $slot)
-                );
-
-                return $this->context->builder->load($slot);
+                return $this->loadNullValueStruct();
             }
             if (Variable::TYPE_STRING === $return->type) {
                 $slot = JIT\JitValueBox::alloc($this->context);
@@ -1512,6 +1537,51 @@ class JIT {
 
                 return $this->context->builder->load($slot);
             }
+            if (Variable::TYPE_OBJECT === $return->type) {
+                $slot = JIT\JitValueBox::alloc($this->context);
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__writeObject'),
+                    JIT\JitValueBox::pointer($this->context, $slot),
+                    $retval
+                );
+
+                return $this->context->builder->load($slot);
+            }
+            if (Variable::TYPE_HASHTABLE === $return->type) {
+                $slot = JIT\JitValueBox::alloc($this->context);
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__writeHashtable'),
+                    JIT\JitValueBox::pointer($this->context, $slot),
+                    $retval
+                );
+
+                return $this->context->builder->load($slot);
+            }
+            if (Variable::TYPE_NATIVE_LONG === $return->type || Variable::TYPE_NATIVE_BOOL === $return->type) {
+                $slot = JIT\JitValueBox::alloc($this->context);
+                $long = Variable::TYPE_NATIVE_BOOL === $return->type
+                    ? $this->context->builder->zExt($retval, $this->context->getTypeFromString('int64'))
+                    : $retval;
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__writeLong'),
+                    JIT\JitValueBox::pointer($this->context, $slot),
+                    $long
+                );
+
+                return $this->context->builder->load($slot);
+            }
+            if (Variable::TYPE_NATIVE_DOUBLE === $return->type) {
+                $slot = JIT\JitValueBox::alloc($this->context);
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__writeDouble'),
+                    JIT\JitValueBox::pointer($this->context, $slot),
+                    $retval
+                );
+
+                return $this->context->builder->load($slot);
+            }
+
+            return $this->loadNullValueStruct();
         }
         if (null === $expected || Variable::TYPE_VALUE !== $return->type) {
             if ('__string__*' === $expected && Variable::TYPE_VALUE === $return->type) {
@@ -1638,6 +1708,9 @@ class JIT {
                 $fnType = $func->typeOf();
                 if ($fnType instanceof \PHPLLVM\Type\Function_) {
                     $returnType = $fnType->getReturnType();
+                    if ($this->isValueStructLlvmType($returnType)) {
+                        return $this->loadNullValueStruct();
+                    }
                     if (\PHPLLVM\Type::KIND_POINTER === $returnType->getKind()) {
                         return $returnType->constNull();
                     }
@@ -1647,6 +1720,22 @@ class JIT {
                 }
                 return $this->context->constantFromInteger(0);
         }
+    }
+
+    private function loadNullValueStruct(): PHPLLVM\Value
+    {
+        $slot = JIT\JitValueBox::alloc($this->context);
+        $this->context->builder->call(
+            $this->context->lookupFunction('__value__writeNull'),
+            JIT\JitValueBox::pointer($this->context, $slot)
+        );
+
+        return $this->context->builder->load($slot);
+    }
+
+    private function isValueStructLlvmType(PHPLLVM\Type $type): bool
+    {
+        return $type->toString() === $this->context->getTypeFromString('__value__')->toString();
     }
 
     private function assignOperandsUsedByLiteralInclude(Block $block, OpCode $op): bool
