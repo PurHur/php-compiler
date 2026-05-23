@@ -397,43 +397,58 @@ class Compiler {
                 $block->addOpCode($finallyOp);
             }
         } elseif ($stmt instanceof Op\Stmt\Switch_) {
-            $canBeSwitch = true;
-            $type = null;
-            foreach ($stmt->cases as $case) {
-                if (!$case instanceof Operand\Literal) {
-                    $canBeSwitch = false;
-                    break;
-                }
-                if (is_null($type)) {
-                    $type = $case->type;
-                } elseif (!$type->equals($case->type)) {
-                    $canBeSwitch = false;
-                }
-            }
-            if ($canBeSwitch) {
-                $this->compileSwitchStmt($stmt, $block);
-            } else {
-                $this->compileSwitchToIfBlocks($stmt, $block);
-            }
+            $this->compileSwitchAsJumpIfChain($stmt, $block);
         } else {
             throw new \LogicException("Unknown Stmt Type: " . $stmt->getType());
         }
     }
 
-    protected function compileSwitchStmt(Op\Stmt\Switch_ $switch, Block $block): void {
-        $op = $this->compileOperand($switch->cond, $block, true);
-        foreach ($switch->cases as $key => $case) {
-            $caseOp = new OpCode(
-                OpCode::TYPE_CASE,
-                $op,
-                $this->compileOperand($case, $block, true)
-            );
-            $caseOp->block1 = $this->compileCfgBranch($switch->targets[$key], $block);
-            $block->addOpCode($caseOp);
+    /**
+     * Lower CFG switch to JUMPIF/EQUAL chain (JIT-safe; TYPE_CASE branchIf needs bool #96).
+     */
+    protected function compileSwitchAsJumpIfChain(Op\Stmt\Switch_ $switch, Block $block): void
+    {
+        $condSlot = $this->compileOperand($switch->cond, $block, true);
+        $caseCount = count($switch->cases);
+        if (0 === $caseCount) {
+            $defaultOp = new OpCode(OpCode::TYPE_JUMP);
+            $defaultOp->block1 = $this->compileCfgBranch($switch->default, $block);
+            $block->addOpCode($defaultOp);
+
+            return;
         }
-        $defaultOp = new OpCode(OpCode::TYPE_JUMP);
-        $defaultOp->block1 = $this->compileCfgBranch($switch->default, $block);
-        $block->addOpCode($defaultOp);
+
+        $current = $block;
+        for ($i = 0; $i < $caseCount; ++$i) {
+            $eqSlot = $this->compileBoolTemporary($current);
+            $current->addOpCode(new OpCode(
+                OpCode::TYPE_EQUAL,
+                $eqSlot,
+                $condSlot,
+                $this->compileOperand($switch->cases[$i], $current, true)
+            ));
+
+            $caseTarget = $this->compileCfgBranch($switch->targets[$i], $block);
+            $isLast = $i === $caseCount - 1;
+            if ($isLast) {
+                $elseTarget = $this->compileCfgBranch($switch->default, $block);
+            } else {
+                $elseTarget = new Block($block->orig);
+                $elseTarget->inheritUndefinedLocals = true;
+                $elseTarget->inheritScopeFrom($current);
+                $this->inheritFuncFromParent($elseTarget, $block);
+            }
+
+            $jump = new OpCode(OpCode::TYPE_JUMPIF, $eqSlot);
+            $jump->block1 = $caseTarget;
+            $jump->block2 = $elseTarget;
+            $current->addOpCode($jump);
+            $caseTarget->parents[] = $current;
+            $elseTarget->parents[] = $current;
+            if (!$isLast) {
+                $current = $elseTarget;
+            }
+        }
     }
 
     protected function getOpCodeTypeFromBinaryOp(Op\Expr\BinaryOp $expr): int {

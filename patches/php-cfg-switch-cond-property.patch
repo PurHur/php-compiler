@@ -1,0 +1,11 @@
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Switch_.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Switch_.php
+@@ -17,6 +17,8 @@
+ 
+ class Switch_ extends Stmt
+ {
++    public $cond;
++
+     public $target;
+ 
+     public $cases;
