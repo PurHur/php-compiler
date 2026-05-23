@@ -924,6 +924,13 @@ class JIT {
                     $builder->positionAtEnd($returnBlock);
                     $this->context->freeDeadVariables($func, $returnBlock, $block);
                     if ($this->context->inlineIncludeDepth > 0) {
+                        if ([] !== $this->context->inlineIncludeReturnOperands) {
+                            $holderOp = $this->context->inlineIncludeReturnOperands[
+                                array_key_last($this->context->inlineIncludeReturnOperands)
+                            ];
+                            $this->assignOperand($holderOp, $return, true);
+                        }
+
                         return $origBasicBlock;
                     }
                     if ($this->isVoidCfgFunction($block)) {
@@ -1274,6 +1281,14 @@ class JIT {
 
     public function assignIncludeResult(Operand $result): void
     {
+        if ([] !== $this->context->inlineIncludeReturnOperands) {
+            $holderOp = $this->context->inlineIncludeReturnOperands[
+                array_key_last($this->context->inlineIncludeReturnOperands)
+            ];
+            $this->assignOperand($result, $this->context->getVariableFromOp($holderOp), true);
+
+            return;
+        }
         $this->assignOperand(
             $result,
             new Variable(
