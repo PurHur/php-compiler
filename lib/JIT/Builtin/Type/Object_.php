@@ -23,6 +23,8 @@ use PHPLLVM;
 class Object_ extends Type {
     public PHPLLVM\Type $pointer;
     private array $classes = [];
+    /** @var array<int, string> class id => canonical name */
+    private array $classIdToName = [];
     private array $properties = [];
     private array $propNameMap = [];
     /** @var array<int, array<string, int>> class id => method lc => visibility flags */
@@ -379,7 +381,47 @@ class Object_ extends Type {
         $this->properties[$id] = [];
         $this->classConstants[$id] = [];
 
+        $this->classIdToName[$id] = $name->value;
+
         return $this->classes[strtolower($name->value)] = $id;
+    }
+
+    public function hasDeclaredClass(string $name): bool
+    {
+        return isset($this->classes[strtolower($name)]);
+    }
+
+    /** User-defined classes from DECLARE_CLASS (not JIT external stubs). */
+    public function hasUserDeclaredClass(string $name): bool
+    {
+        $lc = strtolower($name);
+        if (!isset($this->classes[$lc])) {
+            return false;
+        }
+
+        return isset($this->classIdToName[$this->classes[$lc]]);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function allClassNamesById(): array
+    {
+        return $this->classIdToName;
+    }
+
+    public function classNameForId(int $id): string
+    {
+        if (!isset($this->classIdToName[$id])) {
+            throw new \LogicException("Unknown class id {$id}");
+        }
+
+        return $this->classIdToName[$id];
+    }
+
+    public function hasMethod(int $classId, string $methodLc): bool
+    {
+        return isset($this->methodVisibility[$classId][strtolower($methodLc)]);
     }
 
     public function lookupOperand(Operand $name): int
