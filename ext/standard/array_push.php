@@ -56,7 +56,7 @@ final class array_push extends Internal
         $array = $args[0];
         $values = \array_slice($args, 1);
 
-        foreach ($args as $i => $arg) {
+        foreach ($values as $i => $arg) {
             if (JITVariable::TYPE_STRING === $arg->type || JITVariable::TYPE_VALUE === $arg->type) {
                 $this->jitString($context, $arg, 'array_push() argument #'.((int) $i + 1));
             }

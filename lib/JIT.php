@@ -2723,7 +2723,25 @@ class JIT {
         }
         if ('__value__*' === $valueTy && Variable::TYPE_VALUE === $dest->type) {
             $dest->free();
+            $isNullPtr = $this->context->builder->icmp(
+                PHPLLVM\Builder::INT_EQ,
+                $value,
+                $value->typeOf()->constNull()
+            );
+            $nullBlock = JIT\BasicBlockHelper::append($this->context, 'assign_value_null_ptr');
+            $copyBlock = JIT\BasicBlockHelper::append($this->context, 'assign_value_copy_ptr');
+            $doneBlock = JIT\BasicBlockHelper::append($this->context, 'assign_value_ptr_done');
+            $this->context->builder->branchIf($isNullPtr, $nullBlock, $copyBlock);
+            $this->context->builder->positionAtEnd($nullBlock);
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeNull'),
+                JIT\JitValueBox::pointer($this->context, $dest->value)
+            );
+            $this->context->builder->branch($doneBlock);
+            $this->context->builder->positionAtEnd($copyBlock);
             JIT\JitValueBox::copyFromPointer($this->context, $dest->value, $value);
+            $this->context->builder->branch($doneBlock);
+            $this->context->builder->positionAtEnd($doneBlock);
             $dest->addref();
 
             return;

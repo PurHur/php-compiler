@@ -26,15 +26,115 @@ final class HashTableHelper
      */
     public static function readHashtableFromValueBox(Context $context, Variable $container): Value
     {
-        if (Variable::TYPE_VALUE !== $container->type) {
+        if (Variable::TYPE_VALUE !== $container->type && !JitValueBox::isValueOperand($container)) {
             throw new \LogicException('readHashtableFromValueBox requires TYPE_VALUE');
         }
 
-        return $context->builder->call(
-            $context->lookupFunction('__value__readHashtable'),
-            JitValueBox::valuePtrFromVariable($context, $container)
-        );
+        return self::ensureHashtablePointer($context, $container);
     }
+
+    /** Materialize empty hashtables for null boxed arrays and object properties (#1086). */
+    public static function ensureHashtablePointer(Context $context, Variable $array): Value
+    {
+        if (null !== $array->objectPropertySlot && Variable::TYPE_VALUE === ($array->objectPropertyType ?? null)) {
+            $voidPtr = $context->getTypeFromString('void*');
+            $slot = $array->objectPropertySlot;
+            $loaded = $context->builder->load($slot);
+            $slotEmpty = $context->builder->icmp(
+                Builder::INT_EQ,
+                $loaded,
+                $voidPtr->constNull()
+            );
+            $initSlot = BasicBlockHelper::append($context, 'ht_ensure_prop_slot_init');
+            $useSlot = BasicBlockHelper::append($context, 'ht_ensure_prop_slot_use');
+            $done = BasicBlockHelper::append($context, 'ht_ensure_prop_slot_done');
+            $context->builder->branchIf($slotEmpty, $initSlot, $useSlot);
+
+            $context->builder->positionAtEnd($initSlot);
+            $newHt = self::alloc($context);
+            $emptyHt = new Variable(
+                $context,
+                Variable::TYPE_HASHTABLE,
+                Variable::KIND_VALUE,
+                $newHt
+            );
+            $context->type->object->propertyStore($slot, $emptyHt, Variable::TYPE_VALUE);
+            $context->builder->branch($done);
+
+            $context->builder->positionAtEnd($useSlot);
+            $valPtr = $context->builder->pointerCast(
+                $loaded,
+                $context->getTypeFromString('__value__*')
+            );
+            $existing = $context->builder->call(
+                $context->lookupFunction('__value__readHashtable'),
+                $valPtr
+            );
+            $needsInit = $context->builder->icmp(
+                Builder::INT_EQ,
+                $existing,
+                $existing->typeOf()->constNull()
+            );
+            $initBox = BasicBlockHelper::append($context, 'ht_ensure_prop_box_init');
+            $ready = BasicBlockHelper::append($context, 'ht_ensure_prop_box_ready');
+            $context->builder->branchIf($needsInit, $initBox, $ready);
+
+            $context->builder->positionAtEnd($initBox);
+            $boxHt = self::alloc($context);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeHashtable'),
+                $valPtr,
+                $boxHt
+            );
+            $context->builder->branch($done);
+
+            $context->builder->positionAtEnd($ready);
+            $context->builder->branch($done);
+
+            $context->builder->positionAtEnd($done);
+            $htPhi = $context->builder->phi($newHt->typeOf());
+            $htPhi->addIncoming($newHt, $initSlot);
+            $htPhi->addIncoming($boxHt, $initBox);
+            $htPhi->addIncoming($existing, $ready);
+
+            return $htPhi;
+        }
+
+        $valPtr = JitValueBox::valuePtrFromVariable($context, $array);
+        $ht = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $valPtr
+        );
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $ht,
+            $ht->typeOf()->constNull()
+        );
+        $init = BasicBlockHelper::append($context, 'ht_ensure_box_init');
+        $ready = BasicBlockHelper::append($context, 'ht_ensure_box_ready');
+        $done = BasicBlockHelper::append($context, 'ht_ensure_box_done');
+        $context->builder->branchIf($isNull, $init, $ready);
+
+        $context->builder->positionAtEnd($init);
+        $newHt = self::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            $valPtr,
+            $newHt
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($ready);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+        $result = $context->builder->phi($ht->typeOf());
+        $result->addIncoming($newHt, $init);
+        $result->addIncoming($ht, $ready);
+
+        return $result;
+    }
+
 
     /**
      * HashTable view without objectPropertySlot — isset()/dim on $this->props['k'] (#764).
@@ -59,18 +159,51 @@ final class HashTableHelper
     /**
      * Load a native {@see __hashtable__*} from a boxed or direct array variable (#107).
      */
+
+    /** Persist in-place hashtable mutations on native/boxed array operands (#1086). */
+    public static function storeHashtableInArrayVariable(Context $context, Variable $array, Value $ht): void
+    {
+        if (0 !== ($array->type & Variable::IS_NATIVE_ARRAY)) {
+            $boxed = new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, JitValueBox::alloc($context));
+            $context->builder->call(
+                $context->lookupFunction('__value__writeHashtable'),
+                JitValueBox::pointer($context, $boxed->value),
+                $ht
+            );
+            $array->type = Variable::TYPE_VALUE;
+            $array->kind = Variable::KIND_VARIABLE;
+            $array->value = $boxed->value;
+            $array->nextFreeElement = 0;
+
+            return;
+        }
+        if (Variable::TYPE_HASHTABLE === $array->type) {
+            return;
+        }
+        if (Variable::TYPE_VALUE === $array->type || JitValueBox::isValueOperand($array)) {
+            if (null !== $array->objectPropertySlot) {
+                $valPtr = $context->builder->pointerCast(
+                    $context->builder->load($array->objectPropertySlot),
+                    $context->getTypeFromString('__value__*')
+                );
+            } else {
+                $valPtr = JitValueBox::valuePtrFromVariable($context, $array);
+            }
+            $context->builder->call(
+                $context->lookupFunction('__value__writeHashtable'),
+                $valPtr,
+                $ht
+            );
+        }
+    }
+
     public static function loadHashtablePointer(Context $context, Variable $array): Value
     {
         if (Variable::TYPE_HASHTABLE === $array->type) {
             return $context->helper->loadValue($array);
         }
         if (Variable::TYPE_VALUE === $array->type || $array->valueBoxHashtable) {
-            $valPtr = JitValueBox::pointer($context, $array->value);
-
-            return $context->builder->call(
-                $context->lookupFunction('__value__readHashtable'),
-                $valPtr
-            );
+            return self::ensureHashtablePointer($context, $array);
         }
 
         throw new \LogicException(
