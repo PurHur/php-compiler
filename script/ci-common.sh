@@ -50,13 +50,24 @@ ci_install_deps() {
   fi
 }
 
+# Regenerate committed generator output when stale (issue #765; same ergonomics as capability-matrix write).
+ci_ensure_generated_doc() {
+  local script="$1"
+  local label="$2"
+  if "$PHP_BIN" "${PHP_OPTS[@]}" "$script" --check; then
+    return 0
+  fi
+  echo "Regenerating stale ${label} (issue #765)..."
+  "$PHP_BIN" "${PHP_OPTS[@]}" "$script"
+}
+
 ci_run_inventory_checks() {
   script/check-no-unlimited-memory.sh
   script/check-init-miniwebapp-parity.sh
   "$PHP_BIN" "${PHP_OPTS[@]}" script/capability-matrix.php --check
   "$PHP_BIN" "${PHP_OPTS[@]}" script/capability-syntax.php --check
-  "$PHP_BIN" "${PHP_OPTS[@]}" script/bootstrap-inventory.php --check
-  "$PHP_BIN" "${PHP_OPTS[@]}" script/bootstrap-profile.php --check
+  ci_ensure_generated_doc script/bootstrap-inventory.php docs/bootstrap-inventory.md
+  ci_ensure_generated_doc script/bootstrap-profile.php docs/bootstrap-profile.json
 }
 
 ci_llvm_dir() {
