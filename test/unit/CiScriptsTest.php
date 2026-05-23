@@ -177,13 +177,16 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('deploy-smoke.sh', $common);
         $this->assertStringContainsString('--example 001', $common);
         $this->assertStringContainsString('--example 002', $common);
-        $this->assertStringNotContainsString('--example 003', $common);
+        $this->assertStringContainsString('DEPLOY_SMOKE_003_EXECUTE', $common);
+        $this->assertStringContainsString('MINIWEBAPP_AOT_EXECUTE_GATE', $common);
+        $this->assertStringContainsString('--example 003', $common);
     }
 
     public function testCiDefaultsEnvDefinesDeploySmokeGateOn(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
         $this->assertStringContainsString('DEPLOY_SMOKE_GATE="${DEPLOY_SMOKE_GATE:-1}"', $defaults);
+        $this->assertStringContainsString('DEPLOY_SMOKE_003_EXECUTE="${DEPLOY_SMOKE_003_EXECUTE:-0}"', $defaults);
     }
 
     public function testCiFastDoesNotRunDeploySmokeGate(): void

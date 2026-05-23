@@ -272,6 +272,9 @@ ci_run_deploy_smoke() {
   echo "deploy-smoke: phpc deploy + PHPC_DEPLOY_ROOT (DEPLOY_SMOKE_GATE=1 default, #718, #737)..."
   "$_CI_SCRIPT_DIR/deploy-smoke.sh" --example 001
   "$_CI_SCRIPT_DIR/deploy-smoke.sh" --example 002
+  if [[ "${DEPLOY_SMOKE_003_EXECUTE:-0}" == "1" || "${MINIWEBAPP_AOT_EXECUTE_GATE:-0}" == "1" ]]; then
+    "$_CI_SCRIPT_DIR/deploy-smoke.sh" --example 003
+  fi
 }
 
 # @group aot-link PHPUnit (link-only; execute is ci_run_miniwebapp_aot_execute — #775).
