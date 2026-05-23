@@ -79,6 +79,22 @@ class Context {
                 $var = new Variable(Variable::TYPE_INTEGER);
                 $var->int(\PHPCompiler\ext\standard\VmFilter::INPUT_POST);
                 return $var;
+            case 'e_user_error':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(ErrorReporter::E_USER_ERROR);
+                return $var;
+            case 'e_user_warning':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(ErrorReporter::E_USER_WARNING);
+                return $var;
+            case 'e_user_notice':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(ErrorReporter::E_USER_NOTICE);
+                return $var;
+            case 'e_user_deprecated':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(ErrorReporter::E_USER_DEPRECATED);
+                return $var;
         }
         if (isset($this->constants[$name])) {
             return $this->constants[$name];

@@ -278,6 +278,18 @@ class Type extends Builtin {
             $fntypeUndefKeyLong
         );
         $this->context->registerFunction('__compiler_undefined_array_key_warning_long', $fnUndefKeyLong);
+        $fntypeTriggerError = $this->context->context->functionType(
+            $void,
+            false,
+            $i8p,
+            $sizeT,
+            $i32
+        );
+        $fnTriggerError = $this->context->module->addFunction(
+            '__phpc_trigger_error_cstr',
+            $fntypeTriggerError
+        );
+        $this->context->registerFunction('__phpc_trigger_error_cstr', $fnTriggerError);
         $i8p = $this->context->getTypeFromString('int8*');
         $i64p = $this->context->getTypeFromString('int64*');
         $libcFns = [

@@ -2165,6 +2165,40 @@ void __compiler_undefined_array_key_warning_long(long long key)
     fprintf(stderr, "Warning: Undefined array key %lld\n", key);
 }
 
+static const char *__phpc_trigger_error_prefix(int type)
+{
+    switch (type) {
+    case 256:
+        return "Fatal error: ";
+    case 512:
+        return "User warning: ";
+    case 1024:
+        return "User notice: ";
+    case 16384:
+        return "User deprecated: ";
+    default:
+        return NULL;
+    }
+}
+
+/*
+ * trigger_error() for JIT/AOT (issue #1221). Respects no global error_reporting mask yet;
+ * emits Zend-style user error lines to stderr when the type is recognized.
+ */
+void __phpc_trigger_error_cstr(const char *msg, size_t len, int type)
+{
+    const char *prefix;
+
+    if (!msg) {
+        return;
+    }
+    prefix = __phpc_trigger_error_prefix(type);
+    if (!prefix) {
+        return;
+    }
+    fprintf(stderr, "%s%.*s\n", prefix, (int) len, msg);
+}
+
 /*
  * Pending response headers for header_list() / header_remove() JIT/AOT (#311).
  * Mirrors PHPCompiler\Web\ResponseContext (insertion order, case-insensitive names).
