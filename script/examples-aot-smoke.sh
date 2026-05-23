@@ -141,12 +141,8 @@ smoke_003_miniwebapp() {
   local out stderr_file run_code
   stderr_file="$(mktemp "${SMOKE_ROOT}/003.XXXXXX")"
   set +e
-  out="$(env \
-    QUERY_STRING='route=home' \
-    SCRIPT_NAME='/index.php' \
-    REQUEST_URI='/index.php?route=home' \
-    REQUEST_METHOD='GET' \
-    "$binary" 2>"$stderr_file")"
+  eval "$( "${ROOT}/script/miniwebapp-cgi-env.php" --export shellQueryRouteHome )"
+  out="$("$binary" 2>"$stderr_file")"
   run_code=$?
   set -e
   local stderr

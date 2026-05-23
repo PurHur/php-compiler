@@ -34,38 +34,25 @@ final class MiniWebAppVmCliTest extends TestCase
 
     public function testQueryRouteHomeShowsAppName(): void
     {
-        $out = $this->runIndex([
-            'REQUEST_METHOD' => 'GET',
-            'QUERY_STRING' => 'route=home',
-        ]);
-        $this->assertStringContainsString('MiniWebApp', $out);
+        $out = $this->runIndex(MiniWebAppCgiEnv::queryRouteHome());
+        $this->assertStringContainsString(MiniWebAppCgiEnv::APP_NAME, $out);
     }
 
     public function testQueryRouteHelloWithName(): void
     {
-        $out = $this->runIndex([
-            'REQUEST_METHOD' => 'GET',
-            'QUERY_STRING' => 'route=hello&name=Dev',
-        ]);
+        $out = $this->runIndex(MiniWebAppCgiEnv::queryRouteHello());
         $this->assertStringContainsString('Hello Dev', $out);
     }
 
     public function testPostQueryRouteContactThankYou(): void
     {
-        $out = $this->runIndex([
-            'REQUEST_METHOD' => 'POST',
-            'QUERY_STRING' => 'route=contact',
-            'REQUEST_BODY' => 'name=PostDev',
-        ]);
+        $out = $this->runIndex(MiniWebAppCgiEnv::postQueryRouteContact());
         $this->assertStringContainsString('Thank you, PostDev', $out);
     }
 
     public function testQueryRouteApiStatusJson(): void
     {
-        $out = $this->runIndex([
-            'REQUEST_METHOD' => 'GET',
-            'QUERY_STRING' => 'route=api/status',
-        ]);
+        $out = $this->runIndex(MiniWebAppCgiEnv::queryRouteApiStatus());
         $this->assertStringContainsString('"ok":true', $out);
         $this->assertStringContainsString('003-MiniWebApp', $out);
     }
