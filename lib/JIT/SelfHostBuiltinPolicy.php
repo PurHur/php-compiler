@@ -58,6 +58,7 @@ final class SelfHostBuiltinPolicy
         'is_writable' => 'filesystem', 'file_get_contents' => 'filesystem', 'file_put_contents' => 'filesystem',
         'mkdir' => 'filesystem', 'unlink' => 'filesystem', 'rmdir' => 'filesystem', 'realpath' => 'filesystem',
         'fopen' => 'filesystem', 'fread' => 'filesystem', 'fclose' => 'filesystem',
+        'getenv' => 'filesystem', 'putenv' => 'filesystem',
     ];
 
     /** @var array<string, string> */
@@ -76,7 +77,7 @@ final class SelfHostBuiltinPolicy
     private const CATEGORY_ARRAY = [
         'array_merge' => 'array', 'array_keys' => 'array', 'array_values' => 'array',
         'in_array' => 'array', 'array_search' => 'array', 'array_fill' => 'array', 'array_slice' => 'array',
-        'array_key_exists' => 'array', 'array_map' => 'array',
+        'array_key_exists' => 'array', 'array_map' => 'array', 'array_count' => 'array',
         'array_push' => 'array', 'array_pop' => 'array', 'array_shift' => 'array', 'array_unshift' => 'array',
         'array_reverse' => 'array', 'array_filter' => 'array', 'array_combine' => 'array', 'array_flip' => 'array',
         'array_product' => 'array', 'array_unique' => 'array', 'array_sum' => 'array', 'sort' => 'array',
@@ -97,22 +98,13 @@ final class SelfHostBuiltinPolicy
 
     /** @var list<string> */
     public const AUTO_STUB_BATCH = [
-        'abs', 'addslashes', 'array_combine', 'array_count', 'array_fill', 'array_filter', 'array_flip', 'crc32',
-        'array_key_exists', 'array_keys', 'array_map', 'array_merge', 'array_pop', 'array_product',
-        'array_push', 'array_reverse', 'array_search', 'array_shift', 'array_unshift', 'array_slice', 'array_sum',
-        'array_unique', 'array_values', 'bin2hex', 'bindec', 'boolval', 'ceil', 'chr', 'chunk_split',
-        'compact', 'copy', 'cos',
+        'abs', 'addslashes', 'bin2hex', 'bindec', 'boolval', 'ceil', 'chr', 'chunk_split', 'copy', 'cos',
     ];
 
     /** @var array<string, true> */
     private const AUTO_STUB_LOOKUP = [
-        'abs' => true, 'addslashes' => true, 'array_combine' => true, 'array_count' => true, 'crc32' => true,
-        'array_fill' => true, 'array_filter' => true, 'array_flip' => true, 'array_key_exists' => true,
-        'array_keys' => true, 'array_map' => true, 'array_merge' => true, 'array_pop' => true,
-        'array_product' => true, 'array_push' => true, 'array_reverse' => true, 'array_search' => true,
-        'array_shift' => true, 'array_unshift' => true, 'array_slice' => true, 'array_sum' => true, 'array_unique' => true,
-        'array_values' => true, 'bin2hex' => true, 'bindec' => true, 'boolval' => true, 'ceil' => true,
-        'chr' => true, 'chunk_split' => true, 'compact' => true, 'copy' => true, 'cos' => true,
+        'abs' => true, 'addslashes' => true, 'bin2hex' => true, 'bindec' => true, 'boolval' => true,
+        'ceil' => true, 'chr' => true, 'chunk_split' => true, 'copy' => true, 'cos' => true,
     ];
 
     public static function isSelfHostAot(): bool

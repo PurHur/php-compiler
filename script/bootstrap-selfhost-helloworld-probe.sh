@@ -68,7 +68,7 @@ fi
 
 if [[ "${M3_NATIVE_COMPILE}" -eq 0 ]]; then
   echo "bootstrap-selfhost-helloworld-probe: native compile via selfhost bundle blocked (M3 partial)" >&2
-  echo "bootstrap-selfhost-helloworld-probe: NEXT_LOWER: native compile driver link/runtime (parseAndCompile nested emit)" >&2
+  echo "bootstrap-selfhost-helloworld-probe: NEXT_LOWER: native compile driver link/runtime (parseAndCompile nested emit; getenv/putenv real)" >&2
   if [[ "${BOOTSTRAP_M3_HELLOWORLD_STRICT:-0}" == "1" ]]; then
     echo "bootstrap-selfhost-helloworld-probe: BOOTSTRAP_M3_HELLOWORLD_STRICT=1 — failing (no Zend fallback)" >&2
     exit 1
