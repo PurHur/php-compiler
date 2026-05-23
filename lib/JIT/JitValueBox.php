@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPLLVM\Builder;
+use PHPLLVM\Type as LlvmType;
 use PHPLLVM\Value;
 
 final class JitValueBox
@@ -76,7 +77,11 @@ final class JitValueBox
 
             return self::pointer($context, $var->value);
         }
-        if ('__value__*' === $context->getStringFromType($var->value->typeOf())) {
+        $valueTy = $var->value->typeOf();
+        if (
+            LlvmType::KIND_POINTER === $valueTy->getKind()
+            || '__value__*' === $context->getStringFromType($valueTy)
+        ) {
             return $var->value;
         }
         $slot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__'));

@@ -2034,21 +2034,40 @@ class JIT {
             if ($value->type & Variable::IS_NATIVE_ARRAY || Variable::TYPE_HASHTABLE === $value->type) {
                 $result->nextFreeElement = $value->nextFreeElement;
             }
-            $toStore = $this->context->helper->loadValue($value);
             if (Variable::TYPE_VALUE === $value->type) {
-                $destTy = $this->context->getStringFromType($result->value->typeOf());
-                $srcTy = $this->context->getStringFromType($toStore->typeOf());
-                if ('__value__*' === $destTy && '__value__' === $srcTy) {
-                    $slot = JIT\BasicBlockHelper::entryAlloca(
-                        $this->context,
-                        $this->context->getTypeFromString('__value__')
-                    );
-                    $this->context->builder->store($toStore, $slot);
-                    $toStore = JIT\JitValueBox::pointer($this->context, $slot);
-                } elseif ('__value__*' === $srcTy && '__value__' === $destTy) {
-                    $toStore = $this->context->builder->load($toStore);
+                $destLlvm = $result->value->typeOf();
+                $destTy = $this->context->getStringFromType($destLlvm);
+                if ('__value__' === $destTy || '__value__*' === $destTy) {
+                    $destPointsAtStruct = '__value__' === $destTy;
+                    if (
+                        '__value__*' === $destTy
+                        && \PHPLLVM\Type::KIND_POINTER === $destLlvm->getKind()
+                        && '__value__' === $this->context->getStringFromType($destLlvm->getElementType())
+                    ) {
+                        $destPointsAtStruct = true;
+                    }
+                    if ($destPointsAtStruct) {
+                        JIT\JitValueBox::copyFromPointer(
+                            $this->context,
+                            $result->value,
+                            $this->valueBoxPointer($value)
+                        );
+                    } else {
+                        $this->context->builder->store(
+                            $this->valueBoxPointer($value),
+                            $result->value
+                        );
+                    }
+                    $this->copyObjectPropertyBacking($result, $value);
+                    if (null === $result->objectPropertySlot) {
+                        $result->addref();
+                    }
+                    $this->copyValueBoxJitFlags($result, $value);
+
+                    return;
                 }
             }
+            $toStore = $this->context->helper->loadValue($value);
             $this->context->builder->store(
                 $toStore,
                 $result->value
@@ -2165,7 +2184,7 @@ class JIT {
                     JIT\JitValueBox::copyFromPointer(
                         $this->context,
                         $valueRef,
-                        $this->context->helper->loadValue($value)
+                        $this->valueBoxPointer($value)
                     );
                     $this->copyValueBoxJitFlags($result, $value);
 
@@ -2303,6 +2322,27 @@ class JIT {
         );
         if ($source->type === $dest->type) {
             $dest->free();
+            if (Variable::TYPE_VALUE === $dest->type && '__value__' === $destTy) {
+                JIT\JitValueBox::copyFromPointer(
+                    $this->context,
+                    $dest->value,
+                    '__value__*' === $valueTy ? $value : $this->valueBoxPointer($source)
+                );
+                $dest->addref();
+                $this->copyValueBoxJitFlags($dest, $source);
+
+                return;
+            }
+            if (Variable::TYPE_VALUE === $dest->type && '__value__*' === $destTy) {
+                $ptr = '__value__*' === $valueTy
+                    ? $value
+                    : $this->valueBoxPointer($source);
+                $this->context->builder->store($ptr, $dest->value);
+                $dest->addref();
+                $this->copyValueBoxJitFlags($dest, $source);
+
+                return;
+            }
             $toStore = $value;
             if ('__value__*' === $valueTy && '__value__' === $destTy) {
                 $toStore = $this->context->builder->load($value);
