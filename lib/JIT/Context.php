@@ -415,9 +415,27 @@ class Context {
         throw new \LogicException("Unknown bool cast from type: " . $this->getStringFromType($type));
     }
 
+    public function unwrapNullableUnionType(Type $type): Type
+    {
+        if (Type::TYPE_UNION === $type->type && [] !== ($type->subTypes ?? [])) {
+            $nonNull = [];
+            foreach ($type->subTypes as $sub) {
+                if (Type::TYPE_NULL !== $sub->type) {
+                    $nonNull[] = $sub;
+                }
+            }
+            if (1 === count($nonNull)) {
+                return $this->unwrapNullableUnionType($nonNull[0]);
+            }
+        }
+        return $type;
+    }
+
     public function getTypeFromType(Type $type): PHPLLVM\Type {
+        $type = $this->unwrapNullableUnionType($type);
         static $map = [
             Type::TYPE_LONG => 'long long',
+            Type::TYPE_BOOLEAN => 'bool',
             Type::TYPE_STRING => '__string__*',
             Type::TYPE_OBJECT => '__object__*',
             Type::TYPE_ARRAY => '__hashtable__*',
