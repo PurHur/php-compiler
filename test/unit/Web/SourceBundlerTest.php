@@ -44,6 +44,19 @@ final class SourceBundlerTest extends TestCase
         }
     }
 
+    public function testMethodLevelLiteralIncludeIsNotBundled(): void
+    {
+        $entry = realpath(dirname(__DIR__, 2).'/fixtures/aot/cases/method_include_void/entry.php');
+        $this->assertNotFalse($entry);
+        $runtime = new \PHPCompiler\Runtime(\PHPCompiler\Runtime::MODE_AOT);
+        $includes = \PHPCompiler\Web\LiteralIncludeDiscovery::discoverDirectAbsolutePaths($runtime, $entry);
+        $this->assertSame([], $includes, 'template includes inside methods must stay JIT-inlined, not prepended at file scope');
+
+        [$bundled] = SourceBundler::bundleForAot($entry, $includes, null);
+        $this->assertStringNotContainsString("echo \$title", $bundled);
+        $this->assertStringContainsString("include __DIR__", $bundled);
+    }
+
     public function testBundleMiniWebAppPreservesDeployPathIncludes(): void
     {
         $entry = realpath(dirname(__DIR__, 3).'/examples/003-MiniWebApp/public/index.php');
