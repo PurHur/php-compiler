@@ -42,6 +42,7 @@ _None — all JIT `call()` builtins are lowered or deferred._
 - `array_reverse` — `ext/standard/array_reverse.php`
 - `array_search` — `ext/standard/array_search.php`
 - `array_shift` — `ext/standard/array_shift.php`
+- `array_unshift` — `ext/standard/array_unshift.php`
 - `array_slice` — `ext/standard/array_slice.php`
 - `array_sum` — `ext/standard/array_sum.php`
 - `array_unique` — `ext/standard/array_unique.php`
