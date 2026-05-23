@@ -103,7 +103,7 @@ final class SelfHostBuiltinPolicy
     private const CATEGORY_FILTER = ['filter_var' => 'filter', 'filter_input' => 'filter'];
 
     /** @var array<string, string> */
-    private const CATEGORY_JSON = ['json_encode' => 'json'];
+    private const CATEGORY_JSON = ['json_encode' => 'json', 'json_decode' => 'json'];
 
     /** @var list<string> */
     public const AUTO_STUB_BATCH = [
