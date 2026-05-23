@@ -210,3 +210,51 @@ __string__ *__compiler_fgetc(int64_t handle)
 
     return __string__init(1, buf);
 }
+
+__string__ *__compiler_fgets(int64_t handle, int64_t length)
+{
+    FILE *fp;
+    char *buf;
+    size_t buf_size;
+    char *line;
+
+    fp = phpc_resolve_stream(handle);
+    if (NULL == fp) {
+        return NULL;
+    }
+    if (0 == length) {
+        return NULL;
+    }
+    if (length < 0) {
+        buf_size = 8192;
+    } else {
+        buf_size = (size_t) length;
+    }
+    buf = (char *) malloc(buf_size);
+    if (NULL == buf) {
+        return NULL;
+    }
+    line = fgets(buf, (int) buf_size, fp);
+    if (NULL == line) {
+        free(buf);
+
+        return NULL;
+    }
+    {
+        __string__ *result = __string__init((long long) strlen(buf), buf);
+        free(buf);
+
+        return result;
+    }
+}
+
+int64_t __compiler_fseek(int64_t handle, int64_t offset, int64_t whence)
+{
+    FILE *fp = phpc_resolve_stream(handle);
+
+    if (NULL == fp) {
+        return -1;
+    }
+
+    return fseek(fp, (long) offset, (int) whence) == 0 ? 0 : -1;
+}

@@ -62,6 +62,7 @@ static const char *phpc_builtin_functions[] = {
     "fflush",
     "ftell",
     "fgetc",
+    "fgets",
     "file_exists",
     "file_get_contents",
     "file_put_contents",
@@ -76,6 +77,8 @@ static const char *phpc_builtin_functions[] = {
     "fmod",
     "fopen",
     "fread",
+    "fseek",
+    "ftell",
     "function_exists",
     "fwrite",
     "get_class",
@@ -226,4 +229,4 @@ static const char *phpc_builtin_functions[] = {
     "web_string",
     "wordwrap",
 };
-static const size_t phpc_builtin_functions_count = 224;
+static const size_t phpc_builtin_functions_count = 227;
