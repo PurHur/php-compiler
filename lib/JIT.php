@@ -381,7 +381,8 @@ class JIT {
             || str_contains($lower, 'findcoalesce')
             || str_contains($lower, 'resolvecoalesce')
             || str_contains($lower, 'resolveisset')
-            || str_contains($lower, 'operandschainequal');
+            || str_contains($lower, 'operandschainequal')
+            || str_contains($lower, 'isredundantcoalescetailassign');
     }
 
     private function isSkippedSelfHostEntryName(string $name): bool
@@ -416,7 +417,7 @@ class JIT {
             || str_contains($lower, 'deployroot')
             || str_contains($lower, 'sourcebundler')
             || (str_contains($lower, '\\web\\conststringfolder::') && !$this->isConstStringFolderRealLoweringMethod($lower))
-            || (str_contains($lower, '\\web\\superglobals::') && !str_ends_with($lower, '::issuperglobalname'));
+            || str_contains($lower, '\\web\\superglobals::');
     }
 
 
@@ -439,6 +440,11 @@ class JIT {
     /** IncludePathResolver methods with safe LLVM 9 lowering during self-host AOT (#816). */
     private function isIncludePathResolverRealLoweringMethod(string $lower): bool
     {
+        // resolve() nullable return still hits ICmp type mismatch in full self-host probe (#1097).
+        if ($this->shouldUseSelfHostJitStubs()) {
+            return false;
+        }
+
         return str_ends_with($lower, '::resolve');
     }
 

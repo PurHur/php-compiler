@@ -884,12 +884,18 @@ restart:
             }
         }
         if (Variable::TYPE_OBJECT === $leftType && $leftType === $rightType) {
+            $voidp = $this->context->getTypeFromString('void')->pointerType(0);
+            $leftNorm = $this->context->builder->pointerCast($leftValue, $voidp);
+            $rightNorm = $this->context->builder->pointerCast($rightValue, $voidp);
+            $sizeT = $this->context->getTypeFromString('size_t');
+            $leftPtr = $this->context->builder->ptrToInt($leftNorm, $sizeT);
+            $rightPtr = $this->context->builder->ptrToInt($rightNorm, $sizeT);
             if (OpCode::TYPE_IDENTICAL === $opcode->type) {
-                $result = $this->context->builder->icmp(Builder::INT_EQ, $leftValue, $rightValue);
+                $result = $this->context->builder->icmp(Builder::INT_EQ, $leftPtr, $rightPtr);
                 goto return_bool;
             }
             if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
-                $result = $this->context->builder->icmp(Builder::INT_NE, $leftValue, $rightValue);
+                $result = $this->context->builder->icmp(Builder::INT_NE, $leftPtr, $rightPtr);
                 goto return_bool;
             }
         }
