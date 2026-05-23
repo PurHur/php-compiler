@@ -78,7 +78,7 @@ After `phpc build --project .` (LLVM), run the native binary with CGI env — no
 | PHPUnit serve | ✅ | `ServeTest` `@group miniwebapp` (#470) |
 | JIT | partial | [#207](https://github.com/PurHur/php-compiler/issues/207) |
 | AOT link | ✅ | `../../phpc build --project .` when LLVM ready (`MINIWEBAPP_AOT_LINK_GATE=1` default — [#754](https://github.com/PurHur/php-compiler/issues/754)) |
-| AOT execute | partial | Home `?route=home` ✅ (`test003MiniWebAppHomeRouteAotExecutes`); hello/contact/PATH_INFO still [#764](https://github.com/PurHur/php-compiler/issues/764); full matrix opt-in `MINIWEBAPP_AOT_EXECUTE_GATE=1` ([#791](https://github.com/PurHur/php-compiler/issues/791)) |
+| AOT execute | partial | Home `?route=home` opt-in `MINIWEBAPP_AOT_EXECUTE_GATE=1` (`test003MiniWebAppHomeRouteAotExecutes`); hello/contact/PATH_INFO still [#764](https://github.com/PurHur/php-compiler/issues/764); full matrix same gate ([#791](https://github.com/PurHur/php-compiler/issues/791)) |
 
 ### curl recipes (PATH_INFO)
 
