@@ -64,6 +64,7 @@ final class SelfHostBuiltinPolicy
         'glob' => 'filesystem', 'scandir' => 'filesystem',
         'fopen' => 'filesystem', 'fread' => 'filesystem', 'fgetc' => 'filesystem', 'fgets' => 'filesystem',
         'fgetcsv' => 'filesystem',
+        'fputcsv' => 'filesystem',
         'ftell' => 'filesystem', 'fseek' => 'filesystem', 'fclose' => 'filesystem',
         'feof' => 'filesystem', 'fflush' => 'filesystem',
         'getenv' => 'filesystem', 'putenv' => 'filesystem', 'sys_get_temp_dir' => 'filesystem', 'tempnam' => 'filesystem',

@@ -208,6 +208,7 @@ class Module extends ModuleAbstract
             new fgetc(),
             new fgets(),
             new fgetcsv(),
+            new fputcsv(),
             new ftell_(),
             new fseek(),
             new feof_(),
