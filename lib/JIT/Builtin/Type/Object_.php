@@ -352,6 +352,50 @@ class Object_ extends Type {
         }
     }
 
+    /**
+     * JIT storage type for properties on vendor CFG / compiler objects (e.g. PHPCfg\Block::$children).
+     */
+    private function externalPropertyJitType(string $class, string $name): int
+    {
+        $lcClass = strtolower(str_replace('/', '\\', ltrim($class, '\\')));
+        $lcName = strtolower($name);
+
+        /** @var array<string, array<string, true>> */
+        static $arrayProps = [
+            'phpcfg\\block' => [
+                'children' => true,
+                'parents' => true,
+                'phi' => true,
+                'hoistedoperands' => true,
+                'deadoperands' => true,
+            ],
+            'phpcompiler\\block' => [
+                'blocks' => true,
+                'parents' => true,
+                'opcodes' => true,
+            ],
+            'phpcfg\\script' => [
+                'functions' => true,
+            ],
+            'phpcfg\\func' => [
+                'params' => true,
+            ],
+        ];
+
+        if (isset($arrayProps[$lcClass][$lcName])) {
+            return Variable::TYPE_HASHTABLE;
+        }
+
+        if (
+            (str_starts_with($lcClass, 'phpcfg\\') || str_starts_with($lcClass, 'phpcompiler\\'))
+            && in_array($lcName, ['children', 'parents', 'args', 'keys', 'values', 'catches', 'params'], true)
+        ) {
+            return Variable::TYPE_HASHTABLE;
+        }
+
+        return Variable::TYPE_VALUE;
+    }
+
     public function defineMethodVisibility(int $classId, string $methodLc, int $visibilityFlags): void
     {
         $this->methodVisibility[$classId][strtolower($methodLc)] = $visibilityFlags;
@@ -560,7 +604,7 @@ class Object_ extends Type {
             }
         }
         if (!$hasProp) {
-            $this->defineProperty($classId, $name, Variable::TYPE_VALUE);
+            $this->defineProperty($classId, $name, $this->externalPropertyJitType($class, $name));
             $nameId = $this->propNameMap[$name];
         }
         foreach ($this->properties[$classId] as $propset) {
@@ -730,6 +774,38 @@ class Object_ extends Type {
             );
 
             return;
+        }
+
+        if (Variable::TYPE_VALUE === $propertyType) {
+            if (0 !== ($value->type & Variable::IS_NATIVE_ARRAY)) {
+                $ht = HashTableHelper::materializeNativeArrayForCall($this->context, $value);
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__writeHashtable'),
+                    $heapPtr,
+                    $ht
+                );
+                $this->context->refcount->addref($ht);
+                $this->context->builder->store(
+                    $this->context->builder->pointerCast($heapPtr, $voidPtr),
+                    $slot
+                );
+
+                return;
+            }
+            if (Variable::TYPE_HASHTABLE === $value->type) {
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__writeHashtable'),
+                    $heapPtr,
+                    $this->context->helper->loadValue($value)
+                );
+                $value->addref();
+                $this->context->builder->store(
+                    $this->context->builder->pointerCast($heapPtr, $voidPtr),
+                    $slot
+                );
+
+                return;
+            }
         }
 
         if (Variable::TYPE_NATIVE_LONG === $propertyType && Variable::TYPE_NATIVE_LONG === $value->type) {
