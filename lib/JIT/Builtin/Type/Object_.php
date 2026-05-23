@@ -336,9 +336,56 @@ class Object_ extends Type {
         $lcname = strtolower($name);
         if (!isset($this->classes[$lcname])) {
             $this->registerExternalClass($lcname);
+        } else {
+            $this->ensureExternalClassConstants($this->classes[$lcname], $lcname);
         }
 
         return $this->classes[$lcname];
+    }
+
+    private function ensureExternalClassConstants(int $id, string $lcname): void
+    {
+        $seed = function (array $constants) use ($id): void {
+            foreach ($constants as $name => $value) {
+                if (!isset($this->classConstants[$id][$name])) {
+                    $this->classConstants[$id][$name] = [
+                        'type' => Variable::TYPE_NATIVE_LONG,
+                        'value' => $value,
+                    ];
+                }
+            }
+        };
+
+        if ('phpcompiler\\vm\\variable' === $lcname) {
+            $seed([
+                'type_undefined' => \PHPCompiler\VM\Variable::TYPE_UNDEFINED,
+                'type_null' => \PHPCompiler\VM\Variable::TYPE_NULL,
+                'type_integer' => \PHPCompiler\VM\Variable::TYPE_INTEGER,
+                'type_float' => \PHPCompiler\VM\Variable::TYPE_FLOAT,
+                'type_boolean' => \PHPCompiler\VM\Variable::TYPE_BOOLEAN,
+                'type_string' => \PHPCompiler\VM\Variable::TYPE_STRING,
+                'type_array' => \PHPCompiler\VM\Variable::TYPE_ARRAY,
+                'type_object' => \PHPCompiler\VM\Variable::TYPE_OBJECT,
+                'type_indirect' => \PHPCompiler\VM\Variable::TYPE_INDIRECT,
+                'type_string_offset' => \PHPCompiler\VM\Variable::TYPE_STRING_OFFSET,
+            ]);
+        }
+        if ('phpcompiler\\jit\\variable' === $lcname || 'variable' === $lcname) {
+            $seed([
+                'type_null' => \PHPCompiler\JIT\Variable::TYPE_NULL,
+                'type_native_long' => \PHPCompiler\JIT\Variable::TYPE_NATIVE_LONG,
+                'type_native_bool' => \PHPCompiler\JIT\Variable::TYPE_NATIVE_BOOL,
+                'type_native_double' => \PHPCompiler\JIT\Variable::TYPE_NATIVE_DOUBLE,
+                'type_string' => \PHPCompiler\JIT\Variable::TYPE_STRING,
+                'type_object' => \PHPCompiler\JIT\Variable::TYPE_OBJECT,
+                'type_value' => \PHPCompiler\JIT\Variable::TYPE_VALUE,
+                'type_hashtable' => \PHPCompiler\JIT\Variable::TYPE_HASHTABLE,
+                'is_native_array' => \PHPCompiler\JIT\Variable::IS_NATIVE_ARRAY,
+                'is_refcounted' => \PHPCompiler\JIT\Variable::IS_REFCOUNTED,
+                'kind_variable' => \PHPCompiler\JIT\Variable::KIND_VARIABLE,
+                'kind_value' => \PHPCompiler\JIT\Variable::KIND_VALUE,
+            ]);
+        }
     }
 
     private function registerExternalClass(string $lcname): void
@@ -347,6 +394,7 @@ class Object_ extends Type {
         $this->properties[$id] = [];
         $this->classConstants[$id] = [];
         $this->classes[$lcname] = $id;
+        $this->ensureExternalClassConstants($id, $lcname);
         if ('splobjectstorage' === $lcname) {
             $this->splObjectStorageClassId = $id;
             $this->defineProperty($id, '__spl_ht', Variable::TYPE_HASHTABLE);
@@ -413,7 +461,7 @@ class Object_ extends Type {
                 ];
             }
         }
-        if ('phpcompiler\\jit\\variable' === $lcname) {
+        if ('phpcompiler\\jit\\variable' === $lcname || 'variable' === $lcname) {
             foreach ([
                 'type_null' => \PHPCompiler\JIT\Variable::TYPE_NULL,
                 'type_native_long' => \PHPCompiler\JIT\Variable::TYPE_NATIVE_LONG,

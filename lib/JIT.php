@@ -1394,6 +1394,11 @@ class JIT {
                 case OpCode::TYPE_FUNCCALL_INIT:
                     $nameOp = $block->getOperand($op->arg1);
                     if (!$nameOp instanceof Operand\Literal) {
+                        if ($this->shouldUseSelfHostJitStubs()) {
+                            $this->context->scope->toCall = null;
+                            $this->context->scope->args = [];
+                            break;
+                        }
                         throw new \LogicException("Variable function calls not yet supported");
                     }
                     $lcname = strtolower($nameOp->value);
