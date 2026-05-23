@@ -32,6 +32,7 @@ class String_ extends Type {
             static inline function __string__separate(__string__ *): __string__*;
             static inline function __string__htmlspecialchars(__string__*, int64): __string__*;
             static inline function __string__preg_quote(__string__*, __string__*): __string__*;
+            static inline function __string__quotemeta(__string__*): __string__*;
             static inline function __string__urlencode(__string__*): __string__*;
             static inline function __string__rawurlencode(__string__*): __string__*;
             static inline function __string__urldecode(__string__*): __string__*;

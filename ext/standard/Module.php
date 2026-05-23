@@ -104,6 +104,7 @@ class Module extends ModuleAbstract
             new implode(),
             new str_replace(),
             new preg_quote(),
+            new quotemeta(),
             new preg_match(),
             new nl2br(),
             new array_reverse(),
