@@ -296,11 +296,21 @@ class JIT {
         }
         $lower = strtolower($name);
 
-        return str_contains($lower, '\\vm::')
+        if (str_contains($lower, '\\vm::')
             || str_contains($lower, '\\block::')
             || str_contains($lower, '\\frame::')
             || str_contains($lower, '\\module::')
-            || str_contains($lower, '\\runtime::');
+            || str_contains($lower, '\\runtime::')
+        ) {
+            return true;
+        }
+        if (!$this->shouldUseSelfHostJitStubs()) {
+            return false;
+        }
+
+        return str_contains($lower, '\\vm\\')
+            || str_contains($lower, '\\printer::')
+            || str_contains($lower, '\\jit\\operandname::');
     }
 
     private function isSkippedCompilerHotPathName(string $name): bool
@@ -375,7 +385,9 @@ class JIT {
         $lower = strtolower($name);
         return str_contains($lower, 'conststringfolder')
             || str_contains($lower, 'includepathresolver')
-            || str_contains($lower, 'literalincludediscovery');
+            || str_contains($lower, 'literalincludediscovery')
+            || str_contains($lower, 'deployroot')
+            || str_contains($lower, 'sourcebundler');
     }
 
     private function collectStubFunctionArgTypes(Block $block): array
