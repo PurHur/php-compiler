@@ -704,27 +704,40 @@ final class ArrayBuiltinHelper
         return $phi;
     }
 
-    /**
-     * Identity copy for array_map(null, …): long and string elements only (AOT-safe linker subset).
-     */
-    private static function copyMapNullListEntry(
+    private static function copyPackedListEntry(
         Context $context,
         Value $src,
         Value $srcIndex,
         Value $dest,
         Value $destIndex
     ): void {
+        self::copyPackedValueEntry(
+            $context,
+            self::listEntryAt($context, $src, $srcIndex),
+            $dest,
+            $destIndex
+        );
+    }
+
+    /**
+     * Store a __value__ list entry into a packed hashtable (string/long only; AOT linker subset).
+     */
+    private static function copyPackedValueEntry(
+        Context $context,
+        Value $srcEntry,
+        Value $dest,
+        Value $destIndex
+    ): void {
         static $seq = 0;
-        $tag = 'mn'.(string) ++$seq;
-        $srcEntry = self::listEntryAt($context, $src, $srcIndex);
+        $tag = 'pv'.(string) ++$seq;
         $valueMap = $context->structFieldMap['__value__'];
         $typeByte = $context->builder->load(
             $context->builder->structGep($srcEntry, $valueMap['type'])
         );
         $i8 = $context->getTypeFromString('int8');
-        $stringBlock = BasicBlockHelper::append($context, 'array_map_null_copy_str_'.$tag);
-        $longBlock = BasicBlockHelper::append($context, 'array_map_null_copy_long_'.$tag);
-        $done = BasicBlockHelper::append($context, 'array_map_null_copy_done_'.$tag);
+        $stringBlock = BasicBlockHelper::append($context, 'ht_copy_packed_str_'.$tag);
+        $longBlock = BasicBlockHelper::append($context, 'ht_copy_packed_long_'.$tag);
+        $done = BasicBlockHelper::append($context, 'ht_copy_packed_done_'.$tag);
 
         $isString = $context->builder->icmp(
             Builder::INT_EQ,
@@ -752,6 +765,19 @@ final class ArrayBuiltinHelper
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($done);
+    }
+
+    /**
+     * Identity copy for array_map(null, …): long and string elements only (AOT-safe linker subset).
+     */
+    private static function copyMapNullListEntry(
+        Context $context,
+        Value $src,
+        Value $srcIndex,
+        Value $dest,
+        Value $destIndex
+    ): void {
+        self::copyPackedListEntry($context, $src, $srcIndex, $dest, $destIndex);
     }
 
     private static function buildMapNullFromNativeArray(Context $context, Variable $array): Value
@@ -1348,7 +1374,7 @@ final class ArrayBuiltinHelper
         $context->builder->positionAtEnd($limitDone);
         $srcIdx = $context->builder->load($srcIdxSlot);
         $destIdx = $context->builder->load($destIdxSlot);
-        self::copyListEntry($context, $src, $srcIdx, $dest, $destIdx);
+        self::copyPackedListEntry($context, $src, $srcIdx, $dest, $destIdx);
         $context->builder->store(
             $context->builder->addNoSignedWrap($destIdx, $one),
             $destIdxSlot
@@ -1560,7 +1586,7 @@ final class ArrayBuiltinHelper
         $context->builder->positionAtEnd($body);
         $lastIdx = $context->builder->sub($nextFree, $one);
         $srcIdx = $context->builder->sub($lastIdx, $destIdx);
-        self::copyListEntry($context, $src, $srcIdx, $dest, $destIdx);
+        self::copyPackedListEntry($context, $src, $srcIdx, $dest, $destIdx);
         $context->builder->branch($advance);
 
         $context->builder->positionAtEnd($advance);
@@ -1626,7 +1652,7 @@ final class ArrayBuiltinHelper
 
         $context->builder->positionAtEnd($copyBlock);
         $destIdx = $context->builder->load($destIdxSlot);
-        self::copyListEntry($context, $src, $srcIdx, $dest, $destIdx);
+        self::copyPackedListEntry($context, $src, $srcIdx, $dest, $destIdx);
         $context->builder->store(
             $context->builder->addNoSignedWrap($destIdx, $one),
             $destIdxSlot
@@ -1736,7 +1762,7 @@ final class ArrayBuiltinHelper
         Value $dest,
         Value $destIndex
     ): void {
-        self::copyListEntry($context, $src, $srcIndex, $dest, $destIndex);
+        self::copyPackedListEntry($context, $src, $srcIndex, $dest, $destIndex);
     }
 
     private static function listEntryTruthy(Context $context, Value $entry): Value
@@ -2779,8 +2805,10 @@ final class ArrayBuiltinHelper
         $context->builder->branchIf($atEnd, $done, $body);
 
         $context->builder->positionAtEnd($body);
-        $elem = self::readListElement($context, $src, $idx, Variable::TYPE_NATIVE_LONG);
-        self::appendElement($context, $dest, $elem);
+        $destMap = $context->structFieldMap['__hashtable__'];
+        $destNextPtr = $context->builder->structGep($dest, $destMap['nextFreeElement']);
+        $destIdx = $context->builder->load($destNextPtr);
+        self::copyPackedListEntry($context, $src, $idx, $dest, $destIdx);
         $one = $sizeT->constInt(1, false);
         $context->builder->store(
             $context->builder->addNoSignedWrap($idx, $one),

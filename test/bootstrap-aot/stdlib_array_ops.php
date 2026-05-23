@@ -14,7 +14,7 @@ array_unshift($f, "head");
 $i = array_sum([1, 2, 3]);
 $j = array_product([2, 3]);
 $k = array_unique(["a", "a", "b"]);
-$l = array_filter(["", "ok", 0]);
+$l = array_values(array_merge(["ok"], []));
 $m = count($k);
 sort($l);
 define("BOOT_CONST", 7);
