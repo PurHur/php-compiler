@@ -1,0 +1,16 @@
+--- vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
+@@ -304,6 +304,13 @@
+                 new self(self::TYPE_NULL),
+             ]))->simplify();
+         }
++        if ($decl instanceof CfgType\Reference) {
++            if ($decl->declaration instanceof \PHPCfg\Operand\Literal) {
++                return self::fromDecl($decl->declaration->value);
++            }
++
++            return self::mixed();
++        }
+ 
+         throw new \LogicException('Unsupported declaration type: '.get_class($decl));
+     }
