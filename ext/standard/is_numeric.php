@@ -14,6 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
@@ -53,6 +54,8 @@ final class is_numeric extends Internal
                 return $context->constantFromBool(false);
             case JITVariable::TYPE_STRING:
                 return $this->stringIsNumeric($context, $context->helper->loadValue($args[0]));
+            case JITVariable::TYPE_VALUE:
+                return $this->valueIsNumeric($context, $args[0]);
             default:
                 throw new \LogicException('is_numeric() does not support this value type in this compiler build');
         }
@@ -109,6 +112,20 @@ final class is_numeric extends Internal
         );
 
         return $context->builder->select($isEmpty, $context->constantFromBool(false), $numeric);
+    }
+
+    private function valueIsNumeric(Context $context, JITVariable $arg): Value {
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load($context->builder->structGep($valuePtr, $map['type']));
+        $i8 = $context->getTypeFromString('int8');
+        $falseVal = $context->constantFromBool(false); $trueVal = $context->constantFromBool(true);
+        $isLong = $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_NATIVE_LONG, false));
+        $isDouble = $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_NATIVE_DOUBLE, false));
+        $isString = $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_STRING, false));
+        $stringVal = $context->builder->call($context->lookupFunction('__value__readString'), $valuePtr);
+        $stringNumeric = $this->stringIsNumeric($context, $stringVal);
+        return $context->builder->select($isLong, $trueVal, $context->builder->select($isDouble, $trueVal, $context->builder->select($isString, $stringNumeric, $falseVal)));
     }
 
 }

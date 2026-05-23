@@ -198,12 +198,4 @@ final class intval extends Internal
 
         return $context->builder->trunc($raw, $i64);
     }
-
-    private function stringDataPtr(Context $context, Value $strPtr): Value
-    {
-        $structName = $strPtr->typeOf()->getElementType()->getName();
-        $off = $context->structFieldMap[$structName]['value'];
-
-        return $context->builder->structGep($strPtr, $off);
-    }
 }

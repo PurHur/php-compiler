@@ -54,12 +54,4 @@ final class strcasecmp extends Internal
 
         return $context->builder->sExt($raw, $i64);
     }
-
-    private function stringDataPtr(Context $context, Value $strPtr): Value
-    {
-        $structName = $strPtr->typeOf()->getElementType()->getName();
-        $off = $context->structFieldMap[$structName]['value'];
-
-        return $context->builder->structGep($strPtr, $off);
-    }
 }
