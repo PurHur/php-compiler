@@ -12,12 +12,12 @@ final class Linker
     /** @var list<string> */
     private const RUNTIME_C_SOURCES = [
         __DIR__.'/runtime/superglobals_refresh.c',
-        __DIR__.'/runtime/getenv.c',
         __DIR__.'/runtime/hash_crypto.c',
         __DIR__.'/runtime/crc32.c',
         __DIR__.'/runtime/strtr.c',
         __DIR__.'/runtime/filter_validate.c',
         __DIR__.'/runtime/phpc_fs_dir.c',
+        __DIR__.'/runtime/phpc_stdio.c',
         __DIR__.'/runtime/phpc_process.c',
         __DIR__.'/runtime/preg_match.c',
     ];
@@ -27,6 +27,7 @@ final class Linker
     /** Runtime units that need host libc headers (glob/scandir; llvm sysroot lacks linux/limits.h). */
     private const RUNTIME_HOST_LIBC_BASENAMES = [
         'phpc_fs_dir.c',
+        'phpc_stdio.c',
         'preg_match.c',
     ];
 

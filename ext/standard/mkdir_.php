@@ -7,6 +7,8 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitBoolArg;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -53,12 +55,25 @@ final class mkdir_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (2 !== \count($args)) {
-            throw new \LogicException('mkdir() requires exactly two arguments in this compiler build');
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 3) {
+            throw new \LogicException('mkdir() requires one to three arguments in this compiler build');
         }
-        $a = $this->jitString($context, $args[0], 'mkdir() argument #1');
-        $b = $this->jitString($context, $args[1], 'mkdir() argument #2');
+        $path = $this->jitString($context, $args[0], 'mkdir() argument #1');
+        $i64 = $context->getTypeFromString('int64');
+        $mode = $i64->constInt(0777, false);
+        if ($argc >= 2) {
+            $mode = JitLongArg::lower($context, $args[1], 'mkdir() mode');
+        }
+        $i32 = $context->getTypeFromString('int32');
+        $recursive = $i32->constInt(0, false);
+        if (3 === $argc) {
+            $recursive = $context->builder->zext(
+                JitBoolArg::lower($context, $args[2], 'mkdir() recursive'),
+                $i32
+            );
+        }
 
-        return JitMkdir::invoke($context, $a, $b);
+        return JitMkdir::invoke($context, $path, $mode, $recursive);
     }
 }
