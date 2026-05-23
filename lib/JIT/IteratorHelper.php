@@ -11,7 +11,13 @@ use PHPLLVM\Builder;
  */
 final class IteratorHelper
 {
-    private static function asHashtable(Context $context, Variable $array): Variable
+    private static function usesObjectKeys(?string $containerUserType): bool
+    {
+        return null !== $containerUserType
+            && 'splobjectstorage' === strtolower($containerUserType);
+    }
+
+    private static function asHashtable(Context $context, Variable $array, ?string $containerUserType): Variable
     {
         if (Variable::TYPE_HASHTABLE === $array->type) {
             return $array;
@@ -33,13 +39,29 @@ final class IteratorHelper
             );
         }
         if (Variable::TYPE_OBJECT === $array->type) {
-            $ht = HashTableHelper::alloc($context);
+            if (self::usesObjectKeys($containerUserType)) {
+                return $context->type->object->splBackingHashtable($array);
+            }
+            if (
+                null !== $array->objectPropertySlot
+                && Variable::TYPE_HASHTABLE === $array->objectPropertyType
+            ) {
+                $loaded = $context->builder->load($array->objectPropertySlot);
+                $htPtr = $context->builder->pointerCast(
+                    $loaded,
+                    $context->getTypeFromString('__hashtable__*')
+                );
 
-            return new Variable(
-                $context,
-                Variable::TYPE_HASHTABLE,
-                Variable::KIND_VALUE,
-                $ht
+                return new Variable(
+                    $context,
+                    Variable::TYPE_HASHTABLE,
+                    Variable::KIND_VALUE,
+                    $htPtr
+                );
+            }
+
+            throw new \LogicException(
+                'foreach over objects is only supported for SplObjectStorage in this compiler build'
             );
         }
         throw new \LogicException(
@@ -70,9 +92,41 @@ final class IteratorHelper
         return $slot;
     }
 
-    public static function compileReset(Context $context, Variable $array): void
+    private static function objNodeSlot(Context $context, Variable $array): \PHPLLVM\Value
     {
-        $array = self::asHashtable($context, $array);
+        $key = \spl_object_id($array);
+        if (isset($context->foreachObjNodeSlots[$key])) {
+            return $context->foreachObjNodeSlots[$key];
+        }
+        $nodePtrType = $context->getTypeFromString('__objkey_node__*');
+        $saved = $context->builder->getInsertBlock();
+        if (null !== $context->main) {
+            $blocks = $context->main->getBasicBlocks();
+            if ([] !== $blocks) {
+                $context->builder->positionAtEnd($blocks[0]);
+            }
+        }
+        $slot = $context->builder->alloca($nodePtrType, 1, 'foreach_obj_walk');
+        $context->foreachObjNodeSlots[$key] = $slot;
+        if (null !== $saved) {
+            $context->builder->positionAtEnd($saved);
+        }
+
+        return $slot;
+    }
+
+    public static function compileReset(Context $context, Variable $array, ?string $containerUserType = null): void
+    {
+        $array = self::asHashtable($context, $array, $containerUserType);
+        if (self::usesObjectKeys($containerUserType)) {
+            $nodePtrType = $context->getTypeFromString('__objkey_node__*');
+            $context->builder->store(
+                $nodePtrType->constNull(),
+                self::objNodeSlot($context, $array)
+            );
+
+            return;
+        }
         $sizeT = $context->getTypeFromString('size_t');
         $zero = $sizeT->constInt(0, false);
         $one = $sizeT->constInt(1, false);
@@ -80,9 +134,75 @@ final class IteratorHelper
         $context->builder->store($invalid, self::indexSlot($context, $array));
     }
 
-    public static function compileValid(Context $context, Variable $array): \PHPLLVM\Value
+    public static function compileValid(
+        Context $context,
+        Variable $array,
+        ?string $containerUserType = null
+    ): \PHPLLVM\Value {
+        $array = self::asHashtable($context, $array, $containerUserType);
+        if (self::usesObjectKeys($containerUserType)) {
+            return self::compileValidObjectKeys($context, $array);
+        }
+
+        return self::compileValidHashtable($context, $array);
+    }
+
+    private static function compileValidObjectKeys(Context $context, Variable $array): \PHPLLVM\Value
     {
-        $array = self::asHashtable($context, $array);
+        $ht = $context->helper->loadValue($array);
+        $map = $context->structFieldMap['__hashtable__'];
+        $nodeMap = $context->structFieldMap['__objkey_node__'];
+        $nodePtrType = $context->getTypeFromString('__objkey_node__*');
+        $i1 = $context->getTypeFromString('int1');
+        $walkSlot = self::objNodeSlot($context, $array);
+        $current = $context->builder->load($walkSlot);
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $init = $fn->appendBasicBlock('foreach_obj_init');
+        $advance = $fn->appendBasicBlock('foreach_obj_advance');
+        $check = $fn->appendBasicBlock('foreach_obj_check');
+        $found = $fn->appendBasicBlock('foreach_obj_found');
+        $empty = $fn->appendBasicBlock('foreach_obj_empty');
+        $merge = $fn->appendBasicBlock('foreach_obj_merge');
+        $isFirst = $context->builder->icmp(
+            Builder::INT_EQ,
+            $current,
+            $nodePtrType->constNull()
+        );
+        $context->builder->branchIf($isFirst, $init, $advance);
+
+        $context->builder->positionAtEnd($init);
+        $head = $context->builder->load($context->builder->structGep($ht, $map['objKeys']));
+        $context->builder->store($head, $walkSlot);
+        $context->builder->branch($check);
+
+        $context->builder->positionAtEnd($advance);
+        $next = $context->builder->load($context->builder->structGep($current, $nodeMap['next']));
+        $context->builder->store($next, $walkSlot);
+        $context->builder->branch($check);
+
+        $context->builder->positionAtEnd($check);
+        $node = $context->builder->load($walkSlot);
+        $hasNode = $context->builder->icmp(
+            Builder::INT_NE,
+            $node,
+            $nodePtrType->constNull()
+        );
+        $context->builder->branchIf($hasNode, $found, $empty);
+
+        $context->builder->positionAtEnd($found);
+        $context->builder->branch($merge);
+        $context->builder->positionAtEnd($empty);
+        $context->builder->branch($merge);
+        $context->builder->positionAtEnd($merge);
+        $result = $context->builder->phi($i1);
+        $result->addIncoming($i1->constInt(1, false), $found);
+        $result->addIncoming($i1->constInt(0, false), $empty);
+
+        return $result;
+    }
+
+    private static function compileValidHashtable(Context $context, Variable $array): \PHPLLVM\Value
+    {
         $ht = $context->helper->loadValue($array);
         $map = $context->structFieldMap['__hashtable__'];
         $nodeMap = $context->structFieldMap['__strkey_node__'];
@@ -120,26 +240,30 @@ final class IteratorHelper
 
         $context->builder->positionAtEnd($strInit);
         $context->builder->store($zero, $slot);
-        $context->builder->branch($strWalk);
+        $strEntry = $fn->appendBasicBlock('foreach_str_entry');
+        $context->builder->branch($strEntry);
 
-        $context->builder->positionAtEnd($strWalk);
-        $ord = $context->builder->load($slot);
+        $context->builder->positionAtEnd($strEntry);
         $head = $context->builder->load($context->builder->structGep($ht, $map['strKeys']));
         $headNull = $context->builder->icmp(Builder::INT_EQ, $head, $head->typeOf()->constNull());
         $context->builder->branchIf($headNull, $empty, $strWalk);
+
+        $context->builder->positionAtEnd($strWalk);
         $node = $context->builder->phi($head->typeOf());
-        $node->addIncoming($head, $strInit);
-        $ordPhi = $context->builder->phi($sizeT);
-        $ordPhi->addIncoming($ord, $strInit);
-        $atTarget = $context->builder->icmp(Builder::INT_EQ, $ordPhi, $zero);
+        $node->addIncoming($head, $strEntry);
+        $remaining = $context->builder->phi($sizeT);
+        $remaining->addIncoming($zero, $strEntry);
+        $atTarget = $context->builder->icmp(Builder::INT_EQ, $remaining, $zero);
         $strStep = $fn->appendBasicBlock('foreach_str_step');
         $context->builder->branchIf($atTarget, $found, $strStep);
         $context->builder->positionAtEnd($strStep);
         $nextNode = $context->builder->load($context->builder->structGep($node, $nodeMap['next']));
         $nextNull = $context->builder->icmp(Builder::INT_EQ, $nextNode, $nextNode->typeOf()->constNull());
-        $context->builder->branchIf($nextNull, $empty, $strWalk);
-        $node->addIncoming($nextNode, $strStep);
-        $ordPhi->addIncoming($context->builder->sub($ordPhi, $one), $strStep);
+        $strAdvance = $fn->appendBasicBlock('foreach_str_advance');
+        $context->builder->branchIf($nextNull, $empty, $strAdvance);
+        $context->builder->positionAtEnd($strAdvance);
+        $node->addIncoming($nextNode, $strAdvance);
+        $remaining->addIncoming($context->builder->sub($remaining, $one), $strAdvance);
         $context->builder->branch($strWalk);
 
         $context->builder->positionAtEnd($found);
@@ -154,9 +278,37 @@ final class IteratorHelper
         return $result;
     }
 
-    public static function compileKey(Context $context, Variable $array): Variable
+    public static function compileKey(
+        Context $context,
+        Variable $array,
+        ?string $containerUserType = null
+    ): Variable {
+        $array = self::asHashtable($context, $array, $containerUserType);
+        if (self::usesObjectKeys($containerUserType)) {
+            return self::compileKeyObject($context, $array);
+        }
+
+        return self::compileKeyHashtable($context, $array);
+    }
+
+    private static function compileKeyObject(Context $context, Variable $array): Variable
     {
-        $array = self::asHashtable($context, $array);
+        $slot = JitValueBox::alloc($context);
+        $destPtr = JitValueBox::pointer($context, $slot);
+        $nodeMap = $context->structFieldMap['__objkey_node__'];
+        $node = $context->builder->load(self::objNodeSlot($context, $array));
+        $keyObj = $context->builder->load($context->builder->structGep($node, $nodeMap['key']));
+        $context->builder->call(
+            $context->lookupFunction('__value__writeObject'),
+            $destPtr,
+            $keyObj
+        );
+
+        return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
+    }
+
+    private static function compileKeyHashtable(Context $context, Variable $array): Variable
+    {
         $slot = JitValueBox::alloc($context);
         $destPtr = JitValueBox::pointer($context, $slot);
         $ht = $context->helper->loadValue($array);
@@ -192,9 +344,35 @@ final class IteratorHelper
         return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
     }
 
-    public static function compileValue(Context $context, Variable $array): Variable
+    public static function compileValue(
+        Context $context,
+        Variable $array,
+        ?string $containerUserType = null
+    ): Variable {
+        $array = self::asHashtable($context, $array, $containerUserType);
+        if (self::usesObjectKeys($containerUserType)) {
+            return self::compileValueObject($context, $array);
+        }
+
+        return self::compileValueHashtable($context, $array);
+    }
+
+    private static function compileValueObject(Context $context, Variable $array): Variable
     {
-        $array = self::asHashtable($context, $array);
+        $slot = JitValueBox::alloc($context);
+        $destPtr = JitValueBox::pointer($context, $slot);
+        $nodeMap = $context->structFieldMap['__objkey_node__'];
+        $valueMap = $context->structFieldMap['__value__'];
+        $node = $context->builder->load(self::objNodeSlot($context, $array));
+        $valField = $context->builder->structGep($node, $nodeMap['value']);
+        $fn = $context->builder->getInsertBlock()->getParent();
+        self::copyValueEntryToBox($context, $destPtr, $valField, $valueMap, $fn);
+
+        return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
+    }
+
+    private static function compileValueHashtable(Context $context, Variable $array): Variable
+    {
         $slot = JitValueBox::alloc($context);
         $destPtr = JitValueBox::pointer($context, $slot);
         $ht = $context->helper->loadValue($array);
