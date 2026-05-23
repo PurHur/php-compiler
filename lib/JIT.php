@@ -96,8 +96,9 @@ class JIT {
     }
 
     private function compileBlock(Block $block, ?string $funcName = null): PHPLLVM\Value {
+        $logicalName = $funcName;
         if (!is_null($funcName)) {
-            $internalName = $funcName;
+            $internalName = $this->llvmInternalName($funcName);
         } else {
             $internalName = "internal_" . (++self::$functionNumber);
         }
@@ -141,7 +142,7 @@ class JIT {
                 $callbackType = '__value__';
             }
             $returnType = $this->context->getTypeFromString($callbackType);
-            $this->context->functionReturnType[strtolower($internalName)] = $callbackType;
+            $this->context->functionReturnType[strtolower($logicalName ?? $internalName)] = $callbackType;
 
             if ($this->instanceMethodUsesThis($block)) {
                 $rawTypes[] = Type::object();
@@ -188,7 +189,7 @@ class JIT {
             $argVars[] = new Variable($this->context, Variable::getTypeFromType($rawTypes[$idx]), Variable::KIND_VALUE, $func->getParam($idx));
         }
 
-        $lcname = strtolower($internalName);
+        $lcname = strtolower($logicalName ?? $internalName);
         $this->context->functions[$lcname] = $func;
         if (!is_null($funcName)) {
             $lcname = strtolower($funcName);
@@ -209,6 +210,11 @@ class JIT {
         return $func;
     }
 
+    private function llvmInternalName(string $name): string
+    {
+        return preg_replace('/[^a-zA-Z0-9_]/', '_', $name) ?? $name;
+    }
+
     /**
      * Stub out opcode_type_name() — the real implementation is a large switch that crashes LLVM 9 JIT (#540).
      */
@@ -218,7 +224,7 @@ class JIT {
         if (isset($this->context->functions[$lcname])) {
             return $this->context->functions[$lcname];
         }
-        $mangled = preg_replace('/[^a-zA-Z0-9_]/', '_', $internalName) ?? 'opcode_type_name_stub';
+        $mangled = $this->llvmInternalName($internalName);
         $func = $this->context->module->addFunction(
             $mangled,
             $this->context->context->functionType(
@@ -1474,12 +1480,16 @@ class JIT {
                         $methodLc,
                         $visFlags
                     );
-                    $funcName = $this->context->scope->className.'::'.$methodLc;
-                    if (null !== $op->block1) {
+                    $methodBlock = $op->block1;
+                    $className = null !== $methodBlock && null !== $methodBlock->func?->class
+                        ? strtolower($methodBlock->func->class->value)
+                        : $this->context->scope->className;
+                    $funcName = $className.'::'.$methodLc;
+                    if (null !== $methodBlock) {
                         if ('__construct' === $methodLc) {
                             $this->context->type->object->markHasConstructor($this->context->scope->classId);
                         }
-                        $this->compileBlock($op->block1, $funcName);
+                        $this->compileBlock($methodBlock, $funcName);
                     }
                     break;
                 case OpCode::TYPE_DECLARE_CLASS_CONST:
