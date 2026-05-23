@@ -22,6 +22,21 @@ final class HashTableHelper
     }
 
     /**
+     * Unbox a {@see Variable::TYPE_VALUE} slot to a __hashtable__* (array_push, count, isset patterns).
+     */
+    public static function readHashtableFromValueBox(Context $context, Variable $container): Value
+    {
+        if (Variable::TYPE_VALUE !== $container->type) {
+            throw new \LogicException('readHashtableFromValueBox requires TYPE_VALUE');
+        }
+
+        return $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            JitValueBox::valuePtrFromVariable($context, $container)
+        );
+    }
+
+    /**
      * HashTable view without objectPropertySlot — isset()/dim on $this->props['k'] (#764).
      */
     public static function asDetachedHashtable(Context $context, Variable $container): Variable

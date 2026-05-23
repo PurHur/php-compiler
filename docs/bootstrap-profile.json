@@ -436,6 +436,7 @@
     ],
     "aot_lint_targets": [
         "examples/000-HelloWorld/example.php",
+        "test/bootstrap-aot/array_value_box.php",
         "test/bootstrap-aot/assign_ref_alias.php",
         "test/bootstrap-aot/block_getframe_args_contains.php",
         "test/bootstrap-aot/block_getframe_loop.php",
@@ -495,6 +496,7 @@
     ],
     "aot_link_targets": [
         "examples/000-HelloWorld/example.php",
+        "test/bootstrap-aot/array_value_box.php",
         "test/bootstrap-aot/block_getframe_args_contains.php",
         "test/bootstrap-aot/block_getframe_loop.php",
         "test/bootstrap-aot/block_getframe_scope_foreach.php",
@@ -546,8 +548,8 @@
         "inventory_files": 409,
         "excluded": 0,
         "eligible": 409,
-        "aot_lint_targets": 57,
-        "aot_link_targets": 44,
+        "aot_lint_targets": 58,
+        "aot_link_targets": 45,
         "aot_link_lib_targets": 1
     }
 }
