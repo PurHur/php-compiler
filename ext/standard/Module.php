@@ -171,6 +171,7 @@ class Module extends ModuleAbstract
             new rmdir_(),
             new chmod_(),
             new rename_(),
+            new copy_(),
             new filetype(),
             new fopen(),
             new fread(),
