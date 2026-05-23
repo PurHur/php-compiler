@@ -11,7 +11,7 @@ North star: compile a **subset** of php-compiler with itself (native AOT), then 
 | Phase B fixture lint | `php script/bootstrap-aot-lint.php` | ✅ **12** procedural targets under `test/bootstrap-aot/` + `examples/000-HelloWorld` |
 | Phase C native run | `make bootstrap-aot-link` or `./script/bootstrap-aot-link.sh` | ✅ Link + execute **12** `aot_link_targets` (stdout vs Zend PHP) |
 | Phase D `lib/` link | `make bootstrap-aot-link-lib` or `./script/bootstrap-aot-link-lib.sh` | ✅ `test/bootstrap-aot/lib_opcode/main.php` bundles `lib/OpCode.php` ([#540](https://github.com/PurHur/php-compiler/issues/540)) |
-| Bundled `lib/Compiler.php` lint | `./script/bootstrap-selfhost-lint.sh` | ✅ `test/selfhost/compiler_minimal/main.php` + **11** literal `require_once` units toward `bin/vm.php` (no `vendor/`) ([#559](https://github.com/PurHur/php-compiler/issues/559)) |
+| Bundled `lib/Compiler.php` lint | `./script/bootstrap-selfhost-lint.sh` | ✅ `test/selfhost/compiler_minimal/main.php` + **17** literal `require_once` units toward `bin/vm.php` (no `vendor/`) ([#559](https://github.com/PurHur/php-compiler/issues/559)) |
 | Self-host compile probe | `make bootstrap-selfhost-probe` | ✅ `-l` + native `-o build/selfhost`; `LAST_JIT_FUNC:` on segfault (exit 139) ([#816](https://github.com/PurHur/php-compiler/issues/816), [#913](https://github.com/PurHur/php-compiler/issues/913)) |
 | Self-host native link | `./script/bootstrap-selfhost-link.sh` | ✅ `build/selfhost` prints `compiler_minimal bundle OK` ([#557](https://github.com/PurHur/php-compiler/issues/557), [#913](https://github.com/PurHur/php-compiler/issues/913)) |
 
@@ -66,9 +66,13 @@ Incremental growth toward `bin/vm.php` inventory path ([#559](https://github.com
 | `lib/OpCode.php`, `lib/Block.php`, `lib/Frame.php`, `lib/Func.php`, `lib/Func/PHP.php` | CFG / call graph |
 | `lib/Runtime.php` | compile + run entry |
 | `lib/Web/ConstStringFolder.php`, `lib/Web/IncludePathResolver.php` | literal include discovery for `-l` bundle |
+| `lib/Web/DeployRoot.php`, `lib/Web/SourceBundler.php` | AOT bundle path + concat (`bin/compile.php` closure) |
 | `lib/Module.php` | extension module interface (vm.php path) |
-| `lib/VM.php` | interpreter loop (next step toward vm echo path) |
+| `lib/VM.php`, `lib/VM/ClassProperty.php`, `lib/VM/ScriptExit.php` | interpreter + class metadata toward vm echo path |
+| `lib/JIT/OperandName.php`, `lib/Printer.php` | Compiler opcode helpers (names + debug print) |
 | `lib/Compiler.php` | CFG → opcodes |
+
+**Deferred** (PHPCfg gaps or LLVM verify under self-host AOT today): `lib/VM/Variable.php`, `lib/VM/TypeCheck.php` (`match`), `lib/Web/LiteralIncludeDiscovery.php` (arrow fn), explicit `lib/OpCodeNames.php` (large switch; still pulled transitively from `Compiler.php` / `lib/VM.php`).
 
 Native link + run of `compiler_minimal` is gated by `./script/bootstrap-selfhost-link.sh` (LLVM 9; stdout `compiler_minimal bundle OK`). Runtime helpers in the bundle (`VM`, `Runtime`, `Block`, …) are JIT-stubbed for verify; `Compiler` hot paths use existing skip patterns ([#579](https://github.com/PurHur/php-compiler/issues/579), [#913](https://github.com/PurHur/php-compiler/issues/913)). Full `lib/` native self-host remains open.
 

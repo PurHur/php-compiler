@@ -26,23 +26,13 @@ final class CompilerSelfhostLintTest extends TestCase
         $target = $root.'/'.self::BUNDLE_ENTRY;
         $this->assertFileExists($target);
 
-        $cmd = [PHP_BINARY, $bin, '-l', $target];
-        $descriptorSpec = [
-            0 => ['pipe', 'r'],
-            1 => ['pipe', 'w'],
-            2 => ['pipe', 'w'],
-        ];
-        $proc = proc_open($cmd, $descriptorSpec, $pipes, $root);
-        $this->assertIsResource($proc);
-        fclose($pipes[0]);
-        fclose($pipes[1]);
-        $stderr = stream_get_contents($pipes[2]);
-        fclose($pipes[2]);
-        $exit = proc_close($proc);
+        $cmd = escapeshellarg(PHP_BINARY).' '.escapeshellarg($bin)
+            .' -l '.escapeshellarg($target).' 2>&1';
+        exec($cmd, $lines, $exit);
         $this->assertSame(
             0,
             $exit,
-            trim($stderr !== false ? $stderr : '')."\n".'compile.php -l failed for '.self::BUNDLE_ENTRY
+            implode("\n", $lines)."\n".'compile.php -l failed for '.self::BUNDLE_ENTRY
         );
     }
 
@@ -63,13 +53,19 @@ final class CompilerSelfhostLintTest extends TestCase
             'lib/Frame.php',
             'lib/Func.php',
             'lib/Func/PHP.php',
+            'lib/JIT/OperandName.php',
             'lib/Module.php',
             'lib/OpCode.php',
             'lib/OpCodeNames.php',
+            'lib/Printer.php',
             'lib/Runtime.php',
             'lib/VM.php',
+            'lib/VM/ClassProperty.php',
+            'lib/VM/ScriptExit.php',
             'lib/Web/ConstStringFolder.php',
+            'lib/Web/DeployRoot.php',
             'lib/Web/IncludePathResolver.php',
+            'lib/Web/SourceBundler.php',
         ];
         $this->assertSame($expected, $rels);
     }
