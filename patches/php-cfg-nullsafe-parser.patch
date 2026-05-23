@@ -1,0 +1,28 @@
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
+@@ -1222,6 +1222,25 @@
+         return new Op\Expr\Print_($this->readVariable($this->parseExprNode($expr->expr)), $this->mapAttributes($expr));
+     }
+ 
++    protected function parseExpr_NullsafePropertyFetch(Expr\NullsafePropertyFetch $expr)
++    {
++        return new Op\Expr\NullsafePropertyFetch(
++            $this->readVariable($this->parseExprNode($expr->var)),
++            $this->readVariable($this->parseExprNode($expr->name)),
++            $this->mapAttributes($expr)
++        );
++    }
++
++    protected function parseExpr_NullsafeMethodCall(Expr\NullsafeMethodCall $expr)
++    {
++        return new Op\Expr\NullsafeMethodCall(
++            $this->readVariable($this->parseExprNode($expr->var)),
++            $this->readVariable($this->parseExprNode($expr->name)),
++            $this->parseExprList($expr->args, self::MODE_READ),
++            $this->mapAttributes($expr)
++        );
++    }
++
+     protected function parseExpr_PropertyFetch(Expr\PropertyFetch $expr)
+     {
+         return new Op\Expr\PropertyFetch(
