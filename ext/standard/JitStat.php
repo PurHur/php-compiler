@@ -31,9 +31,13 @@ final class JitStat
     private const STAT_MTIME_OFFSET = 88;
 
     private const S_IFMT = 0xF000;
-    private const S_IFREG = 0x8000;
+    private const S_IFIFO = 0x1000;
+    private const S_IFCHR = 0x2000;
     private const S_IFDIR = 0x4000;
+    private const S_IFBLK = 0x6000;
+    private const S_IFREG = 0x8000;
     private const S_IFLNK = 0xA000;
+    private const S_IFSOCK = 0xC000;
 
     /** R_OK for access(2) — read permission (POSIX) */
     private const ACCESS_R_OK = 4;
@@ -64,6 +68,38 @@ final class JitStat
     public static function pathIsLink(Context $context, Value $str): Value
     {
         return self::modeMatches($context, $str, self::S_IFLNK, 'lstat');
+    }
+
+    /** @return Value __value__* (type string, or boolean false when lstat fails) */
+    public static function pathFiletypeBoxed(Context $context, Value $str): Value
+    {
+        $mode = self::loadModeOrFail($context, $str, 'lstat');
+        $i32 = $context->getTypeFromString('int32');
+        $failed = $context->builder->icmp(Builder::INT_SLT, $mode, $i32->constInt(0, true));
+
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $id = (string) (++self::$blockSerial);
+        $failBlock = BasicBlockHelper::append($context, 'filetype_fail_'.$id);
+        $okBlock = BasicBlockHelper::append($context, 'filetype_ok_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, 'filetype_done_'.$id);
+        $context->builder->branchIf($failed, $failBlock, $okBlock);
+
+        $context->builder->positionAtEnd($failBlock);
+        $i1 = $context->getTypeFromString('int1');
+        JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($okBlock);
+        $masked = $context->builder->and(
+            $mode,
+            $i32->constInt(self::S_IFMT, false)
+        );
+        self::writeFiletypeFromMaskedMode($context, $ptr, $masked, $id, 0, $doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+
+        return $ptr;
     }
 
     public static function pathIsReadable(Context $context, Value $str): Value
@@ -256,5 +292,57 @@ final class JitStat
         $minusOne = $i32->constInt(-1, true);
 
         return $context->builder->select($failed, $minusOne, $mode);
+    }
+
+    private static function writeFiletypeFromMaskedMode(
+        Context $context,
+        Value $ptr,
+        Value $masked,
+        string $id,
+        int $pairIndex,
+        $doneBlock
+    ): void {
+        $pairs = [
+            [self::S_IFIFO, 'fifo'],
+            [self::S_IFCHR, 'char'],
+            [self::S_IFDIR, 'dir'],
+            [self::S_IFBLK, 'block'],
+            [self::S_IFLNK, 'link'],
+            [self::S_IFREG, 'file'],
+            [self::S_IFSOCK, 'socket'],
+        ];
+        if ($pairIndex >= \count($pairs)) {
+            self::writeBoxedTypeString($context, $ptr, 'unknown');
+            $context->builder->branch($doneBlock);
+
+            return;
+        }
+        [$modeConst, $label] = $pairs[$pairIndex];
+        $i32 = $context->getTypeFromString('int32');
+        $matchBlock = BasicBlockHelper::append($context, 'filetype_'.$label.'_'.$id);
+        $nextBlock = BasicBlockHelper::append($context, 'filetype_next_'.$pairIndex.'_'.$id);
+        $matches = $context->builder->icmp(
+            Builder::INT_EQ,
+            $masked,
+            $i32->constInt($modeConst, false)
+        );
+        $context->builder->branchIf($matches, $matchBlock, $nextBlock);
+
+        $context->builder->positionAtEnd($matchBlock);
+        self::writeBoxedTypeString($context, $ptr, $label);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($nextBlock);
+        self::writeFiletypeFromMaskedMode($context, $ptr, $masked, $id, $pairIndex + 1, $doneBlock);
+    }
+
+    private static function writeBoxedTypeString(Context $context, Value $ptr, string $label): void
+    {
+        $strVal = $context->builder->load($context->constantStringFromString($label));
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $ptr,
+            $strVal
+        );
     }
 }

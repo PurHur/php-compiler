@@ -161,6 +161,7 @@ class Module extends ModuleAbstract
             new is_writable(),
             new is_executable(),
             new is_link(),
+            new filetype(),
             new fopen(),
             new fread(),
             new fwrite(),

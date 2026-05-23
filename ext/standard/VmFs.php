@@ -50,6 +50,16 @@ final class VmFs
         return (int) $stat['mtime'];
     }
 
+    public static function fileType(string $path): string|false
+    {
+        $type = @filetype($path);
+        if (false === $type) {
+            return false;
+        }
+
+        return $type;
+    }
+
     public static function fileGetContents(string $path): string|false
     {
         if ('php://input' === $path) {
