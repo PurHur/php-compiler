@@ -234,6 +234,22 @@ class JIT {
 
         return $this->compileBlockInternal($func, $block, $limit, null, ...$args);
     }
+
+    /**
+     * Inline an included compilation unit at a dedicated entry block (issue #568 / MiniWebApp templates).
+     */
+    public function compileIncludedAtEntry(
+        PHPLLVM\Value $func,
+        Block $block,
+        PHPLLVM\BasicBlock $entryBlock
+    ): PHPLLVM\BasicBlock {
+        $limit = $block->nOpCodes;
+        if ($limit > 0 && OpCode::TYPE_JUMP === $block->opCodes[$limit - 1]->type) {
+            --$limit;
+        }
+
+        return $this->compileBlockInternal($func, $block, $limit, $entryBlock);
+    }
     
     private function compileBlockInternal(
         PHPLLVM\Value $func,
@@ -753,11 +769,16 @@ class JIT {
                     $equalOp = new OpCode(OpCode::TYPE_EQUAL);
                     $matchVar = $this->context->helper->binaryOp($equalOp, $switchVar, $caseVar);
                     $match = $this->context->helper->loadValue($matchVar);
-                    $caseBb = $this->compileBlockInternal($func, $op->block1, null, null, ...$args);
+                    $caseTail = $this->compileBlockInternal($func, $op->block1, null, null, ...$args);
+                    $caseEntry = $this->context->scope->blockStorage[$op->block1];
                     $nextBb = JIT\BasicBlockHelper::append($this->context, 'switch_next_case');
+                    $builder->positionAtEnd($caseTail);
+                    if (null === $caseTail->getTerminator()) {
+                        $builder->branch($nextBb);
+                    }
                     $builder->positionAtEnd($branchBlock);
                     $this->context->freeDeadVariables($func, $branchBlock, $block);
-                    $builder->branchIf($match, $caseBb, $nextBb);
+                    $builder->branchIf($match, $caseEntry, $nextBb);
                     $builder->positionAtEnd($nextBb);
                     break;
                 case OpCode::TYPE_JUMP:
@@ -838,11 +859,13 @@ class JIT {
                     $condition = $this->context->castToBool(
                         $this->context->helper->loadValue($this->context->getVariableFromOp($block->getOperand($op->arg1)))
                     );
-                    $if = $this->compileBlockInternal($func, $op->block1, null, null, ...$args);
-                    $else = $this->compileBlockInternal($func, $op->block2, null, null, ...$args);
+                    $this->compileBlockInternal($func, $op->block1, null, null, ...$args);
+                    $this->compileBlockInternal($func, $op->block2, null, null, ...$args);
+                    $ifEntry = $this->context->scope->blockStorage[$op->block1];
+                    $elseEntry = $this->context->scope->blockStorage[$op->block2];
                     $builder->positionAtEnd($branchBlock);
                     $this->context->freeDeadVariables($func, $branchBlock, $block);
-                    $builder->branchIf($condition, $if, $else);
+                    $builder->branchIf($condition, $ifEntry, $elseEntry);
                     return $origBasicBlock;
                 case OpCode::TYPE_TRY:
                     $branchBlock = $builder->getInsertBlock();
@@ -1015,6 +1038,20 @@ class JIT {
                 default:
                     throw new \LogicException("Unknown JIT opcode: ". opcode_type_name($op->type));
             }
+        }
+
+        $tail = $builder->getInsertBlock();
+        $isEntryCfg = null !== $block->func && $block->orig === $block->func->cfg;
+        if (
+            0 === $this->context->inlineIncludeDepth
+            && $isEntryCfg
+            && null !== $tail
+            && null === $tail->getTerminator()
+            && $this->isVoidCfgFunction($block)
+        ) {
+            $builder->positionAtEnd($tail);
+            $this->context->freeDeadVariables($func, $tail, $block);
+            $this->context->builder->returnVoid();
         }
 
         return $builder->getInsertBlock();

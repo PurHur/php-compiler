@@ -8,9 +8,9 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 350 |
+| PHP files on vm.php path | 351 |
 | Source constructs flagged (blockers) | 10 |
-| Source constructs flagged (warnings) | 938 |
+| Source constructs flagged (warnings) | 939 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -44,6 +44,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/JitFilesize.php` | 0 | 1 |
 | `ext/standard/JitFiletype.php` | 0 | 1 |
 | `ext/standard/JitFilter.php` | 0 | 1 |
+| `ext/standard/JitFsGlob.php` | 0 | 1 |
 | `ext/standard/JitGetallheaders.php` | 0 | 1 |
 | `ext/standard/JitHash.php` | 0 | 1 |
 | `ext/standard/JitHeader.php` | 0 | 1 |
@@ -435,6 +436,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 
 **Warnings** (review for bootstrap subset):
 - 8 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/JitFsGlob.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/JitGetallheaders.php`
 
@@ -1735,17 +1741,17 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/AOT/Linker.php`
 
 **Blockers** (likely prevent AOT bootstrap compile):
-- shell_exec() (line 135)
-- shell_exec() (line 156)
-- shell_exec() (line 190)
-- shell_exec() (line 194)
-- shell_exec() (line 237)
-- shell_exec() (line 247)
-- shell_exec() (line 317)
-- exec() (line 323)
+- shell_exec() (line 141)
+- shell_exec() (line 162)
+- shell_exec() (line 213)
+- shell_exec() (line 217)
+- shell_exec() (line 260)
+- shell_exec() (line 270)
+- shell_exec() (line 340)
+- exec() (line 346)
 
 **Warnings** (review for bootstrap subset):
-- 11 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 13 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/AOT/ProjectGraph.php`
 
@@ -1941,21 +1947,21 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new Variable (line 169)
 - new JIT\Call\Vararg (line 179)
 - new JIT\Call\Native (line 182)
-- new ext\standard\boolval (line 406)
-- new Operand\Literal (line 460)
-- new Variable (line 568)
-- new Variable (line 686)
-- new OpCode (line 753)
-- new Variable (line 955)
-- new Variable (line 964)
-- new Variable (line 1175)
-- new Variable (line 1426)
-- new Operand\Literal (line 1524)
-- new Operand\Literal (line 1528)
-- new Operand\Literal (line 1532)
-- new Variable (line 1536)
-- new Variable (line 1556)
-- 21 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new ext\standard\boolval (line 422)
+- new Operand\Literal (line 476)
+- new Variable (line 584)
+- new Variable (line 702)
+- new OpCode (line 769)
+- new Variable (line 978)
+- new Variable (line 987)
+- new Variable (line 1212)
+- new Variable (line 1463)
+- new Operand\Literal (line 1561)
+- new Operand\Literal (line 1565)
+- new Operand\Literal (line 1569)
+- new Variable (line 1573)
+- new Variable (line 1593)
+- 22 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Analyzer.php`
 
@@ -2223,23 +2229,23 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/JIT/Context.php`
 
 **Warnings** (review for bootstrap subset):
-- new Scope (line 86)
-- new Analyzer (line 105)
-- new Helper (line 106)
-- new Builtin\Refcount (line 108)
-- new Builtin\Output (line 110)
-- new Builtin\Type (line 111)
-- new Builtin\Internal (line 112)
-- new Builtin\VarArg (line 113)
-- new Builtin\ErrorHandler (line 114)
-- new Scope (line 129)
-- new Call\ExternalMethod (line 140)
-- new Builtin\IsNullFn (line 195)
-- new Builtin\IsNullFn (line 196)
-- new Result (line 251)
-- new Variable (line 338)
-- new Variable (line 572)
-- new Variable (line 607)
+- new Scope (line 89)
+- new Analyzer (line 108)
+- new Helper (line 109)
+- new Builtin\Refcount (line 111)
+- new Builtin\Output (line 113)
+- new Builtin\Type (line 114)
+- new Builtin\Internal (line 115)
+- new Builtin\VarArg (line 116)
+- new Builtin\ErrorHandler (line 117)
+- new Scope (line 132)
+- new Call\ExternalMethod (line 143)
+- new Builtin\IsNullFn (line 198)
+- new Builtin\IsNullFn (line 199)
+- new Result (line 254)
+- new Variable (line 341)
+- new Variable (line 575)
+- new Variable (line 610)
 - 36 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/HashTableHelper.php`
@@ -2270,7 +2276,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/JIT/IncludeHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 6 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/IssetHelper.php`
 
