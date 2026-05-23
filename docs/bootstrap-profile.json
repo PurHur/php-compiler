@@ -27,6 +27,7 @@
     ],
     "excluded_files": [
         "lib/AOT/Linker.php",
+        "lib/JIT.php",
         "lib/JIT/Builtin/StringPregMatch.php",
         "lib/VM/HashTable.php"
     ],
@@ -299,7 +300,6 @@
         "lib/Func/JIT.php",
         "lib/Func/PHP.php",
         "lib/Handler.php",
-        "lib/JIT.php",
         "lib/JIT/Analyzer.php",
         "lib/JIT/ArrayBuiltinHelper.php",
         "lib/JIT/BasicBlockHelper.php",
@@ -425,6 +425,8 @@
         "test/bootstrap-aot/class_int_property.php",
         "test/bootstrap-aot/class_nullable_property.php",
         "test/bootstrap-aot/const_string_folder_deploy_path.php",
+        "test/bootstrap-aot/deploy_path_fold.php",
+        "test/bootstrap-aot/deploy_path_include.php",
         "test/bootstrap-aot/echo_hello.php",
         "test/bootstrap-aot/external_cfg_block_children.php",
         "test/bootstrap-aot/external_method_stub.php",
@@ -450,7 +452,7 @@
         "test/bootstrap-aot/class_const_fetch.php",
         "test/bootstrap-aot/class_constants.php",
         "test/bootstrap-aot/class_nullable_property.php",
-        "test/bootstrap-aot/const_string_folder_deploy_path.php",
+        "test/bootstrap-aot/deploy_path_include.php",
         "test/bootstrap-aot/echo_hello.php",
         "test/bootstrap-aot/external_method_stub.php",
         "test/bootstrap-aot/instanceof_check.php",
@@ -468,9 +470,9 @@
     ],
     "totals": {
         "inventory_files": 384,
-        "excluded": 3,
-        "eligible": 381,
-        "aot_lint_targets": 26,
+        "excluded": 4,
+        "eligible": 380,
+        "aot_lint_targets": 28,
         "aot_link_targets": 20,
         "aot_link_lib_targets": 1
     }

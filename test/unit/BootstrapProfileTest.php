@@ -33,6 +33,11 @@ final class BootstrapProfileTest extends TestCase
         $this->assertContains('test/bootstrap-aot/lib_opcode/main.php', $profile['aot_lint_targets']);
         $this->assertContains('test/bootstrap-aot/isset_array_offset.php', $profile['aot_lint_targets']);
         $this->assertContains('test/bootstrap-aot/isset_array_offset.php', $profile['aot_link_targets']);
+        $this->assertContains('test/bootstrap-aot/deploy_path_include.php', $profile['aot_lint_targets']);
+        $this->assertContains('test/bootstrap-aot/deploy_path_include.php', $profile['aot_link_targets']);
+        $this->assertContains('test/bootstrap-aot/deploy_path_fold.php', $profile['aot_lint_targets']);
+        $this->assertNotContains('test/bootstrap-aot/deploy_path_fold.php', $profile['aot_link_targets']);
+        $this->assertContains('test/bootstrap-aot/const_string_folder_deploy_path.php', $profile['aot_lint_targets']);
         $this->assertNotContains('test/bootstrap-aot/lib_opcode/main.php', $profile['aot_link_targets']);
         $this->assertContains('test/bootstrap-aot/lib_opcode/main.php', $profile['aot_link_lib_targets']);
         $this->assertContains('lib/AOT/Linker.php', $profile['excluded_files']);
