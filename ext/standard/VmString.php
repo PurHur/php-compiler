@@ -145,6 +145,115 @@ final class VmString
         return $out;
     }
 
+    /** wordwrap() — wrap string to width (PHP 8.2 byte subset). */
+    public static function wordwrap(string $text, int $width = 75, string $break = "\n", bool $cut = false): string
+    {
+        $byteLen = self::byteLength($text);
+        if (0 === $byteLen) {
+            return '';
+        }
+        if ('' === $break) {
+            throw new \ValueError('wordwrap(): Argument #3 ($break) must not be empty');
+        }
+        if (0 === $width && $cut) {
+            throw new \ValueError('wordwrap(): Argument #4 ($cut) cannot be true when argument #2 ($width) is 0');
+        }
+
+        $breakLen = self::byteLength($break);
+        if ($cut) {
+            return self::wordwrapHardCut($text, $width, $break);
+        }
+        if (1 === $breakLen) {
+            return self::wordwrapSingleBreak($text, $width, $break[0]);
+        }
+
+        return self::wordwrapGeneral($text, $width, $break, false);
+    }
+
+    /** wordwrap() with cut=true — fixed-width chunks (PHP-compatible for byte strings). */
+    private static function wordwrapHardCut(string $text, int $width, string $break): string
+    {
+        if ($width < 1) {
+            return $text;
+        }
+        $byteLen = self::byteLength($text);
+        $out = '';
+        for ($i = 0; $i < $byteLen; $i += $width) {
+            $out .= self::byteSlice($text, $i, $width);
+            if ($i + $width < $byteLen) {
+                $out .= $break;
+            }
+        }
+
+        return $out;
+    }
+
+    private static function wordwrapSingleBreak(string $text, int $width, string $breakChar): string
+    {
+        $byteLen = self::byteLength($text);
+        $result = $text;
+        $laststart = 0;
+        $lastspace = 0;
+        for ($current = 0; $current < $byteLen; ++$current) {
+            $c = $text[$current];
+            if ($c === $breakChar) {
+                $laststart = $lastspace = $current + 1;
+            } elseif (' ' === $c) {
+                if ($current - $laststart >= $width) {
+                    $result[$current] = $breakChar;
+                    $laststart = $current + 1;
+                }
+                $lastspace = $current;
+            } elseif ($current - $laststart >= $width && $laststart !== $lastspace) {
+                $result[$lastspace] = $breakChar;
+                $laststart = $lastspace + 1;
+            }
+        }
+
+        return $result;
+    }
+
+    private static function wordwrapGeneral(string $text, int $width, string $break, bool $cut): string
+    {
+        $byteLen = self::byteLength($text);
+        $breakLen = self::byteLength($break);
+        $out = '';
+        $laststart = 0;
+        $lastspace = 0;
+        for ($current = 0; $current < $byteLen; ++$current) {
+            if ($current + $breakLen < $byteLen
+                && $text[$current] === $break[0]
+                && self::compareBytes($text, $break, $breakLen, $current)) {
+                $out .= self::byteSlice($text, $laststart, $current - $laststart + $breakLen);
+                $current += $breakLen - 1;
+                $laststart = $lastspace = $current + 1;
+                continue;
+            }
+            $c = $text[$current];
+            if (' ' === $c) {
+                if ($current - $laststart >= $width) {
+                    $out .= self::byteSlice($text, $laststart, $current - $laststart);
+                    $out .= $break;
+                    $laststart = $current + 1;
+                }
+                $lastspace = $current;
+            } elseif ($current - $laststart >= $width && $cut && $laststart >= $lastspace) {
+                $out .= self::byteSlice($text, $laststart, $current - $laststart);
+                $out .= $break;
+                $laststart = $lastspace = $current;
+            } elseif ($current - $laststart >= $width && $laststart < $lastspace) {
+                $out .= self::byteSlice($text, $laststart, $lastspace - $laststart);
+                $out .= $break;
+                $laststart = $lastspace = $lastspace + 1;
+            }
+        }
+        if ($laststart !== $byteLen) {
+            $out .= self::byteSlice($text, $laststart, $byteLen - $laststart);
+        }
+
+        return $out;
+    }
+
     public static function strcmp(string $a, string $b): int
     {
         $lenA = self::byteLength($a);
