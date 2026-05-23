@@ -29,7 +29,7 @@ class Helper {
 
     public function unaryOp(OpCode $opcode, Variable $var): Variable {
         $varValue = $this->loadValue($var);
-        switch ($var->type) {
+        switch ($this->operandJitType($var)) {
             case Variable::TYPE_NATIVE_LONG:
                 switch ($opcode->type) {
                     case OpCode::TYPE_UNARY_MINUS:
@@ -84,8 +84,8 @@ return_bool:
     public function binaryOp(OpCode $opcode, Variable $left, Variable $right): Variable {
         $leftValue = $this->loadValue($left);
         $rightValue = $this->loadValue($right);
-        $leftType = $left->type;
-        $rightType = $right->type;
+        $leftType = $this->operandJitType($left);
+        $rightType = $this->operandJitType($right);
 restart:
         switch (type_pair($leftType, $rightType)) {
             case TYPE_PAIR_NATIVE_LONG_NATIVE_DOUBLE:
@@ -609,13 +609,31 @@ restart:
         }
         if (Variable::TYPE_VALUE === $leftType && Variable::TYPE_VALUE === $rightType) {
             if (OpCode::TYPE_PLUS === $opcode->type) {
-                $leftPtr = Variable::KIND_VARIABLE === $left->kind ? $left->value : $this->loadValue($left);
-                $rightPtr = Variable::KIND_VARIABLE === $right->kind ? $right->value : $this->loadValue($right);
-                $readLong = $this->context->lookupFunction('__value__readLong');
-                $leftLong = $this->context->builder->call($readLong, $leftPtr);
-                $rightLong = $this->context->builder->call($readLong, $rightPtr);
+                $leftLong = JitLongArg::lower($this->context, $left, 'binary op left operand');
+                $rightLong = JitLongArg::lower($this->context, $right, 'binary op right operand');
                 $result = $this->context->builder->addNoSignedWrap($leftLong, $rightLong);
                 goto return_long;
+            }
+            switch ($opcode->type) {
+                case OpCode::TYPE_BITWISE_AND:
+                case OpCode::TYPE_BITWISE_OR:
+                case OpCode::TYPE_BITWISE_XOR:
+                case OpCode::TYPE_SHIFT_LEFT:
+                case OpCode::TYPE_SHIFT_RIGHT:
+                    $leftLong = JitLongArg::lower($this->context, $left, 'binary op left operand');
+                    $rightLong = JitLongArg::lower($this->context, $right, 'binary op right operand');
+                    if (OpCode::TYPE_BITWISE_AND === $opcode->type) {
+                        $result = $this->context->builder->bitwiseAnd($leftLong, $rightLong);
+                    } elseif (OpCode::TYPE_BITWISE_OR === $opcode->type) {
+                        $result = $this->context->builder->bitwiseOr($leftLong, $rightLong);
+                    } elseif (OpCode::TYPE_BITWISE_XOR === $opcode->type) {
+                        $result = $this->context->builder->bitwiseXor($leftLong, $rightLong);
+                    } elseif (OpCode::TYPE_SHIFT_LEFT === $opcode->type) {
+                        $result = $this->context->builder->shl($leftLong, $rightLong);
+                    } else {
+                        $result = $this->context->builder->aShr($leftLong, $rightLong);
+                    }
+                    goto return_long;
             }
             if (OpCode::TYPE_IDENTICAL === $opcode->type) {
                 $result = JitValueCompare::identicalValueToValue($this->context, $left, $right);
@@ -744,11 +762,7 @@ restart:
         }
         if (Variable::TYPE_VALUE === $rightType && Variable::TYPE_VALUE !== $leftType) {
             if (Variable::TYPE_NATIVE_LONG === $leftType || Variable::TYPE_NATIVE_BOOL === $leftType) {
-                $rightPtr = Variable::KIND_VARIABLE === $right->kind ? $right->value : $this->loadValue($right);
-                $rightLong = $this->context->builder->call(
-                    $this->context->lookupFunction('__value__readLong'),
-                    $rightPtr
-                );
+                $rightLong = JitLongArg::lower($this->context, $right, 'binary op right operand');
                 if (Variable::TYPE_NATIVE_BOOL === $leftType) {
                     $__left = $this->context->builder->zExt($leftValue, $rightLong->typeOf());
                 } else {
@@ -898,12 +912,6 @@ return_bool:
                     $this->context->getTypeFromString('__hashtable__*')
                 );
             }
-            if (Variable::TYPE_OBJECT === $variable->objectPropertyType) {
-                return $this->context->builder->pointerCast(
-                    $loaded,
-                    $this->context->getTypeFromString('__object__*')
-                );
-            }
             if (Variable::TYPE_STRING === $variable->objectPropertyType) {
                 return $this->context->builder->pointerCast(
                     $loaded,
@@ -928,6 +936,22 @@ return_bool:
             || OpCode::TYPE_GREATER_OR_EQUAL === $opcodeType
             || OpCode::TYPE_SMALLER === $opcodeType
             || OpCode::TYPE_SMALLER_OR_EQUAL === $opcodeType;
+    }
+
+    private function operandJitType(Variable $var): int
+    {
+        if (null !== $var->objectPropertySlot && null !== $var->objectPropertyType) {
+            if (Variable::TYPE_HASHTABLE === $var->objectPropertyType) {
+                return Variable::TYPE_HASHTABLE;
+            }
+            if (Variable::TYPE_STRING === $var->objectPropertyType) {
+                return Variable::TYPE_STRING;
+            }
+
+            return Variable::TYPE_VALUE;
+        }
+
+        return $var->type;
     }
 
 }

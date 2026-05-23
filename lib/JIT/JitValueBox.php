@@ -37,11 +37,37 @@ final class JitValueBox
         );
     }
 
+    public static function isValueOperand(Variable $var): bool
+    {
+        if (Variable::TYPE_VALUE === $var->type) {
+            return true;
+        }
+        return null !== $var->objectPropertySlot
+            && null !== $var->objectPropertyType
+            && Variable::TYPE_HASHTABLE !== $var->objectPropertyType
+            && Variable::TYPE_STRING !== $var->objectPropertyType;
+    }
+
     /**
      * {@see __value__*} for a boxed {@see Variable::TYPE_VALUE} (by-value or alloca slot).
      */
     public static function valuePtrFromVariable(Context $context, Variable $var): Value
     {
+        if (self::isValueOperand($var) && Variable::TYPE_VALUE !== $var->type) {
+            $valueType = $context->getTypeFromString('__value__');
+            $storage = BasicBlockHelper::entryAlloca($context, $valueType);
+            $valueMap = $context->structFieldMap['__value__'];
+            $context->builder->store(
+                $context->getTypeFromString('int8')->constInt(Variable::TYPE_NULL, false),
+                $context->builder->structGep($storage, $valueMap['type'])
+            );
+            $context->builder->call(
+                $context->lookupFunction('__object__load_value_slot'),
+                $var->objectPropertySlot,
+                $storage
+            );
+            return self::pointer($context, $storage);
+        }
         if (Variable::TYPE_VALUE !== $var->type) {
             throw new \LogicException('valuePtrFromVariable requires TYPE_VALUE');
         }
