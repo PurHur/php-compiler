@@ -30,6 +30,8 @@ final class StringPregMatch
 
         $existing = $context->module->getNamedFunction('__compiler_preg_match');
         if (null !== $existing && $existing->countBasicBlocks() > 0) {
+            self::registerLinkedPregRuntime($context);
+
             return;
         }
 
@@ -44,6 +46,11 @@ final class StringPregMatch
             throw new \LogicException('Failed to link preg_match JIT runtime bitcode');
         }
 
+        self::registerLinkedPregRuntime($context);
+    }
+
+    private static function registerLinkedPregRuntime(Context $context): void
+    {
         $fn = $context->module->getNamedFunction('__compiler_preg_match');
         if (null === $fn) {
             throw new \LogicException('__compiler_preg_match missing after bitcode link');
@@ -55,6 +62,12 @@ final class StringPregMatch
             throw new \LogicException('__compiler_preg_match_all missing after bitcode link');
         }
         $context->registerFunction('__compiler_preg_match_all', $fnAll);
+
+        $fnReplace = $context->module->getNamedFunction('__compiler_preg_replace');
+        if (null === $fnReplace) {
+            throw new \LogicException('__compiler_preg_replace missing after bitcode link');
+        }
+        $context->registerFunction('__compiler_preg_replace', $fnReplace);
     }
 
     private static function ensureBitcode(): string
