@@ -7,10 +7,63 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\VM\Variable;
 
 /**
- * Export VM values to PHP scalars/arrays for json_encode() delegation.
+ * Export/import VM values for json_encode() / json_decode() delegation.
  */
 final class VmJson
 {
+    public static function import(mixed $value): Variable
+    {
+        $var = new Variable();
+        if (null === $value) {
+            $var->null();
+
+            return $var;
+        }
+        if (\is_bool($value)) {
+            $var->bool($value);
+
+            return $var;
+        }
+        if (\is_int($value)) {
+            $var->int($value);
+
+            return $var;
+        }
+        if (\is_float($value)) {
+            $var->float($value);
+
+            return $var;
+        }
+        if (\is_string($value)) {
+            $var->string($value);
+
+            return $var;
+        }
+        if (!\is_array($value)) {
+            throw new \LogicException(
+                'json_decode() result type not supported in this compiler build'
+            );
+        }
+        $ht = new \PHPCompiler\VM\HashTable();
+        $isList = array_is_list($value);
+        foreach ($value as $key => $item) {
+            $slot = self::import($item);
+            if ($isList) {
+                $ht->addIndex((int) $key, $slot);
+            } else {
+                if (!\is_string($key) && !\is_int($key)) {
+                    throw new \LogicException(
+                        'json_decode() only supports string keys in this compiler build'
+                    );
+                }
+                $ht->add((string) $key, $slot);
+            }
+        }
+        $var->array($ht);
+
+        return $var;
+    }
+
     public static function export(Variable $v): mixed
     {
         $v = $v->resolveIndirect();

@@ -118,6 +118,7 @@ static const char *phpc_builtin_functions[] = {
     "is_writable",
     "join",
     "json_encode",
+    "json_decode",
     "lcfirst",
     "log",
     "ltrim",

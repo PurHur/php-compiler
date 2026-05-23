@@ -159,6 +159,7 @@ class Module extends ModuleAbstract
             new ob_get_level(),
             new http_response_code(),
             new json_encode(),
+            new json_decode(),
             new web_int(),
             new web_string(),
             new web_bool(),
