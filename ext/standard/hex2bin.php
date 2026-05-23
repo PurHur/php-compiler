@@ -40,21 +40,7 @@ final class hex2bin extends Internal
             throw new \LogicException('hex2bin() requires exactly one argument');
         }
 
-        return JitHex2bin::convert($context, self::jitStringArg($context, $args[0]));
+        return JitHex2bin::convert($context, $this->jitString($context, $args[0], 'hex2bin() argument #1'));
     }
 
-    private static function jitStringArg(Context $context, JITVariable $arg): Value
-    {
-        if (JITVariable::TYPE_STRING === $arg->type) {
-            return $context->helper->loadValue($arg);
-        }
-        if (JITVariable::TYPE_VALUE === $arg->type) {
-            return $context->builder->call(
-                $context->lookupFunction('__value__readString'),
-                $arg->value
-            );
-        }
-
-        throw new \LogicException('hex2bin() only supports strings in this compiler build');
-    }
 }

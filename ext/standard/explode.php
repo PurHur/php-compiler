@@ -51,15 +51,11 @@ final class explode extends Internal
         if (2 !== \count($args)) {
             throw new \LogicException('explode() requires exactly two arguments in this compiler build');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type
-            || JITVariable::TYPE_STRING !== $args[1]->type) {
-            throw new \LogicException('explode() only supports string arguments in this compiler build');
-        }
         if ('' === ($args[0]->compileTimeString ?? null)) {
             throw new \LogicException('explode(): Argument #1 ($separator) cannot be empty');
         }
-        $delimiter = $context->helper->loadValue($args[0]);
-        $haystack = $context->helper->loadValue($args[1]);
+        $delimiter = $this->jitString($context, $args[0], 'explode() argument #1');
+        $haystack = $this->jitString($context, $args[1], 'explode() argument #2');
 
         return JitExplode::explode($context, $delimiter, $haystack);
     }

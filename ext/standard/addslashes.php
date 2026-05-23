@@ -34,10 +34,7 @@ final class addslashes extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('addslashes() requires exactly one argument in this compiler build');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type) {
-            throw new \LogicException('addslashes() only supports strings in this compiler build');
-        }
 
-        return JitAddslashes::escape($context, $context->helper->loadValue($args[0]));
+        return JitAddslashes::escape($context, $this->jitString($context, $args[0], 'addslashes() argument #1'));
     }
 }

@@ -57,10 +57,7 @@ final class implode extends Internal
         if (2 !== \count($args)) {
             throw new \LogicException($this->getName().'() requires exactly two arguments in this compiler build');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type) {
-            throw new \LogicException($this->getName().'() glue must be a string in this compiler build');
-        }
-        $glue = $context->helper->loadValue($args[0]);
+        $glue = $this->jitString($context, $args[0], $this->getName().'() glue');
         $haystack = $this->loadHaystack($context, $args[1]);
 
         return JitImplode::implode($context, $glue, $haystack);

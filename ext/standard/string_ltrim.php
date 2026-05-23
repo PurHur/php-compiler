@@ -51,10 +51,7 @@ final class string_ltrim extends Internal
         if (1 !== count($args)) {
             throw new \LogicException('ltrim() requires exactly one argument');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type) {
-            throw new \LogicException('ltrim() only supports strings in this compiler build');
-        }
-        $str = $context->helper->loadValue($args[0]);
+        $str = $this->jitString($context, $args[0], 'string_ltrim() argument #1');
         $structName = $str->typeOf()->getElementType()->getName();
         $map = $context->structFieldMap[$structName];
         $len = $context->builder->load(

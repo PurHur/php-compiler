@@ -56,11 +56,8 @@ final class str_contains extends Internal
         if (2 !== count($args)) {
             throw new \LogicException('str_contains() requires exactly two arguments');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type || JITVariable::TYPE_STRING !== $args[1]->type) {
-            throw new \LogicException('str_contains() only supports strings in this compiler build');
-        }
-        $hayPtr = $this->stringDataPtr($context, $context->helper->loadValue($args[0]));
-        $needlePtr = $this->stringDataPtr($context, $context->helper->loadValue($args[1]));
+        $hayPtr = $this->stringDataPtr($context, $this->jitString($context, $args[0], 'str_contains() argument #1'));
+        $needlePtr = $this->stringDataPtr($context, $this->jitString($context, $args[1], 'str_contains() argument #2'));
         $found = $context->builder->call($context->lookupFunction('strstr'), $hayPtr, $needlePtr);
         $null = $context->getTypeFromString('int8*')->constNull();
         $isNull = $context->builder->icmp(Builder::INT_EQ, $found, $null);

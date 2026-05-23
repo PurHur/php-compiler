@@ -46,10 +46,7 @@ final class octdec extends Internal
         if (1 !== count($args)) {
             throw new \LogicException('octdec() requires exactly one argument');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type) {
-            throw new \LogicException('octdec() only supports strings in this compiler build');
-        }
-        $ptr = $this->stringDataPtr($context, $context->helper->loadValue($args[0]));
+        $ptr = $this->stringDataPtr($context, $this->jitString($context, $args[0], 'octdec() argument #1'));
         $endPtr = $context->getTypeFromString('int8**')->constPointerNull();
         $base = $context->getTypeFromString('int32')->constInt(8, false);
         $fn = $context->lookupFunction('strtol');

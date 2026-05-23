@@ -50,9 +50,6 @@ final class strstr extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('strstr() requires two or three arguments in this compiler build');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type || JITVariable::TYPE_STRING !== $args[1]->type) {
-            throw new \LogicException('strstr() only supports strings in this compiler build');
-        }
         $before = null;
         if (3 === $argc) {
             if (JITVariable::TYPE_NATIVE_BOOL !== $args[2]->type) {
@@ -63,8 +60,8 @@ final class strstr extends Internal
 
         return JitStrstr::find(
             $context,
-            $context->helper->loadValue($args[0]),
-            $context->helper->loadValue($args[1]),
+            $this->jitString($context, $args[0], 'strstr() argument #1'),
+            $this->jitString($context, $args[1], 'strstr() argument #2'),
             $before
         );
     }

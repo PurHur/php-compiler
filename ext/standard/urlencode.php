@@ -35,21 +35,7 @@ final class urlencode extends Internal
             throw new \LogicException('urlencode() requires exactly one argument');
         }
 
-        return JitUrlencode::urlencode($context, self::jitStringArg($context, $args[0]));
+        return JitUrlencode::urlencode($context, $this->jitString($context, $args[0], 'urlencode() argument #1'));
     }
 
-    private static function jitStringArg(Context $context, JITVariable $arg): Value
-    {
-        if (JITVariable::TYPE_STRING === $arg->type) {
-            return $context->helper->loadValue($arg);
-        }
-        if (JITVariable::TYPE_VALUE === $arg->type) {
-            return $context->builder->call(
-                $context->lookupFunction('__value__readString'),
-                $arg->value
-            );
-        }
-
-        throw new \LogicException('urlencode() only supports strings in this compiler build');
-    }
 }

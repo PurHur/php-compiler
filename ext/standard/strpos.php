@@ -66,8 +66,8 @@ final class strpos extends Internal
             throw new \LogicException('strpos() offset must be an integer in this compiler build');
         }
 
-        $hay = self::jitStringArg($context, $args[0]);
-        $needle = self::jitStringArg($context, $args[1]);
+        $hay = $this->jitString($context, $args[0], 'strpos() argument #1');
+        $needle = $this->jitString($context, $args[1], 'strpos() argument #2');
         $offset = 3 === $argc
             ? $context->builder->truncOrBitCast($context->helper->loadValue($args[2]), $context->getTypeFromString('int64'))
             : null;
@@ -75,18 +75,4 @@ final class strpos extends Internal
         return JitStrpos::find($context, $hay, $needle, $offset);
     }
 
-    private static function jitStringArg(Context $context, JITVariable $arg): Value
-    {
-        if (JITVariable::TYPE_STRING === $arg->type) {
-            return $context->helper->loadValue($arg);
-        }
-        if (JITVariable::TYPE_VALUE === $arg->type) {
-            return $context->builder->call(
-                $context->lookupFunction('__value__readString'),
-                $arg->value
-            );
-        }
-
-        throw new \LogicException('strpos() only supports strings in this compiler build');
-    }
 }

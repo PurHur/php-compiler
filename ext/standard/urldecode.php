@@ -35,21 +35,7 @@ final class urldecode extends Internal
             throw new \LogicException('urldecode() requires exactly one argument');
         }
 
-        return JitUrlencode::urldecode($context, self::jitStringArg($context, $args[0]));
+        return JitUrlencode::urldecode($context, $this->jitString($context, $args[0], 'urldecode() argument #1'));
     }
 
-    private static function jitStringArg(Context $context, JITVariable $arg): Value
-    {
-        if (JITVariable::TYPE_STRING === $arg->type) {
-            return $context->helper->loadValue($arg);
-        }
-        if (JITVariable::TYPE_VALUE === $arg->type) {
-            return $context->builder->call(
-                $context->lookupFunction('__value__readString'),
-                $arg->value
-            );
-        }
-
-        throw new \LogicException('urldecode() only supports strings in this compiler build');
-    }
 }

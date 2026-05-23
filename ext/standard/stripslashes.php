@@ -34,10 +34,7 @@ final class stripslashes extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('stripslashes() requires exactly one argument in this compiler build');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type) {
-            throw new \LogicException('stripslashes() only supports strings in this compiler build');
-        }
 
-        return JitStripslashes::unescape($context, $context->helper->loadValue($args[0]));
+        return JitStripslashes::unescape($context, $this->jitString($context, $args[0], 'stripslashes() argument #1'));
     }
 }

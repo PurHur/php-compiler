@@ -48,11 +48,8 @@ final class str_starts_with extends Internal
         if (2 !== count($args)) {
             throw new \LogicException('str_starts_with() requires exactly two arguments');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type || JITVariable::TYPE_STRING !== $args[1]->type) {
-            throw new \LogicException('str_starts_with() only supports strings in this compiler build');
-        }
-        $hay = $context->helper->loadValue($args[0]);
-        $needle = $context->helper->loadValue($args[1]);
+        $hay = $this->jitString($context, $args[0], 'str_starts_with() argument #1');
+        $needle = $this->jitString($context, $args[1], 'str_starts_with() argument #2');
         $hayMap = $context->structFieldMap[$hay->typeOf()->getElementType()->getName()];
         $needleMap = $context->structFieldMap[$needle->typeOf()->getElementType()->getName()];
         $hayLen = $context->builder->load($context->builder->structGep($hay, $hayMap['length']));

@@ -37,11 +37,8 @@ final class strcspn extends Internal
         if (2 !== \count($args)) {
             throw new \LogicException('strcspn() requires exactly two arguments in this compiler build');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type || JITVariable::TYPE_STRING !== $args[1]->type) {
-            throw new \LogicException('strcspn() requires two strings in this compiler build');
-        }
-        $p0 = $this->stringDataPtr($context, $context->helper->loadValue($args[0]));
-        $p1 = $this->stringDataPtr($context, $context->helper->loadValue($args[1]));
+        $p0 = $this->stringDataPtr($context, $this->jitString($context, $args[0], 'strcspn() argument #1'));
+        $p1 = $this->stringDataPtr($context, $this->jitString($context, $args[1], 'strcspn() argument #2'));
         $raw = $context->builder->call($context->lookupFunction('strcspn'), $p0, $p1);
         $i64 = $context->getTypeFromString('int64');
 
