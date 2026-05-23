@@ -60,6 +60,62 @@ final class PhpcBuild
     }
 
     /**
+     * Grep-friendly compile-unit summary on stderr; no LLVM (issue #847).
+     */
+    public static function printListUnits(string $projectDir): int
+    {
+        $root = ProjectManifest::resolveProjectDir($projectDir);
+        if (null === $root) {
+            fwrite(STDERR, "phpc build --project --list-units: phpc.json not found in {$projectDir}\n");
+
+            return 1;
+        }
+
+        $graph = ProjectGraph::resolve($projectDir);
+        if ([] !== $graph['errors']) {
+            foreach ($graph['errors'] as $message) {
+                fwrite(STDERR, $message."\n");
+            }
+
+            return 1;
+        }
+
+        $entry = ProjectManifest::resolveEntryPath($root);
+        $binary = ProjectManifest::resolveBinaryOutputPath($root);
+        $units = ProjectGraph::formatFileList($projectDir, $graph['files']);
+
+        if (null !== $entry) {
+            fwrite(STDERR, 'entry: '.self::displayPath($root, $entry)."\n");
+        }
+        fwrite(STDERR, 'units: '.implode(', ', $units)."\n");
+        if (null !== $binary) {
+            fwrite(STDERR, 'binary: '.self::displayPath($root, $binary)."\n");
+        }
+
+        $linter = new Linter();
+        foreach ($graph['files'] as $absolutePath) {
+            if (!is_file($absolutePath)) {
+                continue;
+            }
+            try {
+                $issues = $linter->lintFile($absolutePath);
+            } catch (\Throwable) {
+                continue;
+            }
+            if ([] === $issues) {
+                continue;
+            }
+            $kinds = UnsupportedRegistry::uniqueKinds($issues);
+            fwrite(
+                STDERR,
+                'skipped: '.self::displayPath($root, $absolutePath).' (lint: '.implode(', ', $kinds).")\n"
+            );
+        }
+
+        return 0;
+    }
+
+    /**
      * Print manifest link order (includes[] then entry) as absolute paths; no LLVM (issue #729).
      */
     public static function printIncludes(string $projectDir): int

@@ -74,6 +74,36 @@ ERR;
         $this->assertStringContainsString('#764', $out);
     }
 
+    public function testListUnitsMiniWebAppPrintsEntryUnitsBinary(): void
+    {
+        $repoRoot = dirname(__DIR__, 2);
+        $result = $this->runPhpcBuild(
+            ['--project', $repoRoot.'/examples/003-MiniWebApp', '--list-units'],
+            $repoRoot
+        );
+        $this->assertSame(0, $result['exit'], $result['stderr']);
+        $this->assertSame('', $result['stdout']);
+        $this->assertStringContainsString('entry: public/index.php', $result['stderr']);
+        $this->assertStringContainsString('binary: .phpc/bin/app', $result['stderr']);
+        $this->assertStringContainsString('units:', $result['stderr']);
+        $this->assertStringContainsString('src/Router.php', $result['stderr']);
+        $this->assertStringContainsString('config.php', $result['stderr']);
+    }
+
+    public function testListUnitsWithDryRunExitsBeforeLlvm(): void
+    {
+        $repoRoot = dirname(__DIR__, 2);
+        $result = $this->runPhpcBuild(
+            ['--project', $repoRoot.'/examples/001-SimpleWeb', '--list-units', '--dry-run'],
+            $repoRoot
+        );
+        $this->assertSame(0, $result['exit'], $result['stderr']);
+        $this->assertStringContainsString('entry:', $result['stderr']);
+        $this->assertStringContainsString('units:', $result['stderr']);
+        $this->assertStringNotContainsString('LLVMAbstract', $result['stderr']);
+        $this->assertStringNotContainsString('does not have terminator', $result['stderr']);
+    }
+
     public function testPrintIncludesMiniWebAppManifestLinkOrder(): void
     {
         $repoRoot = dirname(__DIR__, 2);
