@@ -248,6 +248,16 @@ final class VmFs
         return @fclose($fp);
     }
 
+    public static function feof(int $handle): bool
+    {
+        $fp = self::lookup($handle);
+        if (null === $fp) {
+            return true;
+        }
+
+        return \feof($fp);
+    }
+
     private static function lookup(int $handle): mixed
     {
         return self::$handles[$handle] ?? null;

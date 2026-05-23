@@ -199,6 +199,7 @@ class Module extends ModuleAbstract
             new filetype(),
             new fopen(),
             new fread(),
+            new feof_(),
             new fwrite(),
             new fclose(),
             new getenv_(),

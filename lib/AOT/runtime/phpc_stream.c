@@ -148,3 +148,14 @@ int __compiler_fclose(int64_t handle)
 
     return fclose(fp) == 0 ? 1 : 0;
 }
+
+int __compiler_feof(int64_t handle)
+{
+    FILE *fp = phpc_resolve_stream(handle);
+
+    if (NULL == fp) {
+        return 1;
+    }
+
+    return feof(fp) ? 1 : 0;
+}
