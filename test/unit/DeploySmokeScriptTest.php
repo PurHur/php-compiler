@@ -46,6 +46,7 @@ final class DeploySmokeScriptTest extends TestCase
         $this->assertStringContainsString('003-MiniWebApp', $body);
         $this->assertStringContainsString('DEPLOY_SMOKE_003_LAYOUT', $body);
         $this->assertStringContainsString('DEPLOY_SMOKE_003_EXECUTE', $body);
+        $this->assertStringContainsString('DEPLOY_SMOKE_ONLY', $body);
         $this->assertStringContainsString('MINIWEBAPP_AOT_EXECUTE_GATE', $body);
         $this->assertStringContainsString('smoke_003_execute', $body);
         $this->assertStringContainsString('#804', $body);

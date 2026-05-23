@@ -86,6 +86,7 @@ stage3=0
 stage3b=0
 stage4a=0
 stage4c=0
+stage4d=0
 stage4=0
 stage4b2=0
 stage4b2bisect=0
@@ -100,6 +101,9 @@ aot_dry_run_skipped=0
 aot_smoke_003_exit=-1
 aot_smoke_003_skipped=0
 AOT_SMOKE_003_STDERR=""
+deploy_smoke_003_exit=-1
+deploy_smoke_003_skipped=0
+DEPLOY_SMOKE_003_STDERR=""
 
 resolve_llvm_dir() {
   if [[ -n "${PHP_COMPILER_LLVM_PATH:-}" ]]; then
@@ -228,6 +232,28 @@ elif [[ "${aot_dry_run_skipped}" -eq 1 ]]; then
   aot_smoke_003_skipped=1
 fi
 
+# Stage 4d: deploy-smoke 003 execute (#745).
+if [[ -n "${LLVM_DIR}" ]]; then
+  deploy_smoke_log="$(mktemp)"
+  set +e
+  DEPLOY_SMOKE_003_EXECUTE=1 "${ROOT}/script/deploy-smoke.sh" --example 003 >"${deploy_smoke_log}" 2>&1
+  deploy_smoke_003_exit=$?
+  set -e
+  if [[ -s "${deploy_smoke_log}" ]]; then
+    DEPLOY_SMOKE_003_STDERR="$(tail -n 8 "${deploy_smoke_log}")"
+  fi
+  if [[ "${deploy_smoke_003_exit}" -eq 0 ]] \
+    && grep -q '003-MiniWebApp: skip' "${deploy_smoke_log}" 2>/dev/null; then
+    deploy_smoke_003_skipped=1
+  elif [[ "${deploy_smoke_003_exit}" -eq 0 ]] \
+    && grep -q '003-MiniWebApp: ok' "${deploy_smoke_log}" 2>/dev/null; then
+    stage4d=1
+  fi
+  rm -f "${deploy_smoke_log}"
+elif [[ "${aot_dry_run_skipped}" -eq 1 ]]; then
+  deploy_smoke_003_skipped=1
+fi
+
 # Stage 4b2: ordered #764 AOT PHPT ladder (opt-in MINIWEBAPP_AOT_BISECT_GATE=1, #879).
 aot_bisect_gate="${MINIWEBAPP_AOT_BISECT_GATE:-0}"
 if [[ "${aot_bisect_gate}" == "1" && -n "${LLVM_DIR}" ]]; then
@@ -335,13 +361,29 @@ elif [[ "${aot_dry_run_exit}" -ge 0 ]]; then
   fi
 fi
 
+echo "$(mark "${stage4d}") Stage 4d deploy-smoke — phpc deploy + PHPC_DEPLOY_ROOT 003 execute (#745, #718)"
+echo "       ${REPO_URL}/issues/745"
+echo "       ${REPO_URL}/issues/718"
+echo "       DEPLOY_SMOKE_003_EXECUTE=1 ./script/deploy-smoke.sh --example 003"
+if [[ "${aot_dry_run_skipped}" -eq 1 && -z "${LLVM_DIR}" ]]; then
+  echo "       LLVM 9 not available (script/install-llvm9.sh or .llvm/)"
+elif [[ "${deploy_smoke_003_skipped}" -eq 1 ]]; then
+  echo "       003 deploy execute probe: skipped (DEPLOY_SMOKE_003_EXECUTE=0)"
+  if [[ -n "${DEPLOY_SMOKE_003_STDERR}" ]]; then
+    echo "${DEPLOY_SMOKE_003_STDERR}" | sed 's/^/         /'
+  fi
+elif [[ "${deploy_smoke_003_exit}" -eq 0 && "${stage4d}" -eq 1 ]]; then
+  echo "       003 deploy execute probe: green"
+elif [[ "${deploy_smoke_003_exit}" -ge 0 ]]; then
+  echo "       003 deploy execute probe: exit ${deploy_smoke_003_exit} (see #745/#676)"
+  if [[ -n "${DEPLOY_SMOKE_003_STDERR}" ]]; then
+    echo "${DEPLOY_SMOKE_003_STDERR}" | sed 's/^/         /'
+  fi
+fi
+
 echo "$(mark "${stage4c}") Stage 4c AOT smoke — examples-aot-smoke 003 slice (#683, #485)"
 echo "       ${REPO_URL}/issues/683"
 echo "       ${REPO_URL}/issues/485"
-echo "$(mark 0) Stage 4d deploy-smoke — make deploy-smoke / PHPC_DEPLOY_ROOT (#718; 003 execute #764, PHPUnit #612)"
-echo "       ${REPO_URL}/issues/718"
-echo "       ${REPO_URL}/issues/612"
-echo "       make deploy-smoke   # 001/002 when LLVM ready; not wired into ci-local until 003 green"
 if [[ "${aot_dry_run_skipped}" -eq 1 && -z "${LLVM_DIR}" ]]; then
   echo "       LLVM 9 not available (script/install-llvm9.sh or .llvm/)"
 elif [[ "${aot_smoke_003_skipped}" -eq 1 ]]; then
@@ -410,7 +452,8 @@ echo "  eval \"\$(./script/miniwebapp-cgi-env.php --export shellQueryRouteHome)\
 echo "  eval \"\$(./script/miniwebapp-cgi-env.php --export aotFrontController)\""
 echo "  examples/003-MiniWebApp/.phpc/bin/app | wc -c   # stage 4b2 byte probe (#773)"
 echo "  EXAMPLES_AOT_SMOKE_ONLY=003 ./script/examples-aot-smoke.sh   # stage 4c (#683)"
-echo "  make deploy-smoke             # stage 4d shell gate 001/002 (#718)"
+echo "  make deploy-smoke             # stage 4d deploy 001/002; 003 execute via DEPLOY_SMOKE_003_EXECUTE=1 (#745)"
+echo "  DEPLOY_SMOKE_ONLY=003 DEPLOY_SMOKE_003_EXECUTE=1 ./script/deploy-smoke.sh   # stage 4d 003 slice (#745)"
 echo "  ./script/ci-local.sh --filter test003MiniWebAppBuildLinks   # stage 4b link (#754)"
 echo "  MINIWEBAPP_AOT_LINK_GATE=0 ./script/ci-local.sh --filter ExamplesCompileTest   # skip 003 link"
 echo "  ./script/ci-local.sh --filter test003MiniWebAppProjectAotLint   # stage 4a dry-run (#624)"
