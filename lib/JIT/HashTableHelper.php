@@ -447,7 +447,12 @@ final class HashTableHelper
         }
         $zero = $context->constantFromInteger(0, 'size_t');
         $slot = $context->builder->inBoundsGep($array->value, $zero, $index);
-        $context->builder->store($context->helper->loadValue($element), $slot);
+        $elemType = $array->type & ~Variable::IS_NATIVE_ARRAY;
+        if (Variable::TYPE_STRING === $elemType) {
+            $context->builder->store(self::ownedString($context, $element), $slot);
+        } else {
+            $context->builder->store($context->helper->loadValue($element), $slot);
+        }
     }
 
     /**

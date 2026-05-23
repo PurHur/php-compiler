@@ -2367,12 +2367,12 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new Variable (line 278)
 - new Variable (line 320)
 - new Variable (line 382)
-- new Variable (line 468)
-- new Variable (line 501)
-- new Variable (line 625)
-- new Variable (line 660)
-- new Variable (line 702)
-- new Variable (line 704)
+- new Variable (line 473)
+- new Variable (line 506)
+- new Variable (line 630)
+- new Variable (line 665)
+- new Variable (line 707)
+- new Variable (line 709)
 - 20 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Helper.php`
@@ -2490,13 +2490,13 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new self (line 344)
 - new self (line 357)
 - new self (line 364)
-- new Variable (line 459)
-- new Variable (line 483)
-- new Variable (line 529)
-- new Variable (line 543)
-- new Variable (line 584)
-- new Variable (line 603)
-- new Variable (line 624)
+- new Variable (line 470)
+- new Variable (line 494)
+- new Variable (line 540)
+- new Variable (line 554)
+- new Variable (line 595)
+- new Variable (line 614)
+- new Variable (line 635)
 - 15 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/Lint/IncrementDetector.php`
