@@ -147,6 +147,23 @@ ci_run_bootstrap_aot_lint() {
   fi
 }
 
+# compiler_minimal -l/-o probe (issue #816, #829); default on in ci-local llvm tail only.
+ci_run_bootstrap_selfhost_probe() {
+  if [[ "${BOOTSTRAP_SELFHOST_PROBE_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  if ! ci_llvm_ready; then
+    echo "bootstrap-selfhost-probe: skipped (LLVM 9 not available)"
+    return 0
+  fi
+  echo "bootstrap-selfhost-probe (BOOTSTRAP_SELFHOST_PROBE_GATE=1, issue #829)..."
+  local -a probe_args=()
+  if [[ "${BOOTSTRAP_SELFHOST_PROBE_UPDATE:-0}" == "1" ]]; then
+    probe_args+=(--update-inventory)
+  fi
+  "$_CI_SCRIPT_DIR/bootstrap-selfhost-compile-probe.sh" "${probe_args[@]}"
+}
+
 ci_should_run_jit() {
   if [[ -n "${PHP_COMPILER_FORCE_JIT_TESTS:-}" ]]; then
     echo "JIT compliance forced (PHP_COMPILER_FORCE_JIT_TESTS=1)."
