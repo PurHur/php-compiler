@@ -43,7 +43,7 @@ class Native implements Call {
             } elseif (isset($this->defaultArgs[$index])) {
                 $arg = $this->defaultArgs[$index];
             } else {
-                throw new \LogicException("Missing required argument {$index} for {$this->name}()");
+                $arg = $this->missingCallArg($context, $this->argTypes[$index]);
             }
             $argValues[] = $this->compileArg($context, $arg, $index);
         }
