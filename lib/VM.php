@@ -473,8 +473,12 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_CLONE:
-                    // Stub: real clone not implemented yet; assign null so VM can proceed.
-                    $frame->scope[$op->arg1]->null();
+                    $result = $frame->scope[$op->arg1];
+                    $src = $frame->scope[$op->arg2]->resolveIndirect();
+                    if (Variable::TYPE_OBJECT !== $src->type) {
+                        throw new \LogicException('clone requires an object');
+                    }
+                    $result->object($src->toObject()->cloneShallow());
                     break;
                 case OpCode::TYPE_BOOLEAN_NOT:
                     $value = !($frame->scope[$op->arg2]->toBool());
