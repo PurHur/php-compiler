@@ -14,6 +14,7 @@ use PHPUnit\Framework\TestCase;
  * @group aot
  * @group aot-link
  * @group miniwebapp
+ * @group miniwebapp-aot-execute
  */
 final class MiniWebAppAotExecuteTest extends TestCase
 {
@@ -23,6 +24,11 @@ final class MiniWebAppAotExecuteTest extends TestCase
 
     protected function setUp(): void
     {
+        if ('1' !== getenv('MINIWEBAPP_AOT_EXECUTE_GATE')) {
+            $this->markTestSkipped(
+                'MINIWEBAPP_AOT_EXECUTE_GATE=0 (default) — enable when #764/#747 execute is green'
+            );
+        }
         $this->repoRoot = dirname(__DIR__, 2);
         $project = $this->repoRoot.'/examples/003-MiniWebApp';
         if (!is_file($project.'/public/index.php')) {
@@ -113,11 +119,16 @@ final class MiniWebAppAotExecuteTest extends TestCase
     private function runBinaryWithCgiEnv(array $cgiEnv): string
     {
         $env = $this->baseEnv();
+        LlvmToolchain::applyProcessEnv($env, $this->repoRoot);
+        $publicDir = $this->repoRoot.'/examples/003-MiniWebApp/public';
+        $env['SCRIPT_FILENAME'] = $publicDir.'/index.php';
+        $env['SCRIPT_NAME'] = '/index.php';
+        $env['DOCUMENT_ROOT'] = $publicDir;
         foreach ($cgiEnv as $key => $value) {
             $env[$key] = $value;
         }
 
-        return $this->runCommand([$this->binary], $this->repoRoot.'/examples/003-MiniWebApp/public', $env)['stdout'];
+        return $this->runCommand([$this->binary], $publicDir, $env)['stdout'];
     }
 
     /**

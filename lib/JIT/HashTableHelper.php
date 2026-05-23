@@ -14,6 +14,23 @@ use PHPLLVM\Value;
 final class HashTableHelper
 {
     /**
+     * HashTable view without objectPropertySlot — isset()/dim on $this->props['k'] (#764).
+     */
+    public static function asDetachedHashtable(Context $context, Variable $container): Variable
+    {
+        if (Variable::TYPE_HASHTABLE !== $container->type || null === $container->objectPropertySlot) {
+            return $container;
+        }
+
+        return new Variable(
+            $context,
+            Variable::TYPE_HASHTABLE,
+            Variable::KIND_VALUE,
+            $context->helper->loadValue($container)
+        );
+    }
+
+    /**
      * Stable string key for SplObjectStorage object offsets (pointer identity, issue #601).
      */
     public static function objectPointerAsStringKey(Context $context, Variable $keyObject): Variable

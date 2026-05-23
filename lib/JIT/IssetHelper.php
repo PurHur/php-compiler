@@ -170,6 +170,7 @@ final class IssetHelper
         ?Operand $dimOp,
         ?Operand $containerOp
     ): Value {
+        $container = HashTableHelper::asDetachedHashtable($context, $container);
         $superglobalName = self::superglobalName($container, $containerOp);
         if (null !== $superglobalName) {
             $key = $dim->compileTimeString ?? self::literalStringKey($dimOp);
