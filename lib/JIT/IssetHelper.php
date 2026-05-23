@@ -184,6 +184,19 @@ final class IssetHelper
             return $context->type->object->splBackingHashtable($container);
         }
         if (null !== $container->objectPropertySlot) {
+            if (Variable::TYPE_HASHTABLE === $container->objectPropertyType) {
+                $htPtr = $context->builder->pointerCast(
+                    $context->builder->load($container->objectPropertySlot),
+                    $context->getTypeFromString('__hashtable__*')
+                );
+
+                return new Variable(
+                    $context,
+                    Variable::TYPE_HASHTABLE,
+                    Variable::KIND_VALUE,
+                    $htPtr
+                );
+            }
             $valueType = $context->getTypeFromString('__value__');
             $storage = $context->builder->alloca($valueType, 1, 'isset_obj_prop');
             $valueMap = $context->structFieldMap['__value__'];
