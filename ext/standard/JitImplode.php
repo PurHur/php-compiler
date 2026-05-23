@@ -16,8 +16,11 @@ use PHPLLVM\Value;
 
 final class JitImplode
 {
+    private static int $seq = 0;
+
     public static function implode(Context $context, Value $glue, Value $haystack): Value
     {
+        $tag = 'im'.(string) ++self::$seq;
         $num = $context->builder->call(
             $context->lookupFunction('__hashtable__getNumElements'),
             $haystack
@@ -29,9 +32,9 @@ final class JitImplode
         $zeroI64 = $i64->constInt(0, false);
         $oneSize = $sizeT->constInt(1, false);
 
-        $mergeBlock = BasicBlockHelper::append($context, 'implode_merge');
-        $emptyBlock = BasicBlockHelper::append($context, 'implode_empty');
-        $workBlock = BasicBlockHelper::append($context, 'implode_work');
+        $mergeBlock = BasicBlockHelper::append($context, 'implode_merge_'.$tag);
+        $emptyBlock = BasicBlockHelper::append($context, 'implode_empty_'.$tag);
+        $workBlock = BasicBlockHelper::append($context, 'implode_work_'.$tag);
         $isEmpty = $context->builder->icmp(Builder::INT_EQ, $num, $zeroSize);
         $context->builder->branchIf($isEmpty, $emptyBlock, $workBlock);
 
@@ -41,16 +44,16 @@ final class JitImplode
 
         $context->builder->positionAtEnd($workBlock);
         $first = HashTableHelper::readStringAt($context, $haystack, $zeroSize);
-        $resultSlot = $context->builder->alloca($strPtr, 1, 'implode_acc');
+        $resultSlot = $context->builder->alloca($strPtr, 1, 'implode_acc_'.$tag);
         $acc = $context->builder->call($context->lookupFunction('__string__separate'), $first);
         $context->builder->store($acc, $resultSlot);
 
-        $iSlot = $context->builder->alloca($sizeT, 1, 'implode_i');
+        $iSlot = $context->builder->alloca($sizeT, 1, 'implode_i_'.$tag);
         $context->builder->store($oneSize, $iSlot);
 
-        $loopHead = BasicBlockHelper::append($context, 'implode_head');
-        $loopBody = BasicBlockHelper::append($context, 'implode_body');
-        $loopDone = BasicBlockHelper::append($context, 'implode_loop_done');
+        $loopHead = BasicBlockHelper::append($context, 'implode_head_'.$tag);
+        $loopBody = BasicBlockHelper::append($context, 'implode_body_'.$tag);
+        $loopDone = BasicBlockHelper::append($context, 'implode_loop_done_'.$tag);
         $context->builder->branch($loopHead);
 
         $context->builder->positionAtEnd($loopHead);
@@ -79,7 +82,7 @@ final class JitImplode
         $result->addIncoming($emptyStr, $emptyBlock);
         $result->addIncoming($workResult, $loopDone);
 
-        BasicBlockHelper::branchToFreshContinue($context, 'implode_continue');
+        BasicBlockHelper::branchToFreshContinue($context, 'implode_continue_'.$tag);
 
         return $result;
     }

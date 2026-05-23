@@ -16,8 +16,11 @@ use PHPLLVM\Value;
 
 final class JitExplode
 {
+    private static int $seq = 0;
+
     public static function explode(Context $context, Value $delimiter, Value $haystack): Value
     {
+        $tag = 'ex'.(string) ++self::$seq;
         $map = $context->structFieldMap['__string__'];
         $delimLen = $context->builder->load(
             $context->builder->structGep($delimiter, $map['length'])
@@ -31,22 +34,21 @@ final class JitExplode
         $i64 = $context->getTypeFromString('int64');
         $sizeT = $context->getTypeFromString('size_t');
         $zero = $i64->constInt(0, false);
-        $one = $i64->constInt(1, false);
         $sizeOne = $sizeT->constInt(1, false);
 
         $ht = HashTableHelper::alloc($context);
         $setString = $context->lookupFunction('__hashtable__setStringAt');
 
-        $offsetSlot = $context->builder->alloca($i64, 1, 'explode_offset');
-        $idxSlot = $context->builder->alloca($sizeT, 1, 'explode_idx');
+        $offsetSlot = $context->builder->alloca($i64, 1, 'explode_offset_'.$tag);
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'explode_idx_'.$tag);
         $context->builder->store($zero, $offsetSlot);
         $context->builder->store($sizeT->constInt(0, false), $idxSlot);
 
-        $loopHead = BasicBlockHelper::append($context, 'explode_head');
-        $loopBody = BasicBlockHelper::append($context, 'explode_body');
-        $tailBlock = BasicBlockHelper::append($context, 'explode_tail');
-        $appendEmptyBlock = BasicBlockHelper::append($context, 'explode_append_empty');
-        $doneBlock = BasicBlockHelper::append($context, 'explode_done');
+        $loopHead = BasicBlockHelper::append($context, 'explode_head_'.$tag);
+        $loopBody = BasicBlockHelper::append($context, 'explode_body_'.$tag);
+        $tailBlock = BasicBlockHelper::append($context, 'explode_tail_'.$tag);
+        $appendEmptyBlock = BasicBlockHelper::append($context, 'explode_append_empty_'.$tag);
+        $doneBlock = BasicBlockHelper::append($context, 'explode_done_'.$tag);
         $context->builder->branch($loopHead);
 
         $context->builder->positionAtEnd($loopHead);
@@ -94,7 +96,7 @@ final class JitExplode
 
         $context->builder->positionAtEnd($doneBlock);
 
-        BasicBlockHelper::branchToFreshContinue($context, 'explode_continue');
+        BasicBlockHelper::branchToFreshContinue($context, 'explode_continue_'.$tag);
 
         return $ht;
     }
