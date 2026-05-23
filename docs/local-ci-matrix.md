@@ -87,10 +87,18 @@ Defaults are exported from [`script/ci-defaults.env`](../script/ci-defaults.env)
 
 Ladder-only env vars (not in `ci-defaults.env`): `MINIWEBAPP_LINT_GATE` (default `1` in `web-smoke.sh`), `MINIWEBAPP_AOT_BISECT_GATE` (default `0` in `miniwebapp-gates.sh` — [#879](https://github.com/PurHur/php-compiler/issues/879)).
 
+**003 link gate** (default on when LLVM ready — set `0` during execute-only iteration):
+
+```bash
+./script/ci-local.sh --filter 'ExamplesCompileTest::test003MiniWebAppBuildLinks'
+MINIWEBAPP_AOT_LINK_GATE=0 ./script/ci-local.sh --filter ExamplesCompileTest   # skip 003 link (#754)
+```
+
 **#764 execute probe** (opt-in; home route may pass — hello/contact/PATH_INFO still fail on master as of #775):
 
 ```bash
 MINIWEBAPP_AOT_EXECUTE_GATE=1 ./script/ci-local.sh --filter MiniWebAppAotExecuteTest
+MINIWEBAPP_AOT_EXECUTE_GATE=1 ./script/ci-local.sh --filter test003MiniWebAppHomeRouteAotExecutes
 MINIWEBAPP_AOT_EXECUTE_GATE=1 ./script/ci-local.sh --filter test003MiniWebAppExecutesWithCgiEnv
 EXAMPLES_AOT_SMOKE_ONLY=003 ./script/examples-aot-smoke.sh
 DEPLOY_SMOKE_GATE=0 ./script/ci-local.sh   # skip 001/002 deploy smoke (#737)

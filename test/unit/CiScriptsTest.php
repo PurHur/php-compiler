@@ -97,6 +97,17 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('MINIWEBAPP_AOT_EXECUTE_GATE="${MINIWEBAPP_AOT_EXECUTE_GATE:-0}"', $defaults);
     }
 
+    public function testExamplesCompileTestHonorsMiniWebAppAotLinkGate(): void
+    {
+        $source = (string) file_get_contents(dirname(__DIR__).'/unit/ExamplesCompileTest.php');
+        $this->assertStringContainsString('MINIWEBAPP_AOT_LINK_GATE', $source);
+        $this->assertStringContainsString('miniWebAppAotLinkGateEnabled', $source);
+        $this->assertStringContainsString('test003MiniWebAppBuildLinks', $source);
+        $this->assertStringContainsString('test003MiniWebAppHomeRouteAotExecutes', $source);
+        $this->assertStringContainsString('miniWebAppAotExecuteGateEnabled', $source);
+        $this->assertStringContainsString('@group miniwebapp-aot-execute', $source);
+    }
+
     public function testCiLocalExcludesMiniWebAppAotExecuteUnlessGateOn(): void
     {
         $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
@@ -353,7 +364,9 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('EXAMPLES_AOT_SMOKE_ONLY', $doc);
         $this->assertStringContainsString('DEPLOY_SMOKE_GATE', $doc);
         $this->assertStringContainsString('MINIWEBAPP_AOT_EXECUTE_GATE=1', $doc);
+        $this->assertStringContainsString('MINIWEBAPP_AOT_LINK_GATE=0', $doc);
         $this->assertStringContainsString('MINIWEBAPP_AOT_EXECUTE_GATE="${MINIWEBAPP_AOT_EXECUTE_GATE:-0}"', $defaults);
+        $this->assertStringContainsString('MINIWEBAPP_AOT_LINK_GATE="${MINIWEBAPP_AOT_LINK_GATE:-1}"', $defaults);
         $this->assertStringContainsString('EXAMPLES_AOT_SMOKE_GATE="${EXAMPLES_AOT_SMOKE_GATE:-1}"', $defaults);
         $this->assertStringContainsString('DEPLOY_SMOKE_GATE="${DEPLOY_SMOKE_GATE:-1}"', $defaults);
     }

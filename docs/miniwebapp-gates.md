@@ -56,7 +56,8 @@ MINIWEBAPP_WEB_SMOKE_GATE=0 ./script/ci-local.sh
 ./phpc build --project examples/003-MiniWebApp --dry-run
 
 # Stage 4b
-./script/ci-local.sh --filter test003MiniWebAppProjectAotLint
+./script/ci-local.sh --filter test003MiniWebAppBuildLinks
+MINIWEBAPP_AOT_LINK_GATE=0 ./script/ci-local.sh --filter ExamplesCompileTest   # skip link during iteration (#754)
 
 # Stage 4b2 execute (opt-in while #764 open)
 MINIWEBAPP_AOT_EXECUTE_GATE=1 ./script/ci-local.sh --filter MiniWebAppAotExecuteTest
