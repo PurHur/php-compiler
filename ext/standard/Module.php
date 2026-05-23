@@ -205,6 +205,8 @@ class Module extends ModuleAbstract
             new getenv_(),
             new shell_exec(),
             new sys_get_temp_dir(),
+            new getcwd_(),
+            new chdir_(),
             new putenv_(),
             new define_(),
             new defined_(),
@@ -431,6 +433,15 @@ class Module extends ModuleAbstract
             $ft = $context->context->functionType($i32, false, $i8p, $i8p);
             $fn = $context->module->addFunction('rename', $ft);
             $context->registerFunction('rename', $fn);
+        }
+        try {
+            $context->lookupFunction('chdir');
+        } catch (\Throwable $e) {
+            $i8p = $context->getTypeFromString('int8*');
+            $i32 = $context->getTypeFromString('int32');
+            $ft = $context->context->functionType($i32, false, $i8p);
+            $fn = $context->module->addFunction('chdir', $ft);
+            $context->registerFunction('chdir', $fn);
         }
         $double = $context->getTypeFromString('double');
         try {
