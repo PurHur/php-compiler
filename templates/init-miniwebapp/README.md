@@ -33,7 +33,7 @@ curl -s 'http://127.0.0.1:8080/index.php/home'
 phpc build --project .
 ```
 
-`phpc.json` sets `entry`, `public`, `assets`, `includes`, and the default AOT binary path (`.phpc/bin/app`). Native AOT for user classes is tracked in [#568](https://github.com/PurHur/php-compiler/issues/568).
+`phpc.json` sets `entry`, `public`, `assets`, `includes`, and the default AOT binary path (`.phpc/bin/app`). Native AOT execute is tracked in [#764](https://github.com/PurHur/php-compiler/issues/764) (link [#568](https://github.com/PurHur/php-compiler/issues/568) closed).
 
 ## CI gate ladder
 

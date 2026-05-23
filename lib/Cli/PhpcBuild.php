@@ -11,11 +11,11 @@ use PHPCompiler\Lint\UnsupportedRegistry;
 use PHPCompiler\Web\ProjectManifest;
 
 /**
- * phpc build --project orchestration and actionable AOT failure hints (issue #643, #568, #684).
+ * phpc build --project orchestration and actionable AOT failure hints (issue #643, #764, #684).
  */
 final class PhpcBuild
 {
-    private const ISSUE_USER_CLASS = 'https://github.com/PurHur/php-compiler/issues/568';
+    private const ISSUE_USER_CLASS = 'https://github.com/PurHur/php-compiler/issues/764';
 
     private const ISSUE_ROADMAP = 'https://github.com/PurHur/php-compiler/issues/78';
 
@@ -183,7 +183,7 @@ final class PhpcBuild
 
         $classes = self::discoverUserClasses($graph['files'], $root);
         if ([] !== $classes) {
-            fwrite(STDERR, "native link (#568): user-defined classes require native object model\n");
+            fwrite(STDERR, "native link (#764): user-defined classes may still fail AOT execute\n");
             foreach ($classes as $classInfo) {
                 fwrite(STDERR, "  class {$classInfo['class']} ({$classInfo['file']})\n");
                 foreach ($classInfo['methods'] as $method) {
@@ -201,7 +201,7 @@ final class PhpcBuild
     }
 
     /**
-     * True when compile/link stderr matches the known user-class AOT gap (#568).
+     * True when compile/link stderr matches known MiniWebApp AOT execute gaps (#764).
      */
     public static function isUserClassAotBlocked(string $stderr): bool
     {
@@ -236,8 +236,8 @@ final class PhpcBuild
         return implode("\n", [
             '',
             '---',
-            'phpc build --project: user-defined classes are not yet linkable in native AOT (#568).',
-            'Tracking: #568 — '.self::ISSUE_USER_CLASS.' (native user-class object model)',
+            'phpc build --project: native AOT execute may still fail for user-class projects (#764).',
+            'Tracking: #764 — '.self::ISSUE_USER_CLASS.' (native AOT execute / MiniWebApp)',
             'Roadmap: '.self::ISSUE_ROADMAP,
             'Next steps:',
             '  ./phpc lint --all <project>',

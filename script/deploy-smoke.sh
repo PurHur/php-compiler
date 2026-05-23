@@ -3,7 +3,7 @@
 #
 # Builds a shipped web example, runs phpc deploy, and executes bin/app under
 # PHPC_DEPLOY_ROOT with CGI-style env (no HTTP server). Skips with exit 0 when
-# LLVM 9 is missing. 003-MiniWebApp stays skipped until #568 (PHPUnit: #612).
+# LLVM 9 is missing. 003-MiniWebApp stays skipped until AOT execute #764 (PHPUnit: #612).
 #
 # Usage:
 #   ./script/deploy-smoke.sh
@@ -28,7 +28,7 @@ Usage: script/deploy-smoke.sh [--example 001|002]
   001  examples/001-SimpleWeb (QUERY_STRING=name=…)
   002  examples/002-StaticWeb (default; static HTML)
 
-003-MiniWebApp is skipped until native user-class AOT (#568); see #612.
+003-MiniWebApp is skipped until native AOT execute (#764); see #612.
 EOF
   exit 1
 }
@@ -186,7 +186,7 @@ smoke_003_miniwebapp() {
     echo "deploy-smoke: 003-MiniWebApp: skip (tree missing #246)" >&2
     return 0
   fi
-  echo "deploy-smoke: 003-MiniWebApp: skip (AOT link blocked #568; PHPUnit dist E2E #612)" >&2
+  echo "deploy-smoke: 003-MiniWebApp: skip (AOT execute blocked #764; PHPUnit dist E2E #612)" >&2
   return 0
 }
 

@@ -904,7 +904,7 @@ final class ExamplesCompileTest extends TestCase
         $stderrText = trim($stderr !== false ? $stderr : '');
         if (0 !== $exit && PhpcBuild::isUserClassAotBlocked($stderrText)) {
             $this->markTestSkipped(
-                '003-MiniWebApp native AOT link blocked until user-class object model (#568): '.$stderrText
+                '003-MiniWebApp native AOT execute blocked (#764): '.$stderrText
             );
         }
         $this->assertSame(

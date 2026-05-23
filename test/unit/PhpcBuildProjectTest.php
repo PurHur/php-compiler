@@ -28,11 +28,11 @@ ERR;
         $this->assertTrue(PhpcBuild::isUserClassAotBlocked($stderr));
     }
 
-    public function testTrailerContainsIssue568AndGuidance(): void
+    public function testTrailerContainsIssue764AndGuidance(): void
     {
         $trailer = PhpcBuild::formatUserClassTrailer();
-        $this->assertStringContainsString('#568', $trailer);
-        $this->assertStringContainsString('user-defined classes', $trailer);
+        $this->assertStringContainsString('#764', $trailer);
+        $this->assertStringContainsString('user-class projects', $trailer);
         $this->assertStringContainsString('phpc lint', $trailer);
         $this->assertStringContainsString('phpc serve', $trailer);
         $this->assertStringContainsString('miniwebapp-gates', $trailer);
@@ -61,7 +61,7 @@ ERR;
             false
         );
         $this->assertStringNotContainsString('terminator', $out);
-        $this->assertStringContainsString('#568', $out);
+        $this->assertStringContainsString('#764', $out);
     }
 
     public function testEmitBuildOutputKeepsLlvmStderrWhenVerbose(): void
@@ -71,7 +71,7 @@ ERR;
             true
         );
         $this->assertStringContainsString('terminator', $out);
-        $this->assertStringContainsString('#568', $out);
+        $this->assertStringContainsString('#764', $out);
     }
 
     public function testPrintIncludesMiniWebAppManifestLinkOrder(): void
@@ -154,7 +154,7 @@ ERR;
         $stderr = false !== $stderr ? $stderr : '';
         if (0 !== $exit && PhpcBuild::isUserClassAotBlocked($stderr)) {
             $this->markTestSkipped(
-                '003-MiniWebApp native AOT link blocked until user-class object model (#568): '.trim($stderr)
+                '003-MiniWebApp native AOT execute blocked (#764): '.trim($stderr)
             );
         }
         $this->assertSame(0, $exit, 'phpc build --project failed: '.substr($stderr, 0, 500));

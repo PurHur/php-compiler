@@ -11,7 +11,7 @@
 # Docker:
 #   docker run --rm -v "$(pwd):/compiler" -w /compiler php-compiler:22.04-dev make examples-aot-smoke
 #
-# 003-MiniWebApp stays skipped until #568 / #485 (native user-class AOT link).
+# 003-MiniWebApp stays skipped until native AOT execute is green (#764, #485).
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -120,18 +120,18 @@ run_binary() {
 }
 
 # 003-MiniWebApp project AOT + CLI execute (issue #485, #683).
-# Exit 0 + stderr "skip" until #568; exit 0 + "ok" when green; exit 1 on failure.
+# Exit 0 + stderr "skip" until #764 execute is green; exit 0 + "ok" when green; exit 1 on failure.
 smoke_003_miniwebapp() {
   if [[ ! -d "${MINIWEBAPP}/public" ]]; then
     echo "examples-aot-smoke: 003-MiniWebApp: skip (tree missing #246)" >&2
     return 0
   fi
 
-  # Blocked: native user-class AOT link (#568). Remove this block when #485 is green.
-  echo "examples-aot-smoke: 003-MiniWebApp: skip (AOT link blocked #568; see #485)" >&2
+  # Blocked: native MiniWebApp AOT execute (#764). Remove when #485 / #809 are green.
+  echo "examples-aot-smoke: 003-MiniWebApp: skip (AOT execute blocked #764; see #485)" >&2
   return 0
 
-  # --- unblocked path (enable when #568 lands) ---
+  # --- unblocked path (enable when #764 lands) ---
   # local outfile="${SMOKE_ROOT}/003-MiniWebApp/app"
   # echo "examples-aot-smoke: 003-MiniWebApp: phpc build --project -> ${outfile}"
   # "$PHPC" build --project "${MINIWEBAPP}" -o "$outfile"

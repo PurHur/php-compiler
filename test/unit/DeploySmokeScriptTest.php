@@ -44,7 +44,7 @@ final class DeploySmokeScriptTest extends TestCase
     {
         $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/deploy-smoke.sh');
         $this->assertStringContainsString('003-MiniWebApp', $body);
-        $this->assertStringContainsString('#568', $body);
+        $this->assertStringContainsString('#764', $body);
         $this->assertStringContainsString('#612', $body);
         $this->assertStringContainsString('PHPC_DEPLOY_ROOT', $body);
         $this->assertStringContainsString('--example', $body);

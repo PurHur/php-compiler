@@ -65,7 +65,7 @@ final class MiniWebAppAotExecuteTest extends TestCase
         $stderr = false !== $stderr ? $stderr : '';
         if (0 !== $exit && PhpcBuild::isUserClassAotBlocked($stderr)) {
             $this->markTestSkipped(
-                '003-MiniWebApp native AOT link blocked (#568): '.trim($stderr)
+                '003-MiniWebApp native AOT execute blocked (#764): '.trim($stderr)
             );
         }
         $this->assertSame(0, $exit, 'phpc build --project failed: '.substr($stderr, 0, 500));
