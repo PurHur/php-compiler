@@ -77,6 +77,22 @@ DEPLOY_SMOKE_003_EXECUTE=1 ../../script/deploy-smoke.sh --example 003
 DEPLOY_SMOKE_ONLY=003 DEPLOY_SMOKE_003_EXECUTE=1 make deploy-smoke
 ```
 
+## Production deploy (AOT dist + nginx)
+
+Build, deploy, and set `PHPC_DEPLOY_ROOT` as above. For production nginx in front of `bin/app`:
+
+- **Dynamic routes** (`/index.php`, PATH_INFO, `?route=`) → CGI/FastCGI to the native binary
+- **Static assets** (`/assets/style.css`) → nginx `alias` to dist `assets/` — the AOT binary does not serve CSS in v1
+- **`templates/`** — not web-exposed; copied for runtime includes only
+
+Copy-paste nginx snippets, dist tree, and local file smoke: [docs/deploy-web-aot.md § Static assets](../../docs/deploy-web-aot.md#static-assets--front-controller-003-miniwebapp) ([#696](https://github.com/PurHur/php-compiler/issues/696)). Full production guide: [#445](https://github.com/PurHur/php-compiler/issues/445).
+
+```console
+../../phpc build --project .
+../../phpc deploy . -o /tmp/miniwebapp-dist
+test -f /tmp/miniwebapp-dist/assets/style.css
+```
+
 ## Run matrix
 
 | Mode | Status | Command |
