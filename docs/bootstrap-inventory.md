@@ -28,11 +28,6 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - `Unknown Operand Type: `
 - `Unknown Terminal Type: `
 
-
-## Live self-host compile probe
-
-- `LLVM segfault during native compile (exit 139)`
-
 ## Files
 
 | File | Blockers | Warnings |
@@ -2518,9 +2513,9 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/JIT/IssetHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 163)
-- new Variable (line 193)
-- new Variable (line 212)
+- new Variable (line 171)
+- new Variable (line 201)
+- new Variable (line 220)
 - 10 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/IteratorHelper.php`
