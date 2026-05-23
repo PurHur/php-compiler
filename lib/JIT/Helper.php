@@ -612,15 +612,39 @@ restart:
             }
         }
         if (Variable::TYPE_VALUE === $leftType && Variable::TYPE_VALUE !== $rightType) {
-            if (OpCode::TYPE_PLUS === $opcode->type && Variable::TYPE_NATIVE_LONG === $rightType) {
+            if (Variable::TYPE_NATIVE_LONG === $rightType) {
                 $leftPtr = Variable::KIND_VARIABLE === $left->kind ? $left->value : $this->loadValue($left);
                 $leftLong = $this->context->builder->call(
                     $this->context->lookupFunction('__value__readLong'),
                     $leftPtr
                 );
                 $__right = $this->context->builder->intCast($rightValue, $leftLong->typeOf());
-                $result = $this->context->builder->addNoSignedWrap($leftLong, $__right);
-                goto return_long;
+                switch ($opcode->type) {
+                    case OpCode::TYPE_PLUS:
+                        $result = $this->context->builder->addNoSignedWrap($leftLong, $__right);
+                        goto return_long;
+                    case OpCode::TYPE_MINUS:
+                        $result = $this->context->builder->subNoSignedWrap($leftLong, $__right);
+                        goto return_long;
+                    case OpCode::TYPE_MUL:
+                        $result = $this->context->builder->mulNoSignedWrap($leftLong, $__right);
+                        goto return_long;
+                    case OpCode::TYPE_BITWISE_AND:
+                        $result = $this->context->builder->bitwiseAnd($leftLong, $__right);
+                        goto return_long;
+                    case OpCode::TYPE_BITWISE_OR:
+                        $result = $this->context->builder->bitwiseOr($leftLong, $__right);
+                        goto return_long;
+                    case OpCode::TYPE_BITWISE_XOR:
+                        $result = $this->context->builder->bitwiseXor($leftLong, $__right);
+                        goto return_long;
+                    case OpCode::TYPE_SHIFT_LEFT:
+                        $result = $this->context->builder->shl($leftLong, $__right);
+                        goto return_long;
+                    case OpCode::TYPE_SHIFT_RIGHT:
+                        $result = $this->context->builder->aShr($leftLong, $__right);
+                        goto return_long;
+                }
             }
             if (Variable::TYPE_NATIVE_LONG === $rightType && self::isOrderedCompareOpcode($opcode->type)) {
                 $result = JitValueCompare::orderedValueToNativeLong(
@@ -671,15 +695,39 @@ restart:
             }
         }
         if (Variable::TYPE_VALUE === $rightType && Variable::TYPE_VALUE !== $leftType) {
-            if (OpCode::TYPE_PLUS === $opcode->type && Variable::TYPE_NATIVE_LONG === $leftType) {
+            if (Variable::TYPE_NATIVE_LONG === $leftType) {
                 $rightPtr = Variable::KIND_VARIABLE === $right->kind ? $right->value : $this->loadValue($right);
                 $rightLong = $this->context->builder->call(
                     $this->context->lookupFunction('__value__readLong'),
                     $rightPtr
                 );
                 $__left = $this->context->builder->intCast($leftValue, $rightLong->typeOf());
-                $result = $this->context->builder->addNoSignedWrap($__left, $rightLong);
-                goto return_long;
+                switch ($opcode->type) {
+                    case OpCode::TYPE_PLUS:
+                        $result = $this->context->builder->addNoSignedWrap($__left, $rightLong);
+                        goto return_long;
+                    case OpCode::TYPE_MINUS:
+                        $result = $this->context->builder->subNoSignedWrap($__left, $rightLong);
+                        goto return_long;
+                    case OpCode::TYPE_MUL:
+                        $result = $this->context->builder->mulNoSignedWrap($__left, $rightLong);
+                        goto return_long;
+                    case OpCode::TYPE_BITWISE_AND:
+                        $result = $this->context->builder->bitwiseAnd($__left, $rightLong);
+                        goto return_long;
+                    case OpCode::TYPE_BITWISE_OR:
+                        $result = $this->context->builder->bitwiseOr($__left, $rightLong);
+                        goto return_long;
+                    case OpCode::TYPE_BITWISE_XOR:
+                        $result = $this->context->builder->bitwiseXor($__left, $rightLong);
+                        goto return_long;
+                    case OpCode::TYPE_SHIFT_LEFT:
+                        $result = $this->context->builder->shl($__left, $rightLong);
+                        goto return_long;
+                    case OpCode::TYPE_SHIFT_RIGHT:
+                        $result = $this->context->builder->aShr($__left, $rightLong);
+                        goto return_long;
+                }
             }
             if (Variable::TYPE_NATIVE_LONG === $leftType && self::isOrderedCompareOpcode($opcode->type)) {
                 $result = JitValueCompare::orderedNativeLongToValue(
