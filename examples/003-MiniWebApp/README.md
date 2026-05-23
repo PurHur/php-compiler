@@ -105,6 +105,7 @@ test -f /tmp/miniwebapp-dist/assets/style.css
 | JIT | partial | [#207](https://github.com/PurHur/php-compiler/issues/207) |
 | AOT link | ✅ | `../../phpc build --project .` when LLVM ready (`MINIWEBAPP_AOT_LINK_GATE=1` default — [#754](https://github.com/PurHur/php-compiler/issues/754)) |
 | AOT execute | ✅ | `MiniWebAppAotExecuteTest` + `ExamplesCompileTest` execute methods (`MINIWEBAPP_AOT_EXECUTE_GATE=1` default — [#747](https://github.com/PurHur/php-compiler/issues/747), [#764](https://github.com/PurHur/php-compiler/issues/764) closed) |
+| AOT preflight | ✅ | `phpc doctor --aot-project-probe` — build + home-route execute needle ([#746](https://github.com/PurHur/php-compiler/issues/746)) |
 
 ### curl recipes (PATH_INFO)
 

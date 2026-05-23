@@ -363,6 +363,89 @@ final class Doctor
     }
 
     /**
+     * Run script/aot-project-probe.php (MiniWebApp AOT build + execute — issue #746).
+     *
+     * @param string|null $projectDir Absolute project path, or null for examples/003-MiniWebApp
+     */
+    public static function runAotProjectProbe(string $repoRoot, ?string $projectDir = null, bool $echoOutput = true): int
+    {
+        $script = $repoRoot.'/script/aot-project-probe.php';
+        if (!is_file($script)) {
+            if ($echoOutput) {
+                fwrite(STDERR, "AOT project probe: {$script} missing\n");
+            }
+
+            return 2;
+        }
+
+        $cmd = self::phpBinary();
+        $cmd[] = $script;
+        if (null !== $projectDir && '' !== $projectDir) {
+            $resolved = realpath($projectDir);
+            if (false === $resolved) {
+                if ($echoOutput) {
+                    fwrite(STDERR, "AOT project probe: project directory not found: {$projectDir}\n");
+                }
+
+                return 2;
+            }
+            $default = realpath($repoRoot.'/examples/003-MiniWebApp');
+            if (false === $default || $resolved !== $default) {
+                $cmd[] = self::relativeProjectArg($repoRoot, $resolved);
+            }
+        }
+
+        $info = self::resolveLlvmInfo($repoRoot);
+        $env = $_ENV;
+        if (null !== $info['dir']) {
+            self::applyLlvmProcessEnvToArray($info['dir'], $env);
+        }
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open($cmd, $descriptorSpec, $pipes, $repoRoot, $env);
+        if (!is_resource($proc)) {
+            if ($echoOutput) {
+                fwrite(STDERR, "AOT project probe: failed to start aot-project-probe.php\n");
+            }
+
+            return 2;
+        }
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+        if ($echoOutput) {
+            if (false !== $stdout && '' !== $stdout) {
+                fwrite(STDOUT, $stdout);
+            }
+            if (false !== $stderr && '' !== $stderr) {
+                fwrite(STDERR, $stderr);
+            }
+        }
+
+        return is_int($exit) ? $exit : 1;
+    }
+
+    private static function relativeProjectArg(string $repoRoot, string $projectDir): string
+    {
+        $root = realpath($repoRoot);
+        if (false === $root) {
+            return $projectDir;
+        }
+        $prefix = $root.'/';
+        if (str_starts_with($projectDir, $prefix)) {
+            return substr($projectDir, strlen($prefix));
+        }
+
+        return $projectDir;
+    }
+
+    /**
      * @return array{name: string, ok: bool, required: bool, detail: string, hint: string}
      */
     private static function checkLoopback(string $repoRoot): array
