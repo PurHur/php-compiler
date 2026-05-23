@@ -20,7 +20,7 @@ cd php-compiler
 composer install
 ./phpc test --fast             # VM/compliance only (no LLVM compile)
 ./phpc test                    # full suite (VM, JIT, AOT lint + link)
-mkdir my-app && ./phpc init my-app   # phpc.json + public/index.php scaffold
+mkdir my-app && ./phpc init my-app   # phpc.json + public/index.php scaffold (see docs/phpc-json.md)
 ./phpc init --profile miniwebapp my-app   # Router + templates (see examples/003-MiniWebApp/)
 ./phpc run -r 'echo 1;'        # VM mode (or: php bin/vm.php -r 'echo 1;')
 ./phpc run -q 'name=Dev' examples/001-SimpleWeb/example.php   # web example without TCP
@@ -77,6 +77,8 @@ On harness hosts with an empty bind-mount, use `./script/docker-ci-local.sh` or 
 | Phase C native link | `make bootstrap-aot-link` | ✅ **11** link targets ([#538](https://github.com/PurHur/php-compiler/pull/538), [#545](https://github.com/PurHur/php-compiler/pull/545)) |
 | Bundled compiler lint | `./script/bootstrap-selfhost-lint.sh` | ✅ `compiler_minimal` closure **lint** ([#559](https://github.com/PurHur/php-compiler/issues/559)) |
 | Self-host compile probe | `make bootstrap-selfhost-probe` | ✅ `-l` + `-o build/selfhost` ([#816](https://github.com/PurHur/php-compiler/issues/816), [#913](https://github.com/PurHur/php-compiler/issues/913)) |
+| Self-host probe in full CI | `./script/ci-local.sh` | ✅ default-on in LLVM tail; `BOOTSTRAP_SELFHOST_PROBE_GATE=0` to skip ([#829](https://github.com/PurHur/php-compiler/issues/829)) |
+| Wave gate in full CI | `./script/ci-local.sh` | ✅ default-on in LLVM tail; `BOOTSTRAP_WAVE_CHECK=0` to skip |
 | Self-host native link | `./script/bootstrap-selfhost-link.sh` | ✅ `build/selfhost` → `compiler_minimal bundle OK` ([#557](https://github.com/PurHur/php-compiler/issues/557), [#913](https://github.com/PurHur/php-compiler/issues/913)) |
 | Phase D `lib/` link | `make bootstrap-aot-link-lib` | ✅ `lib/OpCode.php` bundle ([#540](https://github.com/PurHur/php-compiler/issues/540)) |
 
@@ -148,7 +150,7 @@ phpc serve --aot 127.0.0.1:8080 examples/001-SimpleWeb
 curl 'http://127.0.0.1:8080/example.php?name=Dev'
 ```
 
-Use `--binary path` or a `phpc.json` `"binary"` field to point at the executable. AOT binaries refresh `$_GET` / `$_SERVER` from `QUERY_STRING` and related env on each run; pass `-q` to `phpc build` to bake superglobals for static pages instead.
+Use `--binary path` or a `phpc.json` `"binary"` field to point at the executable. Manifest reference: [docs/phpc-json.md](docs/phpc-json.md). AOT binaries refresh `$_GET` / `$_SERVER` from `QUERY_STRING` and related env on each run; pass `-q` to `phpc build` to bake superglobals for static pages instead.
 
 Uncaught errors return HTTP 500 with a generic body. Set `PHP_COMPILER_DEBUG=1` to include the exception class, message, and stack trace in the response (details are always logged to stderr).
 

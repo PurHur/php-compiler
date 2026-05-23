@@ -3,6 +3,9 @@
 #
 # Use while iterating on compiler/VM changes. Before merge, run ./script/ci-local.sh
 # (or: phpc test, make test) for the full JIT/AOT/link gate.
+#
+# Optional bootstrap tail (aot-lint + selfhost-probe + wave-check when LLVM ready):
+#   CI_FAST_BOOTSTRAP=1 ./script/ci-fast.sh
 set -euo pipefail
 
 # shellcheck source=ci-common.sh
@@ -49,6 +52,20 @@ echo "PHPUnit (fast): MiniWebApp project lint (PhpcLintProjectTest)..."
 if [[ "${MINIWEBAPP_VM_CLI_GATE:-1}" == "1" ]]; then
   echo "PHPUnit (fast): MiniWebApp VM CLI gates (MiniWebApp*VmCli)..."
   "$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit --filter 'MiniWebApp.*VmCli'
+fi
+
+# Optional bootstrap tail when LLVM 9 present (aot-lint + probe + wave-check; issue #436).
+if [[ "${CI_FAST_BOOTSTRAP:-0}" == "1" ]]; then
+  if ci_llvm_ready; then
+    ci_apply_llvm_memory_env
+    ci_run_bootstrap_aot_lint
+    BOOTSTRAP_SELFHOST_PROBE_GATE="${BOOTSTRAP_SELFHOST_PROBE_GATE:-1}" ci_run_bootstrap_selfhost_probe
+    echo "PHPUnit (fast+bootstrap): AOT lint (@group aot-lint)..."
+    "$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit --group aot-lint "$@"
+    BOOTSTRAP_WAVE_CHECK="${BOOTSTRAP_WAVE_CHECK:-1}" ci_run_bootstrap_wave_check
+  else
+    echo "CI_FAST_BOOTSTRAP=1: bootstrap tail skipped (LLVM 9 not available)"
+  fi
 fi
 
 echo "Fast CI finished. Full LLVM compile gate: ./script/ci-local.sh (issue #436)."

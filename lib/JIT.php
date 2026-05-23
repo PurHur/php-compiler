@@ -410,7 +410,7 @@ class JIT {
             || str_contains($lower, 'deployroot')
             || str_contains($lower, 'sourcebundler')
             || str_contains($lower, 'conststringfolder')
-            || str_contains($lower, 'superglobals');
+            || (str_contains($lower, '\\web\\superglobals::') && !str_ends_with($lower, '::issuperglobalname'));
     }
 
     private function collectStubFunctionArgTypes(Block $block): array

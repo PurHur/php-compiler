@@ -1,6 +1,6 @@
 # 003-MiniWebApp
 
-Reference web app: skeleton [#67](https://github.com/PurHur/php-compiler/issues/67) closed ([#246](https://github.com/PurHur/php-compiler/issues/246)); VM/runtime tracker [#539](https://github.com/PurHur/php-compiler/issues/539); routing [#210](https://github.com/PurHur/php-compiler/issues/210). `phpc serve` and lint are green; PATH_INFO URLs in [#489](https://github.com/PurHur/php-compiler/issues/489); AOT execute [#454](https://github.com/PurHur/php-compiler/issues/454). VM/JIT/AOT matrix for PATH_INFO, deploy includes, and CGI: [capabilities-syntax.md § Web north-star](../../docs/capabilities-syntax.md#web-north-star-examples003-miniwebapp) ([#655](https://github.com/PurHur/php-compiler/issues/655)).
+Reference web app: skeleton [#67](https://github.com/PurHur/php-compiler/issues/67) closed ([#246](https://github.com/PurHur/php-compiler/issues/246)); VM/runtime tracker [#539](https://github.com/PurHur/php-compiler/issues/539); routing [#210](https://github.com/PurHur/php-compiler/issues/210). `phpc serve` and lint are green; PATH_INFO URLs in [#489](https://github.com/PurHur/php-compiler/issues/489); AOT link ✅ ([#752](https://github.com/PurHur/php-compiler/issues/752)); native execute [#764](https://github.com/PurHur/php-compiler/issues/764). VM/JIT/AOT matrix for PATH_INFO, deploy includes, and CGI: [capabilities-syntax.md § Web north-star](../../docs/capabilities-syntax.md#web-north-star-examples003-miniwebapp) ([#655](https://github.com/PurHur/php-compiler/issues/655)).
 
 ## Init template parity
 
@@ -20,7 +20,7 @@ examples/003-MiniWebApp/
   phpc.json              # entry public/index.php, includes[] (#452)
   config.php
   public/index.php       # PATH_INFO + ?route= fallback (#489)
-  src/Router.php         # class dispatch (VM/JIT; AOT pending #454)
+  src/Router.php         # class dispatch (VM/JIT; AOT execute #764)
   templates/             # layout + partials (__DIR__ includes)
   assets/style.css
 ```
@@ -158,7 +158,8 @@ PHP_COMPILER_MAX_BODY=1024 ../../script/examples-web-smoke.sh --miniwebapp-only
 - [#597](https://github.com/PurHur/php-compiler/issues/597) — `MINIWEBAPP_VM_CLI_GATE` in `ci-fast.sh`
 - [#586](https://github.com/PurHur/php-compiler/issues/586) — `?route=` VM CLI matrix
 - [#595](https://github.com/PurHur/php-compiler/issues/595) — PATH_INFO VM CLI matrix
-- [#454](https://github.com/PurHur/php-compiler/issues/454) — `ExamplesCompileTest` AOT execute (still skipped)
+- [#764](https://github.com/PurHur/php-compiler/issues/764) — native AOT execute (empty stdout; `ExamplesCompileTest` still skipped)
+- [#454](https://github.com/PurHur/php-compiler/issues/454) — umbrella `ExamplesCompileTest` AOT tracker
 - [#461](https://github.com/PurHur/php-compiler/issues/461) — `examples-web-smoke.sh` curls
 - [#470](https://github.com/PurHur/php-compiler/issues/470) — `ServeTest` `@group miniwebapp`
 - [#622](https://github.com/PurHur/php-compiler/issues/622) — `MINIWEBAPP_SERVE_GATE` in `ci-local.sh`

@@ -21,6 +21,7 @@ Repository defaults live in [`script/ci-defaults.env`](../script/ci-defaults.env
 |------|-----------------|-------------------------------|
 | Full gate (VM + JIT + AOT) | `./script/ci-local.sh` | `make test` or `./script/docker-ci-local.sh` |
 | Fast gate (no LLVM compile) | `./script/ci-fast.sh` | `make test-fast` or `./script/docker-ci-local.sh fast` |
+| Fast gate + bootstrap tail (optional) | `CI_FAST_BOOTSTRAP=1 ./script/ci-fast.sh` | `make test-fast-bootstrap` |
 | Fast gate + JIT preflight (optional) | `JIT_PREFLIGHT_GATE=1 ./script/ci-fast.sh` | `make test-fast-jit-preflight` or `make test-docker-fast-jit-preflight` |
 | Explicit memory-capped Docker | — | `./script/ci-docker-safe.sh ci-local.sh` or `make test-docker-safe` |
 | Single PHPUnit filter | Append args: `./script/ci-fast.sh --filter VMTest` | Same inside Docker wrappers |
@@ -38,8 +39,10 @@ Defaults are exported from [`script/ci-defaults.env`](../script/ci-defaults.env)
 | `MINIWEBAPP_AOT_EXECUTE_GATE` | `0` | `ci-local.sh` (PHPUnit `@group aot-link`) | 003 execute tests; opt-in while blocked by [#764](https://github.com/PurHur/php-compiler/issues/764) ([#791](https://github.com/PurHur/php-compiler/issues/791), [#775](https://github.com/PurHur/php-compiler/issues/775)) |
 | `EXAMPLES_AOT_SMOKE_GATE` | `1` | `ci-local.sh` | `examples-aot-smoke.sh` after LLVM phases ([#674](https://github.com/PurHur/php-compiler/issues/674)) |
 | `EXAMPLES_AOT_SMOKE_ONLY` | unset | `examples-aot-smoke.sh` | Slice e.g. `003` only ([#738](https://github.com/PurHur/php-compiler/issues/738), [#683](https://github.com/PurHur/php-compiler/issues/683)) |
-| `BOOTSTRAP_SELFHOST_PROBE_GATE` | unset → `1` in `ci-local.sh` llvm tail; set `0` to skip | `ci-local.sh` | `make bootstrap-selfhost-probe` on `compiler_minimal` ([#829](https://github.com/PurHur/php-compiler/issues/829)) |
+| `BOOTSTRAP_SELFHOST_PROBE_GATE` | unset → `1` in `ci-local.sh` llvm tail; set `0` to skip | `ci-local.sh`, `ci-fast.sh` (`CI_FAST_BOOTSTRAP=1`) | `make bootstrap-selfhost-probe` on `compiler_minimal` ([#829](https://github.com/PurHur/php-compiler/issues/829)) |
 | `BOOTSTRAP_SELFHOST_PROBE_UPDATE` | `0` | `ci_run_bootstrap_selfhost_probe` | Pass `--update-inventory` to probe (dev only) |
+| `BOOTSTRAP_WAVE_CHECK` | unset → `1` in `ci-local.sh` llvm tail; set `0` to skip | `ci-local.sh`, `ci-fast.sh` (`CI_FAST_BOOTSTRAP=1`) | `./script/bootstrap-wave-check.sh --fail-fast` after `@group aot-lint` |
+| `CI_FAST_BOOTSTRAP` | `0` | `ci-fast.sh` | Optional llvm tail: bootstrap aot-lint + probe + wave-check when LLVM 9 present |
 | `JIT_PREFLIGHT_GATE` | `0` | `ci-fast.sh` | Early MCJIT probe after `composer install` ([#728](https://github.com/PurHur/php-compiler/issues/728)) |
 
 Ladder-only env vars (not in `ci-defaults.env`): `MINIWEBAPP_LINT_GATE` (default `1` in `web-smoke.sh`), `MINIWEBAPP_AOT_BISECT_GATE` (default `0` in `miniwebapp-gates.sh` — [#879](https://github.com/PurHur/php-compiler/issues/879)).

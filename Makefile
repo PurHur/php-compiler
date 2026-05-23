@@ -83,13 +83,17 @@ test-legacy-16: rebuild-changed
 	docker run -v $(shell pwd):/compiler ircmaxell/php-compiler:16.04-dev php vendor/bin/phpunit
 
 # Run the full PHPUnit suite on the host PHP (no Docker). Requires composer install.
-.PHONY: test-local test-fast test-fast-jit-preflight test-docker-fast test-docker-fast-jit-preflight
+.PHONY: test-local test-fast test-fast-bootstrap test-fast-jit-preflight test-docker-fast test-docker-fast-jit-preflight
 test-local:
 	./script/ci-local.sh
 
 # Fast CI: VM/compliance only — no JIT/AOT compile (issue #436).
 test-fast:
 	./script/ci-fast.sh
+
+# Fast CI with optional bootstrap tail (aot-lint + probe + wave-check when LLVM present).
+test-fast-bootstrap:
+	CI_FAST_BOOTSTRAP=1 ./script/ci-fast.sh
 
 # Fast CI with optional JIT bootstrap preflight (issue #728; LLVM present → MCJIT probe).
 test-fast-jit-preflight:

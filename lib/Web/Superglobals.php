@@ -44,7 +44,20 @@ final class Superglobals
 
     public static function isSuperglobalName(string $name): bool
     {
-        return in_array($name, self::NAMES, true);
+        // Compile-time switch for self-host AOT: avoid class-const NAMES fetch in JIT (#816).
+        switch ($name) {
+            case '_GET':
+            case '_POST':
+            case '_SERVER':
+            case '_REQUEST':
+            case '_COOKIE':
+            case '_ENV':
+            case '_FILES':
+            case '_SESSION':
+                return true;
+            default:
+                return false;
+        }
     }
 
     /**

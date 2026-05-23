@@ -164,9 +164,9 @@ ci_run_bootstrap_selfhost_probe() {
   "$_CI_SCRIPT_DIR/bootstrap-selfhost-compile-probe.sh" "${probe_args[@]}"
 }
 
-# Wave gate: selfhost-lint → aot-lint → probe (opt-in via BOOTSTRAP_WAVE_CHECK=1).
+# Wave gate: selfhost-lint → aot-lint → probe (default on when LLVM ready; BOOTSTRAP_WAVE_CHECK=0 to skip).
 ci_run_bootstrap_wave_check() {
-  if [[ "${BOOTSTRAP_WAVE_CHECK:-0}" != "1" ]]; then
+  if [[ "${BOOTSTRAP_WAVE_CHECK:-1}" != "1" ]]; then
     return 0
   fi
   if ! ci_llvm_ready; then
