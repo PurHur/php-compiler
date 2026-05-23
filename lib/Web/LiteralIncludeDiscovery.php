@@ -35,7 +35,7 @@ final class LiteralIncludeDiscovery
         $runtime->preprocessor->traverse($script);
 
         $paths = [];
-        foreach (self::pathsFromScript($script, $entryFile) as $includePath) {
+        foreach (self::pathsFromMainScopeForBundle($script, $entryFile) as $includePath) {
             $resolved = IncludePathResolver::resolve($includePath, $entryFile);
             if (null !== $resolved) {
                 $paths[] = $resolved;
@@ -93,6 +93,25 @@ final class LiteralIncludeDiscovery
     }
 
     /**
+     * Literal includes at script main scope only (issue #739 / #776).
+     *
+     * Method and nested-function includes are JIT-inlined; bundling them prepends template
+     * bodies at file scope and strips the include line, breaking caller-local inheritance.
+     *
+     * @return list<string> relative or absolute literal path strings from CFG
+     */
+    private static function pathsFromMainScopeForBundle(Script $script, string $fromFile): array
+    {
+        $paths = [];
+        $seen = new \SplObjectStorage();
+        if ($script->main->cfg instanceof CfgBlock) {
+            self::walkCfgBlockForBundle($script->main->cfg, $fromFile, $paths, $seen);
+        }
+
+        return array_values(array_unique($paths));
+    }
+
+    /**
      * @return list<string> relative or absolute literal path strings from CFG
      */
     private static function pathsFromScript(Script $script, string $fromFile): array
@@ -120,6 +139,39 @@ final class LiteralIncludeDiscovery
         array &$paths,
         \SplObjectStorage $seen
     ): void {
+        self::walkCfgBlockInternal($block, $fromFile, $paths, $seen, false);
+    }
+
+    /**
+     * @param list<string> $paths
+     */
+    private static function walkCfgBlockForBundle(
+        CfgBlock $block,
+        string $fromFile,
+        array &$paths,
+        \SplObjectStorage $seen
+    ): void {
+        self::walkCfgBlockInternal($block, $fromFile, $paths, $seen, true);
+    }
+
+    private static function isBundleScopeBoundary(Op $op): bool
+    {
+        return $op instanceof Op\Stmt\Class_
+            || $op instanceof Op\Stmt\Interface_
+            || $op instanceof Op\Stmt\Function_
+            || $op instanceof Op\Stmt\Trait_;
+    }
+
+    /**
+     * @param list<string> $paths
+     */
+    private static function walkCfgBlockInternal(
+        CfgBlock $block,
+        string $fromFile,
+        array &$paths,
+        \SplObjectStorage $seen,
+        bool $mainScopeOnly
+    ): void {
         if ($seen->contains($block)) {
             return;
         }
@@ -132,10 +184,13 @@ final class LiteralIncludeDiscovery
                     $paths[] = $literal;
                 }
             }
+            if ($mainScopeOnly && self::isBundleScopeBoundary($child)) {
+                continue;
+            }
             foreach ($child->getSubBlocks() as $name) {
                 $sub = $child->{$name} ?? null;
                 if ($sub instanceof CfgBlock) {
-                    self::walkCfgBlock($sub, $fromFile, $paths, $seen);
+                    self::walkCfgBlockInternal($sub, $fromFile, $paths, $seen, $mainScopeOnly);
                 }
             }
         }

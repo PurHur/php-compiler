@@ -365,7 +365,7 @@ class JIT {
                         break;
                     }
                     if ($value->type === Variable::TYPE_STRING) {
-                        $charPtr = StringOffsetHelper::dimFetch(
+                        $charPtr = JIT\StringOffsetHelper::dimFetch(
                             $this->context,
                             $value->value,
                             $dim
@@ -1274,6 +1274,9 @@ class JIT {
             return;
         }
         $result = $this->context->getVariableFromOp($result);
+        if ($result === $value) {
+            return;
+        }
         if (null !== $result->objectPropertySlot) {
             if (null === $result->objectPropertyType) {
                 throw new \LogicException('objectPropertySlot requires objectPropertyType');
@@ -1287,7 +1290,7 @@ class JIT {
             return;
         }
         if ($result->kind === Variable::KIND_VALUE && $result->type === Variable::TYPE_STRING) {
-            StringOffsetHelper::dimAssign($this->context, $result->value, $value);
+            JIT\StringOffsetHelper::dimAssign($this->context, $result->value, $value);
 
             return;
         }

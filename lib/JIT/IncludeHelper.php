@@ -89,7 +89,6 @@ final class IncludeHelper
         ++$context->inlineIncludeDepth;
         foreach ($localBindings as $operand) {
             $context->setVariableOp($operand, $localBindings[$operand]);
-            $jit->assignOperandForced($operand, $localBindings[$operand]);
         }
         try {
             $exitBb = $jit->compileIncludedAtEntry($func, $included, $entryBb);
@@ -186,44 +185,7 @@ final class IncludeHelper
             $context->makeVariableFromOp($func, $bb, $callerBlock, $callerOp);
         }
 
-        self::applyPendingAssignForLocal($context, $jit, $callerBlock, $name, $callerOp);
-
         return $context->hasVariableOp($callerOp) ? $context->getVariableFromOp($callerOp) : null;
-    }
-
-    private static function applyPendingAssignForLocal(
-        Context $context,
-        JIT $jit,
-        Block $callerBlock,
-        string $name,
-        Operand $callerOp
-    ): void {
-        $callerSlot = $callerBlock->slotForOperand($callerOp);
-
-        foreach ($callerBlock->opCodes as $op) {
-            if (OpCode::TYPE_ASSIGN !== $op->type) {
-                continue;
-            }
-            $matches = false;
-            foreach ([$op->arg1, $op->arg2] as $slotIdx) {
-                $dest = $callerBlock->getOperand($slotIdx);
-                if (null !== $callerSlot && $callerBlock->slotForOperand($dest) === $callerSlot) {
-                    $matches = true;
-                    break;
-                }
-                if (OperandName::resolve($dest) === $name) {
-                    $matches = true;
-                    break;
-                }
-            }
-            if (!$matches) {
-                continue;
-            }
-            $value = $context->getVariableFromOp($callerBlock->getOperand($op->arg3));
-            $jit->assignOperandForced($callerOp, $value);
-
-            return;
-        }
     }
 
     private static function callerOperandByName(Block $block, string $name): ?Operand
