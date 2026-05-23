@@ -3,26 +3,24 @@
 declare(strict_types=1);
 
 /**
- * Bootstrap AOT: ConstStringFolder isset/?? on deploy-path CFG walk (#816).
+ * Bootstrap AOT: isset/?? on FuncCall-style args (ConstStringFolder::funcCallHasArity pattern).
  */
 
-require_once __DIR__.'/../../vendor/autoload.php';
-
-use PHPCfg\Block as CfgBlock;
-use PHPCfg\Operand;
-use PHPCfg\Op;
-
-function findCall(CfgBlock $cfg, Operand $operand): ?Op\Expr\FuncCall
+final class DeployCallStub
 {
-    foreach ($cfg->children as $child) {
-        if ($child instanceof Op\Expr\FuncCall && $child->result === $operand) {
-            return $child;
-        }
-    }
+    /** @var list<string> */
+    public array $args;
 
-    return null;
+    public function __construct(array $args)
+    {
+        $this->args = $args;
+    }
 }
 
-$cfg = new CfgBlock();
-$operand = new Operand\Literal(null);
-echo null === findCall($cfg, $operand) ? "0\n" : "1\n";
+function missingArg(DeployCallStub $call, int $index): int
+{
+    return isset($call->args[$index]) ? 0 : 1;
+}
+
+$call = new DeployCallStub(['templates']);
+echo (string) missingArg($call, 1)."\n";
