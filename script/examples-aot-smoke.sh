@@ -11,7 +11,7 @@
 # Docker:
 #   docker run --rm -v "$(pwd):/compiler" -w /compiler php-compiler:22.04-dev make examples-aot-smoke
 #
-# 003-MiniWebApp stays skipped until native AOT execute is green (#764, #485).
+# 003-MiniWebApp: link probe + execute bytes; empty stdout skips with #764 (#809, #485).
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -119,29 +119,62 @@ run_binary() {
   printf '%s' "$stdout"
 }
 
-# 003-MiniWebApp project AOT + CLI execute (issue #485, #683).
-# Exit 0 + stderr "skip" until #764 execute is green; exit 0 + "ok" when green; exit 1 on failure.
+# 003-MiniWebApp project AOT + CLI execute (issue #485, #683, #809).
+# Link is attempted; empty stdout skips with #764 unless MINIWEBAPP_AOT_EXECUTE_GATE=1.
 smoke_003_miniwebapp() {
   if [[ ! -d "${MINIWEBAPP}/public" ]]; then
     echo "examples-aot-smoke: 003-MiniWebApp: skip (tree missing #246)" >&2
     return 0
   fi
 
-  # Blocked: native MiniWebApp AOT execute (#764). Remove when #485 / #809 are green.
-  echo "examples-aot-smoke: 003-MiniWebApp: skip (AOT execute blocked #764; see #485)" >&2
-  return 0
+  local binary="${MINIWEBAPP}/.phpc/bin/app"
+  echo "examples-aot-smoke: 003-MiniWebApp: phpc build --project -> ${binary}"
+  if ! "$PHPC" build --project "${MINIWEBAPP}"; then
+    echo "examples-aot-smoke: 003-MiniWebApp: link failed" >&2
+    return 1
+  fi
+  if [[ ! -x "$binary" ]]; then
+    echo "examples-aot-smoke: 003-MiniWebApp: expected executable ${binary}" >&2
+    return 1
+  fi
 
-  # --- unblocked path (enable when #764 lands) ---
-  # local outfile="${SMOKE_ROOT}/003-MiniWebApp/app"
-  # echo "examples-aot-smoke: 003-MiniWebApp: phpc build --project -> ${outfile}"
-  # "$PHPC" build --project "${MINIWEBAPP}" -o "$outfile"
-  # local out
-  # out="$(run_binary '003-MiniWebApp' "$outfile" \
-  #   'QUERY_STRING=route=home' \
-  #   'SCRIPT_NAME=/index.php' \
-  #   'REQUEST_URI=/index.php?route=home')"
-  # assert_needles '003-MiniWebApp' "$out" 'MiniWebApp'
-  # echo "examples-aot-smoke: 003-MiniWebApp: ok"
+  local out stderr_file run_code
+  stderr_file="$(mktemp "${SMOKE_ROOT}/003.XXXXXX")"
+  set +e
+  out="$(env \
+    QUERY_STRING='route=home' \
+    SCRIPT_NAME='/index.php' \
+    REQUEST_URI='/index.php?route=home' \
+    REQUEST_METHOD='GET' \
+    "$binary" 2>"$stderr_file")"
+  run_code=$?
+  set -e
+  local stderr
+  stderr="$(cat "$stderr_file" 2>/dev/null || true)"
+  rm -f "$stderr_file"
+
+  if [[ "$run_code" -ne 0 ]]; then
+    echo "examples-aot-smoke: 003-MiniWebApp: binary exited ${run_code}" >&2
+    [[ -n "$stderr" ]] && echo "$stderr" >&2
+    return 1
+  fi
+  if [[ -n "$stderr" ]]; then
+    echo "examples-aot-smoke: 003-MiniWebApp: stderr: ${stderr}" >&2
+    return 1
+  fi
+
+  if [[ -z "$out" ]] || [[ "$out" != *'MiniWebApp'* ]]; then
+    if [[ "${MINIWEBAPP_AOT_EXECUTE_GATE:-0}" == "1" ]]; then
+      echo "examples-aot-smoke: 003-MiniWebApp: FAILED (empty or wrong stdout; blocked #764)" >&2
+      [[ -n "$out" ]] && echo "--- stdout ---" >&2 && echo "$out" >&2 && echo "--- end ---" >&2
+      return 1
+    fi
+    echo "examples-aot-smoke: 003-MiniWebApp: skip (empty stdout; blocked #764)" >&2
+    return 0
+  fi
+
+  assert_needles '003-MiniWebApp' "$out" 'MiniWebApp'
+  echo "examples-aot-smoke: 003-MiniWebApp: ok"
 }
 
 if [[ "${SMOKE_ONLY}" == "003" ]]; then
