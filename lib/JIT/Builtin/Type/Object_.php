@@ -413,6 +413,27 @@ class Object_ extends Type {
                 ];
             }
         }
+        if ('phpcompiler\\jit\\variable' === $lcname) {
+            foreach ([
+                'type_null' => \PHPCompiler\JIT\Variable::TYPE_NULL,
+                'type_native_long' => \PHPCompiler\JIT\Variable::TYPE_NATIVE_LONG,
+                'type_native_bool' => \PHPCompiler\JIT\Variable::TYPE_NATIVE_BOOL,
+                'type_native_double' => \PHPCompiler\JIT\Variable::TYPE_NATIVE_DOUBLE,
+                'type_string' => \PHPCompiler\JIT\Variable::TYPE_STRING,
+                'type_object' => \PHPCompiler\JIT\Variable::TYPE_OBJECT,
+                'type_value' => \PHPCompiler\JIT\Variable::TYPE_VALUE,
+                'type_hashtable' => \PHPCompiler\JIT\Variable::TYPE_HASHTABLE,
+                'is_native_array' => \PHPCompiler\JIT\Variable::IS_NATIVE_ARRAY,
+                'is_refcounted' => \PHPCompiler\JIT\Variable::IS_REFCOUNTED,
+                'kind_variable' => \PHPCompiler\JIT\Variable::KIND_VARIABLE,
+                'kind_value' => \PHPCompiler\JIT\Variable::KIND_VALUE,
+            ] as $name => $value) {
+                $this->classConstants[$id][$name] = [
+                    'type' => Variable::TYPE_NATIVE_LONG,
+                    'value' => $value,
+                ];
+            }
+        }
     }
 
     /**
