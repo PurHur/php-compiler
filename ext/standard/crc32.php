@@ -8,7 +8,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
-use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -16,11 +15,6 @@ use PHPLLVM\Value;
 /** crc32() — CRC32B (IEEE), signed 32-bit int (VM + JIT/AOT via __compiler_crc32). */
 final class crc32 extends Internal
 {
-    public function __construct()
-    {
-        parent::__construct('crc32');
-    }
-
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
@@ -30,9 +24,9 @@ final class crc32 extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $data = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $data->type) {
-            throw new \LogicException('crc32() requires a string in this compiler build');
+        $subject = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_STRING !== $subject->type) {
+            throw new \LogicException('crc32() only supports strings in this compiler build');
         }
         $seed = 0;
         if (2 === $argc) {
@@ -42,7 +36,7 @@ final class crc32 extends Internal
             }
             $seed = $seedArg->toInt();
         }
-        $frame->returnVar->int(VmCrc32::crc32($data->toString(), $seed));
+        $frame->returnVar->int(VmCrc32::compute($subject->toString(), $seed));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
@@ -50,12 +44,12 @@ final class crc32 extends Internal
         if (\count($args) < 1 || \count($args) > 2) {
             throw new \LogicException('crc32() requires one or two arguments in this compiler build');
         }
-        $str = JitStringArg::lower($context, $args[0], 'crc32() string');
+        $subject = $this->jitString($context, $args[0], 'crc32() argument #1');
         $seed = $context->getTypeFromString('int64')->constInt(0, false);
         if (isset($args[1])) {
             $seed = JitLongArg::lower($context, $args[1], 'crc32() seed');
         }
 
-        return JitCrc32::invoke($context, $str, $seed);
+        return JitCrc32::compute($context, $subject, $seed);
     }
 }

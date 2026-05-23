@@ -5,17 +5,22 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Value;
 
-/** LLVM lowering for crc32() via __compiler_crc32 (CRC32B runtime). */
+/** LLVM JIT helper for crc32() — delegates to __compiler_crc32. */
 final class JitCrc32
 {
-    public static function invoke(Context $context, Value $strPtr, Value $seedLong): Value
+    public static function compute(Context $context, Value $subject, Value $seed): Value
     {
-        return $context->builder->call(
+        $checksum = $context->builder->call(
             $context->lookupFunction('__compiler_crc32'),
-            $strPtr,
-            $seedLong
+            $subject,
+            $seed
         );
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::writeLong($context, $slot, $checksum);
+
+        return $context->builder->load($slot);
     }
 }

@@ -1,0 +1,78 @@
+# Bootstrap self-host gates: probe → native link → wave-check + compile-smoke (wave 7D).
+# Complements CircleCI / local ci-local.sh; does not replace the full test matrix.
+name: Bootstrap self-host
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+concurrency:
+  group: bootstrap-selfhost-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bootstrap-selfhost:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve runner strategy
+        id: plan
+        run: |
+          if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+            echo "strategy=docker" >> "$GITHUB_OUTPUT"
+          else
+            echo "strategy=host" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build dev image
+        if: steps.plan.outputs.strategy == 'docker'
+        run: |
+          if ! docker image inspect php-compiler:22.04-dev >/dev/null 2>&1; then
+            docker build -f Docker/dev/ubuntu-22.04/Dockerfile -t php-compiler:22.04-dev .
+          fi
+
+      - name: Bootstrap gates (Docker)
+        if: steps.plan.outputs.strategy == 'docker'
+        run: |
+          docker run --rm -m 10g \
+            -e PHP_COMPILER_LLVM_PATH=/opt/llvm9 \
+            -e PHP_COMPILER_MEMORY_LIMIT=1536M \
+            -e PHP_COMPILER_LLVM_MEMORY_LIMIT=4096M \
+            -v "$PWD:/compiler" -w /compiler \
+            php-compiler:22.04-dev bash -lc '
+              set -euo pipefail
+              composer install --no-interaction --ignore-platform-reqs
+              script/apply-patches.sh || true
+              make bootstrap-selfhost-probe
+              ./script/bootstrap-selfhost-link.sh
+              ./script/bootstrap-wave-check.sh --with-compile-smoke --fail-fast
+            '
+
+      - name: Install host PHP + LLVM 9 (fallback)
+        if: steps.plan.outputs.strategy == 'host'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            software-properties-common gnupg curl dpkg-dev ca-certificates unzip
+          sudo add-apt-repository -y ppa:ondrej/php
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            php8.2-cli php8.2-mbstring php8.2-xml php8.2-ffi php8.2-posix php8.2-phar \
+            php8.2-tokenizer php8.2-dom php8.2-xmlwriter composer
+          curl -sS https://getcomposer.org/installer | sudo php -- --install-dir=/usr/local/bin --filename=composer
+
+      - name: Bootstrap gates (host + install-llvm9)
+        if: steps.plan.outputs.strategy == 'host'
+        run: |
+          set -euo pipefail
+          export PHP_COMPILER_PHP=php8.2
+          composer install --no-interaction --ignore-platform-reqs
+          script/apply-patches.sh || true
+          ./script/install-llvm9.sh
+          make bootstrap-selfhost-probe
+          ./script/bootstrap-selfhost-link.sh
+          ./script/bootstrap-wave-check.sh --with-compile-smoke --fail-fast

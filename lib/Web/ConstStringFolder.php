@@ -446,7 +446,7 @@ final class ConstStringFolder
     private static function sourceDir(string $sourceFile): string
     {
         $resolved = realpath($sourceFile);
-        if (false !== $resolved) {
+        if (is_string($resolved)) {
             return dirname($resolved);
         }
 

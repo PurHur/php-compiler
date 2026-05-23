@@ -28,9 +28,11 @@ class Vararg implements Call {
     }
 
     public function call(Context $context, Variable ... $args): Value {
-        $argValues = array_map(function($arg) use ($context) {
-            return $context->helper->loadValue($arg);
-        }, $args);
+        $argValues = [];
+        $total = count($args);
+        for ($index = 0; $index < $total; $index++) {
+            $argValues[] = $context->helper->loadValue($args[$index]);
+        }
         $required = array_slice($argValues, 0, $this->numRequiredArgs);
         $varargs = array_slice($argValues, $this->numRequiredArgs);
         return $context->builder->call(

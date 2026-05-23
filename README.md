@@ -2,7 +2,7 @@
 
 [![CircleCI](https://circleci.com/gh/ircmaxell/php-compiler.svg?style=svg)](https://circleci.com/gh/ircmaxell/php-compiler)
 
-**CI:** full gate `./script/ci-local.sh` or `make test`; fast iteration `./script/ci-fast.sh` or `make test-fast` ([#436](https://github.com/PurHur/php-compiler/issues/436)). MiniWebApp stage env vars (`MINIWEBAPP_*`, `EXAMPLES_AOT_SMOKE_*`): [docs/local-ci-matrix.md#miniwebapp-gates](docs/local-ci-matrix.md#miniwebapp-gates). Docker image: `php-compiler:22.04-dev`. GitHub Actions workflows are disabled (see [#394](https://github.com/PurHur/php-compiler/issues/394)).
+**CI:** full gate `./script/ci-local.sh` or `make test`; fast iteration `./script/ci-fast.sh` or `make test-fast` ([#436](https://github.com/PurHur/php-compiler/issues/436)). MiniWebApp stage env vars (`MINIWEBAPP_*`, `EXAMPLES_AOT_SMOKE_*`): [docs/local-ci-matrix.md#miniwebapp-gates](docs/local-ci-matrix.md#miniwebapp-gates). Docker image: `php-compiler:22.04-dev`. GitHub Actions: [`.github/workflows/bootstrap-selfhost.yml`](.github/workflows/bootstrap-selfhost.yml) (bootstrap probe/link/wave gates on `master`; full matrix still CircleCI — [#394](https://github.com/PurHur/php-compiler/issues/394)).
 
 Ok, so this used to be a dead project. It required calling out to all sorts of hackery to generate PHP extensions, or PHP itself.
 
@@ -59,12 +59,21 @@ make bootstrap-aot-link         # Phase C: link + run bootstrap fixtures (stdout
 ./script/bootstrap-selfhost-lint.sh   # bundled lib/Compiler.php AOT lint only
 make bootstrap-selfhost-probe   # compile probe (-l / -o build/selfhost)
 ./script/bootstrap-selfhost-link.sh   # native link + run gate (minimal bundle)
+make bootstrap-wave-check       # wave gate: selfhost-lint → aot-lint → probe (NEXT_LOWER)
 ```
 
 **Docker** (LLVM 9 in `php-compiler:22.04-dev`; build once with `make docker-build-22`):
 
+Phase C ladder:
+
 ```console
 docker run --rm -v "$(pwd):/compiler" -w /compiler php-compiler:22.04-dev bash -lc 'make bootstrap-profile && make bootstrap-aot-link'
+```
+
+Self-host probe, native link, and wave gate (same steps as [`.github/workflows/bootstrap-selfhost.yml`](.github/workflows/bootstrap-selfhost.yml)):
+
+```console
+docker run --rm -v "$(pwd):/compiler" -w /compiler php-compiler:22.04-dev bash -lc 'make bootstrap-selfhost-probe && ./script/bootstrap-selfhost-link.sh && ./script/bootstrap-wave-check.sh'
 ```
 
 On harness hosts with an empty bind-mount, use `./script/docker-ci-local.sh` or tar-copy the tree before the commands above (see [Troubleshooting](#troubleshooting)).

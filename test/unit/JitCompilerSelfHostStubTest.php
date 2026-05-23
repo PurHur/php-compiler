@@ -59,13 +59,21 @@ final class JitCompilerSelfHostStubTest extends TestCase
         'literalincludediscovery',
         'deployroot',
         'sourcebundler',
-        'conststringfolder',
     ];
 
     /** @var list<string> */
     private const WEB_BOOTSTRAP_STUBBED_SUPERGLOBALS_METHODS = [
         'populatefromenvironment',
         'readrequestbody',
+    ];
+
+    /** @var list<string> */
+    private const WEB_BOOTSTRAP_STUBBED_CONSTSTRINGFOLDER_METHODS = [
+        'fold',
+        'foldconcat',
+        'foldforinclude',
+        'tryparsedeployinclude',
+        'funccallhasarity',
     ];
 
     /** @var list<string> */
@@ -150,6 +158,52 @@ final class JitCompilerSelfHostStubTest extends TestCase
                 'superglobals::'.$method,
                 'PHPCompiler\\Web\\Superglobals::'.$method,
             ];
+        }
+        foreach (self::WEB_BOOTSTRAP_STUBBED_CONSTSTRINGFOLDER_METHODS as $method) {
+            yield 'conststringfolder::'.$method => [
+                'conststringfolder::'.$method,
+                'PHPCompiler\\Web\\ConstStringFolder::'.$method,
+            ];
+        }
+    }
+
+    public function testConstStringFolderLiteralStringValueIsNotWebBootstrapStub(): void
+    {
+        $prev = getenv('PHP_COMPILER_SELFHOST_AOT');
+        putenv('PHP_COMPILER_SELFHOST_AOT=1');
+        try {
+            $this->assertFalse(
+                $this->invokeSkipCheck(
+                    'isSkippedWebBootstrapHotPathName',
+                    'phpcompiler\\web\\conststringfolder::literalstringvalue'
+                )
+            );
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_SELFHOST_AOT');
+            } else {
+                putenv('PHP_COMPILER_SELFHOST_AOT='.$prev);
+            }
+        }
+    }
+
+    public function testConstStringFolderSourceDirIsNotWebBootstrapStub(): void
+    {
+        $prev = getenv('PHP_COMPILER_SELFHOST_AOT');
+        putenv('PHP_COMPILER_SELFHOST_AOT=1');
+        try {
+            $this->assertFalse(
+                $this->invokeSkipCheck(
+                    'isSkippedWebBootstrapHotPathName',
+                    'phpcompiler\\web\\conststringfolder::sourcedir'
+                )
+            );
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_SELFHOST_AOT');
+            } else {
+                putenv('PHP_COMPILER_SELFHOST_AOT='.$prev);
+            }
         }
     }
 

@@ -12,13 +12,15 @@ use PHPUnit\Framework\TestCase;
 final class Crc32BuiltinTest extends TestCase
 {
     private const CODE = <<<'PHP'
+echo crc32('test'), "\n";
 echo crc32(''), "\n";
 echo crc32('abc'), "\n";
 echo crc32('foo'), "\n";
+echo crc32("The quick brown fox jumped over the lazy dog."), "\n";
 echo crc32('oo', crc32('f')), "\n";
 PHP;
 
-    private const EXPECT = "0\n891568578\n2356372769\n2356372769\n";
+    private const EXPECT = "3632233996\n0\n891568578\n2356372769\n2191738434\n2356372769\n";
 
     public function testVmMatchesPhpSubset(): void
     {
