@@ -59,6 +59,7 @@ final class SelfHostBuiltinPolicy
         'dirname' => 'filesystem', 'basename' => 'filesystem', 'file_exists' => 'filesystem',
         'clearstatcache' => 'filesystem',
         'stat' => 'filesystem',
+        'lstat' => 'filesystem',
         'is_file' => 'filesystem', 'is_dir' => 'filesystem', 'is_readable' => 'filesystem',
         'is_writable' => 'filesystem', 'file_get_contents' => 'filesystem', 'file_put_contents' => 'filesystem',
         'mkdir' => 'filesystem', 'unlink' => 'filesystem', 'rmdir' => 'filesystem', 'realpath' => 'filesystem',

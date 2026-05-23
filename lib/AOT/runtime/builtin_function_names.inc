@@ -137,6 +137,7 @@ static const char *phpc_builtin_functions[] = {
     "json_last_error",
     "lcfirst",
     "log",
+    "lstat",
     "ltrim",
     "max",
     "mb_strlen",
