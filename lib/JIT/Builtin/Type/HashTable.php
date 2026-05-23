@@ -316,6 +316,11 @@ class HashTable extends Type
         $sizeT = $this->context->getTypeFromString('size_t');
         $one = $sizeT->constInt(1, false);
         $need = $this->context->builder->addNoSignedWrap($index, $one);
+        $wasSet = $this->context->builder->call(
+            $this->context->lookupFunction('__hashtable__offsetIsSet'),
+            $ht,
+            $index
+        );
         $this->context->builder->call($this->context->lookupFunction('__hashtable__grow'), $ht, $need);
         $map = $this->context->structFieldMap['__hashtable__'];
         $values = $this->context->builder->load($this->context->builder->structGep($ht, $map['values']));
@@ -325,7 +330,7 @@ class HashTable extends Type
             $entry,
             $value
         );
-        $this->updateIndexMetadata($ht, $map, $index, $need);
+        $this->updateIndexMetadata($ht, $map, $index, $need, $wasSet);
         $this->context->builder->returnVoid();
     }
 
@@ -340,6 +345,11 @@ class HashTable extends Type
         $sizeT = $this->context->getTypeFromString('size_t');
         $one = $sizeT->constInt(1, false);
         $need = $this->context->builder->addNoSignedWrap($index, $one);
+        $wasSet = $this->context->builder->call(
+            $this->context->lookupFunction('__hashtable__offsetIsSet'),
+            $ht,
+            $index
+        );
         $this->context->builder->call($this->context->lookupFunction('__hashtable__grow'), $ht, $need);
         $map = $this->context->structFieldMap['__hashtable__'];
         $values = $this->context->builder->load($this->context->builder->structGep($ht, $map['values']));
@@ -349,7 +359,7 @@ class HashTable extends Type
             $entry,
             $value
         );
-        $this->updateIndexMetadata($ht, $map, $index, $need);
+        $this->updateIndexMetadata($ht, $map, $index, $need, $wasSet);
         $this->context->builder->returnVoid();
     }
 
@@ -364,6 +374,11 @@ class HashTable extends Type
         $sizeT = $this->context->getTypeFromString('size_t');
         $one = $sizeT->constInt(1, false);
         $need = $this->context->builder->addNoSignedWrap($index, $one);
+        $wasSet = $this->context->builder->call(
+            $this->context->lookupFunction('__hashtable__offsetIsSet'),
+            $ht,
+            $index
+        );
         $this->context->builder->call($this->context->lookupFunction('__hashtable__grow'), $ht, $need);
         $map = $this->context->structFieldMap['__hashtable__'];
         $values = $this->context->builder->load($this->context->builder->structGep($ht, $map['values']));
@@ -386,7 +401,7 @@ class HashTable extends Type
             $i64->constInt(0, false)
         );
         $this->context->builder->store($boolByte, $firstByte);
-        $this->updateIndexMetadata($ht, $map, $index, $need);
+        $this->updateIndexMetadata($ht, $map, $index, $need, $wasSet);
         $this->context->builder->returnVoid();
     }
 
@@ -401,6 +416,11 @@ class HashTable extends Type
         $sizeT = $this->context->getTypeFromString('size_t');
         $one = $sizeT->constInt(1, false);
         $need = $this->context->builder->addNoSignedWrap($index, $one);
+        $wasSet = $this->context->builder->call(
+            $this->context->lookupFunction('__hashtable__offsetIsSet'),
+            $ht,
+            $index
+        );
         $this->context->builder->call($this->context->lookupFunction('__hashtable__grow'), $ht, $need);
         $map = $this->context->structFieldMap['__hashtable__'];
         $values = $this->context->builder->load($this->context->builder->structGep($ht, $map['values']));
@@ -410,7 +430,7 @@ class HashTable extends Type
             $entry,
             $str
         );
-        $this->updateIndexMetadata($ht, $map, $index, $need);
+        $this->updateIndexMetadata($ht, $map, $index, $need, $wasSet);
         $this->context->builder->returnVoid();
     }
 
@@ -1698,8 +1718,14 @@ class HashTable extends Type
         );
     }
 
-    private function updateIndexMetadata(PHPLLVM\Value $ht, array $map, PHPLLVM\Value $index, PHPLLVM\Value $need): void
-    {
+    private function updateIndexMetadata(
+        PHPLLVM\Value $ht,
+        array $map,
+        PHPLLVM\Value $index,
+        PHPLLVM\Value $need,
+        PHPLLVM\Value $wasSetBeforeWrite,
+        bool $countNewElements = true
+    ): void {
         $nextFree = $this->context->builder->load(
             $this->context->builder->structGep($ht, $map['nextFreeElement'])
         );
@@ -1712,8 +1738,18 @@ class HashTable extends Type
             $newNext,
             $this->context->builder->structGep($ht, $map['nextFreeElement'])
         );
-        $updateNum = $this->context->builder->icmp(Builder::INT_UGE, $index, $numElements);
-        $newNum = $this->context->builder->select($updateNum, $need, $numElements);
+        if ($countNewElements) {
+            $sizeT = $need->typeOf();
+            $one = $sizeT->constInt(1, false);
+            $incr = $this->context->builder->zExt(
+                $this->context->builder->not($wasSetBeforeWrite),
+                $sizeT
+            );
+            $newNum = $this->context->builder->addNoSignedWrap($numElements, $incr);
+        } else {
+            $updateNum = $this->context->builder->icmp(Builder::INT_UGE, $index, $numElements);
+            $newNum = $this->context->builder->select($updateNum, $need, $numElements);
+        }
         $this->context->builder->store(
             $newNum,
             $this->context->builder->structGep($ht, $map['numElements'])
