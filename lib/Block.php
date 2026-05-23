@@ -274,6 +274,7 @@ class Block {
     public function getFrame(Context $context, ?Frame $frame = null): Frame {
         // Todo: build scope
         $scope = [];
+        $cfgMerge = count($this->parents) > 1;
         $scopeSize = $this->scope->count();
         foreach ($this->scope as $op) {
             $pos = $this->scope[$op];
@@ -296,7 +297,9 @@ class Block {
                     continue;
                 }
                 $found = false;
-                $parent = $frame->block->findSlot($op, $frame);
+                $parent = $cfgMerge
+                    ? $this->findSlot($op, $frame)
+                    : $frame->block->findSlot($op, $frame);
                 if (!is_null($parent)) {
                     $scope[$pos] = $parent;
                     $found = true;
@@ -327,6 +330,13 @@ class Block {
                         $scope[$pos] = $inherited;
                         continue;
                     }
+                    if ($cfgMerge) {
+                        $fromJump = $this->findSlot($op, $frame);
+                        if (null !== $fromJump) {
+                            $scope[$pos] = $fromJump;
+                            continue;
+                        }
+                    }
                 }
                 if (
                     $this->inheritUndefinedLocals
@@ -340,7 +350,13 @@ class Block {
             }
         }
 
-        $return = new Frame(null, $this, $frame, ...$scope);
+        // CFG merge blocks (?:, if/else join) can use sparse slot indices; variadic spread reindexes (#137).
+        if ($cfgMerge) {
+            $return = new Frame(null, $this, $frame);
+            $return->scope = $scope;
+        } else {
+            $return = new Frame(null, $this, $frame, ...$scope);
+        }
         $return->scriptPath = $this->scriptPath();
         if (!is_null($frame) && !is_null($frame->returnVar)) {
             $return->returnVar = $frame->returnVar;

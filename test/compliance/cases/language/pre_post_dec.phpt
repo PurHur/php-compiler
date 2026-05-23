@@ -1,14 +1,9 @@
 --TEST--
-Pre/post decrement on loop counter (VM)
+language pre/post decrement (issue #137)
 --FILE--
 <?php
-for ($i = 0; $i < 3; $i++) {
-    echo $i;
-}
-echo "\n";
-$n = 2;
-echo --$n, $n;
+$i = 2;
+echo --$i, $i, $i--;
 echo "\n";
 --EXPECT--
-012
-11
+110
