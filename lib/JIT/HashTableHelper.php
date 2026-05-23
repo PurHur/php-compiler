@@ -356,6 +356,8 @@ final class HashTableHelper
         Value $ht,
         Value $keyStr
     ): Variable {
+        static $seq = 0;
+        $tag = 'sg'.(string) ++$seq;
         $slot = JitValueBox::alloc($context);
         $destPtr = JitValueBox::pointer($context, $slot);
         $valPtr = $context->builder->call(
@@ -363,6 +365,21 @@ final class HashTableHelper
             $ht,
             $keyStr
         );
+        $hasValue = BasicBlockHelper::append($context, 'sg_sk_has_'.$tag);
+        $missing = BasicBlockHelper::append($context, 'sg_sk_miss_'.$tag);
+        $done = BasicBlockHelper::append($context, 'sg_sk_done_'.$tag);
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $valPtr,
+            $valPtr->typeOf()->constNull()
+        );
+        $context->builder->branchIf($isNull, $missing, $hasValue);
+
+        $context->builder->positionAtEnd($missing);
+        $context->builder->call($context->lookupFunction('__value__writeNull'), $destPtr);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($hasValue);
         $str = $context->builder->call(
             $context->lookupFunction('__value__readString'),
             $valPtr
@@ -376,6 +393,9 @@ final class HashTableHelper
             $destPtr,
             $owned
         );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
 
         return new Variable(
             $context,

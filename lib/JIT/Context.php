@@ -73,8 +73,19 @@ class Context {
     /** Nested compile-time include inlining depth (issue #568). */
     public int $inlineIncludeDepth = 0;
 
+    /**
+     * Caller blocks for nested literal includes (layout → partial); used to resolve
+     * inherited locals from the outer TU (#764, #784).
+     *
+     * @var list<Block>
+     */
+    public array $inlineIncludeCallerBlocks = [];
+
     /** Require/include expression result slots while inlining (issue #783). */
     public array $inlineIncludeReturnOperands = [];
+
+    /** Last LLVM exit block from an inlined TU (if/elseif before nested include, #764). */
+    public ?\PHPLLVM\BasicBlock $inlineIncludeExitBlock = null;
 
     private array $exports = [];
     public Runtime $runtime;

@@ -267,7 +267,12 @@ class JIT {
             --$limit;
         }
 
-        return $this->compileBlockInternal($func, $block, $limit, $entryBlock);
+        $exit = $this->compileBlockInternal($func, $block, $limit, $entryBlock);
+        if ($this->context->inlineIncludeDepth > 0 && null !== $this->context->inlineIncludeExitBlock) {
+            return $this->context->inlineIncludeExitBlock;
+        }
+
+        return $exit;
     }
     
     private function compileBlockInternal(
@@ -883,10 +888,17 @@ class JIT {
                         $builder->positionAtEnd($mergeBb);
                         $merged = $this->compileBlockInternal($func, $op->block3, null, $mergeBb, ...$args);
                         unset($this->context->coalesceAssignTargets[$coalesceResult]);
+                        if ($this->context->inlineIncludeDepth > 0) {
+                            $this->context->inlineIncludeExitBlock = $merged;
+                            break;
+                        }
 
                         return $merged;
                     }
                     unset($this->context->coalesceAssignTargets[$coalesceResult]);
+                    if ($this->context->inlineIncludeDepth > 0) {
+                        break;
+                    }
 
                     return $origBasicBlock;
                 case OpCode::TYPE_NULLSAFE:
@@ -969,12 +981,18 @@ class JIT {
                 case OpCode::TYPE_RETURN_VOID:
                     $returnBlock = $builder->getInsertBlock();
                     $builder->positionAtEnd($returnBlock);
-                    $this->context->freeDeadVariables($func, $returnBlock, $block);
+                    if ($this->shouldFreeDeadVariablesBeforeBranch()) {
+                        $this->context->freeDeadVariables($func, $returnBlock, $block);
+                    }
                     if (0 === $this->context->inlineIncludeDepth) {
                         $this->context->builder->returnVoid();
+                    } else {
+                        $this->context->inlineIncludeExitBlock = $returnBlock;
                     }
 
-                    return $origBasicBlock;
+                    return $this->context->inlineIncludeDepth > 0
+                        ? $returnBlock
+                        : $origBasicBlock;
                 case OpCode::TYPE_RETURN:
                     $return = $this->context->getVariableFromOp($block->getOperand($op->arg1));
                     $returnBlock = $builder->getInsertBlock();
@@ -987,11 +1005,13 @@ class JIT {
                             $return->addref();
                             $this->assignOperand($holderOp, $return, true);
                         }
-                        $this->context->freeDeadVariables($func, $returnBlock, $block);
+                        $this->context->inlineIncludeExitBlock = $returnBlock;
 
-                        return $origBasicBlock;
+                        return $returnBlock;
                     }
-                    $this->context->freeDeadVariables($func, $returnBlock, $block);
+                    if ($this->shouldFreeDeadVariablesBeforeBranch()) {
+                        $this->context->freeDeadVariables($func, $returnBlock, $block);
+                    }
                     if ($this->isVoidCfgFunction($block)) {
                         $this->context->builder->returnVoid();
                     } else {
