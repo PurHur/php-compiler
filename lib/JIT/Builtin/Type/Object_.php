@@ -446,6 +446,12 @@ class Object_ extends Type {
         if ('phptypes\\type' === $lcname || 'type' === $lcname) {
             $seed(['type_null'=>\PHPTypes\Type::TYPE_NULL,'type_boolean'=>\PHPTypes\Type::TYPE_BOOLEAN,'type_long'=>\PHPTypes\Type::TYPE_LONG,'type_double'=>\PHPTypes\Type::TYPE_DOUBLE,'type_string'=>\PHPTypes\Type::TYPE_STRING,'type_object'=>\PHPTypes\Type::TYPE_OBJECT,'type_array'=>\PHPTypes\Type::TYPE_ARRAY,'type_callable'=>\PHPTypes\Type::TYPE_CALLABLE,'type_union'=>\PHPTypes\Type::TYPE_UNION,'type_intersection'=>\PHPTypes\Type::TYPE_INTERSECTION]);
         }
+        if ('phpcompiler\\runtime' === $lcname || 'runtime' === $lcname) {
+            $seed([
+                'mode_normal' => \PHPCompiler\Runtime::MODE_NORMAL,
+                'mode_aot' => \PHPCompiler\Runtime::MODE_AOT,
+            ]);
+        }
     }
 
     private function registerExternalClass(string $lcname): void
