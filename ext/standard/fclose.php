@@ -12,7 +12,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** fclose() — VM only (issue #194). */
+/** fclose() — VM via VmFs; JIT/AOT via __compiler_fclose (issue #1117). */
 final class fclose extends Internal
 {
     public function execute(Frame $frame): void
@@ -35,7 +35,10 @@ final class fclose extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('fclose() requires exactly one argument in this compiler build');
         }
-        JitLongArg::lower($context, $args[0], 'fclose() handle');
-        throw new \LogicException('fclose() is not implemented for JIT in this compiler build');
+        $handle = $context->builder->truncOrBitCast(
+            JitLongArg::lower($context, $args[0], 'fclose() handle'),
+            $context->getTypeFromString('int64')
+        );
+        return JitFclose::invoke($context, $handle);
     }
 }
