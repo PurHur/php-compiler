@@ -1296,7 +1296,21 @@ class JIT {
                         )
                     );
                     $this->compileBlockInternal($func, $op->block1, null, null, ...$args);
+                    // If-arm may reach merge hub RETURN_VOID and set inlineIncludeExitBlock (#784, #846).
+                    // Clear before compiling elseif/else so that arm is not skipped; restore when else is the hub.
+                    $ifArmIncludeExit = null;
+                    if ($this->context->inlineIncludeDepth > 0) {
+                        $ifArmIncludeExit = $this->context->inlineIncludeExitBlock;
+                        $this->context->inlineIncludeExitBlock = null;
+                    }
                     $this->compileBlockInternal($func, $op->block2, null, null, ...$args);
+                    if (
+                        $this->context->inlineIncludeDepth > 0
+                        && null === $this->context->inlineIncludeExitBlock
+                        && null !== $ifArmIncludeExit
+                    ) {
+                        $this->context->inlineIncludeExitBlock = $ifArmIncludeExit;
+                    }
                     $ifEntry = $this->context->scope->blockStorage[$op->block1];
                     $elseEntry = $this->context->scope->blockStorage[$op->block2];
                     $builder->positionAtEnd($branchBlock);
