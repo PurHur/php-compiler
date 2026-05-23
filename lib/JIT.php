@@ -257,6 +257,9 @@ class JIT {
     /** Stub bundled lib/ interpreter helpers for self-host AOT (#557, #816). */
     private function isSkippedBootstrapInterpreterHotPathName(string $name): bool
     {
+        if (!$this->shouldUseSelfHostJitStubs()) {
+            return false;
+        }
         if ($this->isSkippedSelfHostEntryName($name)) {
             return false;
         }
@@ -284,7 +287,6 @@ class JIT {
         $lower = strtolower($name);
 
         return str_contains($lower, 'splitcfgblockafterstringkeyedarray')
-            || str_contains($lower, '\\compiler::')
             || str_contains($lower, 'compilecfgbranch')
             || str_contains($lower, 'compilecfgblock')
             || str_contains($lower, 'compileblock')
@@ -320,7 +322,8 @@ class JIT {
             || str_contains($lower, 'inheritfuncfromparent')
             || str_contains($lower, 'isarraydim')
             || str_contains($lower, 'findcoalesce')
-            || str_contains($lower, 'resolvecoalesce');
+            || str_contains($lower, 'resolvecoalesce')
+            || str_contains($lower, 'resolveisset');
     }
 
     private function isSkippedSelfHostEntryName(string $name): bool
@@ -1082,11 +1085,11 @@ class JIT {
                 case OpCode::TYPE_NOT_EQUAL:
                 case OpCode::TYPE_SPACESHIP:
                     $this->assignOperand(
-                        $block->getOperand($op->arg1),
+                        $this->operandAt($block, $op->arg1, opcode_type_name($op->type).' result'),
                         $this->context->helper->binaryOp(
                             $op,
-                            $this->context->getVariableFromOp($block->getOperand($op->arg2)),
-                            $this->context->getVariableFromOp($block->getOperand($op->arg3))
+                            $this->context->getVariableFromOp($this->operandAt($block, $op->arg2, opcode_type_name($op->type).' left')),
+                            $this->context->getVariableFromOp($this->operandAt($block, $op->arg3, opcode_type_name($op->type).' right'))
                         )
                     );
                     break;
@@ -1102,8 +1105,8 @@ class JIT {
                 case OpCode::TYPE_CASE:
                     $branchBlock = $builder->getInsertBlock();
                     $builder->positionAtEnd($branchBlock);
-                    $switchVar = $this->context->getVariableFromOp($block->getOperand($op->arg1));
-                    $caseVar = $this->context->getVariableFromOp($block->getOperand($op->arg2));
+                    $switchVar = $this->context->getVariableFromOp($this->operandAt($block, $op->arg1, 'switch value'));
+                    $caseVar = $this->context->getVariableFromOp($this->operandAt($block, $op->arg2, 'switch case'));
                     $equalOp = new OpCode(OpCode::TYPE_EQUAL);
                     $matchVar = $this->context->helper->binaryOp($equalOp, $switchVar, $caseVar);
                     $match = $this->context->castToBool(
@@ -1219,7 +1222,9 @@ class JIT {
                     $branchBlock = $builder->getInsertBlock();
                     $builder->positionAtEnd($branchBlock);
                     $condition = $this->context->castToBool(
-                        $this->context->helper->loadValue($this->context->getVariableFromOp($block->getOperand($op->arg1)))
+                        $this->context->helper->loadValue(
+                            $this->context->getVariableFromOp($this->operandAt($block, $op->arg1, 'branch condition'))
+                        )
                     );
                     $this->compileBlockInternal($func, $op->block1, null, null, ...$args);
                     $this->compileBlockInternal($func, $op->block2, null, null, ...$args);
@@ -1624,6 +1629,15 @@ class JIT {
         }
 
         return $retval;
+    }
+
+    private function operandAt(Block $block, ?int $slot, string $context): Operand
+    {
+        if (null === $slot) {
+            throw new \LogicException('Missing operand slot for '.$context);
+        }
+
+        return $block->getOperand($slot);
     }
 
     private function isVoidCfgFunction(Block $block): bool
