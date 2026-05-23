@@ -239,6 +239,20 @@ ci_run_examples_aot_smoke() {
   "$_CI_SCRIPT_DIR/examples-aot-smoke.sh"
 }
 
+# phpc deploy + PHPC_DEPLOY_ROOT CGI smoke for 001/002 (issue #718); default on via DEPLOY_SMOKE_GATE=1 (#737).
+ci_run_deploy_smoke() {
+  if [[ "${DEPLOY_SMOKE_GATE:-1}" != "1" ]]; then
+    return 0
+  fi
+  if ! ci_llvm_ready; then
+    echo "deploy-smoke: skipped (LLVM 9 not available)"
+    return 0
+  fi
+  echo "deploy-smoke: phpc deploy + PHPC_DEPLOY_ROOT (DEPLOY_SMOKE_GATE=1 default, #718, #737)..."
+  "$_CI_SCRIPT_DIR/deploy-smoke.sh" --example 001
+  "$_CI_SCRIPT_DIR/deploy-smoke.sh" --example 002
+}
+
 # @group aot-link PHPUnit; 003 execute tests opt-in via MINIWEBAPP_AOT_EXECUTE_GATE (#791).
 ci_run_aot_link_phpunit() {
   local -a aot_link_args=(--group aot-link --exclude-group serve)

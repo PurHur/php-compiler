@@ -23,16 +23,27 @@ Minimal HTML page with no `public/` tree — good for a first dist smoke.
 
 If the binary is missing, `phpc deploy` tells you to build first; use `phpc deploy … --from-build` only when your workflow builds in a separate step and you pass a prebuilt `.phpc/bin/app`.
 
-### `examples/003-MiniWebApp` (deploy layout; native execute blocked)
+### `examples/003-MiniWebApp` (deploy layout; AOT link ✅, execute partial)
 
-Manifest includes `public/`, `assets/`, and `templates/` — deploy copies them even when native AOT execute is not production-ready.
+Manifest includes `public/`, `assets/`, and `templates/` — deploy copies them for nginx/CGI even when native AOT execute lacks VM parity.
 
 ```bash
-./phpc build --project examples/003-MiniWebApp   # link green; execute may fail ([#764](https://github.com/PurHur/php-compiler/issues/764))
+./phpc build --project examples/003-MiniWebApp   # link ✅ ([#752](https://github.com/PurHur/php-compiler/issues/752))
 ./phpc deploy examples/003-MiniWebApp -o /tmp/miniwebapp-dist
 ```
 
-Until [#764](https://github.com/PurHur/php-compiler/issues/764) lands, treat MiniWebApp as **VM + `phpc serve`** for runtime checks; use deploy only to validate the **dist layout** and `README.deploy` after a local build succeeds.
+**Execute status (master):** Home route `?route=home` emits HTML (non-zero stdout; [#764](https://github.com/PurHur/php-compiler/issues/764) closed) but layout/config values are empty and output does not match VM — `ExamplesCompileTest::test003MiniWebAppHomeRouteAotExecutes` still fails. Hello, contact, and PATH_INFO routes remain incomplete ([#676](https://github.com/PurHur/php-compiler/issues/676)). Use **VM + `phpc serve`** for runtime checks; use deploy to validate **dist layout** and `README.deploy` after link.
+
+Manual probe:
+
+```bash
+cd examples/003-MiniWebApp
+../../phpc build --project .
+QUERY_STRING=route=home REQUEST_METHOD=GET ./.phpc/bin/app | wc -c
+# non-zero on master; HTML still missing app_name / MiniWebApp title
+```
+
+Gate ladder and route matrix: [examples/003-MiniWebApp/README.md](../examples/003-MiniWebApp/README.md), [examples/README.md § 003-MiniWebApp](../examples/README.md#003-miniwebapp).
 
 Implementation: [`lib/Web/ProjectDeploy.php`](../lib/Web/ProjectDeploy.php).
 
@@ -157,6 +168,8 @@ export PHP_COMPILER_MAX_BODY=65536   # bytes; capped at 8 MiB
 | [#77](https://github.com/PurHur/php-compiler/issues/77) | CGI body limits and header sanitization |
 | [#50](https://github.com/PurHur/php-compiler/issues/50) | Web runtime / serve |
 | [#173](https://github.com/PurHur/php-compiler/issues/173) | FastCGI adapter |
-| [#764](https://github.com/PurHur/php-compiler/issues/764) | MiniWebApp native AOT execute (link closed #568) |
+| [#752](https://github.com/PurHur/php-compiler/issues/752) | MiniWebApp AOT link (`phpc build --project`) |
+| [#764](https://github.com/PurHur/php-compiler/issues/764) | MiniWebApp AOT execute — empty stdout (closed); VM parity in [#676](https://github.com/PurHur/php-compiler/issues/676) |
+| [#676](https://github.com/PurHur/php-compiler/issues/676) | MiniWebApp AOT execute parity / unskip matrix |
 | [#623](https://github.com/PurHur/php-compiler/issues/623) | Runtime `include` under deploy root |
 | [#612](https://github.com/PurHur/php-compiler/issues/612) | MiniWebApp dist-layout E2E smoke |

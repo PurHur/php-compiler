@@ -78,6 +78,7 @@ Defaults are exported from [`script/ci-defaults.env`](../script/ci-defaults.env)
 | `MINIWEBAPP_AOT_EXECUTE_GATE` | `0` | `ci-local.sh` (PHPUnit `@group aot-link`) | 003 execute tests; opt-in while blocked by [#764](https://github.com/PurHur/php-compiler/issues/764) ([#791](https://github.com/PurHur/php-compiler/issues/791), [#775](https://github.com/PurHur/php-compiler/issues/775)) |
 | `EXAMPLES_AOT_SMOKE_GATE` | `1` | `ci-local.sh` | `examples-aot-smoke.sh` after LLVM phases ([#674](https://github.com/PurHur/php-compiler/issues/674)) |
 | `EXAMPLES_AOT_SMOKE_ONLY` | unset | `examples-aot-smoke.sh` | Slice e.g. `003` only ([#738](https://github.com/PurHur/php-compiler/issues/738), [#683](https://github.com/PurHur/php-compiler/issues/683)) |
+| `DEPLOY_SMOKE_GATE` | `1` | `ci-local.sh` | `deploy-smoke.sh` 001/002 after `examples-aot-smoke` when LLVM ready ([#718](https://github.com/PurHur/php-compiler/issues/718), [#737](https://github.com/PurHur/php-compiler/issues/737)); 003 not enabled until [#612](https://github.com/PurHur/php-compiler/issues/612) |
 | `BOOTSTRAP_SELFHOST_PROBE_GATE` | unset → `1` in `ci-local.sh` llvm tail; set `0` to skip | `ci-local.sh`, `ci-fast.sh` (`CI_FAST_BOOTSTRAP=1`) | `make bootstrap-selfhost-probe` on `compiler_minimal` ([#829](https://github.com/PurHur/php-compiler/issues/829)) |
 | `BOOTSTRAP_SELFHOST_PROBE_UPDATE` | `0` | `ci_run_bootstrap_selfhost_probe` | Pass `--update-inventory` to probe (dev only) |
 | `BOOTSTRAP_WAVE_CHECK` | unset → `1` in `ci-local.sh` llvm tail; set `0` to skip | `ci-local.sh`, `ci-fast.sh` (`CI_FAST_BOOTSTRAP=1`) | `./script/bootstrap-wave-check.sh --fail-fast` after `@group aot-lint` |
@@ -91,6 +92,7 @@ Ladder-only env vars (not in `ci-defaults.env`): `MINIWEBAPP_LINT_GATE` (default
 ```bash
 MINIWEBAPP_AOT_EXECUTE_GATE=1 ./script/ci-local.sh --filter test003MiniWebAppExecutesWithCgiEnv
 EXAMPLES_AOT_SMOKE_ONLY=003 ./script/examples-aot-smoke.sh
+DEPLOY_SMOKE_GATE=0 ./script/ci-local.sh   # skip 001/002 deploy smoke (#737)
 MINIWEBAPP_AOT_BISECT_GATE=1 ./script/miniwebapp-gates.sh
 ```
 
@@ -162,6 +164,7 @@ Harness hosts and contributors without host PHP/LLVM should use the **22.04 dev 
 - [#664](https://github.com/PurHur/php-compiler/issues/664) — `MINIWEBAPP_WEB_SMOKE_GATE` in `ci-local`
 - [#754](https://github.com/PurHur/php-compiler/issues/754) — `MINIWEBAPP_AOT_LINK_GATE`
 - [#791](https://github.com/PurHur/php-compiler/issues/791) — `MINIWEBAPP_AOT_EXECUTE_GATE` split
+- [#737](https://github.com/PurHur/php-compiler/issues/737) — `DEPLOY_SMOKE_GATE` in `ci-local`
 - [#436](https://github.com/PurHur/php-compiler/issues/436) — tiered CI (`ci-fast` vs `ci-local`)
 - [#728](https://github.com/PurHur/php-compiler/issues/728) — optional `JIT_PREFLIGHT_GATE` on `ci-fast`
 - [#497](https://github.com/PurHur/php-compiler/issues/497) — memory incident (closed)
