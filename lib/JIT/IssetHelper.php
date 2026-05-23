@@ -18,6 +18,13 @@ use PHPLLVM\Value;
 
 final class IssetHelper
 {
+    private static function isSelfHostAot(): bool
+    {
+        $flag = getenv('PHP_COMPILER_SELFHOST_AOT');
+
+        return '1' === $flag || 'true' === strtolower((string) $flag);
+    }
+
     public static function compile(
         Context $context,
         Variable $container,
@@ -36,6 +43,10 @@ final class IssetHelper
     {
         if (null !== $container->superglobalName) {
             return $container->superglobalName;
+        }
+        // Self-host AOT: OperandName::resolve Temporary walk crashes LLVM 9 (#816).
+        if (self::isSelfHostAot()) {
+            return null;
         }
         $name = OperandName::resolve($containerOp);
         if (null !== $name && Superglobals::isSuperglobalName($name)) {
