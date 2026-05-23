@@ -63,7 +63,7 @@ for rel in "${targets[@]}"; do
     failures+=("${rel}: file not found")
     continue
   fi
-  if ! "$PHP_BIN" "${PHP_OPTS[@]}" "$compile_bin" -o "$binary" "$source" >&2; then
+  if ! PHP_COMPILER_SELFHOST_AOT=0 "$PHP_BIN" "${PHP_OPTS[@]}" "$compile_bin" -o "$binary" "$source" >&2; then
     failures+=("${rel}: compile failed")
     continue
   fi

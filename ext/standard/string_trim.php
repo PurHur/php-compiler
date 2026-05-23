@@ -55,11 +55,15 @@ final class string_trim extends Internal
         }
         $literal = $args[0]->compileTimeString ?? null;
         if (null !== $literal) {
-            return $context->builder->load(
-                $context->constantStringFromString(VmString::trim($literal))
+            return $context->builder->call(
+                $context->lookupFunction('__string__separate'),
+                $context->builder->load(
+                    $context->constantStringFromString(VmString::trim($literal))
+                )
             );
         }
         $str = $this->jitString($context, $args[0], 'string_trim() argument #1');
+        $str = $context->builder->call($context->lookupFunction('__string__separate'), $str);
         $structName = $str->typeOf()->getElementType()->getName();
         $map = $context->structFieldMap[$structName];
         $len = $context->builder->load(

@@ -17,13 +17,18 @@ use PHPCompiler\Web\Superglobals;
 
 function run(string $filename, string $code, array $options): void
 {
-    if ('-' !== $filename && str_contains(str_replace('\\', '/', $filename), '/test/selfhost/')) {
+    $normalized = '-' !== $filename ? str_replace('\\', '/', $filename) : '';
+    if ('' !== $normalized && str_contains($normalized, '/test/bootstrap-aot/')) {
+        // Bootstrap AOT fixtures require real JIT lowering; ignore inherited self-host stub env (#1086).
+        putenv('PHP_COMPILER_SELFHOST_AOT=0');
+    }
+    if ('-' !== $filename && str_contains($normalized, '/test/selfhost/')) {
         $selfhostAot = getenv('PHP_COMPILER_SELFHOST_AOT');
         if (false === $selfhostAot || '' === $selfhostAot) {
             putenv('PHP_COMPILER_SELFHOST_AOT=1');
         }
     }
-    if ('-' !== $filename && str_contains(str_replace('\\', '/', $filename), 'jit_result_stub.php')) {
+    if ('' !== $normalized && str_contains($normalized, 'jit_result_stub.php')) {
         putenv('PHP_COMPILER_SELFHOST_AOT=1');
     }
     $includes = $options['--include'] ?? [];
