@@ -408,7 +408,12 @@ class JIT {
                             $value->value,
                             $dim
                         );
-                        $this->context->makeVariableFromValueOp($charPtr, $resultOp);
+                        if ($forWrite) {
+                            $this->context->makeVariableFromValueOp($charPtr, $resultOp);
+                        } else {
+                            $str = JIT\StringOffsetHelper::readAsString($this->context, $charPtr);
+                            $this->context->makeVariableFromValueOp($str, $resultOp);
+                        }
                         break;
                     }
                     if ($value->type === Variable::TYPE_HASHTABLE) {
@@ -1246,7 +1251,49 @@ class JIT {
 
     private function coerceReturnValue(Variable $return, PHPLLVM\Value $retval, ?string $expected): PHPLLVM\Value
     {
-        if (null === $expected || '__value__' === $expected || Variable::TYPE_VALUE !== $return->type) {
+        if ('__value__' === $expected) {
+            if (Variable::TYPE_VALUE === $return->type) {
+                if (Variable::KIND_VARIABLE === $return->kind) {
+                    return $this->context->builder->load($return->value);
+                }
+                if ('__value__*' === $this->context->getStringFromType($retval->typeOf())) {
+                    return $this->context->builder->load($retval);
+                }
+
+                return $retval;
+            }
+            if (Variable::TYPE_NULL === $return->type) {
+                $slot = JIT\JitValueBox::alloc($this->context);
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__writeNull'),
+                    JIT\JitValueBox::pointer($this->context, $slot)
+                );
+
+                return $this->context->builder->load($slot);
+            }
+            if (Variable::TYPE_STRING === $return->type) {
+                $slot = JIT\JitValueBox::alloc($this->context);
+                $owned = $this->context->builder->call(
+                    $this->context->lookupFunction('__string__separate'),
+                    $retval
+                );
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__writeString'),
+                    JIT\JitValueBox::pointer($this->context, $slot),
+                    $owned
+                );
+
+                return $this->context->builder->load($slot);
+            }
+        }
+        if (null === $expected || Variable::TYPE_VALUE !== $return->type) {
+            if ('__string__*' === $expected && Variable::TYPE_VALUE === $return->type) {
+                return $this->context->builder->call(
+                    $this->context->lookupFunction('__value__readString'),
+                    JIT\JitValueBox::valuePtrFromVariable($this->context, $return)
+                );
+            }
+
             return $retval;
         }
         if ('__string__*' === $expected) {

@@ -272,7 +272,7 @@ final class JitStat
         $context->builder->branchIf($failed, $failBlock, $okBlock);
 
         $context->builder->positionAtEnd($failBlock);
-        $falseVal = $context->constantFromBool(false);
+        $falseVal = $context->getTypeFromString('int1')->constInt(0, false);
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($okBlock);

@@ -601,6 +601,15 @@ restart:
                 }
                 goto return_bool;
             }
+            if (self::isOrderedCompareOpcode($opcode->type)) {
+                $result = JitValueCompare::orderedValueToValue(
+                    $this->context,
+                    $opcode->type,
+                    $left,
+                    $right
+                );
+                goto return_bool;
+            }
         }
         if (Variable::TYPE_VALUE === $leftType && Variable::TYPE_VALUE !== $rightType) {
             if (OpCode::TYPE_PLUS === $opcode->type && Variable::TYPE_NATIVE_LONG === $rightType) {
@@ -612,6 +621,15 @@ restart:
                 $__right = $this->context->builder->intCast($rightValue, $leftLong->typeOf());
                 $result = $this->context->builder->addNoSignedWrap($leftLong, $__right);
                 goto return_long;
+            }
+            if (Variable::TYPE_NATIVE_LONG === $rightType && self::isOrderedCompareOpcode($opcode->type)) {
+                $result = JitValueCompare::orderedValueToNativeLong(
+                    $this->context,
+                    $opcode->type,
+                    $left,
+                    $rightValue
+                );
+                goto return_bool;
             }
             if (OpCode::TYPE_IDENTICAL === $opcode->type) {
                 if (Variable::TYPE_NATIVE_BOOL === $rightType) {
@@ -662,6 +680,15 @@ restart:
                 $__left = $this->context->builder->intCast($leftValue, $rightLong->typeOf());
                 $result = $this->context->builder->addNoSignedWrap($__left, $rightLong);
                 goto return_long;
+            }
+            if (Variable::TYPE_NATIVE_LONG === $leftType && self::isOrderedCompareOpcode($opcode->type)) {
+                $result = JitValueCompare::orderedNativeLongToValue(
+                    $this->context,
+                    $opcode->type,
+                    $leftValue,
+                    $right
+                );
+                goto return_bool;
             }
             if (OpCode::TYPE_IDENTICAL === $opcode->type) {
                 if (Variable::TYPE_NATIVE_BOOL === $leftType) {
@@ -781,6 +808,14 @@ return_bool:
             return $variable->value;
         }
         return $this->context->builder->load($variable->value);
+    }
+
+    private static function isOrderedCompareOpcode(int $opcodeType): bool
+    {
+        return OpCode::TYPE_GREATER === $opcodeType
+            || OpCode::TYPE_GREATER_OR_EQUAL === $opcodeType
+            || OpCode::TYPE_SMALLER === $opcodeType
+            || OpCode::TYPE_SMALLER_OR_EQUAL === $opcodeType;
     }
 
 }
