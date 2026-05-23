@@ -31,6 +31,8 @@ class Object_ extends Type {
     private array $hasConstructor = [];
     /** @var array<int, array<string, array{type: int, value: int|float|bool|string|null}>> */
     private array $classConstants = [];
+    /** @var array<int, array<int, array{propertyType: int, type: int, value: int|float|bool|string|null}>> */
+    private array $propertyDefaults = [];
 
     private ?int $splObjectStorageClassId = null;
 
@@ -214,6 +216,8 @@ class Object_ extends Type {
 
         if ($propCount > 0) {
             $this->initPropertySlots($obj, $propCount);
+            $this->initPropertyDefaults($obj, $classId);
+            $this->initEmptyHashtableProperties($obj, $classId);
         }
 
         if ($this->isSplObjectStorageClass($classId)) {
@@ -280,6 +284,59 @@ class Object_ extends Type {
                 $voidpp
             );
             $this->context->builder->store($nullPtr, $slotPtr);
+        }
+    }
+
+    private function initPropertyDefaults(PHPLLVM\Value $obj, int $classId): void
+    {
+        if (!isset($this->propertyDefaults[$classId])) {
+            return;
+        }
+        foreach ($this->propertyDefaults[$classId] as $slotIndex => $entry) {
+            $slot = $this->propertySlotPtr($obj, $slotIndex);
+            $var = $this->jitConstantFromEntry([
+                'type' => $entry['type'],
+                'value' => $entry['value'],
+            ]);
+            $this->propertyStore($slot, $var, $entry['propertyType']);
+        }
+    }
+
+    private function initEmptyHashtableProperties(PHPLLVM\Value $obj, int $classId): void
+    {
+        if (!isset($this->properties[$classId])) {
+            return;
+        }
+        $initialized = $this->propertyDefaults[$classId] ?? [];
+        foreach ($this->properties[$classId] as $propset) {
+            if (Variable::TYPE_HASHTABLE !== $propset[2]) {
+                continue;
+            }
+            if (isset($initialized[$propset[3]])) {
+                continue;
+            }
+            $slot = $this->propertySlotPtr($obj, $propset[3]);
+            $loaded = $this->context->builder->load($slot);
+            $nullPtr = $loaded->typeOf()->getElementType()->constNull();
+            $isEmpty = $this->context->builder->icmp(
+                PHPLLVM\Builder::INT_EQ,
+                $loaded,
+                $nullPtr
+            );
+            $fn = $this->context->builder->getInsertBlock()->getParent();
+            assert($fn instanceof PHPLLVM\Value\Function_);
+            $initBlock = $fn->appendBasicBlock('prop_ht_init_'.$classId.'_'.$propset[3]);
+            $doneBlock = $fn->appendBasicBlock('prop_ht_done_'.$classId.'_'.$propset[3]);
+            $this->context->builder->branchIf($isEmpty, $initBlock, $doneBlock);
+            $this->context->builder->positionAtEnd($initBlock);
+            $ht = HashTableHelper::alloc($this->context);
+            $voidPtr = $this->context->getTypeFromString('void*');
+            $this->context->builder->store(
+                $this->context->builder->pointerCast($ht, $voidPtr),
+                $slot
+            );
+            $this->context->builder->branch($doneBlock);
+            $this->context->builder->positionAtEnd($doneBlock);
         }
     }
 
@@ -540,7 +597,7 @@ class Object_ extends Type {
     /**
      * JIT storage type for properties on vendor CFG / compiler objects (e.g. PHPCfg\Block::$children).
      */
-    private function externalPropertyJitType(string $class, string $name): int
+    public function externalPropertyJitType(string $class, string $name): int
     {
         $lcClass = strtolower(str_replace('/', '\\', ltrim($class, '\\')));
         $lcName = strtolower($name);
@@ -588,6 +645,26 @@ class Object_ extends Type {
         $this->properties[$classId][] = [
             $this->propNameMap[$name], $name, $type, count($this->properties[$classId]),
         ];
+    }
+
+    public function definePropertyDefault(int $classId, string $name, VMVariable $value): void
+    {
+        if (VMVariable::TYPE_ARRAY === $value->type) {
+            return;
+        }
+        foreach ($this->properties[$classId] as $propset) {
+            if ($propset[1] !== $name) {
+                continue;
+            }
+            $this->propertyDefaults[$classId][$propset[3]] = [
+                'propertyType' => $propset[2],
+                'type' => Variable::fromVMVariable($value->type),
+                'value' => $this->compileTimeValueFromVm($value),
+            ];
+
+            return;
+        }
+        throw new \LogicException("Property {$name} not defined for class {$classId}");
     }
 
     public function defineClassConst(int $classId, string $name, VMVariable $value): void
