@@ -548,11 +548,21 @@ class Object_ extends Type {
 
     public function propertyFetch(PHPLLVM\Value $obj, string $class, string $name): Variable
     {
-        if (!isset($this->propNameMap[$name])) {
-            throw new \LogicException('Attempting to fetch unknown property');
+        $classId = $this->lookup('' !== $class ? $class : 'stdclass');
+        $nameId = $this->propNameMap[$name] ?? null;
+        $hasProp = false;
+        if (null !== $nameId) {
+            foreach ($this->properties[$classId] as $propset) {
+                if ($propset[0] === $nameId) {
+                    $hasProp = true;
+                    break;
+                }
+            }
         }
-        $classId = $this->lookup($class);
-        $nameId = $this->propNameMap[$name];
+        if (!$hasProp) {
+            $this->defineProperty($classId, $name, Variable::TYPE_VALUE);
+            $nameId = $this->propNameMap[$name];
+        }
         foreach ($this->properties[$classId] as $propset) {
             if ($propset[0] === $nameId) {
                 $slot = $this->propertySlotPtr($obj, $propset[3]);
@@ -716,6 +726,30 @@ class Object_ extends Type {
             $value->addref();
             $this->context->builder->store(
                 $this->context->builder->pointerCast($heapPtr, $voidPtr),
+                $slot
+            );
+
+            return;
+        }
+
+        if (Variable::TYPE_NATIVE_LONG === $propertyType && Variable::TYPE_NATIVE_LONG === $value->type) {
+            $nativeType = $this->context->getTypeFromString('int64');
+            $nativePtr = $this->context->memory->malloc($nativeType);
+            $this->context->builder->store($this->context->helper->loadValue($value), $nativePtr);
+            $this->context->builder->store(
+                $this->context->builder->pointerCast($nativePtr, $voidPtr),
+                $slot
+            );
+
+            return;
+        }
+
+        if (Variable::TYPE_NATIVE_BOOL === $propertyType && Variable::TYPE_NATIVE_BOOL === $value->type) {
+            $nativeType = $this->context->getTypeFromString('int1');
+            $nativePtr = $this->context->memory->malloc($nativeType);
+            $this->context->builder->store($this->context->helper->loadValue($value), $nativePtr);
+            $this->context->builder->store(
+                $this->context->builder->pointerCast($nativePtr, $voidPtr),
                 $slot
             );
 

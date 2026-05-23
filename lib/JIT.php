@@ -1547,6 +1547,16 @@ class JIT {
             $result->addref();
 
             return;
+        } elseif (Variable::TYPE_OBJECT === $result->type && Variable::TYPE_VALUE === $value->type) {
+            $obj = $this->context->builder->call(
+                $this->context->lookupFunction('__value__readObject'),
+                $this->valueBoxPointer($value)
+            );
+            $result->free();
+            $this->context->builder->store($obj, $result->value);
+            $result->addref();
+
+            return;
         }
         throw new \LogicException("Cannot assign operands of different types (yet): {$value->type}, {$result->type}");
     }
