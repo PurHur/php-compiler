@@ -161,6 +161,7 @@ class Module extends ModuleAbstract
             new is_writable(),
             new is_executable(),
             new is_link(),
+            new readlink(),
             new filetype(),
             new fopen(),
             new fread(),
@@ -329,6 +330,16 @@ class Module extends ModuleAbstract
             $ft = $context->context->functionType($i32, false, $i8p, $i8p);
             $fn = $context->module->addFunction('lstat', $ft);
             $context->registerFunction('lstat', $fn);
+        }
+        try {
+            $context->lookupFunction('readlink');
+        } catch (\Throwable $e) {
+            $i8p = $context->getTypeFromString('int8*');
+            $sizeT = $context->getTypeFromString('size_t');
+            $i64 = $context->getTypeFromString('int64');
+            $ft = $context->context->functionType($i64, false, $i8p, $i8p, $sizeT);
+            $fn = $context->module->addFunction('readlink', $ft);
+            $context->registerFunction('readlink', $fn);
         }
         $double = $context->getTypeFromString('double');
         try {
