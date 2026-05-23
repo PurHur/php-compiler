@@ -88,6 +88,7 @@
         "ext/standard/JitStrrpos.php",
         "ext/standard/JitStrstr.php",
         "ext/standard/JitSubstrCount.php",
+        "ext/standard/JitTouch.php",
         "ext/standard/JitUnlink.php",
         "ext/standard/JitUrlencode.php",
         "ext/standard/JitWebParams.php",
@@ -267,6 +268,7 @@
         "ext/standard/substr_count.php",
         "ext/standard/tan.php",
         "ext/standard/time.php",
+        "ext/standard/touch_.php",
         "ext/standard/ucfirst.php",
         "ext/standard/ucwords.php",
         "ext/standard/unlink.php",
@@ -447,9 +449,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 377,
+        "inventory_files": 379,
         "excluded": 3,
-        "eligible": 374,
+        "eligible": 376,
         "aot_lint_targets": 19,
         "aot_link_targets": 14,
         "aot_link_lib_targets": 1
