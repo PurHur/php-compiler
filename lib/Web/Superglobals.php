@@ -60,6 +60,12 @@ final class Superglobals
         }
     }
 
+    /** VM implementation shared with {@see compiler_is_superglobal_name} execute(). */
+    public static function isSuperglobalNameVm(string $name): bool
+    {
+        return self::isSuperglobalName($name);
+    }
+
     /**
      * Raw request body from REQUEST_BODY / CGI stdin (issue #289, #50).
      *

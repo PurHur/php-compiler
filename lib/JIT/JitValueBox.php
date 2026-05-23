@@ -47,6 +47,28 @@ final class JitValueBox
     }
 
     /**
+     * Unwrap {@see __value__value*} to the inner {@see __value__*} (issue #1056 bundle ICmp).
+     */
+    public static function normalizeValuePtr(Context $context, Value $ptr): Value
+    {
+        $ptrTy = $ptr->typeOf();
+        if (LlvmType::KIND_POINTER !== $ptrTy->getKind()) {
+            return $ptr;
+        }
+        $elemName = $context->getStringFromType($ptrTy->getElementType());
+        if ('__value__value' !== $elemName) {
+            return $ptr;
+        }
+        $wrapMap = $context->structFieldMap['__value__value'];
+        $inner = $context->builder->structGep($ptr, $wrapMap['value']);
+
+        return $context->builder->pointerCast(
+            $inner,
+            $context->getTypeFromString('__value__*')
+        );
+    }
+
+    /**
      * {@see __value__*} for a boxed {@see Variable::TYPE_VALUE} (by-value or alloca slot).
      */
     public static function valuePtrFromVariable(Context $context, Variable $var): Value
@@ -64,7 +86,7 @@ final class JitValueBox
                 $var->objectPropertySlot,
                 $storage
             );
-            return self::pointer($context, $storage);
+            return self::normalizeValuePtr($context, self::pointer($context, $storage));
         }
         if (Variable::TYPE_VALUE !== $var->type) {
             throw new \LogicException('valuePtrFromVariable requires TYPE_VALUE');
@@ -72,10 +94,10 @@ final class JitValueBox
         if (Variable::KIND_VARIABLE === $var->kind) {
             $llvmType = $context->getStringFromType($var->value->typeOf());
             if ('__value__*' === $llvmType) {
-                return $var->value;
+                return self::normalizeValuePtr($context, $var->value);
             }
             if ('__value__' === $llvmType) {
-                return self::pointer($context, $var->value);
+                return self::normalizeValuePtr($context, self::pointer($context, $var->value));
             }
             if ('__string__**' === $llvmType) {
                 $str = $context->builder->load($var->value);
@@ -86,7 +108,7 @@ final class JitValueBox
                     $str
                 );
 
-                return self::pointer($context, $slot);
+                return self::normalizeValuePtr($context, self::pointer($context, $slot));
             }
             if ('__string__*' === $llvmType) {
                 $slot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__'));
@@ -96,22 +118,22 @@ final class JitValueBox
                     $var->value
                 );
 
-                return self::pointer($context, $slot);
+                return self::normalizeValuePtr($context, self::pointer($context, $slot));
             }
 
-            return self::pointer($context, $var->value);
+            return self::normalizeValuePtr($context, self::pointer($context, $var->value));
         }
         $valueTy = $var->value->typeOf();
         if (
             LlvmType::KIND_POINTER === $valueTy->getKind()
             || '__value__*' === $context->getStringFromType($valueTy)
         ) {
-            return $var->value;
+            return self::normalizeValuePtr($context, $var->value);
         }
         $slot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__'));
         $context->builder->store($var->value, $slot);
 
-        return self::pointer($context, $slot);
+        return self::normalizeValuePtr($context, self::pointer($context, $slot));
     }
 
     public static function writeLong(Context $context, Value $slot, Value $long): void
