@@ -129,6 +129,9 @@ restart:
                 case OpCode::TYPE_CAST_INT:
                     $frame->scope[$op->arg1]->castFrom(Variable::TYPE_INTEGER, $frame->scope[$op->arg2]);
                     break;
+                case OpCode::TYPE_CAST_STRING:
+                    $frame->scope[$op->arg1]->castFrom(Variable::TYPE_STRING, $frame->scope[$op->arg2]);
+                    break;
                 case OpCode::TYPE_IDENTICAL:
                     $arg1 = $frame->scope[$op->arg1];
                     $arg2 = $frame->scope[$op->arg2];
