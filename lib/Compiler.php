@@ -419,13 +419,7 @@ class Compiler {
             $op->block1 = $this->compileCfgBranch($stmt->target, $block);
             $block->addOpCode($op);
         } elseif ($stmt instanceof Op\Stmt\JumpIf) {
-            $op = new OpCode(
-                OpCode::TYPE_JUMPIF,
-                $this->requireOperandSlot(
-                    $this->compileOperand($stmt->cond, $block, true),
-                    'if condition'
-                )
-            );
+            $op = new OpCode(OpCode::TYPE_JUMPIF, $this->compileOperand($stmt->cond, $block, true));
             $op->block1 = $this->compileCfgBranch($stmt->if, $block);
             $op->block2 = $this->compileCfgBranch($stmt->else, $block);
             $block->addOpCode($op);
