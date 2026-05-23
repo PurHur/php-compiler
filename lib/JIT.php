@@ -604,6 +604,24 @@ class JIT {
                     $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));
                     $this->assignOperand($block->getOperand($op->arg1), $value->castTo(Variable::TYPE_NATIVE_BOOL));
                     break;
+                case OpCode::TYPE_CAST_INT:
+                    $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));
+                    if (Variable::TYPE_VALUE === $value->type) {
+                        $ptr = Variable::KIND_VARIABLE === $value->kind
+                            ? $value->value
+                            : $this->context->helper->loadValue($value);
+                        $long = $this->context->builder->call(
+                            $this->context->lookupFunction('__value__readLong'),
+                            $ptr
+                        );
+                        $this->assignOperandValue($block->getOperand($op->arg1), $long);
+                    } else {
+                        $this->assignOperand(
+                            $block->getOperand($op->arg1),
+                            $value->castTo(Variable::TYPE_NATIVE_LONG)
+                        );
+                    }
+                    break;
                 case OpCode::TYPE_CAST_STRING:
                     $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));
                     $this->assignOperand(

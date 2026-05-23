@@ -42,6 +42,19 @@ final class RuntimeAotLintTest extends TestCase
         $this->assertTryCatchLowering($block);
     }
 
+    public function testBootstrapCastIntFixture(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $path = $root.'/test/bootstrap-aot/cast_int.php';
+        $runtime = new Runtime(Runtime::MODE_AOT);
+        $block = $runtime->parseAndCompile((string) file_get_contents($path), $path);
+        $this->assertNotNull($block);
+        $this->assertTrue(
+            $this->blockTreeHasOpcode($block, OpCode::TYPE_CAST_INT),
+            'expected TYPE_CAST_INT lowering in bootstrap cast_int fixture'
+        );
+    }
+
     public function testLibRuntimeCompileLintExitZero(): void
     {
         $root = dirname(__DIR__, 2);
