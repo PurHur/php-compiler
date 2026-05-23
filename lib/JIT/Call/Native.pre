@@ -11,6 +11,7 @@ namespace PHPCompiler\JIT\Call;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Call;
+use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\Variable;
 
 use PHPLLVM\Value;
@@ -64,6 +65,30 @@ class Native implements Call {
                             $context->lookupFunction('__value__readString'),
                             \PHPCompiler\JIT\JitValueBox::valuePtrFromVariable($context, $arg)
                         );
+                }
+                break;
+            case '__hashtable__*':
+                if (0 !== ($arg->type & Variable::IS_NATIVE_ARRAY)) {
+                    return HashTableHelper::materializeNativeArrayForCall($context, $arg);
+                }
+                switch ($arg->type) {
+                    case Variable::TYPE_HASHTABLE:
+                        $context->refcount->addref($value);
+
+                        return $value;
+                    case Variable::TYPE_VALUE:
+                        return $context->builder->call(
+                            $context->lookupFunction('__value__readHashtable'),
+                            Variable::KIND_VARIABLE === $arg->kind
+                                ? \PHPCompiler\JIT\JitValueBox::pointer($context, $arg->value)
+                                : $value
+                        );
+                }
+                break;
+            case '__object__*':
+                switch ($arg->type) {
+                    case Variable::TYPE_OBJECT:
+                        return $value;
                 }
                 break;
             case '__value__':

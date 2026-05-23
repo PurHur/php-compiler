@@ -726,6 +726,35 @@ return_bool:
     }
 
     public function loadValue(Variable $variable): PHPLLVM\Value {
+        if (null !== $variable->objectPropertySlot) {
+            $loaded = $this->context->builder->load($variable->objectPropertySlot);
+            if (null === $variable->objectPropertyType) {
+                throw new \LogicException('objectPropertySlot requires objectPropertyType');
+            }
+            if (Variable::TYPE_HASHTABLE === $variable->objectPropertyType) {
+                return $this->context->builder->pointerCast(
+                    $loaded,
+                    $this->context->getTypeFromString('__hashtable__*')
+                );
+            }
+            if (Variable::TYPE_OBJECT === $variable->objectPropertyType) {
+                return $this->context->builder->pointerCast(
+                    $loaded,
+                    $this->context->getTypeFromString('__object__*')
+                );
+            }
+            if (Variable::TYPE_STRING === $variable->objectPropertyType) {
+                return $this->context->builder->pointerCast(
+                    $loaded,
+                    $this->context->getTypeFromString('__string__*')
+                );
+            }
+
+            return $this->context->builder->pointerCast(
+                $loaded,
+                $this->context->getTypeFromString('__value__*')
+            );
+        }
         if ($variable->kind === Variable::KIND_VALUE) {
             return $variable->value;
         }

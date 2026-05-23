@@ -668,4 +668,57 @@ final class HashTableHelper
 
         return $var;
     }
+
+    /**
+     * Copy a compile-time native array into a refcounted __hashtable__ for calls/properties (issue #767).
+     */
+    public static function materializeNativeArrayForCall(Context $context, Variable $array): Value
+    {
+        if (0 === ($array->type & Variable::IS_NATIVE_ARRAY)) {
+            throw new \LogicException('materializeNativeArrayForCall requires a native array');
+        }
+        $dest = self::alloc($context);
+        $elemType = $array->type & ~Variable::IS_NATIVE_ARRAY;
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $count = $context->constantFromInteger($array->nextFreeElement, 'size_t');
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'native_ht_idx');
+        $context->builder->store($zero, $idxSlot);
+        $head = BasicBlockHelper::append($context, 'native_ht_head');
+        $body = BasicBlockHelper::append($context, 'native_ht_body');
+        $advance = BasicBlockHelper::append($context, 'native_ht_advance');
+        $done = BasicBlockHelper::append($context, 'native_ht_done');
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $count);
+        $context->builder->branchIf($atEnd, $done, $body);
+
+        $context->builder->positionAtEnd($body);
+        $slot = $context->builder->inBoundsGep($array->value, $zero, $idx);
+        if (Variable::TYPE_STRING === $elemType) {
+            $elem = new Variable($context, $elemType, Variable::KIND_VARIABLE, $slot);
+        } else {
+            $elem = new Variable(
+                $context,
+                $elemType,
+                Variable::KIND_VALUE,
+                $context->builder->load($slot)
+            );
+        }
+        self::setAtIndex($context, $dest, $idx, $elem);
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($advance);
+        $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($done);
+
+        $context->refcount->addref($dest);
+
+        return $dest;
+    }
 }

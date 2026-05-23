@@ -26,6 +26,8 @@ class Object_ extends Type {
     private array $propNameMap = [];
     /** @var array<int, array<string, int>> class id => method lc => visibility flags */
     private array $methodVisibility = [];
+    /** @var array<int, true> class ids with a compiled __construct body */
+    private array $hasConstructor = [];
     /** @var array<int, array<string, array{type: int, value: int|float|bool|string|null}>> */
     private array $classConstants = [];
 
@@ -360,6 +362,16 @@ class Object_ extends Type {
         return $this->methodVisibility[$classId][strtolower($methodLc)] ?? \PHPCfg\Func::FLAG_PUBLIC;
     }
 
+    public function markHasConstructor(int $classId): void
+    {
+        $this->hasConstructor[$classId] = true;
+    }
+
+    public function hasConstructor(int $classId): bool
+    {
+        return isset($this->hasConstructor[$classId]);
+    }
+
     public function defineProperty(int $classId, string $name, int $type): void
     {
         if (!isset($this->propNameMap[$name])) {
@@ -612,15 +624,40 @@ class Object_ extends Type {
     {
         $voidPtr = $this->context->getTypeFromString('void*');
 
-        if (Variable::TYPE_HASHTABLE === $propertyType && Variable::TYPE_HASHTABLE === $value->type) {
-            $stored = $this->context->builder->pointerCast(
-                $this->context->helper->loadValue($value),
-                $voidPtr
-            );
-            $this->context->builder->store($stored, $slot);
-            $value->addref();
+        if (Variable::TYPE_HASHTABLE === $propertyType) {
+            if (0 !== ($value->type & Variable::IS_NATIVE_ARRAY)) {
+                $ht = HashTableHelper::materializeNativeArrayForCall($this->context, $value);
+                $stored = $this->context->builder->pointerCast($ht, $voidPtr);
+                $this->context->builder->store($stored, $slot);
+                $this->context->refcount->addref($ht);
 
-            return;
+                return;
+            }
+            if (Variable::TYPE_HASHTABLE === $value->type) {
+                $stored = $this->context->builder->pointerCast(
+                    $this->context->helper->loadValue($value),
+                    $voidPtr
+                );
+                $this->context->builder->store($stored, $slot);
+                $value->addref();
+
+                return;
+            }
+            if (Variable::TYPE_VALUE === $value->type) {
+                $valuePtr = Variable::KIND_VARIABLE === $value->kind
+                    ? JitValueBox::pointer($this->context, $value->value)
+                    : $value->value;
+                $ht = $this->context->builder->call(
+                    $this->context->lookupFunction('__value__readHashtable'),
+                    $valuePtr
+                );
+                $stored = $this->context->builder->pointerCast($ht, $voidPtr);
+                $this->context->builder->store($stored, $slot);
+                $this->context->refcount->addref($ht);
+                $value->addref();
+
+                return;
+            }
         }
 
         $valueType = $this->context->getTypeFromString('__value__');

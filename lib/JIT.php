@@ -92,7 +92,9 @@ class JIT {
         $argVars = [];
         if (!is_null($block->func)) {
             $callbackType = '';
-            if ($block->func->returnType instanceof Op\Type\Void_) {
+            if (null !== $block->func && '__construct' === strtolower($block->func->name)) {
+                $callbackType = 'void';
+            } elseif ($block->func->returnType instanceof Op\Type\Void_) {
                 $callbackType = 'void';
             } elseif ($block->func->returnType instanceof Op\Type\Literal) {
                 switch ($block->func->returnType->name) {
@@ -1003,6 +1005,8 @@ class JIT {
                             JIT\HashTableHelper::alloc($this->context)
                         );
                         $this->assignOperand($block->getOperand($op->arg1), $ht, true);
+                        $this->context->scope->toCall = null;
+                        $this->context->scope->args = [];
                     } else {
                         $class = $this->context->type->object->lookupOperand($classOp);
                         $obj = new Variable(
@@ -1011,10 +1015,20 @@ class JIT {
                             Variable::KIND_VALUE,
                             $this->context->type->object->allocate($class)
                         );
-                        $this->assignOperand($block->getOperand($op->arg1), $obj, true);
+                        $resultOp = $block->getOperand($op->arg1);
+                        $this->assignOperand($resultOp, $obj, true);
+                        if ($this->context->type->object->hasConstructor($class)) {
+                            $className = $classOp instanceof Operand\Literal
+                                ? $classOp->value
+                                : $this->context->scope->className;
+                            $proxyName = strtolower($className).'::'.'__construct';
+                            $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
+                            $this->context->scope->args = [$this->context->getVariableFromOp($resultOp)];
+                        } else {
+                            $this->context->scope->toCall = null;
+                            $this->context->scope->args = [];
+                        }
                     }
-                    $this->context->scope->toCall = null;
-                    $this->context->scope->args = [];
                     break;
                 case OpCode::TYPE_METHODCALL_INIT:
                     $receiverOp = $block->getOperand($op->arg1);
@@ -1143,6 +1157,9 @@ class JIT {
         if (null === $cfgFunc) {
             return null;
         }
+        if ('__construct' === strtolower($cfgFunc->name)) {
+            return 'void';
+        }
         if ($cfgFunc->returnType instanceof Op\Type\Void_) {
             return 'void';
         }
@@ -1198,12 +1215,11 @@ class JIT {
                         $methodLc,
                         $visFlags
                     );
-                    // Constructors are lowered at new; skip JIT until user-class model is complete (#568).
-                    if ('__construct' === $methodLc) {
-                        break;
-                    }
                     $funcName = $this->context->scope->className.'::'.$methodLc;
                     if (null !== $op->block1) {
+                        if ('__construct' === $methodLc) {
+                            $this->context->type->object->markHasConstructor($this->context->scope->classId);
+                        }
                         $this->compileBlock($op->block1, $funcName);
                     }
                     break;

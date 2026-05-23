@@ -374,9 +374,13 @@ final class Variable {
     }
 
     public function addref(): void {
-        if ($this->type & self::IS_REFCOUNTED) {
-            $this->context->refcount->addref($this->value);
+        if (!($this->type & self::IS_REFCOUNTED) || self::TYPE_VALUE === $this->type) {
+            return;
         }
+        $ptr = self::KIND_VALUE === $this->kind
+            ? $this->value
+            : $this->context->helper->loadValue($this);
+        $this->context->refcount->addref($ptr);
     }
 
     public function free(): void {
@@ -401,7 +405,10 @@ final class Variable {
             return;
         }
         if ($this->type & self::IS_REFCOUNTED) {
-            $this->context->refcount->delref($this->value);
+            $ptr = self::KIND_VALUE === $this->kind
+                ? $this->value
+                : $this->context->helper->loadValue($this);
+            $this->context->refcount->delref($ptr);
             return;
         }
         throw new \LogicException('Unknown free type: ' . $this->type);
