@@ -36,6 +36,7 @@ Environment (enable next gates):
   MINIWEBAPP_AOT_LINK_GATE=0      skip 003 native link gate during iteration
   MINIWEBAPP_AOT_EXECUTE_GATE=1   run 003 AOT binary CLI execute in ci-local (#747, #764)
   MINIWEBAPP_AOT_EXECUTE_GATE=0   skip execute (default until #764 green — #791)
+  MINIWEBAPP_AOT_BISECT_GATE=1    run script/miniwebapp-aot-bisect.sh ladder (default off — #879)
 
 See: examples/003-MiniWebApp/README.md, issue #472
 EOF
@@ -86,6 +87,9 @@ stage3b=0
 stage4a=0
 stage4c=0
 stage4=0
+stage4b2=0
+aot_bisect_exit=-1
+aot_bisect_skipped=1
 aot_dry_run_exit=-1
 aot_dry_run_skipped=0
 aot_smoke_003_exit=-1
@@ -185,6 +189,23 @@ if [[ -n "${LLVM_DIR}" ]]; then
   rm -f "${aot_smoke_stderr}"
 elif [[ "${aot_dry_run_skipped}" -eq 1 ]]; then
   aot_smoke_003_skipped=1
+fi
+
+# Stage 4b2: ordered #764 AOT PHPT ladder (opt-in MINIWEBAPP_AOT_BISECT_GATE=1, #879).
+aot_bisect_gate="${MINIWEBAPP_AOT_BISECT_GATE:-0}"
+if [[ "${aot_bisect_gate}" == "1" && -n "${LLVM_DIR}" ]]; then
+  aot_bisect_skipped=0
+  aot_bisect_stderr="$(mktemp)"
+  set +e
+  "${ROOT}/script/miniwebapp-aot-bisect.sh" 2>"${aot_bisect_stderr}" >/dev/null
+  aot_bisect_exit=$?
+  set -e
+  if [[ "${aot_bisect_exit}" -eq 0 ]]; then
+    stage4b2=1
+  fi
+  rm -f "${aot_bisect_stderr}"
+elif [[ "${aot_bisect_gate}" == "1" && -z "${LLVM_DIR}" ]]; then
+  aot_bisect_skipped=1
 fi
 
 # Stage 4b: ExamplesCompileTest @group miniwebapp unskipped (#454).
@@ -300,6 +321,19 @@ echo "$(mark "${stage4}") Stage 4b AOT link — ExamplesCompileTest @group miniw
 echo "       ${REPO_URL}/issues/454"
 echo "       ${REPO_URL}/issues/568"
 
+echo "$(mark "${stage4b2}") Stage 4b2 AOT bisect — MINIWEBAPP_AOT_BISECT_GATE=1 runs miniwebapp-aot-bisect.sh (#879, #764)"
+echo "       ${REPO_URL}/issues/879"
+echo "       ${REPO_URL}/issues/764"
+if [[ "${aot_bisect_gate}" != "1" ]]; then
+  echo "       env: default off (MINIWEBAPP_AOT_BISECT_GATE=1 to probe ordered PHPT ladder)"
+elif [[ "${aot_bisect_skipped}" -eq 1 ]]; then
+  echo "       LLVM 9 not available (script/install-llvm9.sh or .llvm/)"
+elif [[ "${aot_bisect_exit}" -eq 0 ]]; then
+  echo "       AOT bisect probe: green"
+elif [[ "${aot_bisect_exit}" -ge 0 ]]; then
+  echo "       AOT bisect probe: exit ${aot_bisect_exit}"
+fi
+
 echo
 echo "Commands:"
 echo "  make web-smoke              lint + VM smoke (#455)"
@@ -315,6 +349,8 @@ echo "  ./phpc build --project examples/003-MiniWebApp --dry-run   # stage 4a (#
 echo "  EXAMPLES_AOT_SMOKE_ONLY=003 ./script/examples-aot-smoke.sh   # stage 4c (#683)"
 echo "  make deploy-smoke             # stage 4d shell gate 001/002 (#718)"
 echo "  ./script/ci-local.sh --filter test003MiniWebAppProjectAotLint"
+echo "  MINIWEBAPP_AOT_BISECT_GATE=1 ./script/miniwebapp-aot-bisect.sh   # stage 4b2 (#879)"
+echo "  ./script/miniwebapp-aot-bisect.sh --list"
 echo
 echo "Tracking: ${REPO_URL}/issues/472 (gate ladder spec)"
 

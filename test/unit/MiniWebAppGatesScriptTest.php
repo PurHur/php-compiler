@@ -49,6 +49,9 @@ final class MiniWebAppGatesScriptTest extends TestCase
         $this->assertStringContainsString('issues/683', $combined);
         $this->assertStringContainsString('issues/485', $combined);
         $this->assertStringContainsString('Stage 4b AOT link', $combined);
+        $this->assertStringContainsString('Stage 4b2 AOT bisect', $combined);
+        $this->assertStringContainsString('issues/879', $combined);
+        $this->assertStringContainsString('miniwebapp-aot-bisect', $combined);
         $this->assertStringContainsString('issues/454', $combined);
         $this->assertStringContainsString('issues/568', $combined);
         $this->assertStringContainsString('issues/539', $combined);
@@ -60,5 +63,7 @@ final class MiniWebAppGatesScriptTest extends TestCase
         $makefile = (string) file_get_contents(dirname(__DIR__, 2).'/Makefile');
         $this->assertStringContainsString('miniwebapp-gates:', $makefile);
         $this->assertStringContainsString('script/miniwebapp-gates.sh', $makefile);
+        $this->assertStringContainsString('miniwebapp-aot-bisect:', $makefile);
+        $this->assertStringContainsString('script/miniwebapp-aot-bisect.sh', $makefile);
     }
 }
