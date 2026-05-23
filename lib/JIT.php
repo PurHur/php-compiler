@@ -288,6 +288,7 @@ class JIT {
             || str_contains($lower, '\\frame::')
             || str_contains($lower, '\\module::')
             || str_contains($lower, '\\runtime::')
+            || $this->isSkippedJitResultHotPathName($lower)
         ) {
             return true;
         }
@@ -299,10 +300,19 @@ class JIT {
             || str_contains($lower, '\\vm\\variable::')
             || str_contains($lower, '\\printer::')
             || str_contains($lower, '\\jit\\operandname::')
-            || str_contains($lower, '\\jit\\result::')
             || str_contains($lower, '\\func\\jit::')
             || str_contains($lower, '\\jit::')
             || str_contains($lower, '\\jit\\context::');
+    }
+
+    /** Skip JIT\\Result FFI bodies (getCallable/getFunc) during self-host native link (#816). */
+    private function isSkippedJitResultHotPathName(string $lowerName): bool
+    {
+        if (!$this->shouldUseSelfHostJitStubs()) {
+            return false;
+        }
+
+        return str_contains($lowerName, '\\jit\\result::');
     }
 
     private function isSkippedCompilerHotPathName(string $name): bool

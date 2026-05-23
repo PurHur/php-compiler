@@ -11,7 +11,8 @@ North star: compile a **subset** of php-compiler with itself (native AOT), then 
 | Phase B fixture lint | `php script/bootstrap-aot-lint.php` | ✅ **12** procedural targets under `test/bootstrap-aot/` + `examples/000-HelloWorld` |
 | Phase C native run | `make bootstrap-aot-link` or `./script/bootstrap-aot-link.sh` | ✅ Link + execute **12** `aot_link_targets` (stdout vs Zend PHP) |
 | Phase D `lib/` link | `make bootstrap-aot-link-lib` or `./script/bootstrap-aot-link-lib.sh` | ✅ `test/bootstrap-aot/lib_opcode/main.php` bundles `lib/OpCode.php` ([#540](https://github.com/PurHur/php-compiler/issues/540)) |
-| Bundled `lib/Compiler.php` lint | `./script/bootstrap-selfhost-lint.sh` | ✅ `test/selfhost/compiler_minimal/main.php` + **48** literal `require_once` units toward `bin/vm.php` (no `vendor/`) ([#559](https://github.com/PurHur/php-compiler/issues/559)) |
+| Bundled `lib/Compiler.php` lint | `./script/bootstrap-selfhost-lint.sh` | ✅ `test/selfhost/compiler_minimal/main.php` + literal `require_once` units toward `bin/vm.php` (no `vendor/`) ([#559](https://github.com/PurHur/php-compiler/issues/559)) |
+| Wave gate (lint + probe) | `./script/bootstrap-wave-check.sh` | ✅ selfhost-lint → aot-lint → probe; prints `NEXT_LOWER` |
 | Self-host compile probe | `make bootstrap-selfhost-probe` | ⚠️ `-l` OK; native `-o` pending (`HashTableHelper` string-key arrays) — best-effort ([#816](https://github.com/PurHur/php-compiler/issues/816)) |
 | Self-host probe in full CI | `BOOTSTRAP_SELFHOST_PROBE_GATE=1 ./script/ci-local.sh` | ✅ runs after bootstrap AOT lint when LLVM 9 present ([#829](https://github.com/PurHur/php-compiler/issues/829)); off in `ci-fast.sh` unless env set |
 | Self-host native link | `./script/bootstrap-selfhost-link.sh` | ✅ `build/selfhost` prints `compiler_minimal bundle OK` ([#557](https://github.com/PurHur/php-compiler/issues/557), [#913](https://github.com/PurHur/php-compiler/issues/913)) |
@@ -25,6 +26,10 @@ docker run --rm -v "$(pwd):/compiler" -w /compiler php-compiler:22.04-dev bash -
 ```
 
 Self-host native link requires `PHP_COMPILER_SELFHOST_AOT=1` (set by `./script/bootstrap-selfhost-link.sh` and `make bootstrap-selfhost-probe`). `PHP_COMPILER_JIT_PROGRESS_FILE` is optional progress logging for segfault triage only — it does not enable JIT stubs.
+
+## Self-host `JIT\Result` / FFI policy
+
+Native self-host bundles include `lib/JIT/Result.php` for type closure only. When `PHP_COMPILER_SELFHOST_AOT=1`, `lib/JIT.php` stubs every `\JIT\Result::` method body (LLVM must not lower `FFI::new` / `FFI::memcpy` in `getCallable`), and `Result::getFunc` / `getHandler` / `getCallable` return no-op `Func\JIT` handlers at runtime instead of casting native addresses. Normal JIT/AOT (without the env flag) keeps the real FFI path unchanged.
 
 ## Self-host stdlib builtin policy
 
@@ -97,6 +102,25 @@ Incremental growth toward `bin/vm.php` inventory path ([#559](https://github.com
 **Next toward `bin/vm.php`** (`php script/bootstrap-selfhost-next-includes.php`): `lib/JIT/Progress.php` (`??=`), `lib/JIT/IncludeHelper.php`, `lib/JIT/CoalesceHelper.php`, `lib/JIT/Call/Native.php`, …
 
 Native link + run of `compiler_minimal` is gated by `./script/bootstrap-selfhost-link.sh` (LLVM 9; stdout `compiler_minimal bundle OK`). Runtime helpers in the bundle (`VM`, `Runtime`, `Block`, …) are JIT-stubbed for verify; `Compiler` hot paths use existing skip patterns ([#579](https://github.com/PurHur/php-compiler/issues/579), [#913](https://github.com/PurHur/php-compiler/issues/913)). Full `lib/` native self-host remains open.
+
+## Wave workflow
+
+Parallel bootstrap waves use **four agents** with disjoint ownership. Each wave ends with `./script/bootstrap-wave-check.sh` (or `--fail-fast` in CI). Do not commit build artifacts (`build/selfhost`, `build/.last-jit-func`, probe scratch files).
+
+| Agent | Owns | Do not touch |
+|-------|------|--------------|
+| **A — bundle** | `test/selfhost/compiler_minimal/main.php`, literal `require_once` growth, parse fixes in newly bundled `lib/*` | `lib/JIT/Helper.php`, bulk `ext/standard/` |
+| **B — compiler / VM** | `lib/Compiler.php`, `lib/Compiler/*`, `lib/VM/*` helpers on the vm.php path | `lib/JIT/Helper.php`, other agents’ open PR files |
+| **C — stdlib JIT** | `ext/standard/*.php`, `script/stdlib-jit-batch-apply.php` name lists | `lib/JIT/Helper.php`, bundle entry |
+| **D — tooling / docs** | `script/bootstrap-wave-check.sh`, `script/audit-stdlib-jit.php`, `docs/bootstrap-*.md`, inventory regen | runtime hot paths owned by A/B |
+
+**Wave gate order** (same as `script/bootstrap-wave-check.sh`):
+
+1. `./script/bootstrap-selfhost-lint.sh` — bundled `Compiler.php` AOT lint
+2. `php script/bootstrap-aot-lint.php` — quick procedural ladder (exit 2 = LLVM skip)
+3. `./script/bootstrap-selfhost-compile-probe.sh` — prints `NEXT_LOWER` for the next native blocker
+
+Inventory between waves: `php script/bootstrap-inventory.php`. Stdlib JIT audit: `php script/audit-stdlib-jit.php` → `docs/stdlib-jit-audit.md`.
 
 ## Non-goals (initial bootstrap)
 
