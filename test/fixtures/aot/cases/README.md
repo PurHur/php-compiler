@@ -12,8 +12,11 @@ Ordered smallest → largest for **#764** triage (issues **#880**, **#879**). Sa
 | 4 | `deploy_path_layout_nested` | #878 / #764 |
 | 5 | `miniwebapp_render_home` | #867 |
 | 6 | `layout_script_base` | #866 |
-| 7 | `layout_title_branch` | #784 |
-| 8 | `method_include_void_array_property` | #846 |
+| 7 | `coalesce_then_inherited_local` | #866 |
+| 8 | `coalesce_then_htmlspecialchars` | #866 |
+| 9 | `coalesce_then_nested_include` | #784 |
+| 10 | `layout_title_branch` | #784 |
+| 11 | `method_include_void_array_property` | #846 |
 
 Run (LLVM 9 required):
 

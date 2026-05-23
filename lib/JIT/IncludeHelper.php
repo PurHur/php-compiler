@@ -463,22 +463,21 @@ final class IncludeHelper
         }
         foreach ($frame as $entry) {
             [$calleeOp, $prepared, $calleeVar, $compileTimeString] = array_pad($entry, 4, null);
-            if (Variable::TYPE_STRING !== $calleeVar->type || Variable::KIND_VARIABLE !== $calleeVar->kind) {
+            if (Variable::KIND_VARIABLE !== $calleeVar->kind) {
                 continue;
             }
             if (null !== $compileTimeString && '' !== $compileTimeString) {
                 $restored = $context->builder->load(
                     $context->constantStringFromString($compileTimeString)
                 );
-            } else {
+            } elseif (Variable::TYPE_STRING === $prepared->type) {
                 $restored = $context->helper->loadValue($prepared);
+            } else {
+                continue;
             }
+            self::storeIncludeBindingRestore($context, $calleeOp, $calleeVar, $restored);
             $bindingName = OperandName::resolve($calleeOp);
             if (null === $bindingName) {
-                $context->builder->store($restored, $calleeVar->value);
-                $calleeVar->addref();
-                $calleeVar->includeBinding = true;
-                $context->setVariableOp($calleeOp, $calleeVar);
                 continue;
             }
             foreach ($context->scope->variables as $scopeOp) {
@@ -486,17 +485,37 @@ final class IncludeHelper
                     continue;
                 }
                 $scopeVar = $context->scope->variables[$scopeOp];
-                if (
-                    Variable::TYPE_STRING !== $scopeVar->type
-                    || Variable::KIND_VARIABLE !== $scopeVar->kind
-                ) {
+                if (Variable::KIND_VARIABLE !== $scopeVar->kind) {
                     continue;
                 }
-                $context->builder->store($restored, $scopeVar->value);
-                $scopeVar->addref();
-                $scopeVar->includeBinding = true;
-                $context->setVariableOp($scopeOp, $scopeVar);
+                self::storeIncludeBindingRestore($context, $scopeOp, $scopeVar, $restored);
             }
+        }
+    }
+
+    private static function storeIncludeBindingRestore(
+        Context $context,
+        Operand $operand,
+        Variable $var,
+        \PHPLLVM\Value $restored
+    ): void {
+        if (Variable::TYPE_STRING === $var->type) {
+            $context->builder->store($restored, $var->value);
+            $var->addref();
+            $var->includeBinding = true;
+            $context->setVariableOp($operand, $var);
+
+            return;
+        }
+        if (Variable::TYPE_VALUE === $var->type) {
+            $destPtr = JitValueBox::pointer($context, $var->value);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeString'),
+                $destPtr,
+                $restored
+            );
+            $var->includeBinding = true;
+            $context->setVariableOp($operand, $var);
         }
     }
 
