@@ -172,6 +172,7 @@ class Module extends ModuleAbstract
             new chmod_(),
             new rename_(),
             new copy_(),
+            new touch_(),
             new filetype(),
             new fopen(),
             new fread(),
