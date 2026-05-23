@@ -65,6 +65,9 @@ function analyzeInternal(PHPCompiler\Func\Internal $fn): array
     if (preg_match('/\bVM only\b/i', $source)) {
         $notes[] = 'doc: VM only';
     }
+    if ('array_map' === $fn->getName() && preg_match('/callables are deferred/i', $source)) {
+        $notes[] = 'callbacks: null/string builtins; closures deferred (#1154)';
+    }
 
     $jit = false;
     if ($ref->hasMethod('call')) {
