@@ -61,19 +61,4 @@ final class hash_hmac extends Internal
         if (isset($args[3])) { $raw = JitBoolArg::lower($context, $args[3], 'hash_hmac() raw_output'); }
         return JitHash::hashHmac($context, JitStringArg::lower($context, $args[0], 'hash_hmac() algorithm'), JitStringArg::lower($context, $args[1], 'hash_hmac() data'), JitStringArg::lower($context, $args[2], 'hash_hmac() key'), $raw);
     }
-
-    private static function jitStringArg(Context $context, JITVariable $arg): Value
-    {
-        if (JITVariable::TYPE_STRING === $arg->type) {
-            return $context->helper->loadValue($arg);
-        }
-        if (JITVariable::TYPE_VALUE === $arg->type) {
-            return $context->builder->call(
-                $context->lookupFunction('__value__readString'),
-                $arg->value
-            );
-        }
-
-        throw new \LogicException('hash_hmac() only supports strings in this compiler build');
-    }
 }

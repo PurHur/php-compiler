@@ -78,7 +78,6 @@ final class filter_var extends Internal
         $phi->addIncoming($intResult, $intTail);
         $phi->addIncoming($otherResult, $otherTail);
 
-        $this->jitString($context, $args[0], 'filtervar() argument #1');
         return $phi;
     }
 
