@@ -25,3 +25,10 @@ vendor/bin/phpunit --group miniwebapp-bisect
 ```
 
 Optional full **003** CLI execute after the ladder: `MINIWEBAPP_AOT_BISECT_INCLUDE_APP=1 ./script/miniwebapp-aot-bisect.sh`.
+
+## Related fixtures (outside bisect order)
+
+| Fixture | Tracks |
+|---------|--------|
+| `class_method_json_api` | [#849](https://github.com/PurHur/php-compiler/issues/849) — `Router::renderApiStatus()` JSON + `$this->resolveAppName()` |
+| `json_encode_api` | procedural JSON headers |
