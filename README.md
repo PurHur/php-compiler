@@ -48,6 +48,8 @@ make test    # builds php-compiler:22.04-dev if needed, then memory-safe CI in D
 
 ## North-star status (2026)
 
+**Public status site:** [purhur.github.io/php-compiler](https://purhur.github.io/php-compiler/) — edit [`docs/pages/development-status.md`](docs/pages/development-status.md) ([`docs/pages/PAGES.md`](docs/pages/PAGES.md) for GitHub Pages setup).
+
 Single-page snapshot for contributors; keep in sync with [examples/README.md](examples/README.md) ([#753](https://github.com/PurHur/php-compiler/issues/753)).
 
 ### `phpc` CLI
