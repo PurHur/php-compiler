@@ -12,6 +12,7 @@
 #   docker run --rm -v "$(pwd):/compiler" -w /compiler php-compiler:22.04-dev ./script/examples-web-smoke.sh
 #
 # Skips with exit 0 when PHP_COMPILER_SKIP_SERVE_TESTS is set or loopback bind fails.
+# 003-MiniWebApp --aot: home + hello PATH_INFO curls when .phpc/bin/app exists (#833, #676).
 # See also: make web-smoke (lint + VM), examples/README.md (#262).
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -24,11 +25,14 @@ Usage: script/examples-web-smoke.sh [--aot] [--miniwebapp-only]
 
   VM mode (default): phpc serve per example docroot.
   --aot: use phpc serve --aot when <docroot>/.phpc/bin/app exists; skip otherwise.
+         003-MiniWebApp: home + hello PATH_INFO only; CLI byte probe skips when stdout empty (#833, #764).
   --miniwebapp-only: curl only examples/003-MiniWebApp (MINIWEBAPP_WEB_SMOKE_GATE — #633).
 
 Environment:
   PHP_COMPILER_SKIP_SERVE_TESTS=1  exit 0 without running HTTP checks
   PHP_COMPILER_MAX_BODY            optional; 003 oversized POST check uses 1024 when unset (#705)
+  MINIWEBAPP_AOT_EXECUTE_GATE=1    fail instead of skip when 003 AOT probe empty (#764, #747)
+  MINIWEBAPP_WEB_SMOKE_AOT_GATE=1  require 003 --aot curls to pass (#833)
 EOF
 }
 
@@ -165,6 +169,106 @@ curl_expect_post_not_200() {
   fi
   rm -f "$body"
   echo "examples-web-smoke: ${label}: ok (HTTP ${status})"
+}
+
+resolve_llvm_dir() {
+  if [[ -n "${PHP_COMPILER_LLVM_PATH:-}" ]]; then
+    if [[ -f "${PHP_COMPILER_LLVM_PATH}/libLLVM-9.so.1" ]]; then
+      echo "${PHP_COMPILER_LLVM_PATH}"
+      return 0
+    fi
+    return 1
+  fi
+  if [[ -f "${ROOT}/.llvm/libLLVM-9.so.1" ]]; then
+    echo "${ROOT}/.llvm"
+    return 0
+  fi
+  if [[ -f /opt/llvm9/libLLVM-9.so.1 ]]; then
+    echo /opt/llvm9
+    return 0
+  fi
+  return 1
+}
+
+miniwebapp_aot_require_pass() {
+  [[ "${MINIWEBAPP_AOT_EXECUTE_GATE:-0}" == "1" ]] \
+    || [[ "${MINIWEBAPP_WEB_SMOKE_AOT_GATE:-0}" == "1" ]]
+}
+
+# CLI byte probe aligned with MiniWebAppCgiEnv::shellQueryRouteHome (#773, #809).
+miniwebapp_aot_stdout_ready() {
+  local binary="$1"
+  local out stderr_file run_code stderr
+  stderr_file="$(mktemp)"
+  set +e
+  eval "$( "${ROOT}/script/miniwebapp-cgi-env.php" --export shellQueryRouteHome )"
+  out="$("$binary" 2>"$stderr_file")"
+  run_code=$?
+  set -e
+  stderr="$(cat "$stderr_file" 2>/dev/null || true)"
+  rm -f "$stderr_file"
+
+  if [[ "$run_code" -ne 0 ]]; then
+    echo "examples-web-smoke: 003-MiniWebApp AOT probe: binary exited ${run_code}" >&2
+    [[ -n "$stderr" ]] && echo "$stderr" >&2
+    return 1
+  fi
+  if [[ -n "$stderr" ]]; then
+    echo "examples-web-smoke: 003-MiniWebApp AOT probe: stderr: ${stderr}" >&2
+    return 1
+  fi
+  if [[ -z "$out" ]] || [[ "$out" != *'MiniWebApp'* ]]; then
+    return 1
+  fi
+  return 0
+}
+
+ensure_miniwebapp_aot_binary() {
+  local project_dir="${ROOT}/${MINIWEBAPP}"
+  local binary="${project_dir}/.phpc/bin/app"
+  if [[ -x "$binary" ]]; then
+    printf '%s' "$binary"
+    return 0
+  fi
+
+  local llvm_dir=""
+  if ! llvm_dir="$(resolve_llvm_dir)"; then
+    return 1
+  fi
+  export PHP_COMPILER_LLVM_PATH="$llvm_dir"
+  echo "examples-web-smoke: 003-MiniWebApp: phpc build --project -> ${binary}"
+  if ! "$PHPC" build --project "$project_dir"; then
+    return 1
+  fi
+  if [[ ! -x "$binary" ]]; then
+    return 1
+  fi
+  printf '%s' "$binary"
+}
+
+run_miniwebapp_aot_smoke() {
+  local binary
+  if ! binary="$(ensure_miniwebapp_aot_binary)"; then
+    if miniwebapp_aot_require_pass; then
+      echo "examples-web-smoke: 003-MiniWebApp: FAILED (no executable .phpc/bin/app)" >&2
+      return 1
+    fi
+    echo "examples-web-smoke: 003-MiniWebApp: skip --aot (no executable .phpc/bin/app)"
+    return 0
+  fi
+
+  if ! miniwebapp_aot_stdout_ready "$binary"; then
+    if miniwebapp_aot_require_pass; then
+      echo "examples-web-smoke: 003-MiniWebApp: FAILED (empty or wrong stdout; blocked #764)" >&2
+      return 1
+    fi
+    echo "examples-web-smoke: 003-MiniWebApp: skip --aot (empty stdout; blocked #764)"
+    return 0
+  fi
+
+  run_docroot_smoke "003-MiniWebApp" "${MINIWEBAPP}" \
+    'GET|home PATH_INFO|/index.php|-|MiniWebApp;PATH_INFO' \
+    'GET|hello PATH_INFO|/index.php/hello?name=Dev|-|Hello — MiniWebApp;Hello Dev'
 }
 
 run_miniwebapp_oversized_post_smoke() {
@@ -310,6 +414,8 @@ if [[ -d "${ROOT}/${MINIWEBAPP}/public" ]]; then
   fi
   if [[ "${miniwebapp_lint}" -ne 0 ]]; then
     echo "examples-web-smoke: 003-MiniWebApp: skip (lint exit ${miniwebapp_lint}; see ${MINIWEBAPP}/README.md)"
+  elif [[ "$AOT" -eq 1 ]]; then
+    run_miniwebapp_aot_smoke
   else
     run_docroot_smoke "003-MiniWebApp" "${MINIWEBAPP}" \
       'GET|home PATH_INFO|/index.php|-|MiniWebApp;PATH_INFO' \

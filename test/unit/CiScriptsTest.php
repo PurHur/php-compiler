@@ -125,6 +125,7 @@ final class CiScriptsTest extends TestCase
         $this->assertTrue(is_executable($prebuild));
         $body = (string) file_get_contents($prebuild);
         $this->assertStringContainsString('001-SimpleWeb', $body);
+        $this->assertStringContainsString('003-MiniWebApp', $body);
         $this->assertStringContainsString('phpc build --project', $body);
     }
 

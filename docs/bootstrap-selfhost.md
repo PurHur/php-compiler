@@ -1,6 +1,6 @@
 # Self-host bootstrap roadmap
 
-North star: compile a **subset** of php-compiler with itself (native AOT), then run `000-HelloWorld` without Zend PHP. Parent tracking: [#212](https://github.com/PurHur/php-compiler/issues/212) (closed milestone); living index: [#78](https://github.com/PurHur/php-compiler/issues/78).
+**North Star 2:** The **compiler fully compiles itself** — native AOT from `lib/` (no `vendor/`), then compiles PHP and rebuilds the next compiler revision without Zend. **Living tracker:** [#1056](https://github.com/PurHur/php-compiler/issues/1056) · public status: [development-status § North Star 2](https://purhur.github.io/php-compiler/development-status.html#north-star-2-self-host). Parent tracking: [#78](https://github.com/PurHur/php-compiler/issues/78) (roadmap), [#212](https://github.com/PurHur/php-compiler/issues/212) (closed umbrella).
 
 ## Current gates
 

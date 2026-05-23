@@ -173,9 +173,10 @@ make bootstrap-selfhost-link   <span class="php-cmt"># → compiler_minimal bund
     <section id="self-host" class="reveal">
       <h2>Self-host bootstrap</h2>
       <p class="section-intro">
-        Zend still runs <code>bin/compile.php</code> today; native output is a growing
-        <code>lib/</code> bundle. Gate table and M0–M2 definitions:
-        <a href="development-status.html#self-host-milestone-ladder">development-status.md</a>.
+        Stretch goal: the compiler <strong>fully compiles itself</strong> (M5). Zend still runs
+        <code>bin/compile.php</code> today; native output is a growing <code>lib/</code> bundle (~109 → ~413 files).
+        Full ladder: <a href="development-status.html#north-star-2-self-host">development-status.md</a>
+        · tracker <a href="https://github.com/PurHur/php-compiler/issues/1056">#1056</a>.
       </p>
       <ol class="ladder" aria-label="Self-host milestones">
         <li class="is-done">
@@ -185,13 +186,28 @@ make bootstrap-selfhost-link   <span class="php-cmt"># → compiler_minimal bund
         </li>
         <li class="is-wip">
           <span class="ladder__marker" aria-hidden="true">…</span>
-          <h4>M1 — Compiler compiles itself</h4>
+          <h4>M1 — Compiler-shaped bundle</h4>
           <p>Compile-smoke AOT echo; driver smoke ([#1025](https://github.com/PurHur/php-compiler/issues/1025)).</p>
         </li>
-        <li class="is-todo">
+        <li class="is-wip">
           <span class="ladder__marker" aria-hidden="true">2</span>
-          <h4>M2 — Full <code>lib/</code> self-host</h4>
-          <p>No Zend bootstrap — open.</p>
+          <h4>M2 — Full top-level <code>lib/</code></h4>
+          <p>14/14 lint ✅; bundle grows toward vm.php spine.</p>
+        </li>
+        <li class="is-todo">
+          <span class="ladder__marker" aria-hidden="true">3</span>
+          <h4>M3 — Native compiles HelloWorld</h4>
+          <p>Self-hosted binary compiles external PHP without Zend.</p>
+        </li>
+        <li class="is-todo">
+          <span class="ladder__marker" aria-hidden="true">4</span>
+          <h4>M4 — Bootstrap loop</h4>
+          <p>Native toolchain rebuilds the next compiler revision.</p>
+        </li>
+        <li class="is-todo">
+          <span class="ladder__marker" aria-hidden="true">★</span>
+          <h4>M5 — Full self-host (north star)</h4>
+          <p>Real <code>bin/vm.php</code> / <code>bin/compile.php</code>; no Zend bootstrap ([#1056](https://github.com/PurHur/php-compiler/issues/1056)).</p>
         </li>
       </ol>
     </section>
