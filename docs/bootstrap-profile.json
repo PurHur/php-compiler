@@ -518,6 +518,7 @@
         "test/bootstrap-aot/stdlib_string_strpos.php",
         "test/bootstrap-aot/stdlib_string_trim.php",
         "test/bootstrap-aot/stdlib_string_urlencode.php",
+        "test/bootstrap-aot/stdlib_stream.php",
         "test/bootstrap-aot/superglobal_name_check.php",
         "test/bootstrap-aot/switch_equal_value_long.php",
         "test/bootstrap-aot/switch_jumpif_chain.php",
@@ -585,6 +586,7 @@
         "test/bootstrap-aot/stdlib_string_strpos.php",
         "test/bootstrap-aot/stdlib_string_trim.php",
         "test/bootstrap-aot/stdlib_string_urlencode.php",
+        "test/bootstrap-aot/stdlib_stream.php",
         "test/bootstrap-aot/superglobal_name_check.php",
         "test/bootstrap-aot/switch_equal_value_long.php",
         "test/bootstrap-aot/switch_jumpif_chain.php",
@@ -600,8 +602,8 @@
         "inventory_files": 421,
         "excluded": 0,
         "eligible": 421,
-        "aot_lint_targets": 78,
-        "aot_link_targets": 65,
+        "aot_lint_targets": 79,
+        "aot_link_targets": 66,
         "aot_link_lib_targets": 1
     }
 }
