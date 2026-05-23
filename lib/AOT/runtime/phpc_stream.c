@@ -32,6 +32,12 @@ static const char *phpc_string_data(__string__ *s)
 
 static FILE *phpc_resolve_stream(int64_t handle)
 {
+    if (1 == handle) {
+        return stdout;
+    }
+    if (2 == handle) {
+        return stderr;
+    }
     if (0 == handle) {
         return stderr;
     }

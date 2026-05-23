@@ -767,7 +767,25 @@ class Context {
             return $var;
         }
         if (\is_resource($value)) {
-            // Bundled Composer autoload references STD* stream constants; fixtures never use them at runtime.
+            if ('STDIN' === $name) {
+                $var = new VMVariable(VMVariable::TYPE_INTEGER);
+                $var->int(0);
+
+                return $var;
+            }
+            if ('STDOUT' === $name) {
+                $var = new VMVariable(VMVariable::TYPE_INTEGER);
+                $var->int(1);
+
+                return $var;
+            }
+            if ('STDERR' === $name) {
+                $var = new VMVariable(VMVariable::TYPE_INTEGER);
+                $var->int(2);
+
+                return $var;
+            }
+            // Other stream resources are unused in bundled bootstrap fixtures.
             $var = new VMVariable(VMVariable::TYPE_NULL);
 
             return $var;
