@@ -55,6 +55,9 @@ class Block {
     /** When true, unresolved local reads in child frames become undefined (isset chains). */
     public bool $inheritUndefinedLocals = false;
 
+    /** Synthetic ?? branch block: shares php-cfg orig but is not the function CFG entry (#99). */
+    public bool $syntheticCfgBranch = false;
+
     /** File-level declare(strict_types=1) for this function body (issue #156). */
     public bool $strictTypes = false;
 
@@ -221,6 +224,15 @@ class Block {
             if (self::resolveVariableName($operand) === $name) {
                 return $this->scope[$operand];
             }
+        }
+
+        return null;
+    }
+
+    public function slotForOperand(Operand $operand): ?int
+    {
+        if ($this->scope->contains($operand)) {
+            return $this->scope[$operand];
         }
 
         return null;
