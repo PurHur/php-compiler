@@ -45,6 +45,17 @@ final class ExamplesWebSmokeScriptTest extends TestCase
         $this->assertStringContainsString('003-MiniWebApp', $body);
     }
 
+    public function testExamplesWebSmokeScriptSupportsAot003MiniWebAppSlice(): void
+    {
+        $script = dirname(__DIR__, 2).'/script/examples-web-smoke.sh';
+        $body = (string) file_get_contents($script);
+        $this->assertStringContainsString('run_miniwebapp_aot_smoke', $body);
+        $this->assertStringContainsString('shellQueryRouteHome', $body);
+        $this->assertStringContainsString('blocked #764', $body);
+        $this->assertStringContainsString('hello PATH_INFO|/index.php/hello?name=Dev', $body);
+        $this->assertStringContainsString('MINIWEBAPP_WEB_SMOKE_AOT_GATE', $body);
+    }
+
     public function testExamplesWebSmokeScriptPassesWhenLoopbackAvailable(): void
     {
         if (false !== getenv('PHP_COMPILER_SKIP_SERVE_TESTS') && '' !== getenv('PHP_COMPILER_SKIP_SERVE_TESTS')) {

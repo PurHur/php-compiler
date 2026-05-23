@@ -28,6 +28,7 @@ fi
 WEB_EXAMPLES=(
   001-SimpleWeb
   002-StaticWeb
+  003-MiniWebApp
   004-ApiJson
 )
 
