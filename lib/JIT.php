@@ -353,8 +353,7 @@ class JIT {
             return false;
         }
         $lower = strtolower($name);
-        return str_contains($lower, 'conststringfolder')
-            || str_contains($lower, 'includepathresolver')
+        return str_contains($lower, 'includepathresolver')
             || str_contains($lower, 'literalincludediscovery')
             || str_contains($lower, 'deployroot')
             || str_contains($lower, 'sourcebundler');

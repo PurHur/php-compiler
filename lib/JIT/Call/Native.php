@@ -15,6 +15,7 @@ namespace PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable;
 
 use PHPLLVM\Value;
@@ -101,16 +102,11 @@ class Native implements Call {
                 }
                 break;
             case '__string__*':
-                switch ($arg->type) {
-                    case Variable::TYPE_STRING:
-                        return $value;
-                    case Variable::TYPE_VALUE:
-                        return $context->builder->call(
-                            $context->lookupFunction('__value__readString'),
-                            \PHPCompiler\JIT\JitValueBox::valuePtrFromVariable($context, $arg)
-                        );
-                }
-                break;
+                return JitStringArg::lower(
+                    $context,
+                    $arg,
+                    "argument {$argNum} for {$this->name}()"
+                );
             case '__value__':
                 switch ($arg->type) {
                     case Variable::TYPE_VALUE:

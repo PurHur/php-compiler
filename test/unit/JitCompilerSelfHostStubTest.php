@@ -54,7 +54,6 @@ final class JitCompilerSelfHostStubTest extends TestCase
 
     /** @var list<string> */
     private const WEB_BOOTSTRAP_SKIP_PATTERNS = [
-        'conststringfolder',
         'includepathresolver',
         'literalincludediscovery',
     ];
