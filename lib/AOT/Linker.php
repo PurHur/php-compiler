@@ -13,6 +13,7 @@ final class Linker
     private const RUNTIME_C_SOURCES = [
         __DIR__.'/runtime/superglobals_refresh.c',
         __DIR__.'/runtime/superglobal_name.c',
+        __DIR__.'/runtime/function_exists.c',
         __DIR__.'/runtime/hash_crypto.c',
         __DIR__.'/runtime/crc32.c',
         __DIR__.'/runtime/strtr.c',
@@ -181,11 +182,14 @@ final class Linker
 
     private static function runtimeCIncludeFlagsFor(string $basename): string
     {
-        if (in_array($basename, self::RUNTIME_HOST_LIBC_BASENAMES, true)) {
-            return self::runtimeCHostLibcIncludeFlags();
+        $flags = in_array($basename, self::RUNTIME_HOST_LIBC_BASENAMES, true)
+            ? self::runtimeCHostLibcIncludeFlags()
+            : self::runtimeCIncludeFlags();
+        if ('function_exists.c' === $basename) {
+            $flags .= ' -I'.escapeshellarg(__DIR__.'/runtime');
         }
 
-        return self::runtimeCIncludeFlags();
+        return $flags;
     }
 
     private static function runtimeCIncludeFlags(): string

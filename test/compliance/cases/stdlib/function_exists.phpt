@@ -1,11 +1,20 @@
 --TEST--
-Stdlib: function_exists() (VM, #1216)
+stdlib function_exists() VM (issue #1216)
 --FILE--
 <?php
-function helper() { return 1; }
-echo function_exists('helper') ? '1' : '0';
-echo function_exists('strlen') ? '1' : '0';
-echo function_exists('missing_fn') ? '1' : '0';
-echo "\n";
+function user_fn_exists_test(): void
+{
+}
+function helper(): int
+{
+    return 1;
+}
+echo function_exists('strlen') ? "1\n" : "0\n";
+echo function_exists('not_a_real_builtin_xyz') ? "1\n" : "0\n";
+echo function_exists('user_fn_exists_test') ? "1\n" : "0\n";
+echo function_exists('helper') ? "1\n" : "0\n";
 --EXPECT--
-110
+1
+0
+1
+1

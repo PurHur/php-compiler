@@ -202,7 +202,7 @@ class Module extends ModuleAbstract
             new define_(),
             new defined_(),
             new class_exists_(),
-            new function_exists_(),
+            new function_exists(),
             new method_exists_(),
             new get_class_(),
             new get_parent_class_(),
