@@ -15,11 +15,15 @@ final class Linker
         __DIR__.'/runtime/hash_crypto.c',
         __DIR__.'/runtime/filter_validate.c',
         __DIR__.'/runtime/phpc_fs_dir.c',
+        __DIR__.'/runtime/preg_match.c',
     ];
+
+    private const RUNTIME_LINK_LIBS = '-lpcre2-8';
 
     /** Runtime units that need host libc headers (glob/scandir; llvm sysroot lacks linux/limits.h). */
     private const RUNTIME_HOST_LIBC_BASENAMES = [
         'phpc_fs_dir.c',
+        'preg_match.c',
     ];
 
     public static function link(string $objectFile, string $executable): void
@@ -58,6 +62,7 @@ final class Linker
                 implode(' ', $objects),
                 '-lc',
                 '-lm',
+                self::RUNTIME_LINK_LIBS,
                 escapeshellarg($libgcc),
                 escapeshellarg($crtend),
                 escapeshellarg('/usr/lib/x86_64-linux-gnu/crtn.o'),
@@ -77,7 +82,7 @@ final class Linker
             foreach ($runtimeObjects as $runtimeObject) {
                 $objects .= ' '.escapeshellarg($runtimeObject);
             }
-            $cmd = escapeshellarg($clang).' '.$objects.' -lm -o '.escapeshellarg($executable);
+            $cmd = escapeshellarg($clang).' '.$objects.' -lm '.self::RUNTIME_LINK_LIBS.' -o '.escapeshellarg($executable);
             self::run($cmd, $env);
             self::unlinkIfTemp($runtimeObjects);
 
@@ -342,7 +347,7 @@ final class Linker
                 continue;
             }
             $cmd = escapeshellarg($path) . ' '
-                . $objects . ' -lm -o ' . escapeshellarg($executable);
+                . $objects . ' -lm '.self::RUNTIME_LINK_LIBS.' -o ' . escapeshellarg($executable);
             exec($cmd, $output, $code);
             if (0 === $code) {
                 self::unlinkIfTemp($runtimeObjects);

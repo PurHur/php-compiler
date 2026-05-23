@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git curl unzip ca-certificates dpkg \
     php8.2-cli php8.2-mbstring php8.2-xml php8.2-ffi php8.2-posix php8.2-phar \
     php8.2-tokenizer php8.2-dom php8.2-xmlwriter \
-    build-essential clang llvm-14-dev libjansson4 \
+    build-essential clang llvm-14-dev libjansson4 libpcre2-dev \
     && rm -rf /var/lib/apt/lists/* \
     && curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 

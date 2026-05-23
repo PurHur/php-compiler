@@ -103,6 +103,7 @@ class Module extends ModuleAbstract
             new implode(),
             new str_replace(),
             new preg_quote(),
+            new preg_match(),
             new nl2br(),
             new array_reverse(),
             new array_search(),
