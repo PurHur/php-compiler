@@ -178,11 +178,13 @@ final class Superglobals
         }
 
         $segment = strtolower(str_replace('_', '-', $segment));
+        $parts = explode('-', $segment);
+        $out = [];
+        foreach ($parts as $part) {
+            $out[] = self::headerSegmentTitleCase($part);
+        }
 
-        return implode('-', array_map(
-            [self::class, 'headerSegmentTitleCase'],
-            explode('-', $segment)
-        ));
+        return implode('-', $out);
     }
 
     private static function headerSegmentTitleCase(string $part): string
