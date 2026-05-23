@@ -63,7 +63,6 @@ class JIT {
                 $this->isSkippedVmHotPathName($name)
                 || $this->isSkippedCompilerHotPathName($name)
                 || $this->isSkippedWebBootstrapHotPathName($name)
-                || $this->isSkippedConstStringFolderShortHotPathName($name)
                 || $this->isSkippedLibSpineSmokeHotPathName($name)
                 || $this->isSkippedSelfHostEntryName($name)
                 || $this->isSkippedBootstrapInterpreterHotPathName($name)
@@ -150,7 +149,6 @@ class JIT {
         }
         if ($this->isSkippedCompilerHotPathName($logicalName ?? $internalName)
             || $this->isSkippedWebBootstrapHotPathName($logicalName ?? $internalName)
-            || $this->isSkippedConstStringFolderShortHotPathName($logicalName ?? $internalName)
             || $this->isSkippedLibSpineSmokeHotPathName($logicalName ?? $internalName)
             || $this->isSkippedSelfHostEntryName($logicalName ?? $internalName)
             || $this->isSkippedBootstrapInterpreterHotPathName($logicalName ?? $internalName)
@@ -459,42 +457,11 @@ class JIT {
     /** ConstStringFolder methods with safe LLVM 9 lowering during self-host AOT (#816). */
     private function isConstStringFolderRealLoweringMethod(string $lower): bool
     {
-        if ($this->shouldUseSelfHostJitStubs()) {
-            return false;
-        }
-
         return str_ends_with($lower, '::literalstringvalue')
             || str_ends_with($lower, '::sourcedir')
             || str_ends_with($lower, '::fold')
             || str_ends_with($lower, '::funccallhasarity')
             || str_ends_with($lower, '::foldcallargstring');
-    }
-
-    /** CFG FUNCDEF names for ConstStringFolder privates (no class prefix; #1056 M3). */
-    private function isSkippedConstStringFolderShortHotPathName(string $name): bool
-    {
-        if (!$this->shouldUseSelfHostJitStubs()) {
-            return false;
-        }
-        $lower = strtolower($name);
-        if (str_contains($lower, '\\web\\conststringfolder::')) {
-            return false;
-        }
-
-        return in_array($lower, [
-            'magicscriptconstvalue',
-            'findmagicscriptconstforoperand',
-            'findconcatinblocktree',
-            'foldconcat',
-            'foldforinclude',
-            'folddeploypathconcat',
-            'foldcallargstring',
-            'tryparsedeployinclude',
-            'literalstringvalue',
-            'sourcedir',
-            'fold',
-            'funccallhasarity',
-        ], true);
     }
 
     private function collectStubFunctionArgTypes(Block $block): array

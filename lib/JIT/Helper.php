@@ -99,6 +99,28 @@ class Helper {
                 goto return_bool;
             }
         }
+        if (OpCode::TYPE_IDENTICAL === $opcode->type || OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
+            if (Variable::TYPE_VALUE === $leftType && Variable::TYPE_OBJECT === $rightType) {
+                $result = JitValueCompare::identicalValueBoxToObject($this->context, $left, $right);
+                if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
+                    $result = $this->context->builder->xor(
+                        $result,
+                        $this->context->getTypeFromString('int1')->constInt(1, false)
+                    );
+                }
+                goto return_bool;
+            }
+            if (Variable::TYPE_OBJECT === $leftType && Variable::TYPE_VALUE === $rightType) {
+                $result = JitValueCompare::identicalValueBoxToObject($this->context, $right, $left);
+                if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
+                    $result = $this->context->builder->xor(
+                        $result,
+                        $this->context->getTypeFromString('int1')->constInt(1, false)
+                    );
+                }
+                goto return_bool;
+            }
+        }
         $type = opcode_type_name($opcode->type);
         throw new \LogicException("Reached end of switch, can't handle unary operation yet: $type for type {$var->type}");
 return_double:
