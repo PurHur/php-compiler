@@ -13,7 +13,7 @@ require_once __DIR__ . '/../BaseTest.php';
  * @group aot
  * @group aot-link
  */
-final class AotTest extends BaseTest
+class AotTest extends BaseTest
 {
     protected static string $DIR = __DIR__ . '/../fixtures/aot';
 

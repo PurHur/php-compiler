@@ -12,6 +12,18 @@ ci_run_inventory_checks
 ci_report_llvm_status
 ci_configure_serve_tests
 
+# MiniWebApp #764 ladder only — avoids running the full suite when bisecting (#880).
+if printf '%s\0' "$@" | grep -zq 'miniwebapp-bisect'; then
+  if ! ci_llvm_ready; then
+    echo "ci-local: --group miniwebapp-bisect requires LLVM 9 (script/install-llvm9.sh or .llvm/)" >&2
+    exit 1
+  fi
+  ci_apply_llvm_memory_env
+  echo "PHPUnit: MiniWebApp AOT bisect ladder (@group miniwebapp-bisect, issues/880, #764)..."
+  "$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit --group miniwebapp-bisect "$@"
+  exit $?
+fi
+
 echo "PHPUnit: VM, compliance (no LLVM), real-world (includes ExamplesCompileTest VM lint/smoke)..."
 "$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit --exclude-group llvm,serve "$@"
 

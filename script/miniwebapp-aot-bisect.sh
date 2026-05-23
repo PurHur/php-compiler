@@ -25,6 +25,7 @@ readonly -a BISECT_STEPS=(
   'nested_include_two_tier|nested_include_two_tier|878'
   'miniwebapp_render_home|miniwebapp_render_home|867'
   'layout_script_base|layout_script_base|866'
+  'layout_title_branch|layout_title_branch|784'
   'method_include_void_array_property|method_include_void_array_property|846'
 )
 
