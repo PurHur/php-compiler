@@ -1,0 +1,11 @@
+--- vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php
+@@ -1828,7 +1828,7 @@
+         'get_class' => ['string', 'object=' => 'object'],
+         'get_class_vars' => ['array', 'class_name' => 'string'],
+         'get_current_user' => ['string'],
+-        'getcwd' => [''],
++        'getcwd' => ['string'],
+         'getdate' => ['array', 'timestamp=' => 'int'],
+         'get_declared_classes' => ['array'],
+         'get_declared_interfaces' => ['array'],

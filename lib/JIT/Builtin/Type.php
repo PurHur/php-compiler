@@ -385,6 +385,9 @@ class Type extends Builtin {
         $fntypeSysGetTempDir = $this->context->context->functionType($strPtr, false);
         $fnSysGetTempDir = $this->context->module->addFunction('__compiler_sys_get_temp_dir', $fntypeSysGetTempDir);
         $this->context->registerFunction('__compiler_sys_get_temp_dir', $fnSysGetTempDir);
+        $fntypeGetcwd = $this->context->context->functionType($strPtr, false);
+        $fnGetcwd = $this->context->module->addFunction('__compiler_getcwd', $fntypeGetcwd);
+        $this->context->registerFunction('__compiler_getcwd', $fnGetcwd);
         $fntypeHttpBuildQuery = $this->context->context->functionType(
             $strPtr,
             false,

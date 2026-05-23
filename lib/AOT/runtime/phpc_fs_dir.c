@@ -326,6 +326,18 @@ __hashtable__ *__phpc_scandir(__string__ *path, int sorting_order)
 
     return ht;
 }
+/** getcwd() — current working directory; empty string on failure (#1199). */
+__string__ *__compiler_getcwd(void)
+{
+    char buf[PATH_MAX];
+
+    if (NULL != getcwd(buf, sizeof(buf))) {
+        return cstr_to_string(buf);
+    }
+
+    return cstr_to_string("");
+}
+
 /** sys_get_temp_dir() — TMPDIR/TEMP/TMP or /tmp, realpath when possible (#1202). */
 __string__ *__compiler_sys_get_temp_dir(void)
 {

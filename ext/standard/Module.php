@@ -203,6 +203,7 @@ class Module extends ModuleAbstract
             new fwrite(),
             new fclose(),
             new getenv_(),
+            new getcwd_(),
             new shell_exec(),
             new sys_get_temp_dir(),
             new putenv_(),

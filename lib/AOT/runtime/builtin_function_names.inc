@@ -75,6 +75,7 @@ static const char *phpc_builtin_functions[] = {
     "get_class",
     "get_parent_class",
     "getallheaders",
+    "getcwd",
     "getenv",
     "gettype",
     "glob",

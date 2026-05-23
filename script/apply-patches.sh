@@ -156,6 +156,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-binaryop-coalesce.patch"
   apply_patch "$PATCH_DIR/php-types-binaryop-spaceship.patch"
   apply_patch "$PATCH_DIR/php-types-str-bool-fns.patch"
+  apply_patch "$PATCH_DIR/php-types-getcwd-string.patch"
   apply_patch "$PATCH_DIR/php-types-str-split-string-array.patch"
   apply_patch "$PATCH_DIR/php-types-readfile-int-false.patch"
   apply_patch "$PATCH_DIR/php-types-strpbrk-string-false.patch"
