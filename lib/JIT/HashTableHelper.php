@@ -917,6 +917,14 @@ final class HashTableHelper
                     $context->helper->loadValue($element)
                 );
                 break;
+            case Variable::TYPE_HASHTABLE:
+                $context->builder->call(
+                    $context->lookupFunction('__hashtable__setStringKeyHashtable'),
+                    $ht,
+                    $keyPtr,
+                    $context->helper->loadValue($element)
+                );
+                break;
             case Variable::TYPE_VALUE:
                 $valuePtr = Variable::KIND_VARIABLE === $element->kind
                     ? JitValueBox::pointer($context, $element->value)
