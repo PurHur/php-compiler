@@ -7,9 +7,12 @@
 #define PCRE2_CODE_UNIT_WIDTH 8
 #include <pcre2.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 
 typedef struct __string__ __string__;
+
+extern __string__ *__string__init(long long size, const char *value);
 
 static size_t pm_strlen(__string__ *s)
 {
@@ -285,4 +288,143 @@ int64_t __compiler_preg_match_all(__string__ *pattern, __string__ *subject)
     pcre2_code_free(re);
 
     return count;
+}
+
+static int pm_append(char **buf, size_t *cap, size_t *len, const char *data, size_t data_len)
+{
+    if (*len + data_len + 1 > *cap) {
+        size_t need = *len + data_len + 1;
+        size_t new_cap = (0 == *cap) ? 64 : *cap;
+        while (new_cap < need) {
+            new_cap *= 2;
+        }
+        char *grown = (char *) realloc(*buf, new_cap);
+        if (NULL == grown) {
+            return -1;
+        }
+        *buf = grown;
+        *cap = new_cap;
+    }
+    memcpy(*buf + *len, data, data_len);
+    *len += data_len;
+    (*buf)[*len] = '\0';
+
+    return 0;
+}
+
+__string__ *__compiler_preg_replace(__string__ *pattern, __string__ *replacement, __string__ *subject)
+{
+    const char *pat_full = pm_strdata(pattern);
+    size_t pat_len = pm_strlen(pattern);
+    const char *repl = pm_strdata(replacement);
+    size_t repl_len = pm_strlen(replacement);
+    const char *subj = pm_strdata(subject);
+    size_t subj_len = pm_strlen(subject);
+
+    phpc_preg_last_error = PHPC_PREG_NO_ERROR;
+
+    if (pat_len > PM_MAX_PATTERN) {
+        phpc_preg_last_error = PHPC_PREG_BAD_REGEX;
+
+        return NULL;
+    }
+
+    char body[PM_MAX_PATTERN + 1];
+    uint32_t opts = 0;
+    if (0 != pm_extract_body(pat_full, pat_len, body, sizeof(body), &opts)) {
+        phpc_preg_last_error = PHPC_PREG_BAD_REGEX;
+
+        return NULL;
+    }
+
+    int errorcode = 0;
+    PCRE2_SIZE erroffset = 0;
+    pcre2_code *re = pcre2_compile(
+        (PCRE2_SPTR) body,
+        PCRE2_ZERO_TERMINATED,
+        opts,
+        &errorcode,
+        &erroffset,
+        NULL
+    );
+    if (NULL == re) {
+        phpc_preg_last_error = PHPC_PREG_BAD_REGEX;
+
+        return NULL;
+    }
+
+    pcre2_match_data *match_data = pcre2_match_data_create_from_pattern(re, NULL);
+    if (NULL == match_data) {
+        pcre2_code_free(re);
+        phpc_preg_last_error = PHPC_PREG_BAD_REGEX;
+
+        return NULL;
+    }
+
+    char *out = NULL;
+    size_t out_cap = 0;
+    size_t out_len = 0;
+    PCRE2_SIZE start = 0;
+
+    while (start <= subj_len) {
+        int rc = pcre2_match(
+            re,
+            (PCRE2_SPTR) subj,
+            subj_len,
+            start,
+            0,
+            match_data,
+            NULL
+        );
+
+        if (PCRE2_ERROR_NOMATCH == rc) {
+            if (0 != pm_append(&out, &out_cap, &out_len, subj + start, subj_len - start)) {
+                goto fail;
+            }
+            break;
+        }
+        if (rc < 0) {
+            goto fail;
+        }
+
+        PCRE2_SIZE *ovector = pcre2_get_ovector_pointer(match_data);
+        if (0 != pm_append(&out, &out_cap, &out_len, subj + start, ovector[0] - start)) {
+            goto fail;
+        }
+        if (0 != pm_append(&out, &out_cap, &out_len, repl, repl_len)) {
+            goto fail;
+        }
+        if (ovector[1] == start) {
+            start++;
+        } else {
+            start = ovector[1];
+        }
+    }
+
+    pcre2_match_data_free(match_data);
+    pcre2_code_free(re);
+
+    if (NULL == out) {
+        out = (char *) malloc(1);
+        if (NULL == out) {
+            phpc_preg_last_error = PHPC_PREG_BAD_REGEX;
+
+            return NULL;
+        }
+        out[0] = '\0';
+        out_len = 0;
+    }
+
+    __string__ *result = __string__init((long long) out_len, out);
+    free(out);
+
+    return result;
+
+fail:
+    free(out);
+    pcre2_match_data_free(match_data);
+    pcre2_code_free(re);
+    phpc_preg_last_error = PHPC_PREG_BAD_REGEX;
+
+    return NULL;
 }

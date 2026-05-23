@@ -58,4 +58,18 @@ final class VmPreg
 
         return \preg_match_all($pattern, $subject, $matches);
     }
+
+    public static function pregReplace(string $pattern, string $replacement, string $subject): string|false
+    {
+        if (strlen($pattern) > self::MAX_PATTERN_BYTES) {
+            return false;
+        }
+
+        $result = \preg_replace($pattern, $replacement, $subject);
+        if (null === $result) {
+            return false;
+        }
+
+        return $result;
+    }
 }

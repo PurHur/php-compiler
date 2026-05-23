@@ -122,6 +122,7 @@ class Module extends ModuleAbstract
             new preg_match(),
             new preg_match_all(),
             new preg_grep(),
+            new preg_replace(),
             new preg_last_error_(),
             new nl2br(),
             new array_reverse(),
