@@ -27,6 +27,9 @@ final class MiniWebAppBisectAotTest extends AotTest
         'nested_include_two_tier',
         'miniwebapp_render_home',
         'layout_script_base',
+        'coalesce_then_inherited_local',
+        'coalesce_then_htmlspecialchars',
+        'coalesce_then_nested_include',
         'layout_title_branch',
         'method_include_void_array_property',
     ];

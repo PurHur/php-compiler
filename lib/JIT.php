@@ -106,6 +106,16 @@ class JIT {
         return 0 === $this->context->inlineIncludeDepth;
     }
 
+    /**
+     * ?? on superglobals can disturb inherited include locals; restore before use (#866, #784).
+     */
+    private function maybeRefreshIncludeBindingsBeforeUse(): void
+    {
+        if ($this->context->inlineIncludeDepth > 0) {
+            JIT\IncludeHelper::refreshInlineIncludeBindings($this->context);
+        }
+    }
+
     /** Self-host AOT sets PHP_COMPILER_SELFHOST_AOT=1 (#816, #557). */
     private function shouldUseSelfHostJitStubs(): bool
     {
@@ -850,6 +860,7 @@ class JIT {
                     $left = $this->context->getVariableFromOp($block->getOperand($op->arg2));
                     $right = $this->context->getVariableFromOp($block->getOperand($op->arg3));
                     $this->context->type->string->concat($result, $left, $right);
+                    $this->maybeRefreshIncludeBindingsBeforeUse();
                     break;
                 case OpCode::TYPE_CONST_FETCH:
                     $value = null;
@@ -1100,9 +1111,20 @@ class JIT {
                 case OpCode::TYPE_SMALLER:
                 case OpCode::TYPE_IDENTICAL:
                 case OpCode::TYPE_NOT_IDENTICAL:
+                    $this->maybeRefreshIncludeBindingsBeforeUse();
+                    $this->assignOperand(
+                        $this->operandAt($block, $op->arg1, opcode_type_name($op->type).' result'),
+                        $this->context->helper->binaryOp(
+                            $op,
+                            $this->context->getVariableFromOp($this->operandAt($block, $op->arg2, opcode_type_name($op->type).' left')),
+                            $this->context->getVariableFromOp($this->operandAt($block, $op->arg3, opcode_type_name($op->type).' right'))
+                        )
+                    );
+                    break;
                 case OpCode::TYPE_EQUAL:
                 case OpCode::TYPE_NOT_EQUAL:
                 case OpCode::TYPE_SPACESHIP:
+                    $this->maybeRefreshIncludeBindingsBeforeUse();
                     $this->assignOperand(
                         $this->operandAt($block, $op->arg1, opcode_type_name($op->type).' result'),
                         $this->context->helper->binaryOp(
@@ -1124,6 +1146,7 @@ class JIT {
                 case OpCode::TYPE_CASE:
                     $branchBlock = $builder->getInsertBlock();
                     $builder->positionAtEnd($branchBlock);
+                    $this->maybeRefreshIncludeBindingsBeforeUse();
                     $switchVar = $this->context->getVariableFromOp($this->operandAt($block, $op->arg1, 'switch value'));
                     $caseVar = $this->context->getVariableFromOp($this->operandAt($block, $op->arg2, 'switch case'));
                     $equalOp = new OpCode(OpCode::TYPE_EQUAL);
@@ -1187,7 +1210,7 @@ class JIT {
                         $merged = $this->compileBlockInternal($func, $op->block3, null, $mergeBb, ...$args);
                         unset($this->context->coalesceAssignTargets[$coalesceResult]);
                         if ($this->context->inlineIncludeDepth > 0) {
-                            $this->context->inlineIncludeExitBlock = $merged;
+                            // Do not set inlineIncludeExitBlock to the ?? merge block (#866, #784).
                             break;
                         }
 
@@ -1195,6 +1218,7 @@ class JIT {
                     }
                     unset($this->context->coalesceAssignTargets[$coalesceResult]);
                     if ($this->context->inlineIncludeDepth > 0) {
+                        // Two-branch ?? without merge: continue in the including TU (#866).
                         break;
                     }
 
@@ -1240,6 +1264,7 @@ class JIT {
                 case OpCode::TYPE_JUMPIF:
                     $branchBlock = $builder->getInsertBlock();
                     $builder->positionAtEnd($branchBlock);
+                    $this->maybeRefreshIncludeBindingsBeforeUse();
                     $condition = $this->context->castToBool(
                         $this->context->helper->loadValue(
                             $this->context->getVariableFromOp($this->operandAt($block, $op->arg1, 'branch condition'))

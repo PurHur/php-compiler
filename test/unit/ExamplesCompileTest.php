@@ -76,6 +76,7 @@ final class ExamplesCompileTest extends TestCase
         $env['DOCUMENT_ROOT'] = $publicDir;
         $env['REQUEST_METHOD'] = 'GET';
         $env['QUERY_STRING'] = 'route=home';
+        $env['PHPC_DEPLOY_ROOT'] = $project;
 
         $out = $this->runAotBinary($binary, $env);
         $this->assertNotSame('', $out, '003 AOT home route produced empty stdout (#764)');
