@@ -81,7 +81,15 @@ PHP;
         $this->assertFileExists($outfile, trim($compileErr !== false ? $compileErr : ''));
         $this->assertTrue(is_executable($outfile));
 
-        $run = proc_open([$outfile], $descriptorSpec, $runPipes, $repoRoot, $env);
+        $runEnv = $env;
+        for ($i = 0, $n = count($extraArgv); $i < $n; $i++) {
+            if ('-q' === $extraArgv[$i] && isset($extraArgv[$i + 1])) {
+                $runEnv['QUERY_STRING'] = $extraArgv[$i + 1];
+                break;
+            }
+        }
+
+        $run = proc_open([$outfile], $descriptorSpec, $runPipes, $repoRoot, $runEnv);
         $output = stream_get_contents($runPipes[1]);
         fclose($runPipes[0]);
         fclose($runPipes[1]);
