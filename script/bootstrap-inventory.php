@@ -38,7 +38,11 @@ if ($check) {
     }
     $committed = bootstrapStripInventoryProbeSection((string) file_get_contents($outFile));
     if ($committed !== $markdown) {
-        fwrite(STDERR, "Stale {$outFile}; run: php script/bootstrap-inventory.php\n");
+        fwrite(STDERR, "Stale {$outFile}; regenerate with:\n");
+        fwrite(STDERR, "  php script/bootstrap-inventory.php\n");
+        fwrite(STDERR, "If the live probe section changed, also run:\n");
+        fwrite(STDERR, "  php script/bootstrap-selfhost-compile-probe.php --update-inventory\n");
+        fwrite(STDERR, "  php script/bootstrap-inventory.php\n");
         exit(1);
     }
     exit(0);
