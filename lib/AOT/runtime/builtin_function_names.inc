@@ -10,6 +10,7 @@ static const char *phpc_builtin_functions[] = {
     "array_fill",
     "array_filter",
     "array_flip",
+    "array_intersect",
     "array_key_exists",
     "array_keys",
     "array_map",
@@ -219,4 +220,4 @@ static const char *phpc_builtin_functions[] = {
     "web_string",
     "wordwrap",
 };
-static const size_t phpc_builtin_functions_count = 217;
+static const size_t phpc_builtin_functions_count = 218;
