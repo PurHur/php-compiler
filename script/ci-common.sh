@@ -72,6 +72,7 @@ ci_run_capability_syntax_check() {
 
 ci_run_inventory_checks() {
   script/check-no-unlimited-memory.sh
+  script/check-stale-issue-refs.sh
   script/check-init-miniwebapp-parity.sh
   "$PHP_BIN" "${PHP_OPTS[@]}" script/capability-matrix.php --check
   ci_run_capability_syntax_check

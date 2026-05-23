@@ -23,16 +23,16 @@ Minimal HTML page with no `public/` tree — good for a first dist smoke.
 
 If the binary is missing, `phpc deploy` tells you to build first; use `phpc deploy … --from-build` only when your workflow builds in a separate step and you pass a prebuilt `.phpc/bin/app`.
 
-### `examples/003-MiniWebApp` (deploy layout; native binary blocked)
+### `examples/003-MiniWebApp` (deploy layout; native execute blocked)
 
-Manifest includes `public/`, `assets/`, and `templates/` — deploy copies them even when the AOT link is not production-ready.
+Manifest includes `public/`, `assets/`, and `templates/` — deploy copies them even when native AOT execute is not production-ready.
 
 ```bash
-./phpc build --project examples/003-MiniWebApp   # may fail until user-class AOT [#568](https://github.com/PurHur/php-compiler/issues/568)
+./phpc build --project examples/003-MiniWebApp   # link green; execute may fail ([#764](https://github.com/PurHur/php-compiler/issues/764))
 ./phpc deploy examples/003-MiniWebApp -o /tmp/miniwebapp-dist
 ```
 
-Until [#568](https://github.com/PurHur/php-compiler/issues/568) lands, treat MiniWebApp as **VM + `phpc serve`** for runtime checks; use deploy only to validate the **dist layout** and `README.deploy` after a local build succeeds.
+Until [#764](https://github.com/PurHur/php-compiler/issues/764) lands, treat MiniWebApp as **VM + `phpc serve`** for runtime checks; use deploy only to validate the **dist layout** and `README.deploy` after a local build succeeds.
 
 Implementation: [`lib/Web/ProjectDeploy.php`](../lib/Web/ProjectDeploy.php).
 

@@ -63,6 +63,8 @@ Exits **0** when LLVM 9 is missing (nothing to guard). Exits **non-zero** when L
 
 **Unlimited memory is blocked:** `PHP_COMPILER_MEMORY_LIMIT=-1` and `memory_limit=-1` in tracked files fail `script/check-no-unlimited-memory.sh` (run at CI start).
 
+**Stale closed-issue blockers:** `script/check-stale-issue-refs.sh` fails when closed issues (e.g. **#568**, **#67**) still appear as active blockers in `script/`, `lib/Cli/`, `examples/`, and `docs/deploy-web-aot.md`. Opt out per line with `# stale-issue-ok: <reason>`. Wired in `ci-fast.sh` / `ci-local.sh` inventory via `script/ci-common.sh` ([#802](https://github.com/PurHur/php-compiler/issues/802)).
+
 ## Serve tests
 
 Set `PHP_COMPILER_SKIP_SERVE_TESTS=1` only when loopback TCP bind is unavailable. Harness Docker CI should **not** set this by default.
@@ -90,4 +92,5 @@ Harness hosts and contributors without host PHP/LLVM should use the **22.04 dev 
 - [#497](https://github.com/PurHur/php-compiler/issues/497) — memory incident (closed)
 - [#500](https://github.com/PurHur/php-compiler/issues/500) — VM RSS profiling
 - [#501](https://github.com/PurHur/php-compiler/issues/501) — land CI caps (closed via PR)
+- [#802](https://github.com/PurHur/php-compiler/issues/802) — stale closed-issue blocker strings in scripts/docs
 - [#202](https://github.com/PurHur/php-compiler/issues/202) — Docker dev image docs + optional ghcr.io publish

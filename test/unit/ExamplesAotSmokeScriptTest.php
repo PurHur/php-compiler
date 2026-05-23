@@ -44,7 +44,7 @@ final class ExamplesAotSmokeScriptTest extends TestCase
     {
         $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/examples-aot-smoke.sh');
         $this->assertStringContainsString('003-MiniWebApp', $body);
-        $this->assertStringContainsString('#568', $body);
+        $this->assertStringContainsString('#764', $body);
         $this->assertStringContainsString('.phpc/smoke', $body);
         $this->assertStringContainsString('EXAMPLES_AOT_SMOKE_ONLY=003', $body);
         $this->assertStringContainsString('smoke_003_miniwebapp', $body);

@@ -97,7 +97,7 @@ Progressive stages from `script/miniwebapp-gates.sh` / `make miniwebapp-gates`:
 | 3 | `examples-web-smoke.sh` 003 curls | ✅ wired |
 | 3b | `MINIWEBAPP_WEB_SMOKE_GATE=1` shell smoke | ✅ default on |
 | 4a | `phpc build --project --dry-run` | probe (LLVM) |
-| 4c | `EXAMPLES_AOT_SMOKE_ONLY=003` smoke slice | skip until [#568](https://github.com/PurHur/php-compiler/issues/568) ([#683](https://github.com/PurHur/php-compiler/issues/683)) |
+| 4c | `EXAMPLES_AOT_SMOKE_ONLY=003` smoke slice | skip until AOT execute [#764](https://github.com/PurHur/php-compiler/issues/764) ([#683](https://github.com/PurHur/php-compiler/issues/683)) |
 | 4b | `ExamplesCompileTest::test003MiniWebAppBuildLinks` | ✅ link gate ([#754](https://github.com/PurHur/php-compiler/issues/754)) |
 | 4b2 | `test003MiniWebAppExecutesWithCgiEnv` | opt-in `MINIWEBAPP_AOT_EXECUTE_GATE=1` ([#791](https://github.com/PurHur/php-compiler/issues/791), blocked [#764](https://github.com/PurHur/php-compiler/issues/764)) |
 | 4b2 bisect | `script/miniwebapp-aot-bisect.sh` ordered PHPT ladder | opt-in `MINIWEBAPP_AOT_BISECT_GATE=1` ([#879](https://github.com/PurHur/php-compiler/issues/879), [#764](https://github.com/PurHur/php-compiler/issues/764)) |

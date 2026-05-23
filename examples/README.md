@@ -118,7 +118,7 @@ Before a PR that touches examples or `bin/serve.php`:
 ```console
 make web-smoke              # lint examples/*/example.php + 003 lint --all + VM ?name= smoke
 make examples-web-smoke     # phpc serve + curl GET/POST (001-SimpleWeb, 002-StaticWeb, 004-ApiJson)
-make examples-aot-smoke     # phpc build + CLI execute (000–004; skips when LLVM missing; 003 skipped #568)
+make examples-aot-smoke     # phpc build + CLI execute (000–004; skips when LLVM missing; 003 execute #764)
 ```
 
 Full CI (`./script/ci-local.sh`) runs `examples-aot-smoke.sh` after PHPUnit `@group aot-link` when LLVM is available (`EXAMPLES_AOT_SMOKE_GATE=1` default in `script/ci-defaults.env`; set `EXAMPLES_AOT_SMOKE_GATE=0` to skip during iteration — [#674](https://github.com/PurHur/php-compiler/issues/674)). Not run in `ci-fast.sh`.
@@ -150,7 +150,7 @@ MINIWEBAPP_LINT_GATE=1 ./script/rebuild-examples.php
 
 For **001-SimpleWeb**, `bin/compile.php` is timed **without** compile-time `-q`; the `./compiled` column runs the binary with runtime `QUERY_STRING` (and related CGI env), matching production AOT web binaries.
 
-For **003-MiniWebApp**, VM/JIT/native columns run `public/index.php` with `PATH_INFO=/home` (and related CGI env) from the example `public/` directory ([#491](https://github.com/PurHur/php-compiler/issues/491), runtime [#539](https://github.com/PurHur/php-compiler/issues/539)). AOT columns stay **n/a** until `phpc build --project` link is green ([#568](https://github.com/PurHur/php-compiler/issues/568), [#624](https://github.com/PurHur/php-compiler/issues/624)). The row is omitted when `phpc lint --all examples/003-MiniWebApp` fails unless `BENCH_MINIWEBAPP=1`.
+For **003-MiniWebApp**, VM/JIT/native columns run `public/index.php` with `PATH_INFO=/home` (and related CGI env) from the example `public/` directory ([#491](https://github.com/PurHur/php-compiler/issues/491), runtime [#539](https://github.com/PurHur/php-compiler/issues/539)). AOT execute columns stay **n/a** until native run is green ([#764](https://github.com/PurHur/php-compiler/issues/764); link [#568](https://github.com/PurHur/php-compiler/issues/568) closed, [#624](https://github.com/PurHur/php-compiler/issues/624)). The row is omitted when `phpc lint --all examples/003-MiniWebApp` fails unless `BENCH_MINIWEBAPP=1`.
 
 <!-- benchmark table start -->
 

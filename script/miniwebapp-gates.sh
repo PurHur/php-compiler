@@ -169,7 +169,7 @@ else
   aot_dry_run_skipped=1
 fi
 
-# Stage 4c: examples-aot-smoke 003 slice (#683, #485; blocked #568).
+# Stage 4c: examples-aot-smoke 003 slice (#683, #485; execute blocked #764).
 if [[ -n "${LLVM_DIR}" ]]; then
   aot_smoke_stderr="$(mktemp)"
   set +e
@@ -297,27 +297,27 @@ fi
 echo "$(mark "${stage4c}") Stage 4c AOT smoke — examples-aot-smoke 003 slice (#683, #485)"
 echo "       ${REPO_URL}/issues/683"
 echo "       ${REPO_URL}/issues/485"
-echo "$(mark 0) Stage 4d deploy-smoke — make deploy-smoke / PHPC_DEPLOY_ROOT (#718; 003 blocked #568, PHPUnit #612)"
+echo "$(mark 0) Stage 4d deploy-smoke — make deploy-smoke / PHPC_DEPLOY_ROOT (#718; 003 execute #764, PHPUnit #612)"
 echo "       ${REPO_URL}/issues/718"
 echo "       ${REPO_URL}/issues/612"
 echo "       make deploy-smoke   # 001/002 when LLVM ready; not wired into ci-local until 003 green"
 if [[ "${aot_dry_run_skipped}" -eq 1 && -z "${LLVM_DIR}" ]]; then
   echo "       LLVM 9 not available (script/install-llvm9.sh or .llvm/)"
 elif [[ "${aot_smoke_003_skipped}" -eq 1 ]]; then
-  echo "       003 slice probe: skipped (#568)"
+  echo "       003 slice probe: skipped (#764 execute)"
   if [[ -n "${AOT_SMOKE_003_STDERR}" ]]; then
     echo "${AOT_SMOKE_003_STDERR}" | sed 's/^/         /'
   fi
 elif [[ "${aot_smoke_003_exit}" -eq 0 && "${stage4c}" -eq 1 ]]; then
   echo "       003 slice probe: green"
 elif [[ "${aot_smoke_003_exit}" -ge 0 ]]; then
-  echo "       003 slice probe: exit ${aot_smoke_003_exit} (see #568/#485)"
+  echo "       003 slice probe: exit ${aot_smoke_003_exit} (see #764/#485)"
   if [[ -n "${AOT_SMOKE_003_STDERR}" ]]; then
     echo "${AOT_SMOKE_003_STDERR}" | sed 's/^/         /'
   fi
 fi
 
-echo "$(mark "${stage4}") Stage 4b AOT link — ExamplesCompileTest @group miniwebapp unskipped (#454, #568)"
+echo "$(mark "${stage4}") Stage 4b AOT link — ExamplesCompileTest @group miniwebapp unskipped (#454; link #568 closed)"
 echo "       ${REPO_URL}/issues/454"
 echo "       ${REPO_URL}/issues/568"
 
@@ -372,11 +372,11 @@ elif [[ "${stage4a}" -eq 0 && "${aot_dry_run_skipped}" -eq 0 && "${aot_dry_run_e
 elif [[ "${stage4a}" -eq 0 && "${aot_dry_run_skipped}" -eq 1 ]]; then
   echo "Next: install LLVM 9 for stage 4a AOT dry-run (script/install-llvm9.sh)"
 elif [[ "${stage4c}" -eq 0 && "${aot_smoke_003_skipped}" -eq 1 ]]; then
-  echo "Next: native user-class AOT (#568) to green stage 4c examples-aot-smoke 003 (#683, #485)"
+  echo "Next: native AOT execute (#764) to green stage 4c examples-aot-smoke 003 (#683, #485)"
 elif [[ "${stage4c}" -eq 0 && "${aot_smoke_003_exit}" -ne 0 ]]; then
   echo "Next: fix examples-aot-smoke 003 slice failures (#485, #683)"
 elif [[ "${stage4}" -eq 0 ]]; then
-  echo "Next: unskip test003MiniWebAppEventuallyRuns in ExamplesCompileTest (#454, #568)"
+  echo "Next: unskip test003MiniWebAppEventuallyRuns in ExamplesCompileTest (#454, #764)"
 else
   echo "All documented gates are enabled in this tree."
 fi
