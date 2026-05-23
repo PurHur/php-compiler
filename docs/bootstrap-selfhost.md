@@ -6,7 +6,7 @@ North star: compile a **subset** of php-compiler with itself (native AOT), then 
 
 | Gate | Command | Status |
 |------|---------|--------|
-| Phase A inventory | `php script/bootstrap-inventory.php --check` | ✅ **300** files on `bin/vm.php` path; **10** source blockers (only `lib/AOT/Linker.php`, `lib/VM/HashTable.php` — both excluded) |
+| Phase A inventory | `php script/bootstrap-inventory.php --check` | ✅ **379** files on `bin/vm.php` path; **14** source blockers (`lib/AOT/Linker.php`, `lib/JIT/Builtin/StringPregMatch.php`, `lib/VM/HashTable.php` — all excluded) |
 | Phase B lib AOT lint | `php bin/compile.php -l lib/*.php` (with `script/php-env.sh`) | ✅ **14/14** top-level `lib/*.php` units ([#534](https://github.com/PurHur/php-compiler/pull/534)) |
 | Phase B fixture lint | `php script/bootstrap-aot-lint.php` | ✅ **12** procedural targets under `test/bootstrap-aot/` + `examples/000-HelloWorld` |
 | Phase C native run | `make bootstrap-aot-link` or `./script/bootstrap-aot-link.sh` | ✅ Link + execute **12** `aot_link_targets` (stdout vs Zend PHP) |
