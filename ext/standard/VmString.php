@@ -859,6 +859,29 @@ final class VmString
         return $out;
     }
 
+    /** str_shuffle() — Fisher–Yates via randomBytes(); returns a new string. */
+    public static function strShuffle(string $string): string
+    {
+        $len = self::byteLength($string);
+        if ($len < 2) {
+            return $string;
+        }
+        $bytes = [];
+        for ($i = 0; $i < $len; ++$i) {
+            $bytes[$i] = $string[$i];
+        }
+        for ($i = $len - 1; $i > 0; --$i) {
+            $rand = self::randomBytes(8);
+            $u = unpack('J', $rand)[1];
+            $j = (int) ($u % ($i + 1));
+            $tmp = $bytes[$i];
+            $bytes[$i] = $bytes[$j];
+            $bytes[$j] = $tmp;
+        }
+
+        return implode('', $bytes);
+    }
+
     public static function pregQuote(string $string, ?string $delimiter = null): string
     {
         $delim = null;

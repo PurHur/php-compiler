@@ -180,6 +180,13 @@ class Type extends Builtin {
         );
         $fnRandomBytes = $this->context->module->addFunction('__compiler_random_bytes', $fntypeRandomBytes);
         $this->context->registerFunction('__compiler_random_bytes', $fnRandomBytes);
+        $fntypeStrShuffle = $this->context->context->functionType(
+            $this->context->getTypeFromString('__string__*'),
+            false,
+            $this->context->getTypeFromString('__string__*')
+        );
+        $fnStrShuffle = $this->context->module->addFunction('__compiler_str_shuffle', $fntypeStrShuffle);
+        $this->context->registerFunction('__compiler_str_shuffle', $fnStrShuffle);
         $strPtr = $this->context->getTypeFromString('__string__*');
         $i1 = $this->context->getTypeFromString('int1');
         $fntypeHash = $this->context->context->functionType($strPtr, false, $strPtr, $strPtr, $i1);
