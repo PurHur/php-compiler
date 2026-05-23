@@ -92,6 +92,7 @@ class HashTable extends Type
         $this->registerFn('__hashtable__setStringKeyLong', 'void', ['__hashtable__*', '__string__*', 'int64']);
         $this->registerFn('__hashtable__setStringKeyBool', 'void', ['__hashtable__*', '__string__*', 'int1']);
         $this->registerFn('__hashtable__offsetIsSetStringKey', 'int1', ['__hashtable__*', '__string__*']);
+        $this->registerFn('__hashtable__peekStringKeyValue', '__value__*', ['__hashtable__*', '__string__*']);
         $this->registerFn('__hashtable__readStringKeyValue', '__value__*', ['__hashtable__*', '__string__*']);
         $this->registerFn('__hashtable__readStringKeyHashtable', '__hashtable__*', ['__hashtable__*', '__string__*']);
         $this->registerFn('__hashtable__readObjectKeyValue', '__value__*', ['__hashtable__*', '__object__*']);
@@ -137,6 +138,7 @@ class HashTable extends Type
         $this->implementSetStringKeyBool();
         $this->implementSetStringKeyHashtable();
         $this->implementOffsetIsSetStringKey();
+        $this->implementPeekStringKeyValue();
         $this->implementReadStringKeyValue();
         $this->implementReadStringKeyHashtable();
         $this->implementReadObjectKeyValue();
@@ -913,6 +915,23 @@ class HashTable extends Type
         $this->context->builder->positionAtEnd($notFound);
         $result = $i1->constInt(0, false);
         $this->context->builder->returnValue($result);
+    }
+
+    /**
+     * Hashtable lookup without #273 undefined-key warning (isset / ?? on superglobals).
+     */
+    private function implementPeekStringKeyValue(): void
+    {
+        $fn = $this->context->lookupFunction('__hashtable__peekStringKeyValue');
+        $block = $fn->appendBasicBlock('main');
+        $this->context->builder->positionAtEnd($block);
+        $ht = $fn->getParam(0);
+        $key = $fn->getParam(1);
+        $valPtr = $this->lookupStringKeyValue($fn, $block, $ht, $key);
+        $afterLookup = $fn->appendBasicBlock('strkey_peek_after_lookup');
+        $this->context->builder->branch($afterLookup);
+        $this->context->builder->positionAtEnd($afterLookup);
+        $this->context->builder->returnValue($valPtr);
     }
 
     private function implementReadStringKeyValue(): void

@@ -150,12 +150,24 @@ class Block {
 
     public function getVarSlot(Operand $operand, bool $isRead): int {
         if (!$this->scope->contains($operand)) {
-            $this->scope[$operand] = $this->scope->count();
+            $next = $this->nextScopeSlot();
+            $this->scope[$operand] = $next;
             if ($isRead) {
-                $this->args[$operand] = $this->scope[$operand];
+                $this->args[$operand] = $next;
             }
         }
         return $this->scope[$operand];
+    }
+
+    /** Next unused scope slot (SplObjectStorage::count() can collide after inheritScopeFrom, #1058). */
+    private function nextScopeSlot(): int
+    {
+        $next = 0;
+        foreach ($this->scope as $op) {
+            $next = max($next, $this->scope[$op] + 1);
+        }
+
+        return $next;
     }
 
     public function registerConstant(Operand $operand, Variable $const): int {

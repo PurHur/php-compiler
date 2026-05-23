@@ -9,10 +9,7 @@ declare(strict_types=1);
  */
 function miniwebapp_contact_name_is_valid(): bool
 {
-    if (!isset($_REQUEST['name'])) {
-        return false;
-    }
-    $name = $_REQUEST['name'];
+    $name = $_REQUEST['name'] ?? '';
     if ($name == '') {
         return false;
     }

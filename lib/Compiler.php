@@ -137,12 +137,33 @@ class Compiler {
                     } elseif (
                         $child instanceof Op\Expr\ArrayDimFetch
                         && $i + 1 < $opCount
-                        && (
-                            $this->isArrayDimFetchOnlyCoalesceLeft($child, $ops[$i + 1])
-                            || $this->isArrayDimFetchOnlyIssetVar($child, $ops[$i + 1])
-                        )
+                        && $ops[$i + 1] instanceof Op\Expr\BinaryOp\Coalesce
+                        && $this->isArrayDimFetchOnlyCoalesceLeft($child, $ops[$i + 1])
                     ) {
-                        // Lowered by compileCoalesce/compileIsset via isset(container, dim) — no eager fetch (#99, #273, #539).
+                        /** @var Op\Expr\BinaryOp\Coalesce $coalesce */
+                        $coalesce = $ops[$i + 1];
+                        $resultOverride = null;
+                        if (
+                            $i + 2 < $opCount
+                            && $ops[$i + 2] instanceof Op\Expr\Assign
+                            && $this->isRedundantCoalesceTailAssign($ops[$i + 2], $child, $coalesce)
+                        ) {
+                            /** @var Op\Expr\Assign $tailAssign */
+                            $tailAssign = $ops[$i + 2];
+                            $resultOverride = $tailAssign->var;
+                        }
+                        $block = $this->compileCoalesce($coalesce, $block, $resultOverride);
+                        ++$i;
+                        if (null !== $resultOverride) {
+                            ++$i;
+                        }
+                        break;
+                    } elseif (
+                        $child instanceof Op\Expr\ArrayDimFetch
+                        && $i + 1 < $opCount
+                        && $this->isArrayDimFetchOnlyIssetVar($child, $ops[$i + 1])
+                    ) {
+                        // Lowered by compileIsset via isset(container, dim) — no eager fetch (#99, #273, #539).
                         break;
                     } else {
                         if ($this->needsCfgSplitBeforeStringDimFetch($child, $block)) {
@@ -220,6 +241,41 @@ class Compiler {
         }
 
         return $left === $fetch->result;
+    }
+
+    /**
+     * php-cfg: ArrayDimFetch; Coalesce; Assign $dst = fetch-temp after ?? already stored in $dst.
+     */
+    private function isRedundantCoalesceTailAssign(
+        Op\Expr\Assign $assign,
+        Op\Expr\ArrayDimFetch $fetch,
+        Op\Expr\BinaryOp\Coalesce $coalesce
+    ): bool {
+        return $this->operandsChainEqual($assign->expr, $coalesce->result);
+    }
+
+    private function operandsChainEqual(Operand $a, Operand $b): bool
+    {
+        while ($a instanceof Temporary) {
+            if ($a === $b) {
+                return true;
+            }
+            if (null === $a->original) {
+                break;
+            }
+            $a = $a->original;
+        }
+        while ($b instanceof Temporary) {
+            if ($b === $a) {
+                return true;
+            }
+            if (null === $b->original) {
+                break;
+            }
+            $b = $b->original;
+        }
+
+        return $a === $b;
     }
 
     /**
@@ -973,13 +1029,46 @@ class Compiler {
         );
     }
 
-    protected function compileCoalesce(Op\Expr\BinaryOp\Coalesce $expr, Block $block): Block
-    {
+    protected function compileCoalesce(
+        Op\Expr\BinaryOp\Coalesce $expr,
+        Block $block,
+        ?Operand $resultOverride = null
+    ): Block {
+        $resultOperand = $resultOverride ?? $expr->result;
         // php-cfg may mark the ?? result dead while it is still assigned on branch blocks (#99).
-        if ($expr->result instanceof Operand\Temporary && [] === $expr->result->usages) {
-            $expr->result->usages[] = $expr->result;
+        if ($resultOperand instanceof Operand\Temporary && [] === $resultOperand->usages) {
+            $resultOperand->usages[] = $resultOperand;
         }
-        $resultSlot = $this->compileOperand($expr->result, $block, false);
+        $resultSlot = $this->compileOperand($resultOperand, $block, false);
+
+        $checkSlot = $this->compileBoolTemporary($block);
+        $dimFetch = $this->findCoalesceArrayDimFetch($expr->left, $block);
+        $issetTarget = null !== $dimFetch
+            ? $this->resolveIssetTargetFromArrayDimFetch($dimFetch, $block)
+            : $this->resolveCoalesceIssetTarget($expr->left, $block);
+        if (null !== $issetTarget) {
+            [$containerSlot, $dimSlot] = $issetTarget;
+            $block->addOpCode(new OpCode(
+                OpCode::TYPE_ISSET,
+                $checkSlot,
+                $containerSlot,
+                $dimSlot
+            ));
+        } else {
+            $leftSlot = $this->compileOperand($expr->left, $block, true);
+            $block->addOpCode(new OpCode(
+                OpCode::TYPE_ASSIGN,
+                $resultSlot,
+                $resultSlot,
+                $leftSlot
+            ));
+            $block->addOpCode(new OpCode(
+                OpCode::TYPE_ISSET,
+                $checkSlot,
+                $leftSlot,
+                null
+            ));
+        }
 
         $endBlock = new Block($block->orig);
         $endBlock->inheritUndefinedLocals = true;
@@ -1001,20 +1090,7 @@ class Compiler {
         $leftBlock->syntheticCfgBranch = true;
         $leftBlock->inheritUndefinedLocals = true;
         $leftBlock->inheritScopeFrom($block);
-
-        $checkSlot = $this->compileBoolTemporary($block);
-        $dimFetch = $this->findCoalesceArrayDimFetch($expr->left, $block);
-        $issetTarget = null !== $dimFetch
-            ? $this->resolveIssetTargetFromArrayDimFetch($dimFetch, $block)
-            : $this->resolveCoalesceIssetTarget($expr->left, $block);
         if (null !== $issetTarget) {
-            [$containerSlot, $dimSlot] = $issetTarget;
-            $block->addOpCode(new OpCode(
-                OpCode::TYPE_ISSET,
-                $checkSlot,
-                $containerSlot,
-                $dimSlot
-            ));
             if (null !== $dimFetch) {
                 $this->compileArrayDimFetchRead($dimFetch, $leftBlock);
                 $leftSlot = $this->compileOperand($dimFetch->result, $leftBlock, true);
@@ -1033,20 +1109,6 @@ class Compiler {
                     $leftSlot
                 ));
             }
-        } else {
-            $leftSlot = $this->compileOperand($expr->left, $block, true);
-            $block->addOpCode(new OpCode(
-                OpCode::TYPE_ASSIGN,
-                $resultSlot,
-                $resultSlot,
-                $leftSlot
-            ));
-            $block->addOpCode(new OpCode(
-                OpCode::TYPE_ISSET,
-                $checkSlot,
-                $leftSlot,
-                null
-            ));
         }
 
         $leftJump = new OpCode(OpCode::TYPE_JUMP);
@@ -1057,6 +1119,8 @@ class Compiler {
         $rightBlock->addOpCode($rightJump);
         $endBlock->parents[] = $leftBlock;
         $endBlock->parents[] = $rightBlock;
+        $endBlock->inheritScopeFrom($leftBlock);
+        $endBlock->inheritScopeFrom($rightBlock);
 
         $coalesceOp = new OpCode(
             OpCode::TYPE_COALESCE,

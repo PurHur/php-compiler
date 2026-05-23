@@ -4,13 +4,14 @@
 # Builds a shipped web example, runs phpc deploy, and executes bin/app under
 # PHPC_DEPLOY_ROOT with CGI-style env (no HTTP server). Skips with exit 0 when
 # LLVM 9 is missing. 003-MiniWebApp layout-only smoke: DEPLOY_SMOKE_003_LAYOUT=1 (#804).
-# Full 003 execute: PHPUnit #612; layout-only via DEPLOY_SMOKE_003_LAYOUT=1 (#804).
+# Full 003 execute: DEPLOY_SMOKE_003_EXECUTE=1 or MINIWEBAPP_AOT_EXECUTE_GATE=1 (#745).
 #
 # Usage:
 #   ./script/deploy-smoke.sh
 #   ./script/deploy-smoke.sh --example 001
 #   ./script/deploy-smoke.sh --example 002
 #   DEPLOY_SMOKE_003_LAYOUT=1 ./script/deploy-smoke.sh --example 003
+#   DEPLOY_SMOKE_003_EXECUTE=1 ./script/deploy-smoke.sh --example 003
 #
 # Docker:
 #   docker run --rm -v "$(pwd):/compiler" -w /compiler php-compiler:22.04-dev make deploy-smoke
@@ -29,9 +30,10 @@ Usage: script/deploy-smoke.sh [--example 001|002|003]
 
   001  examples/001-SimpleWeb (QUERY_STRING=name=…)
   002  examples/002-StaticWeb (default; static HTML)
-  003  examples/003-MiniWebApp (layout-only when DEPLOY_SMOKE_003_LAYOUT=1; #804)
+  003  examples/003-MiniWebApp (layout: DEPLOY_SMOKE_003_LAYOUT=1 #804;
+                               execute: DEPLOY_SMOKE_003_EXECUTE=1 or MINIWEBAPP_AOT_EXECUTE_GATE=1 #745)
 
-003 execute smoke is skipped until native AOT execute (#764); see #612.
+003 execute smoke is gated (default off via DEPLOY_SMOKE_003_EXECUTE=0); see #745.
 EOF
   exit 1
 }
@@ -248,6 +250,84 @@ smoke_003_layout_only() {
   echo "deploy-smoke: ${label}: layout ok"
 }
 
+deploy_smoke_003_execute_enabled() {
+  [[ "${DEPLOY_SMOKE_003_EXECUTE:-0}" == "1" ]] \
+    || [[ "${MINIWEBAPP_AOT_EXECUTE_GATE:-0}" == "1" ]]
+}
+
+run_deployed_miniwebapp() {
+  local label="$1"
+  local dist="$2"
+  local scenario="$3"
+  shift 3
+  local stderr_file stdout stderr exit_code
+  stderr_file="$(mktemp "${SMOKE_ROOT}/run.XXXXXX")"
+
+  # shellcheck disable=SC1090
+  eval "$( "${ROOT}/script/miniwebapp-cgi-env.php" --export "$scenario" )"
+  export PHPC_DEPLOY_ROOT="$dist"
+  export SCRIPT_FILENAME="${dist}/public/index.php"
+  export SCRIPT_NAME='/index.php'
+  export DOCUMENT_ROOT="${dist}/public"
+
+  stdout="$("${dist}/bin/app" 2>"$stderr_file")"
+  exit_code=$?
+  stderr="$(cat "$stderr_file" 2>/dev/null || true)"
+  rm -f "$stderr_file"
+  if [[ "$exit_code" -ne 0 ]]; then
+    echo "deploy-smoke: ${label}: bin/app exited ${exit_code} (scenario ${scenario})" >&2
+    [[ -n "$stderr" ]] && echo "$stderr" >&2
+    exit 1
+  fi
+  if [[ -n "$stderr" ]]; then
+    echo "deploy-smoke: ${label}: stderr (scenario ${scenario}): ${stderr}" >&2
+    exit 1
+  fi
+  assert_needle "${label} (${scenario})" "$stdout" "$@"
+  printf '%s' "$stdout"
+}
+
+smoke_003_execute() {
+  local label="003-MiniWebApp"
+  local dist="${SMOKE_ROOT}/003-MiniWebApp"
+  local readme="${dist}/README.deploy"
+
+  rm -rf "$dist"
+  mkdir -p "$SMOKE_ROOT"
+
+  echo "deploy-smoke: ${label}: phpc build --project"
+  "$PHPC" build --project "${MINIWEBAPP}"
+
+  echo "deploy-smoke: ${label}: phpc deploy -> ${dist}"
+  "$PHPC" deploy "${MINIWEBAPP}" -o "$dist"
+
+  assert_layout_path "${label}" "${dist}/bin/app" "executable"
+  if [[ ! -x "${dist}/bin/app" ]]; then
+    echo "deploy-smoke: ${label}: expected executable ${dist}/bin/app" >&2
+    exit 1
+  fi
+  assert_layout_path "${label}" "$readme" "file"
+  if ! grep -q 'PHPC_DEPLOY_ROOT' "$readme"; then
+    echo "deploy-smoke: ${label}: README.deploy missing PHPC_DEPLOY_ROOT" >&2
+    exit 1
+  fi
+  assert_layout_path "${label}" "${dist}/templates" "directory"
+  assert_layout_path "${label}" "${dist}/public/index.php" "file"
+  assert_layout_path "${label}" "${dist}/cgi-wrapper" "file"
+
+  local out
+  out="$(run_deployed_miniwebapp "${label}" "$dist" shellQueryRouteHome 'MiniWebApp')"
+  echo "deploy-smoke: ${label}: home route ok (${#out} bytes)"
+
+  out="$(run_deployed_miniwebapp "${label}" "$dist" queryRouteHello 'Hello Dev')"
+  echo "deploy-smoke: ${label}: hello route ok (${#out} bytes)"
+
+  out="$(run_deployed_miniwebapp "${label}" "$dist" postQueryRouteContact 'Thank you, PostDev')"
+  echo "deploy-smoke: ${label}: contact route ok (${#out} bytes)"
+
+  echo "deploy-smoke: ${label}: ok"
+}
+
 smoke_003_miniwebapp() {
   if [[ ! -d "${MINIWEBAPP}/public" ]]; then
     echo "deploy-smoke: 003-MiniWebApp: skip (tree missing #246)" >&2
@@ -257,7 +337,11 @@ smoke_003_miniwebapp() {
     smoke_003_layout_only
     return 0
   fi
-  echo "deploy-smoke: 003-MiniWebApp: skip (set DEPLOY_SMOKE_003_LAYOUT=1 for layout probe #804; execute #764)" >&2
+  if deploy_smoke_003_execute_enabled; then
+    smoke_003_execute
+    return 0
+  fi
+  echo "deploy-smoke: 003-MiniWebApp: skip (DEPLOY_SMOKE_003_LAYOUT=1 layout #804; DEPLOY_SMOKE_003_EXECUTE=1 or MINIWEBAPP_AOT_EXECUTE_GATE=1 execute #745)" >&2
   return 0
 }
 
