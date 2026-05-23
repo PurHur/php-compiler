@@ -51,8 +51,10 @@ final class DeployRootTest extends TestCase
                 [realpath($dir.'/src/view.php') ?: $dir.'/src/view.php'],
                 $dir
             );
-            $this->assertStringContainsString("phpc_deploy_path('src',", $bundled);
+            $srcDir = realpath($dir.'/src') ?: $dir.'/src';
+            $this->assertStringContainsString(var_export($srcDir, true), $bundled);
             $this->assertStringNotContainsString('__DIR__', $bundled);
+            $this->assertStringNotContainsString('phpc_deploy_path(', $bundled);
         } finally {
             @unlink($dir.'/phpc.json');
             @unlink($dir.'/entry.php');
