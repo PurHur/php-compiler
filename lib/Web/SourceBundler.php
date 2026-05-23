@@ -103,12 +103,34 @@ final class SourceBundler
     {
         $dir = dirname(realpath($sourceFile) ?: $sourceFile);
         if (null === $projectRoot) {
-            return str_replace('__DIR__', var_export($dir, true), $code);
+            $replacement = var_export($dir, true);
+        } else {
+            $rel = DeployRoot::relativeDirFromProject($dir, $projectRoot);
+            $replacement = 'phpc_deploy_path('.var_export($rel, true).', '.var_export($dir, true).')';
         }
-        $rel = DeployRoot::relativeDirFromProject($dir, $projectRoot);
-        $expr = 'phpc_deploy_path('.var_export($rel, true).', '.var_export($dir, true).')';
 
-        return str_replace('__DIR__', $expr, $code);
+        $tokens = token_get_all('<?php '.$code);
+        $out = '';
+        $skipOpenTag = true;
+        foreach ($tokens as $token) {
+            if ($skipOpenTag) {
+                if (is_array($token) && T_OPEN_TAG === $token[0]) {
+                    continue;
+                }
+                $skipOpenTag = false;
+            }
+            if (is_array($token)) {
+                if (T_DIR === $token[0]) {
+                    $out .= $replacement;
+                    continue;
+                }
+                $out .= $token[1];
+            } else {
+                $out .= $token;
+            }
+        }
+
+        return $out;
     }
 
     private static function stripOpenTag(string $code): string
