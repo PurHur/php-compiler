@@ -1,7 +1,22 @@
+--- vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
+@@ -298,6 +298,12 @@
+         if ($decl instanceof CfgType\Mixed_) {
+             return self::mixed();
+         }
++        if ($decl instanceof CfgType\Nullable) {
++            return (new self(self::TYPE_UNION, [
++                self::fromTypeDecl($decl->subtype),
++                new self(self::TYPE_NULL),
++            ]))->simplify();
++        }
+ 
+         throw new \LogicException('Unsupported declaration type: '.get_class($decl));
+     }
+
 --- vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
 +++ vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
-@@ -728,7 +728,7 @@
-         if ($type instanceof Op\Type\Mixed_) {
+@@ -758,7 +758,7 @@
              return Type::mixed();
          }
          if ($type instanceof Op\Type\Nullable) {
