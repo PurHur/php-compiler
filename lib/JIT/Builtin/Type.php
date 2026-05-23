@@ -428,6 +428,26 @@ class Type extends Builtin {
         $fntypeJsonLastError = $this->context->context->functionType($i64, false);
         $fnJsonLastError = $this->context->module->addFunction('__compiler_json_last_error', $fntypeJsonLastError);
         $this->context->registerFunction('__compiler_json_last_error', $fnJsonLastError);
+        $fntypeSerializeHashtable = $this->context->context->functionType(
+            $this->context->getTypeFromString('__string__*'),
+            false,
+            $this->context->getTypeFromString('__hashtable__*')
+        );
+        $fnSerializeHashtable = $this->context->module->addFunction(
+            '__compiler_serialize_hashtable',
+            $fntypeSerializeHashtable
+        );
+        $this->context->registerFunction('__compiler_serialize_hashtable', $fnSerializeHashtable);
+        $fntypeSerializeValue = $this->context->context->functionType(
+            $this->context->getTypeFromString('__string__*'),
+            false,
+            $valuePtr
+        );
+        $fnSerializeValue = $this->context->module->addFunction(
+            '__compiler_serialize_value',
+            $fntypeSerializeValue
+        );
+        $this->context->registerFunction('__compiler_serialize_value', $fnSerializeValue);
         $fntypeShellExec = $this->context->context->functionType($strPtr, false, $strPtr);
         $fnShellExec = $this->context->module->addFunction('__compiler_shell_exec', $fntypeShellExec);
         $this->context->registerFunction('__compiler_shell_exec', $fnShellExec);
