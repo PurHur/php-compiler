@@ -347,6 +347,13 @@ final class Variable {
                             self::KIND_VALUE,
                             $this->context->builder->zEdt($this->value, $this->context->getTypeFromString('long long'))
                         );
+                    case self::TYPE_VALUE:
+                        return new self(
+                            $this->context,
+                            $type,
+                            self::KIND_VALUE,
+                            (new \PHPCompiler\ext\standard\boolval())->call($this->context, $this)
+                        );
                 }
                 break;
             case self::TYPE_NATIVE_DOUBLE:
@@ -388,6 +395,9 @@ final class Variable {
         if (!($this->type & self::IS_REFCOUNTED) || self::TYPE_VALUE === $this->type) {
             return;
         }
+        if (null !== $this->objectPropertySlot) {
+            return;
+        }
         $ptr = self::KIND_VALUE === $this->kind
             ? $this->value
             : $this->context->helper->loadValue($this);
@@ -416,6 +426,9 @@ final class Variable {
             return;
         }
         if ($this->type & self::IS_REFCOUNTED) {
+            if (null !== $this->objectPropertySlot) {
+                return;
+            }
             $ptr = self::KIND_VALUE === $this->kind
                 ? $this->value
                 : $this->context->helper->loadValue($this);
@@ -481,6 +494,8 @@ final class Variable {
                     $ptr,
                 );
             case self::TYPE_HASHTABLE:
+                // Property slots own the hashtable; transient delref would free it (#58).
+                $propertyBacked = null !== $this->objectPropertySlot;
                 $container = HashTableHelper::asDetachedHashtable($this->context, $this);
                 if (
                     !$forWrite
@@ -535,7 +550,9 @@ final class Variable {
                 if (self::TYPE_STRING === $dim->type) {
                     $key = $this->context->helper->loadValue($dim);
                     if ($forWrite && (null === $expectedType || Type::TYPE_ARRAY !== $expectedType->type)) {
-                        $this->context->refcount->addref($ht);
+                        if (!$propertyBacked) {
+                            $this->context->refcount->addref($ht);
+                        }
 
                         return HashTableHelper::writableStringKeyValueBox($this->context, $ht, $key);
                     }
@@ -567,13 +584,17 @@ final class Variable {
                         );
                     }
                     if (null !== $expectedType && Type::TYPE_STRING === $expectedType->type) {
-                        $this->context->refcount->addref($ht);
+                        if (!$propertyBacked) {
+                            $this->context->refcount->addref($ht);
+                        }
                         $boxed = HashTableHelper::readStringKeyToValueBox($this->context, $ht, $key);
 
                         return $boxed;
                     }
 
-                    $this->context->refcount->addref($ht);
+                    if (!$propertyBacked) {
+                        $this->context->refcount->addref($ht);
+                    }
                     $boxed = HashTableHelper::readStringKeyToValueBox($this->context, $ht, $key);
 
                     return $boxed;
@@ -583,7 +604,9 @@ final class Variable {
                     $this->context->getTypeFromString('size_t')
                 );
                 if (null !== $expectedType && Type::TYPE_STRING === $expectedType->type) {
-                    $this->context->refcount->addref($ht);
+                    if (!$propertyBacked) {
+                        $this->context->refcount->addref($ht);
+                    }
                     $str = $this->context->builder->call(
                         $this->context->lookupFunction('__hashtable__readStringAt'),
                         $ht,
@@ -593,7 +616,7 @@ final class Variable {
                         $this->context->lookupFunction('__string__separate'),
                         $str
                     );
-                    if (null === $container->superglobalName) {
+                    if (!$propertyBacked && null === $container->superglobalName) {
                         $this->context->refcount->delref($ht);
                     }
 
@@ -604,11 +627,11 @@ final class Variable {
                         $owned
                     );
                 }
-                if (null === $container->superglobalName) {
+                if (!$propertyBacked && null === $container->superglobalName) {
                     $this->context->refcount->addref($ht);
                 }
                 $boxed = HashTableHelper::readIndexedToValueBox($this->context, $ht, $index);
-                if (null === $container->superglobalName) {
+                if (!$propertyBacked && null === $container->superglobalName) {
                     $this->context->refcount->delref($ht);
                 }
 

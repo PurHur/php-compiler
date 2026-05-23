@@ -60,8 +60,26 @@ class is_type extends Internal {
                 return $this->context->constantFromBool($this->type === Variable::TYPE_NULL);
             case JITVariable::TYPE_HASHTABLE:
                 return $this->context->constantFromBool($this->type === Variable::TYPE_ARRAY);
+            case JITVariable::TYPE_OBJECT:
+                if (Variable::TYPE_NULL === $this->type) {
+                    $ptr = JITVariable::KIND_VALUE === $args[0]->kind
+                        ? $args[0]->value
+                        : $context->builder->load($args[0]->value);
+
+                    return $context->builder->icmp(
+                        Builder::INT_EQ,
+                        $ptr,
+                        $ptr->typeOf()->constNull()
+                    );
+                }
+
+                return $context->constantFromBool(false);
             case JITVariable::TYPE_VALUE:
                 $loaded = $context->helper->loadValue($args[0]);
+                $loaded = $context->builder->pointerCast(
+                    $loaded,
+                    $context->getTypeFromString('__value__*')
+                );
                 $typeField = $context->structFieldMap['__value__']['type'];
                 $typeByte = $context->builder->load(
                     $context->builder->structGep($loaded, $typeField)

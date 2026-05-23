@@ -1173,9 +1173,18 @@ class JIT {
                     $name = $block->getOperand($op->arg3);
                     assert($name instanceof Operand\Literal);
                     assert($obj->type->type === Type::TYPE_OBJECT);
+                    $declaringClass = $obj->type->userType;
+                    if (null === $declaringClass && null !== $block->func?->class) {
+                        $declaringClass = $block->func->class->value;
+                    }
+                    if (null === $declaringClass || '' === $declaringClass) {
+                        $declaringClass = $this->context->scope->className !== ''
+                            ? $this->context->scope->className
+                            : 'object';
+                    }
                     $this->context->scope->variables[$result] = $this->context->type->object->propertyFetch(
                         $this->context->helper->loadValue($this->context->getVariableFromOp($obj)),
-                        $obj->type->userType,
+                        $declaringClass,
                         $name->value
                     );
                     break;
@@ -1449,7 +1458,10 @@ class JIT {
                 $this->context->helper->loadValue($value),
                 $result->value
             );
-            $result->addref();
+            $this->copyObjectPropertyBacking($result, $value);
+            if (null === $result->objectPropertySlot) {
+                $result->addref();
+            }
             $this->copyValueBoxJitFlags($result, $value);
 
             return;
@@ -1606,7 +1618,10 @@ class JIT {
             );
             $result->free();
             $this->context->builder->store($ht, $result->value);
-            $result->addref();
+            $this->copyObjectPropertyBacking($result, $value);
+            if (null === $result->objectPropertySlot) {
+                $result->addref();
+            }
 
             return;
         } elseif (Variable::TYPE_STRING === $result->type && Variable::TYPE_VALUE === $value->type) {
@@ -1691,6 +1706,13 @@ class JIT {
         }
         $dest->valueBoxHashtable = $src->valueBoxHashtable;
         $dest->isNullConstant = $src->isNullConstant;
+    }
+
+    /** Keep borrowed object-property hashtable metadata on locals ($cfg = $this->config, #848). */
+    private function copyObjectPropertyBacking(Variable $dest, Variable $src): void
+    {
+        $dest->objectPropertySlot = $src->objectPropertySlot;
+        $dest->objectPropertyType = $src->objectPropertyType;
     }
 
     private function jitTypeFromLlvmValue(PHPLLVM\Value $value): int
