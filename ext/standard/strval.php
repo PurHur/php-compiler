@@ -53,7 +53,7 @@ final class strval extends Internal
         }
         switch ($args[0]->type) {
             case JITVariable::TYPE_STRING:
-                return $context->helper->loadValue($args[0]);
+                return $this->jitString($context, $args[0], 'strval() argument #1');
             case JITVariable::TYPE_NULL:
                 return $context->builder->load($context->constantStringFromString(''));
             case JITVariable::TYPE_NATIVE_BOOL:

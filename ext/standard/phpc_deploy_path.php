@@ -44,6 +44,7 @@ final class phpc_deploy_path extends Internal
             throw new \LogicException('phpc_deploy_path() requires two strings in this compiler build');
         }
 
+        $this->jitString($context, $args[0], 'phpcdeploypath() argument #1');
         return JitDeployPath::invoke(
             $context,
             $context->helper->loadValue($args[0]),

@@ -657,6 +657,18 @@ restart:
                     case OpCode::TYPE_SHIFT_RIGHT:
                         $result = $this->context->builder->aShr($leftLong, $__right);
                         goto return_long;
+                    case OpCode::TYPE_EQUAL:
+                        if (Variable::TYPE_NATIVE_LONG === $rightType) {
+                            $result = JitValueCompare::looseEqualValueToNativeLong($this->context, $left, $__right);
+                            goto return_bool;
+                        }
+                        break;
+                    case OpCode::TYPE_NOT_EQUAL:
+                        if (Variable::TYPE_NATIVE_LONG === $rightType) {
+                            $result = JitValueCompare::notLooseEqualValueToNativeLong($this->context, $left, $__right);
+                            goto return_bool;
+                        }
+                        break;
                 }
             }
             if (Variable::TYPE_NATIVE_LONG === $rightType && self::isOrderedCompareOpcode($opcode->type)) {
@@ -706,18 +718,6 @@ restart:
                 $result = JitValueCompare::notIdenticalToNative($this->context, $left, $right);
                 goto return_bool;
             }
-            if (OpCode::TYPE_EQUAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type) {
-                $identical = JitValueCompare::identicalToNative($this->context, $left, $right);
-                if (OpCode::TYPE_NOT_EQUAL === $opcode->type) {
-                    $result = $this->context->builder->xor(
-                        $identical,
-                        $this->context->getTypeFromString('int1')->constInt(1, false)
-                    );
-                } else {
-                    $result = $identical;
-                }
-                goto return_bool;
-            }
         }
         if (Variable::TYPE_VALUE === $rightType && Variable::TYPE_VALUE !== $leftType) {
             if (Variable::TYPE_NATIVE_LONG === $leftType || Variable::TYPE_NATIVE_BOOL === $leftType) {
@@ -756,6 +756,18 @@ restart:
                     case OpCode::TYPE_SHIFT_RIGHT:
                         $result = $this->context->builder->aShr($__left, $rightLong);
                         goto return_long;
+                    case OpCode::TYPE_EQUAL:
+                        if (Variable::TYPE_NATIVE_LONG === $leftType) {
+                            $result = JitValueCompare::looseEqualNativeLongToValue($this->context, $__left, $right);
+                            goto return_bool;
+                        }
+                        break;
+                    case OpCode::TYPE_NOT_EQUAL:
+                        if (Variable::TYPE_NATIVE_LONG === $leftType) {
+                            $result = JitValueCompare::notLooseEqualNativeLongToValue($this->context, $__left, $right);
+                            goto return_bool;
+                        }
+                        break;
                 }
             }
             if (Variable::TYPE_NATIVE_LONG === $leftType && self::isOrderedCompareOpcode($opcode->type)) {
@@ -803,18 +815,6 @@ restart:
                     goto return_bool;
                 }
                 $result = JitValueCompare::notIdenticalNativeToValue($this->context, $left, $right);
-                goto return_bool;
-            }
-            if (OpCode::TYPE_EQUAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type) {
-                $identical = JitValueCompare::identicalNativeToValue($this->context, $left, $right);
-                if (OpCode::TYPE_NOT_EQUAL === $opcode->type) {
-                    $result = $this->context->builder->xor(
-                        $identical,
-                        $this->context->getTypeFromString('int1')->constInt(1, false)
-                    );
-                } else {
-                    $result = $identical;
-                }
                 goto return_bool;
             }
         }

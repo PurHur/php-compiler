@@ -45,22 +45,12 @@ final class touch_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('touch() requires one or two arguments in this compiler build');
+        if (2 !== \count($args)) {
+            throw new \LogicException('touch() requires exactly two arguments in this compiler build');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type) {
-            throw new \LogicException('touch() filename must be a string in this compiler build');
-        }
-        $i64 = $context->getTypeFromString('int64');
-        $mtime = $i64->constInt(-1, true);
-        if (2 === $argc) {
-            if (JITVariable::TYPE_NATIVE_LONG !== $args[1]->type) {
-                throw new \LogicException('touch() mtime must be an integer in this compiler build');
-            }
-            $mtime = $context->helper->loadValue($args[1]);
-        }
+        $a = $this->jitString($context, $args[0], 'touch() argument #1');
+        $b = $this->jitString($context, $args[1], 'touch() argument #2');
 
-        return JitTouch::invoke($context, $context->helper->loadValue($args[0]), $mtime);
+        return JitTouch::invoke($context, $a, $b);
     }
 }

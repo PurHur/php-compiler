@@ -39,10 +39,8 @@ final class base64_encode extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('base64_encode() requires exactly one argument in this compiler build');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type) {
-            throw new \LogicException('base64_encode() only supports strings in this compiler build');
-        }
+        $str = $this->jitString($context, $args[0], 'base64_encode() argument #1');
 
-        return JitBase64Encode::encode($context, $context->helper->loadValue($args[0]));
+        return JitBase64Encode::encode($context, $str);
     }
 }

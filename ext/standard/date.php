@@ -41,6 +41,7 @@ final class date extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        $this->jitString($context, $args[0], 'date() argument #1');
         return JitDate::formatDate($context, false, ...$args);
     }
 }

@@ -47,6 +47,10 @@ final class str_rot13 extends Internal
             throw new \LogicException('str_rot13() requires exactly one argument');
         }
 
-        return JitStrRot13::rot13($context, $args[0]);
+        $str = $this->jitString($context, $args[0], 'str_rot13() string');
+        $copy = $context->builder->call($context->lookupFunction('__string__separate'), $str);
+        JitStrRot13::transformInPlace($context, $copy);
+
+        return $copy;
     }
 }

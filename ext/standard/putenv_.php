@@ -49,6 +49,7 @@ final class putenv_ extends Internal
             throw new \LogicException('putenv() requires a string assignment in this compiler build');
         }
 
+        $this->jitString($context, $args[0], 'putenv() argument #1');
         return JitEnv::putenv($context, $context->helper->loadValue($args[0]));
     }
 }

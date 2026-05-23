@@ -358,16 +358,18 @@ restart:
                 goto return_bool;
             }
             if (OpCode::TYPE_EQUAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type) {
-                $identical = JitValueCompare::identicalToNative($this->context, $left, $right);
-                if (OpCode::TYPE_NOT_EQUAL === $opcode->type) {
-                    $result = $this->context->builder->xor(
-                        $identical,
-                        $this->context->getTypeFromString('int1')->constInt(1, false)
+                if (Variable::TYPE_NATIVE_LONG === $rightType) {
+                    $nativeLong = $this->context->builder->intCast(
+                        $rightValue,
+                        $this->context->getTypeFromString('int64')
                     );
-                } else {
-                    $result = $identical;
+                    if (OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                        $result = JitValueCompare::notLooseEqualValueToNativeLong($this->context, $left, $nativeLong);
+                    } else {
+                        $result = JitValueCompare::looseEqualValueToNativeLong($this->context, $left, $nativeLong);
+                    }
+                    goto return_bool;
                 }
-                goto return_bool;
             }
         }
         if (Variable::TYPE_VALUE === $rightType && Variable::TYPE_VALUE !== $leftType) {
@@ -380,16 +382,18 @@ restart:
                 goto return_bool;
             }
             if (OpCode::TYPE_EQUAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type) {
-                $identical = JitValueCompare::identicalNativeToValue($this->context, $left, $right);
-                if (OpCode::TYPE_NOT_EQUAL === $opcode->type) {
-                    $result = $this->context->builder->xor(
-                        $identical,
-                        $this->context->getTypeFromString('int1')->constInt(1, false)
+                if (Variable::TYPE_NATIVE_LONG === $leftType) {
+                    $nativeLong = $this->context->builder->intCast(
+                        $leftValue,
+                        $this->context->getTypeFromString('int64')
                     );
-                } else {
-                    $result = $identical;
+                    if (OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                        $result = JitValueCompare::notLooseEqualNativeLongToValue($this->context, $nativeLong, $right);
+                    } else {
+                        $result = JitValueCompare::looseEqualNativeLongToValue($this->context, $nativeLong, $right);
+                    }
+                    goto return_bool;
                 }
-                goto return_bool;
             }
         }
         $type = $opcode->getType();

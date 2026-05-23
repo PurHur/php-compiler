@@ -59,6 +59,8 @@ final class web_string extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        $this->jitString($context, $args[1], 'web_string() key');
+
         return JitWebParams::webString($context, ...$args);
     }
 }

@@ -14,6 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
@@ -66,8 +67,8 @@ final class array_fill extends Internal
             || JITVariable::TYPE_NATIVE_LONG !== $args[1]->type) {
             throw new \LogicException('array_fill() start index and count must be integers in this compiler build');
         }
-        $startIndex = $context->helper->loadValue($args[0]);
-        $count = $context->helper->loadValue($args[1]);
+        $startIndex = JitLongArg::lower($context, $args[0], 'array_fill() start index');
+        $count = JitLongArg::lower($context, $args[1], 'array_fill() count');
         $sizeT = $context->getTypeFromString('size_t');
         $countSized = $context->builder->truncOrBitCast($count, $sizeT);
         $startSized = $context->builder->truncOrBitCast($startIndex, $sizeT);
