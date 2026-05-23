@@ -374,6 +374,17 @@ final class Variable {
     }
 
     public function addref(): void {
+        if ($this->type & self::IS_NATIVE_ARRAY) {
+            $elemType = $this->type & ~self::IS_NATIVE_ARRAY;
+            if (0 === ($elemType & self::IS_REFCOUNTED)) {
+                return;
+            }
+            for ($i = 0; $i < $this->nextFreeElement; $i++) {
+                $this->dimFetch(self::fromConstantInt($this->context, $i))->addref();
+            }
+
+            return;
+        }
         if (!($this->type & self::IS_REFCOUNTED) || self::TYPE_VALUE === $this->type) {
             return;
         }
