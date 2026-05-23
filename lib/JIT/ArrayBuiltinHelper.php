@@ -248,6 +248,91 @@ final class ArrayBuiltinHelper
         return $resultPtr;
     }
 
+    public static function unshift(Context $context, Variable $array, Variable ...$values): Value
+    {
+        $ht = self::loadHashTable($context, $array);
+        foreach (\array_reverse($values) as $value) {
+            self::prependElement($context, $ht, $value);
+        }
+
+        return self::getNumElements($context, $ht);
+    }
+
+    private static function prependElement(Context $context, Value $ht, Variable $element): void
+    {
+        $map = $context->structFieldMap['__hashtable__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $num = $context->builder->call(
+            $context->lookupFunction('__hashtable__getNumElements'),
+            $ht
+        );
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $num, $zero);
+
+        $emptyBlock = BasicBlockHelper::append($context, 'array_unshift_empty');
+        $workBlock = BasicBlockHelper::append($context, 'array_unshift_work');
+        $doneBlock = BasicBlockHelper::append($context, 'array_unshift_elem_done');
+        $context->builder->branchIf($isEmpty, $emptyBlock, $workBlock);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        HashTableHelper::setAtIndex($context, $ht, $zero, $element);
+        $nextFreePtr = $context->builder->structGep($ht, $map['nextFreeElement']);
+        $numPtr = $context->builder->structGep($ht, $map['numElements']);
+        $context->builder->store($one, $nextFreePtr);
+        $context->builder->store($one, $numPtr);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($workBlock);
+        $lastIndex = $context->builder->sub($num, $one);
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'array_unshift_idx');
+        $context->builder->store($lastIndex, $idxSlot);
+        $loopHead = BasicBlockHelper::append($context, 'array_unshift_head');
+        $loopBody = BasicBlockHelper::append($context, 'array_unshift_body');
+        $afterLoop = BasicBlockHelper::append($context, 'array_unshift_after_loop');
+        $context->builder->branch($loopHead);
+
+        $context->builder->positionAtEnd($loopHead);
+        $idx = $context->builder->load($idxSlot);
+        $belowZero = $context->builder->icmp(Builder::INT_SLT, $idx, $zero);
+        $context->builder->branchIf($belowZero, $afterLoop, $loopBody);
+
+        $context->builder->positionAtEnd($loopBody);
+        $nextIdx = $context->builder->addNoSignedWrap($idx, $one);
+        $fromEntry = self::listEntryAt($context, $ht, $idx);
+        $toEntry = self::listEntryAt($context, $ht, $nextIdx);
+        $movedLong = $context->builder->call(
+            $context->lookupFunction('__value__readLong'),
+            $fromEntry
+        );
+        $context->builder->call(
+            $context->lookupFunction('__value__writeLong'),
+            $toEntry,
+            $movedLong
+        );
+        $context->builder->store(
+            $context->builder->sub($idx, $one),
+            $idxSlot
+        );
+        $context->builder->branch($loopHead);
+
+        $context->builder->positionAtEnd($afterLoop);
+        HashTableHelper::setAtIndex($context, $ht, $zero, $element);
+        $nextFreePtr = $context->builder->structGep($ht, $map['nextFreeElement']);
+        $numPtr = $context->builder->structGep($ht, $map['numElements']);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($context->builder->load($nextFreePtr), $one),
+            $nextFreePtr
+        );
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($context->builder->load($numPtr), $one),
+            $numPtr
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+    }
+
     /**
      * Reverse a packed list array into a new packed array (array_reverse subset; matches VM reverseCopy).
      */

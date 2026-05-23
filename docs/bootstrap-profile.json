@@ -126,6 +126,7 @@
         "ext/standard/array_reverse.php",
         "ext/standard/array_search.php",
         "ext/standard/array_shift.php",
+        "ext/standard/array_unshift.php",
         "ext/standard/array_slice.php",
         "ext/standard/array_sum.php",
         "ext/standard/array_unique.php",

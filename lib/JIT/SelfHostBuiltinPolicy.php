@@ -68,6 +68,7 @@ final class SelfHostBuiltinPolicy
         'abs', 'addslashes', 'array_combine', 'array_count', 'array_fill', 'array_filter', 'array_flip',
         'array_key_exists', 'array_keys', 'array_map', 'array_merge', 'array_pop', 'array_product',
         'array_push', 'array_reverse', 'array_search', 'array_shift', 'array_slice', 'array_sum',
+        'array_unshift',
         'array_unique', 'array_values', 'bin2hex', 'bindec', 'boolval', 'ceil', 'chr', 'chunk_split',
         'compact', 'copy', 'cos',
     ];
@@ -79,6 +80,7 @@ final class SelfHostBuiltinPolicy
         'array_keys' => true, 'array_map' => true, 'array_merge' => true, 'array_pop' => true,
         'array_product' => true, 'array_push' => true, 'array_reverse' => true, 'array_search' => true,
         'array_shift' => true, 'array_slice' => true, 'array_sum' => true, 'array_unique' => true,
+        'array_unshift' => true,
         'array_values' => true, 'bin2hex' => true, 'bindec' => true, 'boolval' => true, 'ceil' => true,
         'chr' => true, 'chunk_split' => true, 'compact' => true, 'copy' => true, 'cos' => true,
     ];

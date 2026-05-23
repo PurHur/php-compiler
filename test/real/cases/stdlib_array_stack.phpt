@@ -1,5 +1,5 @@
 --TEST--
-Integration: array_push, array_pop, array_shift, array_values
+Integration: array_push, array_pop, array_shift, array_unshift, array_values
 --FILE--
 <?php
 $list = array('a');
@@ -9,6 +9,9 @@ echo array_pop($list), "\n";
 echo count($list), "\n";
 echo array_shift($list), "\n";
 echo count($list), "\n";
+array_unshift($list, 'z');
+echo count($list), "\n";
+echo $list[0], "\n";
 $vals = array_values(array('x', 'y'));
 echo count($vals), "\n";
 echo sizeof($vals), "\n";
@@ -18,5 +21,7 @@ c
 2
 a
 1
+2
+z
 2
 2

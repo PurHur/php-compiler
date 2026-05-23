@@ -258,6 +258,39 @@ final class HashTable {
     }
 
     /**
+     * Prepend one element to a packed list array (no holes).
+     */
+    public function unshiftPrepend(Variable $data): void
+    {
+        $this->assertConsistent();
+        if (!$this->isWithoutHoles()) {
+            throw new \LogicException('unshiftPrepend() only supports packed list arrays without holes');
+        }
+        $this->refcount->assertSeparated();
+        if (0 === $this->numElements) {
+            $this->addOrUpdate(0, null, $data, self::ADD);
+
+            return;
+        }
+        $this->resizeIfFull();
+        for ($i = $this->numUsed - 1; $i >= 0; --$i) {
+            $src = $this->buckets->read($i);
+            $dst = $this->buckets->read($i + 1);
+            $dst->value->copyFrom($src->value);
+            $dst->hash = $i + 1;
+            $dst->key = null;
+        }
+        $first = $this->buckets->read(0);
+        $first->value->copyFrom($data);
+        $first->hash = 0;
+        $first->key = null;
+        ++$this->numUsed;
+        ++$this->numElements;
+        ++$this->nextFreeElement;
+        $this->rehash();
+    }
+
+    /**
      * Replace packed list values in place (indices 0..n-1, no holes).
      *
      * @param list<Variable> $values

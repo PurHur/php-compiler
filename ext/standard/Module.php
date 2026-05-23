@@ -96,6 +96,7 @@ class Module extends ModuleAbstract
             new array_push(),
             new array_pop(),
             new array_shift(),
+            new array_unshift(),
             new sort_(),
             new sprintf_(),
             new array_values(),
