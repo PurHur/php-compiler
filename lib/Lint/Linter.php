@@ -97,9 +97,7 @@ final class Linter
      */
     public function lintSource(string $code, string $filename): array
     {
-        $issues = [
-            ...(new IncrementDetector())->detect($code, $filename),
-        ];
+        $issues = [];
         $script = $this->parseForLint($code, $filename);
         foreach ($this->lintScript($script) as $issue) {
             $issues[] = $issue;

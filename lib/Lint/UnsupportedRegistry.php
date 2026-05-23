@@ -30,10 +30,6 @@ final class UnsupportedRegistry
         'Expr_Closure' => 72,
         'Stmt_Trait' => 168,
         'Expr_NamedArgument' => 168,
-        'Expr_PreInc' => 137,
-        'Expr_PostInc' => 137,
-        'Expr_PreDec' => 137,
-        'Expr_PostDec' => 137,
     ];
 
     public static function trackingIssueForKind(string $kind): ?int
