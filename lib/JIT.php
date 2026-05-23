@@ -1076,10 +1076,20 @@ class JIT {
                         // short circuit
                         break;
                     }
-                    $this->context->scope->toCall->call($this->context, ...$this->context->scope->args);
+                    $callArgs = $this->prependImplicitThisForStaticConstruct(
+                        $block,
+                        $this->context->scope->toCall,
+                        $this->context->scope->args
+                    );
+                    $this->context->scope->toCall->call($this->context, ...$callArgs);
                     break;
                 case OpCode::TYPE_FUNCCALL_EXEC_RETURN:
-                    $result = $this->context->scope->toCall->call($this->context, ...$this->context->scope->args);
+                    $callArgs = $this->prependImplicitThisForStaticConstruct(
+                        $block,
+                        $this->context->scope->toCall,
+                        $this->context->scope->args
+                    );
+                    $result = $this->context->scope->toCall->call($this->context, ...$callArgs);
                     $this->assignOperandValue($block->getOperand($op->arg1), $result);
                     break;
                 case OpCode::TYPE_DECLARE_GLOBAL_CONST:
@@ -1775,6 +1785,66 @@ class JIT {
         }
 
         return false;
+    }
+
+    /**
+     * Static parent::__construct() from an instance method passes only declared params;
+     * the callee LLVM signature may still include implicit $this when blockUsesThis().
+     *
+     * @param array<int, Variable> $args
+     *
+     * @return array<int, Variable>
+     */
+    private function prependImplicitThisForStaticConstruct(
+        Block $block,
+        JIT\Call $toCall,
+        array $args
+    ): array {
+        if (!$toCall instanceof JIT\Call\Native) {
+            return $args;
+        }
+        if (!str_ends_with(strtolower($toCall->name), '::__construct')) {
+            return $args;
+        }
+        if ([] === $toCall->argTypes) {
+            return $args;
+        }
+        if ('__object__*' !== $this->context->getStringFromType($toCall->argTypes[0])) {
+            return $args;
+        }
+        if (count($args) >= count($toCall->argTypes)) {
+            return $args;
+        }
+        if (null === $block->func || null === $block->func->cfg) {
+            return $args;
+        }
+        $thisVar = $this->resolveThisVariable($block);
+        if (null === $thisVar) {
+            return $args;
+        }
+
+        array_unshift($args, $thisVar);
+
+        return $args;
+    }
+
+    private function resolveThisVariable(Block $block): ?Variable
+    {
+        if (null === $block->func || null === $block->func->cfg) {
+            return null;
+        }
+        foreach ($block->func->cfg->hoistedOperands as $hoisted) {
+            if ('this' !== JIT\OperandName::resolve($hoisted)) {
+                continue;
+            }
+            if (!$this->context->hasVariableOpInScopes($hoisted)) {
+                return null;
+            }
+
+            return $this->context->getVariableFromOpInScopes($hoisted);
+        }
+
+        return null;
     }
 
     private function collectParamDefaults(Block $block): array {
