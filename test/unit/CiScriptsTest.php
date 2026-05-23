@@ -227,6 +227,25 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('--preflight', $doc);
     }
 
+    public function testLocalCiMatrixDocumentsMiniWebAppGates(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString('## MiniWebApp gates', $doc);
+        $this->assertStringContainsString('miniwebapp-gates.sh', $doc);
+        $this->assertStringContainsString('phpc doctor --gates', $doc);
+        $this->assertStringContainsString('MINIWEBAPP_VM_CLI_GATE', $doc);
+        $this->assertStringContainsString('MINIWEBAPP_SERVE_GATE', $doc);
+        $this->assertStringContainsString('MINIWEBAPP_WEB_SMOKE_GATE', $doc);
+        $this->assertStringContainsString('MINIWEBAPP_AOT_LINK_GATE', $doc);
+        $this->assertStringContainsString('MINIWEBAPP_AOT_EXECUTE_GATE', $doc);
+        $this->assertStringContainsString('EXAMPLES_AOT_SMOKE_GATE', $doc);
+        $this->assertStringContainsString('EXAMPLES_AOT_SMOKE_ONLY', $doc);
+        $this->assertStringContainsString('MINIWEBAPP_AOT_EXECUTE_GATE=1', $doc);
+        $this->assertStringContainsString('MINIWEBAPP_AOT_EXECUTE_GATE="${MINIWEBAPP_AOT_EXECUTE_GATE:-0}"', $defaults);
+        $this->assertStringContainsString('EXAMPLES_AOT_SMOKE_GATE="${EXAMPLES_AOT_SMOKE_GATE:-1}"', $defaults);
+    }
+
     public function testCiFastRunsMiniWebAppVmCliGateByDefault(): void
     {
         $fast = dirname(__DIR__, 2).'/script/ci-fast.sh';

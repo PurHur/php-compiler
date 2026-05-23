@@ -25,6 +25,33 @@ Repository defaults live in [`script/ci-defaults.env`](../script/ci-defaults.env
 | Explicit memory-capped Docker | — | `./script/ci-docker-safe.sh ci-local.sh` or `make test-docker-safe` |
 | Single PHPUnit filter | Append args: `./script/ci-fast.sh --filter VMTest` | Same inside Docker wrappers |
 
+## MiniWebApp gates ([#472](https://github.com/PurHur/php-compiler/issues/472), [#664](https://github.com/PurHur/php-compiler/issues/664))
+
+Defaults are exported from [`script/ci-defaults.env`](../script/ci-defaults.env) and read by `ci-local.sh`, `ci-fast.sh`, and helpers in [`script/ci-common.sh`](../script/ci-common.sh). For the progressive stage ladder (lint → serve → AOT link → execute), run [`script/miniwebapp-gates.sh`](../script/miniwebapp-gates.sh), `make miniwebapp-gates`, or `phpc doctor --gates` — see [examples/003-MiniWebApp/README.md](../examples/003-MiniWebApp/README.md).
+
+| Variable | Default | Script | Notes |
+|----------|---------|--------|-------|
+| `MINIWEBAPP_VM_CLI_GATE` | `1` | `ci-fast.sh` | PHPUnit `MiniWebApp*VmCli` matrix ([#597](https://github.com/PurHur/php-compiler/issues/597)) |
+| `MINIWEBAPP_SERVE_GATE` | `1` | `ci-local.sh`, `ci-fast.sh` | `ServeTest` `@group miniwebapp` ([#641](https://github.com/PurHur/php-compiler/issues/641)) |
+| `MINIWEBAPP_WEB_SMOKE_GATE` | `1` | `ci-local.sh` | `examples-web-smoke.sh --miniwebapp-only` ([#664](https://github.com/PurHur/php-compiler/issues/664)) |
+| `MINIWEBAPP_AOT_LINK_GATE` | `1` | `ci-local.sh` (PHPUnit `@group aot-link`) | `ExamplesCompileTest` 003 native link ([#754](https://github.com/PurHur/php-compiler/issues/754)) |
+| `MINIWEBAPP_AOT_EXECUTE_GATE` | `0` | `ci-local.sh` (PHPUnit `@group aot-link`) | 003 execute tests; opt-in while blocked by [#764](https://github.com/PurHur/php-compiler/issues/764) ([#791](https://github.com/PurHur/php-compiler/issues/791), [#775](https://github.com/PurHur/php-compiler/issues/775)) |
+| `EXAMPLES_AOT_SMOKE_GATE` | `1` | `ci-local.sh` | `examples-aot-smoke.sh` after LLVM phases ([#674](https://github.com/PurHur/php-compiler/issues/674)) |
+| `EXAMPLES_AOT_SMOKE_ONLY` | unset | `examples-aot-smoke.sh` | Slice e.g. `003` only ([#738](https://github.com/PurHur/php-compiler/issues/738), [#683](https://github.com/PurHur/php-compiler/issues/683)) |
+| `JIT_PREFLIGHT_GATE` | `0` | `ci-fast.sh` | Early MCJIT probe after `composer install` ([#728](https://github.com/PurHur/php-compiler/issues/728)) |
+
+Ladder-only env vars (not in `ci-defaults.env`): `MINIWEBAPP_LINT_GATE` (default `1` in `web-smoke.sh`), `MINIWEBAPP_AOT_BISECT_GATE` (default `0` in `miniwebapp-gates.sh` — [#879](https://github.com/PurHur/php-compiler/issues/879)).
+
+**#764 execute probe** (opt-in; expect failures until AOT execute is green):
+
+```bash
+MINIWEBAPP_AOT_EXECUTE_GATE=1 ./script/ci-local.sh --filter test003MiniWebAppExecutesWithCgiEnv
+EXAMPLES_AOT_SMOKE_ONLY=003 ./script/examples-aot-smoke.sh
+MINIWEBAPP_AOT_BISECT_GATE=1 ./script/miniwebapp-gates.sh
+```
+
+Set any gate to `0` to skip that stage during iteration (e.g. `MINIWEBAPP_SERVE_GATE=0 ./script/ci-fast.sh`).
+
 ## Memory safety
 
 - **One full CI container at a time.** Parallel `make test` runs can exhaust RAM ([#497](https://github.com/PurHur/php-compiler/issues/497)).
@@ -87,6 +114,10 @@ Harness hosts and contributors without host PHP/LLVM should use the **22.04 dev 
 
 ## Related issues
 
+- [#472](https://github.com/PurHur/php-compiler/issues/472) — MiniWebApp gate ladder umbrella
+- [#664](https://github.com/PurHur/php-compiler/issues/664) — `MINIWEBAPP_WEB_SMOKE_GATE` in `ci-local`
+- [#754](https://github.com/PurHur/php-compiler/issues/754) — `MINIWEBAPP_AOT_LINK_GATE`
+- [#791](https://github.com/PurHur/php-compiler/issues/791) — `MINIWEBAPP_AOT_EXECUTE_GATE` split
 - [#436](https://github.com/PurHur/php-compiler/issues/436) — tiered CI (`ci-fast` vs `ci-local`)
 - [#728](https://github.com/PurHur/php-compiler/issues/728) — optional `JIT_PREFLIGHT_GATE` on `ci-fast`
 - [#497](https://github.com/PurHur/php-compiler/issues/497) — memory incident (closed)
