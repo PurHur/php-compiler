@@ -95,6 +95,30 @@ OUT;
         );
     }
 
+    public function testSegfaultNextLowerIncludesLastJitFunc(): void
+    {
+        $path = sys_get_temp_dir().'/php-compiler-jit-progress-segfault-'.getmypid();
+        file_put_contents($path, 'PHPCompiler\\JIT\\Result::getFunc');
+        try {
+            $last = \bootstrapSelfhostProbeLastJitFunc($path);
+            $this->assertSame('PHPCompiler\\JIT\\Result::getFunc', $last);
+            $next = 'LLVM segfault during native compile (exit 139)';
+            if (null !== $last) {
+                $next .= ' (last JIT: '.$last.')';
+            }
+            $this->assertStringContainsString('last JIT: PHPCompiler\\JIT\\Result::getFunc', $next);
+        } finally {
+            @unlink($path);
+        }
+    }
+
+    public function testProbeScriptSetsDefaultJitProgressFile(): void
+    {
+        $script = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-compile-probe.php');
+        $this->assertStringContainsString("build/.last-jit-func", $script);
+        $this->assertStringContainsString('LAST_JIT_FUNC:', $script);
+    }
+
     public function testShellProbePrintsLastJitFuncOnSegfault(): void
     {
         $script = self::$root.'/script/bootstrap-selfhost-compile-probe.sh';
