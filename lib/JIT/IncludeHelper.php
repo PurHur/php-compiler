@@ -220,7 +220,7 @@ final class IncludeHelper
     /**
      * Zend include/require: callee reads caller locals by variable name (issue #471).
      *
-     * @return \SplObjectStorage<Operand, Variable>
+     * @return \SplObjectStorage
      */
     private static function collectCalleeLocalBindings(
         Context $context,

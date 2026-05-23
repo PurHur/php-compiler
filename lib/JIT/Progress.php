@@ -45,7 +45,9 @@ final class Progress
 
     public static function readLast(?string $path = null): ?string
     {
-        $path ??= self::progressFilePath();
+        if (null === $path) {
+            $path = self::progressFilePath();
+        }
         if (null === $path || !is_file($path)) {
             return null;
         }

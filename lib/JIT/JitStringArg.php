@@ -15,9 +15,7 @@ use PHPLLVM\Value;
 
 final class JitStringArg
 {
-    /**
-     * @return Value {@see __string__*}
-     */
+    /** @return Value */
     public static function lower(Context $context, Variable $arg, string $contextLabel = 'argument'): Value
     {
         $literal = self::compileTimeLiteral($arg);
