@@ -214,6 +214,8 @@ final class HashTableHelper
         $i8 = $context->getTypeFromString('int8');
 
         $stringBlock = BasicBlockHelper::append($context, 'ht_rb_string_'.$tag);
+        $htBlock = BasicBlockHelper::append($context, 'ht_rb_ht_'.$tag);
+        $checkHt = BasicBlockHelper::append($context, 'ht_rb_check_ht_'.$tag);
         $longBlock = BasicBlockHelper::append($context, 'ht_rb_long_'.$tag);
         $done = BasicBlockHelper::append($context, 'ht_rb_done_'.$tag);
 
@@ -222,7 +224,15 @@ final class HashTableHelper
             $typeByte,
             $i8->constInt(Variable::TYPE_STRING, false)
         );
-        $context->builder->branchIf($isString, $stringBlock, $longBlock);
+        $context->builder->branchIf($isString, $stringBlock, $checkHt);
+
+        $context->builder->positionAtEnd($checkHt);
+        $isHt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_HASHTABLE, false)
+        );
+        $context->builder->branchIf($isHt, $htBlock, $longBlock);
 
         $context->builder->positionAtEnd($stringBlock);
         $str = $context->builder->call(
@@ -237,6 +247,18 @@ final class HashTableHelper
             $context->lookupFunction('__value__writeString'),
             $destPtr,
             $owned
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($htBlock);
+        $childHt = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $entryPtr
+        );
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            $destPtr,
+            $childHt
         );
         $context->builder->branch($done);
 
@@ -360,6 +382,8 @@ final class HashTableHelper
         $i8 = $context->getTypeFromString('int8');
 
         $stringBlock = BasicBlockHelper::append($context, 'ht_sk_string_'.$tag);
+        $htBlock = BasicBlockHelper::append($context, 'ht_sk_ht_'.$tag);
+        $checkHt = BasicBlockHelper::append($context, 'ht_sk_check_ht_'.$tag);
         $longBlock = BasicBlockHelper::append($context, 'ht_sk_long_'.$tag);
         $done = BasicBlockHelper::append($context, 'ht_sk_done_'.$tag);
 
@@ -368,7 +392,15 @@ final class HashTableHelper
             $typeByte,
             $i8->constInt(Variable::TYPE_STRING, false)
         );
-        $context->builder->branchIf($isString, $stringBlock, $longBlock);
+        $context->builder->branchIf($isString, $stringBlock, $checkHt);
+
+        $context->builder->positionAtEnd($checkHt);
+        $isHt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_HASHTABLE, false)
+        );
+        $context->builder->branchIf($isHt, $htBlock, $longBlock);
 
         $context->builder->positionAtEnd($stringBlock);
         $str = $context->builder->call(
@@ -383,6 +415,18 @@ final class HashTableHelper
             $context->lookupFunction('__value__writeString'),
             $destPtr,
             $owned
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($htBlock);
+        $childHt = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $valPtr
+        );
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            $destPtr,
+            $childHt
         );
         $context->builder->branch($done);
 
