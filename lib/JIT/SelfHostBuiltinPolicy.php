@@ -58,12 +58,14 @@ final class SelfHostBuiltinPolicy
     private const CATEGORY_FILESYSTEM = [
         'dirname' => 'filesystem', 'basename' => 'filesystem', 'file_exists' => 'filesystem',
         'clearstatcache' => 'filesystem',
+        'stat' => 'filesystem',
         'is_file' => 'filesystem', 'is_dir' => 'filesystem', 'is_readable' => 'filesystem',
         'is_writable' => 'filesystem', 'file_get_contents' => 'filesystem', 'file_put_contents' => 'filesystem',
         'mkdir' => 'filesystem', 'unlink' => 'filesystem', 'rmdir' => 'filesystem', 'realpath' => 'filesystem',
         'glob' => 'filesystem', 'scandir' => 'filesystem',
         'fopen' => 'filesystem', 'fread' => 'filesystem', 'fgetc' => 'filesystem', 'fgets' => 'filesystem',
         'fgetcsv' => 'filesystem',
+        'fputcsv' => 'filesystem',
         'ftell' => 'filesystem', 'fseek' => 'filesystem', 'fclose' => 'filesystem',
         'feof' => 'filesystem', 'fflush' => 'filesystem',
         'getenv' => 'filesystem', 'putenv' => 'filesystem', 'sys_get_temp_dir' => 'filesystem', 'tempnam' => 'filesystem',
@@ -104,7 +106,7 @@ final class SelfHostBuiltinPolicy
     private const CATEGORY_HASH = ['hash' => 'hash', 'hash_hmac' => 'hash', 'crc32' => 'hash'];
 
     /** @var array<string, string> */
-    private const CATEGORY_PREG = ['preg_match' => 'preg', 'preg_quote' => 'preg', 'preg_last_error' => 'preg'];
+    private const CATEGORY_PREG = ['preg_match' => 'preg', 'preg_match_all' => 'preg', 'preg_quote' => 'preg', 'preg_last_error' => 'preg'];
 
     /** @var array<string, string> */
     private const CATEGORY_FILTER = ['filter_var' => 'filter', 'filter_input' => 'filter'];

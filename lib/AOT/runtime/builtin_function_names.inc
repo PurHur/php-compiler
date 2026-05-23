@@ -65,6 +65,7 @@ static const char *phpc_builtin_functions[] = {
     "fflush",
     "fgetc",
     "fgetcsv",
+    "fputcsv",
     "fgets",
     "file_exists",
     "file_get_contents",
@@ -158,6 +159,7 @@ static const char *phpc_builtin_functions[] = {
     "pi",
     "pow",
     "preg_match",
+    "preg_match_all",
     "preg_last_error",
     "preg_quote",
     "putenv",
@@ -182,6 +184,7 @@ static const char *phpc_builtin_functions[] = {
     "sort",
     "sprintf",
     "sqrt",
+    "stat",
     "str_contains",
     "str_ends_with",
     "str_pad",
@@ -234,4 +237,4 @@ static const char *phpc_builtin_functions[] = {
     "web_string",
     "wordwrap",
 };
-static const size_t phpc_builtin_functions_count = 230;
+static const size_t phpc_builtin_functions_count = 231;

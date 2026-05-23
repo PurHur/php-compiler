@@ -249,6 +249,8 @@ class Type extends Builtin {
         );
         $fnPregMatch = $this->context->module->addFunction('__compiler_preg_match', $fntypePregMatch);
         $this->context->registerFunction('__compiler_preg_match', $fnPregMatch);
+        $fnPregMatchAll = $this->context->module->addFunction('__compiler_preg_match_all', $fntypePregMatch);
+        $this->context->registerFunction('__compiler_preg_match_all', $fnPregMatchAll);
         $fntypePregLastError = $this->context->context->functionType($i64, false);
         $fnPregLastError = $this->context->module->addFunction('__compiler_preg_last_error', $fntypePregLastError);
         $this->context->registerFunction('__compiler_preg_last_error', $fnPregLastError);
@@ -373,6 +375,11 @@ class Type extends Builtin {
             $this->context->context->functionType($htPtr, false, $strPtr, $i32)
         );
         $this->context->registerFunction('__phpc_scandir', $fnScandir);
+        $fnStat = $this->context->module->addFunction(
+            '__phpc_stat',
+            $this->context->context->functionType($htPtr, false, $strPtr, $i32)
+        );
+        $this->context->registerFunction('__phpc_stat', $fnStat);
         $fnFgetcsv = $this->context->module->addFunction(
             '__compiler_fgetcsv',
             $this->context->context->functionType($htPtr, false, $i64, $i64, $strPtr, $strPtr, $strPtr)

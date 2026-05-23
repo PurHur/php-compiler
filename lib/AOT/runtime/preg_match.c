@@ -196,3 +196,93 @@ int64_t __compiler_preg_match(__string__ *pattern, __string__ *subject)
 
     return 1;
 }
+
+int64_t __compiler_preg_match_all(__string__ *pattern, __string__ *subject)
+{
+    const char *pat_full = pm_strdata(pattern);
+    size_t pat_len = pm_strlen(pattern);
+    const char *subj = pm_strdata(subject);
+    size_t subj_len = pm_strlen(subject);
+
+    phpc_preg_last_error = PHPC_PREG_NO_ERROR;
+
+    if (pat_len > PM_MAX_PATTERN) {
+        phpc_preg_last_error = PHPC_PREG_BAD_REGEX;
+
+        return -1;
+    }
+
+    char body[PM_MAX_PATTERN + 1];
+    uint32_t opts = 0;
+    if (0 != pm_extract_body(pat_full, pat_len, body, sizeof(body), &opts)) {
+        phpc_preg_last_error = PHPC_PREG_BAD_REGEX;
+
+        return -1;
+    }
+
+    int errorcode = 0;
+    PCRE2_SIZE erroffset = 0;
+    pcre2_code *re = pcre2_compile(
+        (PCRE2_SPTR) body,
+        PCRE2_ZERO_TERMINATED,
+        opts,
+        &errorcode,
+        &erroffset,
+        NULL
+    );
+    if (NULL == re) {
+        phpc_preg_last_error = PHPC_PREG_BAD_REGEX;
+
+        return -1;
+    }
+
+    pcre2_match_data *match_data = pcre2_match_data_create_from_pattern(re, NULL);
+    if (NULL == match_data) {
+        pcre2_code_free(re);
+        phpc_preg_last_error = PHPC_PREG_BAD_REGEX;
+
+        return -1;
+    }
+
+    int64_t count = 0;
+    PCRE2_SIZE start_offset = 0;
+
+    while (start_offset <= subj_len) {
+        int rc = pcre2_match(
+            re,
+            (PCRE2_SPTR) subj,
+            subj_len,
+            start_offset,
+            0,
+            match_data,
+            NULL
+        );
+
+        if (rc < 0) {
+            if (PCRE2_ERROR_NOMATCH == rc) {
+                break;
+            }
+
+            pcre2_match_data_free(match_data);
+            pcre2_code_free(re);
+            phpc_preg_last_error = PHPC_PREG_BAD_REGEX;
+
+            return -1;
+        }
+
+        count++;
+
+        PCRE2_SIZE *ovector = pcre2_get_ovector_pointer(match_data);
+        PCRE2_SIZE match_end = ovector[1];
+        if (match_end == start_offset) {
+            start_offset++;
+        } else {
+            start_offset = match_end;
+        }
+    }
+
+    pcre2_match_data_free(match_data);
+    pcre2_code_free(re);
+
+    return count;
+}
