@@ -3,10 +3,8 @@
 declare(strict_types=1);
 
 /**
- * M3 HelloWorld self-host probe bundle (linkable compiler_compile_smoke spine + inline M3 dispatch).
- * Gate: php bin/compile.php -l test/selfhost/compiler_helloworld_smoke/main.php
- * Driver lint: php bin/compile.php -l test/selfhost/compiler_helloworld_smoke/driver_lint.php
- * Native: ./script/bootstrap-selfhost-helloworld-probe.sh
+ * M3 HelloWorld native compile driver (linkable; runtime dispatch via mode file #1056).
+ * Gate: php bin/compile.php -l test/selfhost/compiler_helloworld_smoke/compile_driver.php
  */
 
 require_once __DIR__.'/../../../lib/OpCode.php';
@@ -95,7 +93,21 @@ require_once __DIR__.'/../../../lib/Lint/Issue.php';
 require_once __DIR__.'/../../../lib/Lint/UnsupportedRegistry.php';
 require_once __DIR__.'/../../../lib/Lint/LintCompiler.php';
 require_once __DIR__.'/../../../lib/Lint/Linter.php';
-require_once __DIR__.'/../../bootstrap-aot/compiler_smoke.php';
 require_once __DIR__.'/../../bootstrap-aot/helloworld_compile_smoke.php';
 
-echo "compiler_helloworld_smoke bundle OK\n";
+$modeFile = __DIR__.'/../../../build/.m3-helloworld-mode';
+if (is_readable($modeFile) && 'compile' === trim((string) file_get_contents($modeFile))) {
+    @unlink($modeFile);
+    if (\function_exists('putenv')) {
+        putenv('PHP_COMPILER_SELFHOST_AOT');
+    }
+    $root = __DIR__.'/../../..';
+    $result = helloworld_compile_smoke(
+        $root.'/examples/000-HelloWorld/example.php',
+        $root.'/build/helloworld-aot'
+    );
+    echo $result['message']."\n";
+    exit($result['ok'] ? 0 : 1);
+}
+
+echo "compiler_helloworld_compile_driver ready\n";
