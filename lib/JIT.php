@@ -1149,7 +1149,18 @@ class JIT {
                             $this->context->builder->positionAtEnd($doneBlock);
                             break;
 
+                        case Variable::TYPE_HASHTABLE:
+                            JIT\ValueEchoHelper::echoLiteral($this->context, 'Array');
+                            break;
+                        case Variable::TYPE_OBJECT:
+                            JIT\ValueEchoHelper::echoLiteral($this->context, 'Object');
+                            break;
+
                         default:
+                            if (0 !== ($arg->type & Variable::IS_NATIVE_ARRAY)) {
+                                JIT\ValueEchoHelper::echoLiteral($this->context, 'Array');
+                                break;
+                            }
                             if (Variable::KIND_VARIABLE === $arg->kind
                                 && '__value__' === $this->context->getStringFromType($arg->value->typeOf())
                             ) {
