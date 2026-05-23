@@ -6,7 +6,9 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
@@ -66,6 +68,13 @@ final class array_column extends Internal
         if (3 === $argc) {
             throw new \LogicException('array_column() index_key is not supported in this compiler build');
         }
-        throw new \LogicException('array_column() is not implemented for JIT in this compiler build');
+        if (null === JitStringArg::compileTimeLiteral($args[1])) {
+            throw new \LogicException(
+                'array_column() column key must be a compile-time string in this compiler build'
+            );
+        }
+        $columnKey = $this->jitString($context, $args[1], 'array_column() column key');
+
+        return ArrayBuiltinHelper::buildColumnArray($context, $args[0], $columnKey);
     }
 }
