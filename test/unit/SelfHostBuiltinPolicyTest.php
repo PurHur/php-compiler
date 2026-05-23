@@ -29,6 +29,7 @@ final class SelfHostBuiltinPolicyTest extends TestCase
         putenv('PHP_COMPILER_SELFHOST_AOT=1');
         $this->assertTrue(SelfHostBuiltinPolicy::shouldExternalStub('abs'));
         $this->assertFalse(SelfHostBuiltinPolicy::shouldExternalStub('dirname'));
+        $this->assertFalse(SelfHostBuiltinPolicy::shouldExternalStub('fopen'));
     }
 
     public function testCompileFuncRegistersExternalMethodStub(): void
