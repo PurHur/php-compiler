@@ -444,16 +444,38 @@ return_bool:
                     $this->context->getTypeFromString('__hashtable__*')
                 );
             }
+            if (Variable::TYPE_OBJECT === $variable->objectPropertyType) {
+                return $this->context->builder->pointerCast(
+                    $loaded,
+                    $this->context->getTypeFromString('__object__*')
+                );
+            }
             if (Variable::TYPE_STRING === $variable->objectPropertyType) {
                 return $this->context->builder->pointerCast(
                     $loaded,
                     $this->context->getTypeFromString('__string__*')
                 );
             }
+            if (Variable::TYPE_VALUE === $variable->objectPropertyType) {
+                $valuePtr = $this->context->builder->pointerCast(
+                    $loaded,
+                    $this->context->getTypeFromString('__value__*')
+                );
+                if (Variable::TYPE_OBJECT === $variable->type) {
+                    return $this->context->builder->call(
+                        $this->context->lookupFunction('__value__readObject'),
+                        $valuePtr
+                    );
+                }
+
+                return $valuePtr;
+            }
+
+            $llvmType = Variable::getStringType($variable->objectPropertyType);
 
             return $this->context->builder->pointerCast(
                 $loaded,
-                $this->context->getTypeFromString('__value__*')
+                $this->context->getTypeFromString($llvmType)
             );
         }
         if ($variable->kind === Variable::KIND_VALUE) {
@@ -465,14 +487,11 @@ return_bool:
     private function operandJitType(Variable $var): int
     {
         if (null !== $var->objectPropertySlot && null !== $var->objectPropertyType) {
-            if (Variable::TYPE_HASHTABLE === $var->objectPropertyType) {
-                return Variable::TYPE_HASHTABLE;
-            }
-            if (Variable::TYPE_STRING === $var->objectPropertyType) {
-                return Variable::TYPE_STRING;
+            if (Variable::TYPE_VALUE === $var->objectPropertyType) {
+                return Variable::TYPE_VALUE;
             }
 
-            return Variable::TYPE_VALUE;
+            return $var->objectPropertyType;
         }
 
         return $var->type;
