@@ -347,3 +347,21 @@ __string__ *__compiler_sys_get_temp_dir(void)
 
     return cstr_to_string(dir);
 }
+
+/** tempnam() — unique temp path in directory with prefix (issue #1201). */
+__string__ *__compiler_tempnam(__string__ *directory, __string__ *prefix)
+{
+    char *path;
+
+    if (NULL == directory || NULL == prefix) {
+        return NULL;
+    }
+    path = tempnam(phpc_strdata(directory), phpc_strdata(prefix));
+    if (NULL == path) {
+        return NULL;
+    }
+    __string__ *result = cstr_to_string(path);
+    free(path);
+
+    return result;
+}

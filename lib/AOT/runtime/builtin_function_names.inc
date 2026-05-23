@@ -10,6 +10,7 @@ static const char *phpc_builtin_functions[] = {
     "array_fill",
     "array_filter",
     "array_flip",
+    "array_intersect",
     "array_key_exists",
     "array_keys",
     "array_map",
@@ -34,6 +35,7 @@ static const char *phpc_builtin_functions[] = {
     "bindec",
     "boolval",
     "ceil",
+    "chdir",
     "chmod",
     "chr",
     "chunk_split",
@@ -57,6 +59,7 @@ static const char *phpc_builtin_functions[] = {
     "extract",
     "fclose",
     "feof",
+    "fgetc",
     "file_exists",
     "file_get_contents",
     "file_put_contents",
@@ -76,6 +79,7 @@ static const char *phpc_builtin_functions[] = {
     "get_class",
     "get_parent_class",
     "getallheaders",
+    "getcwd",
     "getenv",
     "gettype",
     "glob",
@@ -203,6 +207,7 @@ static const char *phpc_builtin_functions[] = {
     "substr_count",
     "sys_get_temp_dir",
     "tan",
+    "tempnam",
     "time",
     "touch",
     "trigger_error",
@@ -219,4 +224,4 @@ static const char *phpc_builtin_functions[] = {
     "web_string",
     "wordwrap",
 };
-static const size_t phpc_builtin_functions_count = 217;
+static const size_t phpc_builtin_functions_count = 223;
