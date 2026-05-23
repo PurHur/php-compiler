@@ -50,6 +50,16 @@ final class VmFs
         return (int) $stat['mtime'];
     }
 
+    public static function filePerms(string $path): int|false
+    {
+        $stat = @stat($path);
+        if (false === $stat) {
+            return false;
+        }
+
+        return (int) $stat['mode'];
+    }
+
     public static function fileType(string $path): string|false
     {
         $stat = @lstat($path);

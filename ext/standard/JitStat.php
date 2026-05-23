@@ -219,6 +219,52 @@ final class JitStat
         return $ptr;
     }
 
+    /** @return Value __value__* (native long st_mode, or boolean false when stat fails) */
+    public static function pathFilePermsBoxed(Context $context, Value $str): Value
+    {
+        $map = $context->structFieldMap['__string__'];
+        $pathPtr = $context->builder->structGep($str, $map['value']);
+        $i8 = $context->getTypeFromString('int8');
+        $bufType = $i8->arrayType(self::STAT_BUF_SIZE);
+        $buf = $context->builder->alloca($bufType, 1, 'fileperms_stat_buf');
+        $i8p = $context->getTypeFromString('int8*');
+        $bufPtr = $context->builder->pointerCast($buf, $i8p);
+        $ret = $context->builder->call(
+            $context->lookupFunction('stat'),
+            $pathPtr,
+            $bufPtr
+        );
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i32->constInt(0, false);
+        $failed = $context->builder->icmp(Builder::INT_NE, $ret, $zero);
+
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $id = (string) (++self::$blockSerial);
+        $failBlock = BasicBlockHelper::append($context, 'fileperms_fail_'.$id);
+        $okBlock = BasicBlockHelper::append($context, 'fileperms_ok_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, 'fileperms_done_'.$id);
+        $context->builder->branchIf($failed, $failBlock, $okBlock);
+
+        $context->builder->positionAtEnd($failBlock);
+        $i1 = $context->getTypeFromString('int1');
+        JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($okBlock);
+        $bytePtr = $context->builder->gep($bufPtr, $i64->constInt(self::STAT_MODE_OFFSET, false));
+        $modePtr = $context->builder->pointerCast($bytePtr, $i32->pointerType(0));
+        $mode = $context->builder->load($modePtr);
+        $mode64 = $context->builder->sextOrBitCast($mode, $i64);
+        JitValueBox::writeLong($context, $slot, $mode64);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+
+        return $ptr;
+    }
+
     private static function statSucceeded(Context $context, Value $str): Value
     {
         $mode = self::loadModeOrFail($context, $str);
