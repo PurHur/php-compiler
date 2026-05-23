@@ -452,7 +452,10 @@ class JIT {
     private function isConstStringFolderRealLoweringMethod(string $lower): bool
     {
         return str_ends_with($lower, '::literalstringvalue')
-            || str_ends_with($lower, '::sourcedir');
+            || str_ends_with($lower, '::sourcedir')
+            || str_ends_with($lower, '::fold')
+            || str_ends_with($lower, '::funccallhasarity')
+            || str_ends_with($lower, '::foldcallargstring');
     }
 
     private function collectStubFunctionArgTypes(Block $block): array
@@ -528,8 +531,8 @@ class JIT {
 
             return Type::fromDecl($param->declaredType->name);
         }
-        if ($param->declaredType instanceof Op\Type\Reference && null !== $param->declaredType->type) {
-            return Type::fromTypeDecl($param->declaredType->type);
+        if ($param->declaredType instanceof Op\Type\Reference && null !== $param->declaredType->declaration) {
+            return Type::fromTypeDecl($param->declaredType);
         }
         if (null !== $param->declaredType) {
             try {
@@ -2158,8 +2161,8 @@ class JIT {
         if ($returnType instanceof Op\Type\Literal) {
             return Type::fromDecl($returnType->name);
         }
-        if ($returnType instanceof Op\Type\Reference && null !== $returnType->type) {
-            return Type::fromTypeDecl($returnType->type);
+        if ($returnType instanceof Op\Type\Reference && null !== $returnType->declaration) {
+            return Type::fromTypeDecl($returnType);
         }
         try {
             return Type::fromTypeDecl($returnType);

@@ -80,11 +80,9 @@ final class JitCompilerSelfHostStubTest extends TestCase
 
     /** @var list<string> */
     private const WEB_BOOTSTRAP_STUBBED_CONSTSTRINGFOLDER_METHODS = [
-        'fold',
         'foldconcat',
         'foldforinclude',
         'tryparsedeployinclude',
-        'funccallhasarity',
     ];
 
     /** @var list<string> */
