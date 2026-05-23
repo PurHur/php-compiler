@@ -540,9 +540,6 @@ final class VmString
         if ('' === $padString) {
             throw new \LogicException('str_pad(): Argument #3 ($pad_string) cannot be empty');
         }
-        if (2 === $padType) {
-            throw new \LogicException('str_pad() STR_PAD_BOTH is not supported in this compiler build');
-        }
         $need = $padLength - $inputLen;
         $padding = '';
         while (self::byteLength($padding) < $need) {
@@ -551,6 +548,22 @@ final class VmString
         $padding = self::byteSlice($padding, 0, $need);
         if (0 === $padType) {
             return $padding.$input;
+        }
+        if (2 === $padType) {
+            $leftNeed = intdiv($need, 2);
+            $rightNeed = $need - $leftNeed;
+            $leftPad = '';
+            while (self::byteLength($leftPad) < $leftNeed) {
+                $leftPad .= $padString;
+            }
+            $leftPad = self::byteSlice($leftPad, 0, $leftNeed);
+            $rightPad = '';
+            while (self::byteLength($rightPad) < $rightNeed) {
+                $rightPad .= $padString;
+            }
+            $rightPad = self::byteSlice($rightPad, 0, $rightNeed);
+
+            return $leftPad.$input.$rightPad;
         }
 
         return $input.$padding;

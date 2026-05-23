@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * LLVM JIT helper for str_pad() — STR_PAD_RIGHT and STR_PAD_LEFT only.
+ * LLVM JIT helper for str_pad() — STR_PAD_LEFT, STR_PAD_RIGHT, STR_PAD_BOTH.
  */
 
 namespace PHPCompiler\ext\standard;
@@ -33,10 +33,11 @@ final class JitStrPad
         $padPtr = $context->builder->structGep($padString, $map['value']);
 
         $i64 = $context->getTypeFromString('int64');
-        $i32 = $context->getTypeFromString('int32');
         $zero = $i64->constInt(0, false);
         $one = $i64->constInt(1, false);
+        $two = $i64->constInt(2, false);
         $padLeftConst = $i64->constInt(0, false);
+        $padBothConst = $i64->constInt(2, false);
 
         $noPad = $context->builder->icmp(Builder::INT_SLE, $padLength, $inputLen);
         $shortBlock = BasicBlockHelper::append($context, 'strpad_short');
@@ -59,12 +60,14 @@ final class JitStrPad
 
         $isLeft = $context->builder->icmp(Builder::INT_EQ, $padType, $padLeftConst);
         $leftBlock = BasicBlockHelper::append($context, 'strpad_left');
+        $typeBlock = BasicBlockHelper::append($context, 'strpad_type');
+        $bothBlock = BasicBlockHelper::append($context, 'strpad_both');
         $rightBlock = BasicBlockHelper::append($context, 'strpad_right');
         $joinedBlock = BasicBlockHelper::append($context, 'strpad_joined');
-        $context->builder->branchIf($isLeft, $leftBlock, $rightBlock);
+        $context->builder->branchIf($isLeft, $leftBlock, $typeBlock);
 
         $context->builder->positionAtEnd($leftBlock);
-        self::fillPadding($context, $destPtr, $zero, $need, $padPtr, $padLen);
+        self::fillPadding($context, $destPtr, $need, $padPtr, $padLen, $zero);
         $context->intrinsic->memcpy(
             $context->builder->gep($destPtr, $need),
             $inputPtr,
@@ -73,15 +76,35 @@ final class JitStrPad
         );
         $context->builder->branch($joinedBlock);
 
+        $context->builder->positionAtEnd($typeBlock);
+        $isBoth = $context->builder->icmp(Builder::INT_EQ, $padType, $padBothConst);
+        $context->builder->branchIf($isBoth, $bothBlock, $rightBlock);
+
+        $context->builder->positionAtEnd($bothBlock);
+        $leftNeed = $context->builder->signedDiv($need, $two);
+        $rightNeed = $context->builder->sub($need, $leftNeed);
+        self::fillPadding($context, $destPtr, $leftNeed, $padPtr, $padLen, $zero);
+        $afterLeft = $context->builder->gep($destPtr, $leftNeed);
+        $context->intrinsic->memcpy($afterLeft, $inputPtr, $inputLen, false);
+        self::fillPadding(
+            $context,
+            $context->builder->gep($afterLeft, $inputLen),
+            $rightNeed,
+            $padPtr,
+            $padLen,
+            $zero
+        );
+        $context->builder->branch($joinedBlock);
+
         $context->builder->positionAtEnd($rightBlock);
         $context->intrinsic->memcpy($destPtr, $inputPtr, $inputLen, false);
         self::fillPadding(
             $context,
             $context->builder->gep($destPtr, $inputLen),
-            $zero,
             $need,
             $padPtr,
-            $padLen
+            $padLen,
+            $zero
         );
         $context->builder->branch($joinedBlock);
 
@@ -99,13 +122,14 @@ final class JitStrPad
     private static function fillPadding(
         Context $context,
         Value $destAt,
-        Value $zero,
         Value $need,
         Value $padPtr,
-        Value $padLen
+        Value $padLen,
+        Value $padOffset
     ): void {
         $i64 = $context->getTypeFromString('int64');
         $one = $i64->constInt(1, false);
+        $zero = $i64->constInt(0, false);
 
         $idxSlot = $context->builder->alloca($i64, 1, 'strpad_pad_idx');
         $context->builder->store($zero, $idxSlot);
@@ -121,7 +145,10 @@ final class JitStrPad
         $context->builder->branchIf($stop, $loopDone, $loopBody);
 
         $context->builder->positionAtEnd($loopBody);
-        $padIdx = $context->builder->unsigendRem($idx, $padLen);
+        $padIdx = $context->builder->unsigendRem(
+            $context->builder->add($padOffset, $idx),
+            $padLen
+        );
         $ch = $context->builder->load($context->builder->gep($padPtr, $padIdx));
         $context->builder->store($ch, $context->builder->gep($destAt, $idx));
         $context->builder->store(
