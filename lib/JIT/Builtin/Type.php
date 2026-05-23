@@ -188,6 +188,9 @@ class Type extends Builtin {
         $fntypeHashHmac = $this->context->context->functionType($strPtr, false, $strPtr, $strPtr, $strPtr, $i1);
         $fnHashHmac = $this->context->module->addFunction('__compiler_hash_hmac', $fntypeHashHmac);
         $this->context->registerFunction('__compiler_hash_hmac', $fnHashHmac);
+        $fntypeCrc32 = $this->context->context->functionType($i64, false, $strPtr, $i64);
+        $fnCrc32 = $this->context->module->addFunction('__compiler_crc32', $fntypeCrc32);
+        $this->context->registerFunction('__compiler_crc32', $fnCrc32);
         $fntypePregMatch = $this->context->context->functionType(
             $i64,
             false,

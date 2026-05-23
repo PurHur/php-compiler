@@ -1,0 +1,11 @@
+--- vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php
+@@ -798,7 +798,7 @@
+         'crack_getlastmessage' => ['string'],
+         'crack_opendict' => ['resource', 'dictionary' => 'string'],
+         'crash' => [''],
+-        'crc32' => ['string', 'str' => 'string'],
++        'crc32' => ['int', 'str' => 'string', 'crc=' => 'int'],
+         'create_function' => ['string', 'args' => 'string', 'code' => 'string'],
+         'crypt' => ['string', 'str' => 'string', 'salt=' => 'string'],
+         'ctype_alnum' => ['bool', 'c' => ''],
