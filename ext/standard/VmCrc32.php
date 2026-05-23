@@ -5,23 +5,24 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * CRC32B (IEEE) for crc32() — table-driven, matches PHP 8 single-arg crc32().
+ * CRC32B (IEEE) for crc32() — table-driven, matches PHP crc32() (issue #1014).
  */
 final class VmCrc32
 {
     /** @var list<int>|null */
     private static ?array $table = null;
 
-    public static function compute(string $data): int
+    public static function compute(string $data, int $crc = 0): int
     {
-        $crc = 0xFFFFFFFF;
+        $state = ((int) $crc) ^ 0xFFFFFFFF;
         $len = VmString::byteLength($data);
         $table = self::table();
         for ($i = 0; $i < $len; ++$i) {
             $byte = \ord($data[$i]);
-            $crc = ($crc >> 8) ^ $table[($crc ^ $byte) & 0xFF];
+            $state = ($state >> 8) ^ $table[($state ^ $byte) & 0xFF];
         }
-        return (int) (~$crc & 0xFFFFFFFF);
+
+        return (int) ((~$state) & 0xFFFFFFFF);
     }
 
     /** @return list<int> */

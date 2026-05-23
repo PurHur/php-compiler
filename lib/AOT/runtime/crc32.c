@@ -1,6 +1,6 @@
 /*
  * crc32() runtime for AOT/JIT (issue #1014).
- * CRC32B (IEEE 802.3), signed 32-bit return — PHP 8 single-arg subset.
+ * CRC32B (IEEE 802.3), signed 32-bit return.
  */
 
 #include <stdint.h>
@@ -48,23 +48,22 @@ static void crc32_init_table(void)
     crc32_table_ready = 1;
 }
 
-static uint32_t crc32_compute_bytes(const unsigned char *data, size_t len)
+static uint32_t crc32_compute_bytes(uint32_t crc, const unsigned char *data, size_t len)
 {
-    uint32_t crc = 0xFFFFFFFFU;
-
     crc32_init_table();
+    crc ^= 0xFFFFFFFFU;
     for (size_t i = 0; i < len; i++) {
         crc = (crc >> 8) ^ crc32_table[(crc ^ data[i]) & 0xFFU];
     }
 
-    return ~crc;
+    return crc ^ 0xFFFFFFFFU;
 }
 
-int64_t __compiler_crc32(__string__ *subject)
+int64_t __compiler_crc32(__string__ *subject, int64_t seed)
 {
     size_t len = crc32_strlen(subject);
     const unsigned char *data = (const unsigned char *) crc32_strdata(subject);
-    uint32_t crc = crc32_compute_bytes(data, len);
+    uint32_t crc = crc32_compute_bytes((uint32_t) seed, data, len);
 
     return (int64_t) crc;
 }

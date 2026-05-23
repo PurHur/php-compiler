@@ -11,11 +11,12 @@ use PHPLLVM\Value;
 /** LLVM JIT helper for crc32() — delegates to __compiler_crc32. */
 final class JitCrc32
 {
-    public static function compute(Context $context, Value $subject): Value
+    public static function compute(Context $context, Value $subject, Value $seed): Value
     {
         $checksum = $context->builder->call(
             $context->lookupFunction('__compiler_crc32'),
-            $subject
+            $subject,
+            $seed
         );
         $slot = JitValueBox::alloc($context);
         JitValueBox::writeLong($context, $slot, $checksum);

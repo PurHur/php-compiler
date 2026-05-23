@@ -131,6 +131,7 @@ class Module extends ModuleAbstract
             new base64_decode(),
             new hash_(),
             new hash_hmac(),
+            new crc32(),
             new password_hash(),
             new password_verify(),
             new random_bytes(),
