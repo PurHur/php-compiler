@@ -110,7 +110,7 @@ Incremental growth toward `bin/vm.php` inventory path ([#559](https://github.com
 | `lib/Compiler.php` | CFG → opcodes |
 | `lib/Lint/Issue.php`, `lib/Lint/UnsupportedRegistry.php`, `lib/Lint/LintCompiler.php`, `lib/Lint/Linter.php` | CFG lint spine (`LintCompiler` extends `Compiler`; no closures in bundle) |
 
-**Next toward `bin/compile.php` / Compiler CFG** (`php script/bootstrap-selfhost-next-includes.php`): literal vm.php spine closed at **76** units; bundle at **87** units with Lint + compile-helper JIT builtins.
+**Next toward `bin/compile.php` / Compiler CFG** (`php script/bootstrap-selfhost-next-includes.php`): literal vm.php spine closed; bundle at **109** units (driver smoke: `test/selfhost/compiler_driver_smoke/main.php`). README milestone ladder: [#1025](https://github.com/PurHur/php-compiler/issues/1025).
 
 Native link + run of `compiler_minimal` is gated by `./script/bootstrap-selfhost-link.sh` (LLVM 9; stdout `compiler_minimal bundle OK`). Runtime helpers in the bundle (`VM`, `Runtime`, `Block`, …) are JIT-stubbed for verify; `Compiler` hot paths use existing skip patterns ([#579](https://github.com/PurHur/php-compiler/issues/579), [#913](https://github.com/PurHur/php-compiler/issues/913)). Full `lib/` native self-host remains open.
 
