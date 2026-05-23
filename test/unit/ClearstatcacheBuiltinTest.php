@@ -45,7 +45,7 @@ PHP;
 
     public function testVmAcceptsOptionalArgs(): void
     {
-        $this->assertSame("ok\n", $this->runBin('bin/vm.php', self::OPTIONAL_CODE));
+        $this->assertSame('ok', $this->runBin('bin/vm.php', self::OPTIONAL_CODE));
     }
 
     public function testVmMatchesPhpSubset(): void
