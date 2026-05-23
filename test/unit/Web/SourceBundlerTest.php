@@ -57,6 +57,48 @@ final class SourceBundlerTest extends TestCase
         $this->assertStringContainsString("include __DIR__", $bundled);
     }
 
+    public function testRewriteDirConstantSkipsStringLiterals(): void
+    {
+        $dir = sys_get_temp_dir().'/phpc_bundle_'.bin2hex(random_bytes(6));
+        $this->assertTrue(mkdir($dir));
+        $this->assertTrue(mkdir($dir.'/public', 0777, true));
+        try {
+            file_put_contents(
+                $dir.'/lib.php',
+                "<?php\ndeclare(strict_types=1);\n\n"
+                ."\$path = __DIR__ . '/x.php';\n"
+                ."\$err = '__DIR__/__FILE__ used without script context';\n"
+                ."\$err2 = \"__DIR__/__FILE__ used without script context\";\n"
+            );
+            file_put_contents(
+                $dir.'/public/index.php',
+                "<?php\nrequire __DIR__ . '/../lib.php';\n"
+            );
+
+            [$bundled] = SourceBundler::bundleForAot(
+                $dir.'/public/index.php',
+                [realpath($dir.'/lib.php') ?: $dir.'/lib.php']
+            );
+
+            $this->assertStringContainsString(
+                "'__DIR__/__FILE__ used without script context'",
+                $bundled
+            );
+            $this->assertStringContainsString(
+                '"__DIR__/__FILE__ used without script context"',
+                $bundled
+            );
+            $this->assertStringNotContainsString('$path = __DIR__', $bundled);
+            $this->assertStringContainsString("\$path = ", $bundled);
+            $this->assertStringContainsString("'/x.php'", $bundled);
+        } finally {
+            @unlink($dir.'/lib.php');
+            @unlink($dir.'/public/index.php');
+            @rmdir($dir.'/public');
+            @rmdir($dir);
+        }
+    }
+
     public function testBundleMiniWebAppPreservesDeployPathIncludes(): void
     {
         $entry = realpath(dirname(__DIR__, 3).'/examples/003-MiniWebApp/public/index.php');
