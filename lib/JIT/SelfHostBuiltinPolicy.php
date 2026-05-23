@@ -105,6 +105,9 @@ final class SelfHostBuiltinPolicy
         return self::isAutoStubBatchMember($name) || self::looksLikeStdlibBuiltin($name);
     }
 
+    /** @var array<string, true>|null */
+    private static ?array $registeredStdlib = null;
+
     private static function looksLikeStdlibBuiltin(string $name): bool
     {
         $key = self::normalizeName($name);
@@ -112,17 +115,16 @@ final class SelfHostBuiltinPolicy
             return false;
         }
 
-        static $registered = null;
-        if (null === $registered) {
-            $registered = [];
+        if (null === self::$registeredStdlib) {
+            self::$registeredStdlib = [];
             foreach ((new \PHPCompiler\ext\standard\Module())->getFunctions() as $fn) {
-                $registered[strtolower($fn->getName())] = true;
+                self::$registeredStdlib[strtolower($fn->getName())] = true;
             }
             foreach ((new \PHPCompiler\ext\types\Module())->getFunctions() as $fn) {
-                $registered[strtolower($fn->getName())] = true;
+                self::$registeredStdlib[strtolower($fn->getName())] = true;
             }
         }
 
-        return isset($registered[$key]);
+        return isset(self::$registeredStdlib[$key]);
     }
 }

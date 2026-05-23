@@ -23,13 +23,16 @@ final class SplObjectStorageMethod implements Call
 
     public function call(Context $context, Variable ...$args): Value
     {
-        return match ($this->method) {
-            'contains' => $this->callContains($context, ...$args),
-            'count' => $this->callCount($context, ...$args),
-            default => throw new \LogicException(
-                'SplObjectStorage JIT lowering is not implemented for '.$this->method.'()'
-            ),
-        };
+        switch ($this->method) {
+            case 'contains':
+                return $this->callContains($context, ...$args);
+            case 'count':
+                return $this->callCount($context, ...$args);
+            default:
+                throw new \LogicException(
+                    'SplObjectStorage JIT lowering is not implemented for '.$this->method.'()'
+                );
+        }
     }
 
     private function callContains(Context $context, Variable ...$args): Value
