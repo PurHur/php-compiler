@@ -315,10 +315,13 @@ final class Variable {
                         return $this;
                     case self::TYPE_NATIVE_DOUBLE:
                         return new self(
-                            $this->context, 
+                            $this->context,
                             $type,
                             self::KIND_VALUE,
-                            $this->context->builder->siToFp($this->value, $this->context->getTypeFromString('double'))
+                            $this->context->builder->fpToSi(
+                                $this->value,
+                                $this->context->getTypeFromString('int64')
+                            )
                         );
                     case self::TYPE_NATIVE_BOOL:
                         return new self(

@@ -641,10 +641,8 @@ class JIT {
                         );
                         $this->assignOperandValue($block->getOperand($op->arg1), $long);
                     } else {
-                        $this->assignOperand(
-                            $block->getOperand($op->arg1),
-                            $value->castTo(Variable::TYPE_NATIVE_LONG)
-                        );
+                        $long = (new ext\standard\intval())->call($this->context, $value);
+                        $this->assignOperandValue($block->getOperand($op->arg1), $long);
                     }
                     break;
                 case OpCode::TYPE_CAST_STRING:
