@@ -15,6 +15,7 @@ North star: compile a **subset** of php-compiler with itself (native AOT), then 
 | Wave gate (lint + probe) | `./script/bootstrap-wave-check.sh` | ✅ selfhost-lint → aot-lint → probe; prints `NEXT_LOWER` |
 | Self-host compile probe | `make bootstrap-selfhost-probe` | ⚠️ `-l` OK; native `-o` pending (`HashTableHelper` string-key arrays) — best-effort ([#816](https://github.com/PurHur/php-compiler/issues/816)) |
 | Self-host probe in full CI | `BOOTSTRAP_SELFHOST_PROBE_GATE=1 ./script/ci-local.sh` | ✅ runs after bootstrap AOT lint when LLVM 9 present ([#829](https://github.com/PurHur/php-compiler/issues/829)); off in `ci-fast.sh` unless env set |
+| Wave gate in full CI (opt-in) | `BOOTSTRAP_WAVE_CHECK=1 ./script/ci-local.sh` | ✅ runs after `@group aot-lint` when LLVM 9 present; `./script/bootstrap-wave-check.sh --fail-fast` |
 | Self-host native link | `./script/bootstrap-selfhost-link.sh` | ✅ `build/selfhost` prints `compiler_minimal bundle OK` ([#557](https://github.com/PurHur/php-compiler/issues/557), [#913](https://github.com/PurHur/php-compiler/issues/913)) |
 
 Regenerate: `make bootstrap-profile` (inventory + profile + optional `bootstrap-aot-lint`). Phase C: `make bootstrap-aot-link` (or `php script/bootstrap-aot-lint.php --link`). Phase D: `make bootstrap-aot-link-lib`. Bundled compiler lint: `./script/bootstrap-selfhost-lint.sh`. Live lowering target: `make bootstrap-selfhost-probe` (or `./script/bootstrap-selfhost-compile-probe.sh`; optional `--update-inventory`).
@@ -97,9 +98,12 @@ Incremental growth toward `bin/vm.php` inventory path ([#559](https://github.com
 | `lib/JIT/OperandName.php`, `lib/Printer.php`, `lib/OpCodeNames.php` | opcode helpers (names + debug print) |
 | `lib/Handler.php`, `lib/Func/Internal.php`, `lib/Func/JIT.php`, `lib/JIT/Call.php`, `lib/JIT/Builtin.php`, `lib/JIT/Result.php`, `lib/JIT/Variable.php`, `lib/JIT/IssetHelper.php`, `lib/JIT/Scope.php` | Func/JIT spine toward `Runtime::loadJit()` |
 | `lib/Web/Superglobals.php` | CGI superglobals (`bin/vm.php`); `array_map` uses named static method (no arrow/closure in bundle) |
+| `lib/JIT/IteratorHelper.php`, `lib/JIT/JitStringCompare.php`, `lib/JIT/JitValueCompare.php`, `lib/JIT/StringOffsetHelper.php`, `lib/JIT/ValueEchoHelper.php`, `lib/JIT/ScriptMagic.php` | JIT string/value compare, offset dim, echo lowering, script magic constants |
+| `lib/JIT/Builtin/Refcount.php`, `lib/JIT/Builtin/Output.php`, `lib/JIT/Builtin/ErrorHandler.php`, `lib/JIT/Builtin/ScriptExit.php` | refcount IR, printf/sprintf, error handler stub, exit/die |
+| `lib/VM/OutputBuffer.php` | request-scoped echo buffering (`VM` echo path) |
 | `lib/Compiler.php` | CFG → opcodes |
 
-**Next toward `bin/vm.php`** (`php script/bootstrap-selfhost-next-includes.php`): `lib/JIT/Progress.php` (`??=`), `lib/JIT/IncludeHelper.php`, `lib/JIT/CoalesceHelper.php`, `lib/JIT/Call/Native.php`, …
+**Next toward `bin/vm.php`** (`php script/bootstrap-selfhost-next-includes.php`): literal spine closed at **67** units; incremental growth continues with vm-path JIT/VM helpers (`lib/JIT/JitStringCompare.php`, `lib/JIT/ValueEchoHelper.php`, `lib/VM/OutputBuffer.php`, …).
 
 Native link + run of `compiler_minimal` is gated by `./script/bootstrap-selfhost-link.sh` (LLVM 9; stdout `compiler_minimal bundle OK`). Runtime helpers in the bundle (`VM`, `Runtime`, `Block`, …) are JIT-stubbed for verify; `Compiler` hot paths use existing skip patterns ([#579](https://github.com/PurHur/php-compiler/issues/579), [#913](https://github.com/PurHur/php-compiler/issues/913)). Full `lib/` native self-host remains open.
 
@@ -112,7 +116,7 @@ Parallel bootstrap waves use **four agents** with disjoint ownership. Each wave 
 | **A — bundle** | `test/selfhost/compiler_minimal/main.php`, literal `require_once` growth, parse fixes in newly bundled `lib/*` | `lib/JIT/Helper.php`, bulk `ext/standard/` |
 | **B — compiler / VM** | `lib/Compiler.php`, `lib/Compiler/*`, `lib/VM/*` helpers on the vm.php path | `lib/JIT/Helper.php`, other agents’ open PR files |
 | **C — stdlib JIT** | `ext/standard/*.php`, `script/stdlib-jit-batch-apply.php` name lists | `lib/JIT/Helper.php`, bundle entry |
-| **D — tooling / docs** | `script/bootstrap-wave-check.sh`, `script/audit-stdlib-jit.php`, `docs/bootstrap-*.md`, inventory regen | runtime hot paths owned by A/B |
+| **D — tooling / docs** | `script/bootstrap-wave-check.sh`, `script/ci-local.sh` (`BOOTSTRAP_WAVE_CHECK=1`), `script/audit-stdlib-jit.php`, `docs/bootstrap-*.md`, inventory regen | runtime hot paths owned by A/B |
 
 **Wave gate order** (same as `script/bootstrap-wave-check.sh`):
 
