@@ -192,6 +192,7 @@ class Module extends ModuleAbstract
             new filemtime(),
             new clearstatcache_(),
             new stat_(),
+            new lstat_(),
             new fileperms(),
             new is_file(),
             new is_dir(),
