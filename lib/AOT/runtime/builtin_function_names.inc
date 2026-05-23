@@ -17,6 +17,7 @@ static const char *phpc_builtin_functions[] = {
     "array_pop",
     "array_product",
     "array_push",
+    "array_replace",
     "array_reverse",
     "array_search",
     "array_shift",
@@ -117,8 +118,8 @@ static const char *phpc_builtin_functions[] = {
     "is_subclass_of",
     "is_writable",
     "join",
-    "json_encode",
     "json_decode",
+    "json_encode",
     "lcfirst",
     "log",
     "ltrim",
@@ -217,4 +218,4 @@ static const char *phpc_builtin_functions[] = {
     "web_string",
     "wordwrap",
 };
-static const size_t phpc_builtin_functions_count = 215;
+static const size_t phpc_builtin_functions_count = 217;

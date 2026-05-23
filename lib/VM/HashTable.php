@@ -393,6 +393,50 @@ final class HashTable {
     }
 
     /**
+     * array_replace(): copy this array, then overlay keys from each replacement array.
+     *
+     * @param HashTable ...$others
+     */
+    public function replaceCopy(HashTable ...$others): HashTable
+    {
+        $out = new self();
+        foreach ($this->iterateKeyed(true) as [$key, $value]) {
+            $copy = new Variable();
+            $copy->copyFrom($value);
+            if (Variable::TYPE_INTEGER === $key->type) {
+                $out->addIndex($key->toInt(), $copy);
+            } else {
+                $out->add($key->toString(), $copy);
+            }
+        }
+        foreach ($others as $other) {
+            foreach ($other->iterateKeyed(true) as [$key, $value]) {
+                $copy = new Variable();
+                $copy->copyFrom($value);
+                if (Variable::TYPE_INTEGER === $key->type) {
+                    $idx = $key->toInt();
+                    $existing = $out->findIndex($idx);
+                    if (null !== $existing) {
+                        $existing->copyFrom($copy);
+                    } else {
+                        $out->addIndex($idx, $copy);
+                    }
+                } else {
+                    $k = $key->toString();
+                    $existing = $out->find($k);
+                    if (null !== $existing) {
+                        $existing->copyFrom($copy);
+                    } else {
+                        $out->add($k, $copy);
+                    }
+                }
+            }
+        }
+
+        return $out;
+    }
+
+    /**
      * Copy string-keyed entries from another array into this one.
      */
     public function mergeStringKeysFrom(HashTable $other, bool $overwrite = false): void

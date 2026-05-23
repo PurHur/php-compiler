@@ -1006,6 +1006,7 @@ class JIT {
                             ? $this->context->getVariableFromOp($block->getOperand($op->arg3))
                             : null;
                         JIT\HashTableHelper::addElement($this->context, $result, $element, $key);
+                        $this->bumpNativeArrayNextFreeForExplicitIntKey($result, $op->arg3, $block);
                     }
                     break;
                 case OpCode::TYPE_ADD_ARRAY_ELEMENT:
@@ -1015,6 +1016,7 @@ class JIT {
                         ? $this->context->getVariableFromOp($block->getOperand($op->arg3))
                         : null;
                     JIT\HashTableHelper::addElement($this->context, $result, $element, $key);
+                    $this->bumpNativeArrayNextFreeForExplicitIntKey($result, $op->arg3, $block);
                     break;
                 case OpCode::TYPE_TYPE_ASSERT:
                     $this->assignOperand(
@@ -3249,6 +3251,24 @@ class JIT {
                 return $this->jitVariableTypeMapConstant();
             default:
                 return null;
+        }
+    }
+
+    private function bumpNativeArrayNextFreeForExplicitIntKey(
+        Variable $array,
+        ?int $keyArg,
+        Block $block
+    ): void {
+        if (null === $keyArg || 0 === ($array->type & Variable::IS_NATIVE_ARRAY)) {
+            return;
+        }
+        $keyOp = $block->getOperand($keyArg);
+        if (!$keyOp instanceof Operand\Literal || !is_int($keyOp->value)) {
+            return;
+        }
+        $needed = $keyOp->value + 1;
+        if ($needed > $array->nextFreeElement) {
+            $array->nextFreeElement = $needed;
         }
     }
 

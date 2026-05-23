@@ -4648,4 +4648,98 @@ final class ArrayBuiltinHelper
 
         return $context->builder->load($foundSlot);
     }
+
+    /**
+     * array_replace() for arrays with int and string keys (subset of PHP; issue #1208).
+     */
+    public static function arrayReplace(Context $context, Variable $first, Variable ...$others): Value
+    {
+        if (\count($others) < 1) {
+            throw new \LogicException('array_replace() requires at least two arguments');
+        }
+        $dest = HashTableHelper::alloc($context);
+        foreach ([$first, ...$others] as $array) {
+            self::overlayHashTable($context, $dest, self::loadHashTable($context, $array));
+        }
+
+        return $dest;
+    }
+
+    private static function overlayHashTable(Context $context, Value $dest, Value $src): void
+    {
+        $map = $context->structFieldMap['__hashtable__'];
+        $nodeMap = $context->structFieldMap['__strkey_node__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $nodePtrType = $context->getTypeFromString('__strkey_node__*');
+
+        $nextFree = $context->builder->load($context->builder->structGep($src, $map['nextFreeElement']));
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'array_replace_overlay_packed_idx');
+        $context->builder->store($zero, $idxSlot);
+
+        $packedHead = BasicBlockHelper::append($context, 'array_replace_overlay_packed_head');
+        $packedBody = BasicBlockHelper::append($context, 'array_replace_overlay_packed_body');
+        $packedSet = BasicBlockHelper::append($context, 'array_replace_overlay_packed_set');
+        $packedNext = BasicBlockHelper::append($context, 'array_replace_overlay_packed_next');
+        $packedDone = BasicBlockHelper::append($context, 'array_replace_overlay_packed_done');
+        $context->builder->branch($packedHead);
+
+        $context->builder->positionAtEnd($packedHead);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $nextFree);
+        $context->builder->branchIf($atEnd, $packedDone, $packedBody);
+
+        $context->builder->positionAtEnd($packedBody);
+        $isSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $src,
+            $idx
+        );
+        $context->builder->branchIf($isSet, $packedSet, $packedNext);
+
+        $context->builder->positionAtEnd($packedSet);
+        self::copyPackedListEntry($context, $src, $idx, $dest, $idx);
+        $context->builder->branch($packedNext);
+
+        $context->builder->positionAtEnd($packedNext);
+        $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+        $context->builder->branch($packedHead);
+
+        $strInit = BasicBlockHelper::append($context, 'array_replace_overlay_str_init');
+        $strHead = BasicBlockHelper::append($context, 'array_replace_overlay_str_head');
+        $context->builder->positionAtEnd($packedDone);
+        $context->builder->branch($strInit);
+
+        $context->builder->positionAtEnd($strInit);
+        $walkSlot = $context->builder->alloca($nodePtrType, 1, 'array_replace_overlay_walk');
+        $head = $context->builder->load($context->builder->structGep($src, $map['strKeys']));
+        $context->builder->store($head, $walkSlot);
+        $strBody = BasicBlockHelper::append($context, 'array_replace_overlay_str_body');
+        $strSet = BasicBlockHelper::append($context, 'array_replace_overlay_str_set');
+        $strNext = BasicBlockHelper::append($context, 'array_replace_overlay_str_next');
+        $strDone = BasicBlockHelper::append($context, 'array_replace_overlay_str_done');
+        $context->builder->branch($strHead);
+
+        $context->builder->positionAtEnd($strHead);
+        $node = $context->builder->load($walkSlot);
+        $nodeNull = $context->builder->icmp(Builder::INT_EQ, $node, $nodePtrType->constNull());
+        $context->builder->branchIf($nodeNull, $strDone, $strBody);
+
+        $context->builder->positionAtEnd($strBody);
+        $valEntry = $context->builder->structGep($node, $nodeMap['value']);
+        $keyStr = $context->builder->load($context->builder->structGep($node, $nodeMap['key']));
+        $context->builder->branch($strSet);
+
+        $context->builder->positionAtEnd($strSet);
+        self::storeValueEntryAtStringKey($context, $dest, $keyStr, $valEntry);
+        $context->builder->branch($strNext);
+
+        $context->builder->positionAtEnd($strNext);
+        $nextNode = $context->builder->load($context->builder->structGep($node, $nodeMap['next']));
+        $context->builder->store($nextNode, $walkSlot);
+        $context->builder->branch($strHead);
+
+        $context->builder->positionAtEnd($strDone);
+    }
 }
