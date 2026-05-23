@@ -114,7 +114,8 @@ final class MiniWebAppAotExecuteTest extends TestCase
             $env[$key] = $value;
         }
 
-        return $this->runCommand([$this->binary], $publicDir, $env)['stdout'];
+        // Repo root cwd so phpunit.xml LD_LIBRARY_PATH=./.llvm resolves (#747).
+        return $this->runCommand([$this->binary], $this->repoRoot, $env)['stdout'];
     }
 
     /**

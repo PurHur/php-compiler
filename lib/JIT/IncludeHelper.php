@@ -88,16 +88,6 @@ final class IncludeHelper
         $preparedBindings = new \SplObjectStorage();
         $context->inlineIncludeBindingRefreshStack[] = [];
         $bindingRefreshIndex = \count($context->inlineIncludeBindingRefreshStack) - 1;
-        if (null !== $preIncludeBb) {
-            $context->builder->positionAtEnd($preIncludeBb);
-            foreach ($localBindings as $operand) {
-                $preparedBindings[$operand] = self::prepareCallerBinding(
-                    $context,
-                    $preIncludeBb,
-                    $localBindings[$operand]
-                );
-            }
-        }
         $returnHolderOp = new Temporary();
         if (null !== $preIncludeBb) {
             $context->builder->positionAtEnd($preIncludeBb);
@@ -117,6 +107,15 @@ final class IncludeHelper
             $context->builder->branch($entryBb);
         }
         $context->builder->positionAtEnd($entryBb);
+        // Materialize inherited locals at include_entry so if/elseif arms that assign
+        // from $_REQUEST before this include are visible (#764, #747).
+        foreach ($localBindings as $operand) {
+            $preparedBindings[$operand] = self::prepareCallerBinding(
+                $context,
+                $entryBb,
+                $localBindings[$operand]
+            );
+        }
 
         $context->pushScope();
         ++$context->inlineIncludeDepth;
@@ -145,7 +144,14 @@ final class IncludeHelper
             $compileTimeString = null;
             if (null !== $bindingName) {
                 $literal = self::variableFromCallerAssignConstant($context, $bindingCaller, $bindingName);
-                if (null !== $literal) {
+                $callerVar = $localBindings[$operand];
+                if (
+                    null !== $literal
+                    && null !== $literal->compileTimeString
+                    && Variable::TYPE_STRING === $callerVar->type
+                    && null !== $callerVar->compileTimeString
+                    && $callerVar->compileTimeString === $literal->compileTimeString
+                ) {
                     $compileTimeString = $literal->compileTimeString;
                 }
             }
@@ -352,6 +358,21 @@ final class IncludeHelper
         Block $callerBlock,
         string $name
     ): ?Variable {
+        $scoped = $context->variableForScopedName($name);
+        if (
+            null !== $scoped
+            && (Variable::TYPE_VALUE === $scoped->type || Variable::TYPE_STRING === $scoped->type)
+        ) {
+            return $scoped;
+        }
+        $callerOp = self::callerOperandByName($callerBlock, $name);
+        if (null !== $callerOp && $context->hasVariableOpInScopes($callerOp)) {
+            $var = $context->getVariableFromOpInScopes($callerOp);
+            if (Variable::TYPE_VALUE === $var->type || Variable::TYPE_STRING === $var->type) {
+                return $var;
+            }
+        }
+        $lastAssign = null;
         foreach ($callerBlock->opCodes as $op) {
             if (OpCode::TYPE_ASSIGN !== $op->type) {
                 continue;
@@ -364,24 +385,13 @@ final class IncludeHelper
                 if ($context->hasVariableOpInScopes($dest)) {
                     $var = $context->getVariableFromOpInScopes($dest);
                     if (Variable::TYPE_VALUE === $var->type || Variable::TYPE_STRING === $var->type) {
-                        return $var;
+                        $lastAssign = $var;
                     }
                 }
             }
         }
-        $callerOp = self::callerOperandByName($callerBlock, $name);
-        if (null !== $callerOp && $context->hasVariableOpInScopes($callerOp)) {
-            $var = $context->getVariableFromOpInScopes($callerOp);
-            if (Variable::TYPE_VALUE === $var->type || Variable::TYPE_STRING === $var->type) {
-                return $var;
-            }
-        }
-        $scoped = $context->variableForScopedName($name);
-        if (
-            null !== $scoped
-            && (Variable::TYPE_VALUE === $scoped->type || Variable::TYPE_STRING === $scoped->type)
-        ) {
-            return $scoped;
+        if (null !== $lastAssign) {
+            return $lastAssign;
         }
 
         return self::variableFromCallerAssignConstant($context, $callerBlock, $name);
