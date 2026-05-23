@@ -35,6 +35,9 @@ class Helper {
                     case OpCode::TYPE_UNARY_MINUS:
                         $result = $this->context->builder->negate($varValue);
                         goto return_long;
+                    case OpCode::TYPE_BITWISE_NOT:
+                        $result = $this->context->builder->not($varValue);
+                        goto return_long;
                 }
                 break;
             case Variable::TYPE_NATIVE_DOUBLE:

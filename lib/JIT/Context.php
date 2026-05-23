@@ -439,17 +439,20 @@ class Context {
 
     public function getTypeFromType(Type $type): PHPLLVM\Type {
         $type = $this->unwrapNullableUnionType($type);
-        static $map = [
-            Type::TYPE_LONG => 'long long',
-            Type::TYPE_BOOLEAN => 'bool',
-            Type::TYPE_STRING => '__string__*',
-            Type::TYPE_OBJECT => '__object__*',
-            Type::TYPE_ARRAY => '__hashtable__*',
-        ];
-        if (isset($map[$type->type])) {
-            return $this->getTypeFromString($map[$type->type]);
+        switch ($type->type) {
+            case Type::TYPE_LONG:
+                return $this->getTypeFromString('long long');
+            case Type::TYPE_BOOLEAN:
+                return $this->getTypeFromString('bool');
+            case Type::TYPE_STRING:
+                return $this->getTypeFromString('__string__*');
+            case Type::TYPE_OBJECT:
+                return $this->getTypeFromString('__object__*');
+            case Type::TYPE_ARRAY:
+                return $this->getTypeFromString('__hashtable__*');
+            default:
+                return $this->getTypeFromString('__value__');
         }
-        return $this->getTypeFromString('__value__');
     }
 
     public function getStringFromType(PHPLLVM\Type $type): string {
