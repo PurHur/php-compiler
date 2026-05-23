@@ -20,7 +20,7 @@ cd php-compiler
 composer install
 ./phpc test --fast             # VM/compliance only (no LLVM compile)
 ./phpc test                    # full suite (VM, JIT, AOT lint + link)
-mkdir my-app && ./phpc init my-app   # phpc.json + public/index.php scaffold
+mkdir my-app && ./phpc init my-app   # phpc.json + public/index.php scaffold (see docs/phpc-json.md)
 ./phpc init --profile miniwebapp my-app   # Router + templates (see examples/003-MiniWebApp/)
 ./phpc run -r 'echo 1;'        # VM mode (or: php bin/vm.php -r 'echo 1;')
 ./phpc run -q 'name=Dev' examples/001-SimpleWeb/example.php   # web example without TCP
@@ -150,7 +150,7 @@ phpc serve --aot 127.0.0.1:8080 examples/001-SimpleWeb
 curl 'http://127.0.0.1:8080/example.php?name=Dev'
 ```
 
-Use `--binary path` or a `phpc.json` `"binary"` field to point at the executable. AOT binaries refresh `$_GET` / `$_SERVER` from `QUERY_STRING` and related env on each run; pass `-q` to `phpc build` to bake superglobals for static pages instead.
+Use `--binary path` or a `phpc.json` `"binary"` field to point at the executable. Manifest reference: [docs/phpc-json.md](docs/phpc-json.md). AOT binaries refresh `$_GET` / `$_SERVER` from `QUERY_STRING` and related env on each run; pass `-q` to `phpc build` to bake superglobals for static pages instead.
 
 Uncaught errors return HTTP 500 with a generic body. Set `PHP_COMPILER_DEBUG=1` to include the exception class, message, and stack trace in the response (details are always logged to stderr).
 
