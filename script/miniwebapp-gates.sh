@@ -36,6 +36,8 @@ Environment (enable next gates):
   MINIWEBAPP_AOT_LINK_GATE=0      skip 003 native link gate during iteration
   MINIWEBAPP_AOT_EXECUTE_GATE=1   run 003 AOT binary CLI execute in ci-local (default — #747)
   MINIWEBAPP_AOT_EXECUTE_GATE=0   skip execute during iteration
+  MINIWEBAPP_SERVE_AOT_GATE=1     MiniWebAppServeAotTest phpc serve --aot (#478, #610)
+  MINIWEBAPP_SERVE_AOT_GATE=0     skip serve-aot PHPUnit (default off until PATH_INFO green)
   MINIWEBAPP_AOT_BISECT_GATE=1    run script/miniwebapp-aot-bisect.sh ladder (default off — #879)
 
 See: examples/003-MiniWebApp/README.md, issue #472

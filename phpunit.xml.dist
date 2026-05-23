@@ -41,6 +41,7 @@
             <file>./test/real/CgiDriverTest.php</file>
             <file>./test/real/ServeTest.php</file>
             <file>./test/real/ServeAotTest.php</file>
+            <file>./test/real/MiniWebAppServeAotTest.php</file>
         </testsuite>
         <testsuite name="PHPCompiler AOT Test Suites">
             <file>./test/aot/MiniWebAppBisectAotTest.php</file>
