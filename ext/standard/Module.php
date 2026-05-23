@@ -165,6 +165,7 @@ class Module extends ModuleAbstract
             new unlink(),
             new mkdir_(),
             new rmdir_(),
+            new chmod_(),
             new filetype(),
             new fopen(),
             new fread(),
@@ -370,6 +371,15 @@ class Module extends ModuleAbstract
             $ft = $context->context->functionType($i32, false, $i8p);
             $fn = $context->module->addFunction('rmdir', $ft);
             $context->registerFunction('rmdir', $fn);
+        }
+        try {
+            $context->lookupFunction('chmod');
+        } catch (\Throwable $e) {
+            $i8p = $context->getTypeFromString('int8*');
+            $i32 = $context->getTypeFromString('int32');
+            $ft = $context->context->functionType($i32, false, $i8p, $i32);
+            $fn = $context->module->addFunction('chmod', $ft);
+            $context->registerFunction('chmod', $fn);
         }
         $double = $context->getTypeFromString('double');
         try {
