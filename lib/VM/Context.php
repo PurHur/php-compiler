@@ -109,6 +109,11 @@ class Context {
         $this->functions[$lcname] = $func;
     }
 
+    public function functionIsRegistered(string $name): bool
+    {
+        return isset($this->functions[strtolower($name)]);
+    }
+
     public function ensureSuperglobal(string $name): Variable
     {
         if (!Superglobals::isSuperglobalName($name)) {

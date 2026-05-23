@@ -87,6 +87,7 @@ final class SelfHostBuiltinPolicy
         'array_reverse' => 'array', 'array_filter' => 'array', 'array_combine' => 'array', 'array_flip' => 'array',
         'array_product' => 'array', 'array_unique' => 'array', 'array_sum' => 'array', 'sort' => 'array',
         'compact' => 'array', 'extract' => 'array', 'defined' => 'array', 'define' => 'array',
+        'function_exists' => 'array',
     ];
 
     /** @var array<string, string> */
