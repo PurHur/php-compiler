@@ -268,6 +268,20 @@ final class VmFs
         return @\fflush($fp);
     }
 
+    public static function ftell(int $handle): int|false
+    {
+        $fp = self::lookup($handle);
+        if (null === $fp) {
+            return false;
+        }
+        $pos = @\ftell($fp);
+        if (false === $pos) {
+            return false;
+        }
+
+        return (int) $pos;
+    }
+
     public static function fgetc(int $handle): string|false
     {
         $fp = self::lookup($handle);
