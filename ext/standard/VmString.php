@@ -531,6 +531,19 @@ final class VmString
         return $out;
     }
 
+    private static function repeatPadString(string $padString, int $length): string
+    {
+        if ($length <= 0) {
+            return '';
+        }
+        $padding = '';
+        while (self::byteLength($padding) < $length) {
+            $padding .= $padString;
+        }
+
+        return self::byteSlice($padding, 0, $length);
+    }
+
     public static function strPad(string $input, int $padLength, string $padString = ' ', int $padType = 1): string
     {
         $inputLen = self::byteLength($input);
@@ -540,15 +553,14 @@ final class VmString
         if ('' === $padString) {
             throw new \LogicException('str_pad(): Argument #3 ($pad_string) cannot be empty');
         }
-        if (2 === $padType) {
-            throw new \LogicException('str_pad() STR_PAD_BOTH is not supported in this compiler build');
-        }
         $need = $padLength - $inputLen;
-        $padding = '';
-        while (self::byteLength($padding) < $need) {
-            $padding .= $padString;
+        if (2 === $padType) {
+            $leftNeed = intdiv($need, 2);
+            $rightNeed = $need - $leftNeed;
+
+            return self::repeatPadString($padString, $leftNeed).$input.self::repeatPadString($padString, $rightNeed);
         }
-        $padding = self::byteSlice($padding, 0, $need);
+        $padding = self::repeatPadString($padString, $need);
         if (0 === $padType) {
             return $padding.$input;
         }

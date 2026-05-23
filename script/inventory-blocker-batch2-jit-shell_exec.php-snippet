@@ -1,0 +1,70 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\ext\standard;
+
+use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
+use PHPLLVM\Builder;
+use PHPLLVM\Value;
+
+/** LLVM lowering for shell_exec() via __compiler_shell_exec (popen). */
+final class JitShellExec
+{
+    /** @return Value __value__* (string, null, or boolean false) */
+    public static function invoke(Context $context, Value $cmdStr): Value
+    {
+        $output = $context->builder->call(
+            $context->lookupFunction('__compiler_shell_exec'),
+            $cmdStr
+        );
+        $strPtr = $context->getTypeFromString('__string__*');
+        $failed = $context->builder->icmp(Builder::INT_EQ, $output, $strPtr->constNull());
+
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+
+        $failBlock = BasicBlockHelper::append($context, 'shell_exec_fail');
+        $okBlock = BasicBlockHelper::append($context, 'shell_exec_ok');
+        $doneBlock = BasicBlockHelper::append($context, 'shell_exec_done');
+        $context->builder->branchIf($failed, $failBlock, $okBlock);
+
+        $context->builder->positionAtEnd($failBlock);
+        $i1 = $context->getTypeFromString('int1');
+        JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($okBlock);
+        $strMap = $context->structFieldMap['__string__'];
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+        $len = $context->builder->load(
+            $context->builder->structGep($output, $strMap['length'])
+        );
+        $empty = $context->builder->icmp(Builder::INT_EQ, $len, $zero);
+        $nullBlock = BasicBlockHelper::append($context, 'shell_exec_null');
+        $strBlock = BasicBlockHelper::append($context, 'shell_exec_str');
+        $context->builder->branchIf($empty, $nullBlock, $strBlock);
+
+        $context->builder->positionAtEnd($nullBlock);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            $ptr
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($strBlock);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $ptr,
+            $output
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+
+        return $ptr;
+    }
+}

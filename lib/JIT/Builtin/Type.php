@@ -297,6 +297,9 @@ class Type extends Builtin {
         );
         $fnJsonEncode = $this->context->module->addFunction('__compiler_json_encode_hashtable', $fntypeJsonEncode);
         $this->context->registerFunction('__compiler_json_encode_hashtable', $fnJsonEncode);
+        $fntypeShellExec = $this->context->context->functionType($strPtr, false, $strPtr);
+        $fnShellExec = $this->context->module->addFunction('__compiler_shell_exec', $fntypeShellExec);
+        $this->context->registerFunction('__compiler_shell_exec', $fnShellExec);
         // $this->maskedarray->register();
         // $this->nativearray->register();
     }
