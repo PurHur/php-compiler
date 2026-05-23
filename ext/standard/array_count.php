@@ -64,7 +64,7 @@ final class array_count extends Internal
         if (JITVariable::TYPE_VALUE === $args[0]->type) {
             $ht = $context->builder->call(
                 $context->lookupFunction('__value__readHashtable'),
-                JitValueBox::pointer($context, $args[0]->value)
+                JitValueBox::valuePtrFromVariable($context, $args[0])
             );
 
             return ArrayBuiltinHelper::getNumElements($context, $ht);

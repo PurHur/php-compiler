@@ -192,12 +192,4 @@ final class floatval extends Internal
 
         return $phi;
     }
-
-    private function stringDataPtr(Context $context, Value $strPtr): Value
-    {
-        $structName = $strPtr->typeOf()->getElementType()->getName();
-        $off = $context->structFieldMap[$structName]['value'];
-
-        return $context->builder->structGep($strPtr, $off);
-    }
 }

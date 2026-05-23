@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -20,10 +21,7 @@ final class JitSprintf
         if ($argc < 1) {
             throw new \LogicException('sprintf() requires at least one argument');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type) {
-            throw new \LogicException('sprintf() format must be a string in this compiler build');
-        }
-        $fmt = $context->helper->loadValue($args[0]);
+        $fmt = JitStringArg::lower($context, $args[0], 'sprintf() format');
         $numArgs = $argc - 1;
         if (0 === $numArgs) {
             $nullArgv = $context->builder->pointerCast(
