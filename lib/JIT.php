@@ -1193,7 +1193,7 @@ class JIT {
                             : 'object';
                     }
                     $this->context->scope->variables[$result] = $this->context->type->object->propertyFetch(
-                        $this->context->helper->loadValue($this->context->getVariableFromOp($obj)),
+                        $this->loadPropertyFetchReceiver($obj),
                         $declaringClass,
                         $name->value
                     );
@@ -1921,6 +1921,25 @@ class JIT {
         }
 
         return $var;
+    }
+
+    private function loadPropertyFetchReceiver(Operand $objOp): PHPLLVM\Value
+    {
+        $var = $this->context->getVariableFromOp($objOp);
+        if (Variable::TYPE_OBJECT === $var->type) {
+            return $this->context->helper->loadValue($var);
+        }
+        if (Variable::TYPE_VALUE === $var->type) {
+            return $this->context->builder->call(
+                $this->context->lookupFunction('__value__readObject'),
+                JIT\JitValueBox::valuePtrFromVariable($this->context, $var)
+            );
+        }
+
+        throw new \LogicException(
+            'Property fetch receiver must be object or object-valued property, got '
+            .Variable::getStringType($var->type)
+        );
     }
 
     private static function foreachContainerUserType(Operand $arrayOp): ?string

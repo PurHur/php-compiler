@@ -368,6 +368,32 @@ class Object_ extends Type {
                 ];
             }
         }
+        if ('phpparser\\parserfactory' === $lcname || 'parserfactory' === $lcname) {
+            foreach ([
+                'prefer_php7' => \PhpParser\ParserFactory::PREFER_PHP7,
+                'prefer_php5' => \PhpParser\ParserFactory::PREFER_PHP5,
+                'only_php7' => \PhpParser\ParserFactory::ONLY_PHP7,
+                'only_php5' => \PhpParser\ParserFactory::ONLY_PHP5,
+            ] as $name => $value) {
+                $this->classConstants[$id][$name] = [
+                    'type' => Variable::TYPE_NATIVE_LONG,
+                    'value' => $value,
+                ];
+            }
+        }
+        if ('phpcompiler\\jit\\builtin' === $lcname || 'builtin' === $lcname) {
+            foreach ([
+                'load_type_export' => \PHPCompiler\JIT\Builtin::LOAD_TYPE_EXPORT,
+                'load_type_import' => \PHPCompiler\JIT\Builtin::LOAD_TYPE_IMPORT,
+                'load_type_embed' => \PHPCompiler\JIT\Builtin::LOAD_TYPE_EMBED,
+                'load_type_standalone' => \PHPCompiler\JIT\Builtin::LOAD_TYPE_STANDALONE,
+            ] as $name => $value) {
+                $this->classConstants[$id][$name] = [
+                    'type' => Variable::TYPE_NATIVE_LONG,
+                    'value' => $value,
+                ];
+            }
+        }
     }
 
     /**
@@ -393,6 +419,7 @@ class Object_ extends Type {
                 'opcodes' => true,
                 'scope' => true,
                 'args' => true,
+                'constants' => true,
             ],
             'phpcfg\\script' => [
                 'functions' => true,

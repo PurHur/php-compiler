@@ -14,5 +14,6 @@ final class IteratorHelperSplObjectStorageTest extends TestCase
         self::assertFileExists($root.'/test/bootstrap-aot/block_getframe_scope_foreach.php');
         self::assertFileExists($root.'/test/bootstrap-aot/block_getframe_args_contains.php');
         self::assertFileExists($root.'/test/bootstrap-aot/block_getframe_loop.php');
+        self::assertFileExists($root.'/test/bootstrap-aot/block_orig_children_foreach.php');
     }
 }
