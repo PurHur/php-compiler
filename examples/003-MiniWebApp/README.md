@@ -65,7 +65,8 @@ Deprecated query dispatch (still supported):
 | Shell smoke (ci-local) | ✅ | `../../script/ci-local.sh` (`MINIWEBAPP_WEB_SMOKE_GATE=1` default; `=0` to skip — #664) |
 | PHPUnit serve | ✅ | `ServeTest` `@group miniwebapp` (#470) |
 | JIT | partial | [#207](https://github.com/PurHur/php-compiler/issues/207) |
-| AOT | ❌ blocked | `../../phpc build --project .` — stderr trailer points to [#568](https://github.com/PurHur/php-compiler/issues/568) / [#454](https://github.com/PurHur/php-compiler/issues/454) |
+| AOT link | ✅ | `../../phpc build --project .` when LLVM ready (`MINIWEBAPP_AOT_LINK_GATE=1` default — [#754](https://github.com/PurHur/php-compiler/issues/754)) |
+| AOT execute | ❌ | Native `.phpc/bin/app` stdout empty until [#764](https://github.com/PurHur/php-compiler/issues/764); opt-in `MINIWEBAPP_AOT_EXECUTE_GATE=1` ([#791](https://github.com/PurHur/php-compiler/issues/791)) |
 
 ### curl recipes (PATH_INFO)
 
@@ -97,7 +98,8 @@ Progressive stages from `script/miniwebapp-gates.sh` / `make miniwebapp-gates`:
 | 3b | `MINIWEBAPP_WEB_SMOKE_GATE=1` shell smoke | ✅ default on |
 | 4a | `phpc build --project --dry-run` | probe (LLVM) |
 | 4c | `EXAMPLES_AOT_SMOKE_ONLY=003` smoke slice | skip until [#568](https://github.com/PurHur/php-compiler/issues/568) ([#683](https://github.com/PurHur/php-compiler/issues/683)) |
-| 4b | `ExamplesCompileTest` AOT execute unskipped | ❌ blocked [#454](https://github.com/PurHur/php-compiler/issues/454) |
+| 4b | `ExamplesCompileTest::test003MiniWebAppBuildLinks` | ✅ link gate ([#754](https://github.com/PurHur/php-compiler/issues/754)) |
+| 4b2 | `test003MiniWebAppExecutesWithCgiEnv` | opt-in `MINIWEBAPP_AOT_EXECUTE_GATE=1` ([#791](https://github.com/PurHur/php-compiler/issues/791), blocked [#764](https://github.com/PurHur/php-compiler/issues/764)) |
 
 Stage **4c** runs only the 003 block of `script/examples-aot-smoke.sh` (same pass/skip/fail UX as 4a). Full examples smoke: `make examples-aot-smoke`.
 
@@ -111,6 +113,8 @@ MINIWEBAPP_VM_CLI_GATE=1 ../../script/ci-fast.sh --filter 'MiniWebApp.*VmCli'
 ../../script/ci-local.sh --filter ServeTest
 MINIWEBAPP_SERVE_GATE=0 ../../script/ci-local.sh   # skip miniwebapp ServeTest while iterating
 MINIWEBAPP_WEB_SMOKE_GATE=0 ../../script/ci-local.sh   # skip 003 shell PATH_INFO curls (#664)
+MINIWEBAPP_AOT_LINK_GATE=0 ../../script/ci-local.sh --filter ExamplesCompileTest   # skip 003 link gate (#754)
+MINIWEBAPP_AOT_EXECUTE_GATE=1 ../../script/ci-local.sh --filter test003MiniWebAppExecutesWithCgiEnv   # after #764
 ```
 
 Fast CI runs `MiniWebAppVmCliTest` and `MiniWebAppPathInfoVmCliTest` when `MINIWEBAPP_VM_CLI_GATE=1` (default). Set `MINIWEBAPP_VM_CLI_GATE=0` to skip the VM CLI matrix during iteration.
