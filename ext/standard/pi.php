@@ -33,11 +33,8 @@ final class pi extends Internal
         $frame->returnVar->float(\M_PI);
     }
 
-    public Context $context;
-
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $this->context = $context;
         if (0 !== count($args)) {
             throw new \LogicException('pi() takes no arguments');
         }
