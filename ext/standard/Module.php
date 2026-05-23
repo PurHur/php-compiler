@@ -42,6 +42,7 @@ class Module extends ModuleAbstract
             new fmod(),
             new intval(),
             new floatval(),
+            new doubleval(),
             new boolval(),
             new var_export(),
             new gettype(),
