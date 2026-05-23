@@ -19,6 +19,7 @@ use PHPCfg\Op;
 use PHPTypes\Type;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\IssetHelper;
+use PHPCompiler\JIT\SelfHostBuiltinPolicy;
 use PHPCompiler\JIT\Variable;
 
 use PHPCompiler\Func as CoreFunc;
