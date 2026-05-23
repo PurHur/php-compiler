@@ -40,6 +40,29 @@ class Helper {
                         goto return_long;
                 }
                 break;
+            case Variable::TYPE_NATIVE_BOOL:
+                switch ($opcode->type) {
+                    case OpCode::TYPE_BITWISE_NOT:
+                        $wide = $this->context->builder->zExt(
+                            $varValue,
+                            $this->context->getTypeFromString('int64')
+                        );
+                        $result = $this->context->builder->not($wide);
+                        goto return_long;
+                }
+                break;
+            case Variable::TYPE_VALUE:
+                switch ($opcode->type) {
+                    case OpCode::TYPE_UNARY_MINUS:
+                        $long = JitLongArg::lower($this->context, $var, 'unary minus operand');
+                        $result = $this->context->builder->negate($long);
+                        goto return_long;
+                    case OpCode::TYPE_BITWISE_NOT:
+                        $long = JitLongArg::lower($this->context, $var, 'bitwise not operand');
+                        $result = $this->context->builder->not($long);
+                        goto return_long;
+                }
+                break;
             case Variable::TYPE_NATIVE_DOUBLE:
                 switch ($opcode->type) {
                     case OpCode::TYPE_UNARY_MINUS:
