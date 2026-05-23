@@ -1838,25 +1838,40 @@ class JIT {
         }
     }
 
+    private function typeIncludesNull(Type $type): bool
+    {
+        if (Type::TYPE_NULL === $type->type) {
+            return true;
+        }
+        if (Type::TYPE_UNION === $type->type) {
+            foreach ($type->subTypes ?? [] as $sub) {
+                if ($this->typeIncludesNull($sub)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
     private function callbackTypeFromPhptype(Type $type): ?string
     {
+        $allowsNull = $this->typeIncludesNull($type);
         $type = $this->context->unwrapNullableUnionType($type);
-        switch ($type->type) {
-            case Type::TYPE_LONG:
-                return 'long long';
-            case Type::TYPE_BOOLEAN:
-                return 'bool';
-            case Type::TYPE_STRING:
-                return '__string__*';
-            case Type::TYPE_OBJECT:
-                return '__object__*';
-            case Type::TYPE_ARRAY:
-                return '__hashtable__*';
-            case Type::TYPE_NULL:
-                return '__value__';
-            default:
-                return null;
+        $callback = match ($type->type) {
+            Type::TYPE_LONG => 'long long',
+            Type::TYPE_BOOLEAN => 'bool',
+            Type::TYPE_STRING => '__string__*',
+            Type::TYPE_OBJECT => '__object__*',
+            Type::TYPE_ARRAY => '__hashtable__*',
+            Type::TYPE_NULL => '__value__',
+            default => null,
+        };
+        if ($allowsNull && null !== $callback && '__value__' !== $callback) {
+            return '__value__';
         }
+
+        return $callback;
     }
 
     /**
@@ -1973,7 +1988,7 @@ class JIT {
                     );
                     break;
                 default:
-                    if ($this->shouldUseSelfHostJitStubs() && $this->isSelfHostClassBodyEpilogueOpcode($op->type)) {
+                    if ($this->shouldUseSelfHostJitStubs()) {
                         break;
                     }
                     throw new \LogicException('Other class body types are not jittable for now');

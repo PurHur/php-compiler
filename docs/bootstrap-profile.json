@@ -27,8 +27,7 @@
     ],
     "excluded_files": [
         "lib/AOT/Linker.php",
-        "lib/JIT/Builtin/StringPregMatch.php",
-        "lib/VM/HashTable.php"
+        "lib/JIT/Builtin/StringPregMatch.php"
     ],
     "eligible_files": [
         "bin/vm.php",
@@ -296,6 +295,7 @@
         "lib/Cli/InvokeCwd.php",
         "lib/Cli/PhpcBuild.php",
         "lib/Cli/PhpcInit.php",
+        "lib/Cli/PhpcRun.php",
         "lib/Compiler.php",
         "lib/Doctor.php",
         "lib/Frame.php",
@@ -392,6 +392,7 @@
         "lib/VM/ClassProperty.php",
         "lib/VM/Context.php",
         "lib/VM/ErrorReporter.php",
+        "lib/VM/HashTable.php",
         "lib/VM/ObjectEntry.php",
         "lib/VM/Optimizer.php",
         "lib/VM/Optimizer/AssignOp.php",
@@ -502,9 +503,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 392,
-        "excluded": 3,
-        "eligible": 389,
+        "inventory_files": 393,
+        "excluded": 2,
+        "eligible": 391,
         "aot_lint_targets": 43,
         "aot_link_targets": 30,
         "aot_link_lib_targets": 1

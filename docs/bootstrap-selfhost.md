@@ -6,12 +6,12 @@ North star: compile a **subset** of php-compiler with itself (native AOT), then 
 
 | Gate | Command | Status |
 |------|---------|--------|
-| Phase A inventory | `php script/bootstrap-inventory.php --check` | ✅ **379** files on `bin/vm.php` path; **14** source blockers (`lib/AOT/Linker.php`, `lib/JIT/Builtin/StringPregMatch.php`, `lib/VM/HashTable.php` — all excluded) |
+| Phase A inventory | `php script/bootstrap-inventory.php --check` | ✅ **393** files on `bin/vm.php` path; **12** source blockers (`lib/AOT/Linker.php`, `lib/JIT/Builtin/StringPregMatch.php` — excluded; `lib/VM/HashTable.php` bundled via `ArrayIterator`) |
 | Phase B lib AOT lint | `php bin/compile.php -l lib/*.php` (with `script/php-env.sh`) | ✅ **14/14** top-level `lib/*.php` units ([#534](https://github.com/PurHur/php-compiler/pull/534)) |
 | Phase B fixture lint | `php script/bootstrap-aot-lint.php` | ✅ **12** procedural targets under `test/bootstrap-aot/` + `examples/000-HelloWorld` |
 | Phase C native run | `make bootstrap-aot-link` or `./script/bootstrap-aot-link.sh` | ✅ Link + execute **12** `aot_link_targets` (stdout vs Zend PHP) |
 | Phase D `lib/` link | `make bootstrap-aot-link-lib` or `./script/bootstrap-aot-link-lib.sh` | ✅ `test/bootstrap-aot/lib_opcode/main.php` bundles `lib/OpCode.php` ([#540](https://github.com/PurHur/php-compiler/issues/540)) |
-| Bundled `lib/Compiler.php` lint | `./script/bootstrap-selfhost-lint.sh` | ✅ `test/selfhost/compiler_minimal/main.php` + **20** literal `require_once` units toward `bin/vm.php` (no `vendor/`) ([#559](https://github.com/PurHur/php-compiler/issues/559)) |
+| Bundled `lib/Compiler.php` lint | `./script/bootstrap-selfhost-lint.sh` | ✅ `test/selfhost/compiler_minimal/main.php` + **30** literal `require_once` units toward `bin/vm.php` (no `vendor/`) ([#559](https://github.com/PurHur/php-compiler/issues/559)) |
 | Self-host compile probe | `make bootstrap-selfhost-probe` | ✅ `-l` + native `-o build/selfhost`; `LAST_JIT_FUNC:` on segfault (exit 139) ([#816](https://github.com/PurHur/php-compiler/issues/816), [#913](https://github.com/PurHur/php-compiler/issues/913)) |
 | Self-host native link | `./script/bootstrap-selfhost-link.sh` | ✅ `build/selfhost` prints `compiler_minimal bundle OK` ([#557](https://github.com/PurHur/php-compiler/issues/557), [#913](https://github.com/PurHur/php-compiler/issues/913)) |
 
@@ -32,7 +32,7 @@ Self-host native link requires `PHP_COMPILER_SELFHOST_AOT=1` (set by `./script/b
 3. **Nullable typed properties** — `?Type` on fields with `= null` defaults ✅ (`php-types-fromvalue-null.patch`, `test/bootstrap-aot/class_nullable_property.php`); nullable **parameters** ✅ (`php-types-nullable-return.patch`, `test/bootstrap-aot/nullable_types.php`); nullable **return types** in `Type::fromTypeDecl()` ✅ (`php-types-nullable-return.patch`, `test/bootstrap-aot/ns_func.php`, `test/bootstrap-aot/ns_nullable_return.php` lint)
 4. **Try/catch** ([#57](https://github.com/PurHur/php-compiler/issues/57)) — `lib/Runtime.php`, error paths (`throw` terminal link ✅ [#538](https://github.com/PurHur/php-compiler/pull/538); happy-path try link ✅ [#558](https://github.com/PurHur/php-compiler/issues/558); catch/unwind VM pending)
 5. **LLVM linker** — `lib/AOT/Linker.php` uses `shell_exec` (excluded from profile; keep external `clang` for now)
-6. **Generators** — `lib/VM/HashTable.php` (excluded)
+6. **Generators** — `lib/VM/HashTable.php` `iterate`/`iterateKeyed` use eager `ArrayIterator` for bootstrap AOT (no `yield`)
 
 ## Bootstrap AOT lint ladder
 
@@ -69,10 +69,13 @@ Incremental growth toward `bin/vm.php` inventory path ([#559](https://github.com
 | `lib/Web/DeployRoot.php`, `lib/Web/SourceBundler.php` | AOT bundle path + concat (`bin/compile.php` closure) |
 | `lib/Module.php` | extension module interface (vm.php path) |
 | `lib/VM.php`, `lib/VM/ClassProperty.php`, `lib/VM/ScriptExit.php`, `lib/VM/Variable.php` | interpreter + value cells toward vm echo path |
+| `lib/VM/Refcount.php`, `lib/VM/ErrorReporter.php`, `lib/VM/ScriptStack.php`, `lib/VM/HashTable.php` | hashtable refcount + VM context stack |
+| `lib/VM/ClassEntry.php`, `lib/VM/ObjectEntry.php`, `lib/VM/TypeCheck.php` | classes/objects + typed slots (`match`→`switch` in `typeName`) |
+| `lib/VM/Optimizer/AssignOp.php`, `lib/VM/Optimizer.php`, `lib/VM/Context.php` | `Runtime` assign-op resolver + `vmContext` |
 | `lib/JIT/OperandName.php`, `lib/Printer.php`, `lib/OpCodeNames.php` | opcode helpers (names + debug print) |
 | `lib/Compiler.php` | CFG → opcodes |
 
-**Deferred** (next toward `bin/vm.php`): `lib/VM/TypeCheck.php` (`match`), `lib/VM/HashTable.php` (generators), full non-stubbed `Variable` / `LiteralIncludeDiscovery` native lowering.
+**Next toward `bin/vm.php`** (`php script/bootstrap-selfhost-next-includes.php`): `lib/Web/Superglobals.php` (arrow functions), `lib/JIT.php`, `lib/Handler.php`, `lib/Func/Internal.php`, `lib/Func/JIT.php`.
 
 Native link + run of `compiler_minimal` is gated by `./script/bootstrap-selfhost-link.sh` (LLVM 9; stdout `compiler_minimal bundle OK`). Runtime helpers in the bundle (`VM`, `Runtime`, `Block`, …) are JIT-stubbed for verify; `Compiler` hot paths use existing skip patterns ([#579](https://github.com/PurHur/php-compiler/issues/579), [#913](https://github.com/PurHur/php-compiler/issues/913)). Full `lib/` native self-host remains open.
 

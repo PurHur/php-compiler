@@ -50,6 +50,7 @@ final class HashTable {
     }
 
     public function iterate(bool $resolveIndirect = false): \Traversable {
+        $values = [];
         for ($i = 0; $i < $this->numUsed; $i++) {
             $bucket = $this->buckets->read($i);
             if ($bucket->value->isUndefined()) {
@@ -59,15 +60,18 @@ final class HashTable {
             if ($resolveIndirect) {
                 $value = $value->resolveIndirect();
             }
-            yield $value;
+            $values[] = $value;
         }
+
+        return new \ArrayIterator($values);
     }
 
     /**
-     * @return \Generator<int, array{0: Variable, 1: Variable}>
+     * @return \Traversable<int, array{0: Variable, 1: Variable}>
      */
-    public function iterateKeyed(bool $resolveIndirect = false): \Generator
+    public function iterateKeyed(bool $resolveIndirect = false): \Traversable
     {
+        $pairs = [];
         for ($i = 0; $i < $this->numUsed; ++$i) {
             $bucket = $this->buckets->read($i);
             if ($bucket->value->isUndefined()) {
@@ -83,8 +87,10 @@ final class HashTable {
             if ($resolveIndirect) {
                 $value = $value->resolveIndirect();
             }
-            yield [$keyVar, $value];
+            $pairs[] = [$keyVar, $value];
         }
+
+        return new \ArrayIterator($pairs);
     }
 
     public function iterReset(): void
