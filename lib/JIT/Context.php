@@ -19,6 +19,7 @@ use PHPTypes\Type;
 
 use PHPLLVM;
 use PHPCompiler\AOT\Linker;
+use PHPCompiler\Func\Internal as FuncInternal;
 use PHPCompiler\JIT\SuperglobalInit;
 use PHPCompiler\Web\Superglobals;
 
@@ -224,6 +225,50 @@ class Context {
     public function recordExternalMethodStub(string $proxyName): void
     {
         $this->externalMethodStubs[strtolower($proxyName)] = true;
+    }
+
+    /**
+     * Whether a function name resolves to a builtin or user function in this compile unit (issue #1216).
+     */
+    public function functionIsRegistered(string $name): bool
+    {
+        $lc = strtolower($name);
+        if ($this->functionProxyIsCallable($lc)) {
+            return true;
+        }
+        $short = SelfHostBuiltinPolicy::normalizeName($name);
+        if ($short !== $lc && $this->functionProxyIsCallable($short)) {
+            return true;
+        }
+
+        return isset($this->functions[$lc]) || ($short !== $lc && isset($this->functions[$short]));
+    }
+
+    /**
+     * @return list<string> Lowercase user-defined function names compiled into this unit.
+     */
+    public function userFunctionNames(): array
+    {
+        $names = [];
+        foreach ($this->functionProxies as $lc => $proxy) {
+            if ($proxy instanceof Call\ExternalMethod || $proxy instanceof FuncInternal) {
+                continue;
+            }
+            if ($proxy instanceof Call\Native || $proxy instanceof Call\Vararg) {
+                $names[] = $lc;
+            }
+        }
+
+        return array_values(array_unique($names));
+    }
+
+    private function functionProxyIsCallable(string $lc): bool
+    {
+        if (!isset($this->functionProxies[$lc])) {
+            return false;
+        }
+
+        return !($this->functionProxies[$lc] instanceof Call\ExternalMethod);
     }
 
     public function registerModule(Module $module): void {

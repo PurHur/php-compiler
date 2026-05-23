@@ -237,6 +237,12 @@ class Type extends Builtin {
             $fntypeSuperglobalName
         );
         $this->context->registerFunction('__compiler_is_superglobal_name', $fnSuperglobalName);
+        $fntypeBuiltinFunctionExists = $this->context->context->functionType($i64, false, $strPtr);
+        $fnBuiltinFunctionExists = $this->context->module->addFunction(
+            '__compiler_builtin_function_exists',
+            $fntypeBuiltinFunctionExists
+        );
+        $this->context->registerFunction('__compiler_builtin_function_exists', $fnBuiltinFunctionExists);
         $fntypeFilterEmail = $this->context->context->functionType($strPtr, false, $strPtr);
         $fnFilterEmail = $this->context->module->addFunction(
             '__compiler_filter_validate_email',

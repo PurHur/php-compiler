@@ -2615,6 +2615,9 @@ class JIT {
             }
             $this->copyValueBoxJitFlags($result, $value);
             $result->compileTimeConstantName = $value->compileTimeConstantName;
+            if (null !== $value->compileTimeString) {
+                $result->compileTimeString = $value->compileTimeString;
+            }
 
             return;
         } elseif ($result->type === Variable::TYPE_VALUE) {
@@ -2835,6 +2838,9 @@ class JIT {
             );
             $this->copyValueBoxJitFlags($result, $value);
             $result->compileTimeConstantName = $value->compileTimeConstantName;
+            if (null !== $value->compileTimeString) {
+                $result->compileTimeString = $value->compileTimeString;
+            }
 
             return;
         } elseif (Variable::TYPE_HASHTABLE === $result->type && Variable::TYPE_VALUE === $value->type) {
@@ -3149,6 +3155,9 @@ class JIT {
         }
         $dest->valueBoxHashtable = $src->valueBoxHashtable;
         $dest->isNullConstant = $src->isNullConstant;
+        if (null !== $src->compileTimeString) {
+            $dest->compileTimeString = $src->compileTimeString;
+        }
     }
 
     /** Keep borrowed object-property hashtable metadata on locals ($cfg = $this->config, #848). */

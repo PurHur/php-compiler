@@ -201,6 +201,7 @@ class Module extends ModuleAbstract
             new putenv_(),
             new define_(),
             new defined_(),
+            new function_exists(),
             new phpc_deploy_path(),
             new compiler_is_superglobal_name(),
             new extract_(),
