@@ -2778,13 +2778,45 @@ class JIT {
 
             return;
         } elseif (Variable::TYPE_OBJECT === $result->type && Variable::TYPE_VALUE === $value->type) {
+            $valuePtr = $this->valueBoxPointer($value);
+            $map = $this->context->structFieldMap['__value__'];
+            $typeByte = $this->context->builder->load(
+                $this->context->builder->structGep($valuePtr, $map['type'])
+            );
+            $i8 = $this->context->getTypeFromString('int8');
+            $isLong = $this->context->builder->icmp(
+                PHPLLVM\Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
+            );
+            $isBool = $this->context->builder->icmp(
+                PHPLLVM\Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)
+            );
+            $isStreamHandle = $this->context->builder->bitwiseOr($isLong, $isBool);
+            $objectBlock = JIT\BasicBlockHelper::append($this->context, 'assign_object_from_value');
+            $handleBlock = JIT\BasicBlockHelper::append($this->context, 'assign_stream_handle_from_value');
+            $doneBlock = JIT\BasicBlockHelper::append($this->context, 'assign_object_from_value_done');
+            $this->context->builder->branchIf($isStreamHandle, $handleBlock, $objectBlock);
+            $this->context->builder->positionAtEnd($objectBlock);
             $obj = $this->context->builder->call(
                 $this->context->lookupFunction('__value__readObject'),
-                $this->valueBoxPointer($value)
+                $valuePtr
             );
             $result->free();
             $this->context->builder->store($obj, $result->value);
             $result->addref();
+            $this->context->builder->branch($doneBlock);
+            $this->context->builder->positionAtEnd($handleBlock);
+            $slot = JIT\JitValueBox::alloc($this->context);
+            JIT\JitValueBox::copyFromPointer($this->context, $slot, $valuePtr);
+            $result->free();
+            $result->type = Variable::TYPE_VALUE;
+            $result->value = $slot;
+            $result->addref();
+            $this->context->builder->branch($doneBlock);
+            $this->context->builder->positionAtEnd($doneBlock);
 
             return;
         }

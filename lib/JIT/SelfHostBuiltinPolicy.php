@@ -55,6 +55,7 @@ final class SelfHostBuiltinPolicy
         'dirname' => 'filesystem', 'basename' => 'filesystem', 'file_exists' => 'filesystem',
         'is_file' => 'filesystem', 'is_dir' => 'filesystem', 'is_readable' => 'filesystem',
         'is_writable' => 'filesystem', 'file_get_contents' => 'filesystem', 'realpath' => 'filesystem',
+        'fopen' => 'filesystem', 'fread' => 'filesystem', 'fclose' => 'filesystem',
     ];
 
     /** @var array<string, string> */

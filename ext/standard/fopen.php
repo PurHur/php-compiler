@@ -7,11 +7,12 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** fopen() — VM only; returns integer handle id (issue #194). */
+/** fopen() — VM via VmFs; JIT/AOT via __compiler_fopen (issue #1117). */
 final class fopen extends Internal
 {
     public function execute(Frame $frame): void
@@ -41,8 +42,11 @@ final class fopen extends Internal
         if (2 !== \count($args)) {
             throw new \LogicException('fopen() requires exactly two arguments in this compiler build');
         }
-        $this->jitString($context, $args[0], 'fopen() path');
-        $this->jitString($context, $args[1], 'fopen() mode');
-        throw new \LogicException('fopen() is not implemented for JIT in this compiler build');
+
+        return JitFopen::invoke(
+            $context,
+            JitStringArg::lower($context, $args[0], 'fopen() path'),
+            JitStringArg::lower($context, $args[1], 'fopen() mode')
+        );
     }
 }
