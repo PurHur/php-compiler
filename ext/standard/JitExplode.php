@@ -94,6 +94,8 @@ final class JitExplode
 
         $context->builder->positionAtEnd($doneBlock);
 
+        BasicBlockHelper::branchToFreshContinue($context, 'explode_continue');
+
         return $ht;
     }
 }

@@ -599,7 +599,15 @@ final class Variable {
                         $owned
                     );
                 }
-                return HashTableHelper::readIndexedToValueBox($this->context, $ht, $index);
+                if (null === $this->superglobalName) {
+                    $this->context->refcount->addref($ht);
+                }
+                $boxed = HashTableHelper::readIndexedToValueBox($this->context, $ht, $index);
+                if (null === $this->superglobalName) {
+                    $this->context->refcount->delref($ht);
+                }
+
+                return $boxed;
             case self::TYPE_VALUE:
                 if (!$this->valueBoxHashtable) {
                     throw new \LogicException(

@@ -79,6 +79,8 @@ final class JitImplode
         $result->addIncoming($emptyStr, $emptyBlock);
         $result->addIncoming($workResult, $loopDone);
 
+        BasicBlockHelper::branchToFreshContinue($context, 'implode_continue');
+
         return $result;
     }
 }

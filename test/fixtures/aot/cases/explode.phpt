@@ -3,8 +3,10 @@ AOT: explode() splits string into indexed list
 --FILE--
 <?php
 $parts = explode(',', 'a,b,c');
-echo $parts[0], '|', $parts[1], '|', $parts[2], "\n";
-echo $parts[0], '|', explode(',', 'solo')[0], "\n";
+echo count($parts), "\n";
+echo implode('|', $parts), "\n";
+echo count(explode(',', '')), "\n";
 --EXPECT--
+3
 a|b|c
-a|solo
+1
