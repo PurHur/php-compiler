@@ -15,6 +15,7 @@ declare(strict_types=1);
  *   phpc build --project [dir] [--dry-run]     AOT compile from phpc.json entry/binary
  *   phpc build --project [dir] [--list-units]  Grep-friendly entry/units/binary summary (no LLVM)
  *   phpc build --project [dir] [--print-includes]  Manifest link order (no LLVM)
+ *   phpc build --project [dir] [--probe]       After link, fail when execute stdout is empty (#792)
  *   phpc deploy [dir] -o <dist> [--from-build]  Bundle binary, public/, assets/, phpc.json
  *   phpc cgi [binary]                           CGI wrapper for AOT binary (issue #665)
  *   phpc lint [-r 'code'] [--json] entry.php
@@ -52,6 +53,7 @@ php-compiler CLI
       --dry-run                                 List entry + includes graph; exit before LLVM
       --list-units                              Print entry, units, binary on stderr; no LLVM (#847)
       --print-includes                          Print includes[] then entry (absolute paths); no LLVM
+      --probe                                   Run byte probe after link; exit 2 on empty stdout (#792)
       --verbose                                 Print compile-unit graph; keep full LLVM stderr on failure
       PHPC_BUILD_VERBOSE=1                      Same as --verbose
       PHPC_INVOKE_CWD=<dir>                     Set by ./phpc wrapper; relative paths use this base
@@ -140,6 +142,7 @@ switch ($command) {
             $dryRun = false;
             $listUnits = false;
             $printIncludes = false;
+            $probe = false;
             $verbose = false;
             $projectDir = '.';
             foreach ($args as $arg) {
@@ -153,6 +156,10 @@ switch ($command) {
                 }
                 if ('--print-includes' === $arg) {
                     $printIncludes = true;
+                    continue;
+                }
+                if ('--probe' === $arg) {
+                    $probe = true;
                     continue;
                 }
                 if ('--verbose' === $arg) {
@@ -177,7 +184,7 @@ switch ($command) {
             if ($listUnits) {
                 exit(\PHPCompiler\Cli\PhpcBuild::printListUnits($projectDir));
             }
-            exit(buildFromProject($repoRoot, $php, $projectDir, $dryRun, $verbose));
+            exit(buildFromProject($repoRoot, $php, $projectDir, $dryRun, $verbose, $probe));
         }
         if ([] === $args) {
             fwrite(STDERR, "phpc build: missing entry.php (or use: phpc build --project [dir])\n");
@@ -378,7 +385,8 @@ function buildFromProject(
     array $php,
     string $projectDir,
     bool $dryRun = false,
-    bool $verbose = false
+    bool $verbose = false,
+    bool $probe = false
 ): int {
     if (!is_file($repoRoot.'/vendor/autoload.php')) {
         fwrite(STDERR, "phpc build --project: run composer install first\n");
@@ -433,7 +441,24 @@ function buildFromProject(
         $repoRoot,
         $compileArgv
     );
-    \PHPCompiler\Cli\PhpcBuild::emitBuildOutput($result, $verbose);
+    \PHPCompiler\Cli\PhpcBuild::emitBuildOutput($result, $verbose, $projectDir, $output);
+
+    if (0 !== $result['exit']) {
+        return $result['exit'];
+    }
+
+    if ($probe && \PHPCompiler\Cli\PhpcBuild::isWebProjectForExecuteProbe($projectDir)) {
+        $probeResult = \PHPCompiler\Cli\PhpcBuild::runExecuteByteProbe($projectDir, $output);
+        if (0 === $probeResult['bytes']) {
+            fwrite(
+                STDERR,
+                "phpc build --probe: linked binary printed 0 stdout bytes (track #764 execute)\n"
+            );
+
+            return \PHPCompiler\Cli\PhpcBuild::EXIT_EMPTY_EXECUTE_PROBE;
+        }
+        fwrite(STDERR, "phpc build --probe: {$probeResult['bytes']} stdout bytes\n");
+    }
 
     return $result['exit'];
 }

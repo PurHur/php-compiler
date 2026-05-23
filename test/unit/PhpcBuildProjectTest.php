@@ -8,7 +8,7 @@ use PHPCompiler\Cli\PhpcBuild;
 use PHPUnit\Framework\TestCase;
 
 /**
- * phpc build --project actionable errors when user-class AOT is blocked (#643).
+ * phpc build --project actionable errors when user-class AOT is blocked (#643, #792).
  */
 final class PhpcBuildProjectTest extends TestCase
 {
@@ -37,6 +37,43 @@ ERR;
         $this->assertStringContainsString('phpc serve', $trailer);
         $this->assertStringContainsString('miniwebapp-gates', $trailer);
         $this->assertStringContainsString('compile-unit graph', $trailer);
+    }
+
+    public function testDetectsWebProjectManifest(): void
+    {
+        $repoRoot = dirname(__DIR__, 2);
+        $this->assertTrue(PhpcBuild::isWebProjectForExecuteProbe($repoRoot.'/examples/003-MiniWebApp'));
+        $this->assertFalse(PhpcBuild::isWebProjectForExecuteProbe($repoRoot.'/examples/001-SimpleWeb'));
+    }
+
+    public function testWebProjectSuccessTrailerMentions764AndProbe(): void
+    {
+        $repoRoot = dirname(__DIR__, 2);
+        $project = $repoRoot.'/examples/003-MiniWebApp';
+        $binary = $project.'/.phpc/bin/app';
+        $trailer = PhpcBuild::formatWebProjectSuccessTrailer($project, $binary);
+        $this->assertStringContainsString('#764', $trailer);
+        $this->assertStringContainsString('wc -c', $trailer);
+        $this->assertStringContainsString('QUERY_STRING=route=home', $trailer);
+        $this->assertStringContainsString('phpc run --project', $trailer);
+        $this->assertStringNotContainsString('#568', $trailer);
+        $this->assertStringNotContainsString('568', $trailer);
+    }
+
+    public function testEmitBuildOutputSuccessPrintsExecuteProbeTrailer(): void
+    {
+        $repoRoot = dirname(__DIR__, 2);
+        $project = $repoRoot.'/examples/003-MiniWebApp';
+        $binary = $project.'/.phpc/bin/app';
+        $out = $this->captureEmitBuildOutput(
+            ['exit' => 0, 'stdout' => '', 'stderr' => ''],
+            false,
+            $project,
+            $binary
+        );
+        $this->assertStringContainsString('Quick execute probe', $out);
+        $this->assertStringContainsString('#764', $out);
+        $this->assertStringContainsString('wc -c', $out);
     }
 
     public function testVerboseEnabledFromEnv(): void
@@ -193,14 +230,23 @@ ERR;
         $this->assertFileExists($binary);
     }
 
-    private function captureEmitBuildOutput(string $compileStderr, bool $verbose): string
-    {
+    private function captureEmitBuildOutput(
+        array|string $result,
+        bool $verbose,
+        ?string $projectDir = null,
+        ?string $binaryPath = null
+    ): string {
         $repoRoot = dirname(__DIR__, 2);
+        if (is_string($result)) {
+            $result = ['exit' => 1, 'stdout' => '', 'stderr' => $result];
+        }
         $snippet = sprintf(
-            'require %s; \PHPCompiler\Cli\PhpcBuild::emitBuildOutput(%s, %s);',
+            'require %s; \PHPCompiler\Cli\PhpcBuild::emitBuildOutput(%s, %s, %s, %s);',
             var_export($repoRoot.'/vendor/autoload.php', true),
-            var_export(['exit' => 1, 'stdout' => '', 'stderr' => $compileStderr], true),
-            $verbose ? 'true' : 'false'
+            var_export($result, true),
+            $verbose ? 'true' : 'false',
+            var_export($projectDir, true),
+            var_export($binaryPath, true)
         );
         $descriptorSpec = [
             0 => ['pipe', 'r'],
