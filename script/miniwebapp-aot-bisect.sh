@@ -162,12 +162,8 @@ run_003_cli_probe() {
   local stderr_file stdout
   stderr_file="$(mktemp)"
   set +e
-  stdout="$(env \
-    QUERY_STRING='route=home' \
-    SCRIPT_NAME='/index.php' \
-    REQUEST_URI='/index.php?route=home' \
-    REQUEST_METHOD='GET' \
-    "${binary}" 2>"${stderr_file}")"
+  eval "$( "${ROOT}/script/miniwebapp-cgi-env.php" --export shellQueryRouteHome )"
+  stdout="$("${binary}" 2>"${stderr_file}")"
   local run_code=$?
   set -e
   local stderr
