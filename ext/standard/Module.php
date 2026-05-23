@@ -164,6 +164,7 @@ class Module extends ModuleAbstract
             new http_response_code(),
             new json_encode(),
             new json_decode(),
+            new json_last_error_(),
             new web_int(),
             new web_string(),
             new web_bool(),

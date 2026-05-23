@@ -397,6 +397,9 @@ class Type extends Builtin {
             $this->context->context->functionType($void, false, $strPtr, $valuePtr)
         );
         $this->context->registerFunction('__compiler_json_decode', $fnJsonDecode);
+        $fntypeJsonLastError = $this->context->context->functionType($i64, false);
+        $fnJsonLastError = $this->context->module->addFunction('__compiler_json_last_error', $fntypeJsonLastError);
+        $this->context->registerFunction('__compiler_json_last_error', $fnJsonLastError);
         $fntypeShellExec = $this->context->context->functionType($strPtr, false, $strPtr);
         $fnShellExec = $this->context->module->addFunction('__compiler_shell_exec', $fntypeShellExec);
         $this->context->registerFunction('__compiler_shell_exec', $fnShellExec);

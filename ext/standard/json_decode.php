@@ -7,7 +7,6 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -79,19 +78,6 @@ final class json_decode extends Internal
             && JITVariable::KIND_VALUE === $args[1]->kind
             && 0 === (int) $context->llvm->lib->LLVMConstIntGetZExtValue($args[1]->value->value)) {
             throw new \LogicException('json_decode() requires assoc=true in this compiler build');
-        }
-
-        $literal = JitStringArg::compileTimeLiteral($args[0]);
-        if (null !== $literal) {
-            $decoded = \json_decode($literal, true);
-            if (!\is_array($decoded) && null !== $decoded) {
-                return JitJsonDecode::materializeScalar($context, $decoded);
-            }
-            if (null === $decoded) {
-                return JitJsonDecode::materializeNull($context);
-            }
-
-            return JitJsonDecode::materializeArray($context, $decoded);
         }
 
         return JitJsonDecode::decodeRuntime($context, $args[0]);
