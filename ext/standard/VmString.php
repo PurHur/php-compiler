@@ -427,6 +427,91 @@ final class VmString
         return $out;
     }
 
+    /** RFC 4648 base64 encode (standard alphabet, padding). */
+    public static function base64_encode(string $data): string
+    {
+        $len = self::byteLength($data);
+        if (0 === $len) {
+            return '';
+        }
+        static $alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+        $out = '';
+        for ($i = 0; $i < $len; $i += 3) {
+            $b0 = self::byteOrd($data[$i]);
+            $b1 = ($i + 1 < $len) ? self::byteOrd($data[$i + 1]) : 0;
+            $b2 = ($i + 2 < $len) ? self::byteOrd($data[$i + 2]) : 0;
+            $n = ($b0 << 16) | ($b1 << 8) | $b2;
+            $out .= $alphabet[($n >> 18) & 63];
+            $out .= $alphabet[($n >> 12) & 63];
+            if ($i + 1 < $len) {
+                $out .= $alphabet[($n >> 6) & 63];
+            } else {
+                $out .= '=';
+            }
+            if ($i + 2 < $len) {
+                $out .= $alphabet[$n & 63];
+            } else {
+                $out .= '=';
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * RFC 4648 base64 decode (non-strict: ignore bytes outside the alphabet).
+     *
+     * @return string|false decoded bytes, or false when padding or input is invalid
+     */
+    public static function base64_decode(string $data): string|false
+    {
+        $len = self::byteLength($data);
+        if (0 === $len) {
+            return '';
+        }
+        static $decode = null;
+        if (null === $decode) {
+            $decode = array_fill(0, 256, -1);
+            $alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+            for ($i = 0; $i < 64; ++$i) {
+                $decode[self::byteOrd($alphabet[$i])] = $i;
+            }
+        }
+        $out = '';
+        $val = 0;
+        $bits = 0;
+        $sawPad = false;
+        for ($i = 0; $i < $len; ++$i) {
+            $ch = self::byteOrd($data[$i]);
+            if (61 === $ch) {
+                if ($sawPad) {
+                    return false;
+                }
+                $sawPad = true;
+                continue;
+            }
+            if ($sawPad) {
+                return false;
+            }
+            $d = $decode[$ch] ?? -1;
+            if ($d < 0) {
+                continue;
+            }
+            $val = ($val << 6) | $d;
+            $bits += 6;
+            if ($bits >= 8) {
+                $bits -= 8;
+                $out .= \chr(($val >> $bits) & 0xFF);
+                $val &= (1 << $bits) - 1;
+            }
+        }
+        if ($sawPad && 0 !== $bits) {
+            return false;
+        }
+
+        return $out;
+    }
+
     /** application/x-www-form-urlencoded (space as '+'). */
     public static function urlencode(string $data): string
     {
