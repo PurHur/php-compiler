@@ -61,6 +61,7 @@ Native self-host bundles include `lib/JIT/Result.php` for type closure only. Whe
 | string | `strtolower`, `strtoupper`, `strcmp`, `strncmp`, `strcasecmp`, `strncasecmp`, `strlen`, `count`/`sizeof` | required |
 | hash | `hash`, `hash_hmac` | required |
 | preg | `preg_match`, `preg_quote` | required |
+| filter | `filter_var`, `filter_input` | required |
 | json | `json_encode` (minimal) | required |
 | echo/print | opcode lowering in `lib/JIT.php` | n/a |
 | other stdlib | — | `ExternalMethod` stub when not required |

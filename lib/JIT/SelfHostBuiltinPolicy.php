@@ -30,6 +30,7 @@ final class SelfHostBuiltinPolicy
         + self::CATEGORY_ARRAY
         + self::CATEGORY_HASH
         + self::CATEGORY_PREG
+        + self::CATEGORY_FILTER
         + self::CATEGORY_JSON
         + self::CATEGORY_NUMERIC;
 
@@ -82,6 +83,9 @@ final class SelfHostBuiltinPolicy
 
     /** @var array<string, string> */
     private const CATEGORY_PREG = ['preg_match' => 'preg', 'preg_quote' => 'preg'];
+
+    /** @var array<string, string> */
+    private const CATEGORY_FILTER = ['filter_var' => 'filter', 'filter_input' => 'filter'];
 
     /** @var array<string, string> */
     private const CATEGORY_JSON = ['json_encode' => 'json'];
