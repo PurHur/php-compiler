@@ -126,6 +126,26 @@ final class BootstrapPhaseCTest extends TestCase
         $this->assertBootstrapFixtureLinkAndExecute('stdlib_string_urlencode.php', '1');
     }
 
+    public function testStdlibFilesystemAotLinkAndExecute(): void
+    {
+        $this->assertBootstrapFixtureLinkAndExecute('stdlib_filesystem.php', '11');
+    }
+
+    public function testStdlibStreamAotLinkAndExecute(): void
+    {
+        $this->assertBootstrapFixtureLinkAndExecute('stdlib_stream.php', '1');
+    }
+
+    public function testStdlibArrayOpsAotLinkAndExecute(): void
+    {
+        $this->assertBootstrapFixtureLinkAndExecute('stdlib_array_ops.php', '42671');
+    }
+
+    public function testStdlibArrayUnshiftAotLinkAndExecute(): void
+    {
+        $this->assertBootstrapFixtureLinkAndExecute('stdlib_array_unshift.php', '1233');
+    }
+
     public function testBootstrapAotLinkScript(): void
     {
         if (!self::isLlvmReady()) {
