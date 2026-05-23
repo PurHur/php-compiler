@@ -438,24 +438,42 @@ class Compiler {
     protected function compileOp(Op $op, Block $block) {
         if ($op instanceof Op\Expr\ConcatList) {
             $total = count($op->list);
-            assert($total >= 2);
-            $pointer = 2;
-
             $return = $this->compileOperand($op->result, $block, false);
-            $block->addOpCode(new OpCode(
-                OpCode::TYPE_CONCAT,
-                $return,
-                $this->compileOperand($op->list[0], $block, true),
-                $this->compileOperand($op->list[1], $block, true)
-            ));
-            while ($pointer < $total) {
-                $right = $this->compileOperand($op->list[$pointer++], $block, true);
+            if (0 === $total) {
+                $empty = new Operand\Literal('');
+                $empty->type = Type::string();
+                $emptySlot = $this->compileOperand($empty, $block, true);
+                $block->addOpCode(new OpCode(
+                    OpCode::TYPE_ASSIGN,
+                    $return,
+                    $return,
+                    $emptySlot
+                ));
+            } elseif (1 === $total) {
+                $part = $this->compileOperand($op->list[0], $block, true);
+                $block->addOpCode(new OpCode(
+                    OpCode::TYPE_ASSIGN,
+                    $return,
+                    $return,
+                    $part
+                ));
+            } else {
+                $pointer = 2;
                 $block->addOpCode(new OpCode(
                     OpCode::TYPE_CONCAT,
                     $return,
-                    $return,
-                    $right
+                    $this->compileOperand($op->list[0], $block, true),
+                    $this->compileOperand($op->list[1], $block, true)
                 ));
+                while ($pointer < $total) {
+                    $right = $this->compileOperand($op->list[$pointer++], $block, true);
+                    $block->addOpCode(new OpCode(
+                        OpCode::TYPE_CONCAT,
+                        $return,
+                        $return,
+                        $right
+                    ));
+                }
             }
         } elseif ($op instanceof Op\Expr) {
             $block->addOpCode(...$this->compileExpr($op, $block));
