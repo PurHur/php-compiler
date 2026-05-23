@@ -249,6 +249,9 @@ class Type extends Builtin {
         );
         $fnPregMatch = $this->context->module->addFunction('__compiler_preg_match', $fntypePregMatch);
         $this->context->registerFunction('__compiler_preg_match', $fnPregMatch);
+        $fntypePregLastError = $this->context->context->functionType($i64, false);
+        $fnPregLastError = $this->context->module->addFunction('__compiler_preg_last_error', $fntypePregLastError);
+        $this->context->registerFunction('__compiler_preg_last_error', $fnPregLastError);
         $fntypeSuperglobalName = $this->context->context->functionType($i64, false, $strPtr);
         $fnSuperglobalName = $this->context->module->addFunction(
             '__compiler_is_superglobal_name',
