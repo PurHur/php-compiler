@@ -321,6 +321,35 @@ final class VmFs
         return $line;
     }
 
+    /**
+     * @return list<string>|false
+     */
+    public static function fgetcsv(
+        int $handle,
+        ?int $length = null,
+        string $separator = ',',
+        string $enclosure = '"',
+        string $escape = '\\',
+    ): array|false {
+        $fp = self::lookup($handle);
+        if (null === $fp) {
+            return false;
+        }
+        if (null === $length) {
+            $row = @\fgetcsv($fp, separator: $separator, enclosure: $enclosure, escape: $escape);
+        } else {
+            if ($length <= 0) {
+                return false;
+            }
+            $row = @\fgetcsv($fp, $length, $separator, $enclosure, $escape);
+        }
+        if (false === $row) {
+            return false;
+        }
+
+        return $row;
+    }
+
     public static function fseek(int $handle, int $offset, int $whence = \SEEK_SET): int
     {
         $fp = self::lookup($handle);

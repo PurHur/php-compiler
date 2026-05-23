@@ -63,6 +63,7 @@ static const char *phpc_builtin_functions[] = {
     "feof",
     "fflush",
     "fgetc",
+    "fgetcsv",
     "fgets",
     "file_exists",
     "file_get_contents",

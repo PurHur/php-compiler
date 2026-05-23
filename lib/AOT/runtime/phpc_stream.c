@@ -258,3 +258,186 @@ int64_t __compiler_fseek(int64_t handle, int64_t offset, int64_t whence)
 
     return fseek(fp, (long) offset, (int) whence) == 0 ? 0 : -1;
 }
+
+typedef struct __hashtable__ __hashtable__;
+
+extern __hashtable__ *__hashtable__alloc(void);
+extern void __hashtable__setStringAt(__hashtable__ *ht, size_t index, __string__ *val);
+
+static char phpc_csv_first_char(__string__ *s, char fallback)
+{
+    if (NULL == s || 0 == phpc_string_len(s)) {
+        return fallback;
+    }
+
+    return phpc_string_data(s)[0];
+}
+
+static __hashtable__ *phpc_parse_csv_line(const char *line, char delim, char enclosure, char escape)
+{
+    __hashtable__ *ht;
+    size_t field_idx = 0;
+    size_t i = 0;
+    size_t line_len = strlen(line);
+    char *field = NULL;
+    size_t field_cap = 0;
+    size_t field_len = 0;
+    int in_quotes = 0;
+
+    ht = __hashtable__alloc();
+    if (NULL == ht) {
+        return NULL;
+    }
+
+    while (i <= line_len) {
+        char c = (i < line_len) ? line[i] : '\0';
+
+        if (in_quotes) {
+            if ('\0' == c) {
+                break;
+            }
+            if (c == escape && i + 1 < line_len) {
+                if (field_len + 1 >= field_cap) {
+                    size_t new_cap = field_cap < 32 ? 32 : field_cap * 2;
+                    char *grown = (char *) realloc(field, new_cap);
+                    if (NULL == grown) {
+                        free(field);
+                        return NULL;
+                    }
+                    field = grown;
+                    field_cap = new_cap;
+                }
+                field[field_len++] = line[++i];
+                ++i;
+                continue;
+            }
+            if (c == enclosure) {
+                if (i + 1 < line_len && line[i + 1] == enclosure) {
+                    if (field_len + 1 >= field_cap) {
+                        size_t new_cap = field_cap < 32 ? 32 : field_cap * 2;
+                        char *grown = (char *) realloc(field, new_cap);
+                        if (NULL == grown) {
+                            free(field);
+                            return NULL;
+                        }
+                        field = grown;
+                        field_cap = new_cap;
+                    }
+                    field[field_len++] = enclosure;
+                    i += 2;
+                    continue;
+                }
+                in_quotes = 0;
+                ++i;
+                continue;
+            }
+            if (field_len + 1 >= field_cap) {
+                size_t new_cap = field_cap < 32 ? 32 : field_cap * 2;
+                char *grown = (char *) realloc(field, new_cap);
+                if (NULL == grown) {
+                    free(field);
+                    return NULL;
+                }
+                field = grown;
+                field_cap = new_cap;
+            }
+            field[field_len++] = c;
+            ++i;
+            continue;
+        }
+
+        if ('\0' == c || c == delim) {
+            __string__ *str;
+            if (NULL == field) {
+                str = __string__init(0, "");
+            } else {
+                str = __string__init((long long) field_len, field);
+                free(field);
+                field = NULL;
+                field_cap = 0;
+                field_len = 0;
+            }
+            if (NULL == str) {
+                return NULL;
+            }
+            __hashtable__setStringAt(ht, field_idx++, str);
+            if ('\0' == c) {
+                break;
+            }
+            ++i;
+            continue;
+        }
+
+        if (c == enclosure) {
+            in_quotes = 1;
+            ++i;
+            continue;
+        }
+
+        if (field_len + 1 >= field_cap) {
+            size_t new_cap = field_cap < 32 ? 32 : field_cap * 2;
+            char *grown = (char *) realloc(field, new_cap);
+            if (NULL == grown) {
+                free(field);
+                return NULL;
+            }
+            field = grown;
+            field_cap = new_cap;
+        }
+        field[field_len++] = c;
+        ++i;
+    }
+
+    free(field);
+
+    return ht;
+}
+
+__hashtable__ *__compiler_fgetcsv(
+    int64_t handle,
+    int64_t length,
+    __string__ *separator,
+    __string__ *enclosure,
+    __string__ *escape
+)
+{
+    FILE *fp;
+    char delim;
+    char enc;
+    char esc;
+    size_t buf_size;
+    char *buf;
+    char *line;
+
+    fp = phpc_resolve_stream(handle);
+    if (NULL == fp) {
+        return NULL;
+    }
+    delim = phpc_csv_first_char(separator, ',');
+    enc = phpc_csv_first_char(enclosure, '"');
+    esc = phpc_csv_first_char(escape, '\\');
+    if (0 == length) {
+        return NULL;
+    }
+    buf_size = length < 0 ? 8192 : (size_t) length;
+    buf = (char *) malloc(buf_size);
+    if (NULL == buf) {
+        return NULL;
+    }
+    line = fgets(buf, (int) buf_size, fp);
+    if (NULL == line) {
+        free(buf);
+
+        return NULL;
+    }
+    {
+        size_t n = strlen(buf);
+        while (n > 0 && ('\n' == buf[n - 1] || '\r' == buf[n - 1])) {
+            buf[--n] = '\0';
+        }
+        __hashtable__ *result = phpc_parse_csv_line(buf, delim, enc, esc);
+        free(buf);
+
+        return result;
+    }
+}
