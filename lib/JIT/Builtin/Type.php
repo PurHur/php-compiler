@@ -147,6 +147,15 @@ class Type extends Builtin {
             $fntypeFilePutContents
         );
         $this->context->registerFunction('__compiler_file_put_contents', $fnFilePutContents);
+        $fntypeFwrite = $this->context->context->functionType(
+            $i64,
+            false,
+            $i64,
+            $this->context->getTypeFromString('__string__*'),
+            $i64
+        );
+        $fnCompilerFwrite = $this->context->module->addFunction('__compiler_fwrite', $fntypeFwrite);
+        $this->context->registerFunction('__compiler_fwrite', $fnCompilerFwrite);
         $fntypeMkdir = $this->context->context->functionType(
             $i32,
             false,
