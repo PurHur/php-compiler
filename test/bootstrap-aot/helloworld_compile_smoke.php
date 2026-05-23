@@ -28,6 +28,10 @@ function helloworld_compile_smoke(string $sourceFile, string $outFile): array
         return ['ok' => false, 'message' => 'helloworld_compile_smoke: empty source '.$resolved];
     }
 
+    if (\function_exists('putenv')) {
+        putenv('PHP_COMPILER_SELFHOST_AOT');
+    }
+
     $runtime = new \PHPCompiler\Runtime(\PHPCompiler\Runtime::MODE_AOT);
     $block = $runtime->parseAndCompile($code, $resolved);
     if (null === $block) {

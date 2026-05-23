@@ -417,7 +417,7 @@ class JIT {
             || str_contains($lower, 'deployroot')
             || str_contains($lower, 'sourcebundler')
             || (str_contains($lower, '\\web\\conststringfolder::') && !$this->isConstStringFolderRealLoweringMethod($lower))
-            || str_contains($lower, '\\web\\superglobals::');
+            || (str_contains($lower, '\\web\\superglobals::') && !str_ends_with($lower, '::issuperglobalname'));
     }
 
 
@@ -2843,13 +2843,38 @@ class JIT {
             $result->addref();
             $this->context->builder->branch($doneBlock);
             $this->context->builder->positionAtEnd($handleBlock);
-            $slot = JIT\JitValueBox::alloc($this->context);
-            JIT\JitValueBox::copyFromPointer($this->context, $slot, $valuePtr);
             $result->free();
+            $slot = JIT\JitValueBox::alloc($this->context);
+            $destPtr = JIT\JitValueBox::pointer($this->context, $slot);
+            $longBlock = JIT\BasicBlockHelper::append($this->context, 'assign_stream_handle_long');
+            $boolBlock = JIT\BasicBlockHelper::append($this->context, 'assign_stream_handle_bool');
+            $this->context->builder->branchIf($isLong, $longBlock, $boolBlock);
+            $this->context->builder->positionAtEnd($longBlock);
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeLong'),
+                $destPtr,
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__readLong'),
+                    $valuePtr
+                )
+            );
+            $this->context->builder->branch($doneBlock);
+            $this->context->builder->positionAtEnd($boolBlock);
+            JIT\JitValueBox::writeBool(
+                $this->context,
+                $slot,
+                $this->context->builder->truncOrBitCast(
+                    $this->context->builder->call(
+                        $this->context->lookupFunction('__value__readLong'),
+                        $valuePtr
+                    ),
+                    $this->context->getTypeFromString('int1')
+                )
+            );
+            $this->context->builder->branch($doneBlock);
             $result->type = Variable::TYPE_VALUE;
             $result->value = $slot;
             $result->addref();
-            $this->context->builder->branch($doneBlock);
             $this->context->builder->positionAtEnd($doneBlock);
 
             return;

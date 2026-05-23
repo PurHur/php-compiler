@@ -94,6 +94,13 @@ final class JitCompilerSelfHostStubTest extends TestCase
     ];
 
     /** @var list<string> */
+    private const CONSTSTRINGFOLDER_SHORT_HOT_PATH_SAMPLES = [
+        'magicscriptconstvalue',
+        'foldconcat',
+        'literalstringvalue',
+    ];
+
+    /** @var list<string> */
     private const LIB_SPINE_SMOKE_STUBBED_SAMPLES = [
         'PHPCompiler\\Doctor::run',
         'PHPCompiler\\Cli\\InvokeCwd::baseDir',
@@ -308,6 +315,35 @@ final class JitCompilerSelfHostStubTest extends TestCase
             } else {
                 putenv('PHP_COMPILER_SELFHOST_AOT='.$prev);
             }
+        }
+    }
+
+    /**
+     * @dataProvider constStringFolderShortHotPathProvider
+     */
+    public function testIsSkippedConstStringFolderShortHotPathNameMatches(string $sample): void
+    {
+        $prev = getenv('PHP_COMPILER_SELFHOST_AOT');
+        putenv('PHP_COMPILER_SELFHOST_AOT=1');
+        try {
+            $this->assertTrue(
+                $this->invokeSkipCheck('isSkippedConstStringFolderShortHotPathName', $sample),
+                "Expected isSkippedConstStringFolderShortHotPathName for {$sample}"
+            );
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_SELFHOST_AOT');
+            } else {
+                putenv('PHP_COMPILER_SELFHOST_AOT='.$prev);
+            }
+        }
+    }
+
+    /** @return iterable<string, array{0: string}> */
+    public static function constStringFolderShortHotPathProvider(): iterable
+    {
+        foreach (self::CONSTSTRINGFOLDER_SHORT_HOT_PATH_SAMPLES as $sample) {
+            yield $sample => [$sample];
         }
     }
 

@@ -38,7 +38,11 @@ final class JitFread
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($okBlock);
-        $context->builder->call($context->lookupFunction('__value__writeString'), $ptr, $contents);
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $contents
+        );
+        $context->builder->call($context->lookupFunction('__value__writeString'), $ptr, $owned);
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);

@@ -178,6 +178,8 @@ final class HashTableHelper
                 $context->builder->pointerCast(JitValueBox::pointer($context, $boxed), $voidPtr),
                 $array->value
             );
+            $array->type = Variable::TYPE_VALUE;
+            $array->valueBoxHashtable = true;
 
             return;
         }
@@ -1196,6 +1198,7 @@ final class HashTableHelper
             throw new \LogicException('materializeNativeArrayForCall requires a native array');
         }
         $dest = self::alloc($context);
+        $map = $context->structFieldMap['__hashtable__'];
         $elemType = $array->type & ~Variable::IS_NATIVE_ARRAY;
         $sizeT = $context->getTypeFromString('size_t');
         $zero = $sizeT->constInt(0, false);
@@ -1234,6 +1237,8 @@ final class HashTableHelper
         $context->builder->branch($head);
 
         $context->builder->positionAtEnd($done);
+        $context->builder->store($count, $context->builder->structGep($dest, $map['numElements']));
+        $context->builder->store($count, $context->builder->structGep($dest, $map['nextFreeElement']));
 
         $context->refcount->addref($dest);
 

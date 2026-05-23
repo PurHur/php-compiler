@@ -3413,6 +3413,7 @@ final class ArrayBuiltinHelper
         }
         $ht = self::loadHashTable($context, $array);
         $context->builder->call($context->lookupFunction('__hashtable__sortPacked'), $ht);
+        HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
     }
 
     private static function sameTypeEqual(Context $context, Variable $left, Variable $right): Value

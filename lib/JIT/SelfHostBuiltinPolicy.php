@@ -68,7 +68,8 @@ final class SelfHostBuiltinPolicy
         'strip_tags' => 'string', 'sprintf' => 'string', 'chr' => 'string', 'number_format' => 'string',
         'base64_encode' => 'string', 'base64_decode' => 'string',
         'htmlspecialchars' => 'string', 'header' => 'string', 'http_response_code' => 'string',
-        'substr' => 'string',
+        'substr' => 'string', 'trim' => 'string', 'ltrim' => 'string', 'rtrim' => 'string',
+        'urlencode' => 'string', 'rawurlencode' => 'string',
     ];
 
     /** @var array<string, string> */
@@ -76,6 +77,10 @@ final class SelfHostBuiltinPolicy
         'array_merge' => 'array', 'array_keys' => 'array', 'array_values' => 'array',
         'in_array' => 'array', 'array_search' => 'array', 'array_fill' => 'array', 'array_slice' => 'array',
         'array_key_exists' => 'array', 'array_map' => 'array',
+        'array_push' => 'array', 'array_pop' => 'array', 'array_shift' => 'array', 'array_unshift' => 'array',
+        'array_reverse' => 'array', 'array_filter' => 'array', 'array_combine' => 'array', 'array_flip' => 'array',
+        'array_product' => 'array', 'array_unique' => 'array', 'array_sum' => 'array', 'sort' => 'array',
+        'compact' => 'array', 'extract' => 'array', 'defined' => 'array', 'define' => 'array',
     ];
 
     /** @var array<string, string> */
