@@ -25,28 +25,25 @@ final class clearstatcache_ extends Internal
         if ($argc > 2) {
             throw new \LogicException('clearstatcache() accepts at most two arguments in this compiler build');
         }
+        if (0 === $argc) {
+            \clearstatcache();
+        } elseif (1 === $argc) {
+            $clearRealpath = $frame->calledArgs[0]->resolveIndirect();
+            if (Variable::TYPE_BOOLEAN !== $clearRealpath->type) {
+                throw new \LogicException('clearstatcache() argument #1 must be a boolean in this compiler build');
+            }
+            \clearstatcache($clearRealpath->toBool());
+        } else {
+            $clearRealpath = $frame->calledArgs[0]->resolveIndirect();
+            if (Variable::TYPE_BOOLEAN !== $clearRealpath->type) {
+                throw new \LogicException('clearstatcache() argument #1 must be a boolean in this compiler build');
+            }
+            $filename = VmReflection::stringArg($frame->calledArgs[1], 'clearstatcache() filename');
+            \clearstatcache($clearRealpath->toBool(), $filename);
+        }
         if (null !== $frame->returnVar) {
             $frame->returnVar->null();
         }
-        if (0 === $argc) {
-            \clearstatcache();
-
-            return;
-        }
-        $clearRealpath = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_BOOLEAN !== $clearRealpath->type) {
-            throw new \LogicException('clearstatcache() argument #1 must be a boolean in this compiler build');
-        }
-        if (1 === $argc) {
-            \clearstatcache($clearRealpath->toBool());
-
-            return;
-        }
-        $path = $frame->calledArgs[1]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $path->type) {
-            throw new \LogicException('clearstatcache() argument #2 must be a string in this compiler build');
-        }
-        \clearstatcache($clearRealpath->toBool(), $path->toString());
     }
 
     public function call(Context $context, JITVariable ...$args): Value

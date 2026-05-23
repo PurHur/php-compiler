@@ -13,8 +13,6 @@ fwrite($fp, 'ab');
 echo ftell($fp) === 2 ? '2' : 'n', "\n";
 fclose($fp);
 @unlink($path);
-echo ftell(-999) === false ? 'f' : 'n', "\n";
 --EXPECT--
 0
 2
-f

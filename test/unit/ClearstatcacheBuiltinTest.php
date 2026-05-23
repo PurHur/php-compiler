@@ -11,6 +11,13 @@ use PHPUnit\Framework\TestCase;
  */
 final class ClearstatcacheBuiltinTest extends TestCase
 {
+    private const OPTIONAL_CODE = <<<'PHP'
+clearstatcache();
+clearstatcache(false);
+clearstatcache(true, 'test/compliance/cases/stdlib/clearstatcache_fixture.txt');
+echo "ok\n";
+PHP;
+
     private const CODE = <<<'PHP'
 $path = tempnam(sys_get_temp_dir(), 'phpc_clearstatcache_unit_');
 if (!is_string($path)) {
@@ -35,6 +42,11 @@ echo null === $r ? 'ok' : 'bad', "\n";
 PHP;
 
     private const AOT_EXPECT = 'ok';
+
+    public function testVmAcceptsOptionalArgs(): void
+    {
+        $this->assertSame("ok\n", $this->runBin('bin/vm.php', self::OPTIONAL_CODE));
+    }
 
     public function testVmMatchesPhpSubset(): void
     {
@@ -100,24 +112,24 @@ PHP;
     private function runBin(string $bin, string $code): string
     {
         $repo = dirname(__DIR__, 2);
-        $tmp = tempnam(sys_get_temp_dir(), 'phpc_clearstatcache_vm_');
+        $path = $repo.'/'.$bin;
+        $tmp = tempnam(sys_get_temp_dir(), 'phpc_clearstatcache_');
         $this->assertNotFalse($tmp);
         file_put_contents($tmp, "<?php\n".$code);
-        $proc = proc_open(
-            ['php', $repo.'/'.$bin, $tmp],
-            [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
-            $pipes,
-            $repo
-        );
+        $descriptor = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+        $env = $_ENV;
+        LlvmToolchain::applyProcessEnv($env, $repo);
+        $proc = proc_open(['php', $path, $tmp], $descriptor, $pipes, $repo, $env);
         $this->assertIsResource($proc);
         fclose($pipes[0]);
-        $stdout = stream_get_contents($pipes[1]);
-        $stderr = stream_get_contents($pipes[2]);
+        $out = stream_get_contents($pipes[1]);
+        $err = stream_get_contents($pipes[2]);
         fclose($pipes[1]);
         fclose($pipes[2]);
-        $this->assertSame(0, proc_close($proc), trim((string) $stderr));
+        $exit = proc_close($proc);
         @unlink($tmp);
+        $this->assertSame(0, $exit, trim((string) $err));
 
-        return rtrim((string) $stdout, "\n");
+        return rtrim((string) $out, "\n");
     }
 }

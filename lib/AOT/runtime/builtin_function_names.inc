@@ -18,6 +18,7 @@ static const char *phpc_builtin_functions[] = {
     "array_pop",
     "array_product",
     "array_push",
+    "array_reduce",
     "array_replace",
     "array_reverse",
     "array_search",
@@ -40,6 +41,7 @@ static const char *phpc_builtin_functions[] = {
     "chr",
     "chunk_split",
     "class_exists",
+    "clearstatcache",
     "compact",
     "copy",
     "cos",
@@ -60,8 +62,8 @@ static const char *phpc_builtin_functions[] = {
     "fclose",
     "feof",
     "fflush",
-    "ftell",
     "fgetc",
+    "fgets",
     "file_exists",
     "file_get_contents",
     "file_put_contents",
@@ -76,6 +78,8 @@ static const char *phpc_builtin_functions[] = {
     "fmod",
     "fopen",
     "fread",
+    "fseek",
+    "ftell",
     "function_exists",
     "fwrite",
     "get_class",
@@ -151,6 +155,7 @@ static const char *phpc_builtin_functions[] = {
     "pi",
     "pow",
     "preg_match",
+    "preg_last_error",
     "preg_quote",
     "putenv",
     "quotemeta",
@@ -226,4 +231,4 @@ static const char *phpc_builtin_functions[] = {
     "web_string",
     "wordwrap",
 };
-static const size_t phpc_builtin_functions_count = 224;
+static const size_t phpc_builtin_functions_count = 230;
