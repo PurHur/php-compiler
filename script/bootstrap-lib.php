@@ -235,6 +235,7 @@ function bootstrapDefaultAotLinkTargets(array $lintTargets): array
         'test/bootstrap-aot/spl_object_storage_dim.php', // lint OK; LLVM verify on link (#601)
         'test/bootstrap-aot/class_int_property.php', // lint OK; LLVM verify on link
         'test/bootstrap-aot/external_cfg_block_children.php', // lint OK; LLVM verify on link
+        'test/bootstrap-aot/block_orig_children_foreach.php', // lint OK; LLVM verify on link (#848)
         'test/bootstrap-aot/isset_object_typed_property.php', // lint OK; LLVM verify on link (#764)
     ];
 

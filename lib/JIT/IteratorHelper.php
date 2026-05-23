@@ -17,10 +17,61 @@ final class IteratorHelper
             && 'splobjectstorage' === strtolower($containerUserType);
     }
 
+    /**
+     * Borrowed {@see Variable::$objectPropertySlot} for external CFG / compiler array fields (#848).
+     */
+    private static function hashtableFromObjectPropertySlot(Context $context, Variable $array): ?Variable
+    {
+        if (null === $array->objectPropertySlot || null === $array->objectPropertyType) {
+            return null;
+        }
+        if (Variable::TYPE_HASHTABLE === $array->objectPropertyType) {
+            $loaded = $context->builder->load($array->objectPropertySlot);
+            $htPtr = $context->builder->pointerCast(
+                $loaded,
+                $context->getTypeFromString('__hashtable__*')
+            );
+
+            return new Variable(
+                $context,
+                Variable::TYPE_HASHTABLE,
+                Variable::KIND_VALUE,
+                $htPtr
+            );
+        }
+        if (Variable::TYPE_VALUE === $array->objectPropertyType) {
+            $valueType = $context->getTypeFromString('__value__');
+            $storage = BasicBlockHelper::entryAlloca($context, $valueType);
+            $valueMap = $context->structFieldMap['__value__'];
+            $context->builder->store(
+                $context->getTypeFromString('int8')->constInt(Variable::TYPE_NULL, false),
+                $context->builder->structGep($storage, $valueMap['type'])
+            );
+            $context->builder->call(
+                $context->lookupFunction('__object__load_value_slot'),
+                $array->objectPropertySlot,
+                $storage
+            );
+            $ht = $context->builder->call(
+                $context->lookupFunction('__value__readHashtable'),
+                JitValueBox::pointer($context, $storage)
+            );
+
+            return new Variable(
+                $context,
+                Variable::TYPE_HASHTABLE,
+                Variable::KIND_VALUE,
+                $ht
+            );
+        }
+
+        return null;
+    }
+
     private static function asHashtable(Context $context, Variable $array, ?string $containerUserType): Variable
     {
         if (Variable::TYPE_HASHTABLE === $array->type) {
-            return $array;
+            return HashTableHelper::asDetachedHashtable($context, $array);
         }
         if ($array->type & Variable::IS_NATIVE_ARRAY) {
             return new Variable(
@@ -29,6 +80,10 @@ final class IteratorHelper
                 Variable::KIND_VALUE,
                 HashTableHelper::materializeNativeArrayForCall($context, $array)
             );
+        }
+        $fromPropertySlot = self::hashtableFromObjectPropertySlot($context, $array);
+        if (null !== $fromPropertySlot) {
+            return $fromPropertySlot;
         }
         if (Variable::TYPE_VALUE === $array->type) {
             $valPtr = Variable::KIND_VARIABLE === $array->kind
@@ -49,23 +104,6 @@ final class IteratorHelper
         if (Variable::TYPE_OBJECT === $array->type) {
             if (self::usesObjectKeys($containerUserType)) {
                 return $context->type->object->splBackingHashtable($array);
-            }
-            if (
-                null !== $array->objectPropertySlot
-                && Variable::TYPE_HASHTABLE === $array->objectPropertyType
-            ) {
-                $loaded = $context->builder->load($array->objectPropertySlot);
-                $htPtr = $context->builder->pointerCast(
-                    $loaded,
-                    $context->getTypeFromString('__hashtable__*')
-                );
-
-                return new Variable(
-                    $context,
-                    Variable::TYPE_HASHTABLE,
-                    Variable::KIND_VALUE,
-                    $htPtr
-                );
             }
 
             if (Variable::KIND_VALUE === $array->kind || Variable::KIND_VARIABLE === $array->kind) {
