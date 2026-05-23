@@ -250,12 +250,30 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('@group aot-link', $source);
     }
 
+    public function testMiniWebAppAotBisectScriptExists(): void
+    {
+        $script = dirname(__DIR__, 2).'/script/miniwebapp-aot-bisect.sh';
+        $this->assertFileExists($script);
+        $this->assertTrue(is_executable($script));
+        $body = (string) file_get_contents($script);
+        $this->assertStringContainsString('miniwebapp-aot-bisect', $body);
+        $this->assertStringContainsString('issues/764', $body);
+        $this->assertStringContainsString('issues/879', $body);
+        $this->assertStringContainsString('isset_object_property_array', $body);
+        $this->assertStringContainsString('nested_include_two_tier', $body);
+        $this->assertStringContainsString('--from', $body);
+        $this->assertStringContainsString('--list', $body);
+    }
+
     public function testMiniWebAppGatesScriptExists(): void
     {
         $script = dirname(__DIR__, 2).'/script/miniwebapp-gates.sh';
         $this->assertFileExists($script);
         $this->assertTrue(is_executable($script));
         $body = (string) file_get_contents($script);
+        $this->assertStringContainsString('MINIWEBAPP_AOT_BISECT_GATE', $body);
+        $this->assertStringContainsString('miniwebapp-aot-bisect.sh', $body);
+        $this->assertStringContainsString('issues/879', $body);
         $this->assertStringContainsString('MINIWEBAPP_LINT_GATE', $body);
         $this->assertStringContainsString('MINIWEBAPP_VM_CLI_GATE', $body);
         $this->assertStringContainsString('MINIWEBAPP_SERVE_GATE', $body);

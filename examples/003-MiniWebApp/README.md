@@ -100,8 +100,19 @@ Progressive stages from `script/miniwebapp-gates.sh` / `make miniwebapp-gates`:
 | 4c | `EXAMPLES_AOT_SMOKE_ONLY=003` smoke slice | skip until [#568](https://github.com/PurHur/php-compiler/issues/568) ([#683](https://github.com/PurHur/php-compiler/issues/683)) |
 | 4b | `ExamplesCompileTest::test003MiniWebAppBuildLinks` | ✅ link gate ([#754](https://github.com/PurHur/php-compiler/issues/754)) |
 | 4b2 | `test003MiniWebAppExecutesWithCgiEnv` | opt-in `MINIWEBAPP_AOT_EXECUTE_GATE=1` ([#791](https://github.com/PurHur/php-compiler/issues/791), blocked [#764](https://github.com/PurHur/php-compiler/issues/764)) |
+| 4b2 bisect | `script/miniwebapp-aot-bisect.sh` ordered PHPT ladder | opt-in `MINIWEBAPP_AOT_BISECT_GATE=1` ([#879](https://github.com/PurHur/php-compiler/issues/879), [#764](https://github.com/PurHur/php-compiler/issues/764)) |
 
 Stage **4c** runs only the 003 block of `script/examples-aot-smoke.sh` (same pass/skip/fail UX as 4a). Full examples smoke: `make examples-aot-smoke`.
+
+Ordered **#764** AOT fixture bisect (smallest failing step first):
+
+```console
+./script/miniwebapp-aot-bisect.sh --list
+./script/miniwebapp-aot-bisect.sh
+./script/miniwebapp-aot-bisect.sh --from nested_include_two_tier
+MINIWEBAPP_AOT_BISECT_INCLUDE_APP=1 ./script/miniwebapp-aot-bisect.sh
+MINIWEBAPP_AOT_BISECT_GATE=1 make miniwebapp-gates
+```
 
 ## CI hooks
 
@@ -115,6 +126,8 @@ MINIWEBAPP_SERVE_GATE=0 ../../script/ci-local.sh   # skip miniwebapp ServeTest w
 MINIWEBAPP_WEB_SMOKE_GATE=0 ../../script/ci-local.sh   # skip 003 shell PATH_INFO curls (#664)
 MINIWEBAPP_AOT_LINK_GATE=0 ../../script/ci-local.sh --filter ExamplesCompileTest   # skip 003 link gate (#754)
 MINIWEBAPP_AOT_EXECUTE_GATE=1 ../../script/ci-local.sh --filter test003MiniWebAppExecutesWithCgiEnv   # after #764
+../../script/miniwebapp-aot-bisect.sh --list   # #764 ladder (#879)
+MINIWEBAPP_AOT_BISECT_GATE=1 ../../script/miniwebapp-gates.sh
 ```
 
 Fast CI runs `MiniWebAppVmCliTest` and `MiniWebAppPathInfoVmCliTest` when `MINIWEBAPP_VM_CLI_GATE=1` (default). Set `MINIWEBAPP_VM_CLI_GATE=0` to skip the VM CLI matrix during iteration.

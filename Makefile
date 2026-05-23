@@ -102,13 +102,17 @@ test-docker-fast-jit-preflight: docker-build-22
 	JIT_PREFLIGHT_GATE=1 ./script/docker-ci-local.sh fast
 
 # VM smoke: examples/001-SimpleWeb with ?name=Test
-.PHONY: web-smoke miniwebapp-gates
+.PHONY: web-smoke miniwebapp-gates miniwebapp-aot-bisect
 web-smoke:
 	./script/web-smoke.sh
 
 # MiniWebApp CI gate ladder status (issue #503; no full CI)
 miniwebapp-gates:
 	./script/miniwebapp-gates.sh
+
+# Ordered #764 AOT PHPT ladder (issue #879; requires LLVM 9)
+miniwebapp-aot-bisect:
+	./script/miniwebapp-aot-bisect.sh
 
 # HTTP smoke: phpc serve + curl for 001-SimpleWeb and 002-StaticWeb (issue #298)
 .PHONY: examples-web-smoke examples-web-smoke-prebuild examples-aot-smoke deploy-smoke
