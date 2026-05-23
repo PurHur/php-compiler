@@ -55,10 +55,20 @@ final class JitCompilerSelfHostStubTest extends TestCase
 
     /** @var list<string> */
     private const WEB_BOOTSTRAP_SKIP_PATTERNS = [
-        'includepathresolver',
-        'literalincludediscovery',
         'deployroot',
         'sourcebundler',
+    ];
+
+    /** @var list<string> */
+    private const WEB_BOOTSTRAP_STUBBED_LITERALINCLUDEDISCOVERY_METHODS = [
+        'discoverdirectabsolutepaths',
+        'discoverabsolutepaths',
+        'pathsfrommainscopeforbundle',
+        'pathsfromscript',
+        'walkcfgblock',
+        'walkcfgblockforbundle',
+        'isbundlescopeboundary',
+        'walkcfgblockinternal',
     ];
 
     /** @var list<string> */
@@ -164,6 +174,32 @@ final class JitCompilerSelfHostStubTest extends TestCase
                 'conststringfolder::'.$method,
                 'PHPCompiler\\Web\\ConstStringFolder::'.$method,
             ];
+        }
+        foreach (self::WEB_BOOTSTRAP_STUBBED_LITERALINCLUDEDISCOVERY_METHODS as $method) {
+            yield 'literalincludediscovery::'.$method => [
+                'literalincludediscovery::'.$method,
+                'PHPCompiler\\Web\\LiteralIncludeDiscovery::'.$method,
+            ];
+        }
+    }
+
+    public function testIncludePathResolverResolveIsNotWebBootstrapStub(): void
+    {
+        $prev = getenv('PHP_COMPILER_SELFHOST_AOT');
+        putenv('PHP_COMPILER_SELFHOST_AOT=1');
+        try {
+            $this->assertFalse(
+                $this->invokeSkipCheck(
+                    'isSkippedWebBootstrapHotPathName',
+                    'phpcompiler\\web\\includepathresolver::resolve'
+                )
+            );
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_SELFHOST_AOT');
+            } else {
+                putenv('PHP_COMPILER_SELFHOST_AOT='.$prev);
+            }
         }
     }
 

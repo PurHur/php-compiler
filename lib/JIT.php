@@ -405,12 +405,24 @@ class JIT {
             return false;
         }
         $lower = strtolower($name);
-        return str_contains($lower, 'includepathresolver')
-            || str_contains($lower, 'literalincludediscovery')
+        return (str_contains($lower, '\\web\\includepathresolver::') && !$this->isIncludePathResolverRealLoweringMethod($lower))
+            || (str_contains($lower, '\\web\\literalincludediscovery::') && !$this->isLiteralIncludeDiscoveryRealLoweringMethod($lower))
             || str_contains($lower, 'deployroot')
             || str_contains($lower, 'sourcebundler')
             || (str_contains($lower, '\\web\\conststringfolder::') && !$this->isConstStringFolderRealLoweringMethod($lower))
             || (str_contains($lower, '\\web\\superglobals::') && !str_ends_with($lower, '::issuperglobalname'));
+    }
+
+    /** IncludePathResolver methods with safe LLVM 9 lowering during self-host AOT (#816). */
+    private function isIncludePathResolverRealLoweringMethod(string $lower): bool
+    {
+        return str_ends_with($lower, '::resolve');
+    }
+
+    /** LiteralIncludeDiscovery methods with safe LLVM 9 lowering during self-host AOT (#816). */
+    private function isLiteralIncludeDiscoveryRealLoweringMethod(string $lower): bool
+    {
+        return false;
     }
 
     /** ConstStringFolder methods with safe LLVM 9 lowering during self-host AOT (#816). */
