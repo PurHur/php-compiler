@@ -58,6 +58,11 @@ class JIT {
             if ('opcode_type_name' === $name || str_ends_with($name, '\\opcode_type_name')) {
                 return;
             }
+            if ($this->isSkippedVmHotPathName($name) || $this->isSkippedCompilerHotPathName($name)) {
+                $this->compileBlock($func->block, $name);
+
+                return;
+            }
             $this->compileBlock($func->block, $name);
             $this->runQueue();
             return;
@@ -104,6 +109,17 @@ class JIT {
         }
         if (str_contains($internalName, 'opcode_type_name')) {
             return $this->compileSkippedOpcodeNameStub($internalName, $block);
+        }
+        if ($this->isSkippedVmHotPathName($logicalName ?? $internalName)) {
+            return $this->compileSkippedVmHotPathStub($internalName, $block, $logicalName ?? $internalName);
+        }
+        if ($this->isSkippedCompilerHotPathName($logicalName ?? $internalName)) {
+            $lower = strtolower($logicalName ?? $internalName);
+            if (str_contains($lower, 'compilecfgbranch')) {
+                return $this->compileSkippedCompilerCfgBranchStub($internalName, $block, $logicalName ?? $internalName);
+            }
+
+            return $this->compileSkippedCompilerSplitCfgStub($internalName, $block, $logicalName ?? $internalName);
         }
         $args = [];
         $rawTypes = [];
@@ -243,6 +259,191 @@ class JIT {
         $this->context->builder->clearInsertionPosition();
         $this->context->builder = $saved;
         $this->context->functions[$lcname] = $func;
+
+        return $func;
+    }
+
+    private function isSkippedVmHotPathName(string $name): bool
+    {
+        $lower = strtolower($name);
+
+        return str_ends_with($lower, '::runframes') || str_ends_with($lower, '::defineclass');
+    }
+
+    private function isSkippedCompilerHotPathName(string $name): bool
+    {
+        $lower = strtolower($name);
+
+        return str_contains($lower, 'splitcfgblockafterstringkeyedarray')
+            || str_contains($lower, 'compilecfgbranch')
+            || str_contains($lower, 'compileclasslike')
+            || str_contains($lower, 'compileclassbody')
+            || str_contains($lower, 'compilefunction')
+            || str_contains($lower, 'compileglobalconst')
+            || str_contains($lower, 'compileoperand');
+    }
+
+    /** Stub VM hot-path methods whose opcode switches crash LLVM 9 during self-host AOT (#816). */
+    private function compileSkippedVmHotPathStub(string $internalName, Block $block, string $logicalName): PHPLLVM\Value
+    {
+        $lcname = strtolower($logicalName);
+        if (isset($this->context->functions[$lcname])) {
+            return $this->context->functions[$lcname];
+        }
+        $args = [];
+        $callbackType = 'void';
+        if (null !== $block->func) {
+            if ($block->func->returnType instanceof Op\Type\Void_) {
+                $callbackType = 'void';
+            } elseif ($block->func->returnType instanceof Op\Type\Literal) {
+                $callbackType = match ($block->func->returnType->name) {
+                    'void' => 'void',
+                    'int' => 'long long',
+                    default => '__value__',
+                };
+            } else {
+                $callbackType = '__value__';
+            }
+            if ($this->instanceMethodUsesThis($block)) {
+                $args[] = $this->context->getTypeFromString('__object__*');
+            }
+            foreach ($block->func->params as $param) {
+                if (empty($param->result->usages)) {
+                    assert($param->declaredType instanceof Op\Type\Literal);
+                    $rawType = Type::fromDecl($param->declaredType->name);
+                } else {
+                    $rawType = $param->result->type;
+                }
+                $args[] = $this->context->getTypeFromType($rawType);
+            }
+        }
+        $returnType = $this->context->getTypeFromString($callbackType);
+        $func = $this->context->module->addFunction(
+            $this->llvmInternalName($internalName),
+            $this->context->context->functionType($returnType, false, ...$args)
+        );
+        $bb = $func->appendBasicBlock('stub');
+        $saved = $this->context->builder;
+        $this->context->builder = $this->context->context->builderCreate();
+        $this->context->builder->positionAtEnd($bb);
+        if ('long long' === $callbackType) {
+            $this->context->builder->returnValue(
+                $this->context->getTypeFromString('int64')->constInt(VM::SUCCESS, false)
+            );
+        } else {
+            $this->context->builder->returnVoid();
+        }
+        $this->context->builder->clearInsertionPosition();
+        $this->context->builder = $saved;
+        $this->context->functions[$lcname] = $func;
+        $this->context->functionReturnType[$lcname] = $callbackType;
+        $this->context->functionProxies[$lcname] = new JIT\Call\Native(
+            $func,
+            $logicalName,
+            $args,
+            $this->collectParamDefaults($block)
+        );
+
+        return $func;
+    }
+
+    /** Stub Compiler::compileCfgBranch() for LLVM 9 self-host AOT (#816). */
+    private function compileSkippedCompilerCfgBranchStub(string $internalName, Block $block, string $logicalName): PHPLLVM\Value
+    {
+        $lcname = strtolower($logicalName);
+        if (isset($this->context->functions[$lcname])) {
+            return $this->context->functions[$lcname];
+        }
+        $objectPtr = $this->context->getTypeFromString('__object__*');
+        $func = $this->context->module->addFunction(
+            $this->llvmInternalName($internalName),
+            $this->context->context->functionType($objectPtr, false, $objectPtr, $objectPtr, $objectPtr)
+        );
+        $bb = $func->appendBasicBlock('stub');
+        $saved = $this->context->builder;
+        $this->context->builder = $this->context->context->builderCreate();
+        $this->context->builder->positionAtEnd($bb);
+        $this->context->builder->returnValue($objectPtr->constNull());
+        $this->context->builder->clearInsertionPosition();
+        $this->context->builder = $saved;
+        $this->context->functions[$lcname] = $func;
+        $this->context->functionReturnType[$lcname] = '__object__*';
+        $this->context->functionProxies[$lcname] = new JIT\Call\Native(
+            $func,
+            $logicalName,
+            [$objectPtr, $objectPtr, $objectPtr],
+            []
+        );
+
+        return $func;
+    }
+
+    /** Stub Compiler CFG helpers that crash LLVM 9 during self-host AOT (#816). */
+    private function compileSkippedCompilerSplitCfgStub(string $internalName, Block $block, string $logicalName): PHPLLVM\Value
+    {
+        $lcname = strtolower($logicalName);
+        if (isset($this->context->functions[$lcname])) {
+            return $this->context->functions[$lcname];
+        }
+        $args = [];
+        $callbackType = '__object__*';
+        if (null !== $block->func) {
+            if ($block->func->returnType instanceof Op\Type\Void_) {
+                $callbackType = 'void';
+            } elseif ($block->func->returnType instanceof Op\Type\Literal) {
+                $callbackType = match ($block->func->returnType->name) {
+                    'void' => 'void',
+                    'int' => 'long long',
+                    'string' => '__string__*',
+                    'bool' => 'bool',
+                    'object' => '__object__*',
+                    'array' => '__hashtable__*',
+                    default => '__object__*',
+                };
+            }
+            if ($this->instanceMethodUsesThis($block)) {
+                $args[] = $this->context->getTypeFromString('__object__*');
+            }
+            foreach ($block->func->params as $param) {
+                if (empty($param->result->usages)) {
+                    assert($param->declaredType instanceof Op\Type\Literal);
+                    $rawType = Type::fromDecl($param->declaredType->name);
+                } else {
+                    $rawType = $param->result->type;
+                }
+                $args[] = $this->context->getTypeFromType($rawType);
+            }
+        }
+        $returnType = $this->context->getTypeFromString($callbackType);
+        $func = $this->context->module->addFunction(
+            $this->llvmInternalName($internalName),
+            $this->context->context->functionType($returnType, false, ...$args)
+        );
+        $bb = $func->appendBasicBlock('stub');
+        $saved = $this->context->builder;
+        $this->context->builder = $this->context->context->builderCreate();
+        $this->context->builder->positionAtEnd($bb);
+        if ('void' === $callbackType) {
+            $this->context->builder->returnVoid();
+        } elseif ('long long' === $callbackType) {
+            $this->context->builder->returnValue(
+                $this->context->getTypeFromString('int64')->constInt(0, false)
+            );
+        } else {
+            $this->context->builder->returnValue(
+                $this->context->getTypeFromString('__object__*')->constNull()
+            );
+        }
+        $this->context->builder->clearInsertionPosition();
+        $this->context->builder = $saved;
+        $this->context->functions[$lcname] = $func;
+        $this->context->functionReturnType[$lcname] = $callbackType;
+        $this->context->functionProxies[$lcname] = new JIT\Call\Native(
+            $func,
+            $logicalName,
+            $args,
+            $this->collectParamDefaults($block)
+        );
 
         return $func;
     }
