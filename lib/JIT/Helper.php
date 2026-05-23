@@ -715,6 +715,28 @@ restart:
             }
             goto return_bool;
         }
+        if (Variable::TYPE_STRING === $leftType && Variable::TYPE_NATIVE_BOOL === $rightType) {
+            $falseVal = $this->context->getTypeFromString('int1')->constInt(0, false);
+            if (OpCode::TYPE_IDENTICAL === $opcode->type || OpCode::TYPE_EQUAL === $opcode->type) {
+                $result = $falseVal;
+                goto return_bool;
+            }
+            if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                $result = $this->context->getTypeFromString('int1')->constInt(1, false);
+                goto return_bool;
+            }
+        }
+        if (Variable::TYPE_NATIVE_BOOL === $leftType && Variable::TYPE_STRING === $rightType) {
+            $falseVal = $this->context->getTypeFromString('int1')->constInt(0, false);
+            if (OpCode::TYPE_IDENTICAL === $opcode->type || OpCode::TYPE_EQUAL === $opcode->type) {
+                $result = $falseVal;
+                goto return_bool;
+            }
+            if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                $result = $this->context->getTypeFromString('int1')->constInt(1, false);
+                goto return_bool;
+            }
+        }
         $type = opcode_type_name($opcode->type);
         throw new \LogicException("Reached end of switch, can't handle binary operation yet: $type for type pair {$leftType} and {$rightType}");
 return_double:
