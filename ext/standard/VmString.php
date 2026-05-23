@@ -92,6 +92,24 @@ final class VmString
         return $out;
     }
 
+    /** ROT13 for ASCII letters a–z and A–Z; other bytes unchanged (PHP-compatible). */
+    public static function strRot13(string $string): string
+    {
+        $len = self::byteLength($string);
+        $out = '';
+        for ($i = 0; $i < $len; ++$i) {
+            $ord = self::byteOrd($string[$i]);
+            if (($ord >= 65 && $ord <= 90) || ($ord >= 97 && $ord <= 122)) {
+                $base = $ord >= 97 ? 97 : 65;
+                $out .= self::byteChr($base + (($ord - $base + 13) % 26));
+            } else {
+                $out .= $string[$i];
+            }
+        }
+
+        return $out;
+    }
+
     public static function strcmp(string $a, string $b): int
     {
         $lenA = self::byteLength($a);

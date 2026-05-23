@@ -74,6 +74,7 @@
         "ext/standard/JitStrPad.php",
         "ext/standard/JitStrRepeat.php",
         "ext/standard/JitStrReplace.php",
+        "ext/standard/JitStrRot13.php",
         "ext/standard/JitStrSplit.php",
         "ext/standard/JitStringConcat.php",
         "ext/standard/JitStringIndex.php",
@@ -231,6 +232,7 @@
         "ext/standard/str_pad.php",
         "ext/standard/str_repeat.php",
         "ext/standard/str_replace.php",
+        "ext/standard/str_rot13.php",
         "ext/standard/str_split.php",
         "ext/standard/str_starts_with.php",
         "ext/standard/strcasecmp.php",
@@ -433,9 +435,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 368,
+        "inventory_files": 370,
         "excluded": 2,
-        "eligible": 366,
+        "eligible": 368,
         "aot_lint_targets": 15,
         "aot_link_targets": 13,
         "aot_link_lib_targets": 1
