@@ -12,11 +12,17 @@ use PHPLLVM\Value;
 
 /**
  * LLVM implementation of __compiler_getenv — libc getenv into a __value__ out-parameter.
+ *
+ * Standalone AOT uses the C runtime in lib/AOT/runtime/superglobals_refresh.c (issue #1068).
  */
 final class StringGetenv
 {
     public static function implement(Context $context): void
     {
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            return;
+        }
+
         $fn = $context->lookupFunction('__compiler_getenv');
         $entry = $fn->appendBasicBlock('main');
         $context->builder->positionAtEnd($entry);

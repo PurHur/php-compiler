@@ -1119,6 +1119,8 @@ class Compiler {
         $rightBlock->addOpCode($rightJump);
         $endBlock->parents[] = $leftBlock;
         $endBlock->parents[] = $rightBlock;
+        $endBlock->inheritScopeFrom($leftBlock);
+        $endBlock->inheritScopeFrom($rightBlock);
 
         $coalesceOp = new OpCode(
             OpCode::TYPE_COALESCE,

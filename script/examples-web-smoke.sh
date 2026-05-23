@@ -25,13 +25,13 @@ Usage: script/examples-web-smoke.sh [--aot] [--miniwebapp-only]
 
   VM mode (default): phpc serve per example docroot.
   --aot: use phpc serve --aot when <docroot>/.phpc/bin/app exists; skip otherwise.
-         003-MiniWebApp: home + hello PATH_INFO only; CLI byte probe skips when stdout empty (#833, #764).
+         003-MiniWebApp: home + hello PATH_INFO only; CLI byte probe skips when stdout empty (#833, #676).
   --miniwebapp-only: curl only examples/003-MiniWebApp (MINIWEBAPP_WEB_SMOKE_GATE — #633).
 
 Environment:
   PHP_COMPILER_SKIP_SERVE_TESTS=1  exit 0 without running HTTP checks
   PHP_COMPILER_MAX_BODY            optional; 003 oversized POST check uses 1024 when unset (#705)
-  MINIWEBAPP_AOT_EXECUTE_GATE=1    fail instead of skip when 003 AOT probe empty (#764, #747)
+  MINIWEBAPP_AOT_EXECUTE_GATE=1    fail instead of skip when 003 AOT probe empty (#676, #747)
   MINIWEBAPP_WEB_SMOKE_AOT_GATE=1  require 003 --aot curls to pass (#833)
 EOF
 }
@@ -259,10 +259,10 @@ run_miniwebapp_aot_smoke() {
 
   if ! miniwebapp_aot_stdout_ready "$binary"; then
     if miniwebapp_aot_require_pass; then
-      echo "examples-web-smoke: 003-MiniWebApp: FAILED (empty or wrong stdout; blocked #764)" >&2
+      echo "examples-web-smoke: 003-MiniWebApp: FAILED (empty or wrong stdout; #676)" >&2
       return 1
     fi
-    echo "examples-web-smoke: 003-MiniWebApp: skip --aot (empty stdout; blocked #764)"
+    echo "examples-web-smoke: 003-MiniWebApp: skip --aot (empty stdout; #676)"
     return 0
   fi
 
