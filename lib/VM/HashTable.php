@@ -67,7 +67,7 @@ final class HashTable {
     }
 
     /**
-     * @return \Traversable<int, array{0: Variable, 1: Variable}>
+     * @return \Traversable
      */
     public function iterateKeyed(bool $resolveIndirect = false): \Traversable
     {
