@@ -873,9 +873,9 @@ class Object_ extends Type {
                 return;
             }
             if (Variable::TYPE_NATIVE_LONG === $value->type) {
-                JitValueBox::writeLong(
-                    $this->context,
-                    $heapVal,
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__writeLong'),
+                    $heapPtr,
                     $this->context->helper->loadValue($value)
                 );
                 $this->context->builder->store(

@@ -26,5 +26,5 @@ if ! php "${ROOT}/bin/compile.php" -o "${OUT}" "${ENTRY}" 2>&1; then
 fi
 test -x "${OUT}"
 out="$("${OUT}")"
-test "selfhost" = "${out//$'\n'/}"
+test "compiler_minimal bundle OK" = "${out//$'\n'/}"
 echo "bootstrap-selfhost-link: OK ${OUT}"

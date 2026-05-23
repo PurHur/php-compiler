@@ -44,7 +44,7 @@ class Native implements Call {
             } elseif (isset($this->defaultArgs[$index])) {
                 $arg = $this->defaultArgs[$index];
             } else {
-                throw new \LogicException("Missing required argument {$index} for {$this->name}()");
+                $arg = $this->missingCallArg($context, $this->argTypes[$index]);
             }
             $argValues[] = $this->compileArg($context, $arg, $index);
         }
@@ -235,6 +235,37 @@ class Native implements Call {
                 break;
         }
         throw new \LogicException("Unsupported cast for arg type $typeName from " . Variable::getStringType($arg->type));
+    }
+
+    private function missingCallArg(Context $context, \PHPLLVM\Type $llvmType): Variable
+    {
+        $typeName = $context->getStringFromType($llvmType);
+        switch ($typeName) {
+            case '__object__*':
+                return new Variable(
+                    $context,
+                    Variable::TYPE_NULL,
+                    Variable::KIND_VALUE,
+                    $context->getTypeFromString('__object__*')->constNull()
+                );
+            case 'int64':
+            case 'long long':
+                return new Variable(
+                    $context,
+                    Variable::TYPE_NATIVE_LONG,
+                    Variable::KIND_VALUE,
+                    $context->getTypeFromString('int64')->constInt(0, false)
+                );
+            default:
+                $slot = \PHPCompiler\JIT\JitValueBox::alloc($context);
+
+                return new Variable(
+                    $context,
+                    Variable::TYPE_VALUE,
+                    Variable::KIND_VARIABLE,
+                    $slot
+                );
+        }
     }
 
 }
