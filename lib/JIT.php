@@ -2494,6 +2494,18 @@ class JIT {
             // wrap
             $valueRef = $result->value;
             $valueFrom = $value->value;
+            if ($value->type & Variable::IS_NATIVE_ARRAY) {
+                $ht = JIT\HashTableHelper::materializeNativeArrayForCall($this->context, $value);
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__writeHashtable'),
+                    $valueRef,
+                    $ht
+                );
+                $this->context->refcount->addref($ht);
+                $result->valueBoxHashtable = true;
+
+                return;
+            }
             switch ($value->type) {
                 case Variable::TYPE_NULL:
                     $this->context->builder->call(
