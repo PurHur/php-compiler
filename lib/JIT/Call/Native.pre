@@ -33,6 +33,8 @@ class Native implements Call {
     }
 
     public function call(Context $context, Variable ... $args): Value {
+        // Instance methods compiled with blockUsesThis() prepend __object__* to argTypes;
+        // JIT prepends $this at static parent::__construct() call sites before invoking call().
         $argValues = [];
         $total = count($this->argTypes);
         for ($index = 0; $index < $total; $index++) {
