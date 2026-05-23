@@ -20,6 +20,8 @@
 | Self-host probe in full CI | `./script/ci-local.sh` (LLVM tail) | ✅ default-on when LLVM 9 present; `BOOTSTRAP_SELFHOST_PROBE_GATE=0` to skip ([#829](https://github.com/PurHur/php-compiler/issues/829)) |
 | Wave gate in full CI | `./script/ci-local.sh` (LLVM tail) | ✅ default-on when LLVM 9 present; `BOOTSTRAP_WAVE_CHECK=0` to skip; `./script/bootstrap-wave-check.sh --fail-fast` |
 | Self-host native link | `./script/bootstrap-selfhost-link.sh` | ✅ `build/selfhost` prints `compiler_minimal bundle OK` ([#557](https://github.com/PurHur/php-compiler/issues/557), [#913](https://github.com/PurHur/php-compiler/issues/913)) |
+| M2 lib spine smoke lint | `php bin/compile.php -l test/selfhost/compiler_lib_spine_smoke/main.php` | ✅ **132** units (`compiler_minimal` + **24** vm.php-path lib/ + ext/standard; [#1056](https://github.com/PurHur/php-compiler/issues/1056)) |
+| M2 lib spine smoke native run | `./script/bootstrap-selfhost-lib-spine-smoke-link.sh` or `make bootstrap-selfhost-lib-spine-smoke` | 🚧 `build/selfhost-lib-spine-smoke` (opt-in `BOOTSTRAP_LIB_SPINE_SMOKE=1` in `./script/bootstrap-wave-check.sh`) |
 
 Regenerate: `make bootstrap-profile` (inventory + profile + optional `bootstrap-aot-lint`). Phase C: `make bootstrap-aot-link` (or `php script/bootstrap-aot-lint.php --link`). Phase D: `make bootstrap-aot-link-lib`. Bundled compiler lint: `./script/bootstrap-selfhost-lint.sh`. Live lowering target: `make bootstrap-selfhost-probe` (or `./script/bootstrap-selfhost-compile-probe.sh`; optional `--update-inventory`).
 
@@ -91,9 +93,7 @@ Add scripts under `test/bootstrap-aot/*.php` — picked up automatically by `scr
 - `cast_int.php` — `(int)` cast on string/float literals (`TYPE_CAST_INT`); Phase C link ✅ ([#868](https://github.com/PurHur/php-compiler/issues/868))
 - `cast_string.php` — `(string)` cast on superglobal/scalar (`TYPE_CAST_STRING`); VM + JIT/AOT; MiniWebApp `index.php` dispatch
 - `isset_array_offset.php` — `isset($a['k'])` + `var_export()` on hashtable string keys; Phase C link ✅ ([#868](https://github.com/PurHur/php-compiler/issues/868))
-- `nested_array_dim.php` — chained `$a['outer']['inner']` on nested array values; Phase C link ✅ ([#827](https://github.com/PurHur/php-compiler/issues/827), [#1072](https://github.com/PurHur/php-compiler/issues/1072))
-- `nested_array_dim_mixed.php` — nested string-key fetch for long/string/bool leaves; Phase C link ([#1072](https://github.com/PurHur/php-compiler/issues/1072))
-- `nested_array_dim_write.php` — chained `$a['outer']['inner'] = …` assignment; Phase C link ([#1072](https://github.com/PurHur/php-compiler/issues/1072))
+- `nested_array_dim.php` — chained `$a['outer']['inner']` on nested array values; Phase C link ([#827](https://github.com/PurHur/php-compiler/issues/827))
 - `lib_opcode/main.php` — `require_once lib/OpCode.php`; Phase D link ✅ ([#540](https://github.com/PurHur/php-compiler/issues/540))
 
 Per-file `php bin/compile.php -l lib/*.php` passes for all 14 top-level units after class-const and throw lowering ([#520](https://github.com/PurHur/php-compiler/issues/520), [#529](https://github.com/PurHur/php-compiler/issues/529)). **Bundled** minimal compiler closure: `test/selfhost/compiler_minimal/main.php` (gate: `./script/bootstrap-selfhost-lint.sh`). **Compile smoke** entry bundles the same spine plus `test/bootstrap-aot/compiler_smoke.php`: `test/selfhost/compiler_compile_smoke/main.php` (`php bin/compile.php -l`). **Compile smoke** entry bundles the same spine plus `test/bootstrap-aot/compiler_smoke.php`: `test/selfhost/compiler_compile_smoke/main.php` (`php bin/compile.php -l`).
@@ -122,7 +122,21 @@ Incremental growth toward `bin/vm.php` inventory path ([#559](https://github.com
 | `lib/Compiler.php` | CFG → opcodes |
 | `lib/Lint/Issue.php`, `lib/Lint/UnsupportedRegistry.php`, `lib/Lint/LintCompiler.php`, `lib/Lint/Linter.php` | CFG lint spine (`LintCompiler` extends `Compiler`; no closures in bundle) |
 
-**Next toward `bin/compile.php` / Compiler CFG** (`php script/bootstrap-selfhost-next-includes.php`): literal vm.php spine closed; bundle at **109** units (driver smoke: `test/selfhost/compiler_driver_smoke/main.php`). README milestone ladder: [#1025](https://github.com/PurHur/php-compiler/issues/1025).
+**Next toward `bin/compile.php` / Compiler CFG** (`php script/bootstrap-selfhost-next-includes.php`): literal vm.php spine closed for `compiler_minimal` at **109** units; M2 growth bundle `test/selfhost/compiler_lib_spine_smoke/main.php` at **132** units (+**24** lib/ + ext/standard). Driver smoke: `test/selfhost/compiler_driver_smoke/main.php`. README milestone ladder: [#1025](https://github.com/PurHur/php-compiler/issues/1025), [#1056](https://github.com/PurHur/php-compiler/issues/1056).
+
+### `compiler_lib_spine_smoke` bundle (M2 growth)
+
+Extends `compiler_minimal` with remaining vm.php-path `lib/` units that pass bundled AOT lint, plus small `ext/standard/Jit*.php` leaf helpers:
+
+| Added unit | Role |
+|------------|------|
+| `lib/JIT/Builtin/Type.php`, `lib/JIT/Builtin/Type/String_.php` | JIT builtin type hierarchy toward full stdlib lowering |
+| `lib/Doctor.php` | compile-time diagnostics helper |
+| `lib/Cli/InvokeCwd.php`, `lib/Cli/PhpcBuild.php`, `lib/Cli/PhpcInit.php` | `phpc` CLI spine toward `bin/compile.php` |
+| `lib/Web/CgiAotDriver.php`, `lib/Web/CgiDriver.php`, `lib/Web/ProjectDeploy.php` | CGI / deploy drivers on vm.php path |
+| `ext/standard/JitAddslashes.php`, `JitBase64Encode.php`, `JitBin2hex.php`, `JitChunkSplit.php`, `JitCrc32.php`, `JitExplode.php`, `JitChmod.php`, `JitCopy.php`, `JitDate.php`, `JitImplode.php`, `JitNl2br.php`, `JitPregQuote.php`, `JitQuotemeta.php`, `JitStrRot13.php`, `ext/standard/Module.php` | stdlib JIT leaf modules toward full inventory |
+
+Gate: `php bin/compile.php -l test/selfhost/compiler_lib_spine_smoke/main.php`. Optional native link: `make bootstrap-selfhost-lib-spine-smoke` or `./script/bootstrap-wave-check.sh --with-lib-spine-smoke` (`BOOTSTRAP_LIB_SPINE_SMOKE=1`).
 
 Native link + run of `compiler_minimal` is gated by `./script/bootstrap-selfhost-link.sh` (LLVM 9; stdout `compiler_minimal bundle OK`). Runtime helpers in the bundle (`VM`, `Runtime`, `Block`, …) are JIT-stubbed for verify; `Compiler` hot paths use existing skip patterns ([#579](https://github.com/PurHur/php-compiler/issues/579), [#913](https://github.com/PurHur/php-compiler/issues/913)). Full `lib/` native self-host remains open.
 

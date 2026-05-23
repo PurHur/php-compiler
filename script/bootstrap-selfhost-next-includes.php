@@ -19,6 +19,11 @@ $limit = 10;
 foreach ($argv as $arg) {
     if (str_starts_with($arg, '--limit=')) {
         $limit = max(1, (int) substr($arg, 8));
+    } elseif (str_starts_with($arg, '--bundle=')) {
+        $rel = substr($arg, 9);
+        if ('' !== $rel) {
+            $bundleEntry = str_starts_with($rel, '/') ? $rel : $root.'/'.$rel;
+        }
     }
 }
 
@@ -81,7 +86,7 @@ foreach ($ordered as $rel) {
 }
 $next = array_values(array_unique($next));
 
-fwrite(STDOUT, "compiler_minimal bundle: ".count($inBundle)." lib units\n");
+fwrite(STDOUT, basename(dirname($bundleEntry)).' bundle: '.count($inBundle)." lib units\n");
 fwrite(STDOUT, "literal spine from bin/vm.php: ".count($ordered)." lib units\n");
 fwrite(STDOUT, "next {$limit} toward vm.php closure:\n");
 foreach (array_slice($next, 0, $limit) as $rel) {

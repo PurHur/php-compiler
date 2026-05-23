@@ -1,0 +1,85 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler;
+
+use PHPUnit\Framework\TestCase;
+
+/** @group aot-lint */
+final class BootstrapSelfhostBundleTest extends TestCase
+{
+    private static string $root;
+
+    /** @var list<string> */
+    private const LIB_SPINE_SMOKE_NEW_UNITS = [
+        'lib/JIT/Builtin/Type.php',
+        'lib/JIT/Builtin/Type/String_.php',
+        'lib/Doctor.php',
+        'lib/Cli/InvokeCwd.php',
+        'lib/Cli/PhpcBuild.php',
+        'lib/Cli/PhpcInit.php',
+        'lib/Web/CgiAotDriver.php',
+        'lib/Web/CgiDriver.php',
+        'lib/Web/ProjectDeploy.php',
+        'ext/standard/JitAddslashes.php',
+        'ext/standard/JitBase64Encode.php',
+        'ext/standard/JitBin2hex.php',
+        'ext/standard/JitChunkSplit.php',
+        'ext/standard/JitCrc32.php',
+        'ext/standard/JitExplode.php',
+        'ext/standard/JitChmod.php',
+        'ext/standard/JitCopy.php',
+        'ext/standard/JitDate.php',
+        'ext/standard/JitImplode.php',
+        'ext/standard/JitNl2br.php',
+        'ext/standard/JitPregQuote.php',
+        'ext/standard/JitQuotemeta.php',
+        'ext/standard/JitStrRot13.php',
+        'ext/standard/Module.php',
+    ];
+
+    public static function setUpBeforeClass(): void
+    {
+        self::$root = dirname(__DIR__, 2);
+    }
+
+    public function testCompilerMinimalBundleUnitCount(): void
+    {
+        $entry = self::$root.'/test/selfhost/compiler_minimal/main.php';
+        $this->assertFileExists($entry);
+        $count = substr_count((string) file_get_contents($entry), 'require_once __DIR__');
+        $this->assertSame(108, $count);
+    }
+
+    public function testCompilerLibSpineSmokeBundleUnitCountAndKeyUnits(): void
+    {
+        $entry = self::$root.'/test/selfhost/compiler_lib_spine_smoke/main.php';
+        $this->assertFileExists($entry);
+        $contents = (string) file_get_contents($entry);
+        $count = substr_count($contents, 'require_once __DIR__');
+        $this->assertSame(132, $count, '108 compiler_minimal units + 24 M2 spine units');
+        foreach (self::LIB_SPINE_SMOKE_NEW_UNITS as $unit) {
+            $this->assertStringContainsString(
+                "require_once __DIR__.'/../../../{$unit}';",
+                $contents,
+                "missing {$unit}"
+            );
+        }
+    }
+
+    public function testCompilerLibSpineSmokePassesAotLint(): void
+    {
+        $entry = self::$root.'/test/selfhost/compiler_lib_spine_smoke/main.php';
+        $prefix = LlvmToolchain::envPrefix(self::$root);
+        $cmd = implode(' ', array_map('escapeshellarg', [
+            ...$prefix,
+            'php',
+            self::$root.'/bin/compile.php',
+            '-l',
+            $entry,
+        ])).' 2>&1';
+        exec($cmd, $lines, $exitCode);
+        $this->assertSame(0, $exitCode, implode("\n", $lines));
+    }
+}
