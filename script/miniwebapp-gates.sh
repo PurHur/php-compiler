@@ -88,6 +88,11 @@ stage4a=0
 stage4c=0
 stage4=0
 stage4b2=0
+stage4b2bisect=0
+aot_execute_probe_exit=-1
+aot_execute_probe_skipped=0
+aot_execute_probe_bytes=0
+AOT_EXECUTE_PROBE_STDERR=""
 aot_bisect_exit=-1
 aot_bisect_skipped=1
 aot_dry_run_exit=-1
@@ -191,7 +196,39 @@ elif [[ "${aot_dry_run_skipped}" -eq 1 ]]; then
   aot_smoke_003_skipped=1
 fi
 
-# Stage 4b2: ordered #764 AOT PHPT ladder (opt-in MINIWEBAPP_AOT_BISECT_GATE=1, #879).
+# Stage 4b2: AOT execute byte probe (#773, #764) — MiniWebAppCgiEnv shellQueryRouteHome + aotFrontController.
+if [[ -n "${LLVM_DIR}" ]]; then
+  aot_execute_binary="${ROOT}/${MINIWEBAPP}/.phpc/bin/app"
+  aot_execute_build_stderr="$(mktemp)"
+  set +e
+  "${ROOT}/phpc" build --project "${ROOT}/${MINIWEBAPP}" 2>"${aot_execute_build_stderr}" >/dev/null
+  aot_execute_build_exit=$?
+  set -e
+  if [[ -x "${aot_execute_binary}" ]]; then
+    aot_execute_run_stderr="$(mktemp)"
+    set +e
+    eval "$( "${ROOT}/script/miniwebapp-cgi-env.php" --export shellQueryRouteHome )"
+    eval "$( "${ROOT}/script/miniwebapp-cgi-env.php" --export aotFrontController )"
+    aot_execute_out="$("${aot_execute_binary}" 2>"${aot_execute_run_stderr}")"
+    aot_execute_probe_exit=$?
+    set -e
+    aot_execute_probe_bytes="$(printf '%s' "${aot_execute_out}" | wc -c | tr -d ' ')"
+    if [[ -s "${aot_execute_run_stderr}" ]]; then
+      AOT_EXECUTE_PROBE_STDERR="$(tail -n 8 "${aot_execute_run_stderr}")"
+    fi
+    rm -f "${aot_execute_run_stderr}"
+    if [[ "${aot_execute_probe_exit}" -eq 0 && "${aot_execute_probe_bytes}" -gt 0 ]]; then
+      stage4b2=1
+    fi
+  elif [[ -s "${aot_execute_build_stderr}" ]]; then
+    AOT_EXECUTE_PROBE_STDERR="$(tail -n 8 "${aot_execute_build_stderr}")"
+  fi
+  rm -f "${aot_execute_build_stderr}"
+elif [[ "${aot_dry_run_skipped}" -eq 1 ]]; then
+  aot_execute_probe_skipped=1
+fi
+
+# Stage 4b2 bisect: ordered #764 AOT PHPT ladder (opt-in MINIWEBAPP_AOT_BISECT_GATE=1, #879).
 aot_bisect_gate="${MINIWEBAPP_AOT_BISECT_GATE:-0}"
 if [[ "${aot_bisect_gate}" == "1" && -n "${LLVM_DIR}" ]]; then
   aot_bisect_skipped=0
@@ -201,7 +238,7 @@ if [[ "${aot_bisect_gate}" == "1" && -n "${LLVM_DIR}" ]]; then
   aot_bisect_exit=$?
   set -e
   if [[ "${aot_bisect_exit}" -eq 0 ]]; then
-    stage4b2=1
+    stage4b2bisect=1
   fi
   rm -f "${aot_bisect_stderr}"
 elif [[ "${aot_bisect_gate}" == "1" && -z "${LLVM_DIR}" ]]; then
@@ -294,6 +331,30 @@ elif [[ "${aot_dry_run_exit}" -ge 0 ]]; then
   fi
 fi
 
+echo "$(mark "${stage4b2}") Stage 4b2 AOT execute — native binary + MiniWebAppCgiEnv byte probe (#773, #764)"
+echo "       ${REPO_URL}/issues/773"
+echo "       ${REPO_URL}/issues/764"
+if [[ "${aot_execute_probe_skipped}" -eq 1 ]]; then
+  echo "       LLVM 9 not available (script/install-llvm9.sh or .llvm/)"
+elif [[ "${stage4b2}" -eq 1 ]]; then
+  echo "       AOT execute probe: green (${aot_execute_probe_bytes} stdout bytes)"
+elif [[ "${aot_execute_probe_exit}" -eq 0 && "${aot_execute_probe_bytes}" -eq 0 ]]; then
+  echo "       AOT execute probe: empty stdout (#764)"
+  if [[ -n "${AOT_EXECUTE_PROBE_STDERR}" ]]; then
+    echo "${AOT_EXECUTE_PROBE_STDERR}" | sed 's/^/         /'
+  fi
+elif [[ "${aot_execute_probe_exit}" -ge 0 ]]; then
+  echo "       AOT execute probe: exit ${aot_execute_probe_exit} (see #764)"
+  if [[ -n "${AOT_EXECUTE_PROBE_STDERR}" ]]; then
+    echo "${AOT_EXECUTE_PROBE_STDERR}" | sed 's/^/         /'
+  fi
+else
+  echo "       AOT execute probe: link failed or binary missing (#764)"
+  if [[ -n "${AOT_EXECUTE_PROBE_STDERR}" ]]; then
+    echo "${AOT_EXECUTE_PROBE_STDERR}" | sed 's/^/         /'
+  fi
+fi
+
 echo "$(mark "${stage4c}") Stage 4c AOT smoke — examples-aot-smoke 003 slice (#683, #485)"
 echo "       ${REPO_URL}/issues/683"
 echo "       ${REPO_URL}/issues/485"
@@ -321,7 +382,7 @@ echo "$(mark "${stage4}") Stage 4b AOT link — ExamplesCompileTest @group miniw
 echo "       ${REPO_URL}/issues/454"
 echo "       ${REPO_URL}/issues/764"
 
-echo "$(mark "${stage4b2}") Stage 4b2 AOT bisect — MINIWEBAPP_AOT_BISECT_GATE=1 runs miniwebapp-aot-bisect.sh (#879, #764)"
+echo "$(mark "${stage4b2bisect}") Stage 4b2 bisect — MINIWEBAPP_AOT_BISECT_GATE=1 runs miniwebapp-aot-bisect.sh (#879, #764)"
 echo "       ${REPO_URL}/issues/879"
 echo "       ${REPO_URL}/issues/764"
 if [[ "${aot_bisect_gate}" != "1" ]]; then
@@ -346,10 +407,13 @@ echo "  MINIWEBAPP_SERVE_GATE=0 ./script/ci-local.sh   # skip miniwebapp ServeTe
 echo "  ./script/ci-local.sh   # MINIWEBAPP_WEB_SMOKE_GATE=1 by default (#664)"
 echo "  MINIWEBAPP_WEB_SMOKE_GATE=0 ./script/ci-local.sh   # skip 003 shell curls"
 echo "  ./phpc build --project examples/003-MiniWebApp --dry-run   # stage 4a (#624)"
+echo "  eval \"\$(./script/miniwebapp-cgi-env.php --export shellQueryRouteHome)\"   # stage 4b2 (#773)"
+echo "  eval \"\$(./script/miniwebapp-cgi-env.php --export aotFrontController)\""
+echo "  examples/003-MiniWebApp/.phpc/bin/app | wc -c   # stage 4b2 byte probe (#773)"
 echo "  EXAMPLES_AOT_SMOKE_ONLY=003 ./script/examples-aot-smoke.sh   # stage 4c (#683)"
 echo "  make deploy-smoke             # stage 4d shell gate 001/002 (#718)"
 echo "  ./script/ci-local.sh --filter test003MiniWebAppProjectAotLint"
-echo "  MINIWEBAPP_AOT_BISECT_GATE=1 ./script/miniwebapp-aot-bisect.sh   # stage 4b2 (#879)"
+echo "  MINIWEBAPP_AOT_BISECT_GATE=1 ./script/miniwebapp-aot-bisect.sh   # stage 4b2 bisect (#879)"
 echo "  ./script/miniwebapp-aot-bisect.sh --list"
 echo
 echo "Tracking: ${REPO_URL}/issues/472 (gate ladder spec)"
@@ -371,6 +435,8 @@ elif [[ "${stage4a}" -eq 0 && "${aot_dry_run_skipped}" -eq 0 && "${aot_dry_run_e
   echo "Next: fix MiniWebApp AOT dry-run blockers (#58) — stage 4a (#624)"
 elif [[ "${stage4a}" -eq 0 && "${aot_dry_run_skipped}" -eq 1 ]]; then
   echo "Next: install LLVM 9 for stage 4a AOT dry-run (script/install-llvm9.sh)"
+elif [[ "${stage4b2}" -eq 0 && "${aot_execute_probe_skipped}" -eq 0 ]]; then
+  echo "Next: native AOT execute (#764) to green stage 4b2 byte probe (#773)"
 elif [[ "${stage4c}" -eq 0 && "${aot_smoke_003_skipped}" -eq 1 ]]; then
   echo "Next: native AOT execute (#764) to green stage 4c examples-aot-smoke 003 (#683, #485)"
 elif [[ "${stage4c}" -eq 0 && "${aot_smoke_003_exit}" -ne 0 ]]; then

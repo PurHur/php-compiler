@@ -49,9 +49,12 @@ final class MiniWebAppGatesScriptTest extends TestCase
         $this->assertStringContainsString('issues/683', $combined);
         $this->assertStringContainsString('issues/485', $combined);
         $this->assertStringContainsString('Stage 4b AOT link', $combined);
-        $this->assertStringContainsString('Stage 4b2 AOT bisect', $combined);
+        $this->assertStringContainsString('Stage 4b2 AOT execute', $combined);
+        $this->assertStringContainsString('issues/773', $combined);
+        $this->assertStringContainsString('Stage 4b2 bisect', $combined);
         $this->assertStringContainsString('issues/879', $combined);
         $this->assertStringContainsString('miniwebapp-aot-bisect', $combined);
+        $this->assertStringContainsString('miniwebapp-cgi-env.php', $combined);
         $this->assertStringContainsString('issues/454', $combined);
         $this->assertStringContainsString('issues/764', $combined);
         $this->assertStringNotContainsString('issues/568', $combined);

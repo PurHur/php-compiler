@@ -142,6 +142,7 @@ smoke_003_miniwebapp() {
   stderr_file="$(mktemp "${SMOKE_ROOT}/003.XXXXXX")"
   set +e
   eval "$( "${ROOT}/script/miniwebapp-cgi-env.php" --export shellQueryRouteHome )"
+  eval "$( "${ROOT}/script/miniwebapp-cgi-env.php" --export aotFrontController )"
   out="$("$binary" 2>"$stderr_file")"
   run_code=$?
   set -e
