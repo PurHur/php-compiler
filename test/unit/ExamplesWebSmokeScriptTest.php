@@ -51,8 +51,9 @@ final class ExamplesWebSmokeScriptTest extends TestCase
         $body = (string) file_get_contents($script);
         $this->assertStringContainsString('run_miniwebapp_aot_smoke', $body);
         $this->assertStringContainsString('shellQueryRouteHome', $body);
-        $this->assertStringContainsString('blocked #764', $body);
         $this->assertStringContainsString('hello PATH_INFO|/index.php/hello?name=Dev', $body);
+        $this->assertStringContainsString('contact PATH_INFO|/index.php/contact', $body);
+        $this->assertStringContainsString('#676', $body);
         $this->assertStringContainsString('MINIWEBAPP_WEB_SMOKE_AOT_GATE', $body);
     }
 

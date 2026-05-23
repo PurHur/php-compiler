@@ -208,22 +208,22 @@ fi
 
 # Stage 4c: examples-aot-smoke 003 slice (#683, #485; execute default on #747).
 if [[ -n "${LLVM_DIR}" ]]; then
-  aot_smoke_stderr="$(mktemp)"
+  aot_smoke_log="$(mktemp)"
   set +e
-  EXAMPLES_AOT_SMOKE_ONLY=003 "${ROOT}/script/examples-aot-smoke.sh" 2>"${aot_smoke_stderr}" >/dev/null
+  EXAMPLES_AOT_SMOKE_ONLY=003 "${ROOT}/script/examples-aot-smoke.sh" >"${aot_smoke_log}" 2>&1
   aot_smoke_003_exit=$?
   set -e
-  if [[ -s "${aot_smoke_stderr}" ]]; then
-    AOT_SMOKE_003_STDERR="$(tail -n 8 "${aot_smoke_stderr}")"
+  if [[ -s "${aot_smoke_log}" ]]; then
+    AOT_SMOKE_003_STDERR="$(tail -n 8 "${aot_smoke_log}")"
   fi
   if [[ "${aot_smoke_003_exit}" -eq 0 ]] \
-    && grep -q '003-MiniWebApp: skip' "${aot_smoke_stderr}" 2>/dev/null; then
+    && grep -q '003-MiniWebApp: skip' "${aot_smoke_log}" 2>/dev/null; then
     aot_smoke_003_skipped=1
   elif [[ "${aot_smoke_003_exit}" -eq 0 ]] \
-    && grep -q '003-MiniWebApp: ok' "${aot_smoke_stderr}" 2>/dev/null; then
+    && grep -q '003-MiniWebApp: ok' "${aot_smoke_log}" 2>/dev/null; then
     stage4c=1
   fi
-  rm -f "${aot_smoke_stderr}"
+  rm -f "${aot_smoke_log}"
 elif [[ "${aot_dry_run_skipped}" -eq 1 ]]; then
   aot_smoke_003_skipped=1
 fi
