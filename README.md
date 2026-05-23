@@ -48,7 +48,7 @@ make test    # builds php-compiler:22.04-dev if needed, then memory-safe CI in D
 
 ## North-star status (2026)
 
-**Public status site:** [purhur.github.io/php-compiler](https://purhur.github.io/php-compiler/) — edit [`docs/pages/development-status.md`](docs/pages/development-status.md) ([`docs/pages/PAGES.md`](docs/pages/PAGES.md) for GitHub Pages setup).
+**Public status site:** [purhur.github.io/php-compiler](https://purhur.github.io/php-compiler/) — [North Star 1 (web app)](https://purhur.github.io/php-compiler/development-status.html#north-star-1-web-app) · tracker [#1044](https://github.com/PurHur/php-compiler/issues/1044) · edit [`docs/pages/development-status.md`](docs/pages/development-status.md).
 
 Single-page snapshot for contributors; keep in sync with [examples/README.md](examples/README.md) ([#753](https://github.com/PurHur/php-compiler/issues/753)).
 
@@ -73,9 +73,9 @@ Also: `phpc doctor` (env probe), `phpc validate-manifest`, `phpc cgi`. See `./ph
 | Example | VM | AOT link | AOT execute | Deploy smoke |
 |---------|----|----------|-------------|--------------|
 | [000–002](examples/000-HelloWorld/), [004-ApiJson](examples/004-ApiJson/) | ✅ `./phpc run` / `serve` | ✅ `phpc build` | ✅ CLI | 001/002 ✅ ([#718](https://github.com/PurHur/php-compiler/issues/718)) |
-| [003-MiniWebApp](examples/003-MiniWebApp/) | ✅ `phpc serve` ([#539](https://github.com/PurHur/php-compiler/issues/539)) | ✅ `phpc build --project` ([#752](https://github.com/PurHur/php-compiler/issues/752)) | ❌ [#764](https://github.com/PurHur/php-compiler/issues/764) (empty stdout) | blocked [#764](https://github.com/PurHur/php-compiler/issues/764) |
+| [003-MiniWebApp](examples/003-MiniWebApp/) | ✅ `phpc serve` ([#539](https://github.com/PurHur/php-compiler/issues/539)) | ✅ `phpc build --project` ([#752](https://github.com/PurHur/php-compiler/issues/752)) | 🚧 partial ([#764](https://github.com/PurHur/php-compiler/issues/764) home ✅; [#1044](https://github.com/PurHur/php-compiler/issues/1044)) | blocked [#676](https://github.com/PurHur/php-compiler/issues/676) |
 
-`make examples-aot-smoke` links and executes 000–002 and 004; 003 **links** but skips native execute until [#764](https://github.com/PurHur/php-compiler/issues/764). Per-example commands: [examples/README.md](examples/README.md).
+`make examples-aot-smoke` links and executes 000–002 and 004; 003 **links**; native execute partial — see [#1044](https://github.com/PurHur/php-compiler/issues/1044). Per-example commands: [examples/README.md](examples/README.md).
 
 ### Capabilities
 
@@ -93,7 +93,7 @@ Matrix details: [docs/local-ci-matrix.md](docs/local-ci-matrix.md).
 
 ## Self-host bootstrap (experimental)
 
-**North star:** `bin/compile.php` builds a native binary from php-compiler’s own `lib/` tree (no `vendor/`), and that binary can compile PHP again. Tracking: [#78](https://github.com/PurHur/php-compiler/issues/78) (roadmap), [#212](https://github.com/PurHur/php-compiler/issues/212) (closed umbrella). This is separate from the **web-app** north star ([`examples/003-MiniWebApp`](examples/003-MiniWebApp/) — [#521](https://github.com/PurHur/php-compiler/issues/521)).
+**North star:** `bin/compile.php` builds a native binary from php-compiler’s own `lib/` tree (no `vendor/`), and that binary can compile PHP again. Tracking: [#78](https://github.com/PurHur/php-compiler/issues/78) (roadmap), [#212](https://github.com/PurHur/php-compiler/issues/212) (closed umbrella). This is separate from **North Star 1 — web application** ([`examples/003-MiniWebApp`](examples/003-MiniWebApp/) — [#1044](https://github.com/PurHur/php-compiler/issues/1044), roadmap [#78](https://github.com/PurHur/php-compiler/issues/78)).
 
 Deep dive: [docs/bootstrap-selfhost.md](docs/bootstrap-selfhost.md) (gates, wave workflow, stub policy). Inventory: [docs/bootstrap-inventory.md](docs/bootstrap-inventory.md) (`php script/bootstrap-inventory.php`). Process doc issue: [#1025](https://github.com/PurHur/php-compiler/issues/1025).
 
