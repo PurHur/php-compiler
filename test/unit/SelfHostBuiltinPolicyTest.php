@@ -53,6 +53,7 @@ final class SelfHostBuiltinPolicyTest extends TestCase
             'compact',
             'extract',
             'sort',
+            'usort',
             'filter_var',
             'getenv',
             'putenv',
