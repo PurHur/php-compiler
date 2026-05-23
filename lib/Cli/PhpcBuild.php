@@ -11,13 +11,16 @@ use PHPCompiler\Lint\UnsupportedRegistry;
 use PHPCompiler\Web\ProjectManifest;
 
 /**
- * phpc build --project orchestration and actionable AOT failure hints (issue #643, #764, #684).
+ * phpc build --project orchestration and actionable AOT failure hints (issue #643, #764, #684, #792).
  */
 final class PhpcBuild
 {
     private const ISSUE_USER_CLASS = 'https://github.com/PurHur/php-compiler/issues/764';
 
     private const ISSUE_ROADMAP = 'https://github.com/PurHur/php-compiler/issues/78';
+
+    /** Exit when --probe runs and linked binary prints 0 stdout bytes (#792, #773). */
+    public const EXIT_EMPTY_EXECUTE_PROBE = 2;
 
     /**
      * @param list<string> $php Host PHP argv prefix (binary + -d flags)
@@ -306,10 +309,127 @@ final class PhpcBuild
     }
 
     /**
+     * Web manifest: public/ tree or multi-file includes[] (issue #792).
+     */
+    public static function isWebProjectForExecuteProbe(string $projectDir): bool
+    {
+        $manifest = ProjectManifest::loadManifest($projectDir);
+        if (null === $manifest) {
+            return false;
+        }
+        if (isset($manifest['public']) && is_string($manifest['public']) && '' !== $manifest['public']) {
+            return true;
+        }
+        $includes = $manifest['includes'] ?? null;
+
+        return is_array($includes) && count($includes) >= 2;
+    }
+
+    /**
+     * Post-link trailer with byte-probe command when build succeeded (#792).
+     */
+    public static function formatWebProjectSuccessTrailer(string $projectDir, string $binaryPath): string
+    {
+        $root = ProjectManifest::resolveProjectDir($projectDir);
+        if (null === $root) {
+            return '';
+        }
+        $binaryRel = self::displayPath($root, $binaryPath);
+        $sizeLabel = self::formatBinarySizeLabel($binaryPath);
+        $projectLabel = basename($root);
+        $probe = self::defaultExecuteProbeShellLine($root, $binaryRel);
+
+        return implode("\n", [
+            '',
+            '---',
+            "Linked {$binaryRel} ({$sizeLabel}). Quick execute probe:",
+            "  cd {$projectLabel} && {$probe}",
+            '  # or: phpc run --project . --cgi-env QUERY_STRING=route=home --cgi-env REQUEST_METHOD=GET  (#774)',
+            'Empty stdout? Track #764 (execute), not link failure.',
+            '---',
+            '',
+        ]);
+    }
+
+    public static function formatBinarySizeLabel(string $binaryPath): string
+    {
+        if (!is_file($binaryPath)) {
+            return '0 B';
+        }
+        $bytes = filesize($binaryPath);
+        if (false === $bytes) {
+            return '0 B';
+        }
+        if ($bytes < 1024) {
+            return $bytes.' B';
+        }
+
+        return (string) round($bytes / 1024).' KB';
+    }
+
+    /**
+     * @return array{exit: int, bytes: int, stdout: string}
+     */
+    public static function runExecuteByteProbe(string $projectDir, string $binaryPath): array
+    {
+        $root = ProjectManifest::resolveProjectDir($projectDir);
+        if (null === $root || !is_executable($binaryPath)) {
+            return ['exit' => 1, 'bytes' => 0, 'stdout' => ''];
+        }
+
+        $entry = ProjectManifest::resolveEntryPath($root);
+        $publicDir = ProjectManifest::resolvePublicDir($root);
+        $cwd = is_dir($publicDir) ? $publicDir : $root;
+
+        $env = [];
+        foreach (array_merge($_ENV, $_SERVER) as $key => $value) {
+            if (is_string($value)) {
+                $env[$key] = $value;
+            }
+        }
+        foreach (self::defaultExecuteProbeCgiEnv($root, $entry) as $key => $value) {
+            $env[$key] = $value;
+        }
+        if (null !== $entry) {
+            $env['SCRIPT_FILENAME'] = $entry;
+        }
+
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open([$binaryPath], $descriptorSpec, $pipes, $cwd, $env);
+        if (!is_resource($proc)) {
+            return ['exit' => 1, 'bytes' => 0, 'stdout' => ''];
+        }
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+        $stdout = false !== $stdout ? $stdout : '';
+        if (false !== $stderr && '' !== $stderr) {
+            fwrite(STDERR, $stderr);
+        }
+
+        return [
+            'exit' => is_int($exit) ? $exit : 1,
+            'bytes' => strlen($stdout),
+            'stdout' => $stdout,
+        ];
+    }
+
+    /**
      * @param array{exit: int, stdout: string, stderr: string} $result
      */
-    public static function emitBuildOutput(array $result, bool $verbose): void
-    {
+    public static function emitBuildOutput(
+        array $result,
+        bool $verbose,
+        ?string $projectDir = null,
+        ?string $binaryPath = null
+    ): void {
         if ('' !== $result['stdout']) {
             fwrite(STDOUT, $result['stdout']);
             if (!str_ends_with($result['stdout'], "\n")) {
@@ -327,7 +447,48 @@ final class PhpcBuild
         }
         if ($userClassBlocked) {
             fwrite(STDERR, self::formatUserClassTrailer());
+        } elseif (
+            0 === $result['exit']
+            && null !== $projectDir
+            && null !== $binaryPath
+            && self::isWebProjectForExecuteProbe($projectDir)
+        ) {
+            fwrite(STDERR, self::formatWebProjectSuccessTrailer($projectDir, $binaryPath));
         }
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private static function defaultExecuteProbeCgiEnv(string $projectRoot, ?string $entryPath): array
+    {
+        $entryBase = null !== $entryPath ? basename($entryPath) : 'index.php';
+        $scriptName = '/'.$entryBase;
+        $env = [
+            'REQUEST_METHOD' => 'GET',
+            'SCRIPT_NAME' => $scriptName,
+            'REQUEST_URI' => $scriptName,
+        ];
+        if (str_contains($entryPath ?? '', 'public/index.php')) {
+            $env['QUERY_STRING'] = 'route=home';
+            $env['REQUEST_URI'] = $scriptName.'?route=home';
+        }
+
+        return $env;
+    }
+
+    private static function defaultExecuteProbeShellLine(string $projectRoot, string $binaryRel): string
+    {
+        $entry = ProjectManifest::resolveEntryPath($projectRoot);
+        $cgi = self::defaultExecuteProbeCgiEnv($projectRoot, $entry);
+        $prefix = '';
+        foreach (['QUERY_STRING', 'REQUEST_METHOD'] as $key) {
+            if (isset($cgi[$key])) {
+                $prefix .= $key.'='.$cgi[$key].' ';
+            }
+        }
+
+        return trim($prefix).'./'.$binaryRel.' | wc -c';
     }
 
     /**
