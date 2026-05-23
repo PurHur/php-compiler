@@ -14,6 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNativeString;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -52,6 +53,17 @@ final class sprintf_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        if (
+            2 === count($args)
+            && (
+                JITVariable::TYPE_NATIVE_LONG === $args[1]->type
+                || JITVariable::TYPE_VALUE === $args[1]->type
+                || \PHPCompiler\JIT\JitValueBox::isValueOperand($args[1])
+            )
+        ) {
+            return $context->helper->loadValue(JitNativeString::coerce($context, $args[1]));
+        }
+
         return JitSprintf::formatWithFmt($context, $this->jitString($context, $args[0], 'sprintf() format'), ...\array_slice($args, 1));
     }
 }
