@@ -29,6 +29,7 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('--group aot-lint', $body);
         $this->assertStringContainsString('--group jit', $body);
         $this->assertStringContainsString('ci_run_aot_link_phpunit', $body);
+        $this->assertStringContainsString('ci_run_miniwebapp_aot_execute', $body);
         $this->assertStringContainsString('ci_prepare_test_runtime', $body);
         $this->assertStringContainsString('ci_run_examples_web_smoke_aot', $body);
         $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
@@ -98,8 +99,10 @@ final class CiScriptsTest extends TestCase
     {
         $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
         $this->assertStringContainsString('ci_run_aot_link_phpunit', $body);
-        $this->assertStringContainsString('miniwebapp-aot-execute', $body);
-        $this->assertStringContainsString('MINIWEBAPP_AOT_EXECUTE_GATE', $body);
+        $this->assertStringContainsString('ci_run_miniwebapp_aot_execute', $body);
+        $this->assertStringContainsString('--exclude-group miniwebapp-aot-execute', $body);
+        $this->assertStringContainsString('--group miniwebapp-aot-execute', $body);
+        $this->assertStringContainsString('MINIWEBAPP_AOT_EXECUTE_GATE:-0', $body);
     }
 
     public function testExamplesWebSmokePrebuildScriptExists(): void
@@ -316,6 +319,7 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('MINIWEBAPP_WEB_SMOKE_GATE', $doc);
         $this->assertStringContainsString('MINIWEBAPP_AOT_LINK_GATE', $doc);
         $this->assertStringContainsString('MINIWEBAPP_AOT_EXECUTE_GATE', $doc);
+        $this->assertStringContainsString('ci_run_miniwebapp_aot_execute', $doc);
         $this->assertStringContainsString('EXAMPLES_AOT_SMOKE_GATE', $doc);
         $this->assertStringContainsString('EXAMPLES_AOT_SMOKE_ONLY', $doc);
         $this->assertStringContainsString('MINIWEBAPP_AOT_EXECUTE_GATE=1', $doc);

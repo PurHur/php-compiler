@@ -239,12 +239,22 @@ ci_run_examples_aot_smoke() {
   "$_CI_SCRIPT_DIR/examples-aot-smoke.sh"
 }
 
-# @group aot-link PHPUnit; 003 execute tests opt-in via MINIWEBAPP_AOT_EXECUTE_GATE (#791).
+# @group aot-link PHPUnit (link-only; execute is ci_run_miniwebapp_aot_execute — #775).
 ci_run_aot_link_phpunit() {
-  local -a aot_link_args=(--group aot-link --exclude-group serve)
-  if [[ "${MINIWEBAPP_AOT_EXECUTE_GATE:-0}" != "1" ]]; then
-    aot_link_args+=(--exclude-group miniwebapp-aot-execute)
-  fi
-  echo "PHPUnit: AOT link + execute (@group aot-link; MINIWEBAPP_AOT_EXECUTE_GATE=${MINIWEBAPP_AOT_EXECUTE_GATE:-0})..."
+  local -a aot_link_args=(--group aot-link --exclude-group serve --exclude-group miniwebapp-aot-execute)
+  echo "PHPUnit: AOT link (@group aot-link)..."
   "$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit "${aot_link_args[@]}" "$@"
+}
+
+# 003-MiniWebApp AOT binary CLI execute (issues #747, #764, #775); opt-in MINIWEBAPP_AOT_EXECUTE_GATE=1.
+ci_run_miniwebapp_aot_execute() {
+  if [[ "${MINIWEBAPP_AOT_EXECUTE_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  if ! ci_llvm_ready; then
+    echo "PHPUnit: MiniWebApp AOT execute skipped (LLVM 9 not available)"
+    return 0
+  fi
+  echo "PHPUnit: MiniWebApp AOT execute (@group miniwebapp-aot-execute; MINIWEBAPP_AOT_EXECUTE_GATE=1, #747, #775)..."
+  "$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit --group miniwebapp-aot-execute "$@"
 }
