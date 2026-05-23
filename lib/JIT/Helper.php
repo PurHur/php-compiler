@@ -657,6 +657,18 @@ restart:
                     case OpCode::TYPE_SHIFT_RIGHT:
                         $result = $this->context->builder->aShr($leftLong, $__right);
                         goto return_long;
+                    case OpCode::TYPE_EQUAL:
+                        if (Variable::TYPE_NATIVE_LONG === $rightType) {
+                            $result = JitValueCompare::looseEqualValueToNativeLong($this->context, $left, $__right);
+                            goto return_bool;
+                        }
+                        break;
+                    case OpCode::TYPE_NOT_EQUAL:
+                        if (Variable::TYPE_NATIVE_LONG === $rightType) {
+                            $result = JitValueCompare::notLooseEqualValueToNativeLong($this->context, $left, $__right);
+                            goto return_bool;
+                        }
+                        break;
                 }
             }
             if (Variable::TYPE_NATIVE_LONG === $rightType && self::isOrderedCompareOpcode($opcode->type)) {
@@ -744,6 +756,18 @@ restart:
                     case OpCode::TYPE_SHIFT_RIGHT:
                         $result = $this->context->builder->aShr($__left, $rightLong);
                         goto return_long;
+                    case OpCode::TYPE_EQUAL:
+                        if (Variable::TYPE_NATIVE_LONG === $leftType) {
+                            $result = JitValueCompare::looseEqualNativeLongToValue($this->context, $__left, $right);
+                            goto return_bool;
+                        }
+                        break;
+                    case OpCode::TYPE_NOT_EQUAL:
+                        if (Variable::TYPE_NATIVE_LONG === $leftType) {
+                            $result = JitValueCompare::notLooseEqualNativeLongToValue($this->context, $__left, $right);
+                            goto return_bool;
+                        }
+                        break;
                 }
             }
             if (Variable::TYPE_NATIVE_LONG === $leftType && self::isOrderedCompareOpcode($opcode->type)) {

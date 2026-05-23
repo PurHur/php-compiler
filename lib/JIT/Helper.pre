@@ -357,6 +357,20 @@ restart:
                 $result = JitValueCompare::notIdenticalToNative($this->context, $left, $right);
                 goto return_bool;
             }
+            if (OpCode::TYPE_EQUAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                if (Variable::TYPE_NATIVE_LONG === $rightType) {
+                    $nativeLong = $this->context->builder->intCast(
+                        $rightValue,
+                        $this->context->getTypeFromString('int64')
+                    );
+                    if (OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                        $result = JitValueCompare::notLooseEqualValueToNativeLong($this->context, $left, $nativeLong);
+                    } else {
+                        $result = JitValueCompare::looseEqualValueToNativeLong($this->context, $left, $nativeLong);
+                    }
+                    goto return_bool;
+                }
+            }
         }
         if (Variable::TYPE_VALUE === $rightType && Variable::TYPE_VALUE !== $leftType) {
             if (OpCode::TYPE_IDENTICAL === $opcode->type) {
@@ -366,6 +380,20 @@ restart:
             if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
                 $result = JitValueCompare::notIdenticalNativeToValue($this->context, $left, $right);
                 goto return_bool;
+            }
+            if (OpCode::TYPE_EQUAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                if (Variable::TYPE_NATIVE_LONG === $leftType) {
+                    $nativeLong = $this->context->builder->intCast(
+                        $leftValue,
+                        $this->context->getTypeFromString('int64')
+                    );
+                    if (OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                        $result = JitValueCompare::notLooseEqualNativeLongToValue($this->context, $nativeLong, $right);
+                    } else {
+                        $result = JitValueCompare::looseEqualNativeLongToValue($this->context, $nativeLong, $right);
+                    }
+                    goto return_bool;
+                }
             }
         }
         $type = $opcode->getType();
