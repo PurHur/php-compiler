@@ -754,6 +754,9 @@ class JIT {
                     }
                     break;
                 case OpCode::TYPE_INCLUDE:
+                    if ($this->context->inlineIncludeDepth > 0) {
+                        JIT\IncludeHelper::refreshInlineIncludeBindings($this->context);
+                    }
                     JIT\IncludeHelper::compileLiteral(
                         $this,
                         $func,
@@ -877,6 +880,9 @@ class JIT {
                     break;
                 case OpCode::TYPE_ECHO:
                 case OpCode::TYPE_PRINT:
+                    if ($this->context->inlineIncludeDepth > 0) {
+                        JIT\IncludeHelper::refreshInlineIncludeBindings($this->context);
+                    }
                     JIT\Builtin\PendingHeaders::emitFlushForStandalone($this->context);
                     $argOffset = $op->type === OpCode::TYPE_ECHO ? $op->arg1 : $op->arg2;
                     $arg = $this->context->getVariableFromOp($block->getOperand($argOffset));
@@ -1109,11 +1115,14 @@ class JIT {
                     $condition = $this->context->castToBool(
                         $this->context->helper->loadValue($this->context->getVariableFromOp($block->getOperand($op->arg2)))
                     );
+                    // Branch from the block that defined $condition (e.g. sg_sk_done after $_SERVER['key']).
+                    // Repositioning to $branchBlock caused invalid LLVM when ?? left uses multi-block reads (#866).
+                    $coalesceTestBlock = $builder->getInsertBlock();
                     $leftTail = JIT\CoalesceHelper::compileBranch($this, $func, $op->block1);
                     $rightTail = JIT\CoalesceHelper::compileBranch($this, $func, $op->block2);
                     $leftEntry = $this->context->scope->blockStorage[$op->block1];
                     $rightEntry = $this->context->scope->blockStorage[$op->block2];
-                    $builder->positionAtEnd($branchBlock);
+                    $builder->positionAtEnd($coalesceTestBlock);
                     // Do not free php-cfg "dead" operands here; ?? temps are used on branch/merge blocks (#99).
                     $builder->branchIf($condition, $leftEntry, $rightEntry);
                     if (null !== $op->block3) {
@@ -1127,6 +1136,9 @@ class JIT {
                             $builder->branch($mergeBb);
                         }
                         $builder->positionAtEnd($mergeBb);
+                        if ($this->context->inlineIncludeDepth > 0) {
+                            JIT\IncludeHelper::refreshInlineIncludeBindings($this->context);
+                        }
                         $merged = $this->compileBlockInternal($func, $op->block3, null, $mergeBb, ...$args);
                         unset($this->context->coalesceAssignTargets[$coalesceResult]);
                         if ($this->context->inlineIncludeDepth > 0) {
@@ -1303,6 +1315,9 @@ class JIT {
                     $this->context->scope->args = [];
                     break;
                 case OpCode::TYPE_ARG_SEND:
+                    if ($this->context->inlineIncludeDepth > 0) {
+                        JIT\IncludeHelper::refreshInlineIncludeBindings($this->context);
+                    }
                     $this->context->scope->args[] = $this->context->getVariableFromOp($block->getOperand($op->arg1));
                     break;
                 case OpCode::TYPE_FUNCCALL_EXEC_NORETURN:
@@ -1776,7 +1791,9 @@ class JIT {
             throw new \LogicException("Cannot assign to a value");
         }
         if ($value->type === $result->type) {
-            $result->free();
+            if (!$result->includeBinding) {
+                $result->free();
+            }
             if ($value->type & Variable::IS_NATIVE_ARRAY || Variable::TYPE_HASHTABLE === $value->type) {
                 $result->nextFreeElement = $value->nextFreeElement;
             }

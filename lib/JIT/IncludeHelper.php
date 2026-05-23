@@ -86,6 +86,8 @@ final class IncludeHelper
         $localBindings = self::collectCalleeLocalBindings($context, $bindingCaller, $included);
         $preIncludeBb = $context->builder->getInsertBlock();
         $preparedBindings = new \SplObjectStorage();
+        $context->inlineIncludeBindingRefreshStack[] = [];
+        $bindingRefreshIndex = \count($context->inlineIncludeBindingRefreshStack) - 1;
         if (null !== $preIncludeBb) {
             $context->builder->positionAtEnd($preIncludeBb);
             foreach ($localBindings as $operand) {
@@ -139,6 +141,22 @@ final class IncludeHelper
                 $operand,
                 $preparedBindings[$operand] ?? $localBindings[$operand]
             );
+            $bindingName = OperandName::resolve($operand);
+            $compileTimeString = null;
+            if (null !== $bindingName) {
+                $literal = self::variableFromCallerAssignConstant($context, $bindingCaller, $bindingName);
+                if (null !== $literal) {
+                    $compileTimeString = $literal->compileTimeString;
+                }
+            }
+            $context->inlineIncludeBindingRefreshStack[$bindingRefreshIndex][] = [
+                $operand,
+                $preparedBindings->contains($operand)
+                    ? $preparedBindings[$operand]
+                    : $localBindings[$operand],
+                $context->getVariableFromOp($operand),
+                $compileTimeString,
+            ];
         }
         $bodyBb = $func->appendBasicBlock('include_body_'.(++self::$includeEntrySerial));
         // Bindings may end in copyFromPointer tails; entryBb can already have a terminator (#776).
@@ -157,6 +175,7 @@ final class IncludeHelper
             --$context->inlineIncludeDepth;
             $context->popScope();
             array_pop($context->inlineIncludeCallerBlocks);
+            array_pop($context->inlineIncludeBindingRefreshStack);
         }
 
         $resumeBb = self::appendIncludeResume($context, $func);
@@ -236,8 +255,39 @@ final class IncludeHelper
         BasicBlock $materializeBb,
         Variable $callerVar
     ): Variable {
-        if (Variable::TYPE_VALUE !== $callerVar->type) {
-            return $callerVar;
+        if (
+            Variable::TYPE_STRING !== $callerVar->type
+            || Variable::KIND_VARIABLE !== $callerVar->kind
+        ) {
+            if (Variable::TYPE_VALUE !== $callerVar->type) {
+                return $callerVar;
+            }
+            $saved = $context->builder->getInsertBlock();
+            $context->builder->positionAtEnd($materializeBb);
+            $slot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__string__*'));
+            $stringVar = new Variable(
+                $context,
+                Variable::TYPE_STRING,
+                Variable::KIND_VARIABLE,
+                $slot
+            );
+            $stringVar->initialize();
+            $srcPtr = JitValueBox::valuePtrFromVariable($context, $callerVar);
+            $str = $context->builder->call(
+                $context->lookupFunction('__value__readString'),
+                $srcPtr
+            );
+            $owned = $context->builder->call(
+                $context->lookupFunction('__string__separate'),
+                $str
+            );
+            $context->builder->store($owned, $slot);
+            $stringVar->addref();
+            if (null !== $saved) {
+                $context->builder->positionAtEnd($saved);
+            }
+
+            return $stringVar;
         }
         $saved = $context->builder->getInsertBlock();
         $context->builder->positionAtEnd($materializeBb);
@@ -249,14 +299,9 @@ final class IncludeHelper
             $slot
         );
         $stringVar->initialize();
-        $srcPtr = JitValueBox::valuePtrFromVariable($context, $callerVar);
-        $str = $context->builder->call(
-            $context->lookupFunction('__value__readString'),
-            $srcPtr
-        );
         $owned = $context->builder->call(
             $context->lookupFunction('__string__separate'),
-            $str
+            $context->helper->loadValue($callerVar)
         );
         $context->builder->store($owned, $slot);
         $stringVar->addref();
@@ -290,12 +335,14 @@ final class IncludeHelper
                 $calleeVar->value
             );
             $calleeVar->addref();
+            $calleeVar->includeBinding = true;
             $context->setVariableOp($calleeOp, $calleeVar);
 
             return;
         }
 
         $jit->assignOperandForced($calleeOp, $callerVar);
+        $context->getVariableFromOp($calleeOp)->includeBinding = true;
     }
 
     private static function callerVariableForName(
@@ -390,6 +437,65 @@ final class IncludeHelper
     private static function appendIncludeResume(Context $context, Function_ $func): BasicBlock
     {
         return $func->appendBasicBlock('include_resume_'.(++self::$includeEntrySerial));
+    }
+
+    /**
+     * Re-store caller locals materialized before the include entry (#784, #866).
+     *
+     * ?? on $_SERVER/$_GET inside an included template can disturb boxed callee slots;
+     * refresh from the pre-include string copies before running post-coalesce code.
+     */
+    public static function refreshInlineIncludeBindings(Context $context): void
+    {
+        if ([] === $context->inlineIncludeBindingRefreshStack) {
+            return;
+        }
+        $frameIndex = \count($context->inlineIncludeBindingRefreshStack) - 1;
+        $frame = $context->inlineIncludeBindingRefreshStack[$frameIndex];
+        if ([] === $frame) {
+            return;
+        }
+        $bb = $context->builder->getInsertBlock();
+        if (null === $bb) {
+            return;
+        }
+        foreach ($frame as $entry) {
+            [$calleeOp, $prepared, $calleeVar, $compileTimeString] = array_pad($entry, 4, null);
+            if (Variable::TYPE_STRING !== $calleeVar->type || Variable::KIND_VARIABLE !== $calleeVar->kind) {
+                continue;
+            }
+            if (null !== $compileTimeString && '' !== $compileTimeString) {
+                $restored = $context->builder->load(
+                    $context->constantStringFromString($compileTimeString)
+                );
+            } else {
+                $restored = $context->helper->loadValue($prepared);
+            }
+            $bindingName = OperandName::resolve($calleeOp);
+            if (null === $bindingName) {
+                $context->builder->store($restored, $calleeVar->value);
+                $calleeVar->addref();
+                $calleeVar->includeBinding = true;
+                $context->setVariableOp($calleeOp, $calleeVar);
+                continue;
+            }
+            foreach ($context->scope->variables as $scopeOp) {
+                if (OperandName::resolve($scopeOp) !== $bindingName) {
+                    continue;
+                }
+                $scopeVar = $context->scope->variables[$scopeOp];
+                if (
+                    Variable::TYPE_STRING !== $scopeVar->type
+                    || Variable::KIND_VARIABLE !== $scopeVar->kind
+                ) {
+                    continue;
+                }
+                $context->builder->store($restored, $scopeVar->value);
+                $scopeVar->addref();
+                $scopeVar->includeBinding = true;
+                $context->setVariableOp($scopeOp, $scopeVar);
+            }
+        }
     }
 
     private static function resolveLiteralPath(

@@ -87,6 +87,15 @@ class Context {
     /** Last LLVM exit block from an inlined TU (if/elseif before nested include, #764). */
     public ?\PHPLLVM\BasicBlock $inlineIncludeExitBlock = null;
 
+    /**
+     * Stack of include callee bindings to re-store after ?? on superglobals (#866).
+     *
+     * Each frame entry: [Operand $calleeOp, Variable $prepared, Variable $calleeVar, ?string $compileTime].
+     *
+     * @var list<list<array{Operand, Variable, Variable}>>
+     */
+    public array $inlineIncludeBindingRefreshStack = [];
+
     private array $exports = [];
     public Runtime $runtime;
 
