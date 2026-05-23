@@ -15,6 +15,23 @@ final class SelfHostBuiltinPolicy
         + self::CATEGORY_JSON;
 
     /** @var array<string, string> */
+    private const VM_ONLY_DEFERRED = [
+        'ob_start' => 'output', 'ob_get_clean' => 'output', 'ob_end_flush' => 'output',
+        'ob_get_level' => 'output',
+        'password_hash' => 'password', 'password_verify' => 'password',
+    ];
+
+    /** @var array<string, string> */
+    private const CATEGORY_OUTPUT = self::VM_ONLY_DEFERRED + [
+        'getallheaders' => 'output', 'header_list' => 'output',
+    ];
+
+    /** @var array<string, string> */
+    private const CATEGORY_PASSWORD = [
+        'password_hash' => 'password', 'password_verify' => 'password',
+    ];
+
+    /** @var array<string, string> */
     private const CATEGORY_FILESYSTEM = [
         'dirname' => 'filesystem', 'basename' => 'filesystem', 'file_exists' => 'filesystem',
         'is_file' => 'filesystem', 'is_dir' => 'filesystem', 'is_readable' => 'filesystem',
@@ -87,7 +104,23 @@ final class SelfHostBuiltinPolicy
 
     public static function categoryFor(string $name): ?string
     {
-        return self::REQUIRED_FOR_BUNDLE[self::normalizeName($name)] ?? null;
+        $key = self::normalizeName($name);
+
+        return self::REQUIRED_FOR_BUNDLE[$key]
+            ?? self::CATEGORY_OUTPUT[$key]
+            ?? self::CATEGORY_PASSWORD[$key]
+            ?? null;
+    }
+
+    public static function isVmOnlyDeferred(string $name): bool
+    {
+        return isset(self::VM_ONLY_DEFERRED[self::normalizeName($name)]);
+    }
+
+    /** @return array<string, string> */
+    public static function vmOnlyDeferredByCategory(): array
+    {
+        return self::VM_ONLY_DEFERRED;
     }
 
     /** @return array<string, string> */
