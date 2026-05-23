@@ -25,6 +25,10 @@ final class BootstrapProfileTest extends TestCase
         $this->assertContains('test/bootstrap-aot/echo_hello.php', $profile['aot_lint_targets']);
         $this->assertContains('test/bootstrap-aot/nullable_types.php', $profile['aot_lint_targets']);
         $this->assertContains('test/bootstrap-aot/namespace_hello.php', $profile['aot_lint_targets']);
+        $this->assertContains('test/bootstrap-aot/ns_func.php', $profile['aot_lint_targets']);
+        $this->assertContains('test/bootstrap-aot/ns_func.php', $profile['aot_link_targets']);
+        $this->assertContains('test/bootstrap-aot/ns_nullable_return.php', $profile['aot_lint_targets']);
+        $this->assertNotContains('test/bootstrap-aot/ns_nullable_return.php', $profile['aot_link_targets']);
         $this->assertContains('test/bootstrap-aot/minimal_class.php', $profile['aot_lint_targets']);
         $this->assertContains('test/bootstrap-aot/class_nullable_property.php', $profile['aot_lint_targets']);
         $this->assertContains('test/bootstrap-aot/class_constants.php', $profile['aot_lint_targets']);
