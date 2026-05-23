@@ -1299,8 +1299,17 @@ class JIT {
                             $this->context->getVariableFromOp($this->operandAt($block, $op->arg1, 'branch condition'))
                         )
                     );
+                    // If-branch JUMP may compile a shared merge RETURN_VOID before the else/elseif arm
+                    // runs; do not let inlineIncludeExitBlock leak across arms (#784, #846, #764).
+                    $savedIncludeExit = $this->context->inlineIncludeExitBlock;
+                    $this->context->inlineIncludeExitBlock = null;
                     $this->compileBlockInternal($func, $op->block1, null, null, ...$args);
+                    $includeExitAfterIf = $this->context->inlineIncludeExitBlock;
+                    $this->context->inlineIncludeExitBlock = null;
                     $this->compileBlockInternal($func, $op->block2, null, null, ...$args);
+                    $this->context->inlineIncludeExitBlock = $this->context->inlineIncludeExitBlock
+                        ?? $includeExitAfterIf
+                        ?? $savedIncludeExit;
                     $ifEntry = $this->context->scope->blockStorage[$op->block1];
                     $elseEntry = $this->context->scope->blockStorage[$op->block2];
                     $builder->positionAtEnd($branchBlock);
