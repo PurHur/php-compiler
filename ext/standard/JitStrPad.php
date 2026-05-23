@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * LLVM JIT helper for str_pad() — STR_PAD_RIGHT and STR_PAD_LEFT only.
+ * LLVM JIT helper for str_pad() — STR_PAD_LEFT, STR_PAD_RIGHT, STR_PAD_BOTH.
  */
 
 namespace PHPCompiler\ext\standard;
@@ -33,9 +33,7 @@ final class JitStrPad
         $padPtr = $context->builder->structGep($padString, $map['value']);
 
         $i64 = $context->getTypeFromString('int64');
-        $i32 = $context->getTypeFromString('int32');
         $zero = $i64->constInt(0, false);
-        $one = $i64->constInt(1, false);
         $padLeftConst = $i64->constInt(0, false);
 
         $noPad = $context->builder->icmp(Builder::INT_SLE, $padLength, $inputLen);
@@ -57,19 +55,47 @@ final class JitStrPad
             $context->builder->structGep($dest, $map['length'])
         );
 
+        $padBothConst = $i64->constInt(2, false);
         $isLeft = $context->builder->icmp(Builder::INT_EQ, $padType, $padLeftConst);
+        $isBoth = $context->builder->icmp(Builder::INT_EQ, $padType, $padBothConst);
         $leftBlock = BasicBlockHelper::append($context, 'strpad_left');
+        $bothBlock = BasicBlockHelper::append($context, 'strpad_both');
         $rightBlock = BasicBlockHelper::append($context, 'strpad_right');
+        $typeCheckBlock = BasicBlockHelper::append($context, 'strpad_type_check');
         $joinedBlock = BasicBlockHelper::append($context, 'strpad_joined');
-        $context->builder->branchIf($isLeft, $leftBlock, $rightBlock);
+        $context->builder->branchIf($isLeft, $leftBlock, $typeCheckBlock);
+
+        $context->builder->positionAtEnd($typeCheckBlock);
+        $context->builder->branchIf($isBoth, $bothBlock, $rightBlock);
 
         $context->builder->positionAtEnd($leftBlock);
-        self::fillPadding($context, $destPtr, $zero, $need, $padPtr, $padLen);
+        self::fillPadding($context, $destPtr, $zero, $need, $padPtr, $padLen, '_left');
         $context->intrinsic->memcpy(
             $context->builder->gep($destPtr, $need),
             $inputPtr,
             $inputLen,
             false
+        );
+        $context->builder->branch($joinedBlock);
+
+        $context->builder->positionAtEnd($bothBlock);
+        $leftNeed = $context->builder->signedDiv($need, $i64->constInt(2, false));
+        $rightNeed = $context->builder->sub($need, $leftNeed);
+        self::fillPadding($context, $destPtr, $zero, $leftNeed, $padPtr, $padLen, '_both_l');
+        $context->intrinsic->memcpy(
+            $context->builder->gep($destPtr, $leftNeed),
+            $inputPtr,
+            $inputLen,
+            false
+        );
+        self::fillPadding(
+            $context,
+            $context->builder->gep($destPtr, $context->builder->add($leftNeed, $inputLen)),
+            $zero,
+            $rightNeed,
+            $padPtr,
+            $padLen,
+            '_both_r'
         );
         $context->builder->branch($joinedBlock);
 
@@ -81,7 +107,8 @@ final class JitStrPad
             $zero,
             $need,
             $padPtr,
-            $padLen
+            $padLen,
+            '_right'
         );
         $context->builder->branch($joinedBlock);
 
@@ -102,17 +129,18 @@ final class JitStrPad
         Value $zero,
         Value $need,
         Value $padPtr,
-        Value $padLen
+        Value $padLen,
+        string $suffix
     ): void {
         $i64 = $context->getTypeFromString('int64');
         $one = $i64->constInt(1, false);
 
-        $idxSlot = $context->builder->alloca($i64, 1, 'strpad_pad_idx');
+        $idxSlot = $context->builder->alloca($i64, 1, 'strpad_pad_idx'.$suffix);
         $context->builder->store($zero, $idxSlot);
 
-        $loopHead = BasicBlockHelper::append($context, 'strpad_pad_head');
-        $loopBody = BasicBlockHelper::append($context, 'strpad_pad_body');
-        $loopDone = BasicBlockHelper::append($context, 'strpad_pad_done');
+        $loopHead = BasicBlockHelper::append($context, 'strpad_pad_head'.$suffix);
+        $loopBody = BasicBlockHelper::append($context, 'strpad_pad_body'.$suffix);
+        $loopDone = BasicBlockHelper::append($context, 'strpad_pad_done'.$suffix);
         $context->builder->branch($loopHead);
 
         $context->builder->positionAtEnd($loopHead);
