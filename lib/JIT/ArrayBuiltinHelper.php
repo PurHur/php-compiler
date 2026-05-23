@@ -131,6 +131,12 @@ final class ArrayBuiltinHelper
         $context->builder->branchIf($hasPacked, $loopSetup, $prependBlock);
 
         $context->builder->positionAtEnd($loopSetup);
+        $minCap = $context->builder->addNoSignedWrap($num, $offset);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__grow'),
+            $ht,
+            $minCap
+        );
         $one = $sizeT->constInt(1, false);
         $lastIdx = $context->builder->sub($num, $one);
         $idxSlot = $context->builder->alloca($sizeT, 1, 'array_unshift_idx');
@@ -178,6 +184,9 @@ final class ArrayBuiltinHelper
         $context->builder->positionAtEnd($doneBlock);
 
         HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
+        if (0 !== ($array->type & Variable::IS_NATIVE_ARRAY)) {
+            $array->nextFreeElement += $k;
+        }
 
         return self::getNumElements($context, $ht);
     }
