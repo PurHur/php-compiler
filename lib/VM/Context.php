@@ -165,6 +165,15 @@ class Context {
         }
         return null;;
     }
+
+  /** Swap the run stack (nested user-function calls from VM builtins). */
+    public function swapRunStack(?RunStackEntry $stack): ?RunStackEntry
+    {
+        $prev = $this->runStack;
+        $this->runStack = $stack;
+
+        return $prev;
+    }
 }
 
 class RunStackEntry {

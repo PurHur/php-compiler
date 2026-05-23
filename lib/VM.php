@@ -48,6 +48,29 @@ class VM {
         return $result;
     }
 
+    /**
+     * Invoke a user-defined PHP function from a VM builtin (isolated run stack).
+     */
+    public function invokePhpFunction(Func\PHP $func, Variable ...$args): Variable
+    {
+        $savedStack = $this->context->swapRunStack(null);
+        try {
+            $child = $func->getFrame($this->context, null);
+            $child->calledArgs = $args;
+            $out = new Variable();
+            $child->returnVar = $out;
+            $this->context->push($child);
+            $result = $this->runFrames();
+            if (self::SUCCESS !== $result) {
+                throw new \LogicException('User function invocation failed in this compiler build');
+            }
+
+            return $out->resolveIndirect();
+        } finally {
+            $this->context->swapRunStack($savedStack);
+        }
+    }
+
     private function seedScriptPath(Frame $frame): void
     {
         if ('' !== $frame->scriptPath) {
