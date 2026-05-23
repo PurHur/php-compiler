@@ -162,6 +162,7 @@ class Module extends ModuleAbstract
             new filter_input(),
             new urlencode(),
             new rawurlencode(),
+            new http_build_query(),
             new urldecode(),
             new rawurldecode(),
             new parse_url(),
