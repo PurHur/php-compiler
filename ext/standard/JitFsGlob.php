@@ -50,12 +50,13 @@ final class JitFsGlob
         $okSlot = JitValueBox::alloc($context);
         $okPtr = JitValueBox::pointer($context, $okSlot);
         $context->builder->call($context->lookupFunction('__value__writeHashtable'), $okPtr, $ht);
+        $okTail = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
         $context->builder->positionAtEnd($doneBlock);
         $valuePtrTy = $context->getTypeFromString('__value__*');
         $result = $context->builder->phi($valuePtrTy);
         $result->addIncoming($falsePtr, $failBlock);
-        $result->addIncoming($okPtr, $buildBlock);
+        $result->addIncoming($okPtr, $okTail);
 
         return $result;
     }
@@ -77,7 +78,7 @@ final class JitFsGlob
         $context->builder->branch($loopHead);
         $context->builder->positionAtEnd($loopHead);
         $i = $context->builder->load($iSlot);
-        $countSized = $context->builder->truncOrBitCast($count, $sizeT);
+        $countSized = $context->builder->zExt($count, $sizeT);
         $atEnd = $context->builder->icmp(Builder::INT_SGE, $i, $countSized);
         $context->builder->branchIf($atEnd, $loopDone, $loopBody);
         $context->builder->positionAtEnd($loopBody);

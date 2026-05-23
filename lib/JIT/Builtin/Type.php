@@ -291,6 +291,7 @@ class Type extends Builtin {
         $i32 = $this->context->getTypeFromString('int32');
         $htPtr = $this->context->getTypeFromString('__hashtable__*');
         $i8ppPtr = $this->context->getTypeFromString('int8**');
+        $i8pppPtr = $this->context->getTypeFromString('int8***');
         $fnPendingReset = $this->context->module->addFunction(
             '__phpc_pending_header_reset',
             $this->context->context->functionType($void, false)
@@ -313,12 +314,12 @@ class Type extends Builtin {
         $this->context->registerFunction('__phpc_pending_header_list', $fnPendingList);
         $fnGlobVec = $this->context->module->addFunction(
             '__phpc_glob_vec',
-            $this->context->context->functionType($i32, false, $strPtr, $i32, $i8ppPtr)
+            $this->context->context->functionType($i32, false, $strPtr, $i32, $i8pppPtr)
         );
         $this->context->registerFunction('__phpc_glob_vec', $fnGlobVec);
         $fnScandirVec = $this->context->module->addFunction(
             '__phpc_scandir_vec',
-            $this->context->context->functionType($i32, false, $strPtr, $i32, $i8ppPtr)
+            $this->context->context->functionType($i32, false, $strPtr, $i32, $i8pppPtr)
         );
         $this->context->registerFunction('__phpc_scandir_vec', $fnScandirVec);
         $fnStrvecFree = $this->context->module->addFunction(
