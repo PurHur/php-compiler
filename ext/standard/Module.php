@@ -101,6 +101,7 @@ class Module extends ModuleAbstract
             new explode(),
             new implode(),
             new str_replace(),
+            new preg_quote(),
             new nl2br(),
             new array_reverse(),
             new array_search(),
