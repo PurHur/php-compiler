@@ -611,7 +611,7 @@ final class Variable {
                                 $baked
                             );
                         }
-                        $ht = $this->context->helper->loadValue($container);
+                        $ht = HashTableHelper::loadHashtablePointer($this->context, $container);
                         $keyVal = $this->context->helper->loadValue($dim);
 
                         return HashTableHelper::readSuperglobalStringKeyToValueBox(
@@ -621,7 +621,7 @@ final class Variable {
                         );
                     }
                 }
-                $ht = $this->context->helper->loadValue($container);
+                $ht = HashTableHelper::loadHashtablePointer($this->context, $container);
                 if (self::TYPE_VALUE === $dim->type || self::TYPE_OBJECT === $dim->type) {
                     $keyObj = self::TYPE_OBJECT === $dim->type
                         ? $this->context->helper->loadValue($dim)
