@@ -53,6 +53,7 @@ final class MiniWebAppCgiEnv
         return array_merge(self::queryRouteHome(), [
             'SCRIPT_NAME' => '/index.php',
             'REQUEST_URI' => '/index.php?route=home',
+            'PATH_INFO' => '',
         ]);
     }
 
@@ -172,11 +173,13 @@ final class MiniWebAppCgiEnv
     public static function aotFrontController(string $repoRoot): array
     {
         $publicDir = $repoRoot.'/'.self::PUBLIC_REL;
+        $projectDir = $repoRoot.'/'.self::PROJECT_REL;
 
         return [
             'SCRIPT_FILENAME' => $publicDir.'/index.php',
             'SCRIPT_NAME' => '/index.php',
             'DOCUMENT_ROOT' => $publicDir,
+            'PHPC_DEPLOY_ROOT' => $projectDir,
         ];
     }
 

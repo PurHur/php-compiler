@@ -34,8 +34,8 @@ Environment (enable next gates):
   MINIWEBAPP_WEB_SMOKE_GATE=0     skip shell PATH_INFO curls during iteration
   MINIWEBAPP_AOT_LINK_GATE=1      phpc build --project in ExamplesCompileTest (default on — #754)
   MINIWEBAPP_AOT_LINK_GATE=0      skip 003 native link gate during iteration
-  MINIWEBAPP_AOT_EXECUTE_GATE=1   run 003 AOT binary CLI execute in ci-local (#747, #764)
-  MINIWEBAPP_AOT_EXECUTE_GATE=0   skip execute (default until #764 green — #791)
+  MINIWEBAPP_AOT_EXECUTE_GATE=1   run 003 AOT binary CLI execute in ci-local (default — #747)
+  MINIWEBAPP_AOT_EXECUTE_GATE=0   skip execute during iteration
   MINIWEBAPP_AOT_BISECT_GATE=1    run script/miniwebapp-aot-bisect.sh ladder (default off — #879)
 
 See: examples/003-MiniWebApp/README.md, issue #472
@@ -169,7 +169,7 @@ else
   aot_dry_run_skipped=1
 fi
 
-# Stage 4c: examples-aot-smoke 003 slice (#683, #485; execute blocked #764).
+# Stage 4c: examples-aot-smoke 003 slice (#683, #485; execute default on #747).
 if [[ -n "${LLVM_DIR}" ]]; then
   aot_smoke_stderr="$(mktemp)"
   set +e
@@ -208,16 +208,20 @@ elif [[ "${aot_bisect_gate}" == "1" && -z "${LLVM_DIR}" ]]; then
   aot_bisect_skipped=1
 fi
 
-# Stage 4b: ExamplesCompileTest @group miniwebapp unskipped (#454).
+# Stage 4b: ExamplesCompileTest link gate (#754).
 compile_test="${ROOT}/test/unit/ExamplesCompileTest.php"
 if [[ -f "${compile_test}" ]]; then
   if "${ROOT}/script/php-local.sh" -r '
 $path = $argv[1];
 $body = file_get_contents($path);
-if (!preg_match("/function test003MiniWebAppEventuallyRuns\\(\\).*?\\n    \\}/s", $body, $m)) {
+if (!preg_match("/function test003MiniWebAppBuildLinks\\(\\).*?\\n    \\}/s", $body, $m)) {
     exit(1);
 }
-exit(str_contains($m[0], "markTestSkipped") ? 1 : 0);
+// Gate=0 iteration skip is OK; fail only on unconditional link blockers (#568-style).
+if (preg_match("/markTestSkipped\\([^)]*(?:#568|blocked)/", $m[0])) {
+    exit(1);
+}
+exit(0);
 ' "${compile_test}" 2>/dev/null; then
     stage4=1
   fi
@@ -304,7 +308,7 @@ echo "       make deploy-smoke   # 001/002 when LLVM ready; not wired into ci-lo
 if [[ "${aot_dry_run_skipped}" -eq 1 && -z "${LLVM_DIR}" ]]; then
   echo "       LLVM 9 not available (script/install-llvm9.sh or .llvm/)"
 elif [[ "${aot_smoke_003_skipped}" -eq 1 ]]; then
-  echo "       003 slice probe: skipped (#764 execute)"
+  echo "       003 slice probe: skipped (MINIWEBAPP_AOT_EXECUTE_GATE=0)"
   if [[ -n "${AOT_SMOKE_003_STDERR}" ]]; then
     echo "${AOT_SMOKE_003_STDERR}" | sed 's/^/         /'
   fi
@@ -317,9 +321,10 @@ elif [[ "${aot_smoke_003_exit}" -ge 0 ]]; then
   fi
 fi
 
-echo "$(mark "${stage4}") Stage 4b AOT link — ExamplesCompileTest @group miniwebapp unskipped (#454; execute #764)"
+echo "$(mark "${stage4}") Stage 4b AOT link — test003MiniWebAppBuildLinks (MINIWEBAPP_AOT_LINK_GATE=1 default — #754, #454)"
+echo "       ${REPO_URL}/issues/754"
 echo "       ${REPO_URL}/issues/454"
-echo "       ${REPO_URL}/issues/764"
+echo "       MINIWEBAPP_AOT_LINK_GATE=0 skips link test during iteration"
 
 echo "$(mark "${stage4b2}") Stage 4b2 AOT bisect — MINIWEBAPP_AOT_BISECT_GATE=1 runs miniwebapp-aot-bisect.sh (#879, #764)"
 echo "       ${REPO_URL}/issues/879"
@@ -348,7 +353,9 @@ echo "  MINIWEBAPP_WEB_SMOKE_GATE=0 ./script/ci-local.sh   # skip 003 shell curl
 echo "  ./phpc build --project examples/003-MiniWebApp --dry-run   # stage 4a (#624)"
 echo "  EXAMPLES_AOT_SMOKE_ONLY=003 ./script/examples-aot-smoke.sh   # stage 4c (#683)"
 echo "  make deploy-smoke             # stage 4d shell gate 001/002 (#718)"
-echo "  ./script/ci-local.sh --filter test003MiniWebAppProjectAotLint"
+echo "  ./script/ci-local.sh --filter test003MiniWebAppBuildLinks   # stage 4b link (#754)"
+echo "  MINIWEBAPP_AOT_LINK_GATE=0 ./script/ci-local.sh --filter ExamplesCompileTest   # skip 003 link"
+echo "  ./script/ci-local.sh --filter test003MiniWebAppProjectAotLint   # stage 4a dry-run (#624)"
 echo "  MINIWEBAPP_AOT_BISECT_GATE=1 ./script/miniwebapp-aot-bisect.sh   # stage 4b2 (#879)"
 echo "  ./script/miniwebapp-aot-bisect.sh --list"
 echo
@@ -372,11 +379,11 @@ elif [[ "${stage4a}" -eq 0 && "${aot_dry_run_skipped}" -eq 0 && "${aot_dry_run_e
 elif [[ "${stage4a}" -eq 0 && "${aot_dry_run_skipped}" -eq 1 ]]; then
   echo "Next: install LLVM 9 for stage 4a AOT dry-run (script/install-llvm9.sh)"
 elif [[ "${stage4c}" -eq 0 && "${aot_smoke_003_skipped}" -eq 1 ]]; then
-  echo "Next: native AOT execute (#764) to green stage 4c examples-aot-smoke 003 (#683, #485)"
+  echo "Next: stage 4c examples-aot-smoke 003 with MINIWEBAPP_AOT_EXECUTE_GATE=1 (#683, #485)"
 elif [[ "${stage4c}" -eq 0 && "${aot_smoke_003_exit}" -ne 0 ]]; then
   echo "Next: fix examples-aot-smoke 003 slice failures (#485, #683)"
 elif [[ "${stage4}" -eq 0 ]]; then
-  echo "Next: unskip test003MiniWebAppEventuallyRuns in ExamplesCompileTest (#454, #764)"
+  echo "Next: green test003MiniWebAppBuildLinks when LLVM ready (#754, #454)"
 else
   echo "All documented gates are enabled in this tree."
 fi

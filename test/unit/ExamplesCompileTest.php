@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler;
 
-use PHPCompiler\Cli\PhpcBuild;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -44,15 +43,19 @@ final class ExamplesCompileTest extends TestCase
     /**
      * 003 home route AOT execute (bundle literal __DIR__ for template includes, #764).
      *
+     * Runs when MINIWEBAPP_AOT_EXECUTE_GATE=1 (default); link-only gate is test003MiniWebAppBuildLinks (#754).
+     *
      * @group miniwebapp
      * @group llvm
      * @group aot
-     * @group aot-link
+     * @group miniwebapp-aot-execute
      */
     public function test003MiniWebAppHomeRouteAotExecutes(): void
     {
-        if (!self::miniWebAppAotLinkGateEnabled()) {
-            $this->markTestSkipped('MINIWEBAPP_AOT_LINK_GATE=0 — skip 003 project link gate (#754)');
+        if (!self::miniWebAppAotExecuteGateEnabled()) {
+            $this->markTestSkipped(
+                'MINIWEBAPP_AOT_EXECUTE_GATE=0 — set to 1 (default) to run 003 AOT execute tests'
+            );
         }
         $project = $this->miniWebAppProjectPath();
         $binary = $this->build003MiniWebAppProject($project);
@@ -73,19 +76,18 @@ final class ExamplesCompileTest extends TestCase
     /**
      * 003-MiniWebApp AOT binary CLI execute with CGI env (#747, #764).
      *
-     * Opt-in via MINIWEBAPP_AOT_EXECUTE_GATE=1 until native execute is green.
+     * Runs when MINIWEBAPP_AOT_EXECUTE_GATE=1 (default).
      *
      * @group miniwebapp
      * @group llvm
      * @group aot
-     * @group aot-link
      * @group miniwebapp-aot-execute
      */
     public function test003MiniWebAppExecutesWithCgiEnv(): void
     {
         if (!self::miniWebAppAotExecuteGateEnabled()) {
             $this->markTestSkipped(
-                'MINIWEBAPP_AOT_EXECUTE_GATE=0 (default) — enable when #764/#747 execute is green'
+                'MINIWEBAPP_AOT_EXECUTE_GATE=0 — set to 1 (default) to run 003 AOT execute tests'
             );
         }
         if (!self::isLlvmReady()) {
@@ -889,7 +891,9 @@ final class ExamplesCompileTest extends TestCase
 
     private static function miniWebAppAotExecuteGateEnabled(): bool
     {
-        return '1' === getenv('MINIWEBAPP_AOT_EXECUTE_GATE');
+        $gate = getenv('MINIWEBAPP_AOT_EXECUTE_GATE');
+
+        return false === $gate || '' === $gate || '1' === $gate;
     }
 
     private function miniWebAppProjectPath(): string
@@ -932,11 +936,6 @@ final class ExamplesCompileTest extends TestCase
         fclose($pipes[2]);
         $exit = proc_close($proc);
         $stderrText = trim($stderr !== false ? $stderr : '');
-        if (0 !== $exit && PhpcBuild::isUserClassAotBlocked($stderrText)) {
-            $this->markTestSkipped(
-                '003-MiniWebApp native AOT execute blocked (#764): '.$stderrText
-            );
-        }
         $this->assertSame(
             0,
             $exit,

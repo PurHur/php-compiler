@@ -9,10 +9,7 @@ declare(strict_types=1);
  */
 function miniwebapp_contact_name_is_valid(): bool
 {
-    if (!isset($_REQUEST['name'])) {
-        return false;
-    }
-    $name = $_REQUEST['name'];
+    $name = $_REQUEST['name'] ?? '';
     if ($name == '') {
         return false;
     }
@@ -100,10 +97,6 @@ class Router
     private function renderHello(): void
     {
         $appName = $this->resolveAppName();
-        $guestName = 'World';
-        if (isset($_REQUEST['name'])) {
-            $guestName = $_REQUEST['name'];
-        }
         $title = 'Hello';
         include __DIR__ . '/../templates/layout.php';
     }
@@ -117,7 +110,6 @@ class Router
 
     private function renderContactThankYou($contactName): void
     {
-        $name = $contactName;
         $appName = $this->resolveAppName();
         $title = 'Thank you';
         include __DIR__ . '/../templates/layout.php';

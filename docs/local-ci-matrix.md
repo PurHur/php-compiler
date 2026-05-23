@@ -75,7 +75,7 @@ Defaults are exported from [`script/ci-defaults.env`](../script/ci-defaults.env)
 | `MINIWEBAPP_SERVE_GATE` | `1` | `ci-local.sh`, `ci-fast.sh` | `ServeTest` `@group miniwebapp` ([#641](https://github.com/PurHur/php-compiler/issues/641)) |
 | `MINIWEBAPP_WEB_SMOKE_GATE` | `1` | `ci-local.sh` | `examples-web-smoke.sh --miniwebapp-only` ([#664](https://github.com/PurHur/php-compiler/issues/664)) |
 | `MINIWEBAPP_AOT_LINK_GATE` | `1` | `ci-local.sh` (PHPUnit `@group aot-link`) | `ExamplesCompileTest` 003 native link ([#754](https://github.com/PurHur/php-compiler/issues/754)) |
-| `MINIWEBAPP_AOT_EXECUTE_GATE` | `0` | `ci-local.sh` after `@group aot-link` (`ci_run_miniwebapp_aot_execute`) | PHPUnit `@group miniwebapp-aot-execute` / `MiniWebAppAotExecuteTest`; opt-in while blocked by [#764](https://github.com/PurHur/php-compiler/issues/764) ([#791](https://github.com/PurHur/php-compiler/issues/791), [#775](https://github.com/PurHur/php-compiler/issues/775)) |
+| `MINIWEBAPP_AOT_EXECUTE_GATE` | `1` | `ci-local.sh` after `@group aot-link` (`ci_run_miniwebapp_aot_execute`) | PHPUnit `@group miniwebapp-aot-execute` / `MiniWebAppAotExecuteTest` ([#747](https://github.com/PurHur/php-compiler/issues/747), [#791](https://github.com/PurHur/php-compiler/issues/791)) |
 | `EXAMPLES_AOT_SMOKE_GATE` | `1` | `ci-local.sh` | `examples-aot-smoke.sh` after LLVM phases ([#674](https://github.com/PurHur/php-compiler/issues/674)) |
 | `EXAMPLES_AOT_SMOKE_ONLY` | unset | `examples-aot-smoke.sh` | Slice e.g. `003` only ([#738](https://github.com/PurHur/php-compiler/issues/738), [#683](https://github.com/PurHur/php-compiler/issues/683)) |
 | `DEPLOY_SMOKE_GATE` | `1` | `ci-local.sh` | `deploy-smoke.sh` 001/002 after `examples-aot-smoke` when LLVM ready ([#718](https://github.com/PurHur/php-compiler/issues/718), [#737](https://github.com/PurHur/php-compiler/issues/737)); 003 not enabled until [#612](https://github.com/PurHur/php-compiler/issues/612) |
@@ -87,17 +87,25 @@ Defaults are exported from [`script/ci-defaults.env`](../script/ci-defaults.env)
 
 Ladder-only env vars (not in `ci-defaults.env`): `MINIWEBAPP_LINT_GATE` (default `1` in `web-smoke.sh`), `MINIWEBAPP_AOT_BISECT_GATE` (default `0` in `miniwebapp-gates.sh` — [#879](https://github.com/PurHur/php-compiler/issues/879)).
 
-**#764 execute probe** (opt-in; home route may pass — hello/contact/PATH_INFO still fail on master as of #775):
+**003 link gate** (default on when LLVM ready — set `0` during execute-only iteration):
+
+```bash
+./script/ci-local.sh --filter 'ExamplesCompileTest::test003MiniWebAppBuildLinks'
+MINIWEBAPP_AOT_LINK_GATE=0 ./script/ci-local.sh --filter ExamplesCompileTest   # skip 003 link (#754)
+```
+
+**003 AOT execute** (`MINIWEBAPP_AOT_EXECUTE_GATE=1` default; set `0` to skip during iteration):
 
 ```bash
 MINIWEBAPP_AOT_EXECUTE_GATE=1 ./script/ci-local.sh --filter MiniWebAppAotExecuteTest
-MINIWEBAPP_AOT_EXECUTE_GATE=1 ./script/ci-local.sh --filter test003MiniWebAppExecutesWithCgiEnv
+./script/ci-local.sh --filter test003MiniWebAppHomeRouteAotExecutes
+./script/ci-local.sh --filter test003MiniWebAppExecutesWithCgiEnv
 EXAMPLES_AOT_SMOKE_ONLY=003 ./script/examples-aot-smoke.sh
 DEPLOY_SMOKE_GATE=0 ./script/ci-local.sh   # skip 001/002 deploy smoke (#737)
 MINIWEBAPP_AOT_BISECT_GATE=1 ./script/miniwebapp-gates.sh
 ```
 
-Set any gate to `0` to skip that stage during iteration (e.g. `MINIWEBAPP_SERVE_GATE=0 ./script/ci-fast.sh`).
+Set any gate to `0` to skip that stage during iteration (e.g. `MINIWEBAPP_SERVE_GATE=0 ./script/ci-fast.sh`, `MINIWEBAPP_AOT_EXECUTE_GATE=0 ./script/ci-local.sh`).
 
 ## Memory safety
 

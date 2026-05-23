@@ -10,8 +10,8 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT"
 
-# Closed issues that must not be cited as open blockers (extend when #764 closes).
-CLOSED_ISSUES=(568 67)
+# Closed issues that must not be cited as open blockers.
+CLOSED_ISSUES=(568 67 764)
 
 SCAN_PATHS=(
   script
