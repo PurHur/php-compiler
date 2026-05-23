@@ -32,6 +32,20 @@ final class BasicBlockHelper
     }
 
     /**
+     * Close an open helper tail so the next statement starts in a fresh block (#AOT chain).
+     */
+    public static function branchToFreshContinue(Context $context, string $name): void
+    {
+        $tail = $context->builder->getInsertBlock();
+        if (null === $tail || null !== $tail->getTerminator()) {
+            return;
+        }
+        $continue = self::append($context, $name);
+        $context->builder->branch($continue);
+        $context->builder->positionAtEnd($continue);
+    }
+
+    /**
      * Close CFG merge blocks left open by expression helpers (e.g. strval valueToString phi).
      */
     public static function sealOpenBlock(Context $context, BasicBlock $block): void

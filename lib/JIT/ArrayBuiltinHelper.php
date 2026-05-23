@@ -700,6 +700,7 @@ final class ArrayBuiltinHelper
         $context->builder->branch($head);
 
         $context->builder->positionAtEnd($done);
+        BasicBlockHelper::branchToFreshContinue($context, 'array_flip_native_continue');
 
         return $dest;
     }
@@ -787,6 +788,7 @@ final class ArrayBuiltinHelper
         $context->builder->branch($strHead);
 
         $context->builder->positionAtEnd($strDone);
+        BasicBlockHelper::branchToFreshContinue($context, 'array_flip_ht_continue');
 
         return $dest;
     }
@@ -2317,11 +2319,19 @@ final class ArrayBuiltinHelper
         $context->builder->branchIf($isString, $stringBlock, $afterString);
 
         $context->builder->positionAtEnd($stringBlock);
+        $str = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $valEntry
+        );
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $str
+        );
         $context->builder->call(
             $context->lookupFunction('__hashtable__setStringAt'),
             $dest,
             $index,
-            $context->builder->call($context->lookupFunction('__value__readString'), $valEntry)
+            $owned
         );
         $context->builder->branch($done);
 
@@ -2406,11 +2416,19 @@ final class ArrayBuiltinHelper
         $context->builder->branchIf($isString, $stringBlock, $afterString);
 
         $context->builder->positionAtEnd($stringBlock);
+        $str = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $valEntry
+        );
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $str
+        );
         $context->builder->call(
             $context->lookupFunction('__hashtable__setStringKeyString'),
             $dest,
             $keyStr,
-            $context->builder->call($context->lookupFunction('__value__readString'), $valEntry)
+            $owned
         );
         $context->builder->branch($done);
 
@@ -3912,6 +3930,7 @@ final class ArrayBuiltinHelper
         $context->builder->branch($strHead);
 
         $context->builder->positionAtEnd($strDone);
+        BasicBlockHelper::branchToFreshContinue($context, 'array_unique_continue');
 
         return $dest;
     }
