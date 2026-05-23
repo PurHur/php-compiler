@@ -49,6 +49,12 @@ final class StringPregMatch
             throw new \LogicException('__compiler_preg_match missing after bitcode link');
         }
         $context->registerFunction('__compiler_preg_match', $fn);
+
+        $fnAll = $context->module->getNamedFunction('__compiler_preg_match_all');
+        if (null === $fnAll) {
+            throw new \LogicException('__compiler_preg_match_all missing after bitcode link');
+        }
+        $context->registerFunction('__compiler_preg_match_all', $fnAll);
     }
 
     private static function ensureBitcode(): string
