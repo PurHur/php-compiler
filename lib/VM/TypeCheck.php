@@ -153,15 +153,23 @@ final class TypeCheck
 
     private static function typeName(int $type): string
     {
-        return match ($type) {
-            Variable::TYPE_INTEGER => 'int',
-            Variable::TYPE_FLOAT => 'float',
-            Variable::TYPE_BOOLEAN => 'bool',
-            Variable::TYPE_STRING => 'string',
-            Variable::TYPE_NULL => 'null',
-            Variable::TYPE_ARRAY => 'array',
-            Variable::TYPE_OBJECT => 'object',
-            default => 'mixed',
-        };
+        switch ($type) {
+            case Variable::TYPE_INTEGER:
+                return 'int';
+            case Variable::TYPE_FLOAT:
+                return 'float';
+            case Variable::TYPE_BOOLEAN:
+                return 'bool';
+            case Variable::TYPE_STRING:
+                return 'string';
+            case Variable::TYPE_NULL:
+                return 'null';
+            case Variable::TYPE_ARRAY:
+                return 'array';
+            case Variable::TYPE_OBJECT:
+                return 'object';
+            default:
+                return 'mixed';
+        }
     }
 }

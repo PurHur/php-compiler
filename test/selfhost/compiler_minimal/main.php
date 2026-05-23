@@ -25,6 +25,16 @@ require_once __DIR__.'/../../../lib/VM/Variable.php';
 require_once __DIR__.'/../../../lib/Web/DeployRoot.php';
 require_once __DIR__.'/../../../lib/Web/SourceBundler.php';
 require_once __DIR__.'/../../../lib/Module.php';
+require_once __DIR__.'/../../../lib/VM/Refcount.php';
+require_once __DIR__.'/../../../lib/VM/ErrorReporter.php';
+require_once __DIR__.'/../../../lib/VM/ScriptStack.php';
+require_once __DIR__.'/../../../lib/VM/HashTable.php';
+require_once __DIR__.'/../../../lib/VM/ClassEntry.php';
+require_once __DIR__.'/../../../lib/VM/ObjectEntry.php';
+require_once __DIR__.'/../../../lib/VM/TypeCheck.php';
+require_once __DIR__.'/../../../lib/VM/Optimizer/AssignOp.php';
+require_once __DIR__.'/../../../lib/VM/Optimizer.php';
+require_once __DIR__.'/../../../lib/VM/Context.php';
 require_once __DIR__.'/../../../lib/VM.php';
 require_once __DIR__.'/../../../lib/Compiler.php';
 
