@@ -11,11 +11,41 @@ require_once __DIR__ . '/../BaseTest.php';
  *
  * @group llvm
  * @group aot
- * @group aot-link
  */
 final class AotTest extends BaseTest
 {
     protected static string $DIR = __DIR__ . '/../fixtures/aot';
+
+    /**
+     * Ordered #764 MiniWebApp AOT ladder (issues #880, #879). Run via
+     * `./script/ci-local.sh --group miniwebapp-bisect` or `make miniwebapp-aot-bisect`.
+     *
+     * @var list<string> basename without .phpt
+     */
+    public const MINIWEBAPP_BISECT_CASES = [
+        'isset_object_property_array',
+        'require_return_config',
+        'nested_include_two_tier',
+        'miniwebapp_render_home',
+        'layout_script_base',
+        'layout_title_branch',
+        'method_include_void_array_property',
+    ];
+
+    /**
+     * @return \Generator<string, array{0: string, 1: string, 2: array<string, string>}>
+     */
+    public static function provideMiniWebAppBisectPHPTests(): \Generator
+    {
+        $dir = self::$DIR.'/cases';
+        foreach (self::MINIWEBAPP_BISECT_CASES as $basename) {
+            $path = $dir.'/'.$basename.'.phpt';
+            if (!is_file($path)) {
+                throw new \LogicException("Missing MiniWebApp bisect PHPT: {$path}");
+            }
+            yield $basename => self::parsePHPT($path, $basename.'.phpt');
+        }
+    }
 
     /**
      * CGI vars read at AOT runtime via __superglobals__refresh; unset during compile
@@ -52,6 +82,7 @@ final class AotTest extends BaseTest
     }
 
     /**
+     * @group aot-link
      * @dataProvider providePHPTests
      */
     public function testCases(string $name, string $code, array $sections): void
@@ -203,6 +234,17 @@ final class AotTest extends BaseTest
             $this->assertSame(0, $exitCode, "AOT run for {$name} stderr: {$runErrText}");
         }
         $this->assertExpect($result !== false ? $result : '', $sections);
+    }
+
+    /**
+     * Ordered #764 MiniWebApp ladder only (issues #880, #879).
+     *
+     * @group miniwebapp-bisect
+     * @dataProvider provideMiniWebAppBisectPHPTests
+     */
+    public function testMiniWebAppBisectCases(string $name, string $code, array $sections): void
+    {
+        $this->testCases($name, $code, $sections);
     }
 
 }

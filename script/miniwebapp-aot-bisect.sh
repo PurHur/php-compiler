@@ -13,7 +13,7 @@ cd "$(dirname "$0")/.."
 ROOT="$PWD"
 REPO_URL="https://github.com/PurHur/php-compiler"
 MINIWEBAPP="${ROOT}/examples/003-MiniWebApp"
-AOT_TEST="${ROOT}/test/aot/AotTest.php"
+AOT_BISECT_TEST="${ROOT}/test/aot/AotTest.php"
 
 # shellcheck source=ci-common.sh
 source "${ROOT}/script/ci-common.sh"
@@ -25,6 +25,7 @@ readonly -a BISECT_STEPS=(
   'nested_include_two_tier|nested_include_two_tier|878'
   'miniwebapp_render_home|miniwebapp_render_home|867'
   'layout_script_base|layout_script_base|866'
+  'layout_title_branch|layout_title_branch|784'
   'method_include_void_array_property|method_include_void_array_property|846'
 )
 
@@ -118,11 +119,12 @@ fi
 
 run_phpt_step() {
   local step_id="$1" filter="$2" issue="$3"
-  echo "miniwebapp-aot-bisect: ${step_id} (phpunit --filter ${filter})..."
+  echo "miniwebapp-aot-bisect: ${step_id} (phpunit --group miniwebapp-bisect --filter ${filter})..."
   set +e
   "${PHP_BIN}" "${PHP_OPTS[@]}" vendor/bin/phpunit \
+    --group miniwebapp-bisect \
     --filter "${filter}" \
-    "${AOT_TEST}" 2>&1 | sed 's/^/  /'
+    "${AOT_BISECT_TEST}" 2>&1 | sed 's/^/  /'
   local code=${PIPESTATUS[0]}
   set -e
   if [[ "${code}" -ne 0 ]]; then

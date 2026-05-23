@@ -42,6 +42,14 @@ Defaults are exported from [`script/ci-defaults.env`](../script/ci-defaults.env)
 
 Ladder-only env vars (not in `ci-defaults.env`): `MINIWEBAPP_LINT_GATE` (default `1` in `web-smoke.sh`), `MINIWEBAPP_AOT_BISECT_GATE` (default `0` in `miniwebapp-gates.sh` — [#879](https://github.com/PurHur/php-compiler/issues/879)).
 
+**#764 ordered PHPT ladder** (`@group miniwebapp-bisect`, [#880](https://github.com/PurHur/php-compiler/issues/880)) — LLVM required; skips full CI when passed as the only `--group`:
+
+```bash
+./script/ci-local.sh --group miniwebapp-bisect
+vendor/bin/phpunit --group miniwebapp-bisect test/aot/AotTest.php
+./script/miniwebapp-aot-bisect.sh
+```
+
 **#764 execute probe** (opt-in; expect failures until AOT execute is green):
 
 ```bash

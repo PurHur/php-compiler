@@ -209,6 +209,32 @@ ci_run_examples_aot_smoke() {
   "$_CI_SCRIPT_DIR/examples-aot-smoke.sh"
 }
 
+# True when argv requests a PHPUnit group (e.g. --group miniwebapp-bisect).
+ci_args_has_group() {
+  local want="$1"
+  shift
+  local arg next=0
+  for arg in "$@"; do
+    if [[ "${next}" -eq 1 ]]; then
+      if [[ "${arg}" == *"${want}"* ]]; then
+        return 0
+      fi
+      next=0
+      continue
+    fi
+    if [[ "${arg}" == "--group" ]]; then
+      next=1
+    fi
+  done
+  return 1
+}
+
+# Ordered #764 ladder only (@group miniwebapp-bisect, issue #880).
+ci_run_miniwebapp_bisect_phpunit() {
+  echo "PHPUnit: MiniWebApp AOT bisect ladder (@group miniwebapp-bisect, #880)..."
+  "$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit --group miniwebapp-bisect "$@"
+}
+
 # @group aot-link PHPUnit; 003 execute tests opt-in via MINIWEBAPP_AOT_EXECUTE_GATE (#791).
 ci_run_aot_link_phpunit() {
   local -a aot_link_args=(--group aot-link --exclude-group serve)

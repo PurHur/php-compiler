@@ -107,6 +107,7 @@ Stage **4c** runs only the 003 block of `script/examples-aot-smoke.sh` (same pas
 Ordered **#764** AOT fixture bisect (smallest failing step first):
 
 ```console
+./script/ci-local.sh --group miniwebapp-bisect   # PHPUnit ladder only (#880)
 ./script/miniwebapp-aot-bisect.sh --list
 ./script/miniwebapp-aot-bisect.sh
 ./script/miniwebapp-aot-bisect.sh --from nested_include_two_tier

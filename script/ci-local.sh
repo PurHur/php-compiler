@@ -12,6 +12,16 @@ ci_run_inventory_checks
 ci_report_llvm_status
 ci_configure_serve_tests
 
+if ci_args_has_group miniwebapp-bisect "$@"; then
+  if ci_llvm_ready; then
+    ci_apply_llvm_memory_env
+    ci_run_miniwebapp_bisect_phpunit "$@"
+  else
+    echo "PHPUnit: @group miniwebapp-bisect skipped (LLVM 9 not available; script/install-llvm9.sh)" >&2
+  fi
+  exit 0
+fi
+
 echo "PHPUnit: VM, compliance (no LLVM), real-world (includes ExamplesCompileTest VM lint/smoke)..."
 "$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit --exclude-group llvm,serve "$@"
 

@@ -267,6 +267,8 @@ final class CiScriptsTest extends TestCase
     {
         $source = (string) file_get_contents(dirname(__DIR__).'/aot/AotTest.php');
         $this->assertStringContainsString('@group aot-link', $source);
+        $this->assertStringContainsString('testCases', $source);
+        $this->assertStringContainsString('@group miniwebapp-bisect', $source);
     }
 
     public function testMiniWebAppAotBisectScriptExists(): void
@@ -280,8 +282,22 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('issues/879', $body);
         $this->assertStringContainsString('isset_object_property_array', $body);
         $this->assertStringContainsString('nested_include_two_tier', $body);
+        $this->assertStringContainsString('layout_title_branch', $body);
+        $this->assertStringContainsString('--group miniwebapp-bisect', $body);
+        $this->assertStringContainsString('test/aot/AotTest.php', $body);
         $this->assertStringContainsString('--from', $body);
         $this->assertStringContainsString('--list', $body);
+    }
+
+    public function testCiLocalSupportsMiniWebAppBisectGroup(): void
+    {
+        $local = dirname(__DIR__, 2).'/script/ci-local.sh';
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $body = (string) file_get_contents($local);
+        $this->assertStringContainsString('ci_args_has_group miniwebapp-bisect', $body);
+        $this->assertStringContainsString('ci_run_miniwebapp_bisect_phpunit', $body);
+        $this->assertStringContainsString('ci_run_miniwebapp_bisect_phpunit', $common);
+        $this->assertStringContainsString('--group miniwebapp-bisect', $common);
     }
 
     public function testMiniWebAppGatesScriptExists(): void
