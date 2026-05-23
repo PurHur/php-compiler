@@ -16,6 +16,8 @@ North star: compile a **subset** of php-compiler with itself (native AOT), then 
 
 Regenerate: `make bootstrap-profile` (inventory + profile + optional `bootstrap-aot-lint`). Phase C: `make bootstrap-aot-link` (or `php script/bootstrap-aot-lint.php --link`). Phase D: `make bootstrap-aot-link-lib`. Bundled compiler lint: `./script/bootstrap-selfhost-lint.sh`. Live lowering target: `make bootstrap-selfhost-probe` (or `php script/bootstrap-selfhost-compile-probe.php`; optional `--update-inventory`).
 
+**Docker** (optional; LLVM 9 in `php-compiler:22.04-dev` — see README): `docker run --rm -v "$(pwd):/compiler" -w /compiler php-compiler:22.04-dev bash -lc 'make bootstrap-selfhost-probe'`
+
 ## Blockers to compile `lib/Compiler.php` (priority order)
 
 1. **Namespaces** ([#84](https://github.com/PurHur/php-compiler/issues/84)) — every `lib/` unit uses `namespace PHPCompiler;` (per-file and bundled minimal subset `-l` pass; native link/run pending)

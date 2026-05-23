@@ -439,3 +439,27 @@ function bootstrapLlvmProcessEnv(string $llvmDir): array
 
     return $env;
 }
+
+/**
+ * First fatal / LogicException line from compile probe output (skips Notice/Deprecated).
+ */
+function bootstrapSelfhostProbeExtractNextLower(string $output): ?string
+{
+    foreach (preg_split('/\R/', $output) as $line) {
+        $line = trim($line);
+        if ('' === $line) {
+            continue;
+        }
+        if (preg_match('/\b(?:PHP )?(?:Notice|Deprecated):\s/i', $line)) {
+            continue;
+        }
+        if (preg_match('/\bLogicException:\s*(.+)$/i', $line, $m)) {
+            return trim($m[1]);
+        }
+        if (preg_match('/\b(?:PHP )?Fatal error:\s*(.+)$/i', $line, $m)) {
+            return trim($m[1]);
+        }
+    }
+
+    return null;
+}
