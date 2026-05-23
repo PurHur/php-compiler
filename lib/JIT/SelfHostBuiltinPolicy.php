@@ -23,10 +23,8 @@ final class SelfHostBuiltinPolicy
     /** @var array<string, string> */
     private const CATEGORY_STRING = [
         'strtolower' => 'string', 'strtoupper' => 'string', 'strcmp' => 'string', 'strncmp' => 'string',
-        'strcasecmp' => 'string', 'strncasecmp' => 'string', 'substr' => 'string', 'strpos' => 'string',
-        'strrpos' => 'string', 'strstr' => 'string', 'str_replace' => 'string', 'explode' => 'string',
-        'implode' => 'string', 'join' => 'string', 'str_contains' => 'string', 'str_starts_with' => 'string',
-        'str_ends_with' => 'string', 'strlen' => 'string', 'count' => 'string', 'sizeof' => 'string',
+        'strcasecmp' => 'string', 'strncasecmp' => 'string', 'strlen' => 'string', 'count' => 'string',
+        'sizeof' => 'string',
     ];
 
     /** @var array<string, string> */

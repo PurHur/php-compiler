@@ -33,7 +33,7 @@ Self-host native link requires `PHP_COMPILER_SELFHOST_AOT=1` (set by `./script/b
 | Category | Real lowering (`isRequiredForBundle`) | Self-host AOT default |
 |----------|---------------------------------------|------------------------|
 | filesystem | `dirname`, `basename`, `file_exists`, `is_file`, `is_dir`, `is_readable`, `is_writable`, `file_get_contents`, `realpath` | required |
-| string | `strtolower`, `strtoupper`, `strcmp`, `strncmp`, `strcasecmp`, `strncasecmp`, `substr`, `strpos`, `strrpos`, `strstr`, `str_replace`, `explode`, `implode`/`join`, `str_contains`, `str_starts_with`, `str_ends_with`, `strlen`, `count`/`sizeof` | required |
+| string | `strtolower`, `strtoupper`, `strcmp`, `strncmp`, `strcasecmp`, `strncasecmp`, `strlen`, `count`/`sizeof` | required |
 | hash | `hash`, `hash_hmac` | required |
 | preg | `preg_match`, `preg_quote` | required |
 | json | `json_encode` (minimal) | required |
