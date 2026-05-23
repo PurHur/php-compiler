@@ -2,6 +2,16 @@
 JIT: mkdir() via libc mkdir(2)
 --FILE--
 <?php
+$default = 'test/compliance/cases/stdlib/mkdir_fixture/jit_default';
+if (mkdir($default)) {
+    if (is_dir($default)) {
+        echo "def\n";
+    } else {
+        echo "baddef\n";
+    }
+} else {
+    echo "faildef\n";
+}
 $one = 'test/compliance/cases/stdlib/mkdir_fixture/jit_one';
 if (mkdir($one, 0700)) {
     if (is_dir($one)) {
@@ -23,5 +33,6 @@ if (mkdir($nested, 0777, true)) {
     echo "failrec\n";
 }
 --EXPECT--
+def
 ok
 rec
