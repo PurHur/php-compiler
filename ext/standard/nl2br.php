@@ -53,7 +53,7 @@ final class nl2br extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('nl2br() requires one or two arguments');
         }
-        $str = self::jitStringArg($context, $args[0]);
+        $str = $this->jitString($context, $args[0], 'nl2br() argument #1');
         $i8 = $context->getTypeFromString('int8');
         $useXhtmlI8 = $i8->constInt(1, false);
         if (2 === $argc) {
@@ -68,18 +68,4 @@ final class nl2br extends Internal
         return JitNl2br::nl2br($context, $str, $useXhtmlI8);
     }
 
-    private static function jitStringArg(Context $context, JITVariable $arg): Value
-    {
-        if (JITVariable::TYPE_STRING === $arg->type) {
-            return $context->helper->loadValue($arg);
-        }
-        if (JITVariable::TYPE_VALUE === $arg->type) {
-            return $context->builder->call(
-                $context->lookupFunction('__value__readString'),
-                $arg->value
-            );
-        }
-
-        throw new \LogicException('nl2br() only supports strings in this compiler build');
-    }
 }

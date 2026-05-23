@@ -34,10 +34,7 @@ final class quotemeta extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('quotemeta() requires exactly one argument in this compiler build');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type) {
-            throw new \LogicException('quotemeta() only supports strings in this compiler build');
-        }
 
-        return JitQuotemeta::quote($context, $context->helper->loadValue($args[0]));
+        return JitQuotemeta::quote($context, $this->jitString($context, $args[0], 'quotemeta() argument #1'));
     }
 }

@@ -483,7 +483,17 @@ restart:
                 }
                 break;
             case TYPE_PAIR_NATIVE_LONG_NATIVE_BOOL:
-                if (OpCode::TYPE_IDENTICAL === $opcode->type) {
+    
+            if (OpCode::TYPE_EQUAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                if (Variable::TYPE_NATIVE_LONG === $rightType) {
+                    $leftLong = JitLongArg::lower($this->context, $left, 'binary op left operand');
+                    $__right = $this->context->builder->intCast($rightValue, $leftLong->typeOf());
+                    $cmp = OpCode::TYPE_EQUAL === $opcode->type ? Builder::INT_EQ : Builder::INT_NE;
+                    $result = $this->context->builder->icmp($cmp, $leftLong, $__right);
+                    goto return_bool;
+                }
+            }
+            if (OpCode::TYPE_IDENTICAL === $opcode->type) {
                     $result = $this->context->getTypeFromString('int1')->constInt(0, false);
                     goto return_bool;
                 }
@@ -616,11 +626,7 @@ restart:
         }
         if (Variable::TYPE_VALUE === $leftType && Variable::TYPE_VALUE !== $rightType) {
             if (Variable::TYPE_NATIVE_LONG === $rightType || Variable::TYPE_NATIVE_BOOL === $rightType) {
-                $leftPtr = Variable::KIND_VARIABLE === $left->kind ? $left->value : $this->loadValue($left);
-                $leftLong = $this->context->builder->call(
-                    $this->context->lookupFunction('__value__readLong'),
-                    $leftPtr
-                );
+                $leftLong = JitLongArg::lower($this->context, $left, 'binary op left operand');
                 if (Variable::TYPE_NATIVE_BOOL === $rightType) {
                     $__right = $this->context->builder->zExt($rightValue, $leftLong->typeOf());
                 } else {

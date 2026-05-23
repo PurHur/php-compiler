@@ -46,10 +46,7 @@ final class ucfirst extends Internal
         if (1 !== count($args)) {
             throw new \LogicException('ucfirst() requires exactly one argument');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type) {
-            throw new \LogicException('ucfirst() only supports strings in this compiler build');
-        }
-        $str = $context->helper->loadValue($args[0]);
+        $str = $this->jitString($context, $args[0], 'ucfirst() argument #1');
         $copy = $context->builder->call($context->lookupFunction('__string__separate'), $str);
         lcfirst::transformFirstAscii($context, $copy, ord('a'), ord('z'), -32);
 

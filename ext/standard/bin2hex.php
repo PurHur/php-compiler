@@ -46,10 +46,7 @@ final class bin2hex extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('bin2hex() requires exactly one argument');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type) {
-            throw new \LogicException('bin2hex() only supports strings in this compiler build');
-        }
 
-        return JitBin2hex::convert($context, $context->helper->loadValue($args[0]));
+        return JitBin2hex::convert($context, $this->jitString($context, $args[0], 'bin2hex() argument #1'));
     }
 }

@@ -63,9 +63,6 @@ final class str_split extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('str_split() requires one or two arguments');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type) {
-            throw new \LogicException('str_split() argument must be a string in this compiler build');
-        }
         $literal = $args[0]->compileTimeString ?? null;
         if (null !== $literal) {
             $chunkLenInt = 1;
@@ -85,7 +82,7 @@ final class str_split extends Internal
 
         return JitStrSplit::split(
             $context,
-            $context->helper->loadValue($args[0]),
+            $this->jitString($context, $args[0], 'str_split() argument #1'),
             $chunkLen
         );
     }

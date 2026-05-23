@@ -59,10 +59,7 @@ final class chunk_split extends Internal
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException('chunk_split() requires one to three arguments in this compiler build');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type) {
-            throw new \LogicException('chunk_split() first argument must be a string in this compiler build');
-        }
-        $input = $context->helper->loadValue($args[0]);
+        $input = $this->jitString($context, $args[0], 'chunk_split() argument #1');
         $i64 = $context->getTypeFromString('int64');
         $chunkLen = $i64->constInt(76, false);
         if ($argc >= 2) {
@@ -72,10 +69,7 @@ final class chunk_split extends Internal
             $chunkLen = $context->helper->loadValue($args[1]);
         }
         if ($argc >= 3) {
-            if (JITVariable::TYPE_STRING !== $args[2]->type) {
-                throw new \LogicException('chunk_split() separator must be a string in this compiler build');
-            }
-            $separator = $context->helper->loadValue($args[2]);
+            $separator = $this->jitString($context, $args[2], 'chunk_split() argument #3');
         } else {
             $separator = $context->builder->load($context->constantStringFromString("\r\n"));
         }

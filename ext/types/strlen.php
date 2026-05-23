@@ -17,6 +17,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\Frame;
 
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable;
 
 use PHPLLVM\Value;
@@ -41,17 +42,9 @@ class strlen extends Internal {
         if (count($args) !== 1) {
             throw new \LogicException('Too few args passed to strlen()');
         }
-        $argValue = $context->helper->loadValue($args[0]);
-        switch ($args[0]->type) {
-            case Variable::TYPE_STRING:
-                $offset = $this->context->structFieldMap[$argValue->typeOf()->getElementType()->getName()]['length'];
-                    $result = $this->context->builder->load(
-                        $this->context->builder->structGep($argValue, $offset)
-                    );
-    
-                return $result;
-        }
-        throw new \LogicException('Non-implemented type handled: ' . $args[0]->type);
+        $argValue = JitStringArg::lower($context, $args[0], 'strlen() string');
+        $offset = $this->context->structFieldMap[$argValue->typeOf()->getElementType()->getName()]['length'];
+            $result = $this->context->builder->load($this->context->builder->structGep($argValue, $offset));
     }
 
 }

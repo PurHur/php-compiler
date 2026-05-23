@@ -41,23 +41,12 @@ final class strcmp extends Internal
         if (2 !== count($args)) {
             throw new \LogicException('strcmp() requires exactly two arguments');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type || JITVariable::TYPE_STRING !== $args[1]->type) {
-            throw new \LogicException('strcmp() only supports strings in this compiler build');
-        }
-        $p0 = $this->stringDataPtr($context, $context->helper->loadValue($args[0]));
-        $p1 = $this->stringDataPtr($context, $context->helper->loadValue($args[1]));
+        $p0 = $this->stringDataPtr($context, $this->jitString($context, $args[0], 'strcmp() argument #1'));
+        $p1 = $this->stringDataPtr($context, $this->jitString($context, $args[1], 'strcmp() argument #2'));
         $fn = $context->lookupFunction('strcmp');
         $raw = $context->builder->call($fn, $p0, $p1);
         $i64 = $context->getTypeFromString('int64');
 
         return $context->builder->sExt($raw, $i64);
-    }
-
-    private function stringDataPtr(Context $context, Value $strPtr): Value
-    {
-        $structName = $strPtr->typeOf()->getElementType()->getName();
-        $off = $context->structFieldMap[$structName]['value'];
-
-        return $context->builder->structGep($strPtr, $off);
     }
 }

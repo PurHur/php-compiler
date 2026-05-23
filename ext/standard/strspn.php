@@ -37,22 +37,11 @@ final class strspn extends Internal
         if (2 !== \count($args)) {
             throw new \LogicException('strspn() requires exactly two arguments in this compiler build');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type || JITVariable::TYPE_STRING !== $args[1]->type) {
-            throw new \LogicException('strspn() requires two strings in this compiler build');
-        }
-        $p0 = $this->stringDataPtr($context, $context->helper->loadValue($args[0]));
-        $p1 = $this->stringDataPtr($context, $context->helper->loadValue($args[1]));
+        $p0 = $this->stringDataPtr($context, $this->jitString($context, $args[0], 'strspn() argument #1'));
+        $p1 = $this->stringDataPtr($context, $this->jitString($context, $args[1], 'strspn() argument #2'));
         $raw = $context->builder->call($context->lookupFunction('strspn'), $p0, $p1);
         $i64 = $context->getTypeFromString('int64');
 
         return $context->builder->zExt($raw, $i64);
-    }
-
-    private function stringDataPtr(Context $context, Value $strPtr): Value
-    {
-        $structName = $strPtr->typeOf()->getElementType()->getName();
-        $off = $context->structFieldMap[$structName]['value'];
-
-        return $context->builder->structGep($strPtr, $off);
     }
 }

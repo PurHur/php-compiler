@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -33,7 +34,7 @@ final class JitStripTags
             );
         }
 
-        $inPtr = self::jitStringArg($context, $input);
+        $inPtr = JitStringArg::lower($context, $input, 'strip_tags() string');
         $allowPtr = self::jitAllowedArg($context, $allowed);
 
         return $context->builder->call(
@@ -43,34 +44,14 @@ final class JitStripTags
         );
     }
 
-    private static function jitStringArg(Context $context, JITVariable $arg): Value
-    {
-        if (JITVariable::TYPE_STRING === $arg->type) {
-            return $context->helper->loadValue($arg);
-        }
-        if (JITVariable::TYPE_VALUE === $arg->type) {
-            return $context->builder->call(
-                $context->lookupFunction('__value__readString'),
-                $arg->value
-            );
-        }
-
-        throw new \LogicException('strip_tags() only supports strings in this compiler build');
-    }
-
     private static function jitAllowedArg(Context $context, ?JITVariable $allowed): Value
     {
         if (null === $allowed) {
             return $context->builder->load($context->constantStringFromString(''));
         }
-        if (JITVariable::TYPE_STRING === $allowed->type) {
-            return $context->helper->loadValue($allowed);
-        }
-        if (JITVariable::TYPE_VALUE === $allowed->type) {
-            return $context->builder->call(
-                $context->lookupFunction('__value__readString'),
-                $allowed->value
-            );
+        try {
+            return JitStringArg::lower($context, $allowed, 'strip_tags() allowed_tags');
+        } catch (\LogicException) {
         }
 
         throw new \LogicException('strip_tags() allowed_tags must be a string or null in this compiler build');

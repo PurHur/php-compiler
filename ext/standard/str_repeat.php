@@ -50,15 +50,12 @@ final class str_repeat extends Internal
         if (2 !== count($args)) {
             throw new \LogicException('str_repeat() requires exactly two arguments');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type) {
-            throw new \LogicException('str_repeat() input must be a string in this compiler build');
-        }
         if (JITVariable::TYPE_NATIVE_LONG !== $args[1]->type) {
             throw new \LogicException('str_repeat() multiplier must be an integer in this compiler build');
         }
         return JitStrRepeat::repeat(
             $context,
-            $context->helper->loadValue($args[0]),
+            $this->jitString($context, $args[0], 'str_repeat() argument #1'),
             $context->helper->loadValue($args[1])
         );
     }

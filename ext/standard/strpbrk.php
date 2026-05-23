@@ -40,14 +40,11 @@ final class strpbrk extends Internal
         if (2 !== \count($args)) {
             throw new \LogicException('strpbrk() requires exactly two arguments in this compiler build');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type || JITVariable::TYPE_STRING !== $args[1]->type) {
-            throw new \LogicException('strpbrk() only supports strings in this compiler build');
-        }
 
         return JitStrpbrk::find(
             $context,
-            $context->helper->loadValue($args[0]),
-            $context->helper->loadValue($args[1])
+            $this->jitString($context, $args[0], 'strpbrk() argument #1'),
+            $this->jitString($context, $args[1], 'strpbrk() argument #2')
         );
     }
 }
