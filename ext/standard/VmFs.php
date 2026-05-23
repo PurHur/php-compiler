@@ -90,6 +90,11 @@ final class VmFs
         return @chmod($path, $permissions);
     }
 
+    public static function rename(string $from, string $to): bool
+    {
+        return @rename($from, $to);
+    }
+
     private static function modeToFiletype(int $mode): string
     {
         $type = $mode & 0xF000;

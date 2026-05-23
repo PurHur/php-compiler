@@ -17,6 +17,16 @@ final class SuperglobalInit
     /** @var array<string, \PHPLLVM\Value> */
     public static array $globals = [];
 
+    /** Superglobals fully repopulated by __superglobals__refresh in standalone AOT binaries. */
+    private const STANDALONE_REFRESHED = [
+        '_GET',
+        '_POST',
+        '_REQUEST',
+        '_SERVER',
+        '_FILES',
+        '_COOKIE',
+    ];
+
     /** $_SERVER keys repopulated by __superglobals__refresh (issue #201, #235, #296, #302, #295, #314, #453). */
     private const RUNTIME_SERVER_KEYS = [
         'REQUEST_SCHEME',
@@ -157,10 +167,22 @@ final class SuperglobalInit
     }
 
     /**
+     * Standalone AOT binaries refresh these superglobals at runtime; compile-time folds must not bypass writes.
+     */
+    private static function isStandaloneRuntimeSuperglobal(Context $context, string $superglobalName): bool
+    {
+        return Builtin::LOAD_TYPE_STANDALONE === $context->loadType
+            && in_array($superglobalName, self::STANDALONE_REFRESHED, true);
+    }
+
+    /**
      * For AOT: resolve isset($superglobal['key']) from VM data baked in at compile time.
      */
     public static function compileTimeOffsetIsSet(Context $context, string $superglobalName, string $key): ?bool
     {
+        if (self::isStandaloneRuntimeSuperglobal($context, $superglobalName)) {
+            return null;
+        }
         if ('_REQUEST' === $superglobalName) {
             return null;
         }
@@ -186,6 +208,9 @@ final class SuperglobalInit
         string $superglobalName,
         string $key
     ): ?\PHPLLVM\Value {
+        if (self::isStandaloneRuntimeSuperglobal($context, $superglobalName)) {
+            return null;
+        }
         // $_REQUEST is rebuilt each run from $_GET + $_POST (issue #291).
         if ('_REQUEST' === $superglobalName) {
             return null;
