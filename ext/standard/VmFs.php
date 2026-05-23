@@ -257,4 +257,19 @@ final class VmFs
     {
         return \sys_get_temp_dir();
     }
+
+    public static function getcwd(): string|false
+    {
+        $cwd = @\getcwd();
+        if (false === $cwd) {
+            return false;
+        }
+
+        return $cwd;
+    }
+
+    public static function chdir(string $path): bool
+    {
+        return @\chdir($path);
+    }
 }

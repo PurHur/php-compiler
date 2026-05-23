@@ -63,6 +63,7 @@ final class SelfHostBuiltinPolicy
         'glob' => 'filesystem', 'scandir' => 'filesystem',
         'fopen' => 'filesystem', 'fread' => 'filesystem', 'fclose' => 'filesystem',
         'getenv' => 'filesystem', 'putenv' => 'filesystem', 'sys_get_temp_dir' => 'filesystem',
+        'getcwd' => 'filesystem', 'chdir' => 'filesystem',
     ];
 
     /** @var array<string, string> */

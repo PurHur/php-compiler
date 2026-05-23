@@ -17,7 +17,6 @@
 
 typedef struct __hashtable__ __hashtable__;
 typedef struct __string__ __string__;
-
 extern __hashtable__ *__hashtable__alloc(void);
 extern void __hashtable__setStringAt(__hashtable__ *ht, size_t index, __string__ *val);
 extern __string__ *__string__init(long long size, const char *value);
