@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPLLVM\BasicBlock;
+use PHPLLVM\Type;
+use PHPLLVM\Value;
 use PHPLLVM\Value\Function_;
 
 /**
@@ -32,6 +34,7 @@ final class BasicBlockHelper
     }
 
     /**
+<<<<<<< HEAD
      * Close an open helper tail so the next statement starts in a fresh block (#AOT chain).
      */
     public static function branchToFreshContinue(Context $context, string $name): void
@@ -43,6 +46,24 @@ final class BasicBlockHelper
         $continue = self::append($context, $name);
         $context->builder->branch($continue);
         $context->builder->positionAtEnd($continue);
+=======
+     * Allocate stack space in the function entry block so the slot dominates all uses (#764).
+     */
+    public static function entryAlloca(Context $context, Type $type): Value
+    {
+        $entry = self::parentFunction($context)->getFirstBasicBlock();
+        $restore = $context->builder->getInsertBlock();
+        try {
+            $first = $entry->getFirstInstruction();
+            $context->builder->position($entry, $first);
+        } catch (\Throwable) {
+            $context->builder->positionAtEnd($entry);
+        }
+        $slot = $context->builder->alloca($type);
+        $context->builder->positionAtEnd($restore);
+
+        return $slot;
+>>>>>>> 01ca655 (Fix JIT LLVM dominance for boxed values on native string slots (#764).)
     }
 
     /**

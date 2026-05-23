@@ -71,11 +71,13 @@ final class strval extends Internal
 
     public function valueToString(Context $context, Value $valuePtr): Value
     {
+        $slot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__'));
         if ('__value__' === $context->getStringFromType($valuePtr->typeOf())) {
-            $slot = $context->builder->alloca($context->getTypeFromString('__value__'), 1, 'strval_value_box');
             $context->builder->store($valuePtr, $slot);
-            $valuePtr = JitValueBox::pointer($context, $slot);
+        } else {
+            JitValueBox::copyFromPointer($context, $slot, $valuePtr);
         }
+        $valuePtr = JitValueBox::pointer($context, $slot);
         $map = $context->structFieldMap['__value__'];
         $typeByte = $context->builder->load(
             $context->builder->structGep($valuePtr, $map['type'])
