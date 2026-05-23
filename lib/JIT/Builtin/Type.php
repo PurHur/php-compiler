@@ -176,6 +176,9 @@ class Type extends Builtin {
         $fntypeFclose = $this->context->context->functionType($i32, false, $i64);
         $fnFclose = $this->context->module->addFunction('__compiler_fclose', $fntypeFclose);
         $this->context->registerFunction('__compiler_fclose', $fnFclose);
+        $fntypeFeof = $this->context->context->functionType($i32, false, $i64);
+        $fnFeof = $this->context->module->addFunction('__compiler_feof', $fntypeFeof);
+        $this->context->registerFunction('__compiler_feof', $fnFeof);
         $fntypeMkdir = $this->context->context->functionType(
             $i32,
             false,

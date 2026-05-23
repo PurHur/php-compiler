@@ -53,6 +53,7 @@ static const char *phpc_builtin_functions[] = {
     "explode",
     "extract",
     "fclose",
+    "feof",
     "file_exists",
     "file_get_contents",
     "file_put_contents",
@@ -199,16 +200,18 @@ static const char *phpc_builtin_functions[] = {
     "tan",
     "time",
     "touch",
+    "trigger_error",
     "trim",
     "ucfirst",
     "ucwords",
     "unlink",
     "urldecode",
     "urlencode",
+    "usort",
     "var_export",
     "web_bool",
     "web_int",
     "web_string",
     "wordwrap",
 };
-static const size_t phpc_builtin_functions_count = 210;
+static const size_t phpc_builtin_functions_count = 213;
