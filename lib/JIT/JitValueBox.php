@@ -17,7 +17,7 @@ final class JitValueBox
 
     public static function alloc(Context $context): Value
     {
-        $slot = $context->builder->alloca($context->getTypeFromString('__value__'));
+        $slot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__'));
         // LLVM alloca is uninitialized; __value__write* calls valueDelref first (issue #AOT heap).
         $map = $context->structFieldMap['__value__'];
         $context->builder->store(
@@ -45,12 +45,41 @@ final class JitValueBox
             throw new \LogicException('valuePtrFromVariable requires TYPE_VALUE');
         }
         if (Variable::KIND_VARIABLE === $var->kind) {
+            $llvmType = $context->getStringFromType($var->value->typeOf());
+            if ('__value__*' === $llvmType) {
+                return $var->value;
+            }
+            if ('__value__' === $llvmType) {
+                return self::pointer($context, $var->value);
+            }
+            if ('__string__**' === $llvmType) {
+                $str = $context->builder->load($var->value);
+                $slot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__'));
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeString'),
+                    self::pointer($context, $slot),
+                    $str
+                );
+
+                return self::pointer($context, $slot);
+            }
+            if ('__string__*' === $llvmType) {
+                $slot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__'));
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeString'),
+                    self::pointer($context, $slot),
+                    $var->value
+                );
+
+                return self::pointer($context, $slot);
+            }
+
             return self::pointer($context, $var->value);
         }
         if ('__value__*' === $context->getStringFromType($var->value->typeOf())) {
             return $var->value;
         }
-        $slot = $context->builder->alloca($context->getTypeFromString('__value__'), 1, 'value_rvalue_box');
+        $slot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__'));
         $context->builder->store($var->value, $slot);
 
         return self::pointer($context, $slot);
@@ -232,7 +261,10 @@ final class JitValueBox
             $i8->constInt(Variable::TYPE_NATIVE_BOOL, false),
             $context->builder->structGep($ptr, $map['type'])
         );
-        $boolByte = $context->builder->truncOrBitCast($bool, $i8);
+        $boolTy = $context->getStringFromType($bool->typeOf());
+        $boolByte = ('int1' === $boolTy || 'bool' === $boolTy)
+            ? $context->builder->zExt($bool, $i8)
+            : $context->builder->truncOrBitCast($bool, $i8);
         $valueField = $context->builder->structGep($ptr, $map['value']);
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');

@@ -7,6 +7,11 @@ namespace PHPCompiler\JIT;
 /** Optional JIT compile progress file for native AOT segfault triage (issue #816). */
 final class Progress
 {
+    private static bool $pathResolved = false;
+
+    /** @var string|null */
+    private static $cachedPath = null;
+
     public static function noteFunction(string $name): void
     {
         if ('' === $name) {
@@ -55,18 +60,15 @@ final class Progress
 
     private static function progressFilePath(): ?string
     {
-        static $resolved = false;
-        /** @var string|null */
-        static $path = null;
-        if ($resolved) {
-            return $path;
+        if (self::$pathResolved) {
+            return self::$cachedPath;
         }
-        $resolved = true;
+        self::$pathResolved = true;
         $env = getenv('PHP_COMPILER_JIT_PROGRESS_FILE');
         if (false !== $env && '' !== $env) {
-            $path = $env;
+            self::$cachedPath = $env;
 
-            return $path;
+            return self::$cachedPath;
         }
 
         return null;

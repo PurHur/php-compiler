@@ -11,6 +11,7 @@ namespace PHPCompiler\JIT\Builtin\Type;
 
 use PHPCfg\Operand;
 use PHPCfg\Operand\Literal;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\Refcount;
 use PHPCompiler\JIT\Builtin\Type;
 use PHPCompiler\JIT\HashTableHelper;
@@ -373,6 +374,8 @@ class Object_ extends Type {
                 'blocks' => true,
                 'parents' => true,
                 'opcodes' => true,
+                'scope' => true,
+                'args' => true,
             ],
             'phpcfg\\script' => [
                 'functions' => true,
@@ -613,7 +616,7 @@ class Object_ extends Type {
                 $loaded = $this->context->builder->load($slot);
                 if (Variable::TYPE_VALUE === $propset[2]) {
                     $valueType = $this->context->getTypeFromString('__value__');
-                    $storage = $this->context->builder->alloca($valueType, 1, 'prop_'.$name);
+                    $storage = BasicBlockHelper::entryAlloca($this->context, $valueType);
                     $valueMap = $this->context->structFieldMap['__value__'];
                     $this->context->builder->store(
                         $this->context->getTypeFromString('int8')->constInt(Variable::TYPE_NULL, false),

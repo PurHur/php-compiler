@@ -73,8 +73,19 @@ class Context {
     /** Nested compile-time include inlining depth (issue #568). */
     public int $inlineIncludeDepth = 0;
 
+    /**
+     * Caller blocks for nested literal includes (layout → partial); used to resolve
+     * inherited locals from the outer TU (#764, #784).
+     *
+     * @var list<Block>
+     */
+    public array $inlineIncludeCallerBlocks = [];
+
     /** Require/include expression result slots while inlining (issue #783). */
     public array $inlineIncludeReturnOperands = [];
+
+    /** Last LLVM exit block from an inlined TU (if/elseif before nested include, #764). */
+    public ?\PHPLLVM\BasicBlock $inlineIncludeExitBlock = null;
 
     private array $exports = [];
     public Runtime $runtime;
@@ -86,6 +97,9 @@ class Context {
 
     /** @var array<int, PHPLLVM\Value> foreach index alloca slots keyed by array Variable id */
     public array $foreachIndexSlots = [];
+
+    /** @var array<int, PHPLLVM\Value> foreach object-key walk slots keyed by array Variable id */
+    public array $foreachObjNodeSlots = [];
 
     public function __construct(Runtime $runtime, int $loadType) {
         $this->runtime = $runtime;
@@ -355,7 +369,7 @@ class Context {
             case '__value__*':
                 $ptr = $value;
                 if ('__value__' === $this->getStringFromType($type)) {
-                    $slot = $this->builder->alloca($type, 1, 'bool_cast_value');
+                    $slot = BasicBlockHelper::entryAlloca($this, $type);
                     $this->builder->store($value, $slot);
                     $ptr = $slot;
                 }

@@ -267,7 +267,12 @@ class JIT {
             --$limit;
         }
 
-        return $this->compileBlockInternal($func, $block, $limit, $entryBlock);
+        $exit = $this->compileBlockInternal($func, $block, $limit, $entryBlock);
+        if ($this->context->inlineIncludeDepth > 0 && null !== $this->context->inlineIncludeExitBlock) {
+            return $this->context->inlineIncludeExitBlock;
+        }
+
+        return $exit;
     }
     
     private function compileBlockInternal(
@@ -464,25 +469,45 @@ class JIT {
                     $this->assignOperandValue($block->getOperand($op->arg1), $issetResult);
                     break;
                 case OpCode::TYPE_ITER_RESET:
-                    $array = $this->context->getVariableFromOp($block->getOperand($op->arg1));
-                    JIT\IteratorHelper::compileReset($this->context, $array);
+                    $arrayOp = $block->getOperand($op->arg1);
+                    $array = $this->context->getVariableFromOp($arrayOp);
+                    JIT\IteratorHelper::compileReset(
+                        $this->context,
+                        $array,
+                        self::foreachContainerUserType($arrayOp)
+                    );
                     break;
                 case OpCode::TYPE_ITER_VALID:
-                    $array = $this->context->getVariableFromOp($block->getOperand($op->arg2));
-                    $valid = JIT\IteratorHelper::compileValid($this->context, $array);
+                    $arrayOp = $block->getOperand($op->arg2);
+                    $array = $this->context->getVariableFromOp($arrayOp);
+                    $valid = JIT\IteratorHelper::compileValid(
+                        $this->context,
+                        $array,
+                        self::foreachContainerUserType($arrayOp)
+                    );
                     $this->assignOperandValue($block->getOperand($op->arg1), $valid);
                     break;
                 case OpCode::TYPE_ITER_KEY:
-                    $array = $this->context->getVariableFromOp($block->getOperand($op->arg2));
-                    $key = JIT\IteratorHelper::compileKey($this->context, $array);
+                    $arrayOp = $block->getOperand($op->arg2);
+                    $array = $this->context->getVariableFromOp($arrayOp);
+                    $key = JIT\IteratorHelper::compileKey(
+                        $this->context,
+                        $array,
+                        self::foreachContainerUserType($arrayOp)
+                    );
                     $this->assignOperand($block->getOperand($op->arg1), $key);
                     break;
                 case OpCode::TYPE_ITER_VALUE:
                     if ($op->arg3) {
                         throw new \LogicException('foreach by-reference is not implemented');
                     }
-                    $array = $this->context->getVariableFromOp($block->getOperand($op->arg2));
-                    $value = JIT\IteratorHelper::compileValue($this->context, $array);
+                    $arrayOp = $block->getOperand($op->arg2);
+                    $array = $this->context->getVariableFromOp($arrayOp);
+                    $value = JIT\IteratorHelper::compileValue(
+                        $this->context,
+                        $array,
+                        self::foreachContainerUserType($arrayOp)
+                    );
                     $this->assignOperand($block->getOperand($op->arg1), $value);
                     break;
                 case OpCode::TYPE_SCRIPT_MAGIC:
@@ -603,6 +628,24 @@ class JIT {
                 case OpCode::TYPE_CAST_BOOL:
                     $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));
                     $this->assignOperand($block->getOperand($op->arg1), $value->castTo(Variable::TYPE_NATIVE_BOOL));
+                    break;
+                case OpCode::TYPE_CAST_INT:
+                    $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));
+                    if (Variable::TYPE_VALUE === $value->type) {
+                        $ptr = Variable::KIND_VARIABLE === $value->kind
+                            ? $value->value
+                            : $this->context->helper->loadValue($value);
+                        $long = $this->context->builder->call(
+                            $this->context->lookupFunction('__value__readLong'),
+                            $ptr
+                        );
+                        $this->assignOperandValue($block->getOperand($op->arg1), $long);
+                    } else {
+                        $this->assignOperand(
+                            $block->getOperand($op->arg1),
+                            $value->castTo(Variable::TYPE_NATIVE_LONG)
+                        );
+                    }
                     break;
                 case OpCode::TYPE_CAST_STRING:
                     $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));
@@ -865,10 +908,17 @@ class JIT {
                         $builder->positionAtEnd($mergeBb);
                         $merged = $this->compileBlockInternal($func, $op->block3, null, $mergeBb, ...$args);
                         unset($this->context->coalesceAssignTargets[$coalesceResult]);
+                        if ($this->context->inlineIncludeDepth > 0) {
+                            $this->context->inlineIncludeExitBlock = $merged;
+                            break;
+                        }
 
                         return $merged;
                     }
                     unset($this->context->coalesceAssignTargets[$coalesceResult]);
+                    if ($this->context->inlineIncludeDepth > 0) {
+                        break;
+                    }
 
                     return $origBasicBlock;
                 case OpCode::TYPE_NULLSAFE:
@@ -951,12 +1001,18 @@ class JIT {
                 case OpCode::TYPE_RETURN_VOID:
                     $returnBlock = $builder->getInsertBlock();
                     $builder->positionAtEnd($returnBlock);
-                    $this->context->freeDeadVariables($func, $returnBlock, $block);
+                    if ($this->shouldFreeDeadVariablesBeforeBranch()) {
+                        $this->context->freeDeadVariables($func, $returnBlock, $block);
+                    }
                     if (0 === $this->context->inlineIncludeDepth) {
                         $this->context->builder->returnVoid();
+                    } else {
+                        $this->context->inlineIncludeExitBlock = $returnBlock;
                     }
 
-                    return $origBasicBlock;
+                    return $this->context->inlineIncludeDepth > 0
+                        ? $returnBlock
+                        : $origBasicBlock;
                 case OpCode::TYPE_RETURN:
                     $return = $this->context->getVariableFromOp($block->getOperand($op->arg1));
                     $returnBlock = $builder->getInsertBlock();
@@ -969,11 +1025,13 @@ class JIT {
                             $return->addref();
                             $this->assignOperand($holderOp, $return, true);
                         }
-                        $this->context->freeDeadVariables($func, $returnBlock, $block);
+                        $this->context->inlineIncludeExitBlock = $returnBlock;
 
-                        return $origBasicBlock;
+                        return $returnBlock;
                     }
-                    $this->context->freeDeadVariables($func, $returnBlock, $block);
+                    if ($this->shouldFreeDeadVariablesBeforeBranch()) {
+                        $this->context->freeDeadVariables($func, $returnBlock, $block);
+                    }
                     if ($this->isVoidCfgFunction($block)) {
                         $this->context->builder->returnVoid();
                     } else {
@@ -1115,9 +1173,18 @@ class JIT {
                     $name = $block->getOperand($op->arg3);
                     assert($name instanceof Operand\Literal);
                     assert($obj->type->type === Type::TYPE_OBJECT);
+                    $declaringClass = $obj->type->userType;
+                    if (null === $declaringClass && null !== $block->func?->class) {
+                        $declaringClass = $block->func->class->value;
+                    }
+                    if (null === $declaringClass || '' === $declaringClass) {
+                        $declaringClass = $this->context->scope->className !== ''
+                            ? $this->context->scope->className
+                            : 'object';
+                    }
                     $this->context->scope->variables[$result] = $this->context->type->object->propertyFetch(
                         $this->context->helper->loadValue($this->context->getVariableFromOp($obj)),
-                        $obj->type->userType,
+                        $declaringClass,
                         $name->value
                     );
                     break;
@@ -1156,10 +1223,9 @@ class JIT {
         }
         $valuePtr = Variable::KIND_VARIABLE === $return->kind
             ? JIT\JitValueBox::pointer($this->context, $return->value)
-            : $this->context->builder->alloca(
-                $this->context->getTypeFromString('__value__'),
-                1,
-                'return_value_box'
+            : JIT\BasicBlockHelper::entryAlloca(
+                $this->context,
+                $this->context->getTypeFromString('__value__')
             );
         if (Variable::KIND_VALUE === $return->kind) {
             $this->context->builder->store($retval, $valuePtr);
@@ -1392,7 +1458,10 @@ class JIT {
                 $this->context->helper->loadValue($value),
                 $result->value
             );
-            $result->addref();
+            $this->copyObjectPropertyBacking($result, $value);
+            if (null === $result->objectPropertySlot) {
+                $result->addref();
+            }
             $this->copyValueBoxJitFlags($result, $value);
 
             return;
@@ -1549,16 +1618,24 @@ class JIT {
             );
             $result->free();
             $this->context->builder->store($ht, $result->value);
-            $result->addref();
+            $this->copyObjectPropertyBacking($result, $value);
+            if (null === $result->objectPropertySlot) {
+                $result->addref();
+            }
 
             return;
         } elseif (Variable::TYPE_STRING === $result->type && Variable::TYPE_VALUE === $value->type) {
-            $str = $this->context->builder->call(
-                $this->context->lookupFunction('__value__readString'),
+            // getenv() and similar builtins return string|false as __value__; keep the box
+            // so strict comparisons against false use JitValueCompare (issue #848).
+            $slot = JIT\JitValueBox::alloc($this->context);
+            JIT\JitValueBox::copyFromPointer(
+                $this->context,
+                $slot,
                 $this->valueBoxPointer($value)
             );
             $result->free();
-            $this->context->builder->store($str, $result->value);
+            $result->type = Variable::TYPE_VALUE;
+            $result->value = $slot;
             $result->addref();
 
             return;
@@ -1629,6 +1706,13 @@ class JIT {
         }
         $dest->valueBoxHashtable = $src->valueBoxHashtable;
         $dest->isNullConstant = $src->isNullConstant;
+    }
+
+    /** Keep borrowed object-property hashtable metadata on locals ($cfg = $this->config, #848). */
+    private function copyObjectPropertyBacking(Variable $dest, Variable $src): void
+    {
+        $dest->objectPropertySlot = $src->objectPropertySlot;
+        $dest->objectPropertyType = $src->objectPropertyType;
     }
 
     private function jitTypeFromLlvmValue(PHPLLVM\Value $value): int
@@ -1767,6 +1851,22 @@ class JIT {
         }
 
         return $var;
+    }
+
+    private static function foreachContainerUserType(Operand $arrayOp): ?string
+    {
+        $userType = $arrayOp->type->userType ?? null;
+        if (null !== $userType && '' !== $userType) {
+            return $userType;
+        }
+        if (null !== $arrayOp->type && Variable::TYPE_HASHTABLE === Variable::getTypeFromType($arrayOp->type)) {
+            $decl = $arrayOp->type->userType ?? null;
+            if (null !== $decl && 0 === strcasecmp($decl, 'SplObjectStorage')) {
+                return 'SplObjectStorage';
+            }
+        }
+
+        return null;
     }
 
 }

@@ -103,7 +103,7 @@ class Value extends Type {
                         return $result;
                     }
                 }
-                $var = alloca __value__;
+                $var = entry_alloca __value__;
                 $tmp = (int64) 0;
                 __value__writeLong($var, $tmp);
                 return $var;

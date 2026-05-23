@@ -151,6 +151,7 @@ $(macro :unsafe :recursive) {
                 chain(buffer('typeof'), T_VARIABLE as typeof_var) as typeof,
                 chain(buffer('sizeof'), T_VARIABLE as sizeof_var) as sizeof,
                 chain(buffer('sizeof'), ctype() as sizeoftype_type) as sizeoftype,
+                chain(buffer('entry_alloca'), ctype() as entry_alloca_type) as entry_alloca,
                 chain(buffer('alloca'), ctype() as alloca_type) as alloca,
                 chain(buffer('malloc'), ctype() as malloc_type, optional(T_VARIABLE as malloc_extra)) as malloc,
                 chain(buffer('realloc'), T_VARIABLE as realloc_var, T_VARIABLE as realloc_extra) as realloc,
@@ -519,6 +520,11 @@ $(macro :unsafe :recursive) {
                     $(malloc_extra ! {
                         $(result) = $this->context->memory->malloc($type);
                     })
+                })
+
+                $(entry_alloca ? ... {
+                    $type = $this->context->getTypeFromString($$(stringify($(entry_alloca_type))));
+                    $(result) = \PHPCompiler\JIT\BasicBlockHelper::entryAlloca($this->context, $type);
                 })
 
                 $(alloca ? ... {

@@ -5,15 +5,10 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPLLVM\BasicBlock;
+use PHPLLVM\Type;
+use PHPLLVM\Value;
 use PHPLLVM\Value\Function_;
 
-/**
- * Helpers for LLVM CFG construction.
- *
- * {@see BasicBlock::insertBasicBlock()} inserts *before* the reference block, which
- * steals the function entry block if used on the current block. Always append
- * successor blocks with these helpers instead.
- */
 final class BasicBlockHelper
 {
     public static function parentFunction(Context $context): Function_
@@ -22,7 +17,6 @@ final class BasicBlockHelper
         if (!$parent instanceof Function_) {
             throw new \LogicException('Current basic block has no parent function');
         }
-
         return $parent;
     }
 
@@ -31,9 +25,6 @@ final class BasicBlockHelper
         return self::parentFunction($context)->appendBasicBlock($name);
     }
 
-    /**
-     * Close an open helper tail so the next statement starts in a fresh block (#AOT chain).
-     */
     public static function branchToFreshContinue(Context $context, string $name): void
     {
         $tail = $context->builder->getInsertBlock();
@@ -45,9 +36,21 @@ final class BasicBlockHelper
         $context->builder->positionAtEnd($continue);
     }
 
-    /**
-     * Close CFG merge blocks left open by expression helpers (e.g. strval valueToString phi).
-     */
+    public static function entryAlloca(Context $context, Type $type): Value
+    {
+        $entry = self::parentFunction($context)->getEntryBasicBlock();
+        $restore = $context->builder->getInsertBlock();
+        try {
+            $first = $entry->getFirstInstruction();
+            $context->builder->position($entry, $first);
+        } catch (\Throwable) {
+            $context->builder->positionAtEnd($entry);
+        }
+        $slot = $context->builder->alloca($type);
+        $context->builder->positionAtEnd($restore);
+        return $slot;
+    }
+
     public static function sealOpenBlock(Context $context, BasicBlock $block): void
     {
         if (null !== $block->getTerminator()) {
@@ -57,9 +60,6 @@ final class BasicBlockHelper
         $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
     }
 
-    /**
-     * Phi merge tails from JIT helpers (strval, concat, …) must not be left open in dead CFG paths.
-     */
     public static function sealPhiMergeBlocks(Context $context, BasicBlock $block): void
     {
         if (null !== $block->getTerminator()) {
@@ -76,9 +76,6 @@ final class BasicBlockHelper
         self::sealOpenBlock($context, $block);
     }
 
-    /**
-     * @param PHPLLVM\Value\Function_ $function
-     */
     public static function sealFunction(Context $context, $function): void
     {
         if (0 === $function->countBasicBlocks()) {
