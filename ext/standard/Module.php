@@ -208,6 +208,7 @@ class Module extends ModuleAbstract
             new get_parent_class_(),
             new is_a_(),
             new is_subclass_of_(),
+            new trigger_error_(),
             new phpc_deploy_path(),
             new compiler_is_superglobal_name(),
             new extract_(),
