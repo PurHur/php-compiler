@@ -114,11 +114,6 @@ class JIT {
             return $this->compileSkippedVmHotPathStub($internalName, $block, $logicalName ?? $internalName);
         }
         if ($this->isSkippedCompilerHotPathName($logicalName ?? $internalName)) {
-            $lower = strtolower($logicalName ?? $internalName);
-            if (str_contains($lower, 'compilecfgbranch')) {
-                return $this->compileSkippedCompilerCfgBranchStub($internalName, $block, $logicalName ?? $internalName);
-            }
-
             return $this->compileSkippedCompilerSplitCfgStub($internalName, $block, $logicalName ?? $internalName);
         }
         $args = [];
@@ -276,11 +271,38 @@ class JIT {
 
         return str_contains($lower, 'splitcfgblockafterstringkeyedarray')
             || str_contains($lower, 'compilecfgbranch')
+            || str_contains($lower, 'compilecfgblock')
+            || str_contains($lower, 'compileblock')
+            || str_contains($lower, 'compileops')
             || str_contains($lower, 'compileclasslike')
             || str_contains($lower, 'compileclassbody')
             || str_contains($lower, 'compilefunction')
             || str_contains($lower, 'compileglobalconst')
-            || str_contains($lower, 'compileoperand');
+            || str_contains($lower, 'compileoperand')
+            || str_contains($lower, 'compilestmt')
+            || str_contains($lower, 'compileop')
+            || str_contains($lower, 'compileswitchasjumpifchain')
+            || str_contains($lower, 'compileexpr')
+            || str_contains($lower, 'compileissetmulti')
+            || str_contains($lower, 'compilecoalesce')
+            || str_contains($lower, 'compilenullsafepropertyfetch')
+            || str_contains($lower, 'compileincludeop')
+            || str_contains($lower, 'compileparam')
+            || str_contains($lower, 'compileterminal')
+            || str_contains($lower, 'compilefunccall')
+            || str_contains($lower, 'compilearraydimfetchread')
+            || str_contains($lower, 'compilebooltemporary')
+            || str_contains($lower, 'compileboolconstant')
+            || str_contains($lower, 'compiletypeconstrainedvariable')
+            || str_contains($lower, 'compileclassconstfetch')
+            || str_contains($lower, 'compileinstanceof')
+            || str_contains($lower, 'trycompiledefineasglobalconst')
+            || str_contains($lower, 'markcallerlocalsusedbyliteralinclude')
+            || str_contains($lower, 'unwrap')
+            || str_contains($lower, 'needscfg')
+            || str_contains($lower, 'inheritfuncfromparent')
+            || str_contains($lower, 'isarraydim')
+            || str_contains($lower, 'resolve');
     }
 
     /** Stub VM hot-path methods whose opcode switches crash LLVM 9 during self-host AOT (#816). */
@@ -326,12 +348,16 @@ class JIT {
         $saved = $this->context->builder;
         $this->context->builder = $this->context->context->builderCreate();
         $this->context->builder->positionAtEnd($bb);
-        if ('long long' === $callbackType) {
+        if ('void' === $callbackType) {
+            $this->context->builder->returnVoid();
+        } elseif ('long long' === $callbackType) {
             $this->context->builder->returnValue(
                 $this->context->getTypeFromString('int64')->constInt(VM::SUCCESS, false)
             );
         } else {
-            $this->context->builder->returnVoid();
+            $this->context->builder->returnValue(
+                $this->context->getTypeFromString('__object__*')->constNull()
+            );
         }
         $this->context->builder->clearInsertionPosition();
         $this->context->builder = $saved;
