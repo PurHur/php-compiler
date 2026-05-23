@@ -53,6 +53,12 @@ final class string_trim extends Internal
         if (1 !== count($args)) {
             throw new \LogicException('trim() requires exactly one argument');
         }
+        $literal = $args[0]->compileTimeString ?? null;
+        if (null !== $literal) {
+            return $context->builder->load(
+                $context->constantStringFromString(VmString::trim($literal))
+            );
+        }
         $str = $this->jitString($context, $args[0], 'string_trim() argument #1');
         $structName = $str->typeOf()->getElementType()->getName();
         $map = $context->structFieldMap[$structName];
@@ -69,14 +75,14 @@ final class string_trim extends Internal
         $context->builder->store($zero, $startSlot);
         $context->builder->store($len, $endSlot);
 
-        self::advanceWhileTrimByte($context, $charPtr, $len, $startSlot, true);
-        self::advanceWhileTrimByte($context, $charPtr, $len, $endSlot, false);
+        self::advanceWhileTrimByte($context, $charPtr, $len, $startSlot, true, 'trim');
+        self::advanceWhileTrimByte($context, $charPtr, $len, $endSlot, false, 'trim');
 
         $start = $context->builder->load($startSlot);
         $end = $context->builder->load($endSlot);
         $newLen = $context->builder->sub($end, $start);
 
-        return self::jitCopySlice($context, $str, $charPtr, $start, $newLen);
+        return self::jitCopySlice($context, $str, $charPtr, $start, $newLen, 'trim');
     }
 
     public static function jitCopySlice(
@@ -128,15 +134,18 @@ final class string_trim extends Internal
         Value $charPtr,
         Value $len,
         Value $indexSlot,
-        bool $fromStart
+        bool $fromStart,
+        string $blockId = ''
     ): void {
+        static $seq = 0;
+        $suffix = ('' === $blockId ? '' : '_'.$blockId).'_'.(string) (++$seq);
         $i64 = JitStringIndex::i64($context);
         $zero = JitStringIndex::zero($context);
         $one = $i64->constInt(1, false);
 
-        $done = BasicBlockHelper::append($context, $fromStart ? 'trim_start_done' : 'trim_end_done');
-        $loopHead = BasicBlockHelper::append($context, $fromStart ? 'trim_start_head' : 'trim_end_head');
-        $loopBody = BasicBlockHelper::append($context, $fromStart ? 'trim_start_body' : 'trim_end_body');
+        $done = BasicBlockHelper::append($context, ($fromStart ? 'trim_start_done' : 'trim_end_done').$suffix);
+        $loopHead = BasicBlockHelper::append($context, ($fromStart ? 'trim_start_head' : 'trim_end_head').$suffix);
+        $loopBody = BasicBlockHelper::append($context, ($fromStart ? 'trim_start_body' : 'trim_end_body').$suffix);
         $context->builder->branch($loopHead);
 
         $context->builder->positionAtEnd($loopHead);
