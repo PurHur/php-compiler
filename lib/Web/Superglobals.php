@@ -167,9 +167,14 @@ final class Superglobals
         $segment = strtolower(str_replace('_', '-', $segment));
 
         return implode('-', array_map(
-            static fn (string $part): string => '' === $part ? '' : ucfirst($part),
+            [self::class, 'headerSegmentTitleCase'],
             explode('-', $segment)
         ));
+    }
+
+    private static function headerSegmentTitleCase(string $part): string
+    {
+        return '' === $part ? '' : ucfirst($part);
     }
 
     /**

@@ -363,8 +363,7 @@ class JIT {
             return false;
         }
         $lower = strtolower($name);
-        return str_contains($lower, 'conststringfolder')
-            || str_contains($lower, 'includepathresolver')
+        return str_contains($lower, 'includepathresolver')
             || str_contains($lower, 'literalincludediscovery')
             || str_contains($lower, 'deployroot')
             || str_contains($lower, 'sourcebundler');
@@ -508,9 +507,10 @@ class JIT {
             --$limit;
         }
 
+        $this->context->inlineIncludeExitBlock = null;
         $exit = $this->compileBlockInternal($func, $block, $limit, $entryBlock);
-        if ($this->context->inlineIncludeDepth > 0 && null !== $this->context->inlineIncludeExitBlock) {
-            return $this->context->inlineIncludeExitBlock;
+        if (null !== $this->context->inlineIncludeExitBlock) {
+            $exit = $this->context->inlineIncludeExitBlock;
         }
 
         return $exit;

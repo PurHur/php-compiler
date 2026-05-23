@@ -23,6 +23,7 @@ readonly -a BISECT_STEPS=(
   'isset_object_property_array|isset_object_property_array|848'
   'require_return_config|require_return_config|806'
   'nested_include_two_tier|nested_include_two_tier|878'
+  'deploy_path_layout_nested|deploy_path_layout_nested|878'
   'miniwebapp_render_home|miniwebapp_render_home|867'
   'layout_script_base|layout_script_base|866'
   'coalesce_then_inherited_local|coalesce_then_inherited_local|866'

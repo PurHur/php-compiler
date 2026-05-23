@@ -35,6 +35,16 @@ require_once __DIR__.'/../../../lib/VM/TypeCheck.php';
 require_once __DIR__.'/../../../lib/VM/Optimizer/AssignOp.php';
 require_once __DIR__.'/../../../lib/VM/Optimizer.php';
 require_once __DIR__.'/../../../lib/VM/Context.php';
+require_once __DIR__.'/../../../lib/Handler.php';
+require_once __DIR__.'/../../../lib/JIT/Call.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin.php';
+require_once __DIR__.'/../../../lib/JIT/Result.php';
+require_once __DIR__.'/../../../lib/Func/Internal.php';
+require_once __DIR__.'/../../../lib/Func/JIT.php';
+require_once __DIR__.'/../../../lib/JIT/Variable.php';
+require_once __DIR__.'/../../../lib/JIT/IssetHelper.php';
+require_once __DIR__.'/../../../lib/Web/Superglobals.php';
+require_once __DIR__.'/../../../lib/JIT/Scope.php';
 require_once __DIR__.'/../../../lib/VM.php';
 require_once __DIR__.'/../../../lib/Compiler.php';
 

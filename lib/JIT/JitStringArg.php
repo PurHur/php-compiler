@@ -33,6 +33,18 @@ final class JitStringArg
                 JitValueBox::valuePtrFromVariable($context, $arg)
             );
         }
+        if (Variable::TYPE_HASHTABLE === $arg->type) {
+            // FuncCall->args and similar may be lowered as hashtable pointers (issue #816).
+            $ht = $context->helper->loadValue($arg);
+
+            return $context->builder->call(
+                $context->lookupFunction('__value__readString'),
+                $context->builder->pointerCast(
+                    $ht,
+                    $context->getTypeFromString('__value__*')
+                )
+            );
+        }
 
         throw new \LogicException("{$contextLabel} must be a string in this compiler build");
     }

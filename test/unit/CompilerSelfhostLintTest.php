@@ -52,8 +52,17 @@ final class CompilerSelfhostLintTest extends TestCase
             'lib/Compiler.php',
             'lib/Frame.php',
             'lib/Func.php',
+            'lib/Func/Internal.php',
+            'lib/Func/JIT.php',
             'lib/Func/PHP.php',
+            'lib/Handler.php',
+            'lib/JIT/Builtin.php',
+            'lib/JIT/Call.php',
+            'lib/JIT/IssetHelper.php',
             'lib/JIT/OperandName.php',
+            'lib/JIT/Result.php',
+            'lib/JIT/Scope.php',
+            'lib/JIT/Variable.php',
             'lib/Module.php',
             'lib/OpCode.php',
             'lib/OpCodeNames.php',
@@ -78,6 +87,7 @@ final class CompilerSelfhostLintTest extends TestCase
             'lib/Web/IncludePathResolver.php',
             'lib/Web/LiteralIncludeDiscovery.php',
             'lib/Web/SourceBundler.php',
+            'lib/Web/Superglobals.php',
         ];
         $this->assertSame($expected, $rels);
     }

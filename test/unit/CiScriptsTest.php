@@ -155,6 +155,35 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('EXAMPLES_AOT_SMOKE_GATE="${EXAMPLES_AOT_SMOKE_GATE:-1}"', $defaults);
     }
 
+    public function testCiLocalHonorsBootstrapSelfhostProbeGate(): void
+    {
+        $local = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-local.sh');
+        $this->assertStringContainsString('ci_run_bootstrap_selfhost_probe', $local);
+        $this->assertStringContainsString('BOOTSTRAP_SELFHOST_PROBE_GATE:-1', $local);
+
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('BOOTSTRAP_SELFHOST_PROBE_GATE', $common);
+        $this->assertStringContainsString('bootstrap-selfhost-compile-probe.sh', $common);
+        $this->assertStringContainsString('BOOTSTRAP_SELFHOST_PROBE_UPDATE', $common);
+    }
+
+    public function testCiDefaultsEnvDefinesBootstrapSelfhostProbeUpdateOff(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringNotContainsString('BOOTSTRAP_SELFHOST_PROBE_GATE', $defaults);
+        $this->assertStringContainsString(
+            'BOOTSTRAP_SELFHOST_PROBE_UPDATE="${BOOTSTRAP_SELFHOST_PROBE_UPDATE:-0}"',
+            $defaults
+        );
+    }
+
+    public function testCiFastDoesNotRunBootstrapSelfhostProbeGate(): void
+    {
+        $fast = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-fast.sh');
+        $this->assertStringNotContainsString('ci_run_bootstrap_selfhost_probe', $fast);
+        $this->assertStringNotContainsString('bootstrap-selfhost-compile-probe', $fast);
+    }
+
     public function testCiFastDoesNotRunExamplesAotSmokeGate(): void
     {
         $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-fast.sh');

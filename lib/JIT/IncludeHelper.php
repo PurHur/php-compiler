@@ -176,6 +176,8 @@ final class IncludeHelper
             $context->popScope();
             array_pop($context->inlineIncludeCallerBlocks);
             array_pop($context->inlineIncludeBindingRefreshStack);
+            // Nested includes must not leak exit blocks to the outer TU (#764, #878).
+            $context->inlineIncludeExitBlock = null;
         }
 
         $resumeBb = self::appendIncludeResume($context, $func);
