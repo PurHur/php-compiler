@@ -373,6 +373,11 @@ class Type extends Builtin {
             $this->context->context->functionType($htPtr, false, $strPtr, $i32)
         );
         $this->context->registerFunction('__phpc_scandir', $fnScandir);
+        $fnStat = $this->context->module->addFunction(
+            '__phpc_stat',
+            $this->context->context->functionType($htPtr, false, $strPtr, $i32)
+        );
+        $this->context->registerFunction('__phpc_stat', $fnStat);
         $valuePtr = $this->context->getTypeFromString('__value__*');
         $i64 = $this->context->getTypeFromString('int64');
         $fnParseUrl = $this->context->module->addFunction(
