@@ -32,15 +32,26 @@ Manifest includes `public/`, `assets/`, and `templates/` — deploy copies them 
 ./phpc deploy examples/003-MiniWebApp -o /tmp/miniwebapp-dist
 ```
 
-**Execute status (master):** Home route `?route=home` emits HTML (non-zero stdout; [#764](https://github.com/PurHur/php-compiler/issues/764) closed) but layout/config values are empty and output does not match VM — `ExamplesCompileTest::test003MiniWebAppHomeRouteAotExecutes` still fails. Hello, contact, and PATH_INFO routes remain incomplete ([#676](https://github.com/PurHur/php-compiler/issues/676)). Use **VM + `phpc serve`** for runtime checks; use deploy to validate **dist layout** and `README.deploy` after link.
+**Execute status (master):** Home route `?route=home` emits HTML with `MiniWebApp` title when `PHPC_DEPLOY_ROOT` points at a deploy dist ([#745](https://github.com/PurHur/php-compiler/issues/745)). Hello and contact query routes pass `deploy-smoke.sh --example 003` when `DEPLOY_SMOKE_003_EXECUTE=1` or `MINIWEBAPP_AOT_EXECUTE_GATE=1`. PATH_INFO routes and full VM parity remain tracked in [#676](https://github.com/PurHur/php-compiler/issues/676).
+
+Deploy execute smoke:
+
+```bash
+DEPLOY_SMOKE_003_EXECUTE=1 ./script/deploy-smoke.sh --example 003
+# or when MINIWEBAPP_AOT_EXECUTE_GATE=1 (default in ci-defaults.env)
+```
 
 Manual probe:
 
 ```bash
 cd examples/003-MiniWebApp
 ../../phpc build --project .
-QUERY_STRING=route=home REQUEST_METHOD=GET ./.phpc/bin/app | wc -c
-# non-zero on master; HTML still missing app_name / MiniWebApp title
+../../phpc deploy . -o /tmp/miniwebapp-dist
+export PHPC_DEPLOY_ROOT=/tmp/miniwebapp-dist
+eval "$(../../script/miniwebapp-cgi-env.php --export shellQueryRouteHome)"
+export SCRIPT_FILENAME="$PHPC_DEPLOY_ROOT/public/index.php"
+export DOCUMENT_ROOT="$PHPC_DEPLOY_ROOT/public"
+./bin/app   # from project tree; use $PHPC_DEPLOY_ROOT/bin/app from dist
 ```
 
 Gate ladder and route matrix: [examples/003-MiniWebApp/README.md](../examples/003-MiniWebApp/README.md), [examples/README.md § 003-MiniWebApp](../examples/README.md#003-miniwebapp).
@@ -116,7 +127,7 @@ Production AOT CGI wrapper for nginx spawn: [#665](https://github.com/PurHur/php
 
 | Step | Command |
 |------|---------|
-| Deploy smoke | `make deploy-smoke` or `./script/deploy-smoke.sh` (001/002; skips without LLVM — [#718](https://github.com/PurHur/php-compiler/issues/718)) |
+| Deploy smoke | `make deploy-smoke` or `./script/deploy-smoke.sh` (001/002; 003 execute when `DEPLOY_SMOKE_003_EXECUTE=1` or `MINIWEBAPP_AOT_EXECUTE_GATE=1` — [#718](https://github.com/PurHur/php-compiler/issues/718), [#745](https://github.com/PurHur/php-compiler/issues/745)) |
 | Manual deploy | `phpc deploy examples/002-StaticWeb -o /tmp/static-dist` → executable `bin/app` |
 | Deploy root env | `grep PHPC_DEPLOY_ROOT /tmp/static-dist/README.deploy` |
 | CGI one-shot | `PHPC_DEPLOY_ROOT=/tmp/static-dist QUERY_STRING= ./bin/app` (002 prints HTML) |

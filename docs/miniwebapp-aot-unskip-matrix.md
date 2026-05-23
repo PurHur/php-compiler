@@ -10,7 +10,7 @@ Ordered checklist for [`examples/003-MiniWebApp/`](../examples/003-MiniWebApp/) 
 | 3 AOT | [#833](https://github.com/PurHur/php-compiler/issues/833) | `examples-web-smoke.sh --aot` 003 | 🚧 | Home + hello PATH_INFO curls when binary ready; skips on empty stdout |
 | 4 PHPUnit HTTP | [#478](https://github.com/PurHur/php-compiler/issues/478) | `ServeAotTest::testServes003MiniWebApp*` | ⬜ | No shipped 003 `phpc serve --aot` tests yet |
 | 4 assets | [#610](https://github.com/PurHur/php-compiler/issues/610) | `ServeAotTest` `/assets/style.css` | ⬜ | Static assets from 003 docroot via AOT serve |
-| 4d execute | [#745](https://github.com/PurHur/php-compiler/issues/745) | `deploy-smoke.sh --example 003` execute | ⬜ | Layout probe only (`DEPLOY_SMOKE_003_LAYOUT=1`); full E2E blocked on execute |
+| 4d execute | [#745](https://github.com/PurHur/php-compiler/issues/745) | `deploy-smoke.sh --example 003` execute | ✅ | `DEPLOY_SMOKE_003_EXECUTE=1` or `MINIWEBAPP_AOT_EXECUTE_GATE=1`; home + hello + contact via `MiniWebAppCgiEnv` |
 
 **Legend:** ✅ green / default-on · 🚧 wired, blocked on execute parity · ⬜ not started
 
@@ -32,6 +32,9 @@ EXAMPLES_AOT_SMOKE_ONLY=003 ./script/examples-aot-smoke.sh
 
 # Deploy layout (745 partial)
 DEPLOY_SMOKE_003_LAYOUT=1 ./script/deploy-smoke.sh --example 003
+
+# Deploy execute E2E (745)
+DEPLOY_SMOKE_003_EXECUTE=1 ./script/deploy-smoke.sh --example 003
 ```
 
 When [#747](https://github.com/PurHur/php-compiler/issues/747) and [#833](https://github.com/PurHur/php-compiler/issues/833) are green, enable [#478](https://github.com/PurHur/php-compiler/issues/478) / [#610](https://github.com/PurHur/php-compiler/issues/610) PHPUnit HTTP gates, then [#745](https://github.com/PurHur/php-compiler/issues/745) deploy execute in `ci-local.sh`.
