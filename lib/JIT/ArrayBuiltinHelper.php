@@ -4762,6 +4762,11 @@ final class ArrayBuiltinHelper
             : self::loadHashTable($context, $first);
 
         return self::arrayIntersectHashTable($context, $src, $otherHts);
+    }
+
+    /**
+     * @param list<Value> $otherHts
+     */
     private static function arrayIntersectHashTable(Context $context, Value $src, array $otherHts): Value
     {
         $dest = HashTableHelper::alloc($context);
@@ -4999,4 +5004,5 @@ final class ArrayBuiltinHelper
         $context->builder->positionAtEnd($mergeBlock);
 
         return $context->builder->load($resultSlot);
+    }
 }
