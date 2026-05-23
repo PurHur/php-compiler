@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT;
 
 use PHPCfg\Operand;
 use PHPCfg\Operand\Literal;
+use PHPCfg\Operand\Temporary;
 use PHPLLVM\BasicBlock;
 use PHPTypes\Type;
 use PHPLLVM\Value\Function_;
@@ -80,6 +81,16 @@ final class IncludeHelper
 
         $localBindings = self::collectCalleeLocalBindings($context, $callerBlock, $included);
         $preIncludeBb = $context->builder->getInsertBlock();
+        $returnHolderOp = new Temporary();
+        $returnHolder = new Variable(
+            $context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VARIABLE,
+            JitValueBox::alloc($context)
+        );
+        JitValueBox::writeLong($context, $returnHolder->value, $context->constantFromInteger(1));
+        $context->setVariableOp($returnHolderOp, $returnHolder);
+        $context->inlineIncludeReturnOperands[] = $returnHolderOp;
         $entryBb = $func->appendBasicBlock('include_entry_'.(++self::$includeEntrySerial));
         if (null !== $preIncludeBb && null === $preIncludeBb->getTerminator()) {
             $context->builder->positionAtEnd($preIncludeBb);
@@ -141,6 +152,7 @@ final class IncludeHelper
         if (null !== $resultOperand) {
             $jit->assignIncludeResult($resultOperand);
         }
+        array_pop($context->inlineIncludeReturnOperands);
     }
 
     /**
