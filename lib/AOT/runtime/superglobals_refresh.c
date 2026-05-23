@@ -2272,6 +2272,8 @@ void __phpc_response_headers_flush(void)
         }
         cur = cur->next;
     }
+    /* CGI/1.1: blank line between response headers and body (issue #682). */
+    printf("\r\n");
 }
 
 void __phpc_pending_header_remove(__string__ *name)

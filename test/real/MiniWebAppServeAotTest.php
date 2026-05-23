@@ -77,18 +77,12 @@ final class MiniWebAppServeAotTest extends TestCase
         $this->assertStringContainsString('Hello Dev', $this->responseBody($response));
     }
 
-    /**
-     * PATH_INFO front-controller dispatch via serve-aot (#610 partial until AOT execute parity).
-     */
+    /** PATH_INFO front-controller dispatch via serve-aot (#610, #747 execute parity). */
     public function testServeAot003PathInfoHello(): void
     {
         $response = $this->httpGetAot(MiniWebAppCgiEnv::httpPathPathInfoHello());
         $this->assertStringContainsString('HTTP/1.1 200', $response);
-        $body = $this->responseBody($response);
-        if (!str_contains($body, 'Hello Dev')) {
-            $this->markTestSkipped('AOT PATH_INFO hello not green yet (#610, execute parity blocked)');
-        }
-        $this->assertStringContainsString('Hello Dev', $body);
+        $this->assertStringContainsString('Hello Dev', $this->responseBody($response));
     }
 
     public function testServeAot003PostQueryRouteContact(): void

@@ -42,6 +42,7 @@ class ApiRouter
 --EXPECT--
 Status: 200
 Content-Type: application/json
+
 {"ok":true,"service":"003-MiniWebApp","app":"MiniWebApp"}
 --EXPECT_EXIT--
 0

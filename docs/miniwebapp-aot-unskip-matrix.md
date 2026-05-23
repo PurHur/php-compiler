@@ -8,7 +8,8 @@ Ordered checklist for [`examples/003-MiniWebApp/`](../examples/003-MiniWebApp/) 
 | 4b2 execute | [#747](https://github.com/PurHur/php-compiler/issues/747) | `MINIWEBAPP_AOT_EXECUTE_GATE=1` → `MiniWebAppAotExecuteTest` | ✅ | Query + PATH_INFO hello + POST contact (#485 thank-you via direct template include) |
 | 4c | [#738](https://github.com/PurHur/php-compiler/issues/738) | `EXAMPLES_AOT_SMOKE_ONLY=003` → `examples-aot-smoke.sh` | ✅ | Home CLI probe passes when stdout contains `MiniWebApp`; fails (not skip) when gate on and empty |
 | 3 AOT | [#833](https://github.com/PurHur/php-compiler/issues/833) | `examples-web-smoke.sh --aot` 003 | 🚧 | Home + hello PATH_INFO + contact POST when binary ready; opt-in `MINIWEBAPP_WEB_SMOKE_AOT_GATE=1` |
-| 4 PHPUnit HTTP | [#478](https://github.com/PurHur/php-compiler/issues/478) | `MiniWebAppServeAotTest` | 🚧 | `MINIWEBAPP_SERVE_AOT_GATE=1` or execute gate; 5/6 green; PATH_INFO hello skipped until 4b2 stable (#1067) |
+| 4 PHPUnit HTTP | [#478](https://github.com/PurHur/php-compiler/issues/478) | `MiniWebAppServeAotTest` | ✅ | 6/6 including PATH_INFO hello via serve-aot (#1067, #747) |
+| 6 AOT CGI | [#682](https://github.com/PurHur/php-compiler/issues/682) | `CgiDriverTest::testMiniWebApp*ViaAotCgiWrapper` | ✅ | home + PATH_INFO hello + api/status via `bin/cgi-aot.php` (#764) |
 | 4 assets | [#610](https://github.com/PurHur/php-compiler/issues/610) | `GET /assets/style.css` | ✅ | Static CSS via AOT serve (#1067) |
 | 4d execute | [#745](https://github.com/PurHur/php-compiler/issues/745) | `deploy-smoke.sh --example 003` execute | ✅ | `DEPLOY_SMOKE_003_EXECUTE=1` or `MINIWEBAPP_AOT_EXECUTE_GATE=1`; home + hello + contact via `MiniWebAppCgiEnv` (#1065) |
 
