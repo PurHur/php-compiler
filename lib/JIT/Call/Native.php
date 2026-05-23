@@ -202,6 +202,26 @@ class Native implements Call {
                         return $context->getTypeFromString('int64')->constInt(0, true);
                 }
                 break;
+            case 'int1':
+            case 'bool':
+                switch ($arg->type) {
+                    case Variable::TYPE_NATIVE_BOOL:
+                        return $value;
+                    case Variable::TYPE_NATIVE_LONG:
+                        return $context->builder->truncOrBitCast(
+                            $value,
+                            $context->getTypeFromString('int1')
+                        );
+                    case Variable::TYPE_VALUE:
+                        return $context->builder->truncOrBitCast(
+                            $context->builder->call(
+                                $context->lookupFunction('__value__readLong'),
+                                \PHPCompiler\JIT\JitValueBox::valuePtrFromVariable($context, $arg)
+                            ),
+                            $context->getTypeFromString('int1')
+                        );
+                }
+                break;
             case 'double':
                 switch ($arg->type) {
                     case Variable::TYPE_NATIVE_DOUBLE:

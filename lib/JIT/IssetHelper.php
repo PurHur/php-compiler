@@ -205,13 +205,8 @@ final class IssetHelper
                     $htPtr
                 );
             }
-            $valueType = $context->getTypeFromString('__value__');
-            $storage = $context->builder->alloca($valueType, 1, 'isset_obj_prop');
+            $storage = JitValueBox::alloc($context);
             $valueMap = $context->structFieldMap['__value__'];
-            $context->builder->store(
-                $context->getTypeFromString('int8')->constInt(Variable::TYPE_NULL, false),
-                $context->builder->structGep($storage, $valueMap['type'])
-            );
             $context->builder->call(
                 $context->lookupFunction('__object__load_value_slot'),
                 $container->objectPropertySlot,

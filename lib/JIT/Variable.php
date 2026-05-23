@@ -167,6 +167,17 @@ final class Variable {
         if (null === $type) {
             return self::TYPE_VALUE;
         }
+        if (Type::TYPE_UNION === $type->type && [] !== ($type->subTypes ?? [])) {
+            $nonNull = [];
+            foreach ($type->subTypes as $sub) {
+                if (Type::TYPE_NULL !== $sub->type) {
+                    $nonNull[] = $sub;
+                }
+            }
+            if (1 === count($nonNull)) {
+                return self::getTypeFromType($nonNull[0]);
+            }
+        }
         if (null !== $type->userType && 0 === strcasecmp($type->userType, 'SplObjectStorage')) {
             return self::TYPE_HASHTABLE;
         }

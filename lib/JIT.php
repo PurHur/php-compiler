@@ -138,37 +138,9 @@ class JIT {
         $rawTypes = [];
         $argVars = [];
         if (!is_null($block->func)) {
-            $callbackType = '';
-            if (null !== $block->func && '__construct' === strtolower($block->func->name)) {
+            $callbackType = $this->cfgFunctionReturnCallbackType($block->func) ?? '__value__';
+            if ('__construct' === strtolower($block->func->name)) {
                 $callbackType = 'void';
-            } elseif ($block->func->returnType instanceof Op\Type\Void_) {
-                $callbackType = 'void';
-            } elseif ($block->func->returnType instanceof Op\Type\Literal) {
-                switch ($block->func->returnType->name) {
-                    case 'void':
-                        $callbackType = 'void';
-                        break;
-                    case 'int':
-                        $callbackType = 'long long';
-                        break;
-                    case 'string':
-                        $callbackType = '__string__*';
-                        break;
-                    case 'bool':
-                        $callbackType = 'bool';
-                        break;
-                    case 'object':
-                        $callbackType = '__object__*';
-                        break;
-                    case 'array':
-                        $callbackType = '__hashtable__*';
-                        break;
-                    default:
-                        $callbackType = '__value__';
-                        break;
-                }
-            } else {
-                $callbackType = '__value__';
             }
             $returnType = $this->context->getTypeFromString($callbackType);
             $this->context->functionReturnType[strtolower($logicalName ?? $internalName)] = $callbackType;
@@ -184,13 +156,7 @@ class JIT {
                 $callbackSep = ', ';
             }
             foreach ($block->func->params as $idx => $param) {
-                if (empty($param->result->usages)) {
-                    // only compile for param
-                    assert($param->declaredType instanceof Op\Type\Literal);
-                    $rawType = Type::fromDecl($param->declaredType->name);
-                } else {
-                    $rawType = $param->result->type;
-                }
+                $rawType = $this->rawTypeFromCfgParam($param);
                 $type = $this->context->getTypeFromType($rawType);
                 $callbackType .= $callbackSep . $this->context->getStringFromType($type);
                 $callbackSep = ', ';
@@ -296,11 +262,21 @@ class JIT {
         }
         $lower = strtolower($name);
 
-        return str_contains($lower, '\\vm::')
+        if (str_contains($lower, '\\vm::')
             || str_contains($lower, '\\block::')
             || str_contains($lower, '\\frame::')
             || str_contains($lower, '\\module::')
-            || str_contains($lower, '\\runtime::');
+            || str_contains($lower, '\\runtime::')
+        ) {
+            return true;
+        }
+        if (!$this->shouldUseSelfHostJitStubs()) {
+            return false;
+        }
+
+        return str_contains($lower, '\\vm\\')
+            || str_contains($lower, '\\printer::')
+            || str_contains($lower, '\\jit\\operandname::');
     }
 
     private function isSkippedCompilerHotPathName(string $name): bool
@@ -375,7 +351,9 @@ class JIT {
         $lower = strtolower($name);
         return str_contains($lower, 'conststringfolder')
             || str_contains($lower, 'includepathresolver')
-            || str_contains($lower, 'literalincludediscovery');
+            || str_contains($lower, 'literalincludediscovery')
+            || str_contains($lower, 'deployroot')
+            || str_contains($lower, 'sourcebundler');
     }
 
     private function collectStubFunctionArgTypes(Block $block): array
@@ -388,13 +366,7 @@ class JIT {
             $args[] = $this->context->getTypeFromString('__object__*');
         }
         foreach ($block->func->params as $param) {
-            if (empty($param->result->usages)) {
-                assert($param->declaredType instanceof Op\Type\Literal);
-                $rawType = Type::fromDecl($param->declaredType->name);
-            } else {
-                $rawType = $param->result->type;
-            }
-            $args[] = $this->context->getTypeFromType($rawType);
+            $args[] = $this->context->getTypeFromType($this->rawTypeFromCfgParam($param));
         }
         return $args;
     }
@@ -1788,6 +1760,72 @@ class JIT {
         return false;
     }
 
+    private function rawTypeFromCfgParam(\PHPCfg\Op\Expr\Param $param): Type
+    {
+        $declared = null;
+        if ($param->declaredType instanceof Op\Type\Literal) {
+            $declared = Type::fromDecl($param->declaredType->name);
+        } elseif ($param->declaredType instanceof Op\Type\Reference && null !== $param->declaredType->type) {
+            $declared = Type::fromTypeDecl($param->declaredType->type);
+        } elseif (null !== $param->declaredType) {
+            try {
+                $declared = Type::fromTypeDecl($param->declaredType);
+            } catch (\LogicException) {
+                $declared = null;
+            }
+        }
+        if (null !== $param->result->type && Type::TYPE_NULL !== $param->result->type->type) {
+            return $param->result->type;
+        }
+        if (null !== $declared) {
+            return $declared;
+        }
+        if (null !== $param->result->type) {
+            return $param->result->type;
+        }
+
+        return Type::mixed();
+    }
+
+    private function rawTypeFromCfgReturn(?\PHPCfg\Op\Type $returnType): ?Type
+    {
+        if (null === $returnType) {
+            return null;
+        }
+        if ($returnType instanceof Op\Type\Literal) {
+            return Type::fromDecl($returnType->name);
+        }
+        if ($returnType instanceof Op\Type\Reference && null !== $returnType->type) {
+            return Type::fromTypeDecl($returnType->type);
+        }
+        try {
+            return Type::fromTypeDecl($returnType);
+        } catch (\LogicException) {
+            return null;
+        }
+    }
+
+    private function callbackTypeFromPhptype(Type $type): ?string
+    {
+        $type = $this->context->unwrapNullableUnionType($type);
+        switch ($type->type) {
+            case Type::TYPE_LONG:
+                return 'long long';
+            case Type::TYPE_BOOLEAN:
+                return 'bool';
+            case Type::TYPE_STRING:
+                return '__string__*';
+            case Type::TYPE_OBJECT:
+                return '__object__*';
+            case Type::TYPE_ARRAY:
+                return '__hashtable__*';
+            case Type::TYPE_NULL:
+                return '__value__';
+            default:
+                return null;
+        }
+    }
+
     /**
      * LLVM return type tag for a CFG function (must match compileBlock() signature lowering).
      */
@@ -1801,6 +1839,13 @@ class JIT {
         }
         if ($cfgFunc->returnType instanceof Op\Type\Void_) {
             return 'void';
+        }
+        $rawReturn = $this->rawTypeFromCfgReturn($cfgFunc->returnType);
+        if (null !== $rawReturn) {
+            $callback = $this->callbackTypeFromPhptype($rawReturn);
+            if (null !== $callback) {
+                return $callback;
+            }
         }
         if ($cfgFunc->returnType instanceof Op\Type\Literal) {
             switch ($cfgFunc->returnType->name) {
@@ -1955,8 +2000,23 @@ class JIT {
             if ($value->type & Variable::IS_NATIVE_ARRAY || Variable::TYPE_HASHTABLE === $value->type) {
                 $result->nextFreeElement = $value->nextFreeElement;
             }
+            $toStore = $this->context->helper->loadValue($value);
+            if (Variable::TYPE_VALUE === $value->type) {
+                $destTy = $this->context->getStringFromType($result->value->typeOf());
+                $srcTy = $this->context->getStringFromType($toStore->typeOf());
+                if ('__value__*' === $destTy && '__value__' === $srcTy) {
+                    $slot = JIT\BasicBlockHelper::entryAlloca(
+                        $this->context,
+                        $this->context->getTypeFromString('__value__')
+                    );
+                    $this->context->builder->store($toStore, $slot);
+                    $toStore = JIT\JitValueBox::pointer($this->context, $slot);
+                } elseif ('__value__*' === $srcTy && '__value__' === $destTy) {
+                    $toStore = $this->context->builder->load($toStore);
+                }
+            }
             $this->context->builder->store(
-                $this->context->helper->loadValue($value),
+                $toStore,
                 $result->value
             );
             $this->copyObjectPropertyBacking($result, $value);
@@ -2179,6 +2239,28 @@ class JIT {
         if ($dest->kind !== Variable::KIND_VARIABLE) {
             throw new \LogicException('Cannot assign to a value');
         }
+        $valueTy = $this->context->getStringFromType($value->typeOf());
+        $destTy = $this->context->getStringFromType($dest->value->typeOf());
+        if (Variable::TYPE_NATIVE_BOOL === $dest->type) {
+            if ('__value__' === $valueTy || '__value__*' === $valueTy) {
+                $source = new Variable(
+                    $this->context,
+                    Variable::TYPE_VALUE,
+                    Variable::KIND_VALUE,
+                    $value
+                );
+                $this->assignOperand($result, $source);
+
+                return;
+            }
+            if ('int1' === $valueTy || 'bool' === $valueTy) {
+                $dest->free();
+                $this->context->builder->store($value, $dest->value);
+                $dest->addref();
+
+                return;
+            }
+        }
         $source = new Variable(
             $this->context,
             $this->jitTypeFromLlvmValue($value),
@@ -2188,7 +2270,7 @@ class JIT {
         if ($source->type === $dest->type) {
             $dest->free();
             $toStore = $value;
-            if ('__value__*' === $this->context->getStringFromType($value->typeOf())) {
+            if ('__value__*' === $valueTy && '__value__' === $destTy) {
                 $toStore = $this->context->builder->load($value);
             }
             $this->context->builder->store($toStore, $dest->value);
