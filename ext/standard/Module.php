@@ -132,6 +132,7 @@ class Module extends ModuleAbstract
             new random_bytes(),
             new str_pad(),
             new str_split(),
+            new chunk_split(),
             new htmlspecialchars(),
             new strip_tags(),
             new header_(),
