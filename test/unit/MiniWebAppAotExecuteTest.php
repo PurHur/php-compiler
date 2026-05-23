@@ -96,9 +96,6 @@ final class MiniWebAppAotExecuteTest extends TestCase
 
     public function testPostQueryRouteContactThankYou(): void
     {
-        $this->markTestSkipped(
-            'POST contact thank-you SIGSEGV on phpc build --project bundle; PHPT miniwebapp_dispatch_post passes (#764)'
-        );
         $out = $this->runBinaryWithCgiEnv(MiniWebAppCgiEnv::postQueryRouteContact());
         $this->assertStringContainsString('Thank you, PostDev', $out);
     }

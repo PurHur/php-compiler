@@ -110,10 +110,8 @@ class Router
 
     private function renderContactThankYou($contactName): void
     {
-        $name = $contactName;
-        $appName = $this->resolveAppName();
-        $title = 'Thank you';
-        include __DIR__ . '/../templates/layout.php';
+        $name = (string) $contactName;
+        include __DIR__ . '/../templates/thankyou.php';
     }
 
     private function resolveAppName(): string
