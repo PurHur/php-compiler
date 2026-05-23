@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Wave gate: selfhost-lint → aot-lint (quick) → selfhost-probe; prints NEXT_LOWER.
-# Optional: --with-compile-smoke adds compiler_compile_smoke native link + run.
+# Optional: --with-compile-smoke adds compiler_compile_smoke native link + echo run.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -83,6 +83,7 @@ echo "NEXT_LOWER: ${NEXT_LOWER}"
 
 if [[ "${WITH_COMPILE_SMOKE}" -eq 1 ]]; then
   run_step "selfhost-compile-smoke" ./script/bootstrap-selfhost-compile-smoke-link.sh
+  run_step "selfhost-compile-smoke-echo" ./script/bootstrap-selfhost-compile-smoke-run.sh
   print_summary
 fi
 
