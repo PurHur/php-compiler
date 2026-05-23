@@ -185,6 +185,7 @@ class Module extends ModuleAbstract
             new fwrite(),
             new fclose(),
             new getenv_(),
+            new shell_exec(),
             new putenv_(),
             new define_(),
             new defined_(),
