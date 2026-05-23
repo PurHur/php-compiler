@@ -475,6 +475,7 @@
         "test/bootstrap-aot/minimal_class.php",
         "test/bootstrap-aot/namespace_hello.php",
         "test/bootstrap-aot/native_int_param_call.php",
+        "test/bootstrap-aot/nested_array_dim.php",
         "test/bootstrap-aot/ns_func.php",
         "test/bootstrap-aot/ns_nullable_return.php",
         "test/bootstrap-aot/nullable_types.php",
@@ -497,6 +498,7 @@
         "test/bootstrap-aot/stdlib_string_strpos.php",
         "test/bootstrap-aot/stdlib_string_trim.php",
         "test/bootstrap-aot/stdlib_string_urlencode.php",
+        "test/bootstrap-aot/superglobal_name_check.php",
         "test/bootstrap-aot/switch_equal_value_long.php",
         "test/bootstrap-aot/switch_jumpif_chain.php",
         "test/bootstrap-aot/throw_logic.php",
@@ -534,6 +536,7 @@
         "test/bootstrap-aot/minimal_class.php",
         "test/bootstrap-aot/namespace_hello.php",
         "test/bootstrap-aot/native_int_param_call.php",
+        "test/bootstrap-aot/nested_array_dim.php",
         "test/bootstrap-aot/ns_func.php",
         "test/bootstrap-aot/nullable_types.php",
         "test/bootstrap-aot/parent_construct.php",
@@ -553,6 +556,7 @@
         "test/bootstrap-aot/stdlib_string_strpos.php",
         "test/bootstrap-aot/stdlib_string_trim.php",
         "test/bootstrap-aot/stdlib_string_urlencode.php",
+        "test/bootstrap-aot/superglobal_name_check.php",
         "test/bootstrap-aot/switch_equal_value_long.php",
         "test/bootstrap-aot/switch_jumpif_chain.php",
         "test/bootstrap-aot/throw_logic.php",
@@ -567,8 +571,8 @@
         "inventory_files": 410,
         "excluded": 0,
         "eligible": 410,
-        "aot_lint_targets": 67,
-        "aot_link_targets": 54,
+        "aot_lint_targets": 69,
+        "aot_link_targets": 56,
         "aot_link_lib_targets": 1
     }
 }
