@@ -76,40 +76,26 @@ final class MiniWebAppAotExecuteTest extends TestCase
 
     public function testQueryRouteHomeShowsAppName(): void
     {
-        $out = $this->runBinaryWithCgiEnv([
-            'REQUEST_METHOD' => 'GET',
-            'QUERY_STRING' => 'route=home',
-        ]);
+        $out = $this->runBinaryWithCgiEnv(MiniWebAppCgiEnv::queryRouteHome());
         $this->assertNotSame('', $out, 'expected HTML stdout from AOT binary');
-        $this->assertStringContainsString('MiniWebApp', $out);
+        $this->assertStringContainsString(MiniWebAppCgiEnv::APP_NAME, $out);
     }
 
     public function testQueryRouteHelloWithName(): void
     {
-        $out = $this->runBinaryWithCgiEnv([
-            'REQUEST_METHOD' => 'GET',
-            'QUERY_STRING' => 'route=hello&name=Dev',
-        ]);
+        $out = $this->runBinaryWithCgiEnv(MiniWebAppCgiEnv::queryRouteHello());
         $this->assertStringContainsString('Hello Dev', $out);
     }
 
     public function testPathInfoHelloWithName(): void
     {
-        $out = $this->runBinaryWithCgiEnv([
-            'REQUEST_METHOD' => 'GET',
-            'PATH_INFO' => '/hello',
-            'QUERY_STRING' => 'name=Dev',
-        ]);
+        $out = $this->runBinaryWithCgiEnv(MiniWebAppCgiEnv::aotPathInfoHello());
         $this->assertStringContainsString('Hello Dev', $out);
     }
 
     public function testPostQueryRouteContactThankYou(): void
     {
-        $out = $this->runBinaryWithCgiEnv([
-            'REQUEST_METHOD' => 'POST',
-            'QUERY_STRING' => 'route=contact',
-            'REQUEST_BODY' => 'name=PostDev',
-        ]);
+        $out = $this->runBinaryWithCgiEnv(MiniWebAppCgiEnv::postQueryRouteContact());
         $this->assertStringContainsString('Thank you, PostDev', $out);
     }
 
@@ -120,10 +106,10 @@ final class MiniWebAppAotExecuteTest extends TestCase
     {
         $env = $this->baseEnv();
         LlvmToolchain::applyProcessEnv($env, $this->repoRoot);
-        $publicDir = $this->repoRoot.'/examples/003-MiniWebApp/public';
-        $env['SCRIPT_FILENAME'] = $publicDir.'/index.php';
-        $env['SCRIPT_NAME'] = '/index.php';
-        $env['DOCUMENT_ROOT'] = $publicDir;
+        foreach (MiniWebAppCgiEnv::aotFrontController($this->repoRoot) as $key => $value) {
+            $env[$key] = $value;
+        }
+        $publicDir = $this->repoRoot.'/'.MiniWebAppCgiEnv::PUBLIC_REL;
         foreach ($cgiEnv as $key => $value) {
             $env[$key] = $value;
         }

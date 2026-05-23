@@ -398,6 +398,7 @@ class Object_ extends Type {
         $this->classConstants[$id] = [];
         $this->classes[$lcname] = $id;
         $this->ensureExternalClassConstants($id, $lcname);
+        $this->seedExternalClassProperties($id, $lcname);
         if ('splobjectstorage' === $lcname) {
             $this->splObjectStorageClassId = $id;
             $this->defineProperty($id, '__spl_ht', Variable::TYPE_HASHTABLE);
@@ -493,15 +494,11 @@ class Object_ extends Type {
     }
 
     /**
-     * JIT storage type for properties on vendor CFG / compiler objects (e.g. PHPCfg\Block::$children).
+     * @return array<string, array<string, true>>
      */
-    private function externalPropertyJitType(string $class, string $name): int
+    private static function externalCfgArrayPropertyMap(): array
     {
-        $lcClass = strtolower(str_replace('/', '\\', ltrim($class, '\\')));
-        $lcName = strtolower($name);
-
-        /** @var array<string, array<string, true>> */
-        static $arrayProps = [
+        return [
             'phpcfg\\block' => [
                 'children' => true,
                 'parents' => true,
@@ -524,6 +521,30 @@ class Object_ extends Type {
                 'params' => true,
             ],
         ];
+    }
+
+    /**
+     * Pre-register hashtable slots for vendor CFG array properties (issue #828).
+     */
+    private function seedExternalClassProperties(int $classId, string $lcname): void
+    {
+        $arrayProps = self::externalCfgArrayPropertyMap();
+        if (!isset($arrayProps[$lcname])) {
+            return;
+        }
+        foreach (array_keys($arrayProps[$lcname]) as $propName) {
+            $this->defineProperty($classId, $propName, Variable::TYPE_HASHTABLE);
+        }
+    }
+
+    /**
+     * JIT storage type for properties on vendor CFG / compiler objects (e.g. PHPCfg\Block::$children).
+     */
+    private function externalPropertyJitType(string $class, string $name): int
+    {
+        $lcClass = strtolower(str_replace('/', '\\', ltrim($class, '\\')));
+        $lcName = strtolower($name);
+        $arrayProps = self::externalCfgArrayPropertyMap();
 
         if (isset($arrayProps[$lcClass][$lcName])) {
             return Variable::TYPE_HASHTABLE;

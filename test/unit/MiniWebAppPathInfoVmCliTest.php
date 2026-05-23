@@ -34,54 +34,34 @@ final class MiniWebAppPathInfoVmCliTest extends TestCase
 
     public function testPathInfoHelloWithQueryString(): void
     {
-        $out = $this->runIndex([
-            'SCRIPT_NAME' => '/index.php',
-            'PATH_INFO' => '/hello',
-            'QUERY_STRING' => 'name=Dev',
-            'REQUEST_METHOD' => 'GET',
-        ]);
+        $out = $this->runIndex(MiniWebAppCgiEnv::pathInfoHello());
         $this->assertStringContainsString('Hello Dev', $out);
     }
 
     public function testPathInfoContactForm(): void
     {
-        $out = $this->runIndex([
-            'SCRIPT_NAME' => '/index.php',
-            'PATH_INFO' => '/contact',
-            'REQUEST_METHOD' => 'GET',
-        ]);
+        $out = $this->runIndex(MiniWebAppCgiEnv::pathInfoContact());
         $this->assertStringContainsString('<h1>Contact</h1>', $out);
     }
 
     public function testPathInfoApiStatus(): void
     {
-        $out = $this->runIndex([
-            'SCRIPT_NAME' => '/index.php',
-            'PATH_INFO' => '/api/status',
-            'REQUEST_METHOD' => 'GET',
-        ]);
+        $out = $this->runIndex(MiniWebAppCgiEnv::pathInfoApiStatus());
         $this->assertStringContainsString('"ok":true', $out);
         $this->assertStringContainsString('003-MiniWebApp', $out);
     }
 
     public function testPathInfoEmptyDefaultsToHome(): void
     {
-        $out = $this->runIndex([
-            'SCRIPT_NAME' => '/index.php',
-            'PATH_INFO' => '',
-            'REQUEST_METHOD' => 'GET',
-        ]);
-        $this->assertStringContainsString('MiniWebApp', $out);
+        $out = $this->runIndex(MiniWebAppCgiEnv::pathInfoEmptyHome());
+        $this->assertStringContainsString(MiniWebAppCgiEnv::APP_NAME, $out);
         $this->assertStringContainsString('PATH_INFO', $out);
     }
 
     public function testPathInfoAbsentDefaultsToHome(): void
     {
-        $out = $this->runIndex([
-            'SCRIPT_NAME' => '/index.php',
-            'REQUEST_METHOD' => 'GET',
-        ]);
-        $this->assertStringContainsString('MiniWebApp', $out);
+        $out = $this->runIndex(MiniWebAppCgiEnv::pathInfoAbsentHome());
+        $this->assertStringContainsString(MiniWebAppCgiEnv::APP_NAME, $out);
     }
 
     /**
