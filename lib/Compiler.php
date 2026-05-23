@@ -20,8 +20,10 @@ use PHPCfg\Operand\Temporary;
 use PHPCfg\Script;
 use PHPTypes\Type;
 use PHPCompiler\VM\Variable;
+use PHPCompiler\JIT\OperandName;
 use PHPCompiler\Web\ConstStringFolder;
 use PHPCompiler\Web\IncludePathResolver;
+use PHPCompiler\Web\Superglobals;
 
 class Compiler {
 
@@ -855,6 +857,7 @@ class Compiler {
         if (null !== $includePath) {
             $resolved = IncludePathResolver::resolve($includePath, $expr->getFile());
             if (null !== $resolved) {
+                $this->markCallerLocalsUsedByLiteralInclude($resolved, $block);
                 $literal = new Operand\Literal($resolved);
                 $literal->type = Type::string();
                 $pathIndex = count($block->literalIncludePaths);
@@ -889,6 +892,7 @@ class Compiler {
         $endBlock->inheritScopeFrom($block);
 
         $rightBlock = new Block($block->orig);
+        $rightBlock->syntheticCfgBranch = true;
         $rightBlock->inheritUndefinedLocals = true;
         $rightBlock->inheritScopeFrom($block);
         $rightSlot = $this->compileOperand($expr->right, $rightBlock, true);
@@ -900,6 +904,7 @@ class Compiler {
         ));
 
         $leftBlock = new Block($block->orig);
+        $leftBlock->syntheticCfgBranch = true;
         $leftBlock->inheritUndefinedLocals = true;
         $leftBlock->inheritScopeFrom($block);
 
@@ -1482,6 +1487,32 @@ class Compiler {
         }
 
         return $ops;
+    }
+
+    /**
+     * Literal includes read caller locals by name; php-cfg may mark those assigns dead (#568).
+     */
+    private function markCallerLocalsUsedByLiteralInclude(string $path, Block $block): void
+    {
+        if (!is_file($path)) {
+            return;
+        }
+        $code = file_get_contents($path);
+        if (false === $code || '' === $code) {
+            return;
+        }
+        foreach ($block->scopedOperands() as $operand) {
+            $name = OperandName::resolve($operand);
+            if (null === $name || Superglobals::isSuperglobalName($name)) {
+                continue;
+            }
+            if (!preg_match('/\\$'.preg_quote($name, '/').'\\b/', $code)) {
+                continue;
+            }
+            if ($operand instanceof Temporary && [] === $operand->usages) {
+                $operand->usages[] = $operand;
+            }
+        }
     }
 
 }

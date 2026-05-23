@@ -76,7 +76,7 @@ final class IncludeHelper
         $included->inheritScopeFrom($callerBlock);
         $included->inheritUndefinedLocals = true;
 
-        $localBindings = self::collectCalleeLocalBindings($context, $callerBlock, $included);
+        $localBindings = self::collectCalleeLocalBindings($context, $jit, $func, $callerBlock, $included);
         $preIncludeBb = $context->builder->getInsertBlock();
         $entryBb = $func->appendBasicBlock('include_entry_'.(++self::$includeEntrySerial));
         if (null !== $preIncludeBb && null === $preIncludeBb->getTerminator()) {
@@ -134,13 +134,12 @@ final class IncludeHelper
     }
 
     /**
-     * Zend include/require: callee reads caller locals by variable name (issue #471).
-     */
-    /**
      * @return \SplObjectStorage<Operand, Variable>
      */
     private static function collectCalleeLocalBindings(
         Context $context,
+        JIT $jit,
+        Function_ $func,
         Block $callerBlock,
         Block $includedBlock
     ): \SplObjectStorage {
@@ -157,17 +156,84 @@ final class IncludeHelper
             if (null === $name || Superglobals::isSuperglobalName($name)) {
                 continue;
             }
-            foreach ($context->scope->variables as $callerOp) {
-                if (OperandName::resolve($callerOp) !== $name) {
-                    continue;
-                }
-                $bindings[$operand] = $context->scope->variables[$callerOp];
-
-                break;
+            $callerVar = self::resolveCallerLocalBinding($context, $jit, $func, $callerBlock, $name);
+            if (null !== $callerVar) {
+                $bindings[$operand] = $callerVar;
             }
         }
 
         return $bindings;
+    }
+
+    private static function resolveCallerLocalBinding(
+        Context $context,
+        JIT $jit,
+        Function_ $func,
+        Block $callerBlock,
+        string $name
+    ): ?Variable {
+        $callerOp = self::callerOperandByName($callerBlock, $name);
+        if (null === $callerOp) {
+            return null;
+        }
+
+        $bb = $context->builder->getInsertBlock();
+        if (null === $bb) {
+            return null;
+        }
+        if (!$context->hasVariableOp($callerOp)) {
+            $context->makeVariableFromOp($func, $bb, $callerBlock, $callerOp);
+        }
+
+        self::applyPendingAssignForLocal($context, $jit, $callerBlock, $name, $callerOp);
+
+        return $context->hasVariableOp($callerOp) ? $context->getVariableFromOp($callerOp) : null;
+    }
+
+    private static function applyPendingAssignForLocal(
+        Context $context,
+        JIT $jit,
+        Block $callerBlock,
+        string $name,
+        Operand $callerOp
+    ): void {
+        $callerSlot = $callerBlock->slotForOperand($callerOp);
+
+        foreach ($callerBlock->opCodes as $op) {
+            if (OpCode::TYPE_ASSIGN !== $op->type) {
+                continue;
+            }
+            $matches = false;
+            foreach ([$op->arg1, $op->arg2] as $slotIdx) {
+                $dest = $callerBlock->getOperand($slotIdx);
+                if (null !== $callerSlot && $callerBlock->slotForOperand($dest) === $callerSlot) {
+                    $matches = true;
+                    break;
+                }
+                if (OperandName::resolve($dest) === $name) {
+                    $matches = true;
+                    break;
+                }
+            }
+            if (!$matches) {
+                continue;
+            }
+            $value = $context->getVariableFromOp($callerBlock->getOperand($op->arg3));
+            $jit->assignOperandForced($callerOp, $value);
+
+            return;
+        }
+    }
+
+    private static function callerOperandByName(Block $block, string $name): ?Operand
+    {
+        foreach ($block->scopedOperands() as $operand) {
+            if (OperandName::resolve($operand) === $name) {
+                return $operand;
+            }
+        }
+
+        return null;
     }
 
     private static function appendIncludeResume(Context $context, Function_ $func): BasicBlock

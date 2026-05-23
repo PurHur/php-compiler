@@ -797,17 +797,23 @@ class JIT {
                     $condition = $this->context->castToBool(
                         $this->context->helper->loadValue($this->context->getVariableFromOp($block->getOperand($op->arg2)))
                     );
-                    $leftBb = JIT\CoalesceHelper::compileBranch($this, $func, $op->block1);
-                    $rightBb = JIT\CoalesceHelper::compileBranch($this, $func, $op->block2);
+                    $leftTail = JIT\CoalesceHelper::compileBranch($this, $func, $op->block1);
+                    $rightTail = JIT\CoalesceHelper::compileBranch($this, $func, $op->block2);
+                    $leftEntry = $this->context->scope->blockStorage[$op->block1];
+                    $rightEntry = $this->context->scope->blockStorage[$op->block2];
                     $builder->positionAtEnd($branchBlock);
                     // Do not free php-cfg "dead" operands here; ?? temps are used on branch/merge blocks (#99).
-                    $builder->branchIf($condition, $leftBb, $rightBb);
+                    $builder->branchIf($condition, $leftEntry, $rightEntry);
                     if (null !== $op->block3) {
                         $mergeBb = JIT\BasicBlockHelper::append($this->context, 'coalesce_merge');
-                        $builder->positionAtEnd($leftBb);
-                        $builder->branch($mergeBb);
-                        $builder->positionAtEnd($rightBb);
-                        $builder->branch($mergeBb);
+                        $builder->positionAtEnd($leftTail);
+                        if (null === $leftTail->getTerminator()) {
+                            $builder->branch($mergeBb);
+                        }
+                        $builder->positionAtEnd($rightTail);
+                        if (null === $rightTail->getTerminator()) {
+                            $builder->branch($mergeBb);
+                        }
                         $builder->positionAtEnd($mergeBb);
                         $merged = $this->compileBlockInternal($func, $op->block3, null, $mergeBb, ...$args);
                         unset($this->context->coalesceAssignTargets[$coalesceResult]);
@@ -1041,7 +1047,9 @@ class JIT {
         }
 
         $tail = $builder->getInsertBlock();
-        $isEntryCfg = null !== $block->func && $block->orig === $block->func->cfg;
+        $isEntryCfg = null !== $block->func
+            && $block->orig === $block->func->cfg
+            && !$block->syntheticCfgBranch;
         if (
             0 === $this->context->inlineIncludeDepth
             && $isEntryCfg
@@ -1216,6 +1224,11 @@ class JIT {
                 $this->context->constantFromInteger(1)
             )
         );
+    }
+
+    public function assignOperandForced(Operand $result, Variable $value): void
+    {
+        $this->assignOperand($result, $value, true);
     }
 
     private function assignOperand(Operand $result, Variable $value, bool $force = false): void {
