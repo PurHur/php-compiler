@@ -111,7 +111,7 @@ class Analyzer
                 $fnOperand = $usage instanceof Op\Expr\NsFuncCall ? $usage->nsName : $usage->name;
                 if ($fnOperand instanceof Operand\Literal) {
                     $fn = strtolower($fnOperand->value);
-                    if (in_array($fn, ['array_push', 'array_pop', 'array_shift', 'array_unshift'], true)) {
+                    if (in_array($fn, ['array_push', 'array_pop', 'array_shift', 'array_unshift', 'array_splice'], true)) {
                         return true;
                     }
                 }

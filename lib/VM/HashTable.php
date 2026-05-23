@@ -519,6 +519,107 @@ final class HashTable {
     }
 
     /**
+     * Remove a portion of a packed list array, optionally replace it, and return the removed slice.
+     *
+     * @param list<Variable> $replacement
+     */
+    public function spliceInPlace(int $offset, ?int $length = null, array $replacement = []): HashTable
+    {
+        $this->assertConsistent();
+        if (!$this->isWithoutHoles()) {
+            throw new \LogicException('spliceInPlace() only supports packed list arrays without holes');
+        }
+        $this->refcount->assertSeparated();
+
+        $num = $this->numElements;
+        if ($offset < 0) {
+            $offset = $num + $offset;
+            if ($offset < 0) {
+                $offset = 0;
+            }
+        }
+        if (null === $length) {
+            $removeLen = $num - $offset;
+        } elseif ($length < 0) {
+            $removeLen = $num - $offset + $length;
+        } else {
+            $removeLen = $length;
+        }
+        if ($removeLen < 0) {
+            $removeLen = 0;
+        }
+        if ($offset >= $num) {
+            $removeLen = 0;
+        } elseif ($removeLen > $num - $offset) {
+            $removeLen = $num - $offset;
+        }
+
+        $removed = $this->sliceCopy($offset, $removeLen);
+
+        $values = [];
+        foreach ($this->iterate(true) as $value) {
+            $values[] = $value;
+        }
+
+        $newValues = [];
+        for ($i = 0; $i < $offset; ++$i) {
+            $copy = new Variable();
+            $copy->copyFrom($values[$i]);
+            $newValues[] = $copy;
+        }
+        foreach ($replacement as $value) {
+            $copy = new Variable();
+            $copy->copyFrom($value);
+            $newValues[] = $copy;
+        }
+        for ($i = $offset + $removeLen; $i < $num; ++$i) {
+            $copy = new Variable();
+            $copy->copyFrom($values[$i]);
+            $newValues[] = $copy;
+        }
+
+        $this->assignPackedList($newValues);
+
+        return $removed;
+    }
+
+    /**
+     * Replace a packed list array's contents with a new ordered value list.
+     *
+     * @param list<Variable> $values
+     */
+    public function assignPackedList(array $values): void
+    {
+        $this->assertConsistent();
+        if ($this->numElements > 0 && !$this->isWithoutHoles()) {
+            throw new \LogicException('assignPackedList() only supports packed list arrays without holes');
+        }
+        $this->refcount->assertSeparated();
+        if ($this->flags & self::FLAG_UNINITIALIZED) {
+            $this->initMixed();
+        }
+
+        $n = \count($values);
+        while ($n > $this->indexes->size()) {
+            $this->resize();
+        }
+        while ($this->numUsed < $n) {
+            $this->resizeIfFull();
+            ++$this->numUsed;
+        }
+        for ($i = 0; $i < $n; ++$i) {
+            $bucket = $this->buckets->read($i);
+            $bucket->value->copyFrom($values[$i]);
+            $bucket->hash = $i;
+            $bucket->key = null;
+        }
+        $this->numUsed = $n;
+        $this->numElements = $n;
+        $this->nextFreeElement = $n;
+        $this->rehash();
+    }
+
+    /**
      * Split a packed list array into consecutive chunks (preserve_keys=false subset).
      */
     public function chunkCopy(int $size, bool $preserveKeys = false): HashTable
