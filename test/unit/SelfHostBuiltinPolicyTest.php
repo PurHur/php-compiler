@@ -34,6 +34,28 @@ final class SelfHostBuiltinPolicyTest extends TestCase
         $this->assertFalse(SelfHostBuiltinPolicy::shouldExternalStub('fopen'));
     }
 
+    public function testWave12ArrayOpsUseRealLoweringUnderSelfHostAot(): void
+    {
+        putenv('PHP_COMPILER_SELFHOST_AOT=1');
+        foreach ([
+            'array_push',
+            'array_unshift',
+            'array_filter',
+            'array_combine',
+            'array_reverse',
+            'compact',
+            'extract',
+            'sort',
+            'filter_var',
+        ] as $fn) {
+            $this->assertTrue(
+                SelfHostBuiltinPolicy::isRequiredForBundle($fn),
+                $fn.' must stay on real JIT lowering for bootstrap wave 12'
+            );
+            $this->assertFalse(SelfHostBuiltinPolicy::shouldExternalStub($fn), $fn);
+        }
+    }
+
     public function testCompileFuncRegistersExternalMethodStub(): void
     {
         putenv('PHP_COMPILER_SELFHOST_AOT=1');
