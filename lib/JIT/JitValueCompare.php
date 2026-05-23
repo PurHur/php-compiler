@@ -141,68 +141,15 @@ final class JitValueCompare
         $isNull = $context->builder->icmp(Builder::INT_EQ, $typeByte, $nullTag);
         $nullMatches = $context->builder->icmp(Builder::INT_EQ, $__native, $i64->constInt(0, false));
 
-        $doubleTag = $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false);
-        $isDouble = $context->builder->icmp(Builder::INT_EQ, $typeByte, $doubleTag);
-        $storedDouble = $context->builder->call(
-            $context->lookupFunction('__value__readDouble'),
-            $valuePtr
-        );
-        $nativeDouble = $context->builder->siToFp($__native, $storedDouble->typeOf());
-        $doubleMatches = $context->builder->fcmp(Builder::REAL_OEQ, $storedDouble, $nativeDouble);
-
-        $stringTag = $i8->constInt(Variable::TYPE_STRING, false);
-        $isString = $context->builder->icmp(Builder::INT_EQ, $typeByte, $stringTag);
-        $stringMatches = self::looseEqualBoxedStringToNativeLong($context, $valuePtr, $__native);
-
         return $context->builder->select(
             $isLong,
             $longMatches,
             $context->builder->select(
                 $isBool,
                 $boolMatches,
-                $context->builder->select(
-                    $isNull,
-                    $nullMatches,
-                    $context->builder->select(
-                        $isDouble,
-                        $doubleMatches,
-                        $context->builder->select($isString, $stringMatches, $falseVal)
-                    )
-                )
+                $context->builder->select($isNull, $nullMatches, $falseVal)
             )
         );
-    }
-
-    private static function looseEqualBoxedStringToNativeLong(
-        Context $context,
-        Value $valuePtr,
-        Value $nativeLong
-    ): Value {
-        $str = $context->builder->call(
-            $context->lookupFunction('__value__readString'),
-            $valuePtr
-        );
-        $stringMap = $context->structFieldMap['__string__'];
-        $dataPtr = $context->builder->structGep($str, $stringMap['value']);
-        $i64 = $context->getTypeFromString('int64');
-        $falseVal = $context->getTypeFromString('int1')->constInt(0, false);
-        $isZero = $context->builder->icmp(
-            Builder::INT_EQ,
-            $nativeLong,
-            $i64->constInt(0, false)
-        );
-        $zeroCstr = $context->builder->pointerCast(
-            $context->constantFromString('0'),
-            $context->getTypeFromString('char*')
-        );
-        $cmp = $context->builder->call(
-            $context->lookupFunction('strcmp'),
-            $dataPtr,
-            $zeroCstr
-        );
-        $zeroMatch = $context->builder->icmp(Builder::INT_EQ, $cmp, $cmp->typeOf()->constInt(0, false));
-
-        return $context->builder->select($isZero, $zeroMatch, $falseVal);
     }
 
     public static function looseEqualNativeLongToValue(

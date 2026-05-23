@@ -16,4 +16,11 @@ final class JitMixedPropertyTypeTest extends TestCase
 
         $this->assertSame(JitVariable::TYPE_VALUE, JitVariable::getTypeFromType($mixed));
     }
+
+    public function testMixedDeclMapsToValueJitType(): void
+    {
+        $mixed = Type::fromDecl('mixed');
+
+        $this->assertSame(JitVariable::TYPE_VALUE, JitVariable::getTypeFromType($mixed));
+    }
 }
