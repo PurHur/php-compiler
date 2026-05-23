@@ -466,6 +466,12 @@ function bootstrapSelfhostProbeExtractNextLower(string $output): ?string
         if (preg_match('/\b(?:PHP )?(?:Notice|Deprecated):\s/i', $line)) {
             continue;
         }
+        if (preg_match('/\b(?:PHP )?Parse error:\s*(.+)$/i', $line, $m)) {
+            return trim($m[1]);
+        }
+        if (preg_match('/\bUncaught \S+:\s*(.+)$/i', $line, $m)) {
+            return trim($m[1]);
+        }
         if (preg_match('/\bLogicException:\s*(.+)$/i', $line, $m)) {
             return trim($m[1]);
         }
