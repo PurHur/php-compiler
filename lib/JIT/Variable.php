@@ -115,6 +115,7 @@ final class Variable {
 
     public static function fromVMVariable(int $type): int {
         switch ($type) {
+            case VMVariable::TYPE_NULL: return self::TYPE_NULL;
             case VMVariable::TYPE_INTEGER: return self::TYPE_NATIVE_LONG;
             case VMVariable::TYPE_FLOAT: return self::TYPE_NATIVE_DOUBLE;
             case VMVariable::TYPE_BOOLEAN: return self::TYPE_NATIVE_BOOL;
