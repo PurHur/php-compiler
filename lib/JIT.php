@@ -810,14 +810,12 @@ class JIT {
                     $caseVar = $this->context->getVariableFromOp($block->getOperand($op->arg2));
                     $equalOp = new OpCode(OpCode::TYPE_EQUAL);
                     $matchVar = $this->context->helper->binaryOp($equalOp, $switchVar, $caseVar);
-                    $match = $this->context->helper->loadValue($matchVar);
-                    $caseTail = $this->compileBlockInternal($func, $op->block1, null, null, ...$args);
+                    $match = $this->context->castToBool(
+                        $this->context->helper->loadValue($matchVar)
+                    );
+                    $this->compileBlockInternal($func, $op->block1, null, null, ...$args);
                     $caseEntry = $this->context->scope->blockStorage[$op->block1];
                     $nextBb = JIT\BasicBlockHelper::append($this->context, 'switch_next_case');
-                    $builder->positionAtEnd($caseTail);
-                    if (null === $caseTail->getTerminator()) {
-                        $builder->branch($nextBb);
-                    }
                     $builder->positionAtEnd($branchBlock);
                     if ($this->shouldFreeDeadVariablesBeforeBranch()) {
                         $this->context->freeDeadVariables($func, $branchBlock, $block);
