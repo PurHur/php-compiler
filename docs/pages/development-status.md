@@ -208,8 +208,8 @@ Zend PHP still runs `bin/compile.php` during bootstrap. The output is a **curate
 | Native link + run | `./script/bootstrap-selfhost-link.sh` | ✅ M0 |
 | Compile smoke link | `make bootstrap-selfhost-compile-smoke` | ✅ M1 |
 | Compile smoke AOT echo | `make bootstrap-selfhost-compile-smoke-run` | ✅ M1 partial |
-| M2 lib spine smoke lint | `php bin/compile.php -l test/selfhost/compiler_lib_spine_smoke/main.php` | 🚧 **132** units |
-| M2 lib spine smoke link | `make bootstrap-selfhost-lib-spine-smoke` | 🚧 opt-in `BOOTSTRAP_LIB_SPINE_SMOKE=1` |
+| M2 lib spine smoke lint | `php bin/compile.php -l test/selfhost/compiler_lib_spine_smoke/main.php` | ✅ **132** units |
+| M2 lib spine smoke link | `make bootstrap-selfhost-lib-spine-smoke` | ✅ opt-in `BOOTSTRAP_LIB_SPINE_SMOKE=1` |
 | Wave gate | `./script/bootstrap-wave-check.sh` | ✅ CI / GHA |
 | Next includes probe | `php script/bootstrap-selfhost-next-includes.php` | 🚧 bundle growth |
 

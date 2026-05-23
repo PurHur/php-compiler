@@ -21,7 +21,7 @@
 | Wave gate in full CI | `./script/ci-local.sh` (LLVM tail) | ✅ default-on when LLVM 9 present; `BOOTSTRAP_WAVE_CHECK=0` to skip; `./script/bootstrap-wave-check.sh --fail-fast` |
 | Self-host native link | `./script/bootstrap-selfhost-link.sh` | ✅ `build/selfhost` prints `compiler_minimal bundle OK` ([#557](https://github.com/PurHur/php-compiler/issues/557), [#913](https://github.com/PurHur/php-compiler/issues/913)) |
 | M2 lib spine smoke lint | `php bin/compile.php -l test/selfhost/compiler_lib_spine_smoke/main.php` | ✅ **132** units (`compiler_minimal` + **24** vm.php-path lib/ + ext/standard; [#1056](https://github.com/PurHur/php-compiler/issues/1056)) |
-| M2 lib spine smoke native run | `./script/bootstrap-selfhost-lib-spine-smoke-link.sh` or `make bootstrap-selfhost-lib-spine-smoke` | 🚧 `build/selfhost-lib-spine-smoke` (opt-in `BOOTSTRAP_LIB_SPINE_SMOKE=1` in `./script/bootstrap-wave-check.sh`) |
+| M2 lib spine smoke native run | `./script/bootstrap-selfhost-lib-spine-smoke-link.sh` or `make bootstrap-selfhost-lib-spine-smoke` | ✅ `build/selfhost-lib-spine-smoke` prints `compiler_lib_spine_smoke bundle OK` (opt-in `BOOTSTRAP_LIB_SPINE_SMOKE=1` in `./script/bootstrap-wave-check.sh`) |
 
 Regenerate: `make bootstrap-profile` (inventory + profile + optional `bootstrap-aot-lint`). Phase C: `make bootstrap-aot-link` (or `php script/bootstrap-aot-lint.php --link`). Phase D: `make bootstrap-aot-link-lib`. Bundled compiler lint: `./script/bootstrap-selfhost-lint.sh`. Live lowering target: `make bootstrap-selfhost-probe` (or `./script/bootstrap-selfhost-compile-probe.sh`; optional `--update-inventory`).
 
