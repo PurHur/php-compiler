@@ -21,6 +21,15 @@ final class JitExternalMethodStubTest extends TestCase
         $this->assertSame('vendorlike::addvisitor', $proxy->proxyName);
     }
 
+    public function testNamespacedCallFallsBackToGlobalBuiltin(): void
+    {
+        $runtime = new Runtime(Runtime::MODE_AOT);
+        $ctx = new JIT\Context($runtime, JIT\Builtin::LOAD_TYPE_STANDALONE);
+        $global = $ctx->resolveFunctionProxy('dirname');
+        $namespaced = $ctx->resolveFunctionProxy('phpcompiler\\web\\dirname');
+        $this->assertSame($global, $namespaced);
+    }
+
     public function testExternalMethodStubBootstrapAotLint(): void
     {
         $root = dirname(__DIR__, 2);
