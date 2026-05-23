@@ -410,6 +410,111 @@ class Object_ extends Type {
         return $this->classIdToName;
     }
 
+    /**
+     * Shallow clone: allocate a new object with the same class and copy property slots.
+     */
+    public function cloneObject(PHPLLVM\Value $src): PHPLLVM\Value
+    {
+        $classIds = array_keys($this->classIdToName);
+        if (1 === count($classIds)) {
+            $id = $classIds[0];
+            $dest = $this->allocate($id);
+            if (isset($this->properties[$id]) && [] !== $this->properties[$id]) {
+                $fn = $this->context->builder->getInsertBlock()->getParent();
+                assert($fn instanceof PHPLLVM\Value\Function_);
+                $afterProps = $fn->appendBasicBlock('clone_single_props_done');
+                $this->copyPropertySlots($dest, $src, $id, $afterProps);
+                $this->context->builder->positionAtEnd($afterProps);
+            }
+
+            return $dest;
+        }
+
+        $objMap = $this->context->structFieldMap['__object__'];
+        $classId = $this->context->builder->load(
+            $this->context->builder->structGep($src, $objMap['class_id'])
+        );
+        $fn = $this->context->builder->getInsertBlock()->getParent();
+        assert($fn instanceof PHPLLVM\Value\Function_);
+        $entry = $this->context->builder->getInsertBlock();
+        $done = $fn->appendBasicBlock('clone_done');
+        $exit = $fn->appendBasicBlock('clone_exit');
+        $incomings = [];
+        $classIds = array_keys($this->classIdToName);
+        if ([] === $classIds) {
+            $nullObj = $this->pointer->constNull();
+            $this->context->builder->branch($done);
+            $incomings[] = [$nullObj, $entry];
+            $this->context->builder->positionAtEnd($done);
+            $result = $this->context->builder->phi($this->pointer);
+            foreach ($incomings as [$value, $block]) {
+                $result->addIncoming($value, $block);
+            }
+            $this->context->builder->branch($exit);
+            $this->context->builder->positionAtEnd($exit);
+
+            return $result;
+        }
+        $fallback = $fn->appendBasicBlock('clone_unknown');
+        $caseBlocks = [];
+        foreach ($classIds as $id) {
+            $caseBlocks[] = $fn->appendBasicBlock('clone_class_'.$id);
+        }
+        $checkBlock = $entry;
+        foreach ($classIds as $i => $id) {
+            $this->context->builder->positionAtEnd($checkBlock);
+            $expected = $this->context->constantFromInteger($id, 'int64');
+            $isId = $this->context->builder->icmp(PHPLLVM\Builder::INT_EQ, $classId, $expected);
+            $nextCheck = $i + 1 < count($classIds)
+                ? $fn->appendBasicBlock('clone_try_'.($i + 1))
+                : $fallback;
+            $this->context->builder->branchIf($isId, $caseBlocks[$i], $nextCheck);
+            $this->context->builder->positionAtEnd($caseBlocks[$i]);
+            $dest = $this->allocate($id);
+            $afterProps = $fn->appendBasicBlock('clone_class_'.$id.'_props_done');
+            $this->copyPropertySlots($dest, $src, $id, $afterProps);
+            $this->context->builder->positionAtEnd($afterProps);
+            $this->context->builder->branch($done);
+            $incomings[] = [$dest, $afterProps];
+            $checkBlock = $nextCheck;
+        }
+        $this->context->builder->positionAtEnd($fallback);
+        $nullObj = $this->pointer->constNull();
+        $this->context->builder->branch($done);
+        $incomings[] = [$nullObj, $fallback];
+        $this->context->builder->positionAtEnd($done);
+        $result = $this->context->builder->phi($this->pointer);
+        foreach ($incomings as [$value, $block]) {
+            $result->addIncoming($value, $block);
+        }
+        $this->context->builder->branch($exit);
+        $this->context->builder->positionAtEnd($exit);
+
+        return $result;
+    }
+
+    private function copyPropertySlots(
+        PHPLLVM\Value $dest,
+        PHPLLVM\Value $src,
+        int $classId,
+        PHPLLVM\LLVMAbstract\BasicBlock $continue
+    ): void {
+        if (!isset($this->properties[$classId]) || [] === $this->properties[$classId]) {
+            $this->context->builder->branch($continue);
+
+            return;
+        }
+        $className = $this->classNameForId($classId);
+        foreach ($this->properties[$classId] as $propset) {
+            $propName = $propset[1];
+            $propType = $propset[2];
+            $slotIndex = $propset[3];
+            $value = $this->propertyFetch($src, $className, $propName);
+            $this->propertyStore($this->propertySlotPtr($dest, $slotIndex), $value, $propType);
+        }
+        $this->context->builder->branch($continue);
+    }
+
     public function classNameForId(int $id): string
     {
         if (!isset($this->classIdToName[$id])) {

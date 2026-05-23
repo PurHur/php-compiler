@@ -1119,15 +1119,26 @@ class JIT {
                     );
                     break;
                 case OpCode::TYPE_CLONE:
-                    // Stub: real clone not implemented yet; assign null so JIT/AOT can proceed.
-                    $nullVar = new JIT\Variable(
+                    $srcVar = $this->context->getVariableFromOp($block->getOperand($op->arg2));
+                    if (Variable::TYPE_OBJECT === $srcVar->type) {
+                        $srcObj = $this->context->helper->loadValue($srcVar);
+                    } elseif (Variable::TYPE_VALUE === $srcVar->type) {
+                        $valuePtr = JIT\JitValueBox::valuePtrFromVariable($this->context, $srcVar);
+                        $srcObj = $this->context->builder->call(
+                            $this->context->lookupFunction('__value__readObject'),
+                            $valuePtr
+                        );
+                    } else {
+                        throw new \LogicException('clone requires an object');
+                    }
+                    $cloned = $this->context->type->object->cloneObject($srcObj);
+                    $objVar = new JIT\Variable(
                         $this->context,
-                        Variable::TYPE_NULL,
+                        Variable::TYPE_OBJECT,
                         Variable::KIND_VALUE,
-                        $this->context->getTypeFromString('__value__*')->constNull()
+                        $cloned
                     );
-                    $nullVar->isNullConstant = true;
-                    $this->assignOperand($block->getOperand($op->arg1), $nullVar);
+                    $this->assignOperand($block->getOperand($op->arg1), $objVar);
                     break;
                 case OpCode::TYPE_BOOLEAN_NOT:
                     $from = $this->context->getVariableFromOp($block->getOperand($op->arg2));

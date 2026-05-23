@@ -42,4 +42,14 @@ class ObjectEntry {
         return $this->class->getProperties($this->properties, $purpose);
     }
 
+    /** Shallow clone: new object id, copied instance property values. */
+    public function cloneShallow(): self {
+        $clone = new self($this->class);
+        foreach ($this->properties as $name => $var) {
+            $clone->properties[$name]->copyFrom($var);
+        }
+
+        return $clone;
+    }
+
 }
