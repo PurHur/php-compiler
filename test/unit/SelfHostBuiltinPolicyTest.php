@@ -32,6 +32,11 @@ final class SelfHostBuiltinPolicyTest extends TestCase
         $this->assertFalse(SelfHostBuiltinPolicy::shouldExternalStub('mkdir'));
         $this->assertFalse(SelfHostBuiltinPolicy::shouldExternalStub('file_put_contents'));
         $this->assertFalse(SelfHostBuiltinPolicy::shouldExternalStub('fopen'));
+        $this->assertTrue(SelfHostBuiltinPolicy::isRequiredForBundle('filter_var'));
+        $this->assertSame('filter', SelfHostBuiltinPolicy::categoryFor('filter_input'));
+        $this->assertFalse(SelfHostBuiltinPolicy::shouldExternalStub('filter_var'));
+        $this->assertFalse(SelfHostBuiltinPolicy::shouldExternalStub('hash'));
+        $this->assertFalse(SelfHostBuiltinPolicy::shouldExternalStub('preg_match'));
     }
 
     public function testCompileFuncRegistersExternalMethodStub(): void

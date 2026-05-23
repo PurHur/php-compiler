@@ -9,7 +9,7 @@ require $root.'/vendor/autoload.php';
 $hasJitLowering = static function (string $source): bool {
     return (bool) preg_match(
         '/JitStringArg|JitLongArg|JitBoolArg|->jitString\s*\(|->jitLong\s*\(|->jitBool\s*\(|'
-        .'ArrayBuiltinHelper::|pow::toJitDouble|JitDate::|JitGetallheaders::|JitPendingHeaders::|constReal\s*\(/',
+        .'ArrayBuiltinHelper::|pow::toJitDouble|JitDate::|JitFilter::|JitGetallheaders::|JitPendingHeaders::|constReal\s*\(/',
         $source
     );
 };
