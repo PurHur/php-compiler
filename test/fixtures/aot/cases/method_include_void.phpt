@@ -1,5 +1,5 @@
 --TEST--
-AOT: void method trailing include inherits caller locals (#739, #776)
+AOT: void method with trailing literal include (MiniWebApp render*, issue #739)
 --RUNFILE--
 method_include_void/entry.php
 --EXPECT--
