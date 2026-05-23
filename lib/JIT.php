@@ -548,6 +548,11 @@ class JIT {
     private function llvmTypeForCfgParam(\PHPCfg\Op\Expr\Param $param): PHPLLVM\Type
     {
         if ($param->declaredType instanceof Op\Type\Literal
+            && 'mixed' === strtolower($param->declaredType->name)
+        ) {
+            return $this->context->getTypeFromString('__value__*');
+        }
+        if ($param->declaredType instanceof Op\Type\Literal
             && $this->isCfgOperandDeclaredName($param->declaredType->name)
         ) {
             return $this->context->getTypeFromString('__object__*');
@@ -2146,6 +2151,14 @@ class JIT {
     private function rawTypeFromCfgParam(\PHPCfg\Op\Expr\Param $param): Type
     {
         $declared = $this->declaredTypeFromCfgParam($param);
+        if ($param->declaredType instanceof Op\Type\Literal
+            && 'mixed' === strtolower($param->declaredType->name)
+        ) {
+            return Type::mixed();
+        }
+        if (null !== $declared && Type::TYPE_UNION === $declared->type) {
+            return $declared;
+        }
         if (null !== $param->result->type && Type::TYPE_NULL !== $param->result->type->type) {
             return $param->result->type;
         }
@@ -2292,6 +2305,14 @@ class JIT {
             || OpCode::TYPE_SHIFT_RIGHT === $type;
     }
 
+    /** Bootstrap fixture: compile only isSuperglobalName from bundled Web\\Superglobals (#816). */
+    private function isBundledSuperglobalsClass(int $classId): bool
+    {
+        $name = strtolower($this->context->scope->className ?? '');
+
+        return 'phpcompiler\\web\\superglobals' === $name || 'superglobals' === $name;
+    }
+
     private function compileClass(?Block $block, int $classId) {
         if ($block === null) {
             return;
@@ -2338,6 +2359,9 @@ class JIT {
                     $name = $block->getOperand($op->arg1);
                     assert($name instanceof Operand\Literal);
                     $methodLc = strtolower($name->value);
+                    if ($this->isBundledSuperglobalsClass($classId) && 'issuperglobalname' !== $methodLc) {
+                        break;
+                    }
                     $visFlags = \PHPCfg\Func::FLAG_PUBLIC;
                     if (null !== $op->arg3 && isset($block->constants[$op->arg3])) {
                         $visFlags = MethodVisibility::mask($block->constants[$op->arg3]->toInt());
@@ -2363,7 +2387,7 @@ class JIT {
                     $name = $block->getOperand($op->arg1);
                     assert($name instanceof Operand\Literal);
                     if (!isset($block->constants[$op->arg2])) {
-                        if ($this->shouldUseSelfHostJitStubs()) {
+                        if ($this->shouldUseSelfHostJitStubs() || $this->isBundledSuperglobalsClass($classId)) {
                             break;
                         }
                         throw new \LogicException('Class constant value must be a compile-time constant');
@@ -2375,7 +2399,7 @@ class JIT {
                     );
                     break;
                 default:
-                    if ($this->shouldUseSelfHostJitStubs()) {
+                    if ($this->shouldUseSelfHostJitStubs() || $this->isBundledSuperglobalsClass($classId)) {
                         break;
                     }
                     throw new \LogicException('Other class body types are not jittable for now');
