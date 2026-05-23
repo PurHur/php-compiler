@@ -63,6 +63,7 @@ class JIT {
                 $this->isSkippedVmHotPathName($name)
                 || $this->isSkippedCompilerHotPathName($name)
                 || $this->isSkippedWebBootstrapHotPathName($name)
+                || $this->isSkippedLibSpineSmokeHotPathName($name)
                 || $this->isSkippedSelfHostEntryName($name)
                 || $this->isSkippedBootstrapInterpreterHotPathName($name)
                 || $this->isSkippedIssetHelperHotPathName($name)
@@ -148,6 +149,7 @@ class JIT {
         }
         if ($this->isSkippedCompilerHotPathName($logicalName ?? $internalName)
             || $this->isSkippedWebBootstrapHotPathName($logicalName ?? $internalName)
+            || $this->isSkippedLibSpineSmokeHotPathName($logicalName ?? $internalName)
             || $this->isSkippedSelfHostEntryName($logicalName ?? $internalName)
             || $this->isSkippedBootstrapInterpreterHotPathName($logicalName ?? $internalName)
             || $this->isSkippedIssetHelperHotPathName($logicalName ?? $internalName)
@@ -415,6 +417,23 @@ class JIT {
             || str_contains($lower, 'sourcebundler')
             || (str_contains($lower, '\\web\\conststringfolder::') && !$this->isConstStringFolderRealLoweringMethod($lower))
             || (str_contains($lower, '\\web\\superglobals::') && !str_ends_with($lower, '::issuperglobalname'));
+    }
+
+
+    /** Stub M2 lib spine smoke units (Doctor, Cli, Web drivers, ext/standard JIT leaves) for self-host AOT (#1056). */
+    private function isSkippedLibSpineSmokeHotPathName(string $name): bool
+    {
+        if (!$this->shouldUseSelfHostJitStubs()) {
+            return false;
+        }
+        $lower = strtolower($name);
+
+        return str_contains($lower, '\\doctor::')
+            || str_contains($lower, '\\cli\\')
+            || str_contains($lower, '\\web\\cgiaotdriver::')
+            || str_contains($lower, '\\web\\cgidriver::')
+            || str_contains($lower, '\\web\\projectdeploy::')
+            || str_contains($lower, '\\ext\\standard\\jit');
     }
 
     /** IncludePathResolver methods with safe LLVM 9 lowering during self-host AOT (#816). */
@@ -1741,7 +1760,7 @@ class JIT {
                     $declaringClassId = $this->context->type->object->lookup($className);
                     $visFlags = $this->context->type->object->methodVisibility($declaringClassId, $methodLc);
                     $callerClassLc = null;
-                    if (null !== $block->func?->class) {
+                    if (null !== $block->func && null !== $block->func->class) {
                         $callerClassLc = strtolower($block->func->class->value);
                     } elseif ($this->context->scope->className !== '') {
                         $callerClassLc = $this->context->scope->className;
@@ -1764,7 +1783,7 @@ class JIT {
                     assert($name instanceof Operand\Literal);
                     assert($obj->type->type === Type::TYPE_OBJECT);
                     $declaringClass = $obj->type->userType;
-                    if (null === $declaringClass && null !== $block->func?->class) {
+                    if (null === $declaringClass && null !== $block->func && null !== $block->func->class) {
                         $declaringClass = $block->func->class->value;
                     }
                     if (null === $declaringClass || '' === $declaringClass) {
@@ -2279,7 +2298,7 @@ class JIT {
                         $visFlags
                     );
                     $methodBlock = $op->block1;
-                    $className = null !== $methodBlock && null !== $methodBlock->func?->class
+                    $className = null !== $methodBlock && null !== $methodBlock->func && null !== $methodBlock->func->class
                         ? strtolower($methodBlock->func->class->value)
                         : $this->context->scope->className;
                     $funcName = $className.'::'.$methodLc;
@@ -2993,7 +3012,7 @@ class JIT {
         }
         $lc = strtolower($classOp->value);
         if ('self' === $lc || 'static' === $lc) {
-            if (null === $block->func?->class) {
+            if (null === $block->func || null === $block->func->class) {
                 throw new \LogicException('static::class used outside of class scope');
             }
 

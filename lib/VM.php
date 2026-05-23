@@ -274,7 +274,7 @@ restart:
                     $className = $frame->scope[$op->arg2]->toString();
                     $lcClass = strtolower($className);
                     if ('self' === $lcClass || 'static' === $lcClass) {
-                        if (null === $frame->block->func?->class) {
+                        if (null === $frame->block->func || null === $frame->block->func->class) {
                             return $this->raise('self:: used outside of class scope', $frame);
                         }
                         $lcClass = strtolower($frame->block->func->class->name);
@@ -357,7 +357,7 @@ restart:
                     }
                     $vis = $class->methodVisibility[$methodName] ?? \PHPCfg\Func::FLAG_PUBLIC;
                     $callerClassLc = null;
-                    if (null !== $frame->block->func?->class) {
+                    if (null !== $frame->block->func && null !== $frame->block->func->class) {
                         $callerClassLc = strtolower($frame->block->func->class->value);
                     }
                     MethodVisibility::assertCallable(
