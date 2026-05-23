@@ -12,8 +12,8 @@ North star: compile a **subset** of php-compiler with itself (native AOT), then 
 | Phase C native run | `make bootstrap-aot-link` or `./script/bootstrap-aot-link.sh` | ✅ Link + execute **12** `aot_link_targets` (stdout vs Zend PHP) |
 | Phase D `lib/` link | `make bootstrap-aot-link-lib` or `./script/bootstrap-aot-link-lib.sh` | ✅ `test/bootstrap-aot/lib_opcode/main.php` bundles `lib/OpCode.php` ([#540](https://github.com/PurHur/php-compiler/issues/540)) |
 | Bundled `lib/Compiler.php` lint | `./script/bootstrap-selfhost-lint.sh` | ✅ `test/selfhost/compiler_minimal/main.php` + **11** literal `require_once` units toward `bin/vm.php` (no `vendor/`) ([#559](https://github.com/PurHur/php-compiler/issues/559)) |
-| Self-host compile probe | `make bootstrap-selfhost-probe` | ✅ `-l` + `-o build/selfhost` for `compiler_minimal` ([#816](https://github.com/PurHur/php-compiler/issues/816)) |
-| Self-host native link | `./script/bootstrap-selfhost-link.sh` | ✅ **minimal** bundle link + run (`compiler_minimal bundle OK`) ([#557](https://github.com/PurHur/php-compiler/issues/557)) |
+| Self-host compile probe | `make bootstrap-selfhost-probe` | ✅ `-l` + native `-o build/selfhost`; `LAST_JIT_FUNC:` on segfault (exit 139) ([#816](https://github.com/PurHur/php-compiler/issues/816), [#913](https://github.com/PurHur/php-compiler/issues/913)) |
+| Self-host native link | `./script/bootstrap-selfhost-link.sh` | ✅ `build/selfhost` prints `compiler_minimal bundle OK` ([#557](https://github.com/PurHur/php-compiler/issues/557), [#913](https://github.com/PurHur/php-compiler/issues/913)) |
 
 Regenerate: `make bootstrap-profile` (inventory + profile + optional `bootstrap-aot-lint`). Phase C: `make bootstrap-aot-link` (or `php script/bootstrap-aot-lint.php --link`). Phase D: `make bootstrap-aot-link-lib`. Bundled compiler lint: `./script/bootstrap-selfhost-lint.sh`. Live lowering target: `make bootstrap-selfhost-probe` (or `./script/bootstrap-selfhost-compile-probe.sh`; optional `--update-inventory`).
 
@@ -64,7 +64,7 @@ Incremental growth toward `bin/vm.php` inventory path ([#559](https://github.com
 | `lib/VM.php` | interpreter loop (next step toward vm echo path) |
 | `lib/Compiler.php` | CFG → opcodes |
 
-Native link of the **minimal** bundle is claimed when `./script/bootstrap-selfhost-link.sh` passes (stdout `compiler_minimal bundle OK`). Full `lib/` native self-host remains open.
+Native link + run of `compiler_minimal` is gated by `./script/bootstrap-selfhost-link.sh` (LLVM 9; stdout `compiler_minimal bundle OK`). Runtime helpers in the bundle (`VM`, `Runtime`, `Block`, …) are JIT-stubbed for verify; `Compiler` hot paths use existing skip patterns ([#579](https://github.com/PurHur/php-compiler/issues/579), [#913](https://github.com/PurHur/php-compiler/issues/913)). Full `lib/` native self-host remains open.
 
 ## Non-goals (initial bootstrap)
 
