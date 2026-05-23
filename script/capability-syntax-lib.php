@@ -88,6 +88,14 @@ function syntaxRowDefinitions(): array
             'probe' => '$f = fn () => 1; echo $f();',
         ],
         [
+            'id' => 'class_name_const',
+            'construct' => '`ClassName::class` / `static::class`',
+            'opcodes' => ['TYPE_CLASS_CONST_FETCH'],
+            'issue' => 740,
+            'notes' => ['Compile-time class name string; related to __CLASS__ (#199)'],
+            'probe' => 'class A {} echo A::class;',
+        ],
+        [
             'id' => 'magic_const_class_method',
             'construct' => 'Magic constants `__CLASS__`, `__METHOD__`, `__FUNCTION__`',
             'opcodes' => ['TYPE_CONST_FETCH'],
@@ -245,6 +253,7 @@ function collectSyntaxPhptCoverage(string $root, array $definitions): array
         'instanceof' => '/\binstanceof\b/',
         'match_expr' => '/\bmatch\s*\(/',
         'arrow_functions' => '/\bfn\s*\(/',
+        'class_name_const' => '/::class\b/',
         'magic_const_class_method' => '/__CLASS__|__FUNCTION__|__METHOD__/',
         'magic_const_namespace' => '/__NAMESPACE__/',
         'magic_const_dir_file' => '/__DIR__|__FILE__/',

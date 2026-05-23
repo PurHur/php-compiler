@@ -538,6 +538,16 @@ class JIT {
                     $classOp = $block->getOperand($op->arg2);
                     $nameOp = $block->getOperand($op->arg3);
                     assert($nameOp instanceof Operand\Literal);
+                    if ('class' === strtolower($nameOp->value)) {
+                        $className = $this->resolveClassNameForPseudoConst($block, $classOp);
+                        $lit = new Operand\Literal($className);
+                        $lit->type = Type::string();
+                        $this->assignOperand(
+                            $block->getOperand($op->arg1),
+                            JIT\Variable::fromLiteral($this->context, $lit)
+                        );
+                        break;
+                    }
                     $classId = $this->context->type->object->resolveClassId($classOp);
                     $value = $this->context->type->object->classConstFetch($classId, $nameOp->value);
                     $this->assignOperand($block->getOperand($op->arg1), $value);
@@ -892,14 +902,19 @@ class JIT {
                     $returnBlock = $builder->getInsertBlock();
                     $builder->positionAtEnd($returnBlock);
                     $this->context->freeDeadVariables($func, $returnBlock, $block);
-                    $this->context->builder->returnVoid();
-    
+                    if (0 === $this->context->inlineIncludeDepth) {
+                        $this->context->builder->returnVoid();
+                    }
+
                     return $origBasicBlock;
                 case OpCode::TYPE_RETURN:
                     $return = $this->context->getVariableFromOp($block->getOperand($op->arg1));
                     $returnBlock = $builder->getInsertBlock();
                     $builder->positionAtEnd($returnBlock);
                     $this->context->freeDeadVariables($func, $returnBlock, $block);
+                    if ($this->context->inlineIncludeDepth > 0) {
+                        return $origBasicBlock;
+                    }
                     if ($this->isVoidCfgFunction($block)) {
                         $this->context->builder->returnVoid();
                     } else {
@@ -1524,6 +1539,23 @@ class JIT {
     /**
      * @return array<int, Variable>
      */
+    private function resolveClassNameForPseudoConst(Block $block, Operand $classOp): string
+    {
+        if (!$classOp instanceof Operand\Literal) {
+            throw new \LogicException('Class::class requires a literal class name for JIT/AOT');
+        }
+        $lc = strtolower($classOp->value);
+        if ('self' === $lc || 'static' === $lc) {
+            if (null === $block->func?->class) {
+                throw new \LogicException('static::class used outside of class scope');
+            }
+
+            return $block->func->class->value;
+        }
+
+        return $classOp->value;
+    }
+
     private function blockUsesThis(Block $block): bool
     {
         foreach ($block->orig->hoistedOperands as $hoisted) {
