@@ -5,11 +5,13 @@
 
 #include <dirent.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <glob.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <utime.h>
 
 typedef struct __hashtable__ __hashtable__;
 typedef struct __string__ __string__;
@@ -149,6 +151,39 @@ int __compiler_copy(__string__ *from, __string__ *to)
     }
 
     return ok;
+}
+
+/**
+ * touch() runtime: returns 1 on success, 0 on failure.
+ * When mtime is negative, utime(path, NULL) sets both times to now.
+ */
+int __compiler_touch(__string__ *path, long long mtime)
+{
+    const char *p;
+    struct stat st;
+    struct utimbuf times;
+    int fd;
+
+    if (NULL == path) {
+        return 0;
+    }
+    p = phpc_strdata(path);
+    if (stat(p, &st) != 0) {
+        fd = open(p, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+        if (fd < 0) {
+            return 0;
+        }
+        if (close(fd) != 0) {
+            return 0;
+        }
+    }
+    if (mtime < 0) {
+        return utime(p, NULL) == 0 ? 1 : 0;
+    }
+    times.actime = (time_t) mtime;
+    times.modtime = (time_t) mtime;
+
+    return utime(p, &times) == 0 ? 1 : 0;
 }
 
 /** mkdir() runtime: returns 1 on success, 0 on failure (issue #757). */
