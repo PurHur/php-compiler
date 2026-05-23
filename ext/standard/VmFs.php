@@ -254,6 +254,31 @@ final class VmFs
         return @fread($fp, $length);
     }
 
+    public static function fpassthru(int $handle): int|false
+    {
+        $fp = self::lookup($handle);
+        if (null === $fp) {
+            return false;
+        }
+        $total = 0;
+        while (!feof($fp)) {
+            $chunk = @fread($fp, 8192);
+            if (false === $chunk) {
+                return false;
+            }
+            if ('' === $chunk) {
+                break;
+            }
+            $written = @fwrite(\STDOUT, $chunk);
+            if (false === $written) {
+                return false;
+            }
+            $total += $written;
+        }
+
+        return $total;
+    }
+
     public static function fwrite(int $handle, string $data, ?int $length = null): int|false
     {
         $fp = self::lookup($handle);

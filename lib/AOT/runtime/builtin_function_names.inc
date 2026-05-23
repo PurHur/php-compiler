@@ -80,6 +80,7 @@ static const char *phpc_builtin_functions[] = {
     "floor",
     "fmod",
     "fopen",
+    "fpassthru",
     "fread",
     "fseek",
     "ftell",

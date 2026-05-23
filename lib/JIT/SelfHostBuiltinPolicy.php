@@ -68,7 +68,7 @@ final class SelfHostBuiltinPolicy
         'fgetcsv' => 'filesystem',
         'fputcsv' => 'filesystem',
         'ftell' => 'filesystem', 'fseek' => 'filesystem', 'fclose' => 'filesystem',
-        'feof' => 'filesystem', 'fflush' => 'filesystem',
+        'feof' => 'filesystem', 'fflush' => 'filesystem', 'fpassthru' => 'filesystem',
         'getenv' => 'filesystem', 'putenv' => 'filesystem', 'sys_get_temp_dir' => 'filesystem', 'tempnam' => 'filesystem',
         'getcwd' => 'filesystem', 'chdir' => 'filesystem',
     ];
