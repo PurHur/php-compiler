@@ -320,9 +320,19 @@ final class Variable {
                             self::KIND_VALUE,
                             $this->context->builder->fpToSi(
                                 $this->value,
-                                $this->context->getTypeFromString('int64')
+                                $this->context->getTypeFromString('long long')
                             )
                         );
+                    case self::TYPE_STRING:
+                        if (null !== $this->compileTimeString) {
+                            return new self(
+                                $this->context,
+                                $type,
+                                self::KIND_VALUE,
+                                $this->context->constantFromInteger((int) $this->compileTimeString)
+                            );
+                        }
+                        break;
                     case self::TYPE_NATIVE_BOOL:
                         return new self(
                             $this->context, 
@@ -365,10 +375,13 @@ final class Variable {
                         return $this;
                     case self::TYPE_NATIVE_LONG:
                         return new self(
-                            $this->context, 
+                            $this->context,
                             $type,
                             self::KIND_VALUE,
-                            $this->context->builder->fpToSi($this->value, $this->context->getTypeFromString('long long'))
+                            $this->context->builder->siToFp(
+                                $this->value,
+                                $this->context->getTypeFromString('double')
+                            )
                         );
                     case self::TYPE_NATIVE_BOOL:
                         return new self(

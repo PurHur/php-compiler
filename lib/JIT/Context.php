@@ -144,6 +144,9 @@ class Context {
         $this->exports[] = [$name, $signature, $block];
     }
 
+    /** Implicit $this passed as the first LLVM arg for instance methods (#877). */
+    public ?Variable $implicitThisArgument = null;
+
     public function pushScope(): void {
         $this->scopeStack[] = $this->scope;
         $this->scope = new Scope;
@@ -525,6 +528,15 @@ class Context {
             return;
         }
         $name = OperandName::resolve($op);
+        if ('this' === $name) {
+            foreach ($this->scope->variables as $existingOp) {
+                if ('this' === OperandName::resolve($existingOp)) {
+                    $this->scope->variables[$op] = $this->scope->variables[$existingOp];
+
+                    return;
+                }
+            }
+        }
         if (null !== $name && Superglobals::isSuperglobalName($name)) {
             $this->scope->variables[$op] = SuperglobalInit::load($this, $name);
 
@@ -552,11 +564,32 @@ class Context {
         if (!$this->scope->variables->contains($op)) {
             if ($op instanceof Operand\Literal) {
                 $this->scope->variables[$op] = Variable::fromLiteral($this, $op);
+            } elseif ('this' === OperandName::resolve($op)) {
+                $existing = $this->findThisVariable();
+                if (null !== $existing) {
+                    $this->scope->variables[$op] = $existing;
+                } else {
+                    throw new \LogicException("Unknown variable referenced: " . get_class($op));
+                }
             } else {
                 throw new \LogicException("Unknown variable referenced: " . get_class($op));
             }
         }
         return $this->scope->variables[$op];
+    }
+
+    public function findThisVariable(): ?Variable
+    {
+        foreach ($this->scope->variables as $existingOp) {
+            if ('this' === OperandName::resolve($existingOp)) {
+                return $this->scope->variables[$existingOp];
+            }
+        }
+        if (null !== $this->implicitThisArgument) {
+            return $this->implicitThisArgument;
+        }
+
+        return null;
     }
 
     public function hasVariableOpInScopes(Operand $op): bool
@@ -620,6 +653,7 @@ class Context {
             if (
                 null !== $var->superglobalName
                 || (null !== $name && Superglobals::isSuperglobalName($name))
+                || 'this' === $name
             ) {
                 continue;
             }
