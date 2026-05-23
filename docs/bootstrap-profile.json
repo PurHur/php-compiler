@@ -40,6 +40,7 @@
         "ext/standard/JitFilePutContents.php",
         "ext/standard/JitFilemtime.php",
         "ext/standard/JitFilesize.php",
+        "ext/standard/JitFiletype.php",
         "ext/standard/JitFilter.php",
         "ext/standard/JitGetallheaders.php",
         "ext/standard/JitHash.php",
@@ -136,6 +137,7 @@
         "ext/standard/file_put_contents.php",
         "ext/standard/filemtime.php",
         "ext/standard/filesize.php",
+        "ext/standard/filetype.php",
         "ext/standard/filter_input.php",
         "ext/standard/filter_var.php",
         "ext/standard/floatval.php",
@@ -413,9 +415,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 348,
+        "inventory_files": 350,
         "excluded": 2,
-        "eligible": 346,
+        "eligible": 348,
         "aot_lint_targets": 15,
         "aot_link_targets": 13,
         "aot_link_lib_targets": 1
