@@ -5,22 +5,20 @@ declare(strict_types=1);
 /** @var string $title */
 /** @var string $appName */
 $scriptBase = $_SERVER['SCRIPT_NAME'] ?? '/index.php';
-?>
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title><?php echo htmlspecialchars($title); ?> — <?php echo htmlspecialchars($appName); ?></title>
-    <link rel="stylesheet" href="/assets/style.css">
-</head>
-<body>
-<nav>
-    <a href="<?php echo htmlspecialchars($scriptBase); ?>">Home</a>
-    <a href="<?php echo htmlspecialchars($scriptBase); ?>/hello?name=Dev">Hello</a>
-    <a href="<?php echo htmlspecialchars($scriptBase); ?>/contact">Contact</a>
-</nav>
-<main>
-<?php
+echo '<!DOCTYPE html>', "\n";
+echo '<html>', "\n";
+echo '<head>', "\n";
+echo '    <meta charset="UTF-8">', "\n";
+echo '    <title>', htmlspecialchars($title), ' — ', htmlspecialchars($appName), '</title>', "\n";
+echo '    <link rel="stylesheet" href="/assets/style.css">', "\n";
+echo '</head>', "\n";
+echo '<body>', "\n";
+echo '<nav>', "\n";
+echo '    <a href="', htmlspecialchars($scriptBase), '">Home</a>', "\n";
+echo '    <a href="', htmlspecialchars($scriptBase), '/hello?name=Dev">Hello</a>', "\n";
+echo '    <a href="', htmlspecialchars($scriptBase), '/contact">Contact</a>', "\n";
+echo '</nav>', "\n";
+echo '<main>', "\n";
 if ('Home' === $title) {
     include __DIR__ . '/home.php';
 } elseif ('Hello' === $title) {
@@ -30,7 +28,6 @@ if ('Home' === $title) {
 } elseif ('Thank you' === $title) {
     include __DIR__ . '/thankyou.php';
 }
-?>
-</main>
-</body>
-</html>
+echo '</main>', "\n";
+echo '</body>', "\n";
+echo '</html>', "\n";

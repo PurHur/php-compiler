@@ -1,5 +1,4 @@
 <?php
 
 /** @var string $name Validated contact name (set by Router before include). */
-?>
-<h1>Thank you, <?php echo htmlspecialchars($_REQUEST['name'] ?? ''); ?></h1>
+echo '<h1>Thank you, ', htmlspecialchars($name), '</h1>', "\n";

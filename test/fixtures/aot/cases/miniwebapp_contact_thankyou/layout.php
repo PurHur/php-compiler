@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 /** @var string $title */
 /** @var string $appName */
+/** @var string $name */
 $scriptBase = $_SERVER['SCRIPT_NAME'] ?? '/index.php';
 echo '<!DOCTYPE html>', "\n";
 echo '<html>', "\n";
