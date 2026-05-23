@@ -8,8 +8,7 @@ declare(strict_types=1);
 
 $a = ~7;
 $b = ~0;
-$flag = true;
-$c = ~((int) $flag);
+$c = ~1; // PHP 8.2+ rejects ~true; use int operand for bool-like not
 
 class Holder
 {
