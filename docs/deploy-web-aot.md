@@ -157,6 +157,6 @@ export PHP_COMPILER_MAX_BODY=65536   # bytes; capped at 8 MiB
 | [#77](https://github.com/PurHur/php-compiler/issues/77) | CGI body limits and header sanitization |
 | [#50](https://github.com/PurHur/php-compiler/issues/50) | Web runtime / serve |
 | [#173](https://github.com/PurHur/php-compiler/issues/173) | FastCGI adapter |
-| [#568](https://github.com/PurHur/php-compiler/issues/568) | User-class AOT for MiniWebApp binary |
+| [#764](https://github.com/PurHur/php-compiler/issues/764) | MiniWebApp native AOT execute (link closed #568) |
 | [#623](https://github.com/PurHur/php-compiler/issues/623) | Runtime `include` under deploy root |
 | [#612](https://github.com/PurHur/php-compiler/issues/612) | MiniWebApp dist-layout E2E smoke |
