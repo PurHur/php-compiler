@@ -17,6 +17,7 @@ final class Linker
         __DIR__.'/runtime/strtr.c',
         __DIR__.'/runtime/filter_validate.c',
         __DIR__.'/runtime/phpc_fs_dir.c',
+        __DIR__.'/runtime/phpc_parse_url.c',
         __DIR__.'/runtime/phpc_stream.c',
         __DIR__.'/runtime/phpc_process.c',
         __DIR__.'/runtime/preg_match.c',
