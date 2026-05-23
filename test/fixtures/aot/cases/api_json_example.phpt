@@ -8,6 +8,7 @@ echo json_encode(['ok' => true, 'service' => 'php-compiler']);
 --EXPECT--
 Status: 200
 Content-Type: application/json
+
 {"ok":true,"service":"php-compiler"}
 --EXPECT_EXIT--
 0

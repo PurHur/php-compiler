@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler;
 
+use PHPCompiler\Cli\PhpcBuild;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -221,6 +222,65 @@ final class CgiDriverTest extends TestCase
     }
 
     /**
+     * 003-MiniWebApp PATH_INFO routes via native binary + cgi-aot (issue #682, #764).
+     *
+     * @group llvm
+     * @group aot-link
+     * @group miniwebapp
+     */
+    public function testMiniWebAppHomeViaAotCgiWrapper(): void
+    {
+        $binary = $this->buildMiniWebAppAotBinary();
+        $script = $this->miniWebAppIndexScript();
+        $env = $this->miniWebAppBaseEnv($script);
+        $env['PATH_INFO'] = '';
+        $env['REQUEST_URI'] = '/index.php';
+
+        $out = $this->runCgiAot($this->requireCgiAotBin(), $binary, $env);
+        $this->assertStringContainsString('Status: 200', $out);
+        $this->assertStringContainsString('Content-Type: text/html', $out);
+        $this->assertStringContainsString('MiniWebApp', $this->cgiBody($out));
+    }
+
+    /**
+     * @group llvm
+     * @group aot-link
+     * @group miniwebapp
+     */
+    public function testMiniWebAppHelloViaAotCgiWrapper(): void
+    {
+        $binary = $this->buildMiniWebAppAotBinary();
+        $script = $this->miniWebAppIndexScript();
+        $env = $this->miniWebAppBaseEnv($script);
+        $env['PATH_INFO'] = '/hello';
+        $env['QUERY_STRING'] = 'name=AotCgi';
+        $env['REQUEST_URI'] = '/index.php/hello?name=AotCgi';
+
+        $out = $this->runCgiAot($this->requireCgiAotBin(), $binary, $env);
+        $this->assertStringContainsString('Status: 200', $out);
+        $this->assertStringContainsString('Hello AotCgi', $this->cgiBody($out));
+    }
+
+    /**
+     * @group llvm
+     * @group aot-link
+     * @group miniwebapp
+     */
+    public function testMiniWebAppApiStatusViaAotCgiWrapper(): void
+    {
+        $binary = $this->buildMiniWebAppAotBinary();
+        $script = $this->miniWebAppIndexScript();
+        $env = $this->miniWebAppBaseEnv($script);
+        $env['PATH_INFO'] = '/api/status';
+        $env['REQUEST_URI'] = '/index.php/api/status';
+
+        $out = $this->runCgiAot($this->requireCgiAotBin(), $binary, $env);
+        $this->assertStringContainsString('Status: 200', $out);
+        $this->assertStringContainsString('Content-Type: application/json', $out);
+        $this->assertStringContainsString('"ok":true', $this->cgiBody($out));
+    }
+
+    /**
      * Deploy dist cgi-wrapper shell script (issue #665).
      *
      * @group llvm
@@ -268,6 +328,66 @@ final class CgiDriverTest extends TestCase
         }
 
         return $script;
+    }
+
+    private function requireCgiAotBin(): string
+    {
+        if (!self::isLlvmReady()) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+        $cgiAot = realpath($this->repoRoot.'/bin/cgi-aot.php');
+        if (false === $cgiAot) {
+            $this->markTestSkipped('bin/cgi-aot.php missing (#665)');
+        }
+
+        return $cgiAot;
+    }
+
+    private function buildMiniWebAppAotBinary(): string
+    {
+        $this->requireCgiAotBin();
+        $project = $this->repoRoot.'/examples/003-MiniWebApp';
+        if (!is_file($project.'/public/index.php')) {
+            $this->markTestSkipped('examples/003-MiniWebApp/public/index.php missing (#246)');
+        }
+        $phpc = $this->repoRoot.'/phpc';
+        if (!is_file($phpc)) {
+            $this->markTestSkipped('phpc wrapper missing');
+        }
+
+        $binary = $project.'/.phpc/bin/app';
+        $env = $this->baseEnv();
+        LlvmToolchain::applyProcessEnv($env, $this->repoRoot);
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open(
+            [$phpc, 'build', '--project', $project],
+            $descriptorSpec,
+            $pipes,
+            $this->repoRoot,
+            $env
+        );
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+        $stderr = false !== $stderr ? $stderr : '';
+        if (0 !== $exit && PhpcBuild::isUserClassAotBlocked($stderr)) {
+            $this->markTestSkipped(
+                '003-MiniWebApp native AOT CGI blocked: '.trim($stderr)
+            );
+        }
+        $this->assertSame(0, $exit, 'phpc build --project failed: '.substr($stderr, 0, 500));
+        $this->assertFileExists($binary);
+        $real = realpath($binary);
+        $this->assertNotFalse($real);
+
+        return $real;
     }
 
     /**
