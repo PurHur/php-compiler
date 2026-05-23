@@ -120,7 +120,7 @@ Incremental growth toward `bin/vm.php` inventory path ([#559](https://github.com
 | `lib/VM/Optimizer/AssignOp.php`, `lib/VM/Optimizer.php`, `lib/VM/Context.php` | `Runtime` assign-op resolver + `vmContext` |
 | `lib/JIT/OperandName.php`, `lib/Printer.php`, `lib/OpCodeNames.php` | opcode helpers (names + debug print) |
 | `lib/Handler.php`, `lib/Func/Internal.php`, `lib/Func/JIT.php`, `lib/JIT/Call.php`, `lib/JIT/Builtin.php`, `lib/JIT/Result.php`, `lib/JIT/Variable.php`, `lib/JIT/IssetHelper.php`, `lib/JIT/Scope.php` | Func/JIT spine toward `Runtime::loadJit()` |
-| `lib/Web/Superglobals.php` | CGI superglobals (`bin/vm.php`); `array_map` uses named static method (no arrow/closure in bundle) |
+| `lib/Web/Superglobals.php` | CGI superglobals (`bin/vm.php`); header title-case uses foreach (no array_map callable in bundle) |
 | `lib/JIT/IteratorHelper.php`, `lib/JIT/JitStringCompare.php`, `lib/JIT/JitValueCompare.php`, `lib/JIT/StringOffsetHelper.php`, `lib/JIT/ValueEchoHelper.php`, `lib/JIT/ScriptMagic.php` | JIT string/value compare, offset dim, echo lowering, script magic constants |
 | `lib/JIT/Builtin/Refcount.php`, `lib/JIT/Builtin/Output.php`, `lib/JIT/Builtin/ErrorHandler.php`, `lib/JIT/Builtin/ScriptExit.php`, `lib/JIT/Builtin/IsNullFn.php`, `lib/JIT/Builtin/PendingHeaders.php`, `lib/JIT/Builtin/HttpResponseCode.php`, `lib/JIT/Builtin/StringJsonEncode.php`, `lib/JIT/Builtin/StringGetenv.php` | refcount IR, printf/sprintf, error handler stub, exit/die, is_null IR, pending HTTP headers, response code, json_encode/getenv compile helpers |
 | `lib/VM/OutputBuffer.php` | request-scoped echo buffering (`VM` echo path) |

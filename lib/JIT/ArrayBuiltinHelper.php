@@ -619,9 +619,7 @@ final class ArrayBuiltinHelper
     {
         $name = $callback->compileTimeString ?? null;
         if (null === $name) {
-            throw new \LogicException(
-                'array_map() callback must be a compile-time string builtin name in this compiler build'
-            );
+            throw new \LogicException(ArrayMapCallbackPolicy::jitRejectionMessage());
         }
 
         return VmInternalCall::resolveStringCallback($name);

@@ -14,6 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\ArrayMapCallbackPolicy;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
@@ -22,6 +23,8 @@ use PHPLLVM\Value;
 
 /**
  * array_map() for list arrays with null or string builtin callbacks (subset of PHP).
+ *
+ * Deferred (issue #1154): closures, array callables, invokable objects — see ArrayMapCallbackPolicy.
  */
 final class array_map extends Internal
 {
@@ -47,10 +50,8 @@ final class array_map extends Internal
 
             return;
         }
-        if (Variable::TYPE_STRING !== $callback->type) {
-            throw new \LogicException(
-                'array_map() callback must be null or a string builtin name in this compiler build'
-            );
+        if (!ArrayMapCallbackPolicy::isVmSupportedType($callback->type)) {
+            throw new \LogicException(ArrayMapCallbackPolicy::vmRejectionMessage());
         }
         $fn = VmInternalCall::resolveStringCallback($callback->toString());
         foreach ($src->iterateKeyed(true) as [$key, $value]) {
@@ -70,6 +71,10 @@ final class array_map extends Internal
         if (JITVariable::TYPE_HASHTABLE !== ($args[1]->type & ~JITVariable::IS_NATIVE_ARRAY)
             && !ArrayBuiltinHelper::isNativeArray($args[1]->type)) {
             throw new \LogicException('array_map() second argument must be an array in this compiler build');
+        }
+
+        if (!ArrayMapCallbackPolicy::isJitLowerable($args[0])) {
+            throw new \LogicException(ArrayMapCallbackPolicy::jitRejectionMessage());
         }
 
         if (JITVariable::TYPE_STRING === $args[0]->type || JITVariable::TYPE_VALUE === $args[0]->type) {
