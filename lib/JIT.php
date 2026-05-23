@@ -2340,22 +2340,24 @@ class JIT {
         );
         if ($source->type === $dest->type) {
             $dest->free();
-            if (Variable::TYPE_VALUE === $dest->type && '__value__' === $destTy) {
-                JIT\JitValueBox::copyFromPointer(
-                    $this->context,
-                    $dest->value,
-                    '__value__*' === $valueTy ? $value : $this->valueBoxPointer($source)
-                );
-                $dest->addref();
-                $this->copyValueBoxJitFlags($dest, $source);
-
-                return;
-            }
-            if (Variable::TYPE_VALUE === $dest->type && '__value__*' === $destTy) {
+            if (Variable::TYPE_VALUE === $dest->type && ('__value__' === $destTy || '__value__*' === $destTy)) {
+                $destLlvm = $dest->value->typeOf();
+                $destPointsAtStruct = '__value__' === $destTy;
+                if (
+                    '__value__*' === $destTy
+                    && \PHPLLVM\Type::KIND_POINTER === $destLlvm->getKind()
+                    && '__value__' === $this->context->getStringFromType($destLlvm->getElementType())
+                ) {
+                    $destPointsAtStruct = true;
+                }
                 $ptr = '__value__*' === $valueTy
                     ? $value
                     : $this->valueBoxPointer($source);
-                $this->context->builder->store($ptr, $dest->value);
+                if ($destPointsAtStruct) {
+                    JIT\JitValueBox::copyFromPointer($this->context, $dest->value, $ptr);
+                } else {
+                    $this->context->builder->store($ptr, $dest->value);
+                }
                 $dest->addref();
                 $this->copyValueBoxJitFlags($dest, $source);
 
