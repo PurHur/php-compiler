@@ -2,7 +2,7 @@
 
 [![CircleCI](https://circleci.com/gh/ircmaxell/php-compiler.svg?style=svg)](https://circleci.com/gh/ircmaxell/php-compiler)
 
-**CI:** full gate `./script/ci-local.sh` or `make test`; fast iteration `./script/ci-fast.sh` or `make test-fast` ([#436](https://github.com/PurHur/php-compiler/issues/436)). MiniWebApp stage env vars (`MINIWEBAPP_*`, `EXAMPLES_AOT_SMOKE_*`): [docs/local-ci-matrix.md#miniwebapp-gates](docs/local-ci-matrix.md#miniwebapp-gates). Docker image: `php-compiler:22.04-dev`. GitHub Actions: [`.github/workflows/bootstrap-selfhost.yml`](.github/workflows/bootstrap-selfhost.yml) (bootstrap probe/link/wave gates on `master`; full matrix still CircleCI — [#394](https://github.com/PurHur/php-compiler/issues/394)).
+**CI:** full gate `./script/ci-local.sh` or `make test`; fast iteration `./script/ci-fast.sh` or `make test-fast` ([#436](https://github.com/PurHur/php-compiler/issues/436)). MiniWebApp gate ladder (lint → serve → AOT → web-smoke): [docs/miniwebapp-gates.md](docs/miniwebapp-gates.md) ([#472](https://github.com/PurHur/php-compiler/issues/472)); env defaults: [docs/local-ci-matrix.md#miniwebapp-gates](docs/local-ci-matrix.md#miniwebapp-gates). Docker image: `php-compiler:22.04-dev`. GitHub Actions: [`.github/workflows/bootstrap-selfhost.yml`](.github/workflows/bootstrap-selfhost.yml) (bootstrap probe/link/wave gates on `master`; full matrix still CircleCI — [#394](https://github.com/PurHur/php-compiler/issues/394)).
 
 Ok, so this used to be a dead project. It required calling out to all sorts of hackery to generate PHP extensions, or PHP itself.
 

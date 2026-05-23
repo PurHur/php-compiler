@@ -99,7 +99,7 @@ curl -s 'http://127.0.0.1:8080/index.php?route=home'
 
 ## CI gate ladder
 
-Progressive stages from `script/miniwebapp-gates.sh` / `make miniwebapp-gates`:
+Progressive stages from `script/miniwebapp-gates.sh` / `make miniwebapp-gates` (full ladder table: [docs/miniwebapp-gates.md](../../docs/miniwebapp-gates.md), [#472](https://github.com/PurHur/php-compiler/issues/472)):
 
 | Stage | Check | Status |
 |-------|--------|--------|
