@@ -825,6 +825,25 @@ final class VmString
         return self::asciiCaseTransform($string, false);
     }
 
+    /** str_rot13() for byte strings — ASCII letters only. */
+    public static function strRot13(string $string): string
+    {
+        $out = '';
+        $len = self::byteLength($string);
+        for ($i = 0; $i < $len; ++$i) {
+            $ch = $string[$i];
+            $ord = self::byteOrd($ch);
+            if (($ord >= 65 && $ord <= 77) || ($ord >= 97 && $ord <= 109)) {
+                $ch = self::byteChr($ord + 13);
+            } elseif (($ord >= 78 && $ord <= 90) || ($ord >= 110 && $ord <= 122)) {
+                $ch = self::byteChr($ord - 13);
+            }
+            $out .= $ch;
+        }
+
+        return $out;
+    }
+
     public static function pregQuote(string $string, ?string $delimiter = null): string
     {
         $delim = null;

@@ -73,6 +73,7 @@ class Module extends ModuleAbstract
             new string_rtrim(),
             new substr(),
             new strrev(),
+            new str_rot13(),
             new strpos(),
             new strstr(),
             new strchr(),
