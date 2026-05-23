@@ -19,7 +19,7 @@ final class SelfHostBuiltinPolicyTest extends TestCase
 
     public function testAutoStubBatchCountIsThirty(): void
     {
-        $this->assertSame(30, SelfHostBuiltinPolicy::autoStubBatchCount());
+        $this->assertSame(32, SelfHostBuiltinPolicy::autoStubBatchCount());
     }
 
     public function testRequiredBundleCategories(): void
@@ -29,6 +29,8 @@ final class SelfHostBuiltinPolicyTest extends TestCase
         putenv('PHP_COMPILER_SELFHOST_AOT=1');
         $this->assertTrue(SelfHostBuiltinPolicy::shouldExternalStub('abs'));
         $this->assertFalse(SelfHostBuiltinPolicy::shouldExternalStub('dirname'));
+        $this->assertFalse(SelfHostBuiltinPolicy::shouldExternalStub('mkdir'));
+        $this->assertFalse(SelfHostBuiltinPolicy::shouldExternalStub('file_put_contents'));
         $this->assertFalse(SelfHostBuiltinPolicy::shouldExternalStub('fopen'));
     }
 
