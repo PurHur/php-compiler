@@ -65,7 +65,7 @@ final class SelfHostBuiltinPolicy
 
     /** @var list<string> */
     public const AUTO_STUB_BATCH = [
-        'abs', 'addslashes', 'array_combine', 'array_count', 'array_fill', 'array_filter', 'array_flip',
+        'abs', 'addslashes', 'array_combine', 'array_count', 'array_fill', 'array_filter', 'array_flip', 'crc32',
         'array_key_exists', 'array_keys', 'array_map', 'array_merge', 'array_pop', 'array_product',
         'array_push', 'array_reverse', 'array_search', 'array_shift', 'array_unshift', 'array_slice', 'array_sum',
         'array_unique', 'array_values', 'bin2hex', 'bindec', 'boolval', 'ceil', 'chr', 'chunk_split',
@@ -74,7 +74,7 @@ final class SelfHostBuiltinPolicy
 
     /** @var array<string, true> */
     private const AUTO_STUB_LOOKUP = [
-        'abs' => true, 'addslashes' => true, 'array_combine' => true, 'array_count' => true,
+        'abs' => true, 'addslashes' => true, 'array_combine' => true, 'array_count' => true, 'crc32' => true,
         'array_fill' => true, 'array_filter' => true, 'array_flip' => true, 'array_key_exists' => true,
         'array_keys' => true, 'array_map' => true, 'array_merge' => true, 'array_pop' => true,
         'array_product' => true, 'array_push' => true, 'array_reverse' => true, 'array_search' => true,

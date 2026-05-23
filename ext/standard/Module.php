@@ -125,6 +125,7 @@ class Module extends ModuleAbstract
             new array_filter(),
             new range(),
             new bin2hex(),
+            new crc32(),
             new hex2bin(),
             new base64_encode(),
             new base64_decode(),
