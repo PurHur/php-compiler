@@ -4,7 +4,7 @@
 # Builds a shipped web example, runs phpc deploy, and executes bin/app under
 # PHPC_DEPLOY_ROOT with CGI-style env (no HTTP server). Skips with exit 0 when
 # LLVM 9 is missing. 003-MiniWebApp layout-only smoke: DEPLOY_SMOKE_003_LAYOUT=1 (#804).
-# Full 003 execute stays blocked until AOT execute #764 (PHPUnit: #612).
+# Full 003 execute: PHPUnit #612; layout-only via DEPLOY_SMOKE_003_LAYOUT=1 (#804).
 #
 # Usage:
 #   ./script/deploy-smoke.sh

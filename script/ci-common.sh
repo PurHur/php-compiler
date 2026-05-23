@@ -281,9 +281,9 @@ ci_run_aot_link_phpunit() {
   ci_run_phpunit "${aot_link_args[@]}" "$@"
 }
 
-# 003-MiniWebApp AOT binary CLI execute (issues #747, #764, #775); opt-in MINIWEBAPP_AOT_EXECUTE_GATE=1.
+# 003-MiniWebApp AOT binary CLI execute (issues #747, #775); default on via MINIWEBAPP_AOT_EXECUTE_GATE=1.
 ci_run_miniwebapp_aot_execute() {
-  if [[ "${MINIWEBAPP_AOT_EXECUTE_GATE:-0}" != "1" ]]; then
+  if [[ "${MINIWEBAPP_AOT_EXECUTE_GATE:-1}" != "1" ]]; then
     return 0
   fi
   if ! ci_llvm_ready; then

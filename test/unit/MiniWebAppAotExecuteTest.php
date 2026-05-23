@@ -8,7 +8,7 @@ use PHPCompiler\Cli\PhpcBuild;
 use PHPUnit\Framework\TestCase;
 
 /**
- * AOT CLI execute gate for examples/003-MiniWebApp (issues #747, #764, #783).
+ * AOT CLI execute gate for examples/003-MiniWebApp (issues #747, #783).
  *
  * @group llvm
  * @group aot
@@ -24,9 +24,10 @@ final class MiniWebAppAotExecuteTest extends TestCase
 
     protected function setUp(): void
     {
-        if ('1' !== getenv('MINIWEBAPP_AOT_EXECUTE_GATE')) {
+        $gate = getenv('MINIWEBAPP_AOT_EXECUTE_GATE');
+        if (false !== $gate && '' !== $gate && '1' !== $gate) {
             $this->markTestSkipped(
-                'MINIWEBAPP_AOT_EXECUTE_GATE=0 (default) — enable when #764/#747 execute is green'
+                'MINIWEBAPP_AOT_EXECUTE_GATE=0 — set to 1 (default) to run MiniWebApp AOT execute tests'
             );
         }
         $this->repoRoot = dirname(__DIR__, 2);
@@ -65,7 +66,7 @@ final class MiniWebAppAotExecuteTest extends TestCase
         $stderr = false !== $stderr ? $stderr : '';
         if (0 !== $exit && PhpcBuild::isUserClassAotBlocked($stderr)) {
             $this->markTestSkipped(
-                '003-MiniWebApp native AOT execute blocked (#764): '.trim($stderr)
+                '003-MiniWebApp native AOT execute blocked: '.trim($stderr)
             );
         }
         $this->assertSame(0, $exit, 'phpc build --project failed: '.substr($stderr, 0, 500));
