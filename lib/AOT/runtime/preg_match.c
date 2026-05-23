@@ -428,3 +428,158 @@ fail:
 
     return NULL;
 }
+
+typedef struct __hashtable__ __hashtable__;
+
+extern __hashtable__ *__hashtable__alloc(void);
+extern void __hashtable__setStringAt(__hashtable__ *ht, size_t index, __string__ *val);
+
+static __string__ *pm_slice_to_string(const char *data, size_t len)
+{
+    char *buf;
+
+    if (0 == len) {
+        return __string__init(0, "");
+    }
+    buf = (char *) malloc(len + 1);
+    if (NULL == buf) {
+        return NULL;
+    }
+    memcpy(buf, data, len);
+    buf[len] = '\0';
+    {
+        __string__ *result = __string__init((long long) len, buf);
+        free(buf);
+
+        return result;
+    }
+}
+
+static int pm_ht_push(__hashtable__ *ht, size_t *idx, const char *data, size_t len)
+{
+    __string__ *part = pm_slice_to_string(data, len);
+    if (NULL == part) {
+        return -1;
+    }
+    __hashtable__setStringAt(ht, (*idx)++, part);
+
+    return 0;
+}
+
+__hashtable__ *__compiler_preg_split(__string__ *pattern, __string__ *subject)
+{
+    const char *pat_full = pm_strdata(pattern);
+    size_t pat_len = pm_strlen(pattern);
+    const char *subj = pm_strdata(subject);
+    size_t subj_len = pm_strlen(subject);
+    __hashtable__ *ht;
+    size_t idx = 0;
+    PCRE2_SIZE start = 0;
+
+    phpc_preg_last_error = PHPC_PREG_NO_ERROR;
+
+    if (pat_len > PM_MAX_PATTERN) {
+        phpc_preg_last_error = PHPC_PREG_BAD_REGEX;
+
+        return NULL;
+    }
+
+    ht = __hashtable__alloc();
+    if (NULL == ht) {
+        phpc_preg_last_error = PHPC_PREG_BAD_REGEX;
+
+        return NULL;
+    }
+
+    if (0 == subj_len) {
+        if (0 != pm_ht_push(ht, &idx, "", 0)) {
+            phpc_preg_last_error = PHPC_PREG_BAD_REGEX;
+
+            return NULL;
+        }
+
+        return ht;
+    }
+
+    char body[PM_MAX_PATTERN + 1];
+    uint32_t opts = 0;
+    if (0 != pm_extract_body(pat_full, pat_len, body, sizeof(body), &opts)) {
+        phpc_preg_last_error = PHPC_PREG_BAD_REGEX;
+
+        return NULL;
+    }
+
+    int errorcode = 0;
+    PCRE2_SIZE erroffset = 0;
+    pcre2_code *re = pcre2_compile(
+        (PCRE2_SPTR) body,
+        PCRE2_ZERO_TERMINATED,
+        opts,
+        &errorcode,
+        &erroffset,
+        NULL
+    );
+    if (NULL == re) {
+        phpc_preg_last_error = PHPC_PREG_BAD_REGEX;
+
+        return NULL;
+    }
+
+    pcre2_match_data *match_data = pcre2_match_data_create_from_pattern(re, NULL);
+    if (NULL == match_data) {
+        pcre2_code_free(re);
+        phpc_preg_last_error = PHPC_PREG_BAD_REGEX;
+
+        return NULL;
+    }
+
+    while (start <= subj_len) {
+        int rc = pcre2_match(
+            re,
+            (PCRE2_SPTR) subj,
+            subj_len,
+            start,
+            0,
+            match_data,
+            NULL
+        );
+
+        if (PCRE2_ERROR_NOMATCH == rc) {
+            if (0 != pm_ht_push(ht, &idx, subj + start, subj_len - start)) {
+                goto split_fail;
+            }
+            break;
+        }
+        if (rc < 0) {
+            goto split_fail;
+        }
+
+        PCRE2_SIZE *ovector = pcre2_get_ovector_pointer(match_data);
+        if (0 != pm_ht_push(ht, &idx, subj + start, (size_t) (ovector[0] - start))) {
+            goto split_fail;
+        }
+        if (ovector[1] == start) {
+            start++;
+        } else {
+            start = ovector[1];
+        }
+        if (start >= subj_len) {
+            if (0 != pm_ht_push(ht, &idx, "", 0)) {
+                goto split_fail;
+            }
+            break;
+        }
+    }
+
+    pcre2_match_data_free(match_data);
+    pcre2_code_free(re);
+
+    return ht;
+
+split_fail:
+    pcre2_match_data_free(match_data);
+    pcre2_code_free(re);
+    phpc_preg_last_error = PHPC_PREG_BAD_REGEX;
+
+    return NULL;
+}
