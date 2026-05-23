@@ -12,6 +12,7 @@
 #   ./script/deploy-smoke.sh --example 002
 #   DEPLOY_SMOKE_003_LAYOUT=1 ./script/deploy-smoke.sh --example 003
 #   DEPLOY_SMOKE_003_EXECUTE=1 ./script/deploy-smoke.sh --example 003
+#   DEPLOY_SMOKE_ONLY=003 DEPLOY_SMOKE_003_EXECUTE=1 make deploy-smoke
 #
 # Docker:
 #   docker run --rm -v "$(pwd):/compiler" -w /compiler php-compiler:22.04-dev make deploy-smoke
@@ -23,6 +24,7 @@ PHPC="${ROOT}/phpc"
 SMOKE_ROOT="${ROOT}/.phpc/smoke/deploy"
 MINIWEBAPP="${ROOT}/examples/003-MiniWebApp"
 EXAMPLE="002"
+DEPLOY_SMOKE_ONLY="${DEPLOY_SMOKE_ONLY:-}"
 
 usage() {
   cat <<'EOF' >&2
@@ -345,14 +347,22 @@ smoke_003_miniwebapp() {
   return 0
 }
 
-case "${EXAMPLE}" in
-  001) smoke_deploy_example '001-SimpleWeb' 'examples/001-SimpleWeb' '001-SimpleWeb' ;;
-  002) smoke_deploy_example '002-StaticWeb' 'examples/002-StaticWeb' '002-StaticWeb' ;;
-  003) smoke_003_miniwebapp ;;
-  *)
-    echo "deploy-smoke: unknown --example ${EXAMPLE} (use 001, 002, or 003)" >&2
-    exit 1
-    ;;
-esac
+run_deploy_smoke_example() {
+  case "$1" in
+    001) smoke_deploy_example '001-SimpleWeb' 'examples/001-SimpleWeb' '001-SimpleWeb' ;;
+    002) smoke_deploy_example '002-StaticWeb' 'examples/002-StaticWeb' '002-StaticWeb' ;;
+    003) smoke_003_miniwebapp ;;
+    *)
+      echo "deploy-smoke: unknown example ${1} (use 001, 002, or 003)" >&2
+      exit 1
+      ;;
+  esac
+}
+
+if [[ -n "${DEPLOY_SMOKE_ONLY}" ]]; then
+  run_deploy_smoke_example "${DEPLOY_SMOKE_ONLY}"
+else
+  run_deploy_smoke_example "${EXAMPLE}"
+fi
 
 echo "deploy-smoke: ok"

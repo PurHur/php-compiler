@@ -67,6 +67,16 @@ After `phpc build --project .` (LLVM), run the native binary with CGI env — no
 
 `--require-nonempty-stdout` exits `2` when stdout is empty. With `phpc deploy -o /tmp/dist`, add `--deploy-root /tmp/dist`.
 
+Deploy + execute smoke (stage 4d, [#745](https://github.com/PurHur/php-compiler/issues/745)):
+
+```console
+../../phpc build --project .
+../../phpc deploy . -o /tmp/miniwebapp-dist
+PHPC_DEPLOY_ROOT=/tmp/miniwebapp-dist eval "$(../../script/miniwebapp-cgi-env.php --export shellQueryRouteHome)" ../../phpc run --project . --deploy-root /tmp/miniwebapp-dist
+DEPLOY_SMOKE_003_EXECUTE=1 ../../script/deploy-smoke.sh --example 003
+DEPLOY_SMOKE_ONLY=003 DEPLOY_SMOKE_003_EXECUTE=1 make deploy-smoke
+```
+
 ## Run matrix
 
 | Mode | Status | Command |
@@ -110,6 +120,7 @@ Progressive stages from `script/miniwebapp-gates.sh` / `make miniwebapp-gates` (
 | 3b | `MINIWEBAPP_WEB_SMOKE_GATE=1` shell smoke | ✅ default on |
 | 4a | `phpc build --project --dry-run` | probe (LLVM) |
 | 4c | `EXAMPLES_AOT_SMOKE_ONLY=003` smoke slice | ✅ when `MINIWEBAPP_AOT_EXECUTE_GATE=1` (default) ([#683](https://github.com/PurHur/php-compiler/issues/683)) |
+| 4d | `DEPLOY_SMOKE_003_EXECUTE=1 deploy-smoke --example 003` | ✅ when gated ([#745](https://github.com/PurHur/php-compiler/issues/745)) |
 | 4b | `ExamplesCompileTest::test003MiniWebAppBuildLinks` | ✅ link gate ([#754](https://github.com/PurHur/php-compiler/issues/754)) |
 | 4b2 | `test003MiniWebAppExecutesWithCgiEnv` | ✅ default on ([#747](https://github.com/PurHur/php-compiler/issues/747), [#791](https://github.com/PurHur/php-compiler/issues/791)) |
 | 4b2 bisect | `script/miniwebapp-aot-bisect.sh` ordered PHPT ladder | opt-in `MINIWEBAPP_AOT_BISECT_GATE=1` ([#879](https://github.com/PurHur/php-compiler/issues/879), [#764](https://github.com/PurHur/php-compiler/issues/764)) |
@@ -169,6 +180,7 @@ PHP_COMPILER_MAX_BODY=1024 ../../script/examples-web-smoke.sh --miniwebapp-only
 - [#705](https://github.com/PurHur/php-compiler/issues/705) — oversized POST check in `examples-web-smoke.sh`
 - [#675](https://github.com/PurHur/php-compiler/issues/675) — stage 4a AOT dry-run in gate ladder
 - [#683](https://github.com/PurHur/php-compiler/issues/683) — stage 4c `examples-aot-smoke` 003 slice probe
+- [#745](https://github.com/PurHur/php-compiler/issues/745) — stage 4d `deploy-smoke` 003 execute E2E
 
 ## Related
 
