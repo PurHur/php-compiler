@@ -286,7 +286,7 @@ class JIT {
             return $this->context->scope->blockStorage[$block];
         }
         if (null !== $block->func && $block->orig === $block->func->cfg) {
-            JIT\Progress::noteFunction($block->func->getName());
+            JIT\Progress::noteFunction($block->func->name);
         }
         if (null !== $entryBlock) {
             $origBasicBlock = $basicBlock = $entryBlock;
