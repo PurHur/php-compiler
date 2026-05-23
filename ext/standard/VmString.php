@@ -95,6 +95,37 @@ final class VmString
         return $out;
     }
 
+    /**
+     * str_shuffle() — Fisher–Yates on bytes (CSPRNG via {@see randomBytes()}).
+     */
+    public static function strShuffle(string $string): string
+    {
+        $len = self::byteLength($string);
+        if ($len < 2) {
+            return $string;
+        }
+        $chars = [];
+        for ($i = 0; $i < $len; ++$i) {
+            $chars[$i] = $string[$i];
+        }
+        for ($i = $len - 1; $i > 0; --$i) {
+            $rand = self::randomBytes(8);
+            $pick = 0;
+            for ($b = 0; $b < 8; ++$b) {
+                $pick = ($pick << 8) | self::byteOrd($rand[$b]);
+            }
+            $j = $pick % ($i + 1);
+            if ($j < 0) {
+                $j += $i + 1;
+            }
+            $tmp = $chars[$i];
+            $chars[$i] = $chars[$j];
+            $chars[$j] = $tmp;
+        }
+
+        return \implode('', $chars);
+    }
+
     public static function strcmp(string $a, string $b): int
     {
         $lenA = self::byteLength($a);
