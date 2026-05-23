@@ -853,6 +853,19 @@ class Object_ extends Type {
 
                 return;
             }
+            if (Variable::TYPE_NATIVE_LONG === $value->type) {
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__writeLong'),
+                    $heapPtr,
+                    $this->context->helper->loadValue($value)
+                );
+                $this->context->builder->store(
+                    $this->context->builder->pointerCast($heapPtr, $voidPtr),
+                    $slot
+                );
+
+                return;
+            }
         }
 
         if (Variable::TYPE_NATIVE_LONG === $propertyType && Variable::TYPE_NATIVE_LONG === $value->type) {
