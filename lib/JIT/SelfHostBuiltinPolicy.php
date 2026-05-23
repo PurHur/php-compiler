@@ -64,7 +64,7 @@ final class SelfHostBuiltinPolicy
         'is_writable' => 'filesystem', 'file_get_contents' => 'filesystem', 'file_put_contents' => 'filesystem',
         'mkdir' => 'filesystem', 'unlink' => 'filesystem', 'rmdir' => 'filesystem', 'realpath' => 'filesystem',
         'glob' => 'filesystem', 'scandir' => 'filesystem',
-        'fopen' => 'filesystem', 'fread' => 'filesystem', 'fgetc' => 'filesystem', 'fgets' => 'filesystem',
+        'fopen' => 'filesystem', 'fread' => 'filesystem', 'fpassthru' => 'filesystem', 'fgetc' => 'filesystem', 'fgets' => 'filesystem',
         'fgetcsv' => 'filesystem',
         'fputcsv' => 'filesystem',
         'ftell' => 'filesystem', 'fseek' => 'filesystem', 'fclose' => 'filesystem',

@@ -173,6 +173,9 @@ class Type extends Builtin {
         );
         $fnFread = $this->context->module->addFunction('__compiler_fread', $fntypeFread);
         $this->context->registerFunction('__compiler_fread', $fnFread);
+        $fntypeFpassthru = $this->context->context->functionType($i64, false, $i64);
+        $fnFpassthru = $this->context->module->addFunction('__compiler_fpassthru', $fntypeFpassthru);
+        $this->context->registerFunction('__compiler_fpassthru', $fnFpassthru);
         $fntypeFclose = $this->context->context->functionType($i32, false, $i64);
         $fnFclose = $this->context->module->addFunction('__compiler_fclose', $fntypeFclose);
         $this->context->registerFunction('__compiler_fclose', $fnFclose);

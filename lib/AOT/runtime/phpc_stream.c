@@ -133,6 +133,33 @@ __string__ *__compiler_fread(int64_t handle, int64_t length)
     return result;
 }
 
+int64_t __compiler_fpassthru(int64_t handle)
+{
+    FILE *fp;
+    char buf[8192];
+    int64_t total = 0;
+
+    fp = phpc_resolve_stream(handle);
+    if (NULL == fp) {
+        return -1;
+    }
+    while (!feof(fp)) {
+        size_t n = fread(buf, 1, sizeof(buf), fp);
+        if (0 == n) {
+            if (ferror(fp)) {
+                return -1;
+            }
+            break;
+        }
+        if (n != fwrite(buf, 1, n, stdout)) {
+            return -1;
+        }
+        total += (int64_t) n;
+    }
+
+    return total;
+}
+
 int __compiler_fclose(int64_t handle)
 {
     FILE *fp;

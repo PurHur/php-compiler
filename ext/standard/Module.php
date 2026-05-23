@@ -211,6 +211,7 @@ class Module extends ModuleAbstract
             new filetype(),
             new fopen(),
             new fread(),
+            new fpassthru(),
             new fgetc(),
             new fgets(),
             new fgetcsv(),
