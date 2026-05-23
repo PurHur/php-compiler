@@ -98,6 +98,8 @@ cd examples/002-StaticWeb
 
 ## `phpc.json` (web examples)
 
+Full field reference: [docs/phpc-json.md](../docs/phpc-json.md) ([#727](https://github.com/PurHur/php-compiler/issues/727)).
+
 **001-SimpleWeb**, **002-StaticWeb**, and **004-ApiJson** ship a minimal manifest beside `example.php` ([#274](https://github.com/PurHur/php-compiler/issues/274)):
 
 ```json
