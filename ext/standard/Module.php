@@ -125,6 +125,8 @@ class Module extends ModuleAbstract
             new range(),
             new bin2hex(),
             new hex2bin(),
+            new base64_encode(),
+            new base64_decode(),
             new hash_(),
             new hash_hmac(),
             new password_hash(),

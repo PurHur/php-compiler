@@ -427,6 +427,112 @@ final class VmString
         return $out;
     }
 
+    private const BASE64_TABLE = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+    /** RFC 4648 base64 encode (PHP base64_encode subset). */
+    public static function base64_encode(string $data): string
+    {
+        $len = self::byteLength($data);
+        if (0 === $len) {
+            return '';
+        }
+        $out = '';
+        $i = 0;
+        while ($len - $i > 2) {
+            $b0 = self::byteOrd($data[$i]);
+            $b1 = self::byteOrd($data[$i + 1]);
+            $b2 = self::byteOrd($data[$i + 2]);
+            $out .= self::BASE64_TABLE[$b0 >> 2];
+            $out .= self::BASE64_TABLE[(($b0 & 0x03) << 4) + ($b1 >> 4)];
+            $out .= self::BASE64_TABLE[(($b1 & 0x0f) << 2) + ($b2 >> 6)];
+            $out .= self::BASE64_TABLE[$b2 & 0x3f];
+            $i += 3;
+        }
+        if ($i < $len) {
+            $b0 = self::byteOrd($data[$i]);
+            $out .= self::BASE64_TABLE[$b0 >> 2];
+            if ($i + 1 < $len) {
+                $b1 = self::byteOrd($data[$i + 1]);
+                $out .= self::BASE64_TABLE[(($b0 & 0x03) << 4) + ($b1 >> 4)];
+                $out .= self::BASE64_TABLE[(($b1 & 0x0f) << 2)];
+                $out .= '=';
+            } else {
+                $out .= self::BASE64_TABLE[(($b0 & 0x03) << 4)];
+                $out .= '==';
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * RFC 4648 base64 decode, non-strict (PHP base64_decode subset).
+     * Ignores characters outside the alphabet and whitespace; never returns false in this subset.
+     */
+    public static function base64_decode(string $data): string|false
+    {
+        $len = self::byteLength($data);
+        $out = '';
+        $i = 0;
+        $pos = 0;
+        $acc = 0;
+        while ($pos < $len) {
+            $ord = self::byteOrd($data[$pos]);
+            ++$pos;
+            if (61 === $ord) {
+                continue;
+            }
+            $ch = self::base64Reverse($ord);
+            if ($ch < 0) {
+                continue;
+            }
+            switch ($i % 4) {
+                case 0:
+                    $acc = $ch << 2;
+                    break;
+                case 1:
+                    $out .= \chr($acc | ($ch >> 4));
+                    $acc = ($ch & 0x0f) << 4;
+                    break;
+                case 2:
+                    $out .= \chr($acc | ($ch >> 2));
+                    $acc = ($ch & 0x03) << 6;
+                    break;
+                case 3:
+                    $out .= \chr($acc | $ch);
+                    break;
+            }
+            ++$i;
+        }
+
+        return $out;
+    }
+
+    /** @return int 0-63 base64 value, or -1 when not in alphabet / whitespace */
+    private static function base64Reverse(int $ord): int
+    {
+        if ($ord >= 65 && $ord <= 90) {
+            return $ord - 65;
+        }
+        if ($ord >= 97 && $ord <= 122) {
+            return $ord - 71;
+        }
+        if ($ord >= 48 && $ord <= 57) {
+            return $ord + 4;
+        }
+        if (43 === $ord) {
+            return 62;
+        }
+        if (47 === $ord) {
+            return 63;
+        }
+        if (9 === $ord || 10 === $ord || 13 === $ord || 32 === $ord) {
+            return -1;
+        }
+
+        return -2;
+    }
+
     /** application/x-www-form-urlencoded (space as '+'). */
     public static function urlencode(string $data): string
     {
