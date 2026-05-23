@@ -9,7 +9,7 @@ declare(strict_types=1);
 $a = ~7;
 $b = ~0;
 $flag = true;
-$c = ~$flag;
+$c = ~((int) $flag);
 
 class Holder
 {

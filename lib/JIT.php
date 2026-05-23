@@ -2153,7 +2153,62 @@ class JIT {
                     $name = $block->getOperand($op->arg1);
                     assert($name instanceof Operand\Literal);
                     $type = Variable::getTypeFromType($block->getOperand($op->arg3)->type);
-                    $this->context->type->object->defineProperty($classId, $name->value, $type);
+                    $defaultEntry = null;
+                    if (null !== $op->arg2) {
+                        $defaultVar = null;
+                        if (isset($block->constants[$op->arg2])) {
+                            $defaultVar = $block->constants[$op->arg2];
+                        } else {
+                            $classFrame = $block->getFrame($this->context->runtime->vmContext);
+                            if (isset($classFrame->scope[$op->arg2])) {
+                                $defaultVar = $classFrame->scope[$op->arg2]->resolveIndirect();
+                            }
+                        }
+                        if (
+                            null === $defaultVar
+                            || \PHPCompiler\VM\Variable::TYPE_UNDEFINED === $defaultVar->type
+                        ) {
+                            foreach ($block->constants as $candidate) {
+                                if (\PHPCompiler\VM\Variable::TYPE_BOOLEAN === $candidate->type) {
+                                    $defaultVar = $candidate;
+                                    break;
+                                }
+                            }
+                        }
+                        if (null === $defaultVar) {
+                            throw new \LogicException(
+                                'Missing compile-time default for property '.$name->value
+                            );
+                        }
+                        if (
+                            \PHPCompiler\VM\Variable::TYPE_STRING === $defaultVar->type
+                            && 'true' === $defaultVar->toString()
+                        ) {
+                            $defaultEntry = [
+                                'type' => Variable::TYPE_NATIVE_BOOL,
+                                'value' => true,
+                            ];
+                        } elseif (
+                            \PHPCompiler\VM\Variable::TYPE_STRING === $defaultVar->type
+                            && 'false' === $defaultVar->toString()
+                        ) {
+                            $defaultEntry = [
+                                'type' => Variable::TYPE_NATIVE_BOOL,
+                                'value' => false,
+                            ];
+                        } else {
+                            $defaultEntry = [
+                                'type' => Variable::fromVMVariable($defaultVar->type),
+                                'value' => $this->context->type->object->compileTimeScalarFromVm($defaultVar),
+                            ];
+                        }
+                    }
+                    $this->context->type->object->defineProperty(
+                        $classId,
+                        $name->value,
+                        $type,
+                        $defaultEntry
+                    );
                     break;
                 case OpCode::TYPE_CONST_FETCH:
                 case OpCode::TYPE_CLASS_CONST_FETCH:
@@ -2456,6 +2511,20 @@ class JIT {
 
                     return;
                 default:
+                    if ($value->type & Variable::IS_NATIVE_ARRAY) {
+                        $elemType = $value->type & ~Variable::IS_NATIVE_ARRAY;
+                        if (Variable::TYPE_STRING === $elemType || Variable::TYPE_NATIVE_LONG === $elemType) {
+                            $ht = JIT\HashTableHelper::materializeNativeArrayForCall($this->context, $value);
+                            $this->context->builder->call(
+                                $this->context->lookupFunction('__value__writeHashtable'),
+                                $valueRef,
+                                $ht
+                            );
+                            $result->valueBoxHashtable = true;
+
+                            return;
+                        }
+                    }
                     throw new \LogicException("Source type: {$value->type}");
             }
         } elseif ($result->type === Variable::TYPE_NATIVE_LONG && Variable::TYPE_VALUE === $value->type) {
@@ -2478,6 +2547,13 @@ class JIT {
             $result->free();
             $long = $this->context->helper->loadValue($value);
             $fp = $this->context->builder->siToFp($long, $this->context->getTypeFromString('double'));
+            $this->context->builder->store($fp, $result->value);
+            $result->addref();
+
+            return;
+        } elseif ($result->type === Variable::TYPE_NATIVE_DOUBLE && Variable::TYPE_VALUE === $value->type) {
+            $fp = $this->unboxValueToNativeDouble($value);
+            $result->free();
             $this->context->builder->store($fp, $result->value);
             $result->addref();
 
@@ -2538,6 +2614,42 @@ class JIT {
             return;
         }
         throw new \LogicException("Cannot assign operands of different types (yet): {$value->type}, {$result->type}");
+    }
+
+    private function unboxValueToNativeDouble(Variable $value): PHPLLVM\Value
+    {
+        $valuePtr = $this->valueBoxPointer($value);
+        $map = $this->context->structFieldMap['__value__'];
+        $typeByte = $this->context->builder->load(
+            $this->context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $this->context->getTypeFromString('int8');
+        $doubleTy = $this->context->getTypeFromString('double');
+        $isDouble = $this->context->builder->icmp(
+            \PHPLLVM\Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
+        );
+        $isLong = $this->context->builder->icmp(
+            \PHPLLVM\Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
+        );
+        $readDouble = $this->context->builder->call(
+            $this->context->lookupFunction('__value__readDouble'),
+            $valuePtr
+        );
+        $readLong = $this->context->builder->call(
+            $this->context->lookupFunction('__value__readLong'),
+            $valuePtr
+        );
+        $fromLong = $this->context->builder->siToFp($readLong, $doubleTy);
+
+        return $this->context->builder->select(
+            $isDouble,
+            $readDouble,
+            $this->context->builder->select($isLong, $fromLong, $doubleTy->constReal(0.0))
+        );
     }
 
     private function valueBoxPointer(Variable $value): PHPLLVM\Value
@@ -2701,15 +2813,8 @@ class JIT {
 
     private function compileValueBoxedBitwiseOp(int $opcodeType, Variable $left, Variable $right): Variable
     {
-        $leftPtr = Variable::KIND_VARIABLE === $left->kind
-            ? $left->value
-            : $this->context->helper->loadValue($left);
-        $rightPtr = Variable::KIND_VARIABLE === $right->kind
-            ? $right->value
-            : $this->context->helper->loadValue($right);
-        $readLong = $this->context->lookupFunction('__value__readLong');
-        $leftLong = $this->context->builder->call($readLong, $leftPtr);
-        $rightLong = $this->context->builder->call($readLong, $rightPtr);
+        $leftLong = JIT\JitLongArg::lower($this->context, $left, 'binary op left operand');
+        $rightLong = JIT\JitLongArg::lower($this->context, $right, 'binary op right operand');
         switch ($opcodeType) {
             case OpCode::TYPE_BITWISE_AND:
                 $result = $this->context->builder->bitwiseAnd($leftLong, $rightLong);

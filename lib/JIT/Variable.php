@@ -193,6 +193,9 @@ final class Variable {
         if (null !== $type->userType && 0 === strcasecmp($type->userType, 'SplObjectStorage')) {
             return self::TYPE_HASHTABLE;
         }
+        if (null !== $type->userType && 0 === strcasecmp($type->userType, 'mixed')) {
+            return self::TYPE_VALUE;
+        }
         if (isset(self::TYPE_MAP[$type->type])) {
             return self::TYPE_MAP[$type->type];
         }
