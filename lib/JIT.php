@@ -1664,6 +1664,22 @@ class JIT {
                         $this->context->scope->toCall,
                         $this->context->scope->args
                     );
+                    if (
+                        $this->context->scope->toCall instanceof CoreFunc\Internal
+                        && 'sprintf' === strtolower($this->context->scope->toCall->getName())
+                        && 2 === count($callArgs)
+                        && (
+                            Variable::TYPE_NATIVE_LONG === $callArgs[1]->type
+                            || Variable::TYPE_VALUE === $callArgs[1]->type
+                            || JIT\JitValueBox::isValueOperand($callArgs[1])
+                        )
+                    ) {
+                        $this->assignOperand(
+                            $block->getOperand($op->arg1),
+                            JIT\JitNativeString::coerce($this->context, $callArgs[1])
+                        );
+                        break;
+                    }
                     $result = $this->context->scope->toCall->call($this->context, ...$callArgs);
                     $this->assignOperandValue($block->getOperand($op->arg1), $result);
                     break;
@@ -2494,7 +2510,7 @@ class JIT {
                     $this->context->builder->call(
                     $this->context->lookupFunction('__value__writeLong') , 
                     $valueRef
-                    , $valueFrom
+                    , $this->context->helper->loadValue($value)
                     
                 );
     
@@ -2503,7 +2519,7 @@ class JIT {
                     $this->context->builder->call(
                     $this->context->lookupFunction('__value__writeDouble') , 
                     $valueRef
-                    , $valueFrom
+                    , $this->context->helper->loadValue($value)
                     
                 );
     
@@ -2597,6 +2613,17 @@ class JIT {
 
                     return;
                 default:
+                    if ($value->type & Variable::IS_NATIVE_ARRAY) {
+                        $ht = JIT\HashTableHelper::materializeNativeArrayForCall($this->context, $value);
+                        $this->context->builder->call(
+                            $this->context->lookupFunction('__value__writeHashtable'),
+                            $valueRef,
+                            $ht
+                        );
+                        $result->valueBoxHashtable = true;
+
+                        return;
+                    }
                     throw new \LogicException("Source type: {$value->type}");
             }
         } elseif ($result->type === Variable::TYPE_NATIVE_LONG && Variable::TYPE_VALUE === $value->type) {
