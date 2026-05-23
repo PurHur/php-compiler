@@ -43,9 +43,7 @@ final class JitValueBox
             return true;
         }
         return null !== $var->objectPropertySlot
-            && null !== $var->objectPropertyType
-            && Variable::TYPE_HASHTABLE !== $var->objectPropertyType
-            && Variable::TYPE_STRING !== $var->objectPropertyType;
+            && Variable::TYPE_VALUE === $var->objectPropertyType;
     }
 
     /**
