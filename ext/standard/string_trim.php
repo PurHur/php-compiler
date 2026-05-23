@@ -90,7 +90,8 @@ final class string_trim extends Internal
         Value $sliceLen,
         string $blockId = ''
     ): Value {
-        $suffix = '' === $blockId ? '' : '_'.$blockId;
+        static $seq = 0;
+        $suffix = ('' === $blockId ? '' : '_'.$blockId).'_'.(string) (++$seq);
         $zero = JitStringIndex::zero($context);
         $isEmpty = $context->builder->icmp(Builder::INT_SLE, $sliceLen, $zero);
 
@@ -119,6 +120,8 @@ final class string_trim extends Internal
         $result = $context->builder->phi($dest->typeOf());
         $result->addIncoming($emptyStr, $emptyBlock);
         $result->addIncoming($dest, $copyBlock);
+
+        BasicBlockHelper::branchToFreshContinue($context, 'slice_continue'.$suffix);
 
         return $result;
     }
