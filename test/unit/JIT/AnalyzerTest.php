@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCfg\Op\Expr\Array_;
+use PHPCfg\Op\Expr\StaticCall;
 use PHPCfg\Operand;
 use PHPTypes\Type;
 use PHPUnit\Framework\TestCase;
@@ -53,6 +54,18 @@ class AnalyzerTest extends TestCase
             new Operand\Literal(2),
         ]);
         $this->assertEquals(3, $analyzer->computeStaticArraySize($keys));
+    }
+
+    public function testComputeStaticArraySizeStaticCallWriteOp(): void
+    {
+        $analyzer = new Analyzer();
+        $class = new Operand\Literal('Foo');
+        $class->type = Type::string();
+        $name = new Operand\Literal('bar');
+        $name->type = Type::string();
+        $staticCall = new StaticCall($class, $name, []);
+
+        $this->assertNull($analyzer->computeStaticArraySize($staticCall->result));
     }
 
     private function makeOperand(array $keys): Operand

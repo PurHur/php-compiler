@@ -54,6 +54,7 @@ class Analyzer
                 || $usage instanceof Op\Phi
                 || $usage instanceof Op\Expr\FuncCall
                 || $usage instanceof Op\Expr\NsFuncCall
+                || $usage instanceof Op\Expr\StaticCall
                 || $usage instanceof Op\Expr\ConcatList
                 || $usage instanceof Op\Expr\Assertion
                 || $usage instanceof Op\Expr\New_
@@ -119,6 +120,7 @@ class Analyzer
                 || $usage instanceof Op\Expr\Assertion
                 || $usage instanceof Op\Expr\New_
                 || $usage instanceof Op\Expr\MethodCall
+                || $usage instanceof Op\Expr\StaticCall
                 || $usage instanceof Op\Expr\PropertyFetch
                 || $usage instanceof Op\Expr\Param
                 || $usage instanceof Op\Iterator\Reset
@@ -177,6 +179,7 @@ class Analyzer
                 || $op instanceof Op\Expr\New_
                 || $op instanceof Op\Expr\FuncCall
                 || $op instanceof Op\Expr\NsFuncCall
+                || $op instanceof Op\Expr\StaticCall
                 || $op instanceof Op\Expr\MethodCall
                 || $op instanceof Op\Expr\PropertyFetch
                 || $op instanceof Op\Expr\Param) {
