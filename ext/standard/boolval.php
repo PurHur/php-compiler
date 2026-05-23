@@ -63,6 +63,10 @@ final class boolval extends Internal
                 return $context->constantFromBool(false);
             case JITVariable::TYPE_VALUE:
                 $loaded = $context->helper->loadValue($args[0]);
+                $loaded = $context->builder->pointerCast(
+                    $loaded,
+                    $context->getTypeFromString('__value__*')
+                );
                 $map = $context->structFieldMap['__value__'];
                 $typeByte = $context->builder->load(
                     $context->builder->structGep($loaded, $map['type'])

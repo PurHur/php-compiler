@@ -63,6 +63,23 @@ class Native implements Call {
                 switch ($arg->type) {
                     case Variable::TYPE_OBJECT:
                         return $value;
+                    case Variable::TYPE_VALUE:
+                        return $context->builder->call(
+                            $context->lookupFunction('__value__readObject'),
+                            Variable::KIND_VARIABLE === $arg->kind
+                                ? \PHPCompiler\JIT\JitValueBox::pointer($context, $arg->value)
+                                : $value
+                        );
+                    case Variable::TYPE_NULL:
+                        return $context->getTypeFromString('__object__*')->constNull();
+                    case Variable::TYPE_HASHTABLE:
+                        // Scope arrays may store VM Variable handles as hashtable pointers (issue #816).
+                        return $context->builder->pointerCast(
+                            $value,
+                            $context->getTypeFromString('__object__*')
+                        );
+                    case Variable::TYPE_STRING:
+                        return $context->getTypeFromString('__object__*')->constNull();
                 }
                 break;
             case '__hashtable__*':

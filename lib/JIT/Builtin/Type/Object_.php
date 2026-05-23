@@ -351,6 +351,23 @@ class Object_ extends Type {
             $this->splObjectStorageClassId = $id;
             $this->defineProperty($id, '__spl_ht', Variable::TYPE_HASHTABLE);
         }
+        if ('phpcompiler\\vm\\variable' === $lcname) {
+            foreach ([
+                'type_undefined' => \PHPCompiler\VM\Variable::TYPE_UNDEFINED,
+                'type_null' => \PHPCompiler\VM\Variable::TYPE_NULL,
+                'type_integer' => \PHPCompiler\VM\Variable::TYPE_INTEGER,
+                'type_float' => \PHPCompiler\VM\Variable::TYPE_FLOAT,
+                'type_boolean' => \PHPCompiler\VM\Variable::TYPE_BOOLEAN,
+                'type_string' => \PHPCompiler\VM\Variable::TYPE_STRING,
+                'type_array' => \PHPCompiler\VM\Variable::TYPE_ARRAY,
+                'type_object' => \PHPCompiler\VM\Variable::TYPE_OBJECT,
+            ] as $name => $value) {
+                $this->classConstants[$id][$name] = [
+                    'type' => Variable::TYPE_NATIVE_LONG,
+                    'value' => $value,
+                ];
+            }
+        }
     }
 
     /**
