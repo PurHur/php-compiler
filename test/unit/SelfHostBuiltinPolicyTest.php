@@ -17,7 +17,7 @@ final class SelfHostBuiltinPolicyTest extends TestCase
         parent::tearDown();
     }
 
-    public function testAutoStubBatchCountIsThirty(): void
+    public function testAutoStubBatchCount(): void
     {
         $this->assertSame(32, SelfHostBuiltinPolicy::autoStubBatchCount());
     }
