@@ -36,6 +36,16 @@ final class BootstrapSelfhostCompileProbeTest extends TestCase
         }
     }
 
+    public function testSelfhostScriptsExportDedicatedAotEnv(): void
+    {
+        $link = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-link.sh');
+        $probe = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-compile-probe.sh');
+        $this->assertStringContainsString('PHP_COMPILER_SELFHOST_AOT=1', $link);
+        $this->assertStringContainsString('PHP_COMPILER_SELFHOST_AOT=1', $probe);
+        $this->assertStringContainsString('PHP_COMPILER_JIT_PROGRESS_FILE', $probe);
+        $this->assertStringContainsString('PHP_COMPILER_JIT_PROGRESS_FILE', $link);
+    }
+
     public function testExtractNextLowerIgnoresNoticeAndDeprecated(): void
     {
         $output = <<<'OUT'

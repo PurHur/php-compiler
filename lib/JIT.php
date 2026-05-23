@@ -106,12 +106,12 @@ class JIT {
         return 0 === $this->context->inlineIncludeDepth;
     }
 
-    /** Self-host compile probe sets PHP_COMPILER_JIT_PROGRESS_FILE (#816). */
+    /** Self-host AOT sets PHP_COMPILER_SELFHOST_AOT=1 (#816, #557). */
     private function shouldUseSelfHostJitStubs(): bool
     {
-        $progress = getenv('PHP_COMPILER_JIT_PROGRESS_FILE');
+        $flag = getenv('PHP_COMPILER_SELFHOST_AOT');
 
-        return false !== $progress && '' !== $progress;
+        return '1' === $flag || 'true' === strtolower((string) $flag);
     }
 
     private function compileBlock(Block $block, ?string $funcName = null): PHPLLVM\Value {
@@ -845,6 +845,9 @@ class JIT {
                     $this->assignOperandValue($block->getOperand($op->arg1), $result);
                     break;
                 case OpCode::TYPE_CONCAT:
+                    if (null === $op->arg2 || null === $op->arg3) {
+                        break;
+                    }
                     if (!$this->context->hasVariableOp($block->getOperand($op->arg1))) {
                         // don't bother with constant operations
                         break;

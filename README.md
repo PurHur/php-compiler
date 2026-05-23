@@ -49,7 +49,7 @@ make test    # builds php-compiler:22.04-dev if needed, then memory-safe CI in D
 
 Compile a **subset** of php-compiler with itself (native AOT), separate from the **web-app** north star ([`examples/003-MiniWebApp`](examples/003-MiniWebApp/) — [#521](https://github.com/PurHur/php-compiler/issues/521), [#539](https://github.com/PurHur/php-compiler/issues/539)). Full ladder, blockers, and Phase A–D gates: [docs/bootstrap-selfhost.md](docs/bootstrap-selfhost.md). Per-file inventory and CFG gaps: [docs/bootstrap-inventory.md](docs/bootstrap-inventory.md) (regenerate with `php script/bootstrap-inventory.php`). ROADMAP Phase 0 stretch: [#78](https://github.com/PurHur/php-compiler/issues/78) ([#540](https://github.com/PurHur/php-compiler/issues/540) namespaced `lib/` link).
 
-**Achieved (minimal subset, 2026-05-23)** — `./script/bootstrap-selfhost-link.sh` builds and runs `test/selfhost/compiler_minimal` (`compiler_minimal bundle OK`); full `lib/` tree native self-host still open ([#212](https://github.com/PurHur/php-compiler/issues/212), [#557](https://github.com/PurHur/php-compiler/issues/557)).
+**Achieved (minimal subset, 2026-05-23)** — `./script/bootstrap-selfhost-link.sh` builds and runs `test/selfhost/compiler_minimal` (`compiler_minimal bundle OK`); full `lib/` tree native self-host still open ([#212](https://github.com/PurHur/php-compiler/issues/212), [#557](https://github.com/PurHur/php-compiler/issues/557)). Native link sets `PHP_COMPILER_SELFHOST_AOT=1` for LLVM stub gating; `PHP_COMPILER_JIT_PROGRESS_FILE` is progress logging only, not stub control.
 
 **Local** (after `composer install`; Phase C needs LLVM 9 — `./script/install-llvm9.sh` or `.llvm/` from a prior `ci-local.sh` run):
 

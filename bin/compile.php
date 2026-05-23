@@ -17,6 +17,12 @@ use PHPCompiler\Web\Superglobals;
 
 function run(string $filename, string $code, array $options): void
 {
+    if ('-' !== $filename && str_contains(str_replace('\\', '/', $filename), '/test/selfhost/')) {
+        $selfhostAot = getenv('PHP_COMPILER_SELFHOST_AOT');
+        if (false === $selfhostAot || '' === $selfhostAot) {
+            putenv('PHP_COMPILER_SELFHOST_AOT=1');
+        }
+    }
     $includes = $options['--include'] ?? [];
     if (!is_array($includes)) {
         $includes = [] === $includes || '' === $includes ? [] : [$includes];
