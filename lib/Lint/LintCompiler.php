@@ -28,12 +28,24 @@ final class LintCompiler extends Compiler
 
     protected function compileOp(Op $op, Block $block): void
     {
-        $this->guarded($op, fn () => parent::compileOp($op, $block));
+        try {
+            parent::compileOp($op, $block);
+        } catch (\LogicException $e) {
+            if (!$this->recordIfUnsupported($op, $e)) {
+                throw $e;
+            }
+        }
     }
 
     protected function compileStmt(Op\Stmt $stmt, Block $block): void
     {
-        $this->guarded($stmt, fn () => parent::compileStmt($stmt, $block));
+        try {
+            parent::compileStmt($stmt, $block);
+        } catch (\LogicException $e) {
+            if (!$this->recordIfUnsupported($stmt, $e)) {
+                throw $e;
+            }
+        }
     }
 
     /**
@@ -176,17 +188,6 @@ final class LintCompiler extends Compiler
                 return [new OpCode(OpCode::TYPE_RETURN_VOID)];
             }
             throw $e;
-        }
-    }
-
-    private function guarded(Op $op, callable $compile): void
-    {
-        try {
-            $compile();
-        } catch (\LogicException $e) {
-            if (!$this->recordIfUnsupported($op, $e)) {
-                throw $e;
-            }
         }
     }
 

@@ -90,7 +90,7 @@ Incremental growth toward `bin/vm.php` inventory path ([#559](https://github.com
 | `lib/Runtime.php` | compile + run entry |
 | `lib/Web/ConstStringFolder.php`, `lib/Web/IncludePathResolver.php`, `lib/Web/LiteralIncludeDiscovery.php` | literal include discovery for `-l` bundle |
 | `lib/Web/DeployRoot.php`, `lib/Web/SourceBundler.php` | AOT bundle path + concat (`bin/compile.php` closure) |
-| `lib/Module.php` | extension module interface (vm.php path) |
+| `lib/Module.php`, `lib/ModuleAbstract.php` | extension module interface + shared abstract base |
 | `lib/VM.php`, `lib/VM/ClassProperty.php`, `lib/VM/ScriptExit.php`, `lib/VM/Variable.php` | interpreter + value cells toward vm echo path |
 | `lib/VM/Refcount.php`, `lib/VM/ErrorReporter.php`, `lib/VM/ScriptStack.php`, `lib/VM/HashTable.php` | hashtable refcount + VM context stack |
 | `lib/VM/ClassEntry.php`, `lib/VM/ObjectEntry.php`, `lib/VM/TypeCheck.php` | classes/objects + typed slots (`match`→`switch` in `typeName`) |
@@ -99,11 +99,12 @@ Incremental growth toward `bin/vm.php` inventory path ([#559](https://github.com
 | `lib/Handler.php`, `lib/Func/Internal.php`, `lib/Func/JIT.php`, `lib/JIT/Call.php`, `lib/JIT/Builtin.php`, `lib/JIT/Result.php`, `lib/JIT/Variable.php`, `lib/JIT/IssetHelper.php`, `lib/JIT/Scope.php` | Func/JIT spine toward `Runtime::loadJit()` |
 | `lib/Web/Superglobals.php` | CGI superglobals (`bin/vm.php`); `array_map` uses named static method (no arrow/closure in bundle) |
 | `lib/JIT/IteratorHelper.php`, `lib/JIT/JitStringCompare.php`, `lib/JIT/JitValueCompare.php`, `lib/JIT/StringOffsetHelper.php`, `lib/JIT/ValueEchoHelper.php`, `lib/JIT/ScriptMagic.php` | JIT string/value compare, offset dim, echo lowering, script magic constants |
-| `lib/JIT/Builtin/Refcount.php`, `lib/JIT/Builtin/Output.php`, `lib/JIT/Builtin/ErrorHandler.php`, `lib/JIT/Builtin/ScriptExit.php` | refcount IR, printf/sprintf, error handler stub, exit/die |
+| `lib/JIT/Builtin/Refcount.php`, `lib/JIT/Builtin/Output.php`, `lib/JIT/Builtin/ErrorHandler.php`, `lib/JIT/Builtin/ScriptExit.php`, `lib/JIT/Builtin/IsNullFn.php`, `lib/JIT/Builtin/PendingHeaders.php`, `lib/JIT/Builtin/HttpResponseCode.php`, `lib/JIT/Builtin/StringJsonEncode.php`, `lib/JIT/Builtin/StringGetenv.php` | refcount IR, printf/sprintf, error handler stub, exit/die, is_null IR, pending HTTP headers, response code, json_encode/getenv compile helpers |
 | `lib/VM/OutputBuffer.php` | request-scoped echo buffering (`VM` echo path) |
 | `lib/Compiler.php` | CFG → opcodes |
+| `lib/Lint/Issue.php`, `lib/Lint/UnsupportedRegistry.php`, `lib/Lint/LintCompiler.php`, `lib/Lint/Linter.php` | CFG lint spine (`LintCompiler` extends `Compiler`; no closures in bundle) |
 
-**Next toward `bin/vm.php`** (`php script/bootstrap-selfhost-next-includes.php`): literal spine closed at **67** units; incremental growth continues with vm-path JIT/VM helpers (`lib/JIT/JitStringCompare.php`, `lib/JIT/ValueEchoHelper.php`, `lib/VM/OutputBuffer.php`, …).
+**Next toward `bin/compile.php` / Compiler CFG** (`php script/bootstrap-selfhost-next-includes.php`): literal vm.php spine closed at **76** units; bundle at **87** units with Lint + compile-helper JIT builtins.
 
 Native link + run of `compiler_minimal` is gated by `./script/bootstrap-selfhost-link.sh` (LLVM 9; stdout `compiler_minimal bundle OK`). Runtime helpers in the bundle (`VM`, `Runtime`, `Block`, …) are JIT-stubbed for verify; `Compiler` hot paths use existing skip patterns ([#579](https://github.com/PurHur/php-compiler/issues/579), [#913](https://github.com/PurHur/php-compiler/issues/913)). Full `lib/` native self-host remains open.
 

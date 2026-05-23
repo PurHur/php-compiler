@@ -10,7 +10,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 |--------|------:|
 | PHP files on vm.php path | 409 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 1089 |
+| Source constructs flagged (warnings) | 1092 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -318,7 +318,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `lib/Func/JIT.php` | 0 | 2 |
 | `lib/Func/PHP.php` | 0 | 1 |
 | `lib/Handler.php` | 0 | 1 |
-| `lib/JIT.php` | 0 | 28 |
+| `lib/JIT.php` | 0 | 32 |
 | `lib/JIT/Analyzer.php` | 0 | 1 |
 | `lib/JIT/ArrayBuiltinHelper.php` | 0 | 35 |
 | `lib/JIT/BasicBlockHelper.php` | 0 | 1 |
@@ -393,7 +393,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `lib/JIT/Variable.php` | 0 | 23 |
 | `lib/Lint/IncrementDetector.php` | 0 | 4 |
 | `lib/Lint/Issue.php` | 0 | 2 |
-| `lib/Lint/LintCompiler.php` | 0 | 12 |
+| `lib/Lint/LintCompiler.php` | 0 | 11 |
 | `lib/Lint/Linter.php` | 0 | 7 |
 | `lib/Lint/SwitchDetector.php` | 0 | 4 |
 | `lib/Lint/UnsupportedRegistry.php` | 0 | 1 |
@@ -1690,9 +1690,9 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `ext/standard/range.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 57)
-- new Variable (line 61)
-- new Variable (line 68)
+- new HashTable (line 58)
+- new Variable (line 62)
+- new Variable (line 69)
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/rawurldecode.php`
@@ -1743,7 +1743,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `ext/standard/setcookie.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/shell_exec.php`
 
@@ -2284,22 +2284,26 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new Operand\Literal (line 833)
 - new JIT\Variable (line 855)
 - new Operand\Literal (line 926)
-- new ext\standard\intval (line 967)
-- new Variable (line 996)
-- new Variable (line 1120)
-- new OpCode (line 1199)
-- new Variable (line 1510)
-- new Variable (line 1522)
-- new Variable (line 2152)
-- new Variable (line 2472)
-- new Variable (line 2497)
-- new Operand\Literal (line 2725)
-- new Operand\Literal (line 2729)
-- new Operand\Literal (line 2733)
-- new Variable (line 2737)
-- new Variable (line 2757)
-- new Variable (line 2818)
-- 59 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new ext\standard\intval (line 979)
+- new Variable (line 1008)
+- new Variable (line 1132)
+- new OpCode (line 1212)
+- new Variable (line 1523)
+- new Variable (line 1535)
+- new Variable (line 2165)
+- new Variable (line 2485)
+- new Variable (line 2510)
+- new Variable (line 2647)
+- new Variable (line 2668)
+- new Operand\Literal (line 2677)
+- new Variable (line 2692)
+- new Operand\Literal (line 2838)
+- new Operand\Literal (line 2842)
+- new Operand\Literal (line 2846)
+- new Variable (line 2850)
+- new Variable (line 2870)
+- new Variable (line 2931)
+- 64 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Analyzer.php`
 
@@ -2309,40 +2313,40 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/JIT/ArrayBuiltinHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 510)
-- new Variable (line 568)
-- new Variable (line 570)
-- new Variable (line 582)
-- new Variable (line 687)
-- new Variable (line 689)
-- new Variable (line 917)
-- new Variable (line 919)
-- new Variable (line 1126)
-- new Variable (line 1128)
-- new Variable (line 1195)
-- new Variable (line 1197)
-- new Variable (line 1389)
-- new Variable (line 1391)
-- new boolval (line 1401)
-- new Variable (line 1928)
-- new Variable (line 1976)
-- new Variable (line 1979)
-- new Variable (line 2777)
-- new Variable (line 2813)
+- new Variable (line 518)
+- new Variable (line 576)
+- new Variable (line 578)
+- new Variable (line 590)
+- new Variable (line 695)
+- new Variable (line 697)
+- new Variable (line 925)
+- new Variable (line 927)
+- new Variable (line 1134)
+- new Variable (line 1136)
+- new Variable (line 1203)
+- new Variable (line 1205)
+- new Variable (line 1397)
+- new Variable (line 1399)
+- new boolval (line 1409)
+- new Variable (line 1936)
+- new Variable (line 1984)
+- new Variable (line 1987)
+- new Variable (line 2785)
 - new Variable (line 2821)
-- new Variable (line 2831)
-- new Variable (line 2842)
-- new Variable (line 2887)
-- new Variable (line 2908)
-- new Variable (line 2929)
-- new Variable (line 2953)
-- new Variable (line 3004)
+- new Variable (line 2829)
+- new Variable (line 2839)
+- new Variable (line 2850)
+- new Variable (line 2895)
+- new Variable (line 2916)
+- new Variable (line 2937)
+- new Variable (line 2961)
 - new Variable (line 3012)
-- new Variable (line 3952)
-- new Variable (line 3977)
-- new Variable (line 3993)
-- new Variable (line 4052)
-- new Variable (line 4068)
+- new Variable (line 3020)
+- new Variable (line 3960)
+- new Variable (line 3985)
+- new Variable (line 4001)
+- new Variable (line 4060)
+- new Variable (line 4076)
 - 75 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/BasicBlockHelper.php`
@@ -2634,29 +2638,29 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/JIT/HashTableHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 33)
-- new Variable (line 68)
-- new Variable (line 301)
-- new Variable (line 343)
-- new Variable (line 404)
-- new Variable (line 504)
-- new Variable (line 595)
-- new Variable (line 628)
-- new Variable (line 901)
-- new Variable (line 936)
-- new Variable (line 978)
-- new Variable (line 980)
-- 23 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new Variable (line 48)
+- new Variable (line 83)
+- new Variable (line 316)
+- new Variable (line 358)
+- new Variable (line 419)
+- new Variable (line 519)
+- new Variable (line 610)
+- new Variable (line 643)
+- new Variable (line 916)
+- new Variable (line 951)
+- new Variable (line 993)
+- new Variable (line 995)
+- 24 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Helper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 54)
-- new Variable (line 56)
-- new Variable (line 58)
-- new Variable (line 859)
-- new Variable (line 861)
-- new Variable (line 863)
+- new Variable (line 77)
+- new Variable (line 79)
+- new Variable (line 81)
+- new Variable (line 882)
+- new Variable (line 884)
+- new Variable (line 886)
 - 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/IncludeHelper.php`
@@ -2831,18 +2835,17 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/Lint/LintCompiler.php`
 
 **Warnings** (review for bootstrap subset):
-- new OpCode (line 45)
-- new OpCode (line 75)
-- new Block (line 83)
-- new OpCode (line 97)
-- new Operand\Literal (line 111)
-- new Variable (line 113)
-- new Temporary (line 115)
-- new OpCode (line 118)
-- new OpCode (line 142)
-- new OpCode (line 176)
-- 9 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
-- 2 closure(s)
+- new OpCode (line 57)
+- new OpCode (line 87)
+- new Block (line 95)
+- new OpCode (line 109)
+- new Operand\Literal (line 123)
+- new Variable (line 125)
+- new Temporary (line 127)
+- new OpCode (line 130)
+- new OpCode (line 154)
+- new OpCode (line 188)
+- 8 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/Lint/Linter.php`
 
@@ -3108,7 +3111,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/Web/SourceBundler.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 8 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/Web/Superglobals.php`
 
