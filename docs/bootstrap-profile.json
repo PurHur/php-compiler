@@ -455,6 +455,7 @@
         "test/bootstrap-aot/const_string_folder_deploy_path.php",
         "test/bootstrap-aot/const_string_folder_func_call_args.php",
         "test/bootstrap-aot/const_string_folder_magic_dir.php",
+        "test/bootstrap-aot/const_string_folder_smoke.php",
         "test/bootstrap-aot/deploy_path_fold.php",
         "test/bootstrap-aot/deploy_path_include.php",
         "test/bootstrap-aot/dirname_concat_isfile.php",
