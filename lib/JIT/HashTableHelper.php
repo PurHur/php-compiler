@@ -164,16 +164,20 @@ final class HashTableHelper
     public static function storeHashtableInArrayVariable(Context $context, Variable $array, Value $ht): void
     {
         if (0 !== ($array->type & Variable::IS_NATIVE_ARRAY)) {
-            $boxed = new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, JitValueBox::alloc($context));
+            if (Variable::KIND_VARIABLE !== $array->kind) {
+                return;
+            }
+            $boxed = JitValueBox::alloc($context);
             $context->builder->call(
                 $context->lookupFunction('__value__writeHashtable'),
-                JitValueBox::pointer($context, $boxed->value),
+                JitValueBox::pointer($context, $boxed),
                 $ht
             );
-            $array->type = Variable::TYPE_VALUE;
-            $array->kind = Variable::KIND_VARIABLE;
-            $array->value = $boxed->value;
-            $array->nextFreeElement = 0;
+            $voidPtr = $context->getTypeFromString('void*');
+            $context->builder->store(
+                $context->builder->pointerCast(JitValueBox::pointer($context, $boxed), $voidPtr),
+                $array->value
+            );
 
             return;
         }

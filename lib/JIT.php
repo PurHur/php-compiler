@@ -2261,6 +2261,15 @@ class JIT {
                     $declaredJitType = Variable::getTypeFromType($block->getOperand($op->arg3)->type);
                     if (Variable::TYPE_HASHTABLE === $declaredJitType || Variable::TYPE_STRING === $declaredJitType) {
                         $jitType = $declaredJitType;
+                        if (Variable::TYPE_HASHTABLE === $declaredJitType) {
+                            $lcClass = strtolower(str_replace('/', '\\', ltrim($className, '\\')));
+                            if (
+                                !str_starts_with($lcClass, 'phpcfg\\')
+                                && !str_starts_with($lcClass, 'phpcompiler\\')
+                            ) {
+                                $jitType = Variable::TYPE_VALUE;
+                            }
+                        }
                     } else {
                         $jitType = $this->context->type->object->externalPropertyJitType(
                             $className,
@@ -2597,6 +2606,17 @@ class JIT {
 
                     return;
                 default:
+                    if ($value->type & Variable::IS_NATIVE_ARRAY) {
+                        $ht = JIT\HashTableHelper::materializeNativeArrayForCall($this->context, $value);
+                        $this->context->builder->call(
+                            $this->context->lookupFunction('__value__writeHashtable'),
+                            $valueRef,
+                            $ht
+                        );
+                        $result->valueBoxHashtable = true;
+
+                        return;
+                    }
                     throw new \LogicException("Source type: {$value->type}");
             }
         } elseif ($result->type === Variable::TYPE_NATIVE_LONG && Variable::TYPE_VALUE === $value->type) {

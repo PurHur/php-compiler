@@ -36,10 +36,7 @@ final class ArrayBuiltinHelper
     public static function loadHashTable(Context $context, Variable $array): Value
     {
         if (self::isNativeArray($array->type)) {
-            $ht = HashTableHelper::materializeNativeArrayForCall($context, $array);
-            HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
-
-            return $ht;
+            return HashTableHelper::materializeNativeArrayForCall($context, $array);
         }
         if (Variable::TYPE_HASHTABLE === $array->type) {
             return $context->helper->loadValue($array);
