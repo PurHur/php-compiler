@@ -74,6 +74,14 @@ class JIT {
     private function runQueue(): void {
         while (!empty($this->queue)) {
             $run = array_shift($this->queue);
+            $classId = $this->context->scope->classId;
+            $className = $this->context->scope->className;
+            $this->context->scope = new JIT\Scope();
+            $this->context->scope->classId = $classId;
+            $this->context->scope->className = $className;
+            $this->context->scopeStack = [];
+            $this->context->inlineIncludeReturnOperands = [];
+            $this->context->coalesceAssignTargets = new \SplObjectStorage();
             $this->compileBlockInternal($run[0], $run[1], null, null, ...$run[2]);
         }
     }
