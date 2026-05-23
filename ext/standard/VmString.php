@@ -15,6 +15,9 @@ final class VmString
     /** Regex metacharacters escaped by preg_quote() (PHP 8.2 byte subset). */
     private const PREG_QUOTE_ESCAPE = '.\\+*?[^]()$={}-|!<>:';
 
+    /** Metacharacters escaped by quotemeta() (PHP 8.2 byte subset). */
+    private const QUOTEMETA_ESCAPE = '.\\+*?[]^()$';
+
     public static function byteLength(string $string): int
     {
         $len = 0;
@@ -855,6 +858,22 @@ final class VmString
         for ($i = 0; $i < $len; ++$i) {
             $ch = $string[$i];
             if (str_contains(self::PREG_QUOTE_ESCAPE, $ch) || (null !== $delim && $ch === $delim)) {
+                $out .= '\\'.$ch;
+            } else {
+                $out .= $ch;
+            }
+        }
+
+        return $out;
+    }
+
+    public static function quotemeta(string $string): string
+    {
+        $out = '';
+        $len = self::byteLength($string);
+        for ($i = 0; $i < $len; ++$i) {
+            $ch = $string[$i];
+            if (str_contains(self::QUOTEMETA_ESCAPE, $ch)) {
                 $out .= '\\'.$ch;
             } else {
                 $out .= $ch;

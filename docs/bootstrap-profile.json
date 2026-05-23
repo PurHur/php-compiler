@@ -64,6 +64,7 @@
         "ext/standard/JitPendingHeaders.php",
         "ext/standard/JitPregMatch.php",
         "ext/standard/JitPregQuote.php",
+        "ext/standard/JitQuotemeta.php",
         "ext/standard/JitRandomBytes.php",
         "ext/standard/JitReadfile.php",
         "ext/standard/JitReadlink.php",
@@ -217,6 +218,7 @@
         "ext/standard/preg_match.php",
         "ext/standard/preg_quote.php",
         "ext/standard/putenv_.php",
+        "ext/standard/quotemeta.php",
         "ext/standard/rad2deg.php",
         "ext/standard/random_bytes.php",
         "ext/standard/range.php",
@@ -322,6 +324,7 @@
         "lib/JIT/Builtin/StringJsonEncode.php",
         "lib/JIT/Builtin/StringNl2br.php",
         "lib/JIT/Builtin/StringPregQuote.php",
+        "lib/JIT/Builtin/StringQuotemeta.php",
         "lib/JIT/Builtin/StringRandomBytes.php",
         "lib/JIT/Builtin/StringReadfile.php",
         "lib/JIT/Builtin/StringUcwords.php",
@@ -452,11 +455,12 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 380,
+        "inventory_files": 383,
         "excluded": 3,
-        "eligible": 377,
+        "eligible": 380,
         "aot_lint_targets": 20,
         "aot_link_targets": 15,
         "aot_link_lib_targets": 1
     }
 }
+
