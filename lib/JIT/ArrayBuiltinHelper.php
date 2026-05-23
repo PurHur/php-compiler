@@ -2930,7 +2930,6 @@ final class ArrayBuiltinHelper
         $context->builder->positionAtEnd($strInit);
         $ptrSize = $sizeT->constInt(8, false);
         $strCountSlot = $context->builder->alloca($sizeT, 1, 'array_search_str_count');
-        $strRemainSlot = $context->builder->alloca($sizeT, 1, 'array_search_str_remain');
         $nodesSlot = $context->builder->alloca($nodePtrType->pointerType(0), 1, 'array_search_str_nodes');
         $walkSlot = $context->builder->alloca($nodePtrType, 1, 'array_search_walk');
         $head = $context->builder->load($context->builder->structGep($ht, $map['strKeys']));
@@ -2982,17 +2981,18 @@ final class ArrayBuiltinHelper
         $context->builder->store($nextFill, $walkSlot);
         $context->builder->branch($fillHead);
         $context->builder->positionAtEnd($fillDone);
-        $context->builder->store($numStrKeys, $strRemainSlot);
+        $strIdxSlot = $context->builder->alloca($sizeT, 1, 'array_search_str_idx');
+        $context->builder->store($zero, $strIdxSlot);
         $strBody = BasicBlockHelper::append($context, 'array_search_str_body');
         $strFound = BasicBlockHelper::append($context, 'array_search_str_found');
         $strNext = BasicBlockHelper::append($context, 'array_search_str_next');
         $context->builder->branch($strHead);
 
         $context->builder->positionAtEnd($strHead);
-        $remain = $context->builder->load($strRemainSlot);
-        $remainZero = $context->builder->icmp(Builder::INT_EQ, $remain, $zero);
+        $nodeIdx = $context->builder->load($strIdxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $nodeIdx, $numStrKeys);
         $strDrain = BasicBlockHelper::append($context, 'array_search_str_drain');
-        $context->builder->branchIf($remainZero, $strDrain, $strBody);
+        $context->builder->branchIf($atEnd, $strDrain, $strBody);
 
         $context->builder->positionAtEnd($strDrain);
         $nodesArray = $context->builder->load($nodesSlot);
@@ -3001,7 +3001,6 @@ final class ArrayBuiltinHelper
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($strBody);
-        $nodeIdx = $context->builder->subNoSignedWrap($remain, $one);
         $nodesArray = $context->builder->load($nodesSlot);
         $node = $context->builder->load($context->builder->inBoundsGEP($nodesArray, $nodeIdx));
         $valEntry = $context->builder->structGep($node, $nodeMap['value']);
@@ -3022,7 +3021,7 @@ final class ArrayBuiltinHelper
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($strNext);
-        $context->builder->store($nodeIdx, $strRemainSlot);
+        $context->builder->store($context->builder->addNoSignedWrap($nodeIdx, $one), $strIdxSlot);
         $context->builder->branch($strHead);
 
         $retBlock = BasicBlockHelper::append($context, 'array_search_return');
