@@ -8,6 +8,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+require_once __DIR__.'/../OpCodeNames.php';
+
+use PHPCompiler\OpCode;
+use function PHPCompiler\opcode_type_name;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -236,5 +240,107 @@ final class JitValueCompare
         $i1 = $context->getTypeFromString('int1');
 
         return $context->builder->icmp(Builder::INT_EQ, $same, $i1->constInt(0, false));
+    }
+
+    public static function orderedValueToNativeLong(
+        Context $context,
+        int $opcodeType,
+        Variable $boxed,
+        Value $nativeLong
+    ): Value {
+        if (Variable::TYPE_VALUE !== $boxed->type) {
+            throw new \LogicException('Expected boxed __value__ operand');
+        }
+        $valuePtr = Variable::KIND_VARIABLE === $boxed->kind
+            ? $boxed->value
+            : $context->helper->loadValue($boxed);
+        $leftLong = $context->builder->call(
+            $context->lookupFunction('__value__readLong'),
+            $valuePtr
+        );
+        $__right = $context->builder->intCast($nativeLong, $leftLong->typeOf());
+
+        return self::orderedLongCompare($context, $opcodeType, $leftLong, $__right);
+    }
+
+    public static function orderedNativeLongToValue(
+        Context $context,
+        int $opcodeType,
+        Value $nativeLong,
+        Variable $boxed
+    ): Value {
+        if (Variable::TYPE_VALUE !== $boxed->type) {
+            throw new \LogicException('Expected boxed __value__ operand');
+        }
+        $valuePtr = Variable::KIND_VARIABLE === $boxed->kind
+            ? $boxed->value
+            : $context->helper->loadValue($boxed);
+        $rightLong = $context->builder->call(
+            $context->lookupFunction('__value__readLong'),
+            $valuePtr
+        );
+        $__left = $context->builder->intCast($nativeLong, $rightLong->typeOf());
+
+        return self::orderedLongCompare($context, $opcodeType, $__left, $rightLong);
+    }
+
+    public static function orderedValueToValue(
+        Context $context,
+        int $opcodeType,
+        Variable $left,
+        Variable $right
+    ): Value {
+        if (Variable::TYPE_VALUE !== $left->type || Variable::TYPE_VALUE !== $right->type) {
+            throw new \LogicException('Expected two boxed __value__ operands');
+        }
+        $leftPtr = Variable::KIND_VARIABLE === $left->kind
+            ? $left->value
+            : $context->helper->loadValue($left);
+        $rightPtr = Variable::KIND_VARIABLE === $right->kind
+            ? $right->value
+            : $context->helper->loadValue($right);
+        $map = $context->structFieldMap['__value__'];
+        $i8 = $context->getTypeFromString('int8');
+        $falseVal = $context->getTypeFromString('int1')->constInt(0, false);
+        $leftType = $context->builder->load($context->builder->structGep($leftPtr, $map['type']));
+        $rightType = $context->builder->load($context->builder->structGep($rightPtr, $map['type']));
+        $longTag = $i8->constInt(Variable::TYPE_NATIVE_LONG, false);
+        $bothLong = $context->builder->and(
+            $context->builder->icmp(Builder::INT_EQ, $leftType, $longTag),
+            $context->builder->icmp(Builder::INT_EQ, $rightType, $longTag)
+        );
+        $leftLong = $context->builder->call(
+            $context->lookupFunction('__value__readLong'),
+            $leftPtr
+        );
+        $rightLong = $context->builder->call(
+            $context->lookupFunction('__value__readLong'),
+            $rightPtr
+        );
+        $ordered = self::orderedLongCompare($context, $opcodeType, $leftLong, $rightLong);
+
+        return $context->builder->select($bothLong, $ordered, $falseVal);
+    }
+
+    private static function orderedLongCompare(
+        Context $context,
+        int $opcodeType,
+        Value $leftLong,
+        Value $rightLong
+    ): Value {
+        switch ($opcodeType) {
+            case OpCode::TYPE_GREATER:
+                return $context->builder->icmp(Builder::INT_SGT, $leftLong, $rightLong);
+            case OpCode::TYPE_GREATER_OR_EQUAL:
+                return $context->builder->icmp(Builder::INT_SGE, $leftLong, $rightLong);
+            case OpCode::TYPE_SMALLER:
+                return $context->builder->icmp(Builder::INT_SLT, $leftLong, $rightLong);
+            case OpCode::TYPE_SMALLER_OR_EQUAL:
+                return $context->builder->icmp(Builder::INT_SLE, $leftLong, $rightLong);
+            default:
+                throw new \LogicException(
+                    'Ordered compare opcode not implemented for boxed long: '.opcode_type_name($opcodeType)
+                );
+        }
     }
 }

@@ -28,6 +28,24 @@ final class StringOffsetHelper
         $context->builder->store($byte, $charPtr);
     }
 
+    /**
+     * String offset read returns a length-1 {@see __string__} (PHP $s[$i] semantics).
+     */
+    public static function readAsString(Context $context, PHPLLVM\Value $charPtr): PHPLLVM\Value
+    {
+        $byte = $context->builder->load($charPtr);
+        $i8 = $context->getTypeFromString('int8');
+        $buf = BasicBlockHelper::entryAlloca($context, $i8->arrayType(1));
+        $bufChar = $context->builder->pointerCast($buf, $context->getTypeFromString('char*'));
+        $context->builder->store($byte, $bufChar);
+
+        return $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $context->getTypeFromString('int64')->constInt(1, false),
+            $bufChar
+        );
+    }
+
     private static function assignByte(Context $context, Variable $value): PHPLLVM\Value
     {
         $i8 = $context->getTypeFromString('int8');

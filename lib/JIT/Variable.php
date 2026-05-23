@@ -497,17 +497,26 @@ final class Variable {
     public function dimFetch(self $dim, ?Type $expectedType = null, bool $forWrite = false): Variable {
         switch ($this->type) {
             case self::TYPE_STRING:
-                $ptr = StringOffsetHelper::dimFetch(
+                $charPtr = StringOffsetHelper::dimFetch(
                     $this->context,
                     $this->value,
                     $dim
                 );
+                if ($forWrite) {
+                    return new Variable(
+                        $this->context,
+                        self::TYPE_STRING,
+                        self::KIND_VALUE,
+                        $charPtr,
+                    );
+                }
+                $str = StringOffsetHelper::readAsString($this->context, $charPtr);
 
                 return new Variable(
                     $this->context,
                     self::TYPE_STRING,
                     self::KIND_VALUE,
-                    $ptr,
+                    $str,
                 );
             case self::TYPE_HASHTABLE:
                 // Property slots own the hashtable; transient delref would free it (#58).
