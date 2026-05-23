@@ -144,6 +144,13 @@ class JIT {
         if (str_contains($internalName, 'opcode_type_name')) {
             return $this->compileSkippedOpcodeNameStub($internalName, $block);
         }
+        if (
+            $this->shouldUseSelfHostJitStubs()
+            && null !== $logicalName
+            && $this->isSuperglobalNameJitFunction($logicalName)
+        ) {
+            return $this->compileSuperglobalNameNative($internalName, $block, $logicalName);
+        }
         if ($this->isSkippedVmHotPathName($logicalName ?? $internalName)) {
             return $this->compileSkippedVmHotPathStub($internalName, $block, $logicalName ?? $internalName);
         }
@@ -233,6 +240,62 @@ class JIT {
     private function llvmInternalName(string $name): string
     {
         return preg_replace('/[^a-zA-Z0-9_]/', '_', $name) ?? $name;
+    }
+
+    private function isSuperglobalNameJitFunction(string $name): bool
+    {
+        $lower = strtolower($name);
+
+        return str_ends_with($lower, '::issuperglobalname') || 'issuperglobalname' === $lower;
+    }
+
+    /** Native __compiler_is_superglobal_name for self-host AOT (issue #1056). */
+    private function compileSuperglobalNameNative(
+        string $internalName,
+        Block $block,
+        string $logicalName
+    ): PHPLLVM\Value {
+        $lcname = strtolower($logicalName);
+        if (isset($this->context->functions[$lcname])) {
+            return $this->context->functions[$lcname];
+        }
+        $strPtr = $this->context->getTypeFromString('__string__*');
+        $boolTy = $this->context->getTypeFromString('bool');
+        $func = $this->context->module->addFunction(
+            $this->llvmInternalName($internalName),
+            $this->context->context->functionType($boolTy, false, $strPtr)
+        );
+        $bb = $func->appendBasicBlock('entry');
+        $saved = $this->context->builder;
+        $this->context->builder = $this->context->context->builderCreate();
+        $this->context->builder->positionAtEnd($bb);
+        $boxed = \PHPCompiler\ext\standard\JitSuperglobalName::invoke(
+            $this->context,
+            $func->getParam(0)
+        );
+        $long = $this->context->builder->call(
+            $this->context->lookupFunction('__value__readLong'),
+            $boxed
+        );
+        $this->context->builder->returnValue(
+            $this->context->builder->icmp(
+                \PHPLLVM\Builder::INT_NE,
+                $long,
+                $long->typeOf()->constInt(0, false)
+            )
+        );
+        $this->context->builder->clearInsertionPosition();
+        $this->context->builder = $saved;
+        $this->context->functions[$lcname] = $func;
+        $this->context->functionReturnType[$lcname] = 'bool';
+        $this->context->functionProxies[$lcname] = new JIT\Call\Native(
+            $func,
+            $logicalName,
+            [$strPtr],
+            $this->collectParamDefaults($block)
+        );
+
+        return $func;
     }
 
     /**
@@ -454,10 +517,13 @@ class JIT {
         return false;
     }
 
-    /** ConstStringFolder methods with safe LLVM 9 lowering during self-host AOT (#816). */
+    /**
+     * ConstStringFolder real LLVM lowering during self-host AOT (#816, #1056).
+     *
+     * Disabled until string/boxed compare ICmp verify is fixed; web-bootstrap stubs link the bundle.
+     */
     private function isConstStringFolderRealLoweringMethod(string $lower): bool
     {
-        // ConstStringFolder real lowering hits ICmp type mismatches in full self-host probe (#1097).
         return false;
     }
 
@@ -1504,9 +1570,7 @@ class JIT {
                     $branchBlock = $builder->getInsertBlock();
                     $builder->positionAtEnd($branchBlock);
                     $receiver = $this->context->getVariableFromOp($block->getOperand($op->arg2));
-                    $valuePtr = JIT\Variable::KIND_VARIABLE === $receiver->kind
-                        ? $receiver->value
-                        : $this->context->helper->loadValue($receiver);
+                    $valuePtr = JIT\JitValueBox::valuePtrFromVariable($this->context, $receiver);
                     $typeByte = $this->context->builder->load(
                         $this->context->builder->structGep(
                             $valuePtr,

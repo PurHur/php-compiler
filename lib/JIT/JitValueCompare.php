@@ -45,7 +45,11 @@ final class JitValueCompare
                     $valuePtr
                 );
                 $nativeBool = $context->helper->loadValue($native);
-                $matches = $context->builder->icmp(Builder::INT_EQ, $stored, $nativeBool);
+                $matches = $context->builder->icmp(
+                    Builder::INT_EQ,
+                    $context->builder->zExt($stored, $nativeBool->typeOf()),
+                    $nativeBool
+                );
 
                 return $context->builder->select(
                     $isNull,
@@ -266,8 +270,14 @@ final class JitValueCompare
             throw new \LogicException('Expected two boxed __value__ operands');
         }
 
-        $leftPtr = JitValueBox::valuePtrFromVariable($context, $left);
-        $rightPtr = JitValueBox::valuePtrFromVariable($context, $right);
+        $leftPtr = JitValueBox::normalizeValuePtr(
+            $context,
+            JitValueBox::valuePtrFromVariable($context, $left)
+        );
+        $rightPtr = JitValueBox::normalizeValuePtr(
+            $context,
+            JitValueBox::valuePtrFromVariable($context, $right)
+        );
         $map = $context->structFieldMap['__value__'];
         $leftType = $context->builder->load($context->builder->structGep($leftPtr, $map['type']));
         $rightType = $context->builder->load($context->builder->structGep($rightPtr, $map['type']));

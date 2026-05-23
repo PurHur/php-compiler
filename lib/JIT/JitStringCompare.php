@@ -76,20 +76,20 @@ final class JitStringCompare
             throw new \LogicException('Expected boxed __value__ operand');
         }
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $boxed);
-        $map = $context->structFieldMap['__value__'];
-        $typeByte = $context->builder->load(
-            $context->builder->structGep($valuePtr, $map['type'])
-        );
-        $stringTag = $context->getTypeFromString('int8')->constInt(Variable::TYPE_STRING & 0xff, false);
-        $isString = $context->builder->icmp(Builder::INT_EQ, $typeByte, $stringTag);
         $boxedStr = $context->builder->call(
             $context->lookupFunction('__value__readString'),
             $valuePtr
         );
+        $nullStr = $context->getTypeFromString('__string__*')->constNull();
+        $hasString = $context->builder->icmp(
+            Builder::INT_NE,
+            $boxedStr,
+            $nullStr
+        );
         $same = self::identical($context, $boxedStr, $nativeStr);
         $falseVal = $context->getTypeFromString('int1')->constInt(0, false);
 
-        return $context->builder->select($isString, $same, $falseVal);
+        return $context->builder->select($hasString, $same, $falseVal);
     }
 
     public static function identicalStringToValue(

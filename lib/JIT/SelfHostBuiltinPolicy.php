@@ -6,6 +6,9 @@ namespace PHPCompiler\JIT;
 
 final class SelfHostBuiltinPolicy
 {
+    /** Self-host / JIT: array_map() lowers null and compile-time string builtins only (#1154). */
+    public const ARRAY_MAP_CALLBACK_DEFERRED_NOTE = ArrayMapCallbackPolicy::DEFERRED_SUMMARY;
+
     /** @var array<string, string> */
     private const CATEGORY_NUMERIC = [
         'intval' => 'numeric',
@@ -71,7 +74,7 @@ final class SelfHostBuiltinPolicy
         'base64_encode' => 'string', 'base64_decode' => 'string',
         'htmlspecialchars' => 'string', 'header' => 'string', 'http_response_code' => 'string',
         'substr' => 'string', 'trim' => 'string', 'ltrim' => 'string', 'rtrim' => 'string',
-        'urlencode' => 'string', 'rawurlencode' => 'string',
+        'urlencode' => 'string', 'rawurlencode' => 'string', 'http_build_query' => 'string',
     ];
 
     /** @var array<string, string> */

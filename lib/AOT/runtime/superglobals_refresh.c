@@ -2256,6 +2256,7 @@ void __phpc_pending_header_reset(void)
 void __phpc_response_headers_flush(void)
 {
     __phpc_header_node *cur;
+    int wrote_headers = 0;
 
     if (phpc_response_headers_flushed) {
         return;
@@ -2263,17 +2264,21 @@ void __phpc_response_headers_flush(void)
     phpc_response_headers_flushed = 1;
     if (__phpc_http_response_status != 200 || __phpc_http_response_status_explicit) {
         printf("Status: %d\r\n", __phpc_http_response_status);
+        wrote_headers = 1;
     }
     cur = phpc_pending_head;
     while (cur != NULL) {
         __string__ *line = cur->line;
         if (line != NULL) {
             printf("%.*s\r\n", (int) nf_strlen(line), nf_strdata(line));
+            wrote_headers = 1;
         }
         cur = cur->next;
     }
     /* CGI/1.1: blank line between response headers and body (issue #682). */
-    printf("\r\n");
+    if (wrote_headers) {
+        printf("\r\n");
+    }
 }
 
 void __phpc_pending_header_remove(__string__ *name)

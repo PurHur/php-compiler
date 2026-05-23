@@ -52,6 +52,7 @@ final class JitCompilerSelfHostStubTest extends TestCase
         'resolvecoalesce',
         'resolveisset',
         'operandschainequal',
+        'isredundantcoalescetailassign',
     ];
 
     /** @var list<string> */
@@ -111,7 +112,7 @@ final class JitCompilerSelfHostStubTest extends TestCase
     public function testCompilerSkipPatternCount(): void
     {
         $this->assertSame(self::COMPILER_SKIP_PATTERNS, $this->compilerSkipPatternsFromJit());
-        $this->assertCount(40, self::COMPILER_SKIP_PATTERNS);
+        $this->assertCount(41, self::COMPILER_SKIP_PATTERNS);
     }
 
     /**
@@ -197,12 +198,12 @@ final class JitCompilerSelfHostStubTest extends TestCase
         }
     }
 
-    public function testIncludePathResolverResolveIsNotWebBootstrapStub(): void
+    public function testIncludePathResolverResolveIsWebBootstrapStub(): void
     {
         $prev = getenv('PHP_COMPILER_SELFHOST_AOT');
         putenv('PHP_COMPILER_SELFHOST_AOT=1');
         try {
-            $this->assertFalse(
+            $this->assertTrue(
                 $this->invokeSkipCheck(
                     'isSkippedWebBootstrapHotPathName',
                     'phpcompiler\\web\\includepathresolver::resolve'
@@ -217,12 +218,12 @@ final class JitCompilerSelfHostStubTest extends TestCase
         }
     }
 
-    public function testConstStringFolderLiteralStringValueIsNotWebBootstrapStub(): void
+    public function testConstStringFolderLiteralStringValueIsWebBootstrapStub(): void
     {
         $prev = getenv('PHP_COMPILER_SELFHOST_AOT');
         putenv('PHP_COMPILER_SELFHOST_AOT=1');
         try {
-            $this->assertFalse(
+            $this->assertTrue(
                 $this->invokeSkipCheck(
                     'isSkippedWebBootstrapHotPathName',
                     'phpcompiler\\web\\conststringfolder::literalstringvalue'
@@ -237,12 +238,12 @@ final class JitCompilerSelfHostStubTest extends TestCase
         }
     }
 
-    public function testConstStringFolderSourceDirIsNotWebBootstrapStub(): void
+    public function testConstStringFolderSourceDirIsWebBootstrapStub(): void
     {
         $prev = getenv('PHP_COMPILER_SELFHOST_AOT');
         putenv('PHP_COMPILER_SELFHOST_AOT=1');
         try {
-            $this->assertFalse(
+            $this->assertTrue(
                 $this->invokeSkipCheck(
                     'isSkippedWebBootstrapHotPathName',
                     'phpcompiler\\web\\conststringfolder::sourcedir'
@@ -327,8 +328,11 @@ final class JitCompilerSelfHostStubTest extends TestCase
         putenv('PHP_COMPILER_SELFHOST_AOT=1');
         try {
             $this->assertTrue(
-                $this->invokeSkipCheck('isSkippedConstStringFolderShortHotPathName', $sample),
-                "Expected isSkippedConstStringFolderShortHotPathName for {$sample}"
+                $this->invokeSkipCheck(
+                    'isSkippedWebBootstrapHotPathName',
+                    'phpcompiler\\web\\conststringfolder::'.$sample
+                ),
+                "Expected isSkippedWebBootstrapHotPathName for ConstStringFolder::{$sample}"
             );
         } finally {
             if (false === $prev) {

@@ -231,6 +231,12 @@ class Type extends Builtin {
         );
         $fnPregMatch = $this->context->module->addFunction('__compiler_preg_match', $fntypePregMatch);
         $this->context->registerFunction('__compiler_preg_match', $fnPregMatch);
+        $fntypeSuperglobalName = $this->context->context->functionType($i64, false, $strPtr);
+        $fnSuperglobalName = $this->context->module->addFunction(
+            '__compiler_is_superglobal_name',
+            $fntypeSuperglobalName
+        );
+        $this->context->registerFunction('__compiler_is_superglobal_name', $fnSuperglobalName);
         $fntypeFilterEmail = $this->context->context->functionType($strPtr, false, $strPtr);
         $fnFilterEmail = $this->context->module->addFunction(
             '__compiler_filter_validate_email',
@@ -337,6 +343,13 @@ class Type extends Builtin {
             $this->context->context->functionType($htPtr, false, $strPtr, $i32)
         );
         $this->context->registerFunction('__phpc_scandir', $fnScandir);
+        $valuePtr = $this->context->getTypeFromString('__value__*');
+        $i64 = $this->context->getTypeFromString('int64');
+        $fnParseUrl = $this->context->module->addFunction(
+            '__phpc_parse_url_component',
+            $this->context->context->functionType($void, false, $strPtr, $i64, $valuePtr)
+        );
+        $this->context->registerFunction('__phpc_parse_url_component', $fnParseUrl);
         $fnPendingFlush = $this->context->module->addFunction(
             '__phpc_response_headers_flush',
             $this->context->context->functionType($void, false)
@@ -352,6 +365,19 @@ class Type extends Builtin {
         $fntypeShellExec = $this->context->context->functionType($strPtr, false, $strPtr);
         $fnShellExec = $this->context->module->addFunction('__compiler_shell_exec', $fntypeShellExec);
         $this->context->registerFunction('__compiler_shell_exec', $fnShellExec);
+        $fntypeHttpBuildQuery = $this->context->context->functionType(
+            $strPtr,
+            false,
+            $this->context->getTypeFromString('__hashtable__*'),
+            $strPtr,
+            $strPtr,
+            $this->context->getTypeFromString('int64')
+        );
+        $fnHttpBuildQuery = $this->context->module->addFunction(
+            '__compiler_http_build_query',
+            $fntypeHttpBuildQuery
+        );
+        $this->context->registerFunction('__compiler_http_build_query', $fnHttpBuildQuery);
         // $this->maskedarray->register();
         // $this->nativearray->register();
     }

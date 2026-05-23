@@ -136,6 +136,42 @@ return_bool:
         $rightValue = $this->loadValue($right);
         $leftType = $this->operandJitType($left);
         $rightType = $this->operandJitType($right);
+        if (
+            OpCode::TYPE_EQUAL === $opcode->type
+            || OpCode::TYPE_IDENTICAL === $opcode->type
+            || OpCode::TYPE_NOT_EQUAL === $opcode->type
+            || OpCode::TYPE_NOT_IDENTICAL === $opcode->type
+        ) {
+            $negate = OpCode::TYPE_NOT_EQUAL === $opcode->type || OpCode::TYPE_NOT_IDENTICAL === $opcode->type;
+            if (null !== $right->compileTimeString && JitValueBox::isValueOperand($left)) {
+                $result = JitStringCompare::identicalStringToValue(
+                    $this->context,
+                    $rightValue,
+                    $left
+                );
+                if ($negate) {
+                    $result = $this->context->builder->xor(
+                        $result,
+                        $this->context->getTypeFromString('int1')->constInt(1, false)
+                    );
+                }
+                goto return_bool;
+            }
+            if (null !== $left->compileTimeString && JitValueBox::isValueOperand($right)) {
+                $result = JitStringCompare::identicalStringToValue(
+                    $this->context,
+                    $leftValue,
+                    $right
+                );
+                if ($negate) {
+                    $result = $this->context->builder->xor(
+                        $result,
+                        $this->context->getTypeFromString('int1')->constInt(1, false)
+                    );
+                }
+                goto return_bool;
+            }
+        }
 restart:
         switch (type_pair($leftType, $rightType)) {
             case TYPE_PAIR_NATIVE_LONG_NATIVE_DOUBLE:
@@ -645,7 +681,11 @@ restart:
         }
         if (Variable::TYPE_VALUE === $leftType && Variable::TYPE_STRING === $rightType) {
             if (OpCode::TYPE_IDENTICAL === $opcode->type || OpCode::TYPE_EQUAL === $opcode->type) {
-                $result = JitStringCompare::identicalStringToValue($this->context, $rightValue, $left);
+                $result = JitStringCompare::identicalStringToValue(
+                    $this->context,
+                    $rightValue,
+                    $left
+                );
                 goto return_bool;
             }
             if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type) {

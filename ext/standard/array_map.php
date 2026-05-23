@@ -24,7 +24,8 @@ use PHPLLVM\Value;
 /**
  * array_map() for list arrays with null or string builtin callbacks (subset of PHP).
  *
- * Deferred (issue #1154): closures, array callables, invokable objects — see ArrayMapCallbackPolicy.
+ * JIT/AOT: only null and compile-time string builtin names are lowered. Closures, arrow
+ * functions, and [class, method] callables are deferred — see ArrayMapCallbackPolicy (#1154).
  */
 final class array_map extends Internal
 {

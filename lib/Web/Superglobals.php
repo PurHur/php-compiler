@@ -60,6 +60,12 @@ final class Superglobals
         }
     }
 
+    /** VM implementation shared with {@see compiler_is_superglobal_name} execute(). */
+    public static function isSuperglobalNameVm(string $name): bool
+    {
+        return self::isSuperglobalName($name);
+    }
+
     /**
      * Raw request body from REQUEST_BODY / CGI stdin (issue #289, #50).
      *
@@ -178,14 +184,13 @@ final class Superglobals
         }
 
         $segment = strtolower(str_replace('_', '-', $segment));
-
         $parts = explode('-', $segment);
-        $titleParts = [];
+        $out = [];
         foreach ($parts as $part) {
-            $titleParts[] = self::headerSegmentTitleCase($part);
+            $out[] = self::headerSegmentTitleCase($part);
         }
 
-        return implode('-', $titleParts);
+        return implode('-', $out);
     }
 
     private static function headerSegmentTitleCase(string $part): string

@@ -16,6 +16,9 @@ use PHPCompiler\VM\Variable as VMVariable;
  */
 final class ArrayMapCallbackPolicy
 {
+    public const DEFERRED_SUMMARY =
+        'array_map callbacks: null or compile-time string builtins only; closures and [class, method] callables deferred';
+
     public const DEFERRED_KINDS = 'closures, array callables, and invokable objects';
 
     public const JIT_SUBSET = 'null or compile-time string stdlib builtin names';
