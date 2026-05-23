@@ -164,6 +164,19 @@ ci_run_bootstrap_selfhost_probe() {
   "$_CI_SCRIPT_DIR/bootstrap-selfhost-compile-probe.sh" "${probe_args[@]}"
 }
 
+# Wave gate: selfhost-lint → aot-lint → probe (opt-in via BOOTSTRAP_WAVE_CHECK=1).
+ci_run_bootstrap_wave_check() {
+  if [[ "${BOOTSTRAP_WAVE_CHECK:-0}" != "1" ]]; then
+    return 0
+  fi
+  if ! ci_llvm_ready; then
+    echo "bootstrap-wave-check: skipped (LLVM 9 not available)"
+    return 0
+  fi
+  echo "bootstrap-wave-check (BOOTSTRAP_WAVE_CHECK=1)..."
+  "$_CI_SCRIPT_DIR/bootstrap-wave-check.sh" --fail-fast
+}
+
 ci_should_run_jit() {
   if [[ -n "${PHP_COMPILER_FORCE_JIT_TESTS:-}" ]]; then
     echo "JIT compliance forced (PHP_COMPILER_FORCE_JIT_TESTS=1)."

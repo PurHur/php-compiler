@@ -64,6 +64,8 @@ if ci_llvm_ready; then
     echo "PHPUnit: AOT lint only (@group aot-lint)..."
     "$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit --group aot-lint "$@"
 
+    ci_run_bootstrap_wave_check
+
     echo "PHPUnit: JIT compliance (@group jit)..."
     LLVM_JUNIT="$(mktemp "${TMPDIR:-/tmp}/llvm-jit-junit.XXXXXX.xml")"
     "$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit --group jit --log-junit "$LLVM_JUNIT" "$@"
@@ -74,6 +76,8 @@ if ci_llvm_ready; then
   else
     echo "PHPUnit: AOT lint (@group aot-lint)..."
     "$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit --group aot-lint "$@"
+
+    ci_run_bootstrap_wave_check
 
     ci_run_aot_link_phpunit "$@"
   fi

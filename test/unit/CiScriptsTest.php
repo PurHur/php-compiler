@@ -167,6 +167,20 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('BOOTSTRAP_SELFHOST_PROBE_UPDATE', $common);
     }
 
+    public function testCiLocalHonorsBootstrapWaveCheckGate(): void
+    {
+        $local = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-local.sh');
+        $this->assertStringContainsString('ci_run_bootstrap_wave_check', $local);
+
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('BOOTSTRAP_WAVE_CHECK', $common);
+        $this->assertStringContainsString('bootstrap-wave-check.sh', $common);
+        $this->assertStringContainsString('--fail-fast', $common);
+
+        $fast = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-fast.sh');
+        $this->assertStringNotContainsString('ci_run_bootstrap_wave_check', $fast);
+    }
+
     public function testCiDefaultsEnvDefinesBootstrapSelfhostProbeUpdateOff(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
