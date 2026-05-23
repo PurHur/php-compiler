@@ -30,6 +30,7 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('--group jit', $body);
         $this->assertStringContainsString('ci_run_aot_link_phpunit', $body);
         $this->assertStringContainsString('ci_run_miniwebapp_aot_execute', $body);
+        $this->assertStringContainsString('ci_run_miniwebapp_serve_aot', $body);
         $this->assertStringContainsString('ci_prepare_test_runtime', $body);
         $this->assertStringContainsString('ci_run_examples_web_smoke_aot', $body);
         $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
@@ -95,6 +96,7 @@ final class CiScriptsTest extends TestCase
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
         $this->assertStringContainsString('MINIWEBAPP_AOT_LINK_GATE="${MINIWEBAPP_AOT_LINK_GATE:-1}"', $defaults);
         $this->assertStringContainsString('MINIWEBAPP_AOT_EXECUTE_GATE="${MINIWEBAPP_AOT_EXECUTE_GATE:-1}"', $defaults);
+        $this->assertStringContainsString('MINIWEBAPP_SERVE_AOT_GATE="${MINIWEBAPP_SERVE_AOT_GATE:-0}"', $defaults);
     }
 
     public function testExamplesCompileTestHonorsMiniWebAppAotLinkGate(): void
@@ -113,9 +115,13 @@ final class CiScriptsTest extends TestCase
         $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
         $this->assertStringContainsString('ci_run_aot_link_phpunit', $body);
         $this->assertStringContainsString('ci_run_miniwebapp_aot_execute', $body);
+        $this->assertStringContainsString('ci_run_miniwebapp_serve_aot', $body);
         $this->assertStringContainsString('--exclude-group miniwebapp-aot-execute', $body);
+        $this->assertStringContainsString('--exclude-group miniwebapp-aot-serve', $body);
         $this->assertStringContainsString('--group miniwebapp-aot-execute', $body);
+        $this->assertStringContainsString('--group miniwebapp-aot-serve', $body);
         $this->assertStringContainsString('MINIWEBAPP_AOT_EXECUTE_GATE:-1', $body);
+        $this->assertStringContainsString('MINIWEBAPP_SERVE_AOT_GATE:-0', $body);
     }
 
     public function testExamplesWebSmokePrebuildScriptExists(): void

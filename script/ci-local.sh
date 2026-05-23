@@ -74,6 +74,7 @@ if ci_llvm_ready; then
 
     ci_run_aot_link_phpunit "$@"
     ci_run_miniwebapp_aot_execute "$@"
+    ci_run_miniwebapp_serve_aot "$@"
   else
     echo "PHPUnit: AOT lint (@group aot-lint)..."
     ci_run_phpunit --group aot-lint "$@"
@@ -82,6 +83,7 @@ if ci_llvm_ready; then
 
     ci_run_aot_link_phpunit "$@"
     ci_run_miniwebapp_aot_execute "$@"
+    ci_run_miniwebapp_serve_aot "$@"
   fi
 
   ci_run_examples_web_smoke_aot
