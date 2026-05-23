@@ -733,6 +733,46 @@ class Context {
         }
     }
 
+    private function zendConstantVariable(string $name): ?VMVariable
+    {
+        if (!\is_string($name) || !\defined($name)) {
+            return null;
+        }
+        $value = \constant($name);
+        if (\is_int($value)) {
+            $var = new VMVariable(VMVariable::TYPE_INTEGER);
+            $var->int($value);
+
+            return $var;
+        }
+        if (\is_float($value)) {
+            $var = new VMVariable(VMVariable::TYPE_FLOAT);
+            $var->float($value);
+
+            return $var;
+        }
+        if (\is_bool($value)) {
+            $var = new VMVariable(VMVariable::TYPE_BOOLEAN);
+            $var->bool($value);
+
+            return $var;
+        }
+        if (\is_string($value)) {
+            $var = new VMVariable(VMVariable::TYPE_STRING);
+            $var->string($value);
+
+            return $var;
+        }
+        if (\is_resource($value)) {
+            // Bundled Composer autoload references STD* stream constants; fixtures never use them at runtime.
+            $var = new VMVariable(VMVariable::TYPE_NULL);
+
+            return $var;
+        }
+
+        return null;
+    }
+
     public function constantFetch(Operand $op): ?Variable {
         if ($op instanceof Operand\Literal) {
             $name = $op->value;
@@ -741,6 +781,9 @@ class Context {
         }
         if (!isset($this->constants[$name])) {
             $phpVar = $this->runtime->vmContext->constantFetch($name);
+            if (is_null($phpVar)) {
+                $phpVar = $this->zendConstantVariable($name);
+            }
             if (is_null($phpVar)) {
                 return null;
             }
@@ -775,7 +818,7 @@ class Context {
                     $this->constants[$name] = [Variable::TYPE_NATIVE_BOOL, $global];
                     break;
                 case VMVariable::TYPE_STRING:
-                    $global = $this->context->constantStringFromString($phpVar->toString());
+                    $global = $this->constantStringFromString($phpVar->toString());
                     $this->constants[$name] = [Variable::TYPE_STRING, $global];
                     break;
                 default:

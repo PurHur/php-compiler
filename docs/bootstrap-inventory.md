@@ -10,7 +10,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 |--------|------:|
 | PHP files on vm.php path | 393 |
 | Source constructs flagged (blockers) | 12 |
-| Source constructs flagged (warnings) | 1058 |
+| Source constructs flagged (warnings) | 1063 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -354,7 +354,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `lib/JIT/Call/SplObjectStorageMethod.php` | 0 | 1 |
 | `lib/JIT/Call/Vararg.php` | 0 | 2 |
 | `lib/JIT/CoalesceHelper.php` | 0 | 1 |
-| `lib/JIT/Context.php` | 0 | 20 |
+| `lib/JIT/Context.php` | 0 | 25 |
 | `lib/JIT/HashTableHelper.php` | 0 | 13 |
 | `lib/JIT/Helper.php` | 0 | 7 |
 | `lib/JIT/IncludeHelper.php` | 0 | 7 |
@@ -2203,29 +2203,29 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new Variable (line 184)
 - new JIT\Call\Vararg (line 194)
 - new JIT\Call\Native (line 197)
-- new JIT\Call\Native (line 401)
-- new JIT\Call\Native (line 432)
-- new JIT\Call\Native (line 465)
-- new ext\standard\boolval (line 716)
-- new Operand\Literal (line 790)
-- new JIT\Variable (line 812)
-- new Operand\Literal (line 874)
-- new ext\standard\intval (line 915)
-- new Variable (line 944)
-- new Variable (line 1062)
-- new OpCode (line 1129)
-- new Variable (line 1417)
-- new Variable (line 1429)
-- new Variable (line 2012)
-- new Variable (line 2332)
-- new Variable (line 2350)
-- new Operand\Literal (line 2571)
-- new Operand\Literal (line 2575)
-- new Operand\Literal (line 2579)
-- new Variable (line 2583)
-- new Variable (line 2603)
-- new Variable (line 2664)
-- 56 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new JIT\Call\Native (line 412)
+- new JIT\Call\Native (line 443)
+- new JIT\Call\Native (line 476)
+- new ext\standard\boolval (line 727)
+- new Operand\Literal (line 801)
+- new JIT\Variable (line 823)
+- new Operand\Literal (line 893)
+- new ext\standard\intval (line 934)
+- new Variable (line 963)
+- new Variable (line 1087)
+- new OpCode (line 1154)
+- new Variable (line 1442)
+- new Variable (line 1454)
+- new Variable (line 2070)
+- new Variable (line 2390)
+- new Variable (line 2415)
+- new Operand\Literal (line 2643)
+- new Operand\Literal (line 2647)
+- new Operand\Literal (line 2651)
+- new Variable (line 2655)
+- new Variable (line 2675)
+- new Variable (line 2736)
+- 57 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Analyzer.php`
 
@@ -2508,9 +2508,9 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/JIT/Call/Native.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 265)
-- new Variable (line 273)
-- new Variable (line 282)
+- new Variable (line 296)
+- new Variable (line 304)
+- new Variable (line 313)
 - 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Call/SplObjectStorageMethod.php`
@@ -2549,9 +2549,14 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new Call\SplObjectStorageMethod (line 276)
 - new Result (line 331)
 - new Variable (line 418)
-- new Variable (line 750)
-- new Variable (line 785)
-- 42 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new VMVariable (line 743)
+- new VMVariable (line 749)
+- new VMVariable (line 755)
+- new VMVariable (line 761)
+- new VMVariable (line 768)
+- new Variable (line 793)
+- new Variable (line 828)
+- 43 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/HashTableHelper.php`
 
@@ -2695,28 +2700,28 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/JIT/Variable.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 213)
-- new Variable (line 235)
-- new Variable (line 263)
-- new Variable (line 293)
-- new Variable (line 302)
-- new Variable (line 316)
-- new self (line 331)
-- new self (line 342)
-- new self (line 351)
-- new self (line 364)
-- new self (line 371)
-- new self (line 378)
-- new self (line 391)
-- new self (line 401)
-- new Variable (line 523)
-- new Variable (line 532)
-- new Variable (line 559)
-- new Variable (line 607)
-- new Variable (line 621)
-- new Variable (line 662)
-- new Variable (line 684)
-- new Variable (line 705)
+- new Variable (line 219)
+- new Variable (line 241)
+- new Variable (line 269)
+- new Variable (line 299)
+- new Variable (line 308)
+- new Variable (line 322)
+- new self (line 337)
+- new self (line 348)
+- new self (line 357)
+- new self (line 370)
+- new self (line 377)
+- new self (line 384)
+- new self (line 397)
+- new self (line 407)
+- new Variable (line 529)
+- new Variable (line 538)
+- new Variable (line 565)
+- new Variable (line 613)
+- new Variable (line 627)
+- new Variable (line 668)
+- new Variable (line 690)
+- new Variable (line 711)
 - 16 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/Lint/IncrementDetector.php`
