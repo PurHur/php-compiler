@@ -1754,12 +1754,13 @@ final class ArrayBuiltinHelper
             $i64
         );
         $keysHt = HashTableHelper::buildIntegerRange($context, $start, $end, $one);
+        $rangeEndBlock = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
         $phi = $context->builder->phi($emptyHt->typeOf());
         $phi->addIncoming($emptyHt, $emptyBlock);
-        $phi->addIncoming($keysHt, $rangeBlock);
+        $phi->addIncoming($keysHt, $rangeEndBlock);
 
         return $phi;
     }
