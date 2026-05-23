@@ -42,6 +42,35 @@ final class ExamplesCompileTest extends TestCase
     }
 
     /**
+     * 003 home route AOT execute (bundle literal __DIR__ for template includes, #764).
+     *
+     * @group miniwebapp
+     * @group llvm
+     * @group aot
+     * @group aot-link
+     */
+    public function test003MiniWebAppHomeRouteAotExecutes(): void
+    {
+        if (!self::miniWebAppAotLinkGateEnabled()) {
+            $this->markTestSkipped('MINIWEBAPP_AOT_LINK_GATE=0 — skip 003 project link gate (#754)');
+        }
+        $project = $this->miniWebAppProjectPath();
+        $binary = $this->build003MiniWebAppProject($project);
+        $publicDir = $project.'/public';
+        $repoRoot = dirname(__DIR__, 2);
+        $env = $this->llvmProcessEnv($repoRoot);
+        $env['SCRIPT_FILENAME'] = $publicDir.'/index.php';
+        $env['SCRIPT_NAME'] = '/index.php';
+        $env['DOCUMENT_ROOT'] = $publicDir;
+        $env['REQUEST_METHOD'] = 'GET';
+        $env['QUERY_STRING'] = 'route=home';
+
+        $out = $this->runAotBinary($binary, $env);
+        $this->assertNotSame('', $out, '003 AOT home route produced empty stdout (#764)');
+        $this->assertStringContainsString('MiniWebApp', $out);
+    }
+
+    /**
      * 003-MiniWebApp AOT binary CLI execute with CGI env (#747, #764).
      *
      * Opt-in via MINIWEBAPP_AOT_EXECUTE_GATE=1 until native execute is green.

@@ -108,12 +108,11 @@ final class SourceBundler
     private static function rewriteDirConstant(string $code, string $sourceFile, ?string $projectRoot = null): string
     {
         $dir = dirname(realpath($sourceFile) ?: $sourceFile);
-        if (null === $projectRoot) {
-            $replacement = var_export($dir, true);
-        } else {
-            $rel = DeployRoot::relativeDirFromProject($dir, $projectRoot);
-            $replacement = 'phpc_deploy_path('.var_export($rel, true).', '.var_export($dir, true).')';
-        }
+        // AOT bundles inline method-level includes at compile time (issue #54). Literal
+        // directories fold to literalIncludePaths; phpc_deploy_path() in bundled Router
+        // templates linked but native execute printed 0 stdout (#764, #767).
+        // Runtime PHPC_DEPLOY_ROOT stays available for explicit phpc_deploy_path() in source.
+        $replacement = var_export($dir, true);
 
         $tokens = token_get_all('<?php '.$code);
         $out = '';
@@ -198,9 +197,7 @@ final class SourceBundler
         return implode("\n", $kept);
     }
 
-    /**
-     * Keep phpc_deploy_path() . '/suffix' includes for runtime PHPC_DEPLOY_ROOT (#623).
-     */
+    /** No-op: method-level includes use literal dirs from {@see rewriteDirConstant} (#764). */
     private static function rewriteDeployPathIncludes(string $code): string
     {
         return $code;
