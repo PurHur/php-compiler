@@ -35,17 +35,16 @@ class strlen extends Internal {
         }
     }
 
-    public Context $context;
-
     public function call(Context $context, Variable ... $args): Value {
-        $this->context = $context;
         if (count($args) !== 1) {
             throw new \LogicException('Too few args passed to strlen()');
         }
         $argValue = JitStringArg::lower($context, $args[0], 'strlen() string');
-        $offset = $this->context->structFieldMap[$argValue->typeOf()->getElementType()->getName()]['length'];
+        $offset = $context->structFieldMap[$argValue->typeOf()->getElementType()->getName()]['length'];
 
-        return $this->context->builder->load($this->context->builder->structGep($argValue, $offset));
+        return $context->builder->load(
+            $context->builder->structGep($argValue, $offset)
+        );
     }
 
 }
