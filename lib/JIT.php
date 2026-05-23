@@ -1936,6 +1936,12 @@ class JIT {
             return $this->loadNullValueStruct();
         }
         if (null === $expected || Variable::TYPE_VALUE !== $return->type) {
+            if ('__string__*' === $expected && Variable::TYPE_NULL === $return->type) {
+                return $this->context->getTypeFromString('__string__*')->constNull();
+            }
+            if ('__hashtable__*' === $expected && Variable::TYPE_NULL === $return->type) {
+                return $this->context->getTypeFromString('__hashtable__*')->constNull();
+            }
             if ('__string__*' === $expected && Variable::TYPE_VALUE === $return->type) {
                 return $this->context->builder->call(
                     $this->context->lookupFunction('__value__readString'),
@@ -2834,6 +2840,40 @@ class JIT {
 
                 return;
             }
+        }
+        if ('__string__*' === $valueTy && Variable::TYPE_VALUE === $dest->type) {
+            $dest->free();
+            $isNullPtr = $this->context->builder->icmp(
+                PHPLLVM\Builder::INT_EQ,
+                $value,
+                $value->typeOf()->constNull()
+            );
+            $nullBlock = JIT\BasicBlockHelper::append($this->context, 'assign_string_null_ptr');
+            $copyBlock = JIT\BasicBlockHelper::append($this->context, 'assign_string_copy_ptr');
+            $doneBlock = JIT\BasicBlockHelper::append($this->context, 'assign_string_ptr_done');
+            $this->context->builder->branchIf($isNullPtr, $nullBlock, $copyBlock);
+            $this->context->builder->positionAtEnd($nullBlock);
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeNull'),
+                JIT\JitValueBox::pointer($this->context, $dest->value)
+            );
+            $dest->isNullConstant = true;
+            $this->context->builder->branch($doneBlock);
+            $this->context->builder->positionAtEnd($copyBlock);
+            $owned = $this->context->builder->call(
+                $this->context->lookupFunction('__string__separate'),
+                $value
+            );
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeString'),
+                JIT\JitValueBox::pointer($this->context, $dest->value),
+                $owned
+            );
+            $this->context->builder->branch($doneBlock);
+            $this->context->builder->positionAtEnd($doneBlock);
+            $dest->addref();
+
+            return;
         }
         if ('__value__*' === $valueTy && Variable::TYPE_VALUE === $dest->type) {
             $dest->free();
