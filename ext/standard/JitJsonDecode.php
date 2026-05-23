@@ -68,22 +68,24 @@ final class JitJsonDecode
 
     public static function decodeRuntime(Context $context, JITVariable $json): Value
     {
-        $literal = $json->compileTimeString ?? JitStringArg::compileTimeLiteral($json);
-        if (null !== $literal) {
-            $decoded = \json_decode($literal, true);
-            if (!\is_array($decoded) && null !== $decoded) {
-                return self::materializeScalar($context, $decoded);
-            }
-            if (null === $decoded) {
-                return self::materializeNull($context);
-            }
-
-            return self::materializeArray($context, $decoded);
-        }
-
-        throw new \LogicException(
-            'json_decode() requires a compile-time JSON string in the JIT compiler in this build'
+        return self::decodeRuntimeString(
+            $context,
+            JitStringArg::lower($context, $json, 'json_decode() json')
         );
+    }
+
+    /** @return Value __value__* */
+    public static function decodeRuntimeString(Context $context, Value $jsonString): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_json_decode'),
+            $jsonString,
+            $ptr
+        );
+
+        return $ptr;
     }
 
     private static function buildHashtableFromPhp(Context $context, array $data): Value

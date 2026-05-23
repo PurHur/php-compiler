@@ -3,6 +3,7 @@
  */
 
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 
 typedef struct __hashtable__ __hashtable__;
@@ -28,6 +29,13 @@ extern void __value__writeHashtable(__value__ *out, __hashtable__ *ht);
 
 #define PHPC_JSON_MAX_DEPTH 32
 #define PHPC_JSON_MAX_LEN (8 * 1024 * 1024)
+
+/* PHP JSON_ERROR_* subset; updated by __compiler_json_decode (issue #1173). */
+#define PHPC_JSON_ERROR_NONE 0
+#define PHPC_JSON_ERROR_DEPTH 1
+#define PHPC_JSON_ERROR_SYNTAX 4
+
+static int phpc_json_last_error = PHPC_JSON_ERROR_NONE;
 
 typedef struct {
     const char *pos;
@@ -360,6 +368,8 @@ static int phpc_json_parse_value(
     char val_buf[4096];
 
     if (ctx->depth > PHPC_JSON_MAX_DEPTH) {
+        phpc_json_last_error = PHPC_JSON_ERROR_DEPTH;
+
         return 0;
     }
     phpc_json_skip_ws(ctx);
@@ -528,23 +538,36 @@ static int phpc_json_parse_top(phpc_json_ctx *ctx, __value__ *out)
     return 0;
 }
 
+int64_t __compiler_json_last_error(void)
+{
+    return (int64_t) phpc_json_last_error;
+}
+
 void __compiler_json_decode(__string__ *json, __value__ *out)
 {
     phpc_json_ctx ctx;
     const char *body;
     size_t len;
 
+    phpc_json_last_error = PHPC_JSON_ERROR_NONE;
     __value__writeNull(out);
     if (NULL == json) {
+        phpc_json_last_error = PHPC_JSON_ERROR_SYNTAX;
+
         return;
     }
     body = phpc_string_data(json);
     len = phpc_string_len(json);
     if (0 == len || len > PHPC_JSON_MAX_LEN) {
+        phpc_json_last_error = PHPC_JSON_ERROR_SYNTAX;
+
         return;
     }
     ctx.pos = body;
     ctx.end = body + len;
     ctx.depth = 0;
-    (void) phpc_json_parse_top(&ctx, out);
+    if (!phpc_json_parse_top(&ctx, out)) {
+        phpc_json_last_error = PHPC_JSON_ERROR_SYNTAX;
+        __value__writeNull(out);
+    }
 }
