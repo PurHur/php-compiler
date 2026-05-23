@@ -40,6 +40,14 @@ final class DeploySmokeScriptTest extends TestCase
         $this->assertStringContainsString('skipped (LLVM 9 not available', $combined);
     }
 
+    public function testPhpunitRegistersMiniWebAppDeployLayoutTest(): void
+    {
+        $repoRoot = dirname(__DIR__, 2);
+        $this->assertFileIsReadable($repoRoot.'/test/aot/MiniWebAppDeployLayoutTest.php');
+        $phpunit = (string) file_get_contents($repoRoot.'/phpunit.xml.dist');
+        $this->assertStringContainsString('MiniWebAppDeployLayoutTest.php', $phpunit);
+    }
+
     public function testDeploySmokeScriptDocumentsMiniWebAppGates(): void
     {
         $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/deploy-smoke.sh');
