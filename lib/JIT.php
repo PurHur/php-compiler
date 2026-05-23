@@ -409,8 +409,15 @@ class JIT {
             || str_contains($lower, 'literalincludediscovery')
             || str_contains($lower, 'deployroot')
             || str_contains($lower, 'sourcebundler')
-            || str_contains($lower, 'conststringfolder')
+            || (str_contains($lower, '\\web\\conststringfolder::') && !$this->isConstStringFolderRealLoweringMethod($lower))
             || (str_contains($lower, '\\web\\superglobals::') && !str_ends_with($lower, '::issuperglobalname'));
+    }
+
+    /** ConstStringFolder methods with safe LLVM 9 lowering during self-host AOT (#816). */
+    private function isConstStringFolderRealLoweringMethod(string $lower): bool
+    {
+        return str_ends_with($lower, '::literalstringvalue')
+            || str_ends_with($lower, '::sourcedir');
     }
 
     private function collectStubFunctionArgTypes(Block $block): array
