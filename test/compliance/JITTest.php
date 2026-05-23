@@ -33,9 +33,11 @@ class JITTest extends BaseTest {
     public function setUp(): void {
         $this->BIN = realpath(__DIR__ . '/../../bin/jit.php');
         if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
-            $this->markTestSkipped(
-                'LLVM 9 toolchain not available. Run script/install-llvm9.sh or use the 22.04-dev Docker image.'
-            );
+            $reason = LlvmToolchain::readyFailureReason();
+            $detail = null !== $reason && '' !== $reason
+                ? $reason
+                : 'LLVM 9 toolchain not available. Run script/install-llvm9.sh or use the 22.04-dev Docker image.';
+            $this->markTestSkipped($detail);
         }
     }
 

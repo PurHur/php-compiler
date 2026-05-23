@@ -16,6 +16,7 @@ ci_prepare_test_runtime() {
   ci_guard_parallel_ci
   ci_apply_resource_limits
   ci_apply_default_memory_env
+  ci_export_llvm_env
   export PHP_COMPILER_VM_RUNNER="${PHP_COMPILER_VM_RUNNER:-${_CI_REPO_ROOT}/script/run-vm-guarded.sh}"
 }
 
@@ -82,7 +83,27 @@ ci_run_inventory_checks() {
 
 ci_llvm_dir() {
   LLVM_DIR="${PHP_COMPILER_LLVM_PATH:-$_CI_REPO_ROOT/.llvm}"
+  if [[ -f "$LLVM_DIR/libLLVM-9.so.1" ]]; then
+    LLVM_DIR="$(cd "$LLVM_DIR" && pwd)"
+  fi
   printf '%s\n' "$LLVM_DIR"
+}
+
+# Absolute LLVM paths for PHPUnit and bin/jit.php / bin/vm.php children (#98).
+ci_export_llvm_env() {
+  local llvm_dir
+  llvm_dir="$(ci_llvm_dir)"
+  if [[ ! -f "$llvm_dir/libLLVM-9.so.1" ]]; then
+    return 0
+  fi
+  export PHP_COMPILER_LLVM_PATH="$llvm_dir"
+  export LD_LIBRARY_PATH="${llvm_dir}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+  export PATH="${llvm_dir}:${PATH}"
+}
+
+ci_run_phpunit() {
+  ci_export_llvm_env
+  "$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit "$@"
 }
 
 ci_report_llvm_status() {
@@ -257,7 +278,7 @@ ci_run_deploy_smoke() {
 ci_run_aot_link_phpunit() {
   local -a aot_link_args=(--group aot-link --exclude-group serve --exclude-group miniwebapp-aot-execute)
   echo "PHPUnit: AOT link (@group aot-link)..."
-  "$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit "${aot_link_args[@]}" "$@"
+  ci_run_phpunit "${aot_link_args[@]}" "$@"
 }
 
 # 003-MiniWebApp AOT binary CLI execute (issues #747, #764, #775); opt-in MINIWEBAPP_AOT_EXECUTE_GATE=1.
@@ -270,5 +291,5 @@ ci_run_miniwebapp_aot_execute() {
     return 0
   fi
   echo "PHPUnit: MiniWebApp AOT execute (@group miniwebapp-aot-execute; MINIWEBAPP_AOT_EXECUTE_GATE=1, #747, #775)..."
-  "$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit --group miniwebapp-aot-execute "$@"
+  ci_run_phpunit --group miniwebapp-aot-execute "$@"
 }
