@@ -1,0 +1,87 @@
+    protected function compileNullsafeMethodCall(Op\Expr\NullsafeMethodCall $expr, Block $block): Block
+    {
+        $resultSlot = $this->compileOperand($expr->result, $block, false);
+        $receiverSlot = $this->compileOperand($expr->var, $block, true);
+
+        $endBlock = new Block($block->orig);
+        $endBlock->inheritUndefinedLocals = true;
+        $endBlock->inheritScopeFrom($block);
+
+        $nullBlock = new Block($block->orig);
+        $nullBlock->inheritUndefinedLocals = true;
+        $nullBlock->inheritScopeFrom($block);
+        $nullLiteral = new Operand\Literal(null);
+        $nullLiteral->type = Type::null();
+        $nullValueSlot = $this->compileOperand($nullLiteral, $nullBlock, true);
+        $nullBlock->addOpCode(new OpCode(
+            OpCode::TYPE_ASSIGN,
+            $resultSlot,
+            $resultSlot,
+            $nullValueSlot
+        ));
+        $nullJump = new OpCode(OpCode::TYPE_JUMP);
+        $nullJump->block1 = $endBlock;
+        $nullBlock->addOpCode($nullJump);
+
+        $fetchBlock = new Block($block->orig);
+        $fetchBlock->inheritUndefinedLocals = true;
+        $fetchBlock->inheritScopeFrom($block);
+        $fetchBlock->addOpCode(new OpCode(
+            OpCode::TYPE_METHODCALL_INIT,
+            $this->compileOperand($expr->var, $fetchBlock, true),
+            $this->compileOperand($expr->name, $fetchBlock, true)
+        ));
+        foreach ($expr->args as $arg) {
+            $fetchBlock->addOpCode(new OpCode(
+                OpCode::TYPE_ARG_SEND,
+                $this->compileOperand($arg, $fetchBlock, true)
+            ));
+        }
+        if (!empty($expr->result->usages)) {
+            $fetchBlock->addOpCode(new OpCode(
+                OpCode::TYPE_FUNCCALL_EXEC_RETURN,
+                $this->compileOperand($expr->result, $fetchBlock, false)
+            ));
+        } else {
+            $fetchBlock->addOpCode(new OpCode(
+                OpCode::TYPE_FUNCCALL_EXEC_NORETURN,
+            ));
+        }
+        $fetchJump = new OpCode(OpCode::TYPE_JUMP);
+        $fetchJump->block1 = $endBlock;
+        $fetchBlock->addOpCode($fetchJump);
+        $endBlock->parents[] = $nullBlock;
+        $endBlock->parents[] = $fetchBlock;
+
+        $nullsafeOp = new OpCode(
+            OpCode::TYPE_NULLSAFE,
+            $resultSlot,
+            $receiverSlot
+        );
+        $nullsafeOp->block1 = $nullBlock;
+        $nullsafeOp->block2 = $fetchBlock;
+        $nullsafeOp->block3 = $endBlock;
+        $block->addOpCode($nullsafeOp);
+
+        return $endBlock;
+    }
+
+    protected function resolveSimpleVariableName(Operand $var): string
+    {
+        while ($var instanceof Temporary) {
+            if (null === $var->original) {
+                break;
+            }
+            $var = $var->original;
+        }
+        if (!$var instanceof Operand\Variable) {
+            throw new \LogicException('Expected a simple variable operand');
+        }
+        $name = $var->name;
+        if ($name instanceof Operand\Literal && is_string($name->value)) {
+            return $name->value;
+        }
+
+        throw new \LogicException('Expected a simple variable name');
+    }
+

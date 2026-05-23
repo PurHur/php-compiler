@@ -423,6 +423,7 @@
     ],
     "aot_lint_targets": [
         "examples/000-HelloWorld/example.php",
+        "test/bootstrap-aot/assign_ref_alias.php",
         "test/bootstrap-aot/block_getframe_args_contains.php",
         "test/bootstrap-aot/block_getframe_loop.php",
         "test/bootstrap-aot/block_getframe_scope_foreach.php",
@@ -434,6 +435,7 @@
         "test/bootstrap-aot/class_nullable_property.php",
         "test/bootstrap-aot/coalesce_array_dim.php",
         "test/bootstrap-aot/const_string_folder_deploy_path.php",
+        "test/bootstrap-aot/const_string_folder_magic_dir.php",
         "test/bootstrap-aot/deploy_path_fold.php",
         "test/bootstrap-aot/deploy_path_include.php",
         "test/bootstrap-aot/dirname_concat_isfile.php",
@@ -443,6 +445,7 @@
         "test/bootstrap-aot/external_method_stub.php",
         "test/bootstrap-aot/file_exists_concat.php",
         "test/bootstrap-aot/file_get_contents_concat.php",
+        "test/bootstrap-aot/global_var_link.php",
         "test/bootstrap-aot/include_path_resolver.php",
         "test/bootstrap-aot/instanceof_check.php",
         "test/bootstrap-aot/isset_array_offset.php",
@@ -454,6 +457,7 @@
         "test/bootstrap-aot/ns_func.php",
         "test/bootstrap-aot/ns_nullable_return.php",
         "test/bootstrap-aot/nullable_types.php",
+        "test/bootstrap-aot/nullsafe_method_call.php",
         "test/bootstrap-aot/parent_construct.php",
         "test/bootstrap-aot/preg_quote_value_path.php",
         "test/bootstrap-aot/require_chain/main.php",
@@ -472,6 +476,7 @@
         "test/bootstrap-aot/class_constants.php",
         "test/bootstrap-aot/class_nullable_property.php",
         "test/bootstrap-aot/coalesce_array_dim.php",
+        "test/bootstrap-aot/const_string_folder_magic_dir.php",
         "test/bootstrap-aot/deploy_path_include.php",
         "test/bootstrap-aot/dirname_concat_isfile.php",
         "test/bootstrap-aot/dirname_value_path.php",
@@ -500,8 +505,8 @@
         "inventory_files": 392,
         "excluded": 3,
         "eligible": 389,
-        "aot_lint_targets": 39,
-        "aot_link_targets": 29,
+        "aot_lint_targets": 43,
+        "aot_link_targets": 30,
         "aot_link_lib_targets": 1
     }
 }

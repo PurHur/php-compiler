@@ -241,6 +241,9 @@ function bootstrapDefaultAotLinkTargets(array $lintTargets): array
         'test/bootstrap-aot/deploy_path_fold.php', // lint OK; DeployRoot bundle verify on link (#816)
         'test/bootstrap-aot/file_get_contents_concat.php', // lint OK; LLVM verify on link (addrspacecast)
         'test/bootstrap-aot/ns_nullable_return.php', // lint OK; nullable NsFuncCall return JIT pending
+        'test/bootstrap-aot/nullsafe_method_call.php', // lint OK; ?->method() native link pending
+        'test/bootstrap-aot/assign_ref_alias.php', // lint OK; JIT reference alias runtime pending
+        'test/bootstrap-aot/global_var_link.php', // lint OK; JIT user-global runtime pending
     ];
 
     return array_values(array_filter(
