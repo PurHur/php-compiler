@@ -24,7 +24,8 @@ if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
 fi
 
 if [[ -f vendor/bin/phpunit ]] && ci_docker_run -v "$(pwd):/compiler" -w /compiler "$IMAGE" test -f "script/${CI_SCRIPT}" 2>/dev/null; then
-  exec ci_docker_run -v "$(pwd):/compiler" -w /compiler "$IMAGE" "./script/${CI_SCRIPT}" "$@"
+  ci_docker_run -v "$(pwd):/compiler" -w /compiler "$IMAGE" "./script/${CI_SCRIPT}" "$@"
+  exit $?
 fi
 
 echo "Bind-mount has no vendor/; copying repo into container via tar..."
