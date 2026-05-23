@@ -137,6 +137,27 @@ class Context {
         $this->scope = array_pop($this->scopeStack);
     }
 
+    /**
+     * Resolve a JIT variable by PHP name across nested include scopes (#776).
+     */
+    public function variableForScopedName(string $name): ?Variable
+    {
+        foreach ($this->scope->variables as $op) {
+            if (OperandName::resolve($op) === $name) {
+                return $this->scope->variables[$op];
+            }
+        }
+        for ($i = count($this->scopeStack) - 1; $i >= 0; --$i) {
+            foreach ($this->scopeStack[$i]->variables as $op) {
+                if (OperandName::resolve($op) === $name) {
+                    return $this->scopeStack[$i]->variables[$op];
+                }
+            }
+        }
+
+        return null;
+    }
+
     public function resolveFunctionProxy(string $proxyName): Call
     {
         if (!isset($this->functionProxies[$proxyName])) {
@@ -517,6 +538,34 @@ class Context {
             }
         }
         return $this->scope->variables[$op];
+    }
+
+    public function hasVariableOpInScopes(Operand $op): bool
+    {
+        if ($this->scope->variables->contains($op)) {
+            return true;
+        }
+        foreach ($this->scopeStack as $scope) {
+            if ($scope->variables->contains($op)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public function getVariableFromOpInScopes(Operand $op): Variable
+    {
+        if ($this->scope->variables->contains($op)) {
+            return $this->scope->variables[$op];
+        }
+        foreach ($this->scopeStack as $scope) {
+            if ($scope->variables->contains($op)) {
+                return $scope->variables[$op];
+            }
+        }
+
+        return $this->getVariableFromOp($op);
     }
 
     public function makeVariableFromValueOp(
