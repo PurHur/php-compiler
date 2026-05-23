@@ -6,6 +6,10 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 FAIL_FAST=0
 WITH_COMPILE_SMOKE=0
+WITH_LIB_SPINE_SMOKE=0
+if [[ "${BOOTSTRAP_LIB_SPINE_SMOKE:-0}" == "1" ]]; then
+  WITH_LIB_SPINE_SMOKE=1
+fi
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --fail-fast)
@@ -13,6 +17,9 @@ while [[ $# -gt 0 ]]; do
       ;;
     --with-compile-smoke)
       WITH_COMPILE_SMOKE=1
+      ;;
+    --with-lib-spine-smoke)
+      WITH_LIB_SPINE_SMOKE=1
       ;;
     *)
       echo "bootstrap-wave-check: unknown argument: $1" >&2
@@ -84,6 +91,11 @@ echo "NEXT_LOWER: ${NEXT_LOWER}"
 if [[ "${WITH_COMPILE_SMOKE}" -eq 1 ]]; then
   run_step "selfhost-compile-smoke" ./script/bootstrap-selfhost-compile-smoke-link.sh
   run_step "selfhost-compile-smoke-echo" ./script/bootstrap-selfhost-compile-smoke-run.sh
+  print_summary
+fi
+
+if [[ "${WITH_LIB_SPINE_SMOKE}" -eq 1 ]]; then
+  run_step "selfhost-lib-spine-smoke" ./script/bootstrap-selfhost-lib-spine-smoke-link.sh
   print_summary
 fi
 

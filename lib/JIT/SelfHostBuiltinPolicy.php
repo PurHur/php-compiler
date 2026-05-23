@@ -7,12 +7,31 @@ namespace PHPCompiler\JIT;
 final class SelfHostBuiltinPolicy
 {
     /** @var array<string, string> */
+    private const CATEGORY_NUMERIC = [
+        'intval' => 'numeric',
+        'floatval' => 'numeric',
+        'doubleval' => 'numeric',
+        'boolval' => 'numeric',
+        'is_int' => 'numeric',
+        'is_integer' => 'numeric',
+        'is_float' => 'numeric',
+        'is_double' => 'numeric',
+        'is_bool' => 'numeric',
+        'is_string' => 'numeric',
+        'is_array' => 'numeric',
+        'is_null' => 'numeric',
+        'is_numeric' => 'numeric',
+        'time' => 'numeric',
+        'pi' => 'numeric',
+    ];
+
     private const REQUIRED_FOR_BUNDLE = self::CATEGORY_FILESYSTEM
         + self::CATEGORY_STRING
         + self::CATEGORY_ARRAY
         + self::CATEGORY_HASH
         + self::CATEGORY_PREG
-        + self::CATEGORY_JSON;
+        + self::CATEGORY_JSON
+        + self::CATEGORY_NUMERIC;
 
     /** @var array<string, string> */
     private const VM_ONLY_DEFERRED = [

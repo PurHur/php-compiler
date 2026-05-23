@@ -95,6 +95,14 @@ final class JitCompilerSelfHostStubTest extends TestCase
         '\\compiler::compile',
     ];
 
+    /** @var list<string> */
+    private const LIB_SPINE_SMOKE_STUBBED_SAMPLES = [
+        'PHPCompiler\\Doctor::run',
+        'PHPCompiler\\Cli\\InvokeCwd::baseDir',
+        'PHPCompiler\\Web\\CgiDriver::serve',
+        'PHPCompiler\\ext\\standard\\JitAddslashes::escape',
+    ];
+
     public function testCompilerSkipPatternCount(): void
     {
         $this->assertSame(self::COMPILER_SKIP_PATTERNS, $this->compilerSkipPatternsFromJit());
@@ -302,6 +310,35 @@ final class JitCompilerSelfHostStubTest extends TestCase
             } else {
                 putenv('PHP_COMPILER_SELFHOST_AOT='.$prev);
             }
+        }
+    }
+
+    /**
+     * @dataProvider libSpineSmokeStubSampleProvider
+     */
+    public function testIsSkippedLibSpineSmokeHotPathNameMatches(string $sample): void
+    {
+        $prev = getenv('PHP_COMPILER_SELFHOST_AOT');
+        putenv('PHP_COMPILER_SELFHOST_AOT=1');
+        try {
+            $this->assertTrue(
+                $this->invokeSkipCheck('isSkippedLibSpineSmokeHotPathName', $sample),
+                "Expected isSkippedLibSpineSmokeHotPathName for {$sample}"
+            );
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_SELFHOST_AOT');
+            } else {
+                putenv('PHP_COMPILER_SELFHOST_AOT='.$prev);
+            }
+        }
+    }
+
+    /** @return iterable<string, array{0: string}> */
+    public static function libSpineSmokeStubSampleProvider(): iterable
+    {
+        foreach (self::LIB_SPINE_SMOKE_STUBBED_SAMPLES as $sample) {
+            yield $sample => [$sample];
         }
     }
 

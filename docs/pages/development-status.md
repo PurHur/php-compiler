@@ -174,7 +174,7 @@ Zend PHP still runs `bin/compile.php` during bootstrap. The output is a **curate
 |-----------|---------|--------|
 | **M0 — Bundled subset runs** | ~109 literal `require_once` units in `test/selfhost/compiler_minimal/main.php` → `build/selfhost` prints `compiler_minimal bundle OK` | ✅ [#557](https://github.com/PurHur/php-compiler/issues/557), [#913](https://github.com/PurHur/php-compiler/issues/913) |
 | **M1 — Compiler-shaped bundle** | Bundled `Compiler.php` AOT lint; compile-smoke native link + AOT echo (`compiler smoke`); driver smoke toward `bin/compile.php` | 🚧 [#1025](https://github.com/PurHur/php-compiler/issues/1025) |
-| **M2 — Full top-level `lib/`** | All 14 top-level `lib/*.php` in one honest bundle; bundle grows toward `bin/vm.php` spine | 🚧 lint ✅; link/run open |
+| **M2 — Full top-level `lib/`** | All 14 top-level `lib/*.php` in one honest bundle; bundle grows toward `bin/vm.php` spine | 🚧 **132** units in `compiler_lib_spine_smoke` lint ✅; native link open ([#1056](https://github.com/PurHur/php-compiler/issues/1056)) |
 | **M3 — Native compiles PHP** | Self-hosted binary compiles + runs `examples/000-HelloWorld` **without Zend** | ⬜ |
 | **M4 — Bootstrap loop** | Native toolchain rebuilds the **next** compiler sources (same tree, new revision) | ⬜ |
 | **M5 — Full self-host** | Real `bin/vm.php` / `bin/compile.php` path on full inventory; **no Zend bootstrap** | ⬜ **north star** ([#1056](https://github.com/PurHur/php-compiler/issues/1056)) |
@@ -184,6 +184,7 @@ Zend PHP still runs `bin/compile.php` during bootstrap. The output is a **curate
 | Set | ~Files | Notes |
 |-----|--------|-------|
 | `compiler_minimal` bundle today | **109** | Literal `require_once` closure |
+| `compiler_lib_spine_smoke` (M2 growth) | **132** | +24 vm.php-path lib/ + ext/standard JIT leaf units |
 | `bin/vm.php` inventory target | **413** | Full compiler spine |
 | Top-level `lib/*.php` | **14** | Per-file AOT lint ✅ |
 
@@ -207,6 +208,8 @@ Zend PHP still runs `bin/compile.php` during bootstrap. The output is a **curate
 | Native link + run | `./script/bootstrap-selfhost-link.sh` | ✅ M0 |
 | Compile smoke link | `make bootstrap-selfhost-compile-smoke` | ✅ M1 |
 | Compile smoke AOT echo | `make bootstrap-selfhost-compile-smoke-run` | ✅ M1 partial |
+| M2 lib spine smoke lint | `php bin/compile.php -l test/selfhost/compiler_lib_spine_smoke/main.php` | ✅ **132** units |
+| M2 lib spine smoke link | `make bootstrap-selfhost-lib-spine-smoke` | ✅ opt-in `BOOTSTRAP_LIB_SPINE_SMOKE=1` |
 | Wave gate | `./script/bootstrap-wave-check.sh` | ✅ CI / GHA |
 | Next includes probe | `php script/bootstrap-selfhost-next-includes.php` | 🚧 bundle growth |
 
