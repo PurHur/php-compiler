@@ -23,7 +23,7 @@ class Helper {
 
     public function unaryOp(OpCode $opcode, Variable $var): Variable {
         $varValue = $this->loadValue($var);
-        switch ($var->type) {
+        switch ($this->operandJitType($var)) {
             case Variable::TYPE_NATIVE_LONG:
                 switch ($opcode->type) {
                     case OpCode::TYPE_UNARY_MINUS:
@@ -78,8 +78,8 @@ return_bool:
     public function binaryOp(OpCode $opcode, Variable $left, Variable $right): Variable {
         $leftValue = $this->loadValue($left);
         $rightValue = $this->loadValue($right);
-        $leftType = $left->type;
-        $rightType = $right->type;
+        $leftType = $this->operandJitType($left);
+        $rightType = $this->operandJitType($right);
 restart:
         switch (type_pair($leftType, $rightType)) {
             case TYPE_PAIR_NATIVE_LONG_NATIVE_DOUBLE:
@@ -444,12 +444,6 @@ return_bool:
                     $this->context->getTypeFromString('__hashtable__*')
                 );
             }
-            if (Variable::TYPE_OBJECT === $variable->objectPropertyType) {
-                return $this->context->builder->pointerCast(
-                    $loaded,
-                    $this->context->getTypeFromString('__object__*')
-                );
-            }
             if (Variable::TYPE_STRING === $variable->objectPropertyType) {
                 return $this->context->builder->pointerCast(
                     $loaded,
@@ -466,6 +460,22 @@ return_bool:
             return $variable->value;
         }
         return $this->context->builder->load($variable->value);
+    }
+
+    private function operandJitType(Variable $var): int
+    {
+        if (null !== $var->objectPropertySlot && null !== $var->objectPropertyType) {
+            if (Variable::TYPE_HASHTABLE === $var->objectPropertyType) {
+                return Variable::TYPE_HASHTABLE;
+            }
+            if (Variable::TYPE_STRING === $var->objectPropertyType) {
+                return Variable::TYPE_STRING;
+            }
+
+            return Variable::TYPE_VALUE;
+        }
+
+        return $var->type;
     }
 
 }

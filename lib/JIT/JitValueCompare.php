@@ -22,13 +22,11 @@ final class JitValueCompare
         Variable $boxed,
         Variable $native
     ): Value {
-        if (Variable::TYPE_VALUE !== $boxed->type) {
+        if (!JitValueBox::isValueOperand($boxed)) {
             throw new \LogicException('Expected boxed __value__ operand');
         }
 
-        $valuePtr = Variable::KIND_VARIABLE === $boxed->kind
-            ? $boxed->value
-            : $context->helper->loadValue($boxed);
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $boxed);
         $map = $context->structFieldMap['__value__'];
         $typeByte = $context->builder->load(
             $context->builder->structGep($valuePtr, $map['type'])
@@ -109,13 +107,11 @@ final class JitValueCompare
         Variable $boxed,
         Value $nativeLong
     ): Value {
-        if (Variable::TYPE_VALUE !== $boxed->type) {
+        if (!JitValueBox::isValueOperand($boxed)) {
             throw new \LogicException('Expected boxed __value__ operand');
         }
 
-        $valuePtr = Variable::KIND_VARIABLE === $boxed->kind
-            ? $boxed->value
-            : $context->helper->loadValue($boxed);
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $boxed);
         $map = $context->structFieldMap['__value__'];
         $typeByte = $context->builder->load(
             $context->builder->structGep($valuePtr, $map['type'])
@@ -166,16 +162,12 @@ final class JitValueCompare
         Variable $left,
         Variable $right
     ): Value {
-        if (Variable::TYPE_VALUE !== $left->type || Variable::TYPE_VALUE !== $right->type) {
+        if (!JitValueBox::isValueOperand($left) || !JitValueBox::isValueOperand($right)) {
             throw new \LogicException('Expected two boxed __value__ operands');
         }
 
-        $leftPtr = Variable::KIND_VARIABLE === $left->kind
-            ? $left->value
-            : $context->helper->loadValue($left);
-        $rightPtr = Variable::KIND_VARIABLE === $right->kind
-            ? $right->value
-            : $context->helper->loadValue($right);
+        $leftPtr = JitValueBox::valuePtrFromVariable($context, $left);
+        $rightPtr = JitValueBox::valuePtrFromVariable($context, $right);
         $map = $context->structFieldMap['__value__'];
         $leftType = $context->builder->load($context->builder->structGep($leftPtr, $map['type']));
         $rightType = $context->builder->load($context->builder->structGep($rightPtr, $map['type']));
@@ -308,12 +300,10 @@ final class JitValueCompare
         Variable $boxed,
         Value $nativeLong
     ): Value {
-        if (Variable::TYPE_VALUE !== $boxed->type) {
+        if (!JitValueBox::isValueOperand($boxed)) {
             throw new \LogicException('Expected boxed __value__ operand');
         }
-        $valuePtr = Variable::KIND_VARIABLE === $boxed->kind
-            ? $boxed->value
-            : $context->helper->loadValue($boxed);
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $boxed);
         $leftLong = $context->builder->call(
             $context->lookupFunction('__value__readLong'),
             $valuePtr
@@ -329,12 +319,10 @@ final class JitValueCompare
         Value $nativeLong,
         Variable $boxed
     ): Value {
-        if (Variable::TYPE_VALUE !== $boxed->type) {
+        if (!JitValueBox::isValueOperand($boxed)) {
             throw new \LogicException('Expected boxed __value__ operand');
         }
-        $valuePtr = Variable::KIND_VARIABLE === $boxed->kind
-            ? $boxed->value
-            : $context->helper->loadValue($boxed);
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $boxed);
         $rightLong = $context->builder->call(
             $context->lookupFunction('__value__readLong'),
             $valuePtr
