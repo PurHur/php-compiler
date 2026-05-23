@@ -341,6 +341,7 @@
         "lib/JIT/Call.php",
         "lib/JIT/Call/ExternalMethod.php",
         "lib/JIT/Call/Native.php",
+        "lib/JIT/Call/SplObjectStorageMethod.php",
         "lib/JIT/Call/Vararg.php",
         "lib/JIT/CoalesceHelper.php",
         "lib/JIT/Context.php",
@@ -414,6 +415,9 @@
     ],
     "aot_lint_targets": [
         "examples/000-HelloWorld/example.php",
+        "test/bootstrap-aot/block_getframe_args_contains.php",
+        "test/bootstrap-aot/block_getframe_loop.php",
+        "test/bootstrap-aot/block_getframe_scope_foreach.php",
         "test/bootstrap-aot/cast_int.php",
         "test/bootstrap-aot/class_const_fetch.php",
         "test/bootstrap-aot/class_constants.php",
@@ -436,6 +440,9 @@
     ],
     "aot_link_targets": [
         "examples/000-HelloWorld/example.php",
+        "test/bootstrap-aot/block_getframe_args_contains.php",
+        "test/bootstrap-aot/block_getframe_loop.php",
+        "test/bootstrap-aot/block_getframe_scope_foreach.php",
         "test/bootstrap-aot/cast_int.php",
         "test/bootstrap-aot/class_const_fetch.php",
         "test/bootstrap-aot/class_constants.php",
@@ -455,12 +462,11 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 383,
+        "inventory_files": 384,
         "excluded": 3,
-        "eligible": 380,
-        "aot_lint_targets": 20,
-        "aot_link_targets": 15,
+        "eligible": 381,
+        "aot_lint_targets": 23,
+        "aot_link_targets": 18,
         "aot_link_lib_targets": 1
     }
 }
-

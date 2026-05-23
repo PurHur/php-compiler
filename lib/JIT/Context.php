@@ -235,6 +235,8 @@ class Context {
 
         $this->functionProxies['is_null'] = new Builtin\IsNullFn();
         $this->functionProxies['phpcompiler\\is_null'] = new Builtin\IsNullFn();
+        $this->functionProxies['splobjectstorage::contains'] = new Call\SplObjectStorageMethod('contains');
+        $this->functionProxies['splobjectstorage::count'] = new Call\SplObjectStorageMethod('count');
     }
 
     public function compileToFile(string $file) {

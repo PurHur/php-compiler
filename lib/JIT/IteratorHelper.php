@@ -22,6 +22,14 @@ final class IteratorHelper
         if (Variable::TYPE_HASHTABLE === $array->type) {
             return $array;
         }
+        if ($array->type & Variable::IS_NATIVE_ARRAY) {
+            return new Variable(
+                $context,
+                Variable::TYPE_HASHTABLE,
+                Variable::KIND_VALUE,
+                HashTableHelper::materializeNativeArrayForCall($context, $array)
+            );
+        }
         if (Variable::TYPE_VALUE === $array->type) {
             $valPtr = Variable::KIND_VARIABLE === $array->kind
                 ? JitValueBox::pointer($context, $array->value)
@@ -60,6 +68,24 @@ final class IteratorHelper
                 );
             }
 
+            if (Variable::KIND_VALUE === $array->kind || Variable::KIND_VARIABLE === $array->kind) {
+                // Variadic packs (e.g. OpCode ...$ops) are lowered as __hashtable__* but typed as object.
+                $ptr = Variable::KIND_VALUE === $array->kind
+                    ? $array->value
+                    : $context->builder->load($array->value);
+                $htPtr = $context->builder->pointerCast(
+                    $ptr,
+                    $context->getTypeFromString('__hashtable__*')
+                );
+
+                return new Variable(
+                    $context,
+                    Variable::TYPE_HASHTABLE,
+                    Variable::KIND_VALUE,
+                    $htPtr
+                );
+            }
+
             throw new \LogicException(
                 'foreach over objects is only supported for SplObjectStorage in this compiler build'
             );
@@ -76,18 +102,8 @@ final class IteratorHelper
             return $context->foreachIndexSlots[$key];
         }
         $sizeT = $context->getTypeFromString('size_t');
-        $saved = $context->builder->getInsertBlock();
-        if (null !== $context->main) {
-            $blocks = $context->main->getBasicBlocks();
-            if ([] !== $blocks) {
-                $context->builder->positionAtEnd($blocks[0]);
-            }
-        }
-        $slot = $context->builder->alloca($sizeT, 1, 'foreach_idx');
+        $slot = BasicBlockHelper::entryAlloca($context, $sizeT);
         $context->foreachIndexSlots[$key] = $slot;
-        if (null !== $saved) {
-            $context->builder->positionAtEnd($saved);
-        }
 
         return $slot;
     }
@@ -99,18 +115,8 @@ final class IteratorHelper
             return $context->foreachObjNodeSlots[$key];
         }
         $nodePtrType = $context->getTypeFromString('__objkey_node__*');
-        $saved = $context->builder->getInsertBlock();
-        if (null !== $context->main) {
-            $blocks = $context->main->getBasicBlocks();
-            if ([] !== $blocks) {
-                $context->builder->positionAtEnd($blocks[0]);
-            }
-        }
-        $slot = $context->builder->alloca($nodePtrType, 1, 'foreach_obj_walk');
+        $slot = BasicBlockHelper::entryAlloca($context, $nodePtrType);
         $context->foreachObjNodeSlots[$key] = $slot;
-        if (null !== $saved) {
-            $context->builder->positionAtEnd($saved);
-        }
 
         return $slot;
     }

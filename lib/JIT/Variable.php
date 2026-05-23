@@ -347,6 +347,13 @@ final class Variable {
                             self::KIND_VALUE,
                             $this->context->builder->zEdt($this->value, $this->context->getTypeFromString('long long'))
                         );
+                    case self::TYPE_VALUE:
+                        return new self(
+                            $this->context,
+                            $type,
+                            self::KIND_VALUE,
+                            (new \PHPCompiler\ext\standard\boolval())->call($this->context, $this)
+                        );
                 }
                 break;
             case self::TYPE_NATIVE_DOUBLE:
