@@ -149,6 +149,34 @@ int __compiler_fclose(int64_t handle)
     return fclose(fp) == 0 ? 1 : 0;
 }
 
+int64_t __compiler_fpassthru(int64_t handle)
+{
+    FILE *fp;
+    char buf[8192];
+    size_t got;
+    int64_t total = 0;
+
+    fp = phpc_resolve_stream(handle);
+    if (NULL == fp) {
+        return -1;
+    }
+    while (1) {
+        got = fread(buf, 1, sizeof(buf), fp);
+        if (0 == got) {
+            if (ferror(fp)) {
+                return -1;
+            }
+            break;
+        }
+        if (fwrite(buf, 1, got, stdout) != got) {
+            return -1;
+        }
+        total += (int64_t) got;
+    }
+
+    return total;
+}
+
 int __compiler_feof(int64_t handle)
 {
     FILE *fp = phpc_resolve_stream(handle);
