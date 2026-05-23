@@ -56,7 +56,8 @@ final class Progress
     private static function progressFilePath(): ?string
     {
         static $resolved = false;
-        static ?string $path = null;
+        /** @var string|null */
+        static $path = null;
         if ($resolved) {
             return $path;
         }
