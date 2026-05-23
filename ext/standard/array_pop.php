@@ -53,6 +53,11 @@ final class array_pop extends Internal
             throw new \LogicException('array_pop() requires exactly one argument');
         }
 
+        foreach ($args as $i => $arg) {
+            if (JITVariable::TYPE_STRING === $arg->type || JITVariable::TYPE_VALUE === $arg->type) {
+                $this->jitString($context, $arg, 'array_pop() argument #'.((int) $i + 1));
+            }
+        }
         return ArrayBuiltinHelper::popLast($context, $args[0]);
     }
 }

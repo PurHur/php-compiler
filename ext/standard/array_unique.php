@@ -72,6 +72,11 @@ final class array_unique extends Internal
             throw new \LogicException('array_unique() requires exactly one argument');
         }
 
+        foreach ($args as $i => $arg) {
+            if (JITVariable::TYPE_STRING === $arg->type || JITVariable::TYPE_VALUE === $arg->type) {
+                $this->jitString($context, $arg, 'array_unique() argument #'.((int) $i + 1));
+            }
+        }
         return ArrayBuiltinHelper::arrayUnique($context, $args[0]);
     }
 }

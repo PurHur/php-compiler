@@ -14,6 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
@@ -87,13 +88,13 @@ final class range extends Internal
             throw new \LogicException('range() start and end must be integers in this compiler build');
         }
         $i64 = $context->getTypeFromString('int64');
-        $start = $context->helper->loadValue($args[0]);
-        $end = $context->helper->loadValue($args[1]);
+        $start = JitLongArg::lower($context, $args[0], 'range() start');
+        $end = JitLongArg::lower($context, $args[1], 'range() end');
         if (3 === \count($args)) {
             if (JITVariable::TYPE_NATIVE_LONG !== $args[2]->type) {
                 throw new \LogicException('range() step must be an integer in this compiler build');
             }
-            $step = $context->helper->loadValue($args[2]);
+            $step = JitLongArg::lower($context, $args[2], 'range() step');
         } else {
             $cmp = $context->builder->icmp(Builder::INT_SGT, $start, $end);
             $one = $i64->constInt(1, false);

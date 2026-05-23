@@ -83,6 +83,11 @@ final class sort_ extends Internal
         }
         ArrayBuiltinHelper::sortPacked($context, $args[0]);
 
+        foreach ($args as $i => $arg) {
+            if (JITVariable::TYPE_STRING === $arg->type || JITVariable::TYPE_VALUE === $arg->type) {
+                $this->jitString($context, $arg, 'sort() argument #'.((int) $i + 1));
+            }
+        }
         return $context->getTypeFromString('int1')->constInt(1, false);
     }
 }

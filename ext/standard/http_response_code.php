@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\Web\ResponseContext;
@@ -61,6 +62,10 @@ final class http_response_code extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        if (1 === \count($args)) {
+            JitLongArg::lower($context, $args[0], 'http_response_code() code');
+        }
+
         return JitHttpResponseCode::invoke($context, ...$args);
     }
 }

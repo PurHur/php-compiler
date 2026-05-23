@@ -38,6 +38,11 @@ final class fopen extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        if (2 !== \count($args)) {
+            throw new \LogicException('fopen() requires exactly two arguments in this compiler build');
+        }
+        $this->jitString($context, $args[0], 'fopen() path');
+        $this->jitString($context, $args[1], 'fopen() mode');
         throw new \LogicException('fopen() is not implemented for JIT in this compiler build');
     }
 }

@@ -52,6 +52,11 @@ final class array_count extends Internal
         if (1 !== count($args)) {
             throw new \LogicException('count() requires exactly one argument');
         }
+        foreach ($args as $i => $arg) {
+            if (JITVariable::TYPE_STRING === $arg->type || JITVariable::TYPE_VALUE === $arg->type) {
+                $this->jitString($context, $arg, 'array_count() argument #'.((int) $i + 1));
+            }
+        }
         if ($args[0]->type & JITVariable::IS_NATIVE_ARRAY) {
             return $context->constantFromInteger($args[0]->nextFreeElement, 'int64');
         }

@@ -42,6 +42,9 @@ final class defined_ extends Internal
         if (1 !== count($args)) {
             throw new \LogicException('defined() requires exactly one argument');
         }
+        if (JITVariable::TYPE_STRING === $args[0]->type || JITVariable::TYPE_VALUE === $args[0]->type) {
+            $this->jitString($context, $args[0], 'defined() constant name');
+        }
         if (JITVariable::TYPE_STRING !== $args[0]->type || null === $args[0]->compileTimeString) {
             throw new \LogicException('defined() constant name must be a string literal in this compiler build');
         }

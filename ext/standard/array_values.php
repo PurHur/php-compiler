@@ -47,6 +47,11 @@ final class array_values extends Internal
             throw new \LogicException('array_values() requires exactly one argument');
         }
 
+        foreach ($args as $i => $arg) {
+            if (JITVariable::TYPE_STRING === $arg->type || JITVariable::TYPE_VALUE === $arg->type) {
+                $this->jitString($context, $arg, 'array_values() argument #'.((int) $i + 1));
+            }
+        }
         return ArrayBuiltinHelper::buildValuesArray($context, $args[0]);
     }
 }

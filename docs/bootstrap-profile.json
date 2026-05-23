@@ -438,6 +438,7 @@
         "examples/000-HelloWorld/example.php",
         "test/bootstrap-aot/array_value_box.php",
         "test/bootstrap-aot/assign_ref_alias.php",
+        "test/bootstrap-aot/bitwise_not.php",
         "test/bootstrap-aot/block_getframe_args_contains.php",
         "test/bootstrap-aot/block_getframe_loop.php",
         "test/bootstrap-aot/block_getframe_scope_foreach.php",
@@ -480,6 +481,8 @@
         "test/bootstrap-aot/shell_exec_echo.php",
         "test/bootstrap-aot/shift_right.php",
         "test/bootstrap-aot/spl_object_storage_dim.php",
+        "test/bootstrap-aot/stdlib_array_ops.php",
+        "test/bootstrap-aot/stdlib_filesystem.php",
         "test/bootstrap-aot/stdlib_hash.php",
         "test/bootstrap-aot/stdlib_json.php",
         "test/bootstrap-aot/stdlib_numeric.php",
@@ -497,6 +500,7 @@
     "aot_link_targets": [
         "examples/000-HelloWorld/example.php",
         "test/bootstrap-aot/array_value_box.php",
+        "test/bootstrap-aot/bitwise_not.php",
         "test/bootstrap-aot/block_getframe_args_contains.php",
         "test/bootstrap-aot/block_getframe_loop.php",
         "test/bootstrap-aot/block_getframe_scope_foreach.php",
@@ -527,6 +531,8 @@
         "test/bootstrap-aot/require_chain/main.php",
         "test/bootstrap-aot/shell_exec_echo.php",
         "test/bootstrap-aot/shift_right.php",
+        "test/bootstrap-aot/stdlib_array_ops.php",
+        "test/bootstrap-aot/stdlib_filesystem.php",
         "test/bootstrap-aot/stdlib_hash.php",
         "test/bootstrap-aot/stdlib_json.php",
         "test/bootstrap-aot/stdlib_numeric.php",
@@ -548,8 +554,8 @@
         "inventory_files": 409,
         "excluded": 0,
         "eligible": 409,
-        "aot_lint_targets": 58,
-        "aot_link_targets": 45,
+        "aot_lint_targets": 61,
+        "aot_link_targets": 48,
         "aot_link_lib_targets": 1
     }
 }

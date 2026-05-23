@@ -56,6 +56,7 @@ final class header_remove extends Internal
         if (0 === $argc) {
             JitPendingHeaders::remove($context);
         } else {
+            $this->jitString($context, $args[0], 'header_remove() name');
             JitPendingHeaders::remove($context, $args[0]);
         }
 

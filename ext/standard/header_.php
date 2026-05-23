@@ -15,6 +15,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\HttpResponseCode;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\Web\ResponseContext;
@@ -78,7 +79,7 @@ final class header_ extends Internal
         if (JITVariable::TYPE_STRING !== $args[0]->type) {
             throw new \LogicException('header() only supports string header lines in this compiler build');
         }
-        $line = $context->helper->loadValue($args[0]);
+        $line = $this->jitString($context, $args[0], 'header() line');
         if ($argc >= 2 && JITVariable::TYPE_NATIVE_BOOL !== $args[1]->type) {
             throw new \LogicException('header() replace argument must be a boolean in this compiler build');
         }
@@ -86,7 +87,7 @@ final class header_ extends Internal
             if (JITVariable::TYPE_NATIVE_LONG !== $args[2]->type) {
                 throw new \LogicException('header() response_code must be an integer in this compiler build');
             }
-            HttpResponseCode::emitStandaloneStatusLine($context, $context->helper->loadValue($args[2]));
+            HttpResponseCode::emitStandaloneStatusLine($context, JitLongArg::lower($context, $args[2], 'header() response_code'));
         }
         $i32 = $context->getTypeFromString('int32');
         $replaceI32 = $i32->constInt(1, false);
@@ -94,7 +95,7 @@ final class header_ extends Internal
             if (JITVariable::TYPE_NATIVE_BOOL !== $args[1]->type) {
                 throw new \LogicException('header() replace argument must be a boolean in this compiler build');
             }
-            $replaceI32 = $context->builder->zExt($context->helper->loadValue($args[1]), $i32);
+            $replaceI32 = $context->builder->zExt($this->jitBool($context, $args[1], 'header() replace'), $i32);
         }
         JitPendingHeaders::add($context, $line, $replaceI32);
 

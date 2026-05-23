@@ -74,6 +74,11 @@ final class array_sum extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('array_sum() requires exactly one argument');
         }
+        foreach ($args as $i => $arg) {
+            if (JITVariable::TYPE_STRING === $arg->type || JITVariable::TYPE_VALUE === $arg->type) {
+                $this->jitString($context, $arg, 'array_sum() argument #'.((int) $i + 1));
+            }
+        }
         if ($args[0]->type & JITVariable::IS_NATIVE_ARRAY) {
             return ArrayBuiltinHelper::arraySum($context, $args[0]);
         }

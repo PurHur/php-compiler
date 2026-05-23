@@ -28,6 +28,10 @@ final class doubleval extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        if (1 === \count($args) && (JITVariable::TYPE_STRING === $args[0]->type || JITVariable::TYPE_VALUE === $args[0]->type)) {
+            $this->jitString($context, $args[0], 'doubleval() argument #1');
+        }
+
         return $this->delegate->call($context, ...$args);
     }
 }

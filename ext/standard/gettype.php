@@ -59,7 +59,10 @@ final class gettype extends Internal
             || JITVariable::TYPE_HASHTABLE === $args[0]->type) {
             $label = 'array';
         } else {
-            switch ($args[0]->type) {
+            if (JITVariable::TYPE_STRING === $args[0]->type) {
+            $this->jitString($context, $args[0], 'gettype() argument #1');
+        }
+        switch ($args[0]->type) {
                 case JITVariable::TYPE_NATIVE_LONG:
                     $label = 'integer';
                     break;

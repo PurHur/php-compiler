@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\Web\ResponseContext;
@@ -57,16 +58,25 @@ final class setcookie extends Internal
         if (JITVariable::TYPE_STRING !== $args[0]->type) {
             throw new \LogicException('setcookie() name must be a string in this compiler build');
         }
-        $namePtr = $context->helper->loadValue($args[0]);
-        $valuePtr = self::jitStringArg($context, $args, 1, '');
+        $namePtr = $this->jitString($context, $args[0], 'setcookie() name');
+        $valuePtr = $context->builder->load($context->constantStringFromString(''));
+        if ($argc >= 2) {
+            if (JITVariable::TYPE_STRING !== $args[1]->type) {
+                throw new \LogicException('setcookie() value must be a string in this compiler build');
+            }
+            $valuePtr = $this->jitString($context, $args[1], 'setcookie() value');
+        }
         $pathPtr = null;
         if ($argc >= 4 && JITVariable::TYPE_STRING === $args[3]->type) {
-            $pathPtr = $context->helper->loadValue($args[3]);
+            $pathPtr = $this->jitString($context, $args[3], 'setcookie() path');
         } elseif ($argc >= 4) {
             throw new \LogicException('setcookie() path must be a string in this compiler build');
         }
-        if ($argc >= 3 && JITVariable::TYPE_NATIVE_LONG !== $args[2]->type) {
-            throw new \LogicException('setcookie() expires must be an integer in this compiler build');
+        if ($argc >= 3) {
+            JitLongArg::lower($context, $args[2], 'setcookie() expires');
+            if (JITVariable::TYPE_NATIVE_LONG !== $args[2]->type) {
+                throw new \LogicException('setcookie() expires must be an integer in this compiler build');
+            }
         }
         if ($argc >= 5) {
             throw new \LogicException(
@@ -153,18 +163,4 @@ final class setcookie extends Internal
         ];
     }
 
-    /**
-     * @param JITVariable[] $args
-     */
-    private static function jitStringArg(Context $context, array $args, int $index, string $default): Value
-    {
-        if (!isset($args[$index])) {
-            return $context->builder->load($context->constantStringFromString($default));
-        }
-        if (JITVariable::TYPE_STRING !== $args[$index]->type) {
-            throw new \LogicException('setcookie() value must be a string in this compiler build');
-        }
-
-        return $context->helper->loadValue($args[$index]);
-    }
 }
