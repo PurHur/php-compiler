@@ -355,7 +355,7 @@ class Context {
             case '__value__*':
                 $ptr = $value;
                 if ('__value__' === $this->getStringFromType($type)) {
-                    $slot = $this->builder->alloca($type, 1, 'bool_cast_value');
+                    $slot = BasicBlockHelper::entryAlloca($this, $type);
                     $this->builder->store($value, $slot);
                     $ptr = $slot;
                 }

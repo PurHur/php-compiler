@@ -222,7 +222,7 @@ final class Variable {
             $context,
             $type,
             self::KIND_VARIABLE,
-            $context->builder->alloca($context->getTypeFromString($stringType))
+            BasicBlockHelper::entryAlloca($context, $context->getTypeFromString($stringType))
         );
     }
 

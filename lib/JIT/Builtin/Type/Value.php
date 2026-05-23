@@ -907,7 +907,7 @@ class Value extends Type {
                     $__switch->end->remove();
                 }
     $type = $this->context->getTypeFromString('__value__');
-                    $var = $this->context->builder->alloca($type);
+                    $var = \PHPCompiler\JIT\BasicBlockHelper::entryAlloca($this->context, $type);
     $__type = $this->context->getTypeFromString('int64');
                         
                     

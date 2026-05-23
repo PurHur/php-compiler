@@ -1156,10 +1156,9 @@ class JIT {
         }
         $valuePtr = Variable::KIND_VARIABLE === $return->kind
             ? JIT\JitValueBox::pointer($this->context, $return->value)
-            : $this->context->builder->alloca(
-                $this->context->getTypeFromString('__value__'),
-                1,
-                'return_value_box'
+            : JIT\BasicBlockHelper::entryAlloca(
+                $this->context,
+                $this->context->getTypeFromString('__value__')
             );
         if (Variable::KIND_VALUE === $return->kind) {
             $this->context->builder->store($retval, $valuePtr);

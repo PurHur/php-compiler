@@ -118,7 +118,7 @@ final class IncludeHelper
                     $context,
                     Variable::TYPE_STRING,
                     Variable::KIND_VARIABLE,
-                    $context->builder->alloca($context->getTypeFromString('__string__*'))
+                    BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__string__*'))
                 );
                 $calleeVar->initialize();
                 $context->setVariableOp($operand, $calleeVar);
