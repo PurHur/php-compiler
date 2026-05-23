@@ -14,6 +14,7 @@ namespace PHPCompiler\JIT\Call;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Call;
+use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\Variable;
 
 use PHPLLVM\Value;
@@ -65,8 +66,13 @@ class Native implements Call {
                 }
                 break;
             case '__hashtable__*':
+                if (0 !== ($arg->type & Variable::IS_NATIVE_ARRAY)) {
+                    return HashTableHelper::materializeNativeArrayForCall($context, $arg);
+                }
                 switch ($arg->type) {
                     case Variable::TYPE_HASHTABLE:
+                        $context->refcount->addref($value);
+
                         return $value;
                     case Variable::TYPE_VALUE:
                         return $context->builder->call(
