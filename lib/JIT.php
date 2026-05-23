@@ -2350,6 +2350,16 @@ class JIT {
 
                         return;
                     }
+                    if (null !== $result->writableHt && null !== $result->writableStringKey) {
+                        $this->context->builder->call(
+                            $this->context->lookupFunction('__hashtable__setStringKeyLong'),
+                            $result->writableHt,
+                            $result->writableStringKey,
+                            $valueFrom
+                        );
+
+                        return;
+                    }
                     if (null !== $result->writableHt && null !== $result->writableIndex) {
                         JIT\HashTableHelper::setAtIndex(
                             $this->context,
@@ -2378,6 +2388,16 @@ class JIT {
     
                     return;
                 case Variable::TYPE_NATIVE_BOOL:
+                    if (null !== $result->writableHt && null !== $result->writableStringKey) {
+                        $this->context->builder->call(
+                            $this->context->lookupFunction('__hashtable__setStringKeyBool'),
+                            $result->writableHt,
+                            $result->writableStringKey,
+                            $this->context->helper->loadValue($value)
+                        );
+
+                        return;
+                    }
                     JIT\JitValueBox::writeBool(
                         $this->context,
                         $valueRef,

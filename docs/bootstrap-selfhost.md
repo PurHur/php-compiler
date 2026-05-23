@@ -91,7 +91,9 @@ Add scripts under `test/bootstrap-aot/*.php` — picked up automatically by `scr
 - `cast_int.php` — `(int)` cast on string/float literals (`TYPE_CAST_INT`); Phase C link ✅ ([#868](https://github.com/PurHur/php-compiler/issues/868))
 - `cast_string.php` — `(string)` cast on superglobal/scalar (`TYPE_CAST_STRING`); VM + JIT/AOT; MiniWebApp `index.php` dispatch
 - `isset_array_offset.php` — `isset($a['k'])` + `var_export()` on hashtable string keys; Phase C link ✅ ([#868](https://github.com/PurHur/php-compiler/issues/868))
-- `nested_array_dim.php` — chained `$a['outer']['inner']` on nested array values; Phase C link ([#827](https://github.com/PurHur/php-compiler/issues/827))
+- `nested_array_dim.php` — chained `$a['outer']['inner']` on nested array values; Phase C link ✅ ([#827](https://github.com/PurHur/php-compiler/issues/827), [#1072](https://github.com/PurHur/php-compiler/issues/1072))
+- `nested_array_dim_mixed.php` — nested string-key fetch for long/string/bool leaves; Phase C link ([#1072](https://github.com/PurHur/php-compiler/issues/1072))
+- `nested_array_dim_write.php` — chained `$a['outer']['inner'] = …` assignment; Phase C link ([#1072](https://github.com/PurHur/php-compiler/issues/1072))
 - `lib_opcode/main.php` — `require_once lib/OpCode.php`; Phase D link ✅ ([#540](https://github.com/PurHur/php-compiler/issues/540))
 
 Per-file `php bin/compile.php -l lib/*.php` passes for all 14 top-level units after class-const and throw lowering ([#520](https://github.com/PurHur/php-compiler/issues/520), [#529](https://github.com/PurHur/php-compiler/issues/529)). **Bundled** minimal compiler closure: `test/selfhost/compiler_minimal/main.php` (gate: `./script/bootstrap-selfhost-lint.sh`). **Compile smoke** entry bundles the same spine plus `test/bootstrap-aot/compiler_smoke.php`: `test/selfhost/compiler_compile_smoke/main.php` (`php bin/compile.php -l`). **Compile smoke** entry bundles the same spine plus `test/bootstrap-aot/compiler_smoke.php`: `test/selfhost/compiler_compile_smoke/main.php` (`php bin/compile.php -l`).
