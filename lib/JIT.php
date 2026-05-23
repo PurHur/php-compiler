@@ -19,6 +19,7 @@ use PHPCfg\Op;
 use PHPTypes\Type;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\IssetHelper;
+use PHPCompiler\JIT\SelfHostBuiltinPolicy;
 use PHPCompiler\JIT\Variable;
 
 use PHPCompiler\Func as CoreFunc;
@@ -298,6 +299,8 @@ class JIT {
             || str_contains($lower, '\\vm\\variable::')
             || str_contains($lower, '\\printer::')
             || str_contains($lower, '\\jit\\operandname::')
+            || str_contains($lower, '\\jit\\result::')
+            || str_contains($lower, '\\func\\jit::')
             || str_contains($lower, '\\jit::')
             || str_contains($lower, '\\jit\\context::');
     }

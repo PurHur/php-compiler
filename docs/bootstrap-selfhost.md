@@ -26,6 +26,22 @@ docker run --rm -v "$(pwd):/compiler" -w /compiler php-compiler:22.04-dev bash -
 
 Self-host native link requires `PHP_COMPILER_SELFHOST_AOT=1` (set by `./script/bootstrap-selfhost-link.sh` and `make bootstrap-selfhost-probe`). `PHP_COMPILER_JIT_PROGRESS_FILE` is optional progress logging for segfault triage only — it does not enable JIT stubs.
 
+## Self-host stdlib builtin policy
+
+`lib/JIT/SelfHostBuiltinPolicy.php` centralizes stdlib `Internal` real lowering vs `ExternalMethod` null stubs when `PHP_COMPILER_SELFHOST_AOT=1`.
+
+| Category | Real lowering (`isRequiredForBundle`) | Self-host AOT default |
+|----------|---------------------------------------|------------------------|
+| filesystem | `dirname`, `basename`, `file_exists`, `is_file`, `is_dir`, `is_readable`, `is_writable`, `file_get_contents`, `realpath` | required |
+| string | `strtolower`, `strtoupper`, `strcmp`, `strncmp`, `strcasecmp`, `strncasecmp`, `strlen`, `count`/`sizeof` | required |
+| hash | `hash`, `hash_hmac` | required |
+| preg | `preg_match`, `preg_quote` | required |
+| json | `json_encode` (minimal) | required |
+| echo/print | opcode lowering in `lib/JIT.php` | n/a |
+| other stdlib | — | `ExternalMethod` stub when not required |
+
+Audit: `php script/audit-stdlib-jit.php`. Auto-stub batch: **30** builtins.
+
 ## Blockers to compile `lib/Compiler.php` (priority order)
 
 1. **Namespaces** ([#84](https://github.com/PurHur/php-compiler/issues/84)) — every `lib/` unit uses `namespace PHPCompiler;` (per-file and bundled minimal subset `-l` pass; native link/run pending)
