@@ -21,7 +21,6 @@ final class JitCompilerSelfHostStubTest extends TestCase
         'compileclassbody',
         'compilefunction',
         'compileglobalconst',
-        'compileoperand',
         'compilestmt',
         'compileop',
         'compileswitchasjumpifchain',
@@ -30,7 +29,7 @@ final class JitCompilerSelfHostStubTest extends TestCase
         'compileissetmulti',
         'compileisset',
         'compilecoalesce',
-        'compilenullsafepropertyfetch',
+        'compilenullsafe',
         'compileincludeop',
         'compileparam',
         'compileterminal',
@@ -43,6 +42,8 @@ final class JitCompilerSelfHostStubTest extends TestCase
         'compileinstanceof',
         'trycompiledefineasglobalconst',
         'markcallerlocalsusedbyliteralinclude',
+        'requireoperandslot',
+        'resolvesimplevariablename',
         'unwrap',
         'needscfg',
         'inheritfuncfromparent',
@@ -69,7 +70,7 @@ final class JitCompilerSelfHostStubTest extends TestCase
     public function testCompilerSkipPatternCount(): void
     {
         $this->assertSame(self::COMPILER_SKIP_PATTERNS, $this->compilerSkipPatternsFromJit());
-        $this->assertCount(38, self::COMPILER_SKIP_PATTERNS);
+        $this->assertCount(39, self::COMPILER_SKIP_PATTERNS);
     }
 
     /**

@@ -301,10 +301,16 @@ class JIT {
         return str_contains($lower, '\\vm\\')
             || str_contains($lower, '\\vm\\variable::')
             || str_contains($lower, '\\printer::')
-            || str_contains($lower, '\\jit\\operandname::')
+            || str_contains($lower, '\\opcode::')
+            || str_contains($lower, '\\methodvisibility::')
+            || str_contains($lower, '\\nullsafelivenessdetector::')
+            || str_contains($lower, '\\moduleabstract::')
+            || str_contains($lower, '\\opcodenames::')
+            || str_contains($lower, '\\lint\\')
+            || str_contains($lower, '\\jit\\')
             || str_contains($lower, '\\func\\jit::')
-            || str_contains($lower, '\\jit::')
-            || str_contains($lower, '\\jit\\context::');
+            || str_contains($lower, '\\func\\internal::')
+            || str_contains($lower, '\\jit::');
     }
 
     /** Skip JIT\\Result FFI bodies (getCallable/getFunc) during self-host native link (#816). */
@@ -348,7 +354,7 @@ class JIT {
             || str_contains($lower, 'compileissetmulti')
             || str_contains($lower, 'compileisset')
             || str_contains($lower, 'compilecoalesce')
-            || str_contains($lower, 'compilenullsafepropertyfetch')
+            || str_contains($lower, 'compilenullsafe')
             || str_contains($lower, 'compileincludeop')
             || str_contains($lower, 'compileparam')
             || str_contains($lower, 'compileterminal')
@@ -361,6 +367,8 @@ class JIT {
             || str_contains($lower, 'compileinstanceof')
             || str_contains($lower, 'trycompiledefineasglobalconst')
             || str_contains($lower, 'markcallerlocalsusedbyliteralinclude')
+            || str_contains($lower, 'requireoperandslot')
+            || str_contains($lower, 'resolvesimplevariablename')
             || str_contains($lower, 'unwrap')
             || str_contains($lower, 'needscfg')
             || str_contains($lower, 'inheritfuncfromparent')
@@ -400,7 +408,9 @@ class JIT {
         return str_contains($lower, 'includepathresolver')
             || str_contains($lower, 'literalincludediscovery')
             || str_contains($lower, 'deployroot')
-            || str_contains($lower, 'sourcebundler');
+            || str_contains($lower, 'sourcebundler')
+            || str_contains($lower, 'conststringfolder')
+            || str_contains($lower, 'superglobals');
     }
 
     private function collectStubFunctionArgTypes(Block $block): array
