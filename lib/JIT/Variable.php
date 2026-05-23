@@ -474,6 +474,8 @@ final class Variable {
                     $ptr,
                 );
             case self::TYPE_HASHTABLE:
+                // Property slots own the hashtable; transient delref would free it (#58).
+                $propertyBacked = null !== $this->objectPropertySlot;
                 if (
                     !$forWrite
                     && null !== $this->superglobalName
@@ -527,7 +529,9 @@ final class Variable {
                 if (self::TYPE_STRING === $dim->type) {
                     $key = $this->context->helper->loadValue($dim);
                     if ($forWrite && (null === $expectedType || Type::TYPE_ARRAY !== $expectedType->type)) {
-                        $this->context->refcount->addref($ht);
+                        if (!$propertyBacked) {
+                            $this->context->refcount->addref($ht);
+                        }
 
                         return HashTableHelper::writableStringKeyValueBox($this->context, $ht, $key);
                     }
@@ -559,13 +563,17 @@ final class Variable {
                         );
                     }
                     if (null !== $expectedType && Type::TYPE_STRING === $expectedType->type) {
-                        $this->context->refcount->addref($ht);
+                        if (!$propertyBacked) {
+                            $this->context->refcount->addref($ht);
+                        }
                         $boxed = HashTableHelper::readStringKeyToValueBox($this->context, $ht, $key);
 
                         return $boxed;
                     }
 
-                    $this->context->refcount->addref($ht);
+                    if (!$propertyBacked) {
+                        $this->context->refcount->addref($ht);
+                    }
                     $boxed = HashTableHelper::readStringKeyToValueBox($this->context, $ht, $key);
 
                     return $boxed;
@@ -575,7 +583,9 @@ final class Variable {
                     $this->context->getTypeFromString('size_t')
                 );
                 if (null !== $expectedType && Type::TYPE_STRING === $expectedType->type) {
-                    $this->context->refcount->addref($ht);
+                    if (!$propertyBacked) {
+                        $this->context->refcount->addref($ht);
+                    }
                     $str = $this->context->builder->call(
                         $this->context->lookupFunction('__hashtable__readStringAt'),
                         $ht,
@@ -585,7 +595,7 @@ final class Variable {
                         $this->context->lookupFunction('__string__separate'),
                         $str
                     );
-                    if (null === $this->superglobalName) {
+                    if (!$propertyBacked && null === $this->superglobalName) {
                         $this->context->refcount->delref($ht);
                     }
 
