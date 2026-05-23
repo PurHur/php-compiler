@@ -32,6 +32,24 @@ $queue = [
     $root.'/lib/Runtime.php',
     $root.'/lib/VM.php',
 ];
+try {
+    foreach (PHPCompiler\Web\LiteralIncludeDiscovery::discoverAbsolutePaths($runtime, $bundleEntry) as $include) {
+        $queue[] = $include;
+    }
+} catch (\Throwable $e) {
+    fwrite(STDERR, "bundle discovery: {$e->getMessage()}\n");
+}
+// vm.php execution spine (no literal require_once in bin/vm.php)
+foreach (
+    [
+        'lib/Web/Superglobals.php',
+        'lib/JIT.php',
+        'lib/JIT/Context.php',
+        'lib/NullSafeLivenessDetector.php',
+    ] as $rel
+) {
+    $queue[] = $root.'/'.$rel;
+}
 while ([] !== $queue) {
     $file = array_shift($queue);
     $file = realpath($file) ?: $file;
@@ -42,7 +60,13 @@ while ([] !== $queue) {
     if (str_starts_with($file, $root.'/lib/')) {
         $ordered[] = substr($file, strlen($root) + 1);
     }
-    foreach (PHPCompiler\Web\LiteralIncludeDiscovery::discoverDirectAbsolutePaths($runtime, $file) as $include) {
+    try {
+        $includes = PHPCompiler\Web\LiteralIncludeDiscovery::discoverDirectAbsolutePaths($runtime, $file);
+    } catch (\Throwable $e) {
+        fwrite(STDERR, "skip parse {$file}: {$e->getMessage()}\n");
+        $includes = [];
+    }
+    foreach ($includes as $include) {
         if (!isset($seen[$include])) {
             $queue[] = $include;
         }

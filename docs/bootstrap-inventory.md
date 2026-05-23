@@ -10,7 +10,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 |--------|------:|
 | PHP files on vm.php path | 393 |
 | Source constructs flagged (blockers) | 12 |
-| Source constructs flagged (warnings) | 1059 |
+| Source constructs flagged (warnings) | 1058 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -414,7 +414,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `lib/Web/ProjectManifest.php` | 0 | 1 |
 | `lib/Web/ResponseContext.php` | 0 | 2 |
 | `lib/Web/SourceBundler.php` | 0 | 1 |
-| `lib/Web/Superglobals.php` | 0 | 6 |
+| `lib/Web/Superglobals.php` | 0 | 5 |
 | `src/macro_functions.php` | 0 | 1 |
 
 ## Per-file construct flags
@@ -3018,12 +3018,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/Web/Superglobals.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 801)
-- new Variable (line 802)
-- new Variable (line 821)
-- new Variable (line 896)
-- 41 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
-- 1 closure(s)
+- new HashTable (line 806)
+- new Variable (line 807)
+- new Variable (line 826)
+- new Variable (line 901)
+- 42 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `src/macro_functions.php`
 
