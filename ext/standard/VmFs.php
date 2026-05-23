@@ -322,6 +322,28 @@ final class VmFs
     }
 
     /**
+     * @param list<string> $fields
+     */
+    public static function fputcsv(
+        int $handle,
+        array $fields,
+        string $separator = ',',
+        string $enclosure = '"',
+        string $escape = '\\',
+    ): int|false {
+        $fp = self::lookup($handle);
+        if (null === $fp) {
+            return false;
+        }
+        $written = @\fputcsv($fp, $fields, $separator, $enclosure, $escape);
+        if (false === $written) {
+            return false;
+        }
+
+        return (int) $written;
+    }
+
+    /**
      * @return list<string>|false
      */
     public static function fgetcsv(
