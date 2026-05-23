@@ -237,6 +237,8 @@ function bootstrapDefaultAotLinkTargets(array $lintTargets): array
         'test/bootstrap-aot/external_cfg_block_children.php', // lint OK; LLVM verify on link
         'test/bootstrap-aot/block_orig_children_foreach.php', // lint OK; LLVM verify on link (#848)
         'test/bootstrap-aot/isset_object_typed_property.php', // lint OK; LLVM verify on link (#764)
+        'test/bootstrap-aot/const_string_folder_deploy_path.php', // lint OK; vendor autoload inline on link (#816)
+        'test/bootstrap-aot/deploy_path_fold.php', // lint OK; DeployRoot bundle verify on link (#816)
     ];
 
     return array_values(array_filter(

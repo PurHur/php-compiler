@@ -72,6 +72,10 @@ for rel in "${targets[@]}"; do
     continue
   fi
   expected="$("$PHP_BIN" "${PHP_OPTS[@]}" "$source" 2>/dev/null || true)"
+  polyfill="${ROOT}/test/bootstrap-aot/support/deploy_path_polyfill.php"
+  if [[ -f "$polyfill" && "$rel" == test/bootstrap-aot/deploy_path_include.php ]]; then
+    expected="$("$PHP_BIN" "${PHP_OPTS[@]}" -d "auto_prepend_file=${polyfill}" "$source" 2>/dev/null || true)"
+  fi
   actual="$("$binary" 2>/dev/null || true)"
   if [[ "$expected" != "$actual" ]]; then
     failures+=("${rel}: output mismatch

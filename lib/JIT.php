@@ -307,6 +307,9 @@ class JIT {
 
         $thisParamOffset = 0;
         if ([] !== $args) {
+            if ($this->blockUsesThis($block)) {
+                $thisParamOffset = 1;
+            }
             foreach ($block->orig->hoistedOperands as $hoisted) {
                 if ('this' === JIT\OperandName::resolve($hoisted)) {
                     if (!$this->context->hasVariableOp($hoisted)) {
@@ -1005,7 +1008,13 @@ class JIT {
                         $this->context->freeDeadVariables($func, $returnBlock, $block);
                     }
                     if (0 === $this->context->inlineIncludeDepth) {
-                        $this->context->builder->returnVoid();
+                        if ($this->isVoidLlvmFunction($func)) {
+                            $this->context->builder->returnVoid();
+                        } else {
+                            $this->context->builder->returnValue(
+                                $this->defaultLlvmReturnValue($func)
+                            );
+                        }
                     } else {
                         $this->context->inlineIncludeExitBlock = $returnBlock;
                     }
@@ -1032,12 +1041,15 @@ class JIT {
                     if ($this->shouldFreeDeadVariablesBeforeBranch()) {
                         $this->context->freeDeadVariables($func, $returnBlock, $block);
                     }
-                    if ($this->isVoidCfgFunction($block)) {
+                    if ($this->isVoidLlvmFunction($func)) {
                         $this->context->builder->returnVoid();
                     } else {
                         $return->addref();
                         $retval = $this->context->helper->loadValue($return);
                         $expected = $this->cfgFunctionReturnCallbackType($block->func);
+                        if (null === $expected && null !== $this->context->activeFunction) {
+                            $expected = $this->context->functionReturnType[strtolower($this->context->activeFunction)] ?? null;
+                        }
                         $retval = $this->coerceReturnValue($return, $retval, $expected);
                         $this->context->builder->returnValue($retval);
                     }
@@ -1206,7 +1218,7 @@ class JIT {
         $tail = $builder->getInsertBlock();
         if (
             0 === $this->context->inlineIncludeDepth
-            && $this->isVoidCfgFunction($block)
+            && $this->isVoidLlvmFunction($func)
             && !$block->syntheticCfgBranch
             && null !== $block->func
             && null !== $tail
@@ -1274,6 +1286,40 @@ class JIT {
     private function isVoidCfgFunction(Block $block): bool
     {
         return 'void' === $this->cfgFunctionReturnCallbackType($block->func);
+    }
+
+    private function isVoidLlvmFunction(PHPLLVM\Value $func): bool
+    {
+        $fnType = $func->typeOf();
+        if (!$fnType instanceof \PHPLLVM\Type\Function_) {
+            return false;
+        }
+
+        return \PHPLLVM\Type::KIND_VOID === $fnType->getReturnType()->getKind();
+    }
+
+    private function defaultLlvmReturnValue(PHPLLVM\Value $func): PHPLLVM\Value
+    {
+        $fnType = $func->typeOf();
+        if (!$fnType instanceof \PHPLLVM\Type\Function_) {
+            return $this->context->constantFromInteger(0);
+        }
+        $returnType = $fnType->getReturnType();
+        switch ($this->context->getStringFromType($returnType)) {
+            case 'long long':
+            case 'int64':
+                return $this->context->constantFromInteger(0);
+            case 'bool':
+            case 'int1':
+                return $returnType->constInt(0, false);
+            case '__string__*':
+                return $returnType->constNull();
+            case '__object__*':
+            case '__hashtable__*':
+                return $returnType->constNull();
+            default:
+                return $this->context->constantFromInteger(0);
+        }
     }
 
     private function assignOperandsUsedByLiteralInclude(Block $block, OpCode $op): bool

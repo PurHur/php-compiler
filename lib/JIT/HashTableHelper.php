@@ -697,6 +697,25 @@ final class HashTableHelper
                     $context->helper->loadValue($element)
                 );
                 break;
+            case Variable::TYPE_VALUE:
+                $valuePtr = Variable::KIND_VARIABLE === $element->kind
+                    ? JitValueBox::pointer($context, $element->value)
+                    : $element->value;
+                $str = $context->builder->call(
+                    $context->lookupFunction('__value__readString'),
+                    $valuePtr
+                );
+                $owned = $context->builder->call(
+                    $context->lookupFunction('__string__separate'),
+                    $str
+                );
+                $context->builder->call(
+                    $context->lookupFunction('__hashtable__setStringKeyString'),
+                    $ht,
+                    $keyPtr,
+                    $owned
+                );
+                break;
             default:
                 throw new \LogicException(
                     'String-key array element type not supported for JIT: '
