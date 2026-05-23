@@ -17,18 +17,16 @@ $config = require __DIR__ . '/../config.php';
 require __DIR__ . '/../src/Router.php';
 
 $route = 'home';
-if (isset($_SERVER['PATH_INFO'])) {
-    $pathInfo = $_SERVER['PATH_INFO'];
-    if ('' !== $pathInfo) {
-        if (0 === strpos($pathInfo, '/')) {
-            $pathInfo = substr($pathInfo, 1);
-        }
-        if ('' !== $pathInfo) {
-            $route = $pathInfo;
-        }
+$pathInfo = $_SERVER['PATH_INFO'] ?? '';
+if ('' !== $pathInfo) {
+    if (0 === strpos($pathInfo, '/')) {
+        $pathInfo = substr($pathInfo, 1);
     }
-} elseif (isset($_GET['route'])) {
-    $queryRoute = $_GET['route'];
+    if ('' !== $pathInfo) {
+        $route = $pathInfo;
+    }
+} else {
+    $queryRoute = $_GET['route'] ?? '';
     if ('' !== $queryRoute) {
         $route = $queryRoute;
     }

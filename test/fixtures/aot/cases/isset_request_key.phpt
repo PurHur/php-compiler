@@ -1,7 +1,7 @@
 --TEST--
-AOT: isset($_REQUEST['name']) with QUERY_STRING (issue #764)
+AOT: isset($_REQUEST['name']) with QUERY_STRING (MiniWebApp hello, #767, #764)
 --ENV--
-QUERY_STRING=name=Dev
+QUERY_STRING=route=hello&name=Dev
 --FILE--
 <?php
 declare(strict_types=1);

@@ -100,10 +100,7 @@ class Router
     private function renderHello(): void
     {
         $appName = $this->resolveAppName();
-        $guestName = 'World';
-        if (isset($_REQUEST['name'])) {
-            $guestName = $_REQUEST['name'];
-        }
+        $guestName = $_REQUEST['name'] ?? 'World';
         $title = 'Hello';
         include __DIR__ . '/../templates/layout.php';
     }
