@@ -1245,6 +1245,31 @@ final class VmString
         return $out;
     }
 
+    /**
+     * strtr() two-string form — byte translation table (subset of PHP).
+     */
+    public static function strtr(string $string, string $from, string $to): string
+    {
+        if ('' === $from) {
+            return $string;
+        }
+        $pairLen = min(self::byteLength($from), self::byteLength($to));
+        $table = [];
+        for ($i = 0; $i < 256; ++$i) {
+            $table[$i] = \chr($i);
+        }
+        for ($i = 0; $i < $pairLen; ++$i) {
+            $table[\ord($from[$i])] = $to[$i];
+        }
+        $len = self::byteLength($string);
+        $out = '';
+        for ($i = 0; $i < $len; ++$i) {
+            $out .= $table[\ord($string[$i])];
+        }
+
+        return $out;
+    }
+
     public static function nl2br(string $string, bool $useXhtml = true): string
     {
         $br = $useXhtml ? '<br />' : '<br>';
