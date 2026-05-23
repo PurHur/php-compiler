@@ -17,7 +17,8 @@ Ordered smallest → largest for **#764** triage (issues **#880**, **#879**). Sa
 | 9 | `coalesce_scriptbase_htmlspecialchars` | #764 / #866 |
 | 10 | `coalesce_then_nested_include` | #784 |
 | 11 | `layout_title_branch` | #784 |
-| 12 | `method_include_void_array_property` | #846 |
+| 12 | `layout_partial_chain` | #807 |
+| 13 | `method_include_void_array_property` | #846 |
 
 Run (LLVM 9 required):
 

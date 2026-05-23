@@ -33,6 +33,7 @@ final class MiniWebAppBisectAotTest extends AotTest
         'coalesce_scriptbase_htmlspecialchars',
         'coalesce_then_nested_include',
         'layout_title_branch',
+        'layout_partial_chain',
         'method_include_void_array_property',
     ];
 

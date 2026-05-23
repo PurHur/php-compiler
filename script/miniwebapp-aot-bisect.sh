@@ -31,6 +31,7 @@ readonly -a BISECT_STEPS=(
   'coalesce_scriptbase_htmlspecialchars|coalesce_scriptbase_htmlspecialchars|764'
   'coalesce_then_nested_include|coalesce_then_nested_include|784'
   'layout_title_branch|layout_title_branch|784'
+  'layout_partial_chain|layout_partial_chain|807'
   'method_include_void_array_property|method_include_void_array_property|846'
 )
 
