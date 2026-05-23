@@ -26,6 +26,8 @@
     "eligible_files": [
         "bin/vm.php",
         "ext/standard/JitAddslashes.php",
+        "ext/standard/JitBase64Decode.php",
+        "ext/standard/JitBase64Encode.php",
         "ext/standard/JitBin2hex.php",
         "ext/standard/JitChmod.php",
         "ext/standard/JitChunkSplit.php",
@@ -128,6 +130,8 @@
         "ext/standard/array_sum.php",
         "ext/standard/array_unique.php",
         "ext/standard/array_values.php",
+        "ext/standard/base64_decode.php",
+        "ext/standard/base64_encode.php",
         "ext/standard/basename.php",
         "ext/standard/bin2hex.php",
         "ext/standard/bindec.php",
@@ -362,6 +366,8 @@
         "lib/JIT/IncludeHelper.php",
         "lib/JIT/IssetHelper.php",
         "lib/JIT/IteratorHelper.php",
+        "lib/JIT/JitBoolArg.php",
+        "lib/JIT/JitLongArg.php",
         "lib/JIT/JitNativeString.php",
         "lib/JIT/JitStringArg.php",
         "lib/JIT/JitStringCompare.php",
@@ -481,7 +487,8 @@
         "test/bootstrap-aot/switch_jumpif_chain.php",
         "test/bootstrap-aot/throw_logic.php",
         "test/bootstrap-aot/try_catch.php",
-        "test/bootstrap-aot/value_bitwise_shift.php"
+        "test/bootstrap-aot/value_bitwise_shift.php",
+        "test/bootstrap-aot/value_equal_native_long.php"
     ],
     "aot_link_targets": [
         "examples/000-HelloWorld/example.php",
@@ -523,17 +530,18 @@
         "test/bootstrap-aot/switch_jumpif_chain.php",
         "test/bootstrap-aot/throw_logic.php",
         "test/bootstrap-aot/try_catch.php",
-        "test/bootstrap-aot/value_bitwise_shift.php"
+        "test/bootstrap-aot/value_bitwise_shift.php",
+        "test/bootstrap-aot/value_equal_native_long.php"
     ],
     "aot_link_lib_targets": [
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 403,
+        "inventory_files": 409,
         "excluded": 0,
-        "eligible": 403,
-        "aot_lint_targets": 53,
-        "aot_link_targets": 40,
+        "eligible": 409,
+        "aot_lint_targets": 54,
+        "aot_link_targets": 41,
         "aot_link_lib_targets": 1
     }
 }

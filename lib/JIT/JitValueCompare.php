@@ -101,6 +101,66 @@ final class JitValueCompare
         return self::notIdenticalToNative($context, $boxed, $native);
     }
 
+    /**
+     * Loose == between boxed __value__ and native long: true only when the box tag is long and payloads match.
+     */
+    public static function looseEqualValueToNativeLong(
+        Context $context,
+        Variable $boxed,
+        Value $nativeLong
+    ): Value {
+        if (Variable::TYPE_VALUE !== $boxed->type) {
+            throw new \LogicException('Expected boxed __value__ operand');
+        }
+
+        $valuePtr = Variable::KIND_VARIABLE === $boxed->kind
+            ? $boxed->value
+            : $context->helper->loadValue($boxed);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $longTag = $i8->constInt(Variable::TYPE_NATIVE_LONG, false);
+        $isLong = $context->builder->icmp(Builder::INT_EQ, $typeByte, $longTag);
+        $stored = $context->builder->call(
+            $context->lookupFunction('__value__readLong'),
+            $valuePtr
+        );
+        $__native = $context->builder->intCast($nativeLong, $stored->typeOf());
+        $matches = $context->builder->icmp(Builder::INT_EQ, $stored, $__native);
+        $falseVal = $context->getTypeFromString('int1')->constInt(0, false);
+
+        return $context->builder->select($isLong, $matches, $falseVal);
+    }
+
+    public static function looseEqualNativeLongToValue(
+        Context $context,
+        Value $nativeLong,
+        Variable $boxed
+    ): Value {
+        return self::looseEqualValueToNativeLong($context, $boxed, $nativeLong);
+    }
+
+    public static function notLooseEqualValueToNativeLong(
+        Context $context,
+        Variable $boxed,
+        Value $nativeLong
+    ): Value {
+        $same = self::looseEqualValueToNativeLong($context, $boxed, $nativeLong);
+        $i1 = $context->getTypeFromString('int1');
+
+        return $context->builder->icmp(Builder::INT_EQ, $same, $i1->constInt(0, false));
+    }
+
+    public static function notLooseEqualNativeLongToValue(
+        Context $context,
+        Value $nativeLong,
+        Variable $boxed
+    ): Value {
+        return self::notLooseEqualValueToNativeLong($context, $boxed, $nativeLong);
+    }
+
     public static function identicalValueToValue(
         Context $context,
         Variable $left,
