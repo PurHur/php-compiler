@@ -1442,6 +1442,9 @@ class JIT {
                     $nameOp = $block->getOperand($op->arg1);
                     assert($nameOp instanceof Operand\Literal);
                     if (!isset($block->constants[$op->arg2])) {
+                        if ($this->shouldUseSelfHostJitStubs()) {
+                            break;
+                        }
                         throw new \LogicException('Global constant value must be a compile-time constant');
                     }
                     if (!$this->context->runtime->vmContext->defineConstant(

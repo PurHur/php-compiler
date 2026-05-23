@@ -612,13 +612,17 @@ restart:
             }
         }
         if (Variable::TYPE_VALUE === $leftType && Variable::TYPE_VALUE !== $rightType) {
-            if (Variable::TYPE_NATIVE_LONG === $rightType) {
+            if (Variable::TYPE_NATIVE_LONG === $rightType || Variable::TYPE_NATIVE_BOOL === $rightType) {
                 $leftPtr = Variable::KIND_VARIABLE === $left->kind ? $left->value : $this->loadValue($left);
                 $leftLong = $this->context->builder->call(
                     $this->context->lookupFunction('__value__readLong'),
                     $leftPtr
                 );
-                $__right = $this->context->builder->intCast($rightValue, $leftLong->typeOf());
+                if (Variable::TYPE_NATIVE_BOOL === $rightType) {
+                    $__right = $this->context->builder->zExt($rightValue, $leftLong->typeOf());
+                } else {
+                    $__right = $this->context->builder->intCast($rightValue, $leftLong->typeOf());
+                }
                 switch ($opcode->type) {
                     case OpCode::TYPE_PLUS:
                         $result = $this->context->builder->addNoSignedWrap($leftLong, $__right);
@@ -695,13 +699,17 @@ restart:
             }
         }
         if (Variable::TYPE_VALUE === $rightType && Variable::TYPE_VALUE !== $leftType) {
-            if (Variable::TYPE_NATIVE_LONG === $leftType) {
+            if (Variable::TYPE_NATIVE_LONG === $leftType || Variable::TYPE_NATIVE_BOOL === $leftType) {
                 $rightPtr = Variable::KIND_VARIABLE === $right->kind ? $right->value : $this->loadValue($right);
                 $rightLong = $this->context->builder->call(
                     $this->context->lookupFunction('__value__readLong'),
                     $rightPtr
                 );
-                $__left = $this->context->builder->intCast($leftValue, $rightLong->typeOf());
+                if (Variable::TYPE_NATIVE_BOOL === $leftType) {
+                    $__left = $this->context->builder->zExt($leftValue, $rightLong->typeOf());
+                } else {
+                    $__left = $this->context->builder->intCast($leftValue, $rightLong->typeOf());
+                }
                 switch ($opcode->type) {
                     case OpCode::TYPE_PLUS:
                         $result = $this->context->builder->addNoSignedWrap($__left, $rightLong);
