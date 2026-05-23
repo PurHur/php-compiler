@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\ext\standard\JitRequestBody;
@@ -51,15 +52,14 @@ final class file_get_contents extends Internal
             throw new \LogicException('file_get_contents() requires exactly one argument in this compiler build');
         }
         $arg = $args[0];
-        if (JITVariable::TYPE_STRING === $arg->type) {
-            $literal = $arg->compileTimeString ?? null;
-            if ('php://input' === $literal) {
-                return JitRequestBody::readPhpInput($context);
-            }
+        $literal = JitStringArg::compileTimeLiteral($arg);
+        if ('php://input' === $literal) {
+            return JitRequestBody::readPhpInput($context);
         }
-        if (JITVariable::TYPE_STRING !== $arg->type) {
-            throw new \LogicException('file_get_contents() requires a string filename in this compiler build');
-        }
-        return JitFileGetContents::invoke($context, $context->helper->loadValue($arg));
+
+        return JitFileGetContents::invoke(
+            $context,
+            JitStringArg::lower($context, $arg, 'file_get_contents() filename')
+        );
     }
 }

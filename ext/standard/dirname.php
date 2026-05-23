@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -34,10 +35,8 @@ final class dirname extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('dirname() requires exactly one argument');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type) {
-            throw new \LogicException('dirname() only supports strings in this compiler build');
-        }
+        $path = JitStringArg::lower($context, $args[0], 'dirname() path');
 
-        return JitPath::dirname($context, $context->helper->loadValue($args[0]));
+        return JitPath::dirname($context, $path);
     }
 }

@@ -14,6 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -46,10 +47,7 @@ final class strtoupper extends Internal
         if (1 !== count($args)) {
             throw new \LogicException('strtoupper() requires exactly one argument');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type) {
-            throw new \LogicException('strtoupper() only supports strings in this compiler build');
-        }
-        $str = $context->helper->loadValue($args[0]);
+        $str = JitStringArg::lower($context, $args[0], 'strtoupper() string');
         $copy = $context->builder->call($context->lookupFunction('__string__separate'), $str);
         lcfirst::transformAllAscii($context, $copy, ord('a'), ord('z'), -32);
 
