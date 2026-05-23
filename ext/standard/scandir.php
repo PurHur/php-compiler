@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -57,13 +58,18 @@ final class scandir extends Internal
         $i32 = $context->getTypeFromString('int32');
         $sort = $i32->constInt(0, false);
         if (2 === $argc) {
-            if (JITVariable::TYPE_INTEGER !== $args[1]->type) {
+            if (JITVariable::TYPE_INTEGER !== $args[1]->type
+                && JITVariable::TYPE_NATIVE_LONG !== $args[1]->type) {
                 throw new \LogicException('scandir() sorting_order must be an integer in this compiler build');
             }
-            $sort = $context->helper->loadValue($args[1]);
+            $sort = $context->builder->truncOrBitCast(
+                JitLongArg::lower($context, $args[1], 'scandir() sorting_order'),
+                $i32
+            );
         }
 
-        $this->jitString($context, $args[0], 'scandir() argument #1');
-        return JitFsGlob::scandir($context, $context->helper->loadValue($args[0]), $sort);
+        $path = $this->jitString($context, $args[0], 'scandir() argument #1');
+
+        return JitFsGlob::scandir($context, $path, $sort);
     }
 }
