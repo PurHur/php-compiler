@@ -13,20 +13,23 @@ use PHPLLVM\Value;
 
 final class ValueEchoHelper
 {
+    private static int $seq = 0;
+
     public static function echo(Context $context, Value $valuePtr): void
     {
+        $tag = 'ev'.(string) ++self::$seq;
         $map = $context->structFieldMap['__value__'];
         $typeByte = $context->builder->load(
             $context->builder->structGep($valuePtr, $map['type'])
         );
         $i8 = $context->getTypeFromString('int8');
 
-        $nullBlock = BasicBlockHelper::append($context, 'echo_value_null');
-        $longBlock = BasicBlockHelper::append($context, 'echo_value_long');
-        $boolBlock = BasicBlockHelper::append($context, 'echo_value_bool');
-        $doubleBlock = BasicBlockHelper::append($context, 'echo_value_double');
-        $stringBlock = BasicBlockHelper::append($context, 'echo_value_string');
-        $doneBlock = BasicBlockHelper::append($context, 'echo_value_done');
+        $nullBlock = BasicBlockHelper::append($context, 'echo_value_null_'.$tag);
+        $longBlock = BasicBlockHelper::append($context, 'echo_value_long_'.$tag);
+        $boolBlock = BasicBlockHelper::append($context, 'echo_value_bool_'.$tag);
+        $doubleBlock = BasicBlockHelper::append($context, 'echo_value_double_'.$tag);
+        $stringBlock = BasicBlockHelper::append($context, 'echo_value_string_'.$tag);
+        $doneBlock = BasicBlockHelper::append($context, 'echo_value_done_'.$tag);
 
         $type = $typeByte;
         $isNull = $context->builder->icmp(
@@ -55,13 +58,13 @@ final class ValueEchoHelper
             $i8->constInt(Variable::TYPE_STRING, false)
         );
 
-        $afterNull = BasicBlockHelper::append($context, 'echo_value_after_null');
+        $afterNull = BasicBlockHelper::append($context, 'echo_value_after_null_'.$tag);
         $context->builder->branchIf($isNull, $nullBlock, $afterNull);
         $context->builder->positionAtEnd($nullBlock);
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($afterNull);
-        $afterLong = BasicBlockHelper::append($context, 'echo_value_after_long');
+        $afterLong = BasicBlockHelper::append($context, 'echo_value_after_long_'.$tag);
         $context->builder->branchIf($isLong, $longBlock, $afterLong);
 
         $context->builder->positionAtEnd($longBlock);
@@ -81,7 +84,7 @@ final class ValueEchoHelper
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($afterLong);
-        $afterBool = BasicBlockHelper::append($context, 'echo_value_after_bool');
+        $afterBool = BasicBlockHelper::append($context, 'echo_value_after_bool_'.$tag);
         $context->builder->branchIf($isBool, $boolBlock, $afterBool);
 
         $context->builder->positionAtEnd($boolBlock);
@@ -94,9 +97,9 @@ final class ValueEchoHelper
             $boolVal,
             $boolVal->typeOf()->constInt(0, false)
         );
-        $trueBlock = BasicBlockHelper::append($context, 'echo_value_bool_true');
-        $falseBlock = BasicBlockHelper::append($context, 'echo_value_bool_false');
-        $boolDone = BasicBlockHelper::append($context, 'echo_value_bool_done');
+        $trueBlock = BasicBlockHelper::append($context, 'echo_value_bool_true_'.$tag);
+        $falseBlock = BasicBlockHelper::append($context, 'echo_value_bool_false_'.$tag);
+        $boolDone = BasicBlockHelper::append($context, 'echo_value_bool_done_'.$tag);
         $context->builder->branchIf($isTrue, $trueBlock, $falseBlock);
         $context->builder->positionAtEnd($trueBlock);
         $context->builder->call(
@@ -110,7 +113,7 @@ final class ValueEchoHelper
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($afterBool);
-        $afterDouble = BasicBlockHelper::append($context, 'echo_value_after_double');
+        $afterDouble = BasicBlockHelper::append($context, 'echo_value_after_double_'.$tag);
         $context->builder->branchIf($isDouble, $doubleBlock, $afterDouble);
 
         $context->builder->positionAtEnd($doubleBlock);
@@ -153,5 +156,6 @@ final class ValueEchoHelper
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
+        BasicBlockHelper::branchToFreshContinue($context, 'echo_value_continue_'.$tag);
     }
 }
