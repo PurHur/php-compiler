@@ -1,6 +1,6 @@
 # Local CI matrix
 
-How to run the php-compiler test gate on a developer machine or Runforge harness **without GitHub Actions** ([#245](https://github.com/PurHur/php-compiler/issues/245), [#394](https://github.com/PurHur/php-compiler/issues/394)).
+How to run the php-compiler test gate on a developer machine or Runforge harness ([#245](https://github.com/PurHur/php-compiler/issues/245)). The full PHPUnit matrix remains CircleCI / local scripts ([#394](https://github.com/PurHur/php-compiler/issues/394)); GitHub Actions runs an optional **bootstrap self-host** gate on `master` only (see below).
 
 ## Defaults
 
@@ -14,6 +14,45 @@ Repository defaults live in [`script/ci-defaults.env`](../script/ci-defaults.env
 | `PHP_COMPILER_DOCKER_MEM` | `10g` | Docker cgroup RAM cap |
 | `PHP_COMPILER_VM_PEAK_RSS_MB` | `2048` | Kill VM subprocess if RSS exceeds this (when guard enabled) |
 | `PHP_COMPILER_VM_RSS_GUARD` | `1` in CI | Wrap PHPT `vm.php` spawns with `run-vm-guarded.sh` |
+
+## GitHub Actions: bootstrap self-host
+
+Workflow: [`.github/workflows/bootstrap-selfhost.yml`](../.github/workflows/bootstrap-selfhost.yml). Triggers on **push** and **pull_request** to `master`. Timeout **30 minutes**.
+
+| Step | Command |
+|------|---------|
+| Checkout | `actions/checkout@v4` |
+| Bootstrap probe | `make bootstrap-selfhost-probe` |
+| Native link | `./script/bootstrap-selfhost-link.sh` |
+| Wave gate | `./script/bootstrap-wave-check.sh --fail-fast` |
+
+**Runner strategy**
+
+| Path | When | Setup |
+|------|------|-------|
+| Docker (default on `ubuntu-22.04` runners) | `docker info` succeeds | Build or reuse `php-compiler:22.04-dev` (`docker build -f Docker/dev/ubuntu-22.04/Dockerfile -t php-compiler:22.04-dev .` in GHA; local devs may use `make docker-build-22`) |
+| Host fallback | Docker unavailable | Ubuntu 22.04 + `ppa:ondrej/php` PHP 8.2 + `./script/install-llvm9.sh` |
+
+Both paths run `composer install`, `script/apply-patches.sh`, then the three bootstrap gates above. This workflow does **not** change default `ci-local.sh` / `ci-fast.sh` behavior locally.
+
+**Env vars** (inherited from Docker image / `script/ci-defaults.env` when relevant):
+
+| Variable | Role in workflow |
+|----------|------------------|
+| `PHP_COMPILER_LLVM_PATH` | `/opt/llvm9` in Docker; repo `.llvm/` after `install-llvm9.sh` on host fallback |
+| `PHP_COMPILER_MEMORY_LIMIT` | PHP heap during compile (default `1536M`) |
+| `PHP_COMPILER_LLVM_MEMORY_LIMIT` | LLVM compile phases (default `4096M`) |
+| `PHP_COMPILER_SELFHOST_AOT` | Set by probe/link scripts for stub gating |
+| `BOOTSTRAP_WAVE_CHECK` | N/A in workflow (always runs wave-check); set `0` in `ci-local.sh` to skip locally |
+
+Local equivalent (Docker):
+
+```bash
+docker run --rm -v "$(pwd):/compiler" -w /compiler php-compiler:22.04-dev bash -lc \
+  'make bootstrap-selfhost-probe && ./script/bootstrap-selfhost-link.sh && ./script/bootstrap-wave-check.sh'
+```
+
+Local equivalent (host, no Docker): `composer install`, `./script/install-llvm9.sh`, then the same three commands.
 
 ## Entry points
 
