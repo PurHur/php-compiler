@@ -17,6 +17,10 @@ final class StringGetenv
 {
     public static function implement(Context $context): void
     {
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            return;
+        }
+
         $fn = $context->lookupFunction('__compiler_getenv');
         $entry = $fn->appendBasicBlock('main');
         $context->builder->positionAtEnd($entry);
