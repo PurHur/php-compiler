@@ -206,6 +206,24 @@ static void sg_set_nested_value(__hashtable__ *root, sg_parsed_key *pk, const ch
     set_string_key(ht, leaf, value);
 }
 
+static void trim_ws_inplace(char *s)
+{
+    char *start = s;
+    char *end;
+
+    while (' ' == *start || '\t' == *start || '\r' == *start || '\n' == *start) {
+        start++;
+    }
+    if (start != s) {
+        memmove(s, start, strlen(start) + 1);
+    }
+    end = s + strlen(s);
+    while (end > s && (' ' == end[-1] || '\t' == end[-1] || '\r' == end[-1] || '\n' == end[-1])) {
+        end--;
+    }
+    *end = '\0';
+}
+
 static void parse_delimited_pairs(__hashtable__ *ht, const char *body, char delimiter, int decode_pair_first)
 {
     char *copy;
@@ -232,6 +250,7 @@ static void parse_delimited_pairs(__hashtable__ *ht, const char *body, char deli
         sg_parsed_key pk;
 
         if (decode_pair_first) {
+            trim_ws_inplace(pair);
             sg_url_decode_inplace(pair);
         }
         eq = strchr(pair, '=');
