@@ -278,6 +278,7 @@ class JIT {
         }
 
         return str_contains($lower, '\\vm\\')
+            || str_contains($lower, '\\vm\\variable::')
             || str_contains($lower, '\\printer::')
             || str_contains($lower, '\\jit\\operandname::');
     }
@@ -295,7 +296,6 @@ class JIT {
             || str_contains($lower, 'compileclassbody')
             || str_contains($lower, 'compilefunction')
             || str_contains($lower, 'compileglobalconst')
-            || str_contains($lower, 'compileoperand')
             || str_contains($lower, 'compilestmt')
             || str_contains($lower, 'compileop')
             || str_contains($lower, 'compileswitchasjumpifchain')
@@ -343,7 +343,8 @@ class JIT {
         }
 
         return str_ends_with($lower, '\\compiler::compilefunc')
-            || str_ends_with($lower, '\\compiler::compile');
+            || str_ends_with($lower, '\\compiler::compile')
+            || 'type_pair' === $lower;
     }
 
     private function isSkippedWebBootstrapHotPathName(string $name): bool
@@ -1883,6 +1884,19 @@ class JIT {
         return '__value__';
     }
 
+    /** Class const / property default lowering only; values live in $block->constants (self-host bundle). */
+    private function isSelfHostClassBodyEpilogueOpcode(int $type): bool
+    {
+        return OpCode::TYPE_UNARY_MINUS === $type
+            || OpCode::TYPE_PLUS === $type
+            || OpCode::TYPE_MUL === $type
+            || OpCode::TYPE_BITWISE_OR === $type
+            || OpCode::TYPE_BITWISE_AND === $type
+            || OpCode::TYPE_BITWISE_XOR === $type
+            || OpCode::TYPE_SHIFT_LEFT === $type
+            || OpCode::TYPE_SHIFT_RIGHT === $type;
+    }
+
     private function compileClass(?Block $block, int $classId) {
         if ($block === null) {
             return;
@@ -1929,6 +1943,9 @@ class JIT {
                     $name = $block->getOperand($op->arg1);
                     assert($name instanceof Operand\Literal);
                     if (!isset($block->constants[$op->arg2])) {
+                        if ($this->shouldUseSelfHostJitStubs()) {
+                            break;
+                        }
                         throw new \LogicException('Class constant value must be a compile-time constant');
                     }
                     $this->context->type->object->defineClassConst(
@@ -1938,6 +1955,9 @@ class JIT {
                     );
                     break;
                 default:
+                    if ($this->shouldUseSelfHostJitStubs() && $this->isSelfHostClassBodyEpilogueOpcode($op->type)) {
+                        break;
+                    }
                     throw new \LogicException('Other class body types are not jittable for now');
             }
             
@@ -2559,6 +2579,22 @@ class JIT {
         }
 
         return null;
+    }
+
+
+    private function ensureJitGlobal(string $name): Variable
+    {
+        if (!isset($this->context->jitGlobalVariables[$name])) {
+            $slot = JIT\JitValueBox::alloc($this->context);
+            $this->context->jitGlobalVariables[$name] = new Variable(
+                $this->context,
+                Variable::TYPE_VALUE,
+                Variable::KIND_VARIABLE,
+                $slot
+            );
+        }
+
+        return $this->context->jitGlobalVariables[$name];
     }
 
 }

@@ -406,14 +406,20 @@ restart:
 
     private function looseEqual(Variable $self, Variable $other): bool {
         if ($self->type === self::TYPE_NULL) {
-            return match ($other->type) {
-                self::TYPE_NULL => true,
-                self::TYPE_BOOLEAN => !$other->bool,
-                self::TYPE_INTEGER => 0 === $other->integer,
-                self::TYPE_STRING => '' === $other->string,
-                self::TYPE_FLOAT => 0.0 === $other->float,
-                default => false,
-            };
+            switch ($other->type) {
+                case self::TYPE_NULL:
+                    return true;
+                case self::TYPE_BOOLEAN:
+                    return !$other->bool;
+                case self::TYPE_INTEGER:
+                    return 0 === $other->integer;
+                case self::TYPE_STRING:
+                    return '' === $other->string;
+                case self::TYPE_FLOAT:
+                    return 0.0 === $other->float;
+                default:
+                    return false;
+            }
         }
         if ($other->type === self::TYPE_NULL) {
             return $this->looseEqual($other, $self);
@@ -729,15 +735,16 @@ restart:
     }
 }
 
-const TYPE_PAIR_INTEGER_INTEGER = (Variable::TYPE_INTEGER << 8) | Variable::TYPE_INTEGER;
-const TYPE_PAIR_FLOAT_INTEGER = (Variable::TYPE_FLOAT << 8) | Variable::TYPE_INTEGER;
-const TYPE_PAIR_INTEGER_FLOAT = (Variable::TYPE_INTEGER << 8) | Variable::TYPE_FLOAT;
-const TYPE_PAIR_FLOAT_FLOAT = (Variable::TYPE_FLOAT << 8) | Variable::TYPE_FLOAT;
-const TYPE_PAIR_STRING_STRING = (Variable::TYPE_STRING << 8) | Variable::TYPE_STRING;
-const TYPE_PAIR_OBJECT_OBJECT = (Variable::TYPE_OBJECT << 8) | Variable::TYPE_OBJECT;
-const TYPE_PAIR_BOOLEAN_BOOLEAN = (Variable::TYPE_BOOLEAN << 8) | Variable::TYPE_BOOLEAN;
-const TYPE_PAIR_NULL_NULL = (Variable::TYPE_NULL << 8) | Variable::TYPE_NULL;
+/** Precomputed (left * 256 + right) for JIT self-host bundle (no shift/mul in global init). */
+const TYPE_PAIR_INTEGER_INTEGER = 257;
+const TYPE_PAIR_FLOAT_INTEGER = 514;
+const TYPE_PAIR_INTEGER_FLOAT = 260;
+const TYPE_PAIR_FLOAT_FLOAT = 516;
+const TYPE_PAIR_STRING_STRING = 1040;
+const TYPE_PAIR_OBJECT_OBJECT = 1285;
+const TYPE_PAIR_BOOLEAN_BOOLEAN = 771;
+const TYPE_PAIR_NULL_NULL = 0;
 
 function type_pair(int $left, int $right): int {
-    return ($left << 8) | $right;
+    return $left * 256 + $right;
 }

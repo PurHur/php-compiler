@@ -86,10 +86,14 @@ final class LiteralIncludeDiscovery
         }
 
         // Entry is compiled last inside SourceBundler; drop it from the include list.
-        return array_values(array_filter(
-            $paths,
-            static fn (string $p): bool => $p !== $entryFile
-        ));
+        $filtered = [];
+        foreach ($paths as $p) {
+            if ($p !== $entryFile) {
+                $filtered[] = $p;
+            }
+        }
+
+        return array_values($filtered);
     }
 
     /**

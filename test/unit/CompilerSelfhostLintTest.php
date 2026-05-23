@@ -62,9 +62,11 @@ final class CompilerSelfhostLintTest extends TestCase
             'lib/VM.php',
             'lib/VM/ClassProperty.php',
             'lib/VM/ScriptExit.php',
+            'lib/VM/Variable.php',
             'lib/Web/ConstStringFolder.php',
             'lib/Web/DeployRoot.php',
             'lib/Web/IncludePathResolver.php',
+            'lib/Web/LiteralIncludeDiscovery.php',
             'lib/Web/SourceBundler.php',
         ];
         $this->assertSame($expected, $rels);
