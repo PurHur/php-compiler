@@ -442,7 +442,7 @@ final class HashTableHelper
         $slot = JitValueBox::alloc($context);
         $destPtr = JitValueBox::pointer($context, $slot);
         $valPtr = $context->builder->call(
-            $context->lookupFunction('__hashtable__readStringKeyValue'),
+            $context->lookupFunction('__hashtable__peekStringKeyValue'),
             $ht,
             $keyStr
         );
