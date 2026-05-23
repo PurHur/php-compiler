@@ -25,6 +25,7 @@ final class MiniWebAppBisectAotTest extends AotTest
         'isset_object_property_array',
         'require_return_config',
         'nested_include_two_tier',
+        'deploy_path_layout_nested',
         'miniwebapp_render_home',
         'layout_script_base',
         'layout_title_branch',
