@@ -34,7 +34,7 @@ _None — all JIT `call()` builtins are lowered or deferred._
 - `array_flip` — `ext/standard/array_flip.php`
 - `array_key_exists` — `ext/standard/array_key_exists.php`
 - `array_keys` — `ext/standard/array_keys.php`
-- `array_map` — `ext/standard/array_map.php`
+- `array_map` — `ext/standard/array_map.php` (null + string builtin callbacks; closures deferred #1154)
 - `array_merge` — `ext/standard/array_merge.php`
 - `array_pop` — `ext/standard/array_pop.php`
 - `array_product` — `ext/standard/array_product.php`

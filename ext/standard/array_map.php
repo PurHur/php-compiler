@@ -14,6 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\ArrayMapCallbackPolicy;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
@@ -24,8 +25,7 @@ use PHPLLVM\Value;
  * array_map() for list arrays with null or string builtin callbacks (subset of PHP).
  *
  * JIT/AOT: only null and compile-time string builtin names are lowered. Closures, arrow
- * functions, and [class, method] callables are deferred (use a foreach or a string builtin;
- * issue #1154).
+ * functions, and [class, method] callables are deferred — see ArrayMapCallbackPolicy (#1154).
  */
 final class array_map extends Internal
 {
@@ -51,11 +51,8 @@ final class array_map extends Internal
 
             return;
         }
-        if (Variable::TYPE_STRING !== $callback->type) {
-            throw new \LogicException(
-                'array_map() callback must be null or a string builtin name in this compiler build'
-                .' (closures and [class, method] callables are deferred; issue #1154)'
-            );
+        if (!ArrayMapCallbackPolicy::isVmSupportedType($callback->type)) {
+            throw new \LogicException(ArrayMapCallbackPolicy::vmRejectionMessage());
         }
         $fn = VmInternalCall::resolveStringCallback($callback->toString());
         foreach ($src->iterateKeyed(true) as [$key, $value]) {
@@ -77,16 +74,13 @@ final class array_map extends Internal
             throw new \LogicException('array_map() second argument must be an array in this compiler build');
         }
 
-        if (JITVariable::TYPE_NULL === $args[0]->type || $args[0]->isNullConstant) {
-            return ArrayBuiltinHelper::buildMapArray($context, $args[0], $args[1]);
+        if (!ArrayMapCallbackPolicy::isJitLowerable($args[0])) {
+            throw new \LogicException(ArrayMapCallbackPolicy::jitRejectionMessage());
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type && JITVariable::TYPE_VALUE !== $args[0]->type) {
-            throw new \LogicException(
-                'array_map() callback must be null or a compile-time string builtin name in this compiler build'
-                .' (closures and [class, method] callables are deferred; issue #1154)'
-            );
+
+        if (JITVariable::TYPE_STRING === $args[0]->type || JITVariable::TYPE_VALUE === $args[0]->type) {
+            $this->jitString($context, $args[0], 'array_map() callback');
         }
-        $this->jitString($context, $args[0], 'array_map() callback');
 
         return ArrayBuiltinHelper::buildMapArray($context, $args[0], $args[1]);
     }
