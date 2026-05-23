@@ -81,7 +81,21 @@ final class IncludeHelper
 
         $localBindings = self::collectCalleeLocalBindings($context, $callerBlock, $included);
         $preIncludeBb = $context->builder->getInsertBlock();
+        $preparedBindings = new \SplObjectStorage();
+        if (null !== $preIncludeBb) {
+            $context->builder->positionAtEnd($preIncludeBb);
+            foreach ($localBindings as $operand) {
+                $preparedBindings[$operand] = self::prepareCallerBinding(
+                    $context,
+                    $preIncludeBb,
+                    $localBindings[$operand]
+                );
+            }
+        }
         $returnHolderOp = new Temporary();
+        if (null !== $preIncludeBb) {
+            $context->builder->positionAtEnd($preIncludeBb);
+        }
         $returnHolder = new Variable(
             $context,
             Variable::TYPE_VALUE,
@@ -118,11 +132,8 @@ final class IncludeHelper
             self::emitCalleeLocalBinding(
                 $context,
                 $jit,
-                $func,
-                $callerBlock,
-                $included,
                 $operand,
-                $localBindings[$operand]
+                $preparedBindings[$operand] ?? $localBindings[$operand]
             );
         }
         $bodyBb = $func->appendBasicBlock('include_body_'.(++self::$includeEntrySerial));
@@ -211,12 +222,48 @@ final class IncludeHelper
         return $bindings;
     }
 
+    /**
+     * Read boxed caller locals while preIncludeBb still dominates the caller alloca (#784).
+     */
+    private static function prepareCallerBinding(
+        Context $context,
+        BasicBlock $materializeBb,
+        Variable $callerVar
+    ): Variable {
+        if (Variable::TYPE_VALUE !== $callerVar->type) {
+            return $callerVar;
+        }
+        $saved = $context->builder->getInsertBlock();
+        $context->builder->positionAtEnd($materializeBb);
+        $slot = $context->builder->alloca($context->getTypeFromString('__string__*'));
+        $stringVar = new Variable(
+            $context,
+            Variable::TYPE_STRING,
+            Variable::KIND_VARIABLE,
+            $slot
+        );
+        $stringVar->initialize();
+        $srcPtr = JitValueBox::valuePtrFromVariable($context, $callerVar);
+        $str = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $srcPtr
+        );
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $str
+        );
+        $context->builder->store($owned, $slot);
+        $stringVar->addref();
+        if (null !== $saved) {
+            $context->builder->positionAtEnd($saved);
+        }
+
+        return $stringVar;
+    }
+
     private static function emitCalleeLocalBinding(
         Context $context,
         JIT $jit,
-        Function_ $func,
-        Block $callerBlock,
-        Block $included,
         Operand $calleeOp,
         Variable $callerVar
     ): void {
@@ -226,23 +273,6 @@ final class IncludeHelper
         }
 
         $calleeVar = $context->getVariableFromOp($calleeOp);
-
-        if (Variable::TYPE_VALUE === $callerVar->type) {
-            $srcPtr = JIT\JitValueBox::valuePtrFromVariable($context, $callerVar);
-            $str = $context->builder->call(
-                $context->lookupFunction('__value__readString'),
-                $srcPtr
-            );
-            $owned = $context->builder->call(
-                $context->lookupFunction('__string__separate'),
-                $str
-            );
-            $context->builder->store($owned, $calleeVar->value);
-            $calleeVar->addref();
-            $context->setVariableOp($calleeOp, $calleeVar);
-
-            return;
-        }
 
         if (
             Variable::TYPE_STRING === $callerVar->type
