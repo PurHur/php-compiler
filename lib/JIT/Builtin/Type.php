@@ -365,6 +365,19 @@ class Type extends Builtin {
         $fntypeShellExec = $this->context->context->functionType($strPtr, false, $strPtr);
         $fnShellExec = $this->context->module->addFunction('__compiler_shell_exec', $fntypeShellExec);
         $this->context->registerFunction('__compiler_shell_exec', $fnShellExec);
+        $fntypeHttpBuildQuery = $this->context->context->functionType(
+            $strPtr,
+            false,
+            $this->context->getTypeFromString('__hashtable__*'),
+            $strPtr,
+            $strPtr,
+            $this->context->getTypeFromString('int64')
+        );
+        $fnHttpBuildQuery = $this->context->module->addFunction(
+            '__compiler_http_build_query',
+            $fntypeHttpBuildQuery
+        );
+        $this->context->registerFunction('__compiler_http_build_query', $fnHttpBuildQuery);
         // $this->maskedarray->register();
         // $this->nativearray->register();
     }

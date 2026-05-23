@@ -75,7 +75,7 @@ final class SelfHostBuiltinPolicy
         'base64_encode' => 'string', 'base64_decode' => 'string',
         'htmlspecialchars' => 'string', 'header' => 'string', 'http_response_code' => 'string',
         'substr' => 'string', 'trim' => 'string', 'ltrim' => 'string', 'rtrim' => 'string',
-        'urlencode' => 'string', 'rawurlencode' => 'string',
+        'urlencode' => 'string', 'rawurlencode' => 'string', 'http_build_query' => 'string',
     ];
 
     /** @var array<string, string> */
