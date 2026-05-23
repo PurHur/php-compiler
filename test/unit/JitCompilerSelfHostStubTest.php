@@ -57,6 +57,15 @@ final class JitCompilerSelfHostStubTest extends TestCase
     private const WEB_BOOTSTRAP_SKIP_PATTERNS = [
         'includepathresolver',
         'literalincludediscovery',
+        'deployroot',
+        'sourcebundler',
+        'conststringfolder',
+    ];
+
+    /** @var list<string> */
+    private const WEB_BOOTSTRAP_STUBBED_SUPERGLOBALS_METHODS = [
+        'populatefromenvironment',
+        'readrequestbody',
     ];
 
     /** @var list<string> */
@@ -114,14 +123,19 @@ final class JitCompilerSelfHostStubTest extends TestCase
      */
     public function testIsSkippedWebBootstrapHotPathNameMatches(string $pattern, string $sample): void
     {
-        putenv('PHP_COMPILER_JIT_PROGRESS_FILE=/tmp/jit-selfhost-stub-test');
+        $prev = getenv('PHP_COMPILER_SELFHOST_AOT');
+        putenv('PHP_COMPILER_SELFHOST_AOT=1');
         try {
             $this->assertTrue(
                 $this->invokeSkipCheck('isSkippedWebBootstrapHotPathName', $sample),
                 "Expected isSkippedWebBootstrapHotPathName for pattern {$pattern}"
             );
         } finally {
-            putenv('PHP_COMPILER_JIT_PROGRESS_FILE');
+            if (false === $prev) {
+                putenv('PHP_COMPILER_SELFHOST_AOT');
+            } else {
+                putenv('PHP_COMPILER_SELFHOST_AOT='.$prev);
+            }
         }
     }
 
@@ -131,6 +145,52 @@ final class JitCompilerSelfHostStubTest extends TestCase
         foreach (self::WEB_BOOTSTRAP_SKIP_PATTERNS as $pattern) {
             yield $pattern => [$pattern, 'PHPCompiler\\Web\\'.$pattern];
         }
+        foreach (self::WEB_BOOTSTRAP_STUBBED_SUPERGLOBALS_METHODS as $method) {
+            yield 'superglobals::'.$method => [
+                'superglobals::'.$method,
+                'PHPCompiler\\Web\\Superglobals::'.$method,
+            ];
+        }
+    }
+
+    public function testIsSuperglobalNameIsNotWebBootstrapStub(): void
+    {
+        $prev = getenv('PHP_COMPILER_SELFHOST_AOT');
+        putenv('PHP_COMPILER_SELFHOST_AOT=1');
+        try {
+            $this->assertFalse(
+                $this->invokeSkipCheck(
+                    'isSkippedWebBootstrapHotPathName',
+                    'phpcompiler\\web\\superglobals::issuperglobalname'
+                )
+            );
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_SELFHOST_AOT');
+            } else {
+                putenv('PHP_COMPILER_SELFHOST_AOT='.$prev);
+            }
+        }
+    }
+
+    public function testIssetHelperCompileRemainsSelfHostStub(): void
+    {
+        $prev = getenv('PHP_COMPILER_SELFHOST_AOT');
+        putenv('PHP_COMPILER_SELFHOST_AOT=1');
+        try {
+            $this->assertTrue(
+                $this->invokeSkipCheck(
+                    'isSkippedIssetHelperHotPathName',
+                    'phpcompiler\\jit\\issethelper::compile'
+                )
+            );
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_SELFHOST_AOT');
+            } else {
+                putenv('PHP_COMPILER_SELFHOST_AOT='.$prev);
+            }
+        }
     }
 
     /**
@@ -138,14 +198,19 @@ final class JitCompilerSelfHostStubTest extends TestCase
      */
     public function testIsSkippedSelfHostEntryNameMatches(string $suffix): void
     {
-        putenv('PHP_COMPILER_JIT_PROGRESS_FILE=/tmp/jit-selfhost-stub-test');
+        $prev = getenv('PHP_COMPILER_SELFHOST_AOT');
+        putenv('PHP_COMPILER_SELFHOST_AOT=1');
         try {
             $this->assertTrue(
                 $this->invokeSkipCheck('isSkippedSelfHostEntryName', 'PHPCompiler'.$suffix),
                 "Expected isSkippedSelfHostEntryName for suffix {$suffix}"
             );
         } finally {
-            putenv('PHP_COMPILER_JIT_PROGRESS_FILE');
+            if (false === $prev) {
+                putenv('PHP_COMPILER_SELFHOST_AOT');
+            } else {
+                putenv('PHP_COMPILER_SELFHOST_AOT='.$prev);
+            }
         }
     }
 
