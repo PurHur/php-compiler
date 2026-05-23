@@ -129,7 +129,7 @@ final class HashTableHelper
         $tag = 'af'.(string) ++$seq;
         $ht = self::alloc($context);
         $sizeT = $context->getTypeFromString('size_t');
-        $iSlot = $context->builder->alloca($sizeT, 1, 'fill_i_'.$tag);
+        $iSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
         $zero = $sizeT->constInt(0, false);
         $context->builder->store($zero, $iSlot);
 

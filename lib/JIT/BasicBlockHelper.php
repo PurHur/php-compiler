@@ -32,8 +32,11 @@ final class BasicBlockHelper
             return;
         }
         $continue = self::append($context, $name);
+        $after = self::append($context, $name.'_after');
         $context->builder->branch($continue);
         $context->builder->positionAtEnd($continue);
+        $context->builder->branch($after);
+        $context->builder->positionAtEnd($after);
     }
 
     public static function entryAlloca(Context $context, Type $type): Value

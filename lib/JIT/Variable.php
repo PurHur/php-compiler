@@ -624,10 +624,7 @@ final class Variable {
 
                     return $boxed;
                 }
-                $index = $this->context->builder->truncOrBitCast(
-                    $this->context->helper->loadValue($dim),
-                    $this->context->getTypeFromString('size_t')
-                );
+                $index = self::materializePackedIndex($this->context, $dim);
                 if (null !== $expectedType && Type::TYPE_STRING === $expectedType->type) {
                     if (!$propertyBacked) {
                         $this->context->refcount->addref($ht);
@@ -695,6 +692,26 @@ final class Variable {
                     $slot
                 );
         }
+    }
+
+    /**
+     * Load a packed-list index as size_t. Literal long dims are stored to a stack slot
+     * first so later LLVM blocks still see a stable index (#AOT array_fill reads).
+     */
+    private static function materializePackedIndex(Context $context, self $dim): \PHPLLVM\Value
+    {
+        $sizeT = $context->getTypeFromString('size_t');
+        $indexVal = $context->builder->truncOrBitCast(
+            $context->helper->loadValue($dim),
+            $sizeT
+        );
+        if (self::TYPE_NATIVE_LONG !== $dim->type || self::KIND_VALUE !== $dim->kind) {
+            return $indexVal;
+        }
+        $idxSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
+        $context->builder->store($indexVal, $idxSlot);
+
+        return $context->builder->load($idxSlot);
     }
 }
 
