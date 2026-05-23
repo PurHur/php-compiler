@@ -1050,9 +1050,18 @@ class JIT {
                     $name = $block->getOperand($op->arg3);
                     assert($name instanceof Operand\Literal);
                     assert($obj->type->type === Type::TYPE_OBJECT);
+                    $declaringClass = $obj->type->userType;
+                    if (null === $declaringClass && null !== $block->func?->class) {
+                        $declaringClass = $block->func->class->value;
+                    }
+                    if (null === $declaringClass || '' === $declaringClass) {
+                        $declaringClass = $this->context->scope->className !== ''
+                            ? $this->context->scope->className
+                            : 'object';
+                    }
                     $this->context->scope->variables[$result] = $this->context->type->object->propertyFetch(
                         $this->context->helper->loadValue($this->context->getVariableFromOp($obj)),
-                        $obj->type->userType,
+                        $declaringClass,
                         $name->value
                     );
                     break;
