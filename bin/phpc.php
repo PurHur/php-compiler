@@ -10,6 +10,7 @@ declare(strict_types=1);
  *   phpc serve [host:port] [docroot]
  *   phpc serve --aot [host:port] [docroot] [--binary path]
  *   phpc run [-q 'name=World'] [-p 'field=val'] script.php [args...]
+ *   phpc run --project [dir] [--cgi-env KEY=VAL] [--cgi-env-file path] [--deploy-root dist]
  *   phpc build [-o outfile] entry.php
  *   phpc build --project [dir] [--dry-run]     AOT compile from phpc.json entry/binary
  *   phpc build --project [dir] [--list-units]  Grep-friendly entry/units/binary summary (no LLVM)
@@ -41,6 +42,11 @@ php-compiler CLI
       -q 'name=World'                          CGI-style QUERY_STRING → $_GET
       -p 'field=value'                         CGI-style POST body → $_POST
       Example: phpc run -q 'name=Dev' examples/001-SimpleWeb/example.php
+  phpc run --project [dir]                     Run phpc.json AOT binary with CGI env (#774)
+      --cgi-env KEY=VAL                        Set CGI variable (repeatable)
+      --cgi-env-file path                      Load KEY=VAL lines from a file
+      --deploy-root dist                       Set PHPC_DEPLOY_ROOT before exec (#609)
+      --require-nonempty-stdout                Exit 2 when stdout is empty (AOT debug #772)
   phpc build [-o out] <entry.php>               AOT compile to a native binary
   phpc build --project [dir] [--dry-run]        Build from phpc.json entry + binary paths
       --dry-run                                 List entry + includes graph; exit before LLVM
@@ -102,11 +108,12 @@ switch ($command) {
         exit(runProcess(array_merge($php, array_merge([$script], $serveArgs)), $repoRoot));
 
     case 'run':
-        if ([] === $args) {
-            fwrite(STDERR, "phpc run: missing script.php\n");
+        if (!is_file($repoRoot.'/vendor/autoload.php')) {
+            fwrite(STDERR, "phpc run: run composer install first\n");
             exit(1);
         }
-        exit(runProcess(array_merge($php, [$repoRoot.'/bin/vm.php'], $args), $repoRoot));
+        require $repoRoot.'/vendor/autoload.php';
+        exit(\PHPCompiler\Cli\PhpcRun::main($args, $repoRoot, $php));
 
     case 'deploy':
         if (!is_file($repoRoot.'/vendor/autoload.php')) {

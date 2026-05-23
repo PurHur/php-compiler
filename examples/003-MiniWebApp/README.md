@@ -55,6 +55,18 @@ Deprecated query dispatch (still supported):
 | POST | `/index.php?route=contact` |
 | GET | `/index.php?route=api/status` |
 
+## AOT debug without serve (#774)
+
+After `phpc build --project .` (LLVM), run the native binary with CGI env — no TCP:
+
+```console
+../../phpc run --project . --cgi-env QUERY_STRING=route=home --cgi-env REQUEST_METHOD=GET
+../../phpc run --project . --cgi-env-file ../../test/fixtures/cgi-env/miniwebapp-home.env
+../../phpc run --project . --cgi-env-file ../../test/fixtures/cgi-env/miniwebapp-home.env --require-nonempty-stdout
+```
+
+`--require-nonempty-stdout` exits `2` when stdout is empty (useful while [#764](https://github.com/PurHur/php-compiler/issues/764) execute is broken). With `phpc deploy -o /tmp/dist`, add `--deploy-root /tmp/dist`.
+
 ## Run matrix
 
 | Mode | Status | Command |

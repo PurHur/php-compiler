@@ -35,6 +35,11 @@ final class PhpcCliTest extends TestCase
         $this->assertStringContainsString('phpc validate-manifest', $result['stdout']);
         $this->assertStringContainsString('-q', $result['stdout']);
         $this->assertStringContainsString('$_GET', $result['stdout']);
+        $this->assertStringContainsString('phpc run --project', $result['stdout']);
+        $this->assertStringContainsString('--cgi-env', $result['stdout']);
+        $this->assertStringContainsString('--cgi-env-file', $result['stdout']);
+        $this->assertStringContainsString('--deploy-root', $result['stdout']);
+        $this->assertStringContainsString('--require-nonempty-stdout', $result['stdout']);
     }
 
     public function testRunPopulatesScriptFilename(): void
