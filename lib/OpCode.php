@@ -103,6 +103,9 @@ class OpCode {
 
     public const SCRIPT_MAGIC_LINE = 3;
 
+    const TYPE_ASSIGN_REF = 97;
+    const TYPE_DECLARE_GLOBAL = 98;
+
     public int $type;
     public ?int $arg1;
     public ?int $arg2;

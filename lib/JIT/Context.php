@@ -110,6 +110,12 @@ class Context {
     /** @var array<int, PHPLLVM\Value> foreach object-key walk slots keyed by array Variable id */
     public array $foreachObjNodeSlots = [];
 
+    /** @var array<string, Variable> */
+    public array $jitGlobalVariables = [];
+
+    /** @var array<string, string> */
+    public array $refAliasNames = [];
+
     public function __construct(Runtime $runtime, int $loadType) {
         $this->runtime = $runtime;
         $this->scope = new Scope;
@@ -606,7 +612,27 @@ class Context {
         return false;
     }
 
+    public function resolveRefAliasName(string $name): string
+    {
+        while (isset($this->refAliasNames[$name])) {
+            $name = $this->refAliasNames[$name];
+        }
+
+        return $name;
+    }
+
     public function getVariableFromOp(Operand $op): Variable {
+        $name = OperandName::resolve($op);
+        if (null !== $name && '' !== $name) {
+            $resolved = $this->resolveRefAliasName($name);
+            if ($resolved !== $name) {
+                foreach ($this->scope->variables as $scopeOp => $var) {
+                    if ($resolved === OperandName::resolve($scopeOp)) {
+                        return $var;
+                    }
+                }
+            }
+        }
         if (!$this->scope->variables->contains($op)) {
             if ($op instanceof Operand\Literal) {
                 $this->scope->variables[$op] = Variable::fromLiteral($this, $op);

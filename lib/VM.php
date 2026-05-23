@@ -84,6 +84,18 @@ restart:
                         : $frame->block->strictTypes;
                     TypeCheck::coercePropertyWrite($arg2, $strict);
                     break;
+                case OpCode::TYPE_ASSIGN_REF:
+                    $lhs = $frame->scope[$op->arg1];
+                    $rhs = $frame->scope[$op->arg2]->resolveIndirect();
+                    $lhs->indirect($rhs);
+                    break;
+                case OpCode::TYPE_DECLARE_GLOBAL:
+                    if (!isset($frame->block->constants[$op->arg2])) {
+                        throw new \LogicException('Global name must be a compile-time constant');
+                    }
+                    $globalName = $frame->block->constants[$op->arg2]->toString();
+                    $frame->scope[$op->arg1]->indirect($this->context->ensureGlobal($globalName));
+                    break;
                 case OpCode::TYPE_ARRAY_DIM_FETCH:
                 case OpCode::TYPE_ARRAY_DIM_FETCH_WRITE:
                     $arg1 = $frame->scope[$op->arg1];

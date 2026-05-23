@@ -589,6 +589,24 @@ class JIT {
                     $this->assignOperand($block->getOperand($op->arg2), $value, $forceAssign);
                     $this->assignOperand($destOp, $value, $forceAssign);
                     break;  
+                case OpCode::TYPE_ASSIGN_REF:
+                    $destName = JIT\OperandName::resolve($block->getOperand($op->arg1));
+                    $srcName = JIT\OperandName::resolve($block->getOperand($op->arg2));
+                    if (null === $destName || null === $srcName) {
+                        throw new \LogicException('Reference assignment requires named variables');
+                    }
+                    $this->context->refAliasNames[$destName] = $this->context->resolveRefAliasName($srcName);
+                    break;
+                case OpCode::TYPE_DECLARE_GLOBAL:
+                    if (!isset($block->constants[$op->arg2])) {
+                        throw new \LogicException('Global name must be a compile-time constant');
+                    }
+                    $globalName = $block->constants[$op->arg2]->toString();
+                    $this->context->setVariableOp(
+                        $block->getOperand($op->arg1),
+                        $this->ensureJitGlobal($globalName)
+                    );
+                    break;  
                 case OpCode::TYPE_ARRAY_DIM_FETCH:
                 case OpCode::TYPE_ARRAY_DIM_FETCH_WRITE:
                     $forWrite = OpCode::TYPE_ARRAY_DIM_FETCH_WRITE === $op->type;

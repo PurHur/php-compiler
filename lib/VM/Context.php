@@ -23,6 +23,9 @@ class Context {
     /** @var array<string, Variable> */
     private array $superglobalVars = [];
 
+    /** @var array<string, Variable> */
+    private array $globalVars = [];
+
     public Runtime $runtime;
 
     public ErrorReporter $errors;
@@ -123,6 +126,14 @@ class Context {
     public function getSuperglobal(string $name): ?Variable
     {
         return $this->superglobalVars[$name] ?? null;
+    }
+
+    public function ensureGlobal(string $name): Variable
+    {
+        if (!isset($this->globalVars[$name])) {
+            $this->globalVars[$name] = new Variable(Variable::TYPE_NULL);
+        }
+        return $this->globalVars[$name];
     }
 
     public function save(Frame $frame): RunStackEntry {

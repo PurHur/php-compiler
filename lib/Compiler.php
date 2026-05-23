@@ -132,6 +132,8 @@ class Compiler {
                         $block = $this->compileCoalesce($child, $block);
                     } elseif ($child instanceof Op\Expr\NullsafePropertyFetch) {
                         $block = $this->compileNullsafePropertyFetch($child, $block);
+                    } elseif ($child instanceof Op\Expr\NullsafeMethodCall) {
+                        $block = $this->compileNullsafeMethodCall($child, $block);
                     } elseif (
                         $child instanceof Op\Expr\ArrayDimFetch
                         && $i + 1 < $opCount
@@ -878,6 +880,21 @@ class Compiler {
                 )];
             case Op\Expr\InstanceOf_::class:
                 return $this->compileInstanceOf($expr, $block);
+            case Op\Expr\AssignRef::class:
+                $ops = [new OpCode(
+                    OpCode::TYPE_ASSIGN_REF,
+                    $this->compileOperand($expr->var, $block, false),
+                    $this->compileOperand($expr->expr, $block, true)
+                )];
+                if ([] !== $expr->result->usages) {
+                    $ops[] = new OpCode(
+                        OpCode::TYPE_ASSIGN,
+                        $this->compileOperand($expr->result, $block, false),
+                        $this->compileOperand($expr->var, $block, false),
+                        $this->compileOperand($expr->expr, $block, true)
+                    );
+                }
+                return $ops;
         }
         throw new \LogicException("Unsupported expression: " . $expr->getType());
     }
@@ -1118,6 +1135,102 @@ class Compiler {
         $block->addOpCode($nullsafeOp);
 
         return $endBlock;
+    }
+
+    protected function compileNullsafeMethodCall(Op\Expr\NullsafeMethodCall $expr, Block $block): Block
+    {
+        $resultSlot = $this->compileOperand($expr->result, $block, false);
+        $receiverSlot = $this->compileOperand($expr->var, $block, true);
+
+        $endBlock = new Block($block->orig);
+        $endBlock->inheritUndefinedLocals = true;
+        $endBlock->inheritScopeFrom($block);
+
+        $nullBlock = new Block($block->orig);
+        $nullBlock->inheritUndefinedLocals = true;
+        $nullBlock->inheritScopeFrom($block);
+        $nullLiteral = new Operand\Literal(null);
+        $nullLiteral->type = Type::null();
+        $nullValueSlot = $this->compileOperand($nullLiteral, $nullBlock, true);
+        $nullBlock->addOpCode(new OpCode(
+            OpCode::TYPE_ASSIGN,
+            $resultSlot,
+            $resultSlot,
+            $nullValueSlot
+        ));
+        $nullJump = new OpCode(OpCode::TYPE_JUMP);
+        $nullJump->block1 = $endBlock;
+        $nullBlock->addOpCode($nullJump);
+
+        $fetchBlock = new Block($block->orig);
+        $fetchBlock->inheritUndefinedLocals = true;
+        $fetchBlock->inheritScopeFrom($block);
+        $fetchBlock->addOpCode(new OpCode(
+            OpCode::TYPE_METHODCALL_INIT,
+            $this->compileOperand($expr->var, $fetchBlock, true),
+            $this->compileOperand($expr->name, $fetchBlock, true)
+        ));
+        foreach ($expr->args as $arg) {
+            $fetchBlock->addOpCode(new OpCode(
+                OpCode::TYPE_ARG_SEND,
+                $this->compileOperand($arg, $fetchBlock, true)
+            ));
+        }
+        if (!empty($expr->result->usages)) {
+            $fetchBlock->addOpCode(new OpCode(
+                OpCode::TYPE_FUNCCALL_EXEC_RETURN,
+                $this->compileOperand($expr->result, $fetchBlock, false)
+            ));
+        } else {
+            $fetchBlock->addOpCode(new OpCode(
+                OpCode::TYPE_FUNCCALL_EXEC_NORETURN,
+            ));
+        }
+        $fetchJump = new OpCode(OpCode::TYPE_JUMP);
+        $fetchJump->block1 = $endBlock;
+        $fetchBlock->addOpCode($fetchJump);
+        $endBlock->parents[] = $nullBlock;
+        $endBlock->parents[] = $fetchBlock;
+
+        $nullsafeOp = new OpCode(
+            OpCode::TYPE_NULLSAFE,
+            $resultSlot,
+            $receiverSlot
+        );
+        $nullsafeOp->block1 = $nullBlock;
+        $nullsafeOp->block2 = $fetchBlock;
+        $nullsafeOp->block3 = $endBlock;
+        $block->addOpCode($nullsafeOp);
+
+        return $endBlock;
+    }
+
+    protected function resolveSimpleVariableName(Operand $var): string
+    {
+        while ($var instanceof Temporary) {
+            if (null === $var->original) {
+                break;
+            }
+            $var = $var->original;
+        }
+        if ($var instanceof Operand\Literal && is_string($var->value)) {
+            return $var->value;
+        }
+        if (!$var instanceof Operand\Variable) {
+            throw new \LogicException('Expected a simple variable operand');
+        }
+        $name = $var->name;
+        while ($name instanceof Temporary) {
+            if (null === $name->original) {
+                break;
+            }
+            $name = $name->original;
+        }
+        if ($name instanceof Operand\Literal && is_string($name->value)) {
+            return $name->value;
+        }
+
+        throw new \LogicException('Expected a simple variable name');
     }
 
     /**
@@ -1456,6 +1569,18 @@ class Compiler {
                 }
 
                 return $ops;
+            case 'Terminal_GlobalVar':
+                $globalName = $this->resolveSimpleVariableName($terminal->var);
+                $nameVar = new Variable(Variable::TYPE_STRING);
+                $nameVar->string($globalName);
+                $nameOperand = new Operand\Literal($globalName);
+                $nameOperand->type = Type::string();
+                $nameSlot = $block->registerConstant($nameOperand, $nameVar);
+                return [new OpCode(
+                    OpCode::TYPE_DECLARE_GLOBAL,
+                    $this->compileOperand($terminal->var, $block, false),
+                    $nameSlot
+                )];
             default:
                 throw new \LogicException("Unknown Terminal Type: " . $terminal->getType());
         }
