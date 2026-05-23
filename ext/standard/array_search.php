@@ -15,6 +15,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -62,10 +63,10 @@ final class array_search extends Internal
         }
         $strict = $context->constantFromBool(false);
         if (3 === $argc) {
-            if (JITVariable::TYPE_NATIVE_BOOL !== $args[2]->type) {
-                throw new \LogicException('array_search() strict flag must be boolean in this compiler build');
-            }
-            $strict = $context->helper->loadValue($args[2]);
+            $strict = JitBoolArg::lower($context, $args[2], 'array_search() strict');
+        }
+        if (JITVariable::TYPE_STRING === $args[0]->type || JITVariable::TYPE_VALUE === $args[0]->type) {
+            $this->jitString($context, $args[0], 'array_search() needle');
         }
 
         return ArrayBuiltinHelper::arraySearch($context, $args[0], $args[1], $strict);

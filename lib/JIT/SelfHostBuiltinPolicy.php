@@ -9,6 +9,7 @@ final class SelfHostBuiltinPolicy
     /** @var array<string, string> */
     private const REQUIRED_FOR_BUNDLE = self::CATEGORY_FILESYSTEM
         + self::CATEGORY_STRING
+        + self::CATEGORY_ARRAY
         + self::CATEGORY_HASH
         + self::CATEGORY_PREG
         + self::CATEGORY_JSON;
@@ -24,7 +25,16 @@ final class SelfHostBuiltinPolicy
     private const CATEGORY_STRING = [
         'strtolower' => 'string', 'strtoupper' => 'string', 'strcmp' => 'string', 'strncmp' => 'string',
         'strcasecmp' => 'string', 'strncasecmp' => 'string', 'strlen' => 'string', 'count' => 'string',
-        'sizeof' => 'string',
+        'sizeof' => 'string', 'str_replace' => 'string', 'str_rot13' => 'string', 'strval' => 'string',
+        'strip_tags' => 'string', 'sprintf' => 'string', 'chr' => 'string', 'number_format' => 'string',
+        'base64_encode' => 'string', 'base64_decode' => 'string',
+    ];
+
+    /** @var array<string, string> */
+    private const CATEGORY_ARRAY = [
+        'array_merge' => 'array', 'array_keys' => 'array', 'array_values' => 'array',
+        'in_array' => 'array', 'array_search' => 'array', 'array_fill' => 'array', 'array_slice' => 'array',
+        'array_key_exists' => 'array', 'array_map' => 'array',
     ];
 
     /** @var array<string, string> */
@@ -105,6 +115,9 @@ final class SelfHostBuiltinPolicy
         return self::isAutoStubBatchMember($name) || self::looksLikeStdlibBuiltin($name);
     }
 
+    /** @var array<string, true>|null */
+    private static ?array $registeredStdlib = null;
+
     private static function looksLikeStdlibBuiltin(string $name): bool
     {
         $key = self::normalizeName($name);
@@ -112,17 +125,16 @@ final class SelfHostBuiltinPolicy
             return false;
         }
 
-        static $registered = null;
-        if (null === $registered) {
-            $registered = [];
+        if (null === self::$registeredStdlib) {
+            self::$registeredStdlib = [];
             foreach ((new \PHPCompiler\ext\standard\Module())->getFunctions() as $fn) {
-                $registered[strtolower($fn->getName())] = true;
+                self::$registeredStdlib[strtolower($fn->getName())] = true;
             }
             foreach ((new \PHPCompiler\ext\types\Module())->getFunctions() as $fn) {
-                $registered[strtolower($fn->getName())] = true;
+                self::$registeredStdlib[strtolower($fn->getName())] = true;
             }
         }
 
-        return isset($registered[$key]);
+        return isset(self::$registeredStdlib[$key]);
     }
 }

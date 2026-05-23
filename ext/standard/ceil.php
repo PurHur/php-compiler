@@ -14,6 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -57,7 +58,7 @@ final class ceil extends Internal
         $v = $context->helper->loadValue($args[0]);
         switch ($args[0]->type) {
             case JITVariable::TYPE_NATIVE_LONG:
-                $asFloat = $context->builder->siToFp($v, $double);
+                $asFloat = $context->builder->siToFp(JitLongArg::lower($context, $args[0], 'ceil() argument #1'), $double);
                 break;
             case JITVariable::TYPE_NATIVE_DOUBLE:
                 $asFloat = $v;

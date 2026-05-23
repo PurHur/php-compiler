@@ -82,6 +82,7 @@ final class parse_url extends Internal
             throw new \LogicException('parse_url() component must be an integer in this compiler build');
         }
 
+        $this->jitString($context, $args[0], 'parseurl() argument #1');
         return JitParseUrl::parseUrl($context, $args[0], $component);
     }
 }

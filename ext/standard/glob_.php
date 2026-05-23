@@ -68,6 +68,7 @@ final class glob_ extends Internal
             $flags = $context->helper->loadValue($args[1]);
         }
 
+        $this->jitString($context, $args[0], 'glob() argument #1');
         return JitFsGlob::glob($context, $context->helper->loadValue($args[0]), $flags);
     }
 }

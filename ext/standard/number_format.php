@@ -14,6 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -73,6 +74,20 @@ final class number_format extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 4) {
+            throw new \LogicException('number_format() requires one to four arguments');
+        }
+        if ($argc >= 2) {
+            JitLongArg::lower($context, $args[1], 'number_format() decimals');
+        }
+        if ($argc >= 3) {
+            $this->jitString($context, $args[2], 'number_format() decimal separator');
+        }
+        if ($argc >= 4) {
+            $this->jitString($context, $args[3], 'number_format() thousands separator');
+        }
+
         return JitNumberFormat::format($context, ...$args);
     }
 }

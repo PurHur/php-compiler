@@ -81,7 +81,7 @@ final class floatval extends Internal
             case JITVariable::TYPE_NATIVE_BOOL:
                 return $context->builder->uiToFp($v, $double);
             case JITVariable::TYPE_STRING:
-                $ptr = $this->stringDataPtr($context, $v);
+                $ptr = $this->stringDataPtr($context, $this->jitString($context, $args[0], 'floatval() argument #1'));
                 $endPtr = $context->getTypeFromString('int8**')->constNull();
 
                 return $context->builder->call($context->lookupFunction('strtod'), $ptr, $endPtr);

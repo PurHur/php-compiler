@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -48,6 +49,16 @@ final class json_encode extends Internal
         }
         if (\count($args) > 1) {
             throw new \LogicException('json_encode() flags not supported in this compiler build');
+        }
+
+        $literal = JitStringArg::compileTimeLiteral($args[0]);
+        if (null !== $literal) {
+            $encoded = \json_encode($literal);
+            if (false === $encoded) {
+                throw new \LogicException('json_encode() failed');
+            }
+
+            return $context->builder->load($context->constantStringFromString($encoded));
         }
 
         return JitJsonEncode::encode($context, $args[0]);

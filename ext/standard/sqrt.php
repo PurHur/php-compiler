@@ -14,6 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -54,7 +55,7 @@ final class sqrt extends Internal
             throw new \LogicException('sqrt() requires exactly one argument');
         }
         $double = $context->getTypeFromString('double');
-        $v = $context->helper->loadValue($args[0]);
+        $v = JitLongArg::lower($context, $args[0], 'sqrt() argument #1');
         switch ($args[0]->type) {
             case JITVariable::TYPE_NATIVE_LONG:
                 $asFloat = $context->builder->siToFp($v, $double);

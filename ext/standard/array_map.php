@@ -72,6 +72,10 @@ final class array_map extends Internal
             throw new \LogicException('array_map() second argument must be an array in this compiler build');
         }
 
+        if (JITVariable::TYPE_STRING === $args[0]->type || JITVariable::TYPE_VALUE === $args[0]->type) {
+            $this->jitString($context, $args[0], 'array_map() callback');
+        }
+
         return ArrayBuiltinHelper::buildMapArray($context, $args[0], $args[1]);
     }
 

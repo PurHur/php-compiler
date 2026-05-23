@@ -15,6 +15,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -69,10 +70,10 @@ final class array_slice extends Internal
 
         $i64 = $context->getTypeFromString('int64');
         $i1 = $context->getTypeFromString('int1');
-        $offset = self::jitSignedI64($context, $args[1]);
+        $offset = JitLongArg::lower($context, $args[1], 'array_slice() offset');
         $hasLength = $i1->constInt(3 === $argc ? 1 : 0, false);
         $length = 3 === $argc
-            ? self::jitSignedI64($context, $args[2])
+            ? JitLongArg::lower($context, $args[2], 'array_slice() length')
             : $i64->constInt(0, false);
 
         return ArrayBuiltinHelper::buildSliceArray($context, $args[0], $offset, $hasLength, $length);

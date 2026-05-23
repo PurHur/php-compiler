@@ -27,6 +27,20 @@ final class strchr extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        return self::delegate()->call($context, ...$args);
+        $argc = \count($args);
+        if ($argc < 2 || $argc > 3) {
+            throw new \LogicException('strchr() requires two or three arguments in this compiler build');
+        }
+        $before = null;
+        if (3 === $argc) {
+            $before = $this->jitBool($context, $args[2], 'strchr() before_needle');
+        }
+
+        return JitStrstr::find(
+            $context,
+            $this->jitString($context, $args[0], 'strchr() argument #1'),
+            $this->jitString($context, $args[1], 'strchr() argument #2'),
+            $before
+        );
     }
 }
