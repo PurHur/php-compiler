@@ -302,6 +302,7 @@ final class ArrayBuiltinHelper
         strval::class => Variable::TYPE_STRING,
         intval::class => Variable::TYPE_NATIVE_LONG,
         floatval::class => Variable::TYPE_NATIVE_DOUBLE,
+        doubleval::class => Variable::TYPE_NATIVE_DOUBLE,
         boolval::class => Variable::TYPE_NATIVE_BOOL,
         strtolower::class => Variable::TYPE_STRING,
         strtoupper::class => Variable::TYPE_STRING,

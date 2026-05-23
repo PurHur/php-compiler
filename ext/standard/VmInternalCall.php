@@ -25,6 +25,7 @@ final class VmInternalCall
         'strval' => strval::class,
         'intval' => intval::class,
         'floatval' => floatval::class,
+        'doubleval' => doubleval::class,
         'boolval' => boolval::class,
         'strtolower' => strtolower::class,
         'strtoupper' => strtoupper::class,
