@@ -481,7 +481,9 @@ class Context {
         Block $block,
         Operand $op
     ) {
-        assert(!$this->scope->variables->contains($op));
+        if ($this->scope->variables->contains($op)) {
+            return;
+        }
         $name = OperandName::resolve($op);
         if (null !== $name && Superglobals::isSuperglobalName($name)) {
             $this->scope->variables[$op] = SuperglobalInit::load($this, $name);
@@ -493,7 +495,6 @@ class Context {
     }
 
     public function setVariableOp(Operand $op, Variable $var) {
-        assert(!$this->scope->variables->contains($op));
         $this->scope->variables[$op] = $var;
     }
 
