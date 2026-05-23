@@ -12,6 +12,9 @@ final class VmString
 {
     public const TRIM_DEFAULT = " \t\n\r\0\x0B";
 
+    /** Regex metacharacters escaped by preg_quote() (PHP 8.2 byte subset). */
+    private const PREG_QUOTE_ESCAPE = '.\\+*?[^]()$={}-|!<>:';
+
     public static function byteLength(string $string): int
     {
         $len = 0;
@@ -820,6 +823,26 @@ final class VmString
     public static function asciiUpper(string $string): string
     {
         return self::asciiCaseTransform($string, false);
+    }
+
+    public static function pregQuote(string $string, ?string $delimiter = null): string
+    {
+        $delim = null;
+        if (null !== $delimiter && '' !== $delimiter) {
+            $delim = $delimiter[0];
+        }
+        $out = '';
+        $len = self::byteLength($string);
+        for ($i = 0; $i < $len; ++$i) {
+            $ch = $string[$i];
+            if (str_contains(self::PREG_QUOTE_ESCAPE, $ch) || (null !== $delim && $ch === $delim)) {
+                $out .= '\\'.$ch;
+            } else {
+                $out .= $ch;
+            }
+        }
+
+        return $out;
     }
 
     public static function asciiLcfirst(string $string): string
