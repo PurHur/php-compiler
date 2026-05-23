@@ -80,6 +80,11 @@ final class VmFs
         return @mkdir($path, $mode, $recursive);
     }
 
+    public static function rmdir(string $path): bool
+    {
+        return @rmdir($path);
+    }
+
     private static function modeToFiletype(int $mode): string
     {
         $type = $mode & 0xF000;
