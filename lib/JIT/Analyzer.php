@@ -59,6 +59,7 @@ class Analyzer
                 || $usage instanceof Op\Expr\New_
                 || $usage instanceof Op\Expr\MethodCall
                 || $usage instanceof Op\Expr\PropertyFetch
+                || $usage instanceof Op\Expr\Empty_
                 || $usage instanceof Op\Expr\Include_
                 || $usage instanceof Op\Terminal\Return_
                 || $usage instanceof Op\Iterator\Reset
