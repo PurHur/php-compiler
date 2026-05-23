@@ -11,7 +11,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** mkdir() — VM via VmFs; JIT/AOT via libc mkdir(2) (non-recursive subset). */
+/** mkdir() — VM via VmFs; JIT/AOT via __compiler_mkdir (libc mkdir(2), recursive in C). */
 final class mkdir_ extends Internal
 {
     public function __construct()
@@ -60,34 +60,31 @@ final class mkdir_ extends Internal
         if (JITVariable::TYPE_STRING !== $args[0]->type) {
             throw new \LogicException('mkdir() directory must be a string in this compiler build');
         }
-        if ($argc >= 3) {
-            if (JITVariable::TYPE_NATIVE_BOOL !== $args[2]->type) {
-                throw new \LogicException('mkdir() recursive flag must be a boolean in this compiler build');
-            }
-            if (JITVariable::KIND_VALUE === $args[2]->kind) {
-                $lib = $context->llvm->lib;
-                if (null !== $lib->LLVMIsAConstantInt($args[2]->value->value)) {
-                    $truthy = 0 !== (int) $lib->LLVMConstIntGetZExtValue($args[2]->value->value);
-                    if ($truthy) {
-                        throw new \LogicException(
-                            'mkdir() with recursive=true is not supported for LLVM in this compiler build'
-                        );
-                    }
-                }
-            }
-        }
-        $i32 = $context->getTypeFromString('int32');
-        $mode = $i32->constInt(0777, false);
+        $i64 = $context->getTypeFromString('int64');
+        $i1 = $context->getTypeFromString('int1');
+        $mode = $i64->constInt(0777, false);
         if ($argc >= 2) {
             if (JITVariable::TYPE_NATIVE_LONG !== $args[1]->type) {
                 throw new \LogicException('mkdir() mode must be an integer in this compiler build');
             }
             $mode = $context->builder->truncOrBitCast(
                 $context->helper->loadValue($args[1]),
-                $i32
+                $i64
             );
         }
+        $recursive = $i1->constInt(0, false);
+        if ($argc >= 3) {
+            if (JITVariable::TYPE_NATIVE_BOOL !== $args[2]->type) {
+                throw new \LogicException('mkdir() recursive flag must be a boolean in this compiler build');
+            }
+            $recursive = $context->helper->loadValue($args[2]);
+        }
 
-        return JitMkdir::invoke($context, $context->helper->loadValue($args[0]), $mode);
+        return JitMkdir::invoke(
+            $context,
+            $context->helper->loadValue($args[0]),
+            $mode,
+            $recursive
+        );
     }
 }

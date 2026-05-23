@@ -12,5 +12,16 @@ if (mkdir($one, 0700)) {
 } else {
     echo "fail\n";
 }
+$nested = 'test/compliance/cases/stdlib/mkdir_fixture/jit_nested/deep';
+if (mkdir($nested, 0777, true)) {
+    if (is_dir($nested)) {
+        echo "rec\n";
+    } else {
+        echo "badrec\n";
+    }
+} else {
+    echo "failrec\n";
+}
 --EXPECT--
 ok
+rec

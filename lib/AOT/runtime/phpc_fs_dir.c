@@ -8,6 +8,7 @@
 #include <glob.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 
 typedef struct __hashtable__ __hashtable__;
 typedef struct __string__ __string__;
@@ -45,6 +46,81 @@ static __string__ *cstr_to_string(const char *cstr)
 static int phpc_scandir_desc(const struct dirent **a, const struct dirent **b)
 {
     return strcmp((*b)->d_name, (*a)->d_name);
+}
+
+static int phpc_path_is_dir(const char *path)
+{
+    struct stat st;
+
+    return stat(path, &st) == 0 && S_ISDIR(st.st_mode);
+}
+
+static int phpc_mkdir_one(const char *path, mode_t mode)
+{
+    if (mkdir(path, mode) == 0) {
+        return 1;
+    }
+    if (EEXIST == errno && phpc_path_is_dir(path)) {
+        return 1;
+    }
+
+    return 0;
+}
+
+static int phpc_mkdir_recursive(const char *path, mode_t mode)
+{
+    char buf[4096];
+    size_t len;
+    char *p;
+
+    if (NULL == path || '\0' == *path) {
+        return 0;
+    }
+    if (phpc_path_is_dir(path)) {
+        return 1;
+    }
+    if (strlen(path) >= sizeof(buf)) {
+        return 0;
+    }
+    memcpy(buf, path, strlen(path) + 1);
+    len = strlen(buf);
+    if (len > 1 && '/' == buf[len - 1]) {
+        buf[len - 1] = '\0';
+    }
+    for (p = buf + 1; *p != '\0'; p++) {
+        if ('/' != *p) {
+            continue;
+        }
+        *p = '\0';
+        if ('\0' != buf[0] && !phpc_mkdir_one(buf, mode)) {
+            return 0;
+        }
+        *p = '/';
+    }
+
+    return phpc_mkdir_one(buf, mode);
+}
+
+/** mkdir() runtime: returns 1 on success, 0 on failure (issue #757). */
+int __compiler_mkdir(__string__ *path, long long mode, int recursive)
+{
+    const char *p;
+    mode_t m;
+
+    if (NULL == path) {
+        return 0;
+    }
+    p = phpc_strdata(path);
+    m = (mode_t) mode;
+    if (recursive) {
+        return phpc_mkdir_recursive(p, m);
+    }
+
+    if (mkdir(p, m) == 0) {
+        return 1;
+    }
+
+    return 0;
 }
 
 __hashtable__ *__phpc_glob(__string__ *pattern, int flags)
