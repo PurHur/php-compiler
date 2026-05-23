@@ -107,6 +107,7 @@ class Module extends ModuleAbstract
             new implode(),
             new implode('join'),
             new str_replace(),
+            new strtr(),
             new preg_quote(),
             new quotemeta(),
             new addslashes(),

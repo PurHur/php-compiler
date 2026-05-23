@@ -14,6 +14,7 @@ final class Linker
         __DIR__.'/runtime/superglobals_refresh.c',
         __DIR__.'/runtime/hash_crypto.c',
         __DIR__.'/runtime/crc32.c',
+        __DIR__.'/runtime/strtr.c',
         __DIR__.'/runtime/filter_validate.c',
         __DIR__.'/runtime/phpc_fs_dir.c',
         __DIR__.'/runtime/phpc_process.c',

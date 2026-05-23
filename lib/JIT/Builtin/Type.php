@@ -191,6 +191,9 @@ class Type extends Builtin {
         $fntypeCrc32 = $this->context->context->functionType($i64, false, $strPtr, $i64);
         $fnCrc32 = $this->context->module->addFunction('__compiler_crc32', $fntypeCrc32);
         $this->context->registerFunction('__compiler_crc32', $fnCrc32);
+        $fntypeStrtr = $this->context->context->functionType($strPtr, false, $strPtr, $strPtr, $strPtr);
+        $fnStrtr = $this->context->module->addFunction('__compiler_strtr', $fntypeStrtr);
+        $this->context->registerFunction('__compiler_strtr', $fnStrtr);
         $fntypePregMatch = $this->context->context->functionType(
             $i64,
             false,
