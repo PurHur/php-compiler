@@ -258,6 +258,16 @@ final class VmFs
         return \feof($fp);
     }
 
+    public static function fflush(int $handle): bool
+    {
+        $fp = self::lookup($handle);
+        if (null === $fp) {
+            return false;
+        }
+
+        return @\fflush($fp);
+    }
+
     public static function fgetc(int $handle): string|false
     {
         $fp = self::lookup($handle);

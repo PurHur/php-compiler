@@ -203,6 +203,7 @@ class Module extends ModuleAbstract
             new fread(),
             new fgetc(),
             new feof_(),
+            new fflush_(),
             new fwrite(),
             new fclose(),
             new getenv_(),

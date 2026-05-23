@@ -59,6 +59,7 @@ static const char *phpc_builtin_functions[] = {
     "extract",
     "fclose",
     "feof",
+    "fflush",
     "fgetc",
     "file_exists",
     "file_get_contents",
@@ -224,4 +225,4 @@ static const char *phpc_builtin_functions[] = {
     "web_string",
     "wordwrap",
 };
-static const size_t phpc_builtin_functions_count = 223;
+static const size_t phpc_builtin_functions_count = 224;
