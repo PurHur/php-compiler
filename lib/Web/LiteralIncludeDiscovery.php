@@ -127,6 +127,14 @@ final class LiteralIncludeDiscovery
 
         foreach ($block->children as $child) {
             if ($child instanceof Op\Expr\Include_) {
+                // Caller-scope includes are compile-time inlined (IncludeHelper); bundling would
+                // reorder them before the entry body (issue #739, #471).
+                if (
+                    Op\Expr\Include_::TYPE_INCLUDE === $child->type
+                    || Op\Expr\Include_::TYPE_INCLUDE_ONCE === $child->type
+                ) {
+                    continue;
+                }
                 $literal = ConstStringFolder::foldForInclude($block, $child->expr, $child->getFile() ?: $fromFile);
                 if (null !== $literal) {
                     $paths[] = $literal;

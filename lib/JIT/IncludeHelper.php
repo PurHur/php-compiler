@@ -6,8 +6,8 @@ namespace PHPCompiler\JIT;
 
 use PHPCfg\Operand;
 use PHPCfg\Operand\Literal;
-use PHPCfg\Type;
 use PHPLLVM\BasicBlock;
+use PHPTypes\Type;
 use PHPLLVM\Value\Function_;
 use PHPCompiler\Block;
 use PHPCompiler\JIT;
@@ -100,8 +100,12 @@ final class IncludeHelper
                 $localBindings[$operand]
             );
         }
+        $bodyBb = $func->appendBasicBlock('include_body_'.(++self::$includeEntrySerial));
+        if (null === $entryBb->getTerminator()) {
+            $context->builder->branch($bodyBb);
+        }
         try {
-            $exitBb = $jit->compileIncludedAtEntry($func, $included, $entryBb);
+            $exitBb = $jit->compileIncludedAtEntry($func, $included, $bodyBb);
         } finally {
             --$context->inlineIncludeDepth;
             $context->popScope();
@@ -184,63 +188,6 @@ final class IncludeHelper
         Operand $calleeOp,
         Variable $callerVar
     ): void {
-        $bb = $context->builder->getInsertBlock();
-        if (null === $bb) {
-            return;
-        }
-        if (!$context->hasVariableOp($calleeOp)) {
-            $context->makeVariableFromOp($func, $bb, $included, $calleeOp);
-        }
-        $calleeVar = $context->getVariableFromOp($calleeOp);
-        $name = OperandName::resolve($calleeOp);
-        if (null !== $name) {
-            foreach ($callerBlock->opCodes as $op) {
-                if (OpCode::TYPE_ASSIGN !== $op->type) {
-                    continue;
-                }
-                $matches = false;
-                foreach ([$op->arg1, $op->arg2] as $slotIdx) {
-                    if (OperandName::resolve($callerBlock->getOperand($slotIdx)) === $name) {
-                        $matches = true;
-                        break;
-                    }
-                }
-                if (!$matches || !isset($callerBlock->constants[$op->arg3])) {
-                    continue;
-                }
-                $constant = $callerBlock->constants[$op->arg3];
-                if (!$constant instanceof VmVariable || VmVariable::TYPE_STRING !== $constant->type) {
-                    continue;
-                }
-                $native = $context->builder->load(
-                    $context->constantStringFromString($constant->toString())
-                );
-                $owned = $context->builder->call(
-                    $context->lookupFunction('__string__separate'),
-                    $native
-                );
-                $context->builder->store($owned, $calleeVar->value);
-                $calleeVar->addref();
-                $context->setVariableOp($calleeOp, $calleeVar);
-
-                return;
-            }
-        }
-        if (
-            Variable::TYPE_STRING === $callerVar->type
-            && Variable::KIND_VARIABLE === $callerVar->kind
-            && Variable::TYPE_STRING === $calleeVar->type
-            && Variable::KIND_VARIABLE === $calleeVar->kind
-        ) {
-            $context->builder->store(
-                $context->helper->loadValue($callerVar),
-                $calleeVar->value
-            );
-            $calleeVar->addref();
-            $context->setVariableOp($calleeOp, $calleeVar);
-
-            return;
-        }
         $jit->assignOperandForced($calleeOp, $callerVar);
     }
 
