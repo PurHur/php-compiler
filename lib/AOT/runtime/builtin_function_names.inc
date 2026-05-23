@@ -183,6 +183,7 @@ static const char *phpc_builtin_functions[] = {
     "sort",
     "sprintf",
     "sqrt",
+    "stat",
     "str_contains",
     "str_ends_with",
     "str_pad",
@@ -235,4 +236,4 @@ static const char *phpc_builtin_functions[] = {
     "web_string",
     "wordwrap",
 };
-static const size_t phpc_builtin_functions_count = 230;
+static const size_t phpc_builtin_functions_count = 231;

@@ -375,6 +375,11 @@ class Type extends Builtin {
             $this->context->context->functionType($htPtr, false, $strPtr, $i32)
         );
         $this->context->registerFunction('__phpc_scandir', $fnScandir);
+        $fnStat = $this->context->module->addFunction(
+            '__phpc_stat',
+            $this->context->context->functionType($htPtr, false, $strPtr, $i32)
+        );
+        $this->context->registerFunction('__phpc_stat', $fnStat);
         $fnFgetcsv = $this->context->module->addFunction(
             '__compiler_fgetcsv',
             $this->context->context->functionType($htPtr, false, $i64, $i64, $strPtr, $strPtr, $strPtr)

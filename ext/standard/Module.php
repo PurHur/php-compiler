@@ -190,6 +190,7 @@ class Module extends ModuleAbstract
             new filesize(),
             new filemtime(),
             new clearstatcache_(),
+            new stat_(),
             new fileperms(),
             new is_file(),
             new is_dir(),

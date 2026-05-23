@@ -19,6 +19,8 @@ typedef struct __hashtable__ __hashtable__;
 typedef struct __string__ __string__;
 extern __hashtable__ *__hashtable__alloc(void);
 extern void __hashtable__setStringAt(__hashtable__ *ht, size_t index, __string__ *val);
+extern void __hashtable__setStringKeyLong(__hashtable__ *ht, __string__ *key, long long val);
+extern void __hashtable__setLongAt(__hashtable__ *ht, size_t index, long long val);
 extern __string__ *__string__init(long long size, const char *value);
 
 static size_t phpc_strlen(__string__ *s)
@@ -325,6 +327,45 @@ __hashtable__ *__phpc_scandir(__string__ *path, int sorting_order)
 
     return ht;
 }
+
+static void phpc_stat_ht_pair(__hashtable__ *ht, int index, const char *key, long long val)
+{
+    __hashtable__setStringKeyLong(ht, cstr_to_string(key), val);
+    __hashtable__setLongAt(ht, (size_t) index, val);
+}
+
+/** stat()/lstat() metadata array; NULL on failure (issue #1197). */
+__hashtable__ *__phpc_stat(__string__ *path, int use_lstat)
+{
+    struct stat st;
+    const char *p;
+    __hashtable__ *ht;
+
+    if (NULL == path) {
+        return NULL;
+    }
+    p = phpc_strdata(path);
+    if ((use_lstat ? lstat(p, &st) : stat(p, &st)) != 0) {
+        return NULL;
+    }
+    ht = __hashtable__alloc();
+    phpc_stat_ht_pair(ht, 0, "dev", (long long) st.st_dev);
+    phpc_stat_ht_pair(ht, 1, "ino", (long long) st.st_ino);
+    phpc_stat_ht_pair(ht, 2, "mode", (long long) st.st_mode);
+    phpc_stat_ht_pair(ht, 3, "nlink", (long long) st.st_nlink);
+    phpc_stat_ht_pair(ht, 4, "uid", (long long) st.st_uid);
+    phpc_stat_ht_pair(ht, 5, "gid", (long long) st.st_gid);
+    phpc_stat_ht_pair(ht, 6, "rdev", (long long) st.st_rdev);
+    phpc_stat_ht_pair(ht, 7, "size", (long long) st.st_size);
+    phpc_stat_ht_pair(ht, 8, "atime", (long long) st.st_atim.tv_sec);
+    phpc_stat_ht_pair(ht, 9, "mtime", (long long) st.st_mtim.tv_sec);
+    phpc_stat_ht_pair(ht, 10, "ctime", (long long) st.st_ctim.tv_sec);
+    phpc_stat_ht_pair(ht, 11, "blksize", (long long) st.st_blksize);
+    phpc_stat_ht_pair(ht, 12, "blocks", (long long) st.st_blocks);
+
+    return ht;
+}
+
 /** sys_get_temp_dir() — TMPDIR/TEMP/TMP or /tmp, realpath when possible (#1202). */
 __string__ *__compiler_sys_get_temp_dir(void)
 {

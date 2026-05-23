@@ -70,6 +70,41 @@ final class VmFs
         return self::modeToFiletype((int) ($stat['mode'] ?? 0));
     }
 
+  /**
+   * stat()/lstat() array for VM builtins (issue #1197).
+   *
+   * @return HashTable|false
+   */
+    public static function statInfo(string $path, bool $lstat = false): HashTable|false
+    {
+        $raw = $lstat ? @lstat($path) : @stat($path);
+        if (false === $raw) {
+            return false;
+        }
+
+        return self::phpStatArrayToHashTable($raw);
+    }
+
+    /**
+     * @param array<int|string, int> $stat
+     */
+    private static function phpStatArrayToHashTable(array $stat): HashTable
+    {
+        $keys = ['dev', 'ino', 'mode', 'nlink', 'uid', 'gid', 'rdev', 'size', 'atime', 'mtime', 'ctime', 'blksize', 'blocks'];
+        $ht = new HashTable();
+        foreach ($keys as $i => $key) {
+            $val = (int) ($stat[$key] ?? $stat[$i] ?? 0);
+            $named = new Variable();
+            $named->int($val);
+            $ht->add($key, $named);
+            $indexed = new Variable();
+            $indexed->int($val);
+            $ht->updateIndex($i, $indexed);
+        }
+
+        return $ht;
+    }
+
     public static function readlink(string $path): string|false
     {
         $target = @readlink($path);
