@@ -20,7 +20,6 @@ final class UnsupportedRegistryTest extends TestCase
     public static function kindToIssueProvider(): array
     {
         return [
-            'assign coalesce' => ['Expr_AssignOp_Coalesce', 99],
             'yield' => ['Expr_Yield', 167],
             'yield from' => ['Expr_YieldFrom', 167],
             'closure' => ['Expr_Closure', 72],
@@ -31,6 +30,11 @@ final class UnsupportedRegistryTest extends TestCase
     public function testMatchNoLongerTrackedAsUnsupported(): void
     {
         $this->assertNull(UnsupportedRegistry::trackingIssueForKind('Expr_Match'));
+    }
+
+    public function testCoalesceAssignNoLongerTrackedAsUnsupported(): void
+    {
+        $this->assertNull(UnsupportedRegistry::trackingIssueForKind('Expr_AssignOp_Coalesce'));
     }
 
     public function testPrePostIncrementKindsNoLongerTrackedAsUnsupported(): void

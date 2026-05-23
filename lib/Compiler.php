@@ -129,7 +129,20 @@ class Compiler {
                     if ($child instanceof Op\Expr\Isset_ && count($child->vars) > 1) {
                         $block = $this->compileIssetMulti($child, $block);
                     } elseif ($child instanceof Op\Expr\BinaryOp\Coalesce) {
-                        $block = $this->compileCoalesce($child, $block);
+                        $resultOverride = null;
+                        if (
+                            $i + 1 < $opCount
+                            && $ops[$i + 1] instanceof Op\Expr\Assign
+                            && $this->isCoalesceAssignTail($ops[$i + 1], $child)
+                        ) {
+                            /** @var Op\Expr\Assign $tailAssign */
+                            $tailAssign = $ops[$i + 1];
+                            $resultOverride = $tailAssign->var;
+                        }
+                        $block = $this->compileCoalesce($child, $block, $resultOverride);
+                        if (null !== $resultOverride) {
+                            ++$i;
+                        }
                     } elseif ($child instanceof Op\Expr\NullsafePropertyFetch) {
                         $block = $this->compileNullsafePropertyFetch($child, $block);
                     } elseif ($child instanceof Op\Expr\NullsafeMethodCall) {
@@ -249,6 +262,16 @@ class Compiler {
     private function isRedundantCoalesceTailAssign(
         Op\Expr\Assign $assign,
         Op\Expr\ArrayDimFetch $fetch,
+        Op\Expr\BinaryOp\Coalesce $coalesce
+    ): bool {
+        return $this->isCoalesceAssignTail($assign, $coalesce);
+    }
+
+    /**
+     * php-cfg: Coalesce; Assign $dst = coalesce-result for ??= (issue #1235).
+     */
+    private function isCoalesceAssignTail(
+        Op\Expr\Assign $assign,
         Op\Expr\BinaryOp\Coalesce $coalesce
     ): bool {
         return $this->operandsChainEqual($assign->expr, $coalesce->result);
@@ -1097,6 +1120,13 @@ class Compiler {
         $rightBlock->inheritUndefinedLocals = true;
         $rightBlock->inheritScopeFrom($block);
         $rightSlot = $this->compileOperand($expr->right, $rightBlock, true);
+        if (
+            null !== $dimFetch
+            && null !== $resultOverride
+            && $this->operandsChainEqual($resultOverride, $dimFetch->result)
+        ) {
+            $this->compileArrayDimFetchWrite($dimFetch, $rightBlock);
+        }
         $rightBlock->addOpCode(new OpCode(
             OpCode::TYPE_ASSIGN,
             $resultSlot,
@@ -1160,6 +1190,19 @@ class Compiler {
     {
         $block->addOpCode(new OpCode(
             OpCode::TYPE_ARRAY_DIM_FETCH,
+            $this->compileOperand($fetch->result, $block, false),
+            $this->compileOperand($fetch->var, $block, true),
+            null !== $fetch->dim ? $this->compileOperand($fetch->dim, $block, true) : null
+        ));
+    }
+
+    /**
+     * Emit a write fetch in $block (used by ??= right branch when the key is absent, issue #1235).
+     */
+    private function compileArrayDimFetchWrite(Op\Expr\ArrayDimFetch $fetch, Block $block): void
+    {
+        $block->addOpCode(new OpCode(
+            OpCode::TYPE_ARRAY_DIM_FETCH_WRITE,
             $this->compileOperand($fetch->result, $block, false),
             $this->compileOperand($fetch->var, $block, true),
             null !== $fetch->dim ? $this->compileOperand($fetch->dim, $block, true) : null

@@ -30,6 +30,14 @@ PHP;
         $this->assertSame(0, $exit['code']);
     }
 
+    public function testLintCoalesceAssignAccepted(): void
+    {
+        $code = '<?php $a = null; $a ??= "default"; echo $a;';
+        $exit = $this->runLint(['-r', $code]);
+        $this->assertSame(0, $exit['code']);
+        $this->assertStringNotContainsString('Expr_AssignOp_Coalesce', $exit['stdout']);
+    }
+
     public function testLintNullsafePropertyAccepted(): void
     {
         $code = '<?php class C { public int $x = 1; } $c = null; $c?->x;';
