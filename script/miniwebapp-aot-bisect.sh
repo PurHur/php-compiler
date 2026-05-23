@@ -28,6 +28,7 @@ readonly -a BISECT_STEPS=(
   'layout_script_base|layout_script_base|866'
   'coalesce_then_inherited_local|coalesce_then_inherited_local|866'
   'coalesce_then_htmlspecialchars|coalesce_then_htmlspecialchars|866'
+  'coalesce_scriptbase_htmlspecialchars|coalesce_scriptbase_htmlspecialchars|764'
   'coalesce_then_nested_include|coalesce_then_nested_include|784'
   'layout_title_branch|layout_title_branch|784'
   'method_include_void_array_property|method_include_void_array_property|846'

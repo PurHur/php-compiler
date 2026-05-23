@@ -14,9 +14,10 @@ Ordered smallest → largest for **#764** triage (issues **#880**, **#879**). Sa
 | 6 | `layout_script_base` | #866 |
 | 7 | `coalesce_then_inherited_local` | #866 |
 | 8 | `coalesce_then_htmlspecialchars` | #866 |
-| 9 | `coalesce_then_nested_include` | #784 |
-| 10 | `layout_title_branch` | #784 |
-| 11 | `method_include_void_array_property` | #846 |
+| 9 | `coalesce_scriptbase_htmlspecialchars` | #764 / #866 |
+| 10 | `coalesce_then_nested_include` | #784 |
+| 11 | `layout_title_branch` | #784 |
+| 12 | `method_include_void_array_property` | #846 |
 
 Run (LLVM 9 required):
 
