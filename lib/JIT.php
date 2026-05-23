@@ -2258,7 +2258,70 @@ class JIT {
                     $name = $block->getOperand($op->arg1);
                     assert($name instanceof Operand\Literal);
                     $type = Variable::getTypeFromType($block->getOperand($op->arg3)->type);
-                    $this->context->type->object->defineProperty($classId, $name->value, $type);
+                    $defaultEntry = null;
+                    if (null !== $op->arg2) {
+                        $defaultVar = null;
+                        if (isset($block->constants[$op->arg2])) {
+                            $defaultVar = $block->constants[$op->arg2];
+                        } else {
+                            $classFrame = $block->getFrame($this->context->runtime->vmContext);
+                            if (isset($classFrame->scope[$op->arg2])) {
+                                $defaultVar = $classFrame->scope[$op->arg2]->resolveIndirect();
+                            }
+                        }
+                        if (
+                            null === $defaultVar
+                            || 0 === $defaultVar->type
+                            || \PHPCompiler\VM\Variable::TYPE_UNDEFINED === $defaultVar->type
+                        ) {
+                            foreach ($block->constants as $candidate) {
+                                if (\PHPCompiler\VM\Variable::TYPE_BOOLEAN === $candidate->type) {
+                                    $defaultVar = $candidate;
+                                    break;
+                                }
+                                if (
+                                    \PHPCompiler\VM\Variable::TYPE_STRING === $candidate->type
+                                    && in_array($candidate->toString(), ['true', 'false'], true)
+                                ) {
+                                    $defaultVar = $candidate;
+                                    break;
+                                }
+                            }
+                        }
+                        if (null === $defaultVar) {
+                            throw new \LogicException(
+                                'Missing compile-time default for property '.$name->value
+                            );
+                        }
+                        if (
+                            \PHPCompiler\VM\Variable::TYPE_STRING === $defaultVar->type
+                            && 'true' === $defaultVar->toString()
+                        ) {
+                            $defaultEntry = [
+                                'type' => Variable::TYPE_NATIVE_BOOL,
+                                'value' => true,
+                            ];
+                        } elseif (
+                            \PHPCompiler\VM\Variable::TYPE_STRING === $defaultVar->type
+                            && 'false' === $defaultVar->toString()
+                        ) {
+                            $defaultEntry = [
+                                'type' => Variable::TYPE_NATIVE_BOOL,
+                                'value' => false,
+                            ];
+                        } else {
+                            $defaultEntry = [
+                                'type' => Variable::fromVMVariable($defaultVar->type),
+                                'value' => $this->context->type->object->compileTimeScalarFromVm($defaultVar),
+                            ];
+                        }
+                    }
+                    $this->context->type->object->defineProperty(
+                        $classId,
+                        $name->value,
+                        $type,
+                        $defaultEntry
+                    );
                     break;
                 case OpCode::TYPE_CONST_FETCH:
                 case OpCode::TYPE_CLASS_CONST_FETCH:

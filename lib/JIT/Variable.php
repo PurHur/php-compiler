@@ -115,6 +115,7 @@ final class Variable {
 
     public static function fromVMVariable(int $type): int {
         switch ($type) {
+            case VMVariable::TYPE_NULL: return self::TYPE_NULL;
             case VMVariable::TYPE_INTEGER: return self::TYPE_NATIVE_LONG;
             case VMVariable::TYPE_FLOAT: return self::TYPE_NATIVE_DOUBLE;
             case VMVariable::TYPE_BOOLEAN: return self::TYPE_NATIVE_BOOL;
@@ -192,6 +193,9 @@ final class Variable {
         }
         if (null !== $type->userType && 0 === strcasecmp($type->userType, 'SplObjectStorage')) {
             return self::TYPE_HASHTABLE;
+        }
+        if (null !== $type->userType && 0 === strcasecmp($type->userType, 'mixed')) {
+            return self::TYPE_VALUE;
         }
         if (isset(self::TYPE_MAP[$type->type])) {
             return self::TYPE_MAP[$type->type];

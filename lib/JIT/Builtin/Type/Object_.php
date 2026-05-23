@@ -214,6 +214,7 @@ class Object_ extends Type {
 
         if ($propCount > 0) {
             $this->initPropertySlots($obj, $propCount);
+            $this->initPropertyDefaults($obj, $classId);
         }
 
         if ($this->isSplObjectStorageClass($classId)) {
@@ -259,6 +260,21 @@ class Object_ extends Type {
             Variable::KIND_VALUE,
             $htPtr
         );
+    }
+
+    private function initPropertyDefaults(PHPLLVM\Value $obj, int $classId): void
+    {
+        if (!isset($this->properties[$classId])) {
+            return;
+        }
+        foreach ($this->properties[$classId] as $propset) {
+            if (!isset($propset[4])) {
+                continue;
+            }
+            $slot = $this->propertySlotPtr($obj, $propset[3]);
+            $defaultVar = $this->jitConstantFromEntry($propset[4]);
+            $this->propertyStore($slot, $defaultVar, $propset[2]);
+        }
     }
 
     private function initPropertySlots(PHPLLVM\Value $obj, int $propCount): void
@@ -580,14 +596,18 @@ class Object_ extends Type {
         return isset($this->hasConstructor[$classId]);
     }
 
-    public function defineProperty(int $classId, string $name, int $type): void
+    public function defineProperty(int $classId, string $name, int $type, ?array $defaultEntry = null): void
     {
         if (!isset($this->propNameMap[$name])) {
             $this->propNameMap[$name] = count($this->propNameMap);
         }
-        $this->properties[$classId][] = [
+        $propset = [
             $this->propNameMap[$name], $name, $type, count($this->properties[$classId]),
         ];
+        if (null !== $defaultEntry) {
+            $propset[] = $defaultEntry;
+        }
+        $this->properties[$classId][] = $propset;
     }
 
     public function defineClassConst(int $classId, string $name, VMVariable $value): void
@@ -731,6 +751,14 @@ class Object_ extends Type {
             default:
                 throw new \LogicException('Unsupported class constant type for JIT');
         }
+    }
+
+    /**
+     * @return int|float|bool|string|null
+     */
+    public function compileTimeScalarFromVm(VMVariable $value): int|float|bool|string|null
+    {
+        return $this->compileTimeValueFromVm($value);
     }
 
     /**
