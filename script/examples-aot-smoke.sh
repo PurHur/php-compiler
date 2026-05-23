@@ -11,7 +11,7 @@
 # Docker:
 #   docker run --rm -v "$(pwd):/compiler" -w /compiler php-compiler:22.04-dev make examples-aot-smoke
 #
-# 003-MiniWebApp: link probe + execute bytes; empty stdout skips with #764 (#809, #485).
+# 003-MiniWebApp: link probe + execute bytes; fails when MINIWEBAPP_AOT_EXECUTE_GATE=1 and stdout empty (#747, #676).
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
