@@ -8,9 +8,9 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 410 |
+| PHP files on vm.php path | 413 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 1097 |
+| Source constructs flagged (warnings) | 1101 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -40,6 +40,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/JitChmod.php` | 0 | 1 |
 | `ext/standard/JitChunkSplit.php` | 0 | 1 |
 | `ext/standard/JitCopy.php` | 0 | 1 |
+| `ext/standard/JitCrc32.php` | 0 | 1 |
 | `ext/standard/JitDate.php` | 0 | 1 |
 | `ext/standard/JitDeployPath.php` | 0 | 1 |
 | `ext/standard/JitEnv.php` | 0 | 1 |
@@ -102,8 +103,9 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/JitUrlencode.php` | 0 | 1 |
 | `ext/standard/JitWebParams.php` | 0 | 15 |
 | `ext/standard/JitWordwrap.php` | 0 | 1 |
-| `ext/standard/Module.php` | 0 | 185 |
+| `ext/standard/Module.php` | 0 | 186 |
 | `ext/standard/SetcookieLine.php` | 0 | 1 |
+| `ext/standard/VmCrc32.php` | 0 | 1 |
 | `ext/standard/VmDate.php` | 0 | 1 |
 | `ext/standard/VmExit.php` | 0 | 2 |
 | `ext/standard/VmFilter.php` | 0 | 3 |
@@ -152,6 +154,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/compact_.php` | 0 | 1 |
 | `ext/standard/copy_.php` | 0 | 1 |
 | `ext/standard/cos.php` | 0 | 1 |
+| `ext/standard/crc32.php` | 0 | 1 |
 | `ext/standard/date.php` | 0 | 1 |
 | `ext/standard/decbin.php` | 0 | 1 |
 | `ext/standard/dechex.php` | 0 | 1 |
@@ -472,6 +475,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/JitCopy.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/JitCrc32.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
@@ -910,90 +918,96 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new array_filter (line 125)
 - new range (line 126)
 - new bin2hex (line 127)
-- new hex2bin (line 128)
-- new base64_encode (line 129)
-- new base64_decode (line 130)
-- new hash_ (line 131)
-- new hash_hmac (line 132)
-- new password_hash (line 133)
-- new password_verify (line 134)
-- new random_bytes (line 135)
-- new str_pad (line 136)
-- new str_split (line 137)
-- new chunk_split (line 138)
-- new wordwrap (line 139)
-- new htmlspecialchars (line 140)
-- new strip_tags (line 141)
-- new header_ (line 142)
-- new setcookie (line 143)
-- new header_remove (line 144)
-- new header_list (line 145)
-- new getallheaders_ (line 146)
-- new ob_start (line 147)
-- new ob_get_clean (line 148)
-- new ob_end_flush (line 149)
-- new ob_get_level (line 150)
-- new http_response_code (line 151)
-- new json_encode (line 152)
-- new web_int (line 153)
-- new web_string (line 154)
-- new web_bool (line 155)
-- new filter_var (line 156)
-- new filter_input (line 157)
-- new urlencode (line 158)
-- new rawurlencode (line 159)
-- new urldecode (line 160)
-- new rawurldecode (line 161)
-- new parse_url (line 162)
-- new dirname (line 163)
-- new basename (line 164)
-- new realpath (line 165)
-- new pathinfo (line 166)
-- new file_get_contents (line 167)
-- new readfile (line 168)
-- new file_put_contents (line 169)
-- new file_exists (line 170)
-- new filesize (line 171)
-- new filemtime (line 172)
-- new fileperms (line 173)
-- new is_file (line 174)
-- new is_dir (line 175)
-- new is_readable (line 176)
-- new is_writable (line 177)
-- new is_executable (line 178)
-- new is_link (line 179)
-- new readlink (line 180)
-- new unlink (line 181)
-- new mkdir_ (line 182)
-- new rmdir_ (line 183)
-- new chmod_ (line 184)
-- new rename_ (line 185)
-- new copy_ (line 186)
-- new touch_ (line 187)
-- new filetype (line 188)
-- new fopen (line 189)
-- new fread (line 190)
-- new fwrite (line 191)
-- new fclose (line 192)
-- new getenv_ (line 193)
-- new shell_exec (line 194)
-- new putenv_ (line 195)
-- new define_ (line 196)
-- new defined_ (line 197)
-- new phpc_deploy_path (line 198)
-- new extract_ (line 199)
-- new compact_ (line 200)
-- new scandir (line 201)
-- new glob_ (line 202)
-- new time (line 203)
-- new date (line 204)
-- new gmdate (line 205)
+- new crc32 (line 128)
+- new hex2bin (line 129)
+- new base64_encode (line 130)
+- new base64_decode (line 131)
+- new hash_ (line 132)
+- new hash_hmac (line 133)
+- new password_hash (line 134)
+- new password_verify (line 135)
+- new random_bytes (line 136)
+- new str_pad (line 137)
+- new str_split (line 138)
+- new chunk_split (line 139)
+- new wordwrap (line 140)
+- new htmlspecialchars (line 141)
+- new strip_tags (line 142)
+- new header_ (line 143)
+- new setcookie (line 144)
+- new header_remove (line 145)
+- new header_list (line 146)
+- new getallheaders_ (line 147)
+- new ob_start (line 148)
+- new ob_get_clean (line 149)
+- new ob_end_flush (line 150)
+- new ob_get_level (line 151)
+- new http_response_code (line 152)
+- new json_encode (line 153)
+- new web_int (line 154)
+- new web_string (line 155)
+- new web_bool (line 156)
+- new filter_var (line 157)
+- new filter_input (line 158)
+- new urlencode (line 159)
+- new rawurlencode (line 160)
+- new urldecode (line 161)
+- new rawurldecode (line 162)
+- new parse_url (line 163)
+- new dirname (line 164)
+- new basename (line 165)
+- new realpath (line 166)
+- new pathinfo (line 167)
+- new file_get_contents (line 168)
+- new readfile (line 169)
+- new file_put_contents (line 170)
+- new file_exists (line 171)
+- new filesize (line 172)
+- new filemtime (line 173)
+- new fileperms (line 174)
+- new is_file (line 175)
+- new is_dir (line 176)
+- new is_readable (line 177)
+- new is_writable (line 178)
+- new is_executable (line 179)
+- new is_link (line 180)
+- new readlink (line 181)
+- new unlink (line 182)
+- new mkdir_ (line 183)
+- new rmdir_ (line 184)
+- new chmod_ (line 185)
+- new rename_ (line 186)
+- new copy_ (line 187)
+- new touch_ (line 188)
+- new filetype (line 189)
+- new fopen (line 190)
+- new fread (line 191)
+- new fwrite (line 192)
+- new fclose (line 193)
+- new getenv_ (line 194)
+- new shell_exec (line 195)
+- new putenv_ (line 196)
+- new define_ (line 197)
+- new defined_ (line 198)
+- new phpc_deploy_path (line 199)
+- new extract_ (line 200)
+- new compact_ (line 201)
+- new scandir (line 202)
+- new glob_ (line 203)
+- new time (line 204)
+- new date (line 205)
+- new gmdate (line 206)
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/SetcookieLine.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/VmCrc32.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/VmDate.php`
 
@@ -1261,6 +1275,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 
 **Warnings** (review for bootstrap subset):
 - 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/crc32.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/date.php`
 
@@ -2285,33 +2304,33 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new Variable (line 204)
 - new JIT\Call\Vararg (line 214)
 - new JIT\Call\Native (line 217)
-- new JIT\Call\Native (line 465)
-- new JIT\Call\Native (line 496)
-- new JIT\Call\Native (line 529)
-- new ext\standard\boolval (line 781)
-- new Operand\Literal (line 855)
-- new JIT\Variable (line 877)
-- new Operand\Literal (line 948)
-- new ext\standard\intval (line 1001)
-- new Variable (line 1030)
-- new Variable (line 1154)
-- new OpCode (line 1234)
-- new Variable (line 1545)
-- new Variable (line 1557)
-- new Variable (line 2187)
-- new Variable (line 2527)
-- new Variable (line 2552)
-- new Variable (line 2689)
-- new Variable (line 2710)
-- new Operand\Literal (line 2719)
-- new Variable (line 2734)
-- new Operand\Literal (line 2880)
-- new Operand\Literal (line 2884)
-- new Operand\Literal (line 2888)
-- new Variable (line 2892)
-- new Variable (line 2912)
-- new Variable (line 2973)
-- 65 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new JIT\Call\Native (line 472)
+- new JIT\Call\Native (line 503)
+- new JIT\Call\Native (line 536)
+- new ext\standard\boolval (line 788)
+- new Operand\Literal (line 862)
+- new JIT\Variable (line 884)
+- new Operand\Literal (line 955)
+- new ext\standard\intval (line 1008)
+- new Variable (line 1037)
+- new Variable (line 1161)
+- new OpCode (line 1241)
+- new Variable (line 1552)
+- new Variable (line 1564)
+- new Variable (line 2194)
+- new Variable (line 2534)
+- new Variable (line 2559)
+- new Variable (line 2696)
+- new Variable (line 2717)
+- new Operand\Literal (line 2726)
+- new Variable (line 2741)
+- new Operand\Literal (line 2887)
+- new Operand\Literal (line 2891)
+- new Operand\Literal (line 2895)
+- new Variable (line 2899)
+- new Variable (line 2919)
+- new Variable (line 2980)
+- 66 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Analyzer.php`
 
