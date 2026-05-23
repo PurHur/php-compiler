@@ -127,7 +127,6 @@ final class filter_input extends Internal
         $phi->addIncoming($getResult, $getTail);
         $phi->addIncoming($postResult, $postTail);
 
-        $this->jitString($context, $args[0], 'filterinput() argument #1');
         return $phi;
     }
 
