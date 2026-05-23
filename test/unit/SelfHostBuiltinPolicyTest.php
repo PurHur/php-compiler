@@ -19,7 +19,7 @@ final class SelfHostBuiltinPolicyTest extends TestCase
 
     public function testAutoStubBatchCount(): void
     {
-        $this->assertSame(32, SelfHostBuiltinPolicy::autoStubBatchCount());
+        $this->assertSame(10, SelfHostBuiltinPolicy::autoStubBatchCount());
     }
 
     public function testRequiredBundleCategories(): void
@@ -32,6 +32,8 @@ final class SelfHostBuiltinPolicyTest extends TestCase
         $this->assertFalse(SelfHostBuiltinPolicy::shouldExternalStub('mkdir'));
         $this->assertFalse(SelfHostBuiltinPolicy::shouldExternalStub('file_put_contents'));
         $this->assertFalse(SelfHostBuiltinPolicy::shouldExternalStub('fopen'));
+        $this->assertFalse(SelfHostBuiltinPolicy::shouldExternalStub('getenv'));
+        $this->assertFalse(SelfHostBuiltinPolicy::shouldExternalStub('putenv'));
         $this->assertTrue(SelfHostBuiltinPolicy::isRequiredForBundle('filter_var'));
         $this->assertSame('filter', SelfHostBuiltinPolicy::categoryFor('filter_input'));
         $this->assertFalse(SelfHostBuiltinPolicy::shouldExternalStub('filter_var'));
@@ -52,6 +54,8 @@ final class SelfHostBuiltinPolicyTest extends TestCase
             'extract',
             'sort',
             'filter_var',
+            'getenv',
+            'putenv',
         ] as $fn) {
             $this->assertTrue(
                 SelfHostBuiltinPolicy::isRequiredForBundle($fn),

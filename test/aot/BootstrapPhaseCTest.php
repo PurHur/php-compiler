@@ -146,6 +146,67 @@ final class BootstrapPhaseCTest extends TestCase
         $this->assertBootstrapFixtureLinkAndExecute('stdlib_array_unshift.php', '1233');
     }
 
+    public function testM3GetenvSmokeAotLinkAndExecute(): void
+    {
+        $this->assertBootstrapFixtureLinkAndExecute('m3_getenv_smoke.php', '1');
+    }
+
+    public function testM3PreludeSmokeAotLinkAndExecute(): void
+    {
+        if (!self::isLlvmReady()) {
+            $this->markTestSkipped(
+                'LLVM 9 toolchain not available. Run script/install-llvm9.sh from the repository root.'
+            );
+        }
+        $root = dirname(__DIR__, 2);
+        $source = $root.'/test/bootstrap-aot/m3_prelude_smoke.php';
+        $this->assertFileExists($source);
+
+        $env = [];
+        foreach (array_merge($_ENV, $_SERVER) as $key => $value) {
+            if (is_string($value)) {
+                $env[$key] = $value;
+            }
+        }
+        $env['PHP_COMPILER_M3_SOURCE'] = $root.'/examples/000-HelloWorld/example.php';
+        LlvmToolchain::applyProcessEnv($env, $root);
+        $outDir = $root.'/build/bootstrap-aot';
+        if (!is_dir($outDir) && !mkdir($outDir, 0777, true) && !is_dir($outDir)) {
+            $this->fail('Cannot create '.$outDir);
+        }
+        $binary = $outDir.'/m3_prelude_smoke';
+        @unlink($binary);
+
+        $compile = [PHP_BINARY, $root.'/bin/compile.php', '-o', $binary, $source];
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open($compile, $descriptorSpec, $pipes, $root, $env);
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $this->assertSame(0, proc_close($proc), trim($stderr !== false ? $stderr : ''));
+        $this->assertFileExists($binary);
+        $this->assertTrue(is_executable($binary));
+
+        $expected = shell_exec(
+            'PHP_COMPILER_M3_SOURCE='.escapeshellarg($env['PHP_COMPILER_M3_SOURCE']).' '
+            .escapeshellarg(PHP_BINARY).' '.escapeshellarg($source).' 2>/dev/null'
+        );
+        $actual = shell_exec(
+            'PHP_COMPILER_M3_SOURCE='.escapeshellarg($env['PHP_COMPILER_M3_SOURCE']).' '
+            .escapeshellarg($binary).' 2>/dev/null'
+        );
+        $this->assertSame($expected, $actual);
+        $this->assertStringContainsString('ok-', (string) $actual);
+
+        @unlink($binary);
+    }
+
     public function testBootstrapAotLinkScript(): void
     {
         if (!self::isLlvmReady()) {
