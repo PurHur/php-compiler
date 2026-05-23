@@ -58,10 +58,10 @@ function syntaxRowDefinitions(): array
             'id' => 'native_user_class',
             'construct' => 'Native user-class link (`phpc build --project`)',
             'opcodes' => ['TYPE_DECLARE_CLASS', 'TYPE_NEW', 'TYPE_METHODCALL_INIT'],
-            'issue' => 568,
-            'notes' => ['AOT native ABI — blocked #568'],
+            'issue' => 764,
+            'notes' => ['AOT link yes (#568 closed); native execute #764'],
             'probe' => null,
-            'aot' => false,
+            'aot' => true,
         ],
         [
             'id' => 'instanceof',
@@ -310,7 +310,8 @@ function renderSyntaxMarkdown(array $syntax): string
         '',
         'Tracking issues: [#58](' . CAPABILITY_ISSUE_URL_BASE . '58), [#145](' . CAPABILITY_ISSUE_URL_BASE
         . '145), [#138](' . CAPABILITY_ISSUE_URL_BASE . '138), [#568](' . CAPABILITY_ISSUE_URL_BASE
-        . '568), [#143](' . CAPABILITY_ISSUE_URL_BASE . '143), [#142](' . CAPABILITY_ISSUE_URL_BASE . '142), [#199]('
+        . '568) (link closed), [#764](' . CAPABILITY_ISSUE_URL_BASE . '764) (execute), [#143]('
+        . CAPABILITY_ISSUE_URL_BASE . '143), [#142](' . CAPABILITY_ISSUE_URL_BASE . '142), [#199]('
         . CAPABILITY_ISSUE_URL_BASE . '199).',
         '',
         '| Construct | VM | JIT | AOT | Issue | Notes |',
@@ -332,7 +333,7 @@ function renderSyntaxMarkdown(array $syntax): string
     }
 
     $lines[] = '';
-    $lines[] = '_Syntax AOT column reflects `Runtime::MODE_AOT` compile probes unless a row pins AOT (e.g. #568 native link)._';
+    $lines[] = '_Syntax AOT column reflects `Runtime::MODE_AOT` compile probes unless a row pins AOT (e.g. native user-class link)._';
     $lines[] = '';
 
     return implode("\n", $lines);
@@ -365,25 +366,25 @@ function webNorthStarDefinitions(): array
             'construct' => 'PATH_INFO / `?route=` fallback',
             'vm' => 'yes',
             'jit' => 'partial',
-            'aot' => 'blocked',
+            'aot' => 'partial',
             'issue' => 489,
-            'notes' => ['#489 VM closed; AOT blocked #568'],
+            'notes' => ['#489 VM closed; AOT lint partial; execute #764'],
         ],
         [
             'construct' => '`phpc_deploy_path()` + `PHPC_DEPLOY_ROOT`',
             'vm' => 'yes',
             'jit' => 'partial',
-            'aot' => 'blocked',
+            'aot' => 'partial',
             'issue' => 585,
-            'notes' => ['#585 closed; runtime deploy #623'],
+            'notes' => ['#585 closed; deploy includes #623; execute #764'],
         ],
         [
             'construct' => 'Runtime template `include` from deploy tree',
             'vm' => 'yes',
             'jit' => 'no',
-            'aot' => 'blocked',
+            'aot' => 'partial',
             'issue' => 623,
-            'notes' => ['#623 VM/AOT lint; execute blocked #568'],
+            'notes' => ['#623 VM/AOT lint; execute #764'],
         ],
         [
             'construct' => 'CGI/1.1 driver (`bin/cgi.php`)',
@@ -399,7 +400,7 @@ function webNorthStarDefinitions(): array
             'jit' => 'n/a',
             'aot' => 'partial',
             'issue' => 665,
-            'notes' => ['#665 closed; 001 green; 003 blocked #568; #682'],
+            'notes' => ['#665 closed; 001 green; 003 execute #764; #682'],
         ],
         [
             'construct' => 'FastCGI loop',
@@ -449,8 +450,9 @@ function renderWebNorthStarMarkdown(array $web): string
     }
 
     $lines[] = '';
-    $lines[] = '_Web rows are curated from ROADMAP issue state; AOT execute for user classes remains blocked by [#568]('
-        . CAPABILITY_ISSUE_URL_BASE . '568)._';
+    $lines[] = '_Web rows are curated from ROADMAP issue state; native link [#568](' . CAPABILITY_ISSUE_URL_BASE
+        . '568) closed; AOT execute tracked in [#764](' . CAPABILITY_ISSUE_URL_BASE . '764) and [#676]('
+        . CAPABILITY_ISSUE_URL_BASE . '676)._';
     $lines[] = '';
 
     return implode("\n", $lines);

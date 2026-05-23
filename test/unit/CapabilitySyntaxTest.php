@@ -24,6 +24,8 @@ final class CapabilitySyntaxTest extends TestCase
         $body = (string) file_get_contents($doc);
         $this->assertStringContainsString('#58', $body);
         $this->assertStringContainsString('#568', $body);
+        $this->assertStringContainsString('#764', $body);
+        $this->assertStringNotContainsString('blocked #568', $body);
         $this->assertStringContainsString('#199', $body);
         $this->assertStringContainsString('Native user-class link', $body);
         $this->assertStringContainsString('Magic constants', $body);
@@ -35,6 +37,8 @@ final class CapabilitySyntaxTest extends TestCase
         $this->assertStringContainsString('| CGI/1.1 driver (`bin/cgi.php`) | yes | n/a | n/a |', $body);
         $this->assertStringContainsString('AOT CGI (`cgi-wrapper` + `phpc cgi`)', $body);
         $this->assertStringContainsString('| AOT CGI (`cgi-wrapper` + `phpc cgi`) | n/a | n/a | partial |', $body);
+        $this->assertStringContainsString('| PATH_INFO / `?route=` fallback | yes | partial | partial |', $body);
+        $this->assertStringContainsString('| Native user-class link (`phpc build --project`) | yes | yes | yes |', $body);
         $this->assertStringContainsString('#665', $body);
         $this->assertStringContainsString('#489', $body);
         $this->assertStringContainsString('#173', $body);
