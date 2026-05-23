@@ -375,6 +375,26 @@ function bootstrapRenderMarkdown(array $report): string
 }
 
 /**
+ * Strip optional probe section appended by bootstrap-selfhost-compile-probe.php --update-inventory.
+ */
+function bootstrapStripInventoryProbeSection(string $content): string
+{
+    $needle = "\n## Live self-host compile probe\n";
+    $pos = strpos($content, $needle);
+    if (false === $pos) {
+        return $content;
+    }
+    $after = substr($content, $pos + strlen($needle));
+    if (!preg_match('/\n## /', $after, $m, PREG_OFFSET_CAPTURE)) {
+        return substr($content, 0, $pos)."\n";
+    }
+    $end = $pos + strlen($needle) + $m[0][1];
+    $stripped = substr($content, 0, $pos).substr($content, $end);
+
+    return preg_replace('/\n\n\n(## Files)/', "\n\n$1", $stripped, 1) ?? $stripped;
+}
+
+/**
  * @param array<string, mixed> $profile
  */
 function bootstrapProfileJson(array $profile): string

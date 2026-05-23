@@ -36,7 +36,7 @@ if ($check) {
         fwrite(STDERR, "Missing {$outFile}; run: php script/bootstrap-inventory.php\n");
         exit(1);
     }
-    $committed = (string) file_get_contents($outFile);
+    $committed = bootstrapStripInventoryProbeSection((string) file_get_contents($outFile));
     if ($committed !== $markdown) {
         fwrite(STDERR, "Stale {$outFile}; run: php script/bootstrap-inventory.php\n");
         exit(1);
