@@ -179,6 +179,43 @@ final class JitValueCompare
         return self::notLooseEqualValueToNativeLong($context, $boxed, $nativeLong);
     }
 
+
+    /** True when a boxed operand is unset: null {@see __value__*} or a null-tagged box (#1086). */
+    public static function valueBoxIsNull(Context $context, Variable $boxed): Value
+    {
+        if (!JitValueBox::isValueOperand($boxed)) {
+            return $context->getTypeFromString('int1')->constInt(0, false);
+        }
+        $ptr = JitValueBox::valuePtrFromVariable($context, $boxed);
+        $ptrTy = $ptr->typeOf();
+        $i1 = $context->getTypeFromString('int1');
+        $trueVal = $i1->constInt(1, false);
+        $entry = $context->builder->getInsertBlock();
+        $isNullPtr = $context->builder->icmp(
+            Builder::INT_EQ,
+            $ptr,
+            $ptrTy->constNull()
+        );
+        $checkTag = BasicBlockHelper::append($context, 'value_box_null_check_tag');
+        $done = BasicBlockHelper::append($context, 'value_box_null_done');
+        $context->builder->branchIf($isNullPtr, $done, $checkTag);
+
+        $context->builder->positionAtEnd($checkTag);
+        $tag = $context->builder->load(
+            $context->builder->structGep($ptr, $context->structFieldMap['__value__']['type'])
+        );
+        $nullTag = $context->getTypeFromString('int8')->constInt(Variable::TYPE_NULL, false);
+        $isNullTag = $context->builder->icmp(Builder::INT_EQ, $tag, $nullTag);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+        $result = $context->builder->phi($i1);
+        $result->addIncoming($trueVal, $entry);
+        $result->addIncoming($isNullTag, $checkTag);
+
+        return $result;
+    }
+
     public static function identicalValueToValue(
         Context $context,
         Variable $left,

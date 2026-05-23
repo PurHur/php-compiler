@@ -66,11 +66,8 @@ final class array_count extends Internal
                 ArrayBuiltinHelper::loadHashTable($context, $args[0])
             );
         }
-        if (JITVariable::TYPE_VALUE === $args[0]->type) {
-            $ht = $context->builder->call(
-                $context->lookupFunction('__value__readHashtable'),
-                JitValueBox::valuePtrFromVariable($context, $args[0])
-            );
+        if (JITVariable::TYPE_VALUE === $args[0]->type || JitValueBox::isValueOperand($args[0])) {
+            $ht = ArrayBuiltinHelper::loadHashTable($context, $args[0]);
 
             return ArrayBuiltinHelper::getNumElements($context, $ht);
         }
