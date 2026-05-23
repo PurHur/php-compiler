@@ -2166,10 +2166,18 @@ class JIT {
                         }
                         if (
                             null === $defaultVar
+                            || 0 === $defaultVar->type
                             || \PHPCompiler\VM\Variable::TYPE_UNDEFINED === $defaultVar->type
                         ) {
                             foreach ($block->constants as $candidate) {
                                 if (\PHPCompiler\VM\Variable::TYPE_BOOLEAN === $candidate->type) {
+                                    $defaultVar = $candidate;
+                                    break;
+                                }
+                                if (
+                                    \PHPCompiler\VM\Variable::TYPE_STRING === $candidate->type
+                                    && in_array($candidate->toString(), ["true", "false"], true)
+                                ) {
                                     $defaultVar = $candidate;
                                     break;
                                 }
