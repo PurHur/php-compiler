@@ -2290,6 +2290,16 @@ class JIT {
 
                         return;
                     }
+                    if (null !== $result->writableHt && null !== $result->writableIndex) {
+                        JIT\HashTableHelper::setAtIndex(
+                            $this->context,
+                            $result->writableHt,
+                            $result->writableIndex,
+                            $value
+                        );
+
+                        return;
+                    }
                     $this->context->builder->call(
                     $this->context->lookupFunction('__value__writeLong') , 
                     $valueRef
@@ -2321,6 +2331,16 @@ class JIT {
                         $this->context->lookupFunction('__string__separate'),
                         $str
                     );
+                    if (null !== $result->writableHt && null !== $result->writableIndex) {
+                        JIT\HashTableHelper::setAtIndex(
+                            $this->context,
+                            $result->writableHt,
+                            $result->writableIndex,
+                            $value
+                        );
+
+                        return;
+                    }
                     if (null !== $result->writableHt && null !== $result->writableStringKey) {
                         $this->context->builder->call(
                             $this->context->lookupFunction('__hashtable__setStringKeyString'),

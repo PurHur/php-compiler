@@ -54,6 +54,29 @@ final class HashTableHelper
     }
 
     /**
+     * Load a native {@see __hashtable__*} from a boxed or direct array variable (#107).
+     */
+    public static function loadHashtablePointer(Context $context, Variable $array): Value
+    {
+        if (Variable::TYPE_HASHTABLE === $array->type) {
+            return $context->helper->loadValue($array);
+        }
+        if (Variable::TYPE_VALUE === $array->type || $array->valueBoxHashtable) {
+            $valPtr = JitValueBox::pointer($context, $array->value);
+
+            return $context->builder->call(
+                $context->lookupFunction('__value__readHashtable'),
+                $valPtr
+            );
+        }
+
+        throw new \LogicException(
+            'Array offset access requires hashtable or boxed array, got '
+            .Variable::getStringType($array->type)
+        );
+    }
+
+    /**
      * Stable string key for SplObjectStorage object offsets (pointer identity, issue #601).
      */
     public static function objectPointerAsStringKey(Context $context, Variable $keyObject): Variable
@@ -325,6 +348,42 @@ final class HashTableHelper
      * Read an associative string-keyed element into a stack {@see __value__} slot.
      */
     /**
+     * Lvalue marker for $arr['key'] = … without reading the old value first (#107).
+     */
+    public static function prepareStringKeyWrite(Context $context, Value $ht, Value $keyStr): Variable
+    {
+        $slot = JitValueBox::alloc($context);
+        $var = new Variable(
+            $context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VARIABLE,
+            $slot
+        );
+        $var->writableHt = $ht;
+        $var->writableStringKey = $keyStr;
+
+        return $var;
+    }
+
+    /**
+     * Lvalue marker for $arr[0] = … on a native hashtable (#107).
+     */
+    public static function prepareIndexWrite(Context $context, Value $ht, Value $index): Variable
+    {
+        $slot = JitValueBox::alloc($context);
+        $var = new Variable(
+            $context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VARIABLE,
+            $slot
+        );
+        $var->writableHt = $ht;
+        $var->writableIndex = $index;
+
+        return $var;
+    }
+
+    /**
      * Writable __value__ slot for a string key (creates an empty string entry if missing; issue #103).
      */
     public static function writableStringKeyValueBox(Context $context, Value $ht, Value $keyStr): Variable
@@ -531,6 +590,16 @@ final class HashTableHelper
             return;
         }
         $ht = self::alloc($context);
+        if (Variable::TYPE_VALUE === $result->type) {
+            $context->builder->call(
+                $context->lookupFunction('__value__writeHashtable'),
+                $result->value,
+                $ht
+            );
+            $result->valueBoxHashtable = true;
+
+            return;
+        }
         $context->builder->store($ht, $result->value);
     }
 
@@ -545,7 +614,7 @@ final class HashTableHelper
 
             return;
         }
-        $ht = $context->helper->loadValue($array);
+        $ht = self::loadHashtablePointer($context, $array);
         $sizeT = $context->getTypeFromString('size_t');
         if (null === $key) {
             $index = $context->constantFromInteger($array->nextFreeElement, 'size_t');
@@ -610,7 +679,7 @@ final class HashTableHelper
             return new Variable($context, $elementType, Variable::KIND_VARIABLE, $slot);
         }
 
-        $ht = $context->helper->loadValue($array);
+        $ht = self::loadHashtablePointer($context, $array);
         $map = $context->structFieldMap['__hashtable__'];
         $sizeT = $context->getTypeFromString('size_t');
         $index = $context->constantFromInteger($array->nextFreeElement, 'size_t');

@@ -74,6 +74,9 @@ final class Variable {
     /** @var \PHPLLVM\Value|null */
     public ?\PHPLLVM\Value $writableObjectKey = null;
 
+    /** @var \PHPLLVM\Value|null */
+    public ?\PHPLLVM\Value $writableIndex = null;
+
     /** String literal value when this variable represents a constant string operand. */
     public ?string $compileTimeString = null;
 
@@ -82,6 +85,9 @@ final class Variable {
 
     /** {@see __value__} slot holds a nested {@see __hashtable__} (e.g. $_FILES['field']). */
     public bool $valueBoxHashtable = false;
+
+    /** Hashtable pointer from {@see __value__readHashtable}; do not addref/delref (issue #107). */
+    public bool $borrowedHashtable = false;
 
     /** void** property slot on {@see __object__} when this variable is a property lvalue (#58). */
     public ?\PHPLLVM\Value $objectPropertySlot = null;
@@ -598,11 +604,7 @@ final class Variable {
                 if (self::TYPE_STRING === $dim->type) {
                     $key = $this->context->helper->loadValue($dim);
                     if ($forWrite && (null === $expectedType || Type::TYPE_ARRAY !== $expectedType->type)) {
-                        if (!$propertyBacked) {
-                            $this->context->refcount->addref($ht);
-                        }
-
-                        return HashTableHelper::writableStringKeyValueBox($this->context, $ht, $key);
+                        return HashTableHelper::prepareStringKeyWrite($this->context, $ht, $key);
                     }
                     if ('_FILES' === $container->superglobalName && !$forWrite) {
                         $childHt = $this->context->builder->call(
@@ -632,7 +634,7 @@ final class Variable {
                         );
                     }
                     if (null !== $expectedType && Type::TYPE_STRING === $expectedType->type) {
-                        if (!$propertyBacked) {
+                        if (!$propertyBacked && !$this->borrowedHashtable) {
                             $this->context->refcount->addref($ht);
                         }
                         $boxed = HashTableHelper::readStringKeyToValueBox($this->context, $ht, $key);
@@ -640,7 +642,7 @@ final class Variable {
                         return $boxed;
                     }
 
-                    if (!$propertyBacked) {
+                    if (!$propertyBacked && !$this->borrowedHashtable) {
                         $this->context->refcount->addref($ht);
                     }
                     $boxed = HashTableHelper::readStringKeyToValueBox($this->context, $ht, $key);
@@ -648,8 +650,11 @@ final class Variable {
                     return $boxed;
                 }
                 $index = self::materializePackedIndex($this->context, $dim);
+                if ($forWrite) {
+                    return HashTableHelper::prepareIndexWrite($this->context, $ht, $index);
+                }
                 if (null !== $expectedType && Type::TYPE_STRING === $expectedType->type) {
-                    if (!$propertyBacked) {
+                    if (!$propertyBacked && !$this->borrowedHashtable) {
                         $this->context->refcount->addref($ht);
                     }
                     $str = $this->context->builder->call(
@@ -661,7 +666,7 @@ final class Variable {
                         $this->context->lookupFunction('__string__separate'),
                         $str
                     );
-                    if (!$propertyBacked && null === $container->superglobalName) {
+                    if (!$propertyBacked && !$this->borrowedHashtable && null === $container->superglobalName) {
                         $this->context->refcount->delref($ht);
                     }
 
@@ -672,27 +677,24 @@ final class Variable {
                         $owned
                     );
                 }
-                if (!$propertyBacked && null === $container->superglobalName) {
+                if (!$propertyBacked && !$this->borrowedHashtable && null === $container->superglobalName) {
                     $this->context->refcount->addref($ht);
                 }
                 $boxed = HashTableHelper::readIndexedToValueBox($this->context, $ht, $index);
-                if (!$propertyBacked && null === $container->superglobalName) {
+                if (!$propertyBacked && !$this->borrowedHashtable && null === $container->superglobalName) {
                     $this->context->refcount->delref($ht);
                 }
 
                 return $boxed;
             case self::TYPE_VALUE:
-                $valPtr = JitValueBox::pointer($this->context, $this->value);
-                $childHt = $this->context->builder->call(
-                    $this->context->lookupFunction('__value__readHashtable'),
-                    $valPtr
-                );
+                $childHt = HashTableHelper::loadHashtablePointer($this->context, $this);
                 $htVar = new Variable(
                     $this->context,
                     self::TYPE_HASHTABLE,
                     self::KIND_VALUE,
                     $childHt
                 );
+                $htVar->borrowedHashtable = true;
 
                 return $htVar->dimFetch($dim, $expectedType, $forWrite);
             default:
