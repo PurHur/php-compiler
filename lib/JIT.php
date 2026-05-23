@@ -535,7 +535,22 @@ class JIT {
             return Type::fromDecl($param->declaredType->name);
         }
         if ($param->declaredType instanceof Op\Type\Reference && null !== $param->declaredType->declaration) {
-            return Type::fromTypeDecl($param->declaredType);
+            $inner = $param->declaredType->declaration;
+            if ($inner instanceof \PHPCfg\Operand\Literal) {
+                return Type::fromDecl($inner->value);
+            }
+            if ($inner instanceof Op\Type\Literal) {
+                if ($this->isCfgOperandDeclaredName($inner->name)) {
+                    return Type::object('PHPCfg\\Operand');
+                }
+
+                return Type::fromDecl($inner->name);
+            }
+            try {
+                return Type::fromTypeDecl($inner);
+            } catch (\LogicException) {
+                return null;
+            }
         }
         if (null !== $param->declaredType) {
             try {
@@ -2184,7 +2199,18 @@ class JIT {
             return Type::fromDecl($returnType->name);
         }
         if ($returnType instanceof Op\Type\Reference && null !== $returnType->declaration) {
-            return Type::fromTypeDecl($returnType);
+            $inner = $returnType->declaration;
+            if ($inner instanceof \PHPCfg\Operand\Literal) {
+                return Type::fromDecl($inner->value);
+            }
+            if ($inner instanceof Op\Type\Literal) {
+                return Type::fromDecl($inner->name);
+            }
+            try {
+                return Type::fromTypeDecl($inner);
+            } catch (\LogicException) {
+                return null;
+            }
         }
         try {
             return Type::fromTypeDecl($returnType);
