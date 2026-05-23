@@ -171,14 +171,17 @@ final class CiScriptsTest extends TestCase
     {
         $local = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-local.sh');
         $this->assertStringContainsString('ci_run_bootstrap_wave_check', $local);
+        $this->assertStringContainsString('BOOTSTRAP_WAVE_CHECK:-1', $local);
 
         $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
         $this->assertStringContainsString('BOOTSTRAP_WAVE_CHECK', $common);
+        $this->assertStringContainsString('BOOTSTRAP_WAVE_CHECK:-1', $common);
         $this->assertStringContainsString('bootstrap-wave-check.sh', $common);
         $this->assertStringContainsString('--fail-fast', $common);
 
         $fast = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-fast.sh');
-        $this->assertStringNotContainsString('ci_run_bootstrap_wave_check', $fast);
+        $this->assertStringContainsString('CI_FAST_BOOTSTRAP', $fast);
+        $this->assertStringContainsString('ci_run_bootstrap_wave_check', $fast);
     }
 
     public function testCiDefaultsEnvDefinesBootstrapSelfhostProbeUpdateOff(): void
@@ -191,11 +194,12 @@ final class CiScriptsTest extends TestCase
         );
     }
 
-    public function testCiFastDoesNotRunBootstrapSelfhostProbeGate(): void
+    public function testCiFastDoesNotRunBootstrapSelfhostProbeGateByDefault(): void
     {
         $fast = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-fast.sh');
-        $this->assertStringNotContainsString('ci_run_bootstrap_selfhost_probe', $fast);
-        $this->assertStringNotContainsString('bootstrap-selfhost-compile-probe', $fast);
+        $this->assertStringContainsString('CI_FAST_BOOTSTRAP', $fast);
+        $this->assertStringContainsString('ci_run_bootstrap_selfhost_probe', $fast);
+        $this->assertStringContainsString('CI_FAST_BOOTSTRAP:-0', $fast);
     }
 
     public function testCiFastDoesNotRunExamplesAotSmokeGate(): void
@@ -243,6 +247,36 @@ final class CiScriptsTest extends TestCase
         $fast = dirname(__DIR__, 2).'/script/ci-fast.sh';
         $body = (string) file_get_contents($fast);
         $this->assertStringContainsString('ci_prepare_test_runtime', $body);
+    }
+
+    public function testCiFastSupportsOptionalBootstrapTail(): void
+    {
+        $fast = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-fast.sh');
+        $this->assertStringContainsString('CI_FAST_BOOTSTRAP:-0', $fast);
+        $this->assertStringContainsString('ci_run_bootstrap_aot_lint', $fast);
+        $this->assertStringContainsString('--group aot-lint', $fast);
+        $this->assertStringContainsString('bootstrap tail skipped (LLVM 9 not available)', $fast);
+
+        $makefile = (string) file_get_contents(dirname(__DIR__, 2).'/Makefile');
+        $this->assertStringContainsString('test-fast-bootstrap:', $makefile);
+        $this->assertStringContainsString('CI_FAST_BOOTSTRAP=1', $makefile);
+    }
+
+    public function testLocalCiMatrixDocumentsBootstrapWaveCheckDefaultOn(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('BOOTSTRAP_WAVE_CHECK', $doc);
+        $this->assertStringContainsString('CI_FAST_BOOTSTRAP', $doc);
+        $this->assertStringContainsString('test-fast-bootstrap', $doc);
+    }
+
+    public function testBootstrapSelfhostDocMarksProbeAndWaveCheckGreen(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/bootstrap-selfhost.md');
+        $this->assertStringContainsString('Self-host probe in full CI', $doc);
+        $this->assertStringContainsString('Wave gate in full CI', $doc);
+        $this->assertStringContainsString('default-on when LLVM 9 present', $doc);
+        $this->assertStringContainsString('BOOTSTRAP_WAVE_CHECK=0', $doc);
     }
 
     public function testCiFastSupportsOptionalJitPreflightGate(): void
