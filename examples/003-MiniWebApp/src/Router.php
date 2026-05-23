@@ -43,7 +43,9 @@ class Router
 
     public function dispatch(string $method, string $route): void
     {
-        header('Content-Type: text/html; charset=UTF-8');
+        if ('api/status' !== $route) {
+            header('Content-Type: text/html; charset=UTF-8');
+        }
 
         switch ($method) {
             case 'POST':
@@ -123,8 +125,9 @@ class Router
 
     private function resolveAppName(): string
     {
-        if (isset($this->config['app_name'])) {
-            return $this->config['app_name'];
+        $cfg = $this->config;
+        if (isset($cfg['app_name'])) {
+            return $cfg['app_name'];
         }
 
         return 'MiniWebApp';
