@@ -14,7 +14,7 @@ Tracking issues: [#58](https://github.com/PurHur/php-compiler/issues/58), [#145]
 | Private methods | yes | yes | yes | [#145](https://github.com/PurHur/php-compiler/issues/145) | compliance PHPT; bootstrap AOT |
 | Property fetch `$this->x` | yes | yes | yes | [#58](https://github.com/PurHur/php-compiler/issues/58) | compliance PHPT; bootstrap AOT |
 | Native user-class link (`phpc build --project`) | yes | yes | yes | [#764](https://github.com/PurHur/php-compiler/issues/764) | AOT link yes (#568 closed); native execute #764; compliance PHPT; bootstrap AOT |
-| `instanceof` | yes | yes | yes | [#138](https://github.com/PurHur/php-compiler/issues/138) | bootstrap AOT |
+| `instanceof` | yes | yes | yes | [#138](https://github.com/PurHur/php-compiler/issues/138) | compliance PHPT; bootstrap AOT |
 | `match` expression | no | no | no | [#143](https://github.com/PurHur/php-compiler/issues/143) | bootstrap AOT |
 | Arrow functions `fn () =>` | no | no | no | [#142](https://github.com/PurHur/php-compiler/issues/142) |  |
 | `ClassName::class` / `static::class` | yes | yes | yes | [#740](https://github.com/PurHur/php-compiler/issues/740) | Compile-time class name string; related to __CLASS__ (#199); compliance PHPT |
