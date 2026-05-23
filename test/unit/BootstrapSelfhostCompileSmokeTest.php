@@ -38,4 +38,27 @@ final class BootstrapSelfhostCompileSmokeTest extends TestCase
         $this->assertIsString($runOut);
         $this->assertStringContainsString('compiler_compile_smoke bundle OK', $runOut);
     }
+
+    public function testNativeCompileSmokeEchoRunPrintsGreetingWhenLlvmPresent(): void
+    {
+        if (!LlvmToolchain::isReady(self::$root)) {
+            $this->markTestSkipped('LLVM 9 not available for self-host compile smoke echo run test.');
+        }
+
+        $script = self::$root.'/script/bootstrap-selfhost-compile-smoke-run.sh';
+        $this->assertFileExists($script);
+
+        $prefix = LlvmToolchain::envPrefix(self::$root);
+        $cmd = implode(' ', array_map('escapeshellarg', [...$prefix, 'bash', $script])).' 2>&1';
+        exec($cmd, $lines, $exitCode);
+
+        $out = implode("\n", $lines);
+        $this->assertSame(0, $exitCode, $out);
+        $this->assertStringContainsString('bootstrap-selfhost-compile-smoke-run: OK', $out);
+        $binary = self::$root.'/build/selfhost-compile-smoke-echo';
+        $this->assertTrue(is_executable($binary), $binary);
+        $runOut = shell_exec($binary);
+        $this->assertIsString($runOut);
+        $this->assertSame('compiler smoke', trim(str_replace("\n", '', $runOut)));
+    }
 }

@@ -199,5 +199,7 @@ bootstrap-selfhost-link:
 	./script/bootstrap-selfhost-link.sh
 bootstrap-selfhost-compile-smoke:
 	./script/bootstrap-selfhost-compile-smoke-link.sh
+bootstrap-selfhost-compile-smoke-run:
+	./script/bootstrap-selfhost-compile-smoke-run.sh
 bootstrap-wave-check:
 	./script/bootstrap-wave-check.sh
