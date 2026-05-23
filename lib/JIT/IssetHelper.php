@@ -122,7 +122,7 @@ final class IssetHelper
         if ($container->type === Variable::TYPE_HASHTABLE) {
             return self::compileHashTableOffsetIsSet($context, $container, $dim, $dimOp, $containerOp);
         }
-        if (Variable::TYPE_VALUE === $container->type && $container->valueBoxHashtable) {
+        if (Variable::TYPE_VALUE === $container->type) {
             $valPtr = Variable::KIND_VARIABLE === $container->kind
                 ? JitValueBox::pointer($context, $container->value)
                 : $context->helper->loadValue($container);

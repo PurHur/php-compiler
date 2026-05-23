@@ -609,11 +609,6 @@ final class Variable {
 
                 return $boxed;
             case self::TYPE_VALUE:
-                if (!$this->valueBoxHashtable) {
-                    throw new \LogicException(
-                        'Array dim fetch on __value__ requires a nested hashtable in this compiler build'
-                    );
-                }
                 $valPtr = JitValueBox::pointer($this->context, $this->value);
                 $childHt = $this->context->builder->call(
                     $this->context->lookupFunction('__value__readHashtable'),
