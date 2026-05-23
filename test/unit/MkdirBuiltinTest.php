@@ -46,10 +46,20 @@ if (mkdir($one)) {
 } else {
     echo "fail\n";
 }
+$nested = 'test/compliance/cases/stdlib/mkdir_fixture/aot_unit_nested/deep';
+if (mkdir($nested, 0777, true)) {
+    if (is_dir($nested)) {
+        echo "rec\n";
+    } else {
+        echo "badrec\n";
+    }
+} else {
+    echo "failrec\n";
+}
 PHP;
 
     private const EXPECT = "ok\nrec\n";
-    private const AOT_EXPECT = "ok\n";
+    private const AOT_EXPECT = "ok\nrec\n";
 
     protected function setUp(): void
     {
@@ -58,7 +68,7 @@ PHP;
         if (!is_dir($base)) {
             mkdir($base, 0777, true);
         }
-        foreach (['unit_one', 'unit/nested', 'aot_unit_one'] as $rel) {
+        foreach (['unit_one', 'unit/nested', 'aot_unit_one', 'aot_unit_nested'] as $rel) {
             $path = $base.'/'.$rel;
             if (is_dir($path)) {
                 self::removeTree($path);

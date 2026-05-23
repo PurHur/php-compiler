@@ -147,6 +147,15 @@ class Type extends Builtin {
             $fntypeFilePutContents
         );
         $this->context->registerFunction('__compiler_file_put_contents', $fnFilePutContents);
+        $fntypeMkdir = $this->context->context->functionType(
+            $i32,
+            false,
+            $this->context->getTypeFromString('__string__*'),
+            $i64,
+            $i32
+        );
+        $fnMkdir = $this->context->module->addFunction('__compiler_mkdir', $fntypeMkdir);
+        $this->context->registerFunction('__compiler_mkdir', $fnMkdir);
         $void = $this->context->getTypeFromString('void');
         $fntypeRandomBytes = $this->context->context->functionType(
             $this->context->getTypeFromString('__string__*'),
