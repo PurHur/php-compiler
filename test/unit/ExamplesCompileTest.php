@@ -24,7 +24,7 @@ final class ExamplesCompileTest extends TestCase
     private static ?bool $llvmReady = null;
 
     /**
-     * Shipped 003-MiniWebApp: native AOT link via phpc build --project (#568, #754).
+     * Shipped 003-MiniWebApp: native AOT link via phpc build --project (#754; execute #764).
      *
      * @group miniwebapp
      * @group llvm
@@ -910,7 +910,7 @@ final class ExamplesCompileTest extends TestCase
         $this->assertSame(
             0,
             $exit,
-            'phpc build --project 003-MiniWebApp failed (#568): '.$stderrText
+            'phpc build --project 003-MiniWebApp failed (#754 link): '.$stderrText
         );
 
         return $project.'/.phpc/bin/app';

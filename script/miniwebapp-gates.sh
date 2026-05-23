@@ -288,7 +288,7 @@ if [[ "${aot_dry_run_skipped}" -eq 1 ]]; then
 elif [[ "${aot_dry_run_exit}" -eq 0 ]]; then
   echo "       AOT dry-run probe: green"
 elif [[ "${aot_dry_run_exit}" -ge 0 ]]; then
-  echo "       AOT dry-run probe: exit ${aot_dry_run_exit} (see #58/#568)"
+  echo "       AOT dry-run probe: exit ${aot_dry_run_exit} (see #58/#764)"
   if [[ -n "${AOT_DRY_RUN_STDERR}" ]]; then
     echo "${AOT_DRY_RUN_STDERR}" | sed 's/^/         /'
   fi
@@ -317,9 +317,9 @@ elif [[ "${aot_smoke_003_exit}" -ge 0 ]]; then
   fi
 fi
 
-echo "$(mark "${stage4}") Stage 4b AOT link — ExamplesCompileTest @group miniwebapp unskipped (#454; link #568 closed)"
+echo "$(mark "${stage4}") Stage 4b AOT link — ExamplesCompileTest @group miniwebapp unskipped (#454; execute #764)"
 echo "       ${REPO_URL}/issues/454"
-echo "       ${REPO_URL}/issues/568"
+echo "       ${REPO_URL}/issues/764"
 
 echo "$(mark "${stage4b2}") Stage 4b2 AOT bisect — MINIWEBAPP_AOT_BISECT_GATE=1 runs miniwebapp-aot-bisect.sh (#879, #764)"
 echo "       ${REPO_URL}/issues/879"
