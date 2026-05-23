@@ -3,6 +3,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PROGRESS="${ROOT}/build/.last-jit-func"
+export PHP_COMPILER_SELFHOST_AOT=1
 export PHP_COMPILER_JIT_PROGRESS_FILE="${PROGRESS}"
 mkdir -p "${ROOT}/build"
 rm -f "${PROGRESS}"

@@ -101,9 +101,12 @@ function bootstrapSelfhostProbeRunCompile(
         1 => ['pipe', 'w'],
         2 => ['pipe', 'w'],
     ];
-    $progress = getenv('PHP_COMPILER_JIT_PROGRESS_FILE');
-    if (null !== $env && false !== $progress && '' !== $progress) {
-        $env['PHP_COMPILER_JIT_PROGRESS_FILE'] = $progress;
+    if (null !== $env) {
+        $env['PHP_COMPILER_SELFHOST_AOT'] = '1';
+        $progress = getenv('PHP_COMPILER_JIT_PROGRESS_FILE');
+        if (false !== $progress && '' !== $progress) {
+            $env['PHP_COMPILER_JIT_PROGRESS_FILE'] = $progress;
+        }
     }
     $proc = proc_open(['bash', '-c', $bash], $descriptorSpec, $pipes, $root, $env);
     if (!is_resource($proc)) {
