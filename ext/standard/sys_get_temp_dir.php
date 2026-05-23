@@ -10,7 +10,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** sys_get_temp_dir() — host temp directory (VM host; JIT/AOT embeds compile-time path). */
+/** sys_get_temp_dir() — system temp directory (VM host; JIT/AOT via __compiler_sys_get_temp_dir). */
 final class sys_get_temp_dir extends Internal
 {
     public function __construct()
@@ -26,7 +26,7 @@ final class sys_get_temp_dir extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->string(VmFs::tempDir());
+        $frame->returnVar->string(\sys_get_temp_dir());
     }
 
     public function call(Context $context, JITVariable ...$args): Value
@@ -35,8 +35,6 @@ final class sys_get_temp_dir extends Internal
             throw new \LogicException('sys_get_temp_dir() takes no arguments');
         }
 
-        return $context->builder->load(
-            $context->constantStringFromString(VmFs::tempDir())
-        );
+        return JitSysGetTempDir::invoke($context);
     }
 }
