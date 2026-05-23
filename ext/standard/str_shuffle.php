@@ -36,10 +36,7 @@ final class str_shuffle extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('str_shuffle() requires exactly one argument');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type) {
-            throw new \LogicException('str_shuffle() only supports strings in this compiler build');
-        }
 
-        return JitStrShuffle::shuffle($context, $context->helper->loadValue($args[0]));
+        return JitStrShuffle::shuffle($context, $this->jitString($context, $args[0], 'str_shuffle() argument #1'));
     }
 }

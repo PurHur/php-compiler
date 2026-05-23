@@ -50,13 +50,11 @@ final class strncmp extends Internal
         if (3 !== count($args)) {
             throw new \LogicException('strncmp() requires exactly three arguments');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type
-            || JITVariable::TYPE_STRING !== $args[1]->type
-            || JITVariable::TYPE_NATIVE_LONG !== $args[2]->type) {
-            throw new \LogicException('strncmp() requires two strings and an integer length in this compiler build');
+        if (JITVariable::TYPE_NATIVE_LONG !== $args[2]->type) {
+            throw new \LogicException('strncmp() length must be an integer in this compiler build');
         }
-        $p0 = $this->stringDataPtr($context, $context->helper->loadValue($args[0]));
-        $p1 = $this->stringDataPtr($context, $context->helper->loadValue($args[1]));
+        $p0 = $this->stringDataPtr($context, $this->jitString($context, $args[0], 'strncmp() argument #1'));
+        $p1 = $this->stringDataPtr($context, $this->jitString($context, $args[1], 'strncmp() argument #2'));
         $length = $context->builder->zExt(
             $context->builder->trunc(
                 $context->helper->loadValue($args[2]),
@@ -70,11 +68,4 @@ final class strncmp extends Internal
         return $context->builder->sExt($raw, $i64);
     }
 
-    private function stringDataPtr(Context $context, Value $strPtr): Value
-    {
-        $structName = $strPtr->typeOf()->getElementType()->getName();
-        $off = $context->structFieldMap[$structName]['value'];
-
-        return $context->builder->structGep($strPtr, $off);
-    }
 }

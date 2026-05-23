@@ -46,10 +46,7 @@ final class bindec extends Internal
         if (1 !== count($args)) {
             throw new \LogicException('bindec() requires exactly one argument');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type) {
-            throw new \LogicException('bindec() only supports strings in this compiler build');
-        }
-        $ptr = $this->stringDataPtr($context, $context->helper->loadValue($args[0]));
+        $ptr = $this->stringDataPtr($context, $this->jitString($context, $args[0], 'bindec() argument #1'));
         $endPtr = $context->getTypeFromString('int8**')->constPointerNull();
         $base = $context->getTypeFromString('int32')->constInt(2, false);
         $fn = $context->lookupFunction('strtol');
@@ -59,11 +56,4 @@ final class bindec extends Internal
         return $context->builder->trunc($raw, $i64);
     }
 
-    private function stringDataPtr(Context $context, Value $strPtr): Value
-    {
-        $structName = $strPtr->typeOf()->getElementType()->getName();
-        $off = $context->structFieldMap[$structName]['value'];
-
-        return $context->builder->structGep($strPtr, $off);
-    }
 }

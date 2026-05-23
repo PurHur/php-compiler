@@ -62,15 +62,12 @@ final class strrpos extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('strrpos() requires two or three arguments');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type || JITVariable::TYPE_STRING !== $args[1]->type) {
-            throw new \LogicException('strrpos() only supports strings in this compiler build');
-        }
         if (3 === $argc && JITVariable::TYPE_NATIVE_LONG !== $args[2]->type) {
             throw new \LogicException('strrpos() offset must be an integer in this compiler build');
         }
 
-        $hay = $context->helper->loadValue($args[0]);
-        $needle = $context->helper->loadValue($args[1]);
+        $hay = $this->jitString($context, $args[0], 'strrpos() argument #1');
+        $needle = $this->jitString($context, $args[1], 'strrpos() argument #2');
         $offset = 3 === $argc
             ? $context->builder->truncOrBitCast($context->helper->loadValue($args[2]), $context->getTypeFromString('int64'))
             : null;

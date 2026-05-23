@@ -67,10 +67,7 @@ final class wordwrap extends Internal
         if ($argc < 1 || $argc > 4) {
             throw new \LogicException('wordwrap() requires one to four arguments in this compiler build');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type) {
-            throw new \LogicException('wordwrap() first argument must be a string in this compiler build');
-        }
-        $input = $context->helper->loadValue($args[0]);
+        $input = $this->jitString($context, $args[0], 'wordwrap() argument #1');
         $i64 = $context->getTypeFromString('int64');
         $width = $i64->constInt(75, false);
         if ($argc >= 2) {
@@ -80,10 +77,7 @@ final class wordwrap extends Internal
             $width = $context->helper->loadValue($args[1]);
         }
         if ($argc >= 3) {
-            if (JITVariable::TYPE_STRING !== $args[2]->type) {
-                throw new \LogicException('wordwrap() break must be a string in this compiler build');
-            }
-            $break = $context->helper->loadValue($args[2]);
+            $break = $this->jitString($context, $args[2], 'wordwrap() argument #3');
         } else {
             $break = $context->builder->load($context->constantStringFromString("\n"));
         }

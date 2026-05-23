@@ -40,14 +40,11 @@ final class strrchr extends Internal
         if (2 !== \count($args)) {
             throw new \LogicException('strrchr() requires exactly two arguments in this compiler build');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type || JITVariable::TYPE_STRING !== $args[1]->type) {
-            throw new \LogicException('strrchr() only supports strings in this compiler build');
-        }
 
         return JitStrrchr::find(
             $context,
-            $context->helper->loadValue($args[0]),
-            $context->helper->loadValue($args[1])
+            $this->jitString($context, $args[0], 'strrchr() argument #1'),
+            $this->jitString($context, $args[1], 'strrchr() argument #2')
         );
     }
 }

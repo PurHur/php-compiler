@@ -50,10 +50,7 @@ final class ord extends Internal
         if (1 !== count($args)) {
             throw new \LogicException('ord() requires exactly one argument');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type) {
-            throw new \LogicException('ord() only supports strings in this compiler build');
-        }
-        $strPtr = $context->helper->loadValue($args[0]);
+        $strPtr = $this->jitString($context, $args[0], 'ord() argument #1');
         $structName = $strPtr->typeOf()->getElementType()->getName();
         $map = $context->structFieldMap[$structName];
         $lenPtr = $context->builder->structGep($strPtr, $map['length']);

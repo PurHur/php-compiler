@@ -41,10 +41,7 @@ final class realpath extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('realpath() requires exactly one argument');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type) {
-            throw new \LogicException('realpath() only supports strings in this compiler build');
-        }
 
-        return JitRealpath::resolve($context, $context->helper->loadValue($args[0]));
+        return JitRealpath::resolve($context, $this->jitString($context, $args[0], 'realpath() argument #1'));
     }
 }

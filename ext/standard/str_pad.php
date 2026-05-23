@@ -71,19 +71,13 @@ final class str_pad extends Internal
         if ($argc < 2 || $argc > 4) {
             throw new \LogicException('str_pad() requires two to four arguments');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type) {
-            throw new \LogicException('str_pad() input must be a string in this compiler build');
-        }
         if (JITVariable::TYPE_NATIVE_LONG !== $args[1]->type) {
             throw new \LogicException('str_pad() pad length must be an integer in this compiler build');
         }
-        $input = $context->helper->loadValue($args[0]);
+        $input = $this->jitString($context, $args[0], 'str_pad() argument #1');
         $padLength = $context->helper->loadValue($args[1]);
         if ($argc >= 3) {
-            if (JITVariable::TYPE_STRING !== $args[2]->type) {
-                throw new \LogicException('str_pad() pad string must be a string in this compiler build');
-            }
-            $padString = $context->helper->loadValue($args[2]);
+            $padString = $this->jitString($context, $args[2], 'str_pad() argument #3');
         } else {
             $padString = $context->builder->load($context->constantStringFromString(' '));
         }

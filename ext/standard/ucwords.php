@@ -39,13 +39,10 @@ final class ucwords extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('ucwords() requires exactly one argument');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type) {
-            throw new \LogicException('ucwords() only supports strings in this compiler build');
-        }
 
         return $context->builder->call(
             $context->lookupFunction('__string__ucwords'),
-            $context->helper->loadValue($args[0])
+            $this->jitString($context, $args[0], 'ucwords() argument #1')
         );
     }
 }

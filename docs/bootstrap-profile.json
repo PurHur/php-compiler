@@ -467,7 +467,11 @@
         "test/bootstrap-aot/switch_jumpif_chain.php",
         "test/bootstrap-aot/throw_logic.php",
         "test/bootstrap-aot/try_catch.php",
-        "test/bootstrap-aot/value_bitwise_shift.php"
+        "test/bootstrap-aot/value_bitwise_shift.php",
+        "test/bootstrap-aot/stdlib_string_strcmp.php",
+        "test/bootstrap-aot/stdlib_string_strpos.php",
+        "test/bootstrap-aot/stdlib_string_trim.php",
+        "test/bootstrap-aot/stdlib_string_urlencode.php"
     ],
     "aot_link_targets": [
         "examples/000-HelloWorld/example.php",

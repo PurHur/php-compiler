@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -19,10 +20,7 @@ final class JitStrRot13
 
     public static function rot13(Context $context, JITVariable $input): Value
     {
-        if (JITVariable::TYPE_STRING !== $input->type) {
-            throw new \LogicException('str_rot13() only supports strings in this compiler build');
-        }
-        $str = $context->helper->loadValue($input);
+        $str = JitStringArg::lower($context, $input, 'str_rot13() string');
         $copy = $context->builder->call($context->lookupFunction('__string__separate'), $str);
         self::transformInPlace($context, $copy);
 

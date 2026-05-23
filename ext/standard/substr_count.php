@@ -60,9 +60,6 @@ final class substr_count extends Internal
         if ($argc < 2 || $argc > 4) {
             throw new \LogicException('substr_count() requires two to four arguments in this compiler build');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type || JITVariable::TYPE_STRING !== $args[1]->type) {
-            throw new \LogicException('substr_count() only supports strings in this compiler build');
-        }
         if ($argc >= 3 && JITVariable::TYPE_NATIVE_LONG !== $args[2]->type) {
             throw new \LogicException('substr_count() offset must be an integer in this compiler build');
         }
@@ -70,8 +67,8 @@ final class substr_count extends Internal
             throw new \LogicException('substr_count() length must be an integer in this compiler build');
         }
 
-        $hay = $context->helper->loadValue($args[0]);
-        $needle = $context->helper->loadValue($args[1]);
+        $hay = $this->jitString($context, $args[0], 'substr_count() argument #1');
+        $needle = $this->jitString($context, $args[1], 'substr_count() argument #2');
         $i64 = $context->getTypeFromString('int64');
         $offset = $argc >= 3
             ? $context->builder->truncOrBitCast($context->helper->loadValue($args[2]), $i64)

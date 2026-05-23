@@ -66,7 +66,7 @@ final class substr extends Internal
             throw new \LogicException('substr() length must be an integer in this compiler build');
         }
 
-        $str = self::jitStringArg($context, $args[0]);
+        $str = $this->jitString($context, $args[0], 'substr() argument #1');
         $structName = $str->typeOf()->getElementType()->getName();
         $map = $context->structFieldMap[$structName];
         $len = $context->builder->load(
@@ -91,18 +91,4 @@ final class substr extends Internal
         return string_trim::jitCopySlice($context, $str, $charPtr, $start, $sliceLen);
     }
 
-    private static function jitStringArg(Context $context, JITVariable $arg): Value
-    {
-        if (JITVariable::TYPE_STRING === $arg->type) {
-            return $context->helper->loadValue($arg);
-        }
-        if (JITVariable::TYPE_VALUE === $arg->type) {
-            return $context->builder->call(
-                $context->lookupFunction('__value__readString'),
-                $arg->value
-            );
-        }
-
-        throw new \LogicException('substr() only supports strings in this compiler build');
-    }
 }
