@@ -150,9 +150,10 @@ class Block {
 
     public function getVarSlot(Operand $operand, bool $isRead): int {
         if (!$this->scope->contains($operand)) {
-            $this->scope[$operand] = $this->nextScopeSlot();
+            $next = $this->nextScopeSlot();
+            $this->scope[$operand] = $next;
             if ($isRead) {
-                $this->args[$operand] = $this->scope[$operand];
+                $this->args[$operand] = $next;
             }
         }
         return $this->scope[$operand];
