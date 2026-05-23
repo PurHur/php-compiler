@@ -11,6 +11,23 @@ use PHPUnit\Framework\TestCase;
  */
 final class BootstrapSelfhostCompileProbeTest extends TestCase
 {
+    public function testJitProgressNoteAndRead(): void
+    {
+        $path = sys_get_temp_dir().'/php-compiler-jit-progress-'.getmypid();
+        putenv('PHP_COMPILER_JIT_PROGRESS_FILE='.$path);
+        try {
+            \PHPCompiler\JIT\Progress::noteFunction('PHPCompiler\\Compiler::compile');
+            $this->assertSame('PHPCompiler\\Compiler::compile', \PHPCompiler\JIT\Progress::readLast($path));
+            $this->assertSame(
+                'PHPCompiler\\Compiler::compile',
+                bootstrapSelfhostProbeLastJitFunc($path)
+            );
+        } finally {
+            @unlink($path);
+            putenv('PHP_COMPILER_JIT_PROGRESS_FILE');
+        }
+    }
+
     public function testExtractNextLowerIgnoresNoticeAndDeprecated(): void
     {
         $root = dirname(__DIR__, 2);

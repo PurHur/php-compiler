@@ -280,6 +280,9 @@ class JIT {
         if ($this->context->scope->blockStorage->contains($block)) {
             return $this->context->scope->blockStorage[$block];
         }
+        if (null !== $block->func && $block->orig === $block->func->cfg) {
+            JIT\Progress::noteFunction($block->func->getName());
+        }
         if (null !== $entryBlock) {
             $origBasicBlock = $basicBlock = $entryBlock;
         } else {

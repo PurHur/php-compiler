@@ -446,6 +446,16 @@ function bootstrapLlvmProcessEnv(string $llvmDir): array
 /**
  * First fatal / LogicException line from compile probe output (skips Notice/Deprecated).
  */
+function bootstrapSelfhostProbeLastJitFunc(?string $progressFile = null): ?string
+{
+    $path = $progressFile ?? getenv('PHP_COMPILER_JIT_PROGRESS_FILE');
+    if (false === $path || '' === $path) {
+        return null;
+    }
+
+    return \PHPCompiler\JIT\Progress::readLast($path);
+}
+
 function bootstrapSelfhostProbeExtractNextLower(string $output): ?string
 {
     foreach (preg_split('/\R/', $output) as $line) {

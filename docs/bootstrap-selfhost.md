@@ -12,9 +12,9 @@ North star: compile a **subset** of php-compiler with itself (native AOT), then 
 | Phase C native run | `make bootstrap-aot-link` or `./script/bootstrap-aot-link.sh` | ✅ Link + execute **12** `aot_link_targets` (stdout vs Zend PHP) |
 | Phase D `lib/` link | `make bootstrap-aot-link-lib` or `./script/bootstrap-aot-link-lib.sh` | ✅ `test/bootstrap-aot/lib_opcode/main.php` bundles `lib/OpCode.php` ([#540](https://github.com/PurHur/php-compiler/issues/540)) |
 | Bundled `lib/Compiler.php` lint | `./script/bootstrap-selfhost-lint.sh` | ✅ `test/selfhost/compiler_minimal/main.php` + **11** literal `require_once` units toward `bin/vm.php` (no `vendor/`) ([#559](https://github.com/PurHur/php-compiler/issues/559)) |
-| Self-host compile probe | `make bootstrap-selfhost-probe` | Prints `NEXT_LOWER:` on first `-l`/`-o` failure ([#816](https://github.com/PurHur/php-compiler/issues/816)) |
+| Self-host compile probe | `make bootstrap-selfhost-probe` | Prints `NEXT_LOWER:` on first `-l`/`-o` failure; `LAST_JIT_FUNC:` on native segfault (exit 139) ([#816](https://github.com/PurHur/php-compiler/issues/816)) |
 
-Regenerate: `make bootstrap-profile` (inventory + profile + optional `bootstrap-aot-lint`). Phase C: `make bootstrap-aot-link` (or `php script/bootstrap-aot-lint.php --link`). Phase D: `make bootstrap-aot-link-lib`. Bundled compiler lint: `./script/bootstrap-selfhost-lint.sh`. Live lowering target: `make bootstrap-selfhost-probe` (or `php script/bootstrap-selfhost-compile-probe.php`; optional `--update-inventory`).
+Regenerate: `make bootstrap-profile` (inventory + profile + optional `bootstrap-aot-lint`). Phase C: `make bootstrap-aot-link` (or `php script/bootstrap-aot-lint.php --link`). Phase D: `make bootstrap-aot-link-lib`. Bundled compiler lint: `./script/bootstrap-selfhost-lint.sh`. Live lowering target: `make bootstrap-selfhost-probe` (or `./script/bootstrap-selfhost-compile-probe.sh`; optional `--update-inventory`).
 
 **Docker** (optional; LLVM 9 in `php-compiler:22.04-dev` — see README): `docker run --rm -v "$(pwd):/compiler" -w /compiler php-compiler:22.04-dev bash -lc 'make bootstrap-selfhost-probe'`
 
