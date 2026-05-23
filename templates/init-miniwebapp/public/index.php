@@ -17,7 +17,11 @@ $config = require __DIR__ . '/../config.php';
 require __DIR__ . '/../src/Router.php';
 
 $route = 'home';
-$pathInfo = $_SERVER['PATH_INFO'] ?? '';
+// getenv: $_SERVER['PATH_INFO'] ?? '' clears other $_SERVER keys in VM (#1055).
+$pathInfo = getenv('PATH_INFO');
+if (false === $pathInfo) {
+    $pathInfo = '';
+}
 if ('' !== $pathInfo) {
     if (0 === strpos($pathInfo, '/')) {
         $pathInfo = substr($pathInfo, 1);
