@@ -1194,6 +1194,10 @@ class JIT {
                     $builder->positionAtEnd($branchBlock);
                     $this->compileBlockInternal($func, $op->block1, null, null, ...$args);
                     $targetEntry = $this->context->scope->blockStorage[$op->block1];
+                    if ($this->context->inlineIncludeDepth > 0) {
+                        // Use the merge block itself (not getInsertBlock — callee may be cached) (#846, #784).
+                        $this->context->inlineIncludeExitBlock = $targetEntry;
+                    }
                     $builder->positionAtEnd($branchBlock);
                     if ($this->shouldFreeDeadVariablesBeforeBranch()) {
                         $this->context->freeDeadVariables($func, $branchBlock, $block);
