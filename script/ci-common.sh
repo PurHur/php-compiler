@@ -61,11 +61,20 @@ ci_ensure_generated_doc() {
   "$PHP_BIN" "${PHP_OPTS[@]}" "$script"
 }
 
+ci_run_capability_syntax_check() {
+  if [[ "${CAPABILITY_SYNTAX_CHECK:-1}" != "1" ]]; then
+    echo "capability-syntax: skipped (CAPABILITY_SYNTAX_CHECK=${CAPABILITY_SYNTAX_CHECK:-0}, issue #803)"
+    return 0
+  fi
+  echo "capability-syntax: stale check (CAPABILITY_SYNTAX_CHECK=1 default, issue #803)..."
+  "$PHP_BIN" "${PHP_OPTS[@]}" script/capability-syntax.php --check
+}
+
 ci_run_inventory_checks() {
   script/check-no-unlimited-memory.sh
   script/check-init-miniwebapp-parity.sh
   "$PHP_BIN" "${PHP_OPTS[@]}" script/capability-matrix.php --check
-  "$PHP_BIN" "${PHP_OPTS[@]}" script/capability-syntax.php --check
+  ci_run_capability_syntax_check
   ci_ensure_generated_doc script/bootstrap-inventory.php docs/bootstrap-inventory.md
   ci_ensure_generated_doc script/bootstrap-profile.php docs/bootstrap-profile.json
 }
