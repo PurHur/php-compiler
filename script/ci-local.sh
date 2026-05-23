@@ -73,6 +73,7 @@ if ci_llvm_ready; then
     rm -f "$LLVM_JUNIT"
 
     ci_run_aot_link_phpunit "$@"
+    ci_run_miniwebapp_aot_execute "$@"
   else
     echo "PHPUnit: AOT lint (@group aot-lint)..."
     "$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit --group aot-lint "$@"
@@ -80,6 +81,7 @@ if ci_llvm_ready; then
     BOOTSTRAP_WAVE_CHECK="${BOOTSTRAP_WAVE_CHECK:-1}" ci_run_bootstrap_wave_check
 
     ci_run_aot_link_phpunit "$@"
+    ci_run_miniwebapp_aot_execute "$@"
   fi
 
   ci_run_examples_web_smoke_aot
