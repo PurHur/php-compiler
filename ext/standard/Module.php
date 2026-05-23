@@ -201,6 +201,7 @@ class Module extends ModuleAbstract
             new define_(),
             new defined_(),
             new phpc_deploy_path(),
+            new compiler_is_superglobal_name(),
             new extract_(),
             new compact_(),
             new scandir(),

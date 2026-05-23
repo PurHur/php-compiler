@@ -231,6 +231,12 @@ class Type extends Builtin {
         );
         $fnPregMatch = $this->context->module->addFunction('__compiler_preg_match', $fntypePregMatch);
         $this->context->registerFunction('__compiler_preg_match', $fnPregMatch);
+        $fntypeSuperglobalName = $this->context->context->functionType($i64, false, $strPtr);
+        $fnSuperglobalName = $this->context->module->addFunction(
+            '__compiler_is_superglobal_name',
+            $fntypeSuperglobalName
+        );
+        $this->context->registerFunction('__compiler_is_superglobal_name', $fnSuperglobalName);
         $fntypeFilterEmail = $this->context->context->functionType($strPtr, false, $strPtr);
         $fnFilterEmail = $this->context->module->addFunction(
             '__compiler_filter_validate_email',
