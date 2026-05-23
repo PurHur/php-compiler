@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * LLVM JIT helper for str_pad() — STR_PAD_RIGHT and STR_PAD_LEFT only.
+ * LLVM JIT helper for str_pad() — STR_PAD_LEFT, STR_PAD_RIGHT, and STR_PAD_BOTH.
  */
 
 namespace PHPCompiler\ext\standard;
@@ -37,6 +37,8 @@ final class JitStrPad
         $zero = $i64->constInt(0, false);
         $one = $i64->constInt(1, false);
         $padLeftConst = $i64->constInt(0, false);
+        $padBothConst = $i64->constInt(2, false);
+        $two = $i64->constInt(2, false);
 
         $noPad = $context->builder->icmp(Builder::INT_SLE, $padLength, $inputLen);
         $shortBlock = BasicBlockHelper::append($context, 'strpad_short');
@@ -57,11 +59,33 @@ final class JitStrPad
             $context->builder->structGep($dest, $map['length'])
         );
 
-        $isLeft = $context->builder->icmp(Builder::INT_EQ, $padType, $padLeftConst);
+        $isBoth = $context->builder->icmp(Builder::INT_EQ, $padType, $padBothConst);
+        $pickSideBlock = BasicBlockHelper::append($context, 'strpad_pick_side');
+        $bothBlock = BasicBlockHelper::append($context, 'strpad_both');
         $leftBlock = BasicBlockHelper::append($context, 'strpad_left');
         $rightBlock = BasicBlockHelper::append($context, 'strpad_right');
         $joinedBlock = BasicBlockHelper::append($context, 'strpad_joined');
+        $context->builder->branchIf($isBoth, $bothBlock, $pickSideBlock);
+
+        $context->builder->positionAtEnd($pickSideBlock);
+        $isLeft = $context->builder->icmp(Builder::INT_EQ, $padType, $padLeftConst);
         $context->builder->branchIf($isLeft, $leftBlock, $rightBlock);
+
+        $context->builder->positionAtEnd($bothBlock);
+        $leftNeed = $context->builder->signedDiv($need, $two);
+        $rightNeed = $context->builder->sub($need, $leftNeed);
+        self::fillPadding($context, $destPtr, $zero, $leftNeed, $padPtr, $padLen);
+        $afterLeft = $context->builder->gep($destPtr, $leftNeed);
+        $context->intrinsic->memcpy($afterLeft, $inputPtr, $inputLen, false);
+        self::fillPadding(
+            $context,
+            $context->builder->gep($afterLeft, $inputLen),
+            $zero,
+            $rightNeed,
+            $padPtr,
+            $padLen
+        );
+        $context->builder->branch($joinedBlock);
 
         $context->builder->positionAtEnd($leftBlock);
         self::fillPadding($context, $destPtr, $zero, $need, $padPtr, $padLen);
