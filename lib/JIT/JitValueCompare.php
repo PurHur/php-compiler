@@ -216,6 +216,47 @@ final class JitValueCompare
         return $result;
     }
 
+    /** Strict identity between a boxed CFG handle and a native {@see __object__*} (#1056). */
+    public static function identicalValueBoxToObject(
+        Context $context,
+        Variable $boxed,
+        Variable $object
+    ): Value {
+        $falseVal = $context->getTypeFromString('int1')->constInt(0, false);
+        if (!JitValueBox::isValueOperand($boxed) || Variable::TYPE_OBJECT !== $object->type) {
+            return $falseVal;
+        }
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $boxed);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $isObject = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_OBJECT, false)
+        );
+        $boxedObj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $valuePtr
+        );
+        $nativeObj = $context->helper->loadValue($object);
+        $voidp = $context->getTypeFromString('void')->pointerType(0);
+        $sizeT = $context->getTypeFromString('size_t');
+        $leftPtr = $context->builder->ptrToInt(
+            $context->builder->pointerCast($boxedObj, $voidp),
+            $sizeT
+        );
+        $rightPtr = $context->builder->ptrToInt(
+            $context->builder->pointerCast($nativeObj, $voidp),
+            $sizeT
+        );
+        $same = $context->builder->icmp(Builder::INT_EQ, $leftPtr, $rightPtr);
+
+        return $context->builder->and($isObject, $same);
+    }
+
     public static function identicalValueToValue(
         Context $context,
         Variable $left,

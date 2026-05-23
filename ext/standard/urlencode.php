@@ -37,8 +37,11 @@ final class urlencode extends Internal
 
         $literal = $args[0]->compileTimeString ?? null;
         if (null !== $literal) {
-            return $context->builder->load(
-                $context->constantStringFromString(VmString::urlencode($literal))
+            return $context->builder->call(
+                $context->lookupFunction('__string__separate'),
+                $context->builder->load(
+                    $context->constantStringFromString(VmString::urlencode($literal))
+                )
             );
         }
 
