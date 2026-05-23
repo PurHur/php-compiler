@@ -1650,6 +1650,42 @@ typedef struct __value__ {
 extern long long __value__readLong(__value__ *);
 extern double __value__readDouble(__value__ *);
 extern __string__ *__value__readString(__value__ *);
+extern void __value__writeString(__value__ *out, __string__ *str);
+
+/**
+ * LLVM/AOT runtime: getenv() into __value__ out-parameter (mirrors lib/JIT/Builtin/StringGetenv.php).
+ */
+void __compiler_getenv(__string__ *name, __value__ *out)
+{
+    size_t name_len;
+    const char *name_bytes;
+    char *name_buf;
+    const char *env;
+
+    if (NULL == name || NULL == out) {
+        return;
+    }
+    name_len = nf_strlen(name);
+    name_bytes = nf_strdata(name);
+    name_buf = (char *) malloc(name_len + 1);
+    if (NULL == name_buf) {
+        out->type = PHPC_TYPE_BOOL;
+        out->value[0] = 0;
+
+        return;
+    }
+    memcpy(name_buf, name_bytes, name_len);
+    name_buf[name_len] = '\0';
+    env = getenv(name_buf);
+    free(name_buf);
+    if (NULL == env) {
+        out->type = PHPC_TYPE_BOOL;
+        out->value[0] = 0;
+
+        return;
+    }
+    __value__writeString(out, __string__init((long long) strlen(env), env));
+}
 
 #define SPRINTF_MAX_OUT 4096
 
