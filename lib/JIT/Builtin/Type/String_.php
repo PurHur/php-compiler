@@ -165,6 +165,24 @@ class String_ extends Type {
             $fn___quotemeta->addAttributeAtIndex(\PHPLLVM\Attribute::INDEX_FUNCTION, $this->context->attributes['alwaysinline']);
             $this->context->registerFunction('__string__quotemeta', $fn___quotemeta);
 
+        $fntype___addslashes = $this->context->context->functionType(
+                $this->context->getTypeFromString('__string__*'),
+                false,
+                $this->context->getTypeFromString('__string__*')
+            );
+            $fn___addslashes = $this->context->module->addFunction('__string__addslashes', $fntype___addslashes);
+            $fn___addslashes->addAttributeAtIndex(\PHPLLVM\Attribute::INDEX_FUNCTION, $this->context->attributes['alwaysinline']);
+            $this->context->registerFunction('__string__addslashes', $fn___addslashes);
+
+        $fntype___stripslashes = $this->context->context->functionType(
+                $this->context->getTypeFromString('__string__*'),
+                false,
+                $this->context->getTypeFromString('__string__*')
+            );
+            $fn___stripslashes = $this->context->module->addFunction('__string__stripslashes', $fntype___stripslashes);
+            $fn___stripslashes->addAttributeAtIndex(\PHPLLVM\Attribute::INDEX_FUNCTION, $this->context->attributes['alwaysinline']);
+            $this->context->registerFunction('__string__stripslashes', $fn___stripslashes);
+
         $fntype___urlencode = $this->context->context->functionType(
                 $this->context->getTypeFromString('__string__*'),
                 false,
@@ -233,6 +251,8 @@ class String_ extends Type {
         \PHPCompiler\JIT\Builtin\StringHtmlspecialchars::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringPregQuote::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringQuotemeta::implement($this->context);
+        \PHPCompiler\JIT\Builtin\StringAddslashes::implement($this->context);
+        \PHPCompiler\JIT\Builtin\StringStripslashes::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringUrlencode::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringUrldecode::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringNl2br::implement($this->context);
