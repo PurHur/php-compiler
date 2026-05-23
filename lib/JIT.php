@@ -1438,7 +1438,10 @@ class JIT {
                 $this->context->helper->loadValue($value),
                 $result->value
             );
-            $result->addref();
+            $this->copyObjectPropertyBacking($result, $value);
+            if (null === $result->objectPropertySlot) {
+                $result->addref();
+            }
             $this->copyValueBoxJitFlags($result, $value);
 
             return;
@@ -1595,7 +1598,10 @@ class JIT {
             );
             $result->free();
             $this->context->builder->store($ht, $result->value);
-            $result->addref();
+            $this->copyObjectPropertyBacking($result, $value);
+            if (null === $result->objectPropertySlot) {
+                $result->addref();
+            }
 
             return;
         } elseif (Variable::TYPE_STRING === $result->type && Variable::TYPE_VALUE === $value->type) {
@@ -1680,6 +1686,13 @@ class JIT {
         }
         $dest->valueBoxHashtable = $src->valueBoxHashtable;
         $dest->isNullConstant = $src->isNullConstant;
+    }
+
+    /** Keep borrowed object-property hashtable metadata on locals ($cfg = $this->config, #848). */
+    private function copyObjectPropertyBacking(Variable $dest, Variable $src): void
+    {
+        $dest->objectPropertySlot = $src->objectPropertySlot;
+        $dest->objectPropertyType = $src->objectPropertyType;
     }
 
     private function jitTypeFromLlvmValue(PHPLLVM\Value $value): int

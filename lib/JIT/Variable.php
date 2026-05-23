@@ -388,6 +388,9 @@ final class Variable {
         if (!($this->type & self::IS_REFCOUNTED) || self::TYPE_VALUE === $this->type) {
             return;
         }
+        if (null !== $this->objectPropertySlot) {
+            return;
+        }
         $ptr = self::KIND_VALUE === $this->kind
             ? $this->value
             : $this->context->helper->loadValue($this);
@@ -416,6 +419,9 @@ final class Variable {
             return;
         }
         if ($this->type & self::IS_REFCOUNTED) {
+            if (null !== $this->objectPropertySlot) {
+                return;
+            }
             $ptr = self::KIND_VALUE === $this->kind
                 ? $this->value
                 : $this->context->helper->loadValue($this);
