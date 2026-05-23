@@ -207,6 +207,7 @@ class Module extends ModuleAbstract
             new fread(),
             new fgetc(),
             new fgets(),
+            new fgetcsv(),
             new ftell_(),
             new fseek(),
             new feof_(),
