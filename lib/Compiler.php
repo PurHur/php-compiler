@@ -16,6 +16,7 @@ use PHPCfg\Func as CfgFunc;
 use PHPCfg\Op;
 use PHPCfg\Block as CfgBlock;
 use PHPCfg\Operand;
+use PHPCfg\Operand\Literal;
 use PHPCfg\Operand\Temporary;
 use PHPCfg\Script;
 use PHPTypes\Type;
@@ -142,10 +143,57 @@ class Compiler {
                         // Lowered by compileCoalesce/compileIsset via isset(container, dim) — no eager fetch (#99, #273, #539).
                         break;
                     } else {
+                        if ($this->needsCfgSplitBeforeStringDimFetch($child, $block)) {
+                            $block = $this->splitCfgBlockAfterStringKeyedArray($block);
+                        }
                         $this->compileOp($child, $block);
                     }
             }
         }
+    }
+
+    /**
+     * String-key array writes and immediate dim fetch in one CFG block break AOT (#764, #783).
+     */
+    private function needsCfgSplitBeforeStringDimFetch(Op $op, Block $block): bool
+    {
+        if (!$op instanceof Op\Expr\ArrayDimFetch) {
+            return false;
+        }
+        if (!$op->dim instanceof Literal || !is_string($op->dim->value)) {
+            return false;
+        }
+        foreach ($block->opCodes as $prev) {
+            if (OpCode::TYPE_INIT_ARRAY === $prev->type && null !== $prev->arg3) {
+                return true;
+            }
+            if (OpCode::TYPE_INCLUDE === $prev->type && null !== $prev->arg2) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function splitCfgBlockAfterStringKeyedArray(Block $block): Block
+    {
+        $hub = new Block($block->orig);
+        $hub->inheritScopeFrom($block);
+        $this->inheritFuncFromParent($hub, $block);
+        $jumpToHub = new OpCode(OpCode::TYPE_JUMP);
+        $jumpToHub->block1 = $hub;
+        $block->addOpCode($jumpToHub);
+
+        $cont = new Block($block->orig);
+        $cont->inheritScopeFrom($block);
+        $this->inheritFuncFromParent($cont, $hub);
+        $jumpToCont = new OpCode(OpCode::TYPE_JUMP);
+        $jumpToCont->block1 = $cont;
+        $hub->addOpCode($jumpToCont);
+        $hub->parents[] = $block;
+        $cont->parents[] = $hub;
+
+        return $cont;
     }
 
     /**
