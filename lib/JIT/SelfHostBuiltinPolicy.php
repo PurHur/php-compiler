@@ -85,7 +85,8 @@ final class SelfHostBuiltinPolicy
         // array_map: null + compile-time string builtins only; closures deferred (#1154)
         'array_push' => 'array', 'array_pop' => 'array', 'array_shift' => 'array', 'array_unshift' => 'array',
         'array_reverse' => 'array', 'array_filter' => 'array', 'array_combine' => 'array', 'array_flip' => 'array',
-        'array_product' => 'array', 'array_unique' => 'array', 'array_sum' => 'array', 'sort' => 'array',
+        'array_chunk' => 'array', 'array_column' => 'array',
+        'array_product' => 'array', 'array_unique' => 'array', 'array_diff' => 'array', 'array_sum' => 'array', 'sort' => 'array',
         'usort' => 'array',
         'compact' => 'array', 'extract' => 'array', 'defined' => 'array', 'define' => 'array',
         'class_exists' => 'array', 'function_exists' => 'array', 'method_exists' => 'array',

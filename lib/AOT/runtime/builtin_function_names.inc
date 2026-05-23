@@ -3,7 +3,10 @@ static const char *phpc_builtin_functions[] = {
     "__compiler_is_superglobal_name",
     "abs",
     "addslashes",
+    "array_chunk",
+    "array_column",
     "array_combine",
+    "array_diff",
     "array_fill",
     "array_filter",
     "array_flip",
@@ -213,4 +216,4 @@ static const char *phpc_builtin_functions[] = {
     "web_string",
     "wordwrap",
 };
-static const size_t phpc_builtin_functions_count = 212;
+static const size_t phpc_builtin_functions_count = 215;
