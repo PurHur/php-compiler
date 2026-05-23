@@ -179,6 +179,9 @@ class Type extends Builtin {
         $fntypeFeof = $this->context->context->functionType($i32, false, $i64);
         $fnFeof = $this->context->module->addFunction('__compiler_feof', $fntypeFeof);
         $this->context->registerFunction('__compiler_feof', $fnFeof);
+        $fntypeFflush = $this->context->context->functionType($i32, false, $i64);
+        $fnFflush = $this->context->module->addFunction('__compiler_fflush', $fntypeFflush);
+        $this->context->registerFunction('__compiler_fflush', $fnFflush);
         $fntypeFgetc = $this->context->context->functionType($strPtr, false, $i64);
         $fnFgetc = $this->context->module->addFunction('__compiler_fgetc', $fntypeFgetc);
         $this->context->registerFunction('__compiler_fgetc', $fnFgetc);

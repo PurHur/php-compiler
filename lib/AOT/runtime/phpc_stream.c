@@ -160,6 +160,17 @@ int __compiler_feof(int64_t handle)
     return feof(fp) ? 1 : 0;
 }
 
+int __compiler_fflush(int64_t handle)
+{
+    FILE *fp = phpc_resolve_stream(handle);
+
+    if (NULL == fp) {
+        return 0;
+    }
+
+    return fflush(fp) == 0 ? 1 : 0;
+}
+
 __string__ *__compiler_fgetc(int64_t handle)
 {
     FILE *fp;
