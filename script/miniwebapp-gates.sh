@@ -32,6 +32,10 @@ Environment (enable next gates):
   MINIWEBAPP_SERVE_GATE=0     skip ServeTest miniwebapp during fast iteration
   MINIWEBAPP_WEB_SMOKE_GATE=1     003 PATH_INFO curls in ci-local (default on — #664)
   MINIWEBAPP_WEB_SMOKE_GATE=0     skip shell PATH_INFO curls during iteration
+  MINIWEBAPP_AOT_LINK_GATE=1      phpc build --project in ExamplesCompileTest (default on — #754)
+  MINIWEBAPP_AOT_LINK_GATE=0      skip 003 native link gate during iteration
+  MINIWEBAPP_AOT_EXECUTE_GATE=1   run 003 AOT binary CLI execute in ci-local (#747, #764)
+  MINIWEBAPP_AOT_EXECUTE_GATE=0   skip execute (default until #764 green — #791)
 
 See: examples/003-MiniWebApp/README.md, issue #472
 EOF

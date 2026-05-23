@@ -187,3 +187,13 @@ ci_run_examples_aot_smoke() {
   echo "examples-aot-smoke: CLI build + execute (EXAMPLES_AOT_SMOKE_GATE=1 default, #667, #674)..."
   "$_CI_SCRIPT_DIR/examples-aot-smoke.sh"
 }
+
+# @group aot-link PHPUnit; 003 execute tests opt-in via MINIWEBAPP_AOT_EXECUTE_GATE (#791).
+ci_run_aot_link_phpunit() {
+  local -a aot_link_args=(--group aot-link --exclude-group serve)
+  if [[ "${MINIWEBAPP_AOT_EXECUTE_GATE:-0}" != "1" ]]; then
+    aot_link_args+=(--exclude-group miniwebapp-aot-execute)
+  fi
+  echo "PHPUnit: AOT link + execute (@group aot-link; MINIWEBAPP_AOT_EXECUTE_GATE=${MINIWEBAPP_AOT_EXECUTE_GATE:-0})..."
+  "$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit "${aot_link_args[@]}" "$@"
+}

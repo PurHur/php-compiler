@@ -24,59 +24,70 @@ final class ExamplesCompileTest extends TestCase
     private static ?bool $llvmReady = null;
 
     /**
-     * Shipped 003-MiniWebApp: native AOT link via phpc build --project (#568).
+     * Shipped 003-MiniWebApp: native AOT link via phpc build --project (#568, #754).
      *
      * @group miniwebapp
      * @group llvm
      * @group aot
      * @group aot-link
      */
-    public function test003MiniWebAppEventuallyRuns(): void
+    public function test003MiniWebAppBuildLinks(): void
     {
+        if (!self::miniWebAppAotLinkGateEnabled()) {
+            $this->markTestSkipped('MINIWEBAPP_AOT_LINK_GATE=0 — skip 003 project link gate (#754)');
+        }
+        $project = $this->miniWebAppProjectPath();
+        $binary = $this->build003MiniWebAppProject($project);
+        $this->assertFileExists($binary);
+    }
+
+    /**
+     * 003-MiniWebApp AOT binary CLI execute with CGI env (#747, #764).
+     *
+     * Opt-in via MINIWEBAPP_AOT_EXECUTE_GATE=1 until native execute is green.
+     *
+     * @group miniwebapp
+     * @group llvm
+     * @group aot
+     * @group aot-link
+     * @group miniwebapp-aot-execute
+     */
+    public function test003MiniWebAppExecutesWithCgiEnv(): void
+    {
+        if (!self::miniWebAppAotExecuteGateEnabled()) {
+            $this->markTestSkipped(
+                'MINIWEBAPP_AOT_EXECUTE_GATE=0 (default) — enable when #764/#747 execute is green'
+            );
+        }
         if (!self::isLlvmReady()) {
             $this->markTestSkipped(
                 'LLVM 9 toolchain not available. Run script/install-llvm9.sh from the repository root.'
             );
         }
-        $project = realpath(dirname(__DIR__, 2).'/examples/003-MiniWebApp');
-        if (false === $project) {
-            $this->markTestSkipped('examples/003-MiniWebApp missing (#246)');
-        }
-        $phpc = realpath(dirname(__DIR__, 2).'/phpc');
-        $this->assertNotFalse($phpc);
+        $project = $this->miniWebAppProjectPath();
+        $binary = $this->build003MiniWebAppProject($project);
+        $publicDir = $project.'/public';
+        $this->assertDirectoryExists($publicDir);
+
         $repoRoot = dirname(__DIR__, 2);
         $env = $this->llvmProcessEnv($repoRoot);
-        $descriptorSpec = [
-            0 => ['pipe', 'r'],
-            1 => ['pipe', 'w'],
-            2 => ['pipe', 'w'],
-        ];
-        $proc = proc_open(
-            [$phpc, 'build', '--project', $project],
-            $descriptorSpec,
-            $pipes,
-            $repoRoot,
-            $env
-        );
-        $this->assertIsResource($proc);
-        fclose($pipes[0]);
-        $stderr = stream_get_contents($pipes[2]);
-        fclose($pipes[1]);
-        fclose($pipes[2]);
-        $exit = proc_close($proc);
-        $stderrText = trim($stderr !== false ? $stderr : '');
-        if (0 !== $exit && PhpcBuild::isUserClassAotBlocked($stderrText)) {
-            $this->markTestSkipped(
-                '003-MiniWebApp native AOT link blocked until user-class object model (#568): '.$stderrText
-            );
-        }
-        $this->assertSame(
-            0,
-            $exit,
-            'phpc build --project 003-MiniWebApp failed (#568): '.$stderrText
-        );
-        $binary = $project.'/.phpc/bin/app';
-        $this->assertFileExists($binary);
+        $env['SCRIPT_FILENAME'] = $publicDir.'/index.php';
+        $env['SCRIPT_NAME'] = '/index.php';
+        $env['DOCUMENT_ROOT'] = $publicDir;
+        $env['REQUEST_METHOD'] = 'GET';
+        $env['QUERY_STRING'] = 'route=home';
+
+        $out = $this->runAotBinary($binary, $env);
+        $this->assertNotSame('', $out, '003 AOT home route produced empty stdout (#764)');
+        $this->assertStringContainsString('MiniWebApp', $out);
+    }
+
+    /**
+     * @deprecated Use {@see test003MiniWebAppBuildLinks()} — kept for gate script regex (#791).
+     */
+    public function test003MiniWebAppEventuallyRuns(): void
+    {
+        $this->test003MiniWebAppBuildLinks();
     }
 
     /**
@@ -837,6 +848,72 @@ final class ExamplesCompileTest extends TestCase
             }
         }
         rmdir($dir);
+    }
+
+    private static function miniWebAppAotLinkGateEnabled(): bool
+    {
+        $gate = getenv('MINIWEBAPP_AOT_LINK_GATE');
+
+        return false === $gate || '0' !== $gate;
+    }
+
+    private static function miniWebAppAotExecuteGateEnabled(): bool
+    {
+        return '1' === getenv('MINIWEBAPP_AOT_EXECUTE_GATE');
+    }
+
+    private function miniWebAppProjectPath(): string
+    {
+        if (!self::isLlvmReady()) {
+            $this->markTestSkipped(
+                'LLVM 9 toolchain not available. Run script/install-llvm9.sh from the repository root.'
+            );
+        }
+        $project = realpath(dirname(__DIR__, 2).'/examples/003-MiniWebApp');
+        if (false === $project) {
+            $this->markTestSkipped('examples/003-MiniWebApp missing (#246)');
+        }
+
+        return $project;
+    }
+
+    private function build003MiniWebAppProject(string $project): string
+    {
+        $phpc = realpath(dirname(__DIR__, 2).'/phpc');
+        $this->assertNotFalse($phpc);
+        $repoRoot = dirname(__DIR__, 2);
+        $env = $this->llvmProcessEnv($repoRoot);
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open(
+            [$phpc, 'build', '--project', $project],
+            $descriptorSpec,
+            $pipes,
+            $repoRoot,
+            $env
+        );
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+        $stderrText = trim($stderr !== false ? $stderr : '');
+        if (0 !== $exit && PhpcBuild::isUserClassAotBlocked($stderrText)) {
+            $this->markTestSkipped(
+                '003-MiniWebApp native AOT link blocked until user-class object model (#568): '.$stderrText
+            );
+        }
+        $this->assertSame(
+            0,
+            $exit,
+            'phpc build --project 003-MiniWebApp failed (#568): '.$stderrText
+        );
+
+        return $project.'/.phpc/bin/app';
     }
 
     private static function isLlvmReady(): bool

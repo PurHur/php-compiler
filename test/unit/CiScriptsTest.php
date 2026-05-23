@@ -28,9 +28,11 @@ final class CiScriptsTest extends TestCase
         $body = (string) file_get_contents($local);
         $this->assertStringContainsString('--group aot-lint', $body);
         $this->assertStringContainsString('--group jit', $body);
-        $this->assertStringContainsString('--group aot-link', $body);
+        $this->assertStringContainsString('ci_run_aot_link_phpunit', $body);
         $this->assertStringContainsString('ci_prepare_test_runtime', $body);
         $this->assertStringContainsString('ci_run_examples_web_smoke_aot', $body);
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('--group aot-link', $common);
     }
 
     public function testCiLocalHonorsMiniWebAppServeGate(): void
@@ -83,6 +85,21 @@ final class CiScriptsTest extends TestCase
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
         $this->assertStringContainsString('MINIWEBAPP_WEB_SMOKE_GATE="${MINIWEBAPP_WEB_SMOKE_GATE:-1}"', $defaults);
+    }
+
+    public function testCiDefaultsEnvDefinesMiniWebAppAotGates(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString('MINIWEBAPP_AOT_LINK_GATE="${MINIWEBAPP_AOT_LINK_GATE:-1}"', $defaults);
+        $this->assertStringContainsString('MINIWEBAPP_AOT_EXECUTE_GATE="${MINIWEBAPP_AOT_EXECUTE_GATE:-0}"', $defaults);
+    }
+
+    public function testCiLocalExcludesMiniWebAppAotExecuteUnlessGateOn(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('ci_run_aot_link_phpunit', $body);
+        $this->assertStringContainsString('miniwebapp-aot-execute', $body);
+        $this->assertStringContainsString('MINIWEBAPP_AOT_EXECUTE_GATE', $body);
     }
 
     public function testExamplesWebSmokePrebuildScriptExists(): void

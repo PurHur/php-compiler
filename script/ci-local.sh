@@ -57,14 +57,12 @@ if ci_llvm_ready; then
     ci_guard_jit_compliance "$LLVM_JUNIT" "$(ci_llvm_dir)"
     rm -f "$LLVM_JUNIT"
 
-    echo "PHPUnit: AOT link + execute (@group aot-link, excluding serve)..."
-    "$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit --group aot-link --exclude-group serve "$@"
+    ci_run_aot_link_phpunit "$@"
   else
     echo "PHPUnit: AOT lint (@group aot-lint)..."
     "$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit --group aot-lint "$@"
 
-    echo "PHPUnit: AOT link + execute (@group aot-link — PHPT fixtures, web examples)..."
-    "$PHP_BIN" "${PHP_OPTS[@]}" vendor/bin/phpunit --group aot-link --exclude-group serve "$@"
+    ci_run_aot_link_phpunit "$@"
   fi
 
   ci_run_examples_web_smoke_aot
