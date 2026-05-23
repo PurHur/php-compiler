@@ -213,6 +213,35 @@ final class Variable {
     }
 
     /**
+     * Element JIT type when a static array literal may use a homogeneous native LLVM array.
+     *
+     * @param list<Type> $subTypes
+     */
+    private static function homogeneousNativeElementType(array $subTypes): ?int
+    {
+        if ([] === $subTypes) {
+            return null;
+        }
+        $elemType = self::getTypeFromType($subTypes[0]);
+        if (!in_array($elemType, [
+            self::TYPE_NATIVE_LONG,
+            self::TYPE_NATIVE_BOOL,
+            self::TYPE_NATIVE_DOUBLE,
+            self::TYPE_STRING,
+            self::TYPE_OBJECT,
+        ], true)) {
+            return null;
+        }
+        foreach ($subTypes as $sub) {
+            if (self::getTypeFromType($sub) !== $elemType) {
+                return null;
+            }
+        }
+
+        return $elemType;
+    }
+
+    /**
      * Returns a writable variable (lvalue)
      */
     public static function fromOp(
@@ -240,8 +269,8 @@ final class Variable {
                 $size = $context->analyzer->computeStaticArraySize($op);
                 if (!is_null($size) && !$context->analyzer->hasDynamicArrayAppend($op, $size)) {
                     $subTypes = $op->type->subTypes ?? [];
-                    if ([] !== $subTypes) {
-                        $origType = self::getTypeFromType($subTypes[0]);
+                    $origType = self::homogeneousNativeElementType($subTypes);
+                    if (null !== $origType) {
                         $type = self::IS_NATIVE_ARRAY | $origType;
                         $stringType = self::getStringType($origType) . '[' . $size . ']';
                     }

@@ -128,6 +128,8 @@ class HashTable extends Type
         $this->implementAlloc();
         $this->implementGrow();
         $this->implementSetLongAt();
+        $this->implementSetDoubleAt();
+        $this->implementSetBoolAt();
         $this->implementSetStringAt();
         $this->implementReadLongAt();
         $this->implementReadStringAt();
