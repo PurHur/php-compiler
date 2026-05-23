@@ -352,6 +352,7 @@
         "lib/JIT/JitValueCompare.php",
         "lib/JIT/NullsafeHelper.php",
         "lib/JIT/OperandName.php",
+        "lib/JIT/Progress.php",
         "lib/JIT/Result.php",
         "lib/JIT/Scope.php",
         "lib/JIT/ScopeBuiltinHelper.php",
@@ -451,9 +452,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 379,
+        "inventory_files": 380,
         "excluded": 3,
-        "eligible": 376,
+        "eligible": 377,
         "aot_lint_targets": 20,
         "aot_link_targets": 15,
         "aot_link_lib_targets": 1

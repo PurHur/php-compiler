@@ -286,7 +286,7 @@ class JIT {
             return $this->context->scope->blockStorage[$block];
         }
         if (null !== $block->func && $block->orig === $block->func->cfg) {
-            JIT\Progress::noteFunction($block->func->name);
+            JIT\Progress::noteFunction($block->func->getScopedName());
         }
         if (null !== $entryBlock) {
             $origBasicBlock = $basicBlock = $entryBlock;
@@ -1590,12 +1590,17 @@ class JIT {
 
             return;
         } elseif (Variable::TYPE_STRING === $result->type && Variable::TYPE_VALUE === $value->type) {
-            $str = $this->context->builder->call(
-                $this->context->lookupFunction('__value__readString'),
+            // getenv() and similar builtins return string|false as __value__; keep the box
+            // so strict comparisons against false use JitValueCompare (issue #848).
+            $slot = JIT\JitValueBox::alloc($this->context);
+            JIT\JitValueBox::copyFromPointer(
+                $this->context,
+                $slot,
                 $this->valueBoxPointer($value)
             );
             $result->free();
-            $this->context->builder->store($str, $result->value);
+            $result->type = Variable::TYPE_VALUE;
+            $result->value = $slot;
             $result->addref();
 
             return;
