@@ -163,6 +163,7 @@ class Module extends ModuleAbstract
             new is_link(),
             new readlink(),
             new unlink(),
+            new mkdir_(),
             new filetype(),
             new fopen(),
             new fread(),
@@ -350,6 +351,15 @@ class Module extends ModuleAbstract
             $ft = $context->context->functionType($i32, false, $i8p);
             $fn = $context->module->addFunction('unlink', $ft);
             $context->registerFunction('unlink', $fn);
+        }
+        try {
+            $context->lookupFunction('mkdir');
+        } catch (\Throwable $e) {
+            $i8p = $context->getTypeFromString('int8*');
+            $i32 = $context->getTypeFromString('int32');
+            $ft = $context->context->functionType($i32, false, $i8p, $i32);
+            $fn = $context->module->addFunction('mkdir', $ft);
+            $context->registerFunction('mkdir', $fn);
         }
         $double = $context->getTypeFromString('double');
         try {

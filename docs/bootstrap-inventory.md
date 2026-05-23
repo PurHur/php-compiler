@@ -8,9 +8,9 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 355 |
+| PHP files on vm.php path | 357 |
 | Source constructs flagged (blockers) | 10 |
-| Source constructs flagged (warnings) | 946 |
+| Source constructs flagged (warnings) | 949 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -53,6 +53,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/JitHttpResponseCode.php` | 0 | 1 |
 | `ext/standard/JitImplode.php` | 0 | 1 |
 | `ext/standard/JitJsonEncode.php` | 0 | 1 |
+| `ext/standard/JitMkdir.php` | 0 | 1 |
 | `ext/standard/JitNl2br.php` | 0 | 1 |
 | `ext/standard/JitNumberFormat.php` | 0 | 1 |
 | `ext/standard/JitParseUrl.php` | 0 | 1 |
@@ -83,7 +84,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/JitUnlink.php` | 0 | 1 |
 | `ext/standard/JitUrlencode.php` | 0 | 1 |
 | `ext/standard/JitWebParams.php` | 0 | 15 |
-| `ext/standard/Module.php` | 0 | 162 |
+| `ext/standard/Module.php` | 0 | 163 |
 | `ext/standard/SetcookieLine.php` | 0 | 1 |
 | `ext/standard/VmDate.php` | 0 | 1 |
 | `ext/standard/VmExit.php` | 0 | 2 |
@@ -185,6 +186,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 | `ext/standard/json_encode.php` | 0 | 1 |
 | `ext/standard/lcfirst.php` | 0 | 1 |
 | `ext/standard/log.php` | 0 | 1 |
+| `ext/standard/mkdir_.php` | 0 | 1 |
 | `ext/standard/nl2br.php` | 0 | 1 |
 | `ext/standard/number_format.php` | 0 | 1 |
 | `ext/standard/ob_end_flush.php` | 0 | 1 |
@@ -482,6 +484,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/JitJsonEncode.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/JitMkdir.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
@@ -797,23 +804,24 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 - new is_link (line 163)
 - new readlink (line 164)
 - new unlink (line 165)
-- new filetype (line 166)
-- new fopen (line 167)
-- new fread (line 168)
-- new fwrite (line 169)
-- new fclose (line 170)
-- new getenv_ (line 171)
-- new putenv_ (line 172)
-- new define_ (line 173)
-- new defined_ (line 174)
-- new phpc_deploy_path (line 175)
-- new extract_ (line 176)
-- new compact_ (line 177)
-- new scandir (line 178)
-- new glob_ (line 179)
-- new time (line 180)
-- new date (line 181)
-- new gmdate (line 182)
+- new mkdir_ (line 166)
+- new filetype (line 167)
+- new fopen (line 168)
+- new fread (line 169)
+- new fwrite (line 170)
+- new fclose (line 171)
+- new getenv_ (line 172)
+- new putenv_ (line 173)
+- new define_ (line 174)
+- new defined_ (line 175)
+- new phpc_deploy_path (line 176)
+- new extract_ (line 177)
+- new compact_ (line 178)
+- new scandir (line 179)
+- new glob_ (line 180)
+- new time (line 181)
+- new date (line 182)
+- new gmdate (line 183)
 - 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/SetcookieLine.php`
@@ -844,7 +852,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 **Warnings** (review for bootstrap subset):
 - new HashTable (line 23)
 - new Variable (line 25)
-- 15 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 16 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/VmHash.php`
 
@@ -1354,6 +1362,11 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 
 **Warnings** (review for bootstrap subset):
 - 3 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `ext/standard/mkdir_.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/nl2br.php`
 

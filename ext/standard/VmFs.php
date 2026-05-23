@@ -75,6 +75,11 @@ final class VmFs
         return @unlink($path);
     }
 
+    public static function mkdir(string $path, int $mode = 0777, bool $recursive = false): bool
+    {
+        return @mkdir($path, $mode, $recursive);
+    }
+
     private static function modeToFiletype(int $mode): string
     {
         $type = $mode & 0xF000;
