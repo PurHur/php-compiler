@@ -32,20 +32,7 @@ final class SwitchDetector
             return [];
         }
 
-        $visitor = new class extends NodeVisitorAbstract {
-            /** @var list<array{int, string}> */
-            public array $hits = [];
-
-            public function enterNode(Node $node): ?int
-            {
-                if ($node instanceof Switch_) {
-                    $this->hits[] = [$node->getStartLine(), SwitchDetector::KIND];
-                }
-
-                return null;
-            }
-        };
-
+        $visitor = new SwitchDetectorAstVisitor();
         $traverser = new NodeTraverser();
         $traverser->addVisitor($visitor);
         $traverser->traverse($ast);
@@ -63,5 +50,22 @@ final class SwitchDetector
         }
 
         return $issues;
+    }
+}
+
+
+/** @internal */
+final class SwitchDetectorAstVisitor extends NodeVisitorAbstract
+{
+    /** @var list<array{int, string}> */
+    public array $hits = [];
+
+    public function enterNode(Node $node): ?int
+    {
+        if ($node instanceof Switch_) {
+            $this->hits[] = [$node->getStartLine(), SwitchDetector::KIND];
+        }
+
+        return null;
     }
 }
