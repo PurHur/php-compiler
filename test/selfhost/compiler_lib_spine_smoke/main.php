@@ -143,6 +143,14 @@ require_once __DIR__.'/../../../ext/standard/JitQuotemeta.php';
 require_once __DIR__.'/../../../ext/standard/JitStrRot13.php';
 require_once __DIR__.'/../../../ext/standard/JitSessionId.php';
 require_once __DIR__.'/../../../ext/standard/JitSessionName.php';
+require_once __DIR__.'/../../../ext/standard/JitChdir.php';
+require_once __DIR__.'/../../../ext/standard/JitClassExists.php';
+require_once __DIR__.'/../../../ext/standard/JitClearstatcache.php';
+require_once __DIR__.'/../../../ext/standard/JitDeployPath.php';
+require_once __DIR__.'/../../../ext/standard/JitEnumExists.php';
+require_once __DIR__.'/../../../ext/standard/JitEnv.php';
+require_once __DIR__.'/../../../ext/standard/JitFclose.php';
+require_once __DIR__.'/../../../ext/standard/JitFeof.php';
 require_once __DIR__.'/../../../ext/standard/Module.php';
 
 echo "compiler_lib_spine_smoke bundle OK\n";
