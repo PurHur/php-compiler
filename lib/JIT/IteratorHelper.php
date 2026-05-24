@@ -420,6 +420,20 @@ final class IteratorHelper
         return self::compileValueHashtable($context, $array, $slotKey);
     }
 
+    public static function compileValueByRef(
+        Context $context,
+        Variable $array,
+        ?string $containerUserType = null
+    ): Variable {
+        $slotKey = $array;
+        $array = self::asHashtable($context, $array, $containerUserType);
+        if (self::usesObjectKeys($containerUserType)) {
+            return self::compileValueByRefObject($context, $slotKey);
+        }
+
+        return self::compileValueByRefHashtable($context, $array, $slotKey);
+    }
+
     private static function compileValueObject(Context $context, Variable $slotKey): Variable
     {
         $slot = JitValueBox::alloc($context);
@@ -432,6 +446,44 @@ final class IteratorHelper
         self::copyValueEntryToBox($context, $destPtr, $valField, $valueMap, $fn);
 
         return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
+    }
+
+    private static function compileValueByRefObject(Context $context, Variable $slotKey): Variable
+    {
+        $nodeMap = $context->structFieldMap['__objkey_node__'];
+        $node = $context->builder->load(self::objNodeSlot($context, $slotKey));
+        $valField = $context->builder->structGep($node, $nodeMap['value']);
+
+        return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $valField);
+    }
+
+    private static function compileValueByRefHashtable(Context $context, Variable $array, Variable $slotKey): Variable
+    {
+        $ht = $context->helper->loadValue($array);
+        $map = $context->structFieldMap['__hashtable__'];
+        $nodeMap = $context->structFieldMap['__strkey_node__'];
+        $idx = $context->builder->load(self::indexSlot($context, $slotKey));
+        $nextFree = $context->builder->load($context->builder->structGep($ht, $map['nextFreeElement']));
+        $inPacked = self::icmpUltSizeT($context, $idx, $nextFree);
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $packed = $fn->appendBasicBlock('foreach_valref_packed');
+        $str = $fn->appendBasicBlock('foreach_valref_str');
+        $done = $fn->appendBasicBlock('foreach_valref_done');
+        $context->builder->branchIf($inPacked, $packed, $str);
+        $context->builder->positionAtEnd($packed);
+        $packedEntry = HashTableHelper::listEntryPointer($context, $ht, $idx);
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($str);
+        $node = self::stringKeyNodeAt($context, $ht, $map, $nodeMap, $slotKey);
+        $strEntry = $context->builder->structGep($node, $nodeMap['value']);
+        $strEntryBlock = $context->builder->getInsertBlock();
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($done);
+        $entry = $context->builder->phi($packedEntry->typeOf());
+        $entry->addIncoming($packedEntry, $packed);
+        $entry->addIncoming($strEntry, $strEntryBlock);
+
+        return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $entry);
     }
 
     private static function compileValueHashtable(Context $context, Variable $array, Variable $slotKey): Variable

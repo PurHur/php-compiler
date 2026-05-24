@@ -117,6 +117,21 @@ class Context {
     /** @var array<string, string> */
     public array $refAliasNames = [];
 
+    /** Rebound foreach by-ref value variables keyed by source name (#1222). */
+    /** @var array<string, Variable> */
+    public array $namedVariableBindings = [];
+
+    public function bindVariableByName(string $name, Variable $var): void
+    {
+        $resolved = $this->resolveRefAliasName($name);
+        $this->namedVariableBindings[$resolved] = $var;
+        foreach ($this->scope->variables as $scopeOp => $_) {
+            if ($resolved === OperandName::resolve($scopeOp)) {
+                $this->scope->variables[$scopeOp] = $var;
+            }
+        }
+    }
+
     public function __construct(Runtime $runtime, int $loadType) {
         $this->runtime = $runtime;
         $this->scope = new Scope;
@@ -679,6 +694,11 @@ class Context {
                         return $var;
                     }
                 }
+            }
+            if (isset($this->namedVariableBindings[$resolved])) {
+                $this->scope->variables[$op] = $this->namedVariableBindings[$resolved];
+
+                return $this->namedVariableBindings[$resolved];
             }
         }
         if (!$this->scope->variables->contains($op)) {

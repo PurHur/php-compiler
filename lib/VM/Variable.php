@@ -291,6 +291,13 @@ final class Variable {
     }
 
     public function castFrom(int $type, self $var) {
+        if ($this->type === self::TYPE_INDIRECT) {
+            $result = new self();
+            $result->castFrom($type, $var);
+            $this->indirect->copyFrom($result);
+
+            return;
+        }
         $this->reset();
         $this->type = $type;
         switch ($type) {
@@ -450,6 +457,13 @@ restart:
     }
 
     public function compareOp(int $opCode, Variable $left, Variable $right): void {
+        if ($this->type === self::TYPE_INDIRECT) {
+            $result = new self();
+            $result->compareOp($opCode, $left, $right);
+            $this->indirect->copyFrom($result);
+
+            return;
+        }
         $this->reset();
 restart:
         switch (type_pair($left->type, $right->type)) {
@@ -505,6 +519,13 @@ restart:
     }
 
     public function spaceshipOp(Variable $left, Variable $right): void {
+        if ($this->type === self::TYPE_INDIRECT) {
+            $result = new self();
+            $result->spaceshipOp($left, $right);
+            $this->indirect->copyFrom($result);
+
+            return;
+        }
         $this->reset();
 restart:
         switch (type_pair($left->type, $right->type)) {
@@ -555,6 +576,13 @@ restart:
     }
 
     public function bitwiseOp(int $opCode, Variable $left, Variable $right): void {
+        if ($this->type === self::TYPE_INDIRECT) {
+            $result = new self();
+            $result->bitwiseOp($opCode, $left, $right);
+            $this->indirect->copyFrom($result);
+
+            return;
+        }
         $this->reset();
 restart:
         $pair = type_pair($left->type, $right->type);
@@ -600,6 +628,13 @@ restart:
     }
 
     public function numericOp(int $opCode, Variable $left, Variable $right): void {
+        if ($this->type === self::TYPE_INDIRECT) {
+            $result = new self();
+            $result->numericOp($opCode, $left, $right);
+            $this->indirect->copyFrom($result);
+
+            return;
+        }
         $this->reset();
 restart:
         $pair = type_pair($left->type, $right->type);
@@ -656,6 +691,13 @@ restart:
     }
 
     public function unaryOp(int $opCode, Variable $expr): void {
+        if ($this->type === self::TYPE_INDIRECT) {
+            $result = new self();
+            $result->unaryOp($opCode, $expr);
+            $this->indirect->copyFrom($result);
+
+            return;
+        }
         $this->reset();
 restart:
         switch ($opCode) {

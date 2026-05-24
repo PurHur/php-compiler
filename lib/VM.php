@@ -608,9 +608,15 @@ restart:
                         throw new \LogicException('Iterator value requires an array');
                     }
                     $byRef = (bool) $op->arg3;
-                    $frame->scope[$op->arg1]->copyFrom(
-                        $container->toArray()->iterCurrentValue($byRef)
-                    );
+                    if ($byRef) {
+                        $frame->scope[$op->arg1]->indirect(
+                            $container->toArray()->iterCurrentValue(true)
+                        );
+                    } else {
+                        $frame->scope[$op->arg1]->copyFrom(
+                            $container->toArray()->iterCurrentValue(false)
+                        );
+                    }
                     break;
                 case OpCode::TYPE_TRY:
                     $frame = $op->block1->getFrame($this->context, $frame);

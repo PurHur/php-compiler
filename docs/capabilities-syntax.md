@@ -16,13 +16,14 @@ Tracking issues: [#58](https://github.com/PurHur/php-compiler/issues/58), [#145]
 | Dynamic property access `$obj->$name` | yes | yes | yes | [#1227](https://github.com/PurHur/php-compiler/issues/1227) | JIT compares runtime name to declared properties; unknown names abort at runtime; compliance PHPT |
 | Native user-class link (`phpc build --project`) | yes | yes | yes | [#764](https://github.com/PurHur/php-compiler/issues/764) | AOT link yes (#568 closed); native execute #764; compliance PHPT; bootstrap AOT |
 | `instanceof` | yes | yes | yes | [#138](https://github.com/PurHur/php-compiler/issues/138) | compliance PHPT; bootstrap AOT |
-| `match` expression | yes | yes | yes | [#143](https://github.com/PurHur/php-compiler/issues/143) | Lowered in php-cfg to === / jump-if / assign (#143); compliance PHPT; bootstrap AOT |
+| `match` expression | yes | yes | no | [#143](https://github.com/PurHur/php-compiler/issues/143) | Lowered in php-cfg to === / jump-if / assign (#143); compliance PHPT; bootstrap AOT |
 | Arrow functions `fn () =>` | no | no | no | [#142](https://github.com/PurHur/php-compiler/issues/142) |  |
 | `ClassName::class` / `static::class` | yes | yes | yes | [#740](https://github.com/PurHur/php-compiler/issues/740) | Compile-time class name string; related to __CLASS__ (#199); compliance PHPT; bootstrap AOT |
 | Magic constants `__CLASS__`, `__METHOD__`, `__FUNCTION__` | yes | yes | yes | [#199](https://github.com/PurHur/php-compiler/issues/199) | Lowered at parse time via php-cfg MagicStringResolver; compliance PHPT |
 | Magic constant `__NAMESPACE__` | yes | yes | yes | [#199](https://github.com/PurHur/php-compiler/issues/199) | Requires `namespace` declaration (#84); compliance PHPT |
 | Magic constants `__DIR__`, `__FILE__` | yes | yes | yes | [#707](https://github.com/PurHur/php-compiler/issues/707) | VM script stack on include; JIT uses per-unit script path; compliance PHPT; bootstrap AOT |
 | Magic constant `__LINE__` | yes | yes | yes | [#715](https://github.com/PurHur/php-compiler/issues/715) | Per-site line on TYPE_SCRIPT_MAGIC; include stack for multi-file units; compliance PHPT |
+| foreach by-reference (`&$v`) | yes | yes | yes | [#1222](https://github.com/PurHur/php-compiler/issues/1222) | Packed and string-keyed arrays; VM + JIT lowering |
 
 _Syntax AOT column reflects `Runtime::MODE_AOT` compile probes unless a row pins AOT (e.g. native user-class link)._
 ## Web north-star (`examples/003-MiniWebApp`)

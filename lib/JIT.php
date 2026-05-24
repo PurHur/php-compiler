@@ -901,12 +901,23 @@ class JIT {
                     $this->assignOperand($destOp, $value, $forceAssign);
                     break;  
                 case OpCode::TYPE_ASSIGN_REF:
-                    $destName = JIT\OperandName::resolve($block->getOperand($op->arg1));
-                    $srcName = JIT\OperandName::resolve($block->getOperand($op->arg2));
-                    if (null === $destName || null === $srcName) {
-                        throw new \LogicException('Reference assignment requires named variables');
+                    $destOp = $block->getOperand($op->arg1);
+                    $srcOp = $block->getOperand($op->arg2);
+                    $destName = JIT\OperandName::resolve($destOp);
+                    $srcName = JIT\OperandName::resolve($srcOp);
+                    if (null === $destName) {
+                        throw new \LogicException('Reference assignment requires named destination variable');
                     }
-                    $this->context->refAliasNames[$destName] = $this->context->resolveRefAliasName($srcName);
+                    if (null !== $srcName) {
+                        $this->context->refAliasNames[$destName] = $this->context->resolveRefAliasName($srcName);
+                        break;
+                    }
+                    if (!$this->context->hasVariableOp($srcOp)) {
+                        throw new \LogicException('Reference assignment requires a bound source variable');
+                    }
+                    $srcVar = $this->context->getVariableFromOp($srcOp);
+                    $this->context->bindVariableByName($destName, $srcVar);
+                    $this->context->setVariableOp($destOp, $srcVar);
                     break;
                 case OpCode::TYPE_DECLARE_GLOBAL:
                     if (!isset($block->constants[$op->arg2])) {
@@ -1076,11 +1087,17 @@ class JIT {
                     $this->assignOperand($block->getOperand($op->arg1), $key);
                     break;
                 case OpCode::TYPE_ITER_VALUE:
-                    if ($op->arg3) {
-                        throw new \LogicException('foreach by-reference is not implemented');
-                    }
                     $arrayOp = $block->getOperand($op->arg2);
                     $array = $this->context->getVariableFromOp($arrayOp);
+                    if ($op->arg3) {
+                        $value = JIT\IteratorHelper::compileValueByRef(
+                            $this->context,
+                            $array,
+                            self::foreachContainerUserType($arrayOp)
+                        );
+                        $this->context->setVariableOp($block->getOperand($op->arg1), $value);
+                        break;
+                    }
                     $value = JIT\IteratorHelper::compileValue(
                         $this->context,
                         $array,
