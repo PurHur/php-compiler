@@ -2649,6 +2649,9 @@ class JIT {
         if ($cfgFunc->returnType instanceof Op\Type\Void_) {
             return 'void';
         }
+        if ($cfgFunc->returnType instanceof Op\Type\Never_) {
+            return 'void';
+        }
         if ($cfgFunc->returnType instanceof Op\Type\Nullable) {
             $rawReturn = $this->rawTypeFromCfgReturn($cfgFunc->returnType->subtype);
             if (null !== $rawReturn) {
@@ -2668,6 +2671,7 @@ class JIT {
         if ($cfgFunc->returnType instanceof Op\Type\Literal) {
             switch ($cfgFunc->returnType->name) {
                 case 'void':
+                case 'never':
                     return 'void';
                 case 'int':
                     return 'long long';

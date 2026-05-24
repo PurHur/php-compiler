@@ -1,0 +1,45 @@
+--- /dev/null
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Type/Never_.php
+@@ -0,0 +1,18 @@
++<?php
++
++declare(strict_types=1);
++
++/**
++ * This file is part of PHP-CFG, a Control flow graph implementation for PHP
++ *
++ * @copyright 2015 Anthony Ferrara. All rights reserved
++ * @license MIT See LICENSE at the root of the project for more info
++ */
++
++namespace PHPCfg\Op\Type;
++
++use PHPCfg\Op\Type;
++
++class Never_ extends Type
++{
++}
+--- /tmp/parser.php.bak	2026-05-24 14:57:55.030972446 +0200
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php	2026-05-24 14:57:56.590133021 +0200
+@@ -194,6 +194,9 @@
+             );
+         }
+         if ($node instanceof Node\Identifier) {
++            if ('never' === $node->name) {
++                return new Op\Type\Never_();
++            }
+             return new Op\Type\Literal(
+                 $node->name,
+                 $this->mapAttributes($node)
+--- /tmp/printer.php.bak	2026-05-24 14:57:55.031677690 +0200
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Printer.php	2026-05-24 14:57:56.844123548 +0200
+@@ -252,6 +252,9 @@
+         if ($type instanceof Op\Type\Void_) {
+             return 'void';
+         }
++        if ($type instanceof Op\Type\Never_) {
++            return 'never';
++        }
+         if ($type instanceof Op\Type\Nullable) {
+             return '?'.$this->renderType($type->subtype);
+         }

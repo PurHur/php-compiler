@@ -70,6 +70,9 @@ class Block {
     /** Declared `: void` return — non-null returns are rejected. */
     public bool $returnTypeVoid = false;
 
+    /** Declared `: never` return — any return is rejected (issue #1358). */
+    public bool $returnTypeNever = false;
+
     /** Parameter index (0-based, excluding $this) that receives a packed trailing-arg array (#197). */
     public ?int $variadicParamIndex = null;
 
@@ -228,6 +231,7 @@ class Block {
             $this->strictTypes = $parent->strictTypes;
             $this->returnTypeConstraint = $parent->returnTypeConstraint;
             $this->returnTypeVoid = $parent->returnTypeVoid;
+            $this->returnTypeNever = $parent->returnTypeNever;
         }
     }
 

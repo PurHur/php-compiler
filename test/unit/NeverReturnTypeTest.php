@@ -1,0 +1,67 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\Test\Unit;
+
+use PHPCompiler\Runtime;
+use PHPUnit\Framework\TestCase;
+
+/** @covers issue #1358 */
+final class NeverReturnTypeTest extends TestCase
+{
+    public function testNeverFunctionWithExitDoesNotReachCaller(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+function stop(): never {
+    exit('gone');
+}
+stop();
+echo 'after';
+PHP;
+        ob_start();
+        try {
+            $runtime->run($runtime->parseAndCompile($code, 'never_exit.php'));
+            $this->fail('Expected ScriptExit');
+        } catch (\PHPCompiler\VM\ScriptExit $e) {
+            $this->assertSame(0, $e->status);
+        }
+        $this->assertSame('gone', ob_get_clean());
+    }
+
+    public function testNeverRejectsBareReturnAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+function f(): never {
+    return;
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $runtime->parseAndCompile($code, 'never_bare_return.php');
+    }
+
+    public function testNeverRejectsValueReturnAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+function f(): never {
+    return 1;
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $runtime->parseAndCompile($code, 'never_value_return.php');
+    }
+
+    public function testNeverReturnTypeMapsInPhpTypes(): void
+    {
+        $parser = new \PHPCfg\Parser((new \PhpParser\ParserFactory())->create(\PhpParser\ParserFactory::PREFER_PHP7));
+        $script = $parser->parse('<?php function f(): never { exit; }', 't.php');
+        $type = \PHPTypes\Type::fromTypeDecl($script->functions[0]->returnType);
+        $this->assertSame(\PHPTypes\Type::TYPE_NULL, $type->type);
+    }
+}

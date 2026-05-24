@@ -1147,6 +1147,11 @@ restart:
         if (null === $block) {
             return;
         }
+        if ($block->returnTypeNever) {
+            TypeCheck::assertNeverReturn();
+
+            return;
+        }
         if ($block->returnTypeVoid) {
             TypeCheck::assertVoidReturn($value);
 

@@ -63,9 +63,19 @@ class Compiler {
 
             return;
         }
+        if ($returnType instanceof Op\Type\Never_) {
+            $block->returnTypeNever = true;
+
+            return;
+        }
         if ($returnType instanceof Op\Type\Literal) {
             if ('void' === $returnType->name) {
                 $block->returnTypeVoid = true;
+
+                return;
+            }
+            if ('never' === $returnType->name) {
+                $block->returnTypeNever = true;
 
                 return;
             }
@@ -74,6 +84,23 @@ class Compiler {
                 $block->returnTypeConstraint = $mapped;
             }
         }
+    }
+
+    /**
+     * php-cfg appends a null Terminal_Return after exit(); skip it for :never (issue #1358).
+     */
+    protected function neverFunctionHasAbnormalExitBeforeReturn(CfgBlock $block, Op\Terminal\Return_ $return): bool
+    {
+        foreach ($block->children as $child) {
+            if ($child === $return) {
+                return false;
+            }
+            if ($child instanceof Op\Expr\Exit_) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     protected function compileCfgBlock(CfgBlock $block, array $params = [], ?CfgFunc $func = null): Block {
@@ -1201,7 +1228,7 @@ class Compiler {
     protected function compileIncludeOp(Op\Expr\Include_ $expr, Block $block): OpCode
     {
         $resultSlot = null;
-        if (!$block->returnTypeVoid) {
+        if (!$block->returnTypeVoid && !$block->returnTypeNever) {
             if ($expr->result instanceof Operand\Temporary) {
                 if ([] !== $expr->result->usages) {
                     $resultSlot = $this->compileOperand($expr->result, $block, false);
@@ -1901,6 +1928,15 @@ class Compiler {
                     $var
                 )];
             case 'Terminal_Return':
+                if ($block->returnTypeNever) {
+                    if (!is_null($terminal->expr)) {
+                        throw new \CompileError('A never-returning function must not return');
+                    }
+                    if ($this->neverFunctionHasAbnormalExitBeforeReturn($block->orig, $terminal)) {
+                        return [];
+                    }
+                    throw new \CompileError('A never-returning function must not return');
+                }
                 if (is_null($terminal->expr)) {
                     return [new OpCode(
                         OpCode::TYPE_RETURN_VOID
