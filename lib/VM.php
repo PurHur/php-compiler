@@ -422,7 +422,9 @@ restart:
                     if (null !== $frame->block->func && null !== $frame->block->func->class) {
                         ++$recvIdx;
                     }
-                    if (array_key_exists($recvIdx, $frame->calledArgs)) {
+                    if (isset($frame->block->variadicParamSlots[$op->arg1])) {
+                        VM\Variadic::assignPacked($arg1, $frame->calledArgs, $recvIdx);
+                    } elseif (array_key_exists($recvIdx, $frame->calledArgs)) {
                         $arg1->copyFrom($frame->calledArgs[$recvIdx]);
                     } elseif (null !== $op->arg3 && isset($frame->block->constants[$op->arg3])) {
                         $arg1->copyFrom($frame->block->constants[$op->arg3]);

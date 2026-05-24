@@ -31,14 +31,21 @@ class Native implements Call {
     /** @var array<int, Variable> compile-time defaults for optional parameters */
     public array $defaultArgs = [];
 
-    public function __construct(Value $function, string $name, array $argTypes, array $defaultArgs = []) {
+    /** LLVM argument index of the variadic ...$param slot, if any (issue #197). */
+    public ?int $variadicArgIndex = null;
+
+    public function __construct(Value $function, string $name, array $argTypes, array $defaultArgs = [], ?int $variadicArgIndex = null) {
         $this->function = $function;
         $this->name = $name;
         $this->argTypes = $argTypes;
         $this->defaultArgs = $defaultArgs;
+        $this->variadicArgIndex = $variadicArgIndex;
     }
 
     public function call(Context $context, Variable ... $args): Value {
+        if (null !== $this->variadicArgIndex) {
+            $args = $this->packVariadicCallArgs($context, $args);
+        }
         $argValues = [];
         $total = count($this->argTypes);
         for ($index = 0; $index < $total; $index++) {
@@ -114,6 +121,12 @@ class Native implements Call {
                         $context->refcount->addref($value);
 
                         return $value;
+                    case Variable::TYPE_OBJECT:
+                        // Self-host: spread/unpack may pass a single boxed array handle (issue #197).
+                        return $context->builder->pointerCast(
+                            $value,
+                            $context->getTypeFromString('__hashtable__*')
+                        );
                     case Variable::TYPE_VALUE:
                         return $context->builder->call(
                             $context->lookupFunction('__value__readHashtable'),
@@ -313,6 +326,28 @@ class Native implements Call {
                 break;
         }
         throw new \LogicException("Unsupported cast for arg type $typeName from " . Variable::getStringType($arg->type));
+    }
+
+    /**
+     * @param list<Variable> $args
+     *
+     * @return list<Variable>
+     */
+    private function packVariadicCallArgs(Context $context, array $args): array
+    {
+        $idx = $this->variadicArgIndex;
+        assert(null !== $idx);
+        $fixed = array_slice($args, 0, $idx);
+        $extra = array_slice($args, $idx);
+        if (1 === \count($extra) && Variable::TYPE_HASHTABLE === $extra[0]->type) {
+            $packed = $extra[0];
+        } elseif ([] === $extra) {
+            $packed = HashTableHelper::emptyVariable($context);
+        } else {
+            $packed = HashTableHelper::packVariables($context, $extra);
+        }
+
+        return [...$fixed, $packed];
     }
 
     private function missingCallArg(Context $context, \PHPLLVM\Type $llvmType): Variable

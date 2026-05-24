@@ -56,8 +56,15 @@ class Compiler {
                 $new->strictTypes = isset($func->strictTypes) ? (bool) $func->strictTypes : false;
             }
             $paramIdx = 0;
+            $lastParamIdx = count($params) - 1;
             foreach ($params as $param) {
-                $new->addOpCode($this->compileParam($param, $new, $paramIdx++));                
+                if ($param->variadic && $paramIdx !== $lastParamIdx) {
+                    throw new \LogicException('Variadic parameter must be the last parameter');
+                }
+                if ($param->variadic) {
+                    $new->variadicParamIndex = $paramIdx;
+                }
+                $new->addOpCode($this->compileParam($param, $new, $paramIdx++));
             }
             $this->compileBlock($new);
         }
@@ -430,6 +437,9 @@ class Compiler {
             $defaultConst = $this->compileOperand($param->defaultVar, $block, true);
         }
         $slot = $this->compileOperand($param->result, $block, false);
+        if ($param->variadic) {
+            $block->variadicParamSlots[$slot] = true;
+        }
         if ($param->declaredType instanceof Op\Type\Literal) {
             $rawType = Type::fromDecl($param->declaredType->name);
             $mapped = Variable::mapFromType($rawType);

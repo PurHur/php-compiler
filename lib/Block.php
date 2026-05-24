@@ -64,6 +64,12 @@ class Block {
     /** @var array<int, int> scope slot index => Variable::TYPE_* for typed parameters */
     public array $paramTypeConstraints = [];
 
+    /** @var array<int, true> scope slot indices for ...$variadic parameters (issue #197) */
+    public array $variadicParamSlots = [];
+
+    /** Index in func->params for the variadic parameter, if any (issue #197). */
+    public ?int $variadicParamIndex = null;
+
     /** Resolved absolute paths for TYPE_INCLUDE opcodes (arg3 index, issue #54). */
     public array $literalIncludePaths = [];
 
