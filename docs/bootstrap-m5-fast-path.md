@@ -27,6 +27,7 @@ Supporting fixes from #1402:
 | Allowlist | Gate |
 |-----------|------|
 | `Runtime::parseAndCompile` | Link OK with `PHP_COMPILER_M3_COMPILE_DRIVER=1` |
+| `Runtime::loadJitContext` | Compile-driver link OK (#1402); `loadJit` still denied (LLVM 9 segfault) |
 
 Runtime emit still blocked: ctor / `loadJit` / `standalone` remain stubbed until removed from deny list.
 
@@ -49,9 +50,9 @@ BOOTSTRAP_M3_RUNTIME_COMPILE=1  # separate from link; do not enable until spine 
 | Symbol | Notes |
 |--------|-------|
 | `Block::slotIndexForVariableName` | Also in compiler hot-path skip |
-| `Runtime::__construct` | Large ctor graph |
-| `Runtime::loadJit` | Pulls full JIT/module init |
-| `Runtime::standalone` | Needs working JIT context |
+| `Runtime::__construct` | LLVM 9 segfault during compile-driver link |
+| `Runtime::loadJit` | LLVM 9 segfault (even when `loadJitContext` is real-lowered) |
+| `Runtime::standalone` | Module verify: ICmp operand type mismatch (enable only after `loadJit`) |
 
 ## Env flags
 
