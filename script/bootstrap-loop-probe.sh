@@ -4,22 +4,24 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ENTRY="${ROOT}/test/selfhost/bootstrap_loop_smoke/main.php"
+COMPILE_DRIVER="${ROOT}/test/selfhost/bootstrap_loop_smoke/compile_driver.php"
 M3_PROBE="${ROOT}/script/bootstrap-selfhost-helloworld-probe.sh"
 SPINE_LINK="${ROOT}/script/bootstrap-selfhost-lib-spine-smoke-link.sh"
+GEN1_LINK="${ROOT}/script/bootstrap-loop-gen1-link.sh"
 DRY_RUN=0
 
 usage() {
   cat <<'EOF'
 Usage: script/bootstrap-loop-probe.sh [--dry-run]
 
-M4 bootstrap-loop probe (#1498). Runs M2 spine smoke + M3 HelloWorld probe in sequence,
-then (unless --dry-run) M3 strict native emit. Gen-1→gen-2 rebuild is not implemented yet.
+M4 bootstrap-loop probe (#1498). Runs M2 spine + M3 partial + gen-1 link/gen-2 attempt,
+then (unless --dry-run) M3 strict native emit. Full gen-2 without Zend remains blocked on M3.
 
 Exit codes:
-  0  --dry-run: lint + M2 spine + M3 partial (Zend emit OK) green
-     full:      same prerequisites + BOOTSTRAP_M3_HELLOWORLD_STRICT=1 green (loop scaffold ready)
-  1  hard failure (missing entry/scripts, lint, M2 spine, or M3 partial probe)
-  2  LLVM 9 not found (skip), or full mode: M3 strict native emit not ready (M4 blocked)
+  0  --dry-run: lint + M2 spine + M3 partial + gen-1 link (gen-2 Zend partial OK) green
+     full:      same + M3 strict green; gen-2 native still blocked until M3/M4 close
+  1  hard failure (missing entry/scripts, lint, M2 spine, M3 partial, or gen-1 link)
+  2  LLVM 9 not found (skip), or full mode: M3 strict / gen-2 native emit not ready
   3  reserved
 
 Examples:
@@ -103,6 +105,16 @@ if [[ ! -f "${SPINE_LINK}" ]]; then
   exit 1
 fi
 
+if [[ ! -f "${GEN1_LINK}" ]]; then
+  echo "bootstrap-loop-probe: missing ${GEN1_LINK}" >&2
+  exit 1
+fi
+
+if [[ ! -f "${COMPILE_DRIVER}" ]]; then
+  echo "bootstrap-loop-probe: missing ${COMPILE_DRIVER}" >&2
+  exit 1
+fi
+
 if [[ -z "${PHP_COMPILER_LLVM_PATH:-}" || ! -f "${PHP_COMPILER_LLVM_PATH}/libLLVM-9.so.1" ]]; then
   echo "bootstrap-loop-probe: LLVM 9 not found at PHP_COMPILER_LLVM_PATH (exit 2)" >&2
   echo "bootstrap-loop-probe: install LLVM 9 (script/install-llvm9.sh) or set PHP_COMPILER_LLVM_PATH" >&2
@@ -112,6 +124,12 @@ fi
 echo "==> lint bootstrap_loop_smoke bundle entry"
 if ! php "${ROOT}/bin/compile.php" -l "${ENTRY}" 2>&1; then
   echo "bootstrap-loop-probe: lint failed (exit 1)" >&2
+  exit 1
+fi
+
+echo "==> lint bootstrap_loop_smoke compile driver"
+if ! php "${ROOT}/bin/compile.php" -l "${COMPILE_DRIVER}" 2>&1; then
+  echo "bootstrap-loop-probe: compile driver lint failed (exit 1)" >&2
   exit 1
 fi
 
@@ -131,6 +149,33 @@ echo ""
 echo "Prerequisites OK through M3 partial (native HelloWorld run; emit may be Zend)."
 echo ""
 
+GEN1_LOG="$(mktemp)"
+trap 'rm -f "${GEN1_LOG}" "${M3_STRICT_OUT:-}"' EXIT
+echo "==> M4 gen-1 link + gen-2 compile attempt (partial — Zend gen-2 emit allowed)"
+set +e
+(
+  cd "${ROOT}"
+  BOOTSTRAP_M4_LINK_COMPILE_DRIVER=1 \
+  BOOTSTRAP_M4_RUNTIME_COMPILE="${BOOTSTRAP_M4_RUNTIME_COMPILE:-0}" \
+  bash "${GEN1_LINK}"
+) >"${GEN1_LOG}" 2>&1
+GEN1_CODE=$?
+set -e
+
+if [[ "${GEN1_CODE}" -ne 0 ]]; then
+  echo "bootstrap-loop-probe: M4 gen-1 link failed (exit 1)" >&2
+  m4_probe_tail "${GEN1_LOG}"
+  exit 1
+fi
+
+grep -E 'bootstrap-loop-gen1-link: OK' "${GEN1_LOG}" || tail -n 5 "${GEN1_LOG}"
+if grep -q 'emit_path=native' "${GEN1_LOG}"; then
+  echo "bootstrap-loop-probe: gen-2 native emit OK (incremental M4 slice)"
+elif grep -q 'emit_path=zend partial' "${GEN1_LOG}"; then
+  echo "bootstrap-loop-probe: gen-2 emit_path=zend partial (gen-1 native compile blocked on M3 — #1402)"
+fi
+echo ""
+
 if [[ "${DRY_RUN}" -eq 1 ]]; then
   echo "bootstrap-loop-probe: --dry-run OK (exit 0)"
   echo ""
@@ -140,16 +185,15 @@ if [[ "${DRY_RUN}" -eq 1 ]]; then
   echo "       BOOTSTRAP_M3_RUNTIME_COMPILE=1 \\"
   echo "       BOOTSTRAP_M3_HELLOWORLD_STRICT=1 make bootstrap-selfhost-helloworld"
   echo "     Tracker: #1402, docs/bootstrap-m5-fast-path.md"
-  echo "  2. M4 gen-1→gen-2 rebuild (not implemented — #1498):"
-  echo "       Link gen-1 from test/selfhost/bootstrap_loop_smoke/main.php"
-  echo "       gen-1 compiles bin/compile.php (or src/cli.php) → gen-2 binary"
-  echo "       gen-2 compiles compile_smoke / HelloWorld without Zend emit"
-  echo "       gen-1 and gen-2 produce matching artifacts"
+  echo "  2. M4 gen-2 native emit (gen-1 link OK; native gen-2 blocked on M3 — #1498):"
+  echo "       BOOTSTRAP_M4_LINK_COMPILE_DRIVER=1 BOOTSTRAP_M4_RUNTIME_COMPILE=1 \\"
+  echo "         ./script/bootstrap-loop-gen1-link.sh"
+  echo "       Then: gen-1 compiles bin/compile.php (or src/cli.php) → full gen-2 (#1467)"
+  echo "       gen-2 rebuilds compiler tree without Zend; gen-1/gen-2 artifacts must match"
   exit 0
 fi
 
 M3_STRICT_OUT="$(mktemp)"
-trap 'rm -f "${M3_STRICT_OUT}"' EXIT
 echo "==> M3 native-emit prerequisite (strict)"
 set +e
 (
@@ -174,7 +218,14 @@ fi
 grep -E 'bootstrap-selfhost-helloworld-probe: OK' "${M3_STRICT_OUT}" || tail -n 5 "${M3_STRICT_OUT}"
 
 echo ""
-echo "bootstrap-loop-probe: M3 strict prerequisite OK (exit 0)"
-echo "bootstrap-loop-probe: scaffold OK — gen-1→gen-2 rebuild not implemented (#1498)"
-echo "bootstrap-loop-probe: NEXT: native gen-1 compiles compiler tree → gen-2 binary"
-exit 0
+echo "bootstrap-loop-probe: M3 strict prerequisite OK"
+if grep -q 'emit_path=native' "${GEN1_LOG}" 2>/dev/null; then
+  echo "bootstrap-loop-probe: M4 gen-1→gen-2 native slice OK (exit 0)"
+  exit 0
+fi
+
+echo "bootstrap-loop-probe: M3 strict OK; M4 gen-2 native emit still blocked (exit 2)" >&2
+echo "bootstrap-loop-probe: gen-1 link + Zend gen-2 partial OK — close M3 runtime compile (#1402)" >&2
+echo "bootstrap-loop-probe: NEXT: BOOTSTRAP_M4_RUNTIME_COMPILE=1 ./script/bootstrap-loop-gen1-link.sh" >&2
+m4_probe_tail "${GEN1_LOG}" 5
+exit 2

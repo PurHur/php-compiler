@@ -37,7 +37,7 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | **Bundle size** | **358** curated `require_once` in spine smoke (108 minimal overlap + **250** M2-only) | ~**584** inventory files |
 | **Inventory coverage** | **~61%** of vm.php path in spine smoke | **100%** |
 | **HelloWorld** | Native **run** ✅; **emit** still Zend fallback | Native compile + emit |
-| **Bootstrap loop (M4)** | Not started | Native rebuilds next compiler revision |
+| **Bootstrap loop (M4)** | Gen-1 link + gen-2 Zend partial | Native gen-2 emit + full tree rebuild |
 | **Vendor** | `composer install` + patches on host | Prelinked artifacts only |
 
 ### Gates (run after `script/apply-patches.sh`)
@@ -48,7 +48,8 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | M1 compile-smoke AOT echo | ✅ `compiler smoke` |
 | M2 `BOOTSTRAP_LIB_SPINE_SMOKE=1` spine link | ✅ `compiler_lib_spine_smoke bundle OK` |
 | M3 `make bootstrap-selfhost-helloworld` | 🚧 partial — HelloWorld runs natively; emit uses Zend |
-| M4 `make bootstrap-loop-probe` | 🚧 ladder — `--dry-run` validates lint+M2+M3 partial; full exits **2** until M3 strict ([#1498](https://github.com/PurHur/php-compiler/issues/1498)) |
+| M4 `make bootstrap-loop-gen1-link` | 🚧 partial — gen-1 link + gen-2 Zend emit; native gen-2 blocked on M3 ([#1498](https://github.com/PurHur/php-compiler/issues/1498)) |
+| M4 `make bootstrap-loop-probe` | 🚧 ladder — `--dry-run` validates lint+M2+M3 partial+gen-1; full exits **2** until M3 strict ([#1498](https://github.com/PurHur/php-compiler/issues/1498)) |
 | `make bootstrap-aot-link` | ✅ **71/71** |
 | `php script/bootstrap-inventory.php --check` | ✅ **569** files, **0** source blockers |
 
