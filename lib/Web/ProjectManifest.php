@@ -34,7 +34,9 @@ final class ProjectManifest
     }
 
     /**
-     * @return array<string, mixed>|null decoded phpc.json from project dir
+     * Decoded phpc.json from project dir.
+     *
+     * @return array<string, mixed>|null
      */
     public static function loadManifest(string $startDir): ?array
     {
@@ -107,7 +109,9 @@ final class ProjectManifest
     /**
      * Ordered compile units for phpc build --project: manifest includes[] then entry (issue #729).
      *
-     * @return list<string>|null absolute paths; null when project dir or entry is missing
+     * Absolute paths; null when project dir or entry is missing.
+     *
+     * @return list<string>|null
      */
     public static function resolveCompileUnitPaths(string $startDir, ?array $manifest = null): ?array
     {
@@ -225,7 +229,9 @@ final class ProjectManifest
     /**
      * Static assets directory beside public docroot (issue #594).
      *
-     * @return string|null absolute directory when manifest "assets" is set and exists
+     * Absolute directory when manifest "assets" is set and exists.
+     *
+     * @return string|null
      */
     public static function resolveAssetsDir(string $startDir, ?array $manifest = null): ?string
     {

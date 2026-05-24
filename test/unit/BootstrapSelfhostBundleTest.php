@@ -29,6 +29,13 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'lib/Web/CgiAotDriver.php',
         'lib/Web/CgiDriver.php',
         'lib/Web/ProjectDeploy.php',
+        'lib/Web/DevServer.php',
+        'lib/Web/ManifestValidator.php',
+        'lib/Web/Params.php',
+        'lib/Web/ProjectAutoload.php',
+        'lib/Web/ProjectBootstrap.php',
+        'lib/Web/ProjectManifest.php',
+        'lib/Web/ResponseContext.php',
         'lib/JIT/Builtin/CallArgv.php',
         'lib/JIT/Builtin/IniSet.php',
         'lib/JIT/Builtin/SessionId.php',
@@ -168,7 +175,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         $this->assertFileExists($entry);
         $contents = (string) file_get_contents($entry);
         $count = substr_count($contents, 'require_once __DIR__');
-        $this->assertSame(242, $count, '108 compiler_minimal units + 134 M2 spine units');
+        $this->assertSame(249, $count, '108 compiler_minimal units + 141 M2 spine units');
         foreach (self::LIB_SPINE_SMOKE_NEW_UNITS as $unit) {
             $this->assertStringContainsString(
                 "require_once __DIR__.'/../../../{$unit}';",

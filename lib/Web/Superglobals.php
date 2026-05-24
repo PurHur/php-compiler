@@ -242,7 +242,9 @@ final class Superglobals
      *
      * @param array<string, string> $headers lowercase header name => value
      *
-     * @return array<string, string> CGI env entries (HTTP_* / CONTENT_*)
+     * CGI env entries (HTTP_* / CONTENT_*).
+     *
+     * @return array<string, string>
      */
     public static function applyHttpHeaders(array $headers): array
     {
@@ -416,7 +418,10 @@ final class Superglobals
         $headerLines = [];
         $contentLines = [];
         $index = 0;
-        $lineCount = count($lines);
+        $lineCount = 0;
+        foreach ($lines as $_) {
+            ++$lineCount;
+        }
         while ($index < $lineCount) {
             if ('' === trim($lines[$index], "\r\n")) {
                 $peek = $index + 1;
