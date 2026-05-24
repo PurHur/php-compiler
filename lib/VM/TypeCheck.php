@@ -14,6 +14,17 @@ final class TypeCheck
         self::coerceTypedSlot($dest, $strict, 'Argument');
     }
 
+    /**
+     * @param string[] $interfaceLcs lowercase interface names (#1357)
+     */
+    public static function assertParamIntersection(
+        Variable $dest,
+        array $interfaceLcs,
+        Context $context
+    ): void {
+        InterfaceCheck::assertObjectImplementsAll($dest, $interfaceLcs, $context, 'Argument');
+    }
+
     public static function coercePropertyWrite(Variable $dest, bool $strict): void
     {
         self::coerceTypedSlot($dest, $strict, 'Property');

@@ -21,6 +21,10 @@ class ClassEntry {
     public string $name;
     /** Parent class name (lowercase) for single inheritance (#101, #1231). */
     public ?string $parentLc = null;
+    /** True for `interface` declarations (#1357). */
+    public bool $isInterface = false;
+    /** @var string[] lowercase interface names this class/interface implements or extends */
+    public array $interfaces = [];
     public ?Func\PHP $constructor = null;
     public array $properties = [];
     /** @var array<string, Func\PHP> method name (lowercase) => callable */

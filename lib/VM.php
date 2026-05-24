@@ -379,7 +379,13 @@ restart:
                     $className = strtolower($frame->scope[$op->arg3]->toString());
                     $matches = false;
                     if (Variable::TYPE_OBJECT === $value->type) {
-                        $matches = strtolower($value->toObject()->class->name) === $className;
+                        $entry = $value->toObject()->class;
+                        $target = $this->context->classes[$className] ?? null;
+                        if (null !== $target && $target->isInterface) {
+                            $matches = VM\InterfaceCheck::entryImplements($entry, $className, $this->context);
+                        } else {
+                            $matches = VM\InterfaceCheck::entryIsInstanceOf($entry, $className, $this->context);
+                        }
                     }
                     $frame->scope[$op->arg1]->bool($matches);
                     break;
@@ -575,6 +581,24 @@ restart:
                         ? $frame->parent->block->strictTypes
                         : $frame->block->strictTypes;
                     TypeCheck::coerceParameter($arg1, $strict);
+                    if (isset($frame->block->paramIntersectionConstraints[$op->arg1])) {
+                        TypeCheck::assertParamIntersection(
+                            $arg1,
+                            $frame->block->paramIntersectionConstraints[$op->arg1],
+                            $this->context
+                        );
+                    }
+                    break;
+                case OpCode::TYPE_DECLARE_INTERFACE:
+                    $name = $frame->scope[$op->arg1]->toString();
+                    $lcname = strtolower($name);
+                    if (isset($this->context->classes[$lcname])) {
+                        throw new \LogicException("Duplicate interface definition for $name");
+                    }
+                    $ifaceEntry = new VM\ClassEntry($name);
+                    $ifaceEntry->isInterface = true;
+                    $ifaceEntry->interfaces = $op->classImplements;
+                    $this->context->classes[$lcname] = $ifaceEntry;
                     break;
                 case OpCode::TYPE_DECLARE_GLOBAL_CONST:
                     $name = $frame->scope[$op->arg1]->toString();
@@ -592,6 +616,7 @@ restart:
                         throw new \LogicException("Duplicate class definition for $name");
                     }
                     $classEntry = new ClassEntry($name);
+                    $classEntry->interfaces = $op->classImplements;
                     if (null !== $op->arg2) {
                         $parentName = $frame->scope[$op->arg2]->toString();
                         $parentLc = strtolower($parentName);
@@ -1014,6 +1039,11 @@ restart:
             return;
         }
         $parent = $this->context->classes[$entry->parentLc];
+        foreach ($parent->interfaces as $iface) {
+            if (!in_array($iface, $entry->interfaces, true)) {
+                $entry->interfaces[] = $iface;
+            }
+        }
         foreach ($parent->methods as $name => $method) {
             if (!isset($entry->methods[$name])) {
                 $entry->methods[$name] = $method;

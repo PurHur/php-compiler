@@ -265,6 +265,14 @@ function syntaxRowDefinitions(): array
             'notes' => ['php-cfg Op\\Type\\Never_; any `return` in body is a compile error; normal completion via throw/exit'],
             'probe' => 'function f(): never { exit("x"); } f();',
         ],
+        [
+            'id' => 'intersection_types',
+            'construct' => 'Intersection types (`A&B`)',
+            'opcodes' => ['TYPE_DECLARE_INTERFACE', 'TYPE_DECLARE_CLASS', 'TYPE_ARG_RECV'],
+            'issue' => 1357,
+            'notes' => ['php-cfg Op\\Type\\Intersection; VM checks object implements each interface at call'],
+            'probe' => 'interface A {} interface B {} class C implements A, B {} function f(A&B $x): int { return 1; } f(new C());',
+        ],
     ];
 }
 

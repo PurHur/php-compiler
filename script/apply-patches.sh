@@ -111,8 +111,14 @@ patch_already_applied() {
     php-cfg-never-type.patch)
       [[ -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Type/Never_.php" ]]
       ;;
+    php-cfg-intersection-type.patch)
+      [[ -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Type/Intersection.php" ]]
+      ;;
     php-types-never-type.patch)
       grep -q 'function never()' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
+      ;;
+    php-types-intersection-type.patch)
+      grep -q 'instanceof CfgType\\Intersection' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
       ;;
     php-types-magic-script-const.patch)
       grep -q 'KIND_LINE === \$op->kind' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
@@ -179,6 +185,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-named-args.patch"
   apply_patch "$PATCH_DIR/php-cfg-spread.patch"
   apply_patch "$PATCH_DIR/php-cfg-never-type.patch"
+  apply_patch "$PATCH_DIR/php-cfg-intersection-type.patch"
 fi
 
 if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
@@ -205,6 +212,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-magic-script-const.patch"
   apply_patch "$PATCH_DIR/php-types-first-class-callable.patch"
   apply_patch "$PATCH_DIR/php-types-never-type.patch"
+  apply_patch "$PATCH_DIR/php-types-intersection-type.patch"
 fi
 
 if [[ -d "$ROOT/vendor/pre/plugin" ]]; then

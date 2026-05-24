@@ -1,0 +1,17 @@
+--- a/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
++++ b/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
+@@ -315,6 +315,15 @@
+         if ($decl instanceof CfgType\Reference) {
+             return self::fromDecl($decl->declaration->value);
+         }
++        if ($decl instanceof CfgType\Intersection) {
++            $subs = [];
++            foreach ($decl->types as $sub) {
++                $subs[] = self::fromTypeDecl($sub);
++            }
++
++            return new self(self::TYPE_INTERSECTION, $subs);
++        }
+ 
+         throw new \LogicException('Unsupported declaration type: '.get_class($decl));
+     }

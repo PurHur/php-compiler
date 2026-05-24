@@ -1,0 +1,60 @@
+--- /dev/null
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Type/Intersection.php
+@@ -0,0 +1,24 @@
++<?php
++
++declare(strict_types=1);
++
++/**
++ * This file is part of PHP-CFG, a Control flow graph implementation for PHP
++ *
++ * @copyright 2015 Anthony Ferrara. All rights reserved
++ * @license MIT See LICENSE at the root of the project for more info
++ */
++
++namespace PHPCfg\Op\Type;
++
++use PHPCfg\Op\Type;
++
++class Intersection extends Type
++{
++    /** @var Type[] */
++    public $types;
++
++    public function __construct(array $types, array $attributes = [])
++    {
++        $this->types = $types;
++    }
++}
+--- a/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
++++ b/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
+@@ -203,6 +203,14 @@
+                 $this->mapAttributes($node)
+             );
+         }
++        if ($node instanceof Node\IntersectionType) {
++            $types = [];
++            foreach ($node->types as $sub) {
++                $types[] = $this->parseTypeNode($sub);
++            }
++
++            return new Op\Type\Intersection($types, $this->mapAttributes($node));
++        }
+ 
+         throw new \LogicException('Unknown type node: '.$node->getType());
+     }
+--- a/vendor/ircmaxell/php-cfg/lib/PHPCfg/Printer.php
++++ b/vendor/ircmaxell/php-cfg/lib/PHPCfg/Printer.php
+@@ -264,6 +264,12 @@
+         if ($type instanceof Op\Type\Literal) {
+             return $type->name;
+         }
++        if ($type instanceof Op\Type\Intersection) {
++            return implode('&', array_map(
++                fn (Op\Type $t) => $this->renderType($t),
++                $type->types
++            ));
++        }
+         if (null === $type) {
+             return '';
+         }

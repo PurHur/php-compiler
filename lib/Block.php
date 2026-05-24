@@ -64,6 +64,9 @@ class Block {
     /** @var array<int, int> scope slot index => Variable::TYPE_* for typed parameters */
     public array $paramTypeConstraints = [];
 
+    /** @var array<int, string[]> scope slot => lowercase interface names for intersection params (#1357) */
+    public array $paramIntersectionConstraints = [];
+
     /** Declared scalar return type for this function (issue #205), or null when untyped. */
     public ?int $returnTypeConstraint = null;
 
