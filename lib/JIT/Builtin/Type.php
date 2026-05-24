@@ -85,6 +85,7 @@ class Type extends Builtin {
         $this->context->registerFunction('__compiler_utf8_strlen', $fnUtf8Strlen);
         HttpResponseCode::implement($this->context);
         SessionId::implement($this->context);
+        SessionName::implement($this->context);
         CallArgv::implement($this->context);
         $i8p = $this->context->getTypeFromString('int8*');
         $i32 = $this->context->getTypeFromString('int32');

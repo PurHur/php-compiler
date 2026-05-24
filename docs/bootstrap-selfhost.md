@@ -122,12 +122,12 @@ Incremental growth toward `bin/vm.php` inventory path ([#559](https://github.com
 | `lib/Handler.php`, `lib/Func/Internal.php`, `lib/Func/JIT.php`, `lib/JIT/Call.php`, `lib/JIT/Builtin.php`, `lib/JIT/Result.php`, `lib/JIT/Variable.php`, `lib/JIT/IssetHelper.php`, `lib/JIT/Scope.php` | Func/JIT spine toward `Runtime::loadJit()` |
 | `lib/Web/Superglobals.php` | CGI superglobals (`bin/vm.php`); no `array_map` callable callbacks (foreach subset; issue #1154) |
 | `lib/JIT/IteratorHelper.php`, `lib/JIT/JitStringCompare.php`, `lib/JIT/JitValueCompare.php`, `lib/JIT/StringOffsetHelper.php`, `lib/JIT/ValueEchoHelper.php`, `lib/JIT/ScriptMagic.php` | JIT string/value compare, offset dim, echo lowering, script magic constants |
-| `lib/JIT/Builtin/Refcount.php`, `lib/JIT/Builtin/Output.php`, `lib/JIT/Builtin/ErrorHandler.php`, `lib/JIT/Builtin/ScriptExit.php`, `lib/JIT/Builtin/IsNullFn.php`, `lib/JIT/Builtin/PendingHeaders.php`, `lib/JIT/Builtin/HttpResponseCode.php`, `lib/JIT/Builtin/StringJsonEncode.php`, `lib/JIT/Builtin/StringGetenv.php` | refcount IR, printf/sprintf, error handler stub, exit/die, is_null IR, pending HTTP headers, response code, json_encode/getenv compile helpers |
+| `lib/JIT/Builtin/Refcount.php`, `lib/JIT/Builtin/Output.php`, `lib/JIT/Builtin/ErrorHandler.php`, `lib/JIT/Builtin/ScriptExit.php`, `lib/JIT/Builtin/IsNullFn.php`, `lib/JIT/Builtin/PendingHeaders.php`, `lib/JIT/Builtin/HttpResponseCode.php`, `lib/JIT/Builtin/SessionId.php`, `lib/JIT/Builtin/SessionName.php`, `lib/JIT/Builtin/StringJsonEncode.php`, `lib/JIT/Builtin/StringGetenv.php` | refcount IR, printf/sprintf, error handler stub, exit/die, is_null IR, pending HTTP headers, response code, session id/name, json_encode/getenv compile helpers |
 | `lib/VM/OutputBuffer.php` | request-scoped echo buffering (`VM` echo path) |
 | `lib/Compiler.php` | CFG → opcodes |
 | `lib/Lint/Issue.php`, `lib/Lint/UnsupportedRegistry.php`, `lib/Lint/LintCompiler.php`, `lib/Lint/Linter.php` | CFG lint spine (`LintCompiler` extends `Compiler`; no closures in bundle) |
 
-**Next toward `bin/compile.php` / Compiler CFG** (`php script/bootstrap-selfhost-next-includes.php`): literal vm.php spine closed for `compiler_minimal` at **109** units; M2 growth bundle `test/selfhost/compiler_lib_spine_smoke/main.php` at **132** units (+**24** lib/ + ext/standard). Driver smoke: `test/selfhost/compiler_driver_smoke/main.php`. README milestone ladder: [#1025](https://github.com/PurHur/php-compiler/issues/1025), [#1056](https://github.com/PurHur/php-compiler/issues/1056).
+**Next toward `bin/compile.php` / Compiler CFG** (`php script/bootstrap-selfhost-next-includes.php`): literal vm.php spine closed for `compiler_minimal` at **109** units; M2 growth bundle `test/selfhost/compiler_lib_spine_smoke/main.php` at **136** units (+**28** lib/ + ext/standard). Driver smoke: `test/selfhost/compiler_driver_smoke/main.php`. README milestone ladder: [#1025](https://github.com/PurHur/php-compiler/issues/1025), [#1056](https://github.com/PurHur/php-compiler/issues/1056).
 
 ### `compiler_lib_spine_smoke` bundle (M2 growth)
 
@@ -139,7 +139,7 @@ Extends `compiler_minimal` with remaining vm.php-path `lib/` units that pass bun
 | `lib/Doctor.php` | compile-time diagnostics helper |
 | `lib/Cli/InvokeCwd.php`, `lib/Cli/PhpcBuild.php`, `lib/Cli/PhpcInit.php` | `phpc` CLI spine toward `bin/compile.php` |
 | `lib/Web/CgiAotDriver.php`, `lib/Web/CgiDriver.php`, `lib/Web/ProjectDeploy.php` | CGI / deploy drivers on vm.php path |
-| `ext/standard/JitAddslashes.php`, `JitBase64Encode.php`, `JitBin2hex.php`, `JitChunkSplit.php`, `JitCrc32.php`, `JitExplode.php`, `JitChmod.php`, `JitCopy.php`, `JitDate.php`, `JitImplode.php`, `JitNl2br.php`, `JitPregQuote.php`, `JitQuotemeta.php`, `JitStrRot13.php`, `ext/standard/Module.php` | stdlib JIT leaf modules toward full inventory |
+| `ext/standard/JitAddslashes.php`, `JitBase64Encode.php`, `JitBin2hex.php`, `JitChunkSplit.php`, `JitCrc32.php`, `JitExplode.php`, `JitChmod.php`, `JitCopy.php`, `JitDate.php`, `JitImplode.php`, `JitNl2br.php`, `JitPregQuote.php`, `JitQuotemeta.php`, `JitStrRot13.php`, `JitSessionId.php`, `JitSessionName.php`, `ext/standard/Module.php` | stdlib JIT leaf modules toward full inventory |
 
 Gate: `php bin/compile.php -l test/selfhost/compiler_lib_spine_smoke/main.php`. Optional native link: `make bootstrap-selfhost-lib-spine-smoke` or `./script/bootstrap-wave-check.sh --with-lib-spine-smoke` (`BOOTSTRAP_LIB_SPINE_SMOKE=1`).
 
