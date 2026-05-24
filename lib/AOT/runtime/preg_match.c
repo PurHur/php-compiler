@@ -455,6 +455,173 @@ static __string__ *pm_slice_to_string(const char *data, size_t len)
     }
 }
 
+typedef struct __value__ {
+    char type;
+    char value[8];
+} __value__;
+
+extern void __value__writeHashtable(__value__ *out, __hashtable__ *ht);
+extern __string__ *__value__readString(__value__ *arg);
+
+typedef __value__ *(*phpc_preg_replace_callback_fn)(__value__ *);
+
+__string__ *__compiler_preg_replace_callback(
+    __string__ *pattern,
+    __string__ *subject,
+    phpc_preg_replace_callback_fn cb
+)
+{
+    const char *pat_full = pm_strdata(pattern);
+    size_t pat_len = pm_strlen(pattern);
+    const char *subj = pm_strdata(subject);
+    size_t subj_len = pm_strlen(subject);
+
+    phpc_preg_last_error = PHPC_PREG_NO_ERROR;
+
+    if (NULL == cb) {
+        phpc_preg_last_error = PHPC_PREG_BAD_REGEX;
+
+        return NULL;
+    }
+
+    if (pat_len > PM_MAX_PATTERN) {
+        phpc_preg_last_error = PHPC_PREG_BAD_REGEX;
+
+        return NULL;
+    }
+
+    char body[PM_MAX_PATTERN + 1];
+    uint32_t opts = 0;
+    if (0 != pm_extract_body(pat_full, pat_len, body, sizeof(body), &opts)) {
+        phpc_preg_last_error = PHPC_PREG_BAD_REGEX;
+
+        return NULL;
+    }
+
+    int errorcode = 0;
+    PCRE2_SIZE erroffset = 0;
+    pcre2_code *re = pcre2_compile(
+        (PCRE2_SPTR) body,
+        PCRE2_ZERO_TERMINATED,
+        opts,
+        &errorcode,
+        &erroffset,
+        NULL
+    );
+    if (NULL == re) {
+        phpc_preg_last_error = PHPC_PREG_BAD_REGEX;
+
+        return NULL;
+    }
+
+    pcre2_match_data *match_data = pcre2_match_data_create_from_pattern(re, NULL);
+    if (NULL == match_data) {
+        pcre2_code_free(re);
+        phpc_preg_last_error = PHPC_PREG_BAD_REGEX;
+
+        return NULL;
+    }
+
+    char *out = NULL;
+    size_t out_cap = 0;
+    size_t out_len = 0;
+    PCRE2_SIZE start = 0;
+
+    while (start <= subj_len) {
+        int rc = pcre2_match(
+            re,
+            (PCRE2_SPTR) subj,
+            subj_len,
+            start,
+            0,
+            match_data,
+            NULL
+        );
+
+        if (PCRE2_ERROR_NOMATCH == rc) {
+            if (0 != pm_append(&out, &out_cap, &out_len, subj + start, subj_len - start)) {
+                goto cb_fail;
+            }
+            break;
+        }
+        if (rc < 0) {
+            goto cb_fail;
+        }
+
+        PCRE2_SIZE *ovector = pcre2_get_ovector_pointer(match_data);
+        if (0 != pm_append(&out, &out_cap, &out_len, subj + start, ovector[0] - start)) {
+            goto cb_fail;
+        }
+
+        __hashtable__ *matches = __hashtable__alloc();
+        if (NULL == matches) {
+            goto cb_fail;
+        }
+        for (int gi = 0; gi < rc; gi++) {
+            if (ovector[2 * gi] == (PCRE2_SIZE) -1) {
+                continue;
+            }
+            __string__ *piece = pm_slice_to_string(
+                subj + ovector[2 * gi],
+                (size_t) (ovector[2 * gi + 1] - ovector[2 * gi])
+            );
+            if (NULL == piece) {
+                goto cb_fail;
+            }
+            __hashtable__setStringAt(matches, (size_t) gi, piece);
+        }
+
+        __value__ matches_box;
+        __value__writeHashtable(&matches_box, matches);
+        __value__ *repl_box = cb(&matches_box);
+        if (NULL == repl_box) {
+            goto cb_fail;
+        }
+        __string__ *repl = __value__readString(repl_box);
+        if (NULL == repl) {
+            goto cb_fail;
+        }
+        if (0 != pm_append(&out, &out_cap, &out_len, pm_strdata(repl), pm_strlen(repl))) {
+            goto cb_fail;
+        }
+
+        if (ovector[1] == start) {
+            start++;
+        } else {
+            start = ovector[1];
+        }
+    }
+
+    pcre2_match_data_free(match_data);
+    pcre2_code_free(re);
+
+    if (NULL == out) {
+        out = (char *) malloc(1);
+        if (NULL == out) {
+            phpc_preg_last_error = PHPC_PREG_BAD_REGEX;
+
+            return NULL;
+        }
+        out[0] = '\0';
+        out_len = 0;
+    }
+
+    {
+        __string__ *result = __string__init((long long) out_len, out);
+        free(out);
+
+        return result;
+    }
+
+cb_fail:
+    free(out);
+    pcre2_match_data_free(match_data);
+    pcre2_code_free(re);
+    phpc_preg_last_error = PHPC_PREG_BAD_REGEX;
+
+    return NULL;
+}
+
 static int pm_ht_push(__hashtable__ *ht, size_t *idx, const char *data, size_t len)
 {
     __string__ *part = pm_slice_to_string(data, len);

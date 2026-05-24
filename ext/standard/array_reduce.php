@@ -13,6 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\ArrayReduceCallbackPolicy;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -22,8 +23,7 @@ use PHPLLVM\Value;
 /**
  * array_reduce() with string user-function callbacks (subset of PHP).
  *
- * JIT/AOT: callbacks deferred — see ArrayReduceCallbackPolicy (#1213). Closures and other
- * callables are deferred until user-function / callable JIT lands ([#142](https://github.com/PurHur/php-compiler/issues/142)).
+ * JIT/AOT: compile-time string user-function names in this compile unit (#1213).
  */
 final class array_reduce extends Internal
 {
@@ -82,9 +82,18 @@ final class array_reduce extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'array_reduce() not implemented for JIT in this compiler build; '
-            .ArrayReduceCallbackPolicy::DEFERRED_SUMMARY
-        );
+        $argc = \count($args);
+        if ($argc < 2 || $argc > 3) {
+            throw new \LogicException('array_reduce() requires two or three arguments in this compiler build');
+        }
+        if (!ArrayReduceCallbackPolicy::isJitLowerable($args[1])) {
+            throw new \LogicException(ArrayReduceCallbackPolicy::jitRejectionMessage());
+        }
+        if (JITVariable::TYPE_STRING === $args[1]->type || JITVariable::TYPE_VALUE === $args[1]->type) {
+            $this->jitString($context, $args[1], 'array_reduce() callback');
+        }
+        $initial = 3 === $argc ? $args[2] : null;
+
+        return ArrayBuiltinHelper::buildReduceArray($context, $args[0], $args[1], $initial);
     }
 }

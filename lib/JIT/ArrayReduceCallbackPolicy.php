@@ -20,7 +20,7 @@ final class ArrayReduceCallbackPolicy
 
     public const DEFERRED_KINDS = 'closures, array callables, and invokable objects';
 
-    public const JIT_SUBSET = 'compile-time string user-function names (VM only in this build)';
+    public const JIT_SUBSET = 'compile-time string user-function names in this compile unit';
 
     public static function isJitLowerable(JITVariable $callback): bool
     {
@@ -33,7 +33,7 @@ final class ArrayReduceCallbackPolicy
 
     public static function isJitLowerableScalar(int $type, bool $isNullConstant, ?string $compileTimeString): bool
     {
-        return false;
+        return JITVariable::TYPE_STRING === $type && null !== $compileTimeString;
     }
 
     public static function isVmSupportedType(int $type): bool
@@ -43,8 +43,8 @@ final class ArrayReduceCallbackPolicy
 
     public static function jitRejectionMessage(): string
     {
-        return 'array_reduce() is not supported by the JIT compiler in this build; '
-            .self::DEFERRED_KINDS.' are deferred (#142)';
+        return 'array_reduce() callback must be '.self::JIT_SUBSET
+            .' for JIT/AOT in this compiler build; '.self::DEFERRED_KINDS.' are deferred (#142)';
     }
 
     public static function vmRejectionMessage(): string

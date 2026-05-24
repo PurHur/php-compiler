@@ -68,6 +68,12 @@ final class StringPregMatch
             throw new \LogicException('__compiler_preg_replace missing after bitcode link');
         }
         $context->registerFunction('__compiler_preg_replace', $fnReplace);
+
+        $fnReplaceCallback = $context->module->getNamedFunction('__compiler_preg_replace_callback');
+        if (null === $fnReplaceCallback) {
+            throw new \LogicException('__compiler_preg_replace_callback missing after bitcode link');
+        }
+        $context->registerFunction('__compiler_preg_replace_callback', $fnReplaceCallback);
     }
 
     private static function ensureBitcode(): string

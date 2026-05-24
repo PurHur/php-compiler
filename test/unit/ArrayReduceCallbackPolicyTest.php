@@ -10,12 +10,17 @@ use PHPUnit\Framework\TestCase;
 
 final class ArrayReduceCallbackPolicyTest extends TestCase
 {
-    public function testJitRejectsAllCallbacks(): void
+    public function testJitAllowsCompileTimeUserFunctionName(): void
     {
-        $this->assertFalse(ArrayReduceCallbackPolicy::isJitLowerableScalar(
+        $this->assertTrue(ArrayReduceCallbackPolicy::isJitLowerableScalar(
             JITVariable::TYPE_STRING,
             false,
             'sum'
+        ));
+        $this->assertFalse(ArrayReduceCallbackPolicy::isJitLowerableScalar(
+            JITVariable::TYPE_STRING,
+            false,
+            null
         ));
     }
 
