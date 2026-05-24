@@ -23,7 +23,7 @@ Exit code `0` when the entry (and best-effort `include`/`require` targets with s
 
 Operands that are not foldable (variables, function calls, non-literal concatenation) emit a **stderr warning** (`dynamic include/require (not followed)`) and are not traversed. Runtime include for VM/JIT/AOT is tracked separately ([#54](https://github.com/PurHur/php-compiler/issues/54), [#85](https://github.com/PurHur/php-compiler/issues/85)).
 
-Some constructs (for example `break`/`continue`, `list()` / short-list / keyed-list destructuring (`["a" => $x]`), and prefix/postfix `++`/`--`) are lowered by php-cfg before the compiler sees them; they compile in VM/JIT/AOT like ordinary assign and array fetches.
+Some constructs (for example `break`/`continue`, `goto`/`label`, `list()` / short-list / keyed-list destructuring (`["a" => $x]`), and prefix/postfix `++`/`--`) are lowered by php-cfg before the compiler sees them; they compile in VM/JIT/AOT like ordinary assign, array fetches, and `TYPE_JUMP` branches ([#1228](https://github.com/PurHur/php-compiler/issues/1228)).
 
 ## Known gaps (tracking issues)
 

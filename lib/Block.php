@@ -309,6 +309,14 @@ class Block {
     }
 
     public function getFrame(Context $context, ?Frame $frame = null): Frame {
+        // Back-edge to the same block (goto label) must reuse the frame; otherwise each
+        // jump chains a new parent Frame and getFrame never finishes (issue #1228).
+        if (null !== $frame && $this === $frame->block) {
+            $frame->pos = 0;
+
+            return $frame;
+        }
+
         // Todo: build scope
         $scope = [];
         $cfgMerge = count($this->parents) > 1;
