@@ -268,6 +268,41 @@ final class HashTableHelper
         return $context->builder->call($context->lookupFunction('__hashtable__alloc'));
     }
 
+    /** Empty packed list for variadic recv with zero trailing args (issue #197). */
+    public static function emptyVariable(Context $context): Variable
+    {
+        return new Variable(
+            $context,
+            Variable::TYPE_HASHTABLE,
+            Variable::KIND_VALUE,
+            self::alloc($context)
+        );
+    }
+
+    /**
+     * Pack JIT call/recv arguments into a list hashtable (issue #197).
+     *
+     * @param list<Variable> $vars
+     */
+    public static function packVariables(Context $context, array $vars): Variable
+    {
+        $ht = self::alloc($context);
+        $i64 = $context->getTypeFromString('int64');
+        foreach ($vars as $index => $var) {
+            if (!$var instanceof Variable) {
+                continue;
+            }
+            self::setAtIndex($context, $ht, $i64->constInt($index, false), $var);
+        }
+
+        return new Variable(
+            $context,
+            Variable::TYPE_HASHTABLE,
+            Variable::KIND_VALUE,
+            $ht
+        );
+    }
+
     public static function buildIntegerRange(
         Context $context,
         Value $start,
@@ -602,6 +637,15 @@ final class HashTableHelper
         $var->writableStringKey = $keyStr;
 
         return $var;
+    }
+
+    public static function unsetStringKey(Context $context, Value $ht, Value $keyStr): void
+    {
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__unsetStringKey'),
+            $ht,
+            $keyStr
+        );
     }
 
     /**
