@@ -26,10 +26,6 @@ class JITTest extends BaseTest {
             if (str_contains(strtolower($case[0]), 'password')) {
                 continue;
             }
-            // func_get_args()/func_num_args() remain VM-only (#197).
-            if (str_contains(strtolower($case[0]), 'func_get_args')) {
-                continue;
-            }
             yield $case;
         }
     }

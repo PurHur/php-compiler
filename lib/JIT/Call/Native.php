@@ -14,6 +14,7 @@ namespace PHPCompiler\JIT\Call;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Call;
+use PHPCompiler\JIT\Builtin\CallArgv;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitLongArg;
@@ -43,9 +44,11 @@ class Native implements Call {
     }
 
     public function call(Context $context, Variable ... $args): Value {
+        $sentArgs = $args;
         if (null !== $this->variadicArgIndex) {
             $args = $this->packVariadicCallArgs($context, $args);
         }
+        CallArgv::emitStore($context, HashTableHelper::packVariables($context, $sentArgs));
         $argValues = [];
         $total = count($this->argTypes);
         for ($index = 0; $index < $total; $index++) {

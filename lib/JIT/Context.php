@@ -46,6 +46,9 @@ class Context {
     public array $functionReturnType = [];
     public string $activeFunction = '';
     public array $functionScope = [];
+
+    /** User function CFG block while compiling its body (func_get_args / func_num_args, #197). */
+    public ?Block $jitEnclosingBlock = null;
     private array $typeMap = [];
     public array $structFieldMap = [];
     private array $intConstant = [];

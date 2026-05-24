@@ -32,8 +32,10 @@ final class func_num_args extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'func_num_args() not implemented for JIT in this compiler build; use VM (issue #197)'
-        );
+        if (\count($args) > 0) {
+            throw new \LogicException('func_num_args() takes no arguments');
+        }
+
+        return JitFuncArgs::numArgs($context);
     }
 }
