@@ -305,6 +305,14 @@ function syntaxRowDefinitions(): array
             'notes' => ['serialize()/unserialize() call __serialize/__unserialize when present; VM via VmSerialize'],
             'probe' => 'class B { private int $n = 0; public function __construct(int $n = 0) { $this->n = $n; } public function __serialize(): array { return ["n" => $this->n]; } public function __unserialize(array $d): void { $this->n = $d["n"]; } public function get(): int { return $this->n; } } $r = unserialize(serialize(new B(3))); echo $r->get();',
         ],
+        [
+            'id' => 'multi_catch',
+            'construct' => 'Multi-type catch `catch (A|B $e)`',
+            'opcodes' => ['TYPE_TRY', 'TYPE_CATCH', 'TYPE_THROW'],
+            'issue' => 1362,
+            'notes' => ['php-cfg records union types per catch; VM filters TYPE_CATCH via OpCode.catchTypes'],
+            'probe' => 'class A {} class B {} try { throw new A(); } catch (A|B $e) { echo "ok"; }',
+        ],
     ];
 }
 
@@ -444,6 +452,7 @@ function collectSyntaxPhptCoverage(string $root, array $definitions): array
         'goto' => '/\bgoto\s+\w+/',
         'variable_variables' => '/\$\$/',
         'array_argument_unpack' => '/\.\.\.\s*\$/',
+        'multi_catch' => '/catch\s*\([^)]*\|/',
     ];
 
     $scan = [];

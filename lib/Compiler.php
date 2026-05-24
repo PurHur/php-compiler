@@ -520,7 +520,6 @@ class Compiler {
         throw new \LogicException('Unsupported unset target: ' . (is_object($expr) ? $expr->getType() : gettype($expr)));
     }
 
-<<<<<<< HEAD
     protected function compileInterface(Op\Stmt\Interface_ $iface, Block $block): OpCode
     {
         $return = new OpCode(
@@ -528,7 +527,10 @@ class Compiler {
             $this->compileOperand($iface->name, $block, true)
         );
         $return->classImplements = $this->interfaceNamesFromOperands($iface->extends);
-=======
+
+        return $return;
+    }
+
     protected function compileEnum(Op\Stmt\Enum_ $enum, Block $block): OpCode
     {
         $return = new OpCode(
@@ -536,13 +538,10 @@ class Compiler {
             $this->compileOperand($enum->name, $block, true)
         );
         $return->block1 = $this->compileEnumBody($enum->stmts);
->>>>>>> b77c6a42 (feat: backed enum declarations for VM/JIT (#1356))
 
         return $return;
     }
 
-<<<<<<< HEAD
-=======
     protected function compileEnumBody(CfgBlock $block): Block
     {
         $result = new Block($block);
@@ -561,7 +560,6 @@ class Compiler {
         return $result;
     }
 
->>>>>>> b77c6a42 (feat: backed enum declarations for VM/JIT (#1356))
     protected function compileClassLike(Op\Stmt\ClassLike $class, Block $block): OpCode {
         $type = 0;
         if ($class instanceof Op\Stmt\Class_) {
@@ -924,11 +922,16 @@ class Compiler {
             $tryOp->block1 = $try;
             $tryOp->block2 = $merge;
             $block->addOpCode($tryOp);
-            foreach ($stmt->catches as $catchBlock) {
+            foreach ($stmt->catches as $i => $catchBlock) {
                 $compiledCatch = $this->compileCfgBranch($catchBlock, $block);
                 $catchOp = new OpCode(OpCode::TYPE_CATCH);
                 $catchOp->block1 = $compiledCatch;
                 $catchOp->block2 = $merge;
+                $catchOp->catchTypes = $this->encodeCatchTypeList($stmt->catchTypes[$i] ?? []);
+                $catchVar = $stmt->catchVars[$i] ?? null;
+                $catchOp->arg3 = null !== $catchVar
+                    ? $compiledCatch->slotForOperand($catchVar)
+                    : null;
                 $block->addOpCode($catchOp);
             }
             if (null !== $stmt->finally) {
@@ -1904,6 +1907,17 @@ class Compiler {
         $operand->type = Type::bool();
 
         return $block->registerConstant($operand, $var);
+    }
+
+    /**
+     * @param list<string> $types
+     */
+    protected function encodeCatchTypeList(array $types): string
+    {
+        return implode('|', array_map(
+            static fn (string $name): string => strtolower(ltrim($name, '\\')),
+            $types
+        ));
     }
 
     /**

@@ -91,6 +91,12 @@ class OpCode {
     const TYPE_UNSET = 91;
     /** AOT lint: try/catch CFG lowering; VM/JIT exception model deferred (issue #57). */
     const TYPE_TRY = 92;
+    /**
+     * Catch handler entry (issue #57, multi-type #1362).
+     * block1 = catch body; block2 = merge after try/catch.
+     * catchTypes = pipe-separated lowercase caught class names (`a|b`).
+     * arg3 = catch variable scope slot in catch body, or null.
+     */
     const TYPE_CATCH = 93;
     const TYPE_FINALLY = 94;
     const TYPE_DECLARE_GLOBAL_CONST = 95;
@@ -128,6 +134,8 @@ class OpCode {
 
     /** @var string[] lowercase interface names for TYPE_DECLARE_CLASS (#1357) */
     public array $classImplements = [];
+    /** Pipe-separated lowercase catch class names for TYPE_CATCH (#1362). */
+    public ?string $catchTypes = null;
 
     public function __construct(int $type, ?int $arg1 = null, ?int $arg2 = null, ?int $arg3 = null) {
         $this->type = $type;

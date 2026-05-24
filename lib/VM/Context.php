@@ -36,6 +36,9 @@ class Context {
 
     public Runtime $runtime;
 
+    /** Pending thrown value while dispatching catch handlers (issue #1362). */
+    public ?Variable $pendingException = null;
+
     public ErrorReporter $errors;
 
     public ScriptStack $scriptStack;

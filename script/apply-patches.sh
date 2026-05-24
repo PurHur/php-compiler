@@ -188,12 +188,9 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-enum.patch"
   apply_patch "$PATCH_DIR/php-cfg-named-args.patch"
   apply_patch "$PATCH_DIR/php-cfg-spread.patch"
-<<<<<<< HEAD
   apply_patch "$PATCH_DIR/php-cfg-never-type.patch"
   apply_patch "$PATCH_DIR/php-cfg-intersection-type.patch"
-=======
   apply_patch "$PATCH_DIR/php-cfg-ctor-promotion.patch"
->>>>>>> c31aff62 (Language: constructor property promotion (#1359))
 fi
 
 if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then

@@ -842,7 +842,27 @@ restart:
                     $frame = $op->block1->getFrame($this->context, $frame);
                     goto restart;
                 case OpCode::TYPE_CATCH:
+                    if (null !== $this->context->pendingException) {
+                        if ($this->catchTypesMatch($op, $this->context->pendingException)) {
+                            $caught = $this->context->pendingException;
+                            $this->context->pendingException = null;
+                            $frame = $op->block1->getFrame($this->context, $frame);
+                            if (null !== $op->arg3) {
+                                $frame->scope[$op->arg3]->copyFrom($caught);
+                            }
+                            goto restart;
+                        }
+                        break;
+                    }
+                    if (null !== $op->block2) {
+                        $frame = $op->block2->getFrame($this->context, $frame);
+                        goto restart;
+                    }
+                    break;
                 case OpCode::TYPE_FINALLY:
+                    if (null !== $this->context->pendingException) {
+                        break;
+                    }
                     if (null !== $op->block2) {
                         $frame = $op->block2->getFrame($this->context, $frame);
                         goto restart;
@@ -850,6 +870,11 @@ restart:
                     break;
                 case OpCode::TYPE_THROW:
                     $thrown = $frame->scope[$op->arg1]->resolveIndirect();
+                    $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     if (Variable::TYPE_OBJECT === $thrown->type) {
                         $entry = $thrown->toObject();
                         try {
@@ -898,6 +923,114 @@ restart:
     {
         $where = '' !== $frame->scriptPath ? $frame->scriptPath : 'script';
         throw new \LogicException($message.' in '.$where);
+    }
+
+    private function findCatchFrameForThrow(Frame $frame, Variable $thrown): ?Frame
+    {
+        $this->context->pendingException = $thrown;
+        for ($handler = $frame->parent ?? $frame; null !== $handler; $handler = $handler->parent) {
+            $this->rewindHandlerToCatchChain($handler);
+            $catchFrame = $this->enterMatchingCatchHandler($handler);
+            if (null !== $catchFrame) {
+                return $catchFrame;
+            }
+        }
+        $this->context->pendingException = null;
+
+        return null;
+    }
+
+    /** Align handler position to the first TYPE_CATCH after TYPE_TRY (issue #1362). */
+    private function rewindHandlerToCatchChain(Frame $handler): void
+    {
+        $ops = $handler->block->opCodes;
+        $n = $handler->block->nOpCodes;
+        for ($i = 0; $i < $n; ++$i) {
+            if (OpCode::TYPE_TRY !== $ops[$i]->type) {
+                continue;
+            }
+            for ($j = $i + 1; $j < $n; ++$j) {
+                if (OpCode::TYPE_CATCH === $ops[$j]->type) {
+                    $handler->pos = $j;
+
+                    return;
+                }
+                if (OpCode::TYPE_FINALLY === $ops[$j]->type) {
+                    return;
+                }
+            }
+
+            return;
+        }
+    }
+
+    private function enterMatchingCatchHandler(Frame $handler): ?Frame
+    {
+        if (null === $this->context->pendingException) {
+            return null;
+        }
+        while ($handler->pos < $handler->block->nOpCodes) {
+            $op = $handler->block->opCodes[$handler->pos];
+            if (OpCode::TYPE_CATCH !== $op->type) {
+                if (OpCode::TYPE_FINALLY === $op->type) {
+                    break;
+                }
+
+                return null;
+            }
+            $handler->pos++;
+            if (!$this->catchTypesMatch($op, $this->context->pendingException)) {
+                continue;
+            }
+            $caught = $this->context->pendingException;
+            $this->context->pendingException = null;
+            $catchFrame = $op->block1->getFrame($this->context, $handler);
+            if (null !== $op->arg3) {
+                $catchFrame->scope[$op->arg3]->copyFrom($caught);
+            }
+
+            return $catchFrame;
+        }
+
+        return null;
+    }
+
+    private function catchTypesMatch(OpCode $op, Variable $thrown): bool
+    {
+        $encoded = $op->catchTypes;
+        if (null === $encoded || '' === $encoded) {
+            return true;
+        }
+        $types = explode('|', $encoded);
+        if (Variable::TYPE_OBJECT !== $thrown->type) {
+            return false;
+        }
+        $class = $thrown->toObject()->class;
+        foreach ($types as $typeName) {
+            if ('' === $typeName) {
+                continue;
+            }
+            if ($this->objectIsInstanceOfClass($class, $typeName)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function objectIsInstanceOfClass(ClassEntry $class, string $typeName): bool
+    {
+        $want = strtolower(ltrim($typeName, '\\'));
+        $current = $class;
+        while (true) {
+            if (strtolower($current->name) === $want) {
+                return true;
+            }
+            if (null === $current->parentLc || !isset($this->context->classes[$current->parentLc])) {
+                return false;
+            }
+            $current = $this->context->classes[$current->parentLc];
+        }
     }
 
     /**
