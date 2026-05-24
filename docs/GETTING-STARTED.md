@@ -50,7 +50,7 @@ script/apply-patches.sh
 make bootstrap-selfhost-link
 ```
 
-Expect stdout: `compiler_minimal bundle OK`. **Talking point:** experimental path toward the compiler compiling its own `lib/` tree ([#1056](https://github.com/PurHur/php-compiler/issues/1056)).
+Expect stdout: `compiler_minimal bundle OK`. **Talking point:** experimental path toward the compiler compiling its own `lib/` tree ([#1492](https://github.com/PurHur/php-compiler/issues/1492)).
 
 ### 5. (Optional) Full local CI
 

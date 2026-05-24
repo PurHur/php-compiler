@@ -1,6 +1,6 @@
 # Roadmap wave 3 tracker (#1354–#1379)
 
-Living status for the **25 issues** filed May 2026 toward full PHP language + stdlib coverage. Umbrella: [#1380](https://github.com/PurHur/php-compiler/issues/1380). North stars: [#1044](https://github.com/PurHur/php-compiler/issues/1044), [#1056](https://github.com/PurHur/php-compiler/issues/1056).
+Living status for the **25 issues** filed May 2026 toward full PHP language + stdlib coverage. Umbrella: [#1380](https://github.com/PurHur/php-compiler/issues/1380). North stars: [#1044](https://github.com/PurHur/php-compiler/issues/1044), [#1492](https://github.com/PurHur/php-compiler/issues/1492) (self-host; was [#1056](https://github.com/PurHur/php-compiler/issues/1056)).
 
 Regenerate capability truth: `php script/capability-matrix.php`, `php script/capability-syntax.php`, `php script/audit-stdlib-jit.php`.
 
@@ -17,7 +17,7 @@ Regenerate capability truth: `php script/capability-matrix.php`, `php script/cap
 
 Related merges outside this wave: `goto` ([#1228](https://github.com/PurHur/php-compiler/issues/1228) / [#1333](https://github.com/PurHur/php-compiler/pull/1333)), anonymous classes ([#1233](https://github.com/PurHur/php-compiler/issues/1233) / [#1386](https://github.com/PurHur/php-compiler/pull/1386)).
 
-**M2 spine:** **567** / **586** inventory (`compiler_lib_spine_smoke` native link ✅; [#1056](https://github.com/PurHur/php-compiler/issues/1056), M2 batches [#1419](https://github.com/PurHur/php-compiler/issues/1419), [#1497](https://github.com/PurHur/php-compiler/issues/1497)). Target doc: [self-host-target.md](self-host-target.md).
+**M2 spine:** **567** / **586** inventory (`compiler_lib_spine_smoke` native link ✅; [#1492](https://github.com/PurHur/php-compiler/issues/1492), M2 batches [#1419](https://github.com/PurHur/php-compiler/issues/1419), [#1497](https://github.com/PurHur/php-compiler/issues/1497)). Target doc: [self-host-target.md](self-host-target.md).
 
 ## Language (#1354–#1366)
 

@@ -5,7 +5,7 @@ description: Authoritative snapshot of php-compiler — VM, JIT, AOT web deploym
 permalink: /development-status.html
 ---
 
-*Last updated: May 2026. Edit this file when milestones change; keep in sync with [issue #78](https://github.com/PurHur/php-compiler/issues/78), [#1044](https://github.com/PurHur/php-compiler/issues/1044) (North Star 1), [#1056](https://github.com/PurHur/php-compiler/issues/1056) (North Star 2), and the [README](https://github.com/PurHur/php-compiler/blob/master/README.md).*
+*Last updated: May 2026. Edit this file when milestones change; keep in sync with [issue #78](https://github.com/PurHur/php-compiler/issues/78), [#1044](https://github.com/PurHur/php-compiler/issues/1044) (North Star 1), [#1492](https://github.com/PurHur/php-compiler/issues/1492) (North Star 2; was [#1056](https://github.com/PurHur/php-compiler/issues/1056)), and the [README](https://github.com/PurHur/php-compiler/blob/master/README.md).*
 
 ## At a glance
 
@@ -15,7 +15,7 @@ permalink: /development-status.html
 | **Overall progress** | ~**50%** toward web-capable + self-hosting compiler (indicative) |
 | **Wave 3 (May 2026)** | Language **10/13** · Stdlib **12/13** ([#1380](https://github.com/PurHur/php-compiler/issues/1380)) |
 | **North Star 1** | Reference web app — VM ✅ · AOT link ✅ · AOT execute **partial** ([#1044](https://github.com/PurHur/php-compiler/issues/1044)) |
-| **North Star 2** | Self-compile — M0–M1 ✅ · M2 spine **301/532** · M5 ⬜ ([#1056](https://github.com/PurHur/php-compiler/issues/1056)) |
+| **North Star 2** | Self-compile — M0–M1 ✅ · M2 spine **567/586** · M5 ⬜ ([#1492](https://github.com/PurHur/php-compiler/issues/1492)) |
 | **Not Zend parity** | Subset compiler (not full Zend PHP) |
 
 [← Visual overview](index.html) · [Repository](https://github.com/PurHur/php-compiler)
@@ -164,7 +164,7 @@ MINIWEBAPP_SERVE_AOT_GATE=0 ./script/ci-local.sh --filter MiniWebAppServeAot  # 
 
 ### 2. Self-host north star {#north-star-2-self-host}
 
-**Living tracker:** [#1056](https://github.com/PurHur/php-compiler/issues/1056) · **Roadmap:** [#78](https://github.com/PurHur/php-compiler/issues/78) · **Process:** [#1025](https://github.com/PurHur/php-compiler/issues/1025)
+**Living tracker:** [#1492](https://github.com/PurHur/php-compiler/issues/1492) · **Roadmap:** [#78](https://github.com/PurHur/php-compiler/issues/78) · **Process:** [#1025](https://github.com/PurHur/php-compiler/issues/1025)
 
 #### Vision (definition of done)
 
@@ -200,10 +200,10 @@ Zend PHP still runs `bin/compile.php` during bootstrap. The output is a **curate
 |-----------|---------|--------|
 | **M0 — Bundled subset runs** | ~109 literal `require_once` units in `test/selfhost/compiler_minimal/main.php` → `build/selfhost` prints `compiler_minimal bundle OK` | ✅ [#557](https://github.com/PurHur/php-compiler/issues/557), [#913](https://github.com/PurHur/php-compiler/issues/913) |
 | **M1 — Compiler-shaped bundle** | Bundled `Compiler.php` AOT lint; compile-smoke native link + AOT echo (`compiler smoke`); driver smoke toward `bin/compile.php` | ✅ [#1025](https://github.com/PurHur/php-compiler/issues/1025), [#1095](https://github.com/PurHur/php-compiler/issues/1095) |
-| **M2 — Lib spine growth** | `compiler_lib_spine_smoke` bundle toward full `bin/vm.php` inventory (**586** files) | 🚧 **567** / 586 units (~97%; [#1056](https://github.com/PurHur/php-compiler/issues/1056), [#1497](https://github.com/PurHur/php-compiler/issues/1497)) |
-| **M3 — Native compiles PHP** | Self-hosted bundle links; HelloWorld AOT **runs** natively; **emit still uses Zend** `bin/compile.php` fallback | 🚧 partial ([#1056](https://github.com/PurHur/php-compiler/issues/1056)) |
+| **M2 — Lib spine growth** | `compiler_lib_spine_smoke` bundle toward full `bin/vm.php` inventory (**586** files) | 🚧 **567** / 586 units (~97%; [#1492](https://github.com/PurHur/php-compiler/issues/1492), [#1419](https://github.com/PurHur/php-compiler/issues/1419), [#1497](https://github.com/PurHur/php-compiler/issues/1497)) |
+| **M3 — Native compiles PHP** | Self-hosted bundle links; HelloWorld AOT **runs** natively; **emit still uses Zend** `bin/compile.php` fallback | 🚧 partial ([#1492](https://github.com/PurHur/php-compiler/issues/1492)) |
 | **M4 — Bootstrap loop** | Native toolchain rebuilds the **next** compiler sources (same tree, new revision) | ⬜ |
-| **M5 — Full self-host** | Real `bin/vm.php` / `bin/compile.php` path on full inventory; **no Zend bootstrap** | ⬜ **north star** ([#1056](https://github.com/PurHur/php-compiler/issues/1056)) |
+| **M5 — Full self-host** | Real `bin/vm.php` / `bin/compile.php` path on full inventory; **no Zend bootstrap** | ⬜ **north star** ([#1492](https://github.com/PurHur/php-compiler/issues/1492)) |
 
 #### Scale (why M5 is big)
 
@@ -320,19 +320,19 @@ Commands: `./phpc run`, `./phpc build`, `./phpc serve`, `make examples-aot-smoke
 | [#828](https://github.com/PurHur/php-compiler/issues/828) | Self-host JIT | `Object_.php` external property children |
 | [#84](https://github.com/PurHur/php-compiler/issues/84) | Self-host tree | Full `lib/` bundle growth + namespaces |
 | [#57](https://github.com/PurHur/php-compiler/issues/57) | Self-host runtime | Try/catch unwind in native bundle |
-| M3–M5 | North Star 2 | Native PHP → rebuild compiler → full tree ([#1056](https://github.com/PurHur/php-compiler/issues/1056)) |
+| M3–M5 | North Star 2 | Native PHP → rebuild compiler → full tree ([#1492](https://github.com/PurHur/php-compiler/issues/1492)) |
 
 ---
 
 ## How to contribute
 
 1. **Try the project:** [GETTING-STARTED.md](https://github.com/PurHur/php-compiler/blob/master/docs/GETTING-STARTED.md) (clone, demo script, `phpc` cheat sheet).
-2. Pick an issue by [phase label](https://github.com/PurHur/php-compiler/issues), [#1044](https://github.com/PurHur/php-compiler/issues/1044) (North Star 1), [#1056](https://github.com/PurHur/php-compiler/issues/1056) (North Star 2), or self-host bootstrap issues.
+2. Pick an issue by [phase label](https://github.com/PurHur/php-compiler/issues), [#1044](https://github.com/PurHur/php-compiler/issues/1044) (North Star 1), [#1492](https://github.com/PurHur/php-compiler/issues/1492) (North Star 2), or self-host bootstrap issues.
 3. For self-host work, run `./script/bootstrap-wave-check.sh` before opening a PR.
 4. Update **this file** (`docs/pages/development-status.md`) when a user-visible milestone lands (and sync [README](https://github.com/PurHur/php-compiler/blob/master/README.md) / [index.html](index.html) if the public story changed).
 
 - [North Star 1 tracker #1044](https://github.com/PurHur/php-compiler/issues/1044)
-- [North Star 2 tracker #1056](https://github.com/PurHur/php-compiler/issues/1056)
+- [North Star 2 tracker #1492](https://github.com/PurHur/php-compiler/issues/1492)
 - [Open issues](https://github.com/PurHur/php-compiler/issues)
 - [Contributing guide](https://github.com/PurHur/php-compiler/blob/master/CONTRIBUTING.md)
 - [Living roadmap #78](https://github.com/PurHur/php-compiler/issues/78)
