@@ -11,7 +11,6 @@ use PHPLLVM\Value;
 /** LLVM lowering for json_last_error() via __compiler_json_last_error (issue #1173). */
 final class JitJsonLastError
 {
-    /** @return Value __value__* (native long error code) */
     public static function invoke(Context $context): Value
     {
         $code = $context->builder->call($context->lookupFunction('__compiler_json_last_error'));

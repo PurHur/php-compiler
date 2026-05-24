@@ -14,7 +14,6 @@ use PHPLLVM\Value;
 /** LLVM lowering for function_exists() (issue #1216). */
 final class JitFunctionExists
 {
-    /** @return Value int1 — matches defined() / array_key_exists() for JUMPIF truthiness */
     public static function invoke(Context $context, JITVariable $nameArg): Value
     {
         $i1 = $context->getTypeFromString('int1');
