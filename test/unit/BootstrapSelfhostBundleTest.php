@@ -288,6 +288,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/rawurldecode.php',
         'ext/standard/rawurlencode.php',
         'ext/standard/sprintf_.php',
+        'ext/standard/stream_context_create.php',
         'ext/standard/str_contains.php',
         'ext/standard/str_ends_with.php',
         'ext/standard/str_pad.php',
@@ -356,7 +357,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         $this->assertFileExists($entry);
         $contents = (string) file_get_contents($entry);
         $count = substr_count($contents, 'require_once __DIR__');
-                $this->assertSame(440, $count, '108 compiler_minimal units + 332 M2 spine units (#1741 Linker, #1725 tempnam); array_pop/shift/search + preg/array_combine wrappers skipped (AOT types); src/cli.php deferred #1467');
+                $this->assertSame(441, $count, '108 compiler_minimal units + 333 M2 spine units (#1741 Linker, #1725 tempnam, #1701 stream_context_create); array_pop/shift/search + preg/array_combine wrappers skipped (AOT types); src/cli.php deferred #1467');
         foreach (self::LIB_SPINE_SMOKE_NEW_UNITS as $unit) {
             $this->assertStringContainsString(
                 "require_once __DIR__.'/../../../{$unit}';",
