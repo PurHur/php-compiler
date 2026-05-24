@@ -446,7 +446,11 @@ require_once __DIR__.'/../../../src/llvm-env.php';
 require_once __DIR__.'/../../../src/tokenizer-compat.php';
 require_once __DIR__.'/../../../src/yay-php8-compat.php';
 require_once __DIR__.'/../../../src/macro_functions.php';
-// src/cli.php + compat shims — deferred (#1467): String_.php JIT link failure when bundled; cli_driver split ready for M4.
+if (!defined('PHP_COMPILER_LIB_SPINE_SMOKE')) {
+    define('PHP_COMPILER_LIB_SPINE_SMOKE', true);
+}
+require_once __DIR__.'/../../../src/cli_driver.php';
+// src/cli.php — deferred (#1467): String_.php JIT link failure when bundled with full vm.php path.
 // bin/vm.php — deferred (#1423 M4): entry pulls src/cli.php + vendor/autoload argv driver; bundle vm_run_smoke.php instead.
 
 echo "compiler_lib_spine_smoke bundle OK\n";
