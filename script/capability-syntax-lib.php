@@ -39,6 +39,14 @@ function syntaxRowDefinitions(): array
             'probe' => '$o = new class { public function f(): int { return 42; } }; echo $o->f();',
         ],
         [
+            'id' => 'enum_declarations',
+            'construct' => 'Enum declarations `enum Foo: string { case Bar = \'x\'; }`',
+            'opcodes' => ['TYPE_DECLARE_ENUM', 'TYPE_DECLARE_CLASS_CONST', 'TYPE_CLASS_CONST_FETCH'],
+            'issue' => 1356,
+            'notes' => ['Backed enum cases as class constants; `Foo::Bar` const-like fetch; `enum_exists` registry'],
+            'probe' => 'enum Status: string { case Ok = \'ok\'; } echo Status::Ok; echo enum_exists(\'Status\') ? \'1\' : \'0\';',
+        ],
+        [
             'id' => 'instance_methods',
             'construct' => 'Instance methods',
             'opcodes' => ['TYPE_DECLARE_METHOD', 'TYPE_METHODCALL_INIT'],

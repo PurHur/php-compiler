@@ -23,7 +23,6 @@ final class UnsupportedRegistry
         'Stmt_Finally' => 57,
         'Expr_Yield' => 167,
         'Expr_YieldFrom' => 167,
-        'Stmt_Enum' => 169,
         'Expr_ArrowFunction' => 142,
         'Expr_Closure' => 72,
         'Stmt_Trait' => 168,

@@ -163,6 +163,9 @@ class Compiler {
                 case Op\Stmt\Class_::class:
                     $block->addOpCode($this->compileClassLike($child, $block));
                     break;
+                case Op\Stmt\Enum_::class:
+                    $block->addOpCode($this->compileEnum($child, $block));
+                    break;
                 case Op\Terminal\Const_::class:
                     $block->addOpCode($this->compileGlobalConst($child, $block));
                     break;
@@ -179,6 +182,7 @@ class Compiler {
             switch (get_class($child)) {
                 case Op\Stmt\Function_::class:
                 case Op\Stmt\Class_::class:
+                case Op\Stmt\Enum_::class:
                 case Op\Terminal\Const_::class:
                 case Op\Stmt\Interface_::class:
                 case Op\Stmt\Trait_::class:
@@ -513,6 +517,7 @@ class Compiler {
         throw new \LogicException('Unsupported unset target: ' . (is_object($expr) ? $expr->getType() : gettype($expr)));
     }
 
+<<<<<<< HEAD
     protected function compileInterface(Op\Stmt\Interface_ $iface, Block $block): OpCode
     {
         $return = new OpCode(
@@ -520,10 +525,40 @@ class Compiler {
             $this->compileOperand($iface->name, $block, true)
         );
         $return->classImplements = $this->interfaceNamesFromOperands($iface->extends);
+=======
+    protected function compileEnum(Op\Stmt\Enum_ $enum, Block $block): OpCode
+    {
+        $return = new OpCode(
+            OpCode::TYPE_DECLARE_ENUM,
+            $this->compileOperand($enum->name, $block, true)
+        );
+        $return->block1 = $this->compileEnumBody($enum->stmts);
+>>>>>>> b77c6a42 (feat: backed enum declarations for VM/JIT (#1356))
 
         return $return;
     }
 
+<<<<<<< HEAD
+=======
+    protected function compileEnumBody(CfgBlock $block): Block
+    {
+        $result = new Block($block);
+        foreach ($block->children as $child) {
+            if (!$child instanceof Op\Terminal\Const_) {
+                throw new \LogicException('Unsupported enum body element: '.get_class($child));
+            }
+            $this->compileOps($child->valueBlock->children, $result);
+            $result->addOpCode(new OpCode(
+                OpCode::TYPE_DECLARE_CLASS_CONST,
+                $this->compileOperand($child->name, $result, true),
+                $this->compileOperand($child->value, $result, true)
+            ));
+        }
+
+        return $result;
+    }
+
+>>>>>>> b77c6a42 (feat: backed enum declarations for VM/JIT (#1356))
     protected function compileClassLike(Op\Stmt\ClassLike $class, Block $block): OpCode {
         $type = 0;
         if ($class instanceof Op\Stmt\Class_) {

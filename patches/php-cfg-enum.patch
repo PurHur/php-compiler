@@ -1,0 +1,87 @@
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
+@@ -316,6 +316,55 @@
+         $this->block = $loopEnd;
+     }
+ 
++    protected function parseStmt_Enum(Stmt\Enum_ $node)
++    {
++        $name = $this->parseExprNode($node->namespacedName);
++        $old = $this->currentClass;
++        $this->currentClass = $name;
++        $backedType = null;
++        if (null !== $node->scalarType) {
++            $backedType = new Op\Type\Literal(
++                $node->scalarType->toString(),
++                $this->mapAttributes($node->scalarType)
++            );
++        }
++        $stmtsBlock = new Block();
++        $savedBlock = $this->block;
++        $this->block = $stmtsBlock;
++        foreach ($node->stmts as $stmt) {
++            if ($stmt instanceof Stmt\EnumCase) {
++                $this->parseEnumCase($stmt);
++            }
++        }
++        $this->block = $savedBlock;
++        $this->block->children[] = new Op\Stmt\Enum_(
++            $name,
++            $backedType,
++            $stmtsBlock,
++            $this->mapAttributes($node)
++        );
++        $this->currentClass = $old;
++    }
++
++    protected function parseEnumCase(Stmt\EnumCase $node): void
++    {
++        $tmp = $this->block;
++        $this->block = $valueBlock = new Block();
++        if (null !== $node->expr) {
++            $value = $this->parseExprNode($node->expr);
++        } else {
++            $value = $this->readVariable(new Literal($node->name->toString()));
++        }
++        $this->block = $tmp;
++
++        $this->block->children[] = new Op\Terminal\Const_(
++            $this->parseExprNode($node->name),
++            $value,
++            $valueBlock,
++            $this->mapAttributes($node)
++        );
++    }
++
+     protected function parseStmt_Echo(Stmt\Echo_ $node)
+     {
+         foreach ($node->exprs as $expr) {
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Enum_.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Enum_.php
+@@ -0,0 +1,28 @@
++<?php
++
++declare(strict_types=1);
++
++namespace PHPCfg\Op\Stmt;
++
++use PHPCfg\Block;
++use PHPCfg\Op\Type;
++use PHPCfg\Operand;
++
++class Enum_ extends ClassLike
++{
++    /** @var Type|null Backing scalar type (string|int) when declared as `enum Foo: string` */
++    public $backedType = null;
++
++    public function __construct(Operand $name, ?Type $backedType, Block $stmts, array $attributes = [])
++    {
++        parent::__construct($name, $stmts, $attributes);
++        $this->backedType = $backedType;
++    }
++
++    public function getVariableNames(): array
++    {
++        return ['name'];
++    }
++}
