@@ -18,6 +18,9 @@ if (is_file($repoRoot.'/.llvm/libLLVM-9.so.1')) {
     $llvmDir = '/opt/llvm9';
 }
 
+/** @var \FFI|null Cached dlopen FFI handle for php_compiler_preload_llvm_deps(). */
+$php_compiler_llvm_dl = null;
+
 /**
  * @param list<string> $names Basenames under $dir (e.g. libffi.so.7).
  */
@@ -26,11 +29,11 @@ function php_compiler_preload_llvm_deps(string $dir, array $names): void
     if (!extension_loaded('ffi')) {
         return;
     }
-    static $dl = null;
-    if (null === $dl) {
+    global $php_compiler_llvm_dl;
+    if (null === $php_compiler_llvm_dl) {
         foreach (['libdl.so.2', 'libc.so.6'] as $lib) {
             try {
-                $dl = \FFI::cdef(
+                $php_compiler_llvm_dl = \FFI::cdef(
                     'void *dlopen(const char *filename, int flags);',
                     $lib
                 );
@@ -39,7 +42,7 @@ function php_compiler_preload_llvm_deps(string $dir, array $names): void
                 continue;
             }
         }
-        if (null === $dl) {
+        if (null === $php_compiler_llvm_dl) {
             return;
         }
     }
@@ -54,7 +57,7 @@ function php_compiler_preload_llvm_deps(string $dir, array $names): void
         if (false === $resolved) {
             continue;
         }
-        $dl->dlopen($resolved, $flags);
+        $php_compiler_llvm_dl->dlopen($resolved, $flags);
     }
 }
 
