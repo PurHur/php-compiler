@@ -430,6 +430,7 @@ require_once __DIR__.'/../../../ext/standard/strval.php';
 require_once __DIR__.'/../../../ext/standard/substr.php';
 require_once __DIR__.'/../../../ext/standard/substr_count.php';
 require_once __DIR__.'/../../../ext/standard/sys_get_temp_dir.php';
+require_once __DIR__.'/../../../ext/standard/tempnam.php';
 require_once __DIR__.'/../../../ext/standard/trigger_error_.php';
 require_once __DIR__.'/../../../ext/standard/ucfirst.php';
 require_once __DIR__.'/../../../ext/standard/ucwords.php';
