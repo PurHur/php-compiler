@@ -2720,22 +2720,40 @@ class JIT {
         $this->assignOperand($result, $value, true);
     }
 
-    private function assignOperand(Operand $result, Variable $value, bool $force = false): void {
+    private function assignOperand(Operand $resultOp, Variable $value, bool $force = false): void {
         if (
             !$force
-            && empty($result->usages)
-            && !$this->context->scope->variables->contains($result)
+            && empty($resultOp->usages)
+            && !$this->context->scope->variables->contains($resultOp)
         ) {
             return;
         }
-        if (!$this->context->hasVariableOp($result)) {
+        if (!$this->context->hasVariableOp($resultOp)) {
             // it's a kind!
-            $this->context->makeVariableFromValueOp($this->context->helper->loadValue($value), $result);
+            $this->context->makeVariableFromValueOp($this->context->helper->loadValue($value), $resultOp);
             return;
         }
-        $result = $this->context->getVariableFromOp($result);
+        $result = $this->context->getVariableFromOp($resultOp);
         if ($result === $value) {
             return;
+        }
+        if (
+            $force
+            && Variable::KIND_VALUE === $result->kind
+            && Variable::TYPE_STRING !== $result->type
+        ) {
+            // ?? left branch fetch binds a superglobal lvalue; force-assign needs a stack slot (#866).
+            $slot = JIT\JitValueBox::alloc($this->context);
+            $this->context->setVariableOp(
+                $resultOp,
+                new Variable(
+                    $this->context,
+                    Variable::TYPE_VALUE,
+                    Variable::KIND_VARIABLE,
+                    $slot
+                )
+            );
+            $result = $this->context->getVariableFromOp($resultOp);
         }
         if (null !== $result->objectPropertySlot) {
             if (null === $result->objectPropertyType) {
