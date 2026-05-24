@@ -58,9 +58,7 @@ final class usort_ extends Internal
             $copy->copyFrom($value);
             $values[] = $copy;
         }
-        \usort($values, static function (Variable $a, Variable $b) use ($compare): int {
-            return VmInternalCompare::invoke($compare, $a, $b);
-        });
+        VmInternalCompare::sortVariableValues($values, $compare);
         $ht->replacePackedValues($values);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(true);

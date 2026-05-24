@@ -43,4 +43,23 @@ final class VmInternalCompare
 
         return $out->resolveIndirect()->toInt();
     }
+
+    /**
+     * Sort packed Variable list in place (no PHP closures — AOT self-host spine safe).
+     *
+     * @param list<Variable> $values
+     */
+    public static function sortVariableValues(array &$values, Internal $compare): void
+    {
+        $n = \count($values);
+        for ($i = 1; $i < $n; ++$i) {
+            $j = $i;
+            while ($j > 0 && self::invoke($compare, $values[$j - 1], $values[$j]) > 0) {
+                $tmp = $values[$j - 1];
+                $values[$j - 1] = $values[$j];
+                $values[$j] = $tmp;
+                --$j;
+            }
+        }
+    }
 }
