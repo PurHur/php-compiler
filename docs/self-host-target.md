@@ -113,7 +113,7 @@ Parallel batches ([#1419](https://github.com/PurHur/php-compiler/issues/1419)) g
 | Entry | Units | Role |
 |-------|------:|------|
 | `test/selfhost/compiler_minimal/main.php` | **109** | M0 core |
-| `test/selfhost/compiler_lib_spine_smoke/main.php` | **328** | M2 growth ([#1497](https://github.com/PurHur/php-compiler/issues/1497) wave 2 batch 2) |
+| `test/selfhost/compiler_lib_spine_smoke/main.php` | **343** | M2 growth ([#1497](https://github.com/PurHur/php-compiler/issues/1497) wave 2 batch 3) |
 | `test/selfhost/compiler_helloworld_smoke/` | — | M3 probe + compile driver |
 | `test/selfhost/bootstrap_loop_smoke/` | — | M4 scaffold (gen-1→gen-2 loop probe; [#1498](https://github.com/PurHur/php-compiler/issues/1498)) |
 
