@@ -84,6 +84,8 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/PendingHeaders.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/HttpResponseCode.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringJsonEncode.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringGetenv.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/SessionId.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/SessionName.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringQuotemeta.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringNl2br.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringStripslashes.php';
@@ -139,6 +141,8 @@ require_once __DIR__.'/../../../ext/standard/JitNl2br.php';
 require_once __DIR__.'/../../../ext/standard/JitPregQuote.php';
 require_once __DIR__.'/../../../ext/standard/JitQuotemeta.php';
 require_once __DIR__.'/../../../ext/standard/JitStrRot13.php';
+require_once __DIR__.'/../../../ext/standard/JitSessionId.php';
+require_once __DIR__.'/../../../ext/standard/JitSessionName.php';
 require_once __DIR__.'/../../../ext/standard/Module.php';
 
 echo "compiler_lib_spine_smoke bundle OK\n";

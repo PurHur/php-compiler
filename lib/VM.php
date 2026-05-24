@@ -17,6 +17,7 @@ use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\TypeCheck;
 use PHPCompiler\VM\Variable;
+use PHPCompiler\Web\Superglobals;
 
 class VM {
     const SUCCESS = 1;
@@ -111,6 +112,19 @@ restart:
                     $lhs = $frame->scope[$op->arg1];
                     $rhs = $frame->scope[$op->arg2]->resolveIndirect();
                     $lhs->indirect($rhs);
+                    break;
+                case OpCode::TYPE_VAR_FETCH:
+                    $dest = $frame->scope[$op->arg1];
+                    $name = $frame->scope[$op->arg2]->resolveIndirect()->toString();
+                    if (Superglobals::isSuperglobalName($name)) {
+                        $target = $this->context->ensureGlobal($name);
+                    } else {
+                        $target = $frame->block->findVariableByRuntimeName($name, $frame);
+                        if (null === $target) {
+                            return $this->raise("Undefined variable \${$name}", $frame);
+                        }
+                    }
+                    $dest->indirect($target);
                     break;
                 case OpCode::TYPE_DECLARE_GLOBAL:
                     if (!isset($frame->block->constants[$op->arg2])) {
@@ -365,6 +379,7 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_RETURN_VOID:
+                    $this->enforceReturnType($frame, null);
                     if (!is_null($frame->returnVar)) {
                         $frame->returnVar->null();
                     }
@@ -374,8 +389,10 @@ restart:
                     }
                     goto nextframe;
                 case OpCode::TYPE_RETURN:
+                    $returnValue = $frame->scope[$op->arg1];
+                    $this->enforceReturnType($frame, $returnValue);
                     if (!is_null($frame->returnVar)) {
-                        $frame->returnVar->copyFrom($frame->scope[$op->arg1]);
+                        $frame->returnVar->copyFrom($returnValue);
                     }
                     if ($frame->ephemeral && null !== $frame->parent) {
                         $frame = $frame->parent;
@@ -786,6 +803,24 @@ restart:
             }
             
         }
+    }
+
+    private function enforceReturnType(Frame $frame, ?Variable $value): void
+    {
+        $block = $frame->block;
+        if (null === $block) {
+            return;
+        }
+        if ($block->returnTypeVoid) {
+            TypeCheck::assertVoidReturn($value);
+
+            return;
+        }
+        if (null === $block->returnTypeConstraint || null === $value) {
+            return;
+        }
+        $strict = $block->strictTypes;
+        TypeCheck::coerceReturn($value, $strict, $block->returnTypeConstraint);
     }
 
 }
