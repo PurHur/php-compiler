@@ -1836,16 +1836,25 @@ class JIT {
                     break;
                 case OpCode::TYPE_FUNCCALL_INIT:
                     $nameOp = $block->getOperand($op->arg1);
-                    if (!$nameOp instanceof Operand\Literal) {
-                        if ($this->shouldUseSelfHostJitStubs()) {
-                            $this->context->scope->toCall = null;
-                            $this->context->scope->args = [];
-                            break;
+                    if ($nameOp instanceof Operand\Literal) {
+                        $lcname = strtolower($nameOp->value);
+                        $this->context->scope->toCall = $this->context->resolveFunctionProxy($lcname);
+                    } else {
+                        $nameVar = $this->context->getVariableFromOp($nameOp);
+                        if (null === $nameVar->compileTimeString) {
+                            if ($this->shouldUseSelfHostJitStubs()) {
+                                $this->context->scope->toCall = null;
+                                $this->context->scope->args = [];
+                                break;
+                            }
+                            throw new \LogicException('Variable function calls not yet supported');
                         }
-                        throw new \LogicException("Variable function calls not yet supported");
+                        $lcname = strtolower($nameVar->compileTimeString);
+                        if (!$this->context->functionIsRegistered($lcname)) {
+                            throw new \LogicException("Call to undefined function {$lcname}()");
+                        }
+                        $this->context->scope->toCall = $this->context->resolveFunctionProxy($lcname);
                     }
-                    $lcname = strtolower($nameOp->value);
-                    $this->context->scope->toCall = $this->context->resolveFunctionProxy($lcname);
                     $this->context->scope->args = [];
                     break;
                 case OpCode::TYPE_STATICCALL_INIT:
