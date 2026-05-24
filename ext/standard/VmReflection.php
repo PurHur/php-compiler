@@ -45,6 +45,11 @@ final class VmReflection
         return null !== self::resolveClassEntry($ctx, $className);
     }
 
+    public static function enumExists(Context $ctx, string $enumName): bool
+    {
+        return isset($ctx->enums[strtolower($enumName)]);
+    }
+
     public static function functionExists(Context $ctx, string $functionName): bool
     {
         return isset($ctx->functions[strtolower($functionName)]);
@@ -53,6 +58,38 @@ final class VmReflection
     public static function methodExistsOnClass(ClassEntry $class, string $method): bool
     {
         return isset($class->methods[strtolower($method)]);
+    }
+
+    public static function propertyExistsOnClass(ClassEntry $class, string $property): bool
+    {
+        $lc = strtolower($property);
+        if (isset($class->staticProperties[$lc])) {
+            return true;
+        }
+        foreach ($class->properties as $prop) {
+            if (strtolower($prop->name) === $lc) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static function propertyExists(Context $ctx, Variable $objectOrClass, string $property): bool
+    {
+        $objectOrClass = $objectOrClass->resolveIndirect();
+        if (Variable::TYPE_STRING === $objectOrClass->type) {
+            $class = self::resolveClassEntry($ctx, $objectOrClass->toString());
+            if (null === $class) {
+                return false;
+            }
+
+            return self::propertyExistsOnClass($class, $property);
+        }
+        if (Variable::TYPE_OBJECT === $objectOrClass->type) {
+            return self::propertyExistsOnClass($objectOrClass->toObject()->class, $property);
+        }
+        throw new \LogicException('property_exists() expects an object or class name string in this compiler build');
     }
 
     public static function resolveClassFromArg(Context $ctx, Variable $arg): ClassEntry
