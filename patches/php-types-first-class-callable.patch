@@ -1,0 +1,15 @@
+--- vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
+@@ -282,6 +282,12 @@ class TypeReconstructor
+             case 'Expr_Include':
+                 // TODO: we may be able to determine these...
+                 return false;
++            case 'Expr_FirstClassCallable':
++                if (\PHPCfg\Op\Expr\FirstClassCallable::KIND_METHOD === $op->kind) {
++                    return [Type::array()];
++                }
++
++                return [Type::string()];
+             case 'Expr_MagicScriptConst':
+                 if (\PHPCfg\Op\Expr\MagicScriptConst::KIND_LINE === $op->kind) {
+                     return [Type::int()];

@@ -414,7 +414,15 @@ restart:
                         $this->initMethodCall($frame, $callee, '__invoke');
                         break;
                     }
+                    if (Variable::TYPE_ARRAY === $callee->type) {
+                        $this->initArrayCallable($frame, $callee);
+                        break;
+                    }
                     $name = $callee->toString();
+                    if (str_contains($name, '::')) {
+                        $this->initStaticCallable($frame, $name);
+                        break;
+                    }
                     $lcname = strtolower($name);
                     if (!isset($this->context->functions[$lcname])) {
                         throw new \LogicException("Call to undefined function $lcname()");
@@ -818,6 +826,52 @@ restart:
         $frame->call = $class->methods[$methodLc];
         $frame->callArgs = [$receiver];
         $frame->callArgEntries = [];
+    }
+
+    protected function initStaticCallable(Frame $frame, string $callableName): void
+    {
+        [$className, $methodName] = explode('::', $callableName, 2);
+        $lcClass = strtolower($className);
+        $methodLc = strtolower($methodName);
+        if (!isset($this->context->classes[$lcClass])) {
+            throw new \LogicException("Call to undefined static method {$callableName}()");
+        }
+        $class = $this->context->classes[$lcClass];
+        if (!isset($class->methods[$methodLc])) {
+            throw new \LogicException("Call to undefined static method {$callableName}()");
+        }
+        $vis = $class->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+        $callerClassLc = null;
+        if (null !== $frame->block->func && null !== $frame->block->func->class) {
+            $callerClassLc = strtolower($frame->block->func->class->value);
+        }
+        MethodVisibility::assertCallable(
+            $vis,
+            $callerClassLc,
+            $lcClass,
+            $class->name,
+            $methodName
+        );
+        $frame->call = $class->methods[$methodLc];
+        $frame->callArgs = [];
+    }
+
+    protected function initArrayCallable(Frame $frame, Variable $callable): void
+    {
+        $table = $callable->toArray();
+        $idx0 = new Variable(Variable::TYPE_INTEGER);
+        $idx0->int(0);
+        $idx1 = new Variable(Variable::TYPE_INTEGER);
+        $idx1->int(1);
+        if (!$table->keyExists($idx0) || !$table->keyExists($idx1)) {
+            throw new \LogicException('Invalid array callable');
+        }
+        $receiver = $table->findVariable($idx0)->resolveIndirect();
+        $methodName = $table->findVariable($idx1)->resolveIndirect()->toString();
+        if (Variable::TYPE_OBJECT !== $receiver->type) {
+            throw new \LogicException('Invalid array callable');
+        }
+        $this->initMethodCall($frame, $receiver, $methodName);
     }
 
     protected function defineClass(ClassEntry $entry, Block $block): void {
