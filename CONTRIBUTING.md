@@ -21,6 +21,12 @@ All submissions, including submissions by project members, require review. We us
 
 Verify: `php script/bootstrap-inventory.php --check` and `./script/ci-local.sh` (or `./script/ci-fast.sh` while iterating).
 
+**Public documentation** (when a user-visible milestone lands):
+
+- Update [`docs/pages/development-status.md`](docs/pages/development-status.md) (authoritative status for [GitHub Pages](https://purhur.github.io/php-compiler/development-status.html)).
+- Sync north-star / “what works” tables in [`README.md`](README.md) and, if needed, [`docs/pages/index.html`](docs/pages/index.html) progress badges.
+- See [`docs/pages/PAGES.md`](docs/pages/PAGES.md) for publish workflow.
+
 1. Ensure any install or build dependencies are removed before the end of the layer when doing a build.
 2. Update the [README.md](README.md) with details of changes to the interface, this includes new environment variables, exposed ports, useful file locations and container parameters (if applicable).
 3. Increase the version numbers in any examples files and the README.md to the new version that this Pull Request would represent. The versioning scheme we use is [SemVer](http://semver.org/).

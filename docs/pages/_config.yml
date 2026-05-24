@@ -1,5 +1,5 @@
 title: php-compiler
-description: Development status and progress toward a full PHP compiler
+description: Compile PHP to native binaries — VM, LLVM JIT, AOT web deployment, and self-host bootstrap
 url: "https://purhur.github.io"
 baseurl: "/php-compiler"
 markdown: kramdown

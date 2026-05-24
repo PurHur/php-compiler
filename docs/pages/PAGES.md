@@ -1,45 +1,48 @@
 # GitHub Pages (public status site)
 
-Only this folder is published. Repo technical docs (`docs/bootstrap-selfhost.md`, `capabilities.md`, …) stay in the repository and are **not** exposed on the site.
+Only **`docs/pages/`** is intended for public visitors. Technical docs (`docs/bootstrap-selfhost.md`, `capabilities.md`, …) stay in the repository and are linked from the site — not copied into Pages.
 
-## Enable / fix GitHub Pages
-
-1. **Settings → Pages**
-2. Source: **Deploy from a branch**
-3. Branch: **`master`**, folder: **`/docs/pages`** (not `/docs`)
-4. Save → **https://purhur.github.io/php-compiler/**
-
-**Current deployment:** the repo root is published as Jekyll (entire tree). Public URLs:
+## Public URLs
 
 | Page | URL |
 |------|-----|
-| Visual overview | **https://purhur.github.io/php-compiler/docs/pages/index.html** |
-| Written status (Jekyll) | **https://purhur.github.io/php-compiler/development-status.html** |
-| Repo README (site home) | https://purhur.github.io/php-compiler/ |
+| **Overview** (demo-friendly) | https://purhur.github.io/php-compiler/docs/pages/index.html |
+| **Full status** (Jekyll) | https://purhur.github.io/php-compiler/development-status.html |
+| **Repository** | https://github.com/PurHur/php-compiler |
 
-If you switch Pages source to **`/docs/pages`** only, the overview moves to **https://purhur.github.io/php-compiler/** and `development-status.html` stays on that subtree.
+## Publish / change source
 
-If you previously used `/docs` alone, prefer publishing from **repo root** (current) or **`/docs/pages`** — not `/docs` — so bootstrap-inventory and other markdown are not exposed unintentionally.
+**Recommended (cleanest):** Settings → Pages → Deploy from branch **`master`**, folder **`/docs/pages`**.
 
-## Site contents
+Then the overview lives at `https://purhur.github.io/php-compiler/` and `development-status.html` stays on the same site root (`baseurl: /php-compiler` in `_config.yml`).
 
-| File | URL | Role |
-|------|-----|------|
-| `index.html` | `/docs/pages/index.html` (repo-root Jekyll) | Visual overview (progress bars, ladder) |
-| `development-status.md` | `/development-status.html` | **Authoritative written status** — edit this when milestones change |
-| `css/`, `js/` | assets | PHP-themed styling |
+**Current (repo-root Jekyll):** the whole repo may be published; use the table above for direct links until the source folder is switched.
 
-Jekyll renders `development-status.md` with `_layouts/status.html` (same theme as the overview).
+Do **not** publish `/docs` alone — that would expose bootstrap inventory and other contributor markdown unintentionally.
 
-## Update workflow
+## Site map
 
-1. Edit **`development-status.md`** for tables, blockers, milestone text.
-2. Optionally adjust **`index.html`** for visual summary / progress percentages.
-3. Keep aligned with [issue #78](https://github.com/PurHur/php-compiler/issues/78) and README north-star tables.
+| File | Role |
+|------|------|
+| `index.html` | Visual overview — progress bars, north stars, **demo commands** |
+| `development-status.md` | **Authoritative written status** — edit when milestones change |
+| `css/style.css`, `js/main.js` | Theme and animations |
+| `_layouts/status.html` | Jekyll layout for `development-status.md` |
+| `_config.yml` | Jekyll `baseurl`, markdown |
+
+## Update workflow (before a demo or release)
+
+1. **`development-status.md`** — tables, milestones, blockers (source of truth).
+2. **`index.html`** — badges, progress %, demo section if the story changed.
+3. **`README.md`** — quick start, “what works today”, links to the site.
+4. **`docs/GETTING-STARTED.md`** — presenter commands if the demo path changed.
+5. Regenerate capability docs if builtins changed: `php script/capability-matrix.php`, `php script/capability-syntax.php`.
+
+Keep aligned with [#78](https://github.com/PurHur/php-compiler/issues/78), [#1044](https://github.com/PurHur/php-compiler/issues/1044), [#1056](https://github.com/PurHur/php-compiler/issues/1056).
 
 ## Local preview
 
-**Overview (static):**
+**Static overview:**
 
 ```bash
 cd docs/pages && python3 -m http.server 8765
@@ -50,9 +53,9 @@ cd docs/pages && python3 -m http.server 8765
 
 ```bash
 cd docs/pages && bundle exec jekyll serve
-# or: docker run --rm -v "$PWD:/site" -p 4000:4000 -w /site jekyll/jekyll jekyll serve
+# http://127.0.0.1:4000/php-compiler/development-status.html  (baseurl-dependent)
 ```
 
 ## Optional: GitHub Actions
 
-[`.github/workflows/github-pages.yml`](../../.github/workflows/github-pages.yml) deploys `docs/pages` when using **GitHub Actions** as the Pages source.
+[`.github/workflows/github-pages.yml`](../../.github/workflows/github-pages.yml) deploys `docs/pages` when Pages source is **GitHub Actions**.

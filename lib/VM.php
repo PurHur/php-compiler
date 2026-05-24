@@ -139,6 +139,9 @@ restart:
                     $arg1 = $frame->scope[$op->arg1];
                     $arg2 = $frame->scope[$op->arg2];
                     $arg3 = $frame->scope[$op->arg3];
+                    if (null !== ($err = $this->enforceReadonlyPropertyWrite($arg2, $frame))) {
+                        return $err;
+                    }
                     $arg2->copyFrom($arg3);
                     $arg1->copyFrom($arg3);
                     $strict = null !== $frame->parent
@@ -148,6 +151,9 @@ restart:
                     break;
                 case OpCode::TYPE_ASSIGN_REF:
                     $lhs = $frame->scope[$op->arg1];
+                    if (null !== ($err = $this->enforceReadonlyPropertyWrite($lhs, $frame))) {
+                        return $err;
+                    }
                     $rhs = $frame->scope[$op->arg2]->resolveIndirect();
                     $lhs->indirect($rhs);
                     break;
@@ -454,6 +460,7 @@ restart:
                     if (!is_null($frame->returnVar)) {
                         $frame->returnVar->null();
                     }
+                    $this->markObjectConstructedIfLeavingConstruct($frame);
                     if ($frame->ephemeral && null !== $frame->parent) {
                         $frame = $frame->parent;
                         goto restart;
@@ -465,6 +472,7 @@ restart:
                     if (!is_null($frame->returnVar)) {
                         $frame->returnVar->copyFrom($returnValue);
                     }
+                    $this->markObjectConstructedIfLeavingConstruct($frame);
                     if ($frame->ephemeral && null !== $frame->parent) {
                         $frame = $frame->parent;
                         goto restart;
@@ -538,6 +546,7 @@ restart:
                 case OpCode::TYPE_FUNCCALL_EXEC_NORETURN:
                     if (is_null($frame->call)) {
                         // Used for null constructors, etc
+                        $this->markPendingNewObjectConstructed($frame);
                         break;
                     }
                     $new = $frame->call->getFrame($this->context, $frame);
@@ -650,6 +659,9 @@ restart:
                         }
                         $classEntry->parentLc = $parentLc;
                     }
+                    if (null !== $op->arg3 && isset($frame->block->constants[$op->arg3])) {
+                        $classEntry->readonly = (bool) $frame->block->constants[$op->arg3]->toInt();
+                    }
                     self::defineClass($classEntry, $op->block1);
                     if (null !== $classEntry->parentLc) {
                         $this->inheritFromParent($classEntry);
@@ -667,10 +679,14 @@ restart:
                         throw new \LogicException("Attempting to instantiate non-existing class $name");
                     }
                     $class = $this->context->classes[$lcname];
-                    $result->object(new ObjectEntry($class));
-                    $frame->call = $result->toObject()->constructor;
+                    $object = new ObjectEntry($class);
+                    $result->object($object);
+                    $frame->call = $object->constructor;
                     $frame->callArgs = [$result];
                     $frame->callArgEntries = [];
+                    if (null === $frame->call) {
+                        $object->constructed = true;
+                    }
                     break;
                 case OpCode::TYPE_PROPERTY_FETCH:
                     $result = $frame->scope[$op->arg1];
@@ -892,6 +908,7 @@ restart:
         if ($frame->ephemeral) {
             $this->context->scriptStack->pop();
             if (null !== $frame->parent) {
+                $this->markObjectConstructedIfLeavingConstruct($frame);
                 $frame = $frame->parent;
                 goto restart;
             }
@@ -1031,6 +1048,60 @@ restart:
             }
             $current = $this->context->classes[$current->parentLc];
         }
+    }
+
+    /** @return ?int VM::FAILURE when write must be rejected */
+    private function enforceReadonlyPropertyWrite(Variable $lvalue, Frame $frame): ?int
+    {
+        $target = $lvalue->resolveIndirect();
+        $owner = $target->objectPropertyOwner;
+        if (null === $owner || !$owner->class->readonly || !$owner->constructed) {
+            return null;
+        }
+        $prop = $target->objectPropertyName ?? 'property';
+
+        return $this->raise(
+            sprintf('Cannot modify readonly property %s::$%s', $owner->class->name, $prop),
+            $frame
+        );
+    }
+
+    private function markObjectConstructedIfLeavingConstruct(Frame $frame): void
+    {
+        if (!$this->isConstructFrame($frame)) {
+            return;
+        }
+        if (empty($frame->calledArgs)) {
+            return;
+        }
+        $thisArg = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $thisArg->type) {
+            return;
+        }
+        $thisArg->toObject()->constructed = true;
+    }
+
+    private function markPendingNewObjectConstructed(Frame $frame): void
+    {
+        if (empty($frame->callArgs)) {
+            return;
+        }
+        $objVar = $frame->callArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $objVar->type) {
+            return;
+        }
+        $objVar->toObject()->constructed = true;
+    }
+
+    private function isConstructFrame(Frame $frame): bool
+    {
+        $func = $frame->block->func ?? null;
+        if (null === $func) {
+            return false;
+        }
+        $name = strtolower($func->name);
+
+        return '__construct' === $name || str_ends_with($name, '::__construct');
     }
 
     /**
@@ -1217,6 +1288,9 @@ restart:
         }
         if (null === $entry->constructor && null !== $parent->constructor) {
             $entry->constructor = $parent->constructor;
+        }
+        if ($parent->readonly) {
+            $entry->readonly = true;
         }
         foreach ($parent->properties as $property) {
             $exists = false;
