@@ -3,8 +3,12 @@
 declare(strict_types=1);
 
 /**
- * M3 HelloWorld native compile driver (linkable; runtime dispatch via mode file #1056).
+ * M3 HelloWorld native compile driver (linkable; runtime dispatch via env #1056, #1493).
  * Gate: php bin/compile.php -l test/selfhost/compiler_helloworld_smoke/compile_driver.php
+ *
+ * Compile mode (avoid top-level __DIR__ concat — crashes AOT entry; issue #1493):
+ *   PHP_COMPILER_M3_COMPILE_MODE=compile PHP_COMPILER_M3_RUNTIME_COMPILE=1
+ *   PHP_COMPILER_M3_SOURCE=… PHP_COMPILER_M3_OUT=… ./build/selfhost-helloworld-compile
  */
 
 require_once __DIR__.'/../../../lib/OpCode.php';
@@ -96,21 +100,21 @@ require_once __DIR__.'/../../../lib/Lint/Linter.php';
 require_once __DIR__.'/../../bootstrap-aot/compiler_smoke.php';
 require_once __DIR__.'/../../bootstrap-aot/helloworld_compile_smoke.php';
 
-$modeFile = __DIR__.'/../../../build/.m3-helloworld-mode';
-if (is_readable($modeFile) && 'compile' === trim((string) file_get_contents($modeFile))) {
-    @unlink($modeFile);
+if ('compile' === (string) getenv('PHP_COMPILER_M3_COMPILE_MODE')) {
     if (\function_exists('putenv')) {
         putenv('PHP_COMPILER_SELFHOST_AOT');
     }
-    $root = __DIR__.'/../../..';
     if ('1' !== (string) getenv('PHP_COMPILER_M3_RUNTIME_COMPILE')) {
         echo "helloworld_compile_smoke: emit path blocked (gate: set BOOTSTRAP_M3_RUNTIME_COMPILE=1 and PHP_COMPILER_M3_RUNTIME_COMPILE=1 after M3 spine link)\n";
         exit(1);
     }
-    $result = helloworld_compile_smoke(
-        $root.'/examples/000-HelloWorld/example.php',
-        $root.'/build/helloworld-aot'
-    );
+    $sourceFile = getenv('PHP_COMPILER_M3_SOURCE');
+    $outFile = getenv('PHP_COMPILER_M3_OUT');
+    if (!is_string($sourceFile) || '' === $sourceFile || !is_string($outFile) || '' === $outFile) {
+        echo "helloworld_compile_smoke: emit path blocked (set PHP_COMPILER_M3_SOURCE and PHP_COMPILER_M3_OUT for compile mode)\n";
+        exit(1);
+    }
+    $result = helloworld_compile_smoke($sourceFile, $outFile);
     echo $result['message']."\n";
     if (!$result['ok']) {
         echo 'helloworld_compile_smoke: native emit failed at phase='.$result['phase']."\n";

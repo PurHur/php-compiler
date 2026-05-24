@@ -41,12 +41,12 @@ Supporting fixes from #1402:
 | `runtime_ctor_smoke` | `php bin/compile.php -l test/bootstrap-aot/runtime_ctor_smoke.php` |
 | `runtime_parse_compile_smoke` | `php bin/compile.php -l test/bootstrap-aot/runtime_parse_compile_smoke.php` |
 
-**Runtime emit:** `BOOTSTRAP_M3_RUNTIME_COMPILE=1` still segfaults — stubbed `initVmContext` leaves `vmContext` uninitialized (`__hashtable__readStringKeyValue` in `load()`). Next: safe `VMContext` lowering (C floor or isolated `initVmContext` link).
+**Runtime emit:** compile driver uses env dispatch (`PHP_COMPILER_M3_COMPILE_MODE=compile`, `PHP_COMPILER_M3_SOURCE`, `PHP_COMPILER_M3_OUT`) so AOT entry avoids top-level `__DIR__` concat (#1493). `BOOTSTRAP_M3_RUNTIME_COMPILE=1` reaches `helloworld_compile_smoke` but still segfaults — stubbed `Runtime::initVmContext` leaves `vmContext` uninitialized. Real-lowering `initVmContext` segfaults LLVM 9 at link when combined with ctor spine. Next: safe `VMContext` C floor or isolated `initVmContext` link.
 
 **Probe findings (2026-05):**
 
 - **Link + real lowering:** `BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1` + `BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING=1` → `compile driver link OK` (includes `Runtime::parse` / `Runtime::compile` on allowlist, not on deny list — #1496).
-- **Runtime:** `BOOTSTRAP_M3_RUNTIME_COMPILE=1` → segfault until `initVmContext` is real-lowered without LLVM 9 crash.
+- **Runtime:** env dispatch enters compile mode (#1493); `BOOTSTRAP_M3_RUNTIME_COMPILE=1` still segfaults until `initVmContext` is real-lowered without LLVM 9 crash.
 - **Emit paths:** probe logs `emit_path=native` vs `emit_path=zend`; `BOOTSTRAP_M3_HELLOWORLD_STRICT=1` fails with `block_reason=…`.
 
 Re-run link gate:
@@ -92,6 +92,7 @@ BOOTSTRAP_M3_RUNTIME_COMPILE=1 \
 | `PHP_COMPILER_SELFHOST_AOT=1` | Self-host bundle link |
 | `PHP_COMPILER_M3_COMPILE_DRIVER=1` | Real lowering for allowlisted M3 spine |
 | `PHP_COMPILER_M3_RUNTIME_COMPILE=1` | Run native compile in linked driver (runtime) |
+| `PHP_COMPILER_M3_COMPILE_MODE=compile` | Compile-driver dispatch (with `PHP_COMPILER_M3_SOURCE` / `PHP_COMPILER_M3_OUT`) |
 | `BOOTSTRAP_M3_HELLOWORLD_STRICT=1` | Fail probe without Zend emit fallback |
 
 ---
