@@ -269,6 +269,20 @@ export PHP_COMPILER_MAX_BODY=65536   # bytes; capped at 8 MiB
 
 `examples/003-MiniWebApp` validates the contact `name` field (non-empty, max 200 chars, configurable via `config.php` `contact_name_max`) and returns **400** with plain text on invalid input ([#697](https://github.com/PurHur/php-compiler/issues/697)). Put nginx `client_max_body_size` in front of the app for production hardening ([#445](https://github.com/PurHur/php-compiler/issues/445)).
 
+## Header injection (VM / JIT / AOT)
+
+User scripts call `header()` to emit CGI response lines. Values containing **CR or LF** are rejected so attackers cannot inject extra headers (issue [#77](https://github.com/PurHur/php-compiler/issues/77)):
+
+- **VM** — `header()` throws `LogicException` before the line is queued.
+- **JIT / AOT** — compile-time literals with embedded CR/LF fail at compile time; runtime dynamic values are dropped in `__phpc_pending_header_add` (fail closed).
+- **Dev server** — incoming request header values with CR/LF are skipped when mapped to `$_SERVER` (`DevServer::httpHeadersToServerVars`).
+
+Threat model notes for compiled binaries:
+
+- No `eval` in the supported subset; treat user POST/query data as untrusted input.
+- Cap body size with `PHP_COMPILER_MAX_BODY` and reverse-proxy limits.
+- Do not pass raw user strings to `header()` without validation invariants: `./script/ci-local.sh --filter 'header_reject_crlf|DevServerHeaders'`
+
 ## Related issues
 
 | Issue | Topic |

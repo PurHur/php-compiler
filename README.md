@@ -194,6 +194,7 @@ composer install
 | `PHP_COMPILER_MEMORY_LIMIT` | PHP `memory_limit` for PHPUnit and spawned `bin/vm.php` children (default `1536M` in CI) |
 | `PHP_COMPILER_LLVM_MEMORY_LIMIT` | Higher limit during `@group llvm` phases in `ci-local.sh` (default `4096M`) |
 | `PHP_COMPILER_DOCKER_MEM` | Cgroup cap for `script/ci-docker-safe.sh` (default `10g`) |
+| `PHP_COMPILER_MAX_BODY` | Max decoded POST/request body in bytes for `phpc serve` and `bin/cgi.php` (default 8 MiB; capped at 8 MiB; issue [#77](https://github.com/PurHur/php-compiler/issues/77)) |
 
 `script/ci-local.sh` sets LLVM paths automatically when `.llvm/libLLVM-9.so.1` exists. It runs LLVM work in phases (`aot-lint`, `jit`, `aot-link`) so compile subprocesses exit between stages ([#436](https://github.com/PurHur/php-compiler/issues/436)). Use `script/ci-fast.sh` (or `phpc test --fast`) while iterating — same VM/compliance gate without JIT/AOT. It probes `127.0.0.1` bind capability and runs `@group serve` tests when allowed. **Local and Docker CI** (`make test-docker`, `./script/docker-ci-local.sh`) should run those tests — only set `PHP_COMPILER_SKIP_SERVE_TESTS=1` when loopback bind is unavailable.
 
