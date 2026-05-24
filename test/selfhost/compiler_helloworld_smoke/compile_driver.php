@@ -93,12 +93,13 @@ require_once __DIR__.'/../../../lib/JIT.php';
 require_once __DIR__.'/../../../lib/VM/OutputBuffer.php';
 require_once __DIR__.'/../../../lib/VM.php';
 require_once __DIR__.'/../../../lib/Compiler.php';
+// Bootstrap-aot smoke before Lint/* so CFG registers PHPCompiler\helloworld_compile_smoke (#1515).
+require_once __DIR__.'/../../bootstrap-aot/compiler_smoke.php';
+require_once __DIR__.'/../../bootstrap-aot/helloworld_compile_smoke.php';
 require_once __DIR__.'/../../../lib/Lint/Issue.php';
 require_once __DIR__.'/../../../lib/Lint/UnsupportedRegistry.php';
 require_once __DIR__.'/../../../lib/Lint/LintCompiler.php';
 require_once __DIR__.'/../../../lib/Lint/Linter.php';
-require_once __DIR__.'/../../bootstrap-aot/compiler_smoke.php';
-require_once __DIR__.'/../../bootstrap-aot/helloworld_compile_smoke.php';
 
 if ('compile' === (string) getenv('PHP_COMPILER_M3_COMPILE_MODE')) {
     if (\function_exists('putenv')) {
@@ -114,7 +115,7 @@ if ('compile' === (string) getenv('PHP_COMPILER_M3_COMPILE_MODE')) {
         echo "helloworld_compile_smoke: emit path blocked (set PHP_COMPILER_M3_SOURCE and PHP_COMPILER_M3_OUT for compile mode)\n";
         exit(1);
     }
-    $result = helloworld_compile_smoke($sourceFile, $outFile);
+    $result = \PHPCompiler\helloworld_compile_smoke($sourceFile, $outFile);
     echo $result['message']."\n";
     if (!$result['ok']) {
         echo 'helloworld_compile_smoke: native emit failed at phase='.$result['phase']."\n";

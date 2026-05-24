@@ -89,10 +89,11 @@ require_once __DIR__.'/../../../lib/JIT.php';
 require_once __DIR__.'/../../../lib/VM/OutputBuffer.php';
 require_once __DIR__.'/../../../lib/VM.php';
 require_once __DIR__.'/../../../lib/Compiler.php';
+// Bootstrap-aot smoke before Lint/* so CFG registers PHPCompiler\helloworld_compile_smoke (#1515).
+require_once __DIR__.'/../../bootstrap-aot/helloworld_compile_smoke.php';
 require_once __DIR__.'/../../../lib/Lint/Issue.php';
 require_once __DIR__.'/../../../lib/Lint/UnsupportedRegistry.php';
 require_once __DIR__.'/../../../lib/Lint/LintCompiler.php';
 require_once __DIR__.'/../../../lib/Lint/Linter.php';
-require_once __DIR__.'/../../bootstrap-aot/helloworld_compile_smoke.php';
 
 echo "compiler_helloworld_smoke driver lint OK\n";

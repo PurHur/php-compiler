@@ -157,6 +157,7 @@ class JIT {
         }
 
         // Incremental spine: expand one function at a time (docs/bootstrap-m5-fast-path.md).
+        // Global short name only; PHPCompiler\helloworld_compile_smoke real lowering waits on #1514 link.
         if ('helloworld_compile_smoke' === $lower) {
             return true;
         }
@@ -743,7 +744,14 @@ class JIT {
             || str_ends_with($lower, '\\compiler::compile')
             || 'type_pair' === $lower
             || 'runtime_ctor_smoke' === $lower
-            || 'helloworld_compile_smoke' === $lower;
+            || $this->isM3HelloWorldCompileSmokeName($lower);
+    }
+
+    /** Global or PHPCompiler\helloworld_compile_smoke (not PHPCompiler\Lint\… — #1515). */
+    private function isM3HelloWorldCompileSmokeName(string $lower): bool
+    {
+        return 'helloworld_compile_smoke' === $lower
+            || 'phpcompiler\\helloworld_compile_smoke' === $lower;
     }
 
     private function isSkippedWebBootstrapHotPathName(string $name): bool

@@ -139,8 +139,29 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $driver = (string) file_get_contents(self::$root.'/test/selfhost/compiler_helloworld_smoke/compile_driver.php');
         $this->assertStringContainsString('PHP_COMPILER_M3_COMPILE_MODE', $driver);
         $this->assertStringContainsString('PHP_COMPILER_M3_SOURCE', $driver);
-        $this->assertStringContainsString('helloworld_compile_smoke', $driver);
+        $this->assertStringContainsString('\\PHPCompiler\\helloworld_compile_smoke', $driver);
         $this->assertStringContainsString('compiler_smoke.php', $driver);
+    }
+
+    /** @dataProvider helloWorldSelfhostEntryPaths */
+    public function testHelloWorldBootstrapSmokeRequiredBeforeLintNamespace(string $entryPath): void
+    {
+        $source = (string) file_get_contents(self::$root.'/'.$entryPath);
+        $smokePos = strpos($source, 'bootstrap-aot/helloworld_compile_smoke.php');
+        $lintPos = strpos($source, 'lib/Lint/LintCompiler.php');
+        $this->assertNotFalse($smokePos, $entryPath.' must require helloworld_compile_smoke');
+        $this->assertNotFalse($lintPos, $entryPath.' must require LintCompiler for bundle spine');
+        $this->assertLessThan($lintPos, $smokePos, $entryPath.' must load bootstrap smoke before Lint namespace (#1515)');
+    }
+
+    /** @return list<array{0: string}> */
+    public static function helloWorldSelfhostEntryPaths(): array
+    {
+        return [
+            ['test/selfhost/compiler_helloworld_smoke/compile_driver.php'],
+            ['test/selfhost/compiler_helloworld_smoke/main.php'],
+            ['test/selfhost/compiler_helloworld_smoke/driver_lint.php'],
+        ];
     }
 
     public function testIncludeHelperAssignCountGuardsCycles(): void
@@ -155,7 +176,7 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
         $this->assertStringContainsString('PHP_COMPILER_M3_COMPILE_DRIVER', $jit);
         $this->assertStringContainsString('isM3CompileDriverRealLoweringName', $jit);
-        $this->assertStringContainsString('helloworld_compile_smoke', $jit);
+        $this->assertStringContainsString('isM3HelloWorldCompileSmokeName', $jit);
         $this->assertStringContainsString('runtime::parseandcompile', $jit);
         $this->assertStringContainsString('runtime::parse', $jit);
         $this->assertStringContainsString('runtime::compile', $jit);
