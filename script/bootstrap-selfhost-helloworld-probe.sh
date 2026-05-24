@@ -67,7 +67,7 @@ if [[ "${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
   m3_link_mode="stub"
   if [[ "${BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING:-0}" == "1" ]]; then
     m3_link_env=(env PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_M3_COMPILE_DRIVER=1)
-    m3_link_mode="real-lowering (helloworld_compile_smoke + Runtime::parseAndCompile allowlist)"
+    m3_link_mode="real-lowering (helloworld_compile_smoke + Runtime::parse/compile/parseAndCompile allowlist)"
   else
     m3_link_env=(env PHP_COMPILER_SELFHOST_AOT=1)
     m3_link_mode="selfhost stubs (no PHP_COMPILER_M3_COMPILE_DRIVER)"
@@ -88,14 +88,19 @@ if [[ "${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
     native_compile_code=$?
     set -e
     rm -f "${MODE_FILE}"
-    if [[ "${native_compile_code}" -eq 0 ]] && grep -q 'helloworld_compile_smoke: compile OK' <<< "${compile_out}"; then
+    if [[ "${native_compile_code}" -eq 0 ]] \
+      && grep -q 'helloworld_compile_smoke: compile OK' <<< "${compile_out}" \
+      && [[ -x "${AOT_OUT}" ]]; then
       M3_NATIVE_COMPILE=1
       M3_EMIT_PATH="native"
       M3_BLOCK_REASON=""
       echo "bootstrap-selfhost-helloworld-probe: native emit via selfhost compile driver OK"
+      echo "bootstrap-selfhost-helloworld-probe: M3_NATIVE_COMPILE=1 emit_path=native"
     else
       if [[ "${BOOTSTRAP_M3_RUNTIME_COMPILE:-0}" != "1" ]]; then
         M3_BLOCK_REASON="runtime gate: BOOTSTRAP_M3_RUNTIME_COMPILE=1 not set (spine still stubbed in bundle)"
+      elif [[ "${native_compile_code}" -eq 0 ]] && grep -q 'helloworld_compile_smoke: compile OK' <<< "${compile_out}"; then
+        M3_BLOCK_REASON="native compile reported OK but missing executable ${AOT_OUT}"
       elif grep -q 'native emit failed at phase=' <<< "${compile_out}"; then
         M3_BLOCK_REASON="$(grep -m1 'native emit failed at phase=' <<< "${compile_out}" | sed 's/^helloworld_compile_smoke: //')"
       elif grep -q 'emit path blocked' <<< "${compile_out}"; then

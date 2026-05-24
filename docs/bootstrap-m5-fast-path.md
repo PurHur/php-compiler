@@ -47,7 +47,8 @@ Supporting fixes from #1402:
 
 - **Link + real lowering:** `BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1` + `BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING=1` → `compile driver link OK` (includes `Runtime::parse` / `Runtime::compile` on allowlist, not on deny list — #1496).
 - **Runtime:** env dispatch enters compile mode (#1493); `BOOTSTRAP_M3_RUNTIME_COMPILE=1` still segfaults until `initVmContext` is real-lowered without LLVM 9 crash.
-- **Emit paths:** probe logs `emit_path=native` vs `emit_path=zend`; `BOOTSTRAP_M3_HELLOWORLD_STRICT=1` fails with `block_reason=…`.
+- **Native success:** probe sets `M3_NATIVE_COMPILE=1` and `emit_path=native` only when compile driver exits 0, stdout contains `helloworld_compile_smoke: compile OK`, and `build/helloworld-aot` is executable.
+- **Strict:** `BOOTSTRAP_M3_HELLOWORLD_STRICT=1` fails with `emit_path=zend_fallback_would_be_used block_reason=…` (no Zend `bin/compile.php` fallback).
 
 Re-run link gate:
 
@@ -82,6 +83,7 @@ BOOTSTRAP_M3_RUNTIME_COMPILE=1 \
 |--------|-------|
 | `Block::slotIndexForVariableName` | Also in compiler hot-path skip |
 | `Runtime::initVmContext` | `new VMContext` segfaults when lowered with full ctor spine (#1494) |
+| `Runtime::createJit` / `jitContextForLoadJit` / `loadJitCompileModuleFuncs` | Split from `loadJit`; stay on deny list (stubbed) while outer `loadJit` is real-lowered (#1495) |
 
 **Dependency:** runtime `loadJit` needs real `initVmContext` (`fix/m3-init-vmcontext`); until then `BOOTSTRAP_M3_RUNTIME_COMPILE=1` may segfault in ctor.
 

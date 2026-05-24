@@ -231,6 +231,40 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString('emit_path=', $script);
         $this->assertStringContainsString('BOOTSTRAP_M3_HELLOWORLD_STRICT=1', $script);
         $this->assertStringContainsString('block_reason=', $script);
+        $this->assertStringContainsString('M3_NATIVE_COMPILE=1', $script);
+        $this->assertStringContainsString('helloworld_compile_smoke: compile OK', $script);
+        $this->assertStringContainsString('missing executable', $script);
+    }
+
+    public function testHelloWorldProbeStrictFailsWhenRuntimeNativeEmitBlocked(): void
+    {
+        if (!LlvmToolchain::isReady(self::$root)) {
+            $this->markTestSkipped('LLVM 9 not available for M3 HelloWorld strict probe test.');
+        }
+
+        $script = self::$root.'/script/bootstrap-selfhost-helloworld-probe.sh';
+        $prefix = LlvmToolchain::envPrefix(self::$root);
+        $cmd = implode(' ', array_map('escapeshellarg', [
+            ...$prefix,
+            'env',
+            'BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1',
+            'BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING=1',
+            'BOOTSTRAP_M3_RUNTIME_COMPILE=1',
+            'BOOTSTRAP_M3_HELLOWORLD_STRICT=1',
+            'bash',
+            $script,
+        ])).' 2>&1';
+        exec($cmd, $lines, $exitCode);
+
+        $out = implode("\n", $lines);
+        if (str_contains($out, 'link bundle failed')) {
+            $this->markTestSkipped('HelloWorld bundle link failed (LLVM 9 flake); strict runtime gate needs bundle link OK first.');
+        }
+        $this->assertSame(1, $exitCode, $out);
+        $this->assertStringContainsString('emit_path=zend_fallback_would_be_used', $out);
+        $this->assertStringContainsString('block_reason=', $out);
+        $this->assertStringNotContainsString('OK emit_path=native', $out);
+        $this->assertStringNotContainsString('M3_NATIVE_COMPILE=1 emit_path=native', $out);
     }
 
     public function testJitStubsFirstClassCallableForSelfHost(): void
