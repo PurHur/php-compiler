@@ -163,4 +163,29 @@ final class VmReflection
 
         return strtolower($value->toObject()->class->name) === strtolower($className);
     }
+
+    /**
+     * get_object_vars() — copy of accessible instance property values (issue #1370).
+     */
+    public static function getObjectVars(Variable $object): Variable
+    {
+        $object = $object->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $object->type) {
+            throw new \LogicException('get_object_vars() argument must be an object in this compiler build');
+        }
+        $result = new Variable();
+        $result->newArray();
+        $ht = $result->toArray();
+        foreach ($object->toObject()->getProperties(0) as $name => $prop) {
+            $value = $prop->resolveIndirect();
+            if (Variable::TYPE_NULL === $value->type) {
+                continue;
+            }
+            $copy = new Variable();
+            $copy->copyFrom($value);
+            $ht->add($name, $copy);
+        }
+
+        return $result;
+    }
 }

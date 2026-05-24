@@ -597,6 +597,16 @@ class Object_ extends Type {
         return $names;
     }
 
+    /**
+     * Declared instance property metadata for a class (issue #1370).
+     *
+     * @return list<array{0: int, 1: string, 2: int, 3: int}>
+     */
+    public function instancePropertySets(int $classId): array
+    {
+        return $this->properties[$classId] ?? [];
+    }
+
     public function lookupOperand(Operand $name): int
     {
         if (!$name instanceof Literal) {
