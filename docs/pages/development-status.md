@@ -47,8 +47,8 @@ Indicative composite toward a **web-capable, self-hosting** compiler (not line-c
 | Area | Progress | Summary |
 |------|----------|---------|
 | **Foundation** (CI, CLI, Docker) | ~88% | `phpc` CLI, local/Docker CI; GitHub Actions + CircleCI disabled ([#1338](https://github.com/PurHur/php-compiler/pull/1338), [#1340](https://github.com/PurHur/php-compiler/pull/1340)); contributor CI matrix doc in repo only |
-| **Language** (OOP, types, CFG) | ~74% | VM/JIT OOP largely works; wave-3 language **10/13** on master; open: attributes ([#1354](https://github.com/PurHur/php-compiler/issues/1354)), readonly ([#1360](https://github.com/PurHur/php-compiler/issues/1360) / [#1473](https://github.com/PurHur/php-compiler/pull/1473)) |
-| **Stdlib** | ~58% | Wave-3 batch ([#1367](https://github.com/PurHur/php-compiler/issues/1367)–[#1379](https://github.com/PurHur/php-compiler/issues/1379)): 12/13 closed; `debug_backtrace` ([#1378](https://github.com/PurHur/php-compiler/issues/1378)) in [#1404](https://github.com/PurHur/php-compiler/pull/1404) |
+| **Language** (OOP, types, CFG) | ~74% | VM/JIT OOP largely works; wave-3 language **11/12** on master; open: attributes ([#1354](https://github.com/PurHur/php-compiler/issues/1354)) |
+| **Stdlib** | ~58% | Wave-3 batch ([#1367](https://github.com/PurHur/php-compiler/issues/1367)–[#1379](https://github.com/PurHur/php-compiler/issues/1379)): **13/13** closed on master |
 | **Web AOT** (build, deploy) | ~65% | Project link ✅; home-route execute ✅; PATH_INFO / layout chain 🚧 |
 | **Reference app** (MiniWebApp) | ~55% | VM ✅; AOT link ✅; AOT execute **partial** |
 | **Self-host** (North Star 2, M0–M5) | ~97% | M0–M1 ✅; M2 spine **574/586**; M3 partial (native run ✅, Zend emit); M4–M5 ⬜ — [self-host-target.md](https://github.com/PurHur/php-compiler/blob/master/docs/self-host-target.md) |
