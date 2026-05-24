@@ -6,11 +6,11 @@ declare(strict_types=1);
  * M3 HelloWorld native emit chain (issue #1056, #1402):
  *
  *   runtime_ctor_smoke()  →  Runtime::__construct (MODE_AOT, loadCoreModules)
- *   parseAndCompile()    →  parse → compile → Block
+ *   parseAndCompile()    →  parse → compile → Block (#1496: parse/compile real-lowered on link spine)
  *   standalone()         →  loadJitContext → compileToFile
  *
- * Self-host bundle still stubs ctor/loadJit/standalone on the M3 deny list until #1402
- * expands the allowlist; Zend bin/compile.php remains the emit fallback in the probe.
+ * Compile-driver link with real lowering OK (#1402, #1496); native runtime emit still blocked
+ * on deny-list ctor helpers (see docs/bootstrap-m5-fast-path.md).
  */
 
 require_once __DIR__.'/runtime_ctor_smoke.php';
