@@ -31,11 +31,11 @@ Supporting fixes from #1402:
 |--------------------------|------|
 | `Runtime::parseAndCompile` | On M3 allowlist when `PHP_COMPILER_M3_COMPILE_DRIVER=1` |
 | `Runtime::parse` / `Runtime::compile` | On M3 allowlist (#1494) |
-| `Runtime::loadJitContext` | Compile-driver link OK (#1402) |
+| `Runtime::loadJitContext` | On deny list (stubbed) while `loadJit` spine expands (#1495) |
 | `Runtime::__construct` | Slim ctor via `compileRuntimeConstructM3Native` → `compileBlockPhpLowering` (#1494) |
 | `Runtime::initParsePipeline` / `Runtime::initCompiler` / `Runtime::loadCoreModules` | Real-lowered via `compileRuntime*M3Native` when not combined with `initVmContext` |
 | `Runtime::initVmContext` | **LLVM 9 link segfault** when real-lowered alongside other spine helpers; stays on deny list (stub at runtime) |
-| `Runtime::loadJit` | `compileRuntimeLoadJitM3Native` → `compileBlockPhpLowering` (link OK; nested helpers still on deny list) |
+| `Runtime::loadJit` | Real-lowered via `compileRuntimeLoadJitM3Native` → `compileBlockPhpLowering` (#1495) |
 | `Runtime::standalone` | Compile-driver link OK (#1402, #1056) |
 | `helloworld_compile_smoke` | Link OK with real lowering |
 | `runtime_ctor_smoke` | `php bin/compile.php -l test/bootstrap-aot/runtime_ctor_smoke.php` |
@@ -81,7 +81,9 @@ BOOTSTRAP_M3_RUNTIME_COMPILE=1 \
 |--------|-------|
 | `Block::slotIndexForVariableName` | Also in compiler hot-path skip |
 | `Runtime::initVmContext` | `new VMContext` segfaults when lowered with full ctor spine (#1494) |
-| `Runtime::createJit` / `jitContextForLoadJit` / `loadJitCompileModuleFuncs` | Split from `loadJit`; denied while outer `loadJit` uses `compileRuntimeLoadJitM3Native` |
+| `Runtime::loadJitContext` | Explicit deny while `loadJit` real-lowers (#1495); was previously stubbed via `loadjit` substring match |
+| `Runtime::loadJitContext` | Explicit deny while `loadJit` real-lowers (#1495); was previously stubbed via `loadjit` substring match |
+| `Runtime::createJit` / `jitContextForLoadJit` / `loadJitCompileModuleFuncs` | Split from `loadJit`; stay on deny list (stubbed) while outer `loadJit` is real-lowered (#1495) |
 
 ## Env flags
 

@@ -168,9 +168,6 @@ class JIT {
         if (str_ends_with($lower, '\\runtime::parseandcompile')) {
             return true;
         }
-        if (str_ends_with($lower, '\\runtime::loadjitcontext')) {
-            return true;
-        }
         if (str_ends_with($lower, '\\runtime::standalone')) {
             return true;
         }
@@ -178,6 +175,9 @@ class JIT {
             return true;
         }
         if (str_ends_with($lower, '\\runtime::compile')) {
+            return true;
+        }
+        if (str_ends_with($lower, '\\runtime::loadjit')) {
             return true;
         }
         return false;
@@ -197,7 +197,7 @@ class JIT {
             '\\runtime::initcompiler',
             '\\runtime::initvmcontext',
             '\\runtime::loadcoremodules',
-            '\\runtime::loadjit',
+            '\\runtime::loadjitcontext',
             '\\runtime::createjit',
             '\\runtime::jitcontextforloadjit',
             '\\runtime::loadjitcompilemodulefuncs',
@@ -438,11 +438,7 @@ class JIT {
         return $func;
     }
 
-    /**
-     * M3 compile-driver loadJit (#1402): PHP CFG lowering (`new JIT`, nested foreach) segfaults LLVM 9.
-     * Invoked from compileBlock when PHP_COMPILER_M3_COMPILE_DRIVER=1; keep \\runtime::loadjit on deny list
-     * so bootstrap skip stays active until full PHP lowering is safe.
-     */
+    /** M3 compile-driver Runtime::loadJit (#1495): orchestration; createJit helpers stay on deny list. */
     private function compileRuntimeLoadJitM3Native(
         string $internalName,
         Block $block,

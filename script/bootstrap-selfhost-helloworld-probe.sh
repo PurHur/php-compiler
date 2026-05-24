@@ -114,7 +114,7 @@ fi
 
 if [[ "${M3_NATIVE_COMPILE}" -eq 0 ]]; then
   echo "bootstrap-selfhost-helloworld-probe: native emit unavailable (M3 partial) — ${M3_BLOCK_REASON}" >&2
-  echo "bootstrap-selfhost-helloworld-probe: NEXT_LOWER: Runtime ctor / loadJit / standalone off M3 deny list (#1402)" >&2
+  echo "bootstrap-selfhost-helloworld-probe: NEXT_LOWER: Runtime::loadJitContext / initVmContext / loadJit helpers off M3 deny list (#1402, #1495)" >&2
   if [[ "${BOOTSTRAP_M3_HELLOWORLD_STRICT:-0}" == "1" ]]; then
     echo "bootstrap-selfhost-helloworld-probe: BOOTSTRAP_M3_HELLOWORLD_STRICT=1 — require native emit; refusing Zend compile.php fallback" >&2
     echo "bootstrap-selfhost-helloworld-probe: emit_path=zend_fallback_would_be_used block_reason=${M3_BLOCK_REASON}" >&2
