@@ -132,6 +132,7 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString('PHP_COMPILER_M3_COMPILE_DRIVER', $jit);
         $this->assertStringContainsString('isM3CompileDriverRealLoweringName', $jit);
         $this->assertStringContainsString('helloworld_compile_smoke', $jit);
+        $this->assertStringContainsString('runtime::parseandcompile', $jit);
         $this->assertStringContainsString('jitFunctionSkipName', $jit);
     }
 

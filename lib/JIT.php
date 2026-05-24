@@ -156,7 +156,11 @@ class JIT {
         }
 
         // Incremental spine: expand one function at a time (docs/bootstrap-m5-fast-path.md).
-        return 'helloworld_compile_smoke' === $lower;
+        if ('helloworld_compile_smoke' === $lower) {
+            return true;
+        }
+
+        return str_ends_with($lower, '\\runtime::parseandcompile');
     }
 
     /**
