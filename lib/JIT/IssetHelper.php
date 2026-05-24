@@ -318,67 +318,13 @@ final class IssetHelper
                 }
             }
             $ht = HashTableHelper::loadHashtablePointer($context, $container);
-            if (Variable::TYPE_STRING === $dim->type) {
-                return $context->builder->call(
-                    $context->lookupFunction('__hashtable__offsetIsSetStringKey'),
-                    $ht,
-                    $context->helper->loadValue($dim)
-                );
-            }
-            if (Variable::TYPE_NATIVE_LONG === $dim->type) {
-                $index = $context->builder->truncOrBitCast(
-                    $context->helper->loadValue($dim),
-                    $context->getTypeFromString('size_t')
-                );
 
-                return $context->builder->call(
-                    $context->lookupFunction('__hashtable__offsetIsSet'),
-                    $ht,
-                    $index
-                );
-            }
-            throw new \LogicException(
-                'isset() on superglobals only supports string or integer keys in this compiler build'
-            );
+            return HashTableHelper::offsetIsSetDim($context, $ht, $dim);
         }
 
         $ht = HashTableHelper::loadHashtablePointer($context, $container);
-        if (Variable::TYPE_STRING === $dim->type) {
-            return $context->builder->call(
-                $context->lookupFunction('__hashtable__offsetIsSetStringKey'),
-                $ht,
-                $context->helper->loadValue($dim)
-            );
-        }
-        if (Variable::TYPE_VALUE === $dim->type || Variable::TYPE_OBJECT === $dim->type) {
-            $keyObj = Variable::TYPE_OBJECT === $dim->type
-                ? $context->helper->loadValue($dim)
-                : $context->builder->call(
-                    $context->lookupFunction('__value__readObject'),
-                    Variable::KIND_VARIABLE === $dim->kind
-                        ? JitValueBox::pointer($context, $dim->value)
-                        : $context->helper->loadValue($dim)
-                );
 
-            return $context->builder->call(
-                $context->lookupFunction('__hashtable__offsetIsSetObjectKey'),
-                $ht,
-                $keyObj
-            );
-        }
-        if (Variable::TYPE_NATIVE_LONG !== $dim->type) {
-            throw new \LogicException('isset() on HashTable arrays only supports integer or string indices in this compiler build');
-        }
-        $index = $context->builder->truncOrBitCast(
-            $context->helper->loadValue($dim),
-            $context->getTypeFromString('size_t')
-        );
-
-        return $context->builder->call(
-            $context->lookupFunction('__hashtable__offsetIsSet'),
-            $ht,
-            $index
-        );
+        return HashTableHelper::offsetIsSetDim($context, $ht, $dim);
     }
 
     private static function compileNativeArrayOffsetIsSet(Context $context, Variable $container, Variable $dim): Value

@@ -599,11 +599,11 @@ final class Variable {
                     !$forWrite
                     && null !== $container->superglobalName
                     && '_FILES' !== $container->superglobalName
-                    && self::TYPE_STRING === $dim->type
+                    && (self::TYPE_STRING === $dim->type || self::TYPE_VALUE === $dim->type)
                     && (null === $expectedType || Type::TYPE_ARRAY !== $expectedType->type)
                 ) {
                     $key = $dim->compileTimeString;
-                    if (null !== $key) {
+                    if (null !== $key && self::TYPE_STRING === $dim->type) {
                         $baked = Builtin::LOAD_TYPE_EMBED === $this->context->loadType
                             ? null
                             : SuperglobalInit::compileTimeReadString(
@@ -628,17 +628,34 @@ final class Variable {
                             $keyVal
                         );
                     }
+                    if (self::TYPE_VALUE === $dim->type) {
+                        $ht = HashTableHelper::loadHashtablePointer($this->context, $container);
+
+                        return HashTableHelper::readDimToValueBox(
+                            $this->context,
+                            $ht,
+                            $dim,
+                            $container->superglobalName
+                        );
+                    }
                 }
                 $ht = HashTableHelper::loadHashtablePointer($this->context, $container);
-                if (self::TYPE_VALUE === $dim->type || self::TYPE_OBJECT === $dim->type) {
-                    $keyObj = self::TYPE_OBJECT === $dim->type
-                        ? $this->context->helper->loadValue($dim)
-                        : $this->context->builder->call(
-                            $this->context->lookupFunction('__value__readObject'),
-                            self::KIND_VARIABLE === $dim->kind
-                                ? JitValueBox::pointer($this->context, $dim->value)
-                                : $this->context->helper->loadValue($dim)
+                if (self::TYPE_VALUE === $dim->type) {
+                    if ($forWrite) {
+                        throw new \LogicException(
+                            'Array offset write with boxed key is not supported in this compiler build'
                         );
+                    }
+
+                    return HashTableHelper::readDimToValueBox(
+                        $this->context,
+                        $ht,
+                        $dim,
+                        $container->superglobalName
+                    );
+                }
+                if (self::TYPE_OBJECT === $dim->type) {
+                    $keyObj = $this->context->helper->loadValue($dim);
                     if ($forWrite) {
                         return HashTableHelper::writableObjectKeyValueBox($this->context, $ht, $keyObj);
                     }
