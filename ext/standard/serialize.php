@@ -30,11 +30,10 @@ final class serialize extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $value = VmJson::export($frame->calledArgs[0]->resolveIndirect());
-        $encoded = \serialize($value);
-        if (false === $encoded) {
-            throw new \LogicException('serialize() failed');
-        }
+        $encoded = VmSerialize::serializeValue(
+            $frame->vmContext,
+            $frame->calledArgs[0]
+        );
         $frame->returnVar->string($encoded);
     }
 

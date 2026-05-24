@@ -281,6 +281,14 @@ function syntaxRowDefinitions(): array
             'notes' => ['php-cfg spread.patch (#141); VM HashTable::spreadFrom; JIT HashTableHelper::spreadInto + mergeCallArgEntries'],
             'probe' => '$a = [1, 2]; $b = [...$a, 3]; function s(...$n) { return count($n); } s(...$a);',
         ],
+        [
+            'id' => 'serialize_magic',
+            'construct' => '`__serialize` / `__unserialize` magic methods',
+            'opcodes' => ['TYPE_DECLARE_METHOD', 'TYPE_METHODCALL_INIT', 'TYPE_METHODCALL_EXEC_RETURN'],
+            'issue' => 1365,
+            'notes' => ['serialize()/unserialize() call __serialize/__unserialize when present; VM via VmSerialize'],
+            'probe' => 'class B { private int $n = 0; public function __construct(int $n = 0) { $this->n = $n; } public function __serialize(): array { return ["n" => $this->n]; } public function __unserialize(array $d): void { $this->n = $d["n"]; } public function get(): int { return $this->n; } } $r = unserialize(serialize(new B(3))); echo $r->get();',
+        ],
     ];
 }
 

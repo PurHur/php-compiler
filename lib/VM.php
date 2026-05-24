@@ -59,6 +59,16 @@ class VM {
         try {
             $child = $func->getFrame($this->context, null);
             $child->calledArgs = $args;
+            if (
+                [] !== $args
+                && null !== $func->block->func
+                && null !== $func->block->func->class
+            ) {
+                $thisIdx = $func->block->slotIndexForVariableName('this');
+                if (null !== $thisIdx) {
+                    $child->scope[$thisIdx] = $args[0];
+                }
+            }
             $out = new Variable();
             $child->returnVar = $out;
             $this->context->push($child);

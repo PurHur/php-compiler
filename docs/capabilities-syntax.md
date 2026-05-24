@@ -41,6 +41,7 @@ Tracking issues: [#58](https://github.com/PurHur/php-compiler/issues/58), [#145]
 | `never` return type | yes | yes | yes | [#1358](https://github.com/PurHur/php-compiler/issues/1358) | php-cfg Op\Type\Never_; any `return` in body is a compile error; normal completion via throw/exit |
 | Intersection types (`A&B`) | yes | no | no | [#1357](https://github.com/PurHur/php-compiler/issues/1357) | php-cfg Op\Type\Intersection; VM checks object implements each interface at call; VM-only lowering |
 | Array/argument unpack `...$x` | yes | yes | yes | [#1361](https://github.com/PurHur/php-compiler/issues/1361) | php-cfg spread.patch (#141); VM HashTable::spreadFrom; JIT HashTableHelper::spreadInto + mergeCallArgEntries; compliance PHPT |
+| `__serialize` / `__unserialize` magic methods | no | no | yes | [#1365](https://github.com/PurHur/php-compiler/issues/1365) | serialize()/unserialize() call __serialize/__unserialize when present; VM via VmSerialize |
 
 _Syntax AOT column reflects `Runtime::MODE_AOT` compile probes unless a row pins AOT (e.g. native user-class link)._
 ## Web north-star (`examples/003-MiniWebApp`)
