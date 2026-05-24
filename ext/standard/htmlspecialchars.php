@@ -84,7 +84,9 @@ final class htmlspecialchars extends Internal
             throw new \LogicException('htmlspecialchars() flags must be an integer in this compiler build');
         }
 
-        $literal = $args[0]->compileTimeString ?? null;
+        $literal = JITVariable::TYPE_VALUE !== $args[0]->type
+            ? ($args[0]->compileTimeString ?? null)
+            : null;
         if (null !== $literal && 1 === $argc) {
             return $context->builder->load(
                 $context->constantStringFromString(

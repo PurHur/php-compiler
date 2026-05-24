@@ -1673,6 +1673,12 @@ class JIT {
                     $coalesceTestBlock = $builder->getInsertBlock();
                     $leftTail = JIT\CoalesceHelper::compileBranch($this, $func, $op->block1);
                     $rightTail = JIT\CoalesceHelper::compileBranch($this, $func, $op->block2);
+                    // Both branches compile; right-side literal metadata must not fold builtins (#764).
+                    if ($this->context->hasVariableOp($coalesceResult)) {
+                        $coalesceVar = $this->context->getVariableFromOp($coalesceResult);
+                        $coalesceVar->compileTimeString = null;
+                        $coalesceVar->compileTimeConstantName = null;
+                    }
                     $leftEntry = $this->context->scope->blockStorage[$op->block1];
                     $rightEntry = $this->context->scope->blockStorage[$op->block2];
                     $builder->positionAtEnd($coalesceTestBlock);
@@ -2788,7 +2794,7 @@ class JIT {
                     if (null === $result->objectPropertySlot) {
                         $result->addref();
                     }
-                    $this->copyValueBoxJitFlags($result, $value);
+                    $this->copyValueBoxJitFlags($result, $value, $force);
 
                     return;
                 }
@@ -2802,11 +2808,9 @@ class JIT {
             if (null === $result->objectPropertySlot) {
                 $result->addref();
             }
-            $this->copyValueBoxJitFlags($result, $value);
+            $this->copyValueBoxJitFlags($result, $value, $force);
             $result->compileTimeConstantName = $value->compileTimeConstantName;
-            if (null !== $value->compileTimeString) {
-                $result->compileTimeString = $value->compileTimeString;
-            }
+            $this->syncCompileTimeString($result, $value, $force);
 
             return;
         } elseif ($result->type === Variable::TYPE_VALUE) {
@@ -2932,9 +2936,7 @@ class JIT {
                         $valueRef,
                         $owned
                     );
-                    if (null !== $value->compileTimeString) {
-                        $result->compileTimeString = $value->compileTimeString;
-                    }
+                    $this->syncCompileTimeString($result, $value, $force);
 
                     return;
                 case Variable::TYPE_HASHTABLE:
@@ -2971,7 +2973,7 @@ class JIT {
                         $valueRef,
                         $this->valueBoxPointer($value)
                     );
-                    $this->copyValueBoxJitFlags($result, $value);
+                    $this->copyValueBoxJitFlags($result, $value, $force);
 
                     return;
                 default:
@@ -3028,11 +3030,9 @@ class JIT {
                 $result->value,
                 $this->valueBoxPointer($value)
             );
-            $this->copyValueBoxJitFlags($result, $value);
+            $this->copyValueBoxJitFlags($result, $value, $force);
             $result->compileTimeConstantName = $value->compileTimeConstantName;
-            if (null !== $value->compileTimeString) {
-                $result->compileTimeString = $value->compileTimeString;
-            }
+            $this->syncCompileTimeString($result, $value, $force);
 
             return;
         } elseif (Variable::TYPE_HASHTABLE === $result->type && Variable::TYPE_VALUE === $value->type) {
@@ -3060,6 +3060,7 @@ class JIT {
             $result->free();
             $result->type = Variable::TYPE_VALUE;
             $result->value = $slot;
+            $this->syncCompileTimeString($result, $value, $force);
             $result->addref();
 
             return;
@@ -3340,16 +3341,21 @@ class JIT {
         $this->assignOperand($result, $source);
     }
 
-    private function copyValueBoxJitFlags(Variable $dest, Variable $src): void
+    private function syncCompileTimeString(Variable $dest, Variable $src, bool $force): void
+    {
+        if ($force || null !== $src->compileTimeString) {
+            $dest->compileTimeString = $src->compileTimeString;
+        }
+    }
+
+    private function copyValueBoxJitFlags(Variable $dest, Variable $src, bool $force = false): void
     {
         if (Variable::TYPE_VALUE !== $dest->type || Variable::TYPE_VALUE !== $src->type) {
             return;
         }
         $dest->valueBoxHashtable = $src->valueBoxHashtable;
         $dest->isNullConstant = $src->isNullConstant;
-        if (null !== $src->compileTimeString) {
-            $dest->compileTimeString = $src->compileTimeString;
-        }
+        $this->syncCompileTimeString($dest, $src, $force);
     }
 
     /** Keep borrowed object-property hashtable metadata on locals ($cfg = $this->config, #848). */
