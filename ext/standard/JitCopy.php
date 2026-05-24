@@ -11,7 +11,8 @@ use PHPLLVM\Value;
 /** LLVM lowering for copy() via __compiler_copy (native fread/fwrite). */
 final class JitCopy
 {
-    /** @return Value i1 — true when __compiler_copy returns 1 */
+    /** @return Value
+     * true when __compiler_copy returns 1 */
     public static function invoke(Context $context, Value $fromStr, Value $toStr): Value
     {
         $i32 = $context->getTypeFromString('int32');

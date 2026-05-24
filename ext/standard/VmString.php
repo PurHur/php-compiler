@@ -363,8 +363,7 @@ final class VmString
         return $count;
     }
 
-    public static function strpbrk(string $str, string $mask): string|false
-    {
+    public static function strpbrk(string $str, string $mask) {
         if ('' === $mask) {
             throw new \ValueError('strpbrk(): Argument #2 ($characters) must not be empty');
         }
@@ -405,8 +404,7 @@ final class VmString
     }
 
     /** Decode a hex string to binary (PHP hex2bin subset; false on invalid input). */
-    public static function hex2bin(string $data): string|false
-    {
+    public static function hex2bin(string $data) {
         $len = self::byteLength($data);
         if (0 === $len) {
             return '';
@@ -427,6 +425,11 @@ final class VmString
         return $out;
     }
 
+    private const BASE64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+    /** @var array|null */
+    private static ?array $base64DecodeTable = null;
+
     /** RFC 4648 base64 encode (standard alphabet, padding). */
     public static function base64_encode(string $data): string
     {
@@ -434,7 +437,7 @@ final class VmString
         if (0 === $len) {
             return '';
         }
-        static $alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+        $alphabet = self::BASE64_ALPHABET;
         $out = '';
         for ($i = 0; $i < $len; $i += 3) {
             $b0 = self::byteOrd($data[$i]);
@@ -461,22 +464,23 @@ final class VmString
     /**
      * RFC 4648 base64 decode (non-strict: ignore bytes outside the alphabet).
      *
-     * @return string|false decoded bytes, or false when padding or input is invalid
+     * @return string|false
+     * decoded bytes, or false when padding or input is invalid
      */
-    public static function base64_decode(string $data): string|false
-    {
+    public static function base64_decode(string $data) {
         $len = self::byteLength($data);
         if (0 === $len) {
             return '';
         }
-        static $decode = null;
-        if (null === $decode) {
+        if (null === self::$base64DecodeTable) {
             $decode = array_fill(0, 256, -1);
-            $alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+            $alphabet = self::BASE64_ALPHABET;
             for ($i = 0; $i < 64; ++$i) {
                 $decode[self::byteOrd($alphabet[$i])] = $i;
             }
+            self::$base64DecodeTable = $decode;
         }
+        $decode = self::$base64DecodeTable;
         $out = '';
         $val = 0;
         $bits = 0;
@@ -572,7 +576,7 @@ final class VmString
     /**
      * Minimal parse_url() for routing (http/https, path, query, host).
      *
-     * @return array<string, int|string>|string|null
+     * @return array|string|null
      */
     public static function parseUrl(string $url, int $component = -1)
     {
@@ -592,7 +596,7 @@ final class VmString
                 $slash = strpos($rest, '/');
                 $q = strpos($rest, '?');
                 $hash = strpos($rest, '#');
-                $end = self::minPositive($slash, $q, $hash);
+                $end = self::minPositive([$slash, $q, $hash]);
                 $authority = false === $end ? $rest : substr($rest, 0, $end);
                 $rest = false === $end ? '' : substr($rest, $end);
                 if (str_contains($authority, '@')) {
@@ -626,21 +630,32 @@ final class VmString
         ];
 
         if (-1 === $component) {
-            return array_filter(
-                $parts,
-                static fn ($v) => null !== $v && '' !== $v
-            );
+            $filtered = [];
+            foreach ($parts as $key => $value) {
+                if (null !== $value && '' !== $value) {
+                    $filtered[$key] = $value;
+                }
+            }
+
+            return $filtered;
         }
 
-        return match ($component) {
-            \PHP_URL_SCHEME => $scheme,
-            \PHP_URL_HOST => $host,
-            \PHP_URL_PORT => $port,
-            \PHP_URL_PATH => $path,
-            \PHP_URL_QUERY => $query,
-            \PHP_URL_FRAGMENT => $fragment,
-            default => throw new \LogicException('parse_url() component not supported in this compiler build'),
-        };
+        switch ($component) {
+            case \PHP_URL_SCHEME:
+                return $scheme;
+            case \PHP_URL_HOST:
+                return $host;
+            case \PHP_URL_PORT:
+                return $port;
+            case \PHP_URL_PATH:
+                return $path;
+            case \PHP_URL_QUERY:
+                return $query;
+            case \PHP_URL_FRAGMENT:
+                return $fragment;
+            default:
+                throw new \LogicException('parse_url() component not supported in this compiler build');
+        }
     }
 
     private static function percentEncode(string $data, bool $formEncoding): string
@@ -708,9 +723,9 @@ final class VmString
     }
 
     /**
-     * @param int|false ...$candidates
+     * @param list<int|false> $candidates
      */
-    private static function minPositive(...$candidates): int|false
+    private static function minPositive(array $candidates)
     {
         $min = false;
         foreach ($candidates as $c) {
@@ -1653,8 +1668,7 @@ final class VmString
     /**
      * @return string|false
      */
-    public static function realpath(string $path): string|false
-    {
+    public static function realpath(string $path) {
         if ('' === $path) {
             return false;
         }
@@ -1704,7 +1718,7 @@ final class VmString
     }
 
     /**
-     * @return array<string, string>|string
+     * @return array|string
      */
     public static function pathinfo(string $path, int $flags = 15)
     {
@@ -1722,15 +1736,20 @@ final class VmString
             ];
         }
 
-        return match ($flags) {
-            1 => $dirname,
-            2 => $basename,
-            4 => $extension,
-            8 => $filename,
-            default => throw new \LogicException(
-                'pathinfo() flags not supported in this compiler build (use 1, 2, 4, 8, or 15)'
-            ),
-        };
+        switch ($flags) {
+            case 1:
+                return $dirname;
+            case 2:
+                return $basename;
+            case 4:
+                return $extension;
+            case 8:
+                return $filename;
+            default:
+                throw new \LogicException(
+                    'pathinfo() flags not supported in this compiler build (use 1, 2, 4, 8, or 15)'
+                );
+        }
     }
 
     public static function pathExtension(string $path): string

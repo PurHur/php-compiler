@@ -10,7 +10,7 @@ use PHPLLVM\Value;
 /** LLVM lowering for phpc_deploy_path() via {@see \PHPCompiler\JIT\Builtin\StringDeployPath}. */
 final class JitDeployPath
 {
-    /** @return Value __string__* */
+    /** @return Value */
     public static function invoke(Context $context, Value $rel, Value $fallback): Value
     {
         return $context->builder->call(

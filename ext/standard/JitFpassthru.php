@@ -13,7 +13,8 @@ use PHPLLVM\Value;
 /** LLVM lowering for fpassthru() via __compiler_fpassthru (issue #1194). */
 final class JitFpassthru
 {
-    /** @return Value __value__* (int bytes written, or boolean false on failure) */
+    /** @return Value
+     * (int bytes written, or boolean false on failure) */
     public static function invoke(Context $context, Value $handleLong): Value
     {
         $bytes = $context->builder->call(

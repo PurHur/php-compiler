@@ -193,7 +193,8 @@ final class ArrayBuiltinHelper
     }
 
     /**
-     * @return Value __value__* (null when the array is empty)
+     * @return Value
+     * (null when the array is empty)
      */
     public static function popLast(Context $context, Variable $array): Value
     {
@@ -437,7 +438,8 @@ final class ArrayBuiltinHelper
     }
 
     /**
-     * @return Value __value__* (null when the array is empty)
+     * @return Value
+     * (null when the array is empty)
      */
     public static function shiftFirst(Context $context, Variable $array): Value
     {
@@ -3333,7 +3335,8 @@ final class ArrayBuiltinHelper
     /**
      * array_combine() for packed list arrays (subset of PHP; returns __value__*).
      *
-     * @return Value __value__* (hashtable on success, boolean false when lengths differ)
+     * @return Value
+     * (hashtable on success, boolean false when lengths differ)
      */
     public static function combine(Context $context, Variable $keys, Variable $values): Value
     {
@@ -4110,7 +4113,8 @@ final class ArrayBuiltinHelper
     /**
      * array_search() for packed lists and string-keyed assoc arrays (subset of PHP).
      *
-     * @return Value __value__* (key as long/string, or boolean false)
+     * @return Value
+     * (key as long/string, or boolean false)
      */
     public static function arraySearch(
         Context $context,

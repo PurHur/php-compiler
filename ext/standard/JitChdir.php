@@ -11,7 +11,8 @@ use PHPLLVM\Value;
 /** LLVM lowering for chdir() via libc chdir(2). */
 final class JitChdir
 {
-    /** @return Value i1 — true when chdir(2) returns 0 */
+    /** @return Value
+     * true when chdir(2) returns 0 */
     public static function invoke(Context $context, Value $pathStr): Value
     {
         $map = $context->structFieldMap['__string__'];

@@ -36,6 +36,6 @@ final class pack extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        return JitPack::pack($context, ...$args);
+        return \call_user_func_array([JitPack::class, 'pack'], array_merge([$context], $args));
     }
 }

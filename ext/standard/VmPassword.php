@@ -13,8 +13,7 @@ final class VmPassword
 
     public const PASSWORD_DEFAULT = 1;
 
-    public static function hash(string $password, int $algo, array $options = []): string|false
-    {
+    public static function hash(string $password, int $algo, array $options = []) {
         if ($algo !== self::PASSWORD_BCRYPT && $algo !== self::PASSWORD_DEFAULT) {
             return false;
         }

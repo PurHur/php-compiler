@@ -12,39 +12,39 @@ final class VmIni
     /** @var list<string> */
     public const SUPPORTED_KEYS = ['error_reporting', 'display_errors', 'memory_limit'];
 
-    public static function set(Context $ctx, string $option, string $newValue): string|false
-    {
+    public static function set(Context $ctx, string $option, string $newValue) {
         $key = strtolower($option);
         if (!in_array($key, self::SUPPORTED_KEYS, true)) {
             return false;
         }
 
-        return match ($key) {
-            'error_reporting' => self::setErrorReporting($ctx, $newValue),
-            'display_errors' => self::setDisplayErrors($ctx, $newValue),
-            'memory_limit' => self::setMemoryLimit($newValue),
-            default => false,
-        };
+        switch ($key) {
+            case 'error_reporting':
+                return self::setErrorReporting($ctx, $newValue);
+            case 'display_errors':
+                return self::setDisplayErrors($ctx, $newValue);
+            case 'memory_limit':
+                return self::setMemoryLimit($newValue);
+            default:
+                return false;
+        }
     }
 
-    private static function setErrorReporting(Context $ctx, string $newValue): string|false
-    {
+    private static function setErrorReporting(Context $ctx, string $newValue) {
         $old = (string) $ctx->errors->getErrorReporting();
         $ctx->errors->setErrorReporting(self::parseErrorReporting($newValue));
 
         return $old;
     }
 
-    private static function setDisplayErrors(Context $ctx, string $newValue): string|false
-    {
+    private static function setDisplayErrors(Context $ctx, string $newValue) {
         $old = $ctx->errors->getDisplayErrors() ? '1' : '0';
         $ctx->errors->setDisplayErrors(self::parseBoolIni($newValue));
 
         return $old;
     }
 
-    private static function setMemoryLimit(string $newValue): string|false
-    {
+    private static function setMemoryLimit(string $newValue) {
         if ('-1' === $newValue) {
             return false;
         }

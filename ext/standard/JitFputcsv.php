@@ -13,7 +13,8 @@ use PHPLLVM\Value;
 /** LLVM lowering for fputcsv() via implode + __compiler_fwrite (issue #1193). */
 final class JitFputcsv
 {
-    /** @return Value __value__* (int bytes written, or boolean false on failure) */
+    /** @return Value
+     * (int bytes written, or boolean false on failure) */
     public static function invoke(
         Context $context,
         Value $handleLong,

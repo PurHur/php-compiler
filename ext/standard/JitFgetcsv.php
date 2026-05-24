@@ -13,7 +13,8 @@ use PHPLLVM\Value;
 /** LLVM lowering for fgetcsv() via __compiler_fgetcsv (issue #1192). */
 final class JitFgetcsv
 {
-    /** @return Value __value__* (array row, or boolean false on failure/EOF) */
+    /** @return Value
+     * (array row, or boolean false on failure/EOF) */
     public static function invoke(
         Context $context,
         Value $handleLong,

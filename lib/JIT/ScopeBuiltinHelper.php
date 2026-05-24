@@ -44,7 +44,8 @@ final class ScopeBuiltinHelper
     }
 
     /**
-     * @return Value int64 import count
+     * @return Value
+     * int64 import count
      */
     public static function extract(Context $context, Variable $array, ?Variable $flagsArg = null): Value
     {

@@ -44,7 +44,6 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'lib/Web/CgiAotDriver.php',
         'lib/Web/CgiDriver.php',
         'lib/Web/ProjectDeploy.php',
-        'lib/AOT/Linker.php',
         'lib/AOT/ProjectGraph.php',
         'lib/Web/DevServer.php',
         'lib/Web/ManifestValidator.php',
@@ -288,8 +287,6 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/rawurldecode.php',
         'ext/standard/rawurlencode.php',
         'ext/standard/sprintf_.php',
-        'ext/standard/sqrt.php',
-        'ext/standard/stream_context_create.php',
         'ext/standard/str_contains.php',
         'ext/standard/str_ends_with.php',
         'ext/standard/str_pad.php',
@@ -307,8 +304,6 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/string_rtrim.php',
         'ext/standard/string_trim.php',
         'ext/standard/strip_tags.php',
-        'ext/standard/tempnam.php',
-        'ext/standard/touch_.php',
         'ext/standard/stripos.php',
         'ext/standard/stristr.php',
         'ext/standard/strncasecmp.php',
@@ -326,21 +321,29 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/strval.php',
         'ext/standard/substr.php',
         'ext/standard/substr_count.php',
-        'ext/standard/uasort_.php',
         'ext/standard/ucfirst.php',
         'ext/standard/ucwords.php',
-        'ext/standard/unlink.php',
         'ext/standard/urldecode.php',
         'ext/standard/urlencode.php',
-        'ext/standard/usort_.php',
         'ext/standard/var_dump.php',
         'ext/standard/web_int.php',
         'ext/standard/wordwrap.php',
+        'ext/standard/VmFs.php',
+        'ext/standard/VmFilter.php',
+        'ext/standard/VmHash.php',
+        'ext/standard/VmSession.php',
+        'ext/standard/SetcookieLine.php',
+        'ext/standard/sqrt.php',
+        'ext/standard/sin.php',
+        'ext/standard/range.php',
+        'ext/standard/fopen.php',
+        'ext/standard/readfile.php',
+        'ext/standard/stream_context_create.php',
+        'ext/standard/pack.php',
+        'ext/standard/date.php',
+        'ext/standard/session_start.php',
         'src/llvm-env.php',
-        'src/tokenizer-compat.php',
         'src/yay-php8-compat.php',
-        'src/macro_functions.php',
-        'src/cli_driver.php',
     ];
 
     public static function setUpBeforeClass(): void
@@ -362,7 +365,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         $this->assertFileExists($entry);
         $contents = (string) file_get_contents($entry);
         $count = substr_count($contents, 'require_once __DIR__');
-                $this->assertSame(446, $count, '108 compiler_minimal units + 338 M2 spine units (#1741 Linker, #1725 tempnam, #1726 touch_, #1701 stream_context_create, #1731 unlink, #1734 usort_, #1686 sqrt, #1728 uasort_); array_pop/shift/search + preg/array_combine wrappers skipped (AOT types); src/cli.php deferred #1467');
+                $this->assertSame(567, $count, '108 compiler_minimal overlap + 459 M2 spine units; array_pop/shift/search/combine/multisort/sort/usort/uasort + shell_exec + VmString/VmSplAutoload/VmPregReplaceCallback/spl_autoload skipped (AOT lint)');
         foreach (self::LIB_SPINE_SMOKE_NEW_UNITS as $unit) {
             $this->assertStringContainsString(
                 "require_once __DIR__.'/../../../{$unit}';",

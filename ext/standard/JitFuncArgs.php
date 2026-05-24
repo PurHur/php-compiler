@@ -42,7 +42,7 @@ final class JitFuncArgs
         return self::callArgvHashtable($context);
     }
 
-    /** @return Value __value__* */
+    /** @return Value */
     public static function numArgs(Context $context): Value
     {
         self::requireEnclosing($context);

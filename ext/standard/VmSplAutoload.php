@@ -50,9 +50,9 @@ final class VmSplAutoload
     }
 
     /**
-     * @return callable(Context, string): void
+     * @return callable
      */
-    private static function bindCallback(Context $ctx, Variable $callback): callable
+    private static function bindCallback(Context $ctx, Variable $callback)
     {
         $callback = $callback->resolveIndirect();
         if (Variable::TYPE_STRING === $callback->type) {
@@ -72,9 +72,9 @@ final class VmSplAutoload
     }
 
     /**
-     * @return callable(Context, string): void
+     * @return callable
      */
-    private static function bindFunction(Context $ctx, string $name): callable
+    private static function bindFunction(Context $ctx, string $name)
     {
         $func = VmUserCall::resolveStringCallback($ctx, $name);
 
@@ -84,9 +84,9 @@ final class VmSplAutoload
     }
 
     /**
-     * @return callable(Context, string): void
+     * @return callable
      */
-    private static function bindStaticName(Context $ctx, string $callable): callable
+    private static function bindStaticName(Context $ctx, string $callable)
     {
         [$className, $methodName] = explode('::', $callable, 2);
         $func = self::resolveStaticMethod($ctx, $className, $methodName);
@@ -97,9 +97,9 @@ final class VmSplAutoload
     }
 
     /**
-     * @return callable(Context, string): void
+     * @return callable
      */
-    private static function bindArrayCallable(Context $ctx, Variable $callable): callable
+    private static function bindArrayCallable(Context $ctx, Variable $callable)
     {
         $table = $callable->toArray();
         $idx0 = new Variable(Variable::TYPE_INTEGER);
