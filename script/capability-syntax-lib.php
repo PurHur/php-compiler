@@ -167,6 +167,14 @@ function syntaxRowDefinitions(): array
             'notes' => ['Skip string-key CFG split for fetch+assign destructuring pairs (#1234)'],
             'probe' => '["a" => $x, "b" => $y] = ["a" => 1, "b" => 2]; echo $x, $y;',
         ],
+        [
+            'id' => 'goto',
+            'construct' => '`goto` / labels (function scope)',
+            'opcodes' => ['TYPE_JUMP'],
+            'issue' => 1228,
+            'notes' => ['php-cfg lowers labels to CFG Jump; VM avoids frame nesting on same-block back-edges'],
+            'probe' => '$i = 0; start: $i++; if ($i < 2) { goto start; } echo $i;',
+        ],
     ];
 }
 
@@ -299,6 +307,7 @@ function collectSyntaxPhptCoverage(string $root, array $definitions): array
         'magic_const_namespace' => '/__NAMESPACE__/',
         'magic_const_dir_file' => '/__DIR__|__FILE__/',
         'magic_const_line' => '/__LINE__/',
+        'goto' => '/\bgoto\s+\w+/',
     ];
 
     $scan = [];
