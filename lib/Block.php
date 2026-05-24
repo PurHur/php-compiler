@@ -339,6 +339,12 @@ class Block {
                     throw new \LogicException("Could not resolve argument");
                 }
             } else {
+                if (null !== $frame && isset($frame->scope[$pos])) {
+                    // Preserve predecessor slot values across CFG splits (e.g. string-key
+                    // array literal before keyed list destructuring, issue #1234).
+                    $scope[$pos] = $frame->scope[$pos];
+                    continue;
+                }
                 if (null !== $frame) {
                     $inherited = self::findVariableInParentFrames($op, $frame);
                     if (null !== $inherited) {

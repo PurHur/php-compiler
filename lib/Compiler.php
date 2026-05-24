@@ -226,21 +226,13 @@ class Compiler {
 
     private function splitCfgBlockAfterStringKeyedArray(Block $block): Block
     {
-        $hub = new Block($block->orig);
-        $hub->inheritScopeFrom($block);
-        $this->inheritFuncFromParent($hub, $block);
-        $jumpToHub = new OpCode(OpCode::TYPE_JUMP);
-        $jumpToHub->block1 = $hub;
-        $block->addOpCode($jumpToHub);
-
         $cont = new Block($block->orig);
         $cont->inheritScopeFrom($block);
-        $this->inheritFuncFromParent($cont, $hub);
+        $this->inheritFuncFromParent($cont, $block);
         $jumpToCont = new OpCode(OpCode::TYPE_JUMP);
         $jumpToCont->block1 = $cont;
-        $hub->addOpCode($jumpToCont);
-        $hub->parents[] = $block;
-        $cont->parents[] = $hub;
+        $block->addOpCode($jumpToCont);
+        $cont->parents[] = $block;
 
         return $cont;
     }
