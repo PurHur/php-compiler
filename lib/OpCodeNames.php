@@ -186,6 +186,8 @@ function opcode_type_name(int $type): string
             return 'TYPE_ASSIGN_REF';
         case 98:
             return 'TYPE_DECLARE_GLOBAL';
+        case 99:
+            return 'TYPE_DECLARE_STATIC_PROPERTY';
         default:
             return 'unknown opcode';
     }

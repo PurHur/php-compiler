@@ -143,6 +143,14 @@ function syntaxRowDefinitions(): array
             'notes' => ['Packed and string-keyed arrays; VM + JIT lowering'],
             'probe' => '$a = [1, 2, 3]; foreach ($a as &$v) { $v *= 2; } echo $a[0], $a[1], $a[2];',
         ],
+        [
+            'id' => 'static_property_fetch',
+            'construct' => 'Static property `Class::$prop`',
+            'opcodes' => ['TYPE_STATIC_PROPERTY_FETCH', 'TYPE_DECLARE_STATIC_PROPERTY'],
+            'issue' => 1225,
+            'notes' => ['Class-scoped storage; `self::` / `static::`; literal property names in JIT'],
+            'probe' => 'class C { public static int $n = 1; } echo C::$n;',
+        ],
     ];
 }
 

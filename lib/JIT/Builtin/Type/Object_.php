@@ -37,6 +37,11 @@ class Object_ extends Type {
     private array $classConstants = [];
     /** @var array<int, array<int, array{propertyType: int, type: int, value: int|float|bool|string|null}>> */
     private array $propertyDefaults = [];
+    /**
+     * @var array<int, array<string, array{type: int, global: \PHPLLVM\Value}>>
+     *     class id => property lc => typed LLVM global
+     */
+    private array $staticPropertyGlobals = [];
 
     private ?int $splObjectStorageClassId = null;
 
@@ -382,6 +387,7 @@ class Object_ extends Type {
         $id = count($this->classes);
         $this->properties[$id] = [];
         $this->classConstants[$id] = [];
+        $this->staticPropertyGlobals[$id] = [];
 
         $this->classIdToName[$id] = $name->value;
 
@@ -870,6 +876,130 @@ class Object_ extends Type {
         }
 
         return $this->jitConstantFromEntry($this->classConstants[$classId][$key]);
+    }
+
+    public function defineStaticProperty(int $classId, string $name, int $jitType, ?VMVariable $default = null): void
+    {
+        $key = strtolower($name);
+        if (isset($this->staticPropertyGlobals[$classId][$key])) {
+            return;
+        }
+        if (
+            Variable::TYPE_NATIVE_LONG !== $jitType
+            && Variable::TYPE_STRING !== $jitType
+            && Variable::TYPE_NATIVE_BOOL !== $jitType
+            && Variable::TYPE_NATIVE_DOUBLE !== $jitType
+        ) {
+            throw new \LogicException(
+                'JIT static property requires a scalar declared type (int, string, float, bool)'
+            );
+        }
+        $globalName = 'sp_'.$classId.'_'.$key;
+        if (Variable::TYPE_STRING === $jitType) {
+            $llvmType = $this->context->getTypeFromString('__string__*');
+            $global = $this->context->module->addGlobal($llvmType, $globalName);
+            $global->setInitializer($llvmType->constNull());
+        } else {
+            $llvmTypeName = Variable::TYPE_NATIVE_DOUBLE === $jitType ? 'double' : 'int64';
+            $llvmType = $this->context->getTypeFromString($llvmTypeName);
+            $global = $this->context->module->addGlobal($llvmType, $globalName);
+            $global->setInitializer($this->staticPropertyScalarInitializer($jitType, $default));
+        }
+        $this->staticPropertyGlobals[$classId][$key] = [
+            'type' => $jitType,
+            'global' => $global,
+        ];
+        if (Variable::TYPE_STRING === $jitType && null !== $default) {
+            $this->initStaticStringPropertyDefault($global, $default);
+        }
+    }
+
+    private function staticPropertyScalarInitializer(int $jitType, ?VMVariable $value): \PHPLLVM\Value
+    {
+        if (Variable::TYPE_NATIVE_DOUBLE === $jitType) {
+            $llvmType = $this->context->getTypeFromString('double');
+            $float = null !== $value && VMVariable::TYPE_FLOAT === $value->type ? $value->toFloat() : 0.0;
+
+            return $llvmType->constReal($float);
+        }
+        $llvmType = $this->context->getTypeFromString(
+            Variable::TYPE_NATIVE_BOOL === $jitType ? 'int1' : 'int64'
+        );
+        $int = 0;
+        if (null !== $value) {
+            $int = match ($value->type) {
+                VMVariable::TYPE_INTEGER => $value->toInt(),
+                VMVariable::TYPE_BOOLEAN => $value->toBool() ? 1 : 0,
+                default => 0,
+            };
+        }
+
+        return $llvmType->constInt($int, false);
+    }
+
+    private function initStaticStringPropertyDefault(\PHPLLVM\Value $global, VMVariable $value): void
+    {
+        if (VMVariable::TYPE_STRING !== $value->type) {
+            throw new \LogicException('Static string property default must be a string');
+        }
+        $restore = $this->context->builder->getInsertBlock();
+        $this->context->builder->positionAtEnd($this->context->initBlock);
+        $str = $this->context->builder->load(
+            $this->context->constantStringFromString($value->toString())
+        );
+        $owned = $this->context->builder->call(
+            $this->context->lookupFunction('__string__separate'),
+            $str
+        );
+        $this->context->builder->store($owned, $global);
+        $this->context->builder->positionAtEnd($restore);
+    }
+
+    public function staticPropertyFetch(int $classId, string $name): Variable
+    {
+        $key = strtolower($name);
+        if (!isset($this->staticPropertyGlobals[$classId][$key])) {
+            throw new \LogicException("Undefined static property: {$name}");
+        }
+        $entry = $this->staticPropertyGlobals[$classId][$key];
+        $loaded = $this->context->builder->load($entry['global']);
+        $var = new Variable(
+            $this->context,
+            $entry['type'],
+            Variable::KIND_VALUE,
+            $loaded
+        );
+        $var->staticPropertyGlobal = $entry['global'];
+        $var->staticPropertyType = $entry['type'];
+
+        return $var;
+    }
+
+    public function staticPropertyStore(\PHPLLVM\Value $global, Variable $value, int $propertyType): void
+    {
+        if (Variable::TYPE_STRING === $propertyType) {
+            $stored = $this->context->helper->loadValue($value);
+            $this->context->builder->store($stored, $global);
+            if (Variable::TYPE_STRING === $value->type) {
+                $value->addref();
+            }
+
+            return;
+        }
+        if (Variable::TYPE_VALUE === $value->type) {
+            $loaded = $this->context->builder->call(
+                $this->context->lookupFunction(
+                    Variable::TYPE_NATIVE_DOUBLE === $propertyType
+                        ? '__value__readDouble'
+                        : '__value__readLong'
+                ),
+                JitValueBox::valuePtrFromVariable($this->context, $value)
+            );
+            $this->context->builder->store($loaded, $global);
+
+            return;
+        }
+        $this->context->builder->store($this->context->helper->loadValue($value), $global);
     }
 
     public function emitInstanceOf(Variable $expr, string $className): Variable

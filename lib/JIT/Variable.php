@@ -95,6 +95,12 @@ final class Variable {
     /** void** property slot on {@see __object__} when this variable is a property lvalue (#58). */
     public ?\PHPLLVM\Value $objectPropertySlot = null;
 
+    /** Module global backing a static property (issue #1225). */
+    public ?\PHPLLVM\Value $staticPropertyGlobal = null;
+
+    /** Declared JIT type when {@see $staticPropertyGlobal} is set. */
+    public ?int $staticPropertyType = null;
+
     /** Callee slot for a literal-include caller local; skip delref in unrelated assigns (#866). */
     public bool $includeBinding = false;
 

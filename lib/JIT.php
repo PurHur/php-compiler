@@ -1253,7 +1253,16 @@ class JIT {
                     $this->assignOperand($block->getOperand($op->arg1), $result);
                     break;
                 case OpCode::TYPE_STATIC_PROPERTY_FETCH:
-                    // Recorded at compile time; JIT static property fetch is not implemented yet.
+                    $classOp = $block->getOperand($op->arg2);
+                    $nameOp = $block->getOperand($op->arg3);
+                    if (!$nameOp instanceof Operand\Literal) {
+                        throw new \LogicException('JIT static property fetch requires a literal property name');
+                    }
+                    $classId = $this->context->type->object->resolveClassId($classOp);
+                    $this->context->setVariableOp(
+                        $block->getOperand($op->arg1),
+                        $this->context->type->object->staticPropertyFetch($classId, $nameOp->value)
+                    );
                     break;
                 case OpCode::TYPE_UNSET:
                     // Recorded at compile time; JIT unset is not implemented yet.
@@ -2451,6 +2460,20 @@ class JIT {
         }
         foreach ($block->opCodes as $op) {
             switch ($op->type) {
+                case OpCode::TYPE_DECLARE_STATIC_PROPERTY:
+                    $name = $block->getOperand($op->arg1);
+                    assert($name instanceof Operand\Literal);
+                    $declaredJitType = Variable::getTypeFromType($block->getOperand($op->arg3)->type);
+                    $default = (null !== $op->arg2 && isset($block->constants[$op->arg2]))
+                        ? $block->constants[$op->arg2]
+                        : null;
+                    $this->context->type->object->defineStaticProperty(
+                        $classId,
+                        $name->value,
+                        $declaredJitType,
+                        $default
+                    );
+                    break;
                 case OpCode::TYPE_DECLARE_PROPERTY:
                     $name = $block->getOperand($op->arg1);
                     assert($name instanceof Operand\Literal);
@@ -2591,6 +2614,18 @@ class JIT {
                 $result->objectPropertySlot,
                 $value,
                 $result->objectPropertyType
+            );
+
+            return;
+        }
+        if (null !== $result->staticPropertyGlobal) {
+            if (null === $result->staticPropertyType) {
+                throw new \LogicException('staticPropertyGlobal requires staticPropertyType');
+            }
+            $this->context->type->object->staticPropertyStore(
+                $result->staticPropertyGlobal,
+                $value,
+                $result->staticPropertyType
             );
 
             return;
