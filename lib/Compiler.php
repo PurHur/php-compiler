@@ -48,12 +48,41 @@ class Compiler {
         return new Func\PHP($name, $funcBlock);
     }
 
+    protected function applyReturnTypeFromFunc(Block $block, CfgFunc $func): void
+    {
+        // php-cfg marks file-level {main} as void; only enforce on user functions/methods (#205).
+        if ('{main}' === $func->name && null === $func->class) {
+            return;
+        }
+        $returnType = $func->returnType;
+        if (null === $returnType) {
+            return;
+        }
+        if ($returnType instanceof Op\Type\Void_) {
+            $block->returnTypeVoid = true;
+
+            return;
+        }
+        if ($returnType instanceof Op\Type\Literal) {
+            if ('void' === $returnType->name) {
+                $block->returnTypeVoid = true;
+
+                return;
+            }
+            $mapped = Variable::mapFromType(Type::fromDecl($returnType->name));
+            if (Variable::TYPE_UNDEFINED !== $mapped) {
+                $block->returnTypeConstraint = $mapped;
+            }
+        }
+    }
+
     protected function compileCfgBlock(CfgBlock $block, array $params = [], ?CfgFunc $func = null): Block {
         if (!$this->seen->contains($block)) {
             $this->seen[$block] = $new = new Block($block);
             if (null !== $func) {
                 $new->func = $func;
                 $new->strictTypes = isset($func->strictTypes) ? (bool) $func->strictTypes : false;
+                $this->applyReturnTypeFromFunc($new, $func);
             }
             $paramIdx = 0;
             foreach ($params as $param) {
@@ -1183,12 +1212,14 @@ class Compiler {
     protected function compileIncludeOp(Op\Expr\Include_ $expr, Block $block): OpCode
     {
         $resultSlot = null;
-        if ($expr->result instanceof Operand\Temporary) {
-            if ([] !== $expr->result->usages) {
+        if (!$block->returnTypeVoid) {
+            if ($expr->result instanceof Operand\Temporary) {
+                if ([] !== $expr->result->usages) {
+                    $resultSlot = $this->compileOperand($expr->result, $block, false);
+                }
+            } else {
                 $resultSlot = $this->compileOperand($expr->result, $block, false);
             }
-        } else {
-            $resultSlot = $this->compileOperand($expr->result, $block, false);
         }
 
         $sourceFile = $expr->getFile() ?? '';
@@ -1868,6 +1899,16 @@ class Compiler {
                 )];
             case 'Terminal_Return':
                 if (is_null($terminal->expr)) {
+                    return [new OpCode(
+                        OpCode::TYPE_RETURN_VOID
+                    )];
+                }
+                if (
+                    $block->returnTypeVoid
+                    && !$terminal->expr instanceof Operand\Literal
+                    && !$terminal->expr instanceof Operand\Variable
+                ) {
+                    // php-cfg may lower trailing include/call expr as return in void bodies.
                     return [new OpCode(
                         OpCode::TYPE_RETURN_VOID
                     )];

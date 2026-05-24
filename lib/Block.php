@@ -64,6 +64,12 @@ class Block {
     /** @var array<int, int> scope slot index => Variable::TYPE_* for typed parameters */
     public array $paramTypeConstraints = [];
 
+    /** Declared scalar return type for this function (issue #205), or null when untyped. */
+    public ?int $returnTypeConstraint = null;
+
+    /** Declared `: void` return — non-null returns are rejected. */
+    public bool $returnTypeVoid = false;
+
     /** Parameter index (0-based, excluding $this) that receives a packed trailing-arg array (#197). */
     public ?int $variadicParamIndex = null;
 
@@ -214,6 +220,8 @@ class Block {
         if (null !== $parent->func) {
             $this->func = $parent->func;
             $this->strictTypes = $parent->strictTypes;
+            $this->returnTypeConstraint = $parent->returnTypeConstraint;
+            $this->returnTypeVoid = $parent->returnTypeVoid;
         }
     }
 
