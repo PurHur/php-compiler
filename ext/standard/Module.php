@@ -246,6 +246,8 @@ class Module extends ModuleAbstract
             new defined_(),
             new class_exists_(),
             new function_exists(),
+            new func_get_args(),
+            new func_num_args(),
             new method_exists_(),
             new get_class_(),
             new get_parent_class_(),
