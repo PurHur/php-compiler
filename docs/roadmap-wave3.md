@@ -8,12 +8,12 @@ Regenerate capability truth: `php script/capability-matrix.php`, `php script/cap
 
 | Track | Done | Open |
 |-------|-----:|-----:|
-| Stdlib (#1367–#1379) | 12 | 1 ([#1378](https://github.com/PurHur/php-compiler/issues/1378)) |
-| Language (#1354–#1366) | 9 | 3 |
+| Stdlib (#1367–#1379) | 13 | 0 |
+| Language (#1354–#1366) | 11 | 1 ([#1354](https://github.com/PurHur/php-compiler/issues/1354)) |
 
-**Language landed (master):** `never` ([#1358](https://github.com/PurHur/php-compiler/issues/1358) / [#1466](https://github.com/PurHur/php-compiler/pull/1466)), enums ([#1356](https://github.com/PurHur/php-compiler/issues/1356) / [#1463](https://github.com/PurHur/php-compiler/pull/1463)), ctor promotion ([#1359](https://github.com/PurHur/php-compiler/issues/1359) / [#1464](https://github.com/PurHur/php-compiler/pull/1464)), multi-catch ([#1362](https://github.com/PurHur/php-compiler/issues/1362) / [#1468](https://github.com/PurHur/php-compiler/pull/1468)), intersection types ([#1357](https://github.com/PurHur/php-compiler/issues/1357) / [#1474](https://github.com/PurHur/php-compiler/pull/1474)), unpack ([#1361](https://github.com/PurHur/php-compiler/issues/1361) / [#1476](https://github.com/PurHur/php-compiler/pull/1476)), `__serialize` ([#1365](https://github.com/PurHur/php-compiler/issues/1365) / [#1477](https://github.com/PurHur/php-compiler/pull/1477)), first-class callable JIT ([#1363](https://github.com/PurHur/php-compiler/issues/1363) / [#1472](https://github.com/PurHur/php-compiler/pull/1472)), variable-variables JIT ([#1364](https://github.com/PurHur/php-compiler/issues/1364) / [#1381](https://github.com/PurHur/php-compiler/pull/1381)).
+**Language landed (master):** `never` ([#1358](https://github.com/PurHur/php-compiler/issues/1358) / [#1466](https://github.com/PurHur/php-compiler/pull/1466)), enums ([#1356](https://github.com/PurHur/php-compiler/issues/1356) / [#1463](https://github.com/PurHur/php-compiler/pull/1463)), ctor promotion ([#1359](https://github.com/PurHur/php-compiler/issues/1359) / [#1464](https://github.com/PurHur/php-compiler/pull/1464)), multi-catch ([#1362](https://github.com/PurHur/php-compiler/issues/1362) / [#1468](https://github.com/PurHur/php-compiler/pull/1468)), intersection types ([#1357](https://github.com/PurHur/php-compiler/issues/1357) / [#1474](https://github.com/PurHur/php-compiler/pull/1474)), unpack ([#1361](https://github.com/PurHur/php-compiler/issues/1361) / [#1476](https://github.com/PurHur/php-compiler/pull/1476)), `__serialize` ([#1365](https://github.com/PurHur/php-compiler/issues/1365) / [#1477](https://github.com/PurHur/php-compiler/pull/1477)), first-class callable JIT ([#1363](https://github.com/PurHur/php-compiler/issues/1363) / [#1472](https://github.com/PurHur/php-compiler/pull/1472)), variable-variables JIT ([#1364](https://github.com/PurHur/php-compiler/issues/1364) / [#1381](https://github.com/PurHur/php-compiler/pull/1381)), readonly classes ([#1360](https://github.com/PurHur/php-compiler/issues/1360) / [#1473](https://github.com/PurHur/php-compiler/pull/1473)), WeakReference/WeakMap ([#1366](https://github.com/PurHur/php-compiler/issues/1366) / [#1478](https://github.com/PurHur/php-compiler/pull/1478)).
 
-**Language open (3):** attributes ([#1354](https://github.com/PurHur/php-compiler/issues/1354) — no PR yet), readonly classes ([#1360](https://github.com/PurHur/php-compiler/issues/1360) — [#1473](https://github.com/PurHur/php-compiler/pull/1473) needs rebase), WeakReference/WeakMap ([#1366](https://github.com/PurHur/php-compiler/issues/1366) — [#1478](https://github.com/PurHur/php-compiler/pull/1478) open).
+**Language open (1):** attributes ([#1354](https://github.com/PurHur/php-compiler/issues/1354) — no PR yet).
 
 Related merges outside this wave: `goto` ([#1228](https://github.com/PurHur/php-compiler/issues/1228) / [#1333](https://github.com/PurHur/php-compiler/pull/1333)), anonymous classes ([#1233](https://github.com/PurHur/php-compiler/issues/1233) / [#1386](https://github.com/PurHur/php-compiler/pull/1386)).
 
@@ -28,13 +28,13 @@ Related merges outside this wave: `goto` ([#1228](https://github.com/PurHur/php-
 | [#1357](https://github.com/PurHur/php-compiler/issues/1357) | Intersection types | Closed (master) | [#1474](https://github.com/PurHur/php-compiler/pull/1474); JIT deferred — `capabilities-syntax.md` |
 | [#1358](https://github.com/PurHur/php-compiler/issues/1358) | `never` return type | Closed | [#1466](https://github.com/PurHur/php-compiler/pull/1466) |
 | [#1359](https://github.com/PurHur/php-compiler/issues/1359) | Constructor property promotion | Closed | [#1464](https://github.com/PurHur/php-compiler/pull/1464) |
-| [#1360](https://github.com/PurHur/php-compiler/issues/1360) | readonly classes | Open | [#1473](https://github.com/PurHur/php-compiler/pull/1473) — rebase conflicts |
+| [#1360](https://github.com/PurHur/php-compiler/issues/1360) | readonly classes | Closed | [#1473](https://github.com/PurHur/php-compiler/pull/1473) |
 | [#1361](https://github.com/PurHur/php-compiler/issues/1361) | Array/argument unpack `...$x` | Closed | [#1476](https://github.com/PurHur/php-compiler/pull/1476) |
 | [#1362](https://github.com/PurHur/php-compiler/issues/1362) | Multi-type catch | Closed | [#1468](https://github.com/PurHur/php-compiler/pull/1468) |
 | [#1363](https://github.com/PurHur/php-compiler/issues/1363) | First-class callable JIT | Closed | [#1472](https://github.com/PurHur/php-compiler/pull/1472) |
 | [#1364](https://github.com/PurHur/php-compiler/issues/1364) | Variable variables JIT | Closed | [#1381](https://github.com/PurHur/php-compiler/pull/1381) |
 | [#1365](https://github.com/PurHur/php-compiler/issues/1365) | `__serialize` / `__unserialize` | Closed | [#1477](https://github.com/PurHur/php-compiler/pull/1477); VM via `VmSerialize` |
-| [#1366](https://github.com/PurHur/php-compiler/issues/1366) | WeakReference / WeakMap | Open | [#1478](https://github.com/PurHur/php-compiler/pull/1478) |
+| [#1366](https://github.com/PurHur/php-compiler/issues/1366) | WeakReference / WeakMap | Closed | [#1478](https://github.com/PurHur/php-compiler/pull/1478) |
 
 ## Stdlib (#1367–#1379)
 
@@ -51,7 +51,7 @@ Related merges outside this wave: `goto` ([#1228](https://github.com/PurHur/php-
 | [#1375](https://github.com/PurHur/php-compiler/issues/1375) | `pack` | Closed | [#1395](https://github.com/PurHur/php-compiler/pull/1395) |
 | [#1376](https://github.com/PurHur/php-compiler/issues/1376) | `sleep` / `usleep` | Closed | [#1389](https://github.com/PurHur/php-compiler/pull/1389) |
 | [#1377](https://github.com/PurHur/php-compiler/issues/1377) | `stream_context_create` | Closed (VM) | [#1399](https://github.com/PurHur/php-compiler/pull/1399); JIT arg helper still missing in audit |
-| [#1378](https://github.com/PurHur/php-compiler/issues/1378) | `debug_backtrace` | Open | [#1404](https://github.com/PurHur/php-compiler/pull/1404) (rebase needed) |
+| [#1378](https://github.com/PurHur/php-compiler/issues/1378) | `debug_backtrace` | Closed | [#1404](https://github.com/PurHur/php-compiler/pull/1404) |
 | [#1379](https://github.com/PurHur/php-compiler/issues/1379) | `set_error_handler` | Closed (VM) | [#1406](https://github.com/PurHur/php-compiler/pull/1406); `restore_error_handler` JIT deferred |
 
 ## Do not duplicate
