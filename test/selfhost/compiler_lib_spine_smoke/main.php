@@ -507,6 +507,7 @@ require_once __DIR__.'/../../../ext/standard/session_write_close.php';
 require_once __DIR__.'/../../../ext/standard/set_error_handler_.php';
 require_once __DIR__.'/../../../ext/standard/setcookie.php';
 require_once __DIR__.'/../../../ext/standard/setrawcookie.php';
+require_once __DIR__.'/../../../ext/standard/shell_exec.php';
 require_once __DIR__.'/../../../ext/standard/sin.php';
 require_once __DIR__.'/../../../ext/standard/sleep.php';
 require_once __DIR__.'/../../../ext/standard/sort_.php';
