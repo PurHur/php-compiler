@@ -1837,15 +1837,24 @@ class JIT {
                     break;
                 case OpCode::TYPE_FUNCCALL_INIT:
                     $nameOp = $block->getOperand($op->arg1);
-                    if (!$nameOp instanceof Operand\Literal) {
-                        if ($this->shouldUseSelfHostJitStubs()) {
-                            $this->context->scope->toCall = null;
-                            $this->context->scope->args = [];
-                            break;
+                    if ($nameOp instanceof Operand\Literal) {
+                        $lcname = strtolower($nameOp->value);
+                    } else {
+                        if (!$this->context->scope->variables->contains($nameOp)) {
+                            throw new \LogicException('Variable function calls not yet supported');
                         }
-                        throw new \LogicException("Variable function calls not yet supported");
+                        $nameVar = $this->context->scope->variables[$nameOp];
+                        $resolved = $nameVar->compileTimeString ?? null;
+                        if (null === $resolved) {
+                            if ($this->shouldUseSelfHostJitStubs()) {
+                                $this->context->scope->toCall = null;
+                                $this->context->scope->args = [];
+                                break;
+                            }
+                            throw new \LogicException('Variable function calls not yet supported');
+                        }
+                        $lcname = strtolower($resolved);
                     }
-                    $lcname = strtolower($nameOp->value);
                     $this->context->scope->toCall = $this->context->resolveFunctionProxy($lcname);
                     $this->context->scope->args = [];
                     break;
@@ -2907,6 +2916,9 @@ class JIT {
                         $valueRef,
                         $owned
                     );
+                    if (null !== $value->compileTimeString) {
+                        $result->compileTimeString = $value->compileTimeString;
+                    }
 
                     return;
                 case Variable::TYPE_HASHTABLE:

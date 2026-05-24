@@ -17,7 +17,7 @@ Tracking issues: [#58](https://github.com/PurHur/php-compiler/issues/58), [#145]
 | Native user-class link (`phpc build --project`) | yes | yes | yes | [#764](https://github.com/PurHur/php-compiler/issues/764) | AOT link yes (#568 closed); native execute #764; compliance PHPT; bootstrap AOT |
 | `instanceof` | yes | yes | yes | [#138](https://github.com/PurHur/php-compiler/issues/138) | compliance PHPT; bootstrap AOT |
 | `match` expression | yes | yes | yes | [#143](https://github.com/PurHur/php-compiler/issues/143) | Lowered in php-cfg to === / jump-if / assign (#143); compliance PHPT; bootstrap AOT |
-| Arrow functions `fn () =>` | no | no | no | [#142](https://github.com/PurHur/php-compiler/issues/142) |  |
+| Arrow functions `fn () =>` | no | no | no | [#142](https://github.com/PurHur/php-compiler/issues/142) | compliance PHPT |
 | `ClassName::class` / `static::class` | yes | yes | yes | [#740](https://github.com/PurHur/php-compiler/issues/740) | Compile-time class name string; related to __CLASS__ (#199); compliance PHPT; bootstrap AOT |
 | Magic constants `__CLASS__`, `__METHOD__`, `__FUNCTION__` | yes | yes | yes | [#199](https://github.com/PurHur/php-compiler/issues/199) | Lowered at parse time via php-cfg MagicStringResolver; compliance PHPT |
 | Magic constant `__NAMESPACE__` | yes | yes | yes | [#199](https://github.com/PurHur/php-compiler/issues/199) | Requires `namespace` declaration (#84); compliance PHPT |
@@ -30,6 +30,7 @@ Tracking issues: [#58](https://github.com/PurHur/php-compiler/issues/58), [#145]
 | `goto` / labels (function scope) | yes | yes | yes | [#1228](https://github.com/PurHur/php-compiler/issues/1228) | php-cfg lowers labels to CFG Jump; VM avoids frame nesting on same-block back-edges; compliance PHPT |
 | `declare(strict_types=1)` scalar parameter checks | yes | yes | yes | [#1229](https://github.com/PurHur/php-compiler/issues/1229) | VM #156; JIT enforces at user call sites via JIT\TypeCheck + Native::compileArg weak casts |
 | Variable variables (`$$name`) | yes | no | yes | [#1226](https://github.com/PurHur/php-compiler/issues/1226) | php-cfg nests Operand\Variable name; VM resolves runtime local by name; compliance PHPT; VM-only lowering |
+| Variable function calls (`$fn()`) | yes | yes | yes | [#56](https://github.com/PurHur/php-compiler/issues/56) | VM resolves callee name at runtime; JIT when callee has compile-time string (literal assignment) |
 
 _Syntax AOT column reflects `Runtime::MODE_AOT` compile probes unless a row pins AOT (e.g. native user-class link)._
 ## Web north-star (`examples/003-MiniWebApp`)

@@ -191,6 +191,14 @@ function syntaxRowDefinitions(): array
             'notes' => ['php-cfg nests Operand\\Variable name; VM resolves runtime local by name'],
             'probe' => '$a = "x"; $x = 1; echo $$a;',
         ],
+        [
+            'id' => 'variable_function_calls',
+            'construct' => 'Variable function calls (`$fn()`)',
+            'opcodes' => ['TYPE_FUNCCALL_INIT', 'TYPE_FUNCCALL_EXEC_RETURN'],
+            'issue' => 56,
+            'notes' => ['VM resolves callee name at runtime; JIT when callee has compile-time string (literal assignment)'],
+            'probe' => '$fn = "strlen"; echo $fn("hi");',
+        ],
     ];
 }
 
