@@ -180,6 +180,9 @@ class JIT {
         if (str_ends_with($lower, '\\runtime::compile')) {
             return true;
         }
+        if (str_ends_with($lower, '\\runtime::loadjit')) {
+            return true;
+        }
         return false;
     }
 
@@ -197,10 +200,6 @@ class JIT {
             '\\runtime::initcompiler',
             '\\runtime::initvmcontext',
             '\\runtime::loadcoremodules',
-            '\\runtime::loadjit',
-            '\\runtime::createjit',
-            '\\runtime::jitcontextforloadjit',
-            '\\runtime::loadjitcompilemodulefuncs',
         ];
     }
 
@@ -246,6 +245,15 @@ class JIT {
             $m3Spine = strtolower($logicalName);
             if (str_ends_with($m3Spine, '\\runtime::loadjit')) {
                 return $this->compileRuntimeLoadJitM3Native($internalName, $block, $logicalName);
+            }
+            if (str_ends_with($m3Spine, '\\runtime::createjit')) {
+                return $this->compileRuntimeCreateJitM3Native($internalName, $block, $logicalName);
+            }
+            if (str_ends_with($m3Spine, '\\runtime::jitcontextforloadjit')) {
+                return $this->compileRuntimeJitContextForLoadJitM3Native($internalName, $block, $logicalName);
+            }
+            if (str_ends_with($m3Spine, '\\runtime::loadjitcompilemodulefuncs')) {
+                return $this->compileRuntimeLoadJitCompileModuleFuncsM3Native($internalName, $block, $logicalName);
             }
             if (str_ends_with($m3Spine, '\\runtime::__construct')) {
                 return $this->compileRuntimeConstructM3Native($internalName, $block, $logicalName);
@@ -438,21 +446,37 @@ class JIT {
         return $func;
     }
 
-    /**
-     * M3 compile-driver loadJit (#1402): PHP CFG lowering (`new JIT`, nested foreach) segfaults LLVM 9.
-     * Invoked from compileBlock when PHP_COMPILER_M3_COMPILE_DRIVER=1; keep \\runtime::loadjit on deny list
-     * so bootstrap skip stays active until full PHP lowering is safe.
-     */
+    /** M3 compile-driver Runtime::loadJit (#1495): orchestration + nested createJit helpers. */
     private function compileRuntimeLoadJitM3Native(
         string $internalName,
         Block $block,
         string $logicalName
     ): PHPLLVM\Value {
-        $lcname = strtolower($logicalName);
-        if (isset($this->context->functions[$lcname])) {
-            return $this->context->functions[$lcname];
-        }
-        return $this->compileBlockPhpLowering($internalName, $block, $logicalName, $logicalName);
+        return $this->compileRuntimeSpinePhpLowering($internalName, $block, $logicalName);
+    }
+
+    private function compileRuntimeCreateJitM3Native(
+        string $internalName,
+        Block $block,
+        string $logicalName
+    ): PHPLLVM\Value {
+        return $this->compileRuntimeSpinePhpLowering($internalName, $block, $logicalName);
+    }
+
+    private function compileRuntimeJitContextForLoadJitM3Native(
+        string $internalName,
+        Block $block,
+        string $logicalName
+    ): PHPLLVM\Value {
+        return $this->compileRuntimeSpinePhpLowering($internalName, $block, $logicalName);
+    }
+
+    private function compileRuntimeLoadJitCompileModuleFuncsM3Native(
+        string $internalName,
+        Block $block,
+        string $logicalName
+    ): PHPLLVM\Value {
+        return $this->compileRuntimeSpinePhpLowering($internalName, $block, $logicalName);
     }
 
     /** M3 compile-driver Runtime::__construct (#1494): slim ctor + init* helpers via PHP CFG lowering. */
