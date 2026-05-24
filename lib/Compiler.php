@@ -520,7 +520,6 @@ class Compiler {
         throw new \LogicException('Unsupported unset target: ' . (is_object($expr) ? $expr->getType() : gettype($expr)));
     }
 
-<<<<<<< HEAD
     protected function compileInterface(Op\Stmt\Interface_ $iface, Block $block): OpCode
     {
         $return = new OpCode(
@@ -528,7 +527,10 @@ class Compiler {
             $this->compileOperand($iface->name, $block, true)
         );
         $return->classImplements = $this->interfaceNamesFromOperands($iface->extends);
-=======
+
+        return $return;
+    }
+
     protected function compileEnum(Op\Stmt\Enum_ $enum, Block $block): OpCode
     {
         $return = new OpCode(
@@ -536,13 +538,10 @@ class Compiler {
             $this->compileOperand($enum->name, $block, true)
         );
         $return->block1 = $this->compileEnumBody($enum->stmts);
->>>>>>> b77c6a42 (feat: backed enum declarations for VM/JIT (#1356))
 
         return $return;
     }
 
-<<<<<<< HEAD
-=======
     protected function compileEnumBody(CfgBlock $block): Block
     {
         $result = new Block($block);
@@ -561,7 +560,6 @@ class Compiler {
         return $result;
     }
 
->>>>>>> b77c6a42 (feat: backed enum declarations for VM/JIT (#1356))
     protected function compileClassLike(Op\Stmt\ClassLike $class, Block $block): OpCode {
         $type = 0;
         if ($class instanceof Op\Stmt\Class_) {
@@ -586,7 +584,7 @@ class Compiler {
     /**
      * @param Operand[] $operands
      *
-     * @return string[] lowercase interface names
+     * @return list<string>
      */
     protected function interfaceNamesFromOperands(array $operands): array
     {
@@ -615,7 +613,7 @@ class Compiler {
     }
 
     /**
-     * @return string[] lowercase interface names
+     * @return list<string>
      */
     protected function intersectionNamesFromCfgType(Op\Type\Intersection $type): array
     {

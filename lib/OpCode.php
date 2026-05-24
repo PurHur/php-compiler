@@ -126,7 +126,7 @@ class OpCode {
     /** @var ?Block */
     public $block3 = null;
 
-    /** @var string[] lowercase interface names for TYPE_DECLARE_CLASS (#1357) */
+    /** @var list<string> */
     public array $classImplements = [];
 
     public function __construct(int $type, ?int $arg1 = null, ?int $arg2 = null, ?int $arg3 = null) {

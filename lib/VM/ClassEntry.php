@@ -25,7 +25,7 @@ class ClassEntry {
     public ?string $parentLc = null;
     /** True for `interface` declarations (#1357). */
     public bool $isInterface = false;
-    /** @var string[] lowercase interface names this class/interface implements or extends */
+    /** @var list<string> */
     public array $interfaces = [];
     public ?Func\PHP $constructor = null;
     public array $properties = [];
