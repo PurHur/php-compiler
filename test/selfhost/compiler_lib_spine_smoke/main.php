@@ -441,6 +441,7 @@ require_once __DIR__.'/../../../ext/standard/unlink.php';
 require_once __DIR__.'/../../../ext/standard/urldecode.php';
 require_once __DIR__.'/../../../ext/standard/urlencode.php';
 require_once __DIR__.'/../../../ext/standard/usort_.php';
+require_once __DIR__.'/../../../ext/standard/uasort_.php';
 require_once __DIR__.'/../../../ext/standard/var_dump.php';
 require_once __DIR__.'/../../../ext/standard/var_export.php';
 require_once __DIR__.'/../../../ext/standard/web_bool.php';
