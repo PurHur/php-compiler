@@ -116,7 +116,10 @@ class HashTable extends Type
      */
     private function registerFn(string $name, string $returnType, array $paramTypes): void
     {
-        $params = array_map(fn (string $t) => $this->context->getTypeFromString($t), $paramTypes);
+        $params = [];
+        foreach ($paramTypes as $t) {
+            $params[] = $this->context->getTypeFromString($t);
+        }
         $ft = $this->context->context->functionType(
             $this->context->getTypeFromString($returnType),
             false,

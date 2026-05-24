@@ -24,10 +24,8 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'lib/Web/CgiAotDriver.php',
         'lib/Web/CgiDriver.php',
         'lib/Web/ProjectDeploy.php',
-<<<<<<< HEAD
         'lib/JIT/Builtin/CallArgv.php',
         'lib/JIT/Builtin/IniSet.php',
-=======
         'lib/Web/ManifestValidator.php',
         'lib/Web/ProjectBootstrap.php',
         'lib/Web/ProjectAutoload.php',
@@ -37,18 +35,23 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'lib/Web/ProjectManifest.php',
         'lib/Lint/SwitchDetector.php',
         'ext/standard/is_numeric.php',
->>>>>>> 523e12fa (M2: Web/Cli lib units in lib spine smoke (#1056))
         'lib/JIT/Builtin/SessionId.php',
         'lib/JIT/Builtin/SessionName.php',
         'lib/JIT/Builtin/StringFunctionExists.php',
         'lib/JIT/Builtin/StringHttpBuildQuery.php',
         'lib/JIT/Builtin/StringSerialize.php',
         'lib/JIT/Builtin/StringSuperglobalName.php',
-<<<<<<< HEAD
+        'lib/JIT/Builtin/StringParseStr.php',
         'lib/JIT/Builtin/StringPregMatch.php',
         'lib/JIT/Builtin/StringUnserialize.php',
-=======
->>>>>>> 1258208a (M2: add JIT Builtin leaf units to lib spine smoke (#1056))
+        'lib/JIT/Builtin/Type/Object_.php',
+        'lib/JIT/Builtin/Type/HashTable.php',
+        'lib/JIT/VarFetchHelper.php',
+        'lib/JIT/UnsetHelper.php',
+        'lib/JIT/ArrayBuiltinHelper.php',
+        'lib/JIT/ReflectionBuiltinHelper.php',
+        'lib/JIT/TypeCheck.php',
+        'lib/JIT/ErrorHandlerCallbackPolicy.php',
         'lib/JIT/Builtin/StringUrldecode.php',
         'ext/standard/JitAddslashes.php',
         'ext/standard/JitBase64Encode.php',
@@ -122,7 +125,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         $this->assertFileExists($entry);
         $contents = (string) file_get_contents($entry);
         $count = substr_count($contents, 'require_once __DIR__');
-        $this->assertSame(190, $count, '108 compiler_minimal units + 82 M2 spine units');
+        $this->assertSame(199, $count, '108 compiler_minimal units + 91 M2 spine units');
         foreach (self::LIB_SPINE_SMOKE_NEW_UNITS as $unit) {
             $this->assertStringContainsString(
                 "require_once __DIR__.'/../../../{$unit}';",
