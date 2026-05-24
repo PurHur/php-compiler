@@ -48,6 +48,7 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | M1 compile-smoke AOT echo | ✅ `compiler smoke` |
 | M2 `BOOTSTRAP_LIB_SPINE_SMOKE=1` spine link | ✅ `compiler_lib_spine_smoke bundle OK` |
 | M3 `make bootstrap-selfhost-helloworld` | 🚧 partial — HelloWorld runs natively; emit uses Zend |
+| M4 `make bootstrap-loop-probe` | ⬜ scaffold — blocked on M3 native emit ([#1498](https://github.com/PurHur/php-compiler/issues/1498)) |
 | `make bootstrap-aot-link` | ✅ **71/71** |
 | `php script/bootstrap-inventory.php --check` | ✅ **569** files, **0** source blockers |
 
@@ -85,6 +86,7 @@ Work that moves “more compiler logic into compiled PHP” fastest:
 
 3. M4 — bootstrap loop
    └─ Native binary compiles same tree → second-generation binary
+   └─ Scaffold: `test/selfhost/bootstrap_loop_smoke/` + `make bootstrap-loop-probe` ([#1498](https://github.com/PurHur/php-compiler/issues/1498))
 
 4. M5 — vendor prelink + stub retirement
    └─ #1416: no composer at cold boot
@@ -113,6 +115,7 @@ Parallel batches ([#1419](https://github.com/PurHur/php-compiler/issues/1419)) g
 | `test/selfhost/compiler_minimal/main.php` | **109** | M0 core |
 | `test/selfhost/compiler_lib_spine_smoke/main.php` | **299** | M2 growth |
 | `test/selfhost/compiler_helloworld_smoke/` | — | M3 probe + compile driver |
+| `test/selfhost/bootstrap_loop_smoke/` | — | M4 scaffold (gen-1→gen-2 loop probe; [#1498](https://github.com/PurHur/php-compiler/issues/1498)) |
 
 ---
 
@@ -135,6 +138,7 @@ Parallel batches ([#1419](https://github.com/PurHur/php-compiler/issues/1419)) g
 | North Star 2 tracker | [#1056](https://github.com/PurHur/php-compiler/issues/1056) |
 | M2 batch umbrella (done) | [#1419](https://github.com/PurHur/php-compiler/issues/1419) |
 | M3 compile driver / LLVM | [#1402](https://github.com/PurHur/php-compiler/issues/1402) |
+| M4 bootstrap loop scaffold | [#1498](https://github.com/PurHur/php-compiler/issues/1498) |
 | Vendor prelink strategy | [#1416](https://github.com/PurHur/php-compiler/issues/1416) |
 | `src/cli.php` entry (M4) | [#1467](https://github.com/PurHur/php-compiler/issues/1467) |
 | Roadmap parent | [#78](https://github.com/PurHur/php-compiler/issues/78) |
@@ -158,6 +162,13 @@ M3 strict (fails until native emit):
 
 ```bash
 BOOTSTRAP_M3_HELLOWORLD_STRICT=1 make bootstrap-selfhost-helloworld
+```
+
+M4 scaffold (exit 2 until M3 native emit is green):
+
+```bash
+make bootstrap-loop-probe
+# or: ./script/bootstrap-loop-probe.sh
 ```
 
 ---
