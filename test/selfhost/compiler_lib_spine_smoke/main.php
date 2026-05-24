@@ -277,7 +277,7 @@ require_once __DIR__.'/../../../ext/standard/JitSetcookie.php';
 require_once __DIR__.'/../../../ext/standard/JitSleep.php';
 require_once __DIR__.'/../../../ext/standard/JitTraitExists.php';
 require_once __DIR__.'/../../../ext/standard/Module.php';
-require_once __DIR__.'/../../../ext/standard/abs.php';
+require_once __DIR__.'/../../../ext/standard/array_reverse.php';
 require_once __DIR__.'/../../../ext/types/is_type.php';
 require_once __DIR__.'/../../../ext/types/strlen.php';
 require_once __DIR__.'/../../../ext/types/mb_strlen.php';
