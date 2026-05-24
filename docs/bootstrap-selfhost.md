@@ -28,6 +28,7 @@
 | M3 HelloWorld wave gate | `./script/bootstrap-wave-check.sh --with-helloworld` | ✅ opt-in `BOOTSTRAP_M3_HELLOWORLD=1` |
 | M4 bootstrap-loop gen-1 link | `./script/bootstrap-loop-gen1-link.sh` or `make bootstrap-loop-gen1-link` | 🚧 **partial** — gen-1 link ✅; gen-2 **Zend** emit until M3 native compile ([#1498](https://github.com/PurHur/php-compiler/issues/1498)) |
 | M4 bootstrap-loop probe | `./script/bootstrap-loop-probe.sh` or `make bootstrap-loop-probe` | 🚧 **ladder** — M2 + M3 partial + gen-1/gen-2 slice, then M3 strict; `--dry-run` skips strict ([#1498](https://github.com/PurHur/php-compiler/issues/1498)) |
+| M4 bootstrap-loop probe in full CI | `BOOTSTRAP_LOOP_PROBE_GATE=1 ./script/ci-local.sh` (LLVM tail) | opt-in **`--dry-run`** only; default **off** until M3 strict stable ([#1777](https://github.com/PurHur/php-compiler/issues/1777)) |
 
 Regenerate: `make bootstrap-profile` (inventory + profile + optional `bootstrap-aot-lint`). Phase C: `make bootstrap-aot-link` (or `php script/bootstrap-aot-lint.php --link`). Phase D: `make bootstrap-aot-link-lib`. Bundled compiler lint: `./script/bootstrap-selfhost-lint.sh`. Live lowering target: `make bootstrap-selfhost-probe` (or `./script/bootstrap-selfhost-compile-probe.sh`; optional `--update-inventory`).
 

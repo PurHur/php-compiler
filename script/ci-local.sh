@@ -59,6 +59,7 @@ if ci_llvm_ready; then
   ci_apply_llvm_memory_env
   ci_run_bootstrap_aot_lint
   BOOTSTRAP_SELFHOST_PROBE_GATE="${BOOTSTRAP_SELFHOST_PROBE_GATE:-1}" ci_run_bootstrap_selfhost_probe
+  BOOTSTRAP_LOOP_PROBE_GATE="${BOOTSTRAP_LOOP_PROBE_GATE:-0}" ci_run_bootstrap_loop_probe
 
   if ci_should_run_jit; then
     echo "PHPUnit: AOT lint only (@group aot-lint)..."
