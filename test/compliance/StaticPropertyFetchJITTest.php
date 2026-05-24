@@ -70,5 +70,6 @@ final class StaticPropertyFetchJITTest extends BaseTest
     public static function staticPropertyFixtureProvider(): iterable
     {
         yield 'static_property_fetch' => ['static_property_fetch.phpt'];
+        yield 'static_property_untyped' => ['static_property_untyped.phpt'];
     }
 }
