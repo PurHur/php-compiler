@@ -678,3 +678,78 @@ tr:last-child td {
     padding: 1.25rem 1.1rem;
   }
 }
+
+/* Demo section (index.html) */
+.demo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1.25rem;
+  margin: 1.5rem 0 1rem;
+}
+
+.demo-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.35rem;
+  position: relative;
+}
+
+.demo-card--optional {
+  border-style: dashed;
+  opacity: 0.92;
+}
+
+.demo-card__step {
+  position: absolute;
+  top: 0.85rem;
+  right: 1rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--php-purple);
+  background: rgba(119, 123, 180, 0.15);
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+}
+
+.demo-card h3 {
+  margin: 0 0 0.75rem;
+  font-size: 1.05rem;
+  color: #fff;
+  padding-right: 2rem;
+}
+
+.demo-card pre {
+  margin: 0 0 0.75rem;
+  background: #12121f;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  overflow-x: auto;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.demo-card pre code {
+  color: #d7dae8;
+}
+
+.demo-card p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.demo-disclaimer {
+  margin: 1.25rem 0 0;
+  padding: 1rem 1.15rem;
+  background: rgba(240, 198, 116, 0.08);
+  border: 1px solid rgba(240, 198, 116, 0.25);
+  border-radius: var(--radius);
+  font-size: 0.92rem;
+  color: var(--text-muted);
+}
+
+.demo-disclaimer strong {
+  color: var(--php-amber);
+}

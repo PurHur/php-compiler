@@ -39,6 +39,7 @@ final class SelfHostBuiltinPolicy
 
     /** @var array<string, string> */
     private const VM_ONLY_DEFERRED = [
+        'debug_backtrace' => 'debug',
         'spl_autoload_register' => 'spl',
         'set_error_handler' => 'error',
         'restore_error_handler' => 'error',

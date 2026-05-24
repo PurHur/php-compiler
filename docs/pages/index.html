@@ -3,8 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Development status and roadmap for php-compiler — a PHP CFG compiler with VM, JIT, and AOT native deployment.">
-  <title>php-compiler — Development Status</title>
+  <meta name="description" content="php-compiler — compile PHP to native binaries with VM, LLVM JIT, and AOT. Demo-ready web deployment and self-host bootstrap.">
+  <meta property="og:title" content="php-compiler — PHP to native binaries">
+  <meta property="og:description" content="VM, JIT, and AOT deployment for a web-capable PHP subset. See live progress and try it in five minutes.">
+  <title>php-compiler — PHP to native binaries</title>
   <link rel="stylesheet" href="css/style.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><ellipse cx='50' cy='55' rx='42' ry='32' fill='%23777BB4'/><ellipse cx='50' cy='48' rx='38' ry='28' fill='%234F5B93'/><circle cx='35' cy='42' r='4' fill='%231a1a2e'/><circle cx='65' cy='42' r='4' fill='%231a1a2e'/></svg>">
 </head>
@@ -22,26 +24,29 @@
         php-compiler
       </a>
       <nav class="nav" aria-label="Primary">
+        <a href="#demo">Try it</a>
         <a href="#overview">Overview</a>
         <a href="#progress">Progress</a>
         <a href="#wave3">Wave 3</a>
-        <a href="#phases">Phases</a>
         <a href="/php-compiler/development-status.html#north-star-1-web-app">Web app</a>
         <a href="#self-host">Self-host</a>
         <a href="/php-compiler/development-status.html">Full status</a>
+        <a href="https://github.com/PurHur/php-compiler">GitHub</a>
       </nav>
     </div>
   </header>
 
   <div id="top" class="hero">
     <div>
-      <span class="badge badge--live">Active development</span>
+      <span class="badge badge--live">Demo-ready</span>
       <span class="badge">Updated May 2026</span>
-      <h1>Where we are on the road to a full PHP compiler</h1>
+      <h1>Compile PHP to native binaries</h1>
       <p class="lead">
-        <strong>php-compiler</strong> compiles PHP to an internal CFG, runs it on a VM,
-        JIT-compiles hot paths with LLVM, and can deploy <strong>AOT native binaries</strong>
-        for web apps — without requiring Zend PHP at runtime for deployed apps.
+        <strong>php-compiler</strong> lowers PHP to a CFG, executes on a VM, JIT-compiles with LLVM&nbsp;9,
+        and links <strong>AOT native executables</strong> for CLI and web — deployed apps run
+        <strong>without Zend PHP at runtime</strong>. Active work: reference web app
+        (<a href="https://github.com/PurHur/php-compiler/tree/master/examples/003-MiniWebApp">MiniWebApp</a>)
+        and self-host bootstrap (compiler compiling its own <code>lib/</code>).
       </p>
       <div class="hero-badges">
         <span class="badge badge--live">VM + JIT + AOT</span>
@@ -51,9 +56,9 @@
         <span class="badge badge--wip">North Star 1 — AOT execute (partial)</span>
       </div>
       <div class="hero-actions">
-        <a class="btn btn--primary" href="/php-compiler/development-status.html#north-star-1-web-app">North Star 1 — web app</a>
-        <a class="btn btn--ghost" href="/php-compiler/development-status.html">Full status</a>
-        <a class="btn btn--ghost" href="https://github.com/PurHur/php-compiler/issues/1044">Tracker #1044</a>
+        <a class="btn btn--primary" href="#demo">Try in 5 minutes</a>
+        <a class="btn btn--ghost" href="/php-compiler/development-status.html">Full status report</a>
+        <a class="btn btn--ghost" href="https://github.com/PurHur/php-compiler">Clone on GitHub</a>
       </div>
     </div>
     <div class="code-window" aria-label="Example usage">
@@ -77,6 +82,50 @@ make bootstrap-selfhost-link   <span class="php-cmt"># → compiler_minimal bund
   </div>
 
   <main>
+    <section id="demo" class="reveal">
+      <h2>Try it in five minutes</h2>
+      <p class="section-intro">
+        Clone the repo on a Linux host with PHP&nbsp;8.1+ and Composer. Full presenter script:
+        <a href="https://github.com/PurHur/php-compiler/blob/master/docs/GETTING-STARTED.md"><code>docs/GETTING-STARTED.md</code></a>.
+      </p>
+      <div class="demo-grid">
+        <article class="demo-card">
+          <span class="demo-card__step">1</span>
+          <h3>Fast CI smoke</h3>
+          <pre><code>composer install
+./phpc test --fast</code></pre>
+          <p>VM/compliance gate — no LLVM link required.</p>
+        </article>
+        <article class="demo-card">
+          <span class="demo-card__step">2</span>
+          <h3>Native binary</h3>
+          <pre><code>./phpc build -o /tmp/hello \
+  examples/000-HelloWorld/example.php
+/tmp/hello</code></pre>
+          <p>PHP source → standalone executable.</p>
+        </article>
+        <article class="demo-card">
+          <span class="demo-card__step">3</span>
+          <h3>Web app (VM)</h3>
+          <pre><code>./phpc serve examples/003-MiniWebApp
+# → http://127.0.0.1:8080/</code></pre>
+          <p>Router, templates, forms, JSON API — stable today.</p>
+        </article>
+        <article class="demo-card demo-card--optional">
+          <span class="demo-card__step">+</span>
+          <h3>Self-host smoke</h3>
+          <pre><code>script/apply-patches.sh
+make bootstrap-selfhost-link</code></pre>
+          <p>Expect <code>compiler_minimal bundle OK</code> (experimental).</p>
+        </article>
+      </div>
+      <p class="demo-disclaimer">
+        <strong>Honest scope:</strong> not full Zend PHP — subset compiler with generated
+        <a href="https://github.com/PurHur/php-compiler/blob/master/docs/capabilities.md">capability matrices</a>.
+        MiniWebApp AOT execute is <strong>partial</strong> (home route ✅); VM path is the reliable demo.
+      </p>
+    </section>
+
     <section id="overview" class="reveal">
       <h2>Overview</h2>
       <p class="section-intro">
@@ -101,8 +150,8 @@ make bootstrap-selfhost-link   <span class="php-cmt"># → compiler_minimal bund
             <strong>Compiler fully compiles itself:</strong> native binary from <code>lib/</code> (no <code>vendor/</code>),
             compiles PHP, then rebuilds the next compiler revision without Zend.
           </p>
-          <p><strong>Status:</strong> M0 ✅ · M1 ✅ · M2 🚧 (301/532) · M3 🚧 partial · M5 ⬜.</p>
-          <p><a href="/php-compiler/development-status.html#north-star-2-self-host">Full north-star doc →</a> · <a href="https://github.com/PurHur/php-compiler/issues/1056">#1056</a></p>
+          <p><strong>Status:</strong> M0 ✅ · M1 ✅ · M2 🚧 (299/569) · M3 🚧 partial · M5 ⬜.</p>
+          <p><a href="/php-compiler/development-status.html#north-star-2-self-host">Full north-star doc →</a> · <a href="https://github.com/PurHur/php-compiler/blob/master/docs/self-host-target.md">Target doc</a> · <a href="https://github.com/PurHur/php-compiler/issues/1056">#1056</a></p>
         </article>
       </div>
     </section>
@@ -146,7 +195,7 @@ make bootstrap-selfhost-link   <span class="php-cmt"># → compiler_minimal bund
         </div>
         <p class="overall-progress__note">
           Strong on VM and AOT linking; wave-3 language 9/13 and stdlib 12/13 on master; local/Docker CI while remote GHA/Circle are disabled.
-          North Star 1 home execute green; North Star 2 M0–M1 done, M2 spine (301/532) + partial M3 HelloWorld; M5 full self-compile remains the stretch goal.
+          North Star 1 home execute green; North Star 2 M0–M1 done, M2 spine (299/569) + partial M3 HelloWorld; M5 full self-compile remains the stretch goal.
         </p>
       </div>
     </section>
@@ -191,8 +240,8 @@ make bootstrap-selfhost-link   <span class="php-cmt"># → compiler_minimal bund
         <article class="card">
           <span class="phase-num">Self-host</span>
           <h3><span class="status-dot status-dot--wip"></span> Compile-itself</h3>
-          <p>M0–M1 ✅; M2 spine 301/532; partial M3 HelloWorld; M5 = full self-host.</p>
-          <div class="mini-progress"><div class="progress-track"><div class="progress-fill" data-width="47"></div></div></div>
+          <p>M0–M1 ✅; M2 spine 299/569; partial M3 HelloWorld; M5 = full self-host.</p>
+          <div class="mini-progress"><div class="progress-track"><div class="progress-fill" data-width="54"></div></div></div>
         </article>
       </div>
     </section>
@@ -201,8 +250,9 @@ make bootstrap-selfhost-link   <span class="php-cmt"># → compiler_minimal bund
       <h2>Self-host bootstrap</h2>
       <p class="section-intro">
         Stretch goal: the compiler <strong>fully compiles itself</strong> (M5). Zend still runs
-        <code>bin/compile.php</code> today; native output is a growing <code>lib/</code> bundle (~109 → 532 files on the vm.php path).
+        <code>bin/compile.php</code> today; native output is a growing <code>lib/</code> bundle (~109 minimal → <strong>299</strong> spine units toward <strong>569</strong> vm.php-path files).
         Full ladder: <a href="/php-compiler/development-status.html#north-star-2-self-host">development-status.md</a>
+        · <a href="https://github.com/PurHur/php-compiler/blob/master/docs/self-host-target.md">self-host-target.md</a>
         · tracker <a href="https://github.com/PurHur/php-compiler/issues/1056">#1056</a>.
       </p>
       <ol class="ladder" aria-label="Self-host milestones">
@@ -219,7 +269,7 @@ make bootstrap-selfhost-link   <span class="php-cmt"># → compiler_minimal bund
         <li class="is-wip">
           <span class="ladder__marker" aria-hidden="true">2</span>
           <h4>M2 — Full top-level <code>lib/</code></h4>
-          <p>14/14 lint ✅; <strong>301/532</strong> spine units native link ✅ ([#1479](https://github.com/PurHur/php-compiler/pull/1479)).</p>
+          <p>14/14 lint ✅; <strong>299/569</strong> spine units native link ✅ (M2 batch [#1419](https://github.com/PurHur/php-compiler/issues/1419)).</p>
         </li>
         <li class="is-wip">
           <span class="ladder__marker" aria-hidden="true">3</span>
@@ -240,12 +290,14 @@ make bootstrap-selfhost-link   <span class="php-cmt"># → compiler_minimal bund
     </section>
 
     <section id="contribute" class="reveal">
-      <h2>Contributing</h2>
+      <h2>Get involved</h2>
       <p class="section-intro">
-        Update <code>docs/pages/development-status.md</code> when user-visible milestones change.
+        Pick work by phase label, north-star tracker, or bootstrap gate. Update
+        <code>docs/pages/development-status.md</code> when a milestone is user-visible.
       </p>
       <div class="hero-actions">
         <a class="btn btn--primary" href="https://github.com/PurHur/php-compiler/issues">Open issues</a>
+        <a class="btn btn--ghost" href="https://github.com/PurHur/php-compiler/blob/master/CONTRIBUTING.md">Contributing guide</a>
         <a class="btn btn--ghost" href="/php-compiler/development-status.html">Full status document</a>
       </div>
     </section>
@@ -254,12 +306,15 @@ make bootstrap-selfhost-link   <span class="php-cmt"># → compiler_minimal bund
   <footer class="site-footer">
     <p>
       <a href="https://github.com/PurHur/php-compiler">PurHur/php-compiler</a>
-      — GitHub Pages (<code>docs/pages/</code> only).
+      · MIT · GitHub Pages (<code>docs/pages/</code>)
     </p>
     <p>
-      Status source: <a href="/php-compiler/development-status.html">development-status.md</a> ·
-      Roadmap: <a href="https://github.com/PurHur/php-compiler/issues/78">#78</a> ·
-      Wave 3: <a href="https://github.com/PurHur/php-compiler/issues/1380">#1380</a>
+      <a href="#demo">Demo</a> ·
+      <a href="/php-compiler/development-status.html">Status</a> ·
+      <a href="https://github.com/PurHur/php-compiler/blob/master/docs/GETTING-STARTED.md">Getting started</a> ·
+      <a href="https://github.com/PurHur/php-compiler/issues/78">#78</a> ·
+      <a href="https://github.com/PurHur/php-compiler/issues/1044">#1044</a> ·
+      <a href="https://github.com/PurHur/php-compiler/issues/1056">#1056</a>
     </p>
   </footer>
 

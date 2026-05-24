@@ -708,6 +708,12 @@ class Object_ extends Type {
             $this->splObjectStorageClassId = $id;
             $this->defineProperty($id, '__spl_ht', Variable::TYPE_HASHTABLE);
         }
+        if ('weakreference' === $lcname) {
+            $this->defineProperty($id, '__weak_target', Variable::TYPE_NULL);
+        }
+        if ('weakmap' === $lcname) {
+            $this->defineProperty($id, '__weak_map', Variable::TYPE_HASHTABLE);
+        }
         if ('phpcompiler\\vm\\variable' === $lcname) {
             foreach ([
                 'type_undefined' => \PHPCompiler\VM\Variable::TYPE_UNDEFINED,

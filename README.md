@@ -1,14 +1,52 @@
-# A compiler for PHP
+# php-compiler
 
-**CI (local):** GitHub Actions and CircleCI are temporarily disabled — use `./script/ci-local.sh` or `make test`; fast iteration `./script/ci-fast.sh` or `make test-fast` ([#436](https://github.com/PurHur/php-compiler/issues/436)). See [docs/local-ci-matrix.md](docs/local-ci-matrix.md). MiniWebApp gate ladder: [docs/miniwebapp-gates.md](docs/miniwebapp-gates.md) ([#472](https://github.com/PurHur/php-compiler/issues/472)). Docker image: `php-compiler:22.04-dev`.
+**Compile PHP to native binaries** — CFG-based compiler with a **VM**, **LLVM 9 JIT**, and **AOT** deployment. Run shipped web apps **without Zend PHP at runtime** after `phpc build` / `phpc deploy`.
 
-Ok, so this used to be a dead project. It required calling out to all sorts of hackery to generate PHP extensions, or PHP itself.
+| | |
+|---|---|
+| **Status site** | [Overview](https://purhur.github.io/php-compiler/docs/pages/index.html) · [full report](https://purhur.github.io/php-compiler/development-status.html) |
+| **North stars** | [Web app #1044](https://github.com/PurHur/php-compiler/issues/1044) · [Self-host #1056](https://github.com/PurHur/php-compiler/issues/1056) |
+| **Docs index** | [`docs/README.md`](docs/README.md) · [`docs/GETTING-STARTED.md`](docs/GETTING-STARTED.md) |
+| **CI** | `./script/ci-local.sh` or `make test` ([#436](https://github.com/PurHur/php-compiler/issues/436) — remote GHA/Circle temporarily disabled) |
 
-Now, thanks to [FFI landing in PHP 7.4](https://wiki.php.net/rfc/ffi), the potential for all sorts of crazy is HUGE. 
+> **Demo / showcase:** use [Demo in five minutes](#demo-in-five-minutes) below or the [public status overview](https://purhur.github.io/php-compiler/docs/pages/index.html).
 
-So here we go :)
+Originally a research compiler (pre-FFI); revived around [PHP FFI](https://wiki.php.net/rfc/ffi) and LLVM. Current focus: a **web-capable PHP subset**, reference [MiniWebApp](examples/003-MiniWebApp/), and experimental **self-host** (compiler compiling its own `lib/`).
 
-# Quick start (host PHP)
+## Demo in five minutes
+
+**Requirements:** PHP 8.1+, Composer. LLVM only needed for `build` / full CI (not for `test --fast`).
+
+```console
+git clone https://github.com/PurHur/php-compiler.git
+cd php-compiler
+composer install
+./phpc test --fast
+```
+
+| Demo | Command | What it shows |
+|------|---------|----------------|
+| **Native binary** | `./phpc build -o /tmp/hello examples/000-HelloWorld/example.php && /tmp/hello` | PHP → standalone executable |
+| **Web app (VM)** | `./phpc serve examples/003-MiniWebApp` → `http://127.0.0.1:8080/` | Router, templates, JSON API |
+| **Self-host smoke** | `script/apply-patches.sh && make bootstrap-selfhost-link` | `compiler_minimal bundle OK` (experimental) |
+
+Presenter script and troubleshooting: [`docs/GETTING-STARTED.md`](docs/GETTING-STARTED.md).
+
+### What works today (honest)
+
+| Area | Status |
+|------|--------|
+| `phpc` CLI (`run`, `serve`, `build`, `deploy`, `lint`, `test`, `init`) | ✅ |
+| Examples **000–002**, **004** (VM + AOT link + execute) | ✅ |
+| **003-MiniWebApp** VM + AOT link | ✅ |
+| **003** AOT execute (all routes) | 🚧 partial — home ✅ ([#1044](https://github.com/PurHur/php-compiler/issues/1044)) |
+| Self-host **M0–M1** | ✅ |
+| Self-host **M2** spine | 🚧 **301** / 532 units ([#1056](https://github.com/PurHur/php-compiler/issues/1056)) |
+| Full Zend PHP compatibility | ❌ — see [capabilities](docs/capabilities.md) |
+
+MiniWebApp gates: [docs/miniwebapp-gates.md](docs/miniwebapp-gates.md) ([#472](https://github.com/PurHur/php-compiler/issues/472)). Docker image: `php-compiler:22.04-dev`.
+
+## Quick start (host PHP)
 
 On a modern Linux host with PHP 8.1+ (8.2 recommended):
 
@@ -46,7 +84,7 @@ make test    # builds php-compiler:22.04-dev if needed, then memory-safe CI in D
 
 ## North-star status (2026)
 
-**Public status site:** [Overview](https://purhur.github.io/php-compiler/docs/pages/index.html) · [Full status](https://purhur.github.io/php-compiler/development-status.html) — [North Star 1](https://purhur.github.io/php-compiler/development-status.html#north-star-1-web-app) · [North Star 2 (self-host)](https://purhur.github.io/php-compiler/development-status.html#north-star-2-self-host) · wave 3 [#1380](https://github.com/PurHur/php-compiler/issues/1380) · edit [`docs/pages/development-status.md`](docs/pages/development-status.md).
+**Public status site:** [Overview](https://purhur.github.io/php-compiler/docs/pages/index.html) · [Full status](https://purhur.github.io/php-compiler/development-status.html) — [North Star 1](https://purhur.github.io/php-compiler/development-status.html#north-star-1-web-app) · [North Star 2 (self-host)](https://purhur.github.io/php-compiler/development-status.html#north-star-2-self-host) · wave 3 [#1380](https://github.com/PurHur/php-compiler/issues/1380) · presenter guide [`docs/GETTING-STARTED.md`](docs/GETTING-STARTED.md) · edit [`docs/pages/development-status.md`](docs/pages/development-status.md).
 
 Single-page snapshot for contributors; keep in sync with [examples/README.md](examples/README.md) ([#753](https://github.com/PurHur/php-compiler/issues/753)).
 
@@ -93,7 +131,7 @@ Matrix details: [docs/local-ci-matrix.md](docs/local-ci-matrix.md).
 
 **North star:** The **compiler fully compiles itself** — native binary from php-compiler’s own `lib/` tree (no `vendor/`), then that binary compiles PHP again and rebuilds the next compiler revision **without Zend PHP** in the loop. **Living tracker:** [#1056](https://github.com/PurHur/php-compiler/issues/1056) · roadmap [#78](https://github.com/PurHur/php-compiler/issues/78) · process [#1025](https://github.com/PurHur/php-compiler/issues/1025). Orthogonal to **North Star 1 — web application** ([`examples/003-MiniWebApp`](examples/003-MiniWebApp/) — [#1044](https://github.com/PurHur/php-compiler/issues/1044)).
 
-Deep dive: [docs/bootstrap-selfhost.md](docs/bootstrap-selfhost.md) (gates, wave workflow, stub policy). Inventory: [docs/bootstrap-inventory.md](docs/bootstrap-inventory.md) (`php script/bootstrap-inventory.php`). Process doc issue: [#1025](https://github.com/PurHur/php-compiler/issues/1025).
+**Target + critical path:** [docs/self-host-target.md](docs/self-host-target.md) · gates: [docs/bootstrap-selfhost.md](docs/bootstrap-selfhost.md) · M3 playbook: [docs/bootstrap-m5-fast-path.md](docs/bootstrap-m5-fast-path.md) · inventory: [docs/bootstrap-inventory.md](docs/bootstrap-inventory.md) (`php script/bootstrap-inventory.php`) · process: [#1025](https://github.com/PurHur/php-compiler/issues/1025).
 
 ### Milestones (compile-itself ladder)
 
@@ -101,7 +139,7 @@ Deep dive: [docs/bootstrap-selfhost.md](docs/bootstrap-selfhost.md) (gates, wave
 |-----------|----------------|--------|
 | **M0 — Bundled subset runs** | ~**109** literal `require_once` units in `test/selfhost/compiler_minimal/main.php` compile+link under AOT; native binary prints `compiler_minimal bundle OK` | ✅ ([#557](https://github.com/PurHur/php-compiler/issues/557), [#913](https://github.com/PurHur/php-compiler/issues/913)) |
 | **M1 — Compiler-shaped bundle** | Same bundle **lints** as one translation unit; **compile-smoke** links a tiny fixture and runs AOT echo (`compiler smoke`); driver smoke bundles `bin/compile.php`-adjacent units | ✅ ([#1025](https://github.com/PurHur/php-compiler/issues/1025)) |
-| **M2 — Full top-level `lib/` + spine** | All **14** top-level `lib/*.php` lint ✅; **`compiler_lib_spine_smoke`** (**301** / 532 units, [#1479](https://github.com/PurHur/php-compiler/pull/1479)) native link ✅; grow toward full `bin/vm.php` inventory | 🚧 ~57% of inventory |
+| **M2 — Full top-level `lib/` + spine** | All **14** top-level `lib/*.php` lint ✅; **`compiler_lib_spine_smoke`** (**299** / **569** inventory units) native link ✅; grow toward full `bin/vm.php` path | 🚧 ~53% of inventory |
 | **M3 — Native compiles PHP** | Self-host bundle links; HelloWorld AOT **runs** natively; **compile emit still Zend fallback** | 🚧 partial |
 | **M4 — Bootstrap loop** | Native toolchain rebuilds the **next** compiler sources | ⬜ |
 | **M5 — Full self-host** | Real `bin/vm.php` / `bin/compile.php` on full inventory; **no Zend bootstrap** | ⬜ **north star** ([#1056](https://github.com/PurHur/php-compiler/issues/1056)) |
@@ -146,10 +184,10 @@ On harness hosts with an empty bind-mount, use `./script/docker-ci-local.sh` or 
 
 | Gate | Command | Status |
 |------|---------|--------|
-| Phase A inventory | `php script/bootstrap-inventory.php --check` | ✅ **532** files; **0** blockers |
+| Phase A inventory | `php script/bootstrap-inventory.php --check` | ✅ **569** files; **0** blockers |
 | Phase B lib AOT lint | `php bin/compile.php -l lib/*.php` | ✅ **14** top-level `lib/*.php` ([#534](https://github.com/PurHur/php-compiler/pull/534)) |
 | Phase B fixture lint | `php script/bootstrap-aot-lint.php` | ✅ **83** procedural targets |
-| Phase C native link | `make bootstrap-aot-link` | ✅ **70/70** targets OK |
+| Phase C native link | `make bootstrap-aot-link` | ✅ **71/71** link targets OK |
 | Bundled compiler lint (M0) | `./script/bootstrap-selfhost-lint.sh` | ✅ **109**-unit `compiler_minimal` bundle ([#559](https://github.com/PurHur/php-compiler/issues/559)) |
 | Self-host compile probe (M0) | `make bootstrap-selfhost-probe` | ✅ `-l` + `-o build/selfhost` ([#816](https://github.com/PurHur/php-compiler/issues/816)) |
 | Self-host native link (M0) | `./script/bootstrap-selfhost-link.sh` | ✅ `build/selfhost` → `compiler_minimal bundle OK` |

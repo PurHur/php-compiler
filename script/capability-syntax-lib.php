@@ -316,6 +316,26 @@ function syntaxRowDefinitions(): array
             'notes' => ['php-cfg records union types per catch; VM filters TYPE_CATCH via OpCode.catchTypes'],
             'probe' => 'class A {} class B {} try { throw new A(); } catch (A|B $e) { echo "ok"; }',
         ],
+        [
+            'id' => 'readonly_class',
+            'construct' => 'readonly classes',
+            'opcodes' => ['TYPE_DECLARE_CLASS', 'TYPE_NEW', 'TYPE_ASSIGN', 'TYPE_PROPERTY_FETCH'],
+            'issue' => 1360,
+            'notes' => ['php-cfg Class_::flags MODIFIER_READONLY; VM rejects instance property writes after __construct'],
+            'probe' => 'readonly class R { public int $x = 0; } $o = new R(); $o->x = 1;',
+        ],
+        [
+            'id' => 'weak_reference_weak_map',
+            'construct' => 'WeakReference / WeakMap',
+            'opcodes' => [],
+            'issue' => 1366,
+            'jit' => false,
+            'notes' => [
+                'VM stub: WeakReference::create/get via indirect target slot (unset clears get); not cycle-collecting GC weak refs',
+                'WeakMap uses object-id string keys; JIT may compile references but method bodies are VM-only',
+            ],
+            'probe' => 'class Box {} $o = new Box(); $r = WeakReference::create($o); unset($o); echo $r->get() === null ? "1" : "0";',
+        ],
     ];
 }
 
