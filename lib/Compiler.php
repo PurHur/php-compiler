@@ -1111,28 +1111,7 @@ class Compiler {
                     $this->compileOperand($expr->name, $block, true)
                 )];
             case Op\Expr\Array_::class:
-                $result = $this->compileOperand($expr->result, $block, false);
-                if (empty($expr->values)) {
-                    return [new OpCode(
-                        OpCode::TYPE_INIT_ARRAY,
-                        $result
-                    )];
-                }
-                $return = [new OpCode(
-                    OpCode::TYPE_INIT_ARRAY,
-                    $result,
-                    $this->compileOperand($expr->values[0], $block, true),
-                    $this->compileOperand($expr->keys[0], $block, true)
-                )];
-                for ($i = 1, $n = count($expr->values); $i < $n; $i++) {
-                    $return[] = new OpCode(
-                        OpCode::TYPE_ADD_ARRAY_ELEMENT,
-                        $result,
-                        $this->compileOperand($expr->values[$i], $block, true),
-                        $this->compileOperand($expr->keys[$i], $block, true)
-                    );
-                }
-                return $return;
+                return $this->compileArrayLiteral($expr, $block);
             case Op\Expr\MagicScriptConst::class:
                 $line = Op\Expr\MagicScriptConst::KIND_LINE === $expr->kind
                     ? max(1, $expr->getLine())
@@ -2098,10 +2077,16 @@ class Compiler {
                 $nameVar->string($argName);
                 $nameSlot = $block->registerConstant($nameOp, $nameVar);
             }
-            $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot);
+            $unpackFlag = $this->callArgUnpack($arg) ? 1 : null;
+            $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
         }
 
         return $sends;
+    }
+
+    private function callArgUnpack(Operand $arg): bool
+    {
+        return property_exists($arg, 'callArgUnpack') && true === $arg->callArgUnpack;
     }
 
     private function callArgName(Operand $arg): ?string
@@ -2113,6 +2098,46 @@ class Compiler {
         }
 
         return null;
+    }
+
+    /**
+     * @return list<OpCode>
+     */
+    protected function compileArrayLiteral(Op\Expr\Array_ $expr, Block $block): array
+    {
+        $result = $this->compileOperand($expr->result, $block, false);
+        if (empty($expr->values)) {
+            return [new OpCode(OpCode::TYPE_INIT_ARRAY, $result)];
+        }
+
+        $return = [];
+        $started = false;
+        $unpackFlags = property_exists($expr, 'unpack') ? $expr->unpack : [];
+        for ($i = 0, $n = count($expr->values); $i < $n; ++$i) {
+            if (!empty($unpackFlags[$i])) {
+                if (!$started) {
+                    $return[] = new OpCode(OpCode::TYPE_INIT_ARRAY, $result);
+                    $started = true;
+                }
+                $return[] = new OpCode(
+                    OpCode::TYPE_ARRAY_SPREAD,
+                    $result,
+                    $this->compileOperand($expr->values[$i], $block, true)
+                );
+                continue;
+            }
+
+            $valueSlot = $this->compileOperand($expr->values[$i], $block, true);
+            $keySlot = $this->compileOperand($expr->keys[$i], $block, true);
+            if (!$started) {
+                $return[] = new OpCode(OpCode::TYPE_INIT_ARRAY, $result, $valueSlot, $keySlot);
+                $started = true;
+            } else {
+                $return[] = new OpCode(OpCode::TYPE_ADD_ARRAY_ELEMENT, $result, $valueSlot, $keySlot);
+            }
+        }
+
+        return $return;
     }
 
     protected function compileMethodCallOpcodes(

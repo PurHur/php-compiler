@@ -190,6 +190,8 @@ function opcode_type_name(int $type): string
             return 'TYPE_DECLARE_STATIC_PROPERTY';
         case 100:
             return 'TYPE_VAR_FETCH';
+        case 101:
+            return 'TYPE_ARRAY_SPREAD';
         default:
             return 'unknown opcode';
     }

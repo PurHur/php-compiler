@@ -436,6 +436,16 @@ restart:
                     break;
                 case OpCode::TYPE_ARG_SEND:
                     $value = $frame->scope[$op->arg1];
+                    if (null !== $op->arg3) {
+                        $spread = $value->resolveIndirect();
+                        if (Variable::TYPE_ARRAY !== $spread->type) {
+                            throw new \LogicException('Only arrays can be unpacked');
+                        }
+                        foreach ($spread->toArray()->iterate(true) as $element) {
+                            $frame->callArgEntries[] = ['p', $element];
+                        }
+                        break;
+                    }
                     if (null !== $op->arg2 && isset($frame->block->constants[$op->arg2])) {
                         $frame->callArgEntries[] = [
                             'n',
@@ -560,6 +570,18 @@ restart:
                     } else {
                         $ht->add($key->toString(), $frame->scope[$op->arg2]);
                     }
+                    break;
+                case OpCode::TYPE_ARRAY_SPREAD:
+                    $result = $frame->scope[$op->arg1];
+                    $source = $frame->scope[$op->arg2]->resolveIndirect();
+                    if (Variable::TYPE_ARRAY !== $source->type) {
+                        throw new \LogicException(
+                            Variable::TYPE_NULL === $source->type
+                                ? 'Cannot spread null'
+                                : 'Only arrays can be spread'
+                        );
+                    }
+                    $result->toArray()->spreadFrom($source->toArray());
                     break;
                 case OpCode::TYPE_CLONE:
                     $result = $frame->scope[$op->arg1];
