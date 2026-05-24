@@ -129,6 +129,8 @@ final class Variable {
             case VMVariable::TYPE_FLOAT: return self::TYPE_NATIVE_DOUBLE;
             case VMVariable::TYPE_BOOLEAN: return self::TYPE_NATIVE_BOOL;
             case VMVariable::TYPE_STRING: return self::TYPE_STRING;
+            case VMVariable::TYPE_OBJECT: return self::TYPE_OBJECT;
+            case VMVariable::TYPE_ARRAY: return self::TYPE_HASHTABLE;
         }
         throw new \LogicException("Not implemented type conversion: $type");
     }
