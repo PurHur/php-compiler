@@ -45,6 +45,51 @@ final class VmInternalCompare
     }
 
     /**
+     * Sort homogeneous string or integer packed arrays (sort() VM path, no closures).
+     *
+     * @param list<Variable> $values
+     */
+    public static function sortHomogeneousPackedValues(array &$values): void
+    {
+        $n = \count($values);
+        if ($n < 2) {
+            return;
+        }
+        $kind = $values[0]->resolveIndirect()->type;
+        if (Variable::TYPE_STRING !== $kind && Variable::TYPE_INTEGER !== $kind) {
+            throw new \LogicException(
+                'sort() only supports homogeneous string or integer arrays in this compiler build'
+            );
+        }
+        for ($i = 1; $i < $n; ++$i) {
+            if ($values[$i]->resolveIndirect()->type !== $kind) {
+                throw new \LogicException(
+                    'sort() only supports homogeneous string or integer arrays in this compiler build'
+                );
+            }
+        }
+        if (Variable::TYPE_STRING === $kind) {
+            self::sortVariableValues($values, new strcmp());
+
+            return;
+        }
+        for ($i = 1; $i < $n; ++$i) {
+            $j = $i;
+            while ($j > 0 && self::compareIntegerValues($values[$j - 1], $values[$j]) > 0) {
+                $tmp = $values[$j - 1];
+                $values[$j - 1] = $values[$j];
+                $values[$j] = $tmp;
+                --$j;
+            }
+        }
+    }
+
+    private static function compareIntegerValues(Variable $a, Variable $b): int
+    {
+        return $a->resolveIndirect()->toInt() <=> $b->resolveIndirect()->toInt();
+    }
+
+    /**
      * Sort packed Variable list in place (no PHP closures — AOT self-host spine safe).
      *
      * @param list<Variable> $values

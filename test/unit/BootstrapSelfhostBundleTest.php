@@ -342,6 +342,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/pack.php',
         'ext/standard/date.php',
         'ext/standard/session_start.php',
+        'ext/standard/sort_.php',
         'src/llvm-env.php',
         'src/yay-php8-compat.php',
     ];
@@ -365,7 +366,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         $this->assertFileExists($entry);
         $contents = (string) file_get_contents($entry);
         $count = substr_count($contents, 'require_once __DIR__');
-                $this->assertSame(567, $count, '108 compiler_minimal overlap + 459 M2 spine units; array_pop/shift/search/combine/multisort/sort/usort/uasort + shell_exec + VmString/VmSplAutoload/VmPregReplaceCallback/spl_autoload skipped (AOT lint)');
+                $this->assertSame(568, $count, '108 compiler_minimal overlap + 460 M2 spine units; array_pop/shift/search/combine/multisort/usort/uasort + shell_exec + VmString/VmSplAutoload/VmPregReplaceCallback/spl_autoload skipped (AOT lint)');
         foreach (self::LIB_SPINE_SMOKE_NEW_UNITS as $unit) {
             $this->assertStringContainsString(
                 "require_once __DIR__.'/../../../{$unit}';",

@@ -54,20 +54,7 @@ final class sort_ extends Internal
             $copy->copyFrom($value);
             $values[] = $copy;
         }
-        \usort($values, static function (Variable $a, Variable $b): int {
-            $a = $a->resolveIndirect();
-            $b = $b->resolveIndirect();
-            if (Variable::TYPE_STRING === $a->type && Variable::TYPE_STRING === $b->type) {
-                return VmString::strcmp($a->toString(), $b->toString());
-            }
-            if (Variable::TYPE_INTEGER === $a->type && Variable::TYPE_INTEGER === $b->type) {
-                return $a->toInt() <=> $b->toInt();
-            }
-
-            throw new \LogicException(
-                'sort() only supports homogeneous string or integer arrays in this compiler build'
-            );
-        });
+        VmInternalCompare::sortHomogeneousPackedValues($values);
         $ht->replacePackedValues($values);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(true);
