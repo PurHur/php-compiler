@@ -621,7 +621,16 @@ class JIT {
             || str_contains($lower, '\\web\\responsecontext::')
             || str_contains($lower, '\\web\\devserver::')
             || str_contains($lower, '\\web\\params::')
-            || str_contains($lower, '\\ext\\standard\\jit');
+            || str_contains($lower, '\\ext\\standard\\jit')
+            || str_contains($lower, '\\jit\\varfetchhelper::')
+            || str_contains($lower, '\\jit\\unsethelper::')
+            || str_contains($lower, '\\jit\\arraybuiltinhelper::')
+            || str_contains($lower, '\\jit\\reflectionbuiltinhelper::')
+            || str_contains($lower, '\\jit\\typecheck::')
+            || str_contains($lower, '\\jit\\errorhandlercallbackpolicy::')
+            || str_contains($lower, '\\jit\\builtin\\stringparsestr::')
+            || str_contains($lower, '\\jit\\builtin\\type\\object_::')
+            || str_contains($lower, '\\jit\\builtin\\type\\hashtable::');
     }
 
     /** IncludePathResolver methods with safe LLVM 9 lowering during self-host AOT (#816). */

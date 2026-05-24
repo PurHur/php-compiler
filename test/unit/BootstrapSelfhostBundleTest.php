@@ -18,6 +18,13 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'lib/Doctor.php',
         'lib/Cli/InvokeCwd.php',
         'lib/Cli/PhpcBuild.php',
+        'lib/BuiltinParamNames.php',
+        'lib/VM/NamedArgs.php',
+        'ext/types/is_type.php',
+        'ext/types/strlen.php',
+        'ext/types/mb_strlen.php',
+        'ext/types/JitMbStrlen.php',
+        'ext/types/Module.php',
         'lib/Cli/PhpcInit.php',
         'lib/Web/CgiAotDriver.php',
         'lib/Web/CgiDriver.php',
@@ -37,6 +44,19 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'lib/JIT/Builtin/StringHttpBuildQuery.php',
         'lib/JIT/Builtin/StringSerialize.php',
         'lib/JIT/Builtin/StringSuperglobalName.php',
+        'lib/JIT/ErrorHandlerCallbackPolicy.php',
+        'lib/JIT/UsortCallbackPolicy.php',
+        'lib/JIT/PregReplaceCallbackPolicy.php',
+        'lib/JIT/ArrayReduceCallbackPolicy.php',
+        'lib/JIT/ArrayMapCallbackPolicy.php',
+        'lib/JIT/TypeCheck.php',
+        'lib/JIT/ReflectionBuiltinHelper.php',
+        'lib/JIT/ArrayBuiltinHelper.php',
+        'lib/JIT/UnsetHelper.php',
+        'lib/JIT/VarFetchHelper.php',
+        'lib/JIT/Builtin/Type/HashTable.php',
+        'lib/JIT/Builtin/Type/Object_.php',
+        'lib/JIT/Builtin/StringParseStr.php',
         'lib/JIT/Builtin/StringPregMatch.php',
         'lib/JIT/Builtin/StringUnserialize.php',
         'lib/JIT/Builtin/StringUrldecode.php',
@@ -155,7 +175,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         $this->assertFileExists($entry);
         $contents = (string) file_get_contents($entry);
         $count = substr_count($contents, 'require_once __DIR__');
-        $this->assertSame(229, $count, '108 compiler_minimal units + 121 M2 spine units');
+        $this->assertSame(249, $count, '108 compiler_minimal units + 141 M2 spine units');
         foreach (self::LIB_SPINE_SMOKE_NEW_UNITS as $unit) {
             $this->assertStringContainsString(
                 "require_once __DIR__.'/../../../{$unit}';",

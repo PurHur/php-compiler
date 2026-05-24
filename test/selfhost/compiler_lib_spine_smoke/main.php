@@ -42,6 +42,7 @@ require_once __DIR__.'/../../../lib/VM/HashTable.php';
 require_once __DIR__.'/../../../lib/VM/ClassEntry.php';
 require_once __DIR__.'/../../../lib/VM/ObjectEntry.php';
 require_once __DIR__.'/../../../lib/VM/TypeCheck.php';
+require_once __DIR__.'/../../../lib/VM/NamedArgs.php';
 require_once __DIR__.'/../../../lib/VM/Optimizer/AssignOp.php';
 require_once __DIR__.'/../../../lib/VM/Optimizer.php';
 require_once __DIR__.'/../../../lib/VM/Context.php';
@@ -59,6 +60,10 @@ require_once __DIR__.'/../../../lib/JIT/Analyzer.php';
 require_once __DIR__.'/../../../lib/JIT/BasicBlockHelper.php';
 require_once __DIR__.'/../../../lib/JIT/JitValueBox.php';
 require_once __DIR__.'/../../../lib/JIT/SelfHostBuiltinPolicy.php';
+require_once __DIR__.'/../../../lib/JIT/ArrayMapCallbackPolicy.php';
+require_once __DIR__.'/../../../lib/JIT/ArrayReduceCallbackPolicy.php';
+require_once __DIR__.'/../../../lib/JIT/PregReplaceCallbackPolicy.php';
+require_once __DIR__.'/../../../lib/JIT/UsortCallbackPolicy.php';
 require_once __DIR__.'/../../../lib/JIT/CoalesceHelper.php';
 require_once __DIR__.'/../../../lib/JIT/IncludeHelper.php';
 require_once __DIR__.'/../../../lib/JIT/ScopeBuiltinHelper.php';
@@ -114,18 +119,28 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringFunctionExists.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringHttpBuildQuery.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringSerialize.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringSuperglobalName.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/StringParseStr.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringPregMatch.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringUnserialize.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringFilePutContents.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/Type/Value.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/Type/NativeArray.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/Type/MaskedArray.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/Type/HashTable.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/Type/Object_.php';
+require_once __DIR__.'/../../../lib/BuiltinParamNames.php';
 require_once __DIR__.'/../../../lib/MethodVisibility.php';
 require_once __DIR__.'/../../../lib/JIT/Helper.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/Internal.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/VarArg.php';
 require_once __DIR__.'/../../../lib/JIT/Context.php';
 require_once __DIR__.'/../../../lib/JIT/HashTableHelper.php';
+require_once __DIR__.'/../../../lib/JIT/ErrorHandlerCallbackPolicy.php';
+require_once __DIR__.'/../../../lib/JIT/TypeCheck.php';
+require_once __DIR__.'/../../../lib/JIT/VarFetchHelper.php';
+require_once __DIR__.'/../../../lib/JIT/UnsetHelper.php';
+require_once __DIR__.'/../../../lib/JIT/ArrayBuiltinHelper.php';
+require_once __DIR__.'/../../../lib/JIT/ReflectionBuiltinHelper.php';
 require_once __DIR__.'/../../../lib/JIT.php';
 require_once __DIR__.'/../../../lib/VM/OutputBuffer.php';
 require_once __DIR__.'/../../../lib/VM.php';
@@ -237,5 +252,19 @@ require_once __DIR__.'/../../../ext/standard/JitTouch.php';
 require_once __DIR__.'/../../../ext/standard/JitUnlink.php';
 require_once __DIR__.'/../../../ext/standard/JitWebParams.php';
 require_once __DIR__.'/../../../ext/standard/Module.php';
+require_once __DIR__.'/../../../ext/types/is_type.php';
+require_once __DIR__.'/../../../ext/types/strlen.php';
+require_once __DIR__.'/../../../ext/types/mb_strlen.php';
+require_once __DIR__.'/../../../ext/types/JitMbStrlen.php';
+require_once __DIR__.'/../../../ext/types/Module.php';
+// lib/Lint/SwitchDetector.php — deferred (#1425): anonymous class breaks php-types AOT lint at current spine size.
+// lib/Cli/PhpcRun.php — deferred (#1423): docblock type parse failure in bundled AOT lint.
+// lib/AOT/ProjectGraph.php — deferred (#1424): bundled AOT lint failure (ManifestValidator deps).
+// bin/vm.php — deferred (#1423): entry script pulls src/cli.php and executes argv (M4/M5).
+// src/tokenizer-compat.php — deferred (#1432): bracketed Yay namespace mix breaks PhpParser CFG lint.
+// src/yay-php8-compat.php — deferred (#1432): bracketed Yay namespace mix breaks PhpParser CFG lint.
+// src/llvm-env.php — deferred (#1432): host FFI preload shim; bundle after M4.
+// src/macro_functions.php — deferred (#1432): bracketed/unbracketed namespace mix breaks PhpParser CFG.
+// src/cli.php — deferred (#1432): entry shim requires vendor/autoload.php and executes argv (M4).
 
 echo "compiler_lib_spine_smoke bundle OK\n";
