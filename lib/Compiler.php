@@ -2530,30 +2530,49 @@ class Compiler {
 
     /**
      * Fold $fn = 'name'; $fn(...) to a literal callee when the name is a compile-time string (#56).
+     *
+     * Follows TYPE_ASSIGN chains so first-class callables (`strlen(...)`, `C::m(...)`, #1363) fold too.
      */
     protected function tryFoldVariableFunctionName(?int $nameSlot, Block $block): ?int
     {
         if (null === $nameSlot) {
             return null;
         }
-        foreach ($block->opCodes as $op) {
-            if (OpCode::TYPE_ASSIGN !== $op->type) {
-                continue;
-            }
-            if ($op->arg2 !== $nameSlot) {
-                continue;
-            }
-            if (!isset($block->constants[$op->arg3])) {
-                continue;
-            }
-            $const = $block->constants[$op->arg3];
-            if (Variable::TYPE_STRING !== $const->type) {
-                continue;
-            }
-            $lit = new Literal($const->toString());
-            $lit->type = Type::string();
+        $name = $this->resolveCompileTimeStringSlot($nameSlot, $block);
+        if (null === $name) {
+            return null;
+        }
+        $lit = new Literal($name);
+        $lit->type = Type::string();
 
-            return $this->compileOperand($lit, $block, true);
+        return $this->compileOperand($lit, $block, true);
+    }
+
+    /**
+     * Resolve a scope slot to a compile-time string via constants or assign chains (#1363).
+     */
+    protected function resolveCompileTimeStringSlot(int $slot, Block $block, array &$visited = []): ?string
+    {
+        if (isset($visited[$slot])) {
+            return null;
+        }
+        $visited[$slot] = true;
+        if (isset($block->constants[$slot])) {
+            $const = $block->constants[$slot];
+            if (Variable::TYPE_STRING !== $const->type) {
+                return null;
+            }
+
+            return $const->toString();
+        }
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_ASSIGN !== $op->type || $op->arg2 !== $slot) {
+                continue;
+            }
+            $resolved = $this->resolveCompileTimeStringSlot((int) $op->arg3, $block, $visited);
+            if (null !== $resolved) {
+                return $resolved;
+            }
         }
 
         return null;
