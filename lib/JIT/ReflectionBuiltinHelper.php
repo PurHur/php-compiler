@@ -39,6 +39,16 @@ final class ReflectionBuiltinHelper
         return $i1->constInt($exists ? 1 : 0, false);
     }
 
+    public static function enumExistsLiteral(Context $context, string $enumName): Value
+    {
+        $lc = strtolower($enumName);
+        $exists = self::objectBuiltin($context)->hasUserDeclaredEnum($enumName)
+            || (null !== $context->runtime->vmContext && isset($context->runtime->vmContext->enums[$lc]));
+        $i1 = $context->getTypeFromString('int1');
+
+        return $i1->constInt($exists ? 1 : 0, false);
+    }
+
     public static function functionExistsLiteral(Context $context, string $functionName): Value
     {
         $lc = strtolower($functionName);
@@ -59,6 +69,21 @@ final class ReflectionBuiltinHelper
         }
         $classId = $object->lookup($className);
         $exists = $object->hasMethod($classId, $method);
+        $i1 = $context->getTypeFromString('int1');
+
+        return $i1->constInt($exists ? 1 : 0, false);
+    }
+
+    public static function propertyExistsLiteral(Context $context, string $className, string $property): Value
+    {
+        $object = self::objectBuiltin($context);
+        if (!$object->hasUserDeclaredClass($className)) {
+            $i1 = $context->getTypeFromString('int1');
+
+            return $i1->constInt(0, false);
+        }
+        $classId = $object->lookup($className);
+        $exists = $object->hasProperty($classId, $property);
         $i1 = $context->getTypeFromString('int1');
 
         return $i1->constInt($exists ? 1 : 0, false);
