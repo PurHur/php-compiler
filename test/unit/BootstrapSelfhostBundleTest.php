@@ -259,6 +259,26 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/base64_encode.php',
         'ext/standard/basename.php',
         'ext/standard/bindec.php',
+        'ext/standard/boolval.php',
+        'ext/standard/ceil.php',
+        'ext/standard/cos.php',
+        'ext/standard/decbin.php',
+        'ext/standard/dechex.php',
+        'ext/standard/decoct.php',
+        'ext/standard/deg2rad.php',
+        'ext/standard/exp.php',
+        'ext/standard/floor.php',
+        'ext/standard/fmod.php',
+        'ext/standard/gettype.php',
+        'ext/standard/intval.php',
+        'ext/standard/is_finite.php',
+        'ext/standard/is_infinite.php',
+        'ext/standard/is_nan.php',
+        'ext/standard/array_filter.php',
+        'ext/standard/array_reduce.php',
+        'ext/standard/chr.php',
+        'ext/standard/chunk_split.php',
+        'ext/standard/explode.php',
     ];
 
     public static function setUpBeforeClass(): void
@@ -280,7 +300,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         $this->assertFileExists($entry);
         $contents = (string) file_get_contents($entry);
         $count = substr_count($contents, 'require_once __DIR__');
-                $this->assertSame(358, $count, '108 compiler_minimal units + 250 M2 spine units (#1497 wave 2 batch 4); array_pop/shift/search + preg/array_combine wrappers skipped (AOT types); Vm* deferred #1467');
+                $this->assertSame(378, $count, '108 compiler_minimal units + 270 M2 spine units (#1497 wave 2 batch 5); array_pop/shift/search + preg/array_combine wrappers skipped (AOT types); Vm* deferred #1467');
         foreach (self::LIB_SPINE_SMOKE_NEW_UNITS as $unit) {
             $this->assertStringContainsString(
                 "require_once __DIR__.'/../../../{$unit}';",
