@@ -34,7 +34,7 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | Layer | Today | Target |
 |-------|-------|--------|
 | **Bootstrap driver** | Zend runs `php bin/compile.php` | Compiled `bin/compile.php` |
-| **Bundle size** | **299** spine units + **109** minimal = **408** curated `require_once` | ~**569** inventory files |
+| **Bundle size** | **313** spine units + **109** minimal = **422** curated `require_once` | ~**584** inventory files |
 | **Inventory coverage** | **~53%** of vm.php path in spine smoke | **100%** |
 | **HelloWorld** | Native **run** ✅; **emit** still Zend fallback | Native compile + emit |
 | **Bootstrap loop (M4)** | Not started | Native rebuilds next compiler revision |
@@ -59,7 +59,7 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 |-----------|----------------|--------|-----|
 | **M0** | AOT can link a **small** honest `lib/` subset | ✅ | 100% |
 | **M1** | Bundle is **compiler-shaped** (lint + compile-smoke) | ✅ | 100% |
-| **M2** | Spine grows toward full `bin/vm.php` inventory | 🚧 **299/569** units | **~53%** |
+| **M2** | Spine grows toward full `bin/vm.php` inventory | 🚧 **313/584** units | **~54%** |
 | **M3** | Self-host binary **compiles external PHP** (HelloWorld) without Zend emit | 🚧 partial | **~45%** |
 | **M4** | Self-host binary **rebuilds** the next compiler tree | ⬜ | 0% |
 | **M5** | Full self-host; Zend retired from loop | ⬜ north star | 0% |
@@ -111,7 +111,7 @@ Parallel batches ([#1419](https://github.com/PurHur/php-compiler/issues/1419)) g
 | Entry | Units | Role |
 |-------|------:|------|
 | `test/selfhost/compiler_minimal/main.php` | **109** | M0 core |
-| `test/selfhost/compiler_lib_spine_smoke/main.php` | **299** | M2 growth |
+| `test/selfhost/compiler_lib_spine_smoke/main.php` | **313** | M2 growth ([#1497](https://github.com/PurHur/php-compiler/issues/1497) wave 2 batch 1) |
 | `test/selfhost/compiler_helloworld_smoke/` | — | M3 probe + compile driver |
 
 ---

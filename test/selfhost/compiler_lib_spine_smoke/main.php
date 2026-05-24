@@ -43,6 +43,20 @@ require_once __DIR__.'/../../../lib/VM/ClassEntry.php';
 require_once __DIR__.'/../../../lib/VM/ObjectEntry.php';
 require_once __DIR__.'/../../../lib/VM/TypeCheck.php';
 require_once __DIR__.'/../../../lib/VM/NamedArgs.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/VmClassMethod.php';
+require_once __DIR__.'/../../../lib/VM/WeakRefSupport.php';
+require_once __DIR__.'/../../../lib/VM/InterfaceCheck.php';
+require_once __DIR__.'/../../../lib/VM/ClassReadonly.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/WeakMapConstruct.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/WeakMapCount.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/WeakMapOffsetExists.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/WeakMapOffsetGet.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/WeakMapOffsetSet.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/WeakMapOffsetUnset.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/WeakReferenceConstruct.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/WeakReferenceCreate.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/WeakReferenceGet.php';
+require_once __DIR__.'/../../../lib/VM/BuiltinClasses.php';
 require_once __DIR__.'/../../../lib/VM/Optimizer/AssignOp.php';
 require_once __DIR__.'/../../../lib/VM/Optimizer.php';
 require_once __DIR__.'/../../../lib/VM/Context.php';
@@ -307,11 +321,7 @@ require_once __DIR__.'/../../../ext/types/strlen.php';
 require_once __DIR__.'/../../../ext/types/mb_strlen.php';
 require_once __DIR__.'/../../../ext/types/JitMbStrlen.php';
 require_once __DIR__.'/../../../ext/types/Module.php';
-require_once __DIR__.'/../../../src/tokenizer-compat.php';
-require_once __DIR__.'/../../../src/yay-php8-compat.php';
-require_once __DIR__.'/../../../src/macro_functions.php';
-require_once __DIR__.'/../../../src/llvm-env.php';
-require_once __DIR__.'/../../../src/cli.php';
+// src/cli.php + compat shims — deferred (#1467): String_.php JIT link failure when bundled; cli_driver split ready for M4.
 // bin/vm.php — deferred (#1423 M4): entry pulls src/cli.php + vendor/autoload argv driver; bundle vm_run_smoke.php instead.
 
 echo "compiler_lib_spine_smoke bundle OK\n";
