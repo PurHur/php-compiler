@@ -64,6 +64,21 @@ final class ReflectionBuiltinHelper
         return $i1->constInt($exists ? 1 : 0, false);
     }
 
+    public static function propertyExistsLiteral(Context $context, string $className, string $property): Value
+    {
+        $object = self::objectBuiltin($context);
+        if (!$object->hasUserDeclaredClass($className)) {
+            $i1 = $context->getTypeFromString('int1');
+
+            return $i1->constInt(0, false);
+        }
+        $classId = $object->lookup($className);
+        $exists = $object->hasProperty($classId, $property);
+        $i1 = $context->getTypeFromString('int1');
+
+        return $i1->constInt($exists ? 1 : 0, false);
+    }
+
     public static function emitInstanceOf(Context $context, Variable $value, string $className): Variable
     {
         return self::objectBuiltin($context)->emitInstanceOf($value, $className);

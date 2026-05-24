@@ -31,6 +31,11 @@ class ObjectEntry {
         }
     }
 
+    public function hasProperty(string $name): bool
+    {
+        return array_key_exists($name, $this->properties);
+    }
+
     public function getProperty(string $name): Variable {
         if (!isset($this->properties[$name])) {
             throw new \LogicException("Undefined property access");

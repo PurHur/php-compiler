@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -53,6 +54,34 @@ final class VmReflection
     public static function methodExistsOnClass(ClassEntry $class, string $method): bool
     {
         return isset($class->methods[strtolower($method)]);
+    }
+
+    public static function propertyExistsOnClass(Context $ctx, ClassEntry $class, string $property): bool
+    {
+        $lc = strtolower($property);
+        for ($entry = $class; ; ) {
+            foreach ($entry->properties as $prop) {
+                if ($prop->name === $property) {
+                    return true;
+                }
+            }
+            if (isset($entry->staticProperties[$lc])) {
+                return true;
+            }
+            if (null === $entry->parentLc) {
+                return false;
+            }
+            $parent = self::resolveClassEntry($ctx, $entry->parentLc);
+            if (null === $parent) {
+                return false;
+            }
+            $entry = $parent;
+        }
+    }
+
+    public static function propertyExistsOnObject(ObjectEntry $object, string $property): bool
+    {
+        return $object->hasProperty($property);
     }
 
     public static function resolveClassFromArg(Context $ctx, Variable $arg): ClassEntry

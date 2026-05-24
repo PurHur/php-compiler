@@ -547,6 +547,17 @@ class Object_ extends Type {
         return isset($this->methodVisibility[$classId][strtolower($methodLc)]);
     }
 
+    public function hasProperty(int $classId, string $propertyName): bool
+    {
+        foreach ($this->properties[$classId] ?? [] as $propset) {
+            if ($propset[1] === $propertyName) {
+                return true;
+            }
+        }
+
+        return isset($this->staticPropertyGlobals[$classId][strtolower($propertyName)]);
+    }
+
     public function lookupOperand(Operand $name): int
     {
         if (!$name instanceof Literal) {
