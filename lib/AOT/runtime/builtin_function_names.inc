@@ -137,6 +137,7 @@ static const char *phpc_builtin_functions[] = {
     "json_encode",
     "json_last_error",
     "serialize",
+    "unserialize",
     "lcfirst",
     "log",
     "lstat",
