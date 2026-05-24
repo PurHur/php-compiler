@@ -96,6 +96,58 @@ final class IncludeLiteralTest extends TestCase
     }
 
     /**
+     * Two-file require chain (config + helper) mirrors MiniWebApp entry graph (#475).
+     */
+    public function testVmIncludeTwoFileChain(): void
+    {
+        $entry = realpath(__DIR__.'/../compliance/cases/language/include_two_file/entry.php');
+        $this->assertNotFalse($entry);
+        $exit = $this->runVm([$entry]);
+        $this->assertSame(0, $exit['code'], $exit['stderr']);
+        $this->assertSame("TwoFile\n", $exit['stdout']);
+    }
+
+    /**
+     * JIT compile-time include lowering for two-file __DIR__ chain (issue #475).
+     *
+     * @group llvm
+     * @group jit
+     */
+    public function testJitIncludeTwoFileChain(): void
+    {
+        if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM toolchain not available');
+        }
+        if (!$this->jitRuntimeProbeOk()) {
+            $this->markTestSkipped('JIT MCJIT probe failed — bin/jit.php not runnable (#475)');
+        }
+        $entry = realpath(__DIR__.'/../compliance/cases/language/include_two_file/entry.php');
+        $this->assertNotFalse($entry);
+        $exit = $this->runJit([$entry]);
+        $this->assertSame(0, $exit['code'], $exit['stderr']."\n".$exit['stdout']);
+        $this->assertSame("TwoFile\n", $exit['stdout']);
+    }
+
+    /**
+     * @group llvm
+     * @group jit
+     */
+    public function testJitRequireDirRelative(): void
+    {
+        if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM toolchain not available');
+        }
+        if (!$this->jitRuntimeProbeOk()) {
+            $this->markTestSkipped('JIT MCJIT probe failed — bin/jit.php not runnable (#475)');
+        }
+        $entry = realpath(__DIR__.'/../compliance/cases/language/include_dir_literal/entry.php');
+        $this->assertNotFalse($entry);
+        $exit = $this->runJit([$entry]);
+        $this->assertSame(0, $exit['code'], $exit['stderr']."\n".$exit['stdout']);
+        $this->assertSame("hello from helper\n", $exit['stdout']);
+    }
+
+    /**
      * require expression captures return value (MiniWebApp config.php pattern, issue #67).
      */
     public function testVmRequireReturnValue(): void
@@ -221,6 +273,45 @@ final class IncludeLiteralTest extends TestCase
     }
 
     /**
+     * @param list<string> $args
+     *
+     * @return array{code: int, stdout: string, stderr: string}
+     */
+    private function runJit(array $args): array
+    {
+        $repoRoot = dirname(__DIR__, 2);
+        $env = [];
+        LlvmToolchain::applyProcessEnv($env, $repoRoot);
+        $cmd = array_merge(
+            LlvmToolchain::envPrefix($repoRoot),
+            self::phpCommand(),
+            [realpath($repoRoot.'/bin/jit.php')],
+            $args
+        );
+
+        return $this->runCommand($cmd, $repoRoot, $env);
+    }
+
+    private function jitRuntimeProbeOk(): bool
+    {
+        $repoRoot = dirname(__DIR__, 2);
+        $script = $repoRoot.'/script/jit-runtime-probe.php';
+        if (!is_file($script)) {
+            return false;
+        }
+        $env = [];
+        LlvmToolchain::applyProcessEnv($env, $repoRoot);
+        $cmd = array_merge(
+            LlvmToolchain::envPrefix($repoRoot),
+            self::phpCommand(),
+            [$script]
+        );
+        $result = $this->runCommand($cmd, $repoRoot, $env);
+
+        return 0 === $result['code'] && str_contains($result['stdout'], 'jit-runtime-probe OK');
+    }
+
+    /**
      * @param list<string> $lintArgs
      *
      * @return array{code: int, stdout: string, stderr: string}
@@ -234,18 +325,22 @@ final class IncludeLiteralTest extends TestCase
     }
 
     /**
-     * @param list<string> $cmd
+     * @param list<string>              $cmd
+     * @param array<string, string>     $env
      *
      * @return array{code: int, stdout: string, stderr: string}
      */
-    private function runCommand(array $cmd, string $cwd): array
+    private function runCommand(array $cmd, string $cwd, array $env = []): array
     {
+        if ([] === $env) {
+            $env = null;
+        }
         $descriptorSpec = [
             0 => ['pipe', 'r'],
             1 => ['pipe', 'w'],
             2 => ['pipe', 'w'],
         ];
-        $proc = proc_open($cmd, $descriptorSpec, $pipes, $cwd);
+        $proc = proc_open($cmd, $descriptorSpec, $pipes, $cwd, $env);
         $this->assertIsResource($proc);
         fclose($pipes[0]);
         $stdout = stream_get_contents($pipes[1]);

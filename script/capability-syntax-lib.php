@@ -63,6 +63,14 @@ function syntaxRowDefinitions(): array
             'probe' => 'class C { public int $x = 1; } $c = new C(); $k = "x"; echo $c->$k;',
         ],
         [
+            'id' => 'variable_function_call',
+            'construct' => 'Variable function call `$fn()`',
+            'opcodes' => ['TYPE_FUNCCALL_INIT', 'TYPE_FUNCCALL_EXEC_RETURN', 'TYPE_FUNCCALL_EXEC_NORETURN'],
+            'issue' => 56,
+            'notes' => ['VM resolves callee at runtime; JIT when callee name is compile-time string in variable (#56)'],
+            'probe' => '$fn = "strlen"; echo $fn("hi");',
+        ],
+        [
             'id' => 'native_user_class',
             'construct' => 'Native user-class link (`phpc build --project`)',
             'opcodes' => ['TYPE_DECLARE_CLASS', 'TYPE_NEW', 'TYPE_METHODCALL_INIT'],
@@ -136,6 +144,14 @@ function syntaxRowDefinitions(): array
             'probe' => null,
         ],
         [
+            'id' => 'literal_include',
+            'construct' => 'Literal `include`/`require` with `__DIR__`',
+            'opcodes' => ['TYPE_INCLUDE'],
+            'issue' => 475,
+            'notes' => ['Compile-time inlining via IncludeHelper; two-file PHPT + MiniWebApp JIT gate (#587)'],
+            'probe' => null,
+        ],
+        [
             'id' => 'foreach_by_ref',
             'construct' => 'foreach by-reference (`&$v`)',
             'opcodes' => ['TYPE_ITER_VALUE', 'TYPE_ASSIGN_REF'],
@@ -196,8 +212,16 @@ function syntaxRowDefinitions(): array
             'construct' => 'Variable function calls (`$fn()`)',
             'opcodes' => ['TYPE_FUNCCALL_INIT', 'TYPE_FUNCCALL_EXEC_RETURN'],
             'issue' => 56,
-            'notes' => ['VM resolves callee name at runtime; JIT when callee has compile-time string (literal assignment)'],
+            'notes' => ['VM resolves callee at runtime; compiler folds literal assignment; JIT uses compile-time string'],
             'probe' => '$fn = "strlen"; echo $fn("hi");',
+        ],
+        [
+            'id' => 'invoke_object',
+            'construct' => 'Invokable objects (`$obj()` / `__invoke`)',
+            'opcodes' => ['TYPE_METHODCALL_INIT', 'TYPE_DECLARE_METHOD'],
+            'issue' => 1232,
+            'notes' => ['Object-typed FuncCall lowered to __invoke method dispatch; VM runtime fallback'],
+            'probe' => 'class C { public function __invoke(): int { return 1; } } echo (new C())();',
         ],
     ];
 }

@@ -318,3 +318,20 @@ ci_run_miniwebapp_serve_aot() {
   echo "PHPUnit: MiniWebApp serve-aot (@group miniwebapp-aot-serve; MINIWEBAPP_SERVE_AOT_GATE or MINIWEBAPP_AOT_EXECUTE_GATE, #478, #610)..."
   ci_run_phpunit --group miniwebapp-aot-serve "$@"
 }
+
+# 003-MiniWebApp bin/jit.php project entry (issues #587, #475); opt-in MINIWEBAPP_JIT_PROJECT_GATE=1.
+ci_run_miniwebapp_jit_project() {
+  if [[ "${MINIWEBAPP_JIT_PROJECT_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  if ! ci_llvm_ready; then
+    echo "PHPUnit: MiniWebApp JIT project skipped (LLVM 9 not available)"
+    return 0
+  fi
+  if ! ci_should_run_jit; then
+    echo "PHPUnit: MiniWebApp JIT project skipped (JIT MCJIT probe failed)"
+    return 0
+  fi
+  echo "PHPUnit: MiniWebApp JIT project (@group miniwebapp-jit-project; MINIWEBAPP_JIT_PROJECT_GATE=1, #587)..."
+  ci_run_phpunit --group miniwebapp-jit-project "$@"
+}

@@ -14,6 +14,7 @@ Tracking issues: [#58](https://github.com/PurHur/php-compiler/issues/58), [#145]
 | Private methods | yes | yes | yes | [#145](https://github.com/PurHur/php-compiler/issues/145) | compliance PHPT; bootstrap AOT |
 | Property fetch `$this->x` | yes | yes | yes | [#58](https://github.com/PurHur/php-compiler/issues/58) | compliance PHPT; bootstrap AOT |
 | Dynamic property access `$obj->$name` | yes | yes | yes | [#1227](https://github.com/PurHur/php-compiler/issues/1227) | JIT compares runtime name to declared properties; unknown names abort at runtime; compliance PHPT |
+| Variable function call `$fn()` | yes | yes | yes | [#56](https://github.com/PurHur/php-compiler/issues/56) | VM resolves callee at runtime; JIT when callee name is compile-time string in variable (#56) |
 | Native user-class link (`phpc build --project`) | yes | yes | yes | [#764](https://github.com/PurHur/php-compiler/issues/764) | AOT link yes (#568 closed); native execute #764; compliance PHPT; bootstrap AOT |
 | `instanceof` | yes | yes | yes | [#138](https://github.com/PurHur/php-compiler/issues/138) | compliance PHPT; bootstrap AOT |
 | `match` expression | yes | yes | yes | [#143](https://github.com/PurHur/php-compiler/issues/143) | Lowered in php-cfg to === / jump-if / assign (#143); compliance PHPT; bootstrap AOT |
@@ -23,6 +24,7 @@ Tracking issues: [#58](https://github.com/PurHur/php-compiler/issues/58), [#145]
 | Magic constant `__NAMESPACE__` | yes | yes | yes | [#199](https://github.com/PurHur/php-compiler/issues/199) | Requires `namespace` declaration (#84); compliance PHPT |
 | Magic constants `__DIR__`, `__FILE__` | yes | yes | yes | [#707](https://github.com/PurHur/php-compiler/issues/707) | VM script stack on include; JIT uses per-unit script path; compliance PHPT; bootstrap AOT |
 | Magic constant `__LINE__` | yes | yes | yes | [#715](https://github.com/PurHur/php-compiler/issues/715) | Per-site line on TYPE_SCRIPT_MAGIC; include stack for multi-file units; compliance PHPT |
+| Literal `include`/`require` with `__DIR__` | yes | yes | yes | [#475](https://github.com/PurHur/php-compiler/issues/475) | Compile-time inlining via IncludeHelper; two-file PHPT + MiniWebApp JIT gate (#587) |
 | foreach by-reference (`&$v`) | yes | yes | yes | [#1222](https://github.com/PurHur/php-compiler/issues/1222) | Packed and string-keyed arrays; VM + JIT lowering |
 | Static property `Class::$prop` | yes | yes | yes | [#1225](https://github.com/PurHur/php-compiler/issues/1225) | Class-scoped storage; `self::` / `static::`; literal property names in JIT |
 | `unset()` on variables and array offsets | yes | yes | yes | [#1224](https://github.com/PurHur/php-compiler/issues/1224) | VM + JIT assign null to lvalue slots |
@@ -30,7 +32,8 @@ Tracking issues: [#58](https://github.com/PurHur/php-compiler/issues/58), [#145]
 | `goto` / labels (function scope) | yes | yes | yes | [#1228](https://github.com/PurHur/php-compiler/issues/1228) | php-cfg lowers labels to CFG Jump; VM avoids frame nesting on same-block back-edges; compliance PHPT |
 | `declare(strict_types=1)` scalar parameter checks | yes | yes | yes | [#1229](https://github.com/PurHur/php-compiler/issues/1229) | VM #156; JIT enforces at user call sites via JIT\TypeCheck + Native::compileArg weak casts |
 | Variable variables (`$$name`) | yes | no | yes | [#1226](https://github.com/PurHur/php-compiler/issues/1226) | php-cfg nests Operand\Variable name; VM resolves runtime local by name; compliance PHPT; VM-only lowering |
-| Variable function calls (`$fn()`) | yes | yes | yes | [#56](https://github.com/PurHur/php-compiler/issues/56) | VM resolves callee name at runtime; JIT when callee has compile-time string (literal assignment) |
+| Variable function calls (`$fn()`) | yes | yes | yes | [#56](https://github.com/PurHur/php-compiler/issues/56) | VM resolves callee at runtime; compiler folds literal assignment; JIT compile-time string |
+| Invokable objects (`$obj()` / `__invoke`) | yes | yes | yes | [#1232](https://github.com/PurHur/php-compiler/issues/1232) | Object-typed FuncCall lowered to __invoke method dispatch; VM runtime fallback |
 
 _Syntax AOT column reflects `Runtime::MODE_AOT` compile probes unless a row pins AOT (e.g. native user-class link)._
 ## Web north-star (`examples/003-MiniWebApp`)

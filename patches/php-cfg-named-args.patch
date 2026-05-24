@@ -1,0 +1,28 @@
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Operand.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Operand.php
+@@ -20,6 +20,9 @@
+ 
+     public $usages = [];
+ 
++    /** Optional named-argument label from the call site (issue #168). */
++    public $callArgName = null;
++
+     public function getType(): string
+     {
+         return strtr(substr(rtrim(get_class($this), '_'), strlen(__CLASS__) + 1), '\\', '_');
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
+@@ -861,7 +861,12 @@
+ 
+     protected function parseArg(Node\Arg $expr)
+     {
+-        return $this->readVariable($this->parseExprNode($expr->value));
++        $op = $this->readVariable($this->parseExprNode($expr->value));
++        if (null !== $expr->name) {
++            $op->callArgName = $expr->name->toString();
++        }
++
++        return $op;
+     }
+ 
+     protected function parseExpr_Array(Expr\Array_ $expr)

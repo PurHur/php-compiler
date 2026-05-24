@@ -1,5 +1,5 @@
 --TEST--
-goto label within function scope (VM)
+goto statement: forward and backward labels (VM)
 --FILE--
 <?php
 $i = 0;
@@ -9,5 +9,17 @@ if ($i < 3) {
     goto start;
 }
 echo $i, "\n";
+
+if (false) {
+    skip:
+}
+echo "ok\n";
+
+goto end;
+echo "no\n";
+end:
+echo "done\n";
 --EXPECT--
 3
+ok
+done

@@ -594,6 +594,9 @@ class Compiler {
             $defaultConst = $this->compileOperand($param->defaultVar, $block, true);
         }
         $slot = $this->compileOperand($param->result, $block, false);
+        if ($param->name instanceof Operand\Literal && is_string($param->name->value)) {
+            $block->paramNames[$paramIdx] = $param->name->value;
+        }
         if ($param->declaredType instanceof Op\Type\Literal) {
             $rawType = Type::fromDecl($param->declaredType->name);
             $mapped = Variable::mapFromType($rawType);
@@ -1022,6 +1025,16 @@ class Compiler {
                     $this->compileOperand($expr->name, $block, true)
                 )];
             case Op\Expr\FuncCall::class:
+                if ($this->operandIsInvokableReceiver($expr->name, $block)) {
+                    return $this->compileMethodCallOpcodes(
+                        $this->compileOperand($expr->name, $block, true),
+                        $this->compileOperand(new Operand\Literal('__invoke'), $block, true),
+                        $expr->args,
+                        $expr->result,
+                        $block
+                    );
+                }
+
                 return $this->compileFuncCall(
                     $this->compileOperand($expr->name, $block, true),
                     $expr->args,
@@ -1029,6 +1042,16 @@ class Compiler {
                     $block
                 );
             case Op\Expr\NsFuncCall::class:
+                if ($this->operandIsInvokableReceiver($expr->nsName, $block)) {
+                    return $this->compileMethodCallOpcodes(
+                        $this->compileOperand($expr->nsName, $block, true),
+                        $this->compileOperand(new Operand\Literal('__invoke'), $block, true),
+                        $expr->args,
+                        $expr->result,
+                        $block
+                    );
+                }
+
                 return $this->compileFuncCall(
                     $this->compileOperand($expr->nsName, $block, true),
                     $expr->args,
@@ -1043,11 +1066,8 @@ class Compiler {
                         $this->compileOperand($expr->name, $block, true)
                     )
                 ];
-                foreach ($expr->args as $arg) {
-                    $return[] = new OpCode(
-                        OpCode::TYPE_ARG_SEND,
-                        $this->compileOperand($arg, $block, true)
-                    );
+                foreach ($this->compileCallArgSends($expr->args, $block) as $send) {
+                    $return[] = $send;
                 }
                 if (!empty($expr->result->usages)) {
                     $return[] = new OpCode(
@@ -1068,42 +1088,21 @@ class Compiler {
                         $this->compileOperand($expr->class, $block, true),
                     )
                 ];
-                foreach ($expr->args as $arg) {
-                    $return[] = new OpCode(
-                        OpCode::TYPE_ARG_SEND,
-                        $this->compileOperand($arg, $block, true)
-                    );
+                foreach ($this->compileCallArgSends($expr->args, $block) as $send) {
+                    $return[] = $send;
                 }
                 $return[] = new OpCode(
                     OpCode::TYPE_FUNCCALL_EXEC_NORETURN
                 );
                 return $return;
             case Op\Expr\MethodCall::class:
-                $return = [
-                    new OpCode(
-                        OpCode::TYPE_METHODCALL_INIT,
-                        $this->compileOperand($expr->var, $block, true),
-                        $this->compileOperand($expr->name, $block, true)
-                    ),
-                ];
-                foreach ($expr->args as $arg) {
-                    $return[] = new OpCode(
-                        OpCode::TYPE_ARG_SEND,
-                        $this->compileOperand($arg, $block, true)
-                    );
-                }
-                if (!empty($expr->result->usages)) {
-                    $return[] = new OpCode(
-                        OpCode::TYPE_FUNCCALL_EXEC_RETURN,
-                        $this->compileOperand($expr->result, $block, false)
-                    );
-                } else {
-                    $return[] = new OpCode(
-                        OpCode::TYPE_FUNCCALL_EXEC_NORETURN,
-                    );
-                }
-
-                return $return;
+                return $this->compileMethodCallOpcodes(
+                    $this->compileOperand($expr->var, $block, true),
+                    $this->compileOperand($expr->name, $block, true),
+                    $expr->args,
+                    $expr->result,
+                    $block
+                );
             case Op\Expr\PropertyFetch::class:
                 return [new OpCode(
                     OpCode::TYPE_PROPERTY_FETCH,
@@ -1490,11 +1489,8 @@ class Compiler {
             $this->compileOperand($expr->var, $fetchBlock, true),
             $this->compileOperand($expr->name, $fetchBlock, true)
         ));
-        foreach ($expr->args as $arg) {
-            $fetchBlock->addOpCode(new OpCode(
-                OpCode::TYPE_ARG_SEND,
-                $this->compileOperand($arg, $fetchBlock, true)
-            ));
+        foreach ($this->compileCallArgSends($expr->args, $fetchBlock) as $send) {
+            $fetchBlock->addOpCode($send);
         }
         if (!empty($expr->result->usages)) {
             $fetchBlock->addOpCode(new OpCode(
@@ -2014,6 +2010,142 @@ class Compiler {
         );
     }
 
+    protected function operandIsInvokableReceiver(Operand $operand, Block $block): bool
+    {
+        if ($this->operandHasObjectType($operand)) {
+            return true;
+        }
+        if ($this->unwrapOperandChain($operand) instanceof Op\Expr\New_) {
+            return true;
+        }
+        if (null === $block->orig) {
+            return false;
+        }
+        $root = $this->unwrapOperandChain($operand);
+        foreach ($block->orig->children as $child) {
+            if (!$child instanceof Op\Expr\Assign) {
+                continue;
+            }
+            if (!$this->operandsReferToSameVariable($child->var, $root)) {
+                continue;
+            }
+            if ($this->operandDerivesFromNew($child->expr, $block)) {
+                return true;
+            }
+            if ($this->operandHasObjectType($child->expr)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    protected function operandsReferToSameVariable(Operand $a, Operand $b): bool
+    {
+        return $this->unwrapOperandChain($a) === $this->unwrapOperandChain($b);
+    }
+
+    protected function operandDerivesFromNew(Operand $operand, Block $block): bool
+    {
+        if (null === $block->orig) {
+            return false;
+        }
+        $root = $this->unwrapOperandChain($operand);
+        foreach ($block->orig->children as $child) {
+            if (!$child instanceof Op\Expr\New_) {
+                continue;
+            }
+            if ($this->unwrapOperandChain($child->result) === $root) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    protected function unwrapOperandChain(Operand $operand): Operand
+    {
+        while ($operand instanceof Operand\Temporary && null !== $operand->original) {
+            $operand = $operand->original;
+        }
+
+        return $operand;
+    }
+
+    protected function operandHasObjectType(Operand $operand): bool
+    {
+        $operand = $this->unwrapOperandChain($operand);
+
+        return null !== $operand->type && Type::TYPE_OBJECT === $operand->type->type;
+    }
+
+    /**
+     * @param list<Operand> $args
+     *
+     * @return list<OpCode>
+     */
+    protected function compileCallArgSends(array $args, Block $block): array
+    {
+        $sends = [];
+        foreach ($args as $arg) {
+            $valueSlot = $this->compileOperand($arg, $block, true);
+            $nameSlot = null;
+            $argName = $this->callArgName($arg);
+            if (null !== $argName) {
+                $nameOp = new Operand\Literal($argName);
+                $nameOp->type = Type::string();
+                $nameVar = new Variable(Variable::TYPE_STRING);
+                $nameVar->string($argName);
+                $nameSlot = $block->registerConstant($nameOp, $nameVar);
+            }
+            $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot);
+        }
+
+        return $sends;
+    }
+
+    private function callArgName(Operand $arg): ?string
+    {
+        if (property_exists($arg, 'callArgName') && null !== $arg->callArgName) {
+            $name = $arg->callArgName;
+
+            return is_string($name) && '' !== $name ? $name : null;
+        }
+
+        return null;
+    }
+
+    protected function compileMethodCallOpcodes(
+        ?int $receiver,
+        ?int $methodName,
+        array $args,
+        Operand $result,
+        Block $block
+    ): array {
+        $return = [
+            new OpCode(
+                OpCode::TYPE_METHODCALL_INIT,
+                $receiver,
+                $methodName
+            ),
+        ];
+        foreach ($this->compileCallArgSends($args, $block) as $send) {
+            $return[] = $send;
+        }
+        if (!empty($result->usages)) {
+            $return[] = new OpCode(
+                OpCode::TYPE_FUNCCALL_EXEC_RETURN,
+                $this->compileOperand($result, $block, false)
+            );
+        } else {
+            $return[] = new OpCode(
+                OpCode::TYPE_FUNCCALL_EXEC_NORETURN,
+            );
+        }
+
+        return $return;
+    }
+
     protected function compileFuncCall(?int $name, array $args, Operand $result, Block $block): array
     {
         $folded = $this->tryCompileDefineAsGlobalConst($name, $args, $result, $block);
@@ -2024,8 +2156,8 @@ class Compiler {
         $callName = $this->tryFoldVariableFunctionName($name, $block) ?? $name;
 
         $return = [new OpCode(OpCode::TYPE_FUNCCALL_INIT, $callName)];
-        foreach ($args as $arg) {
-            $return[] = new OpCode(OpCode::TYPE_ARG_SEND, $this->compileOperand($arg, $block, true));
+        foreach ($this->compileCallArgSends($args, $block) as $send) {
+            $return[] = $send;
         }
         if (!empty($result->usages)) {
             $return[] = new OpCode(OpCode::TYPE_FUNCCALL_EXEC_RETURN, $this->compileOperand($result, $block, false));

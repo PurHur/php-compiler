@@ -6,9 +6,7 @@ namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
 
-/**
- * Variable function calls $fn() when $fn holds a compile-time string (issue #56).
- */
+/** Variable function calls ($fn()) — issue #56. */
 final class VariableFunctionCallTest extends TestCase
 {
     private const CODE = <<<'PHP'
@@ -29,7 +27,35 @@ hi bob
 
 TXT;
 
-    public function testVmVariableFunctionCall(): void
+    public function testVmBuiltinVariableFunctionCall(): void
+    {
+        $code = <<<'PHP'
+<?php
+$fn = 'strlen';
+echo $fn('abc');
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame('3', ob_get_clean());
+    }
+
+    public function testVmUndefinedVariableFunctionThrows(): void
+    {
+        $code = <<<'PHP'
+<?php
+$fn = 'not_a_real_function_xyz';
+$fn();
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage('Call to undefined function not_a_real_function_xyz()');
+        $rt->run($block);
+    }
+
+    public function testVmVariableFunctionCompliance(): void
     {
         $this->assertSame(self::EXPECT, $this->runBin('bin/vm.php'));
     }
@@ -74,7 +100,7 @@ TXT;
         $repo = dirname(__DIR__, 2);
         $tmp = tempnam(sys_get_temp_dir(), 'phpc_var_fn_');
         $this->assertNotFalse($tmp);
-        file_put_contents($tmp, "<?php\n" . self::CODE);
+        file_put_contents($tmp, "<?php\n".self::CODE);
         $env = [];
         foreach (array_merge($_ENV, $_SERVER) as $key => $value) {
             if (is_string($value)) {

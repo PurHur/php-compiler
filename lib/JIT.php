@@ -569,7 +569,11 @@ class JIT {
             return $args;
         }
         $lower = strtolower($logicalName);
-        if (!str_contains($lower, 'operandschainequal')) {
+        if (
+            !str_contains($lower, 'operandschainequal')
+            && !str_contains($lower, 'unwrapoperandchain')
+            && !str_contains($lower, 'operandhasobjecttype')
+        ) {
             return $args;
         }
         $objectPtr = $this->context->getTypeFromString('__object__*');
@@ -765,6 +769,30 @@ class JIT {
                 $func,
                 $logicalName,
                 [$objectPtr, $objectPtr, $objectPtr],
+                []
+            );
+
+            return $func;
+        }
+        if ($this->shouldUseSelfHostJitStubs() && str_contains($lcname, 'unwrapoperandchain')) {
+            $objectPtr = $this->context->getTypeFromString('__object__*');
+            $func = $this->context->module->addFunction(
+                $this->llvmInternalName($internalName),
+                $this->context->context->functionType($objectPtr, false, $objectPtr, $objectPtr)
+            );
+            $bb = $func->appendBasicBlock('stub');
+            $saved = $this->context->builder;
+            $this->context->builder = $this->context->context->builderCreate();
+            $this->context->builder->positionAtEnd($bb);
+            $this->context->builder->returnValue($objectPtr->constNull());
+            $this->context->builder->clearInsertionPosition();
+            $this->context->builder = $saved;
+            $this->context->functions[$lcname] = $func;
+            $this->context->functionReturnType[$lcname] = '__object__*';
+            $this->context->functionProxies[$lcname] = new JIT\Call\Native(
+                $func,
+                $logicalName,
+                [$objectPtr, $objectPtr],
                 []
             );
 
@@ -1839,13 +1867,14 @@ class JIT {
                     $nameOp = $block->getOperand($op->arg1);
                     if ($nameOp instanceof Operand\Literal) {
                         $lcname = strtolower($nameOp->value);
+                        $this->context->scope->toCall = $this->context->resolveFunctionProxy($lcname);
                     } else {
-                        if (!$this->context->scope->variables->contains($nameOp)) {
-                            throw new \LogicException('Variable function calls not yet supported');
+                        if (null !== $nameOp->type && Type::TYPE_OBJECT === $nameOp->type->type) {
+                            $this->initJitMethodCall($block, $nameOp, '__invoke');
+                            break;
                         }
-                        $nameVar = $this->context->scope->variables[$nameOp];
-                        $resolved = $nameVar->compileTimeString ?? null;
-                        if (null === $resolved) {
+                        $nameVar = $this->context->getVariableFromOp($nameOp);
+                        if (null === $nameVar->compileTimeString) {
                             if ($this->shouldUseSelfHostJitStubs()) {
                                 $this->context->scope->toCall = null;
                                 $this->context->scope->args = [];
@@ -1853,9 +1882,12 @@ class JIT {
                             }
                             throw new \LogicException('Variable function calls not yet supported');
                         }
-                        $lcname = strtolower($resolved);
+                        $lcname = strtolower($nameVar->compileTimeString);
+                        if (!$this->context->functionIsRegistered($lcname)) {
+                            throw new \LogicException("Call to undefined function {$lcname}()");
+                        }
+                        $this->context->scope->toCall = $this->context->resolveFunctionProxy($lcname);
                     }
-                    $this->context->scope->toCall = $this->context->resolveFunctionProxy($lcname);
                     $this->context->scope->args = [];
                     break;
                 case OpCode::TYPE_STATICCALL_INIT:
@@ -1984,29 +2016,7 @@ class JIT {
                     $receiverOp = $block->getOperand($op->arg1);
                     $nameOp = $block->getOperand($op->arg2);
                     assert($nameOp instanceof Operand\Literal);
-                    assert($receiverOp->type->type === Type::TYPE_OBJECT);
-                    $className = $receiverOp->type->userType
-                        ?? ($this->context->scope->className !== '' ? $this->context->scope->className : 'object');
-                    $declaringClassLc = strtolower($className);
-                    $methodLc = strtolower($nameOp->value);
-                    $declaringClassId = $this->context->type->object->lookup($className);
-                    $visFlags = $this->context->type->object->methodVisibility($declaringClassId, $methodLc);
-                    $callerClassLc = null;
-                    if (null !== $block->func && null !== $block->func->class) {
-                        $callerClassLc = strtolower($block->func->class->value);
-                    } elseif ($this->context->scope->className !== '') {
-                        $callerClassLc = $this->context->scope->className;
-                    }
-                    MethodVisibility::assertCallable(
-                        $visFlags,
-                        $callerClassLc,
-                        $declaringClassLc,
-                        $className,
-                        $nameOp->value
-                    );
-                    $proxyName = $declaringClassLc.'::'.$methodLc;
-                    $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
-                    $this->context->scope->args = [$this->context->getVariableFromOp($receiverOp)];
+                    $this->initJitMethodCall($block, $receiverOp, $nameOp->value);
                     break;
                 case OpCode::TYPE_PROPERTY_FETCH:
                     $result = $block->getOperand($op->arg1);
@@ -3533,6 +3543,36 @@ class JIT {
         }
 
         return true;
+    }
+
+    /**
+     * @param Operand\Literal|Operand\Variable|Operand\Temporary $receiverOp
+     */
+    private function initJitMethodCall(Block $block, Operand $receiverOp, string $methodName): void
+    {
+        assert(null !== $receiverOp->type && Type::TYPE_OBJECT === $receiverOp->type->type);
+        $className = $receiverOp->type->userType
+            ?? ($this->context->scope->className !== '' ? $this->context->scope->className : 'object');
+        $declaringClassLc = strtolower($className);
+        $methodLc = strtolower($methodName);
+        $declaringClassId = $this->context->type->object->lookup($className);
+        $visFlags = $this->context->type->object->methodVisibility($declaringClassId, $methodLc);
+        $callerClassLc = null;
+        if (null !== $block->func && null !== $block->func->class) {
+            $callerClassLc = strtolower($block->func->class->value);
+        } elseif ($this->context->scope->className !== '') {
+            $callerClassLc = $this->context->scope->className;
+        }
+        MethodVisibility::assertCallable(
+            $visFlags,
+            $callerClassLc,
+            $declaringClassLc,
+            $className,
+            $methodName
+        );
+        $proxyName = $declaringClassLc.'::'.$methodLc;
+        $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
+        $this->context->scope->args = [$this->context->getVariableFromOp($receiverOp)];
     }
 
     /**

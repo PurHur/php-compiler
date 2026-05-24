@@ -48,6 +48,25 @@ PHP
         );
     }
 
+    public function testStrictModeArrayParameterCompiles(): void
+    {
+        $this->skipUnlessLlvmReady();
+        $stderr = $this->runJitProbeInSubprocess(<<<'PHP'
+<?php
+declare(strict_types=1);
+function f(array $cfg) {
+    return $cfg['k'] ?? '';
+}
+echo f(['k' => 'ok']);
+PHP
+        );
+        self::assertStringNotContainsString(
+            'Not implemented type conversion',
+            $stderr,
+            'JIT strict checks must map VM array types for typed parameters (#587)'
+        );
+    }
+
     private function skipUnlessLlvmReady(): void
     {
         if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {

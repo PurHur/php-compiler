@@ -73,6 +73,9 @@ class Block {
     /** Parameter index (0-based, excluding $this) that receives a packed trailing-arg array (#197). */
     public ?int $variadicParamIndex = null;
 
+    /** Declared parameter names by index (issue #168). */
+    public array $paramNames = [];
+
     /** Resolved absolute paths for TYPE_INCLUDE opcodes (arg3 index, issue #54). */
     public array $literalIncludePaths = [];
 
@@ -309,6 +312,14 @@ class Block {
     }
 
     public function getFrame(Context $context, ?Frame $frame = null): Frame {
+        // Back-edge to the same block (goto label) must reuse the frame; otherwise each
+        // jump chains a new parent Frame and getFrame never finishes (issue #1228).
+        if (null !== $frame && $this === $frame->block) {
+            $frame->pos = 0;
+
+            return $frame;
+        }
+
         // Todo: build scope
         $scope = [];
         $cfgMerge = count($this->parents) > 1;
