@@ -32,13 +32,16 @@ final class VmFilter
 
     public static function inputSuperglobalName(int $type): string
     {
-        return match ($type) {
-            self::INPUT_GET => '_GET',
-            self::INPUT_POST => '_POST',
-            default => throw new \LogicException(
-                'filter_input() type '.$type.' is not supported in this compiler build'
-            ),
-        };
+        if (self::INPUT_GET === $type) {
+            return '_GET';
+        }
+        if (self::INPUT_POST === $type) {
+            return '_POST';
+        }
+
+        throw new \LogicException(
+            'filter_input() type '.$type.' is not supported in this compiler build'
+        );
     }
 
     private static function validateInt(Variable $value): Variable
