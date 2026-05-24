@@ -113,7 +113,10 @@ class Compiler {
             }
             $paramIdx = 0;
             foreach ($params as $param) {
-                $new->addOpCode($this->compileParam($param, $new, $paramIdx++));                
+                $new->addOpCode($this->compileParam($param, $new, $paramIdx++));
+            }
+            if (null !== $func && '__construct' === $func->name && null !== $func->class) {
+                $this->compileCtorPromotionAssignments($new, $params);
             }
             $this->compileBlock($new);
         }
@@ -689,6 +692,13 @@ class Compiler {
                     ));
                     break;
                 case Op\Stmt\ClassMethod::class:
+                    if ('__construct' === $child->func->name) {
+                        foreach ($child->func->params as $param) {
+                            if ($this->isPromotedParam($param)) {
+                                $this->compilePromotedPropertyDeclaration($param, $result);
+                            }
+                        }
+                    }
                     $methodName = new Operand\Literal($child->func->name);
                     $methodName->type = Type::string();
                     $visVar = new Variable(Variable::TYPE_INTEGER);
@@ -724,6 +734,65 @@ class Compiler {
             }
         }
         return $result;
+    }
+
+    protected function isPromotedParam(Op\Expr\Param $param): bool
+    {
+        return 0 !== $param->promotionFlags;
+    }
+
+    protected function compilePromotedPropertyDeclaration(Op\Expr\Param $param, Block $result): void
+    {
+        if (!is_null($param->defaultBlock)) {
+            $this->compileOps($param->defaultBlock->children, $result);
+        }
+        $declared = $param->declaredType instanceof Op\Type\Literal
+            ? Type::fromDecl($param->declaredType->name)
+            : Type::mixed();
+        $propName = new Operand\Literal($param->name->value);
+        $propName->type = Type::string();
+        $result->addOpCode(new OpCode(
+            OpCode::TYPE_DECLARE_PROPERTY,
+            $this->compileOperand($propName, $result, true),
+            is_null($param->defaultVar) ? null : $this->compileOperand($param->defaultVar, $result, true),
+            $this->compileTypeConstrainedVariable($result, $declared)
+        ));
+    }
+
+    /**
+     * @param list<Op\Expr\Param> $params
+     */
+    protected function compileCtorPromotionAssignments(Block $block, array $params): void
+    {
+        $thisVar = new Operand\Variable(new Operand\Literal('this'));
+        $thisSlot = $block->getVarSlot($thisVar, true);
+
+        foreach ($params as $param) {
+            if (!$this->isPromotedParam($param)) {
+                continue;
+            }
+            if (!($param->name instanceof Operand\Literal) || !is_string($param->name->value)) {
+                throw new \LogicException('Promoted constructor parameter must have a simple name');
+            }
+            $propName = new Operand\Literal($param->name->value);
+            $propName->type = Type::string();
+            $propSlot = $this->compileOperand($propName, $block, true);
+            $fetchTmp = new Temporary();
+            $fetchSlot = $block->getVarSlot($fetchTmp, false);
+            $paramSlot = $this->compileOperand($param->result, $block, true);
+            $block->addOpCode(new OpCode(
+                OpCode::TYPE_PROPERTY_FETCH,
+                $fetchSlot,
+                $thisSlot,
+                $propSlot
+            ));
+            $block->addOpCode(new OpCode(
+                OpCode::TYPE_ASSIGN,
+                $fetchSlot,
+                $fetchSlot,
+                $paramSlot
+            ));
+        }
     }
 
     protected function compileTypeConstrainedVariable(Block $block, Type $type): int {

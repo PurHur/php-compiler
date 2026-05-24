@@ -71,6 +71,14 @@ function syntaxRowDefinitions(): array
             'probe' => 'class C { public int $x = 1; public function f(): int { return $this->x; } } echo (new C())->f();',
         ],
         [
+            'id' => 'ctor_promotion',
+            'construct' => 'Constructor property promotion',
+            'opcodes' => ['TYPE_DECLARE_PROPERTY', 'TYPE_PROPERTY_FETCH', 'TYPE_ASSIGN', 'TYPE_ARG_RECV'],
+            'issue' => 1359,
+            'notes' => ['Promoted params declare property + assign in __construct'],
+            'probe' => 'class C { public function __construct(private string $x = "a") {} public function get(): string { return $this->x; } } echo (new C())->get();',
+        ],
+        [
             'id' => 'dynamic_property_fetch',
             'construct' => 'Dynamic property access `$obj->$name`',
             'opcodes' => ['TYPE_PROPERTY_FETCH', 'TYPE_DECLARE_PROPERTY'],
