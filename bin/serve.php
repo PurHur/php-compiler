@@ -19,6 +19,7 @@ use PHPCompiler\Runtime;
 use PHPCompiler\VM\OutputBuffer;
 use PHPCompiler\ext\standard\VmSession;
 use PHPCompiler\Web\DevServer;
+use PHPCompiler\Web\ProjectBootstrap;
 use PHPCompiler\Web\ProjectManifest;
 use PHPCompiler\Web\ResponseContext;
 use PHPCompiler\Web\Superglobals;
@@ -46,6 +47,8 @@ DevServer::run($listen, $docroot, static function (string $script, array $cgiEnv
             $cgiEnv['QUERY_STRING'] ?? '',
             $cgiEnv['REQUEST_BODY'] ?? ''
         );
+        [$bootProjectDir, $bootManifest] = ProjectBootstrap::resolveFromScript($script);
+        ProjectBootstrap::prepare($runtime, $bootProjectDir, $bootManifest);
         $block = $runtime->parseAndCompile($code, $script);
         $runtime->run($block);
         $output = ob_get_clean();

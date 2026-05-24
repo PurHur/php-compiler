@@ -73,6 +73,33 @@ class VM {
         }
     }
 
+    /**
+     * Compile and execute a PHP file once (require_once semantics for manifest includes / PSR-4).
+     */
+    public function executeCompileUnit(string $path): void
+    {
+        $resolved = VM\ScriptStack::normalize($path);
+        if ('' === $resolved || !is_file($resolved)) {
+            return;
+        }
+        if ($this->context->isCompileUnitLoaded($resolved)) {
+            return;
+        }
+        $this->context->markCompileUnitLoaded($resolved);
+
+        $savedStack = $this->context->swapRunStack(null);
+        try {
+            $this->context->scriptStack->push($resolved);
+            $block = $this->context->runtime->parseAndCompileFile($resolved);
+            if (null === $block) {
+                return;
+            }
+            $this->run($block);
+        } finally {
+            $this->context->swapRunStack($savedStack);
+        }
+    }
+
     private function seedScriptPath(Frame $frame): void
     {
         if ('' !== $frame->scriptPath) {
@@ -324,6 +351,11 @@ restart:
                     }
                     $className = $frame->scope[$op->arg2]->toString();
                     if (!isset($this->context->classes[$lcClass])) {
+                        if ('self' !== strtolower($className) && 'static' !== strtolower($className)) {
+                            $this->context->autoloadClass($className);
+                        }
+                    }
+                    if (!isset($this->context->classes[$lcClass])) {
                         return $this->raise("Unknown class for constant fetch: {$className}", $frame);
                     }
                     $constName = strtolower($frame->scope[$op->arg3]->toString());
@@ -347,13 +379,18 @@ restart:
                     $frame->scope[$op->arg1]->bool($matches);
                     break;
                 case OpCode::TYPE_STATIC_PROPERTY_FETCH:
+                    $rawClass = $frame->scope[$op->arg2]->toString();
                     $lcClass = $this->resolveStaticClassName(
-                        $frame->scope[$op->arg2]->toString(),
+                        $rawClass,
                         $frame
                     );
                     if (!isset($this->context->classes[$lcClass])) {
-                        $classLabel = $frame->scope[$op->arg2]->toString();
-                        return $this->raise("Unknown class for static property fetch: {$classLabel}", $frame);
+                        if ('self' !== strtolower($rawClass) && 'static' !== strtolower($rawClass)) {
+                            $this->context->autoloadClass($rawClass);
+                        }
+                    }
+                    if (!isset($this->context->classes[$lcClass])) {
+                        return $this->raise("Unknown class for static property fetch: {$rawClass}", $frame);
                     }
                     $propName = strtolower($frame->scope[$op->arg3]->toString());
                     $classEntry = $this->context->classes[$lcClass];
@@ -554,6 +591,9 @@ restart:
                     $name = $frame->scope[$op->arg2]->toString();
                     $lcname = strtolower($name);
                     if (!isset($this->context->classes[$lcname])) {
+                        $this->context->autoloadClass($name);
+                    }
+                    if (!isset($this->context->classes[$lcname])) {
                         throw new \LogicException("Attempting to instantiate non-existing class $name");
                     }
                     $class = $this->context->classes[$lcname];
@@ -679,6 +719,7 @@ restart:
                     if ('' === $resolved || !is_file($resolved)) {
                         return $this->raise('Failed opening required \''.$file.'\' for inclusion', $frame);
                     }
+                    $this->context->markCompileUnitLoaded($resolved);
                     $this->context->scriptStack->push($resolved);
                     $parsed = $this->context->runtime->parseAndCompileFile($resolved);
                     $new = $parsed->getFrame($this->context, $frame);
@@ -912,6 +953,9 @@ restart:
         $lcClass = $this->resolveClassScopeName($className, $frame);
         $frame->staticCallClass = $this->context->classes[$lcClass]->name;
         $methodLc = strtolower($methodName);
+        if (!isset($this->context->classes[$lcClass])) {
+            $this->context->autoloadClass($className);
+        }
         if (!isset($this->context->classes[$lcClass])) {
             throw new \LogicException("Call to undefined static method {$callableName}()");
         }

@@ -17,6 +17,10 @@ use PHPCompiler\Web\Superglobals;
 class Context {
     public array $functions = [];
     public array $classes = [];
+    /** @var list<callable(string): bool> */
+    public array $classAutoloaders = [];
+    /** @var array<string, true> */
+    private array $loadedCompileUnits = [];
     private ?RunStackEntry $runStack = null;
     public array $constants = [];
 
@@ -107,6 +111,33 @@ class Context {
     public function declareFunction(Func $func): void {
         $lcname = strtolower($func->getName());
         $this->functions[$lcname] = $func;
+    }
+
+    public function isCompileUnitLoaded(string $path): bool
+    {
+        $normalized = ScriptStack::normalize($path);
+
+        return '' !== $normalized && isset($this->loadedCompileUnits[$normalized]);
+    }
+
+    public function markCompileUnitLoaded(string $path): void
+    {
+        $normalized = ScriptStack::normalize($path);
+        if ('' !== $normalized) {
+            $this->loadedCompileUnits[$normalized] = true;
+        }
+    }
+
+  /** Try registered class autoloaders (PSR-4 project bootstrap, issue #155). */
+    public function autoloadClass(string $className): bool
+    {
+        foreach ($this->classAutoloaders as $loader) {
+            if ($loader($className)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function ensureSuperglobal(string $name): Variable
