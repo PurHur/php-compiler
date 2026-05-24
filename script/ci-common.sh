@@ -71,6 +71,14 @@ ci_run_capability_syntax_check() {
   "$PHP_BIN" "${PHP_OPTS[@]}" script/capability-syntax.php --check
 }
 
+ci_run_wave3_roadmap_sync_check() {
+  if [[ "${WAVE3_ROADMAP_SYNC_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  echo "Wave 3 roadmap sync (WAVE3_ROADMAP_SYNC_GATE=1, issue #1802)..."
+  "$PHP_BIN" "${PHP_OPTS[@]}" script/check-wave3-roadmap-sync.php
+}
+
 ci_run_inventory_checks() {
   script/check-no-unlimited-memory.sh
   script/check-stale-issue-refs.sh
@@ -79,6 +87,7 @@ ci_run_inventory_checks() {
   ci_run_capability_syntax_check
   ci_ensure_generated_doc script/bootstrap-inventory.php docs/bootstrap-inventory.md
   ci_ensure_generated_doc script/bootstrap-profile.php docs/bootstrap-profile.json
+  ci_run_wave3_roadmap_sync_check
 }
 
 ci_llvm_dir() {
