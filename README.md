@@ -1,14 +1,52 @@
-# A compiler for PHP
+# php-compiler
 
-**CI (local):** GitHub Actions and CircleCI are temporarily disabled — use `./script/ci-local.sh` or `make test`; fast iteration `./script/ci-fast.sh` or `make test-fast` ([#436](https://github.com/PurHur/php-compiler/issues/436)). See [docs/local-ci-matrix.md](docs/local-ci-matrix.md). MiniWebApp gate ladder: [docs/miniwebapp-gates.md](docs/miniwebapp-gates.md) ([#472](https://github.com/PurHur/php-compiler/issues/472)). Docker image: `php-compiler:22.04-dev`.
+**Compile PHP to native binaries** — CFG-based compiler with a **VM**, **LLVM 9 JIT**, and **AOT** deployment. Run shipped web apps **without Zend PHP at runtime** after `phpc build` / `phpc deploy`.
 
-Ok, so this used to be a dead project. It required calling out to all sorts of hackery to generate PHP extensions, or PHP itself.
+| | |
+|---|---|
+| **Status site** | [Overview](https://purhur.github.io/php-compiler/docs/pages/index.html) · [full report](https://purhur.github.io/php-compiler/development-status.html) |
+| **North stars** | [Web app #1044](https://github.com/PurHur/php-compiler/issues/1044) · [Self-host #1056](https://github.com/PurHur/php-compiler/issues/1056) |
+| **Docs index** | [`docs/README.md`](docs/README.md) · [`docs/GETTING-STARTED.md`](docs/GETTING-STARTED.md) |
+| **CI** | `./script/ci-local.sh` or `make test` ([#436](https://github.com/PurHur/php-compiler/issues/436) — remote GHA/Circle temporarily disabled) |
 
-Now, thanks to [FFI landing in PHP 7.4](https://wiki.php.net/rfc/ffi), the potential for all sorts of crazy is HUGE. 
+> **Demo / showcase:** use [Demo in five minutes](#demo-in-five-minutes) below or the [public status overview](https://purhur.github.io/php-compiler/docs/pages/index.html).
 
-So here we go :)
+Originally a research compiler (pre-FFI); revived around [PHP FFI](https://wiki.php.net/rfc/ffi) and LLVM. Current focus: a **web-capable PHP subset**, reference [MiniWebApp](examples/003-MiniWebApp/), and experimental **self-host** (compiler compiling its own `lib/`).
 
-# Quick start (host PHP)
+## Demo in five minutes
+
+**Requirements:** PHP 8.1+, Composer. LLVM only needed for `build` / full CI (not for `test --fast`).
+
+```console
+git clone https://github.com/PurHur/php-compiler.git
+cd php-compiler
+composer install
+./phpc test --fast
+```
+
+| Demo | Command | What it shows |
+|------|---------|----------------|
+| **Native binary** | `./phpc build -o /tmp/hello examples/000-HelloWorld/example.php && /tmp/hello` | PHP → standalone executable |
+| **Web app (VM)** | `./phpc serve examples/003-MiniWebApp` → `http://127.0.0.1:8080/` | Router, templates, JSON API |
+| **Self-host smoke** | `script/apply-patches.sh && make bootstrap-selfhost-link` | `compiler_minimal bundle OK` (experimental) |
+
+Presenter script and troubleshooting: [`docs/GETTING-STARTED.md`](docs/GETTING-STARTED.md).
+
+### What works today (honest)
+
+| Area | Status |
+|------|--------|
+| `phpc` CLI (`run`, `serve`, `build`, `deploy`, `lint`, `test`, `init`) | ✅ |
+| Examples **000–002**, **004** (VM + AOT link + execute) | ✅ |
+| **003-MiniWebApp** VM + AOT link | ✅ |
+| **003** AOT execute (all routes) | 🚧 partial — home ✅ ([#1044](https://github.com/PurHur/php-compiler/issues/1044)) |
+| Self-host **M0–M1** | ✅ |
+| Self-host **M2** spine | 🚧 **301** / 532 units ([#1056](https://github.com/PurHur/php-compiler/issues/1056)) |
+| Full Zend PHP compatibility | ❌ — see [capabilities](docs/capabilities.md) |
+
+MiniWebApp gates: [docs/miniwebapp-gates.md](docs/miniwebapp-gates.md) ([#472](https://github.com/PurHur/php-compiler/issues/472)). Docker image: `php-compiler:22.04-dev`.
+
+## Quick start (host PHP)
 
 On a modern Linux host with PHP 8.1+ (8.2 recommended):
 
@@ -46,7 +84,7 @@ make test    # builds php-compiler:22.04-dev if needed, then memory-safe CI in D
 
 ## North-star status (2026)
 
-**Public status site:** [Overview](https://purhur.github.io/php-compiler/docs/pages/index.html) · [Full status](https://purhur.github.io/php-compiler/development-status.html) — [North Star 1](https://purhur.github.io/php-compiler/development-status.html#north-star-1-web-app) · [North Star 2 (self-host)](https://purhur.github.io/php-compiler/development-status.html#north-star-2-self-host) · wave 3 [#1380](https://github.com/PurHur/php-compiler/issues/1380) · edit [`docs/pages/development-status.md`](docs/pages/development-status.md).
+**Public status site:** [Overview](https://purhur.github.io/php-compiler/docs/pages/index.html) · [Full status](https://purhur.github.io/php-compiler/development-status.html) — [North Star 1](https://purhur.github.io/php-compiler/development-status.html#north-star-1-web-app) · [North Star 2 (self-host)](https://purhur.github.io/php-compiler/development-status.html#north-star-2-self-host) · wave 3 [#1380](https://github.com/PurHur/php-compiler/issues/1380) · presenter guide [`docs/GETTING-STARTED.md`](docs/GETTING-STARTED.md) · edit [`docs/pages/development-status.md`](docs/pages/development-status.md).
 
 Single-page snapshot for contributors; keep in sync with [examples/README.md](examples/README.md) ([#753](https://github.com/PurHur/php-compiler/issues/753)).
 
