@@ -20,6 +20,7 @@ use PHPCompiler\VM\OutputBuffer;
 use PHPCompiler\Web\DevServer;
 use PHPCompiler\Web\ProjectManifest;
 use PHPCompiler\Web\ResponseContext;
+use PHPCompiler\Web\SessionContext;
 use PHPCompiler\Web\Superglobals;
 
 $listen = $argv[1] ?? '127.0.0.1:8080';
@@ -30,6 +31,7 @@ $docroot = ProjectManifest::resolvePublicDir($docrootArg);
 
 DevServer::run($listen, $docroot, static function (string $script, array $cgiEnv): array {
     ResponseContext::reset();
+    SessionContext::reset();
     OutputBuffer::reset();
     $code = file_get_contents($script);
     if (false === $code) {

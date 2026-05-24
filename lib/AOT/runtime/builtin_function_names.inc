@@ -186,6 +186,7 @@ static const char *phpc_builtin_functions[] = {
     "rtrim",
     "scandir",
     "serialize",
+    "session_id",
     "setcookie",
     "shell_exec",
     "sin",

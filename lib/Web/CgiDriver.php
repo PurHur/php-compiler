@@ -59,6 +59,7 @@ final class CgiDriver
     public static function runVmScript(string $script): array
     {
         ResponseContext::reset();
+        SessionContext::reset();
         OutputBuffer::reset();
         $code = file_get_contents($script);
         if (false === $code) {

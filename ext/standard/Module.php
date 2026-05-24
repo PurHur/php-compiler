@@ -171,6 +171,7 @@ class Module extends ModuleAbstract
             new ob_end_flush(),
             new ob_get_level(),
             new http_response_code(),
+            new session_id(),
             new json_encode(),
             new json_decode(),
             new serialize(),
