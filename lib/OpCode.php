@@ -132,7 +132,7 @@ class OpCode {
     /** @var ?Block */
     public $block3 = null;
 
-    /** @var string[] lowercase interface names for TYPE_DECLARE_CLASS (#1357) */
+    /** @var list<string> */
     public array $classImplements = [];
     /** Pipe-separated lowercase catch class names for TYPE_CATCH (#1362). */
     public ?string $catchTypes = null;

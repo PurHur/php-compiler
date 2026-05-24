@@ -10,7 +10,7 @@ namespace PHPCompiler\VM;
 final class InterfaceCheck
 {
     /**
-     * @param string[] $interfaceLcs lowercase interface names
+     * @param list<string> $interfaceLcs
      */
     public static function assertObjectImplementsAll(
         Variable $value,
@@ -95,7 +95,7 @@ final class InterfaceCheck
     }
 
     /**
-     * @param string[] $interfaceLcs
+     * @param list<string> $interfaceLcs
      */
     private static function formatIntersectionType(array $interfaceLcs): string
     {

@@ -40,5 +40,3 @@ function vm_run_smoke(string $filename, string $code, array $options): string
 
     return 'vm_run_smoke OK';
 }
-
-echo vm_run_smoke('smoke.php', '<?php echo "vm_run_smoke bundle OK\n";', []), "\n";

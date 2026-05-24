@@ -15,7 +15,7 @@ final class TypeCheck
     }
 
     /**
-     * @param string[] $interfaceLcs lowercase interface names (#1357)
+     * @param list<string> $interfaceLcs
      */
     public static function assertParamIntersection(
         Variable $dest,

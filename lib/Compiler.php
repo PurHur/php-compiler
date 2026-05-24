@@ -584,7 +584,7 @@ class Compiler {
     /**
      * @param Operand[] $operands
      *
-     * @return string[] lowercase interface names
+     * @return list<string>
      */
     protected function interfaceNamesFromOperands(array $operands): array
     {
@@ -613,7 +613,7 @@ class Compiler {
     }
 
     /**
-     * @return string[] lowercase interface names
+     * @return list<string>
      */
     protected function intersectionNamesFromCfgType(Op\Type\Intersection $type): array
     {

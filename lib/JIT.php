@@ -2135,6 +2135,11 @@ class JIT {
                         throw new \LogicException("Cannot redefine constant {$nameOp->value}");
                     }
                     break;
+                case OpCode::TYPE_DECLARE_INTERFACE:
+                    $nameOp = $block->getOperand($op->arg1);
+                    assert($nameOp instanceof Operand\Literal);
+                    $this->context->type->object->declareClass($nameOp);
+                    break;
                 case OpCode::TYPE_DECLARE_ENUM:
                     $nameOp = $block->getOperand($op->arg1);
                     assert($nameOp instanceof Operand\Literal);

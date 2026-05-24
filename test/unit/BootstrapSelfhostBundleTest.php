@@ -176,10 +176,31 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/JitTraitExists.php',
         'ext/standard/Module.php',
         'lib/Lint/SwitchDetector.php',
-        'src/tokenizer-compat.php',
-        'src/yay-php8-compat.php',
-        'src/macro_functions.php',
-        'src/llvm-env.php',
+        'ext/standard/VmCrc32.php',
+        'ext/standard/VmDate.php',
+        'ext/standard/VmErrorHandler.php',
+        'ext/standard/VmExit.php',
+        'ext/standard/VmHttpBuildQuery.php',
+        'ext/standard/VmInternalCall.php',
+        'ext/standard/VmInternalCompare.php',
+        'ext/standard/VmJson.php',
+        'ext/standard/VmNumberFormat.php',
+        'ext/standard/VmPack.php',
+        'ext/standard/VmParseStr.php',
+        'ext/standard/VmReflection.php',
+        'ext/standard/VmScope.php',
+        'ext/standard/VmSprintf.php',
+        'ext/standard/VmStreamContext.php',
+        'ext/standard/VmUserCall.php',
+        'ext/standard/floatval.php',
+        'ext/standard/hex2bin.php',
+        'ext/standard/addslashes.php',
+        'ext/standard/stripslashes.php',
+        'ext/standard/bin2hex.php',
+        'ext/standard/doubleval.php',
+        'ext/standard/is_int.php',
+        'ext/standard/is_string.php',
+        'ext/standard/pi.php',
     ];
 
     public static function setUpBeforeClass(): void
@@ -201,7 +222,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         $this->assertFileExists($entry);
         $contents = (string) file_get_contents($entry);
         $count = substr_count($contents, 'require_once __DIR__');
-        $this->assertSame(280, $count, '108 compiler_minimal units + 172 M2 spine units');
+                $this->assertSame(300, $count, '108 compiler_minimal units + 192 M2 spine units');
         foreach (self::LIB_SPINE_SMOKE_NEW_UNITS as $unit) {
             $this->assertStringContainsString(
                 "require_once __DIR__.'/../../../{$unit}';",
