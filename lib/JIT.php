@@ -621,7 +621,8 @@ class JIT {
             || str_contains($lower, '\\web\\responsecontext::')
             || str_contains($lower, '\\web\\devserver::')
             || str_contains($lower, '\\web\\params::')
-            || str_contains($lower, '\\ext\\standard\\jit')
+            || str_contains($lower, '\\ext\\standard\\')
+            || str_contains($lower, '\\ext\\types\\')
             || str_contains($lower, '\\jit\\varfetchhelper::')
             || str_contains($lower, '\\jit\\unsethelper::')
             || str_contains($lower, '\\jit\\arraybuiltinhelper::')
@@ -629,6 +630,7 @@ class JIT {
             || str_contains($lower, '\\jit\\typecheck::')
             || str_contains($lower, '\\jit\\errorhandlercallbackpolicy::')
             || str_contains($lower, '\\jit\\builtin\\stringparsestr::')
+            || str_contains($lower, '\\builtinparamnames::')
             || str_contains($lower, '\\jit\\builtin\\type\\object_::')
             || str_contains($lower, '\\jit\\builtin\\type\\hashtable::');
     }
