@@ -27,6 +27,8 @@ class ClassEntry {
     public array $methodVisibility = [];
     /** @var array<string, Variable> constant name (lowercase) => value */
     public array $constants = [];
+    /** @var array<string, Variable> static property name (lowercase) => shared storage */
+    public array $staticProperties = [];
 
     public function __construct(string $name) {
         $this->name = $name;

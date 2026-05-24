@@ -106,8 +106,11 @@ final class LintCompiler extends Compiler
                         $declared = $child->declaredType instanceof Op\Type\Literal
                             ? Type::fromDecl($child->declaredType->name)
                             : $child->type;
+                        $declareType = $child->static
+                            ? OpCode::TYPE_DECLARE_STATIC_PROPERTY
+                            : OpCode::TYPE_DECLARE_PROPERTY;
                         $result->addOpCode(new OpCode(
-                            OpCode::TYPE_DECLARE_PROPERTY,
+                            $declareType,
                             $this->compileOperand($child->name, $result, true),
                             is_null($child->defaultVar) ? null : $this->compileOperand($child->defaultVar, $result, true),
                             $this->compileTypeConstrainedVariable($result, $declared)

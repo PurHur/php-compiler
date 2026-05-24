@@ -361,8 +361,11 @@ class Compiler {
                     $declared = $child->declaredType instanceof Op\Type\Literal
                         ? Type::fromDecl($child->declaredType->name)
                         : $child->type;
+                    $declareType = $child->static
+                        ? OpCode::TYPE_DECLARE_STATIC_PROPERTY
+                        : OpCode::TYPE_DECLARE_PROPERTY;
                     $result->addOpCode(new OpCode(
-                        OpCode::TYPE_DECLARE_PROPERTY,
+                        $declareType,
                         $this->compileOperand($child->name, $result, true),
                         is_null($child->defaultVar) ? null : $this->compileOperand($child->defaultVar, $result, true),
                         $this->compileTypeConstrainedVariable($result, $declared)
@@ -730,6 +733,35 @@ class Compiler {
                     $this->compileOperand($expr->expr, $block, true) 
                 )];
             case Op\Expr\Assign::class:
+                $staticPropertyFetch = $this->unwrapStaticPropertyFetch($expr->var);
+                if (null !== $staticPropertyFetch) {
+                    $fetchSlot = $this->compileOperand($staticPropertyFetch->result, $block, false);
+                    $rhsSlot = $this->compileOperand($expr->expr, $block, true);
+                    $ops = [
+                        new OpCode(
+                            OpCode::TYPE_STATIC_PROPERTY_FETCH,
+                            $fetchSlot,
+                            $this->compileOperand($staticPropertyFetch->class, $block, true),
+                            $this->compileOperand($staticPropertyFetch->name, $block, true)
+                        ),
+                        new OpCode(
+                            OpCode::TYPE_ASSIGN,
+                            $fetchSlot,
+                            $fetchSlot,
+                            $rhsSlot
+                        ),
+                    ];
+                    if ([] !== $expr->result->usages) {
+                        $ops[] = new OpCode(
+                            OpCode::TYPE_ASSIGN,
+                            $this->compileOperand($expr->result, $block, false),
+                            $fetchSlot,
+                            $rhsSlot
+                        );
+                    }
+
+                    return $ops;
+                }
                 $propertyFetch = $this->unwrapPropertyFetch($expr->var);
                 if (null !== $propertyFetch) {
                     $fetchSlot = $this->compileOperand($propertyFetch->result, $block, false);
@@ -1584,6 +1616,24 @@ class Compiler {
             $operand = $operand->original;
         }
         if ($operand instanceof Op\Expr\PropertyFetch) {
+            return $operand;
+        }
+
+        return null;
+    }
+
+    protected function unwrapStaticPropertyFetch(Operand $operand): ?Op\Expr\StaticPropertyFetch
+    {
+        while ($operand instanceof Temporary) {
+            if ($operand->original instanceof Op\Expr\StaticPropertyFetch) {
+                return $operand->original;
+            }
+            if (null === $operand->original) {
+                return null;
+            }
+            $operand = $operand->original;
+        }
+        if ($operand instanceof Op\Expr\StaticPropertyFetch) {
             return $operand;
         }
 

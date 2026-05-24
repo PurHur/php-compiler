@@ -105,6 +105,7 @@ class OpCode {
 
     const TYPE_ASSIGN_REF = 97;
     const TYPE_DECLARE_GLOBAL = 98;
+    const TYPE_DECLARE_STATIC_PROPERTY = 99;
 
     public int $type;
     public ?int $arg1;

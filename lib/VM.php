@@ -326,7 +326,24 @@ restart:
                     $frame->scope[$op->arg1]->bool($matches);
                     break;
                 case OpCode::TYPE_STATIC_PROPERTY_FETCH:
-                    // Recorded at compile time; VM static property fetch is not implemented yet.
+                    $lcClass = $this->resolveStaticClassName(
+                        $frame->scope[$op->arg2]->toString(),
+                        $frame
+                    );
+                    if (!isset($this->context->classes[$lcClass])) {
+                        $classLabel = $frame->scope[$op->arg2]->toString();
+                        return $this->raise("Unknown class for static property fetch: {$classLabel}", $frame);
+                    }
+                    $propName = strtolower($frame->scope[$op->arg3]->toString());
+                    $classEntry = $this->context->classes[$lcClass];
+                    if (!isset($classEntry->staticProperties[$propName])) {
+                        $classLabel = $classEntry->name;
+                        return $this->raise(
+                            "Undefined static property {$classLabel}::{$propName}",
+                            $frame
+                        );
+                    }
+                    $frame->scope[$op->arg1]->indirect($classEntry->staticProperties[$propName]);
                     break;
                 case OpCode::TYPE_UNSET:
                     if (null !== $op->arg1 && isset($frame->scope[$op->arg1])) {
@@ -661,6 +678,20 @@ restart:
         throw new \LogicException($message.' in '.$where);
     }
 
+    protected function resolveStaticClassName(string $className, Frame $frame): string
+    {
+        $lcClass = strtolower($className);
+        if ('self' === $lcClass || 'static' === $lcClass) {
+            if (null === $frame->block->func || null === $frame->block->func->class) {
+                throw new \LogicException('self:: used outside of class scope');
+            }
+
+            return strtolower($frame->block->func->class->name);
+        }
+
+        return $lcClass;
+    }
+
     protected function defineClass(ClassEntry $entry, Block $block): void {
         $frame = $block->getFrame($this->context);
         // TODO
@@ -674,6 +705,14 @@ restart:
                         $default,
                         $frame->scope[$op->arg3]
                     );
+                    break;
+                case OpCode::TYPE_DECLARE_STATIC_PROPERTY:
+                    $name = strtolower($frame->scope[$op->arg1]->toString());
+                    $storage = clone $frame->scope[$op->arg3];
+                    if (!is_null($op->arg2)) {
+                        $storage->copyFrom($frame->scope[$op->arg2]);
+                    }
+                    $entry->staticProperties[$name] = $storage;
                     break;
                 case OpCode::TYPE_DECLARE_METHOD:
                     $name = strtolower($frame->scope[$op->arg1]->toString());
