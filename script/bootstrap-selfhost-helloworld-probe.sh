@@ -59,7 +59,7 @@ if [[ "${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
     printf 'compile' > "${MODE_FILE}"
     set +e
     runtime_env=()
-    if [[ "${BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING:-0}" == "1" ]]; then
+    if [[ "${BOOTSTRAP_M3_RUNTIME_COMPILE:-0}" == "1" ]]; then
       runtime_env=(env PHP_COMPILER_M3_RUNTIME_COMPILE=1)
     fi
     compile_out="$({ "${runtime_env[@]}" env -u PHP_COMPILER_SELFHOST_AOT "${COMPILE_DRIVER}"; } 2>&1)"
