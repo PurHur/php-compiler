@@ -80,4 +80,17 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString('BOOTSTRAP_M3_HELLOWORLD', $doc);
         $this->assertStringContainsString('compiler_helloworld_smoke', $doc);
     }
+
+    public function testCompilerFirstClassCallableAvoidsMatchThrowInBundle(): void
+    {
+        $source = (string) file_get_contents(self::$root.'/lib/Compiler.php');
+        $this->assertStringNotContainsString('default => throw', $source);
+        $this->assertStringContainsString('3 === $expr->kind', $source);
+    }
+
+    public function testJitStubsFirstClassCallableForSelfHost(): void
+    {
+        $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
+        $this->assertStringContainsString('compilefirstclasscallable', $jit);
+    }
 }
