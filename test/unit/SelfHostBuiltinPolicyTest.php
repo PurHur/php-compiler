@@ -34,6 +34,7 @@ final class SelfHostBuiltinPolicyTest extends TestCase
         $this->assertFalse(SelfHostBuiltinPolicy::shouldExternalStub('fopen'));
         $this->assertFalse(SelfHostBuiltinPolicy::shouldExternalStub('getenv'));
         $this->assertFalse(SelfHostBuiltinPolicy::shouldExternalStub('putenv'));
+        $this->assertFalse(SelfHostBuiltinPolicy::shouldExternalStub('ini_set'));
         $this->assertTrue(SelfHostBuiltinPolicy::isRequiredForBundle('filter_var'));
         $this->assertSame('filter', SelfHostBuiltinPolicy::categoryFor('filter_input'));
         $this->assertFalse(SelfHostBuiltinPolicy::shouldExternalStub('filter_var'));
@@ -57,6 +58,7 @@ final class SelfHostBuiltinPolicyTest extends TestCase
             'filter_var',
             'getenv',
             'putenv',
+            'ini_set',
         ] as $fn) {
             $this->assertTrue(
                 SelfHostBuiltinPolicy::isRequiredForBundle($fn),

@@ -244,6 +244,7 @@ class Module extends ModuleAbstract
             new getcwd_(),
             new chdir_(),
             new putenv_(),
+            new ini_set_(),
             new define_(),
             new defined_(),
             new class_exists_(),
