@@ -61,19 +61,12 @@ final class preg_replace_callback extends Internal
                 'preg_replace_callback() requires exactly three arguments in this compiler build'
             );
         }
-        if (JITVariable::TYPE_STRING === $args[0]->type || JITVariable::TYPE_VALUE === $args[0]->type) {
-            $this->jitString($context, $args[0], 'preg_replace_callback() pattern');
-        }
-        if (JITVariable::TYPE_STRING === $args[1]->type || JITVariable::TYPE_VALUE === $args[1]->type) {
-            $this->jitString($context, $args[1], 'preg_replace_callback() callback');
-        }
-        if (JITVariable::TYPE_STRING === $args[2]->type || JITVariable::TYPE_VALUE === $args[2]->type) {
-            $this->jitString($context, $args[2], 'preg_replace_callback() subject');
-        }
 
-        throw new \LogicException(
-            'preg_replace_callback() not implemented for JIT in this compiler build (issue #1177); '
-            .PregReplaceCallbackPolicy::DEFERRED_KINDS.' are deferred (#142)'
+        return JitPregReplaceCallback::invoke(
+            $context,
+            JitStringArg::lower($context, $args[0], 'preg_replace_callback() pattern'),
+            $args[1],
+            JitStringArg::lower($context, $args[2], 'preg_replace_callback() subject')
         );
     }
 }

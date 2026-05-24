@@ -13,12 +13,16 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\PregReplaceCallbackPolicy;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
+use PHPLLVM\Type as LlvmType;
 use PHPLLVM\Value;
 
 /** LLVM lowering for preg_replace_callback() via __compiler_preg_replace_callback (issue #1177). */
 final class JitPregReplaceCallback
 {
     private static int $blockSerial = 0;
+
+    /** @var array<string, Value> per-module preg callback shims */
+    private static array $callbackShims = [];
 
     /** @return Value __value__* (string result, or boolean false on PCRE error) */
     public static function invoke(
@@ -49,14 +53,12 @@ final class JitPregReplaceCallback
         }
 
         $strPtrTy = $context->getTypeFromString('__string__*');
-        $valuePtr = $context->getTypeFromString('__value__*');
-        $callbackFnTy = $context->context->functionType($valuePtr, false, $valuePtr);
-        $callbackPtr = $context->builder->pointerCast(
-            $proxy->function,
-            $callbackFnTy->pointerType(0)
-        );
+        $replaceCallbackFn = $context->lookupFunction('__compiler_preg_replace_callback');
+        $callbackPtrTy = $replaceCallbackFn->getParam(2)->typeOf();
+        $shimFn = self::callbackShim($context, $proxy, $name, $callbackPtrTy);
+        $callbackPtr = $context->builder->pointerCast($shimFn, $callbackPtrTy);
         $raw = $context->builder->call(
-            $context->lookupFunction('__compiler_preg_replace_callback'),
+            $replaceCallbackFn,
             $pattern,
             $subject,
             $callbackPtr
@@ -84,5 +86,58 @@ final class JitPregReplaceCallback
         $context->builder->positionAtEnd($doneBlock);
 
         return $ptr;
+    }
+
+    private static function callbackShim(
+        Context $context,
+        Native $userFn,
+        string $name,
+        LlvmType $callbackPtrTy
+    ): Value {
+        $moduleKey = spl_object_hash($context->module);
+        $cacheKey = $moduleKey.'::'.$name;
+        if (isset(self::$callbackShims[$cacheKey])) {
+            return self::$callbackShims[$cacheKey];
+        }
+
+        $cbFnTy = $callbackPtrTy->getElementType();
+        if (!$cbFnTy instanceof LlvmType\Function_) {
+            throw new \LogicException('preg_replace_callback() runtime callback type is not a function pointer');
+        }
+        $valuePtrTy = $cbFnTy->getReturnType();
+        $safe = preg_replace('/[^a-zA-Z0-9_]/', '_', $name) ?: 'fn';
+        $shimName = '__preg_cb_shim_'.$safe;
+        $shimFn = $context->module->addFunction($shimName, $cbFnTy);
+        $context->registerFunction($shimName, $shimFn);
+
+        $resumeBlock = $context->builder->getInsertBlock();
+        $entry = $shimFn->appendBasicBlock('entry');
+        $context->builder->positionAtEnd($entry);
+        $arg = $shimFn->getParam(0);
+        $argForRead = $context->builder->pointerCast(
+            $arg,
+            $context->getTypeFromString('__value__*')
+        );
+        $matches = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $argForRead
+        );
+        $replacement = $context->builder->call($userFn->function, $matches);
+        $slot = JitValueBox::alloc($context);
+        $writeStringFn = $context->lookupFunction('__value__writeString');
+        $outSlotTy = $writeStringFn->getParam(0)->typeOf();
+        $slotPtr = $context->builder->pointerCast($slot, $outSlotTy);
+        $context->builder->call(
+            $writeStringFn,
+            $slotPtr,
+            $replacement
+        );
+        $returnPtr = $context->builder->pointerCast($slot, $valuePtrTy);
+        $context->builder->returnValue($returnPtr);
+        $context->builder->positionAtEnd($resumeBlock);
+
+        self::$callbackShims[$cacheKey] = $shimFn;
+
+        return $shimFn;
     }
 }
