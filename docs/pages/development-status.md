@@ -1,11 +1,26 @@
 ---
 layout: status
 title: Development status and progress
-description: Authoritative written snapshot of php-compiler milestones, phases, and gaps toward a full implementation.
+description: Authoritative snapshot of php-compiler — VM, JIT, AOT web deployment, and self-host bootstrap toward a full PHP compiler.
 permalink: /development-status.html
 ---
 
-*Last updated: May 2026. Edit this file when milestones change; keep in sync with [issue #78](https://github.com/PurHur/php-compiler/issues/78), [#1044](https://github.com/PurHur/php-compiler/issues/1044) (North Star 1), [#1056](https://github.com/PurHur/php-compiler/issues/1056) (North Star 2 — **reopened living tracker**), and the [README](https://github.com/PurHur/php-compiler/blob/master/README.md).*
+*Last updated: May 2026. Edit this file when milestones change; keep in sync with [issue #78](https://github.com/PurHur/php-compiler/issues/78), [#1044](https://github.com/PurHur/php-compiler/issues/1044) (North Star 1), [#1056](https://github.com/PurHur/php-compiler/issues/1056) (North Star 2), and the [README](https://github.com/PurHur/php-compiler/blob/master/README.md).*
+
+## At a glance
+
+| | |
+|---|---|
+| **Try it** | `git clone` → `composer install` → `./phpc test --fast` → [`docs/GETTING-STARTED.md`](https://github.com/PurHur/php-compiler/blob/master/docs/GETTING-STARTED.md) |
+| **Overall progress** | ~**50%** toward web-capable + self-hosting compiler (indicative) |
+| **Wave 3 (May 2026)** | Language **9/13** · Stdlib **12/13** ([#1380](https://github.com/PurHur/php-compiler/issues/1380)) |
+| **North Star 1** | Reference web app — VM ✅ · AOT link ✅ · AOT execute **partial** ([#1044](https://github.com/PurHur/php-compiler/issues/1044)) |
+| **North Star 2** | Self-compile — M0–M1 ✅ · M2 spine **301/532** · M5 ⬜ ([#1056](https://github.com/PurHur/php-compiler/issues/1056)) |
+| **Not Zend parity** | Subset compiler — see [capabilities.md](https://github.com/PurHur/php-compiler/blob/master/docs/capabilities.md) |
+
+[← Visual overview](index.html) · [Repository](https://github.com/PurHur/php-compiler)
+
+---
 
 ## What this project is
 
@@ -290,9 +305,10 @@ Commands: `./phpc run`, `./phpc build`, `./phpc serve`, `make examples-aot-smoke
 
 ## How to contribute
 
-1. Pick an issue by [phase label](https://github.com/PurHur/php-compiler/issues), [#1044](https://github.com/PurHur/php-compiler/issues/1044) (North Star 1), [#1056](https://github.com/PurHur/php-compiler/issues/1056) (North Star 2), or self-host bootstrap issues.
-2. For self-host work, run `./script/bootstrap-wave-check.sh` before opening a PR.
-3. Update **this file** (`docs/pages/development-status.md`) when a user-visible milestone lands.
+1. **Try the project:** [GETTING-STARTED.md](https://github.com/PurHur/php-compiler/blob/master/docs/GETTING-STARTED.md) (clone, demo script, `phpc` cheat sheet).
+2. Pick an issue by [phase label](https://github.com/PurHur/php-compiler/issues), [#1044](https://github.com/PurHur/php-compiler/issues/1044) (North Star 1), [#1056](https://github.com/PurHur/php-compiler/issues/1056) (North Star 2), or self-host bootstrap issues.
+3. For self-host work, run `./script/bootstrap-wave-check.sh` before opening a PR.
+4. Update **this file** (`docs/pages/development-status.md`) when a user-visible milestone lands (and sync [README](https://github.com/PurHur/php-compiler/blob/master/README.md) / [index.html](index.html) if the public story changed).
 
 - [North Star 1 tracker #1044](https://github.com/PurHur/php-compiler/issues/1044)
 - [North Star 2 tracker #1056](https://github.com/PurHur/php-compiler/issues/1056)
