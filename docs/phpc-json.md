@@ -16,7 +16,7 @@ Paths are relative to the directory that contains `phpc.json` (unless they start
 | `assets` | no | string | Static files directory copied on `phpc deploy` ([#594](https://github.com/PurHur/php-compiler/issues/594)) |
 | `includes` | no | string[] | Extra compile units linked before `entry` ([#452](https://github.com/PurHur/php-compiler/issues/452), [#752](https://github.com/PurHur/php-compiler/issues/752)) |
 | `index` | no | string | Alternate index script (validated when present; prefer `entry` for builds) |
-| `autoload` | no | object | **Planned / partial** — only `autoload.psr-4` shape is validated today ([#155](https://github.com/PurHur/php-compiler/issues/155)) |
+| `autoload` | no | object | PSR-4 autoload for `phpc serve` / lint ([#155](https://github.com/PurHur/php-compiler/issues/155)) |
 
 ### `entry`
 
@@ -40,7 +40,7 @@ Ordered list of additional `.php` files compiled and linked **before** `entry`. 
 
 Runtime template `include` / `require` paths (for example `include __DIR__ . '/layout.php'`) are **not** listed here; the compiler discovers literals via `LiteralIncludeDiscovery` when bundling.
 
-### `autoload` (planned)
+### `autoload`
 
 ```json
 {
@@ -52,7 +52,7 @@ Runtime template `include` / `require` paths (for example `include __DIR__ . '/l
 }
 ```
 
-Schema validation accepts `autoload.psr-4` key shape; PSR-4 autoloading for `phpc build --project` is tracked in [#155](https://github.com/PurHur/php-compiler/issues/155).
+`phpc serve` registers a VM class autoloader from `autoload.psr-4` before compiling the entry script. `phpc lint --project` also lints PHP files under mapped directories. AOT project builds still require explicit `includes[]` until static discovery lands ([#155](https://github.com/PurHur/php-compiler/issues/155)).
 
 ## Examples
 

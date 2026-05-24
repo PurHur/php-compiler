@@ -13,6 +13,9 @@ use PHPTypes\State;
 use PHPCompiler\Runtime;
 use PHPCompiler\Web\ConstStringFolder;
 use PHPCompiler\Web\IncludePathResolver;
+use PHPCompiler\Web\ProjectAutoload;
+use PHPCompiler\Web\ProjectBootstrap;
+use PHPCompiler\Web\ProjectManifest;
 
 /**
  * Best-effort static compile check with line-accurate unsupported-syntax reporting.
@@ -47,7 +50,34 @@ final class Linter
      */
     public function lintProject(string $entry): array
     {
-        return $this->lintFile($entry);
+        $issues = $this->lintFile($entry);
+        [$projectDir, $manifest] = ProjectBootstrap::resolveFromScript($entry);
+        if (null === $projectDir || null === $manifest) {
+            return $issues;
+        }
+
+        $extraFiles = ProjectManifest::resolveIncludePaths($projectDir, $manifest);
+        $extraFiles = array_merge(
+            $extraFiles,
+            ProjectAutoload::collectPhpFiles(
+                $projectDir,
+                ProjectAutoload::parsePsr4Map($projectDir, $manifest)
+            )
+        );
+
+        $entryReal = realpath($entry) ?: $entry;
+        foreach ($extraFiles as $file) {
+            $fileReal = realpath($file) ?: $file;
+            if ($fileReal === $entryReal || !is_file($file)) {
+                continue;
+            }
+            $issues = array_merge(
+                $issues,
+                $this->lintSource((string) file_get_contents($file), $file)
+            );
+        }
+
+        return $this->dedupeIssues($issues);
     }
 
     /**

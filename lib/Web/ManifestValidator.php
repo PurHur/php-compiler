@@ -78,6 +78,11 @@ final class ManifestValidator
             $errors = array_merge($errors, self::validateAssetsOnDisk($dir, $data['assets']));
         }
 
+        if (isset($data['autoload'])) {
+            $errors = array_merge($errors, self::validateAutoload($data['autoload']));
+            $errors = array_merge($errors, ProjectAutoload::validatePsr4PathsOnDisk($dir, $data['autoload']));
+        }
+
         return $errors;
     }
 
@@ -175,6 +180,7 @@ final class ManifestValidator
 
         if (isset($data['autoload'])) {
             $errors = array_merge($errors, self::validateAutoload($data['autoload']));
+            $errors = array_merge($errors, ProjectAutoload::validatePsr4PathsOnDisk($dir, $data['autoload']));
         }
 
         return $errors;

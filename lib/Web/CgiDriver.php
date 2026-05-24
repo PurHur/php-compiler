@@ -84,6 +84,8 @@ final class CgiDriver
                 $postBody,
                 $scriptFilename
             );
+            [$bootProjectDir, $bootManifest] = ProjectBootstrap::resolveFromScript($script);
+            ProjectBootstrap::prepare($runtime, $bootProjectDir, $bootManifest);
             $block = $runtime->parseAndCompile($code, $script);
             $runtime->run($block);
             $output = ob_get_clean();
