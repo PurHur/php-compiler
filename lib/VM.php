@@ -347,7 +347,9 @@ restart:
                     break;
                 case OpCode::TYPE_UNSET:
                     if (null !== $op->arg1 && isset($frame->scope[$op->arg1])) {
-                        $frame->scope[$op->arg1]->null();
+                        $null = new Variable();
+                        $null->null();
+                        $frame->scope[$op->arg1]->copyFrom($null);
                     }
                     break;
                 case OpCode::TYPE_RETURN_VOID:

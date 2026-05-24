@@ -1265,7 +1265,21 @@ class JIT {
                     );
                     break;
                 case OpCode::TYPE_UNSET:
-                    // Recorded at compile time; JIT unset is not implemented yet.
+                    if (null === $op->arg1) {
+                        break;
+                    }
+                    $targetOp = $block->getOperand($op->arg1);
+                    if (!$this->context->hasVariableOp($targetOp)) {
+                        break;
+                    }
+                    $nullVar = new Variable(
+                        $this->context,
+                        Variable::TYPE_NULL,
+                        Variable::KIND_VALUE,
+                        $this->context->getTypeFromString('__value__*')->constNull()
+                    );
+                    $nullVar->isNullConstant = true;
+                    $this->assignOperand($targetOp, $nullVar, true);
                     break;
                 case OpCode::TYPE_CAST_BOOL:
                     $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));

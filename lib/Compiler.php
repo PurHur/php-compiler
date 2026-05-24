@@ -1570,6 +1570,9 @@ class Compiler {
             if ($usage instanceof Op\Expr\Assign && $usage->var === $fetch->result) {
                 continue;
             }
+            if ($usage instanceof \PHPCfg\Op\Terminal\Unset_ && in_array($fetch->result, $usage->exprs, true)) {
+                continue;
+            }
 
             return false;
         }
@@ -1587,7 +1590,12 @@ class Compiler {
             }
             $next = $children[$i + 1];
 
-            return $next instanceof Op\Expr\Assign && $next->var === $fetch->result;
+            if ($next instanceof Op\Expr\Assign && $next->var === $fetch->result) {
+                return true;
+            }
+
+            return $next instanceof \PHPCfg\Op\Terminal\Unset_
+                && in_array($fetch->result, $next->exprs, true);
         }
 
         return false;
