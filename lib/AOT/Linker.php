@@ -30,6 +30,7 @@ final class Linker
         __DIR__.'/runtime/phpc_process.c',
         __DIR__.'/runtime/preg_match.c',
         __DIR__.'/runtime/phpc_pack.c',
+        __DIR__.'/runtime/phpc_ini_set.c',
     ];
 
     private const RUNTIME_LINK_LIBS = '-lpcre2-8';

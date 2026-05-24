@@ -10,7 +10,10 @@
 #include <string.h>
 
 typedef struct __string__ __string__;
-typedef struct __value__ __value__;
+typedef struct __value__ {
+    char type;
+    char value[8];
+} __value__;
 
 extern __string__ *__string__init(long long size, const char *value);
 extern long long __value__readLong(__value__ *);

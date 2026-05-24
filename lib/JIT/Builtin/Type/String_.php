@@ -276,6 +276,7 @@ class String_ extends Type {
         \PHPCompiler\JIT\Builtin\StringHttpBuildQuery::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringParseStr::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringGetenv::implement($this->context);
+        \PHPCompiler\JIT\Builtin\IniSet::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringDeployPath::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringReadfile::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringFileGetContents::implement($this->context);

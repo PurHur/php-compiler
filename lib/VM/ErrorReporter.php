@@ -26,9 +26,19 @@ final class ErrorReporter
         $this->displayErrors = $displayErrors;
     }
 
+    public function getErrorReporting(): int
+    {
+        return $this->errorReporting;
+    }
+
     public function setErrorReporting(int $level): void
     {
         $this->errorReporting = $level;
+    }
+
+    public function getDisplayErrors(): bool
+    {
+        return $this->displayErrors;
     }
 
     public function setDisplayErrors(bool $display): void
