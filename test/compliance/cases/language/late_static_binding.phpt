@@ -17,7 +17,17 @@ $g = new Greeter();
 echo $g->viaStatic(), "\n";
 echo $g->className(), "\n";
 echo Greeter::tag(), "\n";
+class Base {
+    public static function who(): string {
+        return static::class;
+    }
+}
+class Child extends Base {}
+echo Base::who(), "\n";
+echo Child::who(), "\n";
 --EXPECT--
 hi
 Greeter
 hi
+Base
+Child

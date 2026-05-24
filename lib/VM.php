@@ -583,7 +583,21 @@ restart:
                         throw new \LogicException("Duplicate class definition for $name");
                     }
                     $classEntry = new ClassEntry($name);
+                    if (null !== $op->arg2) {
+                        $parentName = $frame->scope[$op->arg2]->toString();
+                        $parentLc = strtolower($parentName);
+                        if (!isset($this->context->classes[$parentLc])) {
+                            $this->context->autoloadClass($parentName);
+                        }
+                        if (!isset($this->context->classes[$parentLc])) {
+                            throw new \LogicException("Class {$name} extends unknown class {$parentName}");
+                        }
+                        $classEntry->parentLc = $parentLc;
+                    }
                     self::defineClass($classEntry, $op->block1);
+                    if (null !== $classEntry->parentLc) {
+                        $this->inheritFromParent($classEntry);
+                    }
                     $this->context->classes[$lcname] = $classEntry;
                     break;
                 case OpCode::TYPE_NEW:
@@ -881,7 +895,16 @@ restart:
             return $this->lateStaticClassLc($frame);
         }
         if ('parent' === $lcClass) {
-            throw new \LogicException('parent:: is not supported');
+            $declaring = $this->declaringClassLc($frame);
+            if (!isset($this->context->classes[$declaring])) {
+                throw new \LogicException('parent:: used outside of class scope');
+            }
+            $parentLc = $this->context->classes[$declaring]->parentLc;
+            if (null === $parentLc) {
+                throw new \LogicException('parent:: used when class has no parent');
+            }
+
+            return $parentLc;
         }
 
         return $lcClass;
@@ -951,18 +974,15 @@ restart:
     {
         [$className, $methodName] = explode('::', $callableName, 2);
         $lcClass = $this->resolveClassScopeName($className, $frame);
-        $frame->staticCallClass = $this->context->classes[$lcClass]->name;
-        $methodLc = strtolower($methodName);
         if (!isset($this->context->classes[$lcClass])) {
             $this->context->autoloadClass($className);
         }
         if (!isset($this->context->classes[$lcClass])) {
             throw new \LogicException("Call to undefined static method {$callableName}()");
         }
-        $class = $this->context->classes[$lcClass];
-        if (!isset($class->methods[$methodLc])) {
-            throw new \LogicException("Call to undefined static method {$callableName}()");
-        }
+        $frame->staticCallClass = $this->context->classes[$lcClass]->name;
+        $methodLc = strtolower($methodName);
+        [$class, $methodLc] = $this->resolveStaticMethod($lcClass, $methodLc);
         $vis = $class->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
         $callerClassLc = null;
         if (null !== $frame->block->func && null !== $frame->block->func->class) {
@@ -977,6 +997,69 @@ restart:
         );
         $frame->call = $class->methods[$methodLc];
         $frame->callArgs = [];
+    }
+
+    protected function inheritFromParent(ClassEntry $entry): void
+    {
+        if (null === $entry->parentLc || !isset($this->context->classes[$entry->parentLc])) {
+            return;
+        }
+        $parent = $this->context->classes[$entry->parentLc];
+        foreach ($parent->methods as $name => $method) {
+            if (!isset($entry->methods[$name])) {
+                $entry->methods[$name] = $method;
+                $entry->methodVisibility[$name] = $parent->methodVisibility[$name] ?? \PHPCfg\Func::FLAG_PUBLIC;
+            }
+        }
+        foreach ($parent->staticProperties as $name => $storage) {
+            if (!isset($entry->staticProperties[$name])) {
+                $entry->staticProperties[$name] = $storage;
+            }
+        }
+        foreach ($parent->constants as $name => $value) {
+            if (!isset($entry->constants[$name])) {
+                $entry->constants[$name] = $value;
+            }
+        }
+        if (null === $entry->constructor && null !== $parent->constructor) {
+            $entry->constructor = $parent->constructor;
+        }
+        foreach ($parent->properties as $property) {
+            $exists = false;
+            foreach ($entry->properties as $existing) {
+                if ($existing->name === $property->name) {
+                    $exists = true;
+                    break;
+                }
+            }
+            if (!$exists) {
+                $entry->properties[] = $property;
+            }
+        }
+    }
+
+    /**
+     * @return array{0: ClassEntry, 1: string}
+     */
+    protected function resolveStaticMethod(string $lcClass, string $methodLc): array
+    {
+        $visited = [];
+        while (!isset($visited[$lcClass])) {
+            $visited[$lcClass] = true;
+            if (!isset($this->context->classes[$lcClass])) {
+                break;
+            }
+            $class = $this->context->classes[$lcClass];
+            if (isset($class->methods[$methodLc])) {
+                return [$class, $methodLc];
+            }
+            if (null === $class->parentLc) {
+                break;
+            }
+            $lcClass = $class->parentLc;
+        }
+
+        throw new \LogicException("Call to undefined static method {$lcClass}::{$methodLc}()");
     }
 
     protected function initArrayCallable(Frame $frame, Variable $callable): void
