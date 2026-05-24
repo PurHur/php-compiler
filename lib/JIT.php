@@ -171,6 +171,12 @@ class JIT {
         if (str_ends_with($lower, '\\runtime::standalone')) {
             return true;
         }
+        if (str_ends_with($lower, '\\runtime::parse')) {
+            return true;
+        }
+        if (str_ends_with($lower, '\\runtime::compile')) {
+            return true;
+        }
         return false;
     }
 
