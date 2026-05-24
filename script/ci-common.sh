@@ -185,6 +185,19 @@ ci_run_bootstrap_selfhost_probe() {
   "$_CI_SCRIPT_DIR/bootstrap-selfhost-compile-probe.sh" "${probe_args[@]}"
 }
 
+# M4 bootstrap-loop dry-run probe (issue #1777, #1498); default off until M3 strict is stable.
+ci_run_bootstrap_loop_probe() {
+  if [[ "${BOOTSTRAP_LOOP_PROBE_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  if ! ci_llvm_ready; then
+    echo "bootstrap-loop-probe: skipped (LLVM 9 not available)"
+    return 0
+  fi
+  echo "bootstrap-loop-probe (BOOTSTRAP_LOOP_PROBE_GATE=1, --dry-run, issue #1777, #1498)..."
+  "$_CI_SCRIPT_DIR/bootstrap-loop-probe.sh" --dry-run
+}
+
 # Wave gate: selfhost-lint → aot-lint → probe (default on when LLVM ready; BOOTSTRAP_WAVE_CHECK=0 to skip).
 ci_run_bootstrap_wave_check() {
   if [[ "${BOOTSTRAP_WAVE_CHECK:-1}" != "1" ]]; then
