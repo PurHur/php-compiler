@@ -54,20 +54,38 @@ final class sort_ extends Internal
             $copy->copyFrom($value);
             $values[] = $copy;
         }
-        \usort($values, static function (Variable $a, Variable $b): int {
-            $a = $a->resolveIndirect();
-            $b = $b->resolveIndirect();
-            if (Variable::TYPE_STRING === $a->type && Variable::TYPE_STRING === $b->type) {
-                return VmString::strcmp($a->toString(), $b->toString());
+        $first = $values[0]->resolveIndirect();
+        if (Variable::TYPE_STRING === $first->type) {
+            VmInternalCompare::sortVariableValues(
+                $values,
+                VmInternalCompare::resolveStringCallback('strcmp')
+            );
+        } elseif (Variable::TYPE_INTEGER === $first->type) {
+            $n = \count($values);
+            for ($i = 1; $i < $n; ++$i) {
+                $j = $i;
+                while ($j > 0) {
+                    $a = $values[$j - 1]->resolveIndirect();
+                    $b = $values[$j]->resolveIndirect();
+                    if (Variable::TYPE_INTEGER !== $a->type || Variable::TYPE_INTEGER !== $b->type) {
+                        throw new \LogicException(
+                            'sort() only supports homogeneous string or integer arrays in this compiler build'
+                        );
+                    }
+                    if ($a->toInt() <= $b->toInt()) {
+                        break;
+                    }
+                    $tmp = $values[$j - 1];
+                    $values[$j - 1] = $values[$j];
+                    $values[$j] = $tmp;
+                    --$j;
+                }
             }
-            if (Variable::TYPE_INTEGER === $a->type && Variable::TYPE_INTEGER === $b->type) {
-                return $a->toInt() <=> $b->toInt();
-            }
-
+        } else {
             throw new \LogicException(
                 'sort() only supports homogeneous string or integer arrays in this compiler build'
             );
-        });
+        }
         $ht->replacePackedValues($values);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(true);

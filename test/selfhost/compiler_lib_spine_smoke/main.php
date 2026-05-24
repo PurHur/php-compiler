@@ -509,6 +509,7 @@ require_once __DIR__.'/../../../ext/standard/setcookie.php';
 require_once __DIR__.'/../../../ext/standard/setrawcookie.php';
 require_once __DIR__.'/../../../ext/standard/sin.php';
 require_once __DIR__.'/../../../ext/standard/sleep.php';
+require_once __DIR__.'/../../../ext/standard/sort_.php';
 require_once __DIR__.'/../../../ext/standard/sprintf_.php';
 require_once __DIR__.'/../../../ext/standard/sqrt.php';
 require_once __DIR__.'/../../../ext/standard/stat_.php';
