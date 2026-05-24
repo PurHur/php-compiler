@@ -20,7 +20,7 @@ class ObjectEntry {
     public ClassEntry $class;
     public int $id;
     private array $properties = [];
-    public ?Func\PHP $constructor = null;
+    public ?Func $constructor = null;
 
     public function __construct(ClassEntry $class) {
         $this->class = $class;

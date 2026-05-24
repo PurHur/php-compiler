@@ -316,6 +316,18 @@ function syntaxRowDefinitions(): array
             'notes' => ['php-cfg records union types per catch; VM filters TYPE_CATCH via OpCode.catchTypes'],
             'probe' => 'class A {} class B {} try { throw new A(); } catch (A|B $e) { echo "ok"; }',
         ],
+        [
+            'id' => 'weak_reference_weak_map',
+            'construct' => 'WeakReference / WeakMap',
+            'opcodes' => [],
+            'issue' => 1366,
+            'jit' => false,
+            'notes' => [
+                'VM stub: WeakReference::create/get via indirect target slot (unset clears get); not cycle-collecting GC weak refs',
+                'WeakMap uses object-id string keys; JIT may compile references but method bodies are VM-only',
+            ],
+            'probe' => 'class Box {} $o = new Box(); $r = WeakReference::create($o); unset($o); echo $r->get() === null ? "1" : "0";',
+        ],
     ];
 }
 
