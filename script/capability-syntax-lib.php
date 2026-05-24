@@ -151,6 +151,14 @@ function syntaxRowDefinitions(): array
             'notes' => ['Class-scoped storage; `self::` / `static::`; literal property names in JIT'],
             'probe' => 'class C { public static int $n = 1; } echo C::$n;',
         ],
+        [
+            'id' => 'unset',
+            'construct' => '`unset()` on variables and array offsets',
+            'opcodes' => ['TYPE_UNSET'],
+            'issue' => 1224,
+            'notes' => ['VM + JIT assign null to lvalue slots'],
+            'probe' => '$x = 1; unset($x); echo isset($x) ? "set" : "unset";',
+        ],
     ];
 }
 
