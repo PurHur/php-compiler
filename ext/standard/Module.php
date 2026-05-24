@@ -274,6 +274,7 @@ class Module extends ModuleAbstract
             new date(),
             new gmdate(),
             new sleep(),
+            new spl_autoload_register(),
             new usleep(),
         ];
     }
