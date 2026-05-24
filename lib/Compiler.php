@@ -1914,10 +1914,12 @@ class Compiler {
      */
     protected function encodeCatchTypeList(array $types): string
     {
-        return implode('|', array_map(
-            static fn (string $name): string => strtolower(ltrim($name, '\\')),
-            $types
-        ));
+        $encoded = [];
+        foreach ($types as $name) {
+            $encoded[] = strtolower(ltrim($name, '\\'));
+        }
+
+        return implode('|', $encoded);
     }
 
     /**
