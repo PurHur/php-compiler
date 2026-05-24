@@ -19,7 +19,6 @@ final class JitPregGrep
 {
   private static int $blockSerial = 0;
 
-  /** @return Value __value__* (filtered array or boolean false on PCRE error) */
   public static function invoke(Context $context, Value $pattern, Variable $array, Value $invert): Value
   {
     StringPregMatch::ensureLinked($context);
@@ -52,7 +51,6 @@ final class JitPregGrep
     return $ptr;
   }
 
-  /** @return Value __hashtable__* or null on PCRE error */
   private static function buildGrepHashTable(Context $context, Value $src, Value $pattern, Value $invert): Value
   {
     $map = $context->structFieldMap['__hashtable__'];

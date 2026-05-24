@@ -153,6 +153,26 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/JitTouch.php',
         'ext/standard/JitUnlink.php',
         'ext/standard/JitWebParams.php',
+        'ext/standard/JitBase64Decode.php',
+        'ext/standard/JitFuncArgs.php',
+        'ext/standard/JitGetObjectVars.php',
+        'ext/standard/JitGetallheaders.php',
+        'ext/standard/JitHttpBuildQuery.php',
+        'ext/standard/JitHttpResponseCode.php',
+        'ext/standard/JitInterfaceExists.php',
+        'ext/standard/JitParseStr.php',
+        'ext/standard/JitParseUrl.php',
+        'ext/standard/JitPendingHeaders.php',
+        'ext/standard/JitPregGrep.php',
+        'ext/standard/JitPregLastError.php',
+        'ext/standard/JitPregMatchAll.php',
+        'ext/standard/JitPregReplace.php',
+        'ext/standard/JitPregReplaceCallback.php',
+        'ext/standard/JitPregSplit.php',
+        'ext/standard/JitPropertyExists.php',
+        'ext/standard/JitSetcookie.php',
+        'ext/standard/JitSleep.php',
+        'ext/standard/JitTraitExists.php',
         'ext/standard/Module.php',
     ];
 
@@ -175,7 +195,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         $this->assertFileExists($entry);
         $contents = (string) file_get_contents($entry);
         $count = substr_count($contents, 'require_once __DIR__');
-        $this->assertSame(253, $count, '108 compiler_minimal units + 145 M2 spine units');
+        $this->assertSame(273, $count, '108 compiler_minimal units + 165 M2 spine units');
         foreach (self::LIB_SPINE_SMOKE_NEW_UNITS as $unit) {
             $this->assertStringContainsString(
                 "require_once __DIR__.'/../../../{$unit}';",
