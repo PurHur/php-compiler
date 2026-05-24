@@ -19,7 +19,7 @@ final class SelfHostBuiltinPolicyTest extends TestCase
 
     public function testAutoStubBatchCount(): void
     {
-        $this->assertSame(10, SelfHostBuiltinPolicy::autoStubBatchCount());
+        $this->assertSame(11, SelfHostBuiltinPolicy::autoStubBatchCount());
     }
 
     public function testRequiredBundleCategories(): void

@@ -87,6 +87,8 @@ static const char *phpc_builtin_functions[] = {
     "fread",
     "fseek",
     "ftell",
+    "func_get_args",
+    "func_num_args",
     "function_exists",
     "fwrite",
     "get_class",
@@ -112,6 +114,7 @@ static const char *phpc_builtin_functions[] = {
     "implode",
     "in_array",
     "intdiv",
+    "interface_exists",
     "intval",
     "is_a",
     "is_array",
@@ -199,6 +202,7 @@ static const char *phpc_builtin_functions[] = {
     "shell_exec",
     "sin",
     "sizeof",
+    "sleep",
     "sort",
     "sprintf",
     "sqrt",
@@ -241,6 +245,7 @@ static const char *phpc_builtin_functions[] = {
     "tempnam",
     "time",
     "touch",
+    "trait_exists",
     "trigger_error",
     "trim",
     "uasort",
@@ -250,6 +255,7 @@ static const char *phpc_builtin_functions[] = {
     "unserialize",
     "urldecode",
     "urlencode",
+    "usleep",
     "usort",
     "var_export",
     "web_bool",
@@ -257,4 +263,4 @@ static const char *phpc_builtin_functions[] = {
     "web_string",
     "wordwrap",
 };
-static const size_t phpc_builtin_functions_count = 246;
+static const size_t phpc_builtin_functions_count = 262;

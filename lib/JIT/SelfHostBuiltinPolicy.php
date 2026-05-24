@@ -137,13 +137,13 @@ final class SelfHostBuiltinPolicy
 
     /** @var list<string> */
     public const AUTO_STUB_BATCH = [
-        'abs', 'addslashes', 'bin2hex', 'bindec', 'boolval', 'ceil', 'chr', 'chunk_split', 'copy', 'cos',
+        'abs', 'addslashes', 'bin2hex', 'bindec', 'boolval', 'ceil', 'chr', 'chunk_split', 'copy', 'cos', 'pack',
     ];
 
     /** @var array<string, true> */
     private const AUTO_STUB_LOOKUP = [
         'abs' => true, 'addslashes' => true, 'bin2hex' => true, 'bindec' => true, 'boolval' => true,
-        'ceil' => true, 'chr' => true, 'chunk_split' => true, 'copy' => true, 'cos' => true,
+        'ceil' => true, 'chr' => true, 'chunk_split' => true, 'copy' => true, 'cos' => true, 'pack' => true,
     ];
 
     public static function isSelfHostAot(): bool

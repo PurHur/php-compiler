@@ -67,6 +67,15 @@ class Type extends Builtin {
         );
         $fnSprintf = $this->context->module->addFunction('__compiler_sprintf', $fntypeSprintf);
         $this->context->registerFunction('__compiler_sprintf', $fnSprintf);
+        $fntypePack = $this->context->context->functionType(
+            $this->context->getTypeFromString('__string__*'),
+            false,
+            $this->context->getTypeFromString('__string__*'),
+            $this->context->getTypeFromString('int64'),
+            $this->context->getTypeFromString('__value__*')
+        );
+        $fnPack = $this->context->module->addFunction('__compiler_pack', $fntypePack);
+        $this->context->registerFunction('__compiler_pack', $fnPack);
         $fntypeStripTags = $this->context->context->functionType(
             $this->context->getTypeFromString('__string__*'),
             false,
