@@ -44,7 +44,9 @@ final class trigger_error_ extends Internal
         $frame->vmContext->errors->triggerError(
             $messageVar->toString(),
             $level,
-            '' !== $frame->scriptPath ? $frame->scriptPath : null
+            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $frame->vmContext,
+            $frame
         );
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(true);

@@ -264,6 +264,8 @@ class Module extends ModuleAbstract
             new is_a_(),
             new is_subclass_of_(),
             new trigger_error_(),
+            new set_error_handler_(),
+            new restore_error_handler_(),
             new phpc_deploy_path(),
             new compiler_is_superglobal_name(),
             new extract_(),

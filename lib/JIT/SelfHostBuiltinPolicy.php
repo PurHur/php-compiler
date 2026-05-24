@@ -40,6 +40,8 @@ final class SelfHostBuiltinPolicy
     /** @var array<string, string> */
     private const VM_ONLY_DEFERRED = [
         'spl_autoload_register' => 'spl',
+        'set_error_handler' => 'error',
+        'restore_error_handler' => 'error',
         'ob_start' => 'output', 'ob_get_clean' => 'output', 'ob_end_flush' => 'output',
         'ob_get_level' => 'output',
         'password_hash' => 'password', 'password_verify' => 'password',

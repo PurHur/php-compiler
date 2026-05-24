@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\Frame;
+use PHPCompiler\ext\standard\VmErrorHandler;
+
 /**
  * Zend-style warnings for compiled VM code (issue #273).
  */
@@ -17,6 +20,9 @@ final class ErrorReporter
 
     private int $errorReporting;
     private bool $displayErrors;
+
+    /** @var list<array{0: ?string, 1: int}> */
+    private array $handlerStack = [];
 
     public function __construct(
         int $errorReporting = E_ALL,
@@ -46,25 +52,63 @@ final class ErrorReporter
         $this->displayErrors = $display;
     }
 
-    public function undefinedArrayKey(Variable $index, ?string $file = null): void
+    public function pushHandler(?string $callbackName, int $mask): ?string
     {
+        $previous = $this->activeHandlerName();
+        $this->handlerStack[] = [$callbackName, $mask];
+
+        return $previous;
+    }
+
+    public function popHandler(): bool
+    {
+        if ([] === $this->handlerStack) {
+            return false;
+        }
+        array_pop($this->handlerStack);
+
+        return true;
+    }
+
+    public function undefinedArrayKey(
+        Variable $index,
+        ?Context $context = null,
+        ?Frame $frame = null,
+        ?string $file = null
+    ): void {
         if (0 === ($this->errorReporting & self::E_WARNING)) {
             return;
         }
         $key = $this->formatArrayKey($index);
-        $message = "Warning: Undefined array key {$key}";
-        if (null !== $file && '' !== $file) {
-            $message .= " in {$file}";
+        $message = "Undefined array key {$key}";
+        if ($this->dispatchUserHandler($context, $frame, self::E_WARNING, $message, $file, 0)) {
+            return;
         }
-        $message .= "\n";
+        $line = "Warning: {$message}";
+        if (null !== $file && '' !== $file) {
+            $line .= " in {$file}";
+        }
+        $line .= "\n";
         if ($this->displayErrors) {
-            fwrite(STDERR, $message);
+            fwrite(STDERR, $line);
         }
     }
 
-    public function triggerError(string $message, int $level, ?string $file = null): void
-    {
+    public function triggerError(
+        string $message,
+        int $level,
+        ?string $file = null,
+        ?Context $context = null,
+        ?Frame $frame = null
+    ): void {
         if (0 === ($this->errorReporting & $level)) {
+            return;
+        }
+        if ($this->dispatchUserHandler($context, $frame, $level, $message, $file, 0)) {
+            if (self::E_USER_ERROR === $level) {
+                throw new \LogicException("Fatal error: {$message}");
+            }
+
             return;
         }
         $prefix = match ($level) {
@@ -85,6 +129,45 @@ final class ErrorReporter
         if (self::E_USER_ERROR === $level) {
             throw new \LogicException(rtrim($line));
         }
+    }
+
+    private function activeHandlerName(): ?string
+    {
+        if ([] === $this->handlerStack) {
+            return null;
+        }
+
+        return $this->handlerStack[\count($this->handlerStack) - 1][0];
+    }
+
+    private function dispatchUserHandler(
+        ?Context $context,
+        ?Frame $frame,
+        int $errno,
+        string $errstr,
+        ?string $errfile,
+        int $errline
+    ): bool {
+        if (null === $context || null === $frame || [] === $this->handlerStack) {
+            return false;
+        }
+        [$callbackName, $mask] = $this->handlerStack[\count($this->handlerStack) - 1];
+        if (null === $callbackName) {
+            return false;
+        }
+        if (0 === ($mask & $errno)) {
+            return false;
+        }
+
+        return VmErrorHandler::invokeHandler(
+            $context,
+            $frame,
+            $callbackName,
+            $errno,
+            $errstr,
+            $errfile,
+            $errline
+        );
     }
 
     private function formatArrayKey(Variable $index): string
