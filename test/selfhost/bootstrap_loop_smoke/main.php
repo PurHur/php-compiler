@@ -12,7 +12,7 @@ declare(strict_types=1);
  * bundle grows (bin/compile.php / src/cli.php path — #1467).
  *
  * Gate: php bin/compile.php -l test/selfhost/bootstrap_loop_smoke/main.php
- * Probe: make bootstrap-loop-probe  OR  ./script/bootstrap-loop-probe.sh
+ * Probe: make bootstrap-loop-probe  OR  ./script/bootstrap-loop-probe.sh [--dry-run]
  *
  * Tracker: https://github.com/PurHur/php-compiler/issues/1498
  */
