@@ -1015,7 +1015,27 @@ class JIT {
                         $block->getOperand($op->arg1),
                         $this->ensureJitGlobal($globalName)
                     );
-                    break;  
+                    break;
+                case OpCode::TYPE_VAR_FETCH:
+                    $destOp = $block->getOperand($op->arg1);
+                    if (!$this->context->hasVariableOp($destOp)) {
+                        $this->context->makeVariableFromOp($func, $basicBlock, $block, $destOp);
+                    }
+                    $nameSlot = (int) $op->arg2;
+                    foreach ($block->scopedOperands() as $slotOp) {
+                        if ($block->slotForOperand($slotOp) === $nameSlot && !$this->context->hasVariableOp($slotOp)) {
+                            $this->context->makeVariableFromOp($func, $basicBlock, $block, $slotOp);
+                        }
+                    }
+                    $nameVar = $this->variableFromBlockSlot($block, $nameSlot);
+                    $this->foldVarFetchNameFromAssign($block, $nameSlot, $nameVar);
+                    $target = JIT\VarFetchHelper::resolveTarget($this->context, $block, $nameVar);
+                    if ($this->varFetchDestUsedAsAssignLvalue($block, $i, (int) $op->arg1)) {
+                        $this->context->setVariableOp($destOp, $target);
+                    } else {
+                        $this->assignOperand($destOp, $target, true);
+                    }
+                    break;
                 case OpCode::TYPE_ARRAY_DIM_FETCH:
                 case OpCode::TYPE_ARRAY_DIM_FETCH_WRITE:
                     $forWrite = OpCode::TYPE_ARRAY_DIM_FETCH_WRITE === $op->type;
@@ -3850,6 +3870,101 @@ class JIT {
         return null;
     }
 
+
+    /**
+     * When php-cfg assigns through a named temporary with no downstream usages, the name slot
+     * may still be skipped by assignOperand; fold from the matching TYPE_ASSIGN constant (#1226).
+     */
+    private function foldVarFetchNameFromAssign(Block $block, int $nameSlot, Variable $nameVar): void
+    {
+        if (null !== $nameVar->compileTimeString) {
+            return;
+        }
+        if (isset($block->constants[$nameSlot])) {
+            $nameVar->compileTimeString = $block->constants[$nameSlot]->toString();
+
+            return;
+        }
+        foreach ($block->opCodes as $prior) {
+            if (
+                OpCode::TYPE_ASSIGN !== $prior->type
+                || $prior->arg2 !== $nameSlot
+                || !isset($block->constants[$prior->arg3])
+            ) {
+                continue;
+            }
+            $nameVar->compileTimeString = $block->constants[$prior->arg3]->toString();
+
+            return;
+        }
+    }
+
+    private function varFetchDestUsedAsAssignLvalue(Block $block, int $opIndex, int $destSlot): bool
+    {
+        for ($j = $opIndex + 1, $n = count($block->opCodes); $j < $n; $j++) {
+            $next = $block->opCodes[$j];
+            if (OpCode::TYPE_ASSIGN === $next->type && $next->arg2 === $destSlot) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Resolve the JIT variable for a scope slot (issue #1226).
+     *
+     * TYPE_VAR_FETCH arg2 is the slot holding the runtime name string, which may map to
+     * multiple CFG operands; prefer a bound operand with compile-time string metadata.
+     */
+    private function variableFromBlockSlot(Block $block, int $slot): Variable
+    {
+        $operands = [];
+        foreach ($block->scopedOperands() as $op) {
+            if ($block->slotForOperand($op) === $slot) {
+                $operands[] = $op;
+            }
+        }
+        if ([] === $operands) {
+            throw new \LogicException('No operand mapped to slot '.$slot);
+        }
+        usort(
+            $operands,
+            static function (\PHPCfg\Operand $a, \PHPCfg\Operand $b): int {
+                $rank = static function (\PHPCfg\Operand $op): int {
+                    $name = JIT\OperandName::resolve($op);
+                    if ($op instanceof \PHPCfg\Operand\Temporary && null !== $name && '' !== $name) {
+                        return 3;
+                    }
+                    if ($op instanceof \PHPCfg\Operand\Variable) {
+                        return 2;
+                    }
+
+                    return 1;
+                };
+
+                return $rank($b) <=> $rank($a);
+            }
+        );
+        $bound = null;
+        foreach ($operands as $op) {
+            if (!$this->context->hasVariableOp($op)) {
+                continue;
+            }
+            $candidate = $this->context->getVariableFromOp($op);
+            if (null !== $candidate->compileTimeString) {
+                return $candidate;
+            }
+            if (null === $bound) {
+                $bound = $candidate;
+            }
+        }
+        if (null !== $bound) {
+            return $bound;
+        }
+
+        throw new \LogicException('No JIT variable for slot '.$slot);
+    }
 
     private function ensureJitGlobal(string $name): Variable
     {
