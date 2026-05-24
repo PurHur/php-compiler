@@ -263,10 +263,6 @@ class Type extends Builtin {
         );
         $fnPregReplace = $this->context->module->addFunction('__compiler_preg_replace', $fntypePregReplace);
         $this->context->registerFunction('__compiler_preg_replace', $fnPregReplace);
-        $htPtr = $this->context->getTypeFromString('__hashtable__*');
-        $fntypePregSplit = $this->context->context->functionType($htPtr, false, $strPtr, $strPtr);
-        $fnPregSplit = $this->context->module->addFunction('__compiler_preg_split', $fntypePregSplit);
-        $this->context->registerFunction('__compiler_preg_split', $fnPregSplit);
         $fntypePregLastError = $this->context->context->functionType($i64, false);
         $fnPregLastError = $this->context->module->addFunction('__compiler_preg_last_error', $fntypePregLastError);
         $this->context->registerFunction('__compiler_preg_last_error', $fnPregLastError);
@@ -344,6 +340,9 @@ class Type extends Builtin {
         $strPtr = $this->context->getTypeFromString('__string__*');
         $i32 = $this->context->getTypeFromString('int32');
         $htPtr = $this->context->getTypeFromString('__hashtable__*');
+        $fntypePregSplit = $this->context->context->functionType($htPtr, false, $strPtr, $strPtr);
+        $fnPregSplit = $this->context->module->addFunction('__compiler_preg_split', $fntypePregSplit);
+        $this->context->registerFunction('__compiler_preg_split', $fnPregSplit);
         $i8ppPtr = $this->context->getTypeFromString('int8**');
         $i8pppPtr = $this->context->getTypeFromString('int8***');
         $fnPendingReset = $this->context->module->addFunction(
@@ -428,6 +427,16 @@ class Type extends Builtin {
         $fntypeJsonLastError = $this->context->context->functionType($i64, false);
         $fnJsonLastError = $this->context->module->addFunction('__compiler_json_last_error', $fntypeJsonLastError);
         $this->context->registerFunction('__compiler_json_last_error', $fnJsonLastError);
+        $fnSerialize = $this->context->module->addFunction(
+            '__compiler_serialize_value',
+            $this->context->context->functionType($strPtr, false, $valuePtr)
+        );
+        $this->context->registerFunction('__compiler_serialize_value', $fnSerialize);
+        $fnUnserialize = $this->context->module->addFunction(
+            '__compiler_unserialize',
+            $this->context->context->functionType($void, false, $strPtr, $valuePtr)
+        );
+        $this->context->registerFunction('__compiler_unserialize', $fnUnserialize);
         $fntypeShellExec = $this->context->context->functionType($strPtr, false, $strPtr);
         $fnShellExec = $this->context->module->addFunction('__compiler_shell_exec', $fntypeShellExec);
         $this->context->registerFunction('__compiler_shell_exec', $fnShellExec);

@@ -171,6 +171,8 @@ class Module extends ModuleAbstract
             new json_encode(),
             new json_decode(),
             new json_last_error_(),
+            new serialize(),
+            new unserialize(),
             new web_int(),
             new web_string(),
             new web_bool(),
