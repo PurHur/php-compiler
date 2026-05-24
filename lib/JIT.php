@@ -867,6 +867,9 @@ class JIT {
         }
 
         $thisParamOffset = 0;
+        if (null !== $block->func && $block->orig === $block->func->cfg) {
+            $this->context->jitEnclosingBlock = $block;
+        }
         if ([] !== $args) {
             if ($this->instanceMethodUsesThis($block)) {
                 $thisParamOffset = 1;

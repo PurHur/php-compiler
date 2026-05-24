@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -32,8 +33,19 @@ final class func_get_args extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'func_get_args() not implemented for JIT in this compiler build; use VM (issue #197)'
+        if (\count($args) > 0) {
+            throw new \LogicException('func_get_args() takes no arguments');
+        }
+
+        $packed = JitFuncArgs::getArgs($context);
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            $ptr,
+            $context->helper->loadValue($packed)
         );
+
+        return $ptr;
     }
 }
