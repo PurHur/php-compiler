@@ -335,6 +335,7 @@ require_once __DIR__.'/../../../ext/standard/array_key_exists.php';
 require_once __DIR__.'/../../../ext/standard/array_keys.php';
 require_once __DIR__.'/../../../ext/standard/array_map.php';
 require_once __DIR__.'/../../../ext/standard/array_merge.php';
+require_once __DIR__.'/../../../ext/standard/array_multisort.php';
 require_once __DIR__.'/../../../ext/standard/array_product.php';
 require_once __DIR__.'/../../../ext/standard/array_pop.php';
 require_once __DIR__.'/../../../ext/standard/array_push.php';

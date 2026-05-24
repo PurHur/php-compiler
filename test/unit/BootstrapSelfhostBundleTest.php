@@ -368,7 +368,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         $this->assertFileExists($entry);
         $contents = (string) file_get_contents($entry);
         $count = substr_count($contents, 'require_once __DIR__');
-        $this->assertSame(577, $count, '108 compiler_minimal overlap + 469 M2 spine units; array_multisort/usort/uasort + VmString/VmSplAutoload deferred (AOT lint)');
+        $this->assertSame(578, $count, '108 compiler_minimal overlap + 470 M2 spine units; usort/uasort + VmString/VmSplAutoload/VmPregReplaceCallback skipped (AOT lint)');
         foreach (self::LIB_SPINE_SMOKE_NEW_UNITS as $unit) {
             $this->assertStringContainsString(
                 "require_once __DIR__.'/../../../{$unit}';",

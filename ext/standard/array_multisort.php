@@ -92,16 +92,7 @@ final class array_multisort extends Internal
             return;
         }
         $indices = range(0, $length - 1);
-        \usort($indices, function (int $a, int $b) use ($primaryValues, $descending): int {
-            $left = $primaryValues[$a]->resolveIndirect();
-            $right = $primaryValues[$b]->resolveIndirect();
-            $cmp = self::compareValues($left, $right);
-            if ($descending) {
-                return -$cmp;
-            }
-
-            return $cmp;
-        });
+        self::sortIndicesByPrimary($indices, $primaryValues, $descending);
         foreach ($arrays as $array) {
             $ht = $array->toArray();
             $values = [];
@@ -166,19 +157,61 @@ final class array_multisort extends Internal
         return $context->getTypeFromString('int1')->constInt(1, false);
     }
 
-    private static function compareValues(Variable $a, Variable $b): int
+    /**
+     * Sort index permutation by primary array values (no PHP closures — AOT self-host spine safe).
+     *
+     * @param list<int>      $indices
+     * @param list<Variable> $primaryValues
+     */
+    private static function sortIndicesByPrimary(array &$indices, array $primaryValues, bool $descending): void
+    {
+        $first = $primaryValues[0]->resolveIndirect();
+        $stringCompare = null;
+        if (Variable::TYPE_STRING === $first->type) {
+            $stringCompare = VmInternalCompare::resolveStringCallback('strcmp');
+        } elseif (Variable::TYPE_INTEGER !== $first->type) {
+            throw new \LogicException(
+                'array_multisort() only supports homogeneous string or integer arrays in this compiler build'
+            );
+        }
+        $n = \count($indices);
+        for ($i = 1; $i < $n; ++$i) {
+            $j = $i;
+            while ($j > 0) {
+                $cmp = null !== $stringCompare
+                    ? VmInternalCompare::invoke(
+                        $stringCompare,
+                        $primaryValues[$indices[$j - 1]],
+                        $primaryValues[$indices[$j]]
+                    )
+                    : self::compareIntegerPrimary(
+                        $primaryValues[$indices[$j - 1]],
+                        $primaryValues[$indices[$j]]
+                    );
+                if ($descending) {
+                    $cmp = -$cmp;
+                }
+                if ($cmp <= 0) {
+                    break;
+                }
+                $tmp = $indices[$j - 1];
+                $indices[$j - 1] = $indices[$j];
+                $indices[$j] = $tmp;
+                --$j;
+            }
+        }
+    }
+
+    private static function compareIntegerPrimary(Variable $a, Variable $b): int
     {
         $a = $a->resolveIndirect();
         $b = $b->resolveIndirect();
-        if (Variable::TYPE_STRING === $a->type && Variable::TYPE_STRING === $b->type) {
-            return VmString::strcmp($a->toString(), $b->toString());
-        }
-        if (Variable::TYPE_INTEGER === $a->type && Variable::TYPE_INTEGER === $b->type) {
-            return $a->toInt() <=> $b->toInt();
+        if (Variable::TYPE_INTEGER !== $a->type || Variable::TYPE_INTEGER !== $b->type) {
+            throw new \LogicException(
+                'array_multisort() only supports homogeneous string or integer arrays in this compiler build'
+            );
         }
 
-        throw new \LogicException(
-            'array_multisort() only supports homogeneous string or integer arrays in this compiler build'
-        );
+        return $a->toInt() <=> $b->toInt();
     }
 }
