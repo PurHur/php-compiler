@@ -1838,6 +1838,10 @@ class JIT {
                 case OpCode::TYPE_FUNCCALL_INIT:
                     $nameOp = $block->getOperand($op->arg1);
                     if (!$nameOp instanceof Operand\Literal) {
+                        if (null !== $nameOp->type && Type::TYPE_OBJECT === $nameOp->type->type) {
+                            $this->initJitMethodCall($block, $nameOp, '__invoke');
+                            break;
+                        }
                         if ($this->shouldUseSelfHostJitStubs()) {
                             $this->context->scope->toCall = null;
                             $this->context->scope->args = [];
@@ -1975,29 +1979,7 @@ class JIT {
                     $receiverOp = $block->getOperand($op->arg1);
                     $nameOp = $block->getOperand($op->arg2);
                     assert($nameOp instanceof Operand\Literal);
-                    assert($receiverOp->type->type === Type::TYPE_OBJECT);
-                    $className = $receiverOp->type->userType
-                        ?? ($this->context->scope->className !== '' ? $this->context->scope->className : 'object');
-                    $declaringClassLc = strtolower($className);
-                    $methodLc = strtolower($nameOp->value);
-                    $declaringClassId = $this->context->type->object->lookup($className);
-                    $visFlags = $this->context->type->object->methodVisibility($declaringClassId, $methodLc);
-                    $callerClassLc = null;
-                    if (null !== $block->func && null !== $block->func->class) {
-                        $callerClassLc = strtolower($block->func->class->value);
-                    } elseif ($this->context->scope->className !== '') {
-                        $callerClassLc = $this->context->scope->className;
-                    }
-                    MethodVisibility::assertCallable(
-                        $visFlags,
-                        $callerClassLc,
-                        $declaringClassLc,
-                        $className,
-                        $nameOp->value
-                    );
-                    $proxyName = $declaringClassLc.'::'.$methodLc;
-                    $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
-                    $this->context->scope->args = [$this->context->getVariableFromOp($receiverOp)];
+                    $this->initJitMethodCall($block, $receiverOp, $nameOp->value);
                     break;
                 case OpCode::TYPE_PROPERTY_FETCH:
                     $result = $block->getOperand($op->arg1);
@@ -3521,6 +3503,36 @@ class JIT {
         }
 
         return true;
+    }
+
+    /**
+     * @param Operand\Literal|Operand\Variable|Operand\Temporary $receiverOp
+     */
+    private function initJitMethodCall(Block $block, Operand $receiverOp, string $methodName): void
+    {
+        assert(null !== $receiverOp->type && Type::TYPE_OBJECT === $receiverOp->type->type);
+        $className = $receiverOp->type->userType
+            ?? ($this->context->scope->className !== '' ? $this->context->scope->className : 'object');
+        $declaringClassLc = strtolower($className);
+        $methodLc = strtolower($methodName);
+        $declaringClassId = $this->context->type->object->lookup($className);
+        $visFlags = $this->context->type->object->methodVisibility($declaringClassId, $methodLc);
+        $callerClassLc = null;
+        if (null !== $block->func && null !== $block->func->class) {
+            $callerClassLc = strtolower($block->func->class->value);
+        } elseif ($this->context->scope->className !== '') {
+            $callerClassLc = $this->context->scope->className;
+        }
+        MethodVisibility::assertCallable(
+            $visFlags,
+            $callerClassLc,
+            $declaringClassLc,
+            $className,
+            $methodName
+        );
+        $proxyName = $declaringClassLc.'::'.$methodLc;
+        $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
+        $this->context->scope->args = [$this->context->getVariableFromOp($receiverOp)];
     }
 
     /**

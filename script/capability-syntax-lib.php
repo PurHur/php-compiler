@@ -191,6 +191,14 @@ function syntaxRowDefinitions(): array
             'notes' => ['php-cfg nests Operand\\Variable name; VM resolves runtime local by name'],
             'probe' => '$a = "x"; $x = 1; echo $$a;',
         ],
+        [
+            'id' => 'invoke_object',
+            'construct' => 'Invokable objects (`$obj()` / `__invoke`)',
+            'opcodes' => ['TYPE_METHODCALL_INIT', 'TYPE_DECLARE_METHOD'],
+            'issue' => 1232,
+            'notes' => ['Object-typed FuncCall lowered to __invoke method dispatch; VM runtime fallback'],
+            'probe' => 'class C { public function __invoke(): int { return 1; } } echo (new C())();',
+        ],
     ];
 }
 
