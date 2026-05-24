@@ -259,6 +259,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/base64_encode.php',
         'ext/standard/basename.php',
         'ext/standard/bindec.php',
+        'ext/standard/preg_replace.php',
     ];
 
     public static function setUpBeforeClass(): void
@@ -280,7 +281,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         $this->assertFileExists($entry);
         $contents = (string) file_get_contents($entry);
         $count = substr_count($contents, 'require_once __DIR__');
-                $this->assertSame(358, $count, '108 compiler_minimal units + 250 M2 spine units (#1497 wave 2 batch 4); array_pop/shift/search + preg/array_combine wrappers skipped (AOT types); Vm* deferred #1467');
+                $this->assertSame(359, $count, '108 compiler_minimal units + 251 M2 spine units (#1658 preg_replace); array_pop/shift/search + preg/array_combine wrappers skipped (AOT types); Vm* deferred #1467');
         foreach (self::LIB_SPINE_SMOKE_NEW_UNITS as $unit) {
             $this->assertStringContainsString(
                 "require_once __DIR__.'/../../../{$unit}';",

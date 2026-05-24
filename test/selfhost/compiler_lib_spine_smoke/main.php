@@ -361,6 +361,7 @@ require_once __DIR__.'/../../../ext/standard/stripslashes.php';
 require_once __DIR__.'/../../../ext/standard/bin2hex.php';
 require_once __DIR__.'/../../../ext/standard/doubleval.php';
 require_once __DIR__.'/../../../ext/standard/pi.php';
+require_once __DIR__.'/../../../ext/standard/preg_replace.php';
 require_once __DIR__.'/../../../ext/types/is_type.php';
 require_once __DIR__.'/../../../ext/types/strlen.php';
 require_once __DIR__.'/../../../ext/types/mb_strlen.php';
