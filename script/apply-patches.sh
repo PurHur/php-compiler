@@ -96,8 +96,14 @@ patch_already_applied() {
     php-cfg-assignop-coalesce.patch)
       grep -q "'Expr_AssignOp_Coalesce'" "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
       ;;
+    php-cfg-first-class-callable.patch)
+      grep -q 'isFirstClassCallable' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
+      ;;
     php-types-magic-script-const.patch)
       grep -q 'KIND_LINE === \$op->kind' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
+      ;;
+    php-types-first-class-callable.patch)
+      grep -q 'Expr_FirstClassCallable' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
       ;;
     *)
       return 1
@@ -153,6 +159,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-switch-cond-property.patch"
   apply_patch "$PATCH_DIR/php-cfg-match.patch"
   apply_patch "$PATCH_DIR/php-cfg-assignop-coalesce.patch"
+  apply_patch "$PATCH_DIR/php-cfg-first-class-callable.patch"
 fi
 
 if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
@@ -177,6 +184,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-generics-list-array.patch"
   apply_patch "$PATCH_DIR/php-types-ns-func-call.patch"
   apply_patch "$PATCH_DIR/php-types-magic-script-const.patch"
+  apply_patch "$PATCH_DIR/php-types-first-class-callable.patch"
 fi
 
 if [[ -d "$ROOT/vendor/pre/plugin" ]]; then

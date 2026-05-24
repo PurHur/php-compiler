@@ -215,6 +215,14 @@ function syntaxRowDefinitions(): array
             'notes' => ['Object-typed FuncCall lowered to __invoke method dispatch; VM runtime fallback'],
             'probe' => 'class C { public function __invoke(): int { return 1; } } echo (new C())();',
         ],
+        [
+            'id' => 'first_class_callable',
+            'construct' => 'First-class callable syntax (`foo(...)`, `Class::m(...)`)',
+            'opcodes' => ['TYPE_ASSIGN', 'TYPE_FUNCCALL_INIT'],
+            'issue' => 1230,
+            'notes' => ['php-cfg Expr_FirstClassCallable; VM stores string or [obj, method] array; JIT via compileTimeString'],
+            'probe' => '$fn = strlen(...); echo $fn("x");',
+        ],
     ];
 }
 

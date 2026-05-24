@@ -1884,6 +1884,9 @@ class JIT {
                         }
                         $lcname = strtolower($nameVar->compileTimeString);
                         if (!$this->context->functionIsRegistered($lcname)) {
+                            if (str_contains($nameVar->compileTimeString, '::')) {
+                                throw new \LogicException("Call to undefined static method {$nameVar->compileTimeString}()");
+                            }
                             throw new \LogicException("Call to undefined function {$lcname}()");
                         }
                         $this->context->scope->toCall = $this->context->resolveFunctionProxy($lcname);

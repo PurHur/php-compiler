@@ -33,6 +33,7 @@ Tracking issues: [#58](https://github.com/PurHur/php-compiler/issues/58), [#145]
 | `declare(strict_types=1)` scalar parameter checks | yes | yes | yes | [#1229](https://github.com/PurHur/php-compiler/issues/1229) | VM #156; JIT enforces at user call sites via JIT\TypeCheck + Native::compileArg weak casts |
 | Variable variables (`$$name`) | yes | no | yes | [#1226](https://github.com/PurHur/php-compiler/issues/1226) | php-cfg nests Operand\Variable name; VM resolves runtime local by name; compliance PHPT; VM-only lowering |
 | Invokable objects (`$obj()` / `__invoke`) | yes | yes | yes | [#1232](https://github.com/PurHur/php-compiler/issues/1232) | Object-typed FuncCall lowered to __invoke method dispatch; VM runtime fallback |
+| First-class callable syntax (`foo(...)`, `Class::m(...)`) | yes | partial | yes | [#1230](https://github.com/PurHur/php-compiler/issues/1230) | php-cfg Expr_FirstClassCallable; VM string or [obj, method] array; JIT compileTimeString for function/static |
 
 _Syntax AOT column reflects `Runtime::MODE_AOT` compile probes unless a row pins AOT (e.g. native user-class link)._
 ## Web north-star (`examples/003-MiniWebApp`)

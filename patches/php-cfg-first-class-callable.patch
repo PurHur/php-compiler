@@ -1,0 +1,118 @@
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/FirstClassCallable.php	2026-05-24 07:19:29.067255243 +0000
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/FirstClassCallable.php	2026-05-24 07:19:21.000000000 +0000
+@@ -0,0 +1,55 @@
++<?php
++
++declare(strict_types=1);
++
++namespace PHPCfg\Op\Expr;
++
++use PHPCfg\Op\Expr;
++use PHPCfg\Operand;
++
++/** PHP 8.1+ first-class callable: `foo(...)`, `Class::m(...)`, `$obj->m(...)` (#1230). */
++class FirstClassCallable extends Expr
++{
++    public const KIND_FUNCTION = 1;
++    public const KIND_STATIC = 2;
++    public const KIND_METHOD = 3;
++
++    public int $kind;
++
++    /** Function name, static method name, or instance method name. */
++    public Operand $name;
++
++    /** Static call class (KIND_STATIC). */
++    public ?Operand $class = null;
++
++    /** Instance receiver (KIND_METHOD). */
++    public ?Operand $var = null;
++
++    public function __construct(
++        int $kind,
++        Operand $name,
++        ?Operand $class = null,
++        ?Operand $var = null,
++        array $attributes = []
++    ) {
++        parent::__construct($attributes);
++        $this->kind = $kind;
++        $this->name = $this->addReadRef($name);
++        if (null !== $class) {
++            $this->class = $this->addReadRef($class);
++        }
++        if (null !== $var) {
++            $this->var = $this->addReadRef($var);
++        }
++    }
++
++    public function getVariableNames(): array
++    {
++        return ['name', 'class', 'var', 'result'];
++    }
++
++    public function getType(): string
++    {
++        return 'Expr_FirstClassCallable';
++    }
++}
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php	2026-05-24 07:19:29.520322116 +0000
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php	2026-05-24 07:19:29.507374190 +0000
+@@ -1050,9 +1050,23 @@
+         return new Op\Expr\Exit_($e, $this->mapAttributes($expr));
+     }
+ 
++    protected function isFirstClassCallable(array $args): bool
++    {
++        return 1 === count($args) && $args[0] instanceof Node\VariadicPlaceholder;
++    }
+ 
+     protected function parseExpr_FuncCall(Expr\FuncCall $expr)
+     {
++        if ($this->isFirstClassCallable($expr->args)) {
++            return new Op\Expr\FirstClassCallable(
++                Op\Expr\FirstClassCallable::KIND_FUNCTION,
++                $this->readVariable($this->parseExprNode($expr->name)),
++                null,
++                null,
++                $this->mapAttributes($expr)
++            );
++        }
++
+         $args = $this->parseExprList($expr->args, self::MODE_READ);
+         $name = $this->readVariable($this->parseExprNode($expr->name));
+         if ($this->currentNamespace && $expr->name instanceof Node\Name && $expr->name->isUnqualified()) {
+@@ -1158,6 +1172,16 @@
+ 
+     protected function parseExpr_MethodCall(Expr\MethodCall $expr)
+     {
++        if ($this->isFirstClassCallable($expr->args)) {
++            return new Op\Expr\FirstClassCallable(
++                Op\Expr\FirstClassCallable::KIND_METHOD,
++                $this->readVariable($this->parseExprNode($expr->name)),
++                null,
++                $this->readVariable($this->parseExprNode($expr->var)),
++                $this->mapAttributes($expr)
++            );
++        }
++
+         return new Op\Expr\MethodCall(
+             $this->readVariable($this->parseExprNode($expr->var)),
+             $this->readVariable($this->parseExprNode($expr->name)),
+@@ -1254,6 +1278,16 @@
+ 
+     protected function parseExpr_StaticCall(Expr\StaticCall $expr)
+     {
++        if ($this->isFirstClassCallable($expr->args)) {
++            return new Op\Expr\FirstClassCallable(
++                Op\Expr\FirstClassCallable::KIND_STATIC,
++                $this->readVariable($this->parseExprNode($expr->name)),
++                $this->readVariable($this->parseExprNode($expr->class)),
++                null,
++                $this->mapAttributes($expr)
++            );
++        }
++
+         return new Op\Expr\StaticCall(
+             $this->readVariable($this->parseExprNode($expr->class)),
+             $this->readVariable($this->parseExprNode($expr->name)),

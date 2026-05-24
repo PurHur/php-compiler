@@ -1021,6 +1021,8 @@ class Compiler {
                     $this->compileOperand($expr->class, $block, true),
                     $this->compileOperand($expr->name, $block, true)
                 )];
+            case Op\Expr\FirstClassCallable::class:
+                return $this->compileFirstClassCallable($expr, $block);
             case Op\Expr\FuncCall::class:
                 if ($this->operandIsInvokableReceiver($expr->name, $block)) {
                     return $this->compileMethodCallOpcodes(
@@ -2003,6 +2005,86 @@ class Compiler {
             $this->compileOperand($expr->class, $block, true),
             $this->compileOperand($expr->name, $block, true)
         )];
+    }
+
+    /**
+     * Lower PHP 8.1 first-class callables to VM/JIT callable representations (#1230).
+     *
+     * @return OpCode[]
+     */
+    protected function compileFirstClassCallable(Op\Expr\FirstClassCallable $expr, Block $block): array
+    {
+        $result = $this->compileOperand($expr->result, $block, false);
+        if (Op\Expr\FirstClassCallable::KIND_METHOD === $expr->kind) {
+            $receiver = $this->compileOperand($expr->var, $block, true);
+            $method = $this->compileOperand($expr->name, $block, true);
+
+            return [
+                new OpCode(
+                    OpCode::TYPE_INIT_ARRAY,
+                    $result,
+                    $receiver,
+                    $this->compileIntegerLiteralSlot(0, $block)
+                ),
+                new OpCode(
+                    OpCode::TYPE_ADD_ARRAY_ELEMENT,
+                    $result,
+                    $method,
+                    $this->compileIntegerLiteralSlot(1, $block)
+                ),
+            ];
+        }
+
+        $callableSlot = match ($expr->kind) {
+            Op\Expr\FirstClassCallable::KIND_FUNCTION => $this->compileFirstClassFunctionNameSlot($expr->name, $block),
+            Op\Expr\FirstClassCallable::KIND_STATIC => $this->compileFirstClassStaticNameSlot($expr->class, $expr->name, $block),
+            default => throw new \LogicException('Unknown first-class callable kind'),
+        };
+
+        return [new OpCode(
+            OpCode::TYPE_ASSIGN,
+            $result,
+            $result,
+            $callableSlot
+        )];
+    }
+
+    private function compileFirstClassFunctionNameSlot(Operand $name, Block $block): int
+    {
+        if (!$name instanceof Operand\Literal) {
+            throw new \LogicException('First-class function callable name must be a literal');
+        }
+
+        return $this->compileStringLiteralSlot($name->value, $block);
+    }
+
+    private function compileFirstClassStaticNameSlot(?Operand $class, Operand $method, Block $block): int
+    {
+        if (!$class instanceof Operand\Literal || !$method instanceof Operand\Literal) {
+            throw new \LogicException('First-class static callable requires literal class and method names');
+        }
+
+        return $this->compileStringLiteralSlot($class->value.'::'.$method->value, $block);
+    }
+
+    private function compileStringLiteralSlot(string $value, Block $block): int
+    {
+        $var = new Variable(Variable::TYPE_STRING);
+        $var->string($value);
+        $operand = new Temporary();
+        $operand->type = Type::string();
+
+        return $block->registerConstant($operand, $var);
+    }
+
+    private function compileIntegerLiteralSlot(int $value, Block $block): int
+    {
+        $var = new Variable(Variable::TYPE_INTEGER);
+        $var->int($value);
+        $operand = new Temporary();
+        $operand->type = Type::int();
+
+        return $block->registerConstant($operand, $var);
     }
 
     protected function compileGlobalConst(Op\Terminal\Const_ $const, Block $block): OpCode
