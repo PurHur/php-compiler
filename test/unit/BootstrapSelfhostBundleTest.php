@@ -244,6 +244,21 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/array_key_exists.php',
         'ext/standard/array_keys.php',
         'ext/standard/array_intersect.php',
+        'ext/standard/array_push.php',
+        'ext/standard/array_product.php',
+        'ext/standard/array_replace.php',
+        'ext/standard/array_reverse.php',
+        'ext/standard/array_slice.php',
+        'ext/standard/array_splice.php',
+        'ext/standard/array_sum.php',
+        'ext/standard/array_unique.php',
+        'ext/standard/array_unshift.php',
+        'ext/standard/array_values.php',
+        'ext/standard/atan2.php',
+        'ext/standard/base64_decode.php',
+        'ext/standard/base64_encode.php',
+        'ext/standard/basename.php',
+        'ext/standard/bindec.php',
     ];
 
     public static function setUpBeforeClass(): void
@@ -265,7 +280,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         $this->assertFileExists($entry);
         $contents = (string) file_get_contents($entry);
         $count = substr_count($contents, 'require_once __DIR__');
-                $this->assertSame(343, $count, '108 compiler_minimal units + 235 M2 spine units (#1497 wave 2 batch 3); preg/array_combine wrappers skipped (AOT __value__* docblocks); Vm* deferred #1467');
+                $this->assertSame(358, $count, '108 compiler_minimal units + 250 M2 spine units (#1497 wave 2 batch 4); array_pop/shift/search + preg/array_combine wrappers skipped (AOT types); Vm* deferred #1467');
         foreach (self::LIB_SPINE_SMOKE_NEW_UNITS as $unit) {
             $this->assertStringContainsString(
                 "require_once __DIR__.'/../../../{$unit}';",
