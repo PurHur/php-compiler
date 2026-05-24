@@ -12,7 +12,9 @@ use PHPCompiler\Runtime;
 final class ProjectAutoload
 {
     /**
-     * @return array<string, string> namespace prefix => absolute base directory
+     * Namespace prefix => absolute base directory.
+     *
+     * @return array<string, string>
      */
     public static function parsePsr4Map(string $projectDir, ?array $manifest): array
     {
@@ -65,7 +67,9 @@ final class ProjectAutoload
     /**
      * @param array<string, string> $psr4Map
      *
-     * @return list<string> absolute paths to PHP files under mapped directories
+     * Absolute paths to PHP files under mapped directories.
+     *
+     * @return list<string>
      */
     public static function collectPhpFiles(string $projectDir, array $psr4Map): array
     {
@@ -109,15 +113,7 @@ final class ProjectAutoload
             return;
         }
 
-        $runtime->vmContext->classAutoloaders[] = static function (string $className) use ($runtime, $psr4Map): bool {
-            $path = self::resolveClassPath($className, $psr4Map);
-            if (null === $path) {
-                return false;
-            }
-            $runtime->vm->executeCompileUnit($path);
-
-            return isset($runtime->vmContext->classes[strtolower($className)]);
-        };
+        $runtime->vmContext->classAutoloaders[] = new ProjectVmAutoloadHandler($runtime, $psr4Map);
     }
 
     /**
@@ -139,5 +135,29 @@ final class ProjectAutoload
         }
 
         return $errors;
+    }
+}
+
+/** VM class autoload callback without Expr_Closure (self-host AOT spine #1056). */
+final class ProjectVmAutoloadHandler
+{
+    /**
+     * @param array<string, string> $psr4Map
+     */
+    public function __construct(
+        private Runtime $runtime,
+        private array $psr4Map
+    ) {
+    }
+
+    public function __invoke(string $className): bool
+    {
+        $path = ProjectAutoload::resolveClassPath($className, $this->psr4Map);
+        if (null === $path) {
+            return false;
+        }
+        $this->runtime->vm->executeCompileUnit($path);
+
+        return isset($this->runtime->vmContext->classes[strtolower($className)]);
     }
 }

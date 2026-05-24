@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Web;
 
-use PHPCompiler\ext\standard\is_numeric;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -31,7 +30,7 @@ final class Params
         if (null === $raw) {
             return $default;
         }
-        if (!is_numeric::isNumeric($raw)) {
+        if (!self::isNumericVariable($raw)) {
             return $default;
         }
         $n = self::numericToInt($raw);
@@ -96,6 +95,24 @@ final class Params
         }
 
         return $default;
+    }
+
+    private static function isNumericVariable(Variable $v): bool
+    {
+        switch ($v->type) {
+            case Variable::TYPE_INTEGER:
+            case Variable::TYPE_FLOAT:
+                return true;
+            case Variable::TYPE_STRING:
+                $s = $v->toString();
+
+                return '' !== $s && \is_numeric($s);
+            case Variable::TYPE_BOOLEAN:
+            case Variable::TYPE_NULL:
+                return false;
+            default:
+                return false;
+        }
     }
 
     private static function readStringValue(Variable $source, string $key): ?Variable
