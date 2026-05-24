@@ -30,7 +30,7 @@ Supporting fixes from #1402:
 | Allowlist / native spine | Gate |
 |--------------------------|------|
 | `Runtime::parseAndCompile` | On M3 allowlist when `PHP_COMPILER_M3_COMPILE_DRIVER=1` |
-| `Runtime::parse` / `Runtime::compile` | On M3 allowlist (#1494) |
+| `Runtime::parse` / `Runtime::compile` | On M3 allowlist; compile-driver link OK (#1496) |
 | `Runtime::loadJitContext` | Compile-driver link OK (#1402) |
 | `Runtime::__construct` | Slim ctor via `compileRuntimeConstructM3Native` → `compileBlockPhpLowering` (#1494) |
 | `Runtime::initParsePipeline` / `Runtime::initCompiler` / `Runtime::loadCoreModules` | Real-lowered via `compileRuntime*M3Native` when not combined with `initVmContext` |
@@ -39,12 +39,13 @@ Supporting fixes from #1402:
 | `Runtime::standalone` | Compile-driver link OK (#1402, #1056) |
 | `helloworld_compile_smoke` | Link OK with real lowering |
 | `runtime_ctor_smoke` | `php bin/compile.php -l test/bootstrap-aot/runtime_ctor_smoke.php` |
+| `runtime_parse_compile_smoke` | `php bin/compile.php -l test/bootstrap-aot/runtime_parse_compile_smoke.php` |
 
 **Runtime emit:** `BOOTSTRAP_M3_RUNTIME_COMPILE=1` still segfaults — stubbed `initVmContext` leaves `vmContext` uninitialized (`__hashtable__readStringKeyValue` in `load()`). Next: safe `VMContext` lowering (C floor or isolated `initVmContext` link).
 
 **Probe findings (2026-05):**
 
-- **Link + real lowering:** `BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1` + `BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING=1` → `compile driver link OK`.
+- **Link + real lowering:** `BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1` + `BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING=1` → `compile driver link OK` (includes `Runtime::parse` / `Runtime::compile` on allowlist, not on deny list — #1496).
 - **Runtime:** `BOOTSTRAP_M3_RUNTIME_COMPILE=1` → segfault until `initVmContext` is real-lowered without LLVM 9 crash.
 - **Emit paths:** probe logs `emit_path=native` vs `emit_path=zend`; `BOOTSTRAP_M3_HELLOWORLD_STRICT=1` fails with `block_reason=…`.
 

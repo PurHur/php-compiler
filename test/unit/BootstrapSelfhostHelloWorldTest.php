@@ -156,8 +156,56 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString('isM3CompileDriverRealLoweringName', $jit);
         $this->assertStringContainsString('helloworld_compile_smoke', $jit);
         $this->assertStringContainsString('runtime::parseandcompile', $jit);
+        $this->assertStringContainsString('runtime::parse', $jit);
+        $this->assertStringContainsString('runtime::compile', $jit);
         $this->assertStringContainsString('jitFunctionSkipName', $jit);
         $this->assertStringContainsString('m3CompileDriverSpineDenyNames', $jit);
+    }
+
+    public function testJitM3AllowlistIncludesParseAndCompileNotOnDenyList(): void
+    {
+        $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
+        $this->assertMatchesRegularExpression(
+            "/str_ends_with\\(\\\$lower, '\\\\\\\\runtime::parse'\\)/",
+            $jit,
+            'Runtime::parse must be on M3 compile-driver allowlist (#1496)'
+        );
+        $this->assertMatchesRegularExpression(
+            "/str_ends_with\\(\\\$lower, '\\\\\\\\runtime::compile'\\)/",
+            $jit,
+            'Runtime::compile must be on M3 compile-driver allowlist (#1496)'
+        );
+        if (preg_match('/private function m3CompileDriverSpineDenyNames\\(\\): array\\s*\\{\\s*return \\[(.*?)\\];/s', $jit, $m)) {
+            $denyBlock = $m[1];
+            $this->assertStringNotContainsString('runtime::parse', $denyBlock);
+            $this->assertStringNotContainsString('runtime::compile', $denyBlock);
+        } else {
+            $this->fail('Unable to parse m3CompileDriverSpineDenyNames from lib/JIT.php');
+        }
+    }
+
+    public function testRuntimeParseCompileSmokeFixtureExists(): void
+    {
+        $fixture = self::$root.'/test/bootstrap-aot/runtime_parse_compile_smoke.php';
+        $this->assertFileExists($fixture);
+        $source = (string) file_get_contents($fixture);
+        $this->assertStringContainsString('runtime_parse_compile_smoke', $source);
+        $this->assertStringContainsString('->parse(', $source);
+        $this->assertStringContainsString('->compile(', $source);
+    }
+
+    public function testRuntimeParseCompileSmokeLintPassesWhenLlvmPresent(): void
+    {
+        if (!LlvmToolchain::isReady(self::$root)) {
+            $this->markTestSkipped('LLVM 9 not available for runtime_parse_compile_smoke lint.');
+        }
+
+        $fixture = self::$root.'/test/bootstrap-aot/runtime_parse_compile_smoke.php';
+        $prefix = LlvmToolchain::envPrefix(self::$root);
+        $cmd = implode(' ', array_map('escapeshellarg', [...$prefix, 'php', self::$root.'/bin/compile.php', '-l', $fixture])).' 2>&1';
+        exec($cmd, $lines, $exitCode);
+
+        $this->assertSame(0, $exitCode, implode("\n", $lines));
     }
 
     public function testCompileDriverNullSafeRuntimeDispatch(): void
