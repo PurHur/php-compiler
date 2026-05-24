@@ -56,26 +56,17 @@ final class VarFetchHelper
                     $operands[] = $op;
                 }
             }
-            usort(
-                $operands,
-                static function (Operand $a, Operand $b): int {
-                    $rank = static function (Operand $op): int {
-                        $resolved = OperandName::resolve($op);
-                        if ($op instanceof \PHPCfg\Operand\Temporary && null !== $resolved && '' !== $resolved) {
-                            return 3;
-                        }
-                        if ($op instanceof \PHPCfg\Operand\Variable) {
-                            return 2;
-                        }
-
-                        return 1;
-                    };
-
-                    return $rank($b) <=> $rank($a);
+            $best = null;
+            $bestRank = -1;
+            foreach ($operands as $op) {
+                $rank = self::operandBindingRank($op);
+                if ($rank > $bestRank) {
+                    $bestRank = $rank;
+                    $best = $op;
                 }
-            );
-            if ([] !== $operands) {
-                return $context->getVariableFromOp($operands[0]);
+            }
+            if (null !== $best) {
+                return $context->getVariableFromOp($best);
             }
         }
         $found = ScopeBuiltinHelper::findVariableByName($context, $name);
@@ -87,5 +78,18 @@ final class VarFetchHelper
         }
 
         return null;
+    }
+
+    private static function operandBindingRank(Operand $op): int
+    {
+        $resolved = OperandName::resolve($op);
+        if ($op instanceof \PHPCfg\Operand\Temporary && null !== $resolved && '' !== $resolved) {
+            return 3;
+        }
+        if ($op instanceof \PHPCfg\Operand\Variable) {
+            return 2;
+        }
+
+        return 1;
     }
 }

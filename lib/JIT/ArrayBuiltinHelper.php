@@ -258,8 +258,7 @@ final class ArrayBuiltinHelper
 
     private static function copyValueEntryToBox(Context $context, Value $destPtr, Value $entry): void
     {
-        static $seq = 0;
-        $tag = 'vb'.(string) ++$seq;
+        $tag = 'vb'.(string) ++self::$copyListEntrySeq;
         $valueMap = $context->structFieldMap['__value__'];
         $typeByte = $context->builder->load(
             $context->builder->structGep($entry, $valueMap['type'])
@@ -349,8 +348,7 @@ final class ArrayBuiltinHelper
 
     private static function copyValueEntrySlot(Context $context, Value $fromEntry, Value $toEntry): void
     {
-        static $seq = 0;
-        $tag = 'vs'.(string) ++$seq;
+        $tag = 'vs'.(string) ++self::$copyListEntrySeq;
         $valueMap = $context->structFieldMap['__value__'];
         $typeByte = $context->builder->load(
             $context->builder->structGep($fromEntry, $valueMap['type'])
@@ -935,8 +933,7 @@ final class ArrayBuiltinHelper
         Value $dest,
         Value $destIndex
     ): void {
-        static $seq = 0;
-        $tag = 'pv'.(string) ++$seq;
+        $tag = 'pv'.(string) ++self::$copyListEntrySeq;
         $valueMap = $context->structFieldMap['__value__'];
         $typeByte = $context->builder->load(
             $context->builder->structGep($srcEntry, $valueMap['type'])
@@ -2309,8 +2306,7 @@ final class ArrayBuiltinHelper
         Variable $array,
         Value $size
     ): Value {
-        static $seq = 0;
-        $tag = 'acn'.(string) ++$seq;
+        $tag = 'acn'.(string) ++self::$copyListEntrySeq;
         $elemType = $array->type & ~Variable::IS_NATIVE_ARRAY;
         $sizeT = $context->getTypeFromString('size_t');
         $htPtr = $context->getTypeFromString('__hashtable__*');
@@ -2416,8 +2412,7 @@ final class ArrayBuiltinHelper
 
     private static function buildChunkFromHashTable(Context $context, Value $src, Value $size): Value
     {
-        static $seq = 0;
-        $tag = 'ac'.(string) ++$seq;
+        $tag = 'ac'.(string) ++self::$copyListEntrySeq;
         $map = $context->structFieldMap['__hashtable__'];
         $sizeT = $context->getTypeFromString('size_t');
         $htPtr = $context->getTypeFromString('__hashtable__*');
@@ -2792,8 +2787,7 @@ final class ArrayBuiltinHelper
         Value $src,
         Value $columnKeyStr
     ): Value {
-        static $seq = 0;
-        $tag = (string) ++$seq;
+        $tag = (string) ++self::$copyListEntrySeq;
         $map = $context->structFieldMap['__hashtable__'];
         $valueMap = $context->structFieldMap['__value__'];
         $sizeT = $context->getTypeFromString('size_t');
@@ -3001,8 +2995,7 @@ final class ArrayBuiltinHelper
 
     private static function listEntryTruthy(Context $context, Value $entry): Value
     {
-        static $seq = 0;
-        $tag = 'ft'.(string) ++$seq;
+        $tag = 'ft'.(string) ++self::$copyListEntrySeq;
         $valueMap = $context->structFieldMap['__value__'];
         $typeByte = $context->builder->load(
             $context->builder->structGep($entry, $valueMap['type'])

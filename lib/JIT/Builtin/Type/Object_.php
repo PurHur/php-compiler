@@ -73,7 +73,10 @@ class Object_ extends Type {
      */
     private function registerFn(string $name, string $returnType, array $paramTypes): void
     {
-        $params = array_map(fn (string $t) => $this->context->getTypeFromString($t), $paramTypes);
+        $params = [];
+        foreach ($paramTypes as $t) {
+            $params[] = $this->context->getTypeFromString($t);
+        }
         $ft = $this->context->context->functionType(
             $this->context->getTypeFromString($returnType),
             false,
@@ -630,19 +633,8 @@ class Object_ extends Type {
 
     private function ensureExternalClassConstants(int $id, string $lcname): void
     {
-        $seed = function (array $constants) use ($id): void {
-            foreach ($constants as $name => $value) {
-                if (!isset($this->classConstants[$id][$name])) {
-                    $this->classConstants[$id][$name] = [
-                        'type' => Variable::TYPE_NATIVE_LONG,
-                        'value' => $value,
-                    ];
-                }
-            }
-        };
-
         if ('phpcompiler\\vm\\variable' === $lcname) {
-            $seed([
+            $this->seedExternalClassConstants($id, [
                 'type_undefined' => \PHPCompiler\VM\Variable::TYPE_UNDEFINED,
                 'type_null' => \PHPCompiler\VM\Variable::TYPE_NULL,
                 'type_integer' => \PHPCompiler\VM\Variable::TYPE_INTEGER,
@@ -656,7 +648,7 @@ class Object_ extends Type {
             ]);
         }
         if ('phpcompiler\\jit\\variable' === $lcname || 'variable' === $lcname) {
-            $seed([
+            $this->seedExternalClassConstants($id, [
                 'type_null' => \PHPCompiler\JIT\Variable::TYPE_NULL,
                 'type_native_long' => \PHPCompiler\JIT\Variable::TYPE_NATIVE_LONG,
                 'type_native_bool' => \PHPCompiler\JIT\Variable::TYPE_NATIVE_BOOL,
@@ -672,13 +664,25 @@ class Object_ extends Type {
             ]);
         }
         if ('phptypes\\type' === $lcname || 'type' === $lcname) {
-            $seed(['type_null'=>\PHPTypes\Type::TYPE_NULL,'type_boolean'=>\PHPTypes\Type::TYPE_BOOLEAN,'type_long'=>\PHPTypes\Type::TYPE_LONG,'type_double'=>\PHPTypes\Type::TYPE_DOUBLE,'type_string'=>\PHPTypes\Type::TYPE_STRING,'type_object'=>\PHPTypes\Type::TYPE_OBJECT,'type_array'=>\PHPTypes\Type::TYPE_ARRAY,'type_callable'=>\PHPTypes\Type::TYPE_CALLABLE,'type_union'=>\PHPTypes\Type::TYPE_UNION,'type_intersection'=>\PHPTypes\Type::TYPE_INTERSECTION]);
+            $this->seedExternalClassConstants($id, ['type_null'=>\PHPTypes\Type::TYPE_NULL,'type_boolean'=>\PHPTypes\Type::TYPE_BOOLEAN,'type_long'=>\PHPTypes\Type::TYPE_LONG,'type_double'=>\PHPTypes\Type::TYPE_DOUBLE,'type_string'=>\PHPTypes\Type::TYPE_STRING,'type_object'=>\PHPTypes\Type::TYPE_OBJECT,'type_array'=>\PHPTypes\Type::TYPE_ARRAY,'type_callable'=>\PHPTypes\Type::TYPE_CALLABLE,'type_union'=>\PHPTypes\Type::TYPE_UNION,'type_intersection'=>\PHPTypes\Type::TYPE_INTERSECTION]);
         }
         if ('phpcompiler\\runtime' === $lcname || 'runtime' === $lcname) {
-            $seed([
+            $this->seedExternalClassConstants($id, [
                 'mode_normal' => \PHPCompiler\Runtime::MODE_NORMAL,
                 'mode_aot' => \PHPCompiler\Runtime::MODE_AOT,
             ]);
+        }
+    }
+
+    private function seedExternalClassConstants(int $id, array $constants): void
+    {
+        foreach ($constants as $name => $value) {
+            if (!isset($this->classConstants[$id][$name])) {
+                $this->classConstants[$id][$name] = [
+                    'type' => Variable::TYPE_NATIVE_LONG,
+                    'value' => $value,
+                ];
+            }
         }
     }
 
@@ -1311,7 +1315,7 @@ class Object_ extends Type {
     /**
      * @return int|float|bool|string|null
      */
-    private function compileTimeValueFromVm(VMVariable $value): int|float|bool|string|null
+    private function compileTimeValueFromVm(VMVariable $value)
     {
         switch ($value->type) {
             case VMVariable::TYPE_NULL:
