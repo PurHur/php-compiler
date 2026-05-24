@@ -409,6 +409,11 @@ class Type extends Builtin {
             $this->context->context->functionType($void, false, $strPtr, $i64, $valuePtr)
         );
         $this->context->registerFunction('__phpc_parse_url_component', $fnParseUrl);
+        $fnParseUrlAssoc = $this->context->module->addFunction(
+            '__phpc_parse_url_assoc',
+            $this->context->context->functionType($void, false, $strPtr, $valuePtr)
+        );
+        $this->context->registerFunction('__phpc_parse_url_assoc', $fnParseUrlAssoc);
         $fnPendingFlush = $this->context->module->addFunction(
             '__phpc_response_headers_flush',
             $this->context->context->functionType($void, false)

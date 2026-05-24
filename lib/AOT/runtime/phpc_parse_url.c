@@ -9,11 +9,16 @@
 
 typedef struct __string__ __string__;
 typedef struct __value__ __value__;
+typedef struct __hashtable__ __hashtable__;
 
 extern __string__ *__string__init(long long size, const char *value);
 extern void __value__writeNull(__value__ *out);
 extern void __value__writeLong(__value__ *out, long long v);
 extern void __value__writeString(__value__ *out, __string__ *str);
+extern void __value__writeHashtable(__value__ *out, __hashtable__ *ht);
+extern __hashtable__ *__hashtable__alloc(void);
+extern void __hashtable__setStringKeyString(__hashtable__ *ht, __string__ *key, __string__ *val);
+extern void __hashtable__setStringKeyLong(__hashtable__ *ht, __string__ *key, long long val);
 
 #define PHP_URL_SCHEME 0
 #define PHP_URL_HOST 1
@@ -21,6 +26,15 @@ extern void __value__writeString(__value__ *out, __string__ *str);
 #define PHP_URL_PATH 5
 #define PHP_URL_QUERY 6
 #define PHP_URL_FRAGMENT 7
+
+typedef struct {
+    char *scheme;
+    char *host;
+    int port;
+    char *path;
+    char *query;
+    char *fragment;
+} pu_parts_t;
 
 static size_t pu_strlen(__string__ *s)
 {
@@ -102,89 +116,42 @@ static char *pu_substr(const char *src, size_t off, size_t n)
     return out;
 }
 
-static void pu_write_component(__value__ *out, int component, const char *scheme,
-    const char *host, int port, const char *path, const char *query, const char *fragment)
+static void pu_parts_init(pu_parts_t *parts)
 {
-    switch (component) {
-        case PHP_URL_SCHEME:
-            if (scheme == NULL || scheme[0] == '\0') {
-                __value__writeNull(out);
-            } else {
-                __value__writeString(out, pu_cstr(scheme));
-            }
-
-            return;
-        case PHP_URL_HOST:
-            if (host == NULL || host[0] == '\0') {
-                __value__writeNull(out);
-            } else {
-                __value__writeString(out, pu_cstr(host));
-            }
-
-            return;
-        case PHP_URL_PORT:
-            if (port <= 0) {
-                __value__writeNull(out);
-            } else {
-                __value__writeLong(out, (long long) port);
-            }
-
-            return;
-        case PHP_URL_PATH:
-            __value__writeString(out, pu_cstr(path != NULL ? path : ""));
-
-            return;
-        case PHP_URL_QUERY:
-            if (query == NULL || query[0] == '\0') {
-                __value__writeNull(out);
-            } else {
-                __value__writeString(out, pu_cstr(query));
-            }
-
-            return;
-        case PHP_URL_FRAGMENT:
-            if (fragment == NULL || fragment[0] == '\0') {
-                __value__writeNull(out);
-            } else {
-                __value__writeString(out, pu_cstr(fragment));
-            }
-
-            return;
-        default:
-            __value__writeNull(out);
-
-            return;
-    }
+    parts->scheme = NULL;
+    parts->host = NULL;
+    parts->port = 0;
+    parts->path = NULL;
+    parts->query = NULL;
+    parts->fragment = NULL;
 }
 
-void __phpc_parse_url_component(__string__ *url, long long component, __value__ *out)
+static void pu_parts_free(pu_parts_t *parts)
+{
+    free(parts->scheme);
+    free(parts->host);
+    free(parts->path);
+    free(parts->query);
+    free(parts->fragment);
+    pu_parts_init(parts);
+}
+
+static int pu_parse_parts(__string__ *url, pu_parts_t *parts)
 {
     const char *input;
     size_t len;
     char *rest;
-    char *scheme = NULL;
-    char *host = NULL;
-    int port = 0;
-    char *path = NULL;
-    char *query = NULL;
-    char *fragment = NULL;
     size_t i;
 
-    if (NULL == out) {
-        return;
-    }
+    pu_parts_init(parts);
     if (NULL == url) {
-        __value__writeNull(out);
-
-        return;
+        return -1;
     }
     input = pu_strdata(url);
     len = pu_strlen(url);
     rest = pu_substr(input, 0, len);
     if (NULL == rest) {
-        __value__writeNull(out);
-
-        return;
+        return -1;
     }
 
     if (len >= 2 && isalpha((unsigned char) rest[0])) {
@@ -197,13 +164,10 @@ void __phpc_parse_url_component(__string__ *url, long long component, __value__ 
         }
         if (rest[i] == ':') {
             rest[i] = '\0';
-            scheme = rest;
+            parts->scheme = rest;
             rest = pu_strdup0(rest + i + 1);
             if (NULL == rest) {
-                free(scheme);
-                __value__writeNull(out);
-
-                return;
+                return -1;
             }
             if (strncmp(rest, "//", 2) == 0) {
                 char *authority = rest + 2;
@@ -237,9 +201,14 @@ void __phpc_parse_url_component(__string__ *url, long long component, __value__ 
                 port_sep = strchr(auth_buf, ':');
                 if (port_sep != NULL) {
                     *port_sep = '\0';
-                    port = (int) strtol(port_sep + 1, NULL, 10);
+                    parts->port = (int) strtol(port_sep + 1, NULL, 10);
                 }
-                host = pu_strdup0(auth_buf);
+                parts->host = pu_strdup0(auth_buf);
+                if (NULL == parts->host) {
+                    pu_parts_free(parts);
+
+                    return -1;
+                }
                 if (end >= 0) {
                     char *tail = pu_strdup0(authority + end);
                     free(rest);
@@ -247,6 +216,11 @@ void __phpc_parse_url_component(__string__ *url, long long component, __value__ 
                 } else {
                     free(rest);
                     rest = pu_strdup0("");
+                }
+                if (NULL == rest) {
+                    pu_parts_free(parts);
+
+                    return -1;
                 }
             }
         }
@@ -256,27 +230,147 @@ void __phpc_parse_url_component(__string__ *url, long long component, __value__ 
         char *hash = strchr(rest, '#');
         if (hash != NULL) {
             *hash = '\0';
-            fragment = pu_strdup0(hash + 1);
+            parts->fragment = pu_strdup0(hash + 1);
+            if (NULL == parts->fragment) {
+                pu_parts_free(parts);
+                free(rest);
+
+                return -1;
+            }
         }
         {
             char *qmark = strchr(rest, '?');
             if (qmark != NULL) {
                 *qmark = '\0';
-                query = pu_strdup0(qmark + 1);
+                parts->query = pu_strdup0(qmark + 1);
+                if (NULL == parts->query) {
+                    pu_parts_free(parts);
+                    free(rest);
+
+                    return -1;
+                }
             }
         }
-        path = rest;
+        parts->path = rest;
         rest = NULL;
     } else {
-        path = pu_strdup0("");
+        parts->path = pu_strdup0("");
+        if (NULL == parts->path) {
+            pu_parts_free(parts);
+
+            return -1;
+        }
     }
 
-    pu_write_component(out, (int) component, scheme, host, port,
-        path != NULL ? path : "", query, fragment);
+    return 0;
+}
 
-    free(scheme);
-    free(host);
-    free(path);
-    free(query);
-    free(fragment);
+static void pu_write_component(__value__ *out, int component, pu_parts_t *parts)
+{
+    switch (component) {
+        case PHP_URL_SCHEME:
+            if (parts->scheme == NULL || parts->scheme[0] == '\0') {
+                __value__writeNull(out);
+            } else {
+                __value__writeString(out, pu_cstr(parts->scheme));
+            }
+
+            return;
+        case PHP_URL_HOST:
+            if (parts->host == NULL || parts->host[0] == '\0') {
+                __value__writeNull(out);
+            } else {
+                __value__writeString(out, pu_cstr(parts->host));
+            }
+
+            return;
+        case PHP_URL_PORT:
+            if (parts->port <= 0) {
+                __value__writeNull(out);
+            } else {
+                __value__writeLong(out, (long long) parts->port);
+            }
+
+            return;
+        case PHP_URL_PATH:
+            __value__writeString(out, pu_cstr(parts->path != NULL ? parts->path : ""));
+
+            return;
+        case PHP_URL_QUERY:
+            if (parts->query == NULL || parts->query[0] == '\0') {
+                __value__writeNull(out);
+            } else {
+                __value__writeString(out, pu_cstr(parts->query));
+            }
+
+            return;
+        case PHP_URL_FRAGMENT:
+            if (parts->fragment == NULL || parts->fragment[0] == '\0') {
+                __value__writeNull(out);
+            } else {
+                __value__writeString(out, pu_cstr(parts->fragment));
+            }
+
+            return;
+        default:
+            __value__writeNull(out);
+
+            return;
+    }
+}
+
+static void pu_maybe_set_string(__hashtable__ *ht, const char *key, const char *value)
+{
+    if (value == NULL || value[0] == '\0') {
+        return;
+    }
+    __hashtable__setStringKeyString(ht, pu_cstr(key), pu_cstr(value));
+}
+
+void __phpc_parse_url_component(__string__ *url, long long component, __value__ *out)
+{
+    pu_parts_t parts;
+
+    if (NULL == out) {
+        return;
+    }
+    if (0 != pu_parse_parts(url, &parts)) {
+        __value__writeNull(out);
+
+        return;
+    }
+    pu_write_component(out, (int) component, &parts);
+    pu_parts_free(&parts);
+}
+
+void __phpc_parse_url_assoc(__string__ *url, __value__ *out)
+{
+    pu_parts_t parts;
+    __hashtable__ *ht;
+
+    if (NULL == out) {
+        return;
+    }
+    if (0 != pu_parse_parts(url, &parts)) {
+        __value__writeNull(out);
+
+        return;
+    }
+    ht = __hashtable__alloc();
+    if (NULL == ht) {
+        pu_parts_free(&parts);
+        __value__writeNull(out);
+
+        return;
+    }
+    pu_maybe_set_string(ht, "scheme", parts.scheme);
+    pu_maybe_set_string(ht, "host", parts.host);
+    if (parts.port > 0) {
+        __hashtable__setStringKeyLong(ht, pu_cstr("port"), (long long) parts.port);
+    }
+    pu_maybe_set_string(ht, "path", parts.path);
+    pu_maybe_set_string(ht, "query", parts.query);
+    pu_maybe_set_string(ht, "fragment", parts.fragment);
+    __value__writeHashtable(out, ht);
+    pu_parts_free(&parts);
 }
