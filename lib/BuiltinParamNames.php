@@ -12,6 +12,7 @@ final class BuiltinParamNames
     /** @var array<string, list<string>> */
     private const MAP = [
         'strlen' => ['string'],
+        'parse_str' => ['string', 'array'],
     ];
 
     /**
