@@ -1,8 +1,13 @@
 # Local CI matrix
 
-How to run the php-compiler test gate on a developer machine or Runforge harness ([#245](https://github.com/PurHur/php-compiler/issues/245)). The full PHPUnit matrix remains CircleCI / local scripts ([#394](https://github.com/PurHur/php-compiler/issues/394)).
+How to run the php-compiler test gate on a developer machine or Runforge harness ([#245](https://github.com/PurHur/php-compiler/issues/245)).
 
-**GitHub Actions are temporarily disabled** — workflow YAML lives under [`.github/workflows-disabled/`](../.github/workflows-disabled/); use local commands below until restored.
+**Remote CI is temporarily disabled:**
+
+- **GitHub Actions** — [`.github/workflows-disabled/`](../.github/workflows-disabled/)
+- **CircleCI** — [`.circleci-disabled/config.yml`](../.circleci-disabled/config.yml) (no active `.circleci/config.yml`)
+
+Use local commands below until CI is restored ([#394](https://github.com/PurHur/php-compiler/issues/394)).
 
 ## Defaults
 
@@ -17,9 +22,9 @@ Repository defaults live in [`script/ci-defaults.env`](../script/ci-defaults.env
 | `PHP_COMPILER_VM_PEAK_RSS_MB` | `2048` | Kill VM subprocess if RSS exceeds this (when guard enabled) |
 | `PHP_COMPILER_VM_RSS_GUARD` | `1` in CI | Wrap PHPT `vm.php` spawns with `run-vm-guarded.sh` |
 
-## GitHub Actions: bootstrap self-host
+## GitHub Actions: bootstrap self-host (disabled)
 
-Workflow: [`.github/workflows/bootstrap-selfhost.yml`](../.github/workflows/bootstrap-selfhost.yml). Triggers on **push** and **pull_request** to `master`. Timeout **30 minutes**.
+Workflow (inactive): [`.github/workflows-disabled/bootstrap-selfhost.yml`](../.github/workflows-disabled/bootstrap-selfhost.yml). When re-enabled, triggers on **push** and **pull_request** to `master` (timeout **30 minutes**).
 
 | Step | Command |
 |------|---------|

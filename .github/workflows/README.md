@@ -19,7 +19,7 @@ make bootstrap-selfhost-probe
 ./script/bootstrap-wave-check.sh --with-compile-smoke --fail-fast
 ```
 
-Full matrix remains on CircleCI (`.circleci/config.yml`).
+CircleCI is also disabled; see [`.circleci/README.md`](../.circleci/README.md).
 
 ## Re-enable
 
