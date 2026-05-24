@@ -182,7 +182,7 @@ test-harness:
 .PHONY: test-docker-quick
 test-docker-quick: test-docker-fast
 
-.PHONY: bootstrap-inventory bootstrap-profile bootstrap-aot-lint bootstrap-aot-link bootstrap-aot-link-lib bootstrap-selfhost-probe bootstrap-selfhost-link bootstrap-selfhost-compile-smoke bootstrap-selfhost-lib-spine-smoke bootstrap-selfhost-helloworld bootstrap-wave-check
+.PHONY: bootstrap-inventory bootstrap-profile bootstrap-aot-lint bootstrap-aot-link bootstrap-aot-link-lib bootstrap-selfhost-probe bootstrap-selfhost-link bootstrap-selfhost-compile-smoke bootstrap-selfhost-lib-spine-smoke bootstrap-selfhost-helloworld bootstrap-loop-probe bootstrap-wave-check
 bootstrap-inventory:
 	php script/bootstrap-inventory.php
 bootstrap-profile: bootstrap-inventory
@@ -205,5 +205,7 @@ bootstrap-selfhost-lib-spine-smoke:
 	./script/bootstrap-selfhost-lib-spine-smoke-link.sh
 bootstrap-selfhost-helloworld:
 	./script/bootstrap-selfhost-helloworld-probe.sh
+bootstrap-loop-probe:
+	./script/bootstrap-loop-probe.sh
 bootstrap-wave-check:
 	./script/bootstrap-wave-check.sh
