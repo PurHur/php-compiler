@@ -84,6 +84,7 @@ class HashTable extends Type
         $this->registerFn('__hashtable__setBoolAt', 'void', ['__hashtable__*', 'size_t', 'int1']);
         $this->registerFn('__hashtable__setStringAt', 'void', ['__hashtable__*', 'size_t', '__string__*']);
         $this->registerFn('__hashtable__setHashtableAt', 'void', ['__hashtable__*', 'size_t', '__hashtable__*']);
+        $this->registerFn('__hashtable__setObjectAt', 'void', ['__hashtable__*', 'size_t', '__object__*']);
         $this->registerFn('__hashtable__readLongAt', 'int64', ['__hashtable__*', 'size_t']);
         $this->registerFn('__hashtable__readStringAt', '__string__*', ['__hashtable__*', 'size_t']);
         $this->registerFn('__hashtable__getNumElements', 'size_t', ['__hashtable__*']);
@@ -135,6 +136,7 @@ class HashTable extends Type
         $this->implementSetBoolAt();
         $this->implementSetStringAt();
         $this->implementSetHashtableAt();
+        $this->implementSetObjectAt();
         $this->implementReadLongAt();
         $this->implementReadStringAt();
         $this->implementGetNumElements();
@@ -464,6 +466,35 @@ class HashTable extends Type
             $this->context->lookupFunction('__value__writeHashtable'),
             $entry,
             $child
+        );
+        $this->updateIndexMetadata($ht, $map, $index, $need, $wasSet);
+        $this->context->builder->returnVoid();
+    }
+
+    private function implementSetObjectAt(): void
+    {
+        $fn = $this->context->lookupFunction('__hashtable__setObjectAt');
+        $block = $fn->appendBasicBlock('main');
+        $this->context->builder->positionAtEnd($block);
+        $ht = $fn->getParam(0);
+        $index = $fn->getParam(1);
+        $obj = $fn->getParam(2);
+        $sizeT = $this->context->getTypeFromString('size_t');
+        $one = $sizeT->constInt(1, false);
+        $need = $this->context->builder->addNoSignedWrap($index, $one);
+        $wasSet = $this->context->builder->call(
+            $this->context->lookupFunction('__hashtable__offsetIsSet'),
+            $ht,
+            $index
+        );
+        $this->context->builder->call($this->context->lookupFunction('__hashtable__grow'), $ht, $need);
+        $map = $this->context->structFieldMap['__hashtable__'];
+        $values = $this->context->builder->load($this->context->builder->structGep($ht, $map['values']));
+        $entry = $this->context->builder->inBoundsGep($values, $index);
+        $this->context->builder->call(
+            $this->context->lookupFunction('__value__writeObject'),
+            $entry,
+            $obj
         );
         $this->updateIndexMetadata($ht, $map, $index, $need, $wasSet);
         $this->context->builder->returnVoid();
