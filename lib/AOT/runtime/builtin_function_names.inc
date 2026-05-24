@@ -200,6 +200,7 @@ static const char *phpc_builtin_functions[] = {
     "session_start",
     "session_write_close",
     "setcookie",
+    "setrawcookie",
     "shell_exec",
     "sin",
     "sizeof",

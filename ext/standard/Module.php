@@ -164,6 +164,7 @@ class Module extends ModuleAbstract
             new strip_tags(),
             new header_(),
             new setcookie(),
+            new setrawcookie(),
             new session_start(),
             new session_id_(),
             new session_name(),
