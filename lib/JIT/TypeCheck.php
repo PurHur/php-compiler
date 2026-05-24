@@ -26,6 +26,12 @@ final class TypeCheck
         if ($var->type === $expected) {
             return;
         }
+        if (
+            Variable::TYPE_HASHTABLE === $expected
+            && 0 !== ($var->type & Variable::IS_NATIVE_ARRAY)
+        ) {
+            return;
+        }
         if (Variable::TYPE_VALUE === $var->type) {
             self::enforceExactValueBox($context, $var, $expected);
 

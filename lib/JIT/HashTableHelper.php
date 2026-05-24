@@ -968,6 +968,7 @@ final class HashTableHelper
         $longBlock = BasicBlockHelper::append($context, 'ht_idx_vb_long_'.$tag);
         $boolBlock = BasicBlockHelper::append($context, 'ht_idx_vb_bool_'.$tag);
         $doubleBlock = BasicBlockHelper::append($context, 'ht_idx_vb_double_'.$tag);
+        $nullBlock = BasicBlockHelper::append($context, 'ht_idx_vb_null_'.$tag);
         $done = BasicBlockHelper::append($context, 'ht_idx_vb_done_'.$tag);
 
         $isString = $context->builder->icmp(
@@ -1002,7 +1003,16 @@ final class HashTableHelper
             $typeByte,
             $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
         );
-        $context->builder->branchIf($isDouble, $doubleBlock, $longBlock);
+        $checkNull = BasicBlockHelper::append($context, 'ht_idx_vb_check_null_'.$tag);
+        $context->builder->branchIf($isDouble, $doubleBlock, $checkNull);
+
+        $context->builder->positionAtEnd($checkNull);
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NULL, false)
+        );
+        $context->builder->branchIf($isNull, $nullBlock, $longBlock);
 
         $context->builder->positionAtEnd($stringBlock);
         $str = $context->builder->call(
@@ -1056,11 +1066,30 @@ final class HashTableHelper
         );
         $context->builder->branch($done);
 
+        $context->builder->positionAtEnd($nullBlock);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setNullAt'),
+            $ht,
+            $index
+        );
+        $context->builder->branch($done);
+
         $context->builder->positionAtEnd($done);
     }
 
     public static function setAtIndex(Context $context, Value $ht, Value $index, Variable $element): void
     {
+        if (0 !== ($element->type & Variable::IS_NATIVE_ARRAY)) {
+            $materialized = self::materializeNativeArrayForCall($context, $element);
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__setHashtableAt'),
+                $ht,
+                $index,
+                $materialized
+            );
+
+            return;
+        }
         switch ($element->type) {
             case Variable::TYPE_NATIVE_LONG:
                 $context->builder->call(
@@ -1108,6 +1137,13 @@ final class HashTableHelper
                     $ht,
                     $index,
                     $context->helper->loadValue($element)
+                );
+                break;
+            case Variable::TYPE_NULL:
+                $context->builder->call(
+                    $context->lookupFunction('__hashtable__setNullAt'),
+                    $ht,
+                    $index
                 );
                 break;
             case Variable::TYPE_VALUE:
