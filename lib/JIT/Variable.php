@@ -77,6 +77,9 @@ final class Variable {
     /** @var \PHPLLVM\Value|null */
     public ?\PHPLLVM\Value $writableIndex = null;
 
+    /** Boxed foreach / SplObjectStorage offset key for $arr[$key] = … (issue #86). */
+    public ?Variable $writableValueBoxKey = null;
+
     /** String literal value when this variable represents a constant string operand. */
     public ?string $compileTimeString = null;
 
@@ -642,9 +645,7 @@ final class Variable {
                 $ht = HashTableHelper::loadHashtablePointer($this->context, $container);
                 if (self::TYPE_VALUE === $dim->type) {
                     if ($forWrite) {
-                        throw new \LogicException(
-                            'Array offset write with boxed key is not supported in this compiler build'
-                        );
+                        return HashTableHelper::prepareValueBoxKeyWrite($this->context, $ht, $dim);
                     }
 
                     return HashTableHelper::readDimToValueBox(

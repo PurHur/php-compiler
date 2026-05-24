@@ -907,6 +907,24 @@ final class HashTableHelper
     }
 
     /**
+     * Lvalue marker for $arr[$key] = … when $key is a boxed __value__ (issue #86).
+     */
+    public static function prepareValueBoxKeyWrite(Context $context, Value $ht, Variable $dim): Variable
+    {
+        $slot = JitValueBox::alloc($context);
+        $var = new Variable(
+            $context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VARIABLE,
+            $slot
+        );
+        $var->writableHt = $ht;
+        $var->writableValueBoxKey = $dim;
+
+        return $var;
+    }
+
+    /**
      * Lvalue marker for $arr[0] = … on a native hashtable (#107).
      */
     public static function prepareIndexWrite(Context $context, Value $ht, Value $index): Variable
@@ -1483,6 +1501,149 @@ final class HashTableHelper
                     .Variable::getStringType($element->type)
                 );
         }
+    }
+
+    public static function setValueBoxKey(
+        Context $context,
+        Value $ht,
+        Variable $dim,
+        Variable $element
+    ): void {
+        $valPtr = self::valuePtrFromDim($context, $dim);
+        $valueMap = $context->structFieldMap['__value__'];
+        $i8 = $context->getTypeFromString('int8');
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valPtr, $valueMap['type'])
+        );
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $stringBlock = $fn->appendBasicBlock('ht_set_vk_str');
+        $longBlock = $fn->appendBasicBlock('ht_set_vk_long');
+        $objectBlock = $fn->appendBasicBlock('ht_set_vk_obj');
+        $done = $fn->appendBasicBlock('ht_set_vk_done');
+        $afterString = $fn->appendBasicBlock('ht_set_vk_after_str');
+        $context->builder->branchIf(
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(Variable::TYPE_STRING, false)
+            ),
+            $stringBlock,
+            $afterString
+        );
+        $context->builder->positionAtEnd($stringBlock);
+        $keyStr = $context->builder->call($context->lookupFunction('__value__readString'), $valPtr);
+        self::setAtStringKey($context, $ht, $keyStr, $element);
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($afterString);
+        $afterLong = $fn->appendBasicBlock('ht_set_vk_after_long');
+        $context->builder->branchIf(
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
+            ),
+            $longBlock,
+            $afterLong
+        );
+        $context->builder->positionAtEnd($longBlock);
+        $index = $context->builder->truncOrBitCast(
+            $context->builder->call($context->lookupFunction('__value__readLong'), $valPtr),
+            $context->getTypeFromString('size_t')
+        );
+        self::setAtIndex($context, $ht, $index, $element);
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($afterLong);
+        $context->builder->branchIf(
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(Variable::TYPE_OBJECT, false)
+            ),
+            $objectBlock,
+            $done
+        );
+        $context->builder->positionAtEnd($objectBlock);
+        $keyObj = $context->builder->call($context->lookupFunction('__value__readObject'), $valPtr);
+        self::setAtObjectKey($context, $ht, $keyObj, $element);
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($done);
+    }
+
+    public static function setAtObjectKey(
+        Context $context,
+        Value $ht,
+        Value $keyObj,
+        Variable $element
+    ): void {
+        switch ($element->type) {
+            case Variable::TYPE_NATIVE_LONG:
+                $context->builder->call(
+                    $context->lookupFunction('__hashtable__setObjectKeyLong'),
+                    $ht,
+                    $keyObj,
+                    $context->helper->loadValue($element)
+                );
+                break;
+            case Variable::TYPE_OBJECT:
+                $context->builder->call(
+                    $context->lookupFunction('__hashtable__setObjectKeyObject'),
+                    $ht,
+                    $keyObj,
+                    $context->helper->loadValue($element)
+                );
+                break;
+            case Variable::TYPE_VALUE:
+                self::setValueBoxAtObjectKey($context, $ht, $keyObj, $element);
+                break;
+            default:
+                throw new \LogicException(
+                    'Object-key array element type not supported for JIT: '
+                    .Variable::getStringType($element->type)
+                );
+        }
+    }
+
+    private static function setValueBoxAtObjectKey(
+        Context $context,
+        Value $ht,
+        Value $keyObj,
+        Variable $element
+    ): void {
+        $tag = (string) self::nextSeq();
+        $valuePtr = Variable::KIND_VARIABLE === $element->kind
+            ? JitValueBox::pointer($context, $element->value)
+            : $element->value;
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $longBlock = BasicBlockHelper::append($context, 'ht_ok_vb_long_'.$tag);
+        $objectBlock = BasicBlockHelper::append($context, 'ht_ok_vb_obj_'.$tag);
+        $done = BasicBlockHelper::append($context, 'ht_ok_vb_done_'.$tag);
+        $isLong = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
+        );
+        $context->builder->branchIf($isLong, $longBlock, $objectBlock);
+        $context->builder->positionAtEnd($longBlock);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setObjectKeyLong'),
+            $ht,
+            $keyObj,
+            $context->builder->call($context->lookupFunction('__value__readLong'), $valuePtr)
+        );
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($objectBlock);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setObjectKeyObject'),
+            $ht,
+            $keyObj,
+            $context->builder->call($context->lookupFunction('__value__readObject'), $valuePtr)
+        );
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($done);
     }
 
     public static function setAtStringKey(
