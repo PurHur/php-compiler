@@ -1050,7 +1050,7 @@ restart:
         }
     }
 
-    /** @return ?int VM::FAILURE when write must be rejected */
+    /** Reject readonly property writes; returns a failure exit code or null. */
     private function enforceReadonlyPropertyWrite(Variable $lvalue, Frame $frame): ?int
     {
         $target = $lvalue->resolveIndirect();

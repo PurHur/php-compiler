@@ -50,7 +50,7 @@
       </p>
       <div class="hero-badges">
         <span class="badge badge--live">VM + JIT + AOT</span>
-        <span class="badge badge--live">Wave 3 language 9/13</span>
+        <span class="badge badge--live">Wave 3 language 10/13</span>
         <span class="badge badge--live">Wave 3 stdlib 12/13</span>
         <span class="badge badge--wip">Self-host bootstrap</span>
         <span class="badge badge--wip">North Star 1 — AOT execute (partial)</span>
@@ -120,8 +120,8 @@ make bootstrap-selfhost-link</code></pre>
         </article>
       </div>
       <p class="demo-disclaimer">
-        <strong>Honest scope:</strong> not full Zend PHP — subset compiler with generated
-        <a href="https://github.com/PurHur/php-compiler/blob/master/docs/capabilities.md">capability matrices</a>.
+        <strong>Honest scope:</strong> not full Zend PHP — subset compiler (detailed capability matrices are
+        contributor-only in the repo, not on this site).
         MiniWebApp AOT execute is <strong>partial</strong> (home route ✅); VM path is the reliable demo.
       </p>
     </section>
@@ -173,8 +173,8 @@ make bootstrap-selfhost-link</code></pre>
         </article>
         <article class="track-panel track-panel--selfhost">
           <h3>Language (#1354–#1366)</h3>
-          <p><strong>9 / 13 closed on master.</strong> Landed: <code>never</code>, enums, ctor promotion, intersection types, unpack, multi-catch, <code>__serialize</code>, first-class callable JIT, variable-variables JIT.</p>
-          <p><strong>Open:</strong> attributes (#1354); readonly (#1473 rebase); WeakReference/WeakMap (#1478).</p>
+          <p><strong>10 / 13 closed on master.</strong> Landed: <code>never</code>, enums, ctor promotion, intersection types, unpack, multi-catch, <code>__serialize</code>, first-class callable JIT, variable-variables JIT, WeakReference/WeakMap ([#1478](https://github.com/PurHur/php-compiler/pull/1478)).</p>
+          <p><strong>Open:</strong> attributes (#1354); readonly (#1473 rebase).</p>
         </article>
       </div>
     </section>
@@ -194,7 +194,7 @@ make bootstrap-selfhost-link</code></pre>
           <div class="progress-fill" id="overall-progress-fill" data-width="50" style="width: 0"></div>
         </div>
         <p class="overall-progress__note">
-          Strong on VM and AOT linking; wave-3 language 9/13 and stdlib 12/13 on master; local/Docker CI while remote GHA/Circle are disabled.
+          Strong on VM and AOT linking; wave-3 language 10/13 and stdlib 12/13 on master; local/Docker CI while remote GHA/Circle are disabled.
           North Star 1 home execute green; North Star 2 M0–M1 done, M2 spine (299/569) + partial M3 HelloWorld; M5 full self-compile remains the stretch goal.
         </p>
       </div>
@@ -216,7 +216,7 @@ make bootstrap-selfhost-link</code></pre>
         <article class="card">
           <span class="phase-num">Phase 1</span>
           <h3><span class="status-dot status-dot--wip"></span> Language</h3>
-          <p>OOP VM/JIT; wave-3 language <strong>9/13</strong> on master; attributes + readonly + weak refs open.</p>
+          <p>OOP VM/JIT; wave-3 language <strong>10/13</strong> on master; attributes + readonly open.</p>
           <div class="mini-progress"><div class="progress-track"><div class="progress-fill" data-width="72"></div></div></div>
         </article>
         <article class="card">

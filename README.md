@@ -42,7 +42,7 @@ Presenter script and troubleshooting: [`docs/GETTING-STARTED.md`](docs/GETTING-S
 | **003** AOT execute (all routes) | 🚧 partial — home ✅ ([#1044](https://github.com/PurHur/php-compiler/issues/1044)) |
 | Self-host **M0–M1** | ✅ |
 | Self-host **M2** spine | 🚧 **301** / 532 units ([#1056](https://github.com/PurHur/php-compiler/issues/1056)) |
-| Full Zend PHP compatibility | ❌ — see [capabilities](docs/capabilities.md) |
+| Full Zend PHP compatibility | ❌ — subset only (matrices in `docs/`, not on status site) |
 
 MiniWebApp gates: [docs/miniwebapp-gates.md](docs/miniwebapp-gates.md) ([#472](https://github.com/PurHur/php-compiler/issues/472)). Docker image: `php-compiler:22.04-dev`.
 
@@ -115,7 +115,9 @@ Also: `phpc doctor` (env probe), `phpc validate-manifest`, `phpc cgi`. See `./ph
 
 ### Capabilities
 
-Generated matrices (run `php script/capability-matrix.php` when builtins change): [docs/capabilities.md](docs/capabilities.md), [docs/capabilities-syntax.md](docs/capabilities-syntax.md). Wave-3 gap tracker ([#1380](https://github.com/PurHur/php-compiler/issues/1380)): [docs/roadmap-wave3.md](docs/roadmap-wave3.md) — **language 9/13**, **stdlib 12/13** on master (May 2026). The compiler targets a **web-capable PHP subset** — many builtins and constructs are VM-only or in progress compared to Zend PHP.
+Wave-3 gap tracker ([#1380](https://github.com/PurHur/php-compiler/issues/1380)): **language 10/13**, **stdlib 12/13** on master (May 2026). The compiler targets a **web-capable PHP subset** — many builtins and constructs are VM-only or in progress compared to Zend PHP.
+
+**Contributor matrices** (not on the [public status site](https://purhur.github.io/php-compiler/docs/pages/index.html)): regenerate with `php script/capability-matrix.php` and `php script/capability-syntax.php` → [docs/capabilities.md](docs/capabilities.md), [docs/capabilities-syntax.md](docs/capabilities-syntax.md). See [docs/README.md](docs/README.md).
 
 ### CI
 

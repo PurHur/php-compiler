@@ -13,10 +13,10 @@ permalink: /development-status.html
 |---|---|
 | **Try it** | `git clone` → `composer install` → `./phpc test --fast` → [`docs/GETTING-STARTED.md`](https://github.com/PurHur/php-compiler/blob/master/docs/GETTING-STARTED.md) |
 | **Overall progress** | ~**50%** toward web-capable + self-hosting compiler (indicative) |
-| **Wave 3 (May 2026)** | Language **9/13** · Stdlib **12/13** ([#1380](https://github.com/PurHur/php-compiler/issues/1380)) |
+| **Wave 3 (May 2026)** | Language **10/13** · Stdlib **12/13** ([#1380](https://github.com/PurHur/php-compiler/issues/1380)) |
 | **North Star 1** | Reference web app — VM ✅ · AOT link ✅ · AOT execute **partial** ([#1044](https://github.com/PurHur/php-compiler/issues/1044)) |
 | **North Star 2** | Self-compile — M0–M1 ✅ · M2 spine **301/532** · M5 ⬜ ([#1056](https://github.com/PurHur/php-compiler/issues/1056)) |
-| **Not Zend parity** | Subset compiler — see [capabilities.md](https://github.com/PurHur/php-compiler/blob/master/docs/capabilities.md) |
+| **Not Zend parity** | Subset compiler (not full Zend PHP) |
 
 [← Visual overview](index.html) · [Repository](https://github.com/PurHur/php-compiler)
 
@@ -34,7 +34,9 @@ permalink: /development-status.html
 
 Deployed apps can run **without Zend PHP** at runtime. Development and bootstrap still use system PHP today.
 
-This document is the **public development status** for the project. Technical contributor docs (inventory, capabilities matrices, CI matrices) stay in the [repository `docs/` tree](https://github.com/PurHur/php-compiler/tree/master/docs) and are **not** mirrored on this site.
+This document is the **public development status** for the project.
+
+**Excluded from this site (repo-only):** generated capability matrices (`capabilities.md`, `capabilities-syntax.md`), bootstrap inventory tables (`bootstrap-inventory.md`), CI / gate matrices (`local-ci-matrix.md`, `miniwebapp-aot-unskip-matrix.md`), and other large generated maps. They stay in the [repository `docs/` tree](https://github.com/PurHur/php-compiler/tree/master/docs) for contributors — **not mirrored here and not linked from these public pages**.
 
 ---
 
@@ -44,8 +46,8 @@ Indicative composite toward a **web-capable, self-hosting** compiler (not line-c
 
 | Area | Progress | Summary |
 |------|----------|---------|
-| **Foundation** (CI, CLI, Docker) | ~88% | `phpc` CLI, local/Docker CI; GitHub Actions + CircleCI disabled ([#1338](https://github.com/PurHur/php-compiler/pull/1338), [#1340](https://github.com/PurHur/php-compiler/pull/1340)) — see [local-ci-matrix.md](https://github.com/PurHur/php-compiler/blob/master/docs/local-ci-matrix.md) |
-| **Language** (OOP, types, CFG) | ~72% | VM/JIT OOP largely works; wave-3 language **9/13** on master (`never`, enums, ctor promotion, intersection, unpack, multi-catch, `__serialize`, FCC JIT, variable-variables JIT); open: attributes ([#1354](https://github.com/PurHur/php-compiler/issues/1354)), readonly ([#1360](https://github.com/PurHur/php-compiler/issues/1360) / [#1473](https://github.com/PurHur/php-compiler/pull/1473)), WeakReference ([#1366](https://github.com/PurHur/php-compiler/issues/1366) / [#1478](https://github.com/PurHur/php-compiler/pull/1478)) |
+| **Foundation** (CI, CLI, Docker) | ~88% | `phpc` CLI, local/Docker CI; GitHub Actions + CircleCI disabled ([#1338](https://github.com/PurHur/php-compiler/pull/1338), [#1340](https://github.com/PurHur/php-compiler/pull/1340)); contributor CI matrix doc in repo only |
+| **Language** (OOP, types, CFG) | ~74% | VM/JIT OOP largely works; wave-3 language **10/13** on master; open: attributes ([#1354](https://github.com/PurHur/php-compiler/issues/1354)), readonly ([#1360](https://github.com/PurHur/php-compiler/issues/1360) / [#1473](https://github.com/PurHur/php-compiler/pull/1473)) |
 | **Stdlib** | ~58% | Wave-3 batch ([#1367](https://github.com/PurHur/php-compiler/issues/1367)–[#1379](https://github.com/PurHur/php-compiler/issues/1379)): 12/13 closed; `debug_backtrace` ([#1378](https://github.com/PurHur/php-compiler/issues/1378)) in [#1404](https://github.com/PurHur/php-compiler/pull/1404) |
 | **Web AOT** (build, deploy) | ~65% | Project link ✅; home-route execute ✅; PATH_INFO / layout chain 🚧 |
 | **Reference app** (MiniWebApp) | ~55% | VM ✅; AOT link ✅; AOT execute **partial** |
@@ -55,7 +57,7 @@ Indicative composite toward a **web-capable, self-hosting** compiler (not line-c
 
 **Roadmap wave 3** ([#1380](https://github.com/PurHur/php-compiler/issues/1380)): tracker in repo [docs/roadmap-wave3.md](https://github.com/PurHur/php-compiler/blob/master/docs/roadmap-wave3.md).
 
-For per-function truth, see the generated [capabilities matrix](https://github.com/PurHur/php-compiler/blob/master/docs/capabilities.md) in the repo.
+Per-builtin and per-construct coverage detail is in generated contributor matrices in the repo (not published or linked from this site).
 
 ---
 
@@ -153,7 +155,7 @@ MINIWEBAPP_AOT_EXECUTE_GATE=1 ./script/ci-local.sh --filter MiniWebAppAotExecute
 
 #### What is out of scope (for this north star)
 
-- Full Zend PHP compatibility (see [capabilities.md](https://github.com/PurHur/php-compiler/blob/master/docs/capabilities.md))
+- Full Zend PHP compatibility (contributor capability matrices in repo only)
 - Sessions/auth stacks, databases, Composer autoload at runtime
 - Self-hosting the compiler ([North Star 2](#north-star-2-self-host))
 
@@ -184,7 +186,7 @@ Zend PHP still runs `bin/compile.php` during bootstrap. The output is a **curate
 
 - **Contributor gates:** [`docs/bootstrap-selfhost.md`](https://github.com/PurHur/php-compiler/blob/master/docs/bootstrap-selfhost.md) (repo only)
 - **M3 incremental lowering:** [`docs/bootstrap-m5-fast-path.md`](https://github.com/PurHur/php-compiler/blob/master/docs/bootstrap-m5-fast-path.md) ([#1402](https://github.com/PurHur/php-compiler/issues/1402))
-- **Inventory:** [`docs/bootstrap-inventory.md`](https://github.com/PurHur/php-compiler/blob/master/docs/bootstrap-inventory.md) (`php script/bootstrap-inventory.php`)
+- **Inventory:** `php script/bootstrap-inventory.php` (generated `bootstrap-inventory.md` is contributor-only, not on this site)
 - **M2 batch (done):** [#1419](https://github.com/PurHur/php-compiler/issues/1419) — spine **179 → 299** units (May 2026)
 
 ---
@@ -242,7 +244,7 @@ Details: [self-host-target.md](https://github.com/PurHur/php-compiler/blob/maste
 | Compile smoke AOT echo | `make bootstrap-selfhost-compile-smoke-run` | ✅ M1 |
 | M2 spine native link | `BOOTSTRAP_LIB_SPINE_SMOKE=1 make bootstrap-selfhost-lib-spine-smoke` | ✅ `compiler_lib_spine_smoke bundle OK` (**299** units) |
 | M3 HelloWorld probe | `make bootstrap-selfhost-helloworld` | 🚧 partial — native **run** ✅; emit Zend fallback |
-| Wave gate | `./script/bootstrap-wave-check.sh` | ✅ locally / Docker; GHA workflow disabled (see [local-ci-matrix.md](https://github.com/PurHur/php-compiler/blob/master/docs/local-ci-matrix.md)) |
+| Wave gate | `./script/bootstrap-wave-check.sh` | ✅ locally / Docker; GHA workflow disabled |
 | Next includes probe | `php script/bootstrap-selfhost-next-includes.php` | 🚧 bundle growth |
 
 #### Verify locally

@@ -25,6 +25,11 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/types/mb_strlen.php',
         'ext/types/JitMbStrlen.php',
         'ext/types/Module.php',
+        'src/tokenizer-compat.php',
+        'src/yay-php8-compat.php',
+        'src/macro_functions.php',
+        'src/llvm-env.php',
+        'src/cli.php',
         'lib/Cli/PhpcInit.php',
         'lib/Cli/PhpcRun.php',
         'lib/Web/CgiAotDriver.php',
@@ -221,7 +226,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         $this->assertFileExists($entry);
         $contents = (string) file_get_contents($entry);
         $count = substr_count($contents, 'require_once __DIR__');
-                $this->assertSame(299, $count, '108 compiler_minimal units + 191 M2 spine units (is_int/is_string via ext/types Module)');
+                $this->assertSame(304, $count, '108 compiler_minimal units + 196 M2 spine units (src/ compat shims + cli.php #1467)');
         foreach (self::LIB_SPINE_SMOKE_NEW_UNITS as $unit) {
             $this->assertStringContainsString(
                 "require_once __DIR__.'/../../../{$unit}';",

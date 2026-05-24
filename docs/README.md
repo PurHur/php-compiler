@@ -1,6 +1,8 @@
 # Repository documentation
 
-Technical documentation for **php-compiler** contributors and operators. End-user narrative and progress visuals live on **GitHub Pages** (not mirrored from this folder).
+Technical documentation for **php-compiler** contributors and operators. End-user narrative and progress visuals live on **GitHub Pages** (`docs/pages/` only — not mirrored from this folder).
+
+**Public pages do not link to** generated matrices or inventory maps listed under [Contributor-only](#contributor-only-not-on-github-pages) below.
 
 ## Public site (share this link)
 
@@ -20,15 +22,26 @@ Technical documentation for **php-compiler** contributors and operators. End-use
 | [**../README.md**](../README.md) | Install, CI, north stars, examples table |
 | [**pages/development-status.md**](pages/development-status.md) | Milestones, blockers, phase progress (sync to site) |
 
-## Compiler & capabilities
+## Contributor-only (not on GitHub Pages)
+
+Generated maps and large tables — **repo only**; exclude from `docs/pages/` content and links:
 
 | Doc | Content |
 |-----|---------|
 | [capabilities.md](capabilities.md) | Builtin matrix (`php script/capability-matrix.php`) |
 | [capabilities-syntax.md](capabilities-syntax.md) | Language construct matrix |
+| [bootstrap-inventory.md](bootstrap-inventory.md) | `lib/` file inventory |
+| [bootstrap-vendor-inventory.md](bootstrap-vendor-inventory.md) | Vendor prelink inventory |
+| [local-ci-matrix.md](local-ci-matrix.md) | Host / Docker CI matrix |
+| [miniwebapp-aot-unskip-matrix.md](miniwebapp-aot-unskip-matrix.md) | AOT execute bisect matrix |
+| [roadmap-wave3.md](roadmap-wave3.md) | Wave 3 PR table (#1354–#1379) |
+
+## Compiler reference
+
+| Doc | Content |
+|-----|---------|
 | [unsupported-syntax.md](unsupported-syntax.md) | Lint / unsupported registry |
 | [stdlib-jit-audit.md](stdlib-jit-audit.md) | Stdlib JIT coverage audit |
-| [roadmap-wave3.md](roadmap-wave3.md) | Wave 3 issues #1354–#1379 |
 | [runtime-semantics.md](runtime-semantics.md) | Runtime behaviour notes |
 
 ## Web deployment & reference app
@@ -53,7 +66,6 @@ Technical documentation for **php-compiler** contributors and operators. End-use
 
 | Doc | Content |
 |-----|---------|
-| [local-ci-matrix.md](local-ci-matrix.md) | Host / Docker CI matrix |
 | [dev/types.md](dev/types.md) | Type system notes |
 | [dev/macros.md](dev/macros.md) | Macro / codegen notes |
 
