@@ -136,6 +136,14 @@ function syntaxRowDefinitions(): array
             'probe' => null,
         ],
         [
+            'id' => 'literal_include',
+            'construct' => 'Literal `include`/`require` with `__DIR__`',
+            'opcodes' => ['TYPE_INCLUDE'],
+            'issue' => 475,
+            'notes' => ['Compile-time inlining via IncludeHelper; two-file PHPT + MiniWebApp JIT gate (#587)'],
+            'probe' => null,
+        ],
+        [
             'id' => 'foreach_by_ref',
             'construct' => 'foreach by-reference (`&$v`)',
             'opcodes' => ['TYPE_ITER_VALUE', 'TYPE_ASSIGN_REF'],

@@ -23,6 +23,7 @@ Tracking issues: [#58](https://github.com/PurHur/php-compiler/issues/58), [#145]
 | Magic constant `__NAMESPACE__` | yes | yes | yes | [#199](https://github.com/PurHur/php-compiler/issues/199) | Requires `namespace` declaration (#84); compliance PHPT |
 | Magic constants `__DIR__`, `__FILE__` | yes | yes | yes | [#707](https://github.com/PurHur/php-compiler/issues/707) | VM script stack on include; JIT uses per-unit script path; compliance PHPT; bootstrap AOT |
 | Magic constant `__LINE__` | yes | yes | yes | [#715](https://github.com/PurHur/php-compiler/issues/715) | Per-site line on TYPE_SCRIPT_MAGIC; include stack for multi-file units; compliance PHPT |
+| Literal `include`/`require` with `__DIR__` | yes | yes | yes | [#475](https://github.com/PurHur/php-compiler/issues/475) | Compile-time inlining via IncludeHelper; two-file PHPT + MiniWebApp JIT gate (#587) |
 | foreach by-reference (`&$v`) | yes | yes | yes | [#1222](https://github.com/PurHur/php-compiler/issues/1222) | Packed and string-keyed arrays; VM + JIT lowering |
 | Static property `Class::$prop` | yes | yes | yes | [#1225](https://github.com/PurHur/php-compiler/issues/1225) | Class-scoped storage; `self::` / `static::`; literal property names in JIT |
 | `unset()` on variables and array offsets | yes | yes | yes | [#1224](https://github.com/PurHur/php-compiler/issues/1224) | VM + JIT assign null to lvalue slots |
