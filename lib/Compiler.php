@@ -192,7 +192,7 @@ class Compiler {
                     ) {
                         break;
                     } else {
-                        if ($this->needsCfgSplitBeforeStringDimFetch($child, $block)) {
+                        if ($this->needsCfgSplitBeforeStringDimFetch($child, $block, $ops, $i)) {
                             $block = $this->splitCfgBlockAfterStringKeyedArray($block);
                         }
                         $this->compileOp($child, $block);
@@ -203,13 +203,19 @@ class Compiler {
 
     /**
      * String-key array writes and immediate dim fetch in one CFG block break AOT (#764, #783).
+     * Keyed list destructuring (`["a" => $x] = …`) is excluded (#1234).
+     *
+     * @param Op[] $ops
      */
-    private function needsCfgSplitBeforeStringDimFetch(Op $op, Block $block): bool
+    private function needsCfgSplitBeforeStringDimFetch(Op $op, Block $block, array $ops, int $index): bool
     {
         if (!$op instanceof Op\Expr\ArrayDimFetch) {
             return false;
         }
         if (!$op->dim instanceof Literal || !is_string($op->dim->value)) {
+            return false;
+        }
+        if ($this->isKeyedListDestructDimFetch($ops, $index)) {
             return false;
         }
         foreach ($block->opCodes as $prev) {
@@ -222,6 +228,25 @@ class Compiler {
         }
 
         return false;
+    }
+
+    /**
+     * php-cfg lowers `["key" => $v] = $array` to array literal + dim fetch + assign pairs (#1234).
+     *
+     * @param Op[] $ops
+     */
+    private function isKeyedListDestructDimFetch(array $ops, int $index): bool
+    {
+        if ($index + 1 >= count($ops) || !$ops[$index + 1] instanceof Op\Expr\Assign) {
+            return false;
+        }
+        if (!$ops[$index] instanceof Op\Expr\ArrayDimFetch) {
+            return false;
+        }
+        /** @var Op\Expr\Assign $assign */
+        $assign = $ops[$index + 1];
+
+        return $assign->expr === $ops[$index]->result;
     }
 
     private function splitCfgBlockAfterStringKeyedArray(Block $block): Block
