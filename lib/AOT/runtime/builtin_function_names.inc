@@ -171,6 +171,7 @@ static const char *phpc_builtin_functions[] = {
     "preg_replace",
     "preg_replace_callback",
     "preg_split",
+    "property_exists",
     "putenv",
     "quotemeta",
     "rad2deg",
