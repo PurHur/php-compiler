@@ -20,14 +20,20 @@ class ObjectEntry {
     public ClassEntry $class;
     public int $id;
     private array $properties = [];
-    public ?Func\PHP $constructor = null;
+    public ?Func $constructor = null;
+
+    /** True after `__construct` returns (or immediately when none is defined). */
+    public bool $constructed = false;
 
     public function __construct(ClassEntry $class) {
         $this->class = $class;
         $this->id = ++self::$counter;
         $this->constructor = $class->constructor;
         foreach ($class->properties as $property) {
-            $this->properties[$property->name] = $property->getVariable();
+            $var = $property->getVariable();
+            $var->objectPropertyOwner = $this;
+            $var->objectPropertyName = $property->name;
+            $this->properties[$property->name] = $var;
         }
     }
 
@@ -56,6 +62,7 @@ class ObjectEntry {
         foreach ($this->properties as $name => $var) {
             $clone->properties[$name]->copyFrom($var);
         }
+        $clone->constructed = $this->constructed;
 
         return $clone;
     }

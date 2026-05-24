@@ -571,10 +571,18 @@ class Compiler {
         if ($class instanceof Op\Stmt\Class_ && null !== $class->extends) {
             $parentSlot = $this->compileOperand($class->extends, $block, true);
         }
+        $readonlyVar = new Variable(Variable::TYPE_INTEGER);
+        $readonlyVar->int(
+            VM\ClassReadonly::fromClassFlags($class->flags) ? 1 : 0
+        );
+        $readonlyOperand = new Operand\Temporary;
+        $readonlyOperand->type = Type::int();
+        $readonlySlot = $block->registerConstant($readonlyOperand, $readonlyVar);
         $return = new OpCode(
             $type,
             $this->compileOperand($class->name, $block, true),
-            $parentSlot
+            $parentSlot,
+            $readonlySlot
         );
         $return->classImplements = $this->interfaceNamesFromOperands($class->implements);
         $return->block1 = $this->compileClassBody($class->stmts, $type);

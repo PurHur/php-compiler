@@ -164,7 +164,24 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
     {
         $driver = (string) file_get_contents(self::$root.'/test/selfhost/compiler_helloworld_smoke/compile_driver.php');
         $this->assertStringContainsString('PHP_COMPILER_M3_RUNTIME_COMPILE', $driver);
-        $this->assertStringContainsString('native runtime blocked', $driver);
+        $this->assertStringContainsString('emit path blocked', $driver);
+    }
+
+    public function testRuntimeCtorSmokeFixtureExists(): void
+    {
+        $fixture = self::$root.'/test/bootstrap-aot/runtime_ctor_smoke.php';
+        $this->assertFileExists($fixture);
+        $source = (string) file_get_contents($fixture);
+        $this->assertStringContainsString('runtime_ctor_smoke', $source);
+        $this->assertStringContainsString('MODE_AOT', $source);
+    }
+
+    public function testHelloWorldProbeDocumentsEmitPathAndStrict(): void
+    {
+        $script = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-helloworld-probe.sh');
+        $this->assertStringContainsString('emit_path=', $script);
+        $this->assertStringContainsString('BOOTSTRAP_M3_HELLOWORLD_STRICT=1', $script);
+        $this->assertStringContainsString('block_reason=', $script);
     }
 
     public function testJitStubsFirstClassCallableForSelfHost(): void

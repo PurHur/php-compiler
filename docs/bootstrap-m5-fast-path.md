@@ -1,5 +1,7 @@
 # M5 fast path — incremental native emit (M3 compile driver)
 
+**North Star 2 target (full ladder):** [self-host-target.md](self-host-target.md)
+
 Issue [#1056](https://github.com/PurHur/php-compiler/issues/1056); link segfault fix [#1402](https://github.com/PurHur/php-compiler/issues/1402).
 
 ## Goal
@@ -26,12 +28,25 @@ Supporting fixes from #1402:
 
 | Allowlist | Gate |
 |-----------|------|
-| `Runtime::parseAndCompile` | Link OK with `PHP_COMPILER_M3_COMPILE_DRIVER=1` |
+| `Runtime::parseAndCompile` | On M3 allowlist when `PHP_COMPILER_M3_COMPILE_DRIVER=1` |
 | `Runtime::loadJitContext` | Compile-driver link OK (#1402); `loadJit` still denied (LLVM 9 segfault) |
+| `helloworld_compile_smoke` | Link OK **without** real lowering (`BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1` only) |
+| `runtime_ctor_smoke` | `php bin/compile.php -l test/bootstrap-aot/runtime_ctor_smoke.php` (ctor slice, no emit) |
 
-Runtime emit still blocked: ctor / `loadJit` / `standalone` remain stubbed until removed from deny list.
+**Probe findings (2026-05):**
 
-Re-run link gate:
+- **Link + stubs:** `BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1` links `compile_driver.php`; runtime still blocked until `BOOTSTRAP_M3_RUNTIME_COMPILE=1` (deny list keeps ctor / `loadJit` / `standalone` stubbed).
+- **Link + real lowering:** `BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING=1` can **segfault** at link (LLVM 9) while expanding `parseAndCompile` — treat as deny-list / spine work, not a smoke regression.
+- **Emit paths:** probe logs `emit_path=native` vs `emit_path=zend`; `BOOTSTRAP_M3_HELLOWORLD_STRICT=1` fails with `block_reason=…` instead of silent Zend fallback.
+
+Re-run link gate (stub link — should pass):
+
+```bash
+BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1 \
+./script/bootstrap-selfhost-helloworld-probe.sh
+```
+
+Real-lowering link (may segfault until #1402 spine is safe):
 
 ```bash
 BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1 \
@@ -39,10 +54,13 @@ BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING=1 \
 ./script/bootstrap-selfhost-helloworld-probe.sh
 ```
 
-Opt-in runtime (after spine symbols are real-lowered):
+Strict native emit (no Zend fallback):
 
 ```bash
-BOOTSTRAP_M3_RUNTIME_COMPILE=1  # separate from link; do not enable until spine is ready
+BOOTSTRAP_M3_HELLOWORLD_STRICT=1 \
+BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1 \
+BOOTSTRAP_M3_RUNTIME_COMPILE=1 \
+./script/bootstrap-selfhost-helloworld-probe.sh
 ```
 
 ### Known LLVM 9 link crashers (deny list)
@@ -79,4 +97,4 @@ BOOTSTRAP_M3_RUNTIME_COMPILE=1  # separate from link; do not enable until spine 
 
 **Stub policy:** shrink `PHP_COMPILER_SELFHOST_AOT` stubs on the **compile spine first** (`parseAndCompile` → `standalone` → `Compiler::compile`), not whole-tree at once.
 
-**Related:** [`docs/bootstrap-selfhost.md`](bootstrap-selfhost.md) · [#1056](https://github.com/PurHur/php-compiler/issues/1056)
+**Related:** [self-host-target.md](self-host-target.md) · [bootstrap-selfhost.md](bootstrap-selfhost.md) · [#1056](https://github.com/PurHur/php-compiler/issues/1056) · vendor prelink [#1416](https://github.com/PurHur/php-compiler/issues/1416)
