@@ -16,7 +16,6 @@ final class JitPregReplace
 {
     private static int $blockSerial = 0;
 
-    /** @return Value __value__* (string result, or boolean false on PCRE error) */
     public static function invoke(Context $context, Value $pattern, Value $replacement, Value $subject): Value
     {
         StringPregMatch::ensureLinked($context);
