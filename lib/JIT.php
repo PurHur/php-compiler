@@ -1305,7 +1305,36 @@ class JIT {
                     );
                     break;
                 case OpCode::TYPE_UNSET:
-                    // Recorded at compile time; JIT unset is not implemented yet.
+                    $targetOp = $block->getOperand($op->arg1);
+                    if (
+                        !$this->context->hasVariableOp($targetOp)
+                        && null === JIT\OperandName::resolve($targetOp)
+                    ) {
+                        break;
+                    }
+                    if ($this->context->hasVariableOp($targetOp)) {
+                        $target = $this->context->getVariableFromOp($targetOp);
+                        if (
+                            null !== $target->writableHt
+                            && null !== $target->writableStringKey
+                            && JIT\Builtin::LOAD_TYPE_STANDALONE === $this->context->loadType
+                        ) {
+                            JIT\HashTableHelper::unsetStringKey(
+                                $this->context,
+                                $target->writableHt,
+                                $target->writableStringKey
+                            );
+                            break;
+                        }
+                    }
+                    $nullVar = new Variable(
+                        $this->context,
+                        Variable::TYPE_NULL,
+                        Variable::KIND_VALUE,
+                        $this->context->getTypeFromString('__value__*')->constNull()
+                    );
+                    $nullVar->isNullConstant = true;
+                    $this->assignOperand($targetOp, $nullVar, true);
                     break;
                 case OpCode::TYPE_CAST_BOOL:
                     $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));

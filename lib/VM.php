@@ -347,7 +347,14 @@ restart:
                     break;
                 case OpCode::TYPE_UNSET:
                     if (null !== $op->arg1 && isset($frame->scope[$op->arg1])) {
-                        $frame->scope[$op->arg1]->null();
+                        $slot = $frame->scope[$op->arg1];
+                        if (Variable::TYPE_INDIRECT === $slot->type) {
+                            $target = $slot->resolveIndirect();
+                            $target->reset();
+                            $target->type = Variable::TYPE_UNDEFINED;
+                        } else {
+                            $slot->null();
+                        }
                     }
                     break;
                 case OpCode::TYPE_RETURN_VOID:
