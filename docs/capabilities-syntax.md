@@ -32,6 +32,7 @@ Tracking issues: [#58](https://github.com/PurHur/php-compiler/issues/58), [#145]
 | `goto` / labels (function scope) | yes | yes | yes | [#1228](https://github.com/PurHur/php-compiler/issues/1228) | php-cfg lowers labels to CFG Jump; VM avoids frame nesting on same-block back-edges; compliance PHPT |
 | `declare(strict_types=1)` scalar parameter checks | yes | yes | yes | [#1229](https://github.com/PurHur/php-compiler/issues/1229) | VM #156; JIT enforces at user call sites via JIT\TypeCheck + Native::compileArg weak casts |
 | Variable variables (`$$name`) | yes | no | yes | [#1226](https://github.com/PurHur/php-compiler/issues/1226) | php-cfg nests Operand\Variable name; VM resolves runtime local by name; compliance PHPT; VM-only lowering |
+| Variable function calls (`$fn()`) | yes | yes | yes | [#56](https://github.com/PurHur/php-compiler/issues/56) | VM resolves callee at runtime; compiler folds literal assignment; JIT compile-time string |
 | Invokable objects (`$obj()` / `__invoke`) | yes | yes | yes | [#1232](https://github.com/PurHur/php-compiler/issues/1232) | Object-typed FuncCall lowered to __invoke method dispatch; VM runtime fallback |
 | First-class callable syntax (`foo(...)`, `Class::m(...)`) | yes | partial | yes | [#1230](https://github.com/PurHur/php-compiler/issues/1230) | php-cfg Expr_FirstClassCallable; VM string or [obj, method] array; JIT compileTimeString for function/static |
 

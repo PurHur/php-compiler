@@ -1,5 +1,5 @@
 --TEST--
-Variable function call via string variable (issue #56)
+Variable function call to builtin ($fn = 'strlen') JIT (issue #56)
 --FILE--
 <?php
 $fn = 'strlen';
