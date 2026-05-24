@@ -31,3 +31,18 @@
              case 'numeric':
                  return self::fromDecl('int|float');
          }
+
+--- vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
+@@ -775,6 +775,8 @@
+             return Type::null();
+         } elseif ($type instanceof Op\Type\Reference) {
+             // todo
+             return Type::fromDecl($type->declaration->value);
+         } elseif ($type instanceof Op\Type\Literal) {
+             return Type::fromDecl($type->name);
++        } elseif ($type instanceof Op\Type\Never_) {
++            return Type::never();
+         }
+ 
+         throw new \LogicException('Unknown Op\\Type provided: '.get_class($type));

@@ -149,6 +149,7 @@ require_once __DIR__.'/../../../lib/Lint/Issue.php';
 require_once __DIR__.'/../../../lib/Lint/UnsupportedRegistry.php';
 require_once __DIR__.'/../../../lib/Lint/LintCompiler.php';
 require_once __DIR__.'/../../../lib/Lint/Linter.php';
+require_once __DIR__.'/../../../lib/Lint/SwitchDetector.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/Type.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/Type/String_.php';
 require_once __DIR__.'/../../../lib/Doctor.php';
@@ -287,7 +288,6 @@ require_once __DIR__.'/../../../src/yay-php8-compat.php';
 require_once __DIR__.'/../../../src/macro_functions.php';
 require_once __DIR__.'/../../../src/llvm-env.php';
 require_once __DIR__.'/../../bootstrap-aot/vm_run_smoke.php';
-// lib/Lint/SwitchDetector.php — deferred (#1425): anonymous class breaks php-types AOT lint at current spine size.
 // lib/AOT/ProjectGraph.php — deferred (#1424): bundled AOT lint failure (ManifestValidator deps).
 // bin/vm.php — deferred (#1423 M4): entry pulls src/cli.php + vendor/autoload argv driver; bundle vm_run_smoke.php instead.
 // src/cli.php — deferred (#1432): entry shim requires vendor/autoload.php and executes argv (M4).
