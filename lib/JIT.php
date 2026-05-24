@@ -149,6 +149,21 @@ class JIT {
         return '1' === $flag || 'true' === strtolower((string) $flag);
     }
 
+    /** Bundled bootstrap-aot smoke FUNCDEF names (BootstrapAot / legacy Lint bundle) (#1515). */
+    private function isBootstrapHelloWorldSmokeName(string $lower): bool
+    {
+        return str_ends_with($lower, '\\bootstrapaot\\helloworld_compile_smoke')
+            || 'helloworld_compile_smoke' === $lower
+            || str_ends_with($lower, '\\helloworld_compile_smoke');
+    }
+
+    private function isBootstrapRuntimeCtorSmokeName(string $lower): bool
+    {
+        return str_ends_with($lower, '\\bootstrapaot\\runtime_ctor_smoke')
+            || 'runtime_ctor_smoke' === $lower
+            || str_ends_with($lower, '\\runtime_ctor_smoke');
+    }
+
     /** M3 HelloWorld compile driver: real LLVM lowering for parseAndCompile + standalone emit (#1056, #1402). */
     private function isM3CompileDriverRealLoweringName(string $lower): bool
     {
@@ -156,10 +171,6 @@ class JIT {
             return false;
         }
 
-        // Incremental spine: expand one function at a time (docs/bootstrap-m5-fast-path.md).
-        if ('helloworld_compile_smoke' === $lower) {
-            return true;
-        }
         if ($this->isM3CompileDriverSpineDenyName($lower)) {
             return false;
         }
@@ -202,6 +213,8 @@ class JIT {
     {
         return [
             'slotindexforvariablename',
+            // Real-lowering bootstrapaot\\helloworld_compile_smoke LLVM 9 link crash (#1514); namespace fixed #1515.
+            '\\bootstrapaot\\helloworld_compile_smoke',
             '\\runtime::__destruct',
             '\\runtime::initparsepipeline',
             '\\runtime::initcompiler',
@@ -630,6 +643,7 @@ class JIT {
             || str_contains($lower, '\\moduleabstract::')
             || str_contains($lower, '\\opcodenames::')
             || str_contains($lower, '\\lint\\')
+            || (str_contains($lower, '\\bootstrapaot\\') && !$this->isM3CompileDriverRealLoweringName($lower))
             || str_contains($lower, '\\jit\\')
             || str_contains($lower, '\\func\\jit::')
             || str_contains($lower, '\\func\\internal::')
@@ -742,8 +756,8 @@ class JIT {
         return str_ends_with($lower, '\\compiler::compilefunc')
             || str_ends_with($lower, '\\compiler::compile')
             || 'type_pair' === $lower
-            || 'runtime_ctor_smoke' === $lower
-            || 'helloworld_compile_smoke' === $lower;
+            || $this->isBootstrapRuntimeCtorSmokeName($lower)
+            || $this->isBootstrapHelloWorldSmokeName($lower);
     }
 
     private function isSkippedWebBootstrapHotPathName(string $name): bool

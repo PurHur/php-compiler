@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+namespace PHPCompiler\BootstrapAot;
+
 /**
  * M3 spine slice: Runtime MODE_AOT ctor only (no parseAndCompile / standalone / loadJit).
  *

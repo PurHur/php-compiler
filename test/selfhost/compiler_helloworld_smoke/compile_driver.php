@@ -114,7 +114,7 @@ if ('compile' === (string) getenv('PHP_COMPILER_M3_COMPILE_MODE')) {
         echo "helloworld_compile_smoke: emit path blocked (set PHP_COMPILER_M3_SOURCE and PHP_COMPILER_M3_OUT for compile mode)\n";
         exit(1);
     }
-    $result = helloworld_compile_smoke($sourceFile, $outFile);
+    $result = \PHPCompiler\BootstrapAot\helloworld_compile_smoke($sourceFile, $outFile);
     echo $result['message']."\n";
     if (!$result['ok']) {
         echo 'helloworld_compile_smoke: native emit failed at phase='.$result['phase']."\n";

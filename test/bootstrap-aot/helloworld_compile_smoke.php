@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+namespace PHPCompiler\BootstrapAot;
+
 /**
  * M3 HelloWorld native emit chain (issue #1056, #1402):
  *

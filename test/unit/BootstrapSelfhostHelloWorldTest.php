@@ -143,6 +143,19 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString('compiler_smoke.php', $driver);
     }
 
+    public function testJitM3AllowlistMatchesBootstrapAotHelloWorldSmoke(): void
+    {
+        $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
+        $this->assertStringContainsString('isBootstrapHelloWorldSmokeName', $jit);
+        $this->assertStringContainsString('isBootstrapHelloWorldSmokeName', $jit);
+        $this->assertStringContainsString('m3CompileDriverSpineDenyNames', $jit);
+        $this->assertStringContainsString('#1515', $jit);
+        $driver = (string) file_get_contents(self::$root.'/test/selfhost/compiler_helloworld_smoke/compile_driver.php');
+        $this->assertStringContainsString('\\PHPCompiler\\BootstrapAot\\helloworld_compile_smoke', $driver);
+        $smoke = (string) file_get_contents(self::$root.'/test/bootstrap-aot/helloworld_compile_smoke.php');
+        $this->assertStringContainsString('namespace PHPCompiler\\BootstrapAot', $smoke);
+    }
+
     public function testIncludeHelperAssignCountGuardsCycles(): void
     {
         $source = (string) file_get_contents(self::$root.'/lib/JIT/IncludeHelper.php');
