@@ -10,6 +10,7 @@ Tracking issues: [#58](https://github.com/PurHur/php-compiler/issues/58), [#145]
 | Construct | VM | JIT | AOT | Issue | Notes |
 |-----------|:--:|:---:|:---:|-------|-------|
 | `class` / `new` | yes | yes | yes | [#58](https://github.com/PurHur/php-compiler/issues/58) | compliance PHPT; bootstrap AOT |
+| Anonymous class `new class { }` | yes | yes | yes | [#1233](https://github.com/PurHur/php-compiler/issues/1233) | php-cfg inline Stmt\Class_ in parseExpr_New; synthetic AnonymousClass@line name |
 | Instance methods | yes | yes | yes | [#58](https://github.com/PurHur/php-compiler/issues/58) | compliance PHPT; bootstrap AOT |
 | Private methods | yes | yes | yes | [#145](https://github.com/PurHur/php-compiler/issues/145) | compliance PHPT; bootstrap AOT |
 | Property fetch `$this->x` | yes | yes | yes | [#58](https://github.com/PurHur/php-compiler/issues/58) | compliance PHPT; bootstrap AOT |
@@ -35,7 +36,7 @@ Tracking issues: [#58](https://github.com/PurHur/php-compiler/issues/58), [#145]
 | Variable variables (`$$name`) | yes | no | yes | [#1226](https://github.com/PurHur/php-compiler/issues/1226) | php-cfg nests Operand\Variable name; VM resolves runtime local by name; compliance PHPT; VM-only lowering |
 | Variable function calls (`$fn()`) | yes | yes | yes | [#56](https://github.com/PurHur/php-compiler/issues/56) | VM resolves callee at runtime; compiler folds literal assignment; JIT uses compile-time string |
 | Invokable objects (`$obj()` / `__invoke`) | yes | yes | yes | [#1232](https://github.com/PurHur/php-compiler/issues/1232) | Object-typed FuncCall lowered to __invoke method dispatch; VM runtime fallback |
-| First-class callable syntax (`foo(...)`, `Class::m(...)`) | yes | yes | no | [#1230](https://github.com/PurHur/php-compiler/issues/1230) | php-cfg Expr_FirstClassCallable; VM stores string or [obj, method] array; JIT via compileTimeString |
+| First-class callable syntax (`foo(...)`, `Class::m(...)`) | yes | yes | yes | [#1230](https://github.com/PurHur/php-compiler/issues/1230) | php-cfg Expr_FirstClassCallable; VM stores string or [obj, method] array; JIT via compileTimeString |
 
 _Syntax AOT column reflects `Runtime::MODE_AOT` compile probes unless a row pins AOT (e.g. native user-class link)._
 ## Web north-star (`examples/003-MiniWebApp`)

@@ -31,6 +31,14 @@ function syntaxRowDefinitions(): array
             'probe' => 'class C { public int $x = 1; } echo (new C())->x;',
         ],
         [
+            'id' => 'anonymous_class',
+            'construct' => 'Anonymous class `new class { }`',
+            'opcodes' => ['TYPE_DECLARE_CLASS', 'TYPE_NEW', 'TYPE_METHODCALL_INIT'],
+            'issue' => 1233,
+            'notes' => ['php-cfg inline Stmt\\Class_ in parseExpr_New; synthetic AnonymousClass@line name'],
+            'probe' => '$o = new class { public function f(): int { return 42; } }; echo $o->f();',
+        ],
+        [
             'id' => 'instance_methods',
             'construct' => 'Instance methods',
             'opcodes' => ['TYPE_DECLARE_METHOD', 'TYPE_METHODCALL_INIT'],
