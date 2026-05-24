@@ -226,7 +226,20 @@ class JIT {
                 $this->context->functionProxies[$lcname] = new JIT\Call\Vararg($func, $funcName, count($args));
             } else {
                 $defaultArgs = $this->collectParamDefaults($block);
-                $this->context->functionProxies[$lcname] = new JIT\Call\Native($func, $funcName, $args, $defaultArgs);
+                $variadicArgIndex = null;
+                if (null !== $block->variadicParamIndex) {
+                    $variadicArgIndex = $block->variadicParamIndex;
+                    if ($this->instanceMethodUsesThis($block)) {
+                        ++$variadicArgIndex;
+                    }
+                }
+                $this->context->functionProxies[$lcname] = new JIT\Call\Native(
+                    $func,
+                    $funcName,
+                    $args,
+                    $defaultArgs,
+                    $variadicArgIndex
+                );
             }
         }
 
@@ -631,6 +644,9 @@ class JIT {
 
     private function llvmTypeForCfgParam(\PHPCfg\Op\Expr\Param $param): PHPLLVM\Type
     {
+        if ($param->variadic) {
+            return $this->context->getTypeFromString('__hashtable__*');
+        }
         if ($param->declaredType instanceof Op\Type\Literal
             && 'mixed' === strtolower($param->declaredType->name)
         ) {
@@ -874,6 +890,17 @@ class JIT {
             if (null !== $block->func && $block->orig === $block->func->cfg) {
                 foreach ($block->func->params as $idx => $param) {
                     $argIdx = $thisParamOffset + $idx;
+                    if ($param->variadic) {
+                        $remaining = array_slice($args, $argIdx);
+                        $packed = [] === $remaining
+                            ? JIT\HashTableHelper::emptyVariable($this->context)
+                            : JIT\HashTableHelper::packVariables($this->context, $remaining);
+                        if (!$this->context->hasVariableOp($param->result)) {
+                            $this->context->makeVariableFromOp($func, $basicBlock, $block, $param->result);
+                        }
+                        $this->assignOperand($param->result, $packed, true);
+                        break;
+                    }
                     if ($argIdx >= count($args)) {
                         break;
                     }
@@ -889,7 +916,20 @@ class JIT {
             $op = $block->opCodes[$i];
             switch ($op->type) {
                 case OpCode::TYPE_ARG_RECV:
-                    $this->assignOperand($block->getOperand($op->arg1), $args[$op->arg2 + $thisParamOffset]);
+                    $recvSlot = $op->arg2 + $thisParamOffset;
+                    $isVariadicSlot = null !== $block->variadicParamIndex
+                        && $block->variadicParamIndex === (int) $op->arg2;
+                    if ($isVariadicSlot) {
+                        $packed = isset($args[$recvSlot])
+                            ? $args[$recvSlot]
+                            : JIT\HashTableHelper::emptyVariable($this->context);
+                        $this->assignOperand($block->getOperand($op->arg1), $packed, true);
+                        break;
+                    }
+                    if (!isset($args[$recvSlot])) {
+                        throw new \LogicException('Missing required argument ' . $op->arg2);
+                    }
+                    $this->assignOperand($block->getOperand($op->arg1), $args[$recvSlot]);
                     break;
                 case OpCode::TYPE_ASSIGN:
                     $value = $this->context->getVariableFromOp($block->getOperand($op->arg3));
@@ -3501,6 +3541,9 @@ class JIT {
         $defaults = [];
         foreach ($block->opCodes as $op) {
             if ($op->type !== OpCode::TYPE_ARG_RECV || null === $op->arg3) {
+                continue;
+            }
+            if (null !== $block->variadicParamIndex && $block->variadicParamIndex === (int) $op->arg2) {
                 continue;
             }
             if (!isset($block->constants[$op->arg3])) {
