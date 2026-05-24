@@ -67,7 +67,7 @@ if [[ "${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
   m3_link_mode="stub"
   if [[ "${BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING:-0}" == "1" ]]; then
     m3_link_env=(env PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_M3_COMPILE_DRIVER=1)
-    m3_link_mode="real-lowering (helloworld_compile_smoke + Runtime::parse/compile/parseAndCompile allowlist)"
+    m3_link_mode="real-lowering (helloworld_compile_smoke + Runtime::parseAndCompile allowlist)"
   else
     m3_link_env=(env PHP_COMPILER_SELFHOST_AOT=1)
     m3_link_mode="selfhost stubs (no PHP_COMPILER_M3_COMPILE_DRIVER)"
@@ -114,7 +114,7 @@ fi
 
 if [[ "${M3_NATIVE_COMPILE}" -eq 0 ]]; then
   echo "bootstrap-selfhost-helloworld-probe: native emit unavailable (M3 partial) — ${M3_BLOCK_REASON}" >&2
-  echo "bootstrap-selfhost-helloworld-probe: NEXT_LOWER: Runtime ctor / loadJit / standalone off M3 deny list (#1402)" >&2
+  echo "bootstrap-selfhost-helloworld-probe: NEXT_LOWER: Runtime::initVmContext / loadJit helpers off M3 deny list (#1402, #1495)" >&2
   if [[ "${BOOTSTRAP_M3_HELLOWORLD_STRICT:-0}" == "1" ]]; then
     echo "bootstrap-selfhost-helloworld-probe: BOOTSTRAP_M3_HELLOWORLD_STRICT=1 — require native emit; refusing Zend compile.php fallback" >&2
     echo "bootstrap-selfhost-helloworld-probe: emit_path=zend_fallback_would_be_used block_reason=${M3_BLOCK_REASON}" >&2

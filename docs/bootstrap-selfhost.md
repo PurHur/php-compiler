@@ -152,7 +152,7 @@ Extends the `compiler_compile_smoke` spine with inline `PHP_COMPILER_M3_*` env d
 |------|------|
 | `test/bootstrap-aot/helloworld_compile_smoke.php` | Full `Runtime::parseAndCompile` + `standalone` driver |
 | `test/selfhost/compiler_helloworld_smoke/main.php` | Linkable bundle (`build/selfhost-helloworld`; stdout `compiler_helloworld_smoke bundle OK`) |
-| `test/selfhost/compiler_helloworld_smoke/compile_driver.php` | Native compile driver with mode-file dispatch (`build/.m3-helloworld-mode`; opt-in link via `BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1`) |
+| `test/selfhost/compiler_helloworld_smoke/compile_driver.php` | Native compile driver with env dispatch (`PHP_COMPILER_M3_COMPILE_MODE=compile`, `PHP_COMPILER_M3_SOURCE`, `PHP_COMPILER_M3_OUT`; opt-in link via `BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1`) |
 
 Gate: `php bin/compile.php -l test/selfhost/compiler_helloworld_smoke/main.php`. Compile driver lint: `php bin/compile.php -l test/selfhost/compiler_helloworld_smoke/compile_driver.php`. Native probe: `make bootstrap-selfhost-helloworld` or `./script/bootstrap-selfhost-helloworld-probe.sh` (LLVM 9). Strict (no Zend emit fallback): `BOOTSTRAP_M3_HELLOWORLD_STRICT=1 ./script/bootstrap-selfhost-helloworld-probe.sh`. Opt-in wave gate: `./script/bootstrap-wave-check.sh --with-helloworld` (`BOOTSTRAP_M3_HELLOWORLD=1`).
 

@@ -137,7 +137,8 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
     public function testHelloWorldCompileDriverHasModeDispatch(): void
     {
         $driver = (string) file_get_contents(self::$root.'/test/selfhost/compiler_helloworld_smoke/compile_driver.php');
-        $this->assertStringContainsString('.m3-helloworld-mode', $driver);
+        $this->assertStringContainsString('PHP_COMPILER_M3_COMPILE_MODE', $driver);
+        $this->assertStringContainsString('PHP_COMPILER_M3_SOURCE', $driver);
         $this->assertStringContainsString('helloworld_compile_smoke', $driver);
         $this->assertStringContainsString('compiler_smoke.php', $driver);
     }
