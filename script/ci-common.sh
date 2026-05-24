@@ -297,10 +297,9 @@ ci_run_miniwebapp_aot_execute() {
   ci_run_phpunit --group miniwebapp-aot-execute "$@"
 }
 
-# 003-MiniWebApp phpc serve --aot HTTP integration (issues #478, #610); opt-in MINIWEBAPP_SERVE_AOT_GATE=1
-# or when MINIWEBAPP_AOT_EXECUTE_GATE=1 (default).
+# 003-MiniWebApp phpc serve --aot HTTP integration (issues #478, #610, #1524); default MINIWEBAPP_SERVE_AOT_GATE=1.
 ci_run_miniwebapp_serve_aot() {
-  if [[ "${MINIWEBAPP_SERVE_AOT_GATE:-0}" != "1" && "${MINIWEBAPP_AOT_EXECUTE_GATE:-1}" != "1" ]]; then
+  if [[ "${MINIWEBAPP_SERVE_AOT_GATE:-1}" != "1" && "${MINIWEBAPP_AOT_EXECUTE_GATE:-1}" != "1" ]]; then
     return 0
   fi
   if [[ -n "${PHP_COMPILER_SKIP_SERVE_TESTS:-}" ]]; then
