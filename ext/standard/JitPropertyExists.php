@@ -14,7 +14,6 @@ use PHPLLVM\Value;
 /** LLVM lowering for property_exists() (issue #1372). */
 final class JitPropertyExists
 {
-    /** @return Value int1 — matches defined() / array_key_exists() for JUMPIF truthiness */
     public static function invoke(Context $context, JITVariable $objectOrClass, JITVariable $propertyArg): Value
     {
         $propLiteral = JitStringArg::compileTimeLiteral($propertyArg);

@@ -191,7 +191,6 @@ final class JitBase64Decode
         return $result;
     }
 
-    /** @return Value int64 0-63, or -1 when not base64 alphabet */
     private static function base64DigitValue(Context $context, Value $ch, $i64, $i8): Value
     {
         $ord = $context->builder->zExt($ch, $i64);

@@ -14,7 +14,6 @@ use PHPLLVM\Value;
 /** LLVM lowering for class_exists() (issues #1214, #1056). */
 final class JitClassExists
 {
-    /** @return Value int1 — matches defined() / array_key_exists() for JUMPIF truthiness */
     public static function invoke(Context $context, JITVariable $nameArg): Value
     {
         $literal = JitStringArg::compileTimeLiteral($nameArg);
