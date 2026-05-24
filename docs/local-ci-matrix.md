@@ -7,7 +7,7 @@ How to run the php-compiler test gate on a developer machine or Runforge harness
 - **GitHub Actions** — [`.github/workflows-disabled/`](../.github/workflows-disabled/)
 - **CircleCI** — [`.circleci-disabled/config.yml`](../.circleci-disabled/config.yml) (no active `.circleci/config.yml`)
 
-Use local commands below until CI is restored ([#394](https://github.com/PurHur/php-compiler/issues/394)).
+Use **local/Docker commands below** as the merge gate until remote CI is restored ([#394](https://github.com/PurHur/php-compiler/issues/394)). Disabled workflow mirrors live under [`.github/workflows-disabled/`](../.github/workflows-disabled/).
 
 ## Defaults
 
@@ -22,9 +22,20 @@ Repository defaults live in [`script/ci-defaults.env`](../script/ci-defaults.env
 | `PHP_COMPILER_VM_PEAK_RSS_MB` | `2048` | Kill VM subprocess if RSS exceeds this (when guard enabled) |
 | `PHP_COMPILER_VM_RSS_GUARD` | `1` in CI | Wrap PHPT `vm.php` spawns with `run-vm-guarded.sh` |
 
-## GitHub Actions: bootstrap self-host (disabled)
+## Entry points
 
-Workflow (inactive): [`.github/workflows-disabled/bootstrap-selfhost.yml`](../.github/workflows-disabled/bootstrap-selfhost.yml). When re-enabled, triggers on **push** and **pull_request** to `master` (timeout **30 minutes**).
+| Goal | Host PHP + LLVM | Docker (recommended on harness) |
+|------|-----------------|-------------------------------|
+| Full gate (VM + JIT + AOT) | `./script/ci-local.sh` | `make test` or `./script/docker-ci-local.sh` |
+| Fast gate (no LLVM compile) | `./script/ci-fast.sh` | `make test-fast` or `./script/docker-ci-local.sh fast` |
+| Fast gate + bootstrap tail (optional) | `CI_FAST_BOOTSTRAP=1 ./script/ci-fast.sh` | `make test-fast-bootstrap` |
+| Fast gate + JIT preflight (optional) | `JIT_PREFLIGHT_GATE=1 ./script/ci-fast.sh` | `make test-fast-jit-preflight` or `make test-docker-fast-jit-preflight` |
+| Explicit memory-capped Docker | — | `./script/ci-docker-safe.sh ci-local.sh` or `make test-docker-safe` |
+| Single PHPUnit filter | Append args: `./script/ci-fast.sh --filter VMTest` | Same inside Docker wrappers |
+
+## GitHub Actions: bootstrap self-host (disabled mirror)
+
+Workflow (inactive): [`.github/workflows-disabled/bootstrap-selfhost.yml`](../.github/workflows-disabled/bootstrap-selfhost.yml). When re-enabled, triggers on **push** and **pull_request** to `master` (timeout **30 minutes**). **Do not rely on this for merge** — run the local equivalents below.
 
 | Step | Command |
 |------|---------|
@@ -33,11 +44,11 @@ Workflow (inactive): [`.github/workflows-disabled/bootstrap-selfhost.yml`](../.g
 | Native link | `./script/bootstrap-selfhost-link.sh` |
 | Wave gate | `./script/bootstrap-wave-check.sh --fail-fast` |
 
-**Runner strategy**
+**Runner strategy** (historical; for re-enable only)
 
 | Path | When | Setup |
 |------|------|-------|
-| Docker (default on `ubuntu-22.04` runners) | `docker info` succeeds | Build or reuse `php-compiler:22.04-dev` (`docker build -f Docker/dev/ubuntu-22.04/Dockerfile -t php-compiler:22.04-dev .` in GHA; local devs may use `make docker-build-22`) |
+| Docker (default on `ubuntu-22.04` runners) | `docker info` succeeds | Build or reuse `php-compiler:22.04-dev` (`make docker-build-22` locally; GHA used the same Dockerfile) |
 | Host fallback | Docker unavailable | Ubuntu 22.04 + `ppa:ondrej/php` PHP 8.2 + `./script/install-llvm9.sh` |
 
 Both paths run `composer install`, `script/apply-patches.sh`, then the three bootstrap gates above. This workflow does **not** change default `ci-local.sh` / `ci-fast.sh` behavior locally.
@@ -52,25 +63,16 @@ Both paths run `composer install`, `script/apply-patches.sh`, then the three boo
 | `PHP_COMPILER_SELFHOST_AOT` | Set by probe/link scripts for stub gating |
 | `BOOTSTRAP_WAVE_CHECK` | N/A in workflow (always runs wave-check); set `0` in `ci-local.sh` to skip locally |
 
-Local equivalent (Docker):
+**Local equivalent (Docker)** — canonical today:
 
 ```bash
 docker run --rm -v "$(pwd):/compiler" -w /compiler php-compiler:22.04-dev bash -lc \
   'make bootstrap-selfhost-probe && ./script/bootstrap-selfhost-link.sh && ./script/bootstrap-wave-check.sh'
 ```
 
-Local equivalent (host, no Docker): `composer install`, `./script/install-llvm9.sh`, then the same three commands.
+**Local equivalent (host, no Docker):** `composer install`, `./script/install-llvm9.sh`, then the same three commands.
 
-## Entry points
-
-| Goal | Host PHP + LLVM | Docker (recommended on harness) |
-|------|-----------------|-------------------------------|
-| Full gate (VM + JIT + AOT) | `./script/ci-local.sh` | `make test` or `./script/docker-ci-local.sh` |
-| Fast gate (no LLVM compile) | `./script/ci-fast.sh` | `make test-fast` or `./script/docker-ci-local.sh fast` |
-| Fast gate + bootstrap tail (optional) | `CI_FAST_BOOTSTRAP=1 ./script/ci-fast.sh` | `make test-fast-bootstrap` |
-| Fast gate + JIT preflight (optional) | `JIT_PREFLIGHT_GATE=1 ./script/ci-fast.sh` | `make test-fast-jit-preflight` or `make test-docker-fast-jit-preflight` |
-| Explicit memory-capped Docker | — | `./script/ci-docker-safe.sh ci-local.sh` or `make test-docker-safe` |
-| Single PHPUnit filter | Append args: `./script/ci-fast.sh --filter VMTest` | Same inside Docker wrappers |
+**Former GHA llvm job** (full VM + JIT + AOT gate): reproduce with `./script/ci-local.sh` or `make test-docker` (see Entry points above). Fast iteration without LLVM link: `./script/ci-fast.sh` or `make test-fast`.
 
 ## MiniWebApp gates ([#472](https://github.com/PurHur/php-compiler/issues/472), [#664](https://github.com/PurHur/php-compiler/issues/664))
 

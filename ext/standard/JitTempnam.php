@@ -13,8 +13,7 @@ use PHPLLVM\Value;
 /** LLVM lowering for tempnam() via __compiler_tempnam (issue #1201). */
 final class JitTempnam
 {
-    /** @return Value
-     * (path string, or boolean false on failure) */
+    /** @return Value */
     public static function invoke(Context $context, Value $dirStr, Value $prefixStr): Value
     {
         $path = $context->builder->call(

@@ -25,7 +25,11 @@ final class CapabilitySyntaxTest extends TestCase
         $this->assertStringContainsString('#58', $body);
         $this->assertStringContainsString('#568', $body);
         $this->assertStringContainsString('#764', $body);
+        $this->assertStringContainsString('execute closed', $body);
+        $this->assertStringContainsString('#1760', $body);
         $this->assertStringNotContainsString('blocked #568', $body);
+        $this->assertStringNotContainsString('execute #764', $body);
+        $this->assertStringNotContainsString('native execute #764', $body);
         $this->assertStringContainsString('#199', $body);
         $this->assertStringContainsString('Native user-class link', $body);
         $this->assertStringContainsString('Magic constants', $body);

@@ -4,6 +4,22 @@ declare(strict_types=1);
 
 /** argv driver for bin/*.php entry scripts (issue #1467). */
 
+if (!function_exists('php_compiler_cli_should_skip_entry_driver')) {
+    /** Skip argv driver when bundled in compiler_lib_spine_smoke (issue #1467, #1742). */
+    function php_compiler_cli_should_skip_entry_driver(): bool
+    {
+        $flag = getenv('PHP_COMPILER_CLI_SPINE_BUNDLE');
+        return '1' === $flag || 'true' === strtolower((string) $flag);
+    }
+}
+
+if (
+    (defined('PHP_COMPILER_LIB_SPINE_SMOKE') && PHP_COMPILER_LIB_SPINE_SMOKE)
+    || php_compiler_cli_should_skip_entry_driver()
+) {
+    return;
+}
+
 require __DIR__.'/../vendor/autoload.php';
 
 $memoryLimit = getenv('PHP_COMPILER_MEMORY_LIMIT');

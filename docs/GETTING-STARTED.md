@@ -24,7 +24,7 @@ composer install
 ./phpc test --fast
 ```
 
-VM/compliance only — no LLVM link. Expect green on `master` when the tree is healthy.
+VM/compliance only — no LLVM link. Expect green after `./script/ci-fast.sh` or `./phpc test --fast` on a healthy tree (remote GHA/Circle are disabled — [#394](https://github.com/PurHur/php-compiler/issues/394)).
 
 ### 2. Native binary from PHP
 

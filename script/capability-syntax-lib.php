@@ -99,7 +99,7 @@ function syntaxRowDefinitions(): array
             'construct' => 'Native user-class link (`phpc build --project`)',
             'opcodes' => ['TYPE_DECLARE_CLASS', 'TYPE_NEW', 'TYPE_METHODCALL_INIT'],
             'issue' => 764,
-            'notes' => ['AOT link yes (#568 closed); native execute #764'],
+            'notes' => ['AOT link yes (#568 closed); native execute ✅ (#764 closed)'],
             'probe' => null,
             'aot' => true,
         ],
@@ -528,7 +528,7 @@ function renderSyntaxMarkdown(array $syntax): string
         '',
         'Tracking issues: [#58](' . CAPABILITY_ISSUE_URL_BASE . '58), [#145](' . CAPABILITY_ISSUE_URL_BASE
         . '145), [#138](' . CAPABILITY_ISSUE_URL_BASE . '138), [#568](' . CAPABILITY_ISSUE_URL_BASE
-        . '568) (link closed), [#764](' . CAPABILITY_ISSUE_URL_BASE . '764) (execute), [#143]('
+        . '568) (link closed), [#764](' . CAPABILITY_ISSUE_URL_BASE . '764) (execute closed), [#143]('
         . CAPABILITY_ISSUE_URL_BASE . '143), [#142](' . CAPABILITY_ISSUE_URL_BASE . '142), [#199]('
         . CAPABILITY_ISSUE_URL_BASE . '199).',
         '',
@@ -586,7 +586,7 @@ function webNorthStarDefinitions(): array
             'jit' => 'partial',
             'aot' => 'partial',
             'issue' => 489,
-            'notes' => ['#489 VM closed; AOT lint partial; execute #764'],
+            'notes' => ['#489 VM closed; AOT execute ✅ (#764 closed); default-off gates #1760'],
         ],
         [
             'construct' => '`phpc_deploy_path()` + `PHPC_DEPLOY_ROOT`',
@@ -594,7 +594,7 @@ function webNorthStarDefinitions(): array
             'jit' => 'partial',
             'aot' => 'partial',
             'issue' => 585,
-            'notes' => ['#585 closed; deploy includes #623; execute #764'],
+            'notes' => ['#585 closed; deploy includes #623; execute ✅ (#764 closed); gates #1760'],
         ],
         [
             'construct' => 'Runtime template `include` from deploy tree',
@@ -602,7 +602,7 @@ function webNorthStarDefinitions(): array
             'jit' => 'no',
             'aot' => 'partial',
             'issue' => 623,
-            'notes' => ['#623 VM/AOT lint; execute #764'],
+            'notes' => ['#623 VM/AOT lint; execute ✅ (#764 closed); gates #1760'],
         ],
         [
             'construct' => 'CGI/1.1 driver (`bin/cgi.php`)',
@@ -618,7 +618,7 @@ function webNorthStarDefinitions(): array
             'jit' => 'n/a',
             'aot' => 'partial',
             'issue' => 665,
-            'notes' => ['#665 closed; 001 green; 003 execute #764; #682'],
+            'notes' => ['#665 closed; 001 green; 003 execute ✅ (#764 closed); #682; gates #1760'],
         ],
         [
             'construct' => 'FastCGI loop',
@@ -669,8 +669,8 @@ function renderWebNorthStarMarkdown(array $web): string
 
     $lines[] = '';
     $lines[] = '_Web rows are curated from ROADMAP issue state; native link [#568](' . CAPABILITY_ISSUE_URL_BASE
-        . '568) closed; AOT execute tracked in [#764](' . CAPABILITY_ISSUE_URL_BASE . '764) and [#676]('
-        . CAPABILITY_ISSUE_URL_BASE . '676)._';
+        . '568) closed; AOT execute [#764](' . CAPABILITY_ISSUE_URL_BASE . '764) closed; default-off CI gates [#1760]('
+        . CAPABILITY_ISSUE_URL_BASE . '1760)._';
     $lines[] = '';
 
     return implode("\n", $lines);
