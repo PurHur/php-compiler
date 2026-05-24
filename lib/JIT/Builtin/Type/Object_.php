@@ -564,9 +564,9 @@ class Object_ extends Type {
         return isset($this->methodVisibility[$classId][strtolower($methodLc)]);
     }
 
-    public function hasProperty(int $classId, string $property): bool
+    public function hasProperty(int $classId, string $propertyName): bool
     {
-        $lc = strtolower($property);
+        $lc = strtolower($propertyName);
         if (isset($this->staticPropertyGlobals[$classId][$lc])) {
             return true;
         }
@@ -578,25 +578,6 @@ class Object_ extends Type {
 
         return false;
     }
-
-    /**
-     * Declared instance and static property names for a class (issue #1372).
-     *
-     * @return list<string>
-     */
-    public function declaredPropertyNames(int $classId): array
-    {
-        $names = [];
-        foreach ($this->properties[$classId] ?? [] as $propset) {
-            $names[] = $propset[1];
-        }
-        foreach (array_keys($this->staticPropertyGlobals[$classId] ?? []) as $key) {
-            $names[] = $key;
-        }
-
-        return $names;
-    }
-
     public function lookupOperand(Operand $name): int
     {
         if (!$name instanceof Literal) {

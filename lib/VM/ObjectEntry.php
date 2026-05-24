@@ -38,6 +38,12 @@ class ObjectEntry {
         return $this->properties[$name];
     }
 
+    /** Whether an instance property slot exists (case-sensitive; issue #1372). */
+    public function propertyNameExists(string $name): bool
+    {
+        return isset($this->properties[$name]);
+    }
+
     public function unsetProperty(string $name): void
     {
         if (!isset($this->properties[$name])) {

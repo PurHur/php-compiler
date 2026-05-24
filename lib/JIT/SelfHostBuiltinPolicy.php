@@ -101,7 +101,7 @@ final class SelfHostBuiltinPolicy
         'array_replace' => 'array', 'array_sum' => 'array', 'sort' => 'array', 'array_multisort' => 'array',
         'usort' => 'array',
         'compact' => 'array', 'extract' => 'array', 'defined' => 'array', 'define' => 'array',
-        'class_exists' => 'array', 'enum_exists' => 'array', 'function_exists' => 'array', 'method_exists' => 'array',
+        'class_exists' => 'array', 'function_exists' => 'array', 'method_exists' => 'array',
         'property_exists' => 'array',
         'get_class' => 'array', 'get_parent_class' => 'array', 'is_a' => 'array', 'is_subclass_of' => 'array',
         'trigger_error' => 'array',

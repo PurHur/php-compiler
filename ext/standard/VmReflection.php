@@ -62,12 +62,11 @@ final class VmReflection
 
     public static function propertyExistsOnClass(ClassEntry $class, string $property): bool
     {
-        $lc = strtolower($property);
-        if (isset($class->staticProperties[$lc])) {
+        if (array_key_exists($property, $class->staticProperties)) {
             return true;
         }
         foreach ($class->properties as $prop) {
-            if (strtolower($prop->name) === $lc) {
+            if ($prop->name === $property) {
                 return true;
             }
         }
@@ -87,7 +86,12 @@ final class VmReflection
             return self::propertyExistsOnClass($class, $property);
         }
         if (Variable::TYPE_OBJECT === $objectOrClass->type) {
-            return self::propertyExistsOnClass($objectOrClass->toObject()->class, $property);
+            $obj = $objectOrClass->toObject();
+            if ($obj->propertyNameExists($property)) {
+                return true;
+            }
+
+            return array_key_exists($property, $obj->class->staticProperties);
         }
         throw new \LogicException('property_exists() expects an object or class name string in this compiler build');
     }
