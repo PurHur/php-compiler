@@ -20,6 +20,7 @@ use PHPCompiler\ext\standard\strtoupper;
 use PHPCompiler\ext\standard\VmInternalCall;
 use PHPCompiler\ext\types\strlen;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Call\ExternalMethod;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -618,6 +619,194 @@ final class ArrayBuiltinHelper
         }
 
         return self::buildMapFromHashTable($context, $handler, self::loadHashTable($context, $array));
+    }
+
+    /**
+     * array_reduce() with compile-time string user-function callbacks (issue #1213).
+     */
+    public static function buildReduceArray(
+        Context $context,
+        Variable $array,
+        Variable $callback,
+        ?Variable $initial
+    ): Value {
+        if (!ArrayReduceCallbackPolicy::isJitLowerable($callback)) {
+            throw new \LogicException(ArrayReduceCallbackPolicy::jitRejectionMessage());
+        }
+        $proxy = self::resolveReduceCallback($context, $callback);
+        if ($proxy instanceof ExternalMethod) {
+            throw new \LogicException(
+                "array_reduce() callback '{$callback->compileTimeString}' is not a defined function in this compile unit"
+            );
+        }
+
+        return self::buildReduceFromHashTable(
+            $context,
+            self::loadHashTable($context, $array),
+            $proxy,
+            $callback->compileTimeString ?? '',
+            $initial
+        );
+    }
+
+    private static function resolveReduceCallback(Context $context, Variable $callback): Call
+    {
+        $name = $callback->compileTimeString ?? null;
+        if (null === $name) {
+            throw new \LogicException(ArrayReduceCallbackPolicy::jitRejectionMessage());
+        }
+        if (!$context->functionIsRegistered($name)) {
+            throw new \LogicException(
+                "array_reduce() callback '{$name}' is not a defined function in this compile unit"
+            );
+        }
+
+        return $context->resolveFunctionProxy($name);
+    }
+
+    private static function storeReduceCarryFromCallResult(
+        Context $context,
+        Value $carrySlot,
+        Value $folded,
+        string $callbackName
+    ): void {
+        $retTy = $context->functionReturnType[strtolower($callbackName)] ?? '__value__';
+        if ('int64' === $retTy) {
+            JitValueBox::writeLong($context, $carrySlot, $folded);
+
+            return;
+        }
+        if ('double' === $retTy) {
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                JitValueBox::pointer($context, $carrySlot),
+                $folded
+            );
+
+            return;
+        }
+        if ('bool' === $retTy) {
+            JitValueBox::writeBool($context, $carrySlot, $folded);
+
+            return;
+        }
+        JitValueBox::copyFromPointer(
+            $context,
+            $carrySlot,
+            JitValueBox::normalizeValuePtr($context, $folded)
+        );
+    }
+
+    private static function buildReduceFromHashTable(
+        Context $context,
+        Value $src,
+        Call $proxy,
+        string $callbackName,
+        ?Variable $initial
+    ): Value {
+        $map = $context->structFieldMap['__hashtable__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $nextFree = $context->builder->load(
+            $context->builder->structGep($src, $map['nextFreeElement'])
+        );
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $nextFree, $zero);
+        $emptyBlock = BasicBlockHelper::append($context, 'array_reduce_empty');
+        $workBlock = BasicBlockHelper::append($context, 'array_reduce_work');
+        $doneBlock = BasicBlockHelper::append($context, 'array_reduce_done');
+        $context->builder->branchIf($isEmpty, $emptyBlock, $workBlock);
+
+        $carrySlot = JitValueBox::alloc($context);
+        $carryPtr = JitValueBox::pointer($context, $carrySlot);
+        $hasCarrySlot = $context->builder->alloca($context->getTypeFromString('int1'), 1, 'array_reduce_has_carry');
+        $i1 = $context->getTypeFromString('int1');
+        $context->builder->store($i1->constInt(0, false), $hasCarrySlot);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        if (null !== $initial) {
+            JitValueBox::copyFromPointer(
+                $context,
+                $carrySlot,
+                JitValueBox::valuePtrFromVariable($context, $initial)
+            );
+        } else {
+            $context->builder->call(
+                $context->lookupFunction('__value__writeNull'),
+                JitValueBox::pointer($context, $carrySlot)
+            );
+        }
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($workBlock);
+        if (null !== $initial) {
+            JitValueBox::copyFromPointer(
+                $context,
+                $carrySlot,
+                JitValueBox::valuePtrFromVariable($context, $initial)
+            );
+            $context->builder->store($i1->constInt(1, false), $hasCarrySlot);
+        }
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'array_reduce_idx');
+        $context->builder->store($zero, $idxSlot);
+        $head = BasicBlockHelper::append($context, 'array_reduce_head');
+        $check = BasicBlockHelper::append($context, 'array_reduce_check');
+        $reduceBlock = BasicBlockHelper::append($context, 'array_reduce_reduce');
+        $skip = BasicBlockHelper::append($context, 'array_reduce_skip');
+        $advance = BasicBlockHelper::append($context, 'array_reduce_advance');
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $nextFree);
+        $context->builder->branchIf($atEnd, $doneBlock, $check);
+
+        $context->builder->positionAtEnd($check);
+        $isSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $src,
+            $idx
+        );
+        $context->builder->branchIf($isSet, $reduceBlock, $skip);
+
+        $context->builder->positionAtEnd($reduceBlock);
+        $elem = HashTableHelper::readIndexedToValueBox($context, $src, $idx);
+        $hasCarry = $context->builder->load($hasCarrySlot);
+        $seedBlock = BasicBlockHelper::append($context, 'array_reduce_seed');
+        $foldBlock = BasicBlockHelper::append($context, 'array_reduce_fold');
+        $afterFold = BasicBlockHelper::append($context, 'array_reduce_after_fold');
+        $context->builder->branchIf($hasCarry, $foldBlock, $seedBlock);
+
+        $context->builder->positionAtEnd($seedBlock);
+        JitValueBox::copyFromPointer(
+            $context,
+            $carrySlot,
+            JitValueBox::valuePtrFromVariable($context, $elem)
+        );
+        $context->builder->store($i1->constInt(1, false), $hasCarrySlot);
+        $context->builder->branch($afterFold);
+
+        $context->builder->positionAtEnd($foldBlock);
+        $carryVar = new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VALUE, $carryPtr);
+        $folded = $proxy->call($context, $carryVar, $elem);
+        self::storeReduceCarryFromCallResult($context, $carrySlot, $folded, $callbackName);
+        $context->builder->branch($afterFold);
+
+        $context->builder->positionAtEnd($afterFold);
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($skip);
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($advance);
+        $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $resultSlot = JitValueBox::alloc($context);
+        JitValueBox::copyFromPointer($context, $resultSlot, $carryPtr);
+
+        return JitValueBox::pointer($context, $resultSlot);
     }
 
     /** @var array<class-string<Internal>, int> */
