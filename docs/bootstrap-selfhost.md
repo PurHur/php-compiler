@@ -6,10 +6,10 @@
 
 | Gate | Command | Status |
 |------|---------|--------|
-| Phase A inventory | `php script/bootstrap-inventory.php --check` | ✅ **413** files on `bin/vm.php` path; **0** source blockers (excluded paths: `lib/AOT/Linker.php`, `lib/JIT/Builtin/StringPregMatch.php`; `lib/VM/HashTable.php` bundled via `ArrayIterator`) |
+| Phase A inventory | `php script/bootstrap-inventory.php --check` | ✅ **530** files on `bin/vm.php` path; **0** source blockers (excluded paths: `lib/AOT/Linker.php`, `lib/JIT/Builtin/StringPregMatch.php`; `lib/VM/HashTable.php` bundled via `ArrayIterator`) |
 | Phase B lib AOT lint | `php bin/compile.php -l lib/*.php` (with `script/php-env.sh`) | ✅ **14/14** top-level `lib/*.php` units ([#534](https://github.com/PurHur/php-compiler/pull/534)) |
 | Phase B fixture lint | `php script/bootstrap-aot-lint.php` | ✅ **13** procedural targets under `test/bootstrap-aot/` + `examples/000-HelloWorld` |
-| Phase C native run | `make bootstrap-aot-link` or `./script/bootstrap-aot-link.sh` | ✅ Link + execute **12** `aot_link_targets` (stdout vs Zend PHP) |
+| Phase C native run | `make bootstrap-aot-link` or `./script/bootstrap-aot-link.sh` | 🚧 **66/70** targets OK (4 fixtures open) |
 | Phase D `lib/` link | `make bootstrap-aot-link-lib` or `./script/bootstrap-aot-link-lib.sh` | ✅ `test/bootstrap-aot/lib_opcode/main.php` bundles `lib/OpCode.php` ([#540](https://github.com/PurHur/php-compiler/issues/540)) |
 | Bundled `lib/Compiler.php` lint | `./script/bootstrap-selfhost-lint.sh` | ✅ `test/selfhost/compiler_minimal/main.php` + literal `require_once` units toward `bin/vm.php` (no `vendor/`) ([#559](https://github.com/PurHur/php-compiler/issues/559)) |
 | Compiler compile smoke lint | `php bin/compile.php -l test/selfhost/compiler_compile_smoke/main.php` | ✅ `compiler_minimal` bundle + literal `require_once` of `test/bootstrap-aot/compiler_smoke.php` (named function CFG) |
@@ -24,7 +24,7 @@
 | M2 lib spine smoke native run | `./script/bootstrap-selfhost-lib-spine-smoke-link.sh` or `make bootstrap-selfhost-lib-spine-smoke` | ✅ `build/selfhost-lib-spine-smoke` prints `compiler_lib_spine_smoke bundle OK` (opt-in `BOOTSTRAP_LIB_SPINE_SMOKE=1` in `./script/bootstrap-wave-check.sh`) |
 | M3 HelloWorld self-host probe lint | `php bin/compile.php -l test/selfhost/compiler_helloworld_smoke/main.php` | ✅ `compiler_compile_smoke` spine + `helloworld_compile_smoke` driver (linkable) |
 | M3 HelloWorld compile driver lint | `php bin/compile.php -l test/selfhost/compiler_helloworld_smoke/compile_driver.php` | ✅ `Runtime::parseAndCompile` + mode-file dispatch (native link opt-in) |
-| M3 HelloWorld self-host probe | `./script/bootstrap-selfhost-helloworld-probe.sh` or `make bootstrap-selfhost-helloworld` | 🚧 partial — native bundle link + native AOT run; HelloWorld emit still Zend ([#1056](https://github.com/PurHur/php-compiler/issues/1056); `BOOTSTRAP_M3_HELLOWORLD_STRICT=1` to fail without Zend fallback) |
+| M3 HelloWorld self-host probe | `./script/bootstrap-selfhost-helloworld-probe.sh` or `make bootstrap-selfhost-helloworld` | 🚧 **partial** — bundle link ✅; HelloWorld AOT **run** native ✅; **emit uses Zend fallback** until native compile driver lands ([#1056](https://github.com/PurHur/php-compiler/issues/1056); `BOOTSTRAP_M3_HELLOWORLD_STRICT=1` to fail without fallback) |
 | M3 HelloWorld wave gate | `./script/bootstrap-wave-check.sh --with-helloworld` | ✅ opt-in `BOOTSTRAP_M3_HELLOWORLD=1` |
 
 Regenerate: `make bootstrap-profile` (inventory + profile + optional `bootstrap-aot-lint`). Phase C: `make bootstrap-aot-link` (or `php script/bootstrap-aot-lint.php --link`). Phase D: `make bootstrap-aot-link-lib`. Bundled compiler lint: `./script/bootstrap-selfhost-lint.sh`. Live lowering target: `make bootstrap-selfhost-probe` (or `./script/bootstrap-selfhost-compile-probe.sh`; optional `--update-inventory`).
