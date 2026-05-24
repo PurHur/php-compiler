@@ -17,7 +17,7 @@ require_once __DIR__.'/runtime_ctor_smoke.php';
  */
 function runtime_parse_compile_smoke(string $source = '<?php echo "parse compile smoke";'): array
 {
-    $ctor = runtime_ctor_smoke();
+    $ctor = \PHPCompiler\BootstrapAot\runtime_ctor_smoke();
     if (!$ctor['ok']) {
         return $ctor;
     }
