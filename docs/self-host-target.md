@@ -1,6 +1,6 @@
 # Self-host target — compiler compiles itself
 
-**North Star 2 living tracker:** [#1056](https://github.com/PurHur/php-compiler/issues/1056)  
+**North Star 2 living tracker:** [#1492](https://github.com/PurHur/php-compiler/issues/1492) (was [#1056](https://github.com/PurHur/php-compiler/issues/1056))  
 **Public status:** [development-status § North Star 2](https://purhur.github.io/php-compiler/development-status.html#north-star-2-self-host)  
 **M2 batch tracker:** [#1419](https://github.com/PurHur/php-compiler/issues/1419) (closed — work landed in PRs)
 
@@ -146,7 +146,7 @@ Parallel batches ([#1419](https://github.com/PurHur/php-compiler/issues/1419), [
 
 | Topic | Issue |
 |-------|-------|
-| North Star 2 tracker | [#1056](https://github.com/PurHur/php-compiler/issues/1056) |
+| North Star 2 tracker | [#1492](https://github.com/PurHur/php-compiler/issues/1492) |
 | M2 batch umbrella (done) | [#1419](https://github.com/PurHur/php-compiler/issues/1419) |
 | M3 compile driver / LLVM | [#1402](https://github.com/PurHur/php-compiler/issues/1402) |
 | M4 bootstrap loop scaffold | [#1498](https://github.com/PurHur/php-compiler/issues/1498) |
