@@ -928,8 +928,15 @@ final class HashTable {
 
             return;
         }
-        //todo
-        throw new \LogicException('Need to implement rehash');
+        for ($bucketIndex = 0; $bucketIndex < $this->numUsed; ++$bucketIndex) {
+            $bucket = $this->buckets->read($bucketIndex);
+            if ($bucket->value->isUndefined()) {
+                continue;
+            }
+            $hash = $bucket->hash;
+            $bucket->value->next = $this->indexes->read($hash);
+            $this->indexes->write($hash, $bucketIndex);
+        }
     }
 
     private function isWithoutHoles(): bool {

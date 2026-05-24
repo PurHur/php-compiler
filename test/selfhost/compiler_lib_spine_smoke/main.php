@@ -581,6 +581,10 @@ require_once __DIR__.'/../../../ext/types/is_type.php';
 require_once __DIR__.'/../../../ext/types/mb_strlen.php';
 require_once __DIR__.'/../../../ext/types/strlen.php';
 require_once __DIR__.'/../../../src/llvm-env.php';
+// M2 spine close-out (#1492): Linker + VmPregReplaceCallback + macro_functions (array/shell units on master).
+require_once __DIR__.'/../../../lib/AOT/Linker.php';
+require_once __DIR__.'/../../../ext/standard/VmPregReplaceCallback.php';
+require_once __DIR__.'/../../../src/macro_functions.php';
 require_once __DIR__.'/../../../src/yay-php8-compat.php';
 // src/cli.php + compat shims — deferred (#1467): String_.php JIT link failure when bundled; cli_driver split ready for M4.
 // bin/vm.php — deferred (#1423 M4): entry pulls src/cli.php + vendor/autoload argv driver; bundle vm_run_smoke.php instead.

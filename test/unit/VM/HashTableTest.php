@@ -170,6 +170,33 @@ class HashTableTest extends TestCase
         }
     }
 
+    /** Regression: rehash with holes after unset (#1761, #66). */
+    public function testRehashAfterUnsetCreatesHoles(): void
+    {
+        $ht = new HashTable();
+        for ($i = 0; $i < HashTable::MIN_SIZE + 2; ++$i) {
+            $var = new Variable();
+            $var->string('v'.$i);
+            $ht->add('k'.$i, $var);
+        }
+        $removeKey = new Variable();
+        $removeKey->string('k1');
+        $ht->offsetUnset($removeKey);
+        $this->assertFalse($ht->offsetIsSet($removeKey));
+        $extra = new Variable();
+        $extra->string('extra');
+        $ht->add('k_extra', $extra);
+        for ($i = 0; $i < HashTable::MIN_SIZE + 2; ++$i) {
+            if (1 === $i) {
+                continue;
+            }
+            $found = $ht->find('k'.$i);
+            $this->assertNotNull($found, 'find failed for k'.$i.' after unset hole rehash');
+            $this->assertSame('v'.$i, $found->resolveIndirect()->toString());
+        }
+        $this->assertSame('extra', $ht->find('k_extra')->resolveIndirect()->toString());
+    }
+
     private function int(int $value): Variable
     {
         $var = new Variable();
