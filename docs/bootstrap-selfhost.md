@@ -6,7 +6,7 @@
 
 | Gate | Command | Status |
 |------|---------|--------|
-| Phase A inventory | `php script/bootstrap-inventory.php --check` | ✅ **586** files on `bin/vm.php` path; **0** source blockers (excluded paths: `lib/AOT/Linker.php`, `lib/JIT/Builtin/StringPregMatch.php`; `lib/VM/HashTable.php` bundled via `ArrayIterator`) |
+| Phase A inventory | `php script/bootstrap-inventory.php --check` | ✅ **586** files on `bin/vm.php` path; **0** source blockers (excluded paths: `lib/JIT/Builtin/StringPregMatch.php`; `lib/VM/HashTable.php` bundled via `ArrayIterator`) |
 | Phase B lib AOT lint | `php bin/compile.php -l lib/*.php` (with `script/php-env.sh`) | ✅ **14/14** top-level `lib/*.php` units ([#534](https://github.com/PurHur/php-compiler/pull/534)) |
 | Phase B fixture lint | `php script/bootstrap-aot-lint.php` | ✅ **13** procedural targets under `test/bootstrap-aot/` + `examples/000-HelloWorld` |
 | Phase C native run | `make bootstrap-aot-link` or `./script/bootstrap-aot-link.sh` | ✅ **71/71** link targets OK |
@@ -20,7 +20,7 @@
 | Self-host probe in full CI | `./script/ci-local.sh` (LLVM tail) | ✅ default-on when LLVM 9 present; `BOOTSTRAP_SELFHOST_PROBE_GATE=0` to skip ([#829](https://github.com/PurHur/php-compiler/issues/829)) |
 | Wave gate in full CI | `./script/ci-local.sh` (LLVM tail) | ✅ default-on when LLVM 9 present; `BOOTSTRAP_WAVE_CHECK=0` to skip; `./script/bootstrap-wave-check.sh --fail-fast` |
 | Self-host native link | `./script/bootstrap-selfhost-link.sh` | ✅ `build/selfhost` prints `compiler_minimal bundle OK` ([#557](https://github.com/PurHur/php-compiler/issues/557), [#913](https://github.com/PurHur/php-compiler/issues/913)) |
-| M2 lib spine smoke lint | `php bin/compile.php -l test/selfhost/compiler_lib_spine_smoke/main.php` | ✅ **439** units (`compiler_minimal` **109** + **331** M2 spine; [#1056](https://github.com/PurHur/php-compiler/issues/1056), [#1742](https://github.com/PurHur/php-compiler/issues/1742), [#1744](https://github.com/PurHur/php-compiler/issues/1744), [#1725](https://github.com/PurHur/php-compiler/issues/1725)) |
+| M2 lib spine smoke lint | `php bin/compile.php -l test/selfhost/compiler_lib_spine_smoke/main.php` | ✅ **440** units (`compiler_minimal` **109** + **332** M2 spine; [#1056](https://github.com/PurHur/php-compiler/issues/1056), [#1742](https://github.com/PurHur/php-compiler/issues/1742), [#1744](https://github.com/PurHur/php-compiler/issues/1744), [#1725](https://github.com/PurHur/php-compiler/issues/1725), [#1741](https://github.com/PurHur/php-compiler/issues/1741)) |
 | M2 lib spine smoke native run | `./script/bootstrap-selfhost-lib-spine-smoke-link.sh` or `BOOTSTRAP_LIB_SPINE_SMOKE=1 make bootstrap-selfhost-lib-spine-smoke` | ✅ `build/selfhost-lib-spine-smoke` prints `compiler_lib_spine_smoke bundle OK` |
 | M3 HelloWorld self-host probe lint | `php bin/compile.php -l test/selfhost/compiler_helloworld_smoke/main.php` | ✅ `compiler_compile_smoke` spine + `helloworld_compile_smoke` driver (linkable) |
 | M3 HelloWorld compile driver lint | `php bin/compile.php -l test/selfhost/compiler_helloworld_smoke/compile_driver.php` | ✅ `Runtime::parseAndCompile` + mode-file dispatch (native link opt-in) |
@@ -76,7 +76,7 @@ Audit: `php script/audit-stdlib-jit.php`. Auto-stub batch: **10** builtins (boot
 2. **Class methods** ([#58](https://github.com/PurHur/php-compiler/issues/58), [#145](https://github.com/PurHur/php-compiler/issues/145)) — inventory warns on `Op\Stmt\ClassMethod` across `lib/`
 3. **Nullable typed properties** — `?Type` on fields with `= null` defaults ✅ (`php-types-fromvalue-null.patch`, `test/bootstrap-aot/class_nullable_property.php`); nullable **parameters** ✅ (`php-types-nullable-return.patch`, `test/bootstrap-aot/nullable_types.php`); nullable **return types** in `Type::fromTypeDecl()` ✅ (`php-types-nullable-return.patch`, `test/bootstrap-aot/ns_func.php`, `test/bootstrap-aot/ns_nullable_return.php` lint)
 4. **Try/catch** ([#57](https://github.com/PurHur/php-compiler/issues/57)) — `lib/Runtime.php`, error paths (`throw` terminal link ✅ [#538](https://github.com/PurHur/php-compiler/pull/538); happy-path try link ✅ [#558](https://github.com/PurHur/php-compiler/issues/558); catch/unwind VM pending)
-5. **LLVM linker** — `lib/AOT/Linker.php` uses `shell_exec` (excluded from profile; keep external `clang` for now)
+5. **LLVM linker** — `lib/AOT/Linker.php` bundled in M2 spine ([#1741](https://github.com/PurHur/php-compiler/issues/1741)); uses host `shell_exec`/`proc_open` via JIT for external `clang`
 6. **Generators** — `lib/VM/HashTable.php` `iterate`/`iterateKeyed` use eager `ArrayIterator` for bootstrap AOT (no `yield`)
 
 ## Bootstrap AOT lint ladder

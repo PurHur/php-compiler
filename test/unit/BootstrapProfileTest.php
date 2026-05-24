@@ -48,7 +48,7 @@ final class BootstrapProfileTest extends TestCase
         $this->assertContains('test/bootstrap-aot/const_string_folder_deploy_path.php', $profile['aot_lint_targets']);
         $this->assertNotContains('test/bootstrap-aot/lib_opcode/main.php', $profile['aot_link_targets']);
         $this->assertContains('test/bootstrap-aot/lib_opcode/main.php', $profile['aot_link_lib_targets']);
-        $this->assertContains('lib/AOT/Linker.php', $profile['excluded_files']);
+        $this->assertNotContains('lib/AOT/Linker.php', $profile['excluded_files']);
     }
 
     public function testProfileDocIsFresh(): void

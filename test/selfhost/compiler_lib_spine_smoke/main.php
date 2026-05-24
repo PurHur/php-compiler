@@ -176,6 +176,7 @@ require_once __DIR__.'/../../../lib/Web/CgiAotDriver.php';
 require_once __DIR__.'/../../../lib/Web/CgiDriver.php';
 require_once __DIR__.'/../../../lib/Web/ProjectDeploy.php';
 require_once __DIR__.'/../../../lib/AOT/ProjectGraph.php';
+require_once __DIR__.'/../../../lib/AOT/Linker.php';
 require_once __DIR__.'/../../../ext/standard/JitAddslashes.php';
 require_once __DIR__.'/../../../ext/standard/JitBase64Encode.php';
 require_once __DIR__.'/../../../ext/standard/JitBin2hex.php';
