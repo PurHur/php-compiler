@@ -44,7 +44,12 @@ final class Variable {
     public int $next = -1;
 
     public ?int $typeConstraint = null;
-    public ?string $classConstraint = null; 
+    public ?string $classConstraint = null;
+
+    /** Set for instance properties so readonly-class writes can be enforced (issue #1360). */
+    public ?ObjectEntry $objectPropertyOwner = null;
+
+    public ?string $objectPropertyName = null;
 
     public function __construct(int $type = self::TYPE_NULL) {
         $this->type = $type;

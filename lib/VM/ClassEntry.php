@@ -37,6 +37,8 @@ class ClassEntry {
     public array $constants = [];
     /** @var array<string, Variable> static property name (lowercase) => shared storage */
     public array $staticProperties = [];
+    /** Readonly class: instance properties cannot change after construction (issue #1360). */
+    public bool $readonly = false;
 
     public function __construct(string $name) {
         $this->name = $name;
