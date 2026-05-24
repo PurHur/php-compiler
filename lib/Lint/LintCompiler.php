@@ -123,6 +123,13 @@ final class LintCompiler extends Compiler
                     break;
                 case Op\Stmt\ClassMethod::class:
                     try {
+                        if ('__construct' === $child->func->name) {
+                            foreach ($child->func->params as $param) {
+                                if ($this->isPromotedParam($param)) {
+                                    $this->compilePromotedPropertyDeclaration($param, $result);
+                                }
+                            }
+                        }
                         $methodName = new Operand\Literal($child->func->name);
                         $methodName->type = Type::string();
                         $visVar = new Variable(Variable::TYPE_INTEGER);
@@ -137,8 +144,7 @@ final class LintCompiler extends Compiler
                             $visIdx
                         );
                         if (null !== $child->func->cfg) {
-                            $methodBlock = $this->compileCfgBlock($child->func->cfg, $child->func->params);
-                            $methodBlock->func = $child->func;
+                            $methodBlock = $this->compileCfgBlock($child->func->cfg, $child->func->params, $child->func);
                             $declare->block1 = $methodBlock;
                         }
                         $result->addOpCode($declare);
