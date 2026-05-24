@@ -45,6 +45,18 @@ final class VmReflection
         return null !== self::resolveClassEntry($ctx, $className);
     }
 
+    public static function interfaceExists(Context $ctx, string $interfaceName): bool
+    {
+        // VM currently stores declared interfaces in the same registry as classes.
+        return null !== self::resolveClassEntry($ctx, $interfaceName);
+    }
+
+    public static function traitExists(Context $ctx, string $traitName): bool
+    {
+        // VM currently stores declared traits in the same registry as classes.
+        return null !== self::resolveClassEntry($ctx, $traitName);
+    }
+
     public static function functionExists(Context $ctx, string $functionName): bool
     {
         return isset($ctx->functions[strtolower($functionName)]);
