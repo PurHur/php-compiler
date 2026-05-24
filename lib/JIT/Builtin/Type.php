@@ -28,6 +28,7 @@ class Type extends Builtin {
         $this->string->register();
         $this->value->register();
         $this->object->register();
+        $this->hashtable->register();
         $fntypeGetenv = $this->context->context->functionType(
             $this->context->getTypeFromString('void'),
             false,
@@ -339,7 +340,6 @@ class Type extends Builtin {
             $fn = $this->context->module->addFunction($libcName, $ft);
             $this->context->registerFunction($libcName, $fn);
         }
-        $this->hashtable->register();
         $void = $this->context->getTypeFromString('void');
         $strPtr = $this->context->getTypeFromString('__string__*');
         $i32 = $this->context->getTypeFromString('int32');
