@@ -73,6 +73,9 @@ class Block {
     /** Parameter index (0-based, excluding $this) that receives a packed trailing-arg array (#197). */
     public ?int $variadicParamIndex = null;
 
+    /** Declared parameter names by index (issue #168). */
+    public array $paramNames = [];
+
     /** Resolved absolute paths for TYPE_INCLUDE opcodes (arg3 index, issue #54). */
     public array $literalIncludePaths = [];
 
