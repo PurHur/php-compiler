@@ -224,6 +224,7 @@ class Module extends ModuleAbstract
             new copy_(),
             new touch_(),
             new filetype(),
+            new stream_context_create(),
             new fopen(),
             new fread(),
             new fgetc(),
