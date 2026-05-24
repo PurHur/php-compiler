@@ -11,9 +11,11 @@ Tracking issues: [#58](https://github.com/PurHur/php-compiler/issues/58), [#145]
 |-----------|:--:|:---:|:---:|-------|-------|
 | `class` / `new` | yes | yes | yes | [#58](https://github.com/PurHur/php-compiler/issues/58) | compliance PHPT; bootstrap AOT |
 | Anonymous class `new class { }` | yes | yes | yes | [#1233](https://github.com/PurHur/php-compiler/issues/1233) | php-cfg inline Stmt\Class_ in parseExpr_New; synthetic AnonymousClass@line name |
+| Enum declarations `enum Foo: string { case Bar = 'x'; }` | yes | yes | no | [#1356](https://github.com/PurHur/php-compiler/issues/1356) | Backed enum cases as class constants; `Foo::Bar` const-like fetch; `enum_exists` registry |
 | Instance methods | yes | yes | yes | [#58](https://github.com/PurHur/php-compiler/issues/58) | compliance PHPT; bootstrap AOT |
 | Private methods | yes | yes | yes | [#145](https://github.com/PurHur/php-compiler/issues/145) | compliance PHPT; bootstrap AOT |
 | Property fetch `$this->x` | yes | yes | yes | [#58](https://github.com/PurHur/php-compiler/issues/58) | compliance PHPT; bootstrap AOT |
+| Constructor property promotion | yes | yes | yes | [#1359](https://github.com/PurHur/php-compiler/issues/1359) | Promoted params declare property + assign in __construct |
 | Dynamic property access `$obj->$name` | yes | yes | yes | [#1227](https://github.com/PurHur/php-compiler/issues/1227) | JIT compares runtime name to declared properties; unknown names abort at runtime; compliance PHPT |
 | Variable function call `$fn()` | yes | yes | yes | [#56](https://github.com/PurHur/php-compiler/issues/56) | VM resolves callee at runtime; JIT when callee name is compile-time string in variable (#56) |
 | Native user-class link (`phpc build --project`) | yes | yes | yes | [#764](https://github.com/PurHur/php-compiler/issues/764) | AOT link yes (#568 closed); native execute #764; compliance PHPT; bootstrap AOT |
@@ -39,9 +41,10 @@ Tracking issues: [#58](https://github.com/PurHur/php-compiler/issues/58), [#145]
 | Invokable objects (`$obj()` / `__invoke`) | yes | yes | yes | [#1232](https://github.com/PurHur/php-compiler/issues/1232) | Object-typed FuncCall lowered to __invoke method dispatch; VM runtime fallback |
 | First-class callable syntax (`foo(...)`, `Class::m(...)`) | yes | yes | yes | [#1230](https://github.com/PurHur/php-compiler/issues/1230) | php-cfg Expr_FirstClassCallable; VM stores string or [obj, method] array; JIT via compileTimeString |
 | `never` return type | yes | yes | yes | [#1358](https://github.com/PurHur/php-compiler/issues/1358) | php-cfg Op\Type\Never_; any `return` in body is a compile error; normal completion via throw/exit |
-| Intersection types (`A&B`) | yes | no | no | [#1357](https://github.com/PurHur/php-compiler/issues/1357) | php-cfg Op\Type\Intersection; VM checks object implements each interface at call; VM-only lowering |
+| Intersection types (`A&B`) | yes | yes | no | [#1357](https://github.com/PurHur/php-compiler/issues/1357) | php-cfg Op\Type\Intersection; VM checks object implements each interface at call |
 | Array/argument unpack `...$x` | yes | yes | yes | [#1361](https://github.com/PurHur/php-compiler/issues/1361) | php-cfg spread.patch (#141); VM HashTable::spreadFrom; JIT HashTableHelper::spreadInto + mergeCallArgEntries; compliance PHPT |
 | `__serialize` / `__unserialize` magic methods | no | no | yes | [#1365](https://github.com/PurHur/php-compiler/issues/1365) | serialize()/unserialize() call __serialize/__unserialize when present; VM via VmSerialize |
+| Multi-type catch `catch (A|B $e)` | yes | yes | yes | [#1362](https://github.com/PurHur/php-compiler/issues/1362) | php-cfg records union types per catch; VM filters TYPE_CATCH via OpCode.catchTypes; compliance PHPT |
 
 _Syntax AOT column reflects `Runtime::MODE_AOT` compile probes unless a row pins AOT (e.g. native user-class link)._
 ## Web north-star (`examples/003-MiniWebApp`)

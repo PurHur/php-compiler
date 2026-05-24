@@ -1092,6 +1092,18 @@ class JIT {
                         || $this->assignOperandsUsedByLiteralInclude($block, $op);
                     $this->assignOperand($block->getOperand($op->arg2), $value, $forceAssign);
                     $this->assignOperand($destOp, $value, $forceAssign);
+                    foreach ([$block->getOperand($op->arg2), $destOp] as $destOperand) {
+                        if (!$this->context->hasVariableOp($destOperand)) {
+                            continue;
+                        }
+                        $destVar = $this->context->getVariableFromOp($destOperand);
+                        $this->foldCompileTimeStringFromAssign(
+                            $block,
+                            (int) $op->arg3,
+                            $destVar,
+                            $value
+                        );
+                    }
                     break;  
                 case OpCode::TYPE_ASSIGN_REF:
                     $destOp = $block->getOperand($op->arg1);
@@ -2034,6 +2046,10 @@ class JIT {
                             break;
                         }
                         $nameVar = $this->context->getVariableFromOp($nameOp);
+                        $nameSlot = $block->slotForOperand($nameOp);
+                        if (null !== $nameSlot) {
+                            $this->foldCompileTimeStringFromSlot($block, $nameSlot, $nameVar);
+                        }
                         if (null === $nameVar->compileTimeString) {
                             if ($this->shouldUseSelfHostJitStubs()) {
                                 $this->context->scope->toCall = null;
@@ -4079,6 +4095,67 @@ class JIT {
         return null;
     }
 
+
+    /**
+     * Propagate compile-time callable names through TYPE_ASSIGN (first-class callables, #1363).
+     */
+    private function foldCompileTimeStringFromAssign(
+        Block $block,
+        int $sourceSlot,
+        Variable $dest,
+        Variable $source
+    ): void {
+        if (null !== $dest->compileTimeString) {
+            return;
+        }
+        if (null !== $source->compileTimeString) {
+            $dest->compileTimeString = $source->compileTimeString;
+
+            return;
+        }
+        $this->foldCompileTimeStringFromSlot($block, $sourceSlot, $dest);
+    }
+
+    private function foldCompileTimeStringFromSlot(Block $block, int $slot, Variable $dest): void
+    {
+        if (null !== $dest->compileTimeString) {
+            return;
+        }
+        $resolved = $this->resolveJitCompileTimeStringSlot($block, $slot);
+        if (null !== $resolved) {
+            $dest->compileTimeString = $resolved;
+        }
+    }
+
+    /**
+     * @param array<int, true> $visited
+     */
+    private function resolveJitCompileTimeStringSlot(Block $block, int $slot, array &$visited = []): ?string
+    {
+        if (isset($visited[$slot])) {
+            return null;
+        }
+        $visited[$slot] = true;
+        if (isset($block->constants[$slot])) {
+            $const = $block->constants[$slot];
+            if (VM\Variable::TYPE_STRING !== $const->type) {
+                return null;
+            }
+
+            return $const->toString();
+        }
+        foreach ($block->opCodes as $prior) {
+            if (OpCode::TYPE_ASSIGN !== $prior->type || $prior->arg2 !== $slot) {
+                continue;
+            }
+            $resolved = $this->resolveJitCompileTimeStringSlot($block, (int) $prior->arg3, $visited);
+            if (null !== $resolved) {
+                return $resolved;
+            }
+        }
+
+        return null;
+    }
 
     /**
      * When php-cfg assigns through a named temporary with no downstream usages, the name slot

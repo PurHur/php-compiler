@@ -269,8 +269,11 @@ function syntaxRowDefinitions(): array
             'id' => 'first_class_callable',
             'construct' => 'First-class callable syntax (`foo(...)`, `Class::m(...)`)',
             'opcodes' => ['TYPE_ASSIGN', 'TYPE_FUNCCALL_INIT'],
-            'issue' => 1230,
-            'notes' => ['php-cfg Expr_FirstClassCallable; VM stores string or [obj, method] array; JIT via compileTimeString'],
+            'issue' => 1363,
+            'notes' => [
+                'php-cfg Expr_FirstClassCallable (#1230); VM stores string or [obj, method] array',
+                'JIT folds strlen(...) / Class::m(...) via compileTimeString assign chains (#1363)',
+            ],
             'probe' => '$fn = strlen(...); echo $fn("x");',
         ],
         [
