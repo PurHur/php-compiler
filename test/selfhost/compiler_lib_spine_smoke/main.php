@@ -309,7 +309,7 @@ require_once __DIR__.'/../../../ext/standard/VmScope.php';
 require_once __DIR__.'/../../../ext/standard/VmSprintf.php';
 require_once __DIR__.'/../../../ext/standard/VmStreamContext.php';
 require_once __DIR__.'/../../../ext/standard/VmUserCall.php';
-require_once __DIR__.'/../../../ext/standard/parse_url.php';
+require_once __DIR__.'/../../../ext/standard/preg_match_all.php';
 require_once __DIR__.'/../../../ext/standard/floatval.php';
 require_once __DIR__.'/../../../ext/standard/hex2bin.php';
 require_once __DIR__.'/../../../ext/standard/addslashes.php';
