@@ -613,6 +613,15 @@ final class HashTableHelper
         return $var;
     }
 
+    public static function unsetStringKey(Context $context, Value $ht, Value $keyStr): void
+    {
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__unsetStringKey'),
+            $ht,
+            $keyStr
+        );
+    }
+
     /**
      * Read a CGI superglobal string slot without multi-block type dispatch (issue #273).
      * Avoids LLVM dominance failures on ?? left branches when the key is absent at compile time.

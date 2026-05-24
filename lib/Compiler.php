@@ -1562,12 +1562,15 @@ class Compiler {
     }
 
     /**
-     * True when the fetch result is only used as an Assign lvalue (issue #103).
+     * True when the fetch result is only used as a write lvalue (assign or unset; issue #103, #1224).
      */
     protected function isArrayDimFetchForWrite(Op\Expr\ArrayDimFetch $fetch, Block $block): bool
     {
         foreach ($fetch->result->usages as $usage) {
             if ($usage instanceof Op\Expr\Assign && $usage->var === $fetch->result) {
+                continue;
+            }
+            if ($usage instanceof Op\Terminal\Unset_ && $this->unsetTerminalUsesOperand($usage, $fetch->result)) {
                 continue;
             }
 
@@ -1587,7 +1590,25 @@ class Compiler {
             }
             $next = $children[$i + 1];
 
-            return $next instanceof Op\Expr\Assign && $next->var === $fetch->result;
+            if ($next instanceof Op\Expr\Assign && $next->var === $fetch->result) {
+                return true;
+            }
+            if ($next instanceof Op\Terminal\Unset_ && $this->unsetTerminalUsesOperand($next, $fetch->result)) {
+                return true;
+            }
+
+            return false;
+        }
+
+        return false;
+    }
+
+    private function unsetTerminalUsesOperand(Op\Terminal\Unset_ $unset, Operand $operand): bool
+    {
+        foreach ($unset->exprs as $expr) {
+            if ($expr === $operand) {
+                return true;
+            }
         }
 
         return false;

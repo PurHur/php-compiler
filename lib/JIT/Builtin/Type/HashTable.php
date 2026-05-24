@@ -93,6 +93,7 @@ class HashTable extends Type
         $this->registerFn('__hashtable__setStringKeyLong', 'void', ['__hashtable__*', '__string__*', 'int64']);
         $this->registerFn('__hashtable__setStringKeyBool', 'void', ['__hashtable__*', '__string__*', 'int1']);
         $this->registerFn('__hashtable__offsetIsSetStringKey', 'int1', ['__hashtable__*', '__string__*']);
+        $this->registerFn('__hashtable__unsetStringKey', 'void', ['__hashtable__*', '__string__*']);
         $this->registerFn('__hashtable__peekStringKeyValue', '__value__*', ['__hashtable__*', '__string__*']);
         $this->registerFn('__hashtable__readStringKeyValue', '__value__*', ['__hashtable__*', '__string__*']);
         $this->registerFn('__hashtable__readStringKeyHashtable', '__hashtable__*', ['__hashtable__*', '__string__*']);
@@ -142,6 +143,7 @@ class HashTable extends Type
         $this->implementSetStringKeyBool();
         $this->implementSetStringKeyHashtable();
         $this->implementOffsetIsSetStringKey();
+        $this->implementUnsetStringKey();
         $this->implementPeekStringKeyValue();
         $this->implementReadStringKeyValue();
         $this->implementReadStringKeyHashtable();
@@ -1747,6 +1749,99 @@ class HashTable extends Type
             $this->context->builder->addNoSignedWrap($num, $sizeT->constInt(1, false)),
             $numPtr
         );
+    }
+
+    private function decrementNumElements(PHPLLVM\Value $ht): void
+    {
+        $map = $this->context->structFieldMap['__hashtable__'];
+        $sizeT = $this->context->getTypeFromString('size_t');
+        $numPtr = $this->context->builder->structGep($ht, $map['numElements']);
+        $num = $this->context->builder->load($numPtr);
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $newNum = $this->context->builder->sub($num, $one);
+        $clamped = $this->context->builder->select(
+            $this->context->builder->icmp(Builder::INT_EQ, $num, $zero),
+            $zero,
+            $newNum
+        );
+        $this->context->builder->store($clamped, $numPtr);
+    }
+
+    private function implementUnsetStringKey(): void
+    {
+        $fn = $this->context->lookupFunction('__hashtable__unsetStringKey');
+        $block = $fn->appendBasicBlock('main');
+        $this->context->builder->positionAtEnd($block);
+        $ht = $fn->getParam(0);
+        $key = $fn->getParam(1);
+
+        $htMap = $this->context->structFieldMap['__hashtable__'];
+        $nodeMap = $this->context->structFieldMap['__strkey_node__'];
+        $headSlot = $this->context->builder->structGep($ht, $htMap['strKeys']);
+        $nodePtrType = $this->context->getTypeFromString('__strkey_node__*');
+
+        $prevSlot = $this->context->builder->alloca($nodePtrType, 1, 'strkey_unset_prev');
+        $this->context->builder->store($nodePtrType->constNull(), $prevSlot);
+        $currentSlot = $this->context->builder->alloca($nodePtrType, 1, 'strkey_unset_current');
+        $this->context->builder->store($this->context->builder->load($headSlot), $currentSlot);
+
+        $done = $fn->appendBasicBlock('strkey_unset_done');
+        $loopHead = $fn->appendBasicBlock('strkey_unset_head');
+        $loopBody = $fn->appendBasicBlock('strkey_unset_body');
+        $this->context->builder->branch($loopHead);
+
+        $this->context->builder->positionAtEnd($loopHead);
+        $node = $this->context->builder->load($currentSlot);
+        $isNull = $this->context->builder->icmp(Builder::INT_EQ, $node, $nodePtrType->constNull());
+        $this->context->builder->branchIf($isNull, $done, $loopBody);
+
+        $this->context->builder->positionAtEnd($loopBody);
+        $nodeKey = $this->context->builder->load($this->context->builder->structGep($node, $nodeMap['key']));
+        $cmp = $this->context->builder->call(
+            $this->context->lookupFunction('strcmp'),
+            $this->stringDataPtr($key),
+            $this->stringDataPtr($nodeKey)
+        );
+        $isMatch = $this->context->builder->icmp(Builder::INT_EQ, $cmp, $cmp->typeOf()->constInt(0, false));
+        $remove = $fn->appendBasicBlock('strkey_unset_remove');
+        $next = $fn->appendBasicBlock('strkey_unset_next');
+        $this->context->builder->branchIf($isMatch, $remove, $next);
+
+        $this->context->builder->positionAtEnd($remove);
+        $nextNode = $this->context->builder->load($this->context->builder->structGep($node, $nodeMap['next']));
+        $prev = $this->context->builder->load($prevSlot);
+        $hasPrev = $this->context->builder->icmp(Builder::INT_NE, $prev, $nodePtrType->constNull());
+        $updateHead = $fn->appendBasicBlock('strkey_unset_update_head');
+        $updatePrev = $fn->appendBasicBlock('strkey_unset_update_prev');
+        $afterUnlink = $fn->appendBasicBlock('strkey_unset_after_unlink');
+        $this->context->builder->branchIf($hasPrev, $updatePrev, $updateHead);
+
+        $this->context->builder->positionAtEnd($updateHead);
+        $this->context->builder->store($nextNode, $headSlot);
+        $this->context->builder->branch($afterUnlink);
+
+        $this->context->builder->positionAtEnd($updatePrev);
+        $this->context->builder->store(
+            $nextNode,
+            $this->context->builder->structGep($prev, $nodeMap['next'])
+        );
+        $this->context->builder->branch($afterUnlink);
+
+        $this->context->builder->positionAtEnd($afterUnlink);
+        $valField = $this->context->builder->structGep($node, $nodeMap['value']);
+        $this->context->builder->call($this->context->lookupFunction('__value__writeNull'), $valField);
+        $this->decrementNumElements($ht);
+        $this->context->builder->branch($done);
+
+        $this->context->builder->positionAtEnd($next);
+        $this->context->builder->store($node, $prevSlot);
+        $nextNode = $this->context->builder->load($this->context->builder->structGep($node, $nodeMap['next']));
+        $this->context->builder->store($nextNode, $currentSlot);
+        $this->context->builder->branch($loopHead);
+
+        $this->context->builder->positionAtEnd($done);
+        $this->context->builder->returnVoid();
     }
 
     private function updateIndexMetadata(
