@@ -74,6 +74,7 @@ final class SelfHostBuiltinPolicy
         'feof' => 'filesystem', 'fflush' => 'filesystem', 'fpassthru' => 'filesystem',
         'getenv' => 'filesystem', 'putenv' => 'filesystem', 'sys_get_temp_dir' => 'filesystem', 'tempnam' => 'filesystem',
         'getcwd' => 'filesystem', 'chdir' => 'filesystem',
+        'stream_context_create' => 'filesystem',
     ];
 
     /** @var array<string, string> */
