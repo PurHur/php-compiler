@@ -546,6 +546,8 @@
         "lib/Web/LiteralIncludeDiscovery.php",
         "lib/Web/ManifestValidator.php",
         "lib/Web/Params.php",
+        "lib/Web/ProjectAutoload.php",
+        "lib/Web/ProjectBootstrap.php",
         "lib/Web/ProjectDeploy.php",
         "lib/Web/ProjectManifest.php",
         "lib/Web/ResponseContext.php",
@@ -718,9 +720,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 530,
+        "inventory_files": 532,
         "excluded": 0,
-        "eligible": 530,
+        "eligible": 532,
         "aot_lint_targets": 83,
         "aot_link_targets": 70,
         "aot_link_lib_targets": 1

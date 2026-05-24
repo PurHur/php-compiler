@@ -6,10 +6,10 @@
 
 | Gate | Command | Status |
 |------|---------|--------|
-| Phase A inventory | `php script/bootstrap-inventory.php --check` | ✅ **530** files on `bin/vm.php` path; **0** source blockers (excluded paths: `lib/AOT/Linker.php`, `lib/JIT/Builtin/StringPregMatch.php`; `lib/VM/HashTable.php` bundled via `ArrayIterator`) |
+| Phase A inventory | `php script/bootstrap-inventory.php --check` | ✅ **532** files on `bin/vm.php` path; **0** source blockers (excluded paths: `lib/AOT/Linker.php`, `lib/JIT/Builtin/StringPregMatch.php`; `lib/VM/HashTable.php` bundled via `ArrayIterator`) |
 | Phase B lib AOT lint | `php bin/compile.php -l lib/*.php` (with `script/php-env.sh`) | ✅ **14/14** top-level `lib/*.php` units ([#534](https://github.com/PurHur/php-compiler/pull/534)) |
 | Phase B fixture lint | `php script/bootstrap-aot-lint.php` | ✅ **13** procedural targets under `test/bootstrap-aot/` + `examples/000-HelloWorld` |
-| Phase C native run | `make bootstrap-aot-link` or `./script/bootstrap-aot-link.sh` | 🚧 **66/70** targets OK (4 fixtures open) |
+| Phase C native run | `make bootstrap-aot-link` or `./script/bootstrap-aot-link.sh` | ✅ **70/70** targets OK |
 | Phase D `lib/` link | `make bootstrap-aot-link-lib` or `./script/bootstrap-aot-link-lib.sh` | ✅ `test/bootstrap-aot/lib_opcode/main.php` bundles `lib/OpCode.php` ([#540](https://github.com/PurHur/php-compiler/issues/540)) |
 | Bundled `lib/Compiler.php` lint | `./script/bootstrap-selfhost-lint.sh` | ✅ `test/selfhost/compiler_minimal/main.php` + literal `require_once` units toward `bin/vm.php` (no `vendor/`) ([#559](https://github.com/PurHur/php-compiler/issues/559)) |
 | Compiler compile smoke lint | `php bin/compile.php -l test/selfhost/compiler_compile_smoke/main.php` | ✅ `compiler_minimal` bundle + literal `require_once` of `test/bootstrap-aot/compiler_smoke.php` (named function CFG) |
