@@ -40,8 +40,19 @@ final class ResponseContext
         return true;
     }
 
+  /**
+     * Reject header lines that embed CR/LF (response header injection, issue #77).
+     */
+    public static function assertSafeHeaderLine(string $line): void
+    {
+        if (preg_match('/[\r\n]/', $line)) {
+            throw new \LogicException('header() values must not contain CR or LF characters');
+        }
+    }
+
     public static function addHeader(string $line, bool $replace = true): void
     {
+        self::assertSafeHeaderLine($line);
         if (preg_match('#^HTTP/\d(?:\.\d)?\s+(\d{3})#', $line, $m)) {
             self::setStatus((int) $m[1]);
         }

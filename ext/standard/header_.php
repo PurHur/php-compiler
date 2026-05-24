@@ -58,6 +58,7 @@ final class header_ extends Internal
             $responseCode = $codeVar->toInt();
         }
         $line = $v->toString();
+        ResponseContext::assertSafeHeaderLine($line);
         if (0 !== $responseCode) {
             \header($line, $replace, $responseCode);
             ResponseContext::setStatus($responseCode);
@@ -78,6 +79,10 @@ final class header_ extends Internal
         }
         if (JITVariable::TYPE_STRING !== $args[0]->type) {
             throw new \LogicException('header() only supports string header lines in this compiler build');
+        }
+        $literal = $args[0]->compileTimeString ?? null;
+        if (null !== $literal) {
+            ResponseContext::assertSafeHeaderLine($literal);
         }
         $line = $this->jitString($context, $args[0], 'header() line');
         if ($argc >= 2 && JITVariable::TYPE_NATIVE_BOOL !== $args[1]->type) {

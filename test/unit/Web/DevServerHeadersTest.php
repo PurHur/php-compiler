@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler;
 
 use PHPCompiler\Web\DevServer;
+use PHPCompiler\Web\ResponseContext;
 use PHPUnit\Framework\TestCase;
 
 final class DevServerHeadersTest extends TestCase
@@ -34,6 +35,14 @@ final class DevServerHeadersTest extends TestCase
             'x-inject' => "evil\r\nSet-Cookie: bad=1",
         ]);
         $this->assertSame([], $vars);
+    }
+
+    public function testResponseContextRejectsHeaderLineWithCrlf(): void
+    {
+        ResponseContext::reset();
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage('header() values must not contain CR or LF characters');
+        ResponseContext::addHeader("X: a\r\nInjected: yes");
     }
 
     public function testResolveDirectoryIndexPrefersIndexPhp(): void

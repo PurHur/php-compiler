@@ -95,6 +95,26 @@ static int phpc_header_name_from_line(__string__ *line, char *buf, size_t bufsz)
     }
 }
 
+static int phpc_header_line_has_crlf(__string__ *line)
+{
+    const char *s;
+    size_t len;
+    size_t i;
+
+    if (line == NULL) {
+        return 0;
+    }
+    s = nf_strdata(line);
+    len = nf_strlen(line);
+    for (i = 0; i < len; i++) {
+        if (s[i] == '\r' || s[i] == '\n') {
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
 static int phpc_header_name_match(__string__ *line, __string__ *name)
 {
     char line_name[256];
@@ -292,6 +312,9 @@ void __phpc_pending_header_add(__string__ *line, int replace)
     size_t len;
 
     if (line == NULL) {
+        return;
+    }
+    if (phpc_header_line_has_crlf(line)) {
         return;
     }
     s = nf_strdata(line);
