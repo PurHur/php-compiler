@@ -23,9 +23,10 @@ Verify: `php script/bootstrap-inventory.php --check` and `./script/ci-local.sh` 
 
 **Public documentation** (when a user-visible milestone lands):
 
-- Update [`docs/pages/development-status.md`](docs/pages/development-status.md) (authoritative status for [GitHub Pages](https://purhur.github.io/php-compiler/development-status.html)).
+- Update [`docs/pages/development-status.md`](docs/pages/development-status.md) (authoritative status for [GitHub Pages](https://purhur.github.io/php-compiler/development-status.html)) — **do not link** capability/inventory/CI matrices from public pages.
 - Sync north-star / “what works” tables in [`README.md`](README.md) and, if needed, [`docs/pages/index.html`](docs/pages/index.html) progress badges.
-- See [`docs/pages/PAGES.md`](docs/pages/PAGES.md) for publish workflow.
+- Regenerate contributor matrices (`capabilities.md`, etc.) when builtins change — repo-only, not part of the public site.
+- See [`docs/pages/PAGES.md`](docs/pages/PAGES.md) for publish workflow and excluded map docs.
 
 1. Ensure any install or build dependencies are removed before the end of the layer when doing a build.
 2. Update the [README.md](README.md) with details of changes to the interface, this includes new environment variables, exposed ports, useful file locations and container parameters (if applicable).

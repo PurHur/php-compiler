@@ -77,19 +77,18 @@ Needs LLVM + ~8 GiB RAM; includes JIT/AOT lint/link and example smokes.
 
 Legacy entrypoints (`bin/vm.php`, `bin/jit.php`, `bin/compile.php`) still work.
 
-## Project layout (docs map)
+## Documentation guide
 
 | Path | Audience | Content |
 |------|----------|---------|
 | [README.md](../README.md) | Everyone | Quick start, north stars, CI |
-| [docs/pages/](pages/) | Public | GitHub Pages — overview + `development-status.md` |
-| [docs/roadmap-wave3.md](roadmap-wave3.md) | Contributors | Wave 3 issue tracker |
-| [docs/bootstrap-selfhost.md](bootstrap-selfhost.md) | Contributors | Self-host gates and workflow |
-| [docs/capabilities.md](capabilities.md) | Contributors | Generated builtin matrix |
+| [docs/pages/](pages/) | **Public** | GitHub Pages — overview + `development-status.md` |
 | [docs/deploy-web-aot.md](deploy-web-aot.md) | Operators | AOT deploy + nginx CGI sketch |
-| [docs/local-ci-matrix.md](local-ci-matrix.md) | Contributors | CI / Docker matrix |
+| [docs/bootstrap-selfhost.md](bootstrap-selfhost.md) | Contributors | Self-host gates and workflow |
 | [docs/miniwebapp-gates.md](miniwebapp-gates.md) | Contributors | Reference app gate ladder |
 | [examples/README.md](../examples/README.md) | Everyone | Per-example commands |
+
+**Repo-only (not on GitHub Pages; do not link from public status content):** generated capability matrices (`capabilities.md`, `capabilities-syntax.md`), bootstrap inventory tables (`bootstrap-inventory.md`), CI matrices (`local-ci-matrix.md`), and similar large maps. See [`docs/README.md`](README.md).
 
 ## Environment variables (common)
 
@@ -116,9 +115,10 @@ More: [README § Troubleshooting](../README.md#troubleshooting).
 
 ## Updating public docs after a milestone
 
-1. Edit [`docs/pages/development-status.md`](pages/development-status.md) (authoritative written status).
+1. Edit [`docs/pages/development-status.md`](pages/development-status.md) (authoritative written status — **no links** to capability/inventory/CI matrices).
 2. Adjust [`docs/pages/index.html`](pages/index.html) progress bars / badges if the composite % changed.
 3. Sync north-star tables in [README.md](../README.md).
-4. Regenerate matrices if builtins changed: `php script/capability-matrix.php`, `php script/capability-syntax.php`.
+
+**Contributors only (not part of the public site):** regenerate `capabilities.md` / `capabilities-syntax.md` when builtins change (`php script/capability-matrix.php`, `php script/capability-syntax.php`).
 
 Publish: see [`docs/pages/PAGES.md`](pages/PAGES.md).

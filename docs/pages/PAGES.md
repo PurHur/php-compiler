@@ -1,6 +1,19 @@
 # GitHub Pages (public status site)
 
-Only **`docs/pages/`** is intended for public visitors. Technical docs (`docs/bootstrap-selfhost.md`, `capabilities.md`, …) stay in the repository and are linked from the site — not copied into Pages.
+Only **`docs/pages/`** is intended for public visitors. Contributor technical docs stay in the repository and are **not** copied onto this site.
+
+## Excluded from public content (repo-only)
+
+Do **not** link these from `index.html` or `development-status.md` (visitors should use the status narrative, not generated maps):
+
+| Category | Examples |
+|----------|----------|
+| **Capability matrices** | `docs/capabilities.md`, `docs/capabilities-syntax.md` |
+| **Bootstrap inventory tables** | `docs/bootstrap-inventory.md`, `docs/bootstrap-vendor-inventory.md` |
+| **CI / gate matrices** | `docs/local-ci-matrix.md`, `docs/miniwebapp-aot-unskip-matrix.md` |
+| **Large trackers** | `docs/roadmap-wave3.md` (summarize on the site; link only to GitHub issues) |
+
+Regenerate matrices with `php script/capability-matrix.php` etc. when builtins change — that is **contributor workflow**, not part of the public site update checklist.
 
 ## Public URLs
 
@@ -12,50 +25,33 @@ Only **`docs/pages/`** is intended for public visitors. Technical docs (`docs/bo
 
 ## Publish / change source
 
-**Recommended (cleanest):** Settings → Pages → Deploy from branch **`master`**, folder **`/docs/pages`**.
+**Recommended:** Settings → Pages → Deploy from branch **`master`**, folder **`/docs/pages`**.
 
-Then the overview lives at `https://purhur.github.io/php-compiler/` and `development-status.html` stays on the same site root (`baseurl: /php-compiler` in `_config.yml`).
+Do **not** publish `/docs` alone — that would expose bootstrap inventory and capability matrices unintentionally.
 
-**Current (repo-root Jekyll):** the whole repo may be published; use the table above for direct links until the source folder is switched.
-
-Do **not** publish `/docs` alone — that would expose bootstrap inventory and other contributor markdown unintentionally.
-
-## Site map
+## Site map (published files only)
 
 | File | Role |
 |------|------|
-| `index.html` | Visual overview — progress bars, north stars, **demo commands** |
-| `development-status.md` | **Authoritative written status** — edit when milestones change |
-| `css/style.css`, `js/main.js` | Theme and animations |
-| `_layouts/status.html` | Jekyll layout for `development-status.md` |
-| `_config.yml` | Jekyll `baseurl`, markdown |
+| `index.html` | Visual overview — progress bars, north stars, demo commands |
+| `development-status.md` | **Authoritative written status** |
+| `css/style.css`, `js/main.js` | Theme |
+| `_layouts/status.html` | Jekyll layout |
+| `_config.yml` | `baseurl`, markdown |
 
 ## Update workflow (before a demo or release)
 
-1. **`development-status.md`** — tables, milestones, blockers (source of truth).
-2. **`index.html`** — badges, progress %, demo section if the story changed.
-3. **`README.md`** — quick start, “what works today”, links to the site.
-4. **`docs/GETTING-STARTED.md`** — presenter commands if the demo path changed.
-5. Regenerate capability docs if builtins changed: `php script/capability-matrix.php`, `php script/capability-syntax.php`.
+1. **`development-status.md`** — milestones, blockers (no links to excluded maps above).
+2. **`index.html`** — badges and progress % if the story changed.
+3. **`README.md`** / **`docs/GETTING-STARTED.md`** — clone/demo commands; matrices stay in README contributor sections only.
 
 Keep aligned with [#78](https://github.com/PurHur/php-compiler/issues/78), [#1044](https://github.com/PurHur/php-compiler/issues/1044), [#1056](https://github.com/PurHur/php-compiler/issues/1056).
 
 ## Local preview
 
-**Static overview:**
-
 ```bash
 cd docs/pages && python3 -m http.server 8765
-# http://127.0.0.1:8765/
+# or: bundle exec jekyll serve
 ```
 
-**With Jekyll** (renders `development-status.md`):
-
-```bash
-cd docs/pages && bundle exec jekyll serve
-# http://127.0.0.1:4000/php-compiler/development-status.html  (baseurl-dependent)
-```
-
-## Optional: GitHub Actions
-
-[`.github/workflows/github-pages.yml`](../../.github/workflows/github-pages.yml) deploys `docs/pages` when Pages source is **GitHub Actions**.
+Optional: [`.github/workflows/github-pages.yml`](../../.github/workflows-disabled/github-pages.yml) (currently under `workflows-disabled/`).

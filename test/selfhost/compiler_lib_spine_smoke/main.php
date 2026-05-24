@@ -307,7 +307,11 @@ require_once __DIR__.'/../../../ext/types/strlen.php';
 require_once __DIR__.'/../../../ext/types/mb_strlen.php';
 require_once __DIR__.'/../../../ext/types/JitMbStrlen.php';
 require_once __DIR__.'/../../../ext/types/Module.php';
+require_once __DIR__.'/../../../src/tokenizer-compat.php';
+require_once __DIR__.'/../../../src/yay-php8-compat.php';
+require_once __DIR__.'/../../../src/macro_functions.php';
+require_once __DIR__.'/../../../src/llvm-env.php';
+require_once __DIR__.'/../../../src/cli.php';
 // bin/vm.php — deferred (#1423 M4): entry pulls src/cli.php + vendor/autoload argv driver; bundle vm_run_smoke.php instead.
-// src/cli.php — deferred (#1432): entry shim requires vendor/autoload.php and executes argv (M4).
 
 echo "compiler_lib_spine_smoke bundle OK\n";

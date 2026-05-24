@@ -27,7 +27,7 @@ if ! php "${ROOT}/bin/compile.php" -o "${OUT}" "${ENTRY}" 2>&1; then
   exit 1
 fi
 test -x "${OUT}"
-out="$("${OUT}")"
+out="$({ PHP_COMPILER_CLI_SPINE_BUNDLE=1 "${OUT}"; })"
 if ! grep -q 'compiler_lib_spine_smoke bundle OK' <<< "${out}"; then
   echo "bootstrap-selfhost-lib-spine-smoke-link: unexpected stdout (want compiler_lib_spine_smoke bundle OK)" >&2
   printf '%s\n' "${out}" >&2
