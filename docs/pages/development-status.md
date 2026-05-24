@@ -175,7 +175,7 @@ Zend PHP still runs `bin/compile.php` during bootstrap. The output is a **curate
 |-----------|---------|--------|
 | **M0 — Bundled subset runs** | ~109 literal `require_once` units in `test/selfhost/compiler_minimal/main.php` → `build/selfhost` prints `compiler_minimal bundle OK` | ✅ [#557](https://github.com/PurHur/php-compiler/issues/557), [#913](https://github.com/PurHur/php-compiler/issues/913) |
 | **M1 — Compiler-shaped bundle** | Bundled `Compiler.php` AOT lint; compile-smoke native link + AOT echo (`compiler smoke`); driver smoke toward `bin/compile.php` | ✅ [#1025](https://github.com/PurHur/php-compiler/issues/1025), [#1095](https://github.com/PurHur/php-compiler/issues/1095) |
-| **M2 — Lib spine growth** | `compiler_lib_spine_smoke` bundle toward full `bin/vm.php` inventory (**532** files) | 🚧 **300** / 532 units ([#1056](https://github.com/PurHur/php-compiler/issues/1056)) |
+| **M2 — Lib spine growth** | `compiler_lib_spine_smoke` bundle toward full `bin/vm.php` inventory (**532** files) | 🚧 **301** / 532 units ([#1056](https://github.com/PurHur/php-compiler/issues/1056)) |
 | **M3 — Native compiles PHP** | Self-hosted bundle links; HelloWorld AOT **runs** natively; **emit still uses Zend** `bin/compile.php` fallback | 🚧 partial ([#1056](https://github.com/PurHur/php-compiler/issues/1056)) |
 | **M4 — Bootstrap loop** | Native toolchain rebuilds the **next** compiler sources (same tree, new revision) | ⬜ |
 | **M5 — Full self-host** | Real `bin/vm.php` / `bin/compile.php` path on full inventory; **no Zend bootstrap** | ⬜ **north star** ([#1056](https://github.com/PurHur/php-compiler/issues/1056)) |
@@ -185,7 +185,7 @@ Zend PHP still runs `bin/compile.php` during bootstrap. The output is a **curate
 | Set | ~Files | Notes |
 |-----|--------|-------|
 | `compiler_minimal` bundle (M0) | **109** | Literal `require_once` closure |
-| `compiler_lib_spine_smoke` (M2) | **300** | vm.php-path lib/ + ext/standard growth bundle |
+| `compiler_lib_spine_smoke` (M2) | **301** | vm.php-path lib/ + ext/standard growth bundle |
 | Top-level `lib/*.php` | **14** | Per-file AOT lint ✅ |
 
 **M2 → M5 gap:** ~400 files still outside the honest native bundle; plus native compile driver (`parseAndCompile` emit) and vendor strategy (php-cfg / php-types / php-llvm).

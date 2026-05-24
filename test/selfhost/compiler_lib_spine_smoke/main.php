@@ -160,6 +160,7 @@ require_once __DIR__.'/../../../lib/Cli/PhpcRun.php';
 require_once __DIR__.'/../../../lib/Web/CgiAotDriver.php';
 require_once __DIR__.'/../../../lib/Web/CgiDriver.php';
 require_once __DIR__.'/../../../lib/Web/ProjectDeploy.php';
+require_once __DIR__.'/../../../lib/AOT/ProjectGraph.php';
 require_once __DIR__.'/../../../ext/standard/JitAddslashes.php';
 require_once __DIR__.'/../../../ext/standard/JitBase64Encode.php';
 require_once __DIR__.'/../../../ext/standard/JitBin2hex.php';
@@ -308,7 +309,6 @@ require_once __DIR__.'/../../../ext/types/strlen.php';
 require_once __DIR__.'/../../../ext/types/mb_strlen.php';
 require_once __DIR__.'/../../../ext/types/JitMbStrlen.php';
 require_once __DIR__.'/../../../ext/types/Module.php';
-// lib/AOT/ProjectGraph.php — deferred (#1424): bundled AOT lint failure (ManifestValidator deps).
 // bin/vm.php — deferred (#1423 M4): entry pulls src/cli.php + vendor/autoload argv driver; bundle vm_run_smoke.php instead.
 // src/cli.php — deferred (#1432): entry shim requires vendor/autoload.php and executes argv (M4).
 

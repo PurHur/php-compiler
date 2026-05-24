@@ -117,10 +117,12 @@ final class ProjectGraph
             return $files;
         }
 
-        return array_map(
-            static fn (string $path): string => self::displayPath($root, $path),
-            $files
-        );
+        $display = [];
+        foreach ($files as $path) {
+            $display[] = self::displayPath($root, $path);
+        }
+
+        return $display;
     }
 
     /**
