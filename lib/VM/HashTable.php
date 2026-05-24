@@ -702,6 +702,36 @@ final class HashTable {
         return !$value->isUndefined() && Variable::TYPE_NULL !== $value->type;
     }
 
+    public function offsetUnset(Variable $index): void
+    {
+        $this->assertConsistent();
+        if ($this->flags & self::FLAG_UNINITIALIZED) {
+            return;
+        }
+        $this->refcount->assertSeparated();
+        $bucket = null;
+        switch ($index->type) {
+            case Variable::TYPE_INTEGER:
+                $bucket = $this->findBucket($index->toInt(), null);
+                break;
+            case Variable::TYPE_STRING:
+                $bucket = $this->findBucket($this->hash($index->toString()), $index->toString());
+                break;
+            default:
+                throw new \LogicException("Unknown index type {$index->type}");
+        }
+        if (null === $bucket) {
+            return;
+        }
+        $value = $bucket->value->resolveIndirect();
+        if ($value->isUndefined() || Variable::TYPE_NULL === $value->type) {
+            return;
+        }
+        $bucket->value->reset();
+        $bucket->value->type = Variable::TYPE_UNDEFINED;
+        --$this->numElements;
+    }
+
     public function append(Variable $data): ?Variable {
         return $this->addOrUpdate($this->nextFreeElement, null, $data, self::ADD | self::ADD_NEXT);
     }

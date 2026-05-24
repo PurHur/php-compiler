@@ -1305,36 +1305,35 @@ class JIT {
                     );
                     break;
                 case OpCode::TYPE_UNSET:
-                    $targetOp = $block->getOperand($op->arg1);
-                    if (
-                        !$this->context->hasVariableOp($targetOp)
-                        && null === JIT\OperandName::resolve($targetOp)
-                    ) {
-                        break;
-                    }
-                    if ($this->context->hasVariableOp($targetOp)) {
-                        $target = $this->context->getVariableFromOp($targetOp);
+                    if (null === $op->arg3) {
+                        $targetOp = $block->getOperand($op->arg2);
                         if (
-                            null !== $target->writableHt
-                            && null !== $target->writableStringKey
-                            && JIT\Builtin::LOAD_TYPE_STANDALONE === $this->context->loadType
+                            !$this->context->hasVariableOp($targetOp)
+                            && null === JIT\OperandName::resolve($targetOp)
                         ) {
-                            JIT\HashTableHelper::unsetStringKey(
-                                $this->context,
-                                $target->writableHt,
-                                $target->writableStringKey
-                            );
                             break;
                         }
+                        if ($this->context->hasVariableOp($targetOp)) {
+                            $target = $this->context->getVariableFromOp($targetOp);
+                            if (
+                                null !== $target->writableHt
+                                && null !== $target->writableStringKey
+                                && JIT\Builtin::LOAD_TYPE_STANDALONE === $this->context->loadType
+                            ) {
+                                JIT\HashTableHelper::unsetStringKey(
+                                    $this->context,
+                                    $target->writableHt,
+                                    $target->writableStringKey
+                                );
+                                break;
+                            }
+                        }
+                        if ($this->context->hasVariableOp($targetOp)) {
+                            $this->context->setVariableOp($targetOp, $this->jitNullVariable());
+                        }
+                    } else {
+                        JIT\UnsetHelper::compileOffset($this->context, $block, $op);
                     }
-                    $nullVar = new Variable(
-                        $this->context,
-                        Variable::TYPE_NULL,
-                        Variable::KIND_VALUE,
-                        $this->context->getTypeFromString('__value__*')->constNull()
-                    );
-                    $nullVar->isNullConstant = true;
-                    $this->assignOperand($targetOp, $nullVar, true);
                     break;
                 case OpCode::TYPE_CAST_BOOL:
                     $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));
@@ -3618,6 +3617,22 @@ class JIT {
             default:
                 throw new \LogicException('Unsupported default parameter type for JIT (vm type ' . $vm->type . ')');
         }
+    }
+
+    private function jitNullVariable(): Variable
+    {
+        $slot = JIT\JitValueBox::alloc($this->context);
+        $this->context->builder->call(
+            $this->context->lookupFunction('__value__writeNull'),
+            JIT\JitValueBox::pointer($this->context, $slot)
+        );
+
+        return new Variable(
+            $this->context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VARIABLE,
+            $slot
+        );
     }
 
     private function jitVariableFromVmArray(VM\Variable $vm): Variable

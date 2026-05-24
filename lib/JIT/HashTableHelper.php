@@ -437,6 +437,32 @@ final class HashTableHelper
         return $context->builder->inBoundsGep($values, $index);
     }
 
+    public static function offsetUnset(Context $context, Variable $container, Variable $dim): void
+    {
+        $ht = self::loadHashtablePointer($context, $container);
+        if (Variable::TYPE_NATIVE_LONG === $dim->type) {
+            $index = $context->helper->loadValue($dim);
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__unsetLongAt'),
+                $ht,
+                $index
+            );
+
+            return;
+        }
+        if (Variable::TYPE_STRING === $dim->type) {
+            $key = $context->helper->loadValue($dim);
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__unsetStringKey'),
+                $ht,
+                $key
+            );
+
+            return;
+        }
+        throw new \LogicException('unset() array offset requires int or string index in this compiler build');
+    }
+
     public static function readStringAt(Context $context, Value $ht, Value $index): Value
     {
         $entry = self::listEntryPointer($context, $ht, $index);
