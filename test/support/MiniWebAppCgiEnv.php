@@ -150,6 +150,19 @@ final class MiniWebAppCgiEnv
     }
 
     /**
+     * AOT execute: PATH_INFO api/status without SCRIPT_NAME in the scenario overlay.
+     *
+     * @return array<string, string>
+     */
+    public static function aotPathInfoApiStatus(): array
+    {
+        return [
+            'REQUEST_METHOD' => 'GET',
+            'PATH_INFO' => '/api/status',
+        ];
+    }
+
+    /**
      * @return array<string, string>
      */
     public static function pathInfoContact(): array
