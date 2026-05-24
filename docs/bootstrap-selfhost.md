@@ -20,7 +20,7 @@
 | Self-host probe in full CI | `./script/ci-local.sh` (LLVM tail) | ✅ default-on when LLVM 9 present; `BOOTSTRAP_SELFHOST_PROBE_GATE=0` to skip ([#829](https://github.com/PurHur/php-compiler/issues/829)) |
 | Wave gate in full CI | `./script/ci-local.sh` (LLVM tail) | ✅ default-on when LLVM 9 present; `BOOTSTRAP_WAVE_CHECK=0` to skip; `./script/bootstrap-wave-check.sh --fail-fast` |
 | Self-host native link | `./script/bootstrap-selfhost-link.sh` | ✅ `build/selfhost` prints `compiler_minimal bundle OK` ([#557](https://github.com/PurHur/php-compiler/issues/557), [#913](https://github.com/PurHur/php-compiler/issues/913)) |
-| M2 lib spine smoke lint | `php bin/compile.php -l test/selfhost/compiler_lib_spine_smoke/main.php` | ✅ **132** units (`compiler_minimal` + **24** vm.php-path lib/ + ext/standard; [#1056](https://github.com/PurHur/php-compiler/issues/1056)) |
+| M2 lib spine smoke lint | `php bin/compile.php -l test/selfhost/compiler_lib_spine_smoke/main.php` | ✅ **182** units (`compiler_minimal` + **49** vm.php-path lib/ + ext/standard; [#1056](https://github.com/PurHur/php-compiler/issues/1056)) |
 | M2 lib spine smoke native run | `./script/bootstrap-selfhost-lib-spine-smoke-link.sh` or `make bootstrap-selfhost-lib-spine-smoke` | ✅ `build/selfhost-lib-spine-smoke` prints `compiler_lib_spine_smoke bundle OK` (opt-in `BOOTSTRAP_LIB_SPINE_SMOKE=1` in `./script/bootstrap-wave-check.sh`) |
 | M3 HelloWorld self-host probe lint | `php bin/compile.php -l test/selfhost/compiler_helloworld_smoke/main.php` | ✅ `compiler_compile_smoke` spine + `helloworld_compile_smoke` driver (linkable) |
 | M3 HelloWorld compile driver lint | `php bin/compile.php -l test/selfhost/compiler_helloworld_smoke/compile_driver.php` | ✅ `Runtime::parseAndCompile` + mode-file dispatch (native link opt-in) |
@@ -127,7 +127,7 @@ Incremental growth toward `bin/vm.php` inventory path ([#559](https://github.com
 | `lib/Compiler.php` | CFG → opcodes |
 | `lib/Lint/Issue.php`, `lib/Lint/UnsupportedRegistry.php`, `lib/Lint/LintCompiler.php`, `lib/Lint/Linter.php` | CFG lint spine (`LintCompiler` extends `Compiler`; no closures in bundle) |
 
-**Next toward `bin/compile.php` / Compiler CFG** (`php script/bootstrap-selfhost-next-includes.php`): literal vm.php spine closed for `compiler_minimal` at **109** units; M2 growth bundle `test/selfhost/compiler_lib_spine_smoke/main.php` at **136** units (+**28** lib/ + ext/standard). Driver smoke: `test/selfhost/compiler_driver_smoke/main.php`. README milestone ladder: [#1025](https://github.com/PurHur/php-compiler/issues/1025), [#1056](https://github.com/PurHur/php-compiler/issues/1056).
+**Next toward `bin/compile.php` / Compiler CFG** (`php script/bootstrap-selfhost-next-includes.php`): literal vm.php spine closed for `compiler_minimal` at **109** units; M2 growth bundle `test/selfhost/compiler_lib_spine_smoke/main.php` at **182** units (+**49** lib/ + ext/standard). Driver smoke: `test/selfhost/compiler_driver_smoke/main.php`. README milestone ladder: [#1025](https://github.com/PurHur/php-compiler/issues/1025), [#1056](https://github.com/PurHur/php-compiler/issues/1056).
 
 ### `compiler_lib_spine_smoke` bundle (M2 growth)
 
