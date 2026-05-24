@@ -167,6 +167,8 @@ class Compiler {
                     $block->addOpCode($this->compileGlobalConst($child, $block));
                     break;
                 case Op\Stmt\Interface_::class:
+                    $block->addOpCode($this->compileInterface($child, $block));
+                    break;
                 case Op\Stmt\Trait_::class:
                     break;
             }
@@ -511,11 +513,21 @@ class Compiler {
         throw new \LogicException('Unsupported unset target: ' . (is_object($expr) ? $expr->getType() : gettype($expr)));
     }
 
+    protected function compileInterface(Op\Stmt\Interface_ $iface, Block $block): OpCode
+    {
+        $return = new OpCode(
+            OpCode::TYPE_DECLARE_INTERFACE,
+            $this->compileOperand($iface->name, $block, true)
+        );
+        $return->classImplements = $this->interfaceNamesFromOperands($iface->extends);
+
+        return $return;
+    }
+
     protected function compileClassLike(Op\Stmt\ClassLike $class, Block $block): OpCode {
         $type = 0;
         if ($class instanceof Op\Stmt\Class_) {
             $type = OpCode::TYPE_DECLARE_CLASS;
-            assert(empty($class->implements));
         } else {
             throw new \LogicException('Unsupported class type: ' . get_class($class));
         }
@@ -528,8 +540,93 @@ class Compiler {
             $this->compileOperand($class->name, $block, true),
             $parentSlot
         );
+        $return->classImplements = $this->interfaceNamesFromOperands($class->implements);
         $return->block1 = $this->compileClassBody($class->stmts, $type);
         return $return;
+    }
+
+    /**
+     * @param Operand[] $operands
+     *
+     * @return string[] lowercase interface names
+     */
+    protected function interfaceNamesFromOperands(array $operands): array
+    {
+        $names = [];
+        foreach ($operands as $operand) {
+            $name = $this->staticNameFromOperand($operand);
+            if (null === $name) {
+                throw new \CompileError('Interface name must be a compile-time class reference');
+            }
+            $names[] = strtolower(ltrim($name, '\\'));
+        }
+
+        return $names;
+    }
+
+    protected function staticNameFromOperand(Operand $op): ?string
+    {
+        if ($op instanceof Operand\Literal && is_string($op->value)) {
+            return $op->value;
+        }
+        if ($op instanceof Operand\Variable) {
+            return $this->staticNameFromOperand($op->name);
+        }
+
+        return null;
+    }
+
+    /**
+     * @return string[] lowercase interface names
+     */
+    protected function intersectionNamesFromCfgType(Op\Type\Intersection $type): array
+    {
+        $names = [];
+        foreach ($type->types as $member) {
+            $name = $this->staticNameFromCfgType($member);
+            if (null === $name) {
+                throw new \CompileError('Intersection type members must be interface names');
+            }
+            $names[] = strtolower(ltrim($name, '\\'));
+        }
+
+        return $names;
+    }
+
+    protected function staticNameFromCfgType(?Op\Type $type): ?string
+    {
+        if (null === $type) {
+            return null;
+        }
+        if ($type instanceof Op\Type\Literal) {
+            return $type->name;
+        }
+        if ($type instanceof Op\Type\Reference) {
+            return $this->staticNameFromOperand($type->declaration);
+        }
+
+        return null;
+    }
+
+    protected function applyParamDeclaredType(Op\Expr\Param $param, Block $block, int $slot): void
+    {
+        $declared = $param->declaredType;
+        if ($declared instanceof Op\Type\Intersection) {
+            $block->paramTypeConstraints[$slot] = Variable::TYPE_OBJECT;
+            $block->paramIntersectionConstraints[$slot] = $this->intersectionNamesFromCfgType($declared);
+
+            return;
+        }
+        if ($declared instanceof Op\Type\Literal) {
+            $declName = strtolower($declared->name);
+            if ('mixed' !== $declName) {
+                $rawType = Type::fromDecl($declared->name);
+                $mapped = Variable::mapFromType($rawType);
+                if ($mapped !== Variable::TYPE_UNDEFINED) {
+                    $block->paramTypeConstraints[$slot] = $mapped;
+                }
+            }
+        }
     }
 
     protected function compileClassBody(CfgBlock $block, int $type): Block {
@@ -630,16 +727,7 @@ class Compiler {
         if ($param->name instanceof Operand\Literal && is_string($param->name->value)) {
             $block->paramNames[$paramIdx] = $param->name->value;
         }
-        if ($param->declaredType instanceof Op\Type\Literal) {
-            $declName = strtolower($param->declaredType->name);
-            if ('mixed' !== $declName) {
-                $rawType = Type::fromDecl($param->declaredType->name);
-                $mapped = Variable::mapFromType($rawType);
-                if ($mapped !== Variable::TYPE_UNDEFINED) {
-                    $block->paramTypeConstraints[$slot] = $mapped;
-                }
-            }
-        }
+        $this->applyParamDeclaredType($param, $block, $slot);
 
         return new OpCode(
             OpCode::TYPE_ARG_RECV,

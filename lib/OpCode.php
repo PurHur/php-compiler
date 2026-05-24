@@ -110,6 +110,8 @@ class OpCode {
     const TYPE_VAR_FETCH = 100;
     /** Append all elements from arg2 array into arg1 array (array literal ...$src, issue #141). */
     const TYPE_ARRAY_SPREAD = 101;
+    /** Register a user interface name (#1357). */
+    const TYPE_DECLARE_INTERFACE = 102;
 
     public int $type;
     public ?int $arg1;
@@ -121,6 +123,9 @@ class OpCode {
     public $block2 = null;
     /** @var ?Block */
     public $block3 = null;
+
+    /** @var string[] lowercase interface names for TYPE_DECLARE_CLASS (#1357) */
+    public array $classImplements = [];
 
     public function __construct(int $type, ?int $arg1 = null, ?int $arg2 = null, ?int $arg3 = null) {
         $this->type = $type;

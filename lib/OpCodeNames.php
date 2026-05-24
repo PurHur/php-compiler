@@ -192,6 +192,8 @@ function opcode_type_name(int $type): string
             return 'TYPE_VAR_FETCH';
         case 101:
             return 'TYPE_ARRAY_SPREAD';
+        case 102:
+            return 'TYPE_DECLARE_INTERFACE';
         default:
             return 'unknown opcode';
     }

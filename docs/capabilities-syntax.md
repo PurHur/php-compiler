@@ -38,7 +38,8 @@ Tracking issues: [#58](https://github.com/PurHur/php-compiler/issues/58), [#145]
 | Variable function calls (`$fn()`) | yes | yes | yes | [#56](https://github.com/PurHur/php-compiler/issues/56) | VM resolves callee at runtime; compiler folds literal assignment; JIT uses compile-time string |
 | Invokable objects (`$obj()` / `__invoke`) | yes | yes | yes | [#1232](https://github.com/PurHur/php-compiler/issues/1232) | Object-typed FuncCall lowered to __invoke method dispatch; VM runtime fallback |
 | First-class callable syntax (`foo(...)`, `Class::m(...)`) | yes | yes | yes | [#1230](https://github.com/PurHur/php-compiler/issues/1230) | php-cfg Expr_FirstClassCallable; VM stores string or [obj, method] array; JIT via compileTimeString |
-| `never` return type | yes | yes | no | [#1358](https://github.com/PurHur/php-compiler/issues/1358) | php-cfg Op\Type\Never_; any `return` in body is a compile error; normal completion via throw/exit |
+| `never` return type | yes | yes | yes | [#1358](https://github.com/PurHur/php-compiler/issues/1358) | php-cfg Op\Type\Never_; any `return` in body is a compile error; normal completion via throw/exit |
+| Intersection types (`A&B`) | yes | no | yes | [#1357](https://github.com/PurHur/php-compiler/issues/1357) | php-cfg Op\Type\Intersection; VM checks object implements each interface at call; VM-only lowering |
 
 _Syntax AOT column reflects `Runtime::MODE_AOT` compile probes unless a row pins AOT (e.g. native user-class link)._
 ## Web north-star (`examples/003-MiniWebApp`)
