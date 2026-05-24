@@ -17,6 +17,8 @@ use PHPCompiler\Web\Superglobals;
 class Context {
     public array $functions = [];
     public array $classes = [];
+    /** @var array<string, true> lowercase enum name => registered (#1373, #1356) */
+    public array $enums = [];
     /** @var list<callable(string): bool> */
     public array $classAutoloaders = [];
     /** @var array<string, true> */

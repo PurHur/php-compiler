@@ -25,6 +25,8 @@ use PHPLLVM;
 class Object_ extends Type {
     public PHPLLVM\Type $pointer;
     private array $classes = [];
+    /** @var array<string, true> lowercase enum name => registered (#1373, #1356) */
+    private array $enums = [];
     /** @var array<int, string> class id => canonical name */
     private array $classIdToName = [];
     private array $properties = [];
@@ -428,6 +430,21 @@ class Object_ extends Type {
         return array_keys($this->classes);
     }
 
+    public function hasUserDeclaredEnum(string $name): bool
+    {
+        return isset($this->enums[strtolower($name)]);
+    }
+
+    /**
+     * Lowercase registry keys for JIT enum_exists() runtime compare (#1373).
+     *
+     * @return list<string>
+     */
+    public function allDeclaredEnumLowerNames(): array
+    {
+        return array_keys($this->enums);
+    }
+
     /**
      * Shallow clone: allocate a new object with the same class and copy property slots.
      */
@@ -545,6 +562,39 @@ class Object_ extends Type {
     public function hasMethod(int $classId, string $methodLc): bool
     {
         return isset($this->methodVisibility[$classId][strtolower($methodLc)]);
+    }
+
+    public function hasProperty(int $classId, string $property): bool
+    {
+        $lc = strtolower($property);
+        if (isset($this->staticPropertyGlobals[$classId][$lc])) {
+            return true;
+        }
+        foreach ($this->properties[$classId] ?? [] as $propset) {
+            if (strtolower($propset[1]) === $lc) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Declared instance and static property names for a class (issue #1372).
+     *
+     * @return list<string>
+     */
+    public function declaredPropertyNames(int $classId): array
+    {
+        $names = [];
+        foreach ($this->properties[$classId] ?? [] as $propset) {
+            $names[] = $propset[1];
+        }
+        foreach (array_keys($this->staticPropertyGlobals[$classId] ?? []) as $key) {
+            $names[] = $key;
+        }
+
+        return $names;
     }
 
     public function lookupOperand(Operand $name): int

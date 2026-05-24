@@ -59,6 +59,7 @@ static const char *phpc_builtin_functions[] = {
     "deg2rad",
     "dirname",
     "doubleval",
+    "enum_exists",
     "exp",
     "explode",
     "extract",
