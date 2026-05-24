@@ -417,6 +417,7 @@ require_once __DIR__.'/../../../ext/standard/ucwords.php';
 require_once __DIR__.'/../../../ext/standard/urldecode.php';
 require_once __DIR__.'/../../../ext/standard/urlencode.php';
 require_once __DIR__.'/../../../ext/standard/wordwrap.php';
+require_once __DIR__.'/../../../src/llvm-env.php';
 // src/cli.php + compat shims — deferred (#1467): String_.php JIT link failure when bundled; cli_driver split ready for M4.
 // bin/vm.php — deferred (#1423 M4): entry pulls src/cli.php + vendor/autoload argv driver; bundle vm_run_smoke.php instead.
 
