@@ -17,8 +17,8 @@ final class PhpcRun
     public const EXIT_EMPTY_STDOUT = 2;
 
     /**
-     * @param list<string> $args arguments after "phpc run"
-     * @param list<string> $php    host PHP argv prefix
+     * @param list<string> $args Arguments after "phpc run".
+     * @param list<string> $php Host PHP argv prefix.
      */
     public static function main(array $args, string $repoRoot, array $php): int
     {
@@ -44,7 +44,9 @@ final class PhpcRun
     }
 
     /**
-     * @return list<string> KEY=VAL lines from an env file
+     * KEY=VAL lines from an env file.
+     *
+     * @return list<string>
      */
     public static function loadCgiEnvFile(string $path): array
     {
@@ -102,7 +104,9 @@ final class PhpcRun
     }
 
     /**
-     * @return int process exit code after optional empty-stdout guard
+     * Process exit code after optional empty-stdout guard.
+     *
+     * @return int
      */
     public static function finalizeExit(int $binaryExit, string $stdout, bool $requireNonemptyStdout): int
     {

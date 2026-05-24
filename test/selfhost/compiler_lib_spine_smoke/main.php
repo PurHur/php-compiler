@@ -155,6 +155,7 @@ require_once __DIR__.'/../../../lib/Doctor.php';
 require_once __DIR__.'/../../../lib/Cli/InvokeCwd.php';
 require_once __DIR__.'/../../../lib/Cli/PhpcBuild.php';
 require_once __DIR__.'/../../../lib/Cli/PhpcInit.php';
+require_once __DIR__.'/../../../lib/Cli/PhpcRun.php';
 require_once __DIR__.'/../../../lib/Web/CgiAotDriver.php';
 require_once __DIR__.'/../../../lib/Web/CgiDriver.php';
 require_once __DIR__.'/../../../lib/Web/ProjectDeploy.php';
@@ -276,6 +277,7 @@ require_once __DIR__.'/../../../ext/standard/JitSetcookie.php';
 require_once __DIR__.'/../../../ext/standard/JitSleep.php';
 require_once __DIR__.'/../../../ext/standard/JitTraitExists.php';
 require_once __DIR__.'/../../../ext/standard/Module.php';
+require_once __DIR__.'/../../../ext/standard/abs.php';
 require_once __DIR__.'/../../../ext/types/is_type.php';
 require_once __DIR__.'/../../../ext/types/strlen.php';
 require_once __DIR__.'/../../../ext/types/mb_strlen.php';
@@ -285,10 +287,10 @@ require_once __DIR__.'/../../../src/tokenizer-compat.php';
 require_once __DIR__.'/../../../src/yay-php8-compat.php';
 require_once __DIR__.'/../../../src/macro_functions.php';
 require_once __DIR__.'/../../../src/llvm-env.php';
+require_once __DIR__.'/../../bootstrap-aot/vm_run_smoke.php';
 // lib/Lint/SwitchDetector.php — deferred (#1425): anonymous class breaks php-types AOT lint at current spine size.
-// lib/Cli/PhpcRun.php — deferred (#1423): docblock type parse failure in bundled AOT lint.
 // lib/AOT/ProjectGraph.php — deferred (#1424): bundled AOT lint failure (ManifestValidator deps).
-// bin/vm.php — deferred (#1423): entry script pulls src/cli.php and executes argv (M4/M5).
+// bin/vm.php — deferred (#1423 M4): entry pulls src/cli.php + vendor/autoload argv driver; bundle vm_run_smoke.php instead.
 // src/cli.php — deferred (#1432): entry shim requires vendor/autoload.php and executes argv (M4).
 
 echo "compiler_lib_spine_smoke bundle OK\n";
