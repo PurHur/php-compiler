@@ -1,3 +1,4 @@
+# DISABLED: moved to .circleci-disabled/ — not used until restored to .circleci/config.yml
 version: 2
 
 jobs:
