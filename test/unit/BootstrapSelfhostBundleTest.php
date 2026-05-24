@@ -102,6 +102,30 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/JitUnserialize.php',
         'ext/standard/JitUrlencode.php',
         'ext/standard/JitWordwrap.php',
+        'ext/standard/JitFflush.php',
+        'ext/standard/JitFilePutContents.php',
+        'ext/standard/JitFilemtime.php',
+        'ext/standard/JitFileperms.php',
+        'ext/standard/JitFilesize.php',
+        'ext/standard/JitFiletype.php',
+        'ext/standard/JitFsGlob.php',
+        'ext/standard/JitFtell.php',
+        'ext/standard/JitFwrite.php',
+        'ext/standard/JitMkdir.php',
+        'ext/standard/JitPath.php',
+        'ext/standard/JitPathinfo.php',
+        'ext/standard/JitReadfile.php',
+        'ext/standard/JitReadlink.php',
+        'ext/standard/JitRename.php',
+        'ext/standard/JitRequestBody.php',
+        'ext/standard/JitRmdir.php',
+        'ext/standard/JitShellExec.php',
+        'ext/standard/JitStat.php',
+        'ext/standard/JitStatArray.php',
+        'ext/standard/JitSysGetTempDir.php',
+        'ext/standard/JitTouch.php',
+        'ext/standard/JitUnlink.php',
+        'ext/standard/JitWebParams.php',
         'ext/standard/Module.php',
     ];
 
@@ -124,7 +148,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         $this->assertFileExists($entry);
         $contents = (string) file_get_contents($entry);
         $count = substr_count($contents, 'require_once __DIR__');
-        $this->assertSame(198, $count, '108 compiler_minimal units + 90 M2 spine units');
+        $this->assertSame(222, $count, '108 compiler_minimal units + 114 M2 spine units');
         foreach (self::LIB_SPINE_SMOKE_NEW_UNITS as $unit) {
             $this->assertStringContainsString(
                 "require_once __DIR__.'/../../../{$unit}';",

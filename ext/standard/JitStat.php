@@ -86,7 +86,7 @@ final class JitStat
         return self::pathAccessOk($context, $str, self::ACCESS_X_OK);
     }
 
-    /** @return Value __value__* (string label, or boolean false when lstat fails) */
+    /** @return Value */
     public static function pathFiletypeBoxed(Context $context, Value $str): Value
     {
         $mode = self::loadModeOrFail($context, $str, 'lstat');
@@ -129,7 +129,7 @@ final class JitStat
         return $context->builder->icmp(Builder::INT_EQ, $ret, $zero);
     }
 
-    /** @return Value __value__* (native long size, or boolean false when stat fails) */
+    /** @return Value */
     public static function pathFileSizeBoxed(Context $context, Value $str): Value
     {
         $map = $context->structFieldMap['__string__'];
@@ -174,7 +174,7 @@ final class JitStat
         return $ptr;
     }
 
-    /** @return Value __value__* (native long st_mode, or boolean false when stat fails) */
+    /** @return Value */
     public static function pathFilePermsBoxed(Context $context, Value $str): Value
     {
         $mode = self::loadModeOrFail($context, $str);
@@ -205,7 +205,7 @@ final class JitStat
         return $ptr;
     }
 
-    /** @return Value __value__* (native long mtime, or boolean false when stat fails) */
+    /** @return Value */
     public static function pathFileMtimeBoxed(Context $context, Value $str): Value
     {
         $map = $context->structFieldMap['__string__'];
@@ -295,7 +295,7 @@ final class JitStat
         return $phi;
     }
 
-    /** @return Value i32 mode on success, or i32 -1 on failure */
+    /** @return Value */
     private static function loadModeOrFail(Context $context, Value $str, string $statFn = 'stat'): Value
     {
         $map = $context->structFieldMap['__string__'];

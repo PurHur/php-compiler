@@ -15,7 +15,7 @@ final class JitStatArray
 {
     private static int $seq = 0;
 
-    /** @return Value __value__* (array or boolean false on failure) */
+    /** @return Value */
     public static function invoke(Context $context, Value $pathStr, bool $lstat): Value
     {
         $tag = ($lstat ? 'lstat' : 'stat').(string) ++self::$seq;

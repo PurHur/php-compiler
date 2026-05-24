@@ -11,7 +11,7 @@ use PHPLLVM\Value;
 /** LLVM lowering for fflush() via __compiler_fflush (issue #1189). */
 final class JitFflush
 {
-    /** @return Value i1 — true on success */
+    /** @return Value */
     public static function invoke(Context $context, Value $handleLong): Value
     {
         $ret = $context->builder->call($context->lookupFunction('__compiler_fflush'), $handleLong);

@@ -11,7 +11,7 @@ use PHPLLVM\Value;
 /** LLVM lowering for touch() via __compiler_touch (libc utime). */
 final class JitTouch
 {
-    /** @return Value i1 — true when __compiler_touch returns 1 */
+    /** @return Value */
     public static function invoke(Context $context, Value $pathStr, Value $mtimeLong): Value
     {
         $i32 = $context->getTypeFromString('int32');

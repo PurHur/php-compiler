@@ -11,7 +11,7 @@ use PHPLLVM\Value;
 /** LLVM lowering for unlink() via libc unlink(2). */
 final class JitUnlink
 {
-    /** @return Value i1 — true when unlink(2) returns 0 */
+    /** @return Value */
     public static function invoke(Context $context, Value $pathStr): Value
     {
         $map = $context->structFieldMap['__string__'];
