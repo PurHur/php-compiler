@@ -38,6 +38,12 @@ class Frame {
     /** VM context for nested builtin calls (set when invoking Internal handlers). */
     public ?Context $vmContext = null;
 
+    /** Late-static-bind class for the active call (runtime class name, issue #1231). */
+    public ?string $calledClass = null;
+
+    /** Class used for the pending static call (set by STATICCALL_INIT / initStaticCallable). */
+    public ?string $staticCallClass = null;
+
     public function __construct(?Handler $handler, ?Block $block, ?Frame $parent, Variable ...$scope) {
         $this->handler = $handler;
         $this->block = $block;

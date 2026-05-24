@@ -97,9 +97,11 @@ class JIT {
             $run = array_shift($this->queue);
             $classId = $this->context->scope->classId;
             $className = $this->context->scope->className;
+            $calledClassName = $this->context->scope->calledClassName;
             $this->context->scope = new JIT\Scope();
             $this->context->scope->classId = $classId;
             $this->context->scope->className = $className;
+            $this->context->scope->calledClassName = $calledClassName;
             $this->context->scopeStack = [];
             $this->context->inlineIncludeReturnOperands = [];
             $this->context->coalesceAssignTargets = new \SplObjectStorage();
@@ -1919,7 +1921,8 @@ class JIT {
                     if (!$classOp instanceof Operand\Literal) {
                         throw new \LogicException('Static call class must be a literal');
                     }
-                    $proxyName = strtolower($classOp->value).'::'.strtolower($nameOp->value);
+                    $className = $this->resolveJitStaticScopeClass($block, $classOp);
+                    $proxyName = strtolower($className).'::'.strtolower($nameOp->value);
                     $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
                     $this->context->scope->args = [];
                     break;
@@ -3532,13 +3535,31 @@ class JIT {
         if (!$classOp instanceof Operand\Literal) {
             throw new \LogicException('Class::class requires a literal class name for JIT/AOT');
         }
+
+        return $this->resolveJitStaticScopeClass($block, $classOp);
+    }
+
+    private function resolveJitStaticScopeClass(Block $block, Operand\Literal $classOp): string
+    {
         $lc = strtolower($classOp->value);
-        if ('self' === $lc || 'static' === $lc) {
+        if ('self' === $lc) {
             if (null === $block->func || null === $block->func->class) {
-                throw new \LogicException('static::class used outside of class scope');
+                throw new \LogicException('self:: used outside of class scope');
             }
 
             return $block->func->class->value;
+        }
+        if ('static' === $lc) {
+            if ($this->context->scope->calledClassName !== '') {
+                return $this->context->scope->calledClassName;
+            }
+            if (null !== $block->func && null !== $block->func->class) {
+                return $block->func->class->value;
+            }
+            throw new \LogicException('static:: used outside of class scope');
+        }
+        if ('parent' === $lc) {
+            throw new \LogicException('parent:: is not supported');
         }
 
         return $classOp->value;

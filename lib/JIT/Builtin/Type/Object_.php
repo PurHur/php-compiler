@@ -867,12 +867,25 @@ class Object_ extends Type {
             throw new \LogicException('JIT only supports constant named classes for class const fetch');
         }
         $name = strtolower($classOp->value);
-        if ('self' === $name || 'static' === $name) {
-            if (null === $this->context->scope->className) {
+        if ('self' === $name) {
+            if ('' === $this->context->scope->className) {
                 throw new \LogicException('self:: used outside of class scope');
             }
 
             return $this->lookup($this->context->scope->className);
+        }
+        if ('static' === $name) {
+            $called = $this->context->scope->calledClassName;
+            if ('' !== $called) {
+                return $this->lookup($called);
+            }
+            if ('' !== $this->context->scope->className) {
+                return $this->lookup($this->context->scope->className);
+            }
+            throw new \LogicException('static:: used outside of class scope');
+        }
+        if ('parent' === $name) {
+            throw new \LogicException('parent:: is not supported');
         }
 
         return $this->lookup($classOp->value);

@@ -112,6 +112,14 @@ function syntaxRowDefinitions(): array
             'probe' => 'class A {} echo A::class;',
         ],
         [
+            'id' => 'late_static_binding',
+            'construct' => 'Late static binding `static::method()` / `static::class`',
+            'opcodes' => ['TYPE_STATICCALL_INIT', 'TYPE_CLASS_CONST_FETCH'],
+            'issue' => 1231,
+            'notes' => ['VM called-class propagation; JIT resolves static:: scope; inheritance awaits #101'],
+            'probe' => 'class C { public static function id(): string { return static::class; } } echo C::id();',
+        ],
+        [
             'id' => 'magic_const_class_method',
             'construct' => 'Magic constants `__CLASS__`, `__METHOD__`, `__FUNCTION__`',
             'opcodes' => ['TYPE_CONST_FETCH'],
