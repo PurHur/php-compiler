@@ -120,20 +120,57 @@ final class JitValueBox
 
                 return self::normalizeValuePtr($context, self::pointer($context, $slot));
             }
+            if ('__object__*' === $llvmType) {
+                return self::valuePtrFromObjectParam($context, $var->value);
+            }
 
             return self::normalizeValuePtr($context, self::pointer($context, $var->value));
         }
         $valueTy = $var->value->typeOf();
         if (
             LlvmType::KIND_POINTER === $valueTy->getKind()
-            || '__value__*' === $context->getStringFromType($valueTy)
+            && '__value__' === $context->getStringFromType($valueTy->getElementType())
         ) {
             return self::normalizeValuePtr($context, $var->value);
+        }
+        if ('__object__*' === $context->getStringFromType($valueTy)) {
+            return self::valuePtrFromObjectParam($context, $var->value);
         }
         $slot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__'));
         $context->builder->store($var->value, $slot);
 
         return self::normalizeValuePtr($context, self::pointer($context, $slot));
+    }
+
+    /**
+     * Box a nullable object param ({@see __object__*} at the LLVM edge, {@see Variable::TYPE_VALUE} in JIT).
+     */
+    private static function valuePtrFromObjectParam(Context $context, Value $objPtr): Value
+    {
+        $slot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__'));
+        $destPtr = self::pointer($context, $slot);
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $objPtr,
+            $objPtr->typeOf()->constNull()
+        );
+        $nullBlock = BasicBlockHelper::append($context, 'box_obj_param_null');
+        $objBlock = BasicBlockHelper::append($context, 'box_obj_param_ptr');
+        $done = BasicBlockHelper::append($context, 'box_obj_param_done');
+        $context->builder->branchIf($isNull, $nullBlock, $objBlock);
+        $context->builder->positionAtEnd($nullBlock);
+        $context->builder->call($context->lookupFunction('__value__writeNull'), $destPtr);
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($objBlock);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeObject'),
+            $destPtr,
+            $objPtr
+        );
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($done);
+
+        return self::normalizeValuePtr($context, $destPtr);
     }
 
     public static function writeLong(Context $context, Value $slot, Value $long): void
