@@ -1,5 +1,5 @@
 --TEST--
-array literal spread appends list elements (VM, issue #141)
+array literal spread appends list elements (VM+JIT, #1361 / #141)
 --FILE--
 <?php
 $a = [1, 2];

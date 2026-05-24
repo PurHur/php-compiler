@@ -273,6 +273,14 @@ function syntaxRowDefinitions(): array
             'notes' => ['php-cfg Op\\Type\\Intersection; VM checks object implements each interface at call'],
             'probe' => 'interface A {} interface B {} class C implements A, B {} function f(A&B $x): int { return 1; } f(new C());',
         ],
+        [
+            'id' => 'array_argument_unpack',
+            'construct' => 'Array/argument unpack `...$x`',
+            'opcodes' => ['TYPE_ARRAY_SPREAD', 'TYPE_ARG_SEND', 'TYPE_INIT_ARRAY', 'TYPE_ADD_ARRAY_ELEMENT'],
+            'issue' => 1361,
+            'notes' => ['php-cfg spread.patch (#141); VM HashTable::spreadFrom; JIT HashTableHelper::spreadInto + mergeCallArgEntries'],
+            'probe' => '$a = [1, 2]; $b = [...$a, 3]; function s(...$n) { return count($n); } s(...$a);',
+        ],
     ];
 }
 
@@ -411,6 +419,7 @@ function collectSyntaxPhptCoverage(string $root, array $definitions): array
         'magic_const_line' => '/__LINE__/',
         'goto' => '/\bgoto\s+\w+/',
         'variable_variables' => '/\$\$/',
+        'array_argument_unpack' => '/\.\.\.\s*\$/',
     ];
 
     $scan = [];
