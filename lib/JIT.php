@@ -510,6 +510,9 @@ class JIT {
         if ($this->isM3CompileDriverRealLoweringName($lower)) {
             return false;
         }
+        if ($this->shouldUseSelfHostJitStubs() && str_contains($lower, '\\compiler::')) {
+            return true;
+        }
 
         return str_contains($lower, 'slotindexforvariablename')
             || str_contains($lower, 'splitcfgblockafterstringkeyedarray')
@@ -621,6 +624,7 @@ class JIT {
             || str_contains($lower, '\\web\\responsecontext::')
             || str_contains($lower, '\\web\\devserver::')
             || str_contains($lower, '\\web\\params::')
+            || str_contains($lower, '\\aot\\')
             || str_contains($lower, '\\ext\\standard\\')
             || str_contains($lower, '\\ext\\types\\')
             || str_contains($lower, '\\jit\\varfetchhelper::')
@@ -2152,6 +2156,9 @@ class JIT {
                     }
                     break;
                 case OpCode::TYPE_DECLARE_INTERFACE:
+                    if ($this->shouldUseSelfHostJitStubs()) {
+                        break;
+                    }
                     $nameOp = $block->getOperand($op->arg1);
                     assert($nameOp instanceof Operand\Literal);
                     $this->context->type->object->declareClass($nameOp);

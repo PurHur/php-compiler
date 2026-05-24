@@ -199,8 +199,6 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/stripslashes.php',
         'ext/standard/bin2hex.php',
         'ext/standard/doubleval.php',
-        'ext/standard/is_int.php',
-        'ext/standard/is_string.php',
         'ext/standard/pi.php',
     ];
 
@@ -223,7 +221,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         $this->assertFileExists($entry);
         $contents = (string) file_get_contents($entry);
         $count = substr_count($contents, 'require_once __DIR__');
-                $this->assertSame(301, $count, '108 compiler_minimal units + 193 M2 spine units');
+                $this->assertSame(299, $count, '108 compiler_minimal units + 191 M2 spine units (is_int/is_string via ext/types Module)');
         foreach (self::LIB_SPINE_SMOKE_NEW_UNITS as $unit) {
             $this->assertStringContainsString(
                 "require_once __DIR__.'/../../../{$unit}';",
