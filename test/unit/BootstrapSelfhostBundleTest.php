@@ -174,6 +174,10 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/JitSleep.php',
         'ext/standard/JitTraitExists.php',
         'ext/standard/Module.php',
+        'src/tokenizer-compat.php',
+        'src/yay-php8-compat.php',
+        'src/macro_functions.php',
+        'src/llvm-env.php',
     ];
 
     public static function setUpBeforeClass(): void
@@ -195,7 +199,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         $this->assertFileExists($entry);
         $contents = (string) file_get_contents($entry);
         $count = substr_count($contents, 'require_once __DIR__');
-        $this->assertSame(273, $count, '108 compiler_minimal units + 165 M2 spine units');
+        $this->assertSame(277, $count, '108 compiler_minimal units + 169 M2 spine units');
         foreach (self::LIB_SPINE_SMOKE_NEW_UNITS as $unit) {
             $this->assertStringContainsString(
                 "require_once __DIR__.'/../../../{$unit}';",
