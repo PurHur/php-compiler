@@ -258,18 +258,12 @@ restart:
                     ext\standard\VmExit::terminate($exitArg);
                     break;
                 case OpCode::TYPE_JUMP:
-                    $frame = $op->block1->getFrame(
-                        $this->context,
-                        $frame 
-                    );
+                    $frame = $this->frameForBranch($frame, $op->block1);
                     goto restart;
                 case OpCode::TYPE_JUMPIF:
                     $arg1 = $frame->scope[$op->arg1]->toBool();
-                    if ($arg1) {
-                        $frame = $op->block1->getFrame($this->context, $frame);
-                    } else {
-                        $frame = $op->block2->getFrame($this->context, $frame);
-                    }
+                    $branchTarget = $arg1 ? $op->block1 : $op->block2;
+                    $frame = $this->frameForBranch($frame, $branchTarget);
                     goto restart;
                 case OpCode::TYPE_CASE:
                     $arg1 = $frame->scope[$op->arg1];
@@ -701,6 +695,25 @@ restart:
             goto nextframe;
         }
         return self::SUCCESS;
+    }
+
+    /**
+     * Goto / label back-edges reuse the innermost frame for the target block (#1228).
+     * php-cfg lowers `if (cond) goto L` as JumpIf to the label block; naive getFrame()
+     * nests a new frame per iteration and never terminates on merge blocks.
+     */
+    private function frameForBranch(Frame $frame, Block $target): Frame
+    {
+        if ($target === $frame->block) {
+            while (null !== $frame->parent && $frame->parent->block === $target) {
+                $frame = $frame->parent;
+            }
+            $frame->pos = 0;
+
+            return $frame;
+        }
+
+        return $target->getFrame($this->context, $frame);
     }
 
     protected function raise(string $message, Frame $frame): int

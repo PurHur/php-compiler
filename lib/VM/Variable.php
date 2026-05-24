@@ -635,6 +635,14 @@ restart:
 
             return;
         }
+        $left = $left->resolveIndirect();
+        $right = $right->resolveIndirect();
+        // In-place ops (e.g. $i++ → PLUS($i,$i,1)) alias $this with an operand (#1228).
+        if ($this === $left || $this === $right) {
+            $this->storeNumericOp($opCode, $left->toNumeric(), $right->toNumeric());
+
+            return;
+        }
         $this->reset();
 restart:
         $pair = type_pair($left->type, $right->type);
@@ -664,6 +672,17 @@ restart:
             } else {
                 $this->float($result);
             }
+        }
+    }
+
+    private function storeNumericOp(int $opCode, $left, $right): void
+    {
+        $this->reset();
+        $result = $this->_numericOp($opCode, $left, $right);
+        if (is_int($result)) {
+            $this->int($result);
+        } else {
+            $this->float($result);
         }
     }
 
