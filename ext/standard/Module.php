@@ -249,6 +249,7 @@ class Module extends ModuleAbstract
             new ini_set_(),
             new define_(),
             new defined_(),
+            new debug_backtrace(),
             new class_exists_(),
             new enum_exists_(),
             new interface_exists_(),
