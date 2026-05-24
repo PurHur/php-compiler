@@ -63,6 +63,14 @@ function syntaxRowDefinitions(): array
             'probe' => 'class C { public int $x = 1; } $c = new C(); $k = "x"; echo $c->$k;',
         ],
         [
+            'id' => 'variable_function_call',
+            'construct' => 'Variable function call `$fn()`',
+            'opcodes' => ['TYPE_FUNCCALL_INIT', 'TYPE_FUNCCALL_EXEC_RETURN', 'TYPE_FUNCCALL_EXEC_NORETURN'],
+            'issue' => 56,
+            'notes' => ['VM resolves callee at runtime; JIT when callee name is compile-time string in variable (#56)'],
+            'probe' => '$fn = "strlen"; echo $fn("hi");',
+        ],
+        [
             'id' => 'native_user_class',
             'construct' => 'Native user-class link (`phpc build --project`)',
             'opcodes' => ['TYPE_DECLARE_CLASS', 'TYPE_NEW', 'TYPE_METHODCALL_INIT'],
@@ -133,6 +141,14 @@ function syntaxRowDefinitions(): array
             'opcodes' => ['TYPE_SCRIPT_MAGIC', 'TYPE_INCLUDE'],
             'issue' => 715,
             'notes' => ['Per-site line on TYPE_SCRIPT_MAGIC; include stack for multi-file units'],
+            'probe' => null,
+        ],
+        [
+            'id' => 'literal_include',
+            'construct' => 'Literal `include`/`require` with `__DIR__`',
+            'opcodes' => ['TYPE_INCLUDE'],
+            'issue' => 475,
+            'notes' => ['Compile-time inlining via IncludeHelper; two-file PHPT + MiniWebApp JIT gate (#587)'],
             'probe' => null,
         ],
         [

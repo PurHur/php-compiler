@@ -419,6 +419,16 @@ class Object_ extends Type {
     }
 
     /**
+     * Lowercase registry keys for JIT class_exists() runtime compare (#1214, #1056).
+     *
+     * @return list<string>
+     */
+    public function allDeclaredClassLowerNames(): array
+    {
+        return array_keys($this->classes);
+    }
+
+    /**
      * Shallow clone: allocate a new object with the same class and copy property slots.
      */
     public function cloneObject(PHPLLVM\Value $src): PHPLLVM\Value
