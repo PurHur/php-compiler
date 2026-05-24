@@ -51,7 +51,7 @@ Indicative composite toward a **web-capable, self-hosting** compiler (not line-c
 | **Stdlib** | ~58% | Wave-3 batch ([#1367](https://github.com/PurHur/php-compiler/issues/1367)–[#1379](https://github.com/PurHur/php-compiler/issues/1379)): 12/13 closed; `debug_backtrace` ([#1378](https://github.com/PurHur/php-compiler/issues/1378)) in [#1404](https://github.com/PurHur/php-compiler/pull/1404) |
 | **Web AOT** (build, deploy) | ~65% | Project link ✅; home-route execute ✅; PATH_INFO / layout chain 🚧 |
 | **Reference app** (MiniWebApp) | ~55% | VM ✅; AOT link ✅; AOT execute **partial** |
-| **Self-host** (North Star 2, M0–M5) | ~72% | M0–M1 ✅; M2 spine **419/586**; M3 partial (native run ✅, Zend emit); M4–M5 ⬜ — [self-host-target.md](https://github.com/PurHur/php-compiler/blob/master/docs/self-host-target.md) |
+| **Self-host** (North Star 2, M0–M5) | ~74% | M0–M1 ✅; M2 spine **434/586**; M3 partial (native run ✅, Zend emit); M4–M5 ⬜ — [self-host-target.md](https://github.com/PurHur/php-compiler/blob/master/docs/self-host-target.md) |
 
 **Overall (indicative): ~52%** toward the stated north stars below.
 
@@ -200,7 +200,7 @@ Zend PHP still runs `bin/compile.php` during bootstrap. The output is a **curate
 |-----------|---------|--------|
 | **M0 — Bundled subset runs** | ~109 literal `require_once` units in `test/selfhost/compiler_minimal/main.php` → `build/selfhost` prints `compiler_minimal bundle OK` | ✅ [#557](https://github.com/PurHur/php-compiler/issues/557), [#913](https://github.com/PurHur/php-compiler/issues/913) |
 | **M1 — Compiler-shaped bundle** | Bundled `Compiler.php` AOT lint; compile-smoke native link + AOT echo (`compiler smoke`); driver smoke toward `bin/compile.php` | ✅ [#1025](https://github.com/PurHur/php-compiler/issues/1025), [#1095](https://github.com/PurHur/php-compiler/issues/1095) |
-| **M2 — Lib spine growth** | `compiler_lib_spine_smoke` bundle toward full `bin/vm.php` inventory (**586** files) | 🚧 **419** / 586 units (~72%; [#1056](https://github.com/PurHur/php-compiler/issues/1056), [#1497](https://github.com/PurHur/php-compiler/issues/1497), [#1743](https://github.com/PurHur/php-compiler/issues/1743)) |
+| **M2 — Lib spine growth** | `compiler_lib_spine_smoke` bundle toward full `bin/vm.php` inventory (**586** files) | 🚧 **434** / 586 units (~74%; [#1056](https://github.com/PurHur/php-compiler/issues/1056), [#1497](https://github.com/PurHur/php-compiler/issues/1497)) |
 | **M3 — Native compiles PHP** | Self-hosted bundle links; HelloWorld AOT **runs** natively; **emit still uses Zend** `bin/compile.php` fallback | 🚧 partial ([#1056](https://github.com/PurHur/php-compiler/issues/1056)) |
 | **M4 — Bootstrap loop** | Native toolchain rebuilds the **next** compiler sources (same tree, new revision) | ⬜ |
 | **M5 — Full self-host** | Real `bin/vm.php` / `bin/compile.php` path on full inventory; **no Zend bootstrap** | ⬜ **north star** ([#1056](https://github.com/PurHur/php-compiler/issues/1056)) |
@@ -210,11 +210,11 @@ Zend PHP still runs `bin/compile.php` during bootstrap. The output is a **curate
 | Set | ~Files | Notes |
 |-----|--------|-------|
 | `compiler_minimal` bundle (M0) | **109** | Literal `require_once` closure |
-| `compiler_lib_spine_smoke` (M2) | **419** | vm.php-path lib/ + ext/standard growth bundle |
+| `compiler_lib_spine_smoke` (M2) | **434** | vm.php-path lib/ + ext/standard growth bundle |
 | Top-level `lib/*.php` | **14** | Per-file AOT lint ✅ |
 | Full vm.php inventory | **586** | Phase A inventory (`php script/bootstrap-inventory.php`) |
 
-**M2 → M5 gap:** ~**255** inventory files still outside the honest native bundle; plus native compile driver (`parseAndCompile` emit, [#1402](https://github.com/PurHur/php-compiler/issues/1402)); vendor prelink ([#1416](https://github.com/PurHur/php-compiler/issues/1416)).
+**M2 → M5 gap:** ~**152** inventory files still outside the honest native bundle; plus native compile driver (`parseAndCompile` emit, [#1402](https://github.com/PurHur/php-compiler/issues/1402)); vendor prelink ([#1416](https://github.com/PurHur/php-compiler/issues/1416)).
 
 #### Critical path to “compiler compiles itself”
 
@@ -245,7 +245,7 @@ Details: [self-host-target.md](https://github.com/PurHur/php-compiler/blob/maste
 | Native link + run | `./script/bootstrap-selfhost-link.sh` | ✅ M0 |
 | Compile smoke link | `make bootstrap-selfhost-compile-smoke` | ✅ M1 |
 | Compile smoke AOT echo | `make bootstrap-selfhost-compile-smoke-run` | ✅ M1 |
-| M2 spine native link | `BOOTSTRAP_LIB_SPINE_SMOKE=1 make bootstrap-selfhost-lib-spine-smoke` | ✅ `compiler_lib_spine_smoke bundle OK` (**419** units) |
+| M2 spine native link | `BOOTSTRAP_LIB_SPINE_SMOKE=1 make bootstrap-selfhost-lib-spine-smoke` | ✅ `compiler_lib_spine_smoke bundle OK` (**434** units) |
 | M3 HelloWorld probe | `make bootstrap-selfhost-helloworld` | 🚧 partial — native **run** ✅; emit Zend fallback |
 | Wave gate | `./script/bootstrap-wave-check.sh` | ✅ locally / Docker; GHA workflow disabled |
 | Next includes probe | `php script/bootstrap-selfhost-next-includes.php` | 🚧 bundle growth |
