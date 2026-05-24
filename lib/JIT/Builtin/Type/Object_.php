@@ -704,6 +704,14 @@ class Object_ extends Type {
         $this->classes[$lcname] = $id;
         $this->ensureExternalClassConstants($id, $lcname);
         $this->seedExternalClassProperties($id, $lcname);
+        if ('phpcompiler\vm\context' === $lcname) {
+            $this->defineProperty($id, 'runtime', Variable::TYPE_OBJECT);
+            $this->defineProperty($id, 'errors', Variable::TYPE_OBJECT);
+            $this->defineProperty($id, 'scriptStack', Variable::TYPE_OBJECT);
+        }
+        if ('phpcompiler\runtime' === $lcname) {
+            $this->defineProperty($id, 'vmContext', Variable::TYPE_OBJECT);
+        }
         if ('splobjectstorage' === $lcname) {
             $this->splObjectStorageClassId = $id;
             $this->defineProperty($id, '__spl_ht', Variable::TYPE_HASHTABLE);

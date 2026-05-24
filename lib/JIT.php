@@ -13,6 +13,7 @@
 namespace PHPCompiler;
 
 require_once __DIR__.'/OpCodeNames.php';
+require_once __DIR__.'/JIT/RuntimeInitVmContext.php';
 
 use PHPCfg\Operand;
 use PHPCfg\Op;
@@ -183,6 +184,12 @@ class JIT {
         if (str_ends_with($lower, '\\runtime::loadjit')) {
             return true;
         }
+        if (str_ends_with($lower, '\\runtime::initvmcontext')) {
+            return true;
+        }
+        if (str_ends_with($lower, '\\runtime::loadjit')) {
+            return true;
+        }
         return false;
     }
 
@@ -198,8 +205,11 @@ class JIT {
             '\\runtime::__destruct',
             '\\runtime::initparsepipeline',
             '\\runtime::initcompiler',
-            '\\runtime::initvmcontext',
             '\\runtime::loadcoremodules',
+            '\\runtime::loadjitcontext',
+            '\\runtime::createjit',
+            '\\runtime::jitcontextforloadjit',
+            '\\runtime::loadjitcompilemodulefuncs',
         ];
     }
 
@@ -246,15 +256,6 @@ class JIT {
             if (str_ends_with($m3Spine, '\\runtime::loadjit')) {
                 return $this->compileRuntimeLoadJitM3Native($internalName, $block, $logicalName);
             }
-            if (str_ends_with($m3Spine, '\\runtime::createjit')) {
-                return $this->compileRuntimeCreateJitM3Native($internalName, $block, $logicalName);
-            }
-            if (str_ends_with($m3Spine, '\\runtime::jitcontextforloadjit')) {
-                return $this->compileRuntimeJitContextForLoadJitM3Native($internalName, $block, $logicalName);
-            }
-            if (str_ends_with($m3Spine, '\\runtime::loadjitcompilemodulefuncs')) {
-                return $this->compileRuntimeLoadJitCompileModuleFuncsM3Native($internalName, $block, $logicalName);
-            }
             if (str_ends_with($m3Spine, '\\runtime::__construct')) {
                 return $this->compileRuntimeConstructM3Native($internalName, $block, $logicalName);
             }
@@ -263,6 +264,9 @@ class JIT {
             }
             if (str_ends_with($m3Spine, '\\runtime::initcompiler')) {
                 return $this->compileRuntimeInitCompilerM3Native($internalName, $block, $logicalName);
+            }
+            if (str_ends_with($m3Spine, '\\runtime::initvmcontext')) {
+                return $this->compileRuntimeInitVmContextM3Native($internalName, $block, $logicalName);
             }
             if (str_ends_with($m3Spine, '\\runtime::loadcoremodules')) {
                 return $this->compileRuntimeLoadCoreModulesM3Native($internalName, $block, $logicalName);
@@ -446,37 +450,21 @@ class JIT {
         return $func;
     }
 
-    /** M3 compile-driver Runtime::loadJit (#1495): orchestration + nested createJit helpers. */
+    /**
+     * M3 compile-driver loadJit (#1402): PHP CFG lowering (`new JIT`, nested foreach) segfaults LLVM 9.
+     * Invoked from compileBlock when PHP_COMPILER_M3_COMPILE_DRIVER=1; keep \\runtime::loadjit on deny list
+     * so bootstrap skip stays active until full PHP lowering is safe.
+     */
     private function compileRuntimeLoadJitM3Native(
         string $internalName,
         Block $block,
         string $logicalName
     ): PHPLLVM\Value {
-        return $this->compileRuntimeSpinePhpLowering($internalName, $block, $logicalName);
-    }
-
-    private function compileRuntimeCreateJitM3Native(
-        string $internalName,
-        Block $block,
-        string $logicalName
-    ): PHPLLVM\Value {
-        return $this->compileRuntimeSpinePhpLowering($internalName, $block, $logicalName);
-    }
-
-    private function compileRuntimeJitContextForLoadJitM3Native(
-        string $internalName,
-        Block $block,
-        string $logicalName
-    ): PHPLLVM\Value {
-        return $this->compileRuntimeSpinePhpLowering($internalName, $block, $logicalName);
-    }
-
-    private function compileRuntimeLoadJitCompileModuleFuncsM3Native(
-        string $internalName,
-        Block $block,
-        string $logicalName
-    ): PHPLLVM\Value {
-        return $this->compileRuntimeSpinePhpLowering($internalName, $block, $logicalName);
+        $lcname = strtolower($logicalName);
+        if (isset($this->context->functions[$lcname])) {
+            return $this->context->functions[$lcname];
+        }
+        return $this->compileBlockPhpLowering($internalName, $block, $logicalName, $logicalName);
     }
 
     /** M3 compile-driver Runtime::__construct (#1494): slim ctor + init* helpers via PHP CFG lowering. */
@@ -509,7 +497,36 @@ class JIT {
         Block $block,
         string $logicalName
     ): PHPLLVM\Value {
-        return $this->compileRuntimeSpinePhpLowering($internalName, $block, $logicalName);
+        $lcname = strtolower($logicalName);
+        if (isset($this->context->functions[$lcname])) {
+            return $this->context->functions[$lcname];
+        }
+        $objectPtr = $this->context->getTypeFromString('__object__*');
+        $func = $this->context->module->addFunction(
+            $this->llvmInternalName($internalName),
+            $this->context->context->functionType(
+                $this->context->getTypeFromString('void'),
+                false,
+                $objectPtr
+            )
+        );
+        $bb = $func->appendBasicBlock('entry');
+        $saved = $this->context->builder;
+        $this->context->builder = $this->context->context->builderCreate();
+        $this->context->builder->positionAtEnd($bb);
+        \PHPCompiler\JIT\RuntimeInitVmContext::emit($this->context, $this->context->type->object, $func->getParam(0));
+        $this->context->builder->returnVoid();
+        $this->context->builder->clearInsertionPosition();
+        $this->context->builder = $saved;
+        $this->context->functions[$lcname] = $func;
+        $this->context->functionReturnType[$lcname] = 'void';
+        $this->context->functionProxies[$lcname] = new JIT\Call\Native(
+            $func,
+            $logicalName,
+            [$objectPtr],
+            $this->collectParamDefaults($block)
+        );
+        return $func;
     }
 
     private function compileRuntimeLoadCoreModulesM3Native(
