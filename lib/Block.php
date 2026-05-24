@@ -235,6 +235,24 @@ class Block {
         }
     }
 
+    /** True when this function body contains `global $name` (issue #100). */
+    public function declaresGlobalName(string $name): bool
+    {
+        foreach ($this->opCodes as $op) {
+            if (OpCode::TYPE_DECLARE_GLOBAL !== $op->type) {
+                continue;
+            }
+            if (!isset($this->constants[$op->arg2])) {
+                continue;
+            }
+            if ($this->constants[$op->arg2]->toString() === $name) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public function findSlot(Operand $op, Frame $frame): ?Variable {
         $byName = self::findVariableInParentFrames($op, $frame);
         if (null !== $byName) {
@@ -363,6 +381,12 @@ class Block {
                     $name = self::resolveVariableName($op);
                     if (null !== $name && Superglobals::isSuperglobalName($name)) {
                         $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
+                        continue;
+                    }
+                    if (null !== $name && $this->declaresGlobalName($name)) {
+                        $local = new Variable(Variable::TYPE_NULL);
+                        $local->indirect($context->ensureGlobal($name));
+                        $scope[$pos] = $local;
                         continue;
                     }
                     if ($this->inheritUndefinedLocals) {
