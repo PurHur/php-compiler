@@ -1847,11 +1847,28 @@ class Compiler {
             }
             return $block->registerConstant($operand, $return);
         } elseif ($operand instanceof Operand\Variable) {
+            if ($this->isDynamicVariableOperand($operand)) {
+                $slot = $block->getVarSlot($operand, $isRead);
+                $nameSlot = $this->compileOperand($operand->name, $block, true);
+                $block->addOpCode(new OpCode(
+                    OpCode::TYPE_VAR_FETCH,
+                    $slot,
+                    $nameSlot
+                ));
+
+                return $slot;
+            }
+
             return $block->getVarSlot($operand, $isRead);
         } elseif ($operand instanceof Operand\Temporary) {
             return $block->getVarSlot($operand, $isRead);
         }
         throw new \LogicException("Unknown Operand Type: " . $operand->getType());
+    }
+
+    private function isDynamicVariableOperand(Operand\Variable $operand): bool
+    {
+        return !$operand->name instanceof Operand\Literal;
     }
 
     /**

@@ -262,6 +262,14 @@ class Block {
     }
 
     /**
+     * Resolve a local by runtime name for variable variables (`$$name`, issue #1226).
+     */
+    public function findVariableByRuntimeName(string $name, Frame $frame): ?Variable
+    {
+        return self::findVariableInParentFramesByName($name, $frame);
+    }
+
+    /**
      * Zend include/require: included file shares caller locals by name (issue #471).
      */
     private static function findVariableInParentFrames(Operand $op, Frame $frame): ?Variable
@@ -270,6 +278,12 @@ class Block {
         if (null === $name) {
             return null;
         }
+
+        return self::findVariableInParentFramesByName($name, $frame);
+    }
+
+    private static function findVariableInParentFramesByName(string $name, Frame $frame): ?Variable
+    {
         for ($f = $frame; null !== $f; $f = $f->parent) {
             if ('this' === $name && !empty($f->calledArgs)) {
                 return $f->calledArgs[0];

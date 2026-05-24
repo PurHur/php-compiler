@@ -17,6 +17,7 @@ use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\TypeCheck;
 use PHPCompiler\VM\Variable;
+use PHPCompiler\Web\Superglobals;
 
 class VM {
     const SUCCESS = 1;
@@ -111,6 +112,19 @@ restart:
                     $lhs = $frame->scope[$op->arg1];
                     $rhs = $frame->scope[$op->arg2]->resolveIndirect();
                     $lhs->indirect($rhs);
+                    break;
+                case OpCode::TYPE_VAR_FETCH:
+                    $dest = $frame->scope[$op->arg1];
+                    $name = $frame->scope[$op->arg2]->resolveIndirect()->toString();
+                    if (Superglobals::isSuperglobalName($name)) {
+                        $target = $this->context->ensureGlobal($name);
+                    } else {
+                        $target = $frame->block->findVariableByRuntimeName($name, $frame);
+                        if (null === $target) {
+                            return $this->raise("Undefined variable \${$name}", $frame);
+                        }
+                    }
+                    $dest->indirect($target);
                     break;
                 case OpCode::TYPE_DECLARE_GLOBAL:
                     if (!isset($frame->block->constants[$op->arg2])) {

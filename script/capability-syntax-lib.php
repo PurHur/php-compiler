@@ -175,6 +175,14 @@ function syntaxRowDefinitions(): array
             'notes' => ['php-cfg lowers labels to CFG Jump; VM avoids frame nesting on same-block back-edges'],
             'probe' => '$i = 0; start: $i++; if ($i < 2) { goto start; } echo $i;',
         ],
+        [
+            'id' => 'variable_variables',
+            'construct' => 'Variable variables (`$$name`)',
+            'opcodes' => ['TYPE_VAR_FETCH'],
+            'issue' => 1226,
+            'notes' => ['php-cfg nests Operand\\Variable name; VM resolves runtime local by name'],
+            'probe' => '$a = "x"; $x = 1; echo $$a;',
+        ],
     ];
 }
 
@@ -308,6 +316,7 @@ function collectSyntaxPhptCoverage(string $root, array $definitions): array
         'magic_const_dir_file' => '/__DIR__|__FILE__/',
         'magic_const_line' => '/__LINE__/',
         'goto' => '/\bgoto\s+\w+/',
+        'variable_variables' => '/\$\$/',
     ];
 
     $scan = [];
