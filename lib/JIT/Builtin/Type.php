@@ -263,10 +263,6 @@ class Type extends Builtin {
         );
         $fnPregReplace = $this->context->module->addFunction('__compiler_preg_replace', $fntypePregReplace);
         $this->context->registerFunction('__compiler_preg_replace', $fnPregReplace);
-        $htPtr = $this->context->getTypeFromString('__hashtable__*');
-        $fntypePregSplit = $this->context->context->functionType($htPtr, false, $strPtr, $strPtr);
-        $fnPregSplit = $this->context->module->addFunction('__compiler_preg_split', $fntypePregSplit);
-        $this->context->registerFunction('__compiler_preg_split', $fnPregSplit);
         $fntypePregLastError = $this->context->context->functionType($i64, false);
         $fnPregLastError = $this->context->module->addFunction('__compiler_preg_last_error', $fntypePregLastError);
         $this->context->registerFunction('__compiler_preg_last_error', $fnPregLastError);
@@ -344,6 +340,9 @@ class Type extends Builtin {
         $strPtr = $this->context->getTypeFromString('__string__*');
         $i32 = $this->context->getTypeFromString('int32');
         $htPtr = $this->context->getTypeFromString('__hashtable__*');
+        $fntypePregSplit = $this->context->context->functionType($htPtr, false, $strPtr, $strPtr);
+        $fnPregSplit = $this->context->module->addFunction('__compiler_preg_split', $fntypePregSplit);
+        $this->context->registerFunction('__compiler_preg_split', $fnPregSplit);
         $i8ppPtr = $this->context->getTypeFromString('int8**');
         $i8pppPtr = $this->context->getTypeFromString('int8***');
         $fnPendingReset = $this->context->module->addFunction(
@@ -413,6 +412,11 @@ class Type extends Builtin {
             $this->context->context->functionType($void, false)
         );
         $this->context->registerFunction('__phpc_response_headers_flush', $fnPendingFlush);
+        $fnSetcookieAdd = $this->context->module->addFunction(
+            '__phpc_setcookie_add',
+            $this->context->context->functionType($void, false, $strPtr, $strPtr, $i64, $strPtr, $strPtr, $i32, $i32)
+        );
+        $this->context->registerFunction('__phpc_setcookie_add', $fnSetcookieAdd);
         $fntypeJsonEncode = $this->context->context->functionType(
             $this->context->getTypeFromString('__string__*'),
             false,

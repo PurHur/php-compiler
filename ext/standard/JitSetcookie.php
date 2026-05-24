@@ -8,11 +8,33 @@ use PHPCompiler\JIT\Context;
 use PHPLLVM\Value;
 
 /**
- * LLVM JIT helper for setcookie() — emits Set-Cookie to stdout (CGI-style).
+ * LLVM JIT/AOT helper for setcookie() — pending queue (AOT) or printf fallback (JIT).
  */
 final class JitSetcookie
 {
-    public static function emit(
+    public static function emitPending(
+        Context $context,
+        Value $namePtr,
+        Value $valuePtr,
+        Value $expiresI64,
+        Value $pathPtr,
+        Value $domainPtr,
+        Value $secureI32,
+        Value $httponlyI32
+    ): void {
+        $context->builder->call(
+            $context->lookupFunction('__phpc_setcookie_add'),
+            $namePtr,
+            $valuePtr,
+            $expiresI64,
+            $pathPtr,
+            $domainPtr,
+            $secureI32,
+            $httponlyI32
+        );
+    }
+
+    public static function emitPrintf(
         Context $context,
         Value $namePtr,
         Value $valuePtr,
