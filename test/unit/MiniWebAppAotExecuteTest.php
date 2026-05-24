@@ -100,6 +100,20 @@ final class MiniWebAppAotExecuteTest extends TestCase
         $this->assertStringContainsString('Thank you, PostDev', $out);
     }
 
+    public function testQueryRouteApiStatus(): void
+    {
+        $out = $this->runBinaryWithCgiEnv(MiniWebAppCgiEnv::queryRouteApiStatus());
+        $this->assertStringContainsString('"ok":true', $out);
+        $this->assertStringContainsString('"service":"003-MiniWebApp"', $out);
+    }
+
+    public function testPathInfoApiStatus(): void
+    {
+        $out = $this->runBinaryWithCgiEnv(MiniWebAppCgiEnv::aotPathInfoApiStatus());
+        $this->assertStringContainsString('"ok":true', $out);
+        $this->assertStringContainsString('"service":"003-MiniWebApp"', $out);
+    }
+
     /**
      * @param array<string, string> $cgiEnv
      */
