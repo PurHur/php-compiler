@@ -31,6 +31,11 @@ final class TypeCheck
         }
     }
 
+    public static function assertNeverReturn(): void
+    {
+        throw new \TypeError('A never-returning function must not return');
+    }
+
     private static function coerceTypedSlot(Variable $dest, bool $strict, string $kind, ?int $constraint = null): void
     {
         $target = $dest->resolveIndirect();

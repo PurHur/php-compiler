@@ -1,0 +1,33 @@
+--- vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
+@@ -153,6 +153,11 @@
+         return self::makeCachedType(self::TYPE_NULL);
+     }
+ 
++    public static function never(): self
++    {
++        return self::makeCachedType(self::TYPE_NULL);
++    }
++
+     public static function object(): self
+     {
+         return self::makeCachedType(self::TYPE_OBJECT);
+@@ -295,6 +300,9 @@
+         if ($decl instanceof CfgType\Literal) {
+             return self::fromDecl($decl->name);
+         }
++        if ($decl instanceof CfgType\Never_) {
++            return self::never();
++        }
+         if ($decl instanceof CfgType\Mixed_) {
+             return self::mixed();
+         }
+@@ -363,6 +371,8 @@
+             case 'null':
+             case 'void':
+                 return new self(self::TYPE_NULL);
++            case 'never':
++                return self::never();
+             case 'numeric':
+                 return self::fromDecl('int|float');
+         }

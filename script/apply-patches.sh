@@ -108,6 +108,12 @@ patch_already_applied() {
     php-cfg-spread.patch)
       grep -q 'callArgUnpack' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
       ;;
+    php-cfg-never-type.patch)
+      [[ -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Type/Never_.php" ]]
+      ;;
+    php-types-never-type.patch)
+      grep -q 'function never()' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
+      ;;
     php-types-magic-script-const.patch)
       grep -q 'KIND_LINE === \$op->kind' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
       ;;
@@ -172,6 +178,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-anonymous-class.patch"
   apply_patch "$PATCH_DIR/php-cfg-named-args.patch"
   apply_patch "$PATCH_DIR/php-cfg-spread.patch"
+  apply_patch "$PATCH_DIR/php-cfg-never-type.patch"
 fi
 
 if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
@@ -197,6 +204,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-ns-func-call.patch"
   apply_patch "$PATCH_DIR/php-types-magic-script-const.patch"
   apply_patch "$PATCH_DIR/php-types-first-class-callable.patch"
+  apply_patch "$PATCH_DIR/php-types-never-type.patch"
 fi
 
 if [[ -d "$ROOT/vendor/pre/plugin" ]]; then

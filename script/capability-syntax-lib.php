@@ -257,6 +257,14 @@ function syntaxRowDefinitions(): array
             'notes' => ['php-cfg Expr_FirstClassCallable; VM stores string or [obj, method] array; JIT via compileTimeString'],
             'probe' => '$fn = strlen(...); echo $fn("x");',
         ],
+        [
+            'id' => 'never_return',
+            'construct' => '`never` return type',
+            'opcodes' => ['TYPE_EXIT', 'TYPE_RETURN', 'TYPE_RETURN_VOID'],
+            'issue' => 1358,
+            'notes' => ['php-cfg Op\\Type\\Never_; any `return` in body is a compile error; normal completion via throw/exit'],
+            'probe' => 'function f(): never { exit("x"); } f();',
+        ],
     ];
 }
 
