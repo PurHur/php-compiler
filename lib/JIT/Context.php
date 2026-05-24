@@ -131,7 +131,10 @@ class Context {
     {
         $resolved = $this->resolveRefAliasName($name);
         $this->namedVariableBindings[$resolved] = $var;
-        foreach ($this->scope->variables as $scopeOp => $_) {
+        foreach ($this->scope->variables as $scopeOp) {
+            if (!$scopeOp instanceof Operand) {
+                continue;
+            }
             if ($resolved === OperandName::resolve($scopeOp)) {
                 $this->scope->variables[$scopeOp] = $var;
             }
@@ -697,9 +700,12 @@ class Context {
         if (null !== $name && '' !== $name) {
             $resolved = $this->resolveRefAliasName($name);
             if ($resolved !== $name) {
-                foreach ($this->scope->variables as $scopeOp => $var) {
+                foreach ($this->scope->variables as $scopeOp) {
+                    if (!$scopeOp instanceof Operand) {
+                        continue;
+                    }
                     if ($resolved === OperandName::resolve($scopeOp)) {
-                        return $var;
+                        return $this->scope->variables[$scopeOp];
                     }
                 }
             }

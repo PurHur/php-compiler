@@ -598,10 +598,13 @@ class Compiler {
             $block->paramNames[$paramIdx] = $param->name->value;
         }
         if ($param->declaredType instanceof Op\Type\Literal) {
-            $rawType = Type::fromDecl($param->declaredType->name);
-            $mapped = Variable::mapFromType($rawType);
-            if ($mapped !== Variable::TYPE_UNDEFINED) {
-                $block->paramTypeConstraints[$slot] = $mapped;
+            $declName = strtolower($param->declaredType->name);
+            if ('mixed' !== $declName) {
+                $rawType = Type::fromDecl($param->declaredType->name);
+                $mapped = Variable::mapFromType($rawType);
+                if ($mapped !== Variable::TYPE_UNDEFINED) {
+                    $block->paramTypeConstraints[$slot] = $mapped;
+                }
             }
         }
 

@@ -984,6 +984,12 @@ class JIT {
                         throw new \LogicException('Reference assignment requires named destination variable');
                     }
                     if (null !== $srcName) {
+                        if ($this->context->hasVariableOp($srcOp)) {
+                            $srcVar = $this->context->getVariableFromOp($srcOp);
+                            $this->context->bindVariableByName($destName, $srcVar);
+                            $this->context->setVariableOp($destOp, $srcVar);
+                            break;
+                        }
                         $this->context->refAliasNames[$destName] = $this->context->resolveRefAliasName($srcName);
                         break;
                     }

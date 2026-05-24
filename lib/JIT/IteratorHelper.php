@@ -434,6 +434,16 @@ final class IteratorHelper
         return self::compileValueByRefHashtable($context, $array, $slotKey);
     }
 
+    private static function compileValueByRefNativeArray(Context $context, Variable $array): Variable
+    {
+        $elemType = $array->type & ~Variable::IS_NATIVE_ARRAY;
+        $idx = $context->builder->load(self::indexSlot($context, $array));
+        $zero = $context->getTypeFromString('size_t')->constInt(0, false);
+        $slot = $context->builder->inBoundsGep($array->value, $zero, $idx);
+
+        return new Variable($context, $elemType, Variable::KIND_VARIABLE, $slot);
+    }
+
     private static function compileValueObject(Context $context, Variable $slotKey): Variable
     {
         $slot = JitValueBox::alloc($context);
@@ -459,6 +469,9 @@ final class IteratorHelper
 
     private static function compileValueByRefHashtable(Context $context, Variable $array, Variable $slotKey): Variable
     {
+        if ($slotKey->type & Variable::IS_NATIVE_ARRAY) {
+            return self::compileValueByRefNativeArray($context, $slotKey);
+        }
         $ht = $context->helper->loadValue($array);
         $map = $context->structFieldMap['__hashtable__'];
         $nodeMap = $context->structFieldMap['__strkey_node__'];
