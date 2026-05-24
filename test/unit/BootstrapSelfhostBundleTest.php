@@ -70,19 +70,38 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/JitFunctionExists.php',
         'ext/standard/JitGetcwd.php',
         'ext/standard/JitHash.php',
+        'ext/standard/JitHex2bin.php',
         'ext/standard/JitHtmlspecialchars.php',
         'ext/standard/JitIni.php',
         'ext/standard/JitJsonDecode.php',
         'ext/standard/JitJsonEncode.php',
         'ext/standard/JitJsonLastError.php',
+        'ext/standard/JitNumberFormat.php',
         'ext/standard/JitPregMatch.php',
         'ext/standard/JitRealpath.php',
         'ext/standard/JitSerialize.php',
+        'ext/standard/JitSprintf.php',
+        'ext/standard/JitStrPad.php',
+        'ext/standard/JitStrRepeat.php',
+        'ext/standard/JitStrReplace.php',
+        'ext/standard/JitStrShuffle.php',
+        'ext/standard/JitStrSplit.php',
+        'ext/standard/JitStringConcat.php',
+        'ext/standard/JitStringIndex.php',
+        'ext/standard/JitStripTags.php',
+        'ext/standard/JitStripslashes.php',
+        'ext/standard/JitStrpbrk.php',
+        'ext/standard/JitStrpos.php',
+        'ext/standard/JitStrrchr.php',
+        'ext/standard/JitStrrpos.php',
+        'ext/standard/JitStrstr.php',
+        'ext/standard/JitSubstrCount.php',
         'ext/standard/JitStrtr.php',
         'ext/standard/JitSuperglobalName.php',
         'ext/standard/JitTempnam.php',
         'ext/standard/JitUnserialize.php',
         'ext/standard/JitUrlencode.php',
+        'ext/standard/JitWordwrap.php',
         'ext/standard/Module.php',
     ];
 
@@ -105,7 +124,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         $this->assertFileExists($entry);
         $contents = (string) file_get_contents($entry);
         $count = substr_count($contents, 'require_once __DIR__');
-        $this->assertSame(179, $count, '108 compiler_minimal units + 71 M2 spine units');
+        $this->assertSame(198, $count, '108 compiler_minimal units + 90 M2 spine units');
         foreach (self::LIB_SPINE_SMOKE_NEW_UNITS as $unit) {
             $this->assertStringContainsString(
                 "require_once __DIR__.'/../../../{$unit}';",
