@@ -55,3 +55,4 @@ function run(string $filename, string $code, array $options): void
 }
 
 require_once __DIR__.'/../src/cli.php';
+require_once __DIR__.'/../src/cli_driver.php';
