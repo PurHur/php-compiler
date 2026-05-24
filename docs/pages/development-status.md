@@ -29,14 +29,16 @@ Indicative composite toward a **web-capable, self-hosting** compiler (not line-c
 
 | Area | Progress | Summary |
 |------|----------|---------|
-| **Foundation** (CI, CLI, Docker) | ~88% | `phpc` CLI, local/Docker CI, bootstrap GHA workflow |
-| **Language** (OOP, types, CFG) | ~62% | VM/JIT OOP largely works; gaps in typed arrays, `::class`, some returns |
-| **Stdlib** | ~55% | Large batches of JIT builtins; many functions VM-only |
+| **Foundation** (CI, CLI, Docker) | ~88% | `phpc` CLI, local/Docker CI; GitHub Actions + CircleCI disabled ([#1338](https://github.com/PurHur/php-compiler/pull/1338), [#1340](https://github.com/PurHur/php-compiler/pull/1340)) — see [local-ci-matrix.md](https://github.com/PurHur/php-compiler/blob/master/docs/local-ci-matrix.md) |
+| **Language** (OOP, types, CFG) | ~64% | VM/JIT OOP largely works; `goto` ([#1228](https://github.com/PurHur/php-compiler/issues/1228)) and anonymous classes ([#1233](https://github.com/PurHur/php-compiler/issues/1233)) landed; wave-3 syntax ([#1354](https://github.com/PurHur/php-compiler/issues/1354)–[#1366](https://github.com/PurHur/php-compiler/issues/1366)) still open |
+| **Stdlib** | ~58% | Wave-3 batch ([#1367](https://github.com/PurHur/php-compiler/issues/1367)–[#1379](https://github.com/PurHur/php-compiler/issues/1379)): 12/13 closed; `debug_backtrace` ([#1378](https://github.com/PurHur/php-compiler/issues/1378)) in [#1404](https://github.com/PurHur/php-compiler/pull/1404) |
 | **Web AOT** (build, deploy) | ~65% | Project link ✅; home-route execute ✅; PATH_INFO / layout chain 🚧 |
 | **Reference app** (MiniWebApp) | ~55% | VM ✅; AOT link ✅; AOT execute **partial** |
 | **Self-host bootstrap** | ~47% | M0 ✅ · M1 ✅ · M2 🚧 (157/532 spine) · M3 🚧 partial · M5 ⬜ ([#1056](https://github.com/PurHur/php-compiler/issues/1056)) |
 
-**Overall (indicative): ~47%** toward the stated north stars below.
+**Overall (indicative): ~48%** toward the stated north stars below.
+
+**Roadmap wave 3** ([#1380](https://github.com/PurHur/php-compiler/issues/1380)): tracker in repo [docs/roadmap-wave3.md](https://github.com/PurHur/php-compiler/blob/master/docs/roadmap-wave3.md).
 
 For per-function truth, see the generated [capabilities matrix](https://github.com/PurHur/php-compiler/blob/master/docs/capabilities.md) in the repo.
 
@@ -212,7 +214,7 @@ Zend PHP still runs `bin/compile.php` during bootstrap. The output is a **curate
 | Compile smoke AOT echo | `make bootstrap-selfhost-compile-smoke-run` | ✅ M1 |
 | M2 lib spine smoke link | `make bootstrap-selfhost-lib-spine-smoke` | ✅ **157** units (opt-in `BOOTSTRAP_LIB_SPINE_SMOKE=1`) |
 | M3 HelloWorld probe | `make bootstrap-selfhost-helloworld` | 🚧 partial — native **run** ✅; emit Zend fallback |
-| Wave gate | `./script/bootstrap-wave-check.sh` | ✅ CI / GHA (Docker applies patches) |
+| Wave gate | `./script/bootstrap-wave-check.sh` | ✅ locally / Docker; GHA workflow disabled (see [local-ci-matrix.md](https://github.com/PurHur/php-compiler/blob/master/docs/local-ci-matrix.md)) |
 | Next includes probe | `php script/bootstrap-selfhost-next-includes.php` | 🚧 bundle growth |
 
 #### Verify locally
