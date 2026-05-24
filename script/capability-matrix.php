@@ -74,6 +74,9 @@ function analyzeInternal(PHPCompiler\Func\Internal $fn): array
     if ('array_reduce' === $fn->getName() && preg_match('/callables are deferred/i', $source)) {
         $notes[] = 'callbacks: string user functions VM-only; closures deferred (#1213, #142)';
     }
+    if ('preg_replace_callback' === $fn->getName() && preg_match('/callables are deferred/i', $source)) {
+        $notes[] = 'callbacks: string user functions VM-only; closures deferred (#1177, #142)';
+    }
 
     $jit = false;
     if ($ref->hasMethod('call')) {

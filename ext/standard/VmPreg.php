@@ -74,6 +74,29 @@ final class VmPreg
     }
 
     /**
+     * @param array<int|string, array{0: string, 1: int}|string> $offsetMatches preg_match PREG_OFFSET_CAPTURE
+     *
+     * @return array<int|string, string>
+     */
+    public static function stripMatchOffsets(array $offsetMatches): array
+    {
+        $out = [];
+        foreach ($offsetMatches as $key => $match) {
+            if (\is_array($match) && isset($match[0]) && \is_string($match[0])) {
+                $out[$key] = $match[0];
+            } elseif (\is_string($match)) {
+                $out[$key] = $match;
+            } else {
+                throw new \LogicException(
+                    'preg_replace_callback() internal match shape invalid in this compiler build'
+                );
+            }
+        }
+
+        return $out;
+    }
+
+    /**
      * @return list<string>|false
      */
     public static function pregSplit(string $pattern, string $subject): array|false
