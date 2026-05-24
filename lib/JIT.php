@@ -614,6 +614,13 @@ class JIT {
             || str_contains($lower, '\\web\\cgiaotdriver::')
             || str_contains($lower, '\\web\\cgidriver::')
             || str_contains($lower, '\\web\\projectdeploy::')
+            || str_contains($lower, '\\web\\manifestvalidator::')
+            || str_contains($lower, '\\web\\projectmanifest::')
+            || str_contains($lower, '\\web\\projectautoload::')
+            || str_contains($lower, '\\web\\projectbootstrap::')
+            || str_contains($lower, '\\web\\responsecontext::')
+            || str_contains($lower, '\\web\\devserver::')
+            || str_contains($lower, '\\web\\params::')
             || str_contains($lower, '\\ext\\standard\\jit');
     }
 

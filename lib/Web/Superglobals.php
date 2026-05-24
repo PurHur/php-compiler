@@ -242,7 +242,9 @@ final class Superglobals
      *
      * @param array<string, string> $headers lowercase header name => value
      *
-     * @return array<string, string> CGI env entries (HTTP_* / CONTENT_*)
+     * CGI env entries (HTTP_* / CONTENT_*).
+     *
+     * @return array<string, string>
      */
     public static function applyHttpHeaders(array $headers): array
     {

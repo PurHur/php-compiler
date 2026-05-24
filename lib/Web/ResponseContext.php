@@ -28,7 +28,9 @@ final class ResponseContext
     }
 
     /**
-     * @return bool false when $code is outside 100–599 (PHP semantics)
+     * False when $code is outside 100–599 (PHP semantics).
+     *
+     * @return bool
      */
     public static function setStatus(int $code): bool
     {
@@ -71,14 +73,20 @@ final class ResponseContext
             return;
         }
         $needle = strtolower($name);
-        self::$headers = array_values(array_filter(
-            self::$headers,
-            static function (string $line) use ($needle): bool {
-                $headerName = self::headerNameFromLine($line);
-
-                return null === $headerName || strtolower($headerName) !== $needle;
+        $kept = [];
+        foreach (self::$headers as $line) {
+            if (self::shouldKeepHeaderLine($line, $needle)) {
+                $kept[] = $line;
             }
-        ));
+        }
+        self::$headers = $kept;
+    }
+
+    private static function shouldKeepHeaderLine(string $line, string $needle): bool
+    {
+        $headerName = self::headerNameFromLine($line);
+
+        return null === $headerName || strtolower($headerName) !== $needle;
     }
 
     /**
