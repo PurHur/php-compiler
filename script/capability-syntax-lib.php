@@ -159,6 +159,14 @@ function syntaxRowDefinitions(): array
             'notes' => ['VM + JIT assign null to lvalue slots'],
             'probe' => '$x = 1; unset($x); echo isset($x) ? "set" : "unset";',
         ],
+        [
+            'id' => 'keyed_list_destruct',
+            'construct' => 'Keyed array destructuring (`["a" => $x]`)',
+            'opcodes' => ['TYPE_INIT_ARRAY', 'TYPE_ADD_ARRAY_ELEMENT', 'TYPE_ARRAY_DIM_FETCH', 'TYPE_ASSIGN'],
+            'issue' => 1234,
+            'notes' => ['Skip string-key CFG split for fetch+assign destructuring pairs (#1234)'],
+            'probe' => '["a" => $x, "b" => $y] = ["a" => 1, "b" => 2]; echo $x, $y;',
+        ],
     ];
 }
 
