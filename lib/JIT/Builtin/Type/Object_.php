@@ -889,16 +889,25 @@ class Object_ extends Type {
             && Variable::TYPE_STRING !== $jitType
             && Variable::TYPE_NATIVE_BOOL !== $jitType
             && Variable::TYPE_NATIVE_DOUBLE !== $jitType
+            && Variable::TYPE_VALUE !== $jitType
         ) {
             throw new \LogicException(
-                'JIT static property requires a scalar declared type (int, string, float, bool)'
+                'JIT static property requires a scalar declared type (int, string, float, bool) or boxed value'
             );
         }
         $globalName = 'sp_'.$classId.'_'.$key;
-        if (Variable::TYPE_STRING === $jitType) {
+        if (Variable::TYPE_VALUE === $jitType) {
+            $llvmType = $this->context->getTypeFromString('__value__*');
+            $global = $this->context->module->addGlobal($llvmType, $globalName);
+            $global->setInitializer($llvmType->constNull());
+        } elseif (Variable::TYPE_STRING === $jitType) {
             $llvmType = $this->context->getTypeFromString('__string__*');
             $global = $this->context->module->addGlobal($llvmType, $globalName);
             $global->setInitializer($llvmType->constNull());
+        } elseif (Variable::TYPE_NATIVE_BOOL === $jitType) {
+            $llvmType = $this->context->getTypeFromString('int1');
+            $global = $this->context->module->addGlobal($llvmType, $globalName);
+            $global->setInitializer($this->staticPropertyScalarInitializer($jitType, $default));
         } else {
             $llvmTypeName = Variable::TYPE_NATIVE_DOUBLE === $jitType ? 'double' : 'int64';
             $llvmType = $this->context->getTypeFromString($llvmTypeName);
@@ -911,6 +920,9 @@ class Object_ extends Type {
         ];
         if (Variable::TYPE_STRING === $jitType && null !== $default) {
             $this->initStaticStringPropertyDefault($global, $default);
+        }
+        if (Variable::TYPE_VALUE === $jitType && (null === $default || VMVariable::TYPE_NULL === $default->type)) {
+            $this->initStaticValuePropertyNull($global);
         }
     }
 
@@ -955,6 +967,25 @@ class Object_ extends Type {
         $this->context->builder->positionAtEnd($restore);
     }
 
+    /** Allocate a null {@see __value__} box for untyped static properties (bootstrap JIT helpers). */
+    private function initStaticValuePropertyNull(\PHPLLVM\Value $global): void
+    {
+        $restore = $this->context->builder->getInsertBlock();
+        $this->context->builder->positionAtEnd($this->context->initBlock);
+        $valueType = $this->context->getTypeFromString('__value__');
+        $heapVal = $this->context->memory->malloc($valueType);
+        $heapPtr = $this->context->builder->pointerCast(
+            $heapVal,
+            $this->context->getTypeFromString('__value__*')
+        );
+        $this->context->builder->call(
+            $this->context->lookupFunction('__value__writeNull'),
+            $heapPtr
+        );
+        $this->context->builder->store($heapPtr, $global);
+        $this->context->builder->positionAtEnd($restore);
+    }
+
     public function staticPropertyFetch(int $classId, string $name): Variable
     {
         $key = strtolower($name);
@@ -963,6 +994,18 @@ class Object_ extends Type {
         }
         $entry = $this->staticPropertyGlobals[$classId][$key];
         $loaded = $this->context->builder->load($entry['global']);
+        if (Variable::TYPE_VALUE === $entry['type']) {
+            $var = new Variable(
+                $this->context,
+                Variable::TYPE_VALUE,
+                Variable::KIND_VALUE,
+                $loaded
+            );
+            $var->staticPropertyGlobal = $entry['global'];
+            $var->staticPropertyType = $entry['type'];
+
+            return $var;
+        }
         $var = new Variable(
             $this->context,
             $entry['type'],
@@ -977,6 +1020,11 @@ class Object_ extends Type {
 
     public function staticPropertyStore(\PHPLLVM\Value $global, Variable $value, int $propertyType): void
     {
+        if (Variable::TYPE_VALUE === $propertyType) {
+            $this->staticPropertyStoreValueBox($global, $value);
+
+            return;
+        }
         if (Variable::TYPE_STRING === $propertyType) {
             $stored = $this->context->helper->loadValue($value);
             $this->context->builder->store($stored, $global);
@@ -995,11 +1043,81 @@ class Object_ extends Type {
                 ),
                 JitValueBox::valuePtrFromVariable($this->context, $value)
             );
+            if (Variable::TYPE_NATIVE_BOOL === $propertyType) {
+                $loaded = $this->context->builder->truncOrBitCast(
+                    $loaded,
+                    $this->context->getTypeFromString('int1')
+                );
+            }
             $this->context->builder->store($loaded, $global);
 
             return;
         }
         $this->context->builder->store($this->context->helper->loadValue($value), $global);
+    }
+
+    private function staticPropertyStoreValueBox(\PHPLLVM\Value $global, Variable $value): void
+    {
+        $valueType = $this->context->getTypeFromString('__value__');
+        $valuePtrTy = $this->context->getTypeFromString('__value__*');
+
+        if (Variable::TYPE_VALUE === $value->type) {
+            $ptr = Variable::KIND_VARIABLE === $value->kind
+                ? JitValueBox::pointer($this->context, $value->value)
+                : $value->value;
+            $this->context->builder->store($ptr, $global);
+            $value->addref();
+
+            return;
+        }
+
+        $heapVal = $this->context->memory->malloc($valueType);
+        $heapPtr = $this->context->builder->pointerCast($heapVal, $valuePtrTy);
+        $valueMap = $this->context->structFieldMap['__value__'];
+        $this->context->builder->store(
+            $this->context->getTypeFromString('int8')->constInt(Variable::TYPE_NULL, false),
+            $this->context->builder->structGep($heapVal, $valueMap['type'])
+        );
+
+        if (Variable::TYPE_STRING === $value->type) {
+            $str = $this->context->helper->loadValue($value);
+            $owned = $this->context->builder->call(
+                $this->context->lookupFunction('__string__separate'),
+                $str
+            );
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeString'),
+                $heapPtr,
+                $owned
+            );
+            $value->addref();
+        } elseif (Variable::TYPE_OBJECT === $value->type) {
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeObject'),
+                $heapPtr,
+                $this->context->helper->loadValue($value)
+            );
+            $value->addref();
+        } elseif (Variable::TYPE_NATIVE_LONG === $value->type || Variable::TYPE_NATIVE_BOOL === $value->type) {
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeLong'),
+                $heapPtr,
+                $this->context->helper->loadValue($value)
+            );
+        } elseif (Variable::TYPE_NATIVE_DOUBLE === $value->type) {
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeDouble'),
+                $heapPtr,
+                $this->context->helper->loadValue($value)
+            );
+        } else {
+            throw new \LogicException(
+                'JIT static property boxed store does not support value type '
+                .Variable::getStringType($value->type)
+            );
+        }
+
+        $this->context->builder->store($heapPtr, $global);
     }
 
     public function emitInstanceOf(Variable $expr, string $className): Variable

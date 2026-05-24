@@ -2531,7 +2531,19 @@ class JIT {
                 case OpCode::TYPE_DECLARE_STATIC_PROPERTY:
                     $name = $block->getOperand($op->arg1);
                     assert($name instanceof Operand\Literal);
+                    $className = $this->context->scope->className ?? '';
                     $declaredJitType = Variable::getTypeFromType($block->getOperand($op->arg3)->type);
+                    if (
+                        Variable::TYPE_NATIVE_LONG !== $declaredJitType
+                        && Variable::TYPE_STRING !== $declaredJitType
+                        && Variable::TYPE_NATIVE_BOOL !== $declaredJitType
+                        && Variable::TYPE_NATIVE_DOUBLE !== $declaredJitType
+                    ) {
+                        $declaredJitType = $this->context->type->object->externalPropertyJitType(
+                            $className,
+                            $name->value
+                        );
+                    }
                     $default = (null !== $op->arg2 && isset($block->constants[$op->arg2]))
                         ? $block->constants[$op->arg2]
                         : null;
