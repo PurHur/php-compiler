@@ -74,7 +74,6 @@ final class JitJsonDecode
         );
     }
 
-    /** @return Value __value__* */
     public static function decodeRuntimeString(Context $context, Value $jsonString): Value
     {
         $slot = JitValueBox::alloc($context);

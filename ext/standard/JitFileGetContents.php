@@ -13,7 +13,6 @@ use PHPLLVM\Value;
 /** LLVM lowering for file_get_contents() via {@see \PHPCompiler\JIT\Builtin\StringFileGetContents}. */
 final class JitFileGetContents
 {
-    /** @return Value __value__* holding a string */
     public static function wrapString(Context $context, Value $str): Value
     {
         $slot = JitValueBox::alloc($context);
@@ -27,7 +26,6 @@ final class JitFileGetContents
         return $ptr;
     }
 
-    /** @return Value __value__* (string contents, or boolean false on failure) */
     public static function invoke(Context $context, Value $pathStr): Value
     {
         $contents = $context->builder->call(

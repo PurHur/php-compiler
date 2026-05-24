@@ -16,7 +16,6 @@ final class JitPregMatch
 {
     private static int $blockSerial = 0;
 
-    /** @return Value __value__* (native long 0/1, or boolean false on error) */
     public static function invoke(Context $context, Value $pattern, Value $subject): Value
     {
         StringPregMatch::ensureLinked($context);

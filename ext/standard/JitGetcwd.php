@@ -15,10 +15,6 @@ final class JitGetcwd
 {
     private static int $blockSerial = 0;
 
-    /**
-     * @return Value __string__* canonical cwd, or empty string when resolution fails
-     *              (PHP maps empty to false with strict checks in getcwd_.php wrapper)
-     */
     public static function invoke(Context $context): Value
     {
         $dot = $context->builder->load($context->constantStringFromString('.'));
@@ -26,7 +22,6 @@ final class JitGetcwd
         return JitRealpath::resolve($context, $dot);
     }
 
-    /** @return Value __value__* (string cwd, or boolean false when path is empty) */
     public static function boxed(Context $context, Value $pathStr): Value
     {
         $map = $context->structFieldMap['__string__'];

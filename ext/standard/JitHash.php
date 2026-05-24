@@ -36,7 +36,6 @@ final class JitHash
         ));
     }
 
-    /** @return Value __value__* (string digest or boolean false on failure) */
     private static function digestToValue(Context $context, Value $digest): Value
     {
         $id = (string) (++self::$blockSerial);

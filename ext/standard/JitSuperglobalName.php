@@ -12,7 +12,6 @@ use PHPLLVM\Value;
 /** LLVM lowering for __compiler_is_superglobal_name() (issue #1056). */
 final class JitSuperglobalName
 {
-    /** @return Value __value__* (native long 0/1) */
     public static function invoke(Context $context, Value $name): Value
     {
         StringSuperglobalName::ensureLinked($context);

@@ -313,7 +313,6 @@ final class StringUrldecode
         return $context->builder->truncOrBitCast($combined, $i8);
     }
 
-    /** @return Value int64 nibble 0-15, or -1 when not hex */
     private static function hexNibbleValue(Context $context, Value $ch, $i64, $i8): Value
     {
         $ord = $context->builder->zExt($ch, $i64);

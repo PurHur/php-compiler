@@ -22,8 +22,17 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'lib/Web/CgiAotDriver.php',
         'lib/Web/CgiDriver.php',
         'lib/Web/ProjectDeploy.php',
+        'lib/JIT/Builtin/CallArgv.php',
+        'lib/JIT/Builtin/IniSet.php',
         'lib/JIT/Builtin/SessionId.php',
         'lib/JIT/Builtin/SessionName.php',
+        'lib/JIT/Builtin/StringFunctionExists.php',
+        'lib/JIT/Builtin/StringHttpBuildQuery.php',
+        'lib/JIT/Builtin/StringSerialize.php',
+        'lib/JIT/Builtin/StringSuperglobalName.php',
+        'lib/JIT/Builtin/StringPregMatch.php',
+        'lib/JIT/Builtin/StringUnserialize.php',
+        'lib/JIT/Builtin/StringUrldecode.php',
         'ext/standard/JitAddslashes.php',
         'ext/standard/JitBase64Encode.php',
         'ext/standard/JitBin2hex.php',
@@ -56,11 +65,24 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/JitFputcsv.php',
         'ext/standard/JitFread.php',
         'ext/standard/JitFseek.php',
+        'ext/standard/JitFileGetContents.php',
+        'ext/standard/JitFilter.php',
+        'ext/standard/JitFunctionExists.php',
+        'ext/standard/JitGetcwd.php',
+        'ext/standard/JitHash.php',
         'ext/standard/JitHtmlspecialchars.php',
+        'ext/standard/JitIni.php',
+        'ext/standard/JitJsonDecode.php',
+        'ext/standard/JitJsonEncode.php',
+        'ext/standard/JitJsonLastError.php',
+        'ext/standard/JitPregMatch.php',
         'ext/standard/JitRealpath.php',
         'ext/standard/JitSerialize.php',
         'ext/standard/JitStrtr.php',
+        'ext/standard/JitSuperglobalName.php',
         'ext/standard/JitTempnam.php',
+        'ext/standard/JitUnserialize.php',
+        'ext/standard/JitUrlencode.php',
         'ext/standard/Module.php',
     ];
 
@@ -83,7 +105,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         $this->assertFileExists($entry);
         $contents = (string) file_get_contents($entry);
         $count = substr_count($contents, 'require_once __DIR__');
-        $this->assertSame(157, $count, '108 compiler_minimal units + 49 M2 spine units');
+        $this->assertSame(179, $count, '108 compiler_minimal units + 71 M2 spine units');
         foreach (self::LIB_SPINE_SMOKE_NEW_UNITS as $unit) {
             $this->assertStringContainsString(
                 "require_once __DIR__.'/../../../{$unit}';",

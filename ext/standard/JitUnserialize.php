@@ -23,7 +23,6 @@ final class JitUnserialize
         );
     }
 
-    /** @return Value __value__* */
     public static function decodeRuntimeString(Context $context, Value $payloadString): Value
     {
         $slot = JitValueBox::alloc($context);
