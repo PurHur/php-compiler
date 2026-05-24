@@ -126,6 +126,7 @@ final class SelfHostBuiltinPolicy
         'json_decode' => 'json',
         'json_last_error' => 'json',
         'serialize' => 'json',
+        'unserialize' => 'json',
     ];
 
     /** @var list<string> */
