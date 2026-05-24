@@ -1,0 +1,63 @@
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Operand.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Operand.php
+@@ -24,6 +24,9 @@
+     /** Optional named-argument label from the call site (issue #168). */
+     public $callArgName = null;
+
++    /** Spread/unpack at call site (...$expr) (issue #141). */
++    public $callArgUnpack = false;
++
+     public function getType(): string
+     {
+         return strtr(substr(rtrim(get_class($this), '_'), strlen(__CLASS__) + 1), '\\', '_');
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Array_.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Array_.php
+@@ -21,12 +21,16 @@
+
+     public $byRef;
+
+-    public function __construct(array $keys, array $values, array $byRef, array $attributes = [])
++    /** @var list<bool> parallel to values; true when element is ...$expr (issue #141). */
++    public $unpack;
++
++    public function __construct(array $keys, array $values, array $byRef, array $unpack = [], array $attributes = [])
+     {
+         parent::__construct($attributes);
+         $this->keys = $this->addReadRefs(...$keys);
+         $this->values = $this->addReadRefs(...$values);
+         $this->byRef = $byRef;
++        $this->unpack = $unpack;
+     }
+
+     public function getVariableNames(): array
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
+@@ -881,6 +881,7 @@
+         if (null !== $expr->name) {
+             $op->callArgName = $expr->name->toString();
+         }
++        $op->callArgUnpack = $expr->unpack;
+
+         return $op;
+     }
+@@ -890,6 +891,7 @@
+         $keys = [];
+         $values = [];
+         $byRef = [];
++        $unpack = [];
+         if ($expr->items) {
+             foreach ($expr->items as $item) {
+                 if ($item->key) {
+@@ -899,10 +901,11 @@
+                 }
+                 $values[] = $this->readVariable($this->parseExprNode($item->value));
+                 $byRef[] = $item->byRef;
++                $unpack[] = $item->unpack;
+             }
+         }
+
+-        return new Op\Expr\Array_($keys, $values, $byRef, $this->mapAttributes($expr));
++        return new Op\Expr\Array_($keys, $values, $byRef, $unpack, $this->mapAttributes($expr));
+     }
+
+     protected function parseExpr_ArrayDimFetch(Expr\ArrayDimFetch $expr)

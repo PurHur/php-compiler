@@ -108,6 +108,8 @@ class OpCode {
     const TYPE_DECLARE_STATIC_PROPERTY = 99;
     /** Dynamic variable fetch: `$$name` where arg2 holds the name variable (#1226). */
     const TYPE_VAR_FETCH = 100;
+    /** Append all elements from arg2 array into arg1 array (array literal ...$src, issue #141). */
+    const TYPE_ARRAY_SPREAD = 101;
 
     public int $type;
     public ?int $arg1;

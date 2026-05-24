@@ -736,6 +736,22 @@ final class HashTable {
         return $this->addOrUpdate($this->nextFreeElement, null, $data, self::ADD | self::ADD_NEXT);
     }
 
+    /**
+     * Array-literal spread: int keys append; string keys preserve key (issue #141).
+     */
+    public function spreadFrom(HashTable $source): void
+    {
+        foreach ($source->iterateKeyed(true) as [$key, $value]) {
+            $copy = new Variable();
+            $copy->copyFrom($value);
+            if ($key->is(Variable::TYPE_INTEGER)) {
+                $this->append($copy);
+            } else {
+                $this->add($key->toString(), $copy);
+            }
+        }
+    }
+
     public function addIndex(int $index, Variable $data): ?Variable {
         return $this->addOrUpdate($index, null, $data, self::ADD);
     }
