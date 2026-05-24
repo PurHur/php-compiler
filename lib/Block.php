@@ -365,13 +365,9 @@ class Block {
             }
         }
 
-        // CFG merge blocks (?:, if/else join) can use sparse slot indices; variadic spread reindexes (#137).
-        if ($cfgMerge) {
-            $return = new Frame(null, $this, $frame);
-            $return->scope = $scope;
-        } else {
-            $return = new Frame(null, $this, $frame, ...$scope);
-        }
+        // Sparse slot indices must preserve keys; variadic spread reindexes (#137).
+        $return = new Frame(null, $this, $frame);
+        $return->scope = $scope;
         $return->scriptPath = $this->scriptPath();
         if (!is_null($frame) && !is_null($frame->returnVar)) {
             $return->returnVar = $frame->returnVar;
