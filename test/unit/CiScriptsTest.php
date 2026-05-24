@@ -220,6 +220,34 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('BOOTSTRAP_SELFHOST_PROBE_UPDATE', $common);
     }
 
+    public function testCiLocalHonorsBootstrapLoopProbeGate(): void
+    {
+        $local = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-local.sh');
+        $this->assertStringContainsString('ci_run_bootstrap_loop_probe', $local);
+
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('BOOTSTRAP_LOOP_PROBE_GATE', $common);
+        $this->assertStringContainsString('BOOTSTRAP_LOOP_PROBE_GATE:-0', $common);
+        $this->assertStringContainsString('bootstrap-loop-probe.sh', $common);
+        $this->assertStringContainsString('--dry-run', $common);
+
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString(
+            'BOOTSTRAP_LOOP_PROBE_GATE="${BOOTSTRAP_LOOP_PROBE_GATE:-0}"',
+            $defaults
+        );
+    }
+
+    public function testLocalCiMatrixDocumentsBootstrapLoopProbeGate(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('BOOTSTRAP_LOOP_PROBE_GATE', $doc);
+        $this->assertStringContainsString('bootstrap-loop-probe.sh --dry-run', $doc);
+
+        $docSelfhost = (string) file_get_contents(dirname(__DIR__, 2).'/docs/bootstrap-selfhost.md');
+        $this->assertStringContainsString('BOOTSTRAP_LOOP_PROBE_GATE=1', $docSelfhost);
+    }
+
     public function testCiLocalHonorsBootstrapWaveCheckGate(): void
     {
         $local = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-local.sh');
