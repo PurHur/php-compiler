@@ -137,6 +137,7 @@ static const char *phpc_builtin_functions[] = {
     "json_encode",
     "json_last_error",
     "serialize",
+    "unserialize",
     "lcfirst",
     "log",
     "lstat",
@@ -240,4 +241,4 @@ static const char *phpc_builtin_functions[] = {
     "web_string",
     "wordwrap",
 };
-static const size_t phpc_builtin_functions_count = 231;
+static const size_t phpc_builtin_functions_count = 232;

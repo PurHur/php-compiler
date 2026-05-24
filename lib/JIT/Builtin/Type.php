@@ -425,6 +425,11 @@ class Type extends Builtin {
             $this->context->context->functionType($void, false, $strPtr, $valuePtr)
         );
         $this->context->registerFunction('__compiler_json_decode', $fnJsonDecode);
+        $fnUnserialize = $this->context->module->addFunction(
+            '__compiler_unserialize',
+            $this->context->context->functionType($i64, false, $strPtr, $valuePtr)
+        );
+        $this->context->registerFunction('__compiler_unserialize', $fnUnserialize);
         $fntypeJsonLastError = $this->context->context->functionType($i64, false);
         $fnJsonLastError = $this->context->module->addFunction('__compiler_json_last_error', $fntypeJsonLastError);
         $this->context->registerFunction('__compiler_json_last_error', $fnJsonLastError);
