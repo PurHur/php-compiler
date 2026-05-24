@@ -21,7 +21,7 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | **Compiler in PHP** | Front/middle/back end stay in `lib/`, `ext/` — not rewritten in C |
 | **No `vendor/` at cold boot** | Parser/types/LLVM FFI prelinked once ([#1416](https://github.com/PurHur/php-compiler/issues/1416)); see [`bootstrap-vendor-inventory.md`](bootstrap-vendor-inventory.md) |
 | **No Zend bootstrap** | `bin/compile.php` / `bin/vm.php` run as **compiled** code, not `php bin/compile.php` |
-| **Full inventory** | Honest bundle covers the `bin/vm.php` path (~**569** files; [`bootstrap-inventory.md`](bootstrap-inventory.md)) |
+| **Full inventory** | Honest bundle covers the `bin/vm.php` path (~**586** files; [`bootstrap-inventory.md`](bootstrap-inventory.md)) |
 | **Stub surface minimal** | `PHP_COMPILER_SELFHOST_AOT` stubs shrink; compiler behavior is real, not link-only |
 | **Small native floor OK** | `lib/AOT/runtime/*.c` + external `clang` via `lib/AOT/Linker.php` — **not** required to disappear |
 
@@ -34,8 +34,8 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | Layer | Today | Target |
 |-------|-------|--------|
 | **Bootstrap driver** | Zend runs `php bin/compile.php` | Compiled `bin/compile.php` |
-| **Bundle size** | **358** curated `require_once` in spine smoke (108 minimal overlap + **250** M2-only) | ~**584** inventory files |
-| **Inventory coverage** | **~61%** of vm.php path in spine smoke | **100%** |
+| **Bundle size** | **358** curated `require_once` in spine smoke (108 minimal overlap + **250** M2-only) | **586** inventory files |
+| **Inventory coverage** | **~61%** of vm.php path in spine smoke (**358/586**) | **100%** |
 | **HelloWorld** | Native **run** ✅; **emit** still Zend fallback | Native compile + emit |
 | **Bootstrap loop (M4)** | Not started | Native rebuilds next compiler revision |
 | **Vendor** | `composer install` + patches on host | Prelinked artifacts only |
@@ -50,7 +50,7 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | M3 `make bootstrap-selfhost-helloworld` | 🚧 partial — HelloWorld runs natively; emit uses Zend |
 | M4 `make bootstrap-loop-probe` | 🚧 ladder — `--dry-run` validates lint+M2+M3 partial; full exits **2** until M3 strict ([#1498](https://github.com/PurHur/php-compiler/issues/1498)) |
 | `make bootstrap-aot-link` | ✅ **71/71** |
-| `php script/bootstrap-inventory.php --check` | ✅ **569** files, **0** source blockers |
+| `php script/bootstrap-inventory.php --check` | ✅ **586** files, **0** source blockers |
 
 ---
 
@@ -60,12 +60,22 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 |-----------|----------------|--------|-----|
 | **M0** | AOT can link a **small** honest `lib/` subset | ✅ | 100% |
 | **M1** | Bundle is **compiler-shaped** (lint + compile-smoke) | ✅ | 100% |
-| **M2** | Spine grows toward full `bin/vm.php` inventory | 🚧 **358/584** units | **~61%** |
+| **M2** | Spine grows toward full `bin/vm.php` inventory | 🚧 **358/586** units | **~61%** |
 | **M3** | Self-host binary **compiles external PHP** (HelloWorld) without Zend emit | 🚧 partial | **~45%** |
 | **M4** | Self-host binary **rebuilds** the next compiler tree | ⬜ | 0% |
 | **M5** | Full self-host; Zend retired from loop | ⬜ north star | 0% |
 
-**Indicative North Star 2 composite:** **~54%** (weighted across M0–M5).
+**Indicative North Star 2 composite:** **~54%** (weighted across M0–M5; see formula below).
+
+### North Star 2 % (single formula)
+
+| Indicator | Formula | May 2026 |
+|-----------|---------|----------|
+| **M2 spine progress** | `require_once` units in `compiler_lib_spine_smoke` ÷ Phase A inventory file count | **358 / 586 ≈ 61%** |
+| **Public “Self-host” row** | Same M2 ratio until M3–M5 gates add weight ([`development-status.md`](pages/development-status.md)) | **~61%** |
+| **Composite (internal)** | Milestone weights in table above (M0–M1 = 100%, M2 = spine %, M3–M5 = gate %) | **~54%** |
+
+Regenerate inventory: `php script/bootstrap-inventory.php` · spine count: `grep -c '^require_once' test/selfhost/compiler_lib_spine_smoke/main.php`
 
 ---
 
@@ -99,7 +109,7 @@ Work that moves “more compiler logic into compiled PHP” fastest:
 
 ## What we already did (M2 wave, May 2026)
 
-Parallel batches ([#1419](https://github.com/PurHur/php-compiler/issues/1419)) grew the spine **179 → 299** units and closed deferred spine issues:
+Parallel batches ([#1419](https://github.com/PurHur/php-compiler/issues/1419), [#1497](https://github.com/PurHur/php-compiler/issues/1497)) grew the spine **179 → 358** units and closed deferred spine issues:
 
 | Area | Highlights |
 |------|------------|
