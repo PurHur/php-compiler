@@ -18,6 +18,12 @@ final class JitStringArg
     /** @return Value */
     public static function lower(Context $context, Variable $arg, string $contextLabel = 'argument'): Value
     {
+        if (Variable::TYPE_VALUE === $arg->type) {
+            return $context->builder->call(
+                $context->lookupFunction('__value__readString'),
+                JitValueBox::valuePtrFromVariable($context, $arg)
+            );
+        }
         $literal = self::compileTimeLiteral($arg);
         if (null !== $literal) {
             if (Variable::TYPE_STRING === $arg->type && Variable::KIND_VALUE === $arg->kind) {
