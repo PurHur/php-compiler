@@ -46,6 +46,7 @@ Tracking issues: [#58](https://github.com/PurHur/php-compiler/issues/58), [#145]
 | `__serialize` / `__unserialize` magic methods | no | no | yes | [#1365](https://github.com/PurHur/php-compiler/issues/1365) | serialize()/unserialize() call __serialize/__unserialize when present; VM via VmSerialize |
 | Multi-type catch `catch (A|B $e)` | yes | yes | yes | [#1362](https://github.com/PurHur/php-compiler/issues/1362) | php-cfg records union types per catch; VM filters TYPE_CATCH via OpCode.catchTypes; compliance PHPT |
 | readonly classes | yes | yes | yes | [#1360](https://github.com/PurHur/php-compiler/issues/1360) | php-cfg Class_::flags MODIFIER_READONLY; VM rejects instance property writes after __construct |
+| WeakReference / WeakMap | yes | no | yes | [#1366](https://github.com/PurHur/php-compiler/issues/1366) | VM stub: WeakReference::create/get via indirect target slot (unset clears get); not cycle-collecting GC weak refs; WeakMap uses object-id string keys; JIT may compile references but method bodies are VM-only; VM-only lowering |
 
 _Syntax AOT column reflects `Runtime::MODE_AOT` compile probes unless a row pins AOT (e.g. native user-class link)._
 ## Web north-star (`examples/003-MiniWebApp`)
