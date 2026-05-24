@@ -19,6 +19,8 @@ class ClassEntry {
     const PROP_PURPOSE_DEBUG = 1;
 
     public string $name;
+    /** Parent class name (lowercase) for single inheritance (#101, #1231). */
+    public ?string $parentLc = null;
     public ?Func\PHP $constructor = null;
     public array $properties = [];
     /** @var array<string, Func\PHP> method name (lowercase) => callable */

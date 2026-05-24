@@ -35,6 +35,7 @@ Tracking issues: [#58](https://github.com/PurHur/php-compiler/issues/58), [#145]
 | Variable function calls (`$fn()`) | yes | yes | yes | [#56](https://github.com/PurHur/php-compiler/issues/56) | VM resolves callee at runtime; compiler folds literal assignment; JIT compile-time string |
 | Invokable objects (`$obj()` / `__invoke`) | yes | yes | yes | [#1232](https://github.com/PurHur/php-compiler/issues/1232) | Object-typed FuncCall lowered to __invoke method dispatch; VM runtime fallback |
 | First-class callable syntax (`foo(...)`, `Class::m(...)`) | yes | partial | yes | [#1230](https://github.com/PurHur/php-compiler/issues/1230) | php-cfg Expr_FirstClassCallable; VM string or [obj, method] array; JIT compileTimeString for function/static |
+| Late static binding (`static::method()`, `static::class`) | yes | partial | yes | [#1231](https://github.com/PurHur/php-compiler/issues/1231) | Runtime called class in VM; single inheritance; JIT uses declaring class (partial) |
 
 _Syntax AOT column reflects `Runtime::MODE_AOT` compile probes unless a row pins AOT (e.g. native user-class link)._
 ## Web north-star (`examples/003-MiniWebApp`)

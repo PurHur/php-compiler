@@ -31,6 +31,8 @@ class Object_ extends Type {
     private array $propNameMap = [];
     /** @var array<int, array<string, int>> class id => method lc => visibility flags */
     private array $methodVisibility = [];
+    /** @var array<int, array<string, true>> methods compiled on this class (not inherited) */
+    private array $definedMethods = [];
     /** @var array<int, true> class ids with a compiled __construct body */
     private array $hasConstructor = [];
     /** @var array<int, array<string, array{type: int, value: int|float|bool|string|null}>> */
@@ -44,6 +46,9 @@ class Object_ extends Type {
     private array $staticPropertyGlobals = [];
 
     private ?int $splObjectStorageClassId = null;
+
+    /** @var array<int, int> class id => parent class id */
+    private array $parentClassId = [];
 
     public function register(): void
     {
@@ -394,6 +399,72 @@ class Object_ extends Type {
         return $this->classes[strtolower($name->value)] = $id;
     }
 
+    public function setParentClass(int $classId, int $parentId): void
+    {
+        $this->parentClassId[$classId] = $parentId;
+    }
+
+  /**
+     * Copy parent methods/constants/static property slots into a child class (#101, #1231).
+     */
+    public function inheritFromParent(int $classId, int $parentId): void
+    {
+        if (isset($this->classConstants[$parentId])) {
+            foreach ($this->classConstants[$parentId] as $name => $value) {
+                if (!isset($this->classConstants[$classId][$name])) {
+                    $this->classConstants[$classId][$name] = $value;
+                }
+            }
+        }
+        if (isset($this->staticPropertyGlobals[$parentId])) {
+            foreach ($this->staticPropertyGlobals[$parentId] as $name => $entry) {
+                if (!isset($this->staticPropertyGlobals[$classId][$name])) {
+                    $this->staticPropertyGlobals[$classId][$name] = $entry;
+                }
+            }
+        }
+        if (isset($this->properties[$parentId])) {
+            foreach ($this->properties[$parentId] as $idx => $type) {
+                if (!isset($this->properties[$classId][$idx])) {
+                    $this->properties[$classId][$idx] = $type;
+                }
+            }
+        }
+        if (!isset($this->hasConstructor[$classId]) && isset($this->hasConstructor[$parentId])) {
+            $this->hasConstructor[$classId] = true;
+        }
+    }
+
+    /**
+     * @return array{0: string, 1: string} declaring class name and method lc
+     */
+    public function resolveStaticMethod(string $calledClass, string $methodLc): array
+    {
+        $lcClass = strtolower($calledClass);
+        $methodLc = strtolower($methodLc);
+        $visited = [];
+        while (!isset($visited[$lcClass])) {
+            $visited[$lcClass] = true;
+            if (!isset($this->classes[$lcClass])) {
+                break;
+            }
+            $classId = $this->classes[$lcClass];
+            if (isset($this->definedMethods[$classId][$methodLc])) {
+                return [$this->classIdToName[$classId] ?? $calledClass, $methodLc];
+            }
+            if (!isset($this->parentClassId[$classId])) {
+                break;
+            }
+            $parentId = $this->parentClassId[$classId];
+            $lcClass = strtolower($this->classIdToName[$parentId] ?? '');
+            if ('' === $lcClass) {
+                break;
+            }
+        }
+
+        throw new \LogicException("Call to undefined static method {$calledClass}::{$methodLc}()");
+    }
+
     public function hasDeclaredClass(string $name): bool
     {
         return isset($this->classes[strtolower($name)]);
@@ -540,6 +611,11 @@ class Object_ extends Type {
         }
 
         return $this->classIdToName[$id];
+    }
+
+    public function parentClassId(int $classId): ?int
+    {
+        return $this->parentClassId[$classId] ?? null;
     }
 
     public function hasMethod(int $classId, string $methodLc): bool
@@ -804,7 +880,9 @@ class Object_ extends Type {
 
     public function defineMethodVisibility(int $classId, string $methodLc, int $visibilityFlags): void
     {
-        $this->methodVisibility[$classId][strtolower($methodLc)] = $visibilityFlags;
+        $key = strtolower($methodLc);
+        $this->methodVisibility[$classId][$key] = $visibilityFlags;
+        $this->definedMethods[$classId][$key] = true;
     }
 
     public function methodVisibility(int $classId, string $methodLc): int
@@ -873,6 +951,18 @@ class Object_ extends Type {
             }
 
             return $this->lookup($this->context->scope->className);
+        }
+        if ('parent' === $name) {
+            if ('' === $this->context->scope->className) {
+                throw new \LogicException('parent:: used outside of class scope');
+            }
+            $classId = $this->lookup($this->context->scope->className);
+            if (!isset($this->parentClassId[$classId])) {
+                throw new \LogicException('parent:: used when class has no parent');
+            }
+            $parentId = $this->parentClassId[$classId];
+
+            return $parentId;
         }
 
         return $this->lookup($classOp->value);

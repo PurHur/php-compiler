@@ -1984,6 +1984,13 @@ class JIT {
                     $this->context->pushScope();
                     $this->context->scope->classId = $this->context->type->object->declareClass($nameOp);
                     $this->context->scope->className = strtolower($nameOp->value);
+                    if (null !== $op->arg2) {
+                        $parentOp = $block->getOperand($op->arg2);
+                        assert($parentOp instanceof Operand\Literal);
+                        $parentId = $this->context->type->object->lookup($parentOp->value);
+                        $this->context->type->object->setParentClass($this->context->scope->classId, $parentId);
+                        $this->context->type->object->inheritFromParent($this->context->scope->classId, $parentId);
+                    }
                     $this->compileClass($op->block1, $this->context->scope->classId);
                     $this->context->popScope();
                     break;

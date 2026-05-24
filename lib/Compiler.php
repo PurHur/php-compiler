@@ -488,14 +488,18 @@ class Compiler {
         $type = 0;
         if ($class instanceof Op\Stmt\Class_) {
             $type = OpCode::TYPE_DECLARE_CLASS;
-            assert(null === $class->extends);
             assert(empty($class->implements));
         } else {
             throw new \LogicException('Unsupported class type: ' . get_class($class));
         }
+        $parentSlot = null;
+        if ($class instanceof Op\Stmt\Class_ && null !== $class->extends) {
+            $parentSlot = $this->compileOperand($class->extends, $block, true);
+        }
         $return = new OpCode(
             $type,
-            $this->compileOperand($class->name, $block, true)
+            $this->compileOperand($class->name, $block, true),
+            $parentSlot
         );
         $return->block1 = $this->compileClassBody($class->stmts, $type);
         return $return;

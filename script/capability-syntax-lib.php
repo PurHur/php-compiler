@@ -231,6 +231,14 @@ function syntaxRowDefinitions(): array
             'notes' => ['php-cfg Expr_FirstClassCallable; VM stores string or [obj, method] array; JIT via compileTimeString'],
             'probe' => '$fn = strlen(...); echo $fn("x");',
         ],
+        [
+            'id' => 'late_static_binding',
+            'construct' => 'Late static binding (`static::method()`, `static::class`)',
+            'opcodes' => ['TYPE_STATICCALL_INIT', 'TYPE_CLASS_CONST_FETCH', 'TYPE_DECLARE_CLASS'],
+            'issue' => 1231,
+            'notes' => ['Runtime called class in VM; single inheritance; JIT uses declaring class (partial)'],
+            'probe' => 'class B { public static function id(): string { return static::class; } } class C extends B {} echo C::id();',
+        ],
     ];
 }
 

@@ -304,12 +304,10 @@ restart:
                     break;
                 case OpCode::TYPE_CLASS_CONST_FETCH:
                     $className = $frame->scope[$op->arg2]->toString();
-                    $lcClass = strtolower($className);
-                    if ('self' === $lcClass || 'static' === $lcClass) {
-                        if (null === $frame->block->func || null === $frame->block->func->class) {
-                            return $this->raise('self:: used outside of class scope', $frame);
-                        }
-                        $lcClass = strtolower($frame->block->func->class->name);
+                    try {
+                        $lcClass = $this->resolveClassScopeReference($className, $frame);
+                    } catch (\LogicException $e) {
+                        return $this->raise($e->getMessage(), $frame);
                     }
                     if (!isset($this->context->classes[$lcClass])) {
                         return $this->raise("Unknown class for constant fetch: {$className}", $frame);
@@ -335,10 +333,14 @@ restart:
                     $frame->scope[$op->arg1]->bool($matches);
                     break;
                 case OpCode::TYPE_STATIC_PROPERTY_FETCH:
-                    $lcClass = $this->resolveStaticClassName(
-                        $frame->scope[$op->arg2]->toString(),
-                        $frame
-                    );
+                    try {
+                        $lcClass = $this->resolveClassScopeReference(
+                            $frame->scope[$op->arg2]->toString(),
+                            $frame
+                        );
+                    } catch (\LogicException $e) {
+                        return $this->raise($e->getMessage(), $frame);
+                    }
                     if (!isset($this->context->classes[$lcClass])) {
                         $classLabel = $frame->scope[$op->arg2]->toString();
                         return $this->raise("Unknown class for static property fetch: {$classLabel}", $frame);
@@ -431,6 +433,15 @@ restart:
                     $frame->callArgs = [];
                     $frame->callArgEntries = [];
                     break;
+                case OpCode::TYPE_STATICCALL_INIT:
+                    $className = $frame->scope[$op->arg1]->toString();
+                    $methodName = $frame->scope[$op->arg2]->toString();
+                    try {
+                        $this->initStaticCallableByParts($frame, $className, $methodName);
+                    } catch (\LogicException $e) {
+                        return $this->raise($e->getMessage(), $frame);
+                    }
+                    break;
                 case OpCode::TYPE_METHODCALL_INIT:
                     $receiver = $frame->scope[$op->arg1]->resolveIndirect();
                     if ($receiver->type !== Variable::TYPE_OBJECT) {
@@ -471,6 +482,10 @@ restart:
                         break;
                     }
                     $new = $frame->call->getFrame($this->context, $frame);
+                    if (null !== $frame->pendingCalledClassLc) {
+                        $new->calledClassLc = $frame->pendingCalledClassLc;
+                        $frame->pendingCalledClassLc = null;
+                    }
                     if ($op->type === OpCode::TYPE_FUNCCALL_EXEC_RETURN) {
                         $new->returnVar = $frame->scope[$op->arg1];
                     }
@@ -533,7 +548,18 @@ restart:
                         throw new \LogicException("Duplicate class definition for $name");
                     }
                     $classEntry = new ClassEntry($name);
+                    if (null !== $op->arg2) {
+                        $parentName = $frame->scope[$op->arg2]->toString();
+                        $parentLc = strtolower($parentName);
+                        if (!isset($this->context->classes[$parentLc])) {
+                            throw new \LogicException("Class {$name} extends unknown class {$parentName}");
+                        }
+                        $classEntry->parentLc = $parentLc;
+                    }
                     self::defineClass($classEntry, $op->block1);
+                    if (null !== $classEntry->parentLc) {
+                        $this->inheritFromParent($classEntry);
+                    }
                     $this->context->classes[$lcname] = $classEntry;
                     break;
                 case OpCode::TYPE_NEW:
@@ -812,18 +838,130 @@ restart:
         return [[], null];
     }
 
-    protected function resolveStaticClassName(string $className, Frame $frame): string
+    protected function resolveClassScopeReference(string $className, Frame $frame): string
     {
         $lcClass = strtolower($className);
-        if ('self' === $lcClass || 'static' === $lcClass) {
-            if (null === $frame->block->func || null === $frame->block->func->class) {
-                throw new \LogicException('self:: used outside of class scope');
+        if ('self' === $lcClass) {
+            return $this->declaringClassLc($frame);
+        }
+        if ('static' === $lcClass) {
+            return $frame->calledClassLc ?? $this->declaringClassLc($frame);
+        }
+        if ('parent' === $lcClass) {
+            $declaring = $this->declaringClassLc($frame);
+            if (!isset($this->context->classes[$declaring])) {
+                throw new \LogicException('parent:: used outside of class scope');
+            }
+            $parentLc = $this->context->classes[$declaring]->parentLc;
+            if (null === $parentLc) {
+                throw new \LogicException('parent:: used when class has no parent');
             }
 
-            return strtolower($frame->block->func->class->name);
+            return $parentLc;
         }
 
         return $lcClass;
+    }
+
+    protected function declaringClassLc(Frame $frame): string
+    {
+        if (null === $frame->block->func || null === $frame->block->func->class) {
+            throw new \LogicException('self:: used outside of class scope');
+        }
+
+        return strtolower($frame->block->func->class->name);
+    }
+
+    /** @deprecated Use resolveClassScopeReference() */
+    protected function resolveStaticClassName(string $className, Frame $frame): string
+    {
+        return $this->resolveClassScopeReference($className, $frame);
+    }
+
+    protected function inheritFromParent(ClassEntry $entry): void
+    {
+        if (null === $entry->parentLc || !isset($this->context->classes[$entry->parentLc])) {
+            return;
+        }
+        $parent = $this->context->classes[$entry->parentLc];
+        foreach ($parent->methods as $name => $method) {
+            if (!isset($entry->methods[$name])) {
+                $entry->methods[$name] = $method;
+                $entry->methodVisibility[$name] = $parent->methodVisibility[$name] ?? \PHPCfg\Func::FLAG_PUBLIC;
+            }
+        }
+        foreach ($parent->staticProperties as $name => $storage) {
+            if (!isset($entry->staticProperties[$name])) {
+                $entry->staticProperties[$name] = $storage;
+            }
+        }
+        foreach ($parent->constants as $name => $value) {
+            if (!isset($entry->constants[$name])) {
+                $entry->constants[$name] = $value;
+            }
+        }
+        if (null === $entry->constructor && null !== $parent->constructor) {
+            $entry->constructor = $parent->constructor;
+        }
+        foreach ($parent->properties as $property) {
+            $exists = false;
+            foreach ($entry->properties as $existing) {
+                if ($existing->name === $property->name) {
+                    $exists = true;
+                    break;
+                }
+            }
+            if (!$exists) {
+                $entry->properties[] = $property;
+            }
+        }
+    }
+
+    /**
+     * @return array{0: ClassEntry, 1: string} class entry and method name (lowercase)
+     */
+    protected function resolveStaticMethod(string $lcClass, string $methodLc): array
+    {
+        $visited = [];
+        while (!isset($visited[$lcClass])) {
+            $visited[$lcClass] = true;
+            if (!isset($this->context->classes[$lcClass])) {
+                break;
+            }
+            $class = $this->context->classes[$lcClass];
+            if (isset($class->methods[$methodLc])) {
+                return [$class, $methodLc];
+            }
+            if (null === $class->parentLc) {
+                break;
+            }
+            $lcClass = $class->parentLc;
+        }
+
+        throw new \LogicException("Call to undefined static method {$lcClass}::{$methodLc}()");
+    }
+
+    protected function initStaticCallableByParts(Frame $frame, string $className, string $methodName): void
+    {
+        $lcClass = $this->resolveClassScopeReference($className, $frame);
+        $methodLc = strtolower($methodName);
+        [$class, $methodLc] = $this->resolveStaticMethod($lcClass, $methodLc);
+        $vis = $class->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+        $callerClassLc = null;
+        if (null !== $frame->block->func && null !== $frame->block->func->class) {
+            $callerClassLc = strtolower($frame->block->func->class->value);
+        }
+        MethodVisibility::assertCallable(
+            $vis,
+            $callerClassLc,
+            $lcClass,
+            $class->name,
+            $methodName
+        );
+        $frame->call = $class->methods[$methodLc];
+        $frame->callArgs = [];
+        $frame->callArgEntries = [];
+        $frame->pendingCalledClassLc = $lcClass;
     }
 
     protected function initMethodCall(Frame $frame, Variable $receiver, string $methodName): void
@@ -848,34 +986,13 @@ restart:
         $frame->call = $class->methods[$methodLc];
         $frame->callArgs = [$receiver];
         $frame->callArgEntries = [];
+        $frame->pendingCalledClassLc = strtolower($receiver->toObject()->class->name);
     }
 
     protected function initStaticCallable(Frame $frame, string $callableName): void
     {
         [$className, $methodName] = explode('::', $callableName, 2);
-        $lcClass = strtolower($className);
-        $methodLc = strtolower($methodName);
-        if (!isset($this->context->classes[$lcClass])) {
-            throw new \LogicException("Call to undefined static method {$callableName}()");
-        }
-        $class = $this->context->classes[$lcClass];
-        if (!isset($class->methods[$methodLc])) {
-            throw new \LogicException("Call to undefined static method {$callableName}()");
-        }
-        $vis = $class->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
-        $callerClassLc = null;
-        if (null !== $frame->block->func && null !== $frame->block->func->class) {
-            $callerClassLc = strtolower($frame->block->func->class->value);
-        }
-        MethodVisibility::assertCallable(
-            $vis,
-            $callerClassLc,
-            $lcClass,
-            $class->name,
-            $methodName
-        );
-        $frame->call = $class->methods[$methodLc];
-        $frame->callArgs = [];
+        $this->initStaticCallableByParts($frame, $className, $methodName);
     }
 
     protected function initArrayCallable(Frame $frame, Variable $callable): void
