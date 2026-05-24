@@ -267,6 +267,8 @@
         "ext/standard/hexdec.php",
         "ext/standard/htmlspecialchars.php",
         "ext/standard/http_build_query.php",
+        "ext/standard/parse_str.php",
+        "ext/standard/VmParseStr.php",
         "ext/standard/http_response_code.php",
         "ext/standard/hypot.php",
         "ext/standard/implode.php",

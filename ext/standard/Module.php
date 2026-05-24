@@ -191,6 +191,7 @@ class Module extends ModuleAbstract
             new urlencode(),
             new rawurlencode(),
             new http_build_query(),
+            new parse_str(),
             new urldecode(),
             new rawurldecode(),
             new parse_url(),

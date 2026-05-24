@@ -109,6 +109,7 @@ static const char *phpc_builtin_functions[] = {
     "hexdec",
     "htmlspecialchars",
     "http_build_query",
+    "parse_str",
     "http_response_code",
     "hypot",
     "implode",
