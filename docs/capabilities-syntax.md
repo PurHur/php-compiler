@@ -26,6 +26,7 @@ Tracking issues: [#58](https://github.com/PurHur/php-compiler/issues/58), [#145]
 | foreach by-reference (`&$v`) | yes | yes | yes | [#1222](https://github.com/PurHur/php-compiler/issues/1222) | Packed and string-keyed arrays; VM + JIT lowering |
 | Static property `Class::$prop` | yes | yes | yes | [#1225](https://github.com/PurHur/php-compiler/issues/1225) | Class-scoped storage; `self::` / `static::`; literal property names in JIT |
 | `unset()` on variables and array offsets | yes | yes | yes | [#1224](https://github.com/PurHur/php-compiler/issues/1224) | VM + JIT assign null to lvalue slots |
+| Keyed array destructuring (`["a" => $x]`) | yes | yes | yes | [#1234](https://github.com/PurHur/php-compiler/issues/1234) | Short-list with string keys; skip AOT CFG split for fetch+assign pairs (#1234) |
 
 _Syntax AOT column reflects `Runtime::MODE_AOT` compile probes unless a row pins AOT (e.g. native user-class link)._
 ## Web north-star (`examples/003-MiniWebApp`)

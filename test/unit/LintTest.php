@@ -100,6 +100,13 @@ PHP;
         $this->assertStringNotContainsString('Expr_List', $exit['stdout']);
     }
 
+    public function testLintKeyedListDestructuringExitsZero(): void
+    {
+        $exit = $this->runLint(['-r', '["a" => $x, "b" => $y] = ["a" => 1, "b" => 2]; echo $x, $y;']);
+        $this->assertSame(0, $exit['code']);
+        $this->assertStringNotContainsString('Expr_List', $exit['stdout']);
+    }
+
     public function testLintSwitchWithLiteralCasesExitsZero(): void
     {
         $exit = $this->runLint(['-r', 'switch (1) { case 1: echo 1; break; default: echo 0; }']);
