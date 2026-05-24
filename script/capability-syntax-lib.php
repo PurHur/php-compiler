@@ -212,7 +212,7 @@ function syntaxRowDefinitions(): array
             'construct' => 'Variable variables (`$$name`)',
             'opcodes' => ['TYPE_VAR_FETCH'],
             'issue' => 1226,
-            'notes' => ['php-cfg nests Operand\\Variable name; VM resolves runtime local by name'],
+            'notes' => ['php-cfg nests Operand\\Variable name; VM resolves runtime local by name; JIT compile-time name fold (#1226)'],
             'probe' => '$a = "x"; $x = 1; echo $$a;',
         ],
         [

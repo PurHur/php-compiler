@@ -1,0 +1,91 @@
+<?php
+
+declare(strict_types=1);
+
+/**
+ * LLVM lowering for dynamic variable fetch (`$$name`, issue #1226).
+ *
+ * Phase 1: compile-time string names (literal assignment to the name operand).
+ */
+
+namespace PHPCompiler\JIT;
+
+use PHPCompiler\Block;
+use PHPCompiler\Web\Superglobals;
+use PHPCfg\Operand;
+
+final class VarFetchHelper
+{
+    public static function resolveTarget(Context $context, Block $block, Variable $nameVar): Variable
+    {
+        if (null === $nameVar->compileTimeString) {
+            throw new \LogicException(
+                'Variable-variable JIT lowering requires a compile-time string name (issue #1226)'
+            );
+        }
+        $target = self::resolveBinding($context, $block, $context->resolveRefAliasName($nameVar->compileTimeString));
+        if (null === $target) {
+            throw new \LogicException('Undefined variable $'.$nameVar->compileTimeString);
+        }
+
+        return $target;
+    }
+
+    private static function resolveBinding(Context $context, Block $block, string $name): ?Variable
+    {
+        if (isset($context->namedVariableBindings[$name])) {
+            return $context->namedVariableBindings[$name];
+        }
+        foreach ($context->scope->variables as $op) {
+            if ($name === OperandName::resolve($op)) {
+                return $context->scope->variables[$op];
+            }
+        }
+        foreach ($context->scopeStack as $scope) {
+            foreach ($scope->variables as $op) {
+                if ($name === OperandName::resolve($op)) {
+                    return $scope->variables[$op];
+                }
+            }
+        }
+        $slot = $block->slotIndexForVariableName($name);
+        if (null !== $slot) {
+            $operands = [];
+            foreach ($block->scopedOperands() as $op) {
+                if ($block->slotForOperand($op) === $slot && $context->hasVariableOp($op)) {
+                    $operands[] = $op;
+                }
+            }
+            usort(
+                $operands,
+                static function (Operand $a, Operand $b): int {
+                    $rank = static function (Operand $op): int {
+                        $resolved = OperandName::resolve($op);
+                        if ($op instanceof \PHPCfg\Operand\Temporary && null !== $resolved && '' !== $resolved) {
+                            return 3;
+                        }
+                        if ($op instanceof \PHPCfg\Operand\Variable) {
+                            return 2;
+                        }
+
+                        return 1;
+                    };
+
+                    return $rank($b) <=> $rank($a);
+                }
+            );
+            if ([] !== $operands) {
+                return $context->getVariableFromOp($operands[0]);
+            }
+        }
+        $found = ScopeBuiltinHelper::findVariableByName($context, $name);
+        if (null !== $found) {
+            return $found;
+        }
+        if (Superglobals::isSuperglobalName($name)) {
+            return SuperglobalInit::load($context, $name);
+        }
+
+        return null;
+    }
+}
