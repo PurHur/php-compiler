@@ -1,5 +1,5 @@
 --TEST--
-call argument spread into variadic function (VM, issue #141)
+call argument spread into variadic function (VM+JIT, #1361 / #141)
 --FILE--
 <?php
 function sum(...$nums) {

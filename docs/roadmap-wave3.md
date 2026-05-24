@@ -23,7 +23,7 @@ Related merges outside this wave: `goto` ([#1228](https://github.com/PurHur/php-
 | [#1358](https://github.com/PurHur/php-compiler/issues/1358) | `never` return type | Open | |
 | [#1359](https://github.com/PurHur/php-compiler/issues/1359) | Constructor property promotion | Open | |
 | [#1360](https://github.com/PurHur/php-compiler/issues/1360) | readonly classes | Open | |
-| [#1361](https://github.com/PurHur/php-compiler/issues/1361) | Array/argument unpack `...$x` | Open | |
+| [#1361](https://github.com/PurHur/php-compiler/issues/1361) | Array/argument unpack `...$x` | Closed | VM+JIT (#141 spread patch) |
 | [#1362](https://github.com/PurHur/php-compiler/issues/1362) | Multi-type catch | Open | |
 | [#1363](https://github.com/PurHur/php-compiler/issues/1363) | First-class callable JIT | Open | |
 | [#1364](https://github.com/PurHur/php-compiler/issues/1364) | Variable variables JIT | Closed | [#1381](https://github.com/PurHur/php-compiler/pull/1381) |

@@ -1248,6 +1248,13 @@ class JIT {
                     JIT\HashTableHelper::addElement($this->context, $result, $element, $key);
                     $this->bumpNativeArrayNextFreeForExplicitIntKey($result, $op->arg3, $block);
                     break;
+                case OpCode::TYPE_ARRAY_SPREAD:
+                    JIT\HashTableHelper::spreadInto(
+                        $this->context,
+                        $this->context->getVariableFromOp($block->getOperand($op->arg1)),
+                        $this->context->getVariableFromOp($block->getOperand($op->arg2))
+                    );
+                    break;
                 case OpCode::TYPE_TYPE_ASSERT:
                     $this->assignOperand(
                         $block->getOperand($op->arg1),
@@ -2062,7 +2069,12 @@ class JIT {
                     if ($this->context->inlineIncludeDepth > 0) {
                         JIT\IncludeHelper::refreshInlineIncludeBindings($this->context);
                     }
-                    $this->context->scope->args[] = $this->context->getVariableFromOp($block->getOperand($op->arg1));
+                    $sendValue = $this->context->getVariableFromOp($block->getOperand($op->arg1));
+                    if (null !== $op->arg3) {
+                        $this->context->scope->args[] = ['unpack' => $sendValue];
+                    } else {
+                        $this->context->scope->args[] = $sendValue;
+                    }
                     break;
                 case OpCode::TYPE_FUNCCALL_EXEC_NORETURN:
                     if (is_null($this->context->scope->toCall)) {
@@ -2072,7 +2084,7 @@ class JIT {
                     $callArgs = $this->prependImplicitThisForStaticConstruct(
                         $block,
                         $this->context->scope->toCall,
-                        $this->context->scope->args
+                        $this->finalizeJitCallArgs($this->context->scope->args)
                     );
                     $prevStrict = $this->context->callerStrictTypes;
                     $this->context->callerStrictTypes = $block->strictTypes;
@@ -2083,7 +2095,7 @@ class JIT {
                     $callArgs = $this->prependImplicitThisForStaticConstruct(
                         $block,
                         $this->context->scope->toCall,
-                        $this->context->scope->args
+                        $this->finalizeJitCallArgs($this->context->scope->args)
                     );
                     if (
                         $this->context->scope->toCall instanceof CoreFunc\Internal
@@ -3826,6 +3838,24 @@ class JIT {
      *
      * @return array<int, Variable>
      */
+    /**
+     * Flatten ARG_SEND list; unpack entries merge into one packed list (issue #1361).
+     *
+     * @param list<Variable|array{unpack: Variable}> $argEntries
+     *
+     * @return list<Variable>
+     */
+    private function finalizeJitCallArgs(array $argEntries): array
+    {
+        foreach ($argEntries as $entry) {
+            if (\is_array($entry) && isset($entry['unpack'])) {
+                return [JIT\HashTableHelper::mergeCallArgEntries($this->context, $argEntries)];
+            }
+        }
+
+        return $argEntries;
+    }
+
     private function prependImplicitThisForStaticConstruct(
         Block $block,
         JIT\Call $toCall,
