@@ -35,7 +35,7 @@ Supporting fixes from #1402:
 | `Runtime::__construct` | Slim ctor via `compileRuntimeConstructM3Native` → `compileBlockPhpLowering` (#1494) |
 | `Runtime::initParsePipeline` / `Runtime::initCompiler` / `Runtime::loadCoreModules` | Real-lowered via `compileRuntime*M3Native` when not combined with `initVmContext` |
 | `Runtime::initVmContext` | **LLVM 9 link segfault** when real-lowered alongside other spine helpers; stays on deny list (stub at runtime) |
-| `Runtime::loadJit` | `compileRuntimeLoadJitM3Native` → `compileBlockPhpLowering` (link OK; nested helpers still on deny list) |
+| `Runtime::loadJit` | `compileRuntimeLoadJitM3Native` + nested `createJit` helpers (#1495) |
 | `Runtime::standalone` | Compile-driver link OK (#1402, #1056) |
 | `helloworld_compile_smoke` | Link OK with real lowering |
 | `runtime_ctor_smoke` | `php bin/compile.php -l test/bootstrap-aot/runtime_ctor_smoke.php` |
@@ -81,7 +81,8 @@ BOOTSTRAP_M3_RUNTIME_COMPILE=1 \
 |--------|-------|
 | `Block::slotIndexForVariableName` | Also in compiler hot-path skip |
 | `Runtime::initVmContext` | `new VMContext` segfaults when lowered with full ctor spine (#1494) |
-| `Runtime::createJit` / `jitContextForLoadJit` / `loadJitCompileModuleFuncs` | Split from `loadJit`; denied while outer `loadJit` uses `compileRuntimeLoadJitM3Native` |
+
+**Dependency:** runtime `loadJit` needs real `initVmContext` (`fix/m3-init-vmcontext`); until then `BOOTSTRAP_M3_RUNTIME_COMPILE=1` may segfault in ctor.
 
 ## Env flags
 
