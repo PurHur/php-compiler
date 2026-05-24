@@ -126,6 +126,21 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString('$visited', $source);
     }
 
+    public function testJitDocumentsM3CompileDriverEnvGate(): void
+    {
+        $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
+        $this->assertStringContainsString('PHP_COMPILER_M3_COMPILE_DRIVER', $jit);
+        $this->assertStringContainsString('isM3CompileDriverRealLoweringName', $jit);
+        $this->assertStringContainsString('helloworld_compile_smoke', $jit);
+    }
+
+    public function testCompileDriverNullSafeRuntimeDispatch(): void
+    {
+        $driver = (string) file_get_contents(self::$root.'/test/selfhost/compiler_helloworld_smoke/compile_driver.php');
+        $this->assertStringContainsString('PHP_COMPILER_M3_RUNTIME_COMPILE', $driver);
+        $this->assertStringContainsString('native runtime blocked', $driver);
+    }
+
     public function testJitStubsFirstClassCallableForSelfHost(): void
     {
         $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');

@@ -103,10 +103,18 @@ if (is_readable($modeFile) && 'compile' === trim((string) file_get_contents($mod
         putenv('PHP_COMPILER_SELFHOST_AOT');
     }
     $root = __DIR__.'/../../..';
+    if ('1' !== (string) getenv('PHP_COMPILER_M3_RUNTIME_COMPILE')) {
+        echo "helloworld_compile_smoke: native runtime blocked (Runtime stubs; set PHP_COMPILER_M3_RUNTIME_COMPILE=1 after M3 link)\n";
+        exit(1);
+    }
     $result = helloworld_compile_smoke(
         $root.'/examples/000-HelloWorld/example.php',
         $root.'/build/helloworld-aot'
     );
+    if (null === $result) {
+        echo "helloworld_compile_smoke: native runtime blocked (Runtime stubs)\n";
+        exit(1);
+    }
     echo $result['message']."\n";
     exit($result['ok'] ? 0 : 1);
 }
