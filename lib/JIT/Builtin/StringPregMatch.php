@@ -68,6 +68,12 @@ final class StringPregMatch
             throw new \LogicException('__compiler_preg_replace missing after bitcode link');
         }
         $context->registerFunction('__compiler_preg_replace', $fnReplace);
+
+        $fnSplit = $context->module->getNamedFunction('__compiler_preg_split');
+        if (null === $fnSplit) {
+            throw new \LogicException('__compiler_preg_split missing after bitcode link');
+        }
+        $context->registerFunction('__compiler_preg_split', $fnSplit);
     }
 
     private static function ensureBitcode(): string

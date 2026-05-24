@@ -416,6 +416,9 @@ class Type extends Builtin {
         );
         $fnJsonEncode = $this->context->module->addFunction('__compiler_json_encode_hashtable', $fntypeJsonEncode);
         $this->context->registerFunction('__compiler_json_encode_hashtable', $fnJsonEncode);
+        $fntypePregSplit = $this->context->context->functionType($htPtr, false, $strPtr, $strPtr);
+        $fnPregSplit = $this->context->module->addFunction('__compiler_preg_split', $fntypePregSplit);
+        $this->context->registerFunction('__compiler_preg_split', $fnPregSplit);
         $fnJsonDecode = $this->context->module->addFunction(
             '__compiler_json_decode',
             $this->context->context->functionType($void, false, $strPtr, $valuePtr)

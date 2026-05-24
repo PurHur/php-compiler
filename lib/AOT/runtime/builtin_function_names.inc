@@ -162,6 +162,7 @@ static const char *phpc_builtin_functions[] = {
     "pow",
     "preg_match",
     "preg_match_all",
+    "preg_split",
     "preg_last_error",
     "preg_quote",
     "putenv",

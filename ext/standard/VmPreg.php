@@ -72,4 +72,22 @@ final class VmPreg
 
         return $result;
     }
+
+    /**
+     * @return list<string>|false
+     */
+    public static function pregSplit(string $pattern, string $subject, int $limit = -1, int $flags = 0): array|false
+    {
+        if (strlen($pattern) > self::MAX_PATTERN_BYTES) {
+            return false;
+        }
+        if (-1 !== $limit) {
+            throw new \LogicException('preg_split() limit is not supported in this compiler build');
+        }
+        if (0 !== $flags) {
+            throw new \LogicException('preg_split() flags are not supported in this compiler build');
+        }
+
+        return \preg_split($pattern, $subject);
+    }
 }
