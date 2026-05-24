@@ -48,11 +48,21 @@ fi
 
 # Native compile driver link is opt-in; runtime dispatch uses mode file (#1056).
 if [[ "${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
-  if php "${ROOT}/bin/compile.php" -o "${COMPILE_DRIVER}" "${ROOT}/test/selfhost/compiler_helloworld_smoke/compile_driver.php" 2>&1; then
+  m3_link_env=()
+  if [[ "${BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING:-0}" == "1" ]]; then
+    m3_link_env=(env PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_M3_COMPILE_DRIVER=1)
+  else
+    m3_link_env=(env PHP_COMPILER_SELFHOST_AOT=1)
+  fi
+  if "${m3_link_env[@]}" php "${ROOT}/bin/compile.php" -o "${COMPILE_DRIVER}" "${ROOT}/test/selfhost/compiler_helloworld_smoke/compile_driver.php" 2>&1; then
     echo "bootstrap-selfhost-helloworld-probe: compile driver link OK (${COMPILE_DRIVER})"
     printf 'compile' > "${MODE_FILE}"
     set +e
-    compile_out="$(env -u PHP_COMPILER_SELFHOST_AOT "${COMPILE_DRIVER}" 2>&1)"
+    runtime_env=()
+    if [[ "${BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING:-0}" == "1" ]]; then
+      runtime_env=(env PHP_COMPILER_M3_RUNTIME_COMPILE=1)
+    fi
+    compile_out="$({ "${runtime_env[@]}" env -u PHP_COMPILER_SELFHOST_AOT "${COMPILE_DRIVER}"; } 2>&1)"
     native_compile_code=$?
     set -e
     rm -f "${MODE_FILE}"

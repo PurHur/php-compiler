@@ -136,6 +136,68 @@ class JIT {
         return '1' === $flag || 'true' === strtolower((string) $flag);
     }
 
+    /** Opt-in when linking test/selfhost/compiler_helloworld_smoke/compile_driver.php (#1056). */
+    private function shouldUseM3CompileDriverRealLowering(): bool
+    {
+        if (!$this->shouldUseSelfHostJitStubs()) {
+            return false;
+        }
+        $flag = getenv('PHP_COMPILER_M3_COMPILE_DRIVER');
+
+        return '1' === $flag || 'true' === strtolower((string) $flag);
+    }
+
+    /** M3 HelloWorld compile driver: real LLVM lowering for parseAndCompile + standalone emit (#1056). */
+    private function isM3CompileDriverRealLoweringName(string $lower): bool
+    {
+        if (!$this->shouldUseM3CompileDriverRealLowering()) {
+            return false;
+        }
+        if (str_contains($lower, 'helloworld_compile_smoke')) {
+            return true;
+        }
+        if (str_contains($lower, '\\vm::')
+            || str_contains($lower, '\\doctor::')
+            || str_contains($lower, '\\cli\\')
+            || str_contains($lower, '\\web\\cgiaotdriver::')
+            || str_contains($lower, '\\web\\cgidriver::')
+            || str_contains($lower, '\\web\\projectdeploy::')
+        ) {
+            return false;
+        }
+
+        return str_contains($lower, '\\runtime::')
+            || str_contains($lower, '\\compiler::')
+            || str_contains($lower, '\\block::')
+            || str_contains($lower, '\\frame::')
+            || str_contains($lower, '\\func\\')
+            || str_contains($lower, '\\module::')
+            || str_contains($lower, '\\moduleabstract::')
+            || str_contains($lower, '\\nullsafelivenessdetector::')
+            || str_contains($lower, '\\vm\\optimizer')
+            || str_contains($lower, '\\handler::')
+            || str_contains($lower, '\\printer::')
+            || str_contains($lower, '\\opcode::')
+            || str_contains($lower, '\\opcodenames::')
+            || str_ends_with($lower, '\\jit::compile')
+            || str_ends_with($lower, '\\jit::compilefunc')
+            || str_ends_with($lower, '\\jit::compileblock')
+            || str_ends_with($lower, '\\jit::compilesubblock')
+            || str_contains($lower, '\\jit\\context::')
+            || str_contains($lower, '\\jit\\helper::')
+            || str_contains($lower, '\\jit\\variable::')
+            || str_contains($lower, '\\jit\\basicblockhelper::')
+            || str_contains($lower, '\\jit\\progress::')
+            || str_contains($lower, '\\jit\\valueechohelper::')
+            || str_contains($lower, '\\jit\\builtin\\output::')
+            || str_contains($lower, '\\jit\\builtin\\memorymanager::')
+            || str_contains($lower, '\\jit\\builtin\\refcount::')
+            || str_contains($lower, '\\jit\\builtin\\scriptexit::')
+            || str_contains($lower, '\\jit\\builtin\\errorhandler::')
+            || str_contains($lower, '\\jit\\call\\native::')
+            || str_contains($lower, '\\jit\\result::');
+    }
+
     private function compileBlock(Block $block, ?string $funcName = null): PHPLLVM\Value {
         $logicalName = $funcName;
         if (!is_null($funcName)) {
@@ -364,10 +426,13 @@ class JIT {
         if (!$this->shouldUseSelfHostJitStubs()) {
             return false;
         }
+        $lower = strtolower($name);
+        if ($this->isM3CompileDriverRealLoweringName($lower)) {
+            return false;
+        }
         if ($this->isSkippedSelfHostEntryName($name)) {
             return false;
         }
-        $lower = strtolower($name);
 
         if (str_contains($lower, '\\vm::')
             || str_contains($lower, '\\block::')
@@ -403,6 +468,9 @@ class JIT {
         if (!$this->shouldUseSelfHostJitStubs()) {
             return false;
         }
+        if ($this->isM3CompileDriverRealLoweringName($lowerName)) {
+            return false;
+        }
 
         return str_contains($lowerName, '\\jit\\result::');
     }
@@ -420,6 +488,9 @@ class JIT {
     private function isSkippedCompilerHotPathName(string $name): bool
     {
         $lower = strtolower($name);
+        if ($this->isM3CompileDriverRealLoweringName($lower)) {
+            return false;
+        }
 
         return str_contains($lower, 'splitcfgblockafterstringkeyedarray')
             || str_contains($lower, 'compilecfgbranch')
@@ -477,6 +548,9 @@ class JIT {
             return false;
         }
         $lower = strtolower($name);
+        if ($this->isM3CompileDriverRealLoweringName($lower)) {
+            return false;
+        }
         // Self-host bundle includes Runtime/VM/Func for closure only; stub non-Compiler bodies (#913).
         if (str_contains($lower, '\\runtime::')
             || str_contains($lower, '\\func\\php::')
@@ -3197,6 +3271,42 @@ class JIT {
             $result->value = $slot;
             $result->addref();
             $this->context->builder->positionAtEnd($doneBlock);
+
+            return;
+        } elseif (Variable::TYPE_OBJECT === $result->type && Variable::TYPE_HASHTABLE === $value->type) {
+            $ht = $this->context->helper->loadValue($value);
+            $result->free();
+            $this->context->builder->store(
+                $this->context->builder->pointerCast(
+                    $ht,
+                    $this->context->getTypeFromString('__object__*')
+                ),
+                $result->value
+            );
+            $result->addref();
+
+            return;
+        } elseif (Variable::TYPE_HASHTABLE === $result->type && Variable::TYPE_OBJECT === $value->type) {
+            if (null !== $result->writableHt && null !== $result->writableIndex) {
+                JIT\HashTableHelper::setAtIndex(
+                    $this->context,
+                    $result->writableHt,
+                    $result->writableIndex,
+                    $value
+                );
+
+                return;
+            }
+            $obj = $this->context->helper->loadValue($value);
+            $result->free();
+            $this->context->builder->store(
+                $this->context->builder->pointerCast(
+                    $obj,
+                    $this->context->getTypeFromString('__hashtable__*')
+                ),
+                $result->value
+            );
+            $result->addref();
 
             return;
         }
