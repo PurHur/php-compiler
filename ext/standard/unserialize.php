@@ -38,9 +38,14 @@ final class unserialize extends Internal
         if ($argc > 1) {
             throw new \LogicException('unserialize() options not supported in this compiler build');
         }
-        $decoded = @\unserialize($payloadVar->toString());
+        $decoded = VmSerialize::unserializePayload($frame->vmContext, $payloadVar->toString());
         if (false === $decoded) {
             $frame->returnVar->bool(false);
+
+            return;
+        }
+        if ($decoded instanceof Variable) {
+            $frame->returnVar->copyFrom($decoded);
 
             return;
         }

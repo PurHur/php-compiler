@@ -27,7 +27,7 @@ Related merges outside this wave: `goto` ([#1228](https://github.com/PurHur/php-
 | [#1362](https://github.com/PurHur/php-compiler/issues/1362) | Multi-type catch | Open | |
 | [#1363](https://github.com/PurHur/php-compiler/issues/1363) | First-class callable JIT | Open | |
 | [#1364](https://github.com/PurHur/php-compiler/issues/1364) | Variable variables JIT | Closed | [#1381](https://github.com/PurHur/php-compiler/pull/1381) |
-| [#1365](https://github.com/PurHur/php-compiler/issues/1365) | `__serialize` / `__unserialize` | Open | |
+| [#1365](https://github.com/PurHur/php-compiler/issues/1365) | `__serialize` / `__unserialize` | Closed (VM) | `docs/capabilities-syntax.md` |
 | [#1366](https://github.com/PurHur/php-compiler/issues/1366) | WeakReference / WeakMap | Open | |
 
 ## Stdlib (#1367–#1379)
