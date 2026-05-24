@@ -346,8 +346,21 @@ restart:
                     $frame->scope[$op->arg1]->indirect($classEntry->staticProperties[$propName]);
                     break;
                 case OpCode::TYPE_UNSET:
-                    if (null !== $op->arg1 && isset($frame->scope[$op->arg1])) {
-                        $frame->scope[$op->arg1]->null();
+                    if (null === $op->arg3) {
+                        if (null !== $op->arg2 && isset($frame->scope[$op->arg2])) {
+                            $frame->scope[$op->arg2]->resolveIndirect()->null();
+                        }
+                        break;
+                    }
+                    $container = $frame->scope[$op->arg2]->resolveIndirect();
+                    $key = $frame->scope[$op->arg3];
+                    if (Variable::TYPE_OBJECT === $container->type) {
+                        $container->toObject()->unsetProperty($key->toString());
+                        break;
+                    }
+                    if (Variable::TYPE_ARRAY === $container->type) {
+                        $container->toArray()->offsetUnset($key);
+                        break;
                     }
                     break;
                 case OpCode::TYPE_RETURN_VOID:

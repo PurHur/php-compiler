@@ -88,11 +88,13 @@ class HashTable extends Type
         $this->registerFn('__hashtable__readStringAt', '__string__*', ['__hashtable__*', 'size_t']);
         $this->registerFn('__hashtable__getNumElements', 'size_t', ['__hashtable__*']);
         $this->registerFn('__hashtable__offsetIsSet', 'int1', ['__hashtable__*', 'size_t']);
+        $this->registerFn('__hashtable__unsetLongAt', 'void', ['__hashtable__*', 'size_t']);
+        $this->registerFn('__hashtable__unsetStringKey', 'void', ['__hashtable__*', '__string__*']);
+        $this->registerFn('__hashtable__offsetIsSetStringKey', 'int1', ['__hashtable__*', '__string__*']);
         $this->registerFn('__hashtable__setStringKeyString', 'void', ['__hashtable__*', '__string__*', '__string__*']);
         $this->registerFn('__hashtable__setStringKeyHashtable', 'void', ['__hashtable__*', '__string__*', '__hashtable__*']);
         $this->registerFn('__hashtable__setStringKeyLong', 'void', ['__hashtable__*', '__string__*', 'int64']);
         $this->registerFn('__hashtable__setStringKeyBool', 'void', ['__hashtable__*', '__string__*', 'int1']);
-        $this->registerFn('__hashtable__offsetIsSetStringKey', 'int1', ['__hashtable__*', '__string__*']);
         $this->registerFn('__hashtable__peekStringKeyValue', '__value__*', ['__hashtable__*', '__string__*']);
         $this->registerFn('__hashtable__readStringKeyValue', '__value__*', ['__hashtable__*', '__string__*']);
         $this->registerFn('__hashtable__readStringKeyHashtable', '__hashtable__*', ['__hashtable__*', '__string__*']);
@@ -137,6 +139,8 @@ class HashTable extends Type
         $this->implementReadStringAt();
         $this->implementGetNumElements();
         $this->implementOffsetIsSet();
+        $this->implementUnsetLongAt();
+        $this->implementUnsetStringKey();
         $this->implementSetStringKeyString();
         $this->implementSetStringKeyLong();
         $this->implementSetStringKeyBool();
@@ -1747,6 +1751,82 @@ class HashTable extends Type
             $this->context->builder->addNoSignedWrap($num, $sizeT->constInt(1, false)),
             $numPtr
         );
+    }
+
+    private function decrementNumElements(PHPLLVM\Value $ht): void
+    {
+        $map = $this->context->structFieldMap['__hashtable__'];
+        $sizeT = $this->context->getTypeFromString('size_t');
+        $numPtr = $this->context->builder->structGep($ht, $map['numElements']);
+        $num = $this->context->builder->load($numPtr);
+        $this->context->builder->store(
+            $this->context->builder->subNoSignedWrap($num, $sizeT->constInt(1, false)),
+            $numPtr
+        );
+    }
+
+    private function implementUnsetLongAt(): void
+    {
+        $fn = $this->context->lookupFunction('__hashtable__unsetLongAt');
+        $block = $fn->appendBasicBlock('main');
+        $this->context->builder->positionAtEnd($block);
+        $ht = $fn->getParam(0);
+        $index = $fn->getParam(1);
+        $wasSet = $this->context->builder->call(
+            $this->context->lookupFunction('__hashtable__offsetIsSet'),
+            $ht,
+            $index
+        );
+        $unsetBlock = $fn->appendBasicBlock('unset_long_do');
+        $done = $fn->appendBasicBlock('unset_long_done');
+        $this->context->builder->branchIf($wasSet, $unsetBlock, $done);
+        $this->context->builder->positionAtEnd($unsetBlock);
+        $map = $this->context->structFieldMap['__hashtable__'];
+        $values = $this->context->builder->load($this->context->builder->structGep($ht, $map['values']));
+        $entry = $this->context->builder->inBoundsGep($values, $index);
+        $this->context->builder->call(
+            $this->context->lookupFunction('__value__writeNull'),
+            $entry
+        );
+        $this->decrementNumElements($ht);
+        $this->context->builder->branch($done);
+        $this->context->builder->positionAtEnd($done);
+        $this->context->builder->returnVoid();
+    }
+
+    private function implementUnsetStringKey(): void
+    {
+        $fn = $this->context->lookupFunction('__hashtable__unsetStringKey');
+        $block = $fn->appendBasicBlock('main');
+        $this->context->builder->positionAtEnd($block);
+        $ht = $fn->getParam(0);
+        $key = $fn->getParam(1);
+        $valPtr = $this->lookupStringKeyValue($fn, $block, $ht, $key);
+        $afterLookup = $fn->appendBasicBlock('strkey_unset_after_lookup');
+        $this->context->builder->branch($afterLookup);
+        $this->context->builder->positionAtEnd($afterLookup);
+        $i1 = $this->context->getTypeFromString('int1');
+        $isNull = $this->context->builder->icmp(Builder::INT_EQ, $valPtr, $valPtr->typeOf()->constNull());
+        $nullType = $this->context->getTypeFromString('int8')->constInt(0, false);
+        $unsetBlock = $fn->appendBasicBlock('strkey_unset_do');
+        $done = $fn->appendBasicBlock('strkey_unset_done');
+        $this->context->builder->branchIf($isNull, $done, $unsetBlock);
+        $this->context->builder->positionAtEnd($unsetBlock);
+        $typeByte = $this->context->builder->load(
+            $this->context->builder->structGep($valPtr, $this->context->structFieldMap['__value__']['type'])
+        );
+        $hasValue = $this->context->builder->icmp(Builder::INT_NE, $typeByte, $nullType);
+        $writeBlock = $fn->appendBasicBlock('strkey_unset_write');
+        $this->context->builder->branchIf($hasValue, $writeBlock, $done);
+        $this->context->builder->positionAtEnd($writeBlock);
+        $this->context->builder->call(
+            $this->context->lookupFunction('__value__writeNull'),
+            $valPtr
+        );
+        $this->decrementNumElements($ht);
+        $this->context->builder->branch($done);
+        $this->context->builder->positionAtEnd($done);
+        $this->context->builder->returnVoid();
     }
 
     private function updateIndexMetadata(

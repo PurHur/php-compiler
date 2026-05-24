@@ -178,6 +178,19 @@ class Compiler {
                     ) {
                         // Lowered by compileIsset via isset(container, dim) — no eager fetch (#99, #273, #539).
                         break;
+                    } elseif (
+                        $child instanceof Op\Expr\ArrayDimFetch
+                        && $i + 1 < $opCount
+                        && $this->isArrayDimFetchOnlyUnsetVar($child, $ops[$i + 1])
+                    ) {
+                        // Lowered by compileTerminal Unset via TYPE_UNSET(container, dim) (#1224).
+                        break;
+                    } elseif (
+                        $child instanceof Op\Expr\PropertyFetch
+                        && $i + 1 < $opCount
+                        && $this->isPropertyFetchOnlyUnsetVar($child, $ops[$i + 1])
+                    ) {
+                        break;
                     } else {
                         if ($this->needsCfgSplitBeforeStringDimFetch($child, $block)) {
                             $block = $this->splitCfgBlockAfterStringKeyedArray($block);
@@ -328,6 +341,101 @@ class Compiler {
         }
 
         return false;
+    }
+
+    /**
+     * php-cfg emits ArrayDimFetch as its own stmt before Terminal_Unset; skip duplicate lowering.
+     */
+    private function isArrayDimFetchOnlyUnsetVar(
+        Op\Expr\ArrayDimFetch $fetch,
+        Op $next
+    ): bool {
+        if (!$next instanceof Op\Terminal\Unset_) {
+            return false;
+        }
+        foreach ($next->exprs as $var) {
+            if ($var === $fetch) {
+                return true;
+            }
+            $target = $var;
+            while ($target instanceof Temporary) {
+                if ($target === $fetch->result) {
+                    return true;
+                }
+                if (null === $target->original) {
+                    break;
+                }
+                $target = $target->original;
+            }
+            if ($target === $fetch->result) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function isPropertyFetchOnlyUnsetVar(
+        Op\Expr\PropertyFetch $fetch,
+        Op $next
+    ): bool {
+        if (!$next instanceof Op\Terminal\Unset_) {
+            return false;
+        }
+        foreach ($next->exprs as $var) {
+            if ($var === $fetch) {
+                return true;
+            }
+            $target = $var;
+            while ($target instanceof Temporary) {
+                if ($target === $fetch->result) {
+                    return true;
+                }
+                if (null === $target->original) {
+                    break;
+                }
+                $target = $target->original;
+            }
+            if ($target === $fetch->result) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @return array{0: int, 1: ?int}
+     */
+    protected function resolveUnsetTarget($expr, Block $block): array
+    {
+        if ($expr instanceof Op\Expr\ArrayDimFetch) {
+            return $this->resolveIssetTargetFromArrayDimFetch($expr, $block);
+        }
+        if ($expr instanceof Op\Expr\PropertyFetch) {
+            return [
+                $this->compileOperand($expr->var, $block, true),
+                $this->compileOperand($expr->name, $block, true),
+            ];
+        }
+        if ($expr instanceof Operand) {
+            $dimFetch = $this->findCoalesceArrayDimFetch($expr, $block);
+            if (null !== $dimFetch) {
+                return $this->resolveIssetTargetFromArrayDimFetch($dimFetch, $block);
+            }
+            foreach ($block->orig->children as $child) {
+                if ($child instanceof Op\Expr\PropertyFetch && $child->result === $expr) {
+                    return [
+                        $this->compileOperand($child->var, $block, true),
+                        $this->compileOperand($child->name, $block, true),
+                    ];
+                }
+            }
+
+            return $this->resolveIssetTarget($expr, $block);
+        }
+
+        throw new \LogicException('Unsupported unset target: ' . (is_object($expr) ? $expr->getType() : gettype($expr)));
     }
 
     protected function compileClassLike(Op\Stmt\ClassLike $class, Block $block): OpCode {
@@ -1737,9 +1845,12 @@ class Compiler {
             case 'Terminal_Unset':
                 $ops = [];
                 foreach ($terminal->exprs as $unsetExpr) {
+                    [$containerSlot, $dimSlot] = $this->resolveUnsetTarget($unsetExpr, $block);
                     $ops[] = new OpCode(
                         OpCode::TYPE_UNSET,
-                        $this->compileOperand($unsetExpr, $block, true)
+                        null,
+                        $containerSlot,
+                        $dimSlot
                     );
                 }
 

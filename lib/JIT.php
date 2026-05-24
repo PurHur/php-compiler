@@ -1265,7 +1265,14 @@ class JIT {
                     );
                     break;
                 case OpCode::TYPE_UNSET:
-                    // Recorded at compile time; JIT unset is not implemented yet.
+                    if (null === $op->arg3) {
+                        $destOp = $block->getOperand($op->arg2);
+                        if ($this->context->hasVariableOp($destOp)) {
+                            $this->context->setVariableOp($destOp, $this->jitNullVariable());
+                        }
+                    } else {
+                        JIT\UnsetHelper::compileOffset($this->context, $block, $op);
+                    }
                     break;
                 case OpCode::TYPE_CAST_BOOL:
                     $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));
@@ -3546,6 +3553,22 @@ class JIT {
             default:
                 throw new \LogicException('Unsupported default parameter type for JIT (vm type ' . $vm->type . ')');
         }
+    }
+
+    private function jitNullVariable(): Variable
+    {
+        $slot = JIT\JitValueBox::alloc($this->context);
+        $this->context->builder->call(
+            $this->context->lookupFunction('__value__writeNull'),
+            JIT\JitValueBox::pointer($this->context, $slot)
+        );
+
+        return new Variable(
+            $this->context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VARIABLE,
+            $slot
+        );
     }
 
     private function jitVariableFromVmArray(VM\Variable $vm): Variable
