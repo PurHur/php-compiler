@@ -150,6 +150,18 @@ class Block {
 
     public function getVarSlot(Operand $operand, bool $isRead): int {
         if (!$this->scope->contains($operand)) {
+            $name = self::resolveVariableName($operand);
+            if (null !== $name) {
+                $existing = $this->slotIndexForVariableName($name);
+                if (null !== $existing) {
+                    $this->scope[$operand] = $existing;
+                    if ($isRead) {
+                        $this->args[$operand] = $existing;
+                    }
+
+                    return $existing;
+                }
+            }
             $next = $this->nextScopeSlot();
             $this->scope[$operand] = $next;
             if ($isRead) {

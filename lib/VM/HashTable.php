@@ -124,10 +124,10 @@ final class HashTable {
 
     public function iterCurrentValue(bool $byRef = false): Variable
     {
-        if ($byRef) {
-            throw new \LogicException('foreach by-reference is not implemented');
-        }
         $bucket = $this->buckets->read($this->internalPointer);
+        if ($byRef) {
+            return $bucket->value;
+        }
         $result = new Variable();
         $result->copyFrom($bucket->value->resolveIndirect());
 

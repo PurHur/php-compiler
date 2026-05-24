@@ -135,6 +135,14 @@ function syntaxRowDefinitions(): array
             'notes' => ['Per-site line on TYPE_SCRIPT_MAGIC; include stack for multi-file units'],
             'probe' => null,
         ],
+        [
+            'id' => 'foreach_by_ref',
+            'construct' => 'foreach by-reference (`&$v`)',
+            'opcodes' => ['TYPE_ITER_VALUE', 'TYPE_ASSIGN_REF'],
+            'issue' => 1222,
+            'notes' => ['Packed and string-keyed arrays; VM + JIT lowering'],
+            'probe' => '$a = [1, 2, 3]; foreach ($a as &$v) { $v *= 2; } echo $a[0], $a[1], $a[2];',
+        ],
     ];
 }
 
