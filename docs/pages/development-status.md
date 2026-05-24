@@ -30,12 +30,12 @@ Indicative composite toward a **web-capable, self-hosting** compiler (not line-c
 | Area | Progress | Summary |
 |------|----------|---------|
 | **Foundation** (CI, CLI, Docker) | ~88% | `phpc` CLI, local/Docker CI; GitHub Actions + CircleCI disabled ([#1338](https://github.com/PurHur/php-compiler/pull/1338), [#1340](https://github.com/PurHur/php-compiler/pull/1340)) — see [local-ci-matrix.md](https://github.com/PurHur/php-compiler/blob/master/docs/local-ci-matrix.md) |
-| **Language** (OOP, types, CFG) | ~64% | VM/JIT OOP largely works; `goto` ([#1228](https://github.com/PurHur/php-compiler/issues/1228)) and anonymous classes ([#1233](https://github.com/PurHur/php-compiler/issues/1233)) landed; wave-3 syntax ([#1354](https://github.com/PurHur/php-compiler/issues/1354)–[#1366](https://github.com/PurHur/php-compiler/issues/1366)) still open |
+| **Language** (OOP, types, CFG) | ~72% | VM/JIT OOP largely works; wave-3 language **9/13** on master (`never`, enums, ctor promotion, intersection, unpack, multi-catch, `__serialize`, FCC JIT, variable-variables JIT); open: attributes ([#1354](https://github.com/PurHur/php-compiler/issues/1354)), readonly ([#1360](https://github.com/PurHur/php-compiler/issues/1360) / [#1473](https://github.com/PurHur/php-compiler/pull/1473)), WeakReference ([#1366](https://github.com/PurHur/php-compiler/issues/1366) / [#1478](https://github.com/PurHur/php-compiler/pull/1478)) |
 | **Stdlib** | ~58% | Wave-3 batch ([#1367](https://github.com/PurHur/php-compiler/issues/1367)–[#1379](https://github.com/PurHur/php-compiler/issues/1379)): 12/13 closed; `debug_backtrace` ([#1378](https://github.com/PurHur/php-compiler/issues/1378)) in [#1404](https://github.com/PurHur/php-compiler/pull/1404) |
 | **Web AOT** (build, deploy) | ~65% | Project link ✅; home-route execute ✅; PATH_INFO / layout chain 🚧 |
 | **Reference app** (MiniWebApp) | ~55% | VM ✅; AOT link ✅; AOT execute **partial** |
 
-**Overall (indicative): ~48%** toward the stated north stars below.
+**Overall (indicative): ~50%** toward the stated north stars below.
 
 **Roadmap wave 3** ([#1380](https://github.com/PurHur/php-compiler/issues/1380)): tracker in repo [docs/roadmap-wave3.md](https://github.com/PurHur/php-compiler/blob/master/docs/roadmap-wave3.md).
 
