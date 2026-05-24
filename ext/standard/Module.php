@@ -265,6 +265,8 @@ class Module extends ModuleAbstract
             new time(),
             new date(),
             new gmdate(),
+            new sleep(),
+            new usleep(),
         ];
     }
 
