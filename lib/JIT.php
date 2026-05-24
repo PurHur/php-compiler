@@ -3928,24 +3928,7 @@ class JIT {
         if ([] === $operands) {
             throw new \LogicException('No operand mapped to slot '.$slot);
         }
-        usort(
-            $operands,
-            static function (\PHPCfg\Operand $a, \PHPCfg\Operand $b): int {
-                $rank = static function (\PHPCfg\Operand $op): int {
-                    $name = JIT\OperandName::resolve($op);
-                    if ($op instanceof \PHPCfg\Operand\Temporary && null !== $name && '' !== $name) {
-                        return 3;
-                    }
-                    if ($op instanceof \PHPCfg\Operand\Variable) {
-                        return 2;
-                    }
-
-                    return 1;
-                };
-
-                return $rank($b) <=> $rank($a);
-            }
-        );
+        usort($operands, [self::class, 'compareOperandsForSlotResolution']);
         $bound = null;
         foreach ($operands as $op) {
             if (!$this->context->hasVariableOp($op)) {
@@ -3979,6 +3962,24 @@ class JIT {
         }
 
         return $this->context->jitGlobalVariables[$name];
+    }
+
+    private static function operandSlotRank(\PHPCfg\Operand $op): int
+    {
+        $name = JIT\OperandName::resolve($op);
+        if ($op instanceof \PHPCfg\Operand\Temporary && null !== $name && '' !== $name) {
+            return 3;
+        }
+        if ($op instanceof \PHPCfg\Operand\Variable) {
+            return 2;
+        }
+
+        return 1;
+    }
+
+    private static function compareOperandsForSlotResolution(\PHPCfg\Operand $a, \PHPCfg\Operand $b): int
+    {
+        return self::operandSlotRank($b) <=> self::operandSlotRank($a);
     }
 
 }

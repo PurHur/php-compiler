@@ -40,6 +40,14 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/JitStrRot13.php',
         'ext/standard/JitSessionId.php',
         'ext/standard/JitSessionName.php',
+        'ext/standard/JitChdir.php',
+        'ext/standard/JitClassExists.php',
+        'ext/standard/JitClearstatcache.php',
+        'ext/standard/JitDeployPath.php',
+        'ext/standard/JitEnumExists.php',
+        'ext/standard/JitEnv.php',
+        'ext/standard/JitFclose.php',
+        'ext/standard/JitFeof.php',
         'ext/standard/Module.php',
     ];
 
@@ -62,7 +70,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         $this->assertFileExists($entry);
         $contents = (string) file_get_contents($entry);
         $count = substr_count($contents, 'require_once __DIR__');
-        $this->assertSame(136, $count, '108 compiler_minimal units + 28 M2 spine units');
+        $this->assertSame(144, $count, '108 compiler_minimal units + 36 M2 spine units');
         foreach (self::LIB_SPINE_SMOKE_NEW_UNITS as $unit) {
             $this->assertStringContainsString(
                 "require_once __DIR__.'/../../../{$unit}';",
