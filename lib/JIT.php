@@ -569,7 +569,11 @@ class JIT {
             return $args;
         }
         $lower = strtolower($logicalName);
-        if (!str_contains($lower, 'operandschainequal')) {
+        if (
+            !str_contains($lower, 'operandschainequal')
+            && !str_contains($lower, 'unwrapoperandchain')
+            && !str_contains($lower, 'operandhasobjecttype')
+        ) {
             return $args;
         }
         $objectPtr = $this->context->getTypeFromString('__object__*');
@@ -765,6 +769,30 @@ class JIT {
                 $func,
                 $logicalName,
                 [$objectPtr, $objectPtr, $objectPtr],
+                []
+            );
+
+            return $func;
+        }
+        if ($this->shouldUseSelfHostJitStubs() && str_contains($lcname, 'unwrapoperandchain')) {
+            $objectPtr = $this->context->getTypeFromString('__object__*');
+            $func = $this->context->module->addFunction(
+                $this->llvmInternalName($internalName),
+                $this->context->context->functionType($objectPtr, false, $objectPtr, $objectPtr)
+            );
+            $bb = $func->appendBasicBlock('stub');
+            $saved = $this->context->builder;
+            $this->context->builder = $this->context->context->builderCreate();
+            $this->context->builder->positionAtEnd($bb);
+            $this->context->builder->returnValue($objectPtr->constNull());
+            $this->context->builder->clearInsertionPosition();
+            $this->context->builder = $saved;
+            $this->context->functions[$lcname] = $func;
+            $this->context->functionReturnType[$lcname] = '__object__*';
+            $this->context->functionProxies[$lcname] = new JIT\Call\Native(
+                $func,
+                $logicalName,
+                [$objectPtr, $objectPtr],
                 []
             );
 
