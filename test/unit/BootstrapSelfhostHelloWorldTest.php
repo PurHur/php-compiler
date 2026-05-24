@@ -111,6 +111,29 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertTrue(is_executable($out));
     }
 
+    public function testHelloWorldCompileDriverLinksWithM3RealLowering(): void
+    {
+        if (!LlvmToolchain::isReady(self::$root)) {
+            $this->markTestSkipped('LLVM 9 not available for M3 compile driver real lowering link test.');
+        }
+
+        $driver = self::$root.'/test/selfhost/compiler_helloworld_smoke/compile_driver.php';
+        $out = self::$root.'/build/selfhost-helloworld-compile-m3-test';
+        @unlink($out);
+
+        $prefix = LlvmToolchain::envPrefix(self::$root);
+        $cmd = implode(' ', array_map('escapeshellarg', [
+            ...$prefix,
+            'env', 'PHP_COMPILER_SELFHOST_AOT=1', 'PHP_COMPILER_M3_COMPILE_DRIVER=1',
+            'php', self::$root.'/bin/compile.php', '-o', $out, $driver,
+        ])).' 2>&1';
+        exec($cmd, $lines, $exitCode);
+
+        $this->assertSame(0, $exitCode, implode("\n", $lines));
+        $this->assertFileExists($out);
+        $this->assertTrue(is_executable($out));
+    }
+
     public function testHelloWorldCompileDriverHasModeDispatch(): void
     {
         $driver = (string) file_get_contents(self::$root.'/test/selfhost/compiler_helloworld_smoke/compile_driver.php');
@@ -134,6 +157,7 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString('helloworld_compile_smoke', $jit);
         $this->assertStringContainsString('runtime::parseandcompile', $jit);
         $this->assertStringContainsString('jitFunctionSkipName', $jit);
+        $this->assertStringContainsString('m3CompileDriverSpineDenyNames', $jit);
     }
 
     public function testCompileDriverNullSafeRuntimeDispatch(): void

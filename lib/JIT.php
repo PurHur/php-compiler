@@ -159,8 +159,45 @@ class JIT {
         if ('helloworld_compile_smoke' === $lower) {
             return true;
         }
+        if ($this->isM3CompileDriverSpineDenyName($lower)) {
+            return false;
+        }
+        if (str_ends_with($lower, '\\runtime::parseandcompile')) {
+            return true;
+        }
 
-        return str_ends_with($lower, '\\runtime::parseandcompile');
+        return false;
+    }
+
+    /**
+     * LLVM 9 crashes lowering these during M3 compile-driver link; keep stubbed until fixed (#1402).
+     *
+     * @return list<string> lowercase name fragments
+     */
+    private function m3CompileDriverSpineDenyNames(): array
+    {
+        return [
+            'slotindexforvariablename',
+            '\\runtime::__construct',
+            '\\runtime::__destruct',
+            '\\runtime::loadcoremodules',
+            '\\runtime::loadjit',
+            '\\runtime::loadjitcontext',
+            '\\runtime::standalone',
+            '\\runtime::compile',
+            '\\runtime::parse',
+        ];
+    }
+
+    private function isM3CompileDriverSpineDenyName(string $lower): bool
+    {
+        foreach ($this->m3CompileDriverSpineDenyNames() as $fragment) {
+            if (str_contains($lower, $fragment)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
