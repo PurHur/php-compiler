@@ -50,6 +50,16 @@ final class VmReflection
         return isset($ctx->enums[strtolower($enumName)]);
     }
 
+    public static function interfaceExists(Context $ctx, string $interfaceName): bool
+    {
+        return null !== self::resolveClassEntry($ctx, $interfaceName);
+    }
+
+    public static function traitExists(Context $ctx, string $traitName): bool
+    {
+        return null !== self::resolveClassEntry($ctx, $traitName);
+    }
+
     public static function functionExists(Context $ctx, string $functionName): bool
     {
         return isset($ctx->functions[strtolower($functionName)]);
