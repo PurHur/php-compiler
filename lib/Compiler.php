@@ -2153,7 +2153,9 @@ class Compiler {
             return $folded;
         }
 
-        $return = [new OpCode(OpCode::TYPE_FUNCCALL_INIT, $name)];
+        $callName = $this->tryFoldVariableFunctionName($name, $block) ?? $name;
+
+        $return = [new OpCode(OpCode::TYPE_FUNCCALL_INIT, $callName)];
         foreach ($this->compileCallArgSends($args, $block) as $send) {
             $return[] = $send;
         }
@@ -2163,6 +2165,37 @@ class Compiler {
             $return[] = new OpCode(OpCode::TYPE_FUNCCALL_EXEC_NORETURN);
         }
         return $return;
+    }
+
+    /**
+     * Fold $fn = 'name'; $fn(...) to a literal callee when the name is a compile-time string (#56).
+     */
+    protected function tryFoldVariableFunctionName(?int $nameSlot, Block $block): ?int
+    {
+        if (null === $nameSlot) {
+            return null;
+        }
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_ASSIGN !== $op->type) {
+                continue;
+            }
+            if ($op->arg2 !== $nameSlot) {
+                continue;
+            }
+            if (!isset($block->constants[$op->arg3])) {
+                continue;
+            }
+            $const = $block->constants[$op->arg3];
+            if (Variable::TYPE_STRING !== $const->type) {
+                continue;
+            }
+            $lit = new Literal($const->toString());
+            $lit->type = Type::string();
+
+            return $this->compileOperand($lit, $block, true);
+        }
+
+        return null;
     }
 
     /**

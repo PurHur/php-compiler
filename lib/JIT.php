@@ -2926,6 +2926,9 @@ class JIT {
                         $valueRef,
                         $owned
                     );
+                    if (null !== $value->compileTimeString) {
+                        $result->compileTimeString = $value->compileTimeString;
+                    }
 
                     return;
                 case Variable::TYPE_HASHTABLE:

@@ -208,6 +208,14 @@ function syntaxRowDefinitions(): array
             'probe' => '$a = "x"; $x = 1; echo $$a;',
         ],
         [
+            'id' => 'variable_function_calls',
+            'construct' => 'Variable function calls (`$fn()`)',
+            'opcodes' => ['TYPE_FUNCCALL_INIT', 'TYPE_FUNCCALL_EXEC_RETURN'],
+            'issue' => 56,
+            'notes' => ['VM resolves callee at runtime; compiler folds literal assignment; JIT uses compile-time string'],
+            'probe' => '$fn = "strlen"; echo $fn("hi");',
+        ],
+        [
             'id' => 'invoke_object',
             'construct' => 'Invokable objects (`$obj()` / `__invoke`)',
             'opcodes' => ['TYPE_METHODCALL_INIT', 'TYPE_DECLARE_METHOD'],
