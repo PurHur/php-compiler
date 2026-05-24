@@ -162,6 +162,9 @@ class JIT {
         if ($this->isM3CompileDriverSpineDenyName($lower)) {
             return false;
         }
+        if (str_ends_with($lower, '\\runtime::__construct')) {
+            return true;
+        }
         if (str_ends_with($lower, '\\runtime::parseandcompile')) {
             return true;
         }
@@ -183,8 +186,9 @@ class JIT {
     {
         return [
             'slotindexforvariablename',
-            '\\runtime::__construct',
             '\\runtime::__destruct',
+            '\\runtime::initparsepipeline',
+            '\\runtime::initcompilervmspine',
             '\\runtime::loadcoremodules',
             '\\runtime::loadjit',
             '\\runtime::createjit',
@@ -642,7 +646,9 @@ class JIT {
 
         return str_ends_with($lower, '\\compiler::compilefunc')
             || str_ends_with($lower, '\\compiler::compile')
-            || 'type_pair' === $lower;
+            || 'type_pair' === $lower
+            || 'runtime_ctor_smoke' === $lower
+            || 'helloworld_compile_smoke' === $lower;
     }
 
     private function isSkippedWebBootstrapHotPathName(string $name): bool

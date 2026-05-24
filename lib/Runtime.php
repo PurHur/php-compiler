@@ -47,12 +47,19 @@ class Runtime {
 
     public function __construct(int $mode = self::MODE_NORMAL) {
         $this->mode = $mode;
+        $this->initParsePipeline();
+        $this->initCompilerVmSpine();
+        $this->loadCoreModules();
+    }
+
+    /** PhpParser + PHPCfg traversers; LLVM 9 crashes when inlined in __construct (#1402, #1494). */
+    private function initParsePipeline(): void {
         $astTraverser = new NodeTraverser;
         $astTraverser->addVisitor(
             new NodeVisitor\NameResolver
         );
         $this->parser = new Parser(
-            (new ParserFactory)->create(ParserFactory::ONLY_PHP7), 
+            (new ParserFactory)->create(ParserFactory::ONLY_PHP7),
             $astTraverser
         );
 
@@ -63,13 +70,14 @@ class Runtime {
         $this->postprocessor->addVisitor(new Visitor\PhiResolver);
         $this->detector = new NullSafeLivenessDetector;
         $this->assignOpResolver = new Optimizer\AssignOp;
+    }
 
+    /** Compiler + VM spine; split from ctor for incremental M3 real lowering (#1494). */
+    private function initCompilerVmSpine(): void {
         $this->typeReconstructor = new TypeReconstructor;
         $this->compiler = new Compiler;
-
         $this->vmContext = new VMContext($this);
         $this->vm = new VM($this->vmContext);
-        $this->loadCoreModules();
     }
 
     public function __destruct() {
