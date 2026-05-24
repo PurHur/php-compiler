@@ -168,6 +168,7 @@ static const char *phpc_builtin_functions[] = {
     "preg_match_all",
     "preg_quote",
     "preg_replace",
+    "preg_replace_callback",
     "preg_split",
     "putenv",
     "quotemeta",

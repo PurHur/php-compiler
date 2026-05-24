@@ -112,6 +112,7 @@ final class SelfHostBuiltinPolicy
         'preg_match_all' => 'preg',
         'preg_grep' => 'preg',
         'preg_replace' => 'preg',
+        'preg_replace_callback' => 'preg',
         'preg_split' => 'preg',
         'preg_quote' => 'preg',
         'preg_last_error' => 'preg',

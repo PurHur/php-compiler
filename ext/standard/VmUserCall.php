@@ -40,4 +40,12 @@ final class VmUserCall
 
         return $context->runtime->vm->invokePhpFunction($func, $carryArg, $valueArg);
     }
+
+    public static function invokeOne(Context $context, Func\PHP $func, Variable $arg): Variable
+    {
+        $copy = new Variable();
+        $copy->copyFrom($arg);
+
+        return $context->runtime->vm->invokePhpFunction($func, $copy);
+    }
 }
