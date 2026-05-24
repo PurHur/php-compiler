@@ -59,14 +59,15 @@ class JIT {
             if ('opcode_type_name' === $name || str_ends_with($name, '\\opcode_type_name')) {
                 return;
             }
+            $skipName = $this->jitFunctionSkipName($name, $func->block);
             if (
-                $this->isSkippedVmHotPathName($name)
-                || $this->isSkippedCompilerHotPathName($name)
-                || $this->isSkippedWebBootstrapHotPathName($name)
-                || $this->isSkippedLibSpineSmokeHotPathName($name)
-                || $this->isSkippedSelfHostEntryName($name)
-                || $this->isSkippedBootstrapInterpreterHotPathName($name)
-                || $this->isSkippedIssetHelperHotPathName($name)
+                $this->isSkippedVmHotPathName($skipName)
+                || $this->isSkippedCompilerHotPathName($skipName)
+                || $this->isSkippedWebBootstrapHotPathName($skipName)
+                || $this->isSkippedLibSpineSmokeHotPathName($skipName)
+                || $this->isSkippedSelfHostEntryName($skipName)
+                || $this->isSkippedBootstrapInterpreterHotPathName($skipName)
+                || $this->isSkippedIssetHelperHotPathName($skipName)
             ) {
                 $this->compileBlock($func->block, $name);
 
@@ -147,60 +148,36 @@ class JIT {
         return '1' === $flag || 'true' === strtolower((string) $flag);
     }
 
-    /** M3 HelloWorld compile driver: real LLVM lowering for parseAndCompile + standalone emit (#1056). */
+    /** M3 HelloWorld compile driver: real LLVM lowering for parseAndCompile + standalone emit (#1056, #1402). */
     private function isM3CompileDriverRealLoweringName(string $lower): bool
     {
         if (!$this->shouldUseM3CompileDriverRealLowering()) {
             return false;
         }
-        if (str_contains($lower, 'helloworld_compile_smoke')) {
-            return true;
+
+        // Incremental spine: expand one function at a time (docs/bootstrap-m5-fast-path.md).
+        return 'helloworld_compile_smoke' === $lower;
+    }
+
+    /**
+     * FUNCDEF/DECLARE_METHOD use short names; self-host skip/M3 gates need scoped names (#1402).
+     */
+    private function jitFunctionSkipName(?string $name, Block $block): string
+    {
+        $candidate = strtolower((string) $name);
+        if (str_contains($candidate, '::')) {
+            return $candidate;
         }
-        if (str_contains($lower, '\\vm::')
-            || str_contains($lower, '\\doctor::')
-            || str_contains($lower, '\\cli\\')
-            || str_contains($lower, '\\web\\cgiaotdriver::')
-            || str_contains($lower, '\\web\\cgidriver::')
-            || str_contains($lower, '\\web\\projectdeploy::')
-        ) {
-            return false;
+        if (null !== $block->func) {
+            return strtolower($block->func->getScopedName());
         }
 
-        return str_contains($lower, '\\runtime::')
-            || str_contains($lower, '\\compiler::')
-            || str_contains($lower, '\\block::')
-            || str_contains($lower, '\\frame::')
-            || str_contains($lower, '\\func\\')
-            || str_contains($lower, '\\module::')
-            || str_contains($lower, '\\moduleabstract::')
-            || str_contains($lower, '\\nullsafelivenessdetector::')
-            || str_contains($lower, '\\vm\\optimizer')
-            || str_contains($lower, '\\handler::')
-            || str_contains($lower, '\\printer::')
-            || str_contains($lower, '\\opcode::')
-            || str_contains($lower, '\\opcodenames::')
-            || str_ends_with($lower, '\\jit::compile')
-            || str_ends_with($lower, '\\jit::compilefunc')
-            || str_ends_with($lower, '\\jit::compileblock')
-            || str_ends_with($lower, '\\jit::compilesubblock')
-            || str_contains($lower, '\\jit\\context::')
-            || str_contains($lower, '\\jit\\helper::')
-            || str_contains($lower, '\\jit\\variable::')
-            || str_contains($lower, '\\jit\\basicblockhelper::')
-            || str_contains($lower, '\\jit\\includehelper::')
-            || str_contains($lower, '\\jit\\progress::')
-            || str_contains($lower, '\\jit\\valueechohelper::')
-            || str_contains($lower, '\\jit\\builtin\\output::')
-            || str_contains($lower, '\\jit\\builtin\\memorymanager::')
-            || str_contains($lower, '\\jit\\builtin\\refcount::')
-            || str_contains($lower, '\\jit\\builtin\\scriptexit::')
-            || str_contains($lower, '\\jit\\builtin\\errorhandler::')
-            || str_contains($lower, '\\jit\\call\\native::')
-            || str_contains($lower, '\\jit\\result::');
+        return $candidate;
     }
 
     private function compileBlock(Block $block, ?string $funcName = null): PHPLLVM\Value {
         $logicalName = $funcName;
+        $skipName = $this->jitFunctionSkipName($logicalName, $block);
         if (!is_null($funcName)) {
             $internalName = $this->llvmInternalName($funcName);
         } else {
@@ -216,15 +193,15 @@ class JIT {
         ) {
             return $this->compileSuperglobalNameNative($internalName, $block, $logicalName);
         }
-        if ($this->isSkippedVmHotPathName($logicalName ?? $internalName)) {
+        if ($this->isSkippedVmHotPathName($skipName)) {
             return $this->compileSkippedVmHotPathStub($internalName, $block, $logicalName ?? $internalName);
         }
-        if ($this->isSkippedCompilerHotPathName($logicalName ?? $internalName)
-            || $this->isSkippedWebBootstrapHotPathName($logicalName ?? $internalName)
-            || $this->isSkippedLibSpineSmokeHotPathName($logicalName ?? $internalName)
-            || $this->isSkippedSelfHostEntryName($logicalName ?? $internalName)
-            || $this->isSkippedBootstrapInterpreterHotPathName($logicalName ?? $internalName)
-            || $this->isSkippedIssetHelperHotPathName($logicalName ?? $internalName)
+        if ($this->isSkippedCompilerHotPathName($skipName)
+            || $this->isSkippedWebBootstrapHotPathName($skipName)
+            || $this->isSkippedLibSpineSmokeHotPathName($skipName)
+            || $this->isSkippedSelfHostEntryName($skipName)
+            || $this->isSkippedBootstrapInterpreterHotPathName($skipName)
+            || $this->isSkippedIssetHelperHotPathName($skipName)
         ) {
             return $this->compileSkippedCompilerSplitCfgStub($internalName, $block, $logicalName ?? $internalName);
         }
@@ -493,7 +470,8 @@ class JIT {
             return false;
         }
 
-        return str_contains($lower, 'splitcfgblockafterstringkeyedarray')
+        return str_contains($lower, 'slotindexforvariablename')
+            || str_contains($lower, 'splitcfgblockafterstringkeyedarray')
             || str_contains($lower, 'compilecfgbranch')
             || str_contains($lower, 'compilecfgblock')
             || str_contains($lower, 'compileblock')
