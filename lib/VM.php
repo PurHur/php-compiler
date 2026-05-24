@@ -556,7 +556,11 @@ restart:
                             $packed->append($copy);
                         }
                     } elseif (array_key_exists($recvIdx, $frame->calledArgs)) {
-                        $arg1->copyFrom($frame->calledArgs[$recvIdx]);
+                        if (isset($frame->block->paramByRef[(int) $op->arg2])) {
+                            $arg1->indirect($frame->calledArgs[$recvIdx]);
+                        } else {
+                            $arg1->copyFrom($frame->calledArgs[$recvIdx]);
+                        }
                     } elseif (null !== $op->arg3 && isset($frame->block->constants[$op->arg3])) {
                         $arg1->copyFrom($frame->block->constants[$op->arg3]);
                     } else {

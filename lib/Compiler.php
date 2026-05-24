@@ -585,7 +585,9 @@ class Compiler {
 
 
     protected function compileParam(Op\Expr\Param $param, Block $block, int $paramIdx): OpCode {
-        assert(false === $param->byRef);
+        if ($param->byRef) {
+            $block->paramByRef[$paramIdx] = true;
+        }
         if ($param->variadic) {
             assert(null === $param->defaultVar);
             if (null !== $block->variadicParamIndex) {

@@ -168,6 +168,16 @@ function syntaxRowDefinitions(): array
             'probe' => '$a = [1, 2, 3]; foreach ($a as &$v) { $v *= 2; } echo $a[0], $a[1], $a[2];',
         ],
         [
+            'id' => 'ref_param',
+            'construct' => 'By-reference parameters (`function f(&$x)`)',
+            'opcodes' => ['TYPE_ARG_RECV', 'TYPE_ARG_SEND'],
+            'issue' => 140,
+            'jit' => false,
+            'aot' => false,
+            'notes' => ['VM aliases caller slots via TYPE_INDIRECT; JIT pointer args deferred'],
+            'probe' => 'function inc(&$n) { $n++; } $x = 1; inc($x); echo $x;',
+        ],
+        [
             'id' => 'static_property_fetch',
             'construct' => 'Static property `Class::$prop`',
             'opcodes' => ['TYPE_STATIC_PROPERTY_FETCH', 'TYPE_DECLARE_STATIC_PROPERTY'],
@@ -315,9 +325,13 @@ function collectSyntaxCapabilities(string $root, array $definitions, array $hand
         $vm = $opcodeDriven
             ? opcodesSupported($handlers['vm'], $def['opcodes'])
             : (is_string($def['probe']) && $def['probe'] !== '' && probeVmCompile($def['probe']));
-        $jit = $opcodeDriven
-            ? opcodesSupported($handlers['jit'], $def['opcodes'])
-            : $vm;
+        if (array_key_exists('jit', $def)) {
+            $jit = $def['jit'];
+        } else {
+            $jit = $opcodeDriven
+                ? opcodesSupported($handlers['jit'], $def['opcodes'])
+                : $vm;
+        }
         if (array_key_exists('aot', $def)) {
             $aot = $def['aot'];
         } elseif (is_string($def['probe']) && $def['probe'] !== '') {

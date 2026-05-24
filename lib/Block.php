@@ -76,6 +76,9 @@ class Block {
     /** Declared parameter names by index (issue #168). */
     public array $paramNames = [];
 
+    /** Parameter indices declared with `&$param` (issue #140). */
+    public array $paramByRef = [];
+
     /** Resolved absolute paths for TYPE_INCLUDE opcodes (arg3 index, issue #54). */
     public array $literalIncludePaths = [];
 
