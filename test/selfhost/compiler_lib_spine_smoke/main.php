@@ -416,6 +416,7 @@ require_once __DIR__.'/../../../ext/standard/ucfirst.php';
 require_once __DIR__.'/../../../ext/standard/ucwords.php';
 require_once __DIR__.'/../../../ext/standard/urldecode.php';
 require_once __DIR__.'/../../../ext/standard/urlencode.php';
+require_once __DIR__.'/../../../ext/standard/web_int.php';
 require_once __DIR__.'/../../../ext/standard/wordwrap.php';
 require_once __DIR__.'/../../../src/llvm-env.php';
 // src/cli.php + compat shims — deferred (#1467): String_.php JIT link failure when bundled; cli_driver split ready for M4.
