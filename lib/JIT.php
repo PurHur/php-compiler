@@ -187,6 +187,7 @@ class JIT {
             || str_contains($lower, '\\jit\\helper::')
             || str_contains($lower, '\\jit\\variable::')
             || str_contains($lower, '\\jit\\basicblockhelper::')
+            || str_contains($lower, '\\jit\\includehelper::')
             || str_contains($lower, '\\jit\\progress::')
             || str_contains($lower, '\\jit\\valueechohelper::')
             || str_contains($lower, '\\jit\\builtin\\output::')
