@@ -20,6 +20,7 @@ Ordered checklist for [`examples/003-MiniWebApp/`](../examples/003-MiniWebApp/) 
 | Env | Effect |
 |-----|--------|
 | `MINIWEBAPP_AOT_EXECUTE_GATE=1` | Run `MiniWebAppAotExecuteTest` in `ci-local.sh` (default-on) |
+| `MINIWEBAPP_SERVE_AOT_GATE=1` | Run `MiniWebAppServeAotTest` in `ci-local.sh` (default-on — #1524) |
 | `MINIWEBAPP_WEB_SMOKE_AOT_GATE=1` | Run `examples-web-smoke.sh --aot` 003 slice in full CI |
 | `EXAMPLES_AOT_SMOKE_ONLY=003` | Limit `examples-aot-smoke.sh` to 003-MiniWebApp only |
 
@@ -27,7 +28,8 @@ Ordered checklist for [`examples/003-MiniWebApp/`](../examples/003-MiniWebApp/) 
 
 ```bash
 MINIWEBAPP_AOT_EXECUTE_GATE=1 ./script/ci-local.sh --filter MiniWebAppAotExecuteTest
-MINIWEBAPP_SERVE_AOT_GATE=1 ./script/ci-local.sh --filter MiniWebAppServeAot
+./script/ci-local.sh --filter MiniWebAppServeAot
+MINIWEBAPP_SERVE_AOT_GATE=0 ./script/ci-local.sh --filter MiniWebAppServeAot  # skips
 DEPLOY_SMOKE_003_EXECUTE=1 ./script/deploy-smoke.sh --example 003
 ```
 

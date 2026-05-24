@@ -39,6 +39,7 @@ final class MiniWebAppUnskipMatrixTest extends TestCase
 
         $this->assertStringContainsString('## How to flip', $body);
         $this->assertStringContainsString('MINIWEBAPP_AOT_EXECUTE_GATE', $body);
+        $this->assertStringContainsString('MINIWEBAPP_SERVE_AOT_GATE', $body);
         $this->assertStringContainsString('MINIWEBAPP_WEB_SMOKE_AOT_GATE', $body);
         $this->assertStringContainsString('EXAMPLES_AOT_SMOKE_ONLY=003', $body);
     }

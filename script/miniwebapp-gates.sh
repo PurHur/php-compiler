@@ -36,8 +36,8 @@ Environment (enable next gates):
   MINIWEBAPP_AOT_LINK_GATE=0      skip 003 native link gate during iteration
   MINIWEBAPP_AOT_EXECUTE_GATE=1   run 003 AOT binary CLI execute in ci-local (default — #747)
   MINIWEBAPP_AOT_EXECUTE_GATE=0   skip execute during iteration
-  MINIWEBAPP_SERVE_AOT_GATE=1     MiniWebAppServeAotTest phpc serve --aot (#478, #610)
-  MINIWEBAPP_SERVE_AOT_GATE=0     skip serve-aot PHPUnit (default off until PATH_INFO green)
+  MINIWEBAPP_SERVE_AOT_GATE=1     MiniWebAppServeAotTest phpc serve --aot (default on — #1524, #478, #610)
+  MINIWEBAPP_SERVE_AOT_GATE=0     skip serve-aot PHPUnit during iteration
   MINIWEBAPP_AOT_BISECT_GATE=1    run script/miniwebapp-aot-bisect.sh ladder (default off — #879)
 
 See: examples/003-MiniWebApp/README.md, issue #472
@@ -70,6 +70,7 @@ fi
 lint_gate="${MINIWEBAPP_LINT_GATE:-1}"
 vm_cli_gate="${MINIWEBAPP_VM_CLI_GATE:-1}"
 serve_gate="${MINIWEBAPP_SERVE_GATE:-1}"
+serve_aot_gate="${MINIWEBAPP_SERVE_AOT_GATE:-1}"
 serve_gate_explicit=0
 if [[ -n "${MINIWEBAPP_SERVE_GATE+x}" ]]; then
   serve_gate_explicit=1
@@ -87,6 +88,7 @@ stage2=0
 stage3=0
 stage3b=0
 stage4a=0
+stage4serve=0
 stage4c=0
 stage4d=0
 stage4=0
@@ -273,6 +275,14 @@ elif [[ "${aot_bisect_gate}" == "1" && -z "${LLVM_DIR}" ]]; then
   aot_bisect_skipped=1
 fi
 
+# Stage 4 serve-aot: MiniWebAppServeAotTest default on in ci-local (#1524, #1067).
+serve_aot_test="${ROOT}/test/real/MiniWebAppServeAotTest.php"
+if [[ -f "${serve_aot_test}" ]] \
+  && grep -q 'MINIWEBAPP_SERVE_AOT_GATE:-1' "${ROOT}/script/ci-defaults.env" 2>/dev/null \
+  && [[ "${serve_aot_gate}" == "1" ]]; then
+  stage4serve=1
+fi
+
 # Stage 4b: ExamplesCompileTest link gate (#754).
 compile_test="${ROOT}/test/unit/ExamplesCompileTest.php"
 if [[ -f "${compile_test}" ]]; then
@@ -362,6 +372,11 @@ elif [[ "${aot_dry_run_exit}" -ge 0 ]]; then
     echo "${AOT_DRY_RUN_STDERR}" | sed 's/^/         /'
   fi
 fi
+
+echo "$(mark "${stage4serve}") Stage 4 serve-aot — MiniWebAppServeAotTest (MINIWEBAPP_SERVE_AOT_GATE=1 default — #1524, #1067)"
+echo "       ${REPO_URL}/issues/1524"
+echo "       ${REPO_URL}/issues/1067"
+echo "       MINIWEBAPP_SERVE_AOT_GATE=0 skips serve-aot PHPUnit during iteration"
 
 echo "$(mark "${stage4d}") Stage 4d deploy-smoke — phpc deploy + PHPC_DEPLOY_ROOT 003 execute (#745, #718)"
 echo "       ${REPO_URL}/issues/745"
@@ -458,6 +473,8 @@ echo "  examples/003-MiniWebApp/.phpc/bin/app | wc -c   # stage 4b2 byte probe (
 echo "  EXAMPLES_AOT_SMOKE_ONLY=003 ./script/examples-aot-smoke.sh   # stage 4c (#683)"
 echo "  make deploy-smoke             # stage 4d deploy 001/002; 003 execute via DEPLOY_SMOKE_003_EXECUTE=1 (#745)"
 echo "  DEPLOY_SMOKE_ONLY=003 DEPLOY_SMOKE_003_EXECUTE=1 ./script/deploy-smoke.sh   # stage 4d 003 slice (#745)"
+echo "  ./script/ci-local.sh --filter MiniWebAppServeAot   # stage 4 serve-aot (#1524)"
+echo "  MINIWEBAPP_SERVE_AOT_GATE=0 ./script/ci-local.sh --filter MiniWebAppServeAot   # skip serve-aot"
 echo "  ./script/ci-local.sh --filter test003MiniWebAppBuildLinks   # stage 4b link (#754)"
 echo "  MINIWEBAPP_AOT_LINK_GATE=0 ./script/ci-local.sh --filter ExamplesCompileTest   # skip 003 link"
 echo "  ./script/ci-local.sh --filter test003MiniWebAppProjectAotLint   # stage 4a dry-run (#624)"

@@ -105,8 +105,8 @@ Canonical app: [`examples/003-MiniWebApp`](https://github.com/PurHur/php-compile
 | **VM CLI matrix** | ✅ | `MiniWebApp*VmCli` in `ci-fast.sh` ([#597](https://github.com/PurHur/php-compiler/issues/597)) |
 | **Web shell smoke** | ✅ | `examples-web-smoke.sh` ([#664](https://github.com/PurHur/php-compiler/issues/664)) |
 | **AOT link** | ✅ | `phpc build --project` ([#752](https://github.com/PurHur/php-compiler/issues/752)) |
-| **AOT execute** | 🚧 **partial** | Home `?route=home` ✅ ([#764](https://github.com/PurHur/php-compiler/issues/764) closed, [#1040](https://github.com/PurHur/php-compiler/pull/1040)); hello / contact / PATH_INFO / layout chain still open |
-| **AOT HTTP / deploy 003** | ⬜ | Blocked on execute matrix ([#676](https://github.com/PurHur/php-compiler/issues/676), [#833](https://github.com/PurHur/php-compiler/issues/833), [#612](https://github.com/PurHur/php-compiler/issues/612)) |
+| **AOT execute** | ✅ **query + PATH_INFO** | Home, hello, contact, api/status via CLI + CGI ([#747](https://github.com/PurHur/php-compiler/issues/747), [#764](https://github.com/PurHur/php-compiler/issues/764)); layout-chain edges remain in bisect ladder |
+| **AOT HTTP / deploy 003** | 🚧 **partial** | `MiniWebAppServeAotTest` default-on in full CI ([#1524](https://github.com/PurHur/php-compiler/issues/1524), [#1067](https://github.com/PurHur/php-compiler/issues/1067)); shell `--aot` curls opt-in ([#833](https://github.com/PurHur/php-compiler/issues/833)) |
 
 Examples **000–002** and **004** already pass VM + AOT link + AOT execute. **003** is the integration stress test for real web apps.
 
@@ -122,9 +122,10 @@ Run `./script/miniwebapp-gates.sh` or `phpc doctor --gates`. Details: [miniwebap
 | 3 | Examples web-smoke (curl) | ✅ |
 | 4a | AOT dry-run lint | probe |
 | 4b | AOT link | ✅ |
-| 4b2 | AOT execute (PHPUnit) | opt-in `MINIWEBAPP_AOT_EXECUTE_GATE=1` ([#791](https://github.com/PurHur/php-compiler/issues/791)) |
-| 4c | `examples-aot-smoke` 003 slice | ❌ ([#881](https://github.com/PurHur/php-compiler/issues/881)) |
-| 4d | Deploy smoke (003) | 001/002 only ([#718](https://github.com/PurHur/php-compiler/issues/718)) |
+| 4b2 | AOT execute (PHPUnit) | ✅ `MINIWEBAPP_AOT_EXECUTE_GATE=1` default ([#747](https://github.com/PurHur/php-compiler/issues/747)) |
+| 4 serve-aot | `MiniWebAppServeAotTest` HTTP | ✅ `MINIWEBAPP_SERVE_AOT_GATE=1` default ([#1524](https://github.com/PurHur/php-compiler/issues/1524), [#1067](https://github.com/PurHur/php-compiler/issues/1067)) |
+| 4c | `examples-aot-smoke` 003 slice | ✅ ([#683](https://github.com/PurHur/php-compiler/issues/683)) |
+| 4d | Deploy smoke (003) | ✅ `DEPLOY_SMOKE_003_EXECUTE=1` ([#745](https://github.com/PurHur/php-compiler/issues/745)) |
 
 #### AOT execute bisect ladder (after #764 home fix)
 
@@ -151,6 +152,8 @@ cd examples/003-MiniWebApp && ../../phpc build --project .
 QUERY_STRING=route=home REQUEST_METHOD=GET ./.phpc/bin/app | wc -c   # expect non-zero
 make miniwebapp-gates
 MINIWEBAPP_AOT_EXECUTE_GATE=1 ./script/ci-local.sh --filter MiniWebAppAotExecuteTest
+./script/ci-local.sh --filter MiniWebAppServeAot
+MINIWEBAPP_SERVE_AOT_GATE=0 ./script/ci-local.sh --filter MiniWebAppServeAot  # skip during iteration
 ```
 
 #### What is out of scope (for this north star)
