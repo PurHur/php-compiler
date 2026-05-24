@@ -1,5 +1,7 @@
 # M5 fast path — incremental native emit (M3 compile driver)
 
+**North Star 2 target (full ladder):** [self-host-target.md](self-host-target.md)
+
 Issue [#1056](https://github.com/PurHur/php-compiler/issues/1056); link segfault fix [#1402](https://github.com/PurHur/php-compiler/issues/1402).
 
 ## Goal
@@ -78,4 +80,4 @@ BOOTSTRAP_M3_RUNTIME_COMPILE=1  # separate from link; do not enable until spine 
 
 **Stub policy:** shrink `PHP_COMPILER_SELFHOST_AOT` stubs on the **compile spine first** (`parseAndCompile` → `standalone` → `Compiler::compile`), not whole-tree at once.
 
-**Related:** [`docs/bootstrap-selfhost.md`](bootstrap-selfhost.md) · [#1056](https://github.com/PurHur/php-compiler/issues/1056)
+**Related:** [self-host-target.md](self-host-target.md) · [bootstrap-selfhost.md](bootstrap-selfhost.md) · [#1056](https://github.com/PurHur/php-compiler/issues/1056) · vendor prelink [#1416](https://github.com/PurHur/php-compiler/issues/1416)
