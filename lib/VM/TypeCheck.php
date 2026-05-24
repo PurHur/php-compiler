@@ -19,10 +19,22 @@ final class TypeCheck
         self::coerceTypedSlot($dest, $strict, 'Property');
     }
 
-    private static function coerceTypedSlot(Variable $dest, bool $strict, string $kind): void
+    public static function coerceReturn(Variable $value, bool $strict, int $constraint): void
+    {
+        self::coerceTypedSlot($value, $strict, 'Return value', $constraint);
+    }
+
+    public static function assertVoidReturn(?Variable $value): void
+    {
+        if (null !== $value) {
+            throw new \TypeError('A void function must not return a value');
+        }
+    }
+
+    private static function coerceTypedSlot(Variable $dest, bool $strict, string $kind, ?int $constraint = null): void
     {
         $target = $dest->resolveIndirect();
-        $constraint = $target->typeConstraint;
+        $constraint ??= $target->typeConstraint;
         if (null === $constraint) {
             return;
         }
@@ -37,7 +49,7 @@ final class TypeCheck
         if (self::isExactType($value, $constraint)) {
             return;
         }
-        self::weakCoerceInPlace($target, $constraint, $value);
+        self::weakCoerceInPlace($target, $constraint, $value, $kind);
     }
 
     private static function isExactType(Variable $value, int $constraint): bool
@@ -45,17 +57,17 @@ final class TypeCheck
         return $value->type === $constraint;
     }
 
-    private static function weakCoerceInPlace(Variable $dest, int $constraint, Variable $value): void
+    private static function weakCoerceInPlace(Variable $dest, int $constraint, Variable $value, string $kind): void
     {
         switch ($constraint) {
             case Variable::TYPE_INTEGER:
-                $dest->int(self::coerceToInt($value));
+                $dest->int(self::coerceToInt($value, $kind));
                 return;
             case Variable::TYPE_FLOAT:
-                $dest->float(self::coerceToFloat($value));
+                $dest->float(self::coerceToFloat($value, $kind));
                 return;
             case Variable::TYPE_BOOLEAN:
-                $dest->bool(self::coerceToBool($value));
+                $dest->bool(self::coerceToBool($value, $kind));
                 return;
             case Variable::TYPE_STRING:
                 $dest->string($value->toString());
@@ -69,7 +81,7 @@ final class TypeCheck
         throw new \TypeError(self::strictMessage($constraint, $value, $kind));
     }
 
-    private static function coerceToInt(Variable $value): int
+    private static function coerceToInt(Variable $value, string $kind = 'Argument'): int
     {
         switch ($value->type) {
             case Variable::TYPE_INTEGER:
@@ -79,29 +91,29 @@ final class TypeCheck
             case Variable::TYPE_FLOAT:
                 $f = $value->toFloat();
                 if ($f !== (float) (int) $f) {
-                    throw new \TypeError('Argument must be of type int, float given');
+                    throw new \TypeError("{$kind} must be of type int, float given");
                 }
 
                 return (int) $f;
             case Variable::TYPE_STRING:
                 $s = $value->toString();
                 if (!is_numeric($s) || ((string) (int) $s) !== $s && ((string) (float) $s) !== $s) {
-                    throw new \TypeError('Argument must be of type int, string given');
+                    throw new \TypeError("{$kind} must be of type int, string given");
                 }
                 if (((string) (int) $s) === $s) {
                     return (int) $s;
                 }
                 $f = (float) $s;
                 if ($f !== (float) (int) $f) {
-                    throw new \TypeError('Argument must be of type int, string given');
+                    throw new \TypeError("{$kind} must be of type int, string given");
                 }
 
                 return (int) $f;
         }
-        throw new \TypeError('Argument must be of type int');
+        throw new \TypeError("{$kind} must be of type int");
     }
 
-    private static function coerceToFloat(Variable $value): float
+    private static function coerceToFloat(Variable $value, string $kind = 'Argument'): float
     {
         switch ($value->type) {
             case Variable::TYPE_FLOAT:
@@ -113,15 +125,15 @@ final class TypeCheck
             case Variable::TYPE_STRING:
                 $s = $value->toString();
                 if (!is_numeric($s)) {
-                    throw new \TypeError('Argument must be of type float, string given');
+                    throw new \TypeError("{$kind} must be of type float, string given");
                 }
 
                 return (float) $s;
         }
-        throw new \TypeError('Argument must be of type float');
+        throw new \TypeError("{$kind} must be of type float");
     }
 
-    private static function coerceToBool(Variable $value): bool
+    private static function coerceToBool(Variable $value, string $kind = 'Argument'): bool
     {
         switch ($value->type) {
             case Variable::TYPE_BOOLEAN:
@@ -138,9 +150,9 @@ final class TypeCheck
                 if (in_array($lower, ['0', 'false', 'off', 'no', ''], true)) {
                     return false;
                 }
-                throw new \TypeError('Argument must be of type bool, string given');
+                throw new \TypeError("{$kind} must be of type bool, string given");
         }
-        throw new \TypeError('Argument must be of type bool');
+        throw new \TypeError("{$kind} must be of type bool");
     }
 
     private static function strictMessage(int $constraint, Variable $value, string $kind = 'Argument'): string

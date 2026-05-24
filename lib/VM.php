@@ -365,6 +365,7 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_RETURN_VOID:
+                    $this->enforceReturnType($frame, null);
                     if (!is_null($frame->returnVar)) {
                         $frame->returnVar->null();
                     }
@@ -374,8 +375,10 @@ restart:
                     }
                     goto nextframe;
                 case OpCode::TYPE_RETURN:
+                    $returnValue = $frame->scope[$op->arg1];
+                    $this->enforceReturnType($frame, $returnValue);
                     if (!is_null($frame->returnVar)) {
-                        $frame->returnVar->copyFrom($frame->scope[$op->arg1]);
+                        $frame->returnVar->copyFrom($returnValue);
                     }
                     if ($frame->ephemeral && null !== $frame->parent) {
                         $frame = $frame->parent;
@@ -786,6 +789,24 @@ restart:
             }
             
         }
+    }
+
+    private function enforceReturnType(Frame $frame, ?Variable $value): void
+    {
+        $block = $frame->block;
+        if (null === $block) {
+            return;
+        }
+        if ($block->returnTypeVoid) {
+            TypeCheck::assertVoidReturn($value);
+
+            return;
+        }
+        if (null === $block->returnTypeConstraint || null === $value) {
+            return;
+        }
+        $strict = $block->strictTypes;
+        TypeCheck::coerceReturn($value, $strict, $block->returnTypeConstraint);
     }
 
 }
