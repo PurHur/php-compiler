@@ -35,12 +35,23 @@ class Native implements Call {
     /** LLVM argument index of the variadic ...$param slot, if any (issue #197). */
     public ?int $variadicArgIndex = null;
 
-    public function __construct(Value $function, string $name, array $argTypes, array $defaultArgs = [], ?int $variadicArgIndex = null) {
+    /** @var array<int, int> LLVM arg index => VM scalar type constraint (issue #1229) */
+    public array $paramTypeConstraintsByArg = [];
+
+    public function __construct(
+        Value $function,
+        string $name,
+        array $argTypes,
+        array $defaultArgs = [],
+        ?int $variadicArgIndex = null,
+        array $paramTypeConstraintsByArg = []
+    ) {
         $this->function = $function;
         $this->name = $name;
         $this->argTypes = $argTypes;
         $this->defaultArgs = $defaultArgs;
         $this->variadicArgIndex = $variadicArgIndex;
+        $this->paramTypeConstraintsByArg = $paramTypeConstraintsByArg;
     }
 
     public function call(Context $context, Variable ... $args): Value {
@@ -58,6 +69,14 @@ class Native implements Call {
                 $arg = $this->defaultArgs[$index];
             } else {
                 $arg = $this->missingCallArg($context, $this->argTypes[$index]);
+            }
+            if (isset($this->paramTypeConstraintsByArg[$index])) {
+                \PHPCompiler\JIT\TypeCheck::enforceParameter(
+                    $context,
+                    $arg,
+                    $this->paramTypeConstraintsByArg[$index],
+                    $context->callerStrictTypes
+                );
             }
             $argValues[] = $this->compileArg($context, $arg, $index);
         }
@@ -274,6 +293,13 @@ class Native implements Call {
                         );
                     case Variable::TYPE_NULL:
                         return $context->getTypeFromString('int64')->constInt(0, true);
+                    case Variable::TYPE_STRING:
+                        return (new \PHPCompiler\ext\standard\intval())->call($context, $arg);
+                    case Variable::TYPE_NATIVE_DOUBLE:
+                        return $context->builder->fpToSi(
+                            $value,
+                            $context->getTypeFromString('int64')
+                        );
                 }
                 break;
             case 'int1':

@@ -175,6 +175,14 @@ function syntaxRowDefinitions(): array
             'notes' => ['php-cfg lowers labels to CFG Jump; VM avoids frame nesting on same-block back-edges'],
             'probe' => '$i = 0; start: $i++; if ($i < 2) { goto start; } echo $i;',
         ],
+        [
+            'id' => 'strict_types',
+            'construct' => '`declare(strict_types=1)` scalar parameter checks',
+            'opcodes' => ['TYPE_ARG_RECV', 'TYPE_FUNCCALL_EXEC_RETURN'],
+            'issue' => 1229,
+            'notes' => ['VM #156; JIT enforces at user call sites via JIT\\TypeCheck + Native::compileArg weak casts'],
+            'probe' => 'declare(strict_types=1); function f(int $x) { return $x; } echo f(1);',
+        ],
     ];
 }
 

@@ -49,6 +49,9 @@ class Context {
 
     /** User function CFG block while compiling its body (func_get_args / func_num_args, #197). */
     public ?Block $jitEnclosingBlock = null;
+
+    /** Call-site file strict_types while lowering FUNCCALL (issues #156, #1229). */
+    public bool $callerStrictTypes = false;
     private array $typeMap = [];
     public array $structFieldMap = [];
     private array $intConstant = [];
