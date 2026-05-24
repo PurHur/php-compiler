@@ -46,9 +46,10 @@ if ! grep -q 'compiler_helloworld_smoke bundle OK' <<< "${bundle_out}"; then
   exit 1
 fi
 
-# Native compile driver link is opt-in: top-level parseAndCompile dispatch OOMs at link today.
+# Native compile driver link is opt-in; runtime dispatch uses mode file (#1056).
 if [[ "${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
   if php "${ROOT}/bin/compile.php" -o "${COMPILE_DRIVER}" "${ROOT}/test/selfhost/compiler_helloworld_smoke/compile_driver.php" 2>&1; then
+    echo "bootstrap-selfhost-helloworld-probe: compile driver link OK (${COMPILE_DRIVER})"
     printf 'compile' > "${MODE_FILE}"
     set +e
     compile_out="$(env -u PHP_COMPILER_SELFHOST_AOT "${COMPILE_DRIVER}" 2>&1)"
@@ -59,6 +60,7 @@ if [[ "${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
       M3_NATIVE_COMPILE=1
       echo "bootstrap-selfhost-helloworld-probe: native compile via selfhost bundle OK"
     else
+      echo "bootstrap-selfhost-helloworld-probe: native compile runtime blocked (Runtime stubs; see stderr)" >&2
       printf '%s\n' "${compile_out}" >&2
     fi
   else
@@ -68,7 +70,7 @@ fi
 
 if [[ "${M3_NATIVE_COMPILE}" -eq 0 ]]; then
   echo "bootstrap-selfhost-helloworld-probe: native compile via selfhost bundle blocked (M3 partial)" >&2
-  echo "bootstrap-selfhost-helloworld-probe: NEXT_LOWER: native compile driver link/runtime (parseAndCompile nested emit; getenv/putenv real)" >&2
+  echo "bootstrap-selfhost-helloworld-probe: NEXT_LOWER: native compile runtime (Runtime::parseAndCompile real lowering in selfhost bundle)" >&2
   if [[ "${BOOTSTRAP_M3_HELLOWORLD_STRICT:-0}" == "1" ]]; then
     echo "bootstrap-selfhost-helloworld-probe: BOOTSTRAP_M3_HELLOWORLD_STRICT=1 — failing (no Zend fallback)" >&2
     exit 1
