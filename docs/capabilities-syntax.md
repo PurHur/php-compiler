@@ -28,6 +28,7 @@ Tracking issues: [#58](https://github.com/PurHur/php-compiler/issues/58), [#145]
 | `unset()` on variables and array offsets | yes | yes | yes | [#1224](https://github.com/PurHur/php-compiler/issues/1224) | VM + JIT assign null to lvalue slots |
 | Keyed array destructuring (`["a" => $x]`) | yes | yes | yes | [#1234](https://github.com/PurHur/php-compiler/issues/1234) | Skip string-key CFG split for fetch+assign destructuring pairs (#1234) |
 | `goto` / labels (function scope) | yes | yes | yes | [#1228](https://github.com/PurHur/php-compiler/issues/1228) | php-cfg lowers labels to CFG Jump; VM avoids frame nesting on same-block back-edges; compliance PHPT |
+| Variable variables (`$$name`) | yes | no | yes | [#1226](https://github.com/PurHur/php-compiler/issues/1226) | php-cfg nests Operand\Variable name; VM resolves runtime local by name; compliance PHPT; VM-only lowering |
 
 _Syntax AOT column reflects `Runtime::MODE_AOT` compile probes unless a row pins AOT (e.g. native user-class link)._
 ## Web north-star (`examples/003-MiniWebApp`)
