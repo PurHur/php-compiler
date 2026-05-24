@@ -1,5 +1,7 @@
 # Bootstrap self-host gates: probe → native link → wave-check + compile-smoke (wave 7D).
 # Complements CircleCI / local ci-local.sh; does not replace the full test matrix.
+#
+# DISABLED: moved to workflows-disabled/ — not executed by GitHub Actions until restored.
 name: Bootstrap self-host
 
 on:

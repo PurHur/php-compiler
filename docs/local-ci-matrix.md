@@ -1,6 +1,8 @@
 # Local CI matrix
 
-How to run the php-compiler test gate on a developer machine or Runforge harness ([#245](https://github.com/PurHur/php-compiler/issues/245)). The full PHPUnit matrix remains CircleCI / local scripts ([#394](https://github.com/PurHur/php-compiler/issues/394)); GitHub Actions runs an optional **bootstrap self-host** gate on `master` only (see below).
+How to run the php-compiler test gate on a developer machine or Runforge harness ([#245](https://github.com/PurHur/php-compiler/issues/245)). The full PHPUnit matrix remains CircleCI / local scripts ([#394](https://github.com/PurHur/php-compiler/issues/394)).
+
+**GitHub Actions are temporarily disabled** — workflow YAML lives under [`.github/workflows-disabled/`](../.github/workflows-disabled/); use local commands below until restored.
 
 ## Defaults
 

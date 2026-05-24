@@ -1,4 +1,6 @@
 # Publish docs/pages/ to GitHub Pages (Settings → Pages → /docs/pages, or Actions source).
+#
+# DISABLED: moved to workflows-disabled/ — not executed by GitHub Actions until restored.
 name: GitHub Pages
 
 on:
