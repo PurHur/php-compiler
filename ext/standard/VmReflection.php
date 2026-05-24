@@ -72,6 +72,41 @@ final class VmReflection
         throw new \LogicException('Expected object or class name string in this compiler build');
     }
 
+    /**
+     * Arguments passed to the innermost enclosing user function (excludes $this).
+     *
+     * @return list<Variable>
+     */
+    public static function userCallArgs(Frame $frame): array
+    {
+        for ($f = $frame->parent; null !== $f; $f = $f->parent) {
+            if (null !== $f->block && null !== $f->block->func && !$f->hasHandler()) {
+                $args = $f->calledArgs;
+                if (null !== $f->block->func->class) {
+                    return array_slice($args, 1);
+                }
+
+                return $args;
+            }
+        }
+        throw new \LogicException('Must be called from a function context');
+    }
+
+    /** @param list<Variable> $args */
+    public static function copyArgsToArray(array $args): Variable
+    {
+        $result = new Variable();
+        $result->newArray();
+        $ht = $result->toArray();
+        foreach ($args as $arg) {
+            $copy = new Variable();
+            $copy->copyFrom($arg);
+            $ht->append($copy);
+        }
+
+        return $result;
+    }
+
     public static function isSameClass(Variable $value, string $className): bool
     {
         $value = $value->resolveIndirect();

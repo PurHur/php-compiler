@@ -422,7 +422,18 @@ restart:
                     if (null !== $frame->block->func && null !== $frame->block->func->class) {
                         ++$recvIdx;
                     }
-                    if (array_key_exists($recvIdx, $frame->calledArgs)) {
+                    $isVariadicSlot = null !== $frame->block->variadicParamIndex
+                        && $frame->block->variadicParamIndex === (int) $op->arg2;
+                    if ($isVariadicSlot) {
+                        $arg1->newArray();
+                        $packed = $arg1->toArray();
+                        $n = count($frame->calledArgs);
+                        for ($i = $recvIdx; $i < $n; ++$i) {
+                            $copy = new Variable();
+                            $copy->copyFrom($frame->calledArgs[$i]);
+                            $packed->append($copy);
+                        }
+                    } elseif (array_key_exists($recvIdx, $frame->calledArgs)) {
                         $arg1->copyFrom($frame->calledArgs[$recvIdx]);
                     } elseif (null !== $op->arg3 && isset($frame->block->constants[$op->arg3])) {
                         $arg1->copyFrom($frame->block->constants[$op->arg3]);

@@ -64,6 +64,9 @@ class Block {
     /** @var array<int, int> scope slot index => Variable::TYPE_* for typed parameters */
     public array $paramTypeConstraints = [];
 
+    /** Parameter index (0-based, excluding $this) that receives a packed trailing-arg array (#197). */
+    public ?int $variadicParamIndex = null;
+
     /** Resolved absolute paths for TYPE_INCLUDE opcodes (arg3 index, issue #54). */
     public array $literalIncludePaths = [];
 

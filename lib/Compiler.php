@@ -425,6 +425,13 @@ class Compiler {
 
     protected function compileParam(Op\Expr\Param $param, Block $block, int $paramIdx): OpCode {
         assert(false === $param->byRef);
+        if ($param->variadic) {
+            assert(null === $param->defaultVar);
+            if (null !== $block->variadicParamIndex) {
+                throw new \LogicException('Only one variadic parameter is allowed per function');
+            }
+            $block->variadicParamIndex = $paramIdx;
+        }
         $defaultConst = null;
         if (null !== $param->defaultVar) {
             $defaultConst = $this->compileOperand($param->defaultVar, $block, true);
