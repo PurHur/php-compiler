@@ -30,8 +30,11 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'lib/JIT/Builtin/StringHttpBuildQuery.php',
         'lib/JIT/Builtin/StringSerialize.php',
         'lib/JIT/Builtin/StringSuperglobalName.php',
+<<<<<<< HEAD
         'lib/JIT/Builtin/StringPregMatch.php',
         'lib/JIT/Builtin/StringUnserialize.php',
+=======
+>>>>>>> 1258208a (M2: add JIT Builtin leaf units to lib spine smoke (#1056))
         'lib/JIT/Builtin/StringUrldecode.php',
         'ext/standard/JitAddslashes.php',
         'ext/standard/JitBase64Encode.php',
