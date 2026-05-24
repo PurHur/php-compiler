@@ -10,7 +10,7 @@ use PHPCompiler\VM\Context;
 use PHPCompiler\VM\Variable;
 
 /**
- * VM helpers for class / function introspection builtins (issues #1214–#1219).
+ * VM helpers for class / function introspection builtins (issues #1214–#1219, #1370–#1373).
  */
 final class VmReflection
 {
@@ -42,7 +42,29 @@ final class VmReflection
 
     public static function classExists(Context $ctx, string $className): bool
     {
-        return null !== self::resolveClassEntry($ctx, $className);
+        return self::typeExistsOfKind($ctx, $className, ClassEntry::KIND_CLASS);
+    }
+
+    public static function traitExists(Context $ctx, string $traitName): bool
+    {
+        return self::typeExistsOfKind($ctx, $traitName, ClassEntry::KIND_TRAIT);
+    }
+
+    public static function interfaceExists(Context $ctx, string $interfaceName): bool
+    {
+        return self::typeExistsOfKind($ctx, $interfaceName, ClassEntry::KIND_INTERFACE);
+    }
+
+    public static function enumExists(Context $ctx, string $enumName): bool
+    {
+        return self::typeExistsOfKind($ctx, $enumName, ClassEntry::KIND_ENUM);
+    }
+
+    public static function typeExistsOfKind(Context $ctx, string $name, int $kind): bool
+    {
+        $entry = self::resolveClassEntry($ctx, $name);
+
+        return null !== $entry && $entry->kind === $kind;
     }
 
     public static function functionExists(Context $ctx, string $functionName): bool
@@ -115,5 +137,50 @@ final class VmReflection
         }
 
         return strtolower($value->toObject()->class->name) === strtolower($className);
+    }
+
+    public static function propertyExistsOnClass(ClassEntry $class, string $property): bool
+    {
+        foreach ($class->properties as $prop) {
+            if ($prop->name === $property) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static function propertyExists(Context $ctx, Variable $objectOrClass, string $property): bool
+    {
+        $objectOrClass = $objectOrClass->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $objectOrClass->type) {
+            $props = $objectOrClass->toObject()->getProperties(ClassEntry::PROP_PURPOSE_DEBUG);
+
+            return \array_key_exists($property, $props);
+        }
+        if (Variable::TYPE_STRING === $objectOrClass->type) {
+            $entry = self::resolveClassEntry($ctx, $objectOrClass->toString());
+            if (null === $entry) {
+                return false;
+            }
+
+            return self::propertyExistsOnClass($entry, $property);
+        }
+
+        return false;
+    }
+
+    public static function getObjectVars(\PHPCompiler\VM\ObjectEntry $object): Variable
+    {
+        $result = new Variable();
+        $result->newArray();
+        $ht = $result->toArray();
+        foreach ($object->getProperties(ClassEntry::PROP_PURPOSE_DEBUG) as $name => $value) {
+            $copy = new Variable();
+            $copy->copyFrom($value->resolveIndirect());
+            $ht->add($name, $copy);
+        }
+
+        return $result;
     }
 }

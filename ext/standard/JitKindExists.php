@@ -8,32 +8,31 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\ReflectionBuiltinHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\ClassEntry;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for class_exists() (issues #1214, #1056). */
-final class JitClassExists
+/** LLVM lowering for trait_exists / interface_exists / enum_exists (#1371, #1373). */
+final class JitKindExists
 {
-    /** @return Value int1 — matches defined() / array_key_exists() for JUMPIF truthiness */
-    public static function invoke(Context $context, JITVariable $nameArg): Value
+    /** @return Value int1 */
+    public static function invoke(Context $context, JITVariable $nameArg, int $kind): Value
     {
         $literal = JitStringArg::compileTimeLiteral($nameArg);
         if (null !== $literal) {
-            return ReflectionBuiltinHelper::classExistsLiteral($context, $literal);
+            return ReflectionBuiltinHelper::kindExistsLiteral($context, $literal, $kind);
         }
 
-        $nameStr = JitStringArg::lower($context, $nameArg, 'class_exists() class name');
+        $nameStr = JitStringArg::lower($context, $nameArg, 'type name');
         $i1 = $context->getTypeFromString('int1');
         $i32 = $context->getTypeFromString('int32');
         $exists = $i1->constInt(0, false);
         $strcasecmpFn = $context->lookupFunction('strcasecmp');
-        $nameData = self::stringDataPtr($context, $nameStr);
+        $nameData = JitClassExists::stringDataPtr($context, $nameStr);
 
-        $candidates = $context->type->object->allDeclaredClassLowerNames();
+        $candidates = $context->type->object->allDeclaredLowerNamesByKind($kind);
         if (null !== $context->runtime->vmContext) {
             foreach ($context->runtime->vmContext->classes as $lc => $entry) {
-                if (ClassEntry::KIND_CLASS === $entry->kind) {
+                if ($entry->kind === $kind) {
                     $candidates[] = $lc;
                 }
             }
@@ -42,20 +41,12 @@ final class JitClassExists
 
         foreach ($candidates as $lc) {
             $candidate = $context->builder->load($context->constantStringFromString($lc));
-            $candidateData = self::stringDataPtr($context, $candidate);
+            $candidateData = JitClassExists::stringDataPtr($context, $candidate);
             $cmp = $context->builder->call($strcasecmpFn, $nameData, $candidateData);
             $match = $context->builder->icmp(Builder::INT_EQ, $cmp, $i32->constInt(0, false));
             $exists = $context->builder->or($exists, $match);
         }
 
         return $exists;
-    }
-
-    public static function stringDataPtr(Context $context, Value $strPtr): Value
-    {
-        $structName = $strPtr->typeOf()->getElementType()->getName();
-        $off = $context->structFieldMap[$structName]['value'];
-
-        return $context->builder->structGep($strPtr, $off);
     }
 }

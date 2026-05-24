@@ -18,7 +18,14 @@ class ClassEntry {
 
     const PROP_PURPOSE_DEBUG = 1;
 
+    const KIND_CLASS = 0;
+    const KIND_TRAIT = 1;
+    const KIND_INTERFACE = 2;
+    const KIND_ENUM = 3;
+
     public string $name;
+    /** @see KIND_* — traits/interfaces/enums register when language support lands (#1371–#1373). */
+    public int $kind = self::KIND_CLASS;
     /** Parent class name (lowercase) for single inheritance (#101, #1231). */
     public ?string $parentLc = null;
     public ?Func\PHP $constructor = null;

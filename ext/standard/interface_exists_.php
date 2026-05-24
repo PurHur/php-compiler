@@ -1,0 +1,46 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\ext\standard;
+
+use PHPCompiler\Frame;
+use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\ClassEntry;
+use PHPLLVM\Value;
+
+/** interface_exists() — whether an interface is registered (issue #1371). */
+final class interface_exists_ extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('interface_exists');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        if (\count($frame->calledArgs) < 1 || \count($frame->calledArgs) > 2) {
+            throw new \LogicException('interface_exists() requires one or two arguments in this compiler build');
+        }
+        $ctx = VmReflection::requireContext($frame);
+        $name = VmReflection::stringArg($frame->calledArgs[0], 'interface_exists() interface name');
+        $exists = VmReflection::interfaceExists($ctx, $name);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($exists);
+        }
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        if (\count($args) < 1 || \count($args) > 2) {
+            throw new \LogicException('interface_exists() requires one or two arguments in this compiler build');
+        }
+        if (JITVariable::TYPE_STRING !== $args[0]->type && JITVariable::TYPE_VALUE !== $args[0]->type) {
+            throw new \LogicException('interface_exists() interface name must be a string in this compiler build');
+        }
+
+        return JitKindExists::invoke($context, $args[0], ClassEntry::KIND_INTERFACE);
+    }
+}

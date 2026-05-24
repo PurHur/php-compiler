@@ -19,6 +19,7 @@ use PHPCompiler\JIT\JitNativeString;
 use PHPCompiler\JIT\JitStringCompare;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Variable as VMVariable;
 use PHPLLVM;
 
@@ -33,6 +34,8 @@ class Object_ extends Type {
     private array $methodVisibility = [];
     /** @var array<int, true> class ids with a compiled __construct body */
     private array $hasConstructor = [];
+    /** @var array<int, int> class id => ClassEntry::KIND_* */
+    private array $classKinds = [];
     /** @var array<int, array<string, array{type: int, value: int|float|bool|string|null}>> */
     private array $classConstants = [];
     /** @var array<int, array<int, array{propertyType: int, type: int, value: int|float|bool|string|null}>> */
@@ -390,6 +393,7 @@ class Object_ extends Type {
         $this->staticPropertyGlobals[$id] = [];
 
         $this->classIdToName[$id] = $name->value;
+        $this->classKinds[$id] = ClassEntry::KIND_CLASS;
 
         return $this->classes[strtolower($name->value)] = $id;
     }
@@ -410,6 +414,31 @@ class Object_ extends Type {
         return isset($this->classIdToName[$this->classes[$lc]]);
     }
 
+    public function hasUserDeclaredClassOfKind(string $name, int $kind): bool
+    {
+        if (!$this->hasUserDeclaredClass($name)) {
+            return false;
+        }
+
+        return ($this->classKinds[$this->classes[strtolower($name)]] ?? ClassEntry::KIND_CLASS) === $kind;
+    }
+
+    public function hasProperty(int $classId, string $property): bool
+    {
+        foreach ($this->properties[$classId] ?? [] as $propset) {
+            if ($propset[1] === $property) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public function classKind(int $classId): int
+    {
+        return $this->classKinds[$classId] ?? ClassEntry::KIND_CLASS;
+    }
+
     /**
      * @return array<int, string>
      */
@@ -425,7 +454,25 @@ class Object_ extends Type {
      */
     public function allDeclaredClassLowerNames(): array
     {
-        return array_keys($this->classes);
+        return $this->allDeclaredLowerNamesByKind(ClassEntry::KIND_CLASS);
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function allDeclaredLowerNamesByKind(int $kind): array
+    {
+        $names = [];
+        foreach ($this->classes as $lc => $id) {
+            if (!isset($this->classIdToName[$id])) {
+                continue;
+            }
+            if ($this->classKind($id) === $kind) {
+                $names[] = $lc;
+            }
+        }
+
+        return $names;
     }
 
     /**

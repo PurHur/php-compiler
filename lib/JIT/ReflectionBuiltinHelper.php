@@ -6,11 +6,12 @@ namespace PHPCompiler\JIT;
 
 use PHPCompiler\JIT\Builtin\Type\Object_;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\VM\ClassEntry;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * LLVM helpers for reflection / introspection builtins (#1214–#1219).
+ * LLVM helpers for reflection / introspection builtins (#1214–#1219, #1370–#1373).
  */
 final class ReflectionBuiltinHelper
 {
@@ -31,9 +32,46 @@ final class ReflectionBuiltinHelper
 
     public static function classExistsLiteral(Context $context, string $className): Value
     {
-        $lc = strtolower($className);
-        $exists = self::objectBuiltin($context)->hasUserDeclaredClass($className)
-            || isset($context->runtime->vmContext->classes[$lc]);
+        return self::kindExistsLiteral($context, $className, ClassEntry::KIND_CLASS);
+    }
+
+    public static function traitExistsLiteral(Context $context, string $traitName): Value
+    {
+        return self::kindExistsLiteral($context, $traitName, ClassEntry::KIND_TRAIT);
+    }
+
+    public static function interfaceExistsLiteral(Context $context, string $interfaceName): Value
+    {
+        return self::kindExistsLiteral($context, $interfaceName, ClassEntry::KIND_INTERFACE);
+    }
+
+    public static function enumExistsLiteral(Context $context, string $enumName): Value
+    {
+        return self::kindExistsLiteral($context, $enumName, ClassEntry::KIND_ENUM);
+    }
+
+    public static function kindExistsLiteral(Context $context, string $name, int $kind): Value
+    {
+        $lc = strtolower($name);
+        $exists = self::objectBuiltin($context)->hasUserDeclaredClassOfKind($name, $kind);
+        if (!$exists && isset($context->runtime->vmContext->classes[$lc])) {
+            $exists = $context->runtime->vmContext->classes[$lc]->kind === $kind;
+        }
+        $i1 = $context->getTypeFromString('int1');
+
+        return $i1->constInt($exists ? 1 : 0, false);
+    }
+
+    public static function propertyExistsLiteral(Context $context, string $className, string $property): Value
+    {
+        $object = self::objectBuiltin($context);
+        if (!$object->hasUserDeclaredClass($className)) {
+            $i1 = $context->getTypeFromString('int1');
+
+            return $i1->constInt(0, false);
+        }
+        $classId = $object->lookup($className);
+        $exists = $object->hasProperty($classId, $property);
         $i1 = $context->getTypeFromString('int1');
 
         return $i1->constInt($exists ? 1 : 0, false);
