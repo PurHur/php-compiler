@@ -173,7 +173,7 @@ make bootstrap-profile                       # inventory + docs/bootstrap-profil
 make bootstrap-aot-link                      # link/run test/bootstrap-aot fixtures
 ```
 
-**Docker** (`php-compiler:22.04-dev`; `make docker-build-22` once) — same as [`.github/workflows/bootstrap-selfhost.yml`](.github/workflows/bootstrap-selfhost.yml):
+**Docker** (`php-compiler:22.04-dev`; `make docker-build-22` once) — same bootstrap gates as the disabled workflow [`.github/workflows-disabled/bootstrap-selfhost.yml`](.github/workflows-disabled/bootstrap-selfhost.yml) (local/Docker is canonical; [#394](https://github.com/PurHur/php-compiler/issues/394)):
 
 ```console
 docker run --rm -v "$(pwd):/compiler" -w /compiler php-compiler:22.04-dev bash -lc \
@@ -196,7 +196,7 @@ On harness hosts with an empty bind-mount, use `./script/docker-ci-local.sh` or 
 | Compile-smoke link (M1) | `make bootstrap-selfhost-compile-smoke` | ✅ `build/selfhost-compile-smoke` |
 | Compile-smoke AOT echo (M1) | `make bootstrap-selfhost-compile-smoke-run` | ✅ stdout `compiler smoke` |
 | Wave gate | `make bootstrap-wave-check` | ✅; `--with-compile-smoke` adds M1 echo gate |
-| CI (GitHub Actions) | `.github/workflows/bootstrap-selfhost.yml` | ✅ probe + link + wave-check on `master` |
+| CI (local/Docker) | `./script/ci-local.sh` or `make test-docker` | ✅ canonical merge gate; GHA/Circle disabled ([#394](https://github.com/PurHur/php-compiler/issues/394)) — see [docs/local-ci-matrix.md](docs/local-ci-matrix.md) |
 | Phase D `lib/` link | `make bootstrap-aot-link-lib` | ✅ `lib/OpCode.php` bundle ([#540](https://github.com/PurHur/php-compiler/issues/540)) |
 
 # Installation
