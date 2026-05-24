@@ -137,7 +137,8 @@ Extends `compiler_minimal` with remaining vm.php-path `lib/` units that pass bun
 |------------|------|
 | `lib/JIT/Builtin/Type.php`, `lib/JIT/Builtin/Type/String_.php` | JIT builtin type hierarchy toward full stdlib lowering |
 | `lib/Doctor.php` | compile-time diagnostics helper |
-| `lib/Cli/InvokeCwd.php`, `lib/Cli/PhpcBuild.php`, `lib/Cli/PhpcInit.php` | `phpc` CLI spine toward `bin/compile.php` |
+| `lib/Cli/InvokeCwd.php`, `lib/Cli/PhpcBuild.php`, `lib/Cli/PhpcInit.php`, `lib/Cli/PhpcRun.php` | `phpc` CLI spine toward `bin/compile.php` / `phpc run` |
+| `test/bootstrap-aot/vm_run_smoke.php` | Bundleable `bin/vm.php` run() subset; full entry deferred until M4 (`src/cli.php`) |
 | `lib/Web/CgiAotDriver.php`, `lib/Web/CgiDriver.php`, `lib/Web/ProjectDeploy.php` | CGI / deploy drivers on vm.php path |
 | `ext/standard/JitAddslashes.php`, `JitBase64Encode.php`, `JitBin2hex.php`, `JitChunkSplit.php`, `JitCrc32.php`, `JitExplode.php`, `JitChmod.php`, `JitCopy.php`, `JitDate.php`, `JitImplode.php`, `JitNl2br.php`, `JitPregQuote.php`, `JitQuotemeta.php`, `JitStrRot13.php`, `JitSessionId.php`, `JitSessionName.php`, `ext/standard/Module.php` | stdlib JIT leaf modules toward full inventory |
 
