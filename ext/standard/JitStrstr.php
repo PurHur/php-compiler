@@ -18,9 +18,7 @@ final class JitStrstr
 {
     private static int $blockSerial = 0;
 
-    /**
-     * @return Value __value__* (string slice, or boolean false when not found)
-     */
+    /** @return Value */
     public static function find(
         Context $context,
         Value $haystack,

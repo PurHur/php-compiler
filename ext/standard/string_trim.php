@@ -25,6 +25,10 @@ use PHPLLVM\Value;
  */
 final class string_trim extends Internal
 {
+    private static int $sliceBlockSerial = 0;
+
+    private static int $trimBlockSerial = 0;
+
     public function __construct()
     {
         parent::__construct('trim');
@@ -97,8 +101,7 @@ final class string_trim extends Internal
         Value $sliceLen,
         string $blockId = ''
     ): Value {
-        static $seq = 0;
-        $suffix = ('' === $blockId ? '' : '_'.$blockId).'_'.(string) (++$seq);
+        $suffix = ('' === $blockId ? '' : '_'.$blockId).'_'.(string) (++self::$sliceBlockSerial);
         $zero = JitStringIndex::zero($context);
         $isEmpty = $context->builder->icmp(Builder::INT_SLE, $sliceLen, $zero);
 
@@ -141,8 +144,7 @@ final class string_trim extends Internal
         bool $fromStart,
         string $blockId = ''
     ): void {
-        static $seq = 0;
-        $suffix = ('' === $blockId ? '' : '_'.$blockId).'_'.(string) (++$seq);
+        $suffix = ('' === $blockId ? '' : '_'.$blockId).'_'.(string) (++self::$trimBlockSerial);
         $i64 = JitStringIndex::i64($context);
         $zero = JitStringIndex::zero($context);
         $one = $i64->constInt(1, false);
