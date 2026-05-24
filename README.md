@@ -77,7 +77,7 @@ Also: `phpc doctor` (env probe), `phpc validate-manifest`, `phpc cgi`. See `./ph
 
 ### Capabilities
 
-Generated matrices (run `php script/capability-matrix.php` when builtins change): [docs/capabilities.md](docs/capabilities.md), [docs/capabilities-syntax.md](docs/capabilities-syntax.md). Wave-3 gap tracker ([#1380](https://github.com/PurHur/php-compiler/issues/1380)): [docs/roadmap-wave3.md](docs/roadmap-wave3.md). The compiler targets a **web-capable PHP subset** — many builtins and constructs are VM-only or in progress compared to Zend PHP.
+Generated matrices (run `php script/capability-matrix.php` when builtins change): [docs/capabilities.md](docs/capabilities.md), [docs/capabilities-syntax.md](docs/capabilities-syntax.md). Wave-3 gap tracker ([#1380](https://github.com/PurHur/php-compiler/issues/1380)): [docs/roadmap-wave3.md](docs/roadmap-wave3.md) — **language 9/13**, **stdlib 12/13** on master (May 2026). The compiler targets a **web-capable PHP subset** — many builtins and constructs are VM-only or in progress compared to Zend PHP.
 
 ### CI
 
@@ -101,7 +101,7 @@ Deep dive: [docs/bootstrap-selfhost.md](docs/bootstrap-selfhost.md) (gates, wave
 |-----------|----------------|--------|
 | **M0 — Bundled subset runs** | ~**109** literal `require_once` units in `test/selfhost/compiler_minimal/main.php` compile+link under AOT; native binary prints `compiler_minimal bundle OK` | ✅ ([#557](https://github.com/PurHur/php-compiler/issues/557), [#913](https://github.com/PurHur/php-compiler/issues/913)) |
 | **M1 — Compiler-shaped bundle** | Same bundle **lints** as one translation unit; **compile-smoke** links a tiny fixture and runs AOT echo (`compiler smoke`); driver smoke bundles `bin/compile.php`-adjacent units | ✅ ([#1025](https://github.com/PurHur/php-compiler/issues/1025)) |
-| **M2 — Full top-level `lib/` + spine** | All **14** top-level `lib/*.php` lint ✅; **`compiler_lib_spine_smoke`** (**157** units) native link ✅; grow toward **532**-file `bin/vm.php` inventory | 🚧 ~30% of inventory |
+| **M2 — Full top-level `lib/` + spine** | All **14** top-level `lib/*.php` lint ✅; **`compiler_lib_spine_smoke`** (**301** / 532 units, [#1479](https://github.com/PurHur/php-compiler/pull/1479)) native link ✅; grow toward full `bin/vm.php` inventory | 🚧 ~57% of inventory |
 | **M3 — Native compiles PHP** | Self-host bundle links; HelloWorld AOT **runs** natively; **compile emit still Zend fallback** | 🚧 partial |
 | **M4 — Bootstrap loop** | Native toolchain rebuilds the **next** compiler sources | ⬜ |
 | **M5 — Full self-host** | Real `bin/vm.php` / `bin/compile.php` on full inventory; **no Zend bootstrap** | ⬜ **north star** ([#1056](https://github.com/PurHur/php-compiler/issues/1056)) |
