@@ -600,35 +600,14 @@ restart:
     }
 
     public function numericOp(int $opCode, Variable $left, Variable $right): void {
+        $leftNum = $left->resolveIndirect()->toNumeric();
+        $rightNum = $right->resolveIndirect()->toNumeric();
         $this->reset();
-restart:
-        $pair = type_pair($left->type, $right->type);
-        if ($pair === TYPE_PAIR_INTEGER_INTEGER) {
-            $result = $this->_numericOp($opCode, $left->integer, $right->integer);        
-            if (is_int($result)) {
-                $this->int($result);
-            } else {
-                $this->float($result);
-            }
-        } elseif ($pair === TYPE_PAIR_INTEGER_FLOAT) {
-            $this->float($this->_numericOp($opCode, $left->integer, $right->float));
-        } elseif ($pair === TYPE_PAIR_FLOAT_INTEGER) {
-            $this->float($this->_numericOp($opCode, $left->float, $right->integer));
-        } elseif ($pair === TYPE_PAIR_FLOAT_FLOAT) {
-            $this->float($this->_numericOp($opCode, $left->float, $right->float));
-        } elseif ($left->type === self::TYPE_INDIRECT) {
-            $left = $left->indirect;
-            goto restart;
-        } elseif ($right->type === self::TYPE_INDIRECT) {
-            $right = $right->indirect;
-            goto restart;
+        $result = $this->_numericOp($opCode, $leftNum, $rightNum);
+        if (is_int($result)) {
+            $this->int($result);
         } else {
-            $result = $this->_numericOp($opCode, $left->toNumeric(), $right->toNumeric());
-            if (is_int($result)) {
-                $this->int($result);
-            } else {
-                $this->float($result);
-            }
+            $this->float($result);
         }
     }
 

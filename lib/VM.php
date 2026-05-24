@@ -203,7 +203,13 @@ restart:
                     $arg1 = $frame->scope[$op->arg1];
                     $arg2 = $frame->scope[$op->arg2];
                     $arg3 = $frame->scope[$op->arg3];
-                    $arg1->numericOp($op->type, $arg2, $arg3);
+                    if ($op->arg1 === $op->arg2) {
+                        $tmp = new Variable();
+                        $tmp->numericOp($op->type, $arg2, $arg3);
+                        $arg1->copyFrom($tmp);
+                    } else {
+                        $arg1->numericOp($op->type, $arg2, $arg3);
+                    }
                     break;
                 case OpCode::TYPE_BITWISE_AND:
                 case OpCode::TYPE_BITWISE_OR:
@@ -608,9 +614,15 @@ restart:
                         throw new \LogicException('Iterator value requires an array');
                     }
                     $byRef = (bool) $op->arg3;
-                    $frame->scope[$op->arg1]->copyFrom(
-                        $container->toArray()->iterCurrentValue($byRef)
-                    );
+                    if ($byRef) {
+                        $frame->scope[$op->arg1]->indirect(
+                            $container->toArray()->iterCurrentValue(true)
+                        );
+                    } else {
+                        $frame->scope[$op->arg1]->copyFrom(
+                            $container->toArray()->iterCurrentValue(false)
+                        );
+                    }
                     break;
                 case OpCode::TYPE_TRY:
                     $frame = $op->block1->getFrame($this->context, $frame);
