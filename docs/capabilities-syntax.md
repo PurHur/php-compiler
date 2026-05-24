@@ -14,10 +14,11 @@ Tracking issues: [#58](https://github.com/PurHur/php-compiler/issues/58), [#145]
 | Private methods | yes | yes | yes | [#145](https://github.com/PurHur/php-compiler/issues/145) | compliance PHPT; bootstrap AOT |
 | Property fetch `$this->x` | yes | yes | yes | [#58](https://github.com/PurHur/php-compiler/issues/58) | compliance PHPT; bootstrap AOT |
 | Dynamic property access `$obj->$name` | yes | yes | yes | [#1227](https://github.com/PurHur/php-compiler/issues/1227) | JIT compares runtime name to declared properties; unknown names abort at runtime; compliance PHPT |
+| Variable function call `$fn()` | yes | yes | yes | [#56](https://github.com/PurHur/php-compiler/issues/56) | VM resolves callee at runtime; JIT when callee name is compile-time string in variable (#56) |
 | Native user-class link (`phpc build --project`) | yes | yes | yes | [#764](https://github.com/PurHur/php-compiler/issues/764) | AOT link yes (#568 closed); native execute #764; compliance PHPT; bootstrap AOT |
 | `instanceof` | yes | yes | yes | [#138](https://github.com/PurHur/php-compiler/issues/138) | compliance PHPT; bootstrap AOT |
 | `match` expression | yes | yes | yes | [#143](https://github.com/PurHur/php-compiler/issues/143) | Lowered in php-cfg to === / jump-if / assign (#143); compliance PHPT; bootstrap AOT |
-| Arrow functions `fn () =>` | no | no | no | [#142](https://github.com/PurHur/php-compiler/issues/142) |  |
+| Arrow functions `fn () =>` | no | no | no | [#142](https://github.com/PurHur/php-compiler/issues/142) | compliance PHPT |
 | `ClassName::class` / `static::class` | yes | yes | yes | [#740](https://github.com/PurHur/php-compiler/issues/740) | Compile-time class name string; related to __CLASS__ (#199); compliance PHPT; bootstrap AOT |
 | Magic constants `__CLASS__`, `__METHOD__`, `__FUNCTION__` | yes | yes | yes | [#199](https://github.com/PurHur/php-compiler/issues/199) | Lowered at parse time via php-cfg MagicStringResolver; compliance PHPT |
 | Magic constant `__NAMESPACE__` | yes | yes | yes | [#199](https://github.com/PurHur/php-compiler/issues/199) | Requires `namespace` declaration (#84); compliance PHPT |
