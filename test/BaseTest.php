@@ -56,8 +56,14 @@ abstract class BaseTest extends TestCase {
             yield from self::providePHPTestsFromDir($path->getPathname());
         }
         foreach (new \GlobIterator($dir . '/*.phpt') as $test) {
-            $name = preg_replace('/\.phpt$/', '', $test->getBasename()) ?: $test->getBasename();
-            yield $name => self::parsePHPT($test->getPathname(), $test->getBasename());
+            $casesRoot = static::$DIR . '/cases/';
+            $pathname = $test->getPathname();
+            if (str_starts_with($pathname, $casesRoot)) {
+                $name = preg_replace('/\.phpt$/', '', substr($pathname, strlen($casesRoot))) ?: $test->getBasename();
+            } else {
+                $name = preg_replace('/\.phpt$/', '', $test->getBasename()) ?: $test->getBasename();
+            }
+            yield $name => self::parsePHPT($pathname, $test->getBasename());
         }
     }
 

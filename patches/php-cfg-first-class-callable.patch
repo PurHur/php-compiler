@@ -1,5 +1,5 @@
---- vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/FirstClassCallable.php	2026-05-24 07:19:29.067255243 +0000
-+++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/FirstClassCallable.php	2026-05-24 07:19:21.000000000 +0000
+--- /dev/null
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/FirstClassCallable.php
 @@ -0,0 +1,55 @@
 +<?php
 +
@@ -56,17 +56,18 @@
 +        return 'Expr_FirstClassCallable';
 +    }
 +}
---- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php	2026-05-24 07:19:29.520322116 +0000
-+++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php	2026-05-24 07:19:29.507374190 +0000
-@@ -1050,9 +1050,23 @@
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
+@@ -1033,8 +1033,24 @@
          return new Op\Expr\Exit_($e, $this->mapAttributes($expr));
      }
  
++
 +    protected function isFirstClassCallable(array $args): bool
 +    {
 +        return 1 === count($args) && $args[0] instanceof Node\VariadicPlaceholder;
 +    }
- 
++
      protected function parseExpr_FuncCall(Expr\FuncCall $expr)
      {
 +        if ($this->isFirstClassCallable($expr->args)) {
@@ -82,7 +83,7 @@
          $args = $this->parseExprList($expr->args, self::MODE_READ);
          $name = $this->readVariable($this->parseExprNode($expr->name));
          if ($this->currentNamespace && $expr->name instanceof Node\Name && $expr->name->isUnqualified()) {
-@@ -1158,6 +1172,16 @@
+@@ -1140,6 +1156,16 @@
  
      protected function parseExpr_MethodCall(Expr\MethodCall $expr)
      {
@@ -99,7 +100,7 @@
          return new Op\Expr\MethodCall(
              $this->readVariable($this->parseExprNode($expr->var)),
              $this->readVariable($this->parseExprNode($expr->name)),
-@@ -1254,6 +1278,16 @@
+@@ -1217,6 +1243,16 @@
  
      protected function parseExpr_StaticCall(Expr\StaticCall $expr)
      {
