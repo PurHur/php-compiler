@@ -23,7 +23,9 @@ final class ManifestValidator
     /**
      * Pre-build validation: phpc.json + entry exist; binary path is declared but need not exist yet.
      *
-     * @return list<string> actionable error messages (empty when valid)
+     * Actionable error messages (empty when valid).
+     *
+     * @return list<string>
      */
     public static function validateForBuild(string $projectDir): array
     {
@@ -87,7 +89,9 @@ final class ManifestValidator
     }
 
     /**
-     * @return list<string> actionable error messages (empty when valid)
+     * Actionable error messages (empty when valid).
+     *
+     * @return list<string>
      */
     public static function validate(string $projectDir): array
     {

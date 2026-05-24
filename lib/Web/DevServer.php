@@ -466,7 +466,9 @@ final class DevServer
     /**
      * @param array<string, string> $headers lowercase header name => value
      *
-     * @return array<string, string> HTTP_* keys for $_SERVER / CGI env
+     * HTTP_* keys for $_SERVER / CGI env.
+     *
+     * @return array<string, string>
      */
     public static function httpHeadersToServerVars(array $headers): array
     {
