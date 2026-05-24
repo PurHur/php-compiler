@@ -89,16 +89,29 @@ class Runtime {
 
     public function loadJit(): JIT {
         if (is_null($this->jit)) {
-            $this->jit = new JIT(
-                $this->loadJitContext()
-            );
-            foreach ($this->modules as $module) {
-                foreach ($module->getFunctions() as $func) {
-                    $this->jit->compileFunc($func);
-                }
-            }
+            $this->jit = $this->createJit($this->jitContextForLoadJit());
+            $this->loadJitCompileModuleFuncs($this->jit);
         }
         return $this->jit;
+    }
+
+    /** Avoid inlining loadJitContext into loadJit (LLVM 9 crash when both are real-lowered #1402). */
+    private function jitContextForLoadJit(): JITContext {
+        return $this->loadJitContext();
+    }
+
+    /** `new JIT` crashes LLVM 9 when lowered inside loadJit (#1402); stub until fixed. */
+    private function createJit(JITContext $context): JIT {
+        return new JIT($context);
+    }
+
+    /** Nested foreach + compileFunc crashes LLVM 9 when lowered inside loadJit (#1402). */
+    private function loadJitCompileModuleFuncs(JIT $jit): void {
+        foreach ($this->modules as $module) {
+            foreach ($module->getFunctions() as $func) {
+                $jit->compileFunc($func);
+            }
+        }
     }
 
     public function loadJitContext(): JITContext {

@@ -168,7 +168,6 @@ class JIT {
         if (str_ends_with($lower, '\\runtime::loadjitcontext')) {
             return true;
         }
-
         return false;
     }
 
@@ -185,6 +184,9 @@ class JIT {
             '\\runtime::__destruct',
             '\\runtime::loadcoremodules',
             '\\runtime::loadjit',
+            '\\runtime::createjit',
+            '\\runtime::jitcontextforloadjit',
+            '\\runtime::loadjitcompilemodulefuncs',
             '\\runtime::standalone',
             '\\runtime::compile',
             '\\runtime::parse',
@@ -228,6 +230,13 @@ class JIT {
         }
         if (str_contains($internalName, 'opcode_type_name')) {
             return $this->compileSkippedOpcodeNameStub($internalName, $block);
+        }
+        if (
+            $this->shouldUseM3CompileDriverRealLowering()
+            && null !== $logicalName
+            && str_ends_with(strtolower($logicalName), '\\runtime::loadjit')
+        ) {
+            return $this->compileRuntimeLoadJitM3Native($internalName, $block, $logicalName);
         }
         if (
             $this->shouldUseSelfHostJitStubs()
@@ -391,6 +400,49 @@ class JIT {
             $func,
             $logicalName,
             [$strPtr],
+            $this->collectParamDefaults($block)
+        );
+
+        return $func;
+    }
+
+    /**
+     * M3 compile-driver loadJit (#1402): PHP CFG lowering (`new JIT`, nested foreach) segfaults LLVM 9.
+     * Invoked from compileBlock when PHP_COMPILER_M3_COMPILE_DRIVER=1; keep \\runtime::loadjit on deny list
+     * so bootstrap skip stays active until full PHP lowering is safe.
+     */
+    private function compileRuntimeLoadJitM3Native(
+        string $internalName,
+        Block $block,
+        string $logicalName
+    ): PHPLLVM\Value {
+        $lcname = strtolower($logicalName);
+        if (isset($this->context->functions[$lcname])) {
+            return $this->context->functions[$lcname];
+        }
+        $args = $this->normalizeSelfHostNativeCallArgTypes(
+            $this->collectStubFunctionArgTypes($block),
+            $logicalName
+        );
+        $callbackType = $this->cfgFunctionReturnCallbackType($block->func) ?? '__object__*';
+        $returnType = $this->context->getTypeFromString($callbackType);
+        $func = $this->context->module->addFunction(
+            $this->llvmInternalName($internalName),
+            $this->context->context->functionType($returnType, false, ...$args)
+        );
+        $bb = $func->appendBasicBlock('stub');
+        $saved = $this->context->builder;
+        $this->context->builder = $this->context->context->builderCreate();
+        $this->context->builder->positionAtEnd($bb);
+        $this->emitSelfHostStubReturn($callbackType, $func);
+        $this->context->builder->clearInsertionPosition();
+        $this->context->builder = $saved;
+        $this->context->functions[$lcname] = $func;
+        $this->context->functionReturnType[$lcname] = $callbackType;
+        $this->context->functionProxies[$lcname] = new JIT\Call\Native(
+            $func,
+            $logicalName,
+            $args,
             $this->collectParamDefaults($block)
         );
 
