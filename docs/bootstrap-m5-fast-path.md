@@ -17,6 +17,7 @@ Supporting fixes from #1402:
 - `jitFunctionSkipName()` — FUNCDEF short names → scoped names for stub/M3 gates
 - `isSkippedCompilerHotPathName()` — always stub `Block::slotIndexForVariableName`
 - `m3CompileDriverSpineDenyNames()` — documented LLVM 9 crashers during spine expansion
+- `compileBlockPhpLowering()` + `compileRuntime*M3Native()` — PHP CFG lowering for split `Runtime` ctor spine (#1494)
 
 ## Step 1 (done — #1402)
 
@@ -26,36 +27,41 @@ Supporting fixes from #1402:
 
 ## Step 2 (in progress)
 
-| Allowlist | Gate |
-|-----------|------|
+| Allowlist / native spine | Gate |
+|--------------------------|------|
 | `Runtime::parseAndCompile` | On M3 allowlist when `PHP_COMPILER_M3_COMPILE_DRIVER=1` |
+| `Runtime::parse` / `Runtime::compile` | On M3 allowlist (#1494) |
 | `Runtime::loadJitContext` | Compile-driver link OK (#1402) |
-| `Runtime::__construct` | Compile-driver link OK via split ctor (#1494); helpers on deny list |
-| `Runtime::loadJit` | Compile-driver link OK via `compileRuntimeLoadJitM3Native` (PHP CFG + `new JIT` segfaults LLVM 9; helpers `createJit` / `jitContextForLoadJit` / `loadJitCompileModuleFuncs` on deny list) |
+| `Runtime::__construct` | Slim ctor via `compileRuntimeConstructM3Native` → `compileBlockPhpLowering` (#1494) |
+| `Runtime::initParsePipeline` / `Runtime::initCompiler` / `Runtime::loadCoreModules` | Real-lowered via `compileRuntime*M3Native` when not combined with `initVmContext` |
+| `Runtime::initVmContext` | **LLVM 9 link segfault** when real-lowered alongside other spine helpers; stays on deny list (stub at runtime) |
+| `Runtime::loadJit` | `compileRuntimeLoadJitM3Native` → `compileBlockPhpLowering` (link OK; nested helpers still on deny list) |
 | `Runtime::standalone` | Compile-driver link OK (#1402, #1056) |
-| `helloworld_compile_smoke` | Link OK **without** real lowering (`BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1` only) |
-| `runtime_ctor_smoke` | `php bin/compile.php -l test/bootstrap-aot/runtime_ctor_smoke.php` (ctor slice, no emit) |
+| `helloworld_compile_smoke` | Link OK with real lowering |
+| `runtime_ctor_smoke` | `php bin/compile.php -l test/bootstrap-aot/runtime_ctor_smoke.php` |
 
-Runtime emit still blocked: ctor helpers `initParsePipeline` / `initCompilerVmSpine` remain stubbed; full PHP lowering of `loadJit` body blocked until LLVM 9 `new JIT` fix.
+**Runtime emit:** `BOOTSTRAP_M3_RUNTIME_COMPILE=1` still segfaults — stubbed `initVmContext` leaves `vmContext` uninitialized (`__hashtable__readStringKeyValue` in `load()`). Next: safe `VMContext` lowering (C floor or isolated `initVmContext` link).
 
 **Probe findings (2026-05):**
 
-- **Link + stubs:** `BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1` links `compile_driver.php`; runtime still blocked until `BOOTSTRAP_M3_RUNTIME_COMPILE=1` (deny list keeps ctor / `loadJit` / `standalone` stubbed).
-- **Link + real lowering:** `BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING=1` can **segfault** at link (LLVM 9) while expanding `parseAndCompile` — treat as deny-list / spine work, not a smoke regression.
-- **Emit paths:** probe logs `emit_path=native` vs `emit_path=zend`; `BOOTSTRAP_M3_HELLOWORLD_STRICT=1` fails with `block_reason=…` instead of silent Zend fallback.
+- **Link + real lowering:** `BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1` + `BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING=1` → `compile driver link OK`.
+- **Runtime:** `BOOTSTRAP_M3_RUNTIME_COMPILE=1` → segfault until `initVmContext` is real-lowered without LLVM 9 crash.
+- **Emit paths:** probe logs `emit_path=native` vs `emit_path=zend`; `BOOTSTRAP_M3_HELLOWORLD_STRICT=1` fails with `block_reason=…`.
 
-Re-run link gate (stub link — should pass):
-
-```bash
-BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1 \
-./script/bootstrap-selfhost-helloworld-probe.sh
-```
-
-Real-lowering link (may segfault until #1402 spine is safe):
+Re-run link gate:
 
 ```bash
 BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1 \
 BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING=1 \
+./script/bootstrap-selfhost-helloworld-probe.sh
+```
+
+Runtime gate (blocked on `initVmContext`):
+
+```bash
+BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1 \
+BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING=1 \
+BOOTSTRAP_M3_RUNTIME_COMPILE=1 \
 ./script/bootstrap-selfhost-helloworld-probe.sh
 ```
 
@@ -64,6 +70,7 @@ Strict native emit (no Zend fallback):
 ```bash
 BOOTSTRAP_M3_HELLOWORLD_STRICT=1 \
 BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1 \
+BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING=1 \
 BOOTSTRAP_M3_RUNTIME_COMPILE=1 \
 ./script/bootstrap-selfhost-helloworld-probe.sh
 ```
@@ -73,10 +80,8 @@ BOOTSTRAP_M3_RUNTIME_COMPILE=1 \
 | Symbol | Notes |
 |--------|-------|
 | `Block::slotIndexForVariableName` | Also in compiler hot-path skip |
-| `Runtime::__construct` | Slim ctor real-lowered; helpers on deny list (#1494) |
-| `Runtime::initParsePipeline` / `Runtime::initCompilerVmSpine` | Split from ctor; LLVM 9 crash when real-lowered inline (#1494) |
-| `Runtime::createJit` / `jitContextForLoadJit` / `loadJitCompileModuleFuncs` | Split from `loadJit`; stubbed while outer `loadJit` uses native spine |
-| `Runtime::compile` / `Runtime::parse` | Not yet on allowlist |
+| `Runtime::initVmContext` | `new VMContext` segfaults when lowered with full ctor spine (#1494) |
+| `Runtime::createJit` / `jitContextForLoadJit` / `loadJitCompileModuleFuncs` | Split from `loadJit`; denied while outer `loadJit` uses `compileRuntimeLoadJitM3Native` |
 
 ## Env flags
 

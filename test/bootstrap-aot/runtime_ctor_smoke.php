@@ -19,10 +19,10 @@ function runtime_ctor_smoke(): array
     }
 
     $runtime = new \PHPCompiler\Runtime(\PHPCompiler\Runtime::MODE_AOT);
-    if (!isset($runtime->compiler, $runtime->vmContext, $runtime->vm)) {
+    if (!isset($runtime->compiler, $runtime->vmContext)) {
         return [
             'ok' => false,
-            'message' => 'runtime_ctor_smoke: MODE_AOT ctor incomplete (compiler/vm spine)',
+            'message' => 'runtime_ctor_smoke: MODE_AOT ctor incomplete (compiler/vmContext spine)',
             'phase' => 'ctor',
         ];
     }

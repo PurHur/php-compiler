@@ -174,6 +174,12 @@ class JIT {
         if (str_ends_with($lower, '\\runtime::standalone')) {
             return true;
         }
+        if (str_ends_with($lower, '\\runtime::parse')) {
+            return true;
+        }
+        if (str_ends_with($lower, '\\runtime::compile')) {
+            return true;
+        }
         return false;
     }
 
@@ -188,14 +194,13 @@ class JIT {
             'slotindexforvariablename',
             '\\runtime::__destruct',
             '\\runtime::initparsepipeline',
-            '\\runtime::initcompilervmspine',
+            '\\runtime::initcompiler',
+            '\\runtime::initvmcontext',
             '\\runtime::loadcoremodules',
             '\\runtime::loadjit',
             '\\runtime::createjit',
             '\\runtime::jitcontextforloadjit',
             '\\runtime::loadjitcompilemodulefuncs',
-            '\\runtime::compile',
-            '\\runtime::parse',
         ];
     }
 
@@ -237,12 +242,23 @@ class JIT {
         if (str_contains($internalName, 'opcode_type_name')) {
             return $this->compileSkippedOpcodeNameStub($internalName, $block);
         }
-        if (
-            $this->shouldUseM3CompileDriverRealLowering()
-            && null !== $logicalName
-            && str_ends_with(strtolower($logicalName), '\\runtime::loadjit')
-        ) {
-            return $this->compileRuntimeLoadJitM3Native($internalName, $block, $logicalName);
+        if ($this->shouldUseM3CompileDriverRealLowering() && null !== $logicalName) {
+            $m3Spine = strtolower($logicalName);
+            if (str_ends_with($m3Spine, '\\runtime::loadjit')) {
+                return $this->compileRuntimeLoadJitM3Native($internalName, $block, $logicalName);
+            }
+            if (str_ends_with($m3Spine, '\\runtime::__construct')) {
+                return $this->compileRuntimeConstructM3Native($internalName, $block, $logicalName);
+            }
+            if (str_ends_with($m3Spine, '\\runtime::initparsepipeline')) {
+                return $this->compileRuntimeInitParsePipelineM3Native($internalName, $block, $logicalName);
+            }
+            if (str_ends_with($m3Spine, '\\runtime::initcompiler')) {
+                return $this->compileRuntimeInitCompilerM3Native($internalName, $block, $logicalName);
+            }
+            if (str_ends_with($m3Spine, '\\runtime::loadcoremodules')) {
+                return $this->compileRuntimeLoadCoreModulesM3Native($internalName, $block, $logicalName);
+            }
         }
         if (
             $this->shouldUseSelfHostJitStubs()
@@ -263,6 +279,16 @@ class JIT {
         ) {
             return $this->compileSkippedCompilerSplitCfgStub($internalName, $block, $logicalName ?? $internalName);
         }
+
+        return $this->compileBlockPhpLowering($internalName, $block, $logicalName, $funcName);
+    }
+
+    private function compileBlockPhpLowering(
+        string $internalName,
+        Block $block,
+        ?string $logicalName,
+        ?string $funcName
+    ): PHPLLVM\Value {
         $args = [];
         $rawTypes = [];
         $argVars = [];
@@ -426,33 +452,61 @@ class JIT {
         if (isset($this->context->functions[$lcname])) {
             return $this->context->functions[$lcname];
         }
-        $args = $this->normalizeSelfHostNativeCallArgTypes(
-            $this->collectStubFunctionArgTypes($block),
-            $logicalName
-        );
-        $callbackType = $this->cfgFunctionReturnCallbackType($block->func) ?? '__object__*';
-        $returnType = $this->context->getTypeFromString($callbackType);
-        $func = $this->context->module->addFunction(
-            $this->llvmInternalName($internalName),
-            $this->context->context->functionType($returnType, false, ...$args)
-        );
-        $bb = $func->appendBasicBlock('stub');
-        $saved = $this->context->builder;
-        $this->context->builder = $this->context->context->builderCreate();
-        $this->context->builder->positionAtEnd($bb);
-        $this->emitSelfHostStubReturn($callbackType, $func);
-        $this->context->builder->clearInsertionPosition();
-        $this->context->builder = $saved;
-        $this->context->functions[$lcname] = $func;
-        $this->context->functionReturnType[$lcname] = $callbackType;
-        $this->context->functionProxies[$lcname] = new JIT\Call\Native(
-            $func,
-            $logicalName,
-            $args,
-            $this->collectParamDefaults($block)
-        );
+        return $this->compileBlockPhpLowering($internalName, $block, $logicalName, $logicalName);
+    }
 
-        return $func;
+    /** M3 compile-driver Runtime::__construct (#1494): slim ctor + init* helpers via PHP CFG lowering. */
+    private function compileRuntimeConstructM3Native(
+        string $internalName,
+        Block $block,
+        string $logicalName
+    ): PHPLLVM\Value {
+        return $this->compileRuntimeSpinePhpLowering($internalName, $block, $logicalName);
+    }
+
+    private function compileRuntimeInitParsePipelineM3Native(
+        string $internalName,
+        Block $block,
+        string $logicalName
+    ): PHPLLVM\Value {
+        return $this->compileRuntimeSpinePhpLowering($internalName, $block, $logicalName);
+    }
+
+    private function compileRuntimeInitCompilerM3Native(
+        string $internalName,
+        Block $block,
+        string $logicalName
+    ): PHPLLVM\Value {
+        return $this->compileRuntimeSpinePhpLowering($internalName, $block, $logicalName);
+    }
+
+    private function compileRuntimeInitVmContextM3Native(
+        string $internalName,
+        Block $block,
+        string $logicalName
+    ): PHPLLVM\Value {
+        return $this->compileRuntimeSpinePhpLowering($internalName, $block, $logicalName);
+    }
+
+    private function compileRuntimeLoadCoreModulesM3Native(
+        string $internalName,
+        Block $block,
+        string $logicalName
+    ): PHPLLVM\Value {
+        return $this->compileRuntimeSpinePhpLowering($internalName, $block, $logicalName);
+    }
+
+    private function compileRuntimeSpinePhpLowering(
+        string $internalName,
+        Block $block,
+        string $logicalName
+    ): PHPLLVM\Value {
+        $lcname = strtolower($logicalName);
+        if (isset($this->context->functions[$lcname])) {
+            return $this->context->functions[$lcname];
+        }
+
+        return $this->compileBlockPhpLowering($internalName, $block, $logicalName, $logicalName);
     }
 
     /**
