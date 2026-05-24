@@ -109,11 +109,11 @@ static const char *phpc_builtin_functions[] = {
     "hexdec",
     "htmlspecialchars",
     "http_build_query",
-    "parse_str",
     "http_response_code",
     "hypot",
     "implode",
     "in_array",
+    "ini_set",
     "intdiv",
     "interface_exists",
     "intval",
@@ -161,6 +161,8 @@ static const char *phpc_builtin_functions[] = {
     "ob_start",
     "octdec",
     "ord",
+    "pack",
+    "parse_str",
     "parse_url",
     "password_hash",
     "password_verify",
@@ -206,6 +208,7 @@ static const char *phpc_builtin_functions[] = {
     "sizeof",
     "sleep",
     "sort",
+    "spl_autoload_register",
     "sprintf",
     "sqrt",
     "stat",
@@ -222,6 +225,7 @@ static const char *phpc_builtin_functions[] = {
     "strchr",
     "strcmp",
     "strcspn",
+    "stream_context_create",
     "strip_tags",
     "stripos",
     "stripslashes",
@@ -265,4 +269,4 @@ static const char *phpc_builtin_functions[] = {
     "web_string",
     "wordwrap",
 };
-static const size_t phpc_builtin_functions_count = 262;
+static const size_t phpc_builtin_functions_count = 268;

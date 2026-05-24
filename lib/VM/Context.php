@@ -21,6 +21,8 @@ class Context {
     public array $enums = [];
     /** @var list<callable(string): bool> */
     public array $classAutoloaders = [];
+    /** @var list<callable(Context, string): void> spl_autoload_register() stack (#1369) */
+    public array $splAutoloadCallbacks = [];
     /** @var array<string, true> */
     private array $loadedCompileUnits = [];
     private ?RunStackEntry $runStack = null;
@@ -130,9 +132,12 @@ class Context {
         }
     }
 
-  /** Try registered class autoloaders (PSR-4 project bootstrap, issue #155). */
+  /** Try spl_autoload_register() callbacks, then PSR-4 project autoloaders (#155, #1369). */
     public function autoloadClass(string $className): bool
     {
+        if (\PHPCompiler\ext\standard\VmSplAutoload::runStack($this, $className)) {
+            return true;
+        }
         foreach ($this->classAutoloaders as $loader) {
             if ($loader($className)) {
                 return true;
