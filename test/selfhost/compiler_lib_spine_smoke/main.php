@@ -396,6 +396,7 @@ require_once __DIR__.'/../../../ext/standard/quotemeta.php';
 require_once __DIR__.'/../../../ext/standard/rawurldecode.php';
 require_once __DIR__.'/../../../ext/standard/rawurlencode.php';
 require_once __DIR__.'/../../../ext/standard/sprintf_.php';
+require_once __DIR__.'/../../../ext/standard/stream_context_create.php';
 require_once __DIR__.'/../../../ext/standard/str_contains.php';
 require_once __DIR__.'/../../../ext/standard/str_ends_with.php';
 require_once __DIR__.'/../../../ext/standard/str_pad.php';
