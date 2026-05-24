@@ -2,8 +2,8 @@
 unset() on a local variable
 --FILE--
 <?php
-$x = 42;
+$x = 1;
 unset($x);
-echo isset($x) ? "set\n" : "unset\n";
+echo isset($x) ? "set" : "unset", "\n";
 --EXPECT--
 unset

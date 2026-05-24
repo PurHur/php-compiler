@@ -26,10 +26,8 @@ class JITTest extends BaseTest {
             if (str_contains(strtolower($case[0]), 'password')) {
                 continue;
             }
-            // Variadic recv and func_get_args() are VM-only until JIT lowering lands (#197).
-            if (str_contains(strtolower($case[0]), 'variadic')
-                || str_contains(strtolower($case[0]), 'func_get_args')
-            ) {
+            // func_get_args()/func_num_args() remain VM-only (#197).
+            if (str_contains(strtolower($case[0]), 'func_get_args')) {
                 continue;
             }
             yield $case;

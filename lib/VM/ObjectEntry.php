@@ -38,6 +38,14 @@ class ObjectEntry {
         return $this->properties[$name];
     }
 
+    public function unsetProperty(string $name): void
+    {
+        if (!isset($this->properties[$name])) {
+            return;
+        }
+        $this->properties[$name]->null();
+    }
+
     public function getProperties(int $purpose): array {
         return $this->class->getProperties($this->properties, $purpose);
     }
