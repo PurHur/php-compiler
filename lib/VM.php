@@ -181,7 +181,12 @@ restart:
                     } elseif ($container->type === Variable::TYPE_ARRAY) {
                         $table = $container->toArray();
                         if (!$forWrite && !$table->keyExists($arg3)) {
-                            $this->context->errors->undefinedArrayKey($arg3);
+                            $this->context->errors->undefinedArrayKey(
+                                $arg3,
+                                $this->context,
+                                $frame,
+                                '' !== $frame->scriptPath ? $frame->scriptPath : null
+                            );
                         }
                         $arg1->indirect($table->findVariable($arg3, $forWrite));
                     } else {
