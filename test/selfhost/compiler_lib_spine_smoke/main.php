@@ -515,6 +515,7 @@ require_once __DIR__.'/../../../ext/standard/shell_exec.php';
 require_once __DIR__.'/../../../ext/standard/sin.php';
 require_once __DIR__.'/../../../ext/standard/sleep.php';
 require_once __DIR__.'/../../../ext/standard/sort_.php';
+require_once __DIR__.'/../../../ext/standard/spl_autoload_register.php';
 require_once __DIR__.'/../../../ext/standard/sprintf_.php';
 require_once __DIR__.'/../../../ext/standard/sqrt.php';
 require_once __DIR__.'/../../../ext/standard/stat_.php';
