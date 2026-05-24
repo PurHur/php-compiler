@@ -33,20 +33,20 @@ Supporting fixes from #1402:
 | `Runtime::parse` / `Runtime::compile` | On M3 allowlist; compile-driver link OK (#1496) |
 | `Runtime::loadJitContext` | Compile-driver link OK (#1402) |
 | `Runtime::__construct` | Slim ctor via `compileRuntimeConstructM3Native` → `compileBlockPhpLowering` (#1494) |
-| `Runtime::initParsePipeline` / `Runtime::initCompiler` / `Runtime::loadCoreModules` | Real-lowered via `compileRuntime*M3Native` when not combined with `initVmContext` |
-| `Runtime::initVmContext` | **LLVM 9 link segfault** when real-lowered alongside other spine helpers; stays on deny list (stub at runtime) |
+| `Runtime::initParsePipeline` / `Runtime::initCompiler` / `Runtime::loadCoreModules` | On deny list; `compileRuntime*M3Native` → PHP CFG lowering (#1494) |
+| `Runtime::initVmContext` | **Native** via `RuntimeInitVmContext::emit` (allocate `VM\Context`, set `runtime` + `vmContext`); wired in `compileBlock()`; off deny list (#1494). PHP CFG `new VMContext` still LLVM 9 link crash when combined with ctor spine. |
 | `Runtime::loadJit` | `compileRuntimeLoadJitM3Native` + nested `createJit` helpers (#1495) |
 | `Runtime::standalone` | Compile-driver link OK (#1402, #1056) |
 | `helloworld_compile_smoke` | Link OK with real lowering |
 | `runtime_ctor_smoke` | `php bin/compile.php -l test/bootstrap-aot/runtime_ctor_smoke.php` |
 | `runtime_parse_compile_smoke` | `php bin/compile.php -l test/bootstrap-aot/runtime_parse_compile_smoke.php` |
 
-**Runtime emit:** compile driver uses env dispatch (`PHP_COMPILER_M3_COMPILE_MODE=compile`, `PHP_COMPILER_M3_SOURCE`, `PHP_COMPILER_M3_OUT`) so AOT entry avoids top-level `__DIR__` concat (#1493). `BOOTSTRAP_M3_RUNTIME_COMPILE=1` reaches `helloworld_compile_smoke` but still segfaults — stubbed `Runtime::initVmContext` leaves `vmContext` uninitialized. Real-lowering `initVmContext` segfaults LLVM 9 at link when combined with ctor spine. Next: safe `VMContext` C floor or isolated `initVmContext` link.
+**Runtime emit:** compile driver uses env dispatch (`PHP_COMPILER_M3_COMPILE_MODE=compile`, `PHP_COMPILER_M3_SOURCE`, `PHP_COMPILER_M3_OUT`) so AOT entry avoids top-level `__DIR__` concat (#1493). With `BOOTSTRAP_M3_RUNTIME_COMPILE=1`, compile-driver **link** is OK; native runtime compile still often segfaults (139) in `__hashtable__readStringKeyValue` until native `VM\Context` seeds hashtable slots + `ErrorReporter` / `ScriptStack` (registering extra `VM\Context` hashtable props in `Object_` currently re-triggers LLVM 9 link crash).
 
 **Probe findings (2026-05):**
 
-- **Link + real lowering:** `BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1` + `BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING=1` → `compile driver link OK` (includes `Runtime::parse` / `Runtime::compile` on allowlist, not on deny list — #1496).
-- **Runtime:** env dispatch enters compile mode (#1493); `BOOTSTRAP_M3_RUNTIME_COMPILE=1` still segfaults until `initVmContext` is real-lowered without LLVM 9 crash.
+- **Link + real lowering:** `BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1` + `BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING=1` → `compile driver link OK` (includes native `Runtime::initVmContext` on allowlist).
+- **Runtime:** `BOOTSTRAP_M3_RUNTIME_COMPILE=1` — probe may exit 0 with Zend partial fallback; `helloworld_compile_smoke: compile OK` not yet reliable (native ctor / `VM\Context` incomplete).
 - **Native success:** probe sets `M3_NATIVE_COMPILE=1` and `emit_path=native` only when compile driver exits 0, stdout contains `helloworld_compile_smoke: compile OK`, and `build/helloworld-aot` is executable.
 - **Strict:** `BOOTSTRAP_M3_HELLOWORLD_STRICT=1` fails with `emit_path=zend_fallback_would_be_used block_reason=…` (no Zend `bin/compile.php` fallback).
 
@@ -58,7 +58,7 @@ BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING=1 \
 ./script/bootstrap-selfhost-helloworld-probe.sh
 ```
 
-Runtime gate (blocked on `initVmContext`):
+Runtime gate:
 
 ```bash
 BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1 \
@@ -82,10 +82,10 @@ BOOTSTRAP_M3_RUNTIME_COMPILE=1 \
 | Symbol | Notes |
 |--------|-------|
 | `Block::slotIndexForVariableName` | Also in compiler hot-path skip |
-| `Runtime::initVmContext` | `new VMContext` segfaults when lowered with full ctor spine (#1494) |
+| `Runtime::initParsePipeline` / `initCompiler` / `loadCoreModules` | PHP CFG spine; deny while expanding (#1494) |
 | `Runtime::createJit` / `jitContextForLoadJit` / `loadJitCompileModuleFuncs` | Split from `loadJit`; stay on deny list (stubbed) while outer `loadJit` is real-lowered (#1495) |
 
-**Dependency:** runtime `loadJit` needs real `initVmContext` (`fix/m3-init-vmcontext`); until then `BOOTSTRAP_M3_RUNTIME_COMPILE=1` may segfault in ctor.
+**Next:** complete native `VM\Context` (hashtable props + sub-objects) without LLVM 9 link regression, or small `lib/AOT/runtime/` C floor (#1494).
 
 ## Env flags
 
