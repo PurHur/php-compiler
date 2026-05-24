@@ -7,8 +7,6 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringArg;
-use PHPCompiler\JIT\ReflectionBuiltinHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -38,15 +36,10 @@ final class class_exists_ extends Internal
         if (\count($args) < 1 || \count($args) > 2) {
             throw new \LogicException('class_exists() requires one or two arguments in this compiler build');
         }
-        if (JITVariable::TYPE_STRING === $args[0]->type || JITVariable::TYPE_VALUE === $args[0]->type) {
-            $this->jitString($context, $args[0], 'class_exists() class name');
+        if (JITVariable::TYPE_STRING !== $args[0]->type && JITVariable::TYPE_VALUE !== $args[0]->type) {
+            throw new \LogicException('class_exists() class name must be a string in this compiler build');
         }
-        $name = ReflectionBuiltinHelper::requireCompileTimeClassName(
-            $context,
-            $args[0],
-            'class_exists() class name'
-        );
 
-        return ReflectionBuiltinHelper::classExistsLiteral($context, $name);
+        return JitClassExists::invoke($context, $args[0]);
     }
 }
