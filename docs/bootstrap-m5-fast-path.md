@@ -27,9 +27,10 @@ Supporting fixes from #1402:
 | Allowlist | Gate |
 |-----------|------|
 | `Runtime::parseAndCompile` | Link OK with `PHP_COMPILER_M3_COMPILE_DRIVER=1` |
-| `Runtime::loadJitContext` | Compile-driver link OK (#1402); `loadJit` still denied (LLVM 9 segfault) |
+| `Runtime::loadJitContext` | Compile-driver link OK (#1402) |
+| `Runtime::loadJit` | Compile-driver link OK via `compileRuntimeLoadJitM3Native` (PHP CFG + `new JIT` segfaults LLVM 9; helpers `createJit` / `jitContextForLoadJit` / `loadJitCompileModuleFuncs` on deny list) |
 
-Runtime emit still blocked: ctor / `loadJit` / `standalone` remain stubbed until removed from deny list.
+Runtime emit still blocked: ctor / `standalone` remain stubbed; full PHP lowering of `loadJit` body blocked until LLVM 9 `new JIT` fix.
 
 Re-run link gate:
 
@@ -51,8 +52,8 @@ BOOTSTRAP_M3_RUNTIME_COMPILE=1  # separate from link; do not enable until spine 
 |--------|-------|
 | `Block::slotIndexForVariableName` | Also in compiler hot-path skip |
 | `Runtime::__construct` | LLVM 9 segfault during compile-driver link |
-| `Runtime::loadJit` | LLVM 9 segfault (even when `loadJitContext` is real-lowered) |
-| `Runtime::standalone` | Module verify: ICmp operand type mismatch (enable only after `loadJit`) |
+| `Runtime::createJit` / `jitContextForLoadJit` / `loadJitCompileModuleFuncs` | Split from `loadJit`; stubbed while outer `loadJit` uses native spine |
+| `Runtime::standalone` | Module verify: `__value__` read call parameter mismatch (not yet enabled on allowlist) |
 
 ## Env flags
 
