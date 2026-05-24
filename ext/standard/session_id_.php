@@ -53,8 +53,10 @@ final class session_id_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'session_id() not implemented for JIT in this compiler build (issue #1183)'
-        );
+        if (\count($args) > 1) {
+            throw new \LogicException('session_id() accepts at most one argument in this compiler build');
+        }
+
+        return JitSessionId::invoke($context, ...$args);
     }
 }

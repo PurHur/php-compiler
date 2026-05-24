@@ -50,6 +50,7 @@ final class SelfHostBuiltinPolicy
     /** @var array<string, string> */
     private const CATEGORY_OUTPUT = self::VM_ONLY_DEFERRED + [
         'getallheaders' => 'output', 'header_list' => 'output',
+        'session_id' => 'output',
     ];
 
     /** @var array<string, string> */

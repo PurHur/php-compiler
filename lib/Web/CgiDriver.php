@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Web;
 
+use PHPCompiler\ext\standard\VmSession;
 use PHPCompiler\Runtime;
 use PHPCompiler\VM\OutputBuffer;
 use PHPCompiler\VM\ScriptExit;
@@ -59,6 +60,7 @@ final class CgiDriver
     public static function runVmScript(string $script): array
     {
         ResponseContext::reset();
+        VmSession::reset();
         OutputBuffer::reset();
         $code = file_get_contents($script);
         if (false === $code) {

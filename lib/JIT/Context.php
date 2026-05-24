@@ -332,6 +332,7 @@ class Context {
             $this->builder->call($this->initFunc);
             if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
                 Builtin\HttpResponseCode::emitResetForStandaloneMain($this);
+                Builtin\SessionId::emitResetForStandaloneMain($this);
                 Builtin\PendingHeaders::emitResetForStandaloneMain($this);
                 $this->builder->call($this->lookupFunction('__superglobals__refresh'));
             }
