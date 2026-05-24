@@ -29,8 +29,9 @@ Supporting fixes from #1402:
 | `Runtime::parseAndCompile` | Link OK with `PHP_COMPILER_M3_COMPILE_DRIVER=1` |
 | `Runtime::loadJitContext` | Compile-driver link OK (#1402) |
 | `Runtime::loadJit` | Compile-driver link OK via `compileRuntimeLoadJitM3Native` (PHP CFG + `new JIT` segfaults LLVM 9; helpers `createJit` / `jitContextForLoadJit` / `loadJitCompileModuleFuncs` on deny list) |
+| `Runtime::standalone` | Compile-driver link OK (#1402, #1056) |
 
-Runtime emit still blocked: ctor / `standalone` remain stubbed; full PHP lowering of `loadJit` body blocked until LLVM 9 `new JIT` fix.
+Runtime emit still blocked: ctor remains stubbed; full PHP lowering of `loadJit` body blocked until LLVM 9 `new JIT` fix.
 
 Re-run link gate:
 
@@ -53,7 +54,7 @@ BOOTSTRAP_M3_RUNTIME_COMPILE=1  # separate from link; do not enable until spine 
 | `Block::slotIndexForVariableName` | Also in compiler hot-path skip |
 | `Runtime::__construct` | LLVM 9 segfault during compile-driver link |
 | `Runtime::createJit` / `jitContextForLoadJit` / `loadJitCompileModuleFuncs` | Split from `loadJit`; stubbed while outer `loadJit` uses native spine |
-| `Runtime::standalone` | Module verify: `__value__` read call parameter mismatch (not yet enabled on allowlist) |
+| `Runtime::compile` / `Runtime::parse` | Not yet on allowlist |
 
 ## Env flags
 

@@ -168,6 +168,9 @@ class JIT {
         if (str_ends_with($lower, '\\runtime::loadjitcontext')) {
             return true;
         }
+        if (str_ends_with($lower, '\\runtime::standalone')) {
+            return true;
+        }
         return false;
     }
 
@@ -187,7 +190,6 @@ class JIT {
             '\\runtime::createjit',
             '\\runtime::jitcontextforloadjit',
             '\\runtime::loadjitcompilemodulefuncs',
-            '\\runtime::standalone',
             '\\runtime::compile',
             '\\runtime::parse',
         ];
