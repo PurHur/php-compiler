@@ -389,6 +389,25 @@ final class IncludeHelper
         Block $block,
         string $name
     ): ?Variable {
+        $visited = [];
+
+        return self::lastAssignVariableForNameInBlock($context, $block, $name, $visited);
+    }
+
+    /**
+     * @param array<int, true> $visited
+     */
+    private static function lastAssignVariableForNameInBlock(
+        Context $context,
+        Block $block,
+        string $name,
+        array &$visited
+    ): ?Variable {
+        $blockId = \spl_object_id($block);
+        if (isset($visited[$blockId])) {
+            return null;
+        }
+        $visited[$blockId] = true;
         $lastAssign = null;
         foreach ($block->opCodes as $op) {
             if (OpCode::TYPE_ASSIGN === $op->type) {
@@ -406,13 +425,13 @@ final class IncludeHelper
                 }
             }
             if (null !== $op->block1) {
-                $nested = self::lastAssignVariableForName($context, $op->block1, $name);
+                $nested = self::lastAssignVariableForNameInBlock($context, $op->block1, $name, $visited);
                 if (null !== $nested) {
                     $lastAssign = $nested;
                 }
             }
             if (null !== $op->block2) {
-                $nested = self::lastAssignVariableForName($context, $op->block2, $name);
+                $nested = self::lastAssignVariableForNameInBlock($context, $op->block2, $name, $visited);
                 if (null !== $nested) {
                     $lastAssign = $nested;
                 }
@@ -496,27 +515,45 @@ final class IncludeHelper
     private static function hasMultipleAssignsInCaller(Block $callerBlock, string $name): bool
     {
         $count = 0;
-        self::countAssignsToName($callerBlock, $name, $count);
+        $visited = [];
+        self::countAssignsToName($callerBlock, $name, $count, $visited);
 
         return $count > 1;
     }
 
-    private static function countAssignsToName(Block $block, string $name, int &$count): void
+    /**
+     * @param array<int, true> $visited
+     */
+    private static function countAssignsToName(Block $block, string $name, int &$count, array &$visited): void
     {
+        $blockId = \spl_object_id($block);
+        if (isset($visited[$blockId])) {
+            return;
+        }
+        $visited[$blockId] = true;
         foreach ($block->opCodes as $op) {
             if (OpCode::TYPE_ASSIGN === $op->type) {
                 foreach ([$op->arg1, $op->arg2] as $slotIdx) {
                     $dest = $block->getOperand($slotIdx);
                     if (OperandName::resolve($dest) === $name) {
                         ++$count;
+                        if ($count > 1) {
+                            return;
+                        }
                     }
                 }
             }
             if (null !== $op->block1) {
-                self::countAssignsToName($op->block1, $name, $count);
+                self::countAssignsToName($op->block1, $name, $count, $visited);
+                if ($count > 1) {
+                    return;
+                }
             }
             if (null !== $op->block2) {
-                self::countAssignsToName($op->block2, $name, $count);
+                self::countAssignsToName($op->block2, $name, $count, $visited);
+                if ($count > 1) {
+                    return;
+                }
             }
         }
     }

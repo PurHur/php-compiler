@@ -93,6 +93,7 @@ require_once __DIR__.'/../../../lib/Lint/Issue.php';
 require_once __DIR__.'/../../../lib/Lint/UnsupportedRegistry.php';
 require_once __DIR__.'/../../../lib/Lint/LintCompiler.php';
 require_once __DIR__.'/../../../lib/Lint/Linter.php';
+require_once __DIR__.'/../../bootstrap-aot/compiler_smoke.php';
 require_once __DIR__.'/../../bootstrap-aot/helloworld_compile_smoke.php';
 
 $modeFile = __DIR__.'/../../../build/.m3-helloworld-mode';
