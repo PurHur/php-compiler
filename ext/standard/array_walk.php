@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\ArrayMapCallbackPolicy;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -16,7 +17,7 @@ use PHPLLVM\Value;
 /**
  * array_walk() — in-place walk with string builtin callbacks (subset of PHP; issue #1209).
  *
- * JIT/AOT: deferred — use VM or compile-time string callbacks only in future (#1209).
+ * JIT/AOT: compile-time string builtin callbacks (subset; #1209).
  */
 final class array_walk extends Internal
 {
@@ -67,8 +68,16 @@ final class array_walk extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'array_walk() not implemented for JIT in this compiler build (issue #1209)'
-        );
+        if (2 !== \count($args)) {
+            throw new \LogicException('array_walk() requires exactly two arguments in this compiler build');
+        }
+        if (!ArrayMapCallbackPolicy::isJitLowerable($args[1])) {
+            throw new \LogicException(ArrayMapCallbackPolicy::jitRejectionMessage());
+        }
+        if (JITVariable::TYPE_STRING === $args[1]->type || JITVariable::TYPE_VALUE === $args[1]->type) {
+            $this->jitString($context, $args[1], 'array_walk() callback');
+        }
+
+        return ArrayBuiltinHelper::walkInPlace($context, $args[0], $args[1]);
     }
 }

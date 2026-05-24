@@ -13,13 +13,15 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * array_splice() for packed list arrays (subset of PHP; LLVM deferred #1205).
+ * array_splice() for packed list arrays (subset of PHP; LLVM via ArrayBuiltinHelper #1205).
  */
 final class array_splice extends Internal
 {
@@ -78,7 +80,24 @@ final class array_splice extends Internal
         if ($argc >= 3 && JITVariable::TYPE_NATIVE_LONG !== $args[2]->type) {
             throw new \LogicException('array_splice() length must be an integer in this compiler build');
         }
-        // In-place packed-list splice with variable-length replacement needs LLVM assignPackedList (#1205).
-        throw new \LogicException('array_splice() is not implemented for JIT in this compiler build');
+
+        $i64 = $context->getTypeFromString('int64');
+        $i1 = $context->getTypeFromString('int1');
+        $offset = JitLongArg::lower($context, $args[1], 'array_splice() offset');
+        $hasLength = $i1->constInt($argc >= 3 ? 1 : 0, false);
+        $length = $argc >= 3
+            ? JitLongArg::lower($context, $args[2], 'array_splice() length')
+            : $i64->constInt(0, false);
+        $replacement = 4 === $argc ? $args[3] : null;
+
+        return ArrayBuiltinHelper::buildSpliceArray(
+            $context,
+            $args[0],
+            $offset,
+            $hasLength,
+            $length,
+            $replacement,
+            4 === $argc
+        );
     }
 }

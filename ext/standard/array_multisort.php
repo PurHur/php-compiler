@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
@@ -15,7 +16,7 @@ use PHPLLVM\Value;
  * array_multisort() — sort multiple packed arrays by the first (subset of PHP; issue #1212).
  *
  * VM: homogeneous string or integer arrays, same length, optional trailing SORT_ASC (4) or
- * SORT_DESC (3) for the primary array. JIT/AOT: deferred until multisort LLVM helper lands.
+ * SORT_DESC (3) for the primary array. JIT/AOT: coupled packed bubble sort (#1212).
  */
 final class array_multisort extends Internal
 {
@@ -123,9 +124,46 @@ final class array_multisort extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'array_multisort() not implemented for JIT in this compiler build; use bin/vm.php (issue #1212)'
-        );
+        $argc = \count($args);
+        if ($argc < 2) {
+            throw new \LogicException(
+                'array_multisort() requires at least two arguments in this compiler build'
+            );
+        }
+        $arrays = [];
+        $descending = false;
+        for ($i = 0; $i < $argc; ++$i) {
+            $arg = $args[$i];
+            if (JITVariable::TYPE_HASHTABLE === ($arg->type & ~JITVariable::IS_NATIVE_ARRAY)
+                || ArrayBuiltinHelper::isNativeArray($arg->type)) {
+                $arrays[] = $arg;
+                continue;
+            }
+            if (JITVariable::TYPE_NATIVE_LONG === $arg->type
+                && ($arg->isConstant ?? false)
+                && JITVariable::KIND_VALUE === $arg->kind) {
+                $order = (int) $context->llvm->lib->LLVMConstIntGetZExtValue($arg->value->value);
+                if (self::SORT_DESC === $order) {
+                    $descending = true;
+                } elseif (self::SORT_ASC !== $order) {
+                    throw new \LogicException(
+                        'array_multisort() only supports SORT_ASC or SORT_DESC in this compiler build'
+                    );
+                }
+                continue;
+            }
+            throw new \LogicException(
+                'array_multisort() arguments must be arrays or SORT_* order flags in this compiler build'
+            );
+        }
+        if (\count($arrays) < 2) {
+            throw new \LogicException(
+                'array_multisort() requires at least two array arguments in this compiler build'
+            );
+        }
+        ArrayBuiltinHelper::multisortPacked($context, $arrays, $descending);
+
+        return $context->getTypeFromString('int1')->constInt(1, false);
     }
 
     private static function compareValues(Variable $a, Variable $b): int

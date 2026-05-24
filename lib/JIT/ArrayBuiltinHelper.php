@@ -1434,6 +1434,657 @@ final class ArrayBuiltinHelper
     }
 
     /**
+     * array_splice() for packed list arrays — returns removed slice, mutates source (issue #1205).
+     *
+     * @param Value $offset   int64
+     * @param Value $hasLength int1
+     * @param Value $length    int64 (ignored when $hasLength is false)
+     */
+    public static function buildSpliceArray(
+        Context $context,
+        Variable $array,
+        Value $offset,
+        Value $hasLength,
+        Value $length,
+        ?Variable $replacement,
+        bool $hasReplacement
+    ): Value {
+        if (self::isNativeArray($array->type)) {
+            $ht = self::nativeListToHashTable($context, $array);
+            $removed = self::buildSpliceFromHashTable(
+                $context,
+                $ht,
+                $offset,
+                $hasLength,
+                $length,
+                $replacement,
+                $hasReplacement
+            );
+            HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
+
+            return $removed;
+        }
+        $ht = self::loadHashTable($context, $array);
+        $removed = self::buildSpliceFromHashTable(
+            $context,
+            $ht,
+            $offset,
+            $hasLength,
+            $length,
+            $replacement,
+            $hasReplacement
+        );
+        HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
+
+        return $removed;
+    }
+
+    private static function buildSpliceFromHashTable(
+        Context $context,
+        Value $src,
+        Value $offset,
+        Value $hasLength,
+        Value $length,
+        ?Variable $replacement,
+        bool $hasReplacement
+    ): Value {
+        $snapshot = self::clonePackedHashTable($context, $src);
+        $removed = self::buildSliceFromHashTable($context, $snapshot, $offset, $hasLength, $length);
+
+        $map = $context->structFieldMap['__hashtable__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $num = $context->builder->call(
+            $context->lookupFunction('__hashtable__getNumElements'),
+            $src
+        );
+        $countI64 = $context->builder->zExt($num, $i64);
+        $normOffsetI64 = self::normalizeSliceOffset($context, $offset, $countI64);
+        $normOffset = $context->builder->truncOrBitCast($normOffsetI64, $sizeT);
+        $removeLen = self::computeSpliceRemoveLen($context, $num, $normOffset, $hasLength, $length);
+
+        $replHt = null;
+        $replCount = $zero;
+        if ($hasReplacement && null !== $replacement) {
+            $replHt = self::isNativeArray($replacement->type)
+                ? self::nativeListToHashTable($context, $replacement)
+                : self::loadHashTable($context, $replacement);
+            $replCount = $context->builder->load(
+                $context->builder->structGep($replHt, $map['nextFreeElement'])
+            );
+        }
+
+        $tailStart = $context->builder->add($normOffset, $removeLen);
+        $tailLen = $context->builder->sub($num, $tailStart);
+        $newNum = $context->builder->add(
+            $context->builder->add($normOffset, $replCount),
+            $tailLen
+        );
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__grow'),
+            $src,
+            $newNum
+        );
+
+        $temp = HashTableHelper::alloc($context);
+        $destIdxSlot = $context->builder->alloca($sizeT, 1, 'array_splice_dest');
+        $context->builder->store($zero, $destIdxSlot);
+
+        self::copyPackedPrefixToTemp(
+            $context,
+            $snapshot,
+            $zero,
+            $normOffset,
+            $temp,
+            $destIdxSlot
+        );
+        if ($hasReplacement && null !== $replHt) {
+            self::copyPackedHashtableToTemp(
+                $context,
+                $replHt,
+                $temp,
+                $destIdxSlot
+            );
+        }
+        self::copyPackedPrefixToTemp(
+            $context,
+            $snapshot,
+            $tailStart,
+            $tailLen,
+            $temp,
+            $destIdxSlot
+        );
+
+        self::copyTempPackedIntoHashtable($context, $temp, $src, $newNum);
+
+        return $removed;
+    }
+
+    private static function computeSpliceRemoveLen(
+        Context $context,
+        Value $num,
+        Value $normOffset,
+        Value $hasLength,
+        Value $length
+    ): Value {
+        $sizeT = $context->getTypeFromString('size_t');
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $sizeT->constInt(0, false);
+        $lengthSized = $context->builder->truncOrBitCast($length, $sizeT);
+        $lengthI64 = $context->builder->sext($length, $i64);
+        $defaultLen = $context->builder->sub($num, $normOffset);
+        $negAdjLen = $context->builder->truncOrBitCast(
+            $context->builder->add(
+                $context->builder->sext($defaultLen, $i64),
+                $lengthI64
+            ),
+            $sizeT
+        );
+        $withLength = $context->builder->select($hasLength, $lengthSized, $defaultLen);
+        $negLength = $context->builder->and(
+            $hasLength,
+            $context->builder->icmp(Builder::INT_SLT, $lengthI64, $i64->constInt(0, false))
+        );
+        $removeLen = $context->builder->select($negLength, $negAdjLen, $withLength);
+
+        $isNegative = $context->builder->icmp(Builder::INT_SLT, $removeLen, $zero);
+        $removeLen = $context->builder->select($isNegative, $zero, $removeLen);
+
+        $offsetAtOrPastEnd = $context->builder->icmp(Builder::INT_SGE, $normOffset, $num);
+        $maxRem = $context->builder->sub($num, $normOffset);
+        $tooMuch = $context->builder->icmp(Builder::INT_SGT, $removeLen, $maxRem);
+        $capped = $context->builder->select($tooMuch, $maxRem, $removeLen);
+
+        return $context->builder->select($offsetAtOrPastEnd, $zero, $capped);
+    }
+
+    private static function copyPackedPrefixToTemp(
+        Context $context,
+        Value $src,
+        Value $srcStart,
+        Value $count,
+        Value $temp,
+        Value $destIdxSlot
+    ): void {
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $srcIdxSlot = $context->builder->alloca($sizeT, 1, 'array_splice_src');
+        $takenSlot = $context->builder->alloca($sizeT, 1, 'array_splice_taken');
+        $context->builder->store($srcStart, $srcIdxSlot);
+        $context->builder->store($zero, $takenSlot);
+
+        $head = BasicBlockHelper::append($context, 'array_splice_copy_head');
+        $body = BasicBlockHelper::append($context, 'array_splice_copy_body');
+        $done = BasicBlockHelper::append($context, 'array_splice_copy_done');
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $taken = $context->builder->load($takenSlot);
+        $atLimit = $context->builder->icmp(Builder::INT_SGE, $taken, $count);
+        $context->builder->branchIf($atLimit, $done, $body);
+
+        $context->builder->positionAtEnd($body);
+        $srcIdx = $context->builder->load($srcIdxSlot);
+        $destIdx = $context->builder->load($destIdxSlot);
+        self::copyPackedListEntry($context, $src, $srcIdx, $temp, $destIdx);
+        $context->builder->store($context->builder->addNoSignedWrap($destIdx, $one), $destIdxSlot);
+        $context->builder->store($context->builder->addNoSignedWrap($srcIdx, $one), $srcIdxSlot);
+        $context->builder->store($context->builder->addNoSignedWrap($taken, $one), $takenSlot);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($done);
+    }
+
+    private static function copyPackedHashtableToTemp(
+        Context $context,
+        Value $replHt,
+        Value $temp,
+        Value $destIdxSlot
+    ): void {
+        $map = $context->structFieldMap['__hashtable__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $replEnd = $context->builder->load(
+            $context->builder->structGep($replHt, $map['nextFreeElement'])
+        );
+        $srcIdxSlot = $context->builder->alloca($sizeT, 1, 'array_splice_repl_src');
+        $context->builder->store($zero, $srcIdxSlot);
+
+        $head = BasicBlockHelper::append($context, 'array_splice_repl_head');
+        $body = BasicBlockHelper::append($context, 'array_splice_repl_body');
+        $done = BasicBlockHelper::append($context, 'array_splice_repl_done');
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $srcIdx = $context->builder->load($srcIdxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $srcIdx, $replEnd);
+        $context->builder->branchIf($atEnd, $done, $body);
+
+        $context->builder->positionAtEnd($body);
+        $destIdx = $context->builder->load($destIdxSlot);
+        self::copyPackedListEntry($context, $replHt, $srcIdx, $temp, $destIdx);
+        $context->builder->store($context->builder->addNoSignedWrap($destIdx, $one), $destIdxSlot);
+        $context->builder->store($context->builder->addNoSignedWrap($srcIdx, $one), $srcIdxSlot);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($done);
+    }
+
+    private static function copyTempPackedIntoHashtable(
+        Context $context,
+        Value $temp,
+        Value $dest,
+        Value $newNum
+    ): void {
+        $map = $context->structFieldMap['__hashtable__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $context->builder->store($newNum, $context->builder->structGep($dest, $map['numElements']));
+        $context->builder->store($newNum, $context->builder->structGep($dest, $map['nextFreeElement']));
+
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'array_splice_write_idx');
+        $context->builder->store($zero, $idxSlot);
+        $head = BasicBlockHelper::append($context, 'array_splice_write_head');
+        $body = BasicBlockHelper::append($context, 'array_splice_write_body');
+        $done = BasicBlockHelper::append($context, 'array_splice_write_done');
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $newNum);
+        $context->builder->branchIf($atEnd, $done, $body);
+
+        $context->builder->positionAtEnd($body);
+        self::copyPackedListEntry($context, $temp, $idx, $dest, $idx);
+        $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($done);
+    }
+
+    /**
+     * array_walk() in-place with compile-time string builtin callbacks (issue #1209).
+     */
+    public static function walkInPlace(Context $context, Variable $array, Variable $callback): Value
+    {
+        if (!ArrayMapCallbackPolicy::isJitLowerable($callback)) {
+            throw new \LogicException(ArrayMapCallbackPolicy::jitRejectionMessage());
+        }
+        if (self::isNativeArray($array->type)) {
+            throw new \LogicException(
+                'array_walk() cannot compile fixed-size literal arrays in JIT/AOT yet; assign to a variable first'
+            );
+        }
+        $handler = self::resolveMapCallback($callback);
+        $resultType = self::mapCallbackResultType($handler);
+        $ht = self::loadHashTable($context, $array);
+        self::walkInPlaceHashTable($context, $ht, $handler, $resultType);
+        HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
+
+        return $context->getTypeFromString('int1')->constInt(1, false);
+    }
+
+    private static function walkInPlaceHashTable(
+        Context $context,
+        Value $src,
+        Internal $handler,
+        int $resultType
+    ): void {
+        $map = $context->structFieldMap['__hashtable__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $nextFree = $context->builder->load(
+            $context->builder->structGep($src, $map['nextFreeElement'])
+        );
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $nextFree, $zero);
+        $doneBlock = BasicBlockHelper::append($context, 'array_walk_done');
+        $workBlock = BasicBlockHelper::append($context, 'array_walk_work');
+        $context->builder->branchIf($isEmpty, $doneBlock, $workBlock);
+
+        $context->builder->positionAtEnd($workBlock);
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'array_walk_idx');
+        $context->builder->store($zero, $idxSlot);
+        $head = BasicBlockHelper::append($context, 'array_walk_head');
+        $check = BasicBlockHelper::append($context, 'array_walk_check');
+        $walkBlock = BasicBlockHelper::append($context, 'array_walk_map');
+        $skip = BasicBlockHelper::append($context, 'array_walk_skip');
+        $advance = BasicBlockHelper::append($context, 'array_walk_advance');
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $nextFree);
+        $context->builder->branchIf($atEnd, $doneBlock, $check);
+
+        $context->builder->positionAtEnd($check);
+        $isSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $src,
+            $idx
+        );
+        $context->builder->branchIf($isSet, $walkBlock, $skip);
+
+        $context->builder->positionAtEnd($walkBlock);
+        $elem = HashTableHelper::readIndexedToValueBox($context, $src, $idx);
+        $mapped = $handler->call($context, $elem);
+        self::storeMappedAtIndex(
+            $context,
+            $src,
+            $idx,
+            new Variable($context, $resultType, Variable::KIND_VALUE, $mapped),
+            $resultType
+        );
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($skip);
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($advance);
+        $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($doneBlock);
+    }
+
+    /**
+     * array_multisort() for homogeneous packed string or integer arrays (issue #1212).
+     *
+     * @param list<Variable> $arrays
+     */
+    public static function multisortPacked(Context $context, array $arrays, bool $descending): void
+    {
+        if (\count($arrays) < 2) {
+            throw new \LogicException(
+                'array_multisort() requires at least two array arguments in this compiler build'
+            );
+        }
+        $primary = $arrays[0];
+        $primaryHt = self::isNativeArray($primary->type)
+            ? self::nativeListToHashTable($context, $primary)
+            : self::loadHashTable($context, $primary);
+        $sizeT = $context->getTypeFromString('size_t');
+        $i64 = $context->getTypeFromString('int64');
+        $two = $sizeT->constInt(2, false);
+        $num = $context->builder->call(
+            $context->lookupFunction('__hashtable__getNumElements'),
+            $primaryHt
+        );
+        $tooSmall = $context->builder->icmp(Builder::INT_ULT, $num, $two);
+        $done = BasicBlockHelper::append($context, 'array_multisort_done');
+        $work = BasicBlockHelper::append($context, 'array_multisort_work');
+        $context->builder->branchIf($tooSmall, $done, $work);
+
+        $context->builder->positionAtEnd($work);
+        $hts = [];
+        foreach ($arrays as $array) {
+            if (self::isNativeArray($array->type)) {
+                throw new \LogicException(
+                    'array_multisort() cannot compile fixed-size literal arrays in JIT/AOT yet; assign to variables first'
+                );
+            }
+            $hts[] = self::loadHashTable($context, $array);
+        }
+        self::multisortCoupledBubble($context, $hts, $num, $descending);
+        foreach ($arrays as $i => $array) {
+            HashTableHelper::storeHashtableInArrayVariable($context, $array, $hts[$i]);
+        }
+
+        $context->builder->positionAtEnd($done);
+    }
+
+    /**
+     * @param list<Value> $hts packed __hashtable__* (primary first)
+     */
+    private static function multisortCoupledBubble(
+        Context $context,
+        array $hts,
+        Value $num,
+        bool $descending
+    ): void {
+        $primary = $hts[0];
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $firstEntry = self::listEntryAt($context, $primary, $zero);
+        $valueMap = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($firstEntry, $valueMap['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_STRING, false)
+        );
+        $sortStrings = BasicBlockHelper::append($context, 'array_multisort_coupled_str');
+        $sortLongs = BasicBlockHelper::append($context, 'array_multisort_coupled_long');
+        $sorted = BasicBlockHelper::append($context, 'array_multisort_coupled_done');
+        $context->builder->branchIf($isString, $sortStrings, $sortLongs);
+
+        $context->builder->positionAtEnd($sortStrings);
+        self::multisortCoupledBubbleTyped($context, $hts, $num, Variable::TYPE_STRING, $descending);
+        $context->builder->branch($sorted);
+
+        $context->builder->positionAtEnd($sortLongs);
+        self::multisortCoupledBubbleTyped($context, $hts, $num, Variable::TYPE_NATIVE_LONG, $descending);
+        $context->builder->branch($sorted);
+
+        $context->builder->positionAtEnd($sorted);
+    }
+
+    /**
+     * @param list<Value> $hts
+     */
+    private static function multisortCoupledBubbleTyped(
+        Context $context,
+        array $hts,
+        Value $num,
+        int $elemType,
+        bool $descending
+    ): void {
+        $primary = $hts[0];
+        $sizeT = $context->getTypeFromString('size_t');
+        $one = $sizeT->constInt(1, false);
+        $zero = $sizeT->constInt(0, false);
+        $outerSlot = $context->builder->alloca($sizeT, 1, 'array_multisort_outer');
+        $context->builder->store($zero, $outerSlot);
+        $outerHead = BasicBlockHelper::append($context, 'array_multisort_outer_head');
+        $outerBody = BasicBlockHelper::append($context, 'array_multisort_outer_body');
+        $outerDone = BasicBlockHelper::append($context, 'array_multisort_outer_done');
+        $context->builder->branch($outerHead);
+
+        $context->builder->positionAtEnd($outerHead);
+        $outer = $context->builder->load($outerSlot);
+        $outerEnd = $context->builder->sub($num, $one);
+        $outerAtEnd = $context->builder->icmp(Builder::INT_SGE, $outer, $outerEnd);
+        $context->builder->branchIf($outerAtEnd, $outerDone, $outerBody);
+
+        $context->builder->positionAtEnd($outerBody);
+        $innerSlot = $context->builder->alloca($sizeT, 1, 'array_multisort_inner');
+        $context->builder->store($zero, $innerSlot);
+        $limit = $context->builder->sub($context->builder->sub($num, $outer), $one);
+        $innerHead = BasicBlockHelper::append($context, 'array_multisort_inner_head');
+        $innerBody = BasicBlockHelper::append($context, 'array_multisort_inner_body');
+        $innerDone = BasicBlockHelper::append($context, 'array_multisort_inner_done');
+        $context->builder->branch($innerHead);
+
+        $context->builder->positionAtEnd($innerHead);
+        $inner = $context->builder->load($innerSlot);
+        $innerAtEnd = $context->builder->icmp(Builder::INT_SGE, $inner, $limit);
+        $context->builder->branchIf($innerAtEnd, $innerDone, $innerBody);
+
+        $context->builder->positionAtEnd($innerBody);
+        $nextInner = $context->builder->addNoSignedWrap($inner, $one);
+        $cmp = self::comparePackedAtIndices($context, $primary, $inner, $nextInner, $elemType);
+        $i32 = $context->getTypeFromString('int32');
+        $zeroCmp = $i32->constInt(0, false);
+        $needsSwap = $descending
+            ? $context->builder->icmp(Builder::INT_SLT, $cmp, $zeroCmp)
+            : $context->builder->icmp(Builder::INT_SGT, $cmp, $zeroCmp);
+        $swapBlock = BasicBlockHelper::append($context, 'array_multisort_swap');
+        $noSwap = BasicBlockHelper::append($context, 'array_multisort_no_swap');
+        $afterSwap = BasicBlockHelper::append($context, 'array_multisort_after_swap');
+        $context->builder->branchIf($needsSwap, $swapBlock, $noSwap);
+
+        $context->builder->positionAtEnd($swapBlock);
+        foreach ($hts as $ht) {
+            self::swapPackedEntriesAt($context, $ht, $inner, $nextInner, $elemType);
+        }
+        $context->builder->branch($afterSwap);
+
+        $context->builder->positionAtEnd($noSwap);
+        $context->builder->branch($afterSwap);
+
+        $context->builder->positionAtEnd($afterSwap);
+        $context->builder->store($nextInner, $innerSlot);
+        $context->builder->branch($innerHead);
+
+        $context->builder->positionAtEnd($innerDone);
+        $context->builder->store($context->builder->addNoSignedWrap($outer, $one), $outerSlot);
+        $context->builder->branch($outerHead);
+
+        $context->builder->positionAtEnd($outerDone);
+    }
+
+    private static function comparePackedAtIndices(
+        Context $context,
+        Value $ht,
+        Value $idxA,
+        Value $idxB,
+        int $elemType
+    ): Value {
+        if (Variable::TYPE_STRING === $elemType) {
+            $strA = $context->builder->call(
+                $context->lookupFunction('__hashtable__readStringAt'),
+                $ht,
+                $idxA
+            );
+            $strB = $context->builder->call(
+                $context->lookupFunction('__hashtable__readStringAt'),
+                $ht,
+                $idxB
+            );
+            $map = $context->structFieldMap['__string__'];
+            $ptrA = $context->builder->load($context->builder->structGep($strA, $map['data']));
+            $ptrB = $context->builder->load($context->builder->structGep($strB, $map['data']));
+
+            return $context->builder->call(
+                $context->lookupFunction('strcmp'),
+                $ptrA,
+                $ptrB
+            );
+        }
+        $longA = $context->builder->call(
+            $context->lookupFunction('__hashtable__readLongAt'),
+            $ht,
+            $idxA
+        );
+        $longB = $context->builder->call(
+            $context->lookupFunction('__hashtable__readLongAt'),
+            $ht,
+            $idxB
+        );
+        $cmpLt = $context->builder->icmp(Builder::INT_SLT, $longA, $longB);
+        $cmpGt = $context->builder->icmp(Builder::INT_SGT, $longA, $longB);
+        $i32 = $context->getTypeFromString('int32');
+        $neg = $i32->constInt(-1, false);
+        $pos = $i32->constInt(1, false);
+        $zero = $i32->constInt(0, false);
+
+        return $context->builder->select(
+            $cmpLt,
+            $neg,
+            $context->builder->select($cmpGt, $pos, $zero)
+        );
+    }
+
+    private static function swapPackedEntriesAt(
+        Context $context,
+        Value $ht,
+        Value $idxA,
+        Value $idxB,
+        int $elemType
+    ): void {
+        if (Variable::TYPE_STRING === $elemType) {
+            $strA = $context->builder->call(
+                $context->lookupFunction('__hashtable__readStringAt'),
+                $ht,
+                $idxA
+            );
+            $strB = $context->builder->call(
+                $context->lookupFunction('__hashtable__readStringAt'),
+                $ht,
+                $idxB
+            );
+            $entryA = self::listEntryAt($context, $ht, $idxA);
+            $entryB = self::listEntryAt($context, $ht, $idxB);
+            $context->builder->call($context->lookupFunction('__value__writeString'), $entryA, $strB);
+            $context->builder->call($context->lookupFunction('__value__writeString'), $entryB, $strA);
+
+            return;
+        }
+        $longA = $context->builder->call(
+            $context->lookupFunction('__hashtable__readLongAt'),
+            $ht,
+            $idxA
+        );
+        $longB = $context->builder->call(
+            $context->lookupFunction('__hashtable__readLongAt'),
+            $ht,
+            $idxB
+        );
+        $entryA = self::listEntryAt($context, $ht, $idxA);
+        $entryB = self::listEntryAt($context, $ht, $idxB);
+        $context->builder->call($context->lookupFunction('__value__writeLong'), $entryA, $longB);
+        $context->builder->call($context->lookupFunction('__value__writeLong'), $entryB, $longA);
+    }
+
+    private static function clonePackedHashTable(Context $context, Value $src): Value
+    {
+        $map = $context->structFieldMap['__hashtable__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $num = $context->builder->call(
+            $context->lookupFunction('__hashtable__getNumElements'),
+            $src
+        );
+        $dest = HashTableHelper::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__grow'),
+            $dest,
+            $num
+        );
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'array_clone_idx');
+        $context->builder->store($zero, $idxSlot);
+        $head = BasicBlockHelper::append($context, 'array_clone_head');
+        $body = BasicBlockHelper::append($context, 'array_clone_body');
+        $done = BasicBlockHelper::append($context, 'array_clone_done');
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $num);
+        $context->builder->branchIf($atEnd, $done, $body);
+
+        $context->builder->positionAtEnd($body);
+        self::copyPackedListEntry($context, $src, $idx, $dest, $idx);
+        $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($done);
+        $context->builder->store($num, $context->builder->structGep($dest, $map['numElements']));
+        $context->builder->store($num, $context->builder->structGep($dest, $map['nextFreeElement']));
+
+        return $dest;
+    }
+
+    /**
      * Split a packed list array into consecutive chunks (array_chunk subset; matches VM HashTable::chunkCopy).
      */
     public static function buildChunkArray(Context $context, Variable $array, Value $size): Value
