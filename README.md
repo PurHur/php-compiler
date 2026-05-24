@@ -46,7 +46,7 @@ make test    # builds php-compiler:22.04-dev if needed, then memory-safe CI in D
 
 ## North-star status (2026)
 
-**Public status site:** [purhur.github.io/php-compiler](https://purhur.github.io/php-compiler/) — [North Star 1](https://purhur.github.io/php-compiler/development-status.html#north-star-1-web-app) · [North Star 2 (self-host)](https://purhur.github.io/php-compiler/development-status.html#north-star-2-self-host) · trackers [#1044](https://github.com/PurHur/php-compiler/issues/1044) / [#1056](https://github.com/PurHur/php-compiler/issues/1056) · edit [`docs/pages/development-status.md`](docs/pages/development-status.md).
+**Public status site:** [Overview](https://purhur.github.io/php-compiler/docs/pages/index.html) · [Full status](https://purhur.github.io/php-compiler/development-status.html) — [North Star 1](https://purhur.github.io/php-compiler/development-status.html#north-star-1-web-app) · [North Star 2 (self-host)](https://purhur.github.io/php-compiler/development-status.html#north-star-2-self-host) · wave 3 [#1380](https://github.com/PurHur/php-compiler/issues/1380) · edit [`docs/pages/development-status.md`](docs/pages/development-status.md).
 
 Single-page snapshot for contributors; keep in sync with [examples/README.md](examples/README.md) ([#753](https://github.com/PurHur/php-compiler/issues/753)).
 
@@ -85,7 +85,7 @@ Generated matrices (run `php script/capability-matrix.php` when builtins change)
 |------|---------|-------|
 | Full local / Docker | `./script/ci-local.sh`, `make test`, `make test-docker` | VM + JIT + AOT lint/link + example smokes ([#436](https://github.com/PurHur/php-compiler/issues/436), [#245](https://github.com/PurHur/php-compiler/issues/245)) |
 | Fast iteration | `./script/ci-fast.sh`, `phpc test --fast`, `make test-fast` | VM/compliance only — no LLVM |
-| Bootstrap (GHA) | [`.github/workflows/bootstrap-selfhost.yml`](.github/workflows/bootstrap-selfhost.yml) | M0/M1 probe + link + wave-check on `master` ([#394](https://github.com/PurHur/php-compiler/issues/394); complements CircleCI, not a full matrix replacement) |
+| Bootstrap (local) | `./script/bootstrap-wave-check.sh`, `make bootstrap-selfhost-link` | GHA/CircleCI disabled ([#1338](https://github.com/PurHur/php-compiler/pull/1338), [#1340](https://github.com/PurHur/php-compiler/pull/1340)); workflows in `.github/workflows-disabled/` |
 
 Matrix details: [docs/local-ci-matrix.md](docs/local-ci-matrix.md).
 
@@ -101,7 +101,7 @@ Deep dive: [docs/bootstrap-selfhost.md](docs/bootstrap-selfhost.md) (gates, wave
 |-----------|----------------|--------|
 | **M0 — Bundled subset runs** | ~**109** literal `require_once` units in `test/selfhost/compiler_minimal/main.php` compile+link under AOT; native binary prints `compiler_minimal bundle OK` | ✅ ([#557](https://github.com/PurHur/php-compiler/issues/557), [#913](https://github.com/PurHur/php-compiler/issues/913)) |
 | **M1 — Compiler-shaped bundle** | Same bundle **lints** as one translation unit; **compile-smoke** links a tiny fixture and runs AOT echo (`compiler smoke`); driver smoke bundles `bin/compile.php`-adjacent units | ✅ ([#1025](https://github.com/PurHur/php-compiler/issues/1025)) |
-| **M2 — Full top-level `lib/` + spine** | All **14** top-level `lib/*.php` lint ✅; **`compiler_lib_spine_smoke`** (**132** units) native link ✅; grow toward **532**-file `bin/vm.php` inventory | 🚧 ~25% of inventory |
+| **M2 — Full top-level `lib/` + spine** | All **14** top-level `lib/*.php` lint ✅; **`compiler_lib_spine_smoke`** (**157** units) native link ✅; grow toward **532**-file `bin/vm.php` inventory | 🚧 ~30% of inventory |
 | **M3 — Native compiles PHP** | Self-host bundle links; HelloWorld AOT **runs** natively; **compile emit still Zend fallback** | 🚧 partial |
 | **M4 — Bootstrap loop** | Native toolchain rebuilds the **next** compiler sources | ⬜ |
 | **M5 — Full self-host** | Real `bin/vm.php` / `bin/compile.php` on full inventory; **no Zend bootstrap** | ⬜ **north star** ([#1056](https://github.com/PurHur/php-compiler/issues/1056)) |

@@ -24,10 +24,11 @@
       <nav class="nav" aria-label="Primary">
         <a href="#overview">Overview</a>
         <a href="#progress">Progress</a>
+        <a href="#wave3">Wave 3</a>
         <a href="#phases">Phases</a>
-        <a href="development-status.html#north-star-1-web-app">Web app</a>
+        <a href="/php-compiler/development-status.html#north-star-1-web-app">Web app</a>
         <a href="#self-host">Self-host</a>
-        <a href="development-status.html">Full status</a>
+        <a href="/php-compiler/development-status.html">Full status</a>
       </nav>
     </div>
   </header>
@@ -44,12 +45,13 @@
       </p>
       <div class="hero-badges">
         <span class="badge badge--live">VM + JIT + AOT</span>
+        <span class="badge badge--live">Wave 3 stdlib 12/13</span>
         <span class="badge badge--wip">Self-host bootstrap</span>
         <span class="badge badge--wip">North Star 1 — AOT execute (partial)</span>
       </div>
       <div class="hero-actions">
-        <a class="btn btn--primary" href="development-status.html#north-star-1-web-app">North Star 1 — web app</a>
-        <a class="btn btn--ghost" href="development-status.html">Full status</a>
+        <a class="btn btn--primary" href="/php-compiler/development-status.html#north-star-1-web-app">North Star 1 — web app</a>
+        <a class="btn btn--ghost" href="/php-compiler/development-status.html">Full status</a>
         <a class="btn btn--ghost" href="https://github.com/PurHur/php-compiler/issues/1044">Tracker #1044</a>
       </div>
     </div>
@@ -63,8 +65,8 @@
       <pre><code><span class="php-cmt"># Host PHP builds; deployed app runs natively</span>
 <span class="php-tag">&lt;?php</span>
 <span class="php-fn">composer</span> install
-./phpc <span class="php-str">test</span> --fast          <span class="php-cmt"># VM compliance</span>
-./phpc <span class="php-str">test</span>                 <span class="php-cmt"># + LLVM JIT/AOT</span>
+./phpc <span class="php-str">test</span> --fast          <span class="php-cmt"># VM compliance (local CI)</span>
+./script/ci-local.sh       <span class="php-cmt"># full gate (GHA/Circle disabled)</span>
 ./phpc <span class="php-str">build</span> --project my-app
 ./phpc <span class="php-str">serve</span> examples/003-MiniWebApp
 
@@ -78,7 +80,7 @@ make bootstrap-selfhost-link   <span class="php-cmt"># → compiler_minimal bund
       <h2>Overview</h2>
       <p class="section-intro">
         Visual snapshot for visitors. The authoritative written report is
-        <a href="development-status.html"><strong>development-status.md</strong></a>
+        <a href="/php-compiler/development-status.html"><strong>development-status.md</strong></a>
         (maintained for this site only). Repo technical docs stay on
         <a href="https://github.com/PurHur/php-compiler/tree/master/docs">GitHub</a>.
       </p>
@@ -90,7 +92,7 @@ make bootstrap-selfhost-link   <span class="php-cmt"># → compiler_minimal bund
             <a href="https://github.com/PurHur/php-compiler/tree/master/examples/003-MiniWebApp">003-MiniWebApp</a>.
           </p>
           <p><strong>Status:</strong> VM ✅ · AOT link ✅ · AOT execute <strong>partial</strong> (home ✅).</p>
-          <p><a href="development-status.html#north-star-1-web-app">Full north-star doc →</a> · <a href="https://github.com/PurHur/php-compiler/issues/1044">#1044</a></p>
+          <p><a href="/php-compiler/development-status.html#north-star-1-web-app">Full north-star doc →</a> · <a href="https://github.com/PurHur/php-compiler/issues/1044">#1044</a></p>
         </article>
         <article class="track-panel track-panel--selfhost">
           <h3>🔄 North Star 2 — Self-host</h3>
@@ -98,8 +100,31 @@ make bootstrap-selfhost-link   <span class="php-cmt"># → compiler_minimal bund
             <strong>Compiler fully compiles itself:</strong> native binary from <code>lib/</code> (no <code>vendor/</code>),
             compiles PHP, then rebuilds the next compiler revision without Zend.
           </p>
-          <p><strong>Status:</strong> M0 ✅ · M1 ✅ · M2 🚧 (132/532) · M3 🚧 partial · M5 ⬜.</p>
-          <p><a href="development-status.html#north-star-2-self-host">Full north-star doc →</a> · <a href="https://github.com/PurHur/php-compiler/issues/1056">#1056</a></p>
+          <p><strong>Status:</strong> M0 ✅ · M1 ✅ · M2 🚧 (157/532) · M3 🚧 partial · M5 ⬜.</p>
+          <p><a href="/php-compiler/development-status.html#north-star-2-self-host">Full north-star doc →</a> · <a href="https://github.com/PurHur/php-compiler/issues/1056">#1056</a></p>
+        </article>
+      </div>
+    </section>
+
+    <section id="wave3" class="reveal">
+      <h2>Roadmap wave 3</h2>
+      <p class="section-intro">
+        May 2026 gap batch toward full PHP — umbrella
+        <a href="https://github.com/PurHur/php-compiler/issues/1380">#1380</a>.
+        Detailed PR/status table:
+        <a href="https://github.com/PurHur/php-compiler/blob/master/docs/roadmap-wave3.md">roadmap-wave3.md</a>
+        (repo only).
+      </p>
+      <div class="dual-track">
+        <article class="track-panel track-panel--web">
+          <h3>Stdlib (#1367–#1379)</h3>
+          <p><strong>12 / 13 closed.</strong> Landed: <code>parse_str</code>, reflection helpers, <code>pack</code>, <code>sleep</code>, cookies, autoload (VM), error handlers (VM), and more.</p>
+          <p><strong>Open:</strong> <code>debug_backtrace</code> — <a href="https://github.com/PurHur/php-compiler/pull/1404">#1404</a>.</p>
+        </article>
+        <article class="track-panel track-panel--selfhost">
+          <h3>Language (#1354–#1366)</h3>
+          <p><strong>Mostly open:</strong> attributes, enums, intersection types, unpack, multi-catch, weak refs, etc.</p>
+          <p><strong>Recent:</strong> <code>goto</code> (#1228), anonymous classes (#1233), variable-variables JIT (#1364 / #1381).</p>
         </article>
       </div>
     </section>
@@ -108,19 +133,19 @@ make bootstrap-selfhost-link   <span class="php-cmt"># → compiler_minimal bund
       <h2>Overall progress</h2>
       <p class="section-intro">
         Indicative composite — tables and blockers in
-        <a href="development-status.html">development-status.md</a>.
+        <a href="/php-compiler/development-status.html">development-status.md</a>.
       </p>
       <div class="overall-progress">
         <div class="overall-progress__label">
           <span>Toward a production-ready web-capable compiler</span>
-          <span class="overall-progress__pct" id="overall-pct">~46%</span>
+          <span class="overall-progress__pct" id="overall-pct">~48%</span>
         </div>
-        <div class="progress-track" role="progressbar" aria-valuenow="46" aria-valuemin="0" aria-valuemax="100" aria-label="Overall project progress">
-          <div class="progress-fill" id="overall-progress-fill" data-width="46" style="width: 0"></div>
+        <div class="progress-track" role="progressbar" aria-valuenow="48" aria-valuemin="0" aria-valuemax="100" aria-label="Overall project progress">
+          <div class="progress-fill" id="overall-progress-fill" data-width="48" style="width: 0"></div>
         </div>
         <p class="overall-progress__note">
-          Strong on VM, CI, and AOT linking; North Star 1 home execute green; North Star 2 M0–M1 done,
-          M2 spine (132/532) + partial M3 HelloWorld; M5 full self-compile remains the stretch goal.
+          Strong on VM and AOT linking; wave-3 stdlib batch largely landed (12/13); local/Docker CI while remote GHA/Circle are disabled.
+          North Star 1 home execute green; North Star 2 M0–M1 done, M2 spine (157/532) + partial M3 HelloWorld; M5 full self-compile remains the stretch goal.
         </p>
       </div>
     </section>
@@ -129,26 +154,26 @@ make bootstrap-selfhost-link   <span class="php-cmt"># → compiler_minimal bund
       <h2>Development phases</h2>
       <p class="section-intro">
         Phases follow <a href="https://github.com/PurHur/php-compiler/issues/78">issue #78</a>.
-        Phase breakdown: <a href="development-status.html#development-phases-roadmap-78">full status</a>.
+        Phase breakdown: <a href="/php-compiler/development-status.html#development-phases-roadmap-78">full status</a>.
       </p>
       <div class="phase-grid phase-grid--phases">
         <article class="card">
           <span class="phase-num">Phase 0</span>
           <h3><span class="status-dot status-dot--done"></span> Foundation</h3>
-          <p>CI, <code>phpc</code> CLI, Docker, bootstrap GHA.</p>
+          <p>CI via <code>./script/ci-local.sh</code>; GHA/Circle disabled; <code>phpc</code> CLI + Docker.</p>
           <div class="mini-progress"><div class="progress-track"><div class="progress-fill" data-width="88"></div></div></div>
         </article>
         <article class="card">
           <span class="phase-num">Phase 1</span>
           <h3><span class="status-dot status-dot--wip"></span> Language</h3>
-          <p>OOP VM/JIT; typed properties and <code>::class</code> evolving.</p>
-          <div class="mini-progress"><div class="progress-track"><div class="progress-fill" data-width="62"></div></div></div>
+          <p>OOP VM/JIT; <code>goto</code> + anonymous classes; wave-3 syntax open.</p>
+          <div class="mini-progress"><div class="progress-track"><div class="progress-fill" data-width="64"></div></div></div>
         </article>
         <article class="card">
           <span class="phase-num">Phase 2</span>
           <h3><span class="status-dot status-dot--wip"></span> Stdlib</h3>
-          <p>Web builtins; many VM-only paths remain.</p>
-          <div class="mini-progress"><div class="progress-track"><div class="progress-fill" data-width="55"></div></div></div>
+          <p>Wave 3: 12/13 closed; JIT audit in repo.</p>
+          <div class="mini-progress"><div class="progress-track"><div class="progress-fill" data-width="58"></div></div></div>
         </article>
         <article class="card">
           <span class="phase-num">Phase 3</span>
@@ -165,8 +190,8 @@ make bootstrap-selfhost-link   <span class="php-cmt"># → compiler_minimal bund
         <article class="card">
           <span class="phase-num">Self-host</span>
           <h3><span class="status-dot status-dot--wip"></span> Compile-itself</h3>
-          <p>M0–M1 ✅; M2 spine 132/532; partial M3 HelloWorld; M5 = full self-host.</p>
-          <div class="mini-progress"><div class="progress-track"><div class="progress-fill" data-width="46"></div></div></div>
+          <p>M0–M1 ✅; M2 spine 157/532; partial M3 HelloWorld; M5 = full self-host.</p>
+          <div class="mini-progress"><div class="progress-track"><div class="progress-fill" data-width="47"></div></div></div>
         </article>
       </div>
     </section>
@@ -176,7 +201,7 @@ make bootstrap-selfhost-link   <span class="php-cmt"># → compiler_minimal bund
       <p class="section-intro">
         Stretch goal: the compiler <strong>fully compiles itself</strong> (M5). Zend still runs
         <code>bin/compile.php</code> today; native output is a growing <code>lib/</code> bundle (~109 → 532 files on the vm.php path).
-        Full ladder: <a href="development-status.html#north-star-2-self-host">development-status.md</a>
+        Full ladder: <a href="/php-compiler/development-status.html#north-star-2-self-host">development-status.md</a>
         · tracker <a href="https://github.com/PurHur/php-compiler/issues/1056">#1056</a>.
       </p>
       <ol class="ladder" aria-label="Self-host milestones">
@@ -193,7 +218,7 @@ make bootstrap-selfhost-link   <span class="php-cmt"># → compiler_minimal bund
         <li class="is-wip">
           <span class="ladder__marker" aria-hidden="true">2</span>
           <h4>M2 — Full top-level <code>lib/</code></h4>
-          <p>14/14 lint ✅; <strong>132/532</strong> spine units native link ✅.</p>
+          <p>14/14 lint ✅; <strong>157/532</strong> spine units native link ✅.</p>
         </li>
         <li class="is-wip">
           <span class="ladder__marker" aria-hidden="true">3</span>
@@ -220,7 +245,7 @@ make bootstrap-selfhost-link   <span class="php-cmt"># → compiler_minimal bund
       </p>
       <div class="hero-actions">
         <a class="btn btn--primary" href="https://github.com/PurHur/php-compiler/issues">Open issues</a>
-        <a class="btn btn--ghost" href="development-status.html">Full status document</a>
+        <a class="btn btn--ghost" href="/php-compiler/development-status.html">Full status document</a>
       </div>
     </section>
   </main>
@@ -231,8 +256,9 @@ make bootstrap-selfhost-link   <span class="php-cmt"># → compiler_minimal bund
       — GitHub Pages (<code>docs/pages/</code> only).
     </p>
     <p>
-      Status source: <a href="development-status.html">development-status.md</a> ·
-      Roadmap: <a href="https://github.com/PurHur/php-compiler/issues/78">#78</a>
+      Status source: <a href="/php-compiler/development-status.html">development-status.md</a> ·
+      Roadmap: <a href="https://github.com/PurHur/php-compiler/issues/78">#78</a> ·
+      Wave 3: <a href="https://github.com/PurHur/php-compiler/issues/1380">#1380</a>
     </p>
   </footer>
 
