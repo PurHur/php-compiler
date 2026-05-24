@@ -427,11 +427,26 @@ class Type extends Builtin {
         $fntypeJsonLastError = $this->context->context->functionType($i64, false);
         $fnJsonLastError = $this->context->module->addFunction('__compiler_json_last_error', $fntypeJsonLastError);
         $this->context->registerFunction('__compiler_json_last_error', $fnJsonLastError);
-        $fnSerialize = $this->context->module->addFunction(
-            '__compiler_serialize_value',
-            $this->context->context->functionType($strPtr, false, $valuePtr)
+        $fntypeSerializeHashtable = $this->context->context->functionType(
+            $this->context->getTypeFromString('__string__*'),
+            false,
+            $this->context->getTypeFromString('__hashtable__*')
         );
-        $this->context->registerFunction('__compiler_serialize_value', $fnSerialize);
+        $fnSerializeHashtable = $this->context->module->addFunction(
+            '__compiler_serialize_hashtable',
+            $fntypeSerializeHashtable
+        );
+        $this->context->registerFunction('__compiler_serialize_hashtable', $fnSerializeHashtable);
+        $fntypeSerializeValue = $this->context->context->functionType(
+            $this->context->getTypeFromString('__string__*'),
+            false,
+            $valuePtr
+        );
+        $fnSerializeValue = $this->context->module->addFunction(
+            '__compiler_serialize_value',
+            $fntypeSerializeValue
+        );
+        $this->context->registerFunction('__compiler_serialize_value', $fnSerializeValue);
         $fnUnserialize = $this->context->module->addFunction(
             '__compiler_unserialize',
             $this->context->context->functionType($void, false, $strPtr, $valuePtr)

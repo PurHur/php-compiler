@@ -1,5 +1,5 @@
 /*
- * serialize() / unserialize() runtime for AOT/JIT (PHP format subset; issues #1174–#1175).
+ * unserialize() runtime for AOT/JIT (PHP format subset; issue #1175).
  */
 
 #include <stdlib.h>
@@ -10,25 +10,7 @@
 typedef struct __string__ __string__;
 typedef struct __value__ __value__;
 
-#define PHPC_HT_VALUES_OFFSET 32
-#define PHPC_HT_STRKEYS_OFFSET 40
-#define PHPC_NODE_KEY_OFFSET 8
-#define PHPC_NODE_VALUE_OFFSET 16
-#define PHPC_NODE_NEXT_OFFSET 32
-
-typedef struct __strkey_node__ {
-    char opaque[40];
-} __strkey_node__;
-
-typedef struct __hashtable__ {
-    void *ref;
-    size_t numElements;
-    size_t nextFreeElement;
-    size_t capacity;
-    __value__ *values;
-    __strkey_node__ *strKeys;
-    void *objKeys;
-} __hashtable__;
+typedef struct __hashtable__ __hashtable__;
 
 extern __string__ *__string__init(long long size, const char *value);
 extern long long __value__readLong(__value__ *v);
@@ -41,10 +23,6 @@ extern void __value__writeDouble(__value__ *out, double v);
 extern void __value__writeString(__value__ *out, __string__ *str);
 extern void __value__writeHashtable(__value__ *out, __hashtable__ *ht);
 
-extern size_t __hashtable__getNumElements(__hashtable__ *ht);
-extern int64_t __hashtable__readLongAt(__hashtable__ *ht, size_t index);
-extern __string__ *__hashtable__readStringAt(__hashtable__ *ht, size_t index);
-extern int __hashtable__offsetIsSet(__hashtable__ *ht, size_t index);
 extern void __hashtable__setStringAt(__hashtable__ *ht, size_t index, __string__ *val);
 extern void __hashtable__setLongAt(__hashtable__ *ht, size_t index, long long val);
 extern void __hashtable__setDoubleAt(__hashtable__ *ht, size_t index, double val);
@@ -66,12 +44,6 @@ extern __hashtable__ *__hashtable__alloc(void);
 #define PHPC_VALUE_SIZE 16
 #define PHPC_SER_MAX_DEPTH 32
 #define PHPC_SER_MAX_LEN (4 * 1024 * 1024)
-
-typedef struct {
-    char *data;
-    size_t len;
-    size_t cap;
-} phpc_buf;
 
 typedef struct {
     const char *pos;
@@ -109,274 +81,6 @@ static int phpc_value_type(__value__ *v)
     }
 
     return (int) (unsigned char) *((char *) v);
-}
-
-static int phpc_buf_init(phpc_buf *b, size_t initial)
-{
-    b->data = (char *) malloc(initial > 0 ? initial : 64);
-    if (NULL == b->data) {
-        return -1;
-    }
-    b->len = 0;
-    b->cap = initial > 0 ? initial : 64;
-    b->data[0] = '\0';
-
-    return 0;
-}
-
-static void phpc_buf_free(phpc_buf *b)
-{
-    free(b->data);
-    b->data = NULL;
-    b->len = 0;
-    b->cap = 0;
-}
-
-static int phpc_buf_grow(phpc_buf *b, size_t need)
-{
-    size_t new_cap;
-    char *next;
-
-    if (b->len + need + 1 <= b->cap) {
-        return 0;
-    }
-    new_cap = b->cap > 0 ? b->cap : 64;
-    while (new_cap < b->len + need + 1) {
-        new_cap *= 2;
-    }
-    next = (char *) realloc(b->data, new_cap);
-    if (NULL == next) {
-        return -1;
-    }
-    b->data = next;
-    b->cap = new_cap;
-
-    return 0;
-}
-
-static int phpc_buf_append_raw(phpc_buf *b, const char *s, size_t n)
-{
-    if (0 != phpc_buf_grow(b, n)) {
-        return -1;
-    }
-    memcpy(b->data + b->len, s, n);
-    b->len += n;
-    b->data[b->len] = '\0';
-
-    return 0;
-}
-
-static int phpc_buf_append_cstr(phpc_buf *b, const char *s)
-{
-    return phpc_buf_append_raw(b, s, strlen(s));
-}
-
-static int phpc_buf_append_char(phpc_buf *b, char ch)
-{
-    return phpc_buf_append_raw(b, &ch, 1);
-}
-
-static int phpc_buf_append_ll(phpc_buf *b, long long v)
-{
-    char tmp[32];
-
-    snprintf(tmp, sizeof(tmp), "%lld", (long long) v);
-
-    return phpc_buf_append_cstr(b, tmp);
-}
-
-static int phpc_buf_append_double(phpc_buf *b, double v)
-{
-    char tmp[64];
-
-    snprintf(tmp, sizeof(tmp), "%.17g", v);
-
-    return phpc_buf_append_cstr(b, tmp);
-}
-
-static int phpc_value_bool(__value__ *v)
-{
-    if (NULL == v) {
-        return 0;
-    }
-
-    return 0 != ((unsigned char *) v)[1];
-}
-
-static int phpc_serialize_value(phpc_buf *b, __value__ *v, int depth);
-
-static int phpc_serialize_string_payload(phpc_buf *b, const char *data, size_t len)
-{
-    size_t i;
-
-    if (0 != phpc_buf_append_cstr(b, "s:") || 0 != phpc_buf_append_ll(b, (long long) len) || 0 != phpc_buf_append_cstr(b, ":\"")) {
-        return -1;
-    }
-    for (i = 0; i < len; i++) {
-        char ch = data[i];
-
-        if ('\\' == ch || '"' == ch) {
-            if (0 != phpc_buf_append_char(b, '\\')) {
-                return -1;
-            }
-        }
-        if (0 != phpc_buf_append_char(b, ch)) {
-            return -1;
-        }
-    }
-
-    return phpc_buf_append_cstr(b, "\";");
-}
-
-static __strkey_node__ *phpc_ht_strkeys(__hashtable__ *ht)
-{
-    if (NULL == ht) {
-        return NULL;
-    }
-
-    return *(__strkey_node__ **) ((char *) ht + PHPC_HT_STRKEYS_OFFSET);
-}
-
-static __string__ *phpc_node_key(__strkey_node__ *node)
-{
-    return *(__string__ **) ((char *) node + PHPC_NODE_KEY_OFFSET);
-}
-
-static __value__ *phpc_node_value(__strkey_node__ *node)
-{
-    return (__value__ *) ((char *) node + PHPC_NODE_VALUE_OFFSET);
-}
-
-static __strkey_node__ *phpc_node_next(__strkey_node__ *node)
-{
-    return *(__strkey_node__ **) ((char *) node + PHPC_NODE_NEXT_OFFSET);
-}
-
-static __value__ *phpc_ht_value_at(__hashtable__ *ht, size_t index)
-{
-    __value__ *values;
-
-    if (NULL == ht) {
-        return NULL;
-    }
-    values = *(__value__ **) ((char *) ht + PHPC_HT_VALUES_OFFSET);
-    if (NULL == values) {
-        return NULL;
-    }
-
-    return (__value__ *) ((char *) values + (index * PHPC_VALUE_SIZE));
-}
-
-static int phpc_serialize_hashtable(phpc_buf *b, __hashtable__ *ht, int depth)
-{
-    size_t count = 0;
-    size_t i;
-    size_t num = __hashtable__getNumElements(ht);
-
-    if (depth >= PHPC_SER_MAX_DEPTH) {
-        return -1;
-    }
-
-    count = num;
-
-    if (0 != phpc_buf_append_cstr(b, "a:") || 0 != phpc_buf_append_ll(b, (long long) count) || 0 != phpc_buf_append_cstr(b, ":{")) {
-        return -1;
-    }
-
-    for (i = 0; i < num; i++) {
-        __string__ *str;
-
-        if (0 != phpc_buf_append_cstr(b, "i:") || 0 != phpc_buf_append_ll(b, (long long) i) || 0 != phpc_buf_append_char(b, ';')) {
-            return -1;
-        }
-        str = __hashtable__readStringAt(ht, i);
-        if (NULL != str) {
-            if (0 != phpc_serialize_string_payload(b, phpc_string_data(str), phpc_string_len(str))) {
-                return -1;
-            }
-            continue;
-        }
-        if (0 != phpc_buf_append_cstr(b, "i:")) {
-            return -1;
-        }
-        if (0 != phpc_buf_append_ll(b, __hashtable__readLongAt(ht, i))) {
-            return -1;
-        }
-        if (0 != phpc_buf_append_char(b, ';')) {
-            return -1;
-        }
-    }
-
-    return phpc_buf_append_cstr(b, "}");
-}
-
-static int phpc_serialize_value(phpc_buf *b, __value__ *v, int depth)
-{
-    int kind;
-    __string__ *str;
-    __hashtable__ *ht;
-
-    if (depth >= PHPC_SER_MAX_DEPTH) {
-        return -1;
-    }
-    kind = phpc_value_type(v);
-    switch (kind) {
-        case PHPC_TYPE_NULL:
-            return phpc_buf_append_cstr(b, "N;");
-        case PHPC_TYPE_BOOL:
-            return phpc_buf_append_cstr(b, phpc_value_bool(v) ? "b:1;" : "b:0;");
-        case PHPC_TYPE_LONG:
-            if (0 != phpc_buf_append_cstr(b, "i:")) {
-                return -1;
-            }
-            if (0 != phpc_buf_append_ll(b, __value__readLong(v))) {
-                return -1;
-            }
-            return phpc_buf_append_char(b, ';');
-        case PHPC_TYPE_DOUBLE:
-            if (0 != phpc_buf_append_cstr(b, "d:")) {
-                return -1;
-            }
-            if (0 != phpc_buf_append_double(b, __value__readDouble(v))) {
-                return -1;
-            }
-            return phpc_buf_append_char(b, ';');
-        case PHPC_TYPE_STRING:
-            str = __value__readString(v);
-            return phpc_serialize_string_payload(b, phpc_string_data(str), phpc_string_len(str));
-        case PHPC_TYPE_HASHTABLE:
-            ht = __value__readHashtable(v);
-            return phpc_serialize_hashtable(b, ht, depth + 1);
-        default:
-            return -1;
-    }
-}
-
-__string__ *__compiler_serialize_value(__value__ *v)
-{
-    phpc_buf buf;
-    __string__ *result;
-
-    if (NULL == v) {
-        return NULL;
-    }
-    if (0 != phpc_buf_init(&buf, 128)) {
-        return NULL;
-    }
-    if (0 != phpc_serialize_value(&buf, v, 0)) {
-        phpc_buf_free(&buf);
-
-        return NULL;
-    }
-    if (buf.len > PHPC_SER_MAX_LEN) {
-        phpc_buf_free(&buf);
-
-        return NULL;
-    }
-    result = __string__init((long long) buf.len, buf.data);
-    phpc_buf_free(&buf);
-
-    return result;
 }
 
 static int phpc_expect(phpc_ser_ctx *ctx, char ch)

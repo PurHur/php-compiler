@@ -7,10 +7,13 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** serialize() — VM via VmSerialize; JIT/AOT via __compiler_serialize_value (issues #1174). */
+/**
+ * serialize() — assoc arrays with scalar values (VM delegates to PHP; JIT/AOT via __compiler_serialize_*).
+ */
 final class serialize extends Internal
 {
     public function __construct()
@@ -20,22 +23,57 @@ final class serialize extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('serialize() requires exactly one argument in this compiler build');
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1) {
+            throw new \LogicException('serialize() requires at least one argument');
         }
         if (null === $frame->returnVar) {
             return;
         }
-        $encoded = VmSerialize::serialize($frame->calledArgs[0]);
+        $value = VmJson::export($frame->calledArgs[0]->resolveIndirect());
+        $encoded = \serialize($value);
+        if (false === $encoded) {
+            throw new \LogicException('serialize() failed');
+        }
         $frame->returnVar->string($encoded);
     }
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('serialize() requires exactly one argument in this compiler build');
+        if (\count($args) < 1) {
+            throw new \LogicException('serialize() requires at least one argument');
+        }
+
+        $compileTime = self::compileTimeSerialize($context, $args[0]);
+        if (null !== $compileTime) {
+            return $context->builder->load($context->constantStringFromString($compileTime));
         }
 
         return JitSerialize::encode($context, $args[0]);
+    }
+
+    private static function compileTimeSerialize(Context $context, JITVariable $arg): ?string
+    {
+        if (JITVariable::TYPE_NULL === $arg->type) {
+            return 'N;';
+        }
+        if (JITVariable::TYPE_NATIVE_BOOL === $arg->type && JITVariable::KIND_VALUE === $arg->kind) {
+            return 0 === (int) $context->llvm->lib->LLVMConstIntGetZExtValue($arg->value->value)
+                ? 'b:0;'
+                : 'b:1;';
+        }
+        if (JITVariable::TYPE_NATIVE_LONG === $arg->type && JITVariable::KIND_VALUE === $arg->kind) {
+            $n = (int) $context->llvm->lib->LLVMConstIntGetSExtValue($arg->value->value);
+
+            return 'i:'.$n.';';
+        }
+        if (JITVariable::TYPE_STRING === $arg->type) {
+            $literal = JitStringArg::compileTimeLiteral($arg);
+            if (null !== $literal) {
+                return \serialize($literal);
+            }
+        }
+
+        return null;
     }
 }

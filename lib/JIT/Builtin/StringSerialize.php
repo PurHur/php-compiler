@@ -2,175 +2,357 @@
 
 declare(strict_types=1);
 
+/**
+ * LLVM implementation of __compiler_serialize_hashtable / __compiler_serialize_value.
+ */
+
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT\Builtin;
+use PHPCompiler\ext\standard\JitStringConcat;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\Variable;
+use PHPLLVM\Builder;
+use PHPLLVM\Value;
 
-/**
- * JIT MCJIT body for serialize/unserialize — link shared AOT runtime (issues #1174–#1175).
- */
 final class StringSerialize
 {
-    private const RUNTIME_SOURCE = __DIR__.'/../../AOT/runtime/phpc_serialize.c';
-
-    public static function ensureLinked(Context $context): void
-    {
-        self::implement($context);
-    }
-
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
-
-        $existing = $context->module->getNamedFunction('__compiler_serialize_value');
-        if (null !== $existing && $existing->countBasicBlocks() > 0) {
-            self::registerLinkedRuntime($context);
-
-            return;
-        }
-
-        $bitcode = self::ensureBitcode();
-        $data = file_get_contents($bitcode);
-        if (false === $data || '' === $data) {
-            throw new \LogicException('Failed to read serialize JIT bitcode: '.$bitcode);
-        }
-        $buffer = $context->llvm->createMemoryBufferWithString($data, 'phpc_serialize.bc');
-        $runtimeModule = $buffer->parseBitcode($context->context);
-        if (!$context->module->link($runtimeModule)) {
-            throw new \LogicException('Failed to link serialize JIT runtime bitcode');
-        }
-
-        self::registerLinkedRuntime($context);
+        self::implementHashtable($context);
+        self::implementValue($context);
     }
 
-    private static function registerLinkedRuntime(Context $context): void
+    private static function implementHashtable(Context $context): void
     {
-        foreach (['__compiler_serialize_value', '__compiler_unserialize'] as $name) {
-            $fn = $context->module->getNamedFunction($name);
-            if (null === $fn) {
-                throw new \LogicException($name.' missing after serialize bitcode link');
-            }
-            $context->registerFunction($name, $fn);
-        }
+        $fn = $context->lookupFunction('__compiler_serialize_hashtable');
+        $entry = $fn->appendBasicBlock('ser_ht_entry');
+        $context->builder->positionAtEnd($entry);
+
+        $ht = $fn->getParam(0);
+        $htMap = $context->structFieldMap['__hashtable__'];
+        $nodeMap = $context->structFieldMap['__strkey_node__'];
+        $valMap = $context->structFieldMap['__value__'];
+        $nodePtrType = $context->getTypeFromString('__strkey_node__*');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i8 = $context->getTypeFromString('int8');
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $zeroSize = $sizeT->constInt(0, false);
+        $oneSize = $sizeT->constInt(1, false);
+        $ptrSize = $sizeT->constInt(8, false);
+        $zeroI64 = $i64->constInt(0, false);
+
+        $countSlot = $context->builder->alloca($sizeT, 1, 'ser_count');
+        $walkSlot = $context->builder->alloca($nodePtrType, 1, 'ser_walk');
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'ser_fill_idx');
+        $emitIdxSlot = $context->builder->alloca($sizeT, 1, 'ser_emit_idx');
+        $resultSlot = $context->builder->alloca($strPtr, 1, 'ser_acc');
+        $finalSlot = $context->builder->alloca($strPtr, 1, 'ser_final');
+        $nodesSlot = $context->builder->alloca($nodePtrType->pointerType(0), 1, 'ser_nodes_buf');
+
+        $head = $context->builder->load($context->builder->structGep($ht, $htMap['strKeys']));
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $head, $nodePtrType->constNull());
+        $bbEmpty = $fn->appendBasicBlock('ser_empty');
+        $bbWork = $fn->appendBasicBlock('ser_work');
+        $bbReturn = $fn->appendBasicBlock('ser_return');
+        $context->builder->branchIf($isEmpty, $bbEmpty, $bbWork);
+
+        $context->builder->positionAtEnd($bbEmpty);
+        $context->builder->store(self::literalString($context, 'a:0:{}'), $finalSlot);
+        $context->builder->branch($bbReturn);
+
+        $context->builder->positionAtEnd($bbWork);
+        $context->builder->store($zeroSize, $countSlot);
+        $context->builder->store($head, $walkSlot);
+        $countHead = $fn->appendBasicBlock('ser_count_head');
+        $countBody = $fn->appendBasicBlock('ser_count_body');
+        $countDone = $fn->appendBasicBlock('ser_count_done');
+        $context->builder->branch($countHead);
+        $context->builder->positionAtEnd($countHead);
+        $walkNode = $context->builder->load($walkSlot);
+        $walkEnd = $context->builder->icmp(Builder::INT_EQ, $walkNode, $nodePtrType->constNull());
+        $context->builder->branchIf($walkEnd, $countDone, $countBody);
+        $context->builder->positionAtEnd($countBody);
+        $count = $context->builder->load($countSlot);
+        $context->builder->store($context->builder->addNoSignedWrap($count, $oneSize), $countSlot);
+        $nextWalk = $context->builder->load($context->builder->structGep($walkNode, $nodeMap['next']));
+        $context->builder->store($nextWalk, $walkSlot);
+        $context->builder->branch($countHead);
+        $context->builder->positionAtEnd($countDone);
+
+        $numKeys = $context->builder->load($countSlot);
+        $bytes = $context->builder->mulNoSignedWrap($numKeys, $ptrSize);
+        $nodesRaw = $context->builder->call($context->lookupFunction('__mm__malloc'), $bytes);
+        $nodesArray = $context->builder->pointerCast($nodesRaw, $nodePtrType->pointerType(0));
+        $context->builder->store($nodesArray, $nodesSlot);
+        $context->builder->store($zeroSize, $idxSlot);
+        $context->builder->store($head, $walkSlot);
+        $fillHead = $fn->appendBasicBlock('ser_fill_head');
+        $fillBody = $fn->appendBasicBlock('ser_fill_body');
+        $fillDone = $fn->appendBasicBlock('ser_fill_done');
+        $context->builder->branch($fillHead);
+        $context->builder->positionAtEnd($fillHead);
+        $fillNode = $context->builder->load($walkSlot);
+        $fillEnd = $context->builder->icmp(Builder::INT_EQ, $fillNode, $nodePtrType->constNull());
+        $context->builder->branchIf($fillEnd, $fillDone, $fillBody);
+        $context->builder->positionAtEnd($fillBody);
+        $idx = $context->builder->load($idxSlot);
+        $nodesArray = $context->builder->load($nodesSlot);
+        $slotPtr = $context->builder->inBoundsGEP($nodesArray, $idx);
+        $context->builder->store($fillNode, $slotPtr);
+        $context->builder->store($context->builder->addNoSignedWrap($idx, $oneSize), $idxSlot);
+        $nextFill = $context->builder->load($context->builder->structGep($fillNode, $nodeMap['next']));
+        $context->builder->store($nextFill, $walkSlot);
+        $context->builder->branch($fillHead);
+        $context->builder->positionAtEnd($fillDone);
+
+        $countStr = self::decimalString($context, $numKeys);
+        $acc = JitStringConcat::concat($context, self::literalString($context, 'a:'), $countStr);
+        $acc = JitStringConcat::concat($context, $acc, self::literalString($context, ':{'));
+        $context->builder->store($acc, $resultSlot);
+        $context->builder->store($zeroSize, $emitIdxSlot);
+
+        $emitHead = $fn->appendBasicBlock('ser_emit_head');
+        $emitBody = $fn->appendBasicBlock('ser_emit_body');
+        $emitDone = $fn->appendBasicBlock('ser_emit_done');
+        $context->builder->branch($emitHead);
+        $context->builder->positionAtEnd($emitHead);
+        $emitIdx = $context->builder->load($emitIdxSlot);
+        $emitEnd = $context->builder->icmp(Builder::INT_SGE, $emitIdx, $numKeys);
+        $context->builder->branchIf($emitEnd, $emitDone, $emitBody);
+
+        $context->builder->positionAtEnd($emitBody);
+        $nodesArray = $context->builder->load($nodesSlot);
+        $nodePtr = $context->builder->load($context->builder->inBoundsGEP($nodesArray, $emitIdx));
+        $context->builder->store($context->builder->addNoSignedWrap($emitIdx, $oneSize), $emitIdxSlot);
+
+        $nodeKey = $context->builder->load($context->builder->structGep($nodePtr, $nodeMap['key']));
+        $acc = $context->builder->load($resultSlot);
+        $acc = JitStringConcat::concat($context, $acc, self::serializeQuotedString($context, $nodeKey));
+        $valPtr = $context->builder->structGep($nodePtr, $nodeMap['value']);
+        $afterVal = $fn->appendBasicBlock('ser_after_val');
+        $encodedVal = self::serializeValue(
+            $context,
+            $fn,
+            $valPtr,
+            $valMap,
+            $i8,
+            $i32,
+            $i64,
+            $i8p,
+            $zeroI64,
+            $afterVal
+        );
+        $context->builder->positionAtEnd($afterVal);
+        $acc = JitStringConcat::concat($context, $acc, $encodedVal);
+        $context->builder->store($acc, $resultSlot);
+        $context->builder->branch($emitHead);
+
+        $context->builder->positionAtEnd($emitDone);
+        $nodesArray = $context->builder->load($nodesSlot);
+        $nodesRaw = $context->builder->pointerCast($nodesArray, $context->getTypeFromString('int8*'));
+        $context->builder->call($context->lookupFunction('__mm__free'), $nodesRaw);
+        $acc = $context->builder->load($resultSlot);
+        $workResult = JitStringConcat::concat($context, $acc, self::literalString($context, '}'));
+        $context->builder->store($workResult, $finalSlot);
+        $context->builder->branch($bbReturn);
+
+        $context->builder->positionAtEnd($bbReturn);
+        $context->builder->returnValue($context->builder->load($finalSlot));
+        $context->builder->clearInsertionPosition();
     }
 
-    private static function ensureBitcode(): string
+    private static function implementValue(Context $context): void
     {
-        $source = realpath(self::RUNTIME_SOURCE);
-        if (false === $source || !is_file($source)) {
-            throw new \LogicException('serialize runtime source not found: '.self::RUNTIME_SOURCE);
-        }
+        $fn = $context->lookupFunction('__compiler_serialize_value');
+        $entry = $fn->appendBasicBlock('ser_val_entry');
+        $context->builder->positionAtEnd($entry);
 
-        $compiler = self::resolveCompiler();
-        $cacheDir = sys_get_temp_dir().'/phpc-jit-runtime';
-        if (!is_dir($cacheDir) && !mkdir($cacheDir, 0777, true) && !is_dir($cacheDir)) {
-            throw new \LogicException('Cannot create JIT runtime cache: '.$cacheDir);
-        }
-
-        $cache = $cacheDir.'/phpc_serialize-'.substr(sha1($source.filemtime($source).$compiler), 0, 16).'.bc';
-        if (is_file($cache) && filemtime($cache) >= filemtime($source)) {
-            return $cache;
-        }
-
-        $includes = self::includeFlags();
-        $cmd = escapeshellarg($compiler)
-            .' -emit-llvm -c -fPIC -O2'.$includes.' '
-            .escapeshellarg($source).' -o '.escapeshellarg($cache).' 2>&1';
-        $output = shell_exec($cmd);
-        if (!is_file($cache)) {
-            throw new \LogicException(
-                'Failed to compile serialize JIT bitcode: '.trim((string) $output)
-            );
-        }
-
-        return $cache;
+        $valPtr = $fn->getParam(0);
+        $valMap = $context->structFieldMap['__value__'];
+        $i8 = $context->getTypeFromString('int8');
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $zeroI64 = $i64->constInt(0, false);
+        $done = $fn->appendBasicBlock('ser_val_done');
+        $result = self::serializeValue(
+            $context,
+            $fn,
+            $valPtr,
+            $valMap,
+            $i8,
+            $i32,
+            $i64,
+            $i8p,
+            $zeroI64,
+            $done
+        );
+        $context->builder->positionAtEnd($done);
+        $context->builder->returnValue($result);
+        $context->builder->clearInsertionPosition();
     }
 
-    private static function resolveCompiler(): string
+    private static function literalString(Context $context, string $text): Value
     {
-        $llvmDir = getenv('PHP_COMPILER_LLVM_PATH');
-        if (false !== $llvmDir && '' !== $llvmDir) {
-            foreach (['clang-9', 'clang'] as $name) {
-                $candidate = $llvmDir.'/'.$name;
-                if (is_executable($candidate)) {
-                    return $candidate;
-                }
-            }
-        }
+        $i8p = $context->getTypeFromString('int8*');
+        $len = $context->getTypeFromString('int64')->constInt(strlen($text), false);
 
-        foreach (['clang-9', 'clang', 'gcc', 'cc'] as $name) {
-            $path = trim((string) shell_exec('command -v '.escapeshellarg($name).' 2>/dev/null'));
-            if ('' !== $path) {
-                return $path;
-            }
-        }
-
-        throw new \LogicException('No C compiler found for serialize JIT runtime bitcode');
+        return $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $len,
+            $context->builder->pointerCast($context->constantFromString($text), $i8p)
+        );
     }
 
-    private static function includeFlags(): string
+    private static function decimalString(Context $context, Value $num): Value
     {
-        $flags = '';
-        foreach (self::discoverSystemIncludeDirs() as $dir) {
-            $flags .= ' -isystem '.escapeshellarg($dir);
-        }
-        if ('' === $flags && is_file('/usr/include/stdio.h')) {
-            $flags = ' -isystem /usr/include';
-        }
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+        $i64 = $context->getTypeFromString('int64');
+        $numBuf = $context->builder->alloca($i8, $i64->constInt(32, false), 'ser_numbuf');
+        $bufC = $context->builder->pointerCast($numBuf, $i8p);
+        $fmt = $context->builder->pointerCast($context->constantFromString('%zu'), $i8p);
+        $context->builder->call($context->lookupFunction('sprintf'), $bufC, $fmt, $num);
+        $len = $context->builder->call($context->lookupFunction('strlen'), $bufC);
+        $lenI64 = $len->typeOf() === $i64 ? $len : $context->builder->zExt($len, $i64);
 
-        return $flags;
+        return $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $lenI64,
+            $bufC
+        );
+    }
+
+    private static function serializeQuotedString(Context $context, Value $str): Value
+    {
+        $strMap = $context->structFieldMap['__string__'];
+        $len = $context->builder->load($context->builder->structGep($str, $strMap['length']));
+        $lenStr = self::decimalString($context, $len);
+        $acc = JitStringConcat::concat($context, self::literalString($context, 's:'), $lenStr);
+        $acc = JitStringConcat::concat($context, $acc, self::literalString($context, ':"'));
+        $acc = JitStringConcat::concat($context, $acc, $str);
+        return JitStringConcat::concat($context, $acc, self::literalString($context, '";'));
     }
 
     /**
-     * @return list<string>
+     * @param array<string, int> $valMap
      */
-    private static function discoverSystemIncludeDirs(): array
-    {
-        $dirs = [];
-        foreach (['gcc', 'cc', 'clang'] as $compiler) {
-            $path = trim((string) shell_exec('command -v '.escapeshellarg($compiler).' 2>/dev/null'));
-            if ('' === $path) {
-                continue;
-            }
-            $verbose = shell_exec(
-                escapeshellarg($path).' -E -Wp,-v -xc /dev/null 2>&1'
-            );
-            if (!is_string($verbose)) {
-                continue;
-            }
-            $capture = false;
-            foreach (explode("\n", $verbose) as $line) {
-                if (str_contains($line, '#include <...> search starts here:')) {
-                    $capture = true;
+    private static function serializeValue(
+        Context $context,
+        \PHPLLVM\Value\Function_ $fn,
+        Value $valPtr,
+        array $valMap,
+        \PHPLLVM\Type $i8,
+        \PHPLLVM\Type $i32,
+        \PHPLLVM\Type $i64,
+        \PHPLLVM\Type $i8p,
+        Value $zeroI64,
+        \PHPLLVM\BasicBlock $resumeBlock
+    ): Value {
+        $strPtr = $context->getTypeFromString('__string__*');
+        $bbEntry = $fn->appendBasicBlock('ser_v_entry');
+        $context->builder->branch($bbEntry);
+        $context->builder->positionAtEnd($bbEntry);
 
-                    continue;
-                }
-                if ($capture) {
-                    if (str_contains($line, 'End of search list')) {
-                        break;
-                    }
-                    $dir = trim($line);
-                    if ('' !== $dir && is_dir($dir)) {
-                        $dirs[$dir] = true;
-                    }
-                }
-            }
-            if ([] !== $dirs) {
-                break;
-            }
-        }
+        $resultSlot = $context->builder->alloca($strPtr, 1, 'ser_v_out');
+        $numBuf = $context->builder->alloca($i8, $i64->constInt(32, false), 'ser_v_numbuf');
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valPtr, $valMap['type'])
+        );
+        $nullType = $i8->constInt(Variable::TYPE_NULL, false);
+        $longType = $i8->constInt(Variable::TYPE_NATIVE_LONG, false);
+        $boolType = $i8->constInt(Variable::TYPE_NATIVE_BOOL, false);
+        $stringType = $i8->constInt(Variable::TYPE_STRING & 0xff, false);
 
-        if ([] === $dirs) {
-            foreach (['/usr/include', '/usr/include/x86_64-linux-gnu'] as $fallback) {
-                if (is_dir($fallback)) {
-                    $dirs[$fallback] = true;
-                }
-            }
-        }
+        $bbNull = $fn->appendBasicBlock('ser_v_null');
+        $bbCheckLong = $fn->appendBasicBlock('ser_v_check_long');
+        $bbLong = $fn->appendBasicBlock('ser_v_long');
+        $bbCheckBool = $fn->appendBasicBlock('ser_v_check_bool');
+        $bbBool = $fn->appendBasicBlock('ser_v_bool');
+        $bbCheckString = $fn->appendBasicBlock('ser_v_check_string');
+        $bbString = $fn->appendBasicBlock('ser_v_string');
+        $bbDefault = $fn->appendBasicBlock('ser_v_default');
+        $bbDone = $fn->appendBasicBlock('ser_v_done');
 
-        return array_keys($dirs);
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $typeByte, $nullType);
+        $context->builder->branchIf($isNull, $bbNull, $bbCheckLong);
+
+        $context->builder->positionAtEnd($bbNull);
+        $context->builder->store(self::literalString($context, 'N;'), $resultSlot);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbCheckLong);
+        $isLong = $context->builder->icmp(Builder::INT_EQ, $typeByte, $longType);
+        $context->builder->branchIf($isLong, $bbLong, $bbCheckBool);
+
+        $context->builder->positionAtEnd($bbCheckBool);
+        $isBool = $context->builder->icmp(Builder::INT_EQ, $typeByte, $boolType);
+        $context->builder->branchIf($isBool, $bbBool, $bbCheckString);
+
+        $context->builder->positionAtEnd($bbCheckString);
+        $isStr = $context->builder->icmp(Builder::INT_EQ, $typeByte, $stringType);
+        $context->builder->branchIf($isStr, $bbString, $bbDefault);
+
+        $context->builder->positionAtEnd($bbDefault);
+        $context->builder->store(self::literalString($context, 'N;'), $resultSlot);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbLong);
+        $num = $context->builder->call(
+            $context->lookupFunction('__value__readLong'),
+            $valPtr
+        );
+        $bufC = $context->builder->pointerCast($numBuf, $i8p);
+        $fmt = $context->builder->pointerCast(
+            $context->constantFromString('i:%lld;'),
+            $i8p
+        );
+        $context->builder->call($context->lookupFunction('sprintf'), $bufC, $fmt, $num);
+        $len = $context->builder->call($context->lookupFunction('strlen'), $bufC);
+        $lenI64 = $len->typeOf() === $i64 ? $len : $context->builder->zExt($len, $i64);
+        $context->builder->store(
+            $context->builder->call(
+                $context->lookupFunction('__string__init'),
+                $lenI64,
+                $bufC
+            ),
+            $resultSlot
+        );
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbBool);
+        $valueField = $context->builder->structGep($valPtr, $valMap['value']);
+        $boolByte = $context->builder->load(
+            $context->builder->inBoundsGEP(
+                $valueField,
+                $i32->constInt(0, false),
+                $zeroI64
+            )
+        );
+        $isTrue = $context->builder->icmp(Builder::INT_NE, $boolByte, $i8->constInt(0, false));
+        $boolStr = $context->builder->select(
+            $isTrue,
+            self::literalString($context, 'b:1;'),
+            self::literalString($context, 'b:0;')
+        );
+        $context->builder->store($boolStr, $resultSlot);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbString);
+        $raw = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $valPtr
+        );
+        $context->builder->store(self::serializeQuotedString($context, $raw), $resultSlot);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbDone);
+        $result = $context->builder->load($resultSlot);
+        $context->builder->branch($resumeBlock);
+
+        return $result;
     }
 }

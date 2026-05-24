@@ -139,6 +139,7 @@ class Module extends ModuleAbstract
             new array_combine(),
             new array_map(),
             new array_filter(),
+            new array_walk(),
             new array_reduce(),
             new range(),
             new bin2hex(),

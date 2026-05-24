@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
-use PHPCompiler\JIT\Builtin\StringSerialize;
+use PHPCompiler\JIT\Builtin\StringUnserialize;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Value;
@@ -15,7 +15,7 @@ final class JitUnserialize
     /** @return Value __value__* */
     public static function decodeRuntime(Context $context, Value $payload): Value
     {
-        StringSerialize::ensureLinked($context);
+        StringUnserialize::ensureLinked($context);
 
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
