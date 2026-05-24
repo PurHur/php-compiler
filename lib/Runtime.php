@@ -36,7 +36,7 @@ class Runtime {
     public CfgLivenessDetector $detector;
     public Optimizer $assignOpResolver;
     public VMContext $vmContext;
-    public VM $vm;
+    public ?VM $vm = null;
     private ?JITContext $jitContext = null;
     private ?JIT $jit = null;
     public array $modules = [];
@@ -48,7 +48,8 @@ class Runtime {
     public function __construct(int $mode = self::MODE_NORMAL) {
         $this->mode = $mode;
         $this->initParsePipeline();
-        $this->initCompilerVmSpine();
+        $this->initCompiler();
+        $this->initVmContext();
         $this->loadCoreModules();
     }
 
@@ -70,14 +71,24 @@ class Runtime {
         $this->postprocessor->addVisitor(new Visitor\PhiResolver);
         $this->detector = new NullSafeLivenessDetector;
         $this->assignOpResolver = new Optimizer\AssignOp;
+
+        $this->typeReconstructor = new TypeReconstructor;
     }
 
-    /** Compiler + VM spine; split from ctor for incremental M3 real lowering (#1494). */
-    private function initCompilerVmSpine(): void {
-        $this->typeReconstructor = new TypeReconstructor;
+    /** Compiler instance; split from VMContext for M3 link (#1494). */
+    private function initCompiler(): void {
         $this->compiler = new Compiler;
+    }
+
+    /** VMContext only; `new VM` deferred to run() (#1494). */
+    private function initVmContext(): void {
         $this->vmContext = new VMContext($this);
-        $this->vm = new VM($this->vmContext);
+    }
+
+    private function ensureVm(): void {
+        if (null === $this->vm) {
+            $this->vm = new VM($this->vmContext);
+        }
     }
 
     public function __destruct() {
@@ -222,6 +233,8 @@ class Runtime {
     }
 
     public function run(?Block $block) {
+        $this->ensureVm();
+
         return $this->vm->run($block);
     }
 
