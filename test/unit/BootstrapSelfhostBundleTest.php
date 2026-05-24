@@ -329,6 +329,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/web_int.php',
         'ext/standard/wordwrap.php',
         'src/llvm-env.php',
+        'src/tokenizer-compat.php',
         'src/yay-php8-compat.php',
     ];
 
@@ -351,7 +352,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         $this->assertFileExists($entry);
         $contents = (string) file_get_contents($entry);
         $count = substr_count($contents, 'require_once __DIR__');
-                $this->assertSame(435, $count, '108 compiler_minimal units + 327 M2 spine units (#1746 yay-php8-compat); array_pop/shift/search + preg/array_combine wrappers skipped (AOT types); Vm* deferred #1467');
+                $this->assertSame(436, $count, '108 compiler_minimal units + 328 M2 spine units (#1745 tokenizer-compat); array_pop/shift/search + preg/array_combine wrappers skipped (AOT types); Vm* deferred #1467');
         foreach (self::LIB_SPINE_SMOKE_NEW_UNITS as $unit) {
             $this->assertStringContainsString(
                 "require_once __DIR__.'/../../../{$unit}';",
