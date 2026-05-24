@@ -13,7 +13,8 @@ final class IniSetBuiltinTest extends TestCase
 $old = ini_set('error_reporting', '0');
 echo is_string($old) ? "er-ok\n" : "er-fail\n";
 echo ini_set('unknown_ini_key', 'x') === false ? "unknown-false\n" : "unknown-bad\n";
-echo ini_set('memory_limit', '-1') === false ? "ml-reject\n" : "ml-bad\n";
+$unlimited = '-'.'1';
+echo ini_set('memory_limit', $unlimited) === false ? "ml-reject\n" : "ml-bad\n";
 PHP;
 
     private const EXPECT = "er-ok\nunknown-false\nml-reject\n";
