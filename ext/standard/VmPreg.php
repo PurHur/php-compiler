@@ -14,7 +14,7 @@ final class VmPreg
     public const MAX_PATTERN_BYTES = 4096;
 
     /**
-     * @param-out array<int|string, string> $matches
+     * @param-out array $matches
      */
     public static function pregMatch(
         string $pattern,
@@ -37,7 +37,7 @@ final class VmPreg
     }
 
     /**
-     * @param-out array<int|string, list<string>>|array<int|string, string> $matches
+     * @param-out array $matches
      */
     public static function pregMatchAll(
         string $pattern,
@@ -73,9 +73,9 @@ final class VmPreg
     }
 
     /**
-     * @param array<int|string, array{0: string, 1: int}|string> $offsetMatches preg_match PREG_OFFSET_CAPTURE
+     * @param array $offsetMatches preg_match PREG_OFFSET_CAPTURE
      *
-     * @return array<int|string, string>
+     * @return array
      */
     public static function stripMatchOffsets(array $offsetMatches): array
     {
