@@ -6,15 +6,18 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\Web\ResponseContext;
 use PHPLLVM\Value;
 
 /**
- * setcookie() — emit Set-Cookie response header (VM ResponseContext + JIT printf; issue #63).
+ * setcookie() — emit Set-Cookie response header (VM ResponseContext + JIT pending queue; issue #63, #1170).
  */
 final class setcookie extends Internal
 {
@@ -58,6 +61,8 @@ final class setcookie extends Internal
         if (JITVariable::TYPE_STRING !== $args[0]->type) {
             throw new \LogicException('setcookie() name must be a string in this compiler build');
         }
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
         $namePtr = $this->jitString($context, $args[0], 'setcookie() name');
         $valuePtr = $context->builder->load($context->constantStringFromString(''));
         if ($argc >= 2) {
@@ -66,26 +71,134 @@ final class setcookie extends Internal
             }
             $valuePtr = $this->jitString($context, $args[1], 'setcookie() value');
         }
-        $pathPtr = null;
-        if ($argc >= 4 && JITVariable::TYPE_STRING === $args[3]->type) {
-            $pathPtr = $this->jitString($context, $args[3], 'setcookie() path');
-        } elseif ($argc >= 4) {
-            throw new \LogicException('setcookie() path must be a string in this compiler build');
-        }
+        $expiresI64 = $i64->constInt(0, false);
         if ($argc >= 3) {
             JitLongArg::lower($context, $args[2], 'setcookie() expires');
             if (JITVariable::TYPE_NATIVE_LONG !== $args[2]->type) {
                 throw new \LogicException('setcookie() expires must be an integer in this compiler build');
             }
+            $expiresI64 = $context->builder->sext($args[2]->value, $i64);
         }
+        $pathPtr = $context->builder->load($context->constantStringFromString(''));
+        if ($argc >= 4) {
+            if (JITVariable::TYPE_STRING !== $args[3]->type) {
+                throw new \LogicException('setcookie() path must be a string in this compiler build');
+            }
+            $pathPtr = $this->jitString($context, $args[3], 'setcookie() path');
+        }
+        $domainPtr = $context->builder->load($context->constantStringFromString(''));
         if ($argc >= 5) {
-            throw new \LogicException(
-                'setcookie() with domain/secure/httponly is VM-only in this compiler build; use header() in JIT'
+            if (JITVariable::TYPE_STRING !== $args[4]->type) {
+                throw new \LogicException('setcookie() domain must be a string in this compiler build');
+            }
+            $domainPtr = $this->jitString($context, $args[4], 'setcookie() domain');
+        }
+        $secureI32 = $i32->constInt(0, false);
+        if ($argc >= 6) {
+            $secureI32 = $context->builder->zExt(
+                $this->jitBool($context, $args[5], 'setcookie() secure'),
+                $i32
             );
         }
-        JitSetcookie::emit($context, $namePtr, $valuePtr, $pathPtr);
+        $httponlyI32 = $i32->constInt(0, false);
+        if ($argc >= 7) {
+            $httponlyI32 = $context->builder->zExt(
+                $this->jitBool($context, $args[6], 'setcookie() httponly'),
+                $i32
+            );
+        }
+
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            JitSetcookie::emitPending(
+                $context,
+                $namePtr,
+                $valuePtr,
+                $expiresI64,
+                $pathPtr,
+                $domainPtr,
+                $secureI32,
+                $httponlyI32
+            );
+
+            return $context->constantFromBool(true);
+        }
+
+        if (null === self::compileTimeArgs($args)) {
+            throw new \LogicException(
+                'setcookie() JIT requires compile-time constant arguments (name/value/path; expires 0) in this compiler build'
+            );
+        }
+        JitSetcookie::emitPrintf(
+            $context,
+            $namePtr,
+            $valuePtr,
+            $argc >= 4 ? $pathPtr : null
+        );
 
         return $context->constantFromBool(true);
+    }
+
+    /**
+     * @param JITVariable[] $args
+     *
+     * @return array{name: string, value: string, expires: int, path: string, domain: string, secure: bool, httponly: bool}|null
+     */
+    private static function compileTimeArgs(array $args): ?array
+    {
+        $argc = \count($args);
+        $name = JitStringArg::compileTimeLiteral($args[0]);
+        if (null === $name) {
+            return null;
+        }
+        $value = '';
+        if ($argc >= 2) {
+            $v = JitStringArg::compileTimeLiteral($args[1]);
+            if (null === $v) {
+                return null;
+            }
+            $value = $v;
+        }
+        $expires = 0;
+        if ($argc >= 3) {
+            if (JITVariable::TYPE_NATIVE_LONG !== $args[2]->type) {
+                return null;
+            }
+            $e = self::nativeLongLiteral($args[2]);
+            $expires = null === $e ? 0 : $e;
+        }
+        $path = '';
+        if ($argc >= 4) {
+            $p = JitStringArg::compileTimeLiteral($args[3]);
+            if (null === $p) {
+                return null;
+            }
+            $path = $p;
+        }
+        $domain = '';
+        if ($argc >= 5) {
+            return null;
+        }
+        $secure = false;
+        $httponly = false;
+
+        return [
+            'name' => $name,
+            'value' => $value,
+            'expires' => $expires,
+            'path' => $path,
+            'domain' => $domain,
+            'secure' => $secure,
+            'httponly' => $httponly,
+        ];
+    }
+
+    private static function nativeLongLiteral(JITVariable $var): ?int
+    {
+        if (null !== $var->compileTimeString && is_numeric($var->compileTimeString)) {
+            return (int) $var->compileTimeString;
+        }
+
+        return null;
     }
 
     /**

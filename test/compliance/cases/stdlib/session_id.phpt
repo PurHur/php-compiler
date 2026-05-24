@@ -11,5 +11,5 @@ echo session_id(), "\n";
 
 
 abc123
-abc123
 
+abc123

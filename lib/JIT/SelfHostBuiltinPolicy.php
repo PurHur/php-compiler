@@ -42,6 +42,9 @@ final class SelfHostBuiltinPolicy
         'ob_start' => 'output', 'ob_get_clean' => 'output', 'ob_end_flush' => 'output',
         'ob_get_level' => 'output',
         'password_hash' => 'password', 'password_verify' => 'password',
+        'session_start' => 'session', 'session_id' => 'session', 'session_name' => 'session',
+        'session_destroy' => 'session', 'session_write_close' => 'session',
+        'session_regenerate_id' => 'session',
     ];
 
     /** @var array<string, string> */
