@@ -350,6 +350,7 @@ require_once __DIR__.'/../../../ext/standard/array_unique.php';
 require_once __DIR__.'/../../../ext/standard/array_unshift.php';
 require_once __DIR__.'/../../../ext/standard/array_values.php';
 require_once __DIR__.'/../../../ext/standard/atan2.php';
+require_once __DIR__.'/../../../ext/standard/tan.php';
 require_once __DIR__.'/../../../ext/standard/base64_decode.php';
 require_once __DIR__.'/../../../ext/standard/base64_encode.php';
 require_once __DIR__.'/../../../ext/standard/basename.php';
