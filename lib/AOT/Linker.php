@@ -314,7 +314,7 @@ final class Linker
     /**
      * @param list<string>|string|null $runtimeObjects
      */
-    private static function unlinkIfTemp(array|string|null $runtimeObjects): void
+    private static function unlinkIfTemp($runtimeObjects): void
     {
         if (null === $runtimeObjects) {
             return;
