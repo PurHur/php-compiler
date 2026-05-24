@@ -60,9 +60,7 @@ final class uasort_ extends Internal
             $valCopy->copyFrom($value);
             $pairs[] = [$keyCopy, $valCopy];
         }
-        \usort($pairs, static function (array $a, array $b) use ($compare): int {
-            return VmInternalCompare::invoke($compare, $a[1], $b[1]);
-        });
+        VmInternalCompare::sortKeyedPairsByValue($pairs, $compare);
         $sorted = new HashTable();
         foreach ($pairs as [$key, $value]) {
             array_map::appendKeyedCopy($sorted, $key, $value);
