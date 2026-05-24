@@ -30,8 +30,7 @@ final class VmFs
         return $ht;
     }
 
-    public static function fileSize(string $path): int|false
-    {
+    public static function fileSize(string $path) {
         $stat = @stat($path);
         if (false === $stat) {
             return false;
@@ -40,8 +39,7 @@ final class VmFs
         return (int) $stat['size'];
     }
 
-    public static function fileMtime(string $path): int|false
-    {
+    public static function fileMtime(string $path) {
         $stat = @stat($path);
         if (false === $stat) {
             return false;
@@ -50,8 +48,7 @@ final class VmFs
         return (int) $stat['mtime'];
     }
 
-    public static function filePerms(string $path): int|false
-    {
+    public static function filePerms(string $path) {
         $stat = @stat($path);
         if (false === $stat) {
             return false;
@@ -60,8 +57,7 @@ final class VmFs
         return (int) ($stat['mode'] ?? 0);
     }
 
-    public static function fileType(string $path): string|false
-    {
+    public static function fileType(string $path) {
         $stat = @lstat($path);
         if (false === $stat) {
             return false;
@@ -75,8 +71,7 @@ final class VmFs
    *
    * @return HashTable|false
    */
-    public static function statInfo(string $path, bool $lstat = false): HashTable|false
-    {
+    public static function statInfo(string $path, bool $lstat = false) {
         $raw = $lstat ? @lstat($path) : @stat($path);
         if (false === $raw) {
             return false;
@@ -105,8 +100,7 @@ final class VmFs
         return $ht;
     }
 
-    public static function readlink(string $path): string|false
-    {
+    public static function readlink(string $path) {
         $target = @readlink($path);
         if (false === $target) {
             return false;
@@ -170,8 +164,7 @@ final class VmFs
         };
     }
 
-    public static function fileGetContents(string $path): string|false
-    {
+    public static function fileGetContents(string $path) {
         if ('php://input' === $path) {
             return false;
         }
@@ -183,8 +176,7 @@ final class VmFs
         return $data;
     }
 
-    public static function readfile(string $path): int|false
-    {
+    public static function readfile(string $path) {
         $fp = @fopen($path, 'rb');
         if (false === $fp) {
             return false;
@@ -216,8 +208,7 @@ final class VmFs
     /**
      * @param string|list<string> $data
      */
-    public static function filePutContents(string $path, string|array $data, int $flags = 0): int|false
-    {
+    public static function filePutContents(string $path, $data, int $flags = 0) {
         if (\is_array($data)) {
             $data = implode('', $data);
         }
@@ -229,8 +220,7 @@ final class VmFs
         return $written;
     }
 
-    public static function fopen(string $path, string $mode): int|false
-    {
+    public static function fopen(string $path, string $mode) {
         $fp = @fopen($path, $mode);
         if (false === $fp) {
             return false;
@@ -241,8 +231,7 @@ final class VmFs
         return $id;
     }
 
-    public static function fread(int $handle, int $length): string|false
-    {
+    public static function fread(int $handle, int $length) {
         $fp = self::lookup($handle);
         if (null === $fp) {
             return false;
@@ -254,8 +243,7 @@ final class VmFs
         return @fread($fp, $length);
     }
 
-    public static function fpassthru(int $handle): int|false
-    {
+    public static function fpassthru(int $handle) {
         $fp = self::lookup($handle);
         if (null === $fp) {
             return false;
@@ -279,8 +267,7 @@ final class VmFs
         return $total;
     }
 
-    public static function fwrite(int $handle, string $data, ?int $length = null): int|false
-    {
+    public static function fwrite(int $handle, string $data, ?int $length = null) {
         $fp = self::lookup($handle);
         if (null === $fp) {
             return false;
@@ -328,8 +315,7 @@ final class VmFs
         return @\fflush($fp);
     }
 
-    public static function ftell(int $handle): int|false
-    {
+    public static function ftell(int $handle) {
         $fp = self::lookup($handle);
         if (null === $fp) {
             return false;
@@ -342,8 +328,7 @@ final class VmFs
         return (int) $pos;
     }
 
-    public static function fgetc(int $handle): string|false
-    {
+    public static function fgetc(int $handle) {
         $fp = self::lookup($handle);
         if (null === $fp) {
             return false;
@@ -360,8 +345,7 @@ final class VmFs
         return $byte;
     }
 
-    public static function fgets(int $handle, ?int $length = null): string|false
-    {
+    public static function fgets(int $handle, ?int $length = null) {
         $fp = self::lookup($handle);
         if (null === $fp) {
             return false;
@@ -390,7 +374,7 @@ final class VmFs
         string $separator = ',',
         string $enclosure = '"',
         string $escape = '\\',
-    ): int|false {
+    ) {
         $fp = self::lookup($handle);
         if (null === $fp) {
             return false;
@@ -412,7 +396,7 @@ final class VmFs
         string $separator = ',',
         string $enclosure = '"',
         string $escape = '\\',
-    ): array|false {
+    ) {
         $fp = self::lookup($handle);
         if (null === $fp) {
             return false;
@@ -442,8 +426,7 @@ final class VmFs
         return 0 === @\fseek($fp, $offset, $whence) ? 0 : -1;
     }
 
-    public static function tempnam(string $directory, string $prefix): string|false
-    {
+    public static function tempnam(string $directory, string $prefix) {
         $path = @\tempnam($directory, $prefix);
         if (false === $path) {
             return false;
@@ -462,8 +445,7 @@ final class VmFs
         return \sys_get_temp_dir();
     }
 
-    public static function getcwd(): string|false
-    {
+    public static function getcwd() {
         $cwd = @\getcwd();
         if (false === $cwd) {
             return false;

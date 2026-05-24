@@ -66,6 +66,6 @@ final class http_response_code extends Internal
             JitLongArg::lower($context, $args[0], 'http_response_code() code');
         }
 
-        return JitHttpResponseCode::invoke($context, ...$args);
+        return \call_user_func_array([JitHttpResponseCode::class, 'invoke'], array_merge([$context], $args));
     }
 }

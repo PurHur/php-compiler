@@ -11,7 +11,8 @@ use PHPLLVM\Value;
 /** LLVM lowering for fclose() via __compiler_fclose (issue #1117). */
 final class JitFclose
 {
-    /** @return Value i1 — true when fclose succeeds */
+    /** @return Value
+     * true when fclose succeeds */
     public static function invoke(Context $context, Value $handleLong): Value
     {
         $ret = $context->builder->call($context->lookupFunction('__compiler_fclose'), $handleLong);

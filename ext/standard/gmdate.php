@@ -42,6 +42,6 @@ final class gmdate extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->jitString($context, $args[0], 'gmdate() argument #1');
-        return JitDate::formatDate($context, true, ...$args);
+        return \call_user_func_array([JitDate::class, 'formatDate'], array_merge([$context, true], $args));
     }
 }

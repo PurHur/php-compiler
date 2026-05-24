@@ -13,7 +13,8 @@ use PHPLLVM\Value;
 /** LLVM lowering for fread() via __compiler_fread (issue #1117). */
 final class JitFread
 {
-    /** @return Value __value__* (string data, or boolean false on failure) */
+    /** @return Value
+     * (string data, or boolean false on failure) */
     public static function invoke(Context $context, Value $handleLong, Value $lengthLong): Value
     {
         $contents = $context->builder->call(

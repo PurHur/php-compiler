@@ -18,7 +18,7 @@ final class VmPregReplaceCallback
         string $pattern,
         Func\PHP $callback,
         string $subject
-    ): string|false {
+    ) {
         if (strlen($pattern) > VmPreg::MAX_PATTERN_BYTES) {
             return false;
         }

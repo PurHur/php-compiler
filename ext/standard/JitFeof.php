@@ -11,7 +11,8 @@ use PHPLLVM\Value;
 /** LLVM lowering for feof() via __compiler_feof (issue #1188). */
 final class JitFeof
 {
-    /** @return Value i1 — true at end-of-file */
+    /** @return Value
+     * true at end-of-file */
     public static function invoke(Context $context, Value $handleLong): Value
     {
         $ret = $context->builder->call($context->lookupFunction('__compiler_feof'), $handleLong);

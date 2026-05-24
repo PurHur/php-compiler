@@ -22,7 +22,7 @@ final class VmPreg
         ?array &$matches = null,
         int $flags = 0,
         int $offset = 0
-    ): int|false {
+    ) {
         if (strlen($pattern) > self::MAX_PATTERN_BYTES) {
             return false;
         }
@@ -45,7 +45,7 @@ final class VmPreg
         ?array &$matches = null,
         int $flags = 0,
         int $offset = 0
-    ): int|false {
+    ) {
         if (strlen($pattern) > self::MAX_PATTERN_BYTES) {
             return false;
         }
@@ -59,8 +59,7 @@ final class VmPreg
         return \preg_match_all($pattern, $subject, $matches);
     }
 
-    public static function pregReplace(string $pattern, string $replacement, string $subject): string|false
-    {
+    public static function pregReplace(string $pattern, string $replacement, string $subject) {
         if (strlen($pattern) > self::MAX_PATTERN_BYTES) {
             return false;
         }
@@ -99,8 +98,7 @@ final class VmPreg
     /**
      * @return list<string>|false
      */
-    public static function pregSplit(string $pattern, string $subject): array|false
-    {
+    public static function pregSplit(string $pattern, string $subject) {
         if (strlen($pattern) > self::MAX_PATTERN_BYTES) {
             return false;
         }

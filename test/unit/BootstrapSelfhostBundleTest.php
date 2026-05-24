@@ -328,6 +328,20 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/var_dump.php',
         'ext/standard/web_int.php',
         'ext/standard/wordwrap.php',
+        'ext/standard/VmFs.php',
+        'ext/standard/VmFilter.php',
+        'ext/standard/VmHash.php',
+        'ext/standard/VmSession.php',
+        'ext/standard/SetcookieLine.php',
+        'ext/standard/sqrt.php',
+        'ext/standard/sin.php',
+        'ext/standard/range.php',
+        'ext/standard/fopen.php',
+        'ext/standard/readfile.php',
+        'ext/standard/stream_context_create.php',
+        'ext/standard/pack.php',
+        'ext/standard/date.php',
+        'ext/standard/session_start.php',
         'src/llvm-env.php',
         'src/yay-php8-compat.php',
     ];
@@ -351,7 +365,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         $this->assertFileExists($entry);
         $contents = (string) file_get_contents($entry);
         $count = substr_count($contents, 'require_once __DIR__');
-                $this->assertSame(435, $count, '108 compiler_minimal units + 327 M2 spine units (#1746 yay-php8-compat); array_pop/shift/search + preg/array_combine wrappers skipped (AOT types); Vm* deferred #1467');
+                $this->assertSame(567, $count, '108 compiler_minimal overlap + 459 M2 spine units; array_pop/shift/search/combine/multisort/sort/usort/uasort + shell_exec + VmString/VmSplAutoload/VmPregReplaceCallback/spl_autoload skipped (AOT lint)');
         foreach (self::LIB_SPINE_SMOKE_NEW_UNITS as $unit) {
             $this->assertStringContainsString(
                 "require_once __DIR__.'/../../../{$unit}';",

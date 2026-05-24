@@ -40,10 +40,10 @@ final class VmSession
     }
 
     /**
-     * @return string|false previous name, or false when session is active
+     * @return string|false
+     * previous name, or false when session is active
      */
-    public static function setName(string $name): string|false
-    {
+    public static function setName(string $name) {
         if (self::$active) {
             return false;
         }
@@ -62,10 +62,10 @@ final class VmSession
     }
 
     /**
-     * @return string|false previous id, or false when $id is empty
+     * @return string|false
+     * previous id, or false when $id is empty
      */
-    public static function setId(string $id): string|false
-    {
+    public static function setId(string $id) {
         $sanitized = self::sanitizeId($id);
         if ('' === $sanitized) {
             return false;

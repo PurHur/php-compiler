@@ -57,6 +57,6 @@ final class session_name extends Internal
             throw new \LogicException('session_name() accepts at most one argument in this compiler build');
         }
 
-        return JitSessionName::invoke($context, ...$args);
+        return \call_user_func_array([JitSessionName::class, 'invoke'], array_merge([$context], $args));
     }
 }

@@ -24,7 +24,8 @@ final class JitPregReplaceCallback
     /** @var array<string, Value> per-module preg callback shims */
     private static array $callbackShims = [];
 
-    /** @return Value __value__* (string result, or boolean false on PCRE error) */
+    /** @return Value
+     * (string result, or boolean false on PCRE error) */
     public static function invoke(
         Context $context,
         Value $pattern,

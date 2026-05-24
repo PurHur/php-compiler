@@ -14,7 +14,8 @@ use PHPLLVM\Value;
 /** LLVM lowering for enum_exists() (issue #1373). */
 final class JitEnumExists
 {
-    /** @return Value int1 — matches defined() / array_key_exists() for JUMPIF truthiness */
+    /** @return Value
+     * matches defined() / array_key_exists() for JUMPIF truthiness */
     public static function invoke(Context $context, JITVariable $nameArg): Value
     {
         $literal = JitStringArg::compileTimeLiteral($nameArg);

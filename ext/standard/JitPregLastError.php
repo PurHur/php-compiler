@@ -11,7 +11,8 @@ use PHPLLVM\Value;
 /** LLVM lowering for preg_last_error() via __compiler_preg_last_error (issue #1181). */
 final class JitPregLastError
 {
-    /** @return Value __value__* (native long error code) */
+    /** @return Value
+     * (native long error code) */
     public static function invoke(Context $context): Value
     {
         $code = $context->builder->call($context->lookupFunction('__compiler_preg_last_error'));

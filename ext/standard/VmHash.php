@@ -11,8 +11,7 @@ final class VmHash
 {
     private const SUPPORTED = ['sha256', 'sha1', 'md5'];
 
-    public static function hash(string $algo, string $data, bool $raw = false): string|false
-    {
+    public static function hash(string $algo, string $data, bool $raw = false) {
         $algo = strtolower($algo);
         if (!\in_array($algo, self::SUPPORTED, true)) {
             return false;
@@ -21,8 +20,7 @@ final class VmHash
         return \hash($algo, $data, $raw);
     }
 
-    public static function hashHmac(string $algo, string $data, string $key, bool $raw = false): string|false
-    {
+    public static function hashHmac(string $algo, string $data, string $key, bool $raw = false) {
         $algo = strtolower($algo);
         if (!\in_array($algo, self::SUPPORTED, true)) {
             return false;

@@ -43,6 +43,6 @@ final class compact_ extends Internal
                 $this->jitString($context, $arg, 'compact() variable name #'.((int) $i + 1));
             }
         }
-        return ScopeBuiltinHelper::compact($context, ...$args);
+        return \call_user_func_array([ScopeBuiltinHelper::class, 'compact'], array_merge([$context], $args));
     }
 }

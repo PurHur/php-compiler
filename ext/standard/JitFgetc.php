@@ -13,7 +13,8 @@ use PHPLLVM\Value;
 /** LLVM lowering for fgetc() via __compiler_fgetc (issue #1195). */
 final class JitFgetc
 {
-    /** @return Value __value__* (single-character string, empty string at EOF, or boolean false on failure) */
+    /** @return Value
+     * (single-character string, empty string at EOF, or boolean false on failure) */
     public static function invoke(Context $context, Value $handleLong): Value
     {
         $contents = $context->builder->call(

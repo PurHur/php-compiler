@@ -12,6 +12,6 @@ final class VmPack
      */
     public static function pack(string $format, array $args): string
     {
-        return \pack($format, ...$args);
+        return \call_user_func_array('pack', array_merge([$format], $args));
     }
 }

@@ -16,7 +16,7 @@ use PHPLLVM\Value;
 
 final class JitHttpResponseCode
 {
-    /** @return Value __value__* */
+    /** @return Value */
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
         $argc = count($args);

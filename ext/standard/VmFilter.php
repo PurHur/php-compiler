@@ -150,12 +150,12 @@ final class VmFilter
 
     private static function isEmailLocalPart(string $local): bool
     {
-        return self::charsMatch($local, self::isEmailLocalChar(...));
+        return self::charsMatch($local, [self::class, 'isEmailLocalChar']);
     }
 
     private static function isEmailDomainPart(string $domain): bool
     {
-        return self::charsMatch($domain, self::isEmailDomainChar(...));
+        return self::charsMatch($domain, [self::class, 'isEmailDomainChar']);
     }
 
     private static function charsMatch(string $s, callable $predicate): bool

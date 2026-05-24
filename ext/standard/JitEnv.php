@@ -16,7 +16,8 @@ use PHPLLVM\Value;
 final class JitEnv
 {
     /**
-     * @return Value __value__* (string on success, boolean false when unset)
+     * @return Value
+     * (string on success, boolean false when unset)
      */
     public static function getenv(Context $context, Value $nameStr): Value
     {

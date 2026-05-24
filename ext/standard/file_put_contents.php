@@ -81,7 +81,7 @@ final class file_put_contents extends Internal
     /**
      * @return string|list<string>
      */
-    private static function coerceData(Variable $var): string|array
+    private static function coerceData(Variable $var)
     {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_STRING === $var->type) {

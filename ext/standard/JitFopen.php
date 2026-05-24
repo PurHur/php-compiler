@@ -13,7 +13,8 @@ use PHPLLVM\Value;
 /** LLVM lowering for fopen() via __compiler_fopen (issue #1117). */
 final class JitFopen
 {
-    /** @return Value __value__* (int handle, or boolean false on failure) */
+    /** @return Value
+     * (int handle, or boolean false on failure) */
     public static function invoke(Context $context, Value $pathStr, Value $modeStr): Value
     {
         $handle = $context->builder->call(

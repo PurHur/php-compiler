@@ -11,7 +11,8 @@ use PHPLLVM\Value;
 /** LLVM lowering for fseek() via __compiler_fseek (issue #1191). */
 final class JitFseek
 {
-    /** @return Value __value__* (0 on success, -1 on failure) */
+    /** @return Value
+     * (0 on success, -1 on failure) */
     public static function invoke(Context $context, Value $handleLong, Value $offsetLong, Value $whenceLong): Value
     {
         $result = $context->builder->call(
