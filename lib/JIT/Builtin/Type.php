@@ -332,6 +332,8 @@ class Type extends Builtin {
             'time' => [$i64, false, [$i8p]],
             'localtime' => [$i8p, false, [$i64p]],
             'gmtime' => [$i8p, false, [$i64p]],
+            'sleep' => [$i32, false, [$i32]],
+            'usleep' => [$i32, false, [$i32]],
         ];
         foreach ($libcFns as $libcName => $spec) {
             [$ret, $vararg, $params] = $spec;
