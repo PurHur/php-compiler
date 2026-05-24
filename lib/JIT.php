@@ -238,7 +238,8 @@ class JIT {
                     $funcName,
                     $args,
                     $defaultArgs,
-                    $variadicArgIndex
+                    $variadicArgIndex,
+                    $this->paramTypeConstraintsForNativeCall($block)
                 );
             }
         }
@@ -1875,7 +1876,10 @@ class JIT {
                         $this->context->scope->toCall,
                         $this->context->scope->args
                     );
+                    $prevStrict = $this->context->callerStrictTypes;
+                    $this->context->callerStrictTypes = $block->strictTypes;
                     $this->context->scope->toCall->call($this->context, ...$callArgs);
+                    $this->context->callerStrictTypes = $prevStrict;
                     break;
                 case OpCode::TYPE_FUNCCALL_EXEC_RETURN:
                     $callArgs = $this->prependImplicitThisForStaticConstruct(
@@ -1899,7 +1903,10 @@ class JIT {
                         );
                         break;
                     }
+                    $prevStrict = $this->context->callerStrictTypes;
+                    $this->context->callerStrictTypes = $block->strictTypes;
                     $result = $this->context->scope->toCall->call($this->context, ...$callArgs);
+                    $this->context->callerStrictTypes = $prevStrict;
                     $this->assignOperandValue($block->getOperand($op->arg1), $result);
                     break;
                 case OpCode::TYPE_DECLARE_GLOBAL_CONST:
@@ -3578,6 +3585,26 @@ class JIT {
         }
 
         return null;
+    }
+
+    /**
+     * @return array<int, int> LLVM argument index => VM type constraint
+     */
+    private function paramTypeConstraintsForNativeCall(Block $block): array
+    {
+        $constraints = [];
+        $offset = $this->instanceMethodUsesThis($block) ? 1 : 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_ARG_RECV !== $op->type) {
+                continue;
+            }
+            if (!isset($block->paramTypeConstraints[$op->arg1])) {
+                continue;
+            }
+            $constraints[(int) $op->arg2 + $offset] = $block->paramTypeConstraints[$op->arg1];
+        }
+
+        return $constraints;
     }
 
     private function collectParamDefaults(Block $block): array {
