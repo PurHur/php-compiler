@@ -48,7 +48,7 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | M1 compile-smoke AOT echo | ✅ `compiler smoke` |
 | M2 `BOOTSTRAP_LIB_SPINE_SMOKE=1` spine link | ✅ `compiler_lib_spine_smoke bundle OK` |
 | M3 `make bootstrap-selfhost-helloworld` | 🚧 partial — HelloWorld runs natively; emit uses Zend |
-| M4 `make bootstrap-loop-probe` | ⬜ scaffold — blocked on M3 native emit ([#1498](https://github.com/PurHur/php-compiler/issues/1498)) |
+| M4 `make bootstrap-loop-probe` | 🚧 ladder — `--dry-run` validates lint+M2+M3 partial; full exits **2** until M3 strict ([#1498](https://github.com/PurHur/php-compiler/issues/1498)) |
 | `make bootstrap-aot-link` | ✅ **71/71** |
 | `php script/bootstrap-inventory.php --check` | ✅ **569** files, **0** source blockers |
 
@@ -164,11 +164,15 @@ M3 strict (fails until native emit):
 BOOTSTRAP_M3_HELLOWORLD_STRICT=1 make bootstrap-selfhost-helloworld
 ```
 
-M4 scaffold (exit 2 until M3 native emit is green):
+M4 bootstrap-loop probe ([#1498](https://github.com/PurHur/php-compiler/issues/1498)):
 
 ```bash
+# Prerequisites only (no M3 strict native emit):
+./script/bootstrap-loop-probe.sh --dry-run   # exit 0 when lint + M2 spine + M3 partial green
+
+# Full gate (exit 2 until M3 strict native emit):
 make bootstrap-loop-probe
-# or: ./script/bootstrap-loop-probe.sh
+# Exit codes: 0=strict green | 1=hard failure | 2=LLVM skip or M3 strict blocks M4
 ```
 
 ---

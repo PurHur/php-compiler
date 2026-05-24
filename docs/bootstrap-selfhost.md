@@ -26,6 +26,7 @@
 | M3 HelloWorld compile driver lint | `php bin/compile.php -l test/selfhost/compiler_helloworld_smoke/compile_driver.php` | ✅ `Runtime::parseAndCompile` + mode-file dispatch (native link opt-in) |
 | M3 HelloWorld self-host probe | `./script/bootstrap-selfhost-helloworld-probe.sh` or `make bootstrap-selfhost-helloworld` | 🚧 **partial** — bundle link ✅; HelloWorld AOT **run** native ✅; **emit uses Zend fallback** until native runtime compile passes ([#1056](https://github.com/PurHur/php-compiler/issues/1056); probe sets `M3_NATIVE_COMPILE=1` / `emit_path=native` only on selfhost compile-driver success; `BOOTSTRAP_M3_HELLOWORLD_STRICT=1` fails without fallback — see [bootstrap-m5-fast-path.md](bootstrap-m5-fast-path.md)) |
 | M3 HelloWorld wave gate | `./script/bootstrap-wave-check.sh --with-helloworld` | ✅ opt-in `BOOTSTRAP_M3_HELLOWORLD=1` |
+| M4 bootstrap-loop probe | `./script/bootstrap-loop-probe.sh` or `make bootstrap-loop-probe` | 🚧 **ladder** — runs M2 spine + M3 partial, then M3 strict; `--dry-run` skips strict ([#1498](https://github.com/PurHur/php-compiler/issues/1498)) |
 
 Regenerate: `make bootstrap-profile` (inventory + profile + optional `bootstrap-aot-lint`). Phase C: `make bootstrap-aot-link` (or `php script/bootstrap-aot-lint.php --link`). Phase D: `make bootstrap-aot-link-lib`. Bundled compiler lint: `./script/bootstrap-selfhost-lint.sh`. Live lowering target: `make bootstrap-selfhost-probe` (or `./script/bootstrap-selfhost-compile-probe.sh`; optional `--update-inventory`).
 
