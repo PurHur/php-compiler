@@ -103,6 +103,7 @@ final class SelfHostBuiltinPolicy
         'compact' => 'array', 'extract' => 'array', 'defined' => 'array', 'define' => 'array',
         'class_exists' => 'array', 'enum_exists' => 'array', 'function_exists' => 'array', 'method_exists' => 'array',
         'property_exists' => 'array',
+        'get_object_vars' => 'array',
         'get_class' => 'array', 'get_parent_class' => 'array', 'is_a' => 'array', 'is_subclass_of' => 'array',
         'trigger_error' => 'array',
     ];

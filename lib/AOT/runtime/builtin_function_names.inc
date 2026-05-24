@@ -90,6 +90,7 @@ static const char *phpc_builtin_functions[] = {
     "function_exists",
     "fwrite",
     "get_class",
+    "get_object_vars",
     "get_parent_class",
     "getallheaders",
     "getcwd",
