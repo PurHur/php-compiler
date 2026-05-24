@@ -409,7 +409,12 @@ restart:
                     $this->context->declareFunction(new Func\PHP($name, $op->block1));
                     break;
                 case OpCode::TYPE_FUNCCALL_INIT:
-                    $name = $frame->scope[$op->arg1]->toString();
+                    $callee = $frame->scope[$op->arg1]->resolveIndirect();
+                    if (Variable::TYPE_OBJECT === $callee->type) {
+                        $this->initMethodCall($frame, $callee, '__invoke');
+                        break;
+                    }
+                    $name = $callee->toString();
                     $lcname = strtolower($name);
                     if (!isset($this->context->functions[$lcname])) {
                         throw new \LogicException("Call to undefined function $lcname()");
@@ -423,26 +428,11 @@ restart:
                     if ($receiver->type !== Variable::TYPE_OBJECT) {
                         throw new \LogicException('Method call on non-object');
                     }
-                    $methodName = strtolower($frame->scope[$op->arg2]->toString());
-                    $class = $receiver->toObject()->class;
-                    if (!isset($class->methods[$methodName])) {
-                        throw new \LogicException("Call to undefined method {$class->name}::{$methodName}()");
-                    }
-                    $vis = $class->methodVisibility[$methodName] ?? \PHPCfg\Func::FLAG_PUBLIC;
-                    $callerClassLc = null;
-                    if (null !== $frame->block->func && null !== $frame->block->func->class) {
-                        $callerClassLc = strtolower($frame->block->func->class->value);
-                    }
-                    MethodVisibility::assertCallable(
-                        $vis,
-                        $callerClassLc,
-                        strtolower($class->name),
-                        $class->name,
+                    $this->initMethodCall(
+                        $frame,
+                        $receiver,
                         $frame->scope[$op->arg2]->toString()
                     );
-                    $frame->call = $class->methods[$methodName];
-                    $frame->callArgs = [$receiver];
-                    $frame->callArgEntries = [];
                     break;
                 case OpCode::TYPE_ARG_SEND:
                     $value = $frame->scope[$op->arg1];
@@ -804,6 +794,30 @@ restart:
         }
 
         return $lcClass;
+    }
+
+    protected function initMethodCall(Frame $frame, Variable $receiver, string $methodName): void
+    {
+        $methodLc = strtolower($methodName);
+        $class = $receiver->toObject()->class;
+        if (!isset($class->methods[$methodLc])) {
+            throw new \LogicException("Call to undefined method {$class->name}::{$methodLc}()");
+        }
+        $vis = $class->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+        $callerClassLc = null;
+        if (null !== $frame->block->func && null !== $frame->block->func->class) {
+            $callerClassLc = strtolower($frame->block->func->class->value);
+        }
+        MethodVisibility::assertCallable(
+            $vis,
+            $callerClassLc,
+            strtolower($class->name),
+            $class->name,
+            $methodName
+        );
+        $frame->call = $class->methods[$methodLc];
+        $frame->callArgs = [$receiver];
+        $frame->callArgEntries = [];
     }
 
     protected function defineClass(ClassEntry $entry, Block $block): void {

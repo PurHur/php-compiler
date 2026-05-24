@@ -144,6 +144,14 @@ function syntaxRowDefinitions(): array
             'probe' => null,
         ],
         [
+            'id' => 'literal_include',
+            'construct' => 'Literal `include`/`require` with `__DIR__`',
+            'opcodes' => ['TYPE_INCLUDE'],
+            'issue' => 475,
+            'notes' => ['Compile-time inlining via IncludeHelper; two-file PHPT + MiniWebApp JIT gate (#587)'],
+            'probe' => null,
+        ],
+        [
             'id' => 'foreach_by_ref',
             'construct' => 'foreach by-reference (`&$v`)',
             'opcodes' => ['TYPE_ITER_VALUE', 'TYPE_ASSIGN_REF'],
@@ -198,6 +206,14 @@ function syntaxRowDefinitions(): array
             'issue' => 1226,
             'notes' => ['php-cfg nests Operand\\Variable name; VM resolves runtime local by name'],
             'probe' => '$a = "x"; $x = 1; echo $$a;',
+        ],
+        [
+            'id' => 'invoke_object',
+            'construct' => 'Invokable objects (`$obj()` / `__invoke`)',
+            'opcodes' => ['TYPE_METHODCALL_INIT', 'TYPE_DECLARE_METHOD'],
+            'issue' => 1232,
+            'notes' => ['Object-typed FuncCall lowered to __invoke method dispatch; VM runtime fallback'],
+            'probe' => 'class C { public function __invoke(): int { return 1; } } echo (new C())();',
         ],
     ];
 }

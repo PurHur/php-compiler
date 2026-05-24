@@ -103,9 +103,13 @@ class Native implements Call {
                     );
                 }
                 $valueTy = $value->typeOf();
+                $valueTyName = $context->getStringFromType($valueTy);
                 if (
-                    \PHPLLVM\Type::KIND_POINTER === $valueTy->getKind()
-                    && '__value__' === $context->getStringFromType($valueTy->getElementType())
+                    '__value__*' === $valueTyName
+                    || (
+                        \PHPLLVM\Type::KIND_POINTER === $valueTy->getKind()
+                        && '__value__' === $context->getStringFromType($valueTy->getElementType())
+                    )
                 ) {
                     return $context->builder->call(
                         $context->lookupFunction('__value__readObject'),
@@ -114,6 +118,13 @@ class Native implements Call {
                 }
                 switch ($arg->type) {
                     case Variable::TYPE_OBJECT:
+                        if ('__value__*' === $valueTyName) {
+                            return $context->builder->call(
+                                $context->lookupFunction('__value__readObject'),
+                                $value
+                            );
+                        }
+
                         return $value;
                     case Variable::TYPE_VALUE:
                         return $context->builder->call(

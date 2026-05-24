@@ -17,7 +17,7 @@ final class StaleIssueRefsTest extends TestCase
         $this->assertFileExists($script);
         $this->assertTrue(is_executable($script));
         $body = (string) file_get_contents($script);
-        $this->assertStringContainsString('CLOSED_ISSUES=(568 67)', $body);
+        $this->assertStringContainsString('CLOSED_ISSUES=(568 67 764)', $body);
         $this->assertStringContainsString('stale-issue-ok:', $body);
     }
 

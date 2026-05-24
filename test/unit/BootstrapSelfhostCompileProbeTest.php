@@ -164,4 +164,49 @@ SH
         }
         $this->assertStringContainsString('NEXT_LOWER:', $out);
     }
+
+    /**
+     * @group llvm
+     */
+    public function testCompilerMinimalSelfhostProbeLinksWhenLlvmReady(): void
+    {
+        if (!LlvmToolchain::isReady(self::$root)) {
+            $this->markTestSkipped('LLVM 9 toolchain not available.');
+        }
+
+        $script = self::$root.'/script/bootstrap-selfhost-compile-probe.php';
+        $env = [];
+        foreach (array_merge($_ENV, $_SERVER) as $key => $value) {
+            if (is_string($value)) {
+                $env[$key] = $value;
+            }
+        }
+        LlvmToolchain::applyProcessEnv($env, self::$root);
+        $env['PHP_COMPILER_SELFHOST_AOT'] = '1';
+
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open(
+            [PHP_BINARY, $script],
+            $descriptorSpec,
+            $pipes,
+            self::$root,
+            $env
+        );
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+
+        $combined = trim(($stdout !== false ? $stdout : '').($stderr !== false ? $stderr : ''));
+        $this->assertSame(0, $exit, $combined);
+        $this->assertStringContainsString('bootstrap-selfhost-compile-probe: OK', $combined);
+        $this->assertFileExists(self::$root.'/build/selfhost');
+    }
 }
