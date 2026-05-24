@@ -2009,7 +2009,8 @@ class Compiler {
     protected function compileFirstClassCallable(Op\Expr\FirstClassCallable $expr, Block $block): array
     {
         $result = $this->compileOperand($expr->result, $block, false);
-        if (Op\Expr\FirstClassCallable::KIND_METHOD === $expr->kind) {
+        // Numeric kinds: avoid php-cfg class const fetch during self-host bundle JIT (#1056).
+        if (3 === $expr->kind) {
             $receiver = $this->compileOperand($expr->var, $block, true);
             $method = $this->compileOperand($expr->name, $block, true);
 
@@ -2029,11 +2030,13 @@ class Compiler {
             ];
         }
 
-        $callableSlot = match ($expr->kind) {
-            Op\Expr\FirstClassCallable::KIND_FUNCTION => $this->compileFirstClassFunctionNameSlot($expr->name, $block),
-            Op\Expr\FirstClassCallable::KIND_STATIC => $this->compileFirstClassStaticNameSlot($expr->class, $expr->name, $block),
-            default => throw new \LogicException('Unknown first-class callable kind'),
-        };
+        if (1 === $expr->kind) {
+            $callableSlot = $this->compileFirstClassFunctionNameSlot($expr->name, $block);
+        } elseif (2 === $expr->kind) {
+            $callableSlot = $this->compileFirstClassStaticNameSlot($expr->class, $expr->name, $block);
+        } else {
+            throw new \LogicException('Unknown first-class callable kind');
+        }
 
         return [new OpCode(
             OpCode::TYPE_ASSIGN,
