@@ -2802,6 +2802,16 @@ class JIT {
 
             return;
         }
+        if (null !== $result->writableHt && null !== $result->writableValueBoxKey) {
+            JIT\HashTableHelper::setValueBoxKey(
+                $this->context,
+                $result->writableHt,
+                $result->writableValueBoxKey,
+                $value
+            );
+
+            return;
+        }
         if ($result->kind === Variable::KIND_VALUE && $result->type === Variable::TYPE_STRING) {
             JIT\StringOffsetHelper::dimAssign($this->context, $result->value, $value);
 
