@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * Build a Set-Cookie response header line (subset of PHP setcookie() semantics).
+ * Build a Set-Cookie response header line (setcookie / setrawcookie; issue #1170, #1368).
  */
 final class SetcookieLine
 {
