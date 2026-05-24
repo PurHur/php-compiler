@@ -19,6 +19,8 @@ class ClassEntry {
     const PROP_PURPOSE_DEBUG = 1;
 
     public string $name;
+    /** True for user enums registered via TYPE_DECLARE_ENUM (#1356). */
+    public bool $isEnum = false;
     /** Parent class name (lowercase) for single inheritance (#101, #1231). */
     public ?string $parentLc = null;
     /** True for `interface` declarations (#1357). */

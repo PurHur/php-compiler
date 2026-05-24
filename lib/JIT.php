@@ -2135,6 +2135,18 @@ class JIT {
                         throw new \LogicException("Cannot redefine constant {$nameOp->value}");
                     }
                     break;
+                case OpCode::TYPE_DECLARE_ENUM:
+                    $nameOp = $block->getOperand($op->arg1);
+                    assert($nameOp instanceof Operand\Literal);
+                    $this->context->pushScope();
+                    $this->context->scope->classId = $this->context->type->object->declareEnum($nameOp);
+                    $this->context->scope->className = strtolower($nameOp->value);
+                    if (null !== $this->context->runtime->vmContext) {
+                        $this->context->runtime->vmContext->enums[strtolower($nameOp->value)] = true;
+                    }
+                    $this->compileClass($op->block1, $this->context->scope->classId);
+                    $this->context->popScope();
+                    break;
                 case OpCode::TYPE_DECLARE_CLASS:
                     $nameOp = $block->getOperand($op->arg1);
                     assert($nameOp instanceof Operand\Literal);

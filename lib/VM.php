@@ -619,6 +619,18 @@ restart:
                         throw new \LogicException("Cannot redefine constant {$name}");
                     }
                     break;
+                case OpCode::TYPE_DECLARE_ENUM:
+                    $name = $frame->scope[$op->arg1]->toString();
+                    $lcname = strtolower($name);
+                    if (isset($this->context->classes[$lcname]) || isset($this->context->enums[$lcname])) {
+                        throw new \LogicException("Duplicate enum definition for $name");
+                    }
+                    $classEntry = new ClassEntry($name);
+                    $classEntry->isEnum = true;
+                    self::defineClass($classEntry, $op->block1);
+                    $this->context->classes[$lcname] = $classEntry;
+                    $this->context->enums[$lcname] = true;
+                    break;
                 case OpCode::TYPE_DECLARE_CLASS:
                     $name = $frame->scope[$op->arg1]->toString();
                     $lcname = strtolower($name);

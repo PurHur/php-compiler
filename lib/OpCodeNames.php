@@ -194,6 +194,8 @@ function opcode_type_name(int $type): string
             return 'TYPE_ARRAY_SPREAD';
         case 102:
             return 'TYPE_DECLARE_INTERFACE';
+        case 103:
+            return 'TYPE_DECLARE_ENUM';
         default:
             return 'unknown opcode';
     }

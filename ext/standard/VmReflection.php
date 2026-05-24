@@ -42,7 +42,9 @@ final class VmReflection
 
     public static function classExists(Context $ctx, string $className): bool
     {
-        return null !== self::resolveClassEntry($ctx, $className);
+        $entry = self::resolveClassEntry($ctx, $className);
+
+        return null !== $entry && !$entry->isEnum;
     }
 
     public static function enumExists(Context $ctx, string $enumName): bool

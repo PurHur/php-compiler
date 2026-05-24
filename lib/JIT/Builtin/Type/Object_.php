@@ -399,6 +399,13 @@ class Object_ extends Type {
         return $this->classes[strtolower($name->value)] = $id;
     }
 
+    public function declareEnum(Operand $name): int
+    {
+        $this->enums[strtolower($name->value)] = true;
+
+        return $this->declareClass($name);
+    }
+
     public function hasDeclaredClass(string $name): bool
     {
         return isset($this->classes[strtolower($name)]);
@@ -408,6 +415,9 @@ class Object_ extends Type {
     public function hasUserDeclaredClass(string $name): bool
     {
         $lc = strtolower($name);
+        if (isset($this->enums[$lc])) {
+            return false;
+        }
         if (!isset($this->classes[$lc])) {
             return false;
         }

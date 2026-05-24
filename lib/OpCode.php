@@ -112,6 +112,8 @@ class OpCode {
     const TYPE_ARRAY_SPREAD = 101;
     /** Register a user interface name (#1357). */
     const TYPE_DECLARE_INTERFACE = 102;
+    /** User enum declaration with case constants (#1356). */
+    const TYPE_DECLARE_ENUM = 103;
 
     public int $type;
     public ?int $arg1;
