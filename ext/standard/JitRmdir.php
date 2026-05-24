@@ -11,7 +11,7 @@ use PHPLLVM\Value;
 /** LLVM lowering for rmdir() via libc rmdir(2). */
 final class JitRmdir
 {
-    /** @return Value i1 — true when rmdir(2) returns 0 */
+    /** @return Value */
     public static function invoke(Context $context, Value $pathStr): Value
     {
         $map = $context->structFieldMap['__string__'];

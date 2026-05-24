@@ -13,7 +13,7 @@ use PHPLLVM\Value;
 /** LLVM lowering for readfile() via {@see \PHPCompiler\JIT\Builtin\StringReadfile}. */
 final class JitReadfile
 {
-    /** @return Value __value__* (int bytes written, or boolean false on failure) */
+    /** @return Value */
     public static function invoke(Context $context, Value $pathStr): Value
     {
         $bytes = $context->builder->call(

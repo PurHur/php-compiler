@@ -13,7 +13,7 @@ use PHPLLVM\Value;
 /** LLVM lowering for fwrite() via __compiler_fwrite (native FILE* writes). */
 final class JitFwrite
 {
-    /** @return Value __value__* (int bytes written, or boolean false on failure) */
+    /** @return Value */
     public static function invoke(Context $context, Value $handleLong, Value $dataStr, Value $lengthLong): Value
     {
         $bytes = $context->builder->call(

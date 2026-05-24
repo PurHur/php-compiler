@@ -13,7 +13,7 @@ use PHPLLVM\Value;
 /** LLVM lowering for shell_exec() via __compiler_shell_exec (popen). */
 final class JitShellExec
 {
-    /** @return Value __value__* (string, null, or boolean false) */
+    /** @return Value */
     public static function invoke(Context $context, Value $cmdStr): Value
     {
         $output = $context->builder->call(

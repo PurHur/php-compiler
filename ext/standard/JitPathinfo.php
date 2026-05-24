@@ -41,15 +41,22 @@ final class JitPathinfo
             return self::buildAllArray($context, VmString::pathinfo($literal, 15));
         }
 
-        return match ($flag) {
-            1 => JitPath::dirname($context, $pathVal),
-            2 => JitPath::basename($context, $pathVal),
-            4 => self::extension($context, $pathVal),
-            8 => self::filename($context, $pathVal),
-            default => throw new \LogicException(
-                'pathinfo() flags not supported in this compiler build (use 1, 2, 4, 8, or 15)'
-            ),
-        };
+        if (1 === $flag) {
+            return JitPath::dirname($context, $pathVal);
+        }
+        if (2 === $flag) {
+            return JitPath::basename($context, $pathVal);
+        }
+        if (4 === $flag) {
+            return self::extension($context, $pathVal);
+        }
+        if (8 === $flag) {
+            return self::filename($context, $pathVal);
+        }
+
+        throw new \LogicException(
+            'pathinfo() flags not supported in this compiler build (use 1, 2, 4, 8, or 15)'
+        );
     }
 
     /**

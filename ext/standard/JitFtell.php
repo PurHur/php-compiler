@@ -13,7 +13,7 @@ use PHPLLVM\Value;
 /** LLVM lowering for ftell() via __compiler_ftell (issue #1190). */
 final class JitFtell
 {
-    /** @return Value __value__* (long position, or boolean false on failure) */
+    /** @return Value */
     public static function invoke(Context $context, Value $handleLong): Value
     {
         $pos = $context->builder->call($context->lookupFunction('__compiler_ftell'), $handleLong);

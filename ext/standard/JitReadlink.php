@@ -18,7 +18,7 @@ final class JitReadlink
 
     private static int $blockSerial = 0;
 
-    /** @return Value __value__* (string target, or boolean false on failure) */
+    /** @return Value */
     public static function invoke(Context $context, Value $pathStr): Value
     {
         $map = $context->structFieldMap['__string__'];

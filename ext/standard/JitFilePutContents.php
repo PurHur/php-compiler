@@ -13,7 +13,7 @@ use PHPLLVM\Value;
 /** LLVM lowering for file_put_contents() via {@see \PHPCompiler\JIT\Builtin\StringFilePutContents}. */
 final class JitFilePutContents
 {
-    /** @return Value __value__* (int bytes written, or boolean false on failure) */
+    /** @return Value */
     public static function invoke(Context $context, Value $pathStr, Value $dataStr, Value $flagsLong): Value
     {
         $bytes = $context->builder->call(

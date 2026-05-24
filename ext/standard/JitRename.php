@@ -11,7 +11,7 @@ use PHPLLVM\Value;
 /** LLVM lowering for rename() via libc rename(2). */
 final class JitRename
 {
-    /** @return Value i1 — true when rename(2) returns 0 */
+    /** @return Value */
     public static function invoke(Context $context, Value $fromStr, Value $toStr): Value
     {
         $map = $context->structFieldMap['__string__'];

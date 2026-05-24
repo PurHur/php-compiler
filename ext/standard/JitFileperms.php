@@ -10,7 +10,7 @@ use PHPLLVM\Value;
 /** LLVM lowering for fileperms() via {@see JitStat::pathFilePermsBoxed}. */
 final class JitFileperms
 {
-    /** @return Value __value__* (native long st_mode, or boolean false on failure) */
+    /** @return Value */
     public static function invoke(Context $context, Value $pathStr): Value
     {
         return JitStat::pathFilePermsBoxed($context, $pathStr);

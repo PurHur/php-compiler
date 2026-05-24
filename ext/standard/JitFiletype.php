@@ -10,7 +10,7 @@ use PHPLLVM\Value;
 /** LLVM lowering for filetype() via {@see JitStat::pathFiletypeBoxed}. */
 final class JitFiletype
 {
-    /** @return Value __value__* (string label, or boolean false on failure) */
+    /** @return Value */
     public static function invoke(Context $context, Value $pathStr): Value
     {
         return JitStat::pathFiletypeBoxed($context, $pathStr);
