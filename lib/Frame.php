@@ -23,6 +23,8 @@ class Frame {
 
     public ?Func $call = null;
     public array $callArgs = [];
+    /** @var list<array{0: string, 1?: mixed, 2?: Variable}> */
+    public array $callArgEntries = [];
     public array $calledArgs = [];
     public ?Variable $returnVar = null;
     public ?Handler $handler = null;

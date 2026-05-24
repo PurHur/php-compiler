@@ -14,6 +14,7 @@ require_once __DIR__.'/OpCodeNames.php';
 use PHPCompiler\Func;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ClassEntry;
+use PHPCompiler\VM\NamedArgs;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\TypeCheck;
 use PHPCompiler\VM\Variable;
@@ -415,6 +416,7 @@ restart:
                     }
                     $frame->call = $this->context->functions[$lcname];
                     $frame->callArgs = [];
+                    $frame->callArgEntries = [];
                     break;
                 case OpCode::TYPE_METHODCALL_INIT:
                     $receiver = $frame->scope[$op->arg1]->resolveIndirect();
@@ -440,9 +442,19 @@ restart:
                     );
                     $frame->call = $class->methods[$methodName];
                     $frame->callArgs = [$receiver];
+                    $frame->callArgEntries = [];
                     break;
                 case OpCode::TYPE_ARG_SEND:
-                    $frame->callArgs[] = $frame->scope[$op->arg1];
+                    $value = $frame->scope[$op->arg1];
+                    if (null !== $op->arg2 && isset($frame->block->constants[$op->arg2])) {
+                        $frame->callArgEntries[] = [
+                            'n',
+                            $frame->block->constants[$op->arg2]->toString(),
+                            $value,
+                        ];
+                    } else {
+                        $frame->callArgEntries[] = ['p', $value];
+                    }
                     break;
                 case OpCode::TYPE_FUNCCALL_EXEC_RETURN:
                 case OpCode::TYPE_FUNCCALL_EXEC_NORETURN:
@@ -454,7 +466,11 @@ restart:
                     if ($op->type === OpCode::TYPE_FUNCCALL_EXEC_RETURN) {
                         $new->returnVar = $frame->scope[$op->arg1];
                     }
-                    $new->calledArgs = $frame->callArgs;
+                    try {
+                        $new->calledArgs = $this->resolveOutgoingCallArgs($frame);
+                    } catch (\LogicException $e) {
+                        return $this->raise($e->getMessage(), $frame);
+                    }
                     if ($new->hasHandler()) {
                         $new->parent = $frame;
                         $new->vmContext = $this->context;
@@ -523,6 +539,7 @@ restart:
                     $result->object(new ObjectEntry($class));
                     $frame->call = $result->toObject()->constructor;
                     $frame->callArgs = [$result];
+                    $frame->callArgEntries = [];
                     break;
                 case OpCode::TYPE_PROPERTY_FETCH:
                     $result = $frame->scope[$op->arg1];
@@ -737,6 +754,42 @@ restart:
     {
         $where = '' !== $frame->scriptPath ? $frame->scriptPath : 'script';
         throw new \LogicException($message.' in '.$where);
+    }
+
+    /**
+     * @return list<Variable>
+     */
+    private function resolveOutgoingCallArgs(Frame $frame): array
+    {
+        if (null === $frame->call) {
+            return $frame->callArgs;
+        }
+
+        [$paramNames, $variadicIndex] = $this->calleeParamMetadata($frame->call);
+        $userArgs = [] === $frame->callArgEntries
+            ? []
+            : NamedArgs::resolve($frame->callArgEntries, $paramNames, $variadicIndex);
+
+        if ([] === $frame->callArgs) {
+            return $userArgs;
+        }
+
+        return array_merge($frame->callArgs, $userArgs);
+    }
+
+    /**
+     * @return array{0: list<string>, 1: ?int}
+     */
+    private function calleeParamMetadata(Func $call): array
+    {
+        if ($call instanceof Func\PHP) {
+            return [$call->block->paramNames, $call->block->variadicParamIndex];
+        }
+        if ($call instanceof Func\Internal) {
+            return [BuiltinParamNames::forFunction($call->getName()) ?? [], null];
+        }
+
+        return [[], null];
     }
 
     protected function resolveStaticClassName(string $className, Frame $frame): string

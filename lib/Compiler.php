@@ -594,6 +594,9 @@ class Compiler {
             $defaultConst = $this->compileOperand($param->defaultVar, $block, true);
         }
         $slot = $this->compileOperand($param->result, $block, false);
+        if ($param->name instanceof Operand\Literal && is_string($param->name->value)) {
+            $block->paramNames[$paramIdx] = $param->name->value;
+        }
         if ($param->declaredType instanceof Op\Type\Literal) {
             $rawType = Type::fromDecl($param->declaredType->name);
             $mapped = Variable::mapFromType($rawType);
@@ -1043,11 +1046,8 @@ class Compiler {
                         $this->compileOperand($expr->name, $block, true)
                     )
                 ];
-                foreach ($expr->args as $arg) {
-                    $return[] = new OpCode(
-                        OpCode::TYPE_ARG_SEND,
-                        $this->compileOperand($arg, $block, true)
-                    );
+                foreach ($this->compileCallArgSends($expr->args, $block) as $send) {
+                    $return[] = $send;
                 }
                 if (!empty($expr->result->usages)) {
                     $return[] = new OpCode(
@@ -1068,11 +1068,8 @@ class Compiler {
                         $this->compileOperand($expr->class, $block, true),
                     )
                 ];
-                foreach ($expr->args as $arg) {
-                    $return[] = new OpCode(
-                        OpCode::TYPE_ARG_SEND,
-                        $this->compileOperand($arg, $block, true)
-                    );
+                foreach ($this->compileCallArgSends($expr->args, $block) as $send) {
+                    $return[] = $send;
                 }
                 $return[] = new OpCode(
                     OpCode::TYPE_FUNCCALL_EXEC_NORETURN
@@ -1086,11 +1083,8 @@ class Compiler {
                         $this->compileOperand($expr->name, $block, true)
                     ),
                 ];
-                foreach ($expr->args as $arg) {
-                    $return[] = new OpCode(
-                        OpCode::TYPE_ARG_SEND,
-                        $this->compileOperand($arg, $block, true)
-                    );
+                foreach ($this->compileCallArgSends($expr->args, $block) as $send) {
+                    $return[] = $send;
                 }
                 if (!empty($expr->result->usages)) {
                     $return[] = new OpCode(
@@ -1490,11 +1484,8 @@ class Compiler {
             $this->compileOperand($expr->var, $fetchBlock, true),
             $this->compileOperand($expr->name, $fetchBlock, true)
         ));
-        foreach ($expr->args as $arg) {
-            $fetchBlock->addOpCode(new OpCode(
-                OpCode::TYPE_ARG_SEND,
-                $this->compileOperand($arg, $fetchBlock, true)
-            ));
+        foreach ($this->compileCallArgSends($expr->args, $fetchBlock) as $send) {
+            $fetchBlock->addOpCode($send);
         }
         if (!empty($expr->result->usages)) {
             $fetchBlock->addOpCode(new OpCode(
@@ -2014,6 +2005,42 @@ class Compiler {
         );
     }
 
+    /**
+     * @param list<Operand> $args
+     *
+     * @return list<OpCode>
+     */
+    protected function compileCallArgSends(array $args, Block $block): array
+    {
+        $sends = [];
+        foreach ($args as $arg) {
+            $valueSlot = $this->compileOperand($arg, $block, true);
+            $nameSlot = null;
+            $argName = $this->callArgName($arg);
+            if (null !== $argName) {
+                $nameOp = new Operand\Literal($argName);
+                $nameOp->type = Type::string();
+                $nameVar = new Variable(Variable::TYPE_STRING);
+                $nameVar->string($argName);
+                $nameSlot = $block->registerConstant($nameOp, $nameVar);
+            }
+            $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot);
+        }
+
+        return $sends;
+    }
+
+    private function callArgName(Operand $arg): ?string
+    {
+        if (property_exists($arg, 'callArgName') && null !== $arg->callArgName) {
+            $name = $arg->callArgName;
+
+            return is_string($name) && '' !== $name ? $name : null;
+        }
+
+        return null;
+    }
+
     protected function compileFuncCall(?int $name, array $args, Operand $result, Block $block): array
     {
         $folded = $this->tryCompileDefineAsGlobalConst($name, $args, $result, $block);
@@ -2022,8 +2049,8 @@ class Compiler {
         }
 
         $return = [new OpCode(OpCode::TYPE_FUNCCALL_INIT, $name)];
-        foreach ($args as $arg) {
-            $return[] = new OpCode(OpCode::TYPE_ARG_SEND, $this->compileOperand($arg, $block, true));
+        foreach ($this->compileCallArgSends($args, $block) as $send) {
+            $return[] = $send;
         }
         if (!empty($result->usages)) {
             $return[] = new OpCode(OpCode::TYPE_FUNCCALL_EXEC_RETURN, $this->compileOperand($result, $block, false));
