@@ -95,6 +95,7 @@ Defaults are exported from [`script/ci-defaults.env`](../script/ci-defaults.env)
 | `BOOTSTRAP_WAVE_CHECK` | unset → `1` in `ci-local.sh` llvm tail; set `0` to skip | `ci-local.sh`, `ci-fast.sh` (`CI_FAST_BOOTSTRAP=1`) | `./script/bootstrap-wave-check.sh --fail-fast` after `@group aot-lint` |
 | `CI_FAST_BOOTSTRAP` | `0` | `ci-fast.sh` | Optional llvm tail: bootstrap aot-lint + probe + wave-check when LLVM 9 present |
 | `JIT_PREFLIGHT_GATE` | `0` | `ci-fast.sh` | Early MCJIT probe after `composer install` ([#728](https://github.com/PurHur/php-compiler/issues/728)) |
+| `WAVE3_ROADMAP_SYNC_GATE` | `0` | `ci-fast.sh`, `ci-local.sh` (inventory phase) | `php script/check-wave3-roadmap-sync.php` — Wave 3 table vs M2 spine count ([#1802](https://github.com/PurHur/php-compiler/issues/1802)) |
 
 Ladder-only env vars (not in `ci-defaults.env`): `MINIWEBAPP_LINT_GATE` (default `1` in `web-smoke.sh`), `MINIWEBAPP_AOT_BISECT_GATE` (default `0` in `miniwebapp-gates.sh` — [#879](https://github.com/PurHur/php-compiler/issues/879)).
 

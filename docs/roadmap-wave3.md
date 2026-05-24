@@ -9,7 +9,7 @@ Regenerate capability truth: `php script/capability-matrix.php`, `php script/cap
 | Track | Done | Open |
 |-------|-----:|-----:|
 | Stdlib (#1367–#1379) | 12 | 1 ([#1378](https://github.com/PurHur/php-compiler/issues/1378)) |
-| Language (#1354–#1366) | 9 | 4 |
+| Language (#1354–#1366) | 9 | 3 |
 
 **Language landed (master):** `never` ([#1358](https://github.com/PurHur/php-compiler/issues/1358) / [#1466](https://github.com/PurHur/php-compiler/pull/1466)), enums ([#1356](https://github.com/PurHur/php-compiler/issues/1356) / [#1463](https://github.com/PurHur/php-compiler/pull/1463)), ctor promotion ([#1359](https://github.com/PurHur/php-compiler/issues/1359) / [#1464](https://github.com/PurHur/php-compiler/pull/1464)), multi-catch ([#1362](https://github.com/PurHur/php-compiler/issues/1362) / [#1468](https://github.com/PurHur/php-compiler/pull/1468)), intersection types ([#1357](https://github.com/PurHur/php-compiler/issues/1357) / [#1474](https://github.com/PurHur/php-compiler/pull/1474)), unpack ([#1361](https://github.com/PurHur/php-compiler/issues/1361) / [#1476](https://github.com/PurHur/php-compiler/pull/1476)), `__serialize` ([#1365](https://github.com/PurHur/php-compiler/issues/1365) / [#1477](https://github.com/PurHur/php-compiler/pull/1477)), first-class callable JIT ([#1363](https://github.com/PurHur/php-compiler/issues/1363) / [#1472](https://github.com/PurHur/php-compiler/pull/1472)), variable-variables JIT ([#1364](https://github.com/PurHur/php-compiler/issues/1364) / [#1381](https://github.com/PurHur/php-compiler/pull/1381)).
 

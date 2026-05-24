@@ -34,7 +34,7 @@ Generated maps and large tables — **repo only**; exclude from `docs/pages/` co
 | [bootstrap-vendor-inventory.md](bootstrap-vendor-inventory.md) | Vendor prelink inventory |
 | [local-ci-matrix.md](local-ci-matrix.md) | Host / Docker CI matrix |
 | [miniwebapp-aot-unskip-matrix.md](miniwebapp-aot-unskip-matrix.md) | AOT execute bisect matrix |
-| [roadmap-wave3.md](roadmap-wave3.md) | Wave 3 PR table (#1354–#1379) |
+| [roadmap-wave3.md](roadmap-wave3.md) | Wave 3 PR table (#1354–#1379); drift guard: `php script/check-wave3-roadmap-sync.php` |
 
 ## Compiler reference
 

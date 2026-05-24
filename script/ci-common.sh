@@ -79,6 +79,10 @@ ci_run_inventory_checks() {
   ci_run_capability_syntax_check
   ci_ensure_generated_doc script/bootstrap-inventory.php docs/bootstrap-inventory.md
   ci_ensure_generated_doc script/bootstrap-profile.php docs/bootstrap-profile.json
+  if [[ "${WAVE3_ROADMAP_SYNC_GATE:-0}" == "1" ]]; then
+    echo "wave3-roadmap-sync: drift guard (WAVE3_ROADMAP_SYNC_GATE=1, issue #1802)..."
+    "$PHP_BIN" "${PHP_OPTS[@]}" script/check-wave3-roadmap-sync.php
+  fi
 }
 
 ci_llvm_dir() {
