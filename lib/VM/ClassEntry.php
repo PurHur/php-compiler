@@ -27,9 +27,10 @@ class ClassEntry {
     public bool $isInterface = false;
     /** @var list<string> */
     public array $interfaces = [];
-    public ?Func\PHP $constructor = null;
+    /** User method or VM builtin handler (issues #1360, #1366). */
+    public ?Func $constructor = null;
     public array $properties = [];
-    /** @var array<string, Func\PHP> method name (lowercase) => callable */
+    /** @var array<string, Func> method name (lowercase) => callable */
     public array $methods = [];
     /** @var array<string, int> method name (lowercase) => PHPCfg visibility flags */
     public array $methodVisibility = [];

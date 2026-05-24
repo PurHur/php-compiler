@@ -20,7 +20,7 @@ class ObjectEntry {
     public ClassEntry $class;
     public int $id;
     private array $properties = [];
-    public ?Func\PHP $constructor = null;
+    public ?Func $constructor = null;
 
     /** True after `__construct` returns (or immediately when none is defined). */
     public bool $constructed = false;

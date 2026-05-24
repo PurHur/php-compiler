@@ -47,6 +47,7 @@ class Context {
         $this->runtime = $runtime;
         $this->errors = new ErrorReporter();
         $this->scriptStack = new ScriptStack();
+        BuiltinClasses::register($this);
     }
 
     public function constantFetch(string $name): ?Variable {
