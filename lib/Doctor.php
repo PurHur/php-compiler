@@ -242,13 +242,13 @@ final class Doctor
         $ns2CiGate = getenv('NORTH_STAR2_VERIFY_GATE');
         $ns2CiOn = false !== $ns2CiGate && '1' === $ns2CiGate;
         $ns2CiDetail = $ns2CiOn
-            ? 'NORTH_STAR2_VERIFY_GATE=1 — ci-fast runs presenter (#1928)'
-            : 'opt-in NORTH_STAR2_VERIFY_GATE=1 for ci-fast hook (#1928)';
+            ? 'NORTH_STAR2_VERIFY_GATE=1 (default) — ci-fast runs presenter (#1928, #2051)'
+            : 'opt-out NORTH_STAR2_VERIFY_GATE=0 skips presenter in ci-fast (#1928)';
         if ($ns2Make) {
             fwrite(STDOUT, "  Presenter bundle make north-star2-verify            --require-llvm / --skip-llvm-tail\n");
             fwrite(STDOUT, "  Script           ./script/north-star2-verify.sh    same as make target\n");
         } else {
-            fwrite(STDOUT, "  Presenter bundle make north-star2-verify            pending — see #1865\n");
+            fwrite(STDOUT, "  Presenter bundle make north-star2-verify            script missing in tree\n");
         }
         fwrite(STDOUT, "  Fast CI hook     {$ns2CiDetail}\n");
         fwrite(STDOUT, "  Docs             docs/bootstrap-selfhost.md · docs/self-host-target.md (#1492)\n");

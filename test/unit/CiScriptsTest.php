@@ -663,13 +663,13 @@ final class CiScriptsTest extends TestCase
 
         $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
         $this->assertStringContainsString('NORTH_STAR2_VERIFY_GATE', $common);
-        $this->assertStringContainsString('NORTH_STAR2_VERIFY_GATE:-0', $common);
+        $this->assertStringContainsString('NORTH_STAR2_VERIFY_GATE:-1', $common);
         $this->assertStringContainsString('north-star2-verify.sh', $common);
         $this->assertFileExists(dirname(__DIR__, 2).'/script/north-star2-verify.sh');
 
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
         $this->assertStringContainsString(
-            'NORTH_STAR2_VERIFY_GATE="${NORTH_STAR2_VERIFY_GATE:-0}"',
+            'NORTH_STAR2_VERIFY_GATE="${NORTH_STAR2_VERIFY_GATE:-1}"',
             $defaults
         );
     }
@@ -679,10 +679,11 @@ final class CiScriptsTest extends TestCase
         $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
         $this->assertStringContainsString('NORTH_STAR2_VERIFY_GATE', $doc);
         $this->assertStringContainsString('north-star2-verify.sh', $doc);
-        $this->assertMatchesRegularExpression('/\| `NORTH_STAR2_VERIFY_GATE` \| `0` \|/', $doc);
+        $this->assertMatchesRegularExpression('/\| `NORTH_STAR2_VERIFY_GATE` \| `1` \|/', $doc);
 
         $docSelfhost = (string) file_get_contents(dirname(__DIR__, 2).'/docs/bootstrap-selfhost.md');
-        $this->assertStringContainsString('NORTH_STAR2_VERIFY_GATE=1', $docSelfhost);
+        $this->assertStringContainsString('NORTH_STAR2_VERIFY_GATE=0', $docSelfhost);
+        $this->assertStringContainsString('#2051', $docSelfhost);
         $this->assertStringContainsString('#1928', $doc);
     }
 
