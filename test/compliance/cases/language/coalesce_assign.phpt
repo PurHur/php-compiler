@@ -17,7 +17,8 @@ echo $items['page'], "\n";
 $items['page'] ??= 'other';
 echo $items['page'], "\n";
 
-echo $_GET['missing'] ??= 'from-get', "\n";
+$_GET['missing'] ??= 'from-get';
+echo $_GET['missing'], "\n";
 --ENV--
 QUERY_STRING=
 --EXPECT--

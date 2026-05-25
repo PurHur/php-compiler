@@ -49,4 +49,12 @@ final class M3AllowlistSnapshotTest extends TestCase
         $lists = bootstrap_m3_allowlist_from_jit(self::$root.'/lib/JIT.php');
         $this->assertContains('\\bootstrapaot\\helloworld_compile_smoke', $lists['deny']);
     }
+
+    public function testCompileSmokeM3EmitOnAllowlist(): void
+    {
+        require_once self::$root.'/script/bootstrap-m3-allowlist.php';
+
+        $lists = bootstrap_m3_allowlist_from_jit(self::$root.'/lib/JIT.php');
+        $this->assertContains('\\bootstrapaot\\compile_smoke_m3_emit', $lists['allow']);
+    }
 }

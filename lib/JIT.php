@@ -157,6 +157,14 @@ class JIT {
             || str_ends_with($lower, '\\helloworld_compile_smoke');
     }
 
+    /** M3 compile-smoke native emit (smaller than helloworld_compile_smoke — #1977). */
+    private function isBootstrapCompileSmokeM3EmitName(string $lower): bool
+    {
+        return str_ends_with($lower, '\\bootstrapaot\\compile_smoke_m3_emit')
+            || 'compile_smoke_m3_emit' === $lower
+            || str_ends_with($lower, '\\compile_smoke_m3_emit');
+    }
+
     private function isBootstrapRuntimeCtorSmokeName(string $lower): bool
     {
         return str_ends_with($lower, '\\bootstrapaot\\runtime_ctor_smoke')
@@ -201,6 +209,13 @@ class JIT {
         if (str_ends_with($lower, '\\runtime::loadjit')) {
             return true;
         }
+        if ($this->isBootstrapCompileSmokeM3EmitName($lower)) {
+            return true;
+        }
+        if (str_ends_with($lower, '\\bootstrapaot\\compile_smoke_m3_emit')) {
+            return true;
+        }
+
         return false;
     }
 
@@ -213,7 +228,7 @@ class JIT {
     {
         return [
             'slotindexforvariablename',
-            // Real-lowering bootstrapaot\\helloworld_compile_smoke LLVM 9 link crash (#1514); int+echo smoke ready when link fixed.
+            // Full emit chain LLVM 9 link crash (#1514); use compile_smoke_m3_emit for M3 compile-smoke (#1977).
             '\\bootstrapaot\\helloworld_compile_smoke',
             '\\runtime::__destruct',
             '\\runtime::initparsepipeline',
@@ -743,6 +758,10 @@ class JIT {
         if ($this->isM3CompileDriverRealLoweringName($lower)) {
             return false;
         }
+        // M3 compile-smoke emit (not helloworld_compile_smoke — LLVM 9 link crash #1514).
+        if ($this->shouldUseM3CompileDriverRealLowering() && $this->isBootstrapCompileSmokeM3EmitName($lower)) {
+            return false;
+        }
         // Self-host bundle includes Runtime/VM/Func for closure only; stub non-Compiler bodies (#913).
         if (str_contains($lower, '\\runtime::')
             || str_contains($lower, '\\func\\php::')
@@ -757,8 +776,8 @@ class JIT {
             || str_ends_with($lower, '\\compiler::compile')
             || 'type_pair' === $lower
             || $this->isBootstrapRuntimeCtorSmokeName($lower)
-            || $this->isBootstrapHelloWorldSmokeName($lower)
-            || str_contains($lower, 'vm_run_smoke');
+            || ($this->isBootstrapHelloWorldSmokeName($lower) && !$this->shouldUseM3CompileDriverRealLowering())
+            || ($this->isBootstrapCompileSmokeM3EmitName($lower) && !$this->shouldUseM3CompileDriverRealLowering());
     }
 
     private function isSkippedWebBootstrapHotPathName(string $name): bool

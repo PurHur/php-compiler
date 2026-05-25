@@ -97,6 +97,8 @@ final class PhpcDoctorTest extends TestCase
         $this->assertStringContainsString('north-star1-verify', $result['stdout']);
         $this->assertStringContainsString('make north-star1-verify', $result['stdout']);
         $this->assertStringContainsString('North Star 2 presenter', $result['stdout']);
+        $this->assertStringContainsString('phpc test --bootstrap', $result['stdout']);
+        $this->assertStringContainsString('bootstrap-test-subset.sh', $result['stdout']);
         $this->assertStringContainsString('north-star2-verify', $result['stdout']);
         $this->assertStringContainsString('bootstrap-selfhost-lib-spine-smoke', $result['stdout']);
         $this->assertStringContainsString('bootstrap-selfhost-lib-spine-vm-smoke', $result['stdout']);
@@ -108,14 +110,22 @@ final class PhpcDoctorTest extends TestCase
         $this->assertStringContainsString('Fast CI hook', $result['stdout']);
         $this->assertStringContainsString('LLVM 9:', $result['stdout']);
         $this->assertStringContainsString('Serve tests:', $result['stdout']);
-        $this->assertStringContainsString('SessionsWeb (005)', $result['stdout']);
+        $this->assertStringContainsString('005-SessionsWeb CI gates', $result['stdout']);
         $this->assertStringContainsString('005-SessionsWeb', $result['stdout']);
         $this->assertStringContainsString('SESSIONS_WEB_SMOKE_GATE', $result['stdout']);
         $this->assertStringContainsString('SESSIONS_WEB_AOT_LINK_GATE', $result['stdout']);
         $this->assertStringContainsString('SESSIONS_WEB_AOT_SMOKE_GATE', $result['stdout']);
+        $this->assertStringContainsString('SESSIONS_WEB_DEPLOY_SMOKE_GATE', $result['stdout']);
+        $this->assertStringContainsString('Stage 1', $result['stdout']);
+        $this->assertStringContainsString('Stage 4 Deploy CGI', $result['stdout']);
         $this->assertStringContainsString('examples-sessions-smoke', $result['stdout']);
+        $this->assertStringContainsString('examples-aot-smoke.sh', $result['stdout']);
+        $this->assertStringContainsString('deploy-smoke', $result['stdout']);
+        $this->assertStringContainsString('test005SessionsWebAotLink', $result['stdout']);
         $this->assertStringContainsString('#1891', $result['stdout']);
+        $this->assertStringContainsString('#1893', $result['stdout']);
         $this->assertStringContainsString('#1886', $result['stdout']);
+        $this->assertStringContainsString('ci-defaults.env', $result['stdout']);
     }
 
     /**

@@ -344,6 +344,36 @@ ci_run_bootstrap_wave_check() {
   "$_CI_SCRIPT_DIR/bootstrap-wave-check.sh" --fail-fast
 }
 
+# M3 compile-smoke partial probe (issue #1937): bundle link + Zend emit + native run; strict gate separate.
+ci_run_bootstrap_compile_smoke_probe() {
+  if [[ "${BOOTSTRAP_M3_COMPILE_SMOKE_PROBE_GATE:-1}" != "1" ]]; then
+    return 0
+  fi
+  if ! ci_llvm_ready; then
+    echo "bootstrap-compile-smoke-probe: skipped (LLVM 9 not available)"
+    return 0
+  fi
+  echo "bootstrap-compile-smoke-probe (BOOTSTRAP_M3_COMPILE_SMOKE_PROBE_GATE=1, issue #1937)..."
+  "$_CI_SCRIPT_DIR/bootstrap-selfhost-compile-smoke-probe.sh"
+}
+
+# M3 compile-smoke strict native emit (issue #1937); default off until emit_path=native stable.
+ci_run_bootstrap_m3_compile_smoke_strict() {
+  if [[ "${BOOTSTRAP_M3_COMPILE_SMOKE_STRICT_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  if ! ci_llvm_ready; then
+    echo "bootstrap-m3-compile-smoke-strict: skipped (LLVM 9 not available)"
+    return 0
+  fi
+  echo "bootstrap-m3-compile-smoke-strict (BOOTSTRAP_M3_COMPILE_SMOKE_STRICT_GATE=1, issue #1937/#1977)..."
+  BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1 \
+    BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING=1 \
+    BOOTSTRAP_M3_RUNTIME_COMPILE=1 \
+    BOOTSTRAP_M3_COMPILE_SMOKE_STRICT=1 \
+    "$_CI_SCRIPT_DIR/bootstrap-selfhost-compile-smoke-probe.sh"
+}
+
 # M3 HelloWorld strict native emit (issue #1526); default off until emit_path=native stable in Docker.
 ci_run_bootstrap_m3_strict() {
   if [[ "${BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE:-0}" != "1" ]]; then
@@ -475,6 +505,9 @@ ci_run_deploy_smoke() {
   "$_CI_SCRIPT_DIR/deploy-smoke.sh" --example 002
   if [[ "${DEPLOY_SMOKE_003_EXECUTE:-1}" == "1" || "${MINIWEBAPP_AOT_EXECUTE_GATE:-0}" == "1" ]]; then
     "$_CI_SCRIPT_DIR/deploy-smoke.sh" --example 003
+  fi
+  if [[ "${SESSIONS_WEB_DEPLOY_SMOKE_GATE:-0}" == "1" ]]; then
+    "$_CI_SCRIPT_DIR/deploy-smoke.sh" --example 005
   fi
 }
 

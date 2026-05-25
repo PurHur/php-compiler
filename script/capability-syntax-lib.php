@@ -569,29 +569,29 @@ function capabilityCell($value): string
 }
 
 /**
- * Curated builtin overrides (issue #1947): honest AOT session persistence vs compile probes.
+ * Curated builtin overrides (issue #1947, #1976): AOT session persistence + two-request execute.
  *
  * @return array<string, array{aot?: string, notes?: list<string>}>
  */
 function builtinCapabilityCurations(): array
 {
-    $persistenceNote = 'AOT CGI file persistence (#1938); compile/link may pass';
+    $persistenceNote = 'AOT CGI file persistence (#1938); two-process model; opt-in SESSIONS_WEB_AOT_SMOKE_GATE / SESSIONS_WEB_DEPLOY_SMOKE_GATE';
 
     return [
         'session_start' => [
-            'aot' => 'partial',
+            'aot' => 'yes',
             'notes' => [$persistenceNote],
         ],
         'session_destroy' => [
-            'aot' => 'partial',
+            'aot' => 'yes',
             'notes' => [$persistenceNote],
         ],
         'session_regenerate_id' => [
-            'aot' => 'partial',
+            'aot' => 'yes',
             'notes' => [$persistenceNote],
         ],
         'session_write_close' => [
-            'aot' => 'partial',
+            'aot' => 'yes',
             'notes' => [$persistenceNote],
         ],
     ];
@@ -756,17 +756,17 @@ function sessionsWebNorthStarDefinitions(): array
             'construct' => '`005-SessionsWeb` reference app',
             'vm' => 'yes',
             'jit' => 'yes',
-            'aot' => 'partial',
+            'aot' => 'yes',
             'issue' => 1881,
             'notes' => [
-                '#1881 VM serve + session smoke (#1887); AOT link #1946; execute #1891 (SESSIONS_WEB_AOT_SMOKE_GATE=0)',
+                '#1881 VM serve + session smoke (#1887); AOT link #1946; execute #1891; ci-local gates opt-in (#1923, #1967)',
             ],
         ],
         [
             'construct' => '`session_start` / `$_SESSION` flash across requests',
             'vm' => 'yes',
             'jit' => 'yes',
-            'aot' => 'partial',
+            'aot' => 'yes',
             'issue' => 1938,
             'notes' => ['#1882 JIT; AOT persistence #1938; two-request execute #1891'],
         ],
@@ -774,17 +774,17 @@ function sessionsWebNorthStarDefinitions(): array
             'construct' => 'AOT project link (`phpc build --project`)',
             'vm' => 'n/a',
             'jit' => 'n/a',
-            'aot' => 'partial',
+            'aot' => 'yes',
             'issue' => 1946,
-            'notes' => ['ExamplesCompileTest link-before-execute gate (#1946)'],
+            'notes' => ['ExamplesCompileTest link-before-execute (#1946); SESSIONS_WEB_AOT_LINK_GATE opt-in'],
         ],
         [
             'construct' => 'AOT CLI execute (two-request session flash)',
             'vm' => 'n/a',
             'jit' => 'n/a',
-            'aot' => 'partial',
+            'aot' => 'yes',
             'issue' => 1891,
-            'notes' => ['SessionsWebAotExecuteTest; opt-in SESSIONS_WEB_AOT_SMOKE_GATE=1 (#1923)'],
+            'notes' => ['SessionsWebAotExecuteTest; opt-in SESSIONS_WEB_AOT_SMOKE_GATE (#1923)'],
         ],
     ];
 }
@@ -821,8 +821,8 @@ function renderSessionsWebNorthStarMarkdown(array $rows): string
 
     $lines[] = '';
     $lines[] = '_Sessions rows are curated from ROADMAP issue state; AOT persistence [#1938](' . CAPABILITY_ISSUE_URL_BASE
-        . '1938); link gate [#1946](' . CAPABILITY_ISSUE_URL_BASE . '1946); execute [#1891](' . CAPABILITY_ISSUE_URL_BASE
-        . '1891) (opt-in `SESSIONS_WEB_AOT_SMOKE_GATE`)._';
+        . '1938); link [#1946](' . CAPABILITY_ISSUE_URL_BASE . '1946); execute [#1891](' . CAPABILITY_ISSUE_URL_BASE
+        . '1891). Opt-in ci-local gates: `SESSIONS_WEB_AOT_SMOKE_GATE`, `SESSIONS_WEB_DEPLOY_SMOKE_GATE`._';
     $lines[] = '';
 
     return implode("\n", $lines);

@@ -57,7 +57,21 @@ Requires LLVM (see prerequisites). From repo root:
 
 Layout-edge AOT bisect polish ([#1750](https://github.com/PurHur/php-compiler/issues/1750)) is opt-in and does not block the execute story above.
 
-### 5. (Optional) Self-host smoke
+### 5. (Optional) SessionsWeb — two-request flash (VM)
+
+`session_start()` and `$_SESSION['flash']` across HTTP requests ([#1881](https://github.com/PurHur/php-compiler/issues/1881)). `./phpc run` shows the empty form only; use `phpc serve` and a cookie jar for the POST → redirect → GET story.
+
+```bash
+./phpc serve examples/005-SessionsWeb
+jar=/tmp/phpc-sessionsweb.jar
+curl -s -c "$jar" 'http://127.0.0.1:8080/example.php'
+curl -s -b "$jar" -c "$jar" -X POST -d 'message=Saved' 'http://127.0.0.1:8080/example.php'
+curl -s -b "$jar" 'http://127.0.0.1:8080/example.php'   # expect Flash: Saved
+```
+
+**Talking point:** Real session cookies without Zend PHP at dev time — same pattern as production CGI apps. Automated curls: `make examples-sessions-smoke` ([#1887](https://github.com/PurHur/php-compiler/issues/1887)). Gate ladder: `./phpc doctor --gates | grep -i sessions` ([#1903](https://github.com/PurHur/php-compiler/issues/1903)). AOT two-request execute ([#1891](https://github.com/PurHur/php-compiler/issues/1891)) and deploy smoke ([#1893](https://github.com/PurHur/php-compiler/issues/1893)) are opt-in when LLVM is green — see [examples/005-SessionsWeb/README.md](../examples/005-SessionsWeb/README.md) and ROADMAP [#78](https://github.com/PurHur/php-compiler/issues/78).
+
+### 6. (Optional) Self-host smoke
 
 ```bash
 script/apply-patches.sh
@@ -66,7 +80,7 @@ make bootstrap-selfhost-link
 
 Expect stdout: `compiler_minimal bundle OK`. **Talking point:** experimental path toward the compiler compiling its own `lib/` tree ([#1492](https://github.com/PurHur/php-compiler/issues/1492)).
 
-### 6. (Optional) Full local CI
+### 7. (Optional) Full local CI
 
 ```bash
 ./script/ci-local.sh

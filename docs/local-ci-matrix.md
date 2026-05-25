@@ -84,8 +84,7 @@ Defaults are exported from [`script/ci-defaults.env`](../script/ci-defaults.env)
 | `NESTED_RETURN_COMPLIANCE_GATE` | `1` | `ci-fast.sh` | PHPUnit `NestedReturn*` — nested `return <call>()` / late static binding VM ([#1888](https://github.com/PurHur/php-compiler/issues/1888), [#1885](https://github.com/PurHur/php-compiler/issues/1885)); set `0` to skip |
 | `ATTRIBUTES_COMPLIANCE_GATE` | `1` | `ci-fast.sh` | PHPUnit `Attribute*` — PHP 8 attributes VM v1 ([#1904](https://github.com/PurHur/php-compiler/issues/1904), [#1354](https://github.com/PurHur/php-compiler/issues/1354)); set `0` to skip |
 | `REHASH_COMPLIANCE_GATE` | `1` | `ci-fast.sh` | PHPUnit `array_rehash_string_keys` — HashTable mixed-key rehash ([#1956](https://github.com/PurHur/php-compiler/issues/1956), [#66](https://github.com/PurHur/php-compiler/issues/66)); set `0` to skip |
-| `COALESCE_COMPLIANCE_GATE` | `0` | `ci-fast.sh` | PHPUnit `Coalesce*` — null coalescing `??` VM/JIT compliance ([#1960](https://github.com/PurHur/php-compiler/issues/1960), [#99](https://github.com/PurHur/php-compiler/issues/99)); set `1` when PHPT slice green |
-| `STRING_KEY_JIT_COMPLIANCE_GATE` | `1` | `ci-fast.sh` (LLVM + MCJIT probe) | PHPUnit `array_rehash_string_keys_jit` — string-key dim assign ([#1959](https://github.com/PurHur/php-compiler/issues/1959), [#66](https://github.com/PurHur/php-compiler/issues/66)); set `0` to skip |
+| `COALESCE_COMPLIANCE_GATE` | `1` | `ci-fast.sh` | PHPUnit `Coalesce*` — null coalescing `??` / `??=` VM ([#1960](https://github.com/PurHur/php-compiler/issues/1960), [#99](https://github.com/PurHur/php-compiler/issues/99)); set `0` to skip |
 | `MINIWEBAPP_SERVE_GATE` | `1` | `ci-local.sh`, `ci-fast.sh` | `ServeTest` `@group miniwebapp` ([#641](https://github.com/PurHur/php-compiler/issues/641)) |
 | `SESSIONS_WEB_SMOKE_GATE` | `1` | `ci-fast.sh`, `ci-local.sh` | `examples-web-smoke.sh --sessions-only` / 005 cookie flash curls ([#1887](https://github.com/PurHur/php-compiler/issues/1887)) |
 | `SESSIONS_WEB_AOT_LINK_GATE` | `1` | `ci-local.sh` (PHPUnit `@group aot-link`) | `ExamplesCompileTest::test005SessionsWebAotLink` — 005 native link ([#1946](https://github.com/PurHur/php-compiler/issues/1946)); set `0` to skip during iteration |
@@ -98,6 +97,7 @@ Defaults are exported from [`script/ci-defaults.env`](../script/ci-defaults.env)
 | `EXAMPLES_AOT_SMOKE_ONLY` | unset | `examples-aot-smoke.sh` | Slice e.g. `003` only ([#738](https://github.com/PurHur/php-compiler/issues/738), [#683](https://github.com/PurHur/php-compiler/issues/683)) |
 | `DEPLOY_SMOKE_GATE` | `1` | `ci-local.sh` | `deploy-smoke.sh` 001/002 after `examples-aot-smoke` when LLVM ready ([#718](https://github.com/PurHur/php-compiler/issues/718), [#737](https://github.com/PurHur/php-compiler/issues/737)); 003 execute when `DEPLOY_SMOKE_003_EXECUTE=1` or `MINIWEBAPP_AOT_EXECUTE_GATE=1` ([#745](https://github.com/PurHur/php-compiler/issues/745)) |
 | `DEPLOY_SMOKE_003_EXECUTE` | `1` | `deploy-smoke.sh`, `ci-local.sh` | Default-on 003 deploy execute E2E ([#1530](https://github.com/PurHur/php-compiler/issues/1530)); also runs when `MINIWEBAPP_AOT_EXECUTE_GATE=1` ([#745](https://github.com/PurHur/php-compiler/issues/745)) |
+| `SESSIONS_WEB_DEPLOY_SMOKE_GATE` | `0` | `deploy-smoke.sh`, `ci-local.sh` | Opt-in 005 deploy + `PHPC_DEPLOY_ROOT` session flash CGI ([#1893](https://github.com/PurHur/php-compiler/issues/1893)); VM curls stay on `SESSIONS_WEB_SMOKE_GATE=1` ([#1887](https://github.com/PurHur/php-compiler/issues/1887)) |
 | `BOOTSTRAP_SELFHOST_PROBE_GATE` | unset → `1` in `ci-local.sh` llvm tail; set `0` to skip | `ci-local.sh`, `ci-fast.sh` (`CI_FAST_BOOTSTRAP=1`) | `make bootstrap-selfhost-probe` on `compiler_minimal` ([#829](https://github.com/PurHur/php-compiler/issues/829)) |
 | `BOOTSTRAP_SELFHOST_PROBE_UPDATE` | `0` | `ci_run_bootstrap_selfhost_probe` | Pass `--update-inventory` to probe (dev only) |
 | `BOOTSTRAP_LOOP_PROBE_GATE` | `0` | `ci-fast.sh` (LLVM opt-in), `ci-local.sh` (LLVM tail, after selfhost-probe) | `./script/bootstrap-loop-probe.sh --dry-run` M4 ladder ([#1777](https://github.com/PurHur/php-compiler/issues/1777), [#1498](https://github.com/PurHur/php-compiler/issues/1498), [#1929](https://github.com/PurHur/php-compiler/issues/1929)) |
@@ -107,6 +107,7 @@ Defaults are exported from [`script/ci-defaults.env`](../script/ci-defaults.env)
 | `CI_FAST_BOOTSTRAP` | `0` | `ci-fast.sh` | Optional llvm tail: bootstrap aot-lint + probe + wave-check when LLVM 9 present |
 | `JIT_PREFLIGHT_GATE` | `0` | `ci-fast.sh` | Early MCJIT probe after `composer install` ([#728](https://github.com/PurHur/php-compiler/issues/728)) |
 | `NORTH_STAR2_VERIFY_GATE` | `0` | `ci-fast.sh` | `./script/north-star2-verify.sh` presenter when script exists ([#1928](https://github.com/PurHur/php-compiler/issues/1928), [#1865](https://github.com/PurHur/php-compiler/issues/1865)); skips with message until `#1865` lands |
+| `phpc test --bootstrap` | n/a | `script/bootstrap-test-subset.sh` | Inventory `--check` + `SELFHOST_SPINE_COUNT_SYNC_GATE` spine sync (no LLVM link by default); `BOOTSTRAP_TEST_SUBSET_VM_SMOKE=1` for M2 VM spine smoke; `--strict` sets `BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE=1` for M3 probe ([#1961](https://github.com/PurHur/php-compiler/issues/1961)) |
 | `M2_SPINE_ISSUE_HYGIENE_GATE` | `1` | `ci-fast.sh` (`ci_run_inventory_checks`) | `script/check-m2-spine-issue-hygiene.php` — stale `m2-spine-unit` tickets ([#1819](https://github.com/PurHur/php-compiler/issues/1819), [#1808](https://github.com/PurHur/php-compiler/issues/1808)); set `0` for bulk spine PRs |
 | `WAVE3_ROADMAP_SYNC_GATE` | `1` | `ci-fast.sh` (`ci_run_inventory_checks`) | `script/check-wave3-roadmap-sync.php` ([#1802](https://github.com/PurHur/php-compiler/issues/1802), [#1814](https://github.com/PurHur/php-compiler/issues/1814)); set `0` for doc-only iteration |
 | `EXAMPLES_README_SYNC_GATE` | `1` | `ci-fast.sh` (`ci_run_inventory_checks`) | `script/check-examples-readme-sync.php` ([#1822](https://github.com/PurHur/php-compiler/issues/1822), [#1531](https://github.com/PurHur/php-compiler/issues/1531)); set `0` for doc-only iteration |
@@ -130,6 +131,26 @@ MINIWEBAPP_AOT_LINK_GATE=0 ./script/ci-local.sh --filter ExamplesCompileTest   #
 ```bash
 ./script/ci-local.sh --filter test005SessionsWebAotLink
 SESSIONS_WEB_AOT_LINK_GATE=0 ./script/ci-local.sh --filter ExamplesCompileTest   # skip 005 link
+```
+
+## 005-SessionsWeb gates ([#1881](https://github.com/PurHur/php-compiler/issues/1881), [#1969](https://github.com/PurHur/php-compiler/issues/1969))
+
+Progressive ladder (VM → AOT link → AOT execute → deploy CGI). Probe with `phpc doctor --gates` or grep `005-SessionsWeb` in the output.
+
+| Stage | Variable | Default | When `=1` |
+|-------|----------|---------|-----------|
+| VM session flash | `SESSIONS_WEB_SMOKE_GATE` | `1` | `make examples-sessions-smoke` / `ci-fast` ([#1887](https://github.com/PurHur/php-compiler/issues/1887)) |
+| AOT link | `SESSIONS_WEB_AOT_LINK_GATE` | `1` | `./script/ci-local.sh --filter test005SessionsWebAotLink` ([#1946](https://github.com/PurHur/php-compiler/issues/1946)) |
+| AOT execute | `SESSIONS_WEB_AOT_SMOKE_GATE` | `0` | `SessionsWebAotExecuteTest` or `EXAMPLES_AOT_SMOKE_ONLY=005 ./script/examples-aot-smoke.sh` ([#1891](https://github.com/PurHur/php-compiler/issues/1891) ✅) |
+| Deploy CGI | `SESSIONS_WEB_DEPLOY_SMOKE_GATE` | `0` | `SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 make deploy-smoke` ([#1893](https://github.com/PurHur/php-compiler/issues/1893), [#1962](https://github.com/PurHur/php-compiler/issues/1962)) |
+
+Stages 2–4 require LLVM 9. Execute landed ([#1891](https://github.com/PurHur/php-compiler/issues/1891)); default-on for execute/deploy gates tracked in [#1923](https://github.com/PurHur/php-compiler/issues/1923) / [#1967](https://github.com/PurHur/php-compiler/issues/1967).
+
+```bash
+./phpc doctor --gates | grep -E 'SESSIONS_WEB|005-SessionsWeb'
+SESSIONS_WEB_AOT_SMOKE_GATE=1 ./script/ci-local.sh --filter SessionsWebAotExecuteTest
+SESSIONS_WEB_AOT_SMOKE_GATE=1 EXAMPLES_AOT_SMOKE_ONLY=005 ./script/examples-aot-smoke.sh
+SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 ./script/deploy-smoke.sh --example 005
 ```
 
 **003 AOT execute** (`MINIWEBAPP_AOT_EXECUTE_GATE=1` default; set `0` to skip during iteration):

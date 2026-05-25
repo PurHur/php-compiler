@@ -18,9 +18,9 @@ declare(strict_types=1);
  */
 session_start();
 
-$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+$method = isset($_SERVER['REQUEST_METHOD']) ? (string) $_SERVER['REQUEST_METHOD'] : 'GET';
 if ('POST' === $method) {
-    $_SESSION['flash'] = (string) ($_POST['message'] ?? 'saved');
+    $_SESSION['flash'] = isset($_POST['message']) ? (string) $_POST['message'] : 'saved';
     session_write_close();
     header('Location: /example.php', true, 303);
     exit;

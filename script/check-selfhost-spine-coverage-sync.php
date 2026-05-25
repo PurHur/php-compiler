@@ -31,8 +31,18 @@ if (false !== $testInventoryFile && '' !== $testInventoryFile && is_readable($te
 }
 $spinePaths = array_flip(bootstrap_spine_require_paths($spineMain));
 
+/** Inventory paths covered by spine substitutes (not literal require_once) — issue #1423, #1945. */
+$spineSubstitutes = [
+    'bin/vm.php' => 'test/bootstrap-aot/vm_run_smoke.php',
+];
+
 $missing = [];
 foreach ($inventoryFiles as $rel) {
+    if (isset($spineSubstitutes[$rel])) {
+        if (isset($spinePaths[$rel]) || isset($spinePaths[$spineSubstitutes[$rel]])) {
+            continue;
+        }
+    }
     if (!isset($spinePaths[$rel])) {
         $missing[] = $rel;
     }
