@@ -1779,64 +1779,40 @@ class JIT {
                                 && 'i8*' === $this->context->getStringFromType($arg->value->typeOf())
                             ) {
                                 $byte = $this->context->builder->load($arg->value);
-                                $fmt = $this->context->builder->pointerCast(
-                                    $this->context->constantFromString('%c'),
-                                    $this->context->getTypeFromString('char*')
-                                );
                                 $this->context->builder->call(
-                                    $this->context->lookupFunction('printf'),
-                                    $fmt,
+                                    $this->context->lookupFunction('__phpc_ob_echo_char'),
                                     $byte
                                 );
                                 break;
                             }
                             $argValue = $this->context->helper->loadValue($arg);
-                            $fmt = $this->context->builder->pointerCast(
-                        $this->context->constantFromString("%.*s"),
-                        $this->context->getTypeFromString('char*')
-                    );
-    $offset = $this->context->structFieldMap[$argValue->typeOf()->getElementType()->getName()]['length'];
-                    $__str__length = $this->context->builder->load(
-                        $this->context->builder->structGep($argValue, $offset)
-                    );
-    $offset = $this->context->structFieldMap[$argValue->typeOf()->getElementType()->getName()]['value'];
-                    $__str__value = $this->context->builder->structGep($argValue, $offset);
-    $this->context->builder->call(
-                    $this->context->lookupFunction('printf') , 
-                    $fmt
-                    , $__str__length
-                    , $__str__value
-                    
-                );
-    
+                            $offset = $this->context->structFieldMap[$argValue->typeOf()->getElementType()->getName()]['length'];
+                            $__str__length = $this->context->builder->load(
+                                $this->context->builder->structGep($argValue, $offset)
+                            );
+                            $offset = $this->context->structFieldMap[$argValue->typeOf()->getElementType()->getName()]['value'];
+                            $__str__value = $this->context->builder->structGep($argValue, $offset);
+                            $sizeT = $this->context->getTypeFromString('size_t');
+                            $this->context->builder->call(
+                                $this->context->lookupFunction('__phpc_ob_echo_substr'),
+                                $__str__value,
+                                $this->context->builder->zExt($__str__length, $sizeT)
+                            );
                             break;
                         case Variable::TYPE_NATIVE_LONG:
                             $argValue = $this->context->helper->loadValue($arg);
-                            $fmt = $this->context->builder->pointerCast(
-                        $this->context->constantFromString("%lld"),
-                        $this->context->getTypeFromString('char*')
-                    );
-    $this->context->builder->call(
-                    $this->context->lookupFunction('printf') , 
-                    $fmt
-                    , $argValue
-                    
-                );
-    
+                            $i64 = $this->context->getTypeFromString('int64');
+                            $this->context->builder->call(
+                                $this->context->lookupFunction('__phpc_ob_echo_ll'),
+                                $this->context->builder->zExt($argValue, $i64)
+                            );
                             break;
                         case Variable::TYPE_NATIVE_DOUBLE:
                             $argValue = $this->context->helper->loadValue($arg);
-                            $fmt = $this->context->builder->pointerCast(
-                        $this->context->constantFromString("%.14G"),
-                        $this->context->getTypeFromString('char*')
-                    );
-    $this->context->builder->call(
-                    $this->context->lookupFunction('printf') , 
-                    $fmt
-                    , $argValue
-                    
-                );
-    
+                            $this->context->builder->call(
+                                $this->context->lookupFunction('__phpc_ob_echo_double'),
+                                $argValue
+                            );
                             break;
                         case Variable::TYPE_NATIVE_BOOL:
                             $boolVal = $this->context->helper->loadValue($arg);
@@ -1846,7 +1822,7 @@ class JIT {
                             $this->context->builder->branchIf($boolVal, $trueBlock, $doneBlock);
                             $this->context->builder->positionAtEnd($trueBlock);
                             $this->context->builder->call(
-                                $this->context->lookupFunction('printf'),
+                                $this->context->lookupFunction('__phpc_ob_echo_cstr'),
                                 $this->context->builder->pointerCast(
                                     $this->context->constantFromString('1'),
                                     $charPtr

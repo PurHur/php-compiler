@@ -39,6 +39,6 @@ final class ob_get_clean extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('ob_get_clean() is not implemented for JIT in this compiler build (#118)');
+        return JitObGetClean::invoke($context, ...$args);
     }
 }

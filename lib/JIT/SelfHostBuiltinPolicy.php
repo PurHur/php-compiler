@@ -39,9 +39,6 @@ final class SelfHostBuiltinPolicy
 
     /** @var array<string, string> */
     private const VM_ONLY_DEFERRED = [
-        'debug_backtrace' => 'debug',
-        'ob_start' => 'output', 'ob_get_clean' => 'output', 'ob_end_flush' => 'output',
-        'ob_get_level' => 'output',
         'spl_autoload_register' => 'spl',
         'set_error_handler' => 'error',
         'restore_error_handler' => 'error',
@@ -53,6 +50,8 @@ final class SelfHostBuiltinPolicy
 
     /** @var array<string, string> */
     private const CATEGORY_OUTPUT = self::VM_ONLY_DEFERRED + [
+        'ob_start' => 'output', 'ob_get_clean' => 'output', 'ob_end_flush' => 'output',
+        'ob_get_level' => 'output',
         'getallheaders' => 'output', 'header_list' => 'output',
     ];
 

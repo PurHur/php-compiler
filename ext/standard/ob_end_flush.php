@@ -41,6 +41,6 @@ final class ob_end_flush extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('ob_end_flush() is not implemented for JIT in this compiler build (#118)');
+        return JitObEndFlush::invoke($context, ...$args);
     }
 }

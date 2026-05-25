@@ -13,7 +13,7 @@ use PHPLLVM\Value;
 /**
  * debug_backtrace() — minimal stack trace array (issue #1378).
  *
- * VM: walks Frame parent chain. JIT lowering in {@see JitDebugBacktrace} (call() enablement deferred, #1378, #1056).
+ * VM: walks Frame parent chain. JIT: {@see JitDebugBacktrace} (compile-time frames; #1378, #1870, #1056).
  */
 final class debug_backtrace extends Internal
 {
@@ -37,9 +37,12 @@ final class debug_backtrace extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        unset($context, $args);
-        throw new \LogicException(
-            'debug_backtrace() is not implemented for JIT in this compiler build (#1378)'
-        );
+        if (\count($args) > 0) {
+            throw new \LogicException(
+                'debug_backtrace() options are not supported in this compiler build'
+            );
+        }
+
+        return JitDebugBacktrace::invoke($context);
     }
 }
