@@ -76,7 +76,7 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | **Public “Self-host” row** | Same M2 ratio until M3–M5 gates add weight ([`development-status.md`](pages/development-status.md)) | **~61%** |
 | **Composite (internal)** | Milestone weights in table above (M0–M1 = 100%, M2 = spine %, M3–M5 = gate %) | **~54%** |
 
-Regenerate inventory: `php script/bootstrap-inventory.php` · spine count: `grep -c '^require_once' test/selfhost/compiler_lib_spine_smoke/main.php`
+Regenerate inventory: `php script/bootstrap-inventory.php` · spine count: `php script/bootstrap-spine-count.php` (or `grep -c '^require_once' test/selfhost/compiler_lib_spine_smoke/main.php`)
 
 ---
 
