@@ -243,6 +243,14 @@ ci_run_init_fileupload_parity_check() {
   script/check-init-fileupload-parity.sh
 }
 
+ci_run_init_throwsweb_parity_check() {
+  if [[ "${INIT_THROWSWEB_PARITY_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  echo "init-throwsweb template parity (INIT_THROWSWEB_PARITY_GATE=1, issue #2086)..."
+  script/check-init-throwsweb-parity.sh
+}
+
 ci_run_init_apijson_parity_check() {
   if [[ "${APIJSON_INIT_PARITY_GATE:-1}" != "1" ]]; then
     return 0
@@ -257,6 +265,7 @@ ci_run_inventory_checks() {
   ci_run_init_miniwebapp_parity_check
   ci_run_init_sessionsweb_parity_check
   ci_run_init_fileupload_parity_check
+  ci_run_init_throwsweb_parity_check
   ci_run_init_apijson_parity_check
   "$PHP_BIN" "${PHP_OPTS[@]}" script/capability-matrix.php --check
   ci_run_capability_syntax_check

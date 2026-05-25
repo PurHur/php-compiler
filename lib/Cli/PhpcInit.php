@@ -19,6 +19,8 @@ final class PhpcInit
 
     public const PROFILE_FILEUPLOAD = 'fileupload';
 
+    public const PROFILE_THROWSWEB = 'throwsweb';
+
     /** @var array<string, list<string>> */
     private const PROFILE_TEMPLATES = [
         self::PROFILE_DEFAULT => [
@@ -37,6 +39,11 @@ final class PhpcInit
             'README.md',
         ],
         self::PROFILE_FILEUPLOAD => [
+            'phpc.json',
+            'example.php',
+            'README.md',
+        ],
+        self::PROFILE_THROWSWEB => [
             'phpc.json',
             'example.php',
             'README.md',
@@ -157,6 +164,11 @@ final class PhpcInit
             fwrite(STDOUT, "  phpc lint example.php\n");
             fwrite(STDOUT, "  phpc serve 127.0.0.1:8080 .\n");
             fwrite(STDOUT, "  curl -s -F 'doc=@README.md' http://127.0.0.1:8080/example.php\n");
+        } elseif (self::PROFILE_THROWSWEB === $profile) {
+            fwrite(STDOUT, "  phpc lint example.php\n");
+            fwrite(STDOUT, "  phpc run example.php\n");
+            fwrite(STDOUT, "  phpc serve 127.0.0.1:8080 .\n");
+            fwrite(STDOUT, "  curl -sf -X POST -d 'email=bad' http://127.0.0.1:8080/example.php | grep -i invalid\n");
         } else {
             fwrite(STDOUT, "  phpc lint public/index.php\n");
             fwrite(STDOUT, "  phpc run public/index.php\n");
