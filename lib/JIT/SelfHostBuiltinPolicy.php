@@ -43,8 +43,6 @@ final class SelfHostBuiltinPolicy
         'set_error_handler' => 'error',
         'restore_error_handler' => 'error',
         'password_hash' => 'password', 'password_verify' => 'password',
-        'session_destroy' => 'session',
-        'session_regenerate_id' => 'session',
     ];
 
     /** @var array<string, string> */

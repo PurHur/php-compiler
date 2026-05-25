@@ -32,8 +32,10 @@ final class session_destroy extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'session_destroy() not implemented for JIT in this compiler build (issue #1182)'
-        );
+        if (\count($args) > 0) {
+            throw new \LogicException('session_destroy() takes no arguments in this compiler build');
+        }
+
+        return JitSessionDestroy::invoke($context);
     }
 }
