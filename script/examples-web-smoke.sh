@@ -29,6 +29,7 @@ Usage: script/examples-web-smoke.sh [--aot] [--miniwebapp-only] [--sessions-only
   --miniwebapp-only: curl only examples/003-MiniWebApp (MINIWEBAPP_WEB_SMOKE_GATE — #633).
   --sessions-only: curl only examples/005-SessionsWeb (SESSIONS_WEB_SMOKE_GATE — #1887).
   --fileupload-only: curl only examples/006-FileUploadWeb (FILE_UPLOAD_WEB_SMOKE_GATE — #1999).
+  --throws-only: curl only examples/007-ThrowsWeb (THROWS_WEB_SMOKE_GATE — #2076).
 
 Environment:
   PHP_COMPILER_SKIP_SERVE_TESTS=1  exit 0 without running HTTP checks
@@ -37,6 +38,7 @@ Environment:
   MINIWEBAPP_WEB_SMOKE_AOT_GATE=1  require 003 --aot curls to pass (#833)
   SESSIONS_WEB_SMOKE_GATE=1        include 005 session flash curls in default run (#1887)
   FILE_UPLOAD_WEB_SMOKE_GATE=1     include 006 multipart upload curls (#1999)
+  THROWS_WEB_SMOKE_GATE=1          include 007 throw/catch POST curls (#2076)
 EOF
 }
 
@@ -44,12 +46,14 @@ AOT=0
 MINIWEBAPP_ONLY=0
 SESSIONS_ONLY=0
 FILEUPLOAD_ONLY=0
+THROWS_ONLY=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --aot) AOT=1; shift ;;
     --miniwebapp-only) MINIWEBAPP_ONLY=1; shift ;;
     --sessions-only) SESSIONS_ONLY=1; shift ;;
     --fileupload-only) FILEUPLOAD_ONLY=1; shift ;;
+    --throws-only) THROWS_ONLY=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "examples-web-smoke: unknown argument: $1" >&2; usage >&2; exit 1 ;;
   esac
@@ -402,6 +406,50 @@ run_miniwebapp_oversized_post_smoke() {
   trap - RETURN
 }
 
+run_throws_web_smoke() {
+  local docroot="${ROOT}/examples/007-ThrowsWeb"
+  if [[ ! -d "$docroot" ]]; then
+    echo "examples-web-smoke: 007-ThrowsWeb: skip (missing docroot)"
+    return 0
+  fi
+  if [[ "$AOT" -eq 1 ]]; then
+    echo "examples-web-smoke: 007-ThrowsWeb: skip --aot (VM only until #2101)"
+    return 0
+  fi
+
+  local port pid
+  port="$(find_free_port)"
+  echo "examples-web-smoke: 007-ThrowsWeb on 127.0.0.1:${port} (VM throw/catch POST)"
+  "${PHPC}" serve "127.0.0.1:${port}" "$docroot" >/dev/null 2>&1 &
+  pid=$!
+
+  stop_serve() {
+    kill "$pid" 2>/dev/null || true
+    local waited=0
+    while kill -0 "$pid" 2>/dev/null && ((waited < 40)); do
+      sleep 0.05
+      waited=$((waited + 1))
+    done
+    if kill -0 "$pid" 2>/dev/null; then
+      kill -9 "$pid" 2>/dev/null || true
+    fi
+    wait "$pid" 2>/dev/null || true
+  }
+  trap stop_serve RETURN
+
+  wait_for_serve "$port"
+
+  local base="http://127.0.0.1:${port}"
+  curl_expect_200 "007-ThrowsWeb / GET empty" "${base}/example.php" \
+    "Submit an email"
+  curl_expect_200_post "007-ThrowsWeb / POST invalid" "${base}/example.php" \
+    "email=bad" \
+    "Invalid email"
+
+  stop_serve
+  trap - RETURN
+}
+
 run_file_upload_web_smoke() {
   local docroot="${ROOT}/examples/006-FileUploadWeb"
   if [[ ! -d "$docroot" ]]; then
@@ -581,7 +629,14 @@ mode_label="VM"
 [[ "$MINIWEBAPP_ONLY" -eq 1 ]] && mode_label="${mode_label}; --miniwebapp-only"
 [[ "$SESSIONS_ONLY" -eq 1 ]] && mode_label="${mode_label}; --sessions-only"
 [[ "$FILEUPLOAD_ONLY" -eq 1 ]] && mode_label="${mode_label}; --fileupload-only"
+[[ "$THROWS_ONLY" -eq 1 ]] && mode_label="${mode_label}; --throws-only"
 echo "examples-web-smoke: starting (${mode_label})"
+
+if [[ "${THROWS_ONLY}" -eq 1 ]]; then
+  run_throws_web_smoke
+  echo "examples-web-smoke: ok"
+  exit 0
+fi
 
 if [[ "${FILEUPLOAD_ONLY}" -eq 1 ]]; then
   run_file_upload_web_smoke
@@ -614,6 +669,10 @@ if [[ "${MINIWEBAPP_ONLY}" -eq 0 ]]; then
 
   if [[ "${FILE_UPLOAD_WEB_SMOKE_GATE:-1}" == "1" ]]; then
     run_file_upload_web_smoke
+  fi
+
+  if [[ "${THROWS_WEB_SMOKE_GATE:-0}" == "1" ]]; then
+    run_throws_web_smoke
   fi
 fi
 
