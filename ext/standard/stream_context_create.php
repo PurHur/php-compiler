@@ -14,7 +14,7 @@ use PHPLLVM\Value;
 /**
  * stream_context_create() — VM returns array stream-context representation (#1377).
  *
- * JIT/AOT deferred until fopen/file_get_contents accept context in LLVM lowering.
+ * JIT lowering scaffolded in JitStreamContextCreate (#1377); still VM-deferred in this build.
  */
 final class stream_context_create extends Internal
 {
@@ -74,6 +74,7 @@ final class stream_context_create extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        unset($context, $args);
         throw new \LogicException(
             'stream_context_create() is not implemented for JIT in this compiler build (issue #1377)'
         );

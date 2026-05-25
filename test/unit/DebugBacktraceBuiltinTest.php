@@ -6,7 +6,7 @@ namespace PHPCompiler;
 
 require_once __DIR__.'/../BaseTest.php';
 
-/** debug_backtrace() VM smoke and compliance (issue #1378). */
+/** debug_backtrace() VM/JIT smoke and compliance (issue #1378). */
 final class DebugBacktraceBuiltinTest extends BaseTest
 {
     protected static string $DIR = __DIR__;
@@ -30,7 +30,7 @@ final class DebugBacktraceBuiltinTest extends BaseTest
 function inner() {
     $t = debug_backtrace();
     echo $t[0]['function'], '|', $t[1]['function'], '|', $t[2]['function'], "\n";
-    echo array_key_exists('file', $t[0]) ? 'keys' : 'nokeys', "\n";
+    echo isset($t[0]['file']) ? 'keys' : 'nokeys', "\n";
     echo $t[0]['line'], "\n";
 }
 function outer() {
@@ -41,7 +41,7 @@ PHP;
         $this->assertSame("debug_backtrace|inner|outer\nkeys\n0\n", $this->runInline($code));
     }
 
-    private function runInline(string $code): string
+    private function runInline(string $code, string $bin = 'vm'): string
     {
         $repo = dirname(__DIR__, 2);
         $tmp = tempnam(sys_get_temp_dir(), 'phpc_bt_vm_');
@@ -49,8 +49,9 @@ PHP;
         file_put_contents($tmp, "<?php\n".$code);
         $env = $_ENV;
         LlvmToolchain::applyProcessEnv($env, $repo);
+        $runner = 'jit' === $bin ? $repo.'/bin/jit.php' : $repo.'/bin/vm.php';
         $proc = proc_open(
-            [PHP_BINARY, $repo.'/bin/vm.php', $tmp],
+            [PHP_BINARY, $runner, $tmp],
             [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
             $pipes,
             $repo,
