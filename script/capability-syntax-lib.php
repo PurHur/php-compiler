@@ -322,8 +322,8 @@ function syntaxRowDefinitions(): array
             'opcodes' => ['TYPE_TRY', 'TYPE_CATCH', 'TYPE_THROW'],
             'issue' => 57,
             'notes' => [
-                'php-cfg TryCatch overlay (#2084); VM TYPE_TRY/CATCH/THROW; TryCatchComplianceTest + try_*.phpt',
-                'finally after catch still #57',
+                'throw lowering #195; php-cfg TryCatch overlay (#2084); VM TYPE_TRY/CATCH/THROW',
+                'TryCatchComplianceTest + try_*.phpt; finally after catch still #57',
             ],
             'probe' => 'class E {} try { throw new E(); } catch (E $e) { echo "ok"; }',
         ],
@@ -954,6 +954,98 @@ function renderFileUploadWebNorthStarMarkdown(array $rows): string
         . CAPABILITY_ISSUE_URL_BASE . '2005); deploy [#2028](' . CAPABILITY_ISSUE_URL_BASE . '2028). '
         . 'Opt-in ci-local gates: `FILE_UPLOAD_WEB_SMOKE_GATE`, `FILE_UPLOAD_WEB_AOT_LINK_GATE`, '
         . '`FILE_UPLOAD_WEB_AOT_SMOKE_GATE` (execute default-on #2012), `FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE`._';
+    $lines[] = '';
+
+    return implode("\n", $lines);
+}
+
+/**
+ * Throws / try-catch reference app constructs for examples/007-ThrowsWeb (issues #2103, #2144).
+ *
+ * @return list<array{
+ *   construct: string,
+ *   vm: string,
+ *   jit: string,
+ *   aot: string,
+ *   issue: int,
+ *   notes: list<string>
+ * }>
+ */
+function throwsWebNorthStarDefinitions(): array
+{
+    return [
+        [
+            'construct' => '`007-ThrowsWeb` reference app',
+            'vm' => 'yes',
+            'jit' => 'yes',
+            'aot' => 'partial',
+            'issue' => 2076,
+            'notes' => [
+                '#2076 VM serve + caught invalid POST (THROWS_WEB_SMOKE_GATE default #2125); AOT deferred #2101/#2104',
+            ],
+        ],
+        [
+            'construct' => '`throw` / `catch` on invalid POST (web serve)',
+            'vm' => 'yes',
+            'jit' => 'yes',
+            'aot' => 'partial',
+            'issue' => 195,
+            'notes' => ['#195 throw lowering; #57 catch; #2084 compliance PHPT pack'],
+        ],
+        [
+            'construct' => 'AOT project link (`phpc build --project`)',
+            'vm' => 'n/a',
+            'jit' => 'n/a',
+            'aot' => 'partial',
+            'issue' => 2101,
+            'notes' => ['ExamplesCompileTest 007 link; opt-in THROWSWEB_AOT_LINK_GATE (#2101)'],
+        ],
+        [
+            'construct' => 'AOT CGI execute (caught throw probe)',
+            'vm' => 'n/a',
+            'jit' => 'n/a',
+            'aot' => 'partial',
+            'issue' => 2104,
+            'notes' => ['examples-aot-smoke 007 slice; opt-in THROWSWEB_AOT_SMOKE_GATE (#2104)'],
+        ],
+    ];
+}
+
+/**
+ * @param list<array{construct: string, vm: string, jit: string, aot: string, issue: int, notes: list<string>}> $rows
+ */
+function renderThrowsWebNorthStarMarkdown(array $rows): string
+{
+    $lines = [
+        '## Throws reference (`examples/007-ThrowsWeb`)',
+        '',
+        'Caught `throw` / `catch` on invalid POST for the throws north-star example.',
+        'ROADMAP Phase 4/5: [#78](' . CAPABILITY_ISSUE_URL_BASE . '78), tracker [#2076]('
+        . CAPABILITY_ISSUE_URL_BASE . '2076). Builtin matrix: [capabilities.md](capabilities.md).',
+        '',
+        '| Construct | VM | JIT | AOT | Issue | Notes |',
+        '|-----------|:--:|:---:|:---:|-------|-------|',
+    ];
+
+    foreach ($rows as $row) {
+        $lines[] = sprintf(
+            '| %s | %s | %s | %s | [#%d](%s%d) | %s |',
+            $row['construct'],
+            capabilityStatusLabel($row['vm']),
+            capabilityStatusLabel($row['jit']),
+            capabilityStatusLabel($row['aot']),
+            $row['issue'],
+            CAPABILITY_ISSUE_URL_BASE,
+            $row['issue'],
+            $row['notes'] === [] ? '' : implode('; ', $row['notes'])
+        );
+    }
+
+    $lines[] = '';
+    $lines[] = '_Throws rows are curated from ROADMAP issue state; `throw` [#195](' . CAPABILITY_ISSUE_URL_BASE
+        . '195); `try`/`catch` [#57](' . CAPABILITY_ISSUE_URL_BASE . '57); overlay [#2084](' . CAPABILITY_ISSUE_URL_BASE
+        . '2084). Opt-in ci-local gates: `THROWS_WEB_SMOKE_GATE` (VM serve default-on #2125), '
+        . '`THROWSWEB_AOT_LINK_GATE`, `THROWSWEB_AOT_SMOKE_GATE`._';
     $lines[] = '';
 
     return implode("\n", $lines);
