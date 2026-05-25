@@ -163,10 +163,10 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('FILE_UPLOAD_WEB_AOT_LINK_GATE="${FILE_UPLOAD_WEB_AOT_LINK_GATE:-1}"', $defaults);
     }
 
-    public function testCiDefaultsEnvDefinesFileUploadWebAotSmokeGateOff(): void
+    public function testCiDefaultsEnvDefinesFileUploadWebAotSmokeGateOn(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
-        $this->assertStringContainsString('FILE_UPLOAD_WEB_AOT_SMOKE_GATE="${FILE_UPLOAD_WEB_AOT_SMOKE_GATE:-0}"', $defaults);
+        $this->assertStringContainsString('FILE_UPLOAD_WEB_AOT_SMOKE_GATE="${FILE_UPLOAD_WEB_AOT_SMOKE_GATE:-1}"', $defaults);
     }
 
     public function testCiFastRunsFileUploadWebSmokeGate(): void
@@ -208,7 +208,7 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('ci_run_file_upload_web_aot_execute', $body);
         $this->assertStringContainsString('--exclude-group fileuploadweb-aot-execute', $body);
         $this->assertStringContainsString('--group fileuploadweb-aot-execute', $body);
-        $this->assertStringContainsString('FILE_UPLOAD_WEB_AOT_SMOKE_GATE:-0', $body);
+        $this->assertStringContainsString('FILE_UPLOAD_WEB_AOT_SMOKE_GATE:-1', $body);
     }
 
     public function testCiFastHonorsMiniWebAppServeGate(): void

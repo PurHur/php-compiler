@@ -545,9 +545,9 @@ ci_run_aot_link_phpunit() {
   ci_run_phpunit "${aot_link_args[@]}" "$@"
 }
 
-# 006-FileUploadWeb AOT binary CLI execute (issue #1999); opt-in FILE_UPLOAD_WEB_AOT_SMOKE_GATE=1.
+# 006-FileUploadWeb AOT binary CLI execute (issue #1999); default FILE_UPLOAD_WEB_AOT_SMOKE_GATE=1 (#2012).
 ci_run_file_upload_web_aot_execute() {
-  if [[ "${FILE_UPLOAD_WEB_AOT_SMOKE_GATE:-0}" != "1" ]]; then
+  if [[ "${FILE_UPLOAD_WEB_AOT_SMOKE_GATE:-1}" != "1" ]]; then
     return 0
   fi
   if ! ci_llvm_ready; then
