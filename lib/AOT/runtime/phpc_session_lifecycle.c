@@ -145,3 +145,18 @@ void __phpc_session_regenerate_id_apply(__value__ *out, int8_t delete_old)
     __phpc_session_generate_new_id();
     __value__writeBool(out, 1);
 }
+
+void __phpc_session_destroy_apply(__value__ *out)
+{
+    if (!__phpc_session_active) {
+        __value__writeBool(out, 0);
+
+        return;
+    }
+
+    __phpc_session_active = 0;
+    __phpc_session_id_storage[0] = '\0';
+    __phpc_session_id_len = 0;
+    sg_SESSION = __hashtable__alloc();
+    __value__writeBool(out, 1);
+}
