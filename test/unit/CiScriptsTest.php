@@ -236,6 +236,17 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('DEPLOY_SMOKE_003_EXECUTE:-1', $common);
         $this->assertStringContainsString('MINIWEBAPP_AOT_EXECUTE_GATE', $common);
         $this->assertStringContainsString('--example 003', $common);
+        $this->assertStringContainsString('SESSIONS_WEB_DEPLOY_SMOKE_GATE', $common);
+        $this->assertStringContainsString('--example 005', $common);
+    }
+
+    public function testCiDefaultsEnvDefinesSessionsWebDeploySmokeGateOff(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString(
+            'SESSIONS_WEB_DEPLOY_SMOKE_GATE="${SESSIONS_WEB_DEPLOY_SMOKE_GATE:-0}"',
+            $defaults
+        );
     }
 
     public function testCiDefaultsEnvDefinesDeploySmokeGateOn(): void

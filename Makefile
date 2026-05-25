@@ -139,7 +139,10 @@ examples-aot-smoke:
 
 # phpc deploy + PHPC_DEPLOY_ROOT CGI smoke for 001/002 (issue #718); skips when LLVM missing
 deploy-smoke:
-	./script/deploy-smoke.sh
+	./script/deploy-smoke.sh --example 001
+	./script/deploy-smoke.sh --example 002
+	@if [ "$${DEPLOY_SMOKE_003_EXECUTE:-1}" = "1" ]; then ./script/deploy-smoke.sh --example 003; fi
+	@if [ "$${SESSIONS_WEB_DEPLOY_SMOKE_GATE:-0}" = "1" ]; then ./script/deploy-smoke.sh --example 005; fi
 
 # Local HTTP dev server (see bin/serve.php)
 SERVE_ADDR ?= 127.0.0.1:8080

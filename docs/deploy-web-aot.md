@@ -56,6 +56,27 @@ export DOCUMENT_ROOT="$PHPC_DEPLOY_ROOT/public"
 
 Gate ladder and route matrix: [examples/003-MiniWebApp/README.md](../examples/003-MiniWebApp/README.md), [examples/README.md § 003-MiniWebApp](../examples/README.md#003-miniwebapp).
 
+### `examples/005-SessionsWeb` (deploy + session flash CGI)
+
+Single-file app like `001-SimpleWeb`; requires `PHP_COMPILER_SESSION_DIR` (writable) and `HTTP_COOKIE` across CGI invocations ([#1881](https://github.com/PurHur/php-compiler/issues/1881), [#1893](https://github.com/PurHur/php-compiler/issues/1893)).
+
+```bash
+./phpc build --project examples/005-SessionsWeb
+./phpc deploy examples/005-SessionsWeb -o /tmp/sessions-dist
+export PHPC_DEPLOY_ROOT=/tmp/sessions-dist
+export PHP_COMPILER_SESSION_DIR=/tmp/phpc-sessions
+mkdir -p "$PHP_COMPILER_SESSION_DIR"
+```
+
+Deploy smoke (opt-in until stable):
+
+```bash
+SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 ./script/deploy-smoke.sh --example 005
+SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 make deploy-smoke
+```
+
+The gate runs GET → POST (`message=Saved`) → GET flash → GET after flash under `PHPC_DEPLOY_ROOT`, parsing `Set-Cookie: PHPSESSID` from CGI stdout. VM serve curls remain in `SESSIONS_WEB_SMOKE_GATE=1` ([#1887](https://github.com/PurHur/php-compiler/issues/1887)).
+
 Implementation: [`lib/Web/ProjectDeploy.php`](../lib/Web/ProjectDeploy.php).
 
 ## 2. Dist layout
@@ -225,7 +246,7 @@ Production AOT CGI wrapper for nginx spawn: [#665](https://github.com/PurHur/php
 
 | Step | Command |
 |------|---------|
-| Deploy smoke | `make deploy-smoke` or `./script/deploy-smoke.sh` (001/002; 003 execute when `DEPLOY_SMOKE_003_EXECUTE=1` or `MINIWEBAPP_AOT_EXECUTE_GATE=1` — [#718](https://github.com/PurHur/php-compiler/issues/718), [#745](https://github.com/PurHur/php-compiler/issues/745)) |
+| Deploy smoke | `make deploy-smoke` or `./script/deploy-smoke.sh` (001/002; 003 execute when `DEPLOY_SMOKE_003_EXECUTE=1` or `MINIWEBAPP_AOT_EXECUTE_GATE=1` — [#718](https://github.com/PurHur/php-compiler/issues/718), [#745](https://github.com/PurHur/php-compiler/issues/745)); 005 session flash when `SESSIONS_WEB_DEPLOY_SMOKE_GATE=1` ([#1893](https://github.com/PurHur/php-compiler/issues/1893)) |
 | Manual deploy | `phpc deploy examples/002-StaticWeb -o /tmp/static-dist` → executable `bin/app` |
 | Static assets on disk | `test -f /tmp/miniwebapp-dist/assets/style.css` after 003 deploy ([#696](https://github.com/PurHur/php-compiler/issues/696)) |
 | Deploy root env | `grep PHPC_DEPLOY_ROOT /tmp/static-dist/README.deploy` |

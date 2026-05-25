@@ -63,6 +63,86 @@ final class DeploySmokeScriptTest extends TestCase
         $this->assertStringContainsString('--example', $body);
         $this->assertStringContainsString('phpc deploy', $body);
         $this->assertStringContainsString('miniwebapp-cgi-env.php', $body);
+        $this->assertStringContainsString('005-SessionsWeb', $body);
+        $this->assertStringContainsString('SESSIONS_WEB_DEPLOY_SMOKE_GATE', $body);
+        $this->assertStringContainsString('smoke_005_sessions_web', $body);
+        $this->assertStringContainsString('#1893', $body);
+    }
+
+    public function testDeploySmokeExample005SkipsWhenGateOff(): void
+    {
+        $repoRoot = dirname(__DIR__, 2);
+        $script = $repoRoot.'/script/deploy-smoke.sh';
+
+        $env = $this->baseEnv();
+        $env['SESSIONS_WEB_DEPLOY_SMOKE_GATE'] = '0';
+
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open(['bash', $script, '--example', '005'], $descriptorSpec, $pipes, $repoRoot, $env);
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+
+        $combined = trim(($stdout !== false ? $stdout : '')."\n".($stderr !== false ? $stderr : ''));
+        $this->assertSame(0, $exit, $combined);
+        $this->assertStringContainsString('005-SessionsWeb: skip', $combined);
+        $this->assertStringContainsString('SESSIONS_WEB_DEPLOY_SMOKE_GATE=0', $combined);
+    }
+
+    /**
+     * Requires 005 AOT link green (#1891); opt-in gate SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 (#1893).
+     *
+     * @group llvm
+     * @group sessions-web-deploy
+     */
+    public function testDeploySmokeExample005ExecuteWhenGateOn(): void
+    {
+        if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
+            $this->markTestSkipped(
+                'LLVM 9 toolchain not available. Run script/install-llvm9.sh from the repository root.'
+            );
+        }
+
+        $repoRoot = dirname(__DIR__, 2);
+        $phpc = $repoRoot.'/phpc';
+        if (!is_executable($phpc)) {
+            $this->markTestSkipped('phpc wrapper not executable');
+        }
+        if (!is_dir($repoRoot.'/examples/005-SessionsWeb')) {
+            $this->markTestSkipped('examples/005-SessionsWeb missing (#1881)');
+        }
+
+        $script = $repoRoot.'/script/deploy-smoke.sh';
+        $env = $this->baseEnv();
+        $env['SESSIONS_WEB_DEPLOY_SMOKE_GATE'] = '1';
+
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open(['bash', $script, '--example', '005'], $descriptorSpec, $pipes, $repoRoot, $env);
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+
+        $combined = trim(($stdout !== false ? $stdout : '')."\n".($stderr !== false ? $stderr : ''));
+        $this->assertSame(0, $exit, $combined);
+        $this->assertStringContainsString('deploy-smoke: 005-SessionsWeb: flash read ok', $combined);
+        $this->assertStringContainsString('deploy-smoke: 005-SessionsWeb: ok', $combined);
+        $this->assertStringContainsString('deploy-smoke: ok', $combined);
     }
 
     public function testDeploySmokeExample003SkipsWhenExecuteGateOff(): void
