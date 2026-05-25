@@ -1,0 +1,22 @@
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Visitor/PhiResolver.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Visitor/PhiResolver.php
+@@ -44,13 +44,19 @@ class PhiResolver extends AbstractVisitor
+     private function resolvePhi(Func $func, Op\Phi $phi)
+     {
++        if (null === $phi->result) {
++            return;
++        }
+         // resolve to result var
+         $replacement = new Operand\Temporary($phi->result);
+         $replacement->type = $phi->result->type;
+         foreach ($phi->vars as $var) {
++            if (null === $var) {
++                continue;
++            }
+             $var->replaceWith($replacement);
+             if (count($var->ops) === 1 && $var->ops[0] instanceof Op\Expr\Param) {
+                 $this->emitParamFetch($func, $var, $replacement, $var->ops[0]);
+             }
+         }
+         $phi->result->replaceWith($replacement);
+     }
