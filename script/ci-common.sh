@@ -185,7 +185,7 @@ ci_run_bootstrap_m5_doc_sync_check() {
 }
 
 ci_run_bootstrap_vendor_inventory_sync_check() {
-  if [[ "${BOOTSTRAP_VENDOR_INVENTORY_SYNC_GATE:-0}" != "1" ]]; then
+  if [[ "${BOOTSTRAP_VENDOR_INVENTORY_SYNC_GATE:-1}" != "1" ]]; then
     return 0
   fi
   echo "Bootstrap vendor inventory sync (BOOTSTRAP_VENDOR_INVENTORY_SYNC_GATE=1, issue #2030)..."
