@@ -42,18 +42,14 @@ $spineSubstitutes = [
  */
 $spineNativeLinkDeferred = [
     'bin/vm.php',
-    'ext/standard/VmPregReplaceCallback.php',
     'lib/AOT/Linker.php',
     'src/llvm-env.php',
     'src/macro_functions.php',
     'src/yay-php8-compat.php',
-    'test/bootstrap-aot/vm_run_smoke.php',
 ];
 
 /** Inventory paths not yet in spine (regenerated inventory ahead of bundle — #1922). */
-$spineInventoryAheadDeferred = [
-    'lib/JIT/Builtin/IniGet.php',
-];
+$spineInventoryAheadDeferred = [];
 
 $spineCoverageDeferred = array_values(array_unique(array_merge(
     $spineNativeLinkDeferred,
