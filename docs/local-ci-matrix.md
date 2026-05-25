@@ -86,6 +86,8 @@ Defaults are exported from [`script/ci-defaults.env`](../script/ci-defaults.env)
 | `REHASH_COMPLIANCE_GATE` | `1` | `ci-fast.sh` | PHPUnit `array_rehash_string_keys` — HashTable mixed-key rehash ([#1956](https://github.com/PurHur/php-compiler/issues/1956), [#66](https://github.com/PurHur/php-compiler/issues/66)); set `0` to skip |
 | `MINIWEBAPP_SERVE_GATE` | `1` | `ci-local.sh`, `ci-fast.sh` | `ServeTest` `@group miniwebapp` ([#641](https://github.com/PurHur/php-compiler/issues/641)) |
 | `SESSIONS_WEB_SMOKE_GATE` | `1` | `ci-fast.sh`, `ci-local.sh` | `examples-web-smoke.sh --sessions-only` / 005 cookie flash curls ([#1887](https://github.com/PurHur/php-compiler/issues/1887)) |
+| `SESSIONS_WEB_AOT_LINK_GATE` | `1` | `ci-local.sh` (PHPUnit `@group aot-link`) | `ExamplesCompileTest::test005SessionsWebAotLink` — 005 native link ([#1946](https://github.com/PurHur/php-compiler/issues/1946)); set `0` to skip during iteration |
+| `SESSIONS_WEB_AOT_SMOKE_GATE` | `0` | `ci-local.sh` (`ci_run_sessions_web_aot_execute`) | `SessionsWebAotExecuteTest` two-request execute ([#1891](https://github.com/PurHur/php-compiler/issues/1891), [#1923](https://github.com/PurHur/php-compiler/issues/1923)) |
 | `MINIWEBAPP_WEB_SMOKE_GATE` | `1` | `ci-local.sh` | `examples-web-smoke.sh --miniwebapp-only` ([#664](https://github.com/PurHur/php-compiler/issues/664)) |
 | `MINIWEBAPP_WEB_SMOKE_AOT_GATE` | `1` | `ci-local.sh` | `ci_run_miniwebapp_web_smoke_aot` → `examples-web-smoke.sh --miniwebapp-only --aot` ([#1523](https://github.com/PurHur/php-compiler/issues/1523), [#833](https://github.com/PurHur/php-compiler/issues/833)) |
 | `MINIWEBAPP_AOT_LINK_GATE` | `1` | `ci-local.sh` (PHPUnit `@group aot-link`) | `ExamplesCompileTest` 003 native link ([#754](https://github.com/PurHur/php-compiler/issues/754)) |
@@ -119,6 +121,13 @@ Ladder-only env vars (not in `ci-defaults.env`): `MINIWEBAPP_LINT_GATE` (default
 ```bash
 ./script/ci-local.sh --filter 'ExamplesCompileTest::test003MiniWebAppBuildLinks'
 MINIWEBAPP_AOT_LINK_GATE=0 ./script/ci-local.sh --filter ExamplesCompileTest   # skip 003 link (#754)
+```
+
+**005 AOT link** (`SESSIONS_WEB_AOT_LINK_GATE=1` default — [#1946](https://github.com/PurHur/php-compiler/issues/1946)):
+
+```bash
+./script/ci-local.sh --filter test005SessionsWebAotLink
+SESSIONS_WEB_AOT_LINK_GATE=0 ./script/ci-local.sh --filter ExamplesCompileTest   # skip 005 link
 ```
 
 **003 AOT execute** (`MINIWEBAPP_AOT_EXECUTE_GATE=1` default; set `0` to skip during iteration):
