@@ -53,6 +53,7 @@ final class PhpcDeployTest extends TestCase
             $this->assertTrue(is_executable($out.'/'.CgiAotDriver::WRAPPER_NAME));
             $readme = (string) file_get_contents($out.'/'.ProjectDeploy::README_DEPLOY);
             $this->assertStringContainsString('PHPC_DEPLOY_ROOT', $readme);
+            $this->assertStringContainsString('PHP_COMPILER_SESSION_DIR', $readme);
             $this->assertStringContainsString('cgi-wrapper', $readme);
         } finally {
             $this->removeTree($project);

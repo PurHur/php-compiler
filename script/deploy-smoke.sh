@@ -14,6 +14,7 @@
 #   ./script/deploy-smoke.sh --example 003
 #   DEPLOY_SMOKE_003_EXECUTE=0 ./script/deploy-smoke.sh --example 003
 #   DEPLOY_SMOKE_ONLY=003 make deploy-smoke
+#   SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 ./script/deploy-smoke.sh --example 005
 #
 # Docker:
 #   docker run --rm -v "$(pwd):/compiler" -w /compiler php-compiler:22.04-dev make deploy-smoke
@@ -24,20 +25,23 @@ ROOT="$PWD"
 PHPC="${ROOT}/phpc"
 SMOKE_ROOT="${ROOT}/.phpc/smoke/deploy"
 MINIWEBAPP="${ROOT}/examples/003-MiniWebApp"
+SESSIONS_WEB="${ROOT}/examples/005-SessionsWeb"
 EXAMPLE="002"
 DEPLOY_SMOKE_ONLY="${DEPLOY_SMOKE_ONLY:-}"
 
 usage() {
   cat <<'EOF' >&2
-Usage: script/deploy-smoke.sh [--example 001|002|003]
+Usage: script/deploy-smoke.sh [--example 001|002|003|005]
 
   001  examples/001-SimpleWeb (QUERY_STRING=name=…)
   002  examples/002-StaticWeb (default; static HTML)
   003  examples/003-MiniWebApp (layout: DEPLOY_SMOKE_003_LAYOUT=1 #804;
                                execute: default on DEPLOY_SMOKE_003_EXECUTE=1 #1530;
                                or MINIWEBAPP_AOT_EXECUTE_GATE=1 #745)
+  005  examples/005-SessionsWeb (SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 #1893; cookie + POST redirect flash)
 
 003 execute smoke is default on (DEPLOY_SMOKE_003_EXECUTE=1); set DEPLOY_SMOKE_003_EXECUTE=0 to skip (#1530, #745).
+005 requires SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 (default 0 until stable — #1893).
 EOF
   exit 1
 }
@@ -118,6 +122,57 @@ run_deployed_app() {
     stdout="$(env PHPC_DEPLOY_ROOT="$dist" "${dist}/bin/app" 2>"$stderr_file")"
   fi
   local exit_code=$?
+  stderr="$(cat "$stderr_file" 2>/dev/null || true)"
+  rm -f "$stderr_file"
+  if [[ "$exit_code" -ne 0 ]]; then
+    echo "deploy-smoke: ${label}: bin/app exited ${exit_code}" >&2
+    [[ -n "$stderr" ]] && echo "$stderr" >&2
+    exit 1
+  fi
+  if [[ -n "$stderr" ]]; then
+    echo "deploy-smoke: ${label}: stderr: ${stderr}" >&2
+    exit 1
+  fi
+  printf '%s' "$stdout"
+}
+
+deploy_smoke_005_enabled() {
+  [[ "${SESSIONS_WEB_DEPLOY_SMOKE_GATE:-0}" == "1" ]]
+}
+
+extract_http_cookie_from_cgi() {
+  local output="$1"
+  local line sid
+  line="$(printf '%s\n' "$output" | grep -i '^Set-Cookie: PHPSESSID=' | head -1 || true)"
+  if [[ -z "$line" ]]; then
+    return 0
+  fi
+  sid="$(printf '%s' "$line" | sed -n 's/^[Ss]et-[Cc]ookie: PHPSESSID=\([^;]*\).*/\1/p')"
+  if [[ -n "$sid" ]]; then
+    printf 'PHPSESSID=%s' "$sid"
+  fi
+}
+
+run_deployed_sessions_cgi() {
+  local label="$1"
+  local dist="$2"
+  local session_dir="$3"
+  local http_cookie="$4"
+  local stdin_body="$5"
+  shift 5
+  local stderr_file stdout stderr exit_code
+  stderr_file="$(mktemp "${SMOKE_ROOT}/run.XXXXXX")"
+  local -a run_env=(PHPC_DEPLOY_ROOT="$dist" PHP_COMPILER_SESSION_DIR="$session_dir")
+  if [[ -n "$http_cookie" ]]; then
+    run_env+=(HTTP_COOKIE="$http_cookie")
+  fi
+  run_env+=("$@")
+  if [[ -n "$stdin_body" ]]; then
+    stdout="$(printf '%s' "$stdin_body" | env "${run_env[@]}" "${dist}/bin/app" 2>"$stderr_file")"
+  else
+    stdout="$(env "${run_env[@]}" "${dist}/bin/app" 2>"$stderr_file")"
+  fi
+  exit_code=$?
   stderr="$(cat "$stderr_file" 2>/dev/null || true)"
   rm -f "$stderr_file"
   if [[ "$exit_code" -ne 0 ]]; then
@@ -349,13 +404,96 @@ smoke_003_miniwebapp() {
   return 0
 }
 
+smoke_005_sessions_web() {
+  local label="005-SessionsWeb"
+  local dist="${SMOKE_ROOT}/005-SessionsWeb"
+  local readme="${dist}/README.deploy"
+  local session_dir="${SMOKE_ROOT}/sessions-005"
+  local out cookie post_body new_cookie
+
+  if ! deploy_smoke_005_enabled; then
+    echo "deploy-smoke: ${label}: skip (SESSIONS_WEB_DEPLOY_SMOKE_GATE=0 #1893)" >&2
+    return 0
+  fi
+
+  if [[ ! -d "${SESSIONS_WEB}" ]]; then
+    echo "deploy-smoke: ${label}: skip (tree missing #1881)" >&2
+    return 0
+  fi
+
+  rm -rf "$dist" "$session_dir"
+  mkdir -p "$SMOKE_ROOT" "$session_dir"
+
+  echo "deploy-smoke: ${label}: phpc build --project"
+  "$PHPC" build --project "${SESSIONS_WEB}"
+
+  echo "deploy-smoke: ${label}: phpc deploy -> ${dist}"
+  "$PHPC" deploy "${SESSIONS_WEB}" -o "$dist"
+
+  if [[ ! -x "${dist}/bin/app" ]]; then
+    echo "deploy-smoke: ${label}: expected executable ${dist}/bin/app" >&2
+    exit 1
+  fi
+  if [[ ! -f "$readme" ]]; then
+    echo "deploy-smoke: ${label}: expected ${readme}" >&2
+    exit 1
+  fi
+  if ! grep -q 'PHPC_DEPLOY_ROOT' "$readme"; then
+    echo "deploy-smoke: ${label}: README.deploy missing PHPC_DEPLOY_ROOT" >&2
+    exit 1
+  fi
+  if ! grep -q 'PHP_COMPILER_SESSION_DIR' "$readme"; then
+    echo "deploy-smoke: ${label}: README.deploy missing PHP_COMPILER_SESSION_DIR (#1893)" >&2
+    exit 1
+  fi
+
+  post_body='message=Saved'
+
+  out="$(run_deployed_sessions_cgi "${label} GET empty" "$dist" "$session_dir" "" "" \
+    REQUEST_METHOD=GET SCRIPT_NAME=/example.php REQUEST_URI=/example.php QUERY_STRING=)"
+  assert_needle "${label} GET empty" "$out" 'No flash message yet'
+  cookie="$(extract_http_cookie_from_cgi "$out")"
+  if [[ -z "$cookie" ]]; then
+    echo "deploy-smoke: ${label}: login step: no PHPSESSID Set-Cookie after GET" >&2
+    echo "--- output ---" >&2
+    echo "$out" >&2
+    echo "--- end ---" >&2
+    exit 1
+  fi
+  echo "deploy-smoke: ${label}: session cookie ok"
+
+  out="$(run_deployed_sessions_cgi "${label} POST flash" "$dist" "$session_dir" "$cookie" "$post_body" \
+    REQUEST_METHOD=POST SCRIPT_NAME=/example.php REQUEST_URI=/example.php \
+    CONTENT_TYPE=application/x-www-form-urlencoded "CONTENT_LENGTH=${#post_body}")"
+  assert_needle "${label} POST flash" "$out" 'Status: 303'
+  assert_needle "${label} POST flash" "$out" 'Location: /example.php'
+  new_cookie="$(extract_http_cookie_from_cgi "$out")"
+  if [[ -n "$new_cookie" ]]; then
+    cookie="$new_cookie"
+  fi
+  echo "deploy-smoke: ${label}: POST redirect ok"
+
+  out="$(run_deployed_sessions_cgi "${label} GET flash" "$dist" "$session_dir" "$cookie" "" \
+    REQUEST_METHOD=GET SCRIPT_NAME=/example.php REQUEST_URI=/example.php QUERY_STRING=)"
+  assert_needle "${label} GET flash" "$out" 'Flash: Saved'
+  echo "deploy-smoke: ${label}: flash read ok"
+
+  out="$(run_deployed_sessions_cgi "${label} GET after flash" "$dist" "$session_dir" "$cookie" "" \
+    REQUEST_METHOD=GET SCRIPT_NAME=/example.php REQUEST_URI=/example.php QUERY_STRING=)"
+  assert_needle "${label} GET after flash" "$out" 'No flash message yet'
+  echo "deploy-smoke: ${label}: flash consumed ok"
+
+  echo "deploy-smoke: ${label}: ok"
+}
+
 run_deploy_smoke_example() {
   case "$1" in
     001) smoke_deploy_example '001-SimpleWeb' 'examples/001-SimpleWeb' '001-SimpleWeb' ;;
     002) smoke_deploy_example '002-StaticWeb' 'examples/002-StaticWeb' '002-StaticWeb' ;;
     003) smoke_003_miniwebapp ;;
+    005) smoke_005_sessions_web ;;
     *)
-      echo "deploy-smoke: unknown example ${1} (use 001, 002, or 003)" >&2
+      echo "deploy-smoke: unknown example ${1} (use 001, 002, 003, or 005)" >&2
       exit 1
       ;;
   esac

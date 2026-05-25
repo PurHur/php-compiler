@@ -127,6 +127,7 @@ Run the AOT binary behind nginx/CGI/FastCGI with the document root set to public
   PHPC_DEPLOY_ROOT   Absolute path to this dist directory (required for
                      phpc_deploy_path() template/includes rewritten at AOT link time)
   QUERY_STRING       CGI query string (e.g. name=value&page=1)
+  PHP_COMPILER_SESSION_DIR  Writable directory for file-backed $_SESSION (issue #1881)
   PHP_COMPILER_DEBUG Set to 1 for serve/build diagnostics
 
 Example (direct binary):

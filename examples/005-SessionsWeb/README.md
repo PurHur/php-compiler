@@ -40,7 +40,20 @@ The last response should include `Flash: Saved`.
 | VM `phpc serve` | ✅ with `PHP_COMPILER_SESSION_DIR` + cookie jar |
 | JIT | ✅ `session_start` ([#1882](https://github.com/PurHur/php-compiler/issues/1882)) |
 | AOT link | ✅ `ExamplesCompileTest::test005SessionsWebAotLink` ([#1946](https://github.com/PurHur/php-compiler/issues/1946); `SESSIONS_WEB_AOT_LINK_GATE=1` default) |
-| AOT execute | 📋 `SessionsWebAotExecuteTest` ([#1891](https://github.com/PurHur/php-compiler/issues/1891); `SESSIONS_WEB_AOT_SMOKE_GATE=1`) |
+| AOT execute | ✅ `SessionsWebAotExecuteTest` ([#1891](https://github.com/PurHur/php-compiler/issues/1891); `SESSIONS_WEB_AOT_SMOKE_GATE=1`) |
+| AOT deploy + CGI flash | ✅ `SESSIONS_WEB_DEPLOY_SMOKE_GATE=1` ([#1893](https://github.com/PurHur/php-compiler/issues/1893)) |
+
+Deploy + two-request CGI (no HTTP server):
+
+```console
+export PHP_COMPILER_SESSION_DIR=/tmp/phpc-sessions
+mkdir -p "$PHP_COMPILER_SESSION_DIR"
+../../phpc build --project .
+../../phpc deploy . -o /tmp/sessions-dist
+export PHPC_DEPLOY_ROOT=/tmp/sessions-dist
+# See script/deploy-smoke.sh --example 005 for CGI env + cookie jar pattern
+SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 ../../script/deploy-smoke.sh --example 005
+```
 
 ## Template parity
 
@@ -53,6 +66,7 @@ The last response should include `Flash: Saved`.
 ## Related
 
 - [#1887](https://github.com/PurHur/php-compiler/issues/1887) — `SESSIONS_WEB_SMOKE_GATE=1` (default): `make examples-sessions-smoke`, `ci-fast.sh`, `ExamplesCompileTest::test005SessionsWebServeFlashRoundTrip`
-- [#1946](https://github.com/PurHur/php-compiler/issues/1946) — `SESSIONS_WEB_AOT_LINK_GATE=1`: `ExamplesCompileTest::test005SessionsWebAotLink` (link-only; execute stays [#1891](https://github.com/PurHur/php-compiler/issues/1891))
-- [#1893](https://github.com/PurHur/php-compiler/issues/1893) — deploy + `PHPC_DEPLOY_ROOT` smoke
+- [#1946](https://github.com/PurHur/php-compiler/issues/1946) — `SESSIONS_WEB_AOT_LINK_GATE=1`: `ExamplesCompileTest::test005SessionsWebAotLink`
+- [#1891](https://github.com/PurHur/php-compiler/issues/1891) — `SESSIONS_WEB_AOT_SMOKE_GATE=1`: `SessionsWebAotExecuteTest`
+- [#1893](https://github.com/PurHur/php-compiler/issues/1893) — `SESSIONS_WEB_DEPLOY_SMOKE_GATE=1`: `deploy-smoke.sh --example 005`, `docs/deploy-web-aot.md`
 - [#1886](https://github.com/PurHur/php-compiler/issues/1886) — `phpc init --profile sessionsweb` copies from `templates/init-sessionsweb/`
