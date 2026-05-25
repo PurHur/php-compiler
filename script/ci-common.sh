@@ -541,7 +541,7 @@ ci_run_deploy_smoke() {
 # 005 link: ExamplesCompileTest::test005SessionsWebAotLink when SESSIONS_WEB_AOT_LINK_GATE=1 (#1946).
 ci_run_aot_link_phpunit() {
   local -a aot_link_args=(--group aot-link --exclude-group serve --exclude-group miniwebapp-aot-execute --exclude-group miniwebapp-aot-serve --exclude-group sessionsweb-aot-execute --exclude-group fileuploadweb-aot-execute)
-  echo "PHPUnit: AOT link (@group aot-link; SESSIONS_WEB_AOT_LINK_GATE=${SESSIONS_WEB_AOT_LINK_GATE:-0})..."
+  echo "PHPUnit: AOT link (@group aot-link; SESSIONS_WEB_AOT_LINK_GATE=${SESSIONS_WEB_AOT_LINK_GATE:-0}, FILE_UPLOAD_WEB_AOT_LINK_GATE=${FILE_UPLOAD_WEB_AOT_LINK_GATE:-0})..."
   ci_run_phpunit "${aot_link_args[@]}" "$@"
 }
 
