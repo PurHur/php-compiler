@@ -194,10 +194,30 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('006-FileUploadWeb', $smoke);
     }
 
-    public function testCiDefaultsEnvDefinesThrowsWebSmokeGateOff(): void
+    public function testCiDefaultsEnvDefinesThrowsWebSmokeGateOn(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
-        $this->assertStringContainsString('THROWS_WEB_SMOKE_GATE="${THROWS_WEB_SMOKE_GATE:-0}"', $defaults);
+        $this->assertStringContainsString(
+            'THROWS_WEB_SMOKE_GATE="${THROWS_WEB_SMOKE_GATE:-1}"',
+            $defaults
+        );
+    }
+
+    public function testCiFastRunsThrowsWebSmokeGate(): void
+    {
+        $fast = dirname(__DIR__, 2).'/script/ci-fast.sh';
+        $body = (string) file_get_contents($fast);
+        $this->assertStringContainsString('ci_run_throws_web_smoke', $body);
+
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('THROWS_WEB_SMOKE_GATE', $common);
+        $this->assertStringContainsString('--throws-only', $common);
+    }
+
+    public function testCiLocalRunsThrowsWebSmokeGate(): void
+    {
+        $local = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-local.sh');
+        $this->assertStringContainsString('ci_run_throws_web_smoke', $local);
     }
 
     public function testExamplesWebSmokeDefinesThrowsOnlyFlag(): void

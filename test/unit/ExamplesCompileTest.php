@@ -1044,7 +1044,7 @@ final class ExamplesCompileTest extends TestCase
     {
         $gate = getenv('THROWS_WEB_SMOKE_GATE');
 
-        return false !== $gate && '' !== $gate && '1' === $gate;
+        return false === $gate || '0' !== $gate;
     }
 
     private static function fileUploadWebAotLinkGateEnabled(): bool

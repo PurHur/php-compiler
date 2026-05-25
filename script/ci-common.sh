@@ -569,6 +569,23 @@ ci_run_file_upload_web_smoke() {
   "$_CI_SCRIPT_DIR/examples-web-smoke.sh" --fileupload-only
 }
 
+# Shell curl harness for 007-ThrowsWeb throw/catch POST (issue #2093, default-on #2125).
+ci_run_throws_web_smoke() {
+  if [[ "${THROWS_WEB_SMOKE_GATE:-1}" != "1" ]]; then
+    return 0
+  fi
+  if [[ -n "${PHP_COMPILER_SKIP_SERVE_TESTS:-}" ]]; then
+    echo "examples-web-smoke (007): skipped (PHP_COMPILER_SKIP_SERVE_TESTS is set)"
+    return 0
+  fi
+  if ! ci_can_bind_loopback; then
+    echo "examples-web-smoke (007): skipped (cannot bind loopback TCP)"
+    return 0
+  fi
+  echo "examples-web-smoke (007): ThrowsWeb invalid POST curls (THROWS_WEB_SMOKE_GATE=1 default, #2125)..."
+  "$_CI_SCRIPT_DIR/examples-web-smoke.sh" --throws-only
+}
+
 # Shell curl harness for 005-SessionsWeb session flash (issue #1887).
 ci_run_sessions_web_smoke() {
   if [[ "${SESSIONS_WEB_SMOKE_GATE:-1}" != "1" ]]; then
