@@ -96,7 +96,7 @@ final class BootstrapSelfhostCompileSmokeTest extends TestCase
         $source = (string) file_get_contents($script);
         $this->assertStringContainsString('BOOTSTRAP_M3_LINK_COMPILE_DRIVER', $source);
         $this->assertStringContainsString('compile_smoke_m3_emit_native_entry.php', $source);
-        $this->assertStringContainsString('PHP_COMPILER_EMIT_HELPER_LINK', $source);
+        $this->assertStringContainsString('PHP_COMPILER_M3_COMPILE_DRIVER=1', $source);
         $this->assertStringContainsString('compile_smoke_m3_emit: compile OK', $source);
     }
 
@@ -107,5 +107,12 @@ final class BootstrapSelfhostCompileSmokeTest extends TestCase
         $cmd = 'php '.escapeshellarg(self::$root.'/bin/compile.php').' -l '.escapeshellarg($driver).' 2>&1';
         exec($cmd, $lines, $exitCode);
         $this->assertSame(0, $exitCode, implode("\n", $lines));
+    }
+
+    public function testCompilePhpPreservesSelfhostAotForM3NativeEmitEntry(): void
+    {
+        $compile = (string) file_get_contents(self::$root.'/bin/compile.php');
+        $this->assertStringContainsString('compile_smoke_m3_emit_native_entry.php', $compile);
+        $this->assertStringContainsString('PHP_COMPILER_M3_COMPILE_DRIVER', $compile);
     }
 }

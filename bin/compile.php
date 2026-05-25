@@ -19,8 +19,16 @@ function run(string $filename, string $code, array $options): void
 {
     $normalized = '-' !== $filename ? str_replace('\\', '/', $filename) : '';
     if ('' !== $normalized && str_contains($normalized, '/test/bootstrap-aot/')) {
-        // Bootstrap AOT fixtures require real JIT lowering; ignore inherited self-host stub env (#1086).
-        putenv('PHP_COMPILER_SELFHOST_AOT=0');
+        // M3 native emit TU: self-host M3 allowlist (not full bootstrap JIT) (#1937, #1983).
+        $m3Driver = getenv('PHP_COMPILER_M3_COMPILE_DRIVER');
+        $m3EmitNative = str_contains($normalized, 'compile_smoke_m3_emit_native_entry.php')
+            && ('1' === $m3Driver || 'true' === strtolower((string) $m3Driver));
+        if ($m3EmitNative) {
+            putenv('PHP_COMPILER_SELFHOST_AOT=1');
+        } else {
+            // Bootstrap AOT fixtures require real JIT lowering; ignore inherited self-host stub env (#1086).
+            putenv('PHP_COMPILER_SELFHOST_AOT=0');
+        }
     }
     if ('-' !== $filename && str_contains($normalized, '/test/selfhost/')) {
         $selfhostAot = getenv('PHP_COMPILER_SELFHOST_AOT');
