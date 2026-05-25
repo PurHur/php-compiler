@@ -1343,7 +1343,7 @@ class Compiler {
                 foreach ($this->compileCallArgSends($expr->args, $block) as $send) {
                     $return[] = $send;
                 }
-                if (!empty($expr->result->usages)) {
+                if ($this->callNeedsReturnSlot($expr->result, $block)) {
                     $return[] = new OpCode(
                         OpCode::TYPE_FUNCCALL_EXEC_RETURN,
                         $this->compileOperand($expr->result, $block, false)
@@ -2165,6 +2165,34 @@ class Compiler {
     }
 
     /**
+     * php-cfg may leave call result usages empty when the next op is `return $tmp` (#1885).
+     */
+    private function callNeedsReturnSlot(Operand $result, Block $block): bool
+    {
+        return !empty($result->usages) || $block->callResultFeedsReturn($result);
+    }
+
+    /**
+     * `return foo()` lowers call opcodes then return; reuse FUNCCALL_EXEC_RETURN slot (#1885).
+     */
+    private function funcCallExecReturnSlotForReturn(Block $block, Operand $returnExpr): ?int
+    {
+        $n = $block->nOpCodes;
+        if (0 === $n) {
+            return null;
+        }
+        $last = $block->opCodes[$n - 1];
+        if (OpCode::TYPE_FUNCCALL_EXEC_RETURN !== $last->type) {
+            return null;
+        }
+        if (!$block->callResultFeedsReturn($returnExpr)) {
+            return null;
+        }
+
+        return $last->arg1;
+    }
+
+    /**
      * @return list<OpCode>
      */
     protected function compileTerminal(Op\Terminal $terminal, Block $block): array {
@@ -2200,6 +2228,11 @@ class Compiler {
                     return [new OpCode(
                         OpCode::TYPE_RETURN_VOID
                     )];
+                }
+
+                $callResultSlot = $this->funcCallExecReturnSlotForReturn($block, $terminal->expr);
+                if (null !== $callResultSlot) {
+                    return [new OpCode(OpCode::TYPE_RETURN, $callResultSlot)];
                 }
 
                 return [new OpCode(
@@ -2543,7 +2576,7 @@ class Compiler {
         foreach ($this->compileCallArgSends($args, $block) as $send) {
             $return[] = $send;
         }
-        if (!empty($result->usages)) {
+        if ($this->callNeedsReturnSlot($result, $block)) {
             $return[] = new OpCode(
                 OpCode::TYPE_FUNCCALL_EXEC_RETURN,
                 $this->compileOperand($result, $block, false)
@@ -2570,7 +2603,7 @@ class Compiler {
         foreach ($this->compileCallArgSends($args, $block) as $send) {
             $return[] = $send;
         }
-        if (!empty($result->usages)) {
+        if ($this->callNeedsReturnSlot($result, $block)) {
             $return[] = new OpCode(OpCode::TYPE_FUNCCALL_EXEC_RETURN, $this->compileOperand($result, $block, false));
         } else {
             $return[] = new OpCode(OpCode::TYPE_FUNCCALL_EXEC_NORETURN);
