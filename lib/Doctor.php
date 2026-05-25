@@ -166,6 +166,7 @@ final class Doctor
         $spineCountSyncDefault = $defaults['SELFHOST_SPINE_COUNT_SYNC_GATE'] ?? '1';
         $spineCoverageDefault = $defaults['SELFHOST_SPINE_COVERAGE_SYNC_GATE'] ?? '1';
         $loopProbeDefault = $defaults['BOOTSTRAP_LOOP_PROBE_GATE'] ?? '0';
+        $m4LoopProbeDefault = $defaults['BOOTSTRAP_M4_LOOP_PROBE'] ?? '0';
         $testSubsetDefault = $defaults['BOOTSTRAP_TEST_SUBSET_GATE'] ?? '0';
         $testSubsetStrictDefault = $defaults['BOOTSTRAP_TEST_SUBSET_STRICT'] ?? '0';
 
@@ -207,7 +208,8 @@ final class Doctor
         fwrite(STDOUT, "   make bootstrap-wave-check  (opt-in --with-helloworld)\n\n");
 
         fwrite(STDOUT, "5. M4 loop\n");
-        fwrite(STDOUT, "   BOOTSTRAP_LOOP_PROBE_GATE=".(self::gateEnabled('BOOTSTRAP_LOOP_PROBE_GATE', $loopProbeDefault) ? '1' : '0')." (default {$loopProbeDefault}) — ./script/bootstrap-loop-probe.sh --dry-run\n\n");
+        fwrite(STDOUT, "   BOOTSTRAP_LOOP_PROBE_GATE=".(self::gateEnabled('BOOTSTRAP_LOOP_PROBE_GATE', $loopProbeDefault) ? '1' : '0')." (default {$loopProbeDefault}) — ci-fast ./script/bootstrap-loop-probe.sh --dry-run\n");
+        fwrite(STDOUT, "   BOOTSTRAP_M4_LOOP_PROBE=".(self::gateEnabled('BOOTSTRAP_M4_LOOP_PROBE', $m4LoopProbeDefault) ? '1' : '0')." (default {$m4LoopProbeDefault}) — ci-local LLVM tail after M3 strict (#2058)\n\n");
 
         fwrite(STDOUT, "6. LLVM\n");
         fwrite(STDOUT, "   {$llvmDetail}\n");
@@ -320,10 +322,16 @@ final class Doctor
         fwrite(STDOUT, "  M3 driver smoke  BOOTSTRAP_COMPILER_DRIVER_SMOKE=1 make bootstrap-selfhost-compiler-driver-smoke\n");
         $loopProbeGate = getenv('BOOTSTRAP_LOOP_PROBE_GATE');
         $loopProbeOn = false !== $loopProbeGate && '1' === $loopProbeGate;
+        $m4LoopProbeGate = getenv('BOOTSTRAP_M4_LOOP_PROBE');
+        $m4LoopProbeOn = false !== $m4LoopProbeGate && '1' === $m4LoopProbeGate;
         $loopProbeDetail = $loopProbeOn
-            ? 'BOOTSTRAP_LOOP_PROBE_GATE=1 — ci-fast / ci-local dry-run (#1929)'
+            ? 'BOOTSTRAP_LOOP_PROBE_GATE=1 — ci-fast dry-run (#1929)'
             : 'opt-in BOOTSTRAP_LOOP_PROBE_GATE=1 for M4 dry-run in ci-fast (#1929)';
+        $m4LoopProbeDetail = $m4LoopProbeOn
+            ? 'BOOTSTRAP_M4_LOOP_PROBE=1 — ci-local LLVM tail after M3 strict (#2058)'
+            : 'opt-in BOOTSTRAP_M4_LOOP_PROBE=1 for M4 dry-run in ci-local (#2058)';
         fwrite(STDOUT, "  M4 loop dry-run  {$loopProbeDetail}\n");
+        fwrite(STDOUT, "  M4 ci-local      {$m4LoopProbeDetail}\n");
         $ns2CiGate = getenv('NORTH_STAR2_VERIFY_GATE');
         $ns2CiOn = false !== $ns2CiGate && '1' === $ns2CiGate;
         $ns2CiDetail = $ns2CiOn
