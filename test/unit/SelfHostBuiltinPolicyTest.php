@@ -19,7 +19,7 @@ final class SelfHostBuiltinPolicyTest extends TestCase
 
     public function testAutoStubBatchCount(): void
     {
-        $this->assertSame(11, SelfHostBuiltinPolicy::autoStubBatchCount());
+        $this->assertSame(0, SelfHostBuiltinPolicy::autoStubBatchCount());
     }
 
     public function testRequiredBundleCategories(): void
@@ -27,7 +27,11 @@ final class SelfHostBuiltinPolicyTest extends TestCase
         $this->assertTrue(SelfHostBuiltinPolicy::isRequiredForBundle('dirname'));
         $this->assertSame('filesystem', SelfHostBuiltinPolicy::categoryFor('dirname'));
         putenv('PHP_COMPILER_SELFHOST_AOT=1');
-        $this->assertTrue(SelfHostBuiltinPolicy::shouldExternalStub('abs'));
+        $this->assertFalse(SelfHostBuiltinPolicy::shouldExternalStub('abs'));
+        $this->assertTrue(SelfHostBuiltinPolicy::isRequiredForBundle('abs'));
+        $this->assertSame('numeric', SelfHostBuiltinPolicy::categoryFor('abs'));
+        $this->assertFalse(SelfHostBuiltinPolicy::shouldExternalStub('pack'));
+        $this->assertFalse(SelfHostBuiltinPolicy::shouldExternalStub('copy'));
         $this->assertFalse(SelfHostBuiltinPolicy::shouldExternalStub('dirname'));
         $this->assertFalse(SelfHostBuiltinPolicy::shouldExternalStub('mkdir'));
         $this->assertFalse(SelfHostBuiltinPolicy::shouldExternalStub('file_put_contents'));
@@ -68,11 +72,22 @@ final class SelfHostBuiltinPolicyTest extends TestCase
         }
     }
 
-    public function testCompileFuncRegistersExternalMethodStub(): void
+    public function testFormerAutoStubBatchUsesRealLowering(): void
     {
         putenv('PHP_COMPILER_SELFHOST_AOT=1');
         $runtime = new Runtime(Runtime::MODE_AOT);
         $runtime->loadJit();
-        $this->assertInstanceOf(ExternalMethod::class, $runtime->loadJitContext()->functionProxies['abs']);
+        $proxies = $runtime->loadJitContext()->functionProxies;
+        $this->assertNotInstanceOf(ExternalMethod::class, $proxies['abs']);
+        $this->assertNotInstanceOf(ExternalMethod::class, $proxies['pack']);
+        $this->assertNotInstanceOf(ExternalMethod::class, $proxies['copy']);
+    }
+
+    public function testUnlistedStdlibStillExternalStub(): void
+    {
+        putenv('PHP_COMPILER_SELFHOST_AOT=1');
+        $runtime = new Runtime(Runtime::MODE_AOT);
+        $runtime->loadJit();
+        $this->assertInstanceOf(ExternalMethod::class, $runtime->loadJitContext()->functionProxies['sin']);
     }
 }

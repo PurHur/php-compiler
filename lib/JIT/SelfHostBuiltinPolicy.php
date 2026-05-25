@@ -11,6 +11,10 @@ final class SelfHostBuiltinPolicy
 
     /** @var array<string, string> */
     private const CATEGORY_NUMERIC = [
+        'abs' => 'numeric',
+        'ceil' => 'numeric',
+        'cos' => 'numeric',
+        'bindec' => 'numeric',
         'intval' => 'numeric',
         'floatval' => 'numeric',
         'doubleval' => 'numeric',
@@ -59,6 +63,7 @@ final class SelfHostBuiltinPolicy
 
     /** @var array<string, string> */
     private const CATEGORY_FILESYSTEM = [
+        'copy' => 'filesystem',
         'dirname' => 'filesystem', 'basename' => 'filesystem', 'file_exists' => 'filesystem',
         'clearstatcache' => 'filesystem',
         'stat' => 'filesystem',
@@ -81,6 +86,11 @@ final class SelfHostBuiltinPolicy
 
     /** @var array<string, string> */
     private const CATEGORY_STRING = [
+        'addslashes' => 'string',
+        'bin2hex' => 'string',
+        'chr' => 'string',
+        'chunk_split' => 'string',
+        'pack' => 'string',
         'strtolower' => 'string', 'strtoupper' => 'string', 'strcmp' => 'string', 'strncmp' => 'string',
         'strcasecmp' => 'string', 'strncasecmp' => 'string', 'strlen' => 'string', 'count' => 'string',
         'sizeof' => 'string', 'str_replace' => 'string', 'strtr' => 'string', 'str_rot13' => 'string', 'strval' => 'string',
@@ -140,16 +150,11 @@ final class SelfHostBuiltinPolicy
         'unserialize' => 'json',
     ];
 
-    /** @var list<string> */
-    public const AUTO_STUB_BATCH = [
-        'abs', 'addslashes', 'bin2hex', 'bindec', 'boolval', 'ceil', 'chr', 'chunk_split', 'copy', 'cos', 'pack',
-    ];
+    /** @var list<string> Former auto-stub batch — now in REQUIRED_FOR_BUNDLE categories (#1056). */
+    public const AUTO_STUB_BATCH = [];
 
     /** @var array<string, true> */
-    private const AUTO_STUB_LOOKUP = [
-        'abs' => true, 'addslashes' => true, 'bin2hex' => true, 'bindec' => true, 'boolval' => true,
-        'ceil' => true, 'chr' => true, 'chunk_split' => true, 'copy' => true, 'cos' => true, 'pack' => true,
-    ];
+    private const AUTO_STUB_LOOKUP = [];
 
     public static function isSelfHostAot(): bool
     {
