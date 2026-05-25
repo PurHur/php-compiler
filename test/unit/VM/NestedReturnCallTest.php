@@ -75,6 +75,39 @@ PHP;
         $this->assertSame('hi', ob_get_clean());
     }
 
+    public function testStaticMethodReceivesCallArgs(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class Router
+{
+    public static function fromConfig(array $config): self
+    {
+        return new self($config);
+    }
+
+    public function appName(): string
+    {
+        return $this->config['app_name'] ?? 'MiniWebApp';
+    }
+
+    /** @var array<string, mixed> */
+    private array $config;
+
+    public function __construct(array $config)
+    {
+        $this->config = $config;
+    }
+}
+$router = Router::fromConfig(['app_name' => 'TestApp']);
+echo $router->appName();
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'static_method_args.php'));
+        $this->assertSame('TestApp', ob_get_clean());
+    }
+
     public function testLateStaticBindingPhptShape(): void
     {
         $runtime = new Runtime();
