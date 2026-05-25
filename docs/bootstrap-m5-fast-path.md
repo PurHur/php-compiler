@@ -12,7 +12,7 @@ Self-host HelloWorld bundle emits AOT without Zend `bin/compile.php` fallback (`
 
 Expand `JIT::isM3CompileDriverRealLoweringName()` **one function at a time** while `PHP_COMPILER_M3_COMPILE_DRIVER=1` links `test/selfhost/compiler_helloworld_smoke/compile_driver.php`.
 
-**Allowlist SSOT:** committed `script/m3-allowlist-snapshot.txt` mirrors `lib/JIT.php` allow/deny names; CI fails on drift (`M3_ALLOWLIST_SYNC_GATE=1`, issue [#1905](https://github.com/PurHur/php-compiler/issues/1905)). Regenerate after each batch: `php script/bootstrap-m3-allowlist-snapshot.php --write`. Batch tracker: [#1768](https://github.com/PurHur/php-compiler/issues/1768).
+**Allowlist SSOT:** committed `script/m3-allowlist-snapshot.txt` mirrors `lib/JIT.php` allow/deny names; CI fails on drift (`M3_ALLOWLIST_SYNC_GATE=1`, issue [#1905](https://github.com/PurHur/php-compiler/issues/1905); doc table sync `BOOTSTRAP_M5_DOC_SYNC_GATE=1`, [#1984](https://github.com/PurHur/php-compiler/issues/1984)). Regenerate after each batch: `php script/bootstrap-m3-allowlist-snapshot.php --write` then update this doc Step 2 / deny tables. Batch tracker: [#1768](https://github.com/PurHur/php-compiler/issues/1768).
 
 Supporting fixes from #1402:
 
@@ -33,7 +33,7 @@ Supporting fixes from #1402:
 |--------------------------|------|
 | `Runtime::parseAndCompile` | On M3 allowlist when `PHP_COMPILER_M3_COMPILE_DRIVER=1` |
 | `Runtime::parse` / `Runtime::compile` | On M3 allowlist; compile-driver link OK (#1496) |
-| `Runtime::loadJitContext` | Compile-driver link OK (#1402) |
+| `Runtime::loadJitContext` | Deny-listed (LLVM 9 link crash; same fragment as JIT deny list) |
 | `Runtime::__construct` | Slim ctor via `compileRuntimeConstructM3Native` → `compileBlockPhpLowering` (#1494) |
 | `Runtime::initParsePipeline` / `Runtime::initCompiler` / `Runtime::loadCoreModules` | On deny list; `compileRuntime*M3Native` → PHP CFG lowering (#1494) |
 | `Runtime::initVmContext` | **Native** via `RuntimeInitVmContext::emit` (allocate `VM\Context`, set `runtime` + `vmContext`); wired in `compileBlock()`; off deny list (#1494). PHP CFG `new VMContext` still LLVM 9 link crash when combined with ctor spine. |
@@ -85,7 +85,9 @@ BOOTSTRAP_M3_RUNTIME_COMPILE=1 \
 | Symbol | Notes |
 |--------|-------|
 | `Block::slotIndexForVariableName` | Also in compiler hot-path skip |
+| `Runtime::__destruct` | Deny-listed (LLVM 9; not on compile spine) |
 | `Runtime::initParsePipeline` / `initCompiler` / `loadCoreModules` | PHP CFG spine; deny while expanding (#1494) |
+| `Runtime::loadJitContext` | Deny-listed (LLVM 9 link crash #1402) |
 | `Runtime::createJit` / `jitContextForLoadJit` / `loadJitCompileModuleFuncs` | Split from `loadJit`; stay on deny list (stubbed) while outer `loadJit` is real-lowered (#1495) |
 
 **Next:** complete native `VM\Context` (hashtable props + sub-objects) without LLVM 9 link regression, or small `lib/AOT/runtime/` C floor (#1494).
