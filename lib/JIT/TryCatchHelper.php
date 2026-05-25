@@ -12,7 +12,7 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_;
 
 /**
- * LLVM lowering for try/catch/throw within a single JIT function (issues #57, #2084, #1056).
+ * LLVM lowering for try/catch/throw within a single JIT function (issues #57, #2084, #1056, #2157).
  */
 final class TryCatchHelper
 {
@@ -31,6 +31,9 @@ final class TryCatchHelper
         $n = $handlerBlock->nOpCodes;
         for ($j = $afterTryIndex + 1; $j < $n; ++$j) {
             $next = $handlerBlock->opCodes[$j];
+            if (OpCode::TYPE_JUMP === $next->type) {
+                continue;
+            }
             if (OpCode::TYPE_CATCH === $next->type) {
                 $types = [];
                 $encoded = $next->catchTypes;
@@ -80,10 +83,24 @@ final class TryCatchHelper
             throw new \LogicException('TYPE_TRY lowering requires an active LLVM basic block');
         }
         $builder->positionAtEnd($branchBlock);
+        $mergeBb = $context->scope->blockStorage[$mergeBlock] ?? null;
+        if (null === $mergeBb) {
+            $mergeBb = BasicBlockHelper::append($context, 'try_merge');
+        }
+        if (!$handler->mergeBodyCompiled) {
+            $jit->compileIncludedAtEntry($func, $handler->mergeBlock, $mergeBb);
+            $handler->mergeBodyCompiled = true;
+        }
         if (null === $handler->dispatchBb) {
             $handler->dispatchBb = self::buildDispatch($jit, $func, $context, $handler, $args);
         }
+        self::emitMergeEntryCheck($jit, $func, $context, $mergeBlock, $mergeBb, $args);
         $jit->compileSubBlock($func, $tryOp->block1, ...$args);
+        $tryTail = $builder->getInsertBlock();
+        if (null !== $tryTail && null === $tryTail->getTerminator() && null !== $handler->mergeEntryBb) {
+            $builder->positionAtEnd($tryTail);
+            $builder->branch($handler->mergeEntryBb);
+        }
         $tryEntry = $context->scope->blockStorage[$tryOp->block1];
         $builder->positionAtEnd($branchBlock);
         if (0 === $context->inlineIncludeDepth) {
@@ -111,7 +128,9 @@ final class TryCatchHelper
 
         $builder = $context->builder;
         $saved = $builder->getInsertBlock();
-        $builder->positionAtEnd($mergeBb);
+        $entryBb = BasicBlockHelper::append($context, 'try_merge_entry');
+        $handler->mergeEntryBb = $entryBb;
+        $builder->positionAtEnd($entryBb);
         $hasPending = $builder->call($context->lookupFunction('phpc_jit_has_throw_pending'));
         $i32 = $context->getTypeFromString('int32');
         $hasBool = $builder->icmp(
@@ -119,9 +138,7 @@ final class TryCatchHelper
             $hasPending,
             $i32->constInt(0, false)
         );
-        $fallthrough = BasicBlockHelper::append($context, 'try_merge_ok');
-        $builder->branchIf($hasBool, $handler->dispatchBb, $fallthrough);
-        $builder->positionAtEnd($fallthrough);
+        $builder->branchIf($hasBool, $handler->dispatchBb, $mergeBb);
         if (null !== $saved) {
             $builder->positionAtEnd($saved);
         }
@@ -161,7 +178,6 @@ final class TryCatchHelper
         $builder = $context->builder;
         $throwBlock = $builder->getInsertBlock();
         $builder->positionAtEnd($throwBlock);
-        $context->freeDeadVariables($func, $throwBlock, $block);
         $builder->call($context->lookupFunction('phpc_jit_set_throw_pending'), $obj);
         $builder->branch($handler->dispatchBb);
     }
@@ -181,13 +197,12 @@ final class TryCatchHelper
         $saved = $builder->getInsertBlock();
         $builder->positionAtEnd($dispatch);
 
-        $objPtr = $context->getTypeFromString('__object__*');
-        $i1 = $context->getTypeFromString('int1');
         $pendingObj = $builder->call($context->lookupFunction('phpc_jit_take_throw_pending'));
-        $mergeEntry = $context->scope->blockStorage[$handler->mergeBlock] ?? null;
+        $mergeBody = $context->scope->blockStorage[$handler->mergeBlock] ?? null;
 
         $uncaught = BasicBlockHelper::append($context, 'try_uncaught');
         $nextCatch = $dispatch;
+        $singleArm = 1 === count($handler->catchArms);
 
         foreach ($handler->catchArms as $arm) {
             $catchOp = $arm['op'];
@@ -196,7 +211,7 @@ final class TryCatchHelper
             $noMatchBb = BasicBlockHelper::append($context, 'try_catch_nomatch');
 
             $builder->positionAtEnd($nextCatch);
-            if ([] === $types) {
+            if ([] === $types || $singleArm) {
                 $builder->branch($matchBb);
             } else {
                 $checkBb = $nextCatch;
@@ -204,8 +219,9 @@ final class TryCatchHelper
                 foreach ($types as $idx => $typeName) {
                     $thrownVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $pendingObj);
                     $isInstance = ReflectionBuiltinHelper::emitInstanceOf($context, $thrownVar, $typeName);
-                    // emitInstanceOf is int1; avoid castToBool(loadValue(...)) which broke AOT catch (#2101).
-                    $isBool = $context->helper->loadValue($isInstance);
+                    $isBool = Variable::TYPE_NATIVE_BOOL === $isInstance->type
+                        ? $isInstance->value
+                        : $context->helper->loadValue($isInstance);
                     $isLast = $idx === $typeCount - 1;
                     if ($isLast) {
                         $builder->branchIf($isBool, $matchBb, $noMatchBb);
@@ -224,11 +240,11 @@ final class TryCatchHelper
                 $caughtVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $pendingObj);
                 $jit->assignOperandForced($operand, $caughtVar);
             }
-            $jit->compileSubBlock($func, $catchOp->block1, ...$args);
+            $jit->compileIncludedAtEntry($func, $catchOp->block1, $matchBb);
             $catchTail = $context->builder->getInsertBlock();
             $builder->positionAtEnd($catchTail);
-            if (null !== $mergeEntry && null === $catchTail->getTerminator()) {
-                $builder->branch($mergeEntry);
+            if (null !== $mergeBody && null === $catchTail->getTerminator()) {
+                $builder->branch($mergeBody);
             }
 
             $nextCatch = $noMatchBb;
@@ -261,6 +277,10 @@ final class TryCatchHelper
 final class TryCatchHandler
 {
     public bool $mergeEntryEmitted = false;
+
+    public bool $mergeBodyCompiled = false;
+
+    public ?BasicBlock $mergeEntryBb = null;
 
     public ?BasicBlock $dispatchBb = null;
 
