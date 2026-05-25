@@ -63,6 +63,23 @@ SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 ../../script/deploy-smoke.sh --example 005
 ./script/check-init-sessionsweb-parity.sh   # wired into ci-fast inventory checks
 ```
 
+## CI gate ladder
+
+Probe all four stages (defaults from `script/ci-defaults.env`):
+
+```console
+./phpc doctor --gates | grep -E 'SESSIONS_WEB|005-SessionsWeb'
+```
+
+| Stage | Gate | Command when `=1` |
+|-------|------|-------------------|
+| VM flash | `SESSIONS_WEB_SMOKE_GATE` | `make examples-sessions-smoke` |
+| AOT link | `SESSIONS_WEB_AOT_LINK_GATE` | `./script/ci-local.sh --filter test005SessionsWebAotLink` |
+| AOT execute | `SESSIONS_WEB_AOT_SMOKE_GATE` | `EXAMPLES_AOT_SMOKE_ONLY=005 ./script/examples-aot-smoke.sh` |
+| Deploy CGI | `SESSIONS_WEB_DEPLOY_SMOKE_GATE` | `SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 make deploy-smoke` |
+
+See [#1969](https://github.com/PurHur/php-compiler/issues/1969) and `docs/local-ci-matrix.md`.
+
 ## Related
 
 - [#1887](https://github.com/PurHur/php-compiler/issues/1887) — `SESSIONS_WEB_SMOKE_GATE=1` (default): `make examples-sessions-smoke`, `ci-fast.sh`, `ExamplesCompileTest::test005SessionsWebServeFlashRoundTrip`
