@@ -41,7 +41,7 @@ Presenter script and troubleshooting: [`docs/GETTING-STARTED.md`](docs/GETTING-S
 | **003-MiniWebApp** VM + AOT link | ✅ |
 | **003** AOT execute (home, hello, PATH_INFO, contact) | ✅ native execute ([#764](https://github.com/PurHur/php-compiler/issues/764) closed; close tracker [#1044](https://github.com/PurHur/php-compiler/issues/1044)) |
 | Self-host **M0–M1** | ✅ |
-| Self-host **M2** spine | 🚧 **606** / 606 units ([#1492](https://github.com/PurHur/php-compiler/issues/1492), [#2001](https://github.com/PurHur/php-compiler/issues/2001)) |
+| Self-host **M2** spine | 🚧 **606** / 611 units ([#1492](https://github.com/PurHur/php-compiler/issues/1492), [#2066](https://github.com/PurHur/php-compiler/issues/2066)) |
 | Full Zend PHP compatibility | ❌ — subset only (matrices in `docs/`, not on status site) |
 
 MiniWebApp gates: [docs/miniwebapp-gates.md](docs/miniwebapp-gates.md) ([#472](https://github.com/PurHur/php-compiler/issues/472)). Presenter verify: `make north-star1-verify` ([#1845](https://github.com/PurHur/php-compiler/issues/1845)). Docker image: `php-compiler:22.04-dev`.
@@ -145,7 +145,7 @@ Matrix details: [docs/local-ci-matrix.md](docs/local-ci-matrix.md).
 |-----------|----------------|--------|
 | **M0 — Bundled subset runs** | ~**109** literal `require_once` units in `test/selfhost/compiler_minimal/main.php` compile+link under AOT; native binary prints `compiler_minimal bundle OK` | ✅ ([#557](https://github.com/PurHur/php-compiler/issues/557), [#913](https://github.com/PurHur/php-compiler/issues/913)) |
 | **M1 — Compiler-shaped bundle** | Same bundle **lints** as one translation unit; **compile-smoke** links a tiny fixture and runs AOT echo (`compiler smoke`); driver smoke bundles `bin/compile.php`-adjacent units | ✅ ([#1025](https://github.com/PurHur/php-compiler/issues/1025)) |
-| **M2 — Full top-level `lib/` + spine** | All **14** top-level `lib/*.php` lint ✅; **`compiler_lib_spine_smoke`** (**606** / **606** inventory units) native link ✅; grow toward full `bin/vm.php` path | 🚧 100% inventory coverage (cli shim substitutes) |
+| **M2 — Full top-level `lib/` + spine** | All **14** top-level `lib/*.php` lint ✅; **`compiler_lib_spine_smoke`** (**606** / **611** inventory units) native link ✅; grow toward full `bin/vm.php` path | 🚧 100% inventory coverage (cli shim substitutes) |
 | **M3 — Native compiles PHP** | Self-host bundle links; HelloWorld AOT **runs** natively; **compile emit still Zend fallback** | 🚧 partial |
 | **M4 — Bootstrap loop** | Native toolchain rebuilds the **next** compiler sources | ⬜ |
 | **M5 — Full self-host** | Real `bin/vm.php` / `bin/compile.php` on full inventory; **no Zend bootstrap** | ⬜ **north star** ([#1492](https://github.com/PurHur/php-compiler/issues/1492)) |
