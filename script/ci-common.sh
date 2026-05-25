@@ -79,6 +79,14 @@ ci_run_wave3_roadmap_sync_check() {
   "$PHP_BIN" "${PHP_OPTS[@]}" script/check-wave3-roadmap-sync.php
 }
 
+ci_run_m2_spine_issue_hygiene_check() {
+  if [[ "${M2_SPINE_ISSUE_HYGIENE_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  echo "M2 spine issue hygiene (M2_SPINE_ISSUE_HYGIENE_GATE=1, issue #1808)..."
+  "$PHP_BIN" "${PHP_OPTS[@]}" script/check-m2-spine-issue-hygiene.php
+}
+
 ci_run_inventory_checks() {
   script/check-no-unlimited-memory.sh
   script/check-stale-issue-refs.sh
@@ -88,6 +96,7 @@ ci_run_inventory_checks() {
   ci_ensure_generated_doc script/bootstrap-inventory.php docs/bootstrap-inventory.md
   ci_ensure_generated_doc script/bootstrap-profile.php docs/bootstrap-profile.json
   ci_run_wave3_roadmap_sync_check
+  ci_run_m2_spine_issue_hygiene_check
 }
 
 ci_llvm_dir() {
