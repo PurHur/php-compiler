@@ -139,6 +139,49 @@ final class VmFs
         return @copy($from, $to);
     }
 
+    /** Multipart upload temp prefix from {@see \PHPCompiler\Web\Superglobals::populateMultipartFile}. */
+    public const UPLOAD_TEMP_PREFIX = 'phpc_upload_';
+
+    /**
+     * Whether $path is a compiler-managed multipart upload temp file (issue #2005).
+     */
+    public static function isCompilerUploadTempPath(string $path): bool
+    {
+        if (str_contains($path, "\0") || !is_file($path)) {
+            return false;
+        }
+        $tmpdir = realpath(self::tempDir());
+        $real = realpath($path);
+        if (false === $tmpdir || false === $real) {
+            return false;
+        }
+        $prefix = $tmpdir.DIRECTORY_SEPARATOR;
+        if (!str_starts_with($real, $prefix)) {
+            return false;
+        }
+        $base = basename($real);
+
+        return str_starts_with($base, self::UPLOAD_TEMP_PREFIX);
+    }
+
+    /**
+     * move_uploaded_file() subset: only compiler upload temps; rejects unsafe destinations.
+     */
+    public static function moveUploadedFile(string $from, string $to): bool
+    {
+        if (str_contains($from, "\0") || str_contains($to, "\0")) {
+            return false;
+        }
+        if (!self::isCompilerUploadTempPath($from)) {
+            return false;
+        }
+        if (preg_match('#(^|[/\\\\])\.\.([/\\\\]|$)#', $to)) {
+            return false;
+        }
+
+        return @rename($from, $to);
+    }
+
     public static function touch(string $path, ?int $mtime = null): bool
     {
         if (null === $mtime) {

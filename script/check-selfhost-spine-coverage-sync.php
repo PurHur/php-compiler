@@ -54,6 +54,7 @@ $spineNativeLinkDeferred = [
 $spineInventoryAheadDeferred = [
     'ext/standard/ini_get_.php',
     'lib/JIT/Builtin/IniGet.php',
+    'ext/standard/move_uploaded_file.php',
 ];
 
 $spineCoverageDeferred = array_values(array_unique(array_merge(
