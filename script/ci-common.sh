@@ -95,6 +95,14 @@ ci_run_examples_readme_sync_check() {
   "$PHP_BIN" "${PHP_OPTS[@]}" script/check-examples-readme-sync.php
 }
 
+ci_run_root_readme_sync_check() {
+  if [[ "${ROOT_README_SYNC_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  echo "Root README sync (ROOT_README_SYNC_GATE=1, issue #1832)..."
+  "$PHP_BIN" "${PHP_OPTS[@]}" script/check-root-readme-sync.php
+}
+
 ci_run_selfhost_spine_count_sync_check() {
   if [[ "${SELFHOST_SPINE_COUNT_SYNC_GATE:-0}" != "1" ]]; then
     return 0
@@ -114,6 +122,7 @@ ci_run_inventory_checks() {
   ci_run_wave3_roadmap_sync_check
   ci_run_m2_spine_issue_hygiene_check
   ci_run_examples_readme_sync_check
+  ci_run_root_readme_sync_check
   ci_run_selfhost_spine_count_sync_check
 }
 
