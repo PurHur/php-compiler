@@ -185,7 +185,9 @@ final class Doctor
         fwrite(STDOUT, "   SELFHOST_SPINE_COUNT_SYNC_GATE=".(self::gateEnabled('SELFHOST_SPINE_COUNT_SYNC_GATE', $spineCountSyncDefault) ? '1' : '0')." (default {$spineCountSyncDefault})\n");
         fwrite(STDOUT, "   SELFHOST_SPINE_COVERAGE_SYNC_GATE=".(self::gateEnabled('SELFHOST_SPINE_COVERAGE_SYNC_GATE', $spineCoverageDefault) ? '1' : '0')." (default {$spineCoverageDefault})\n");
         fwrite(STDOUT, "   BOOTSTRAP_LIB_SPINE_SMOKE=1 make bootstrap-selfhost-lib-spine-smoke\n");
-        fwrite(STDOUT, "   BOOTSTRAP_LIB_SPINE_VM_SMOKE=1 make bootstrap-selfhost-lib-spine-vm-smoke\n\n");
+        fwrite(STDOUT, "   BOOTSTRAP_LIB_SPINE_VM_SMOKE=1 make bootstrap-selfhost-lib-spine-vm-smoke\n");
+        fwrite(STDOUT, "   BOOTSTRAP_COMPILER_DRIVER_SMOKE=1 make bootstrap-selfhost-compiler-driver-smoke\n");
+        fwrite(STDOUT, "   COMPILER_DRIVER_SMOKE_GATE=1 ./script/ci-local.sh  (opt-in #2136)\n\n");
 
         fwrite(STDOUT, "3. M3 emit (partial vs strict)\n");
         fwrite(STDOUT, "   BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE=".(self::gateEnabled('BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE', $m3HelloStrictDefault) ? '1' : '0')." (default {$m3HelloStrictDefault}) — ci-local LLVM tail\n");

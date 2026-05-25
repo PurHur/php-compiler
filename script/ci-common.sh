@@ -396,6 +396,19 @@ ci_run_bootstrap_selfhost_probe() {
 }
 
 # M2 lib spine VM -r smoke (issue #1846); default on in ci-defaults (#1867).
+# M3 compiler driver smoke native link + run (issue #2136); default off until default-on (#2137).
+ci_run_compiler_driver_smoke() {
+  if [[ "${COMPILER_DRIVER_SMOKE_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  if ! ci_llvm_ready; then
+    echo "bootstrap-compiler-driver-smoke: skipped (LLVM 9 not available)"
+    return 0
+  fi
+  echo "bootstrap-compiler-driver-smoke (COMPILER_DRIVER_SMOKE_GATE=1, issue #2136)..."
+  "$_CI_SCRIPT_DIR/bootstrap-selfhost-compiler-driver-smoke.sh"
+}
+
 ci_run_bootstrap_lib_spine_vm_smoke() {
   if [[ "${BOOTSTRAP_LIB_SPINE_VM_SMOKE_GATE:-1}" != "1" ]]; then
     return 0

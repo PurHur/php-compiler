@@ -951,6 +951,24 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('BOOTSTRAP_LIB_SPINE_VM_SMOKE_GATE=1', $docSelfhost);
     }
 
+    public function testCiLocalHonorsCompilerDriverSmokeGate(): void
+    {
+        $local = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-local.sh');
+        $this->assertStringContainsString('ci_run_compiler_driver_smoke', $local);
+
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('COMPILER_DRIVER_SMOKE_GATE', $common);
+        $this->assertStringContainsString('COMPILER_DRIVER_SMOKE_GATE:-0', $common);
+        $this->assertStringContainsString('bootstrap-selfhost-compiler-driver-smoke.sh', $common);
+    }
+
+    public function testLocalCiMatrixDocumentsCompilerDriverSmokeGate(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('COMPILER_DRIVER_SMOKE_GATE', $doc);
+        $this->assertStringContainsString('bootstrap-selfhost-compiler-driver-smoke.sh', $doc);
+    }
+
     public function testCiDefaultsEnvDefinesBootstrapSelfhostProbeUpdateOff(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');

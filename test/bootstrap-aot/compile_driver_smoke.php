@@ -29,4 +29,8 @@ function compile_driver_smoke(string $filename, string $code, array $options): s
     return $runtime->parse($code, $filename);
 }
 
-echo compile_driver_smoke('smoke.php', '<?php', []), "\n";
+// Standalone bootstrap-aot ladder runs top-level echo; bundled self-host entry skips
+// (user-class method call in large bundle still needs runtime init — mirror compiler_smoke.php).
+if (!class_exists(\PHPCompiler\Compiler::class, false)) {
+    echo compile_driver_smoke('smoke.php', '<?php', []), "\n";
+}
