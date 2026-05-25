@@ -105,13 +105,14 @@ Unified wrapper (`./phpc` → `bin/phpc.php`); legacy `bin/vm.php`, `bin/jit.php
 
 Also: `phpc doctor` (env probe), `phpc validate-manifest`, `phpc cgi`. See `./phpc help`.
 
-### Shipped examples (000–005)
+### Shipped examples (000–006)
 
 | Example | VM | AOT link | AOT execute | Deploy smoke |
 |---------|----|----------|-------------|--------------|
 | [000–002](examples/000-HelloWorld/), [004-ApiJson](examples/004-ApiJson/) | ✅ `./phpc run` / `serve` | ✅ `phpc build` | ✅ CLI | 001/002 ✅ ([#718](https://github.com/PurHur/php-compiler/issues/718)) |
 | [003-MiniWebApp](examples/003-MiniWebApp/) | ✅ `phpc serve` ([#539](https://github.com/PurHur/php-compiler/issues/539)) | ✅ `phpc build --project` ([#752](https://github.com/PurHur/php-compiler/issues/752)) | ✅ native execute ([#764](https://github.com/PurHur/php-compiler/issues/764); [#1044](https://github.com/PurHur/php-compiler/issues/1044)) | ✅ deploy smoke ([#676](https://github.com/PurHur/php-compiler/issues/676), [#1530](https://github.com/PurHur/php-compiler/issues/1530)) |
 | [005-SessionsWeb](examples/005-SessionsWeb/) | ✅ `phpc serve` + session smoke ([#1881](https://github.com/PurHur/php-compiler/issues/1881), [#1887](https://github.com/PurHur/php-compiler/issues/1887)) | ✅ `phpc build` ([#1946](https://github.com/PurHur/php-compiler/issues/1946)) | ✅ AOT execute (`SESSIONS_WEB_AOT_SMOKE_GATE=1`, [#1891](https://github.com/PurHur/php-compiler/issues/1891)) | ✅ deploy smoke opt-in ([#1893](https://github.com/PurHur/php-compiler/issues/1893)) |
+| [006-FileUploadWeb](examples/006-FileUploadWeb/) | ✅ `phpc serve` + multipart opt-in ([#1999](https://github.com/PurHur/php-compiler/issues/1999)) | ✅ opt-in `FILE_UPLOAD_WEB_AOT_LINK_GATE=1` | ✅ opt-in `FILE_UPLOAD_WEB_AOT_SMOKE_GATE=1` | — |
 
 `make examples-aot-smoke` links and executes 000–004 when LLVM is ready (003 execute green — [#764](https://github.com/PurHur/php-compiler/issues/764)). **005-SessionsWeb** VM/session curls: `make examples-web-smoke` ([#1887](https://github.com/PurHur/php-compiler/issues/1887)). Per-example commands: [examples/README.md](examples/README.md).
 

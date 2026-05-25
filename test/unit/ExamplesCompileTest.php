@@ -19,6 +19,7 @@ use PHPUnit\Framework\TestCase;
  * @see https://github.com/PurHur/php-compiler/issues/454 (003-MiniWebApp gate)
  * @see https://github.com/PurHur/php-compiler/issues/1887 (005-SessionsWeb serve + session cookie)
  * @see https://github.com/PurHur/php-compiler/issues/1946 (005-SessionsWeb AOT link gate)
+ * @see https://github.com/PurHur/php-compiler/issues/1999 (006-FileUploadWeb multipart reference)
  */
 final class ExamplesCompileTest extends TestCase
 {
@@ -189,6 +190,7 @@ final class ExamplesCompileTest extends TestCase
             '002-StaticWeb' => [$root.'/002-StaticWeb'],
             '004-ApiJson' => [$root.'/004-ApiJson'],
             '005-SessionsWeb' => [$root.'/005-SessionsWeb'],
+            '006-FileUploadWeb' => [$root.'/006-FileUploadWeb'],
         ];
     }
 
@@ -342,6 +344,85 @@ final class ExamplesCompileTest extends TestCase
         }
         $project = $this->sessionsWebProjectPath();
         $binary = $this->build005SessionsWebProject($project);
+        $this->assertFileExists($binary);
+    }
+
+    /**
+     * 006-FileUploadWeb: phpc serve + multipart POST (issue #1999).
+     *
+     * @group serve
+     */
+    public function test006FileUploadWebServeMultipart(): void
+    {
+        if (false !== getenv('PHP_COMPILER_SKIP_SERVE_TESTS') && '' !== getenv('PHP_COMPILER_SKIP_SERVE_TESTS')) {
+            $this->markTestSkipped('PHP_COMPILER_SKIP_SERVE_TESTS is set');
+        }
+        if (!self::fileUploadWebSmokeGateEnabled()) {
+            $this->markTestSkipped('FILE_UPLOAD_WEB_SMOKE_GATE=0 — skip 006 multipart serve gate (#1999)');
+        }
+        if (!$this->canBindLoopback()) {
+            $this->markTestSkipped('Cannot bind loopback TCP');
+        }
+        if (!$this->commandExists('curl')) {
+            $this->markTestSkipped('curl not available');
+        }
+
+        $repoRoot = dirname(__DIR__, 2);
+        $docroot = $repoRoot.'/examples/006-FileUploadWeb';
+        $uploadFile = $docroot.'/README.md';
+        $this->assertDirectoryExists($docroot);
+        $this->assertFileExists($uploadFile);
+
+        $port = $this->findFreeTcpPort();
+        $addr = '127.0.0.1:'.$port;
+        $phpc = $repoRoot.'/phpc';
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open(
+            [$phpc, 'serve', $addr, $docroot],
+            $descriptorSpec,
+            $pipes,
+            $repoRoot,
+            null,
+            ['suppress_errors' => true]
+        );
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+
+        try {
+            $this->waitForTcpPort($port);
+            $url = 'http://127.0.0.1:'.$port.'/example.php';
+
+            $empty = $this->curlGet($url);
+            $this->assertStringContainsString('No upload yet', $empty);
+
+            $uploaded = $this->curlPostMultipart($url, 'doc', $uploadFile);
+            $this->assertStringContainsString('Uploaded: README.md', $uploaded);
+        } finally {
+            proc_terminate($proc);
+            proc_close($proc);
+        }
+    }
+
+    /**
+     * 006-FileUploadWeb: native AOT link via phpc build --project (#1999).
+     *
+     * @group llvm
+     * @group aot
+     * @group aot-link
+     */
+    public function test006FileUploadWebAotLink(): void
+    {
+        if (!self::fileUploadWebAotLinkGateEnabled()) {
+            $this->markTestSkipped('FILE_UPLOAD_WEB_AOT_LINK_GATE=0 — skip 006 project link gate (#1999)');
+        }
+        $project = $this->fileUploadWebProjectPath();
+        $binary = $this->build006FileUploadWebProject($project);
         $this->assertFileExists($binary);
     }
 
@@ -890,6 +971,65 @@ final class ExamplesCompileTest extends TestCase
         return false === $gate || '0' !== $gate;
     }
 
+    private static function fileUploadWebSmokeGateEnabled(): bool
+    {
+        $gate = getenv('FILE_UPLOAD_WEB_SMOKE_GATE');
+
+        return false !== $gate && '' !== $gate && '1' === $gate;
+    }
+
+    private static function fileUploadWebAotLinkGateEnabled(): bool
+    {
+        $gate = getenv('FILE_UPLOAD_WEB_AOT_LINK_GATE');
+
+        return false !== $gate && '' !== $gate && '1' === $gate;
+    }
+
+    private function curlGet(string $url): string
+    {
+        $cmd = ['curl', '-sS', '--connect-timeout', '5', '--max-time', '15', $url];
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open($cmd, $descriptorSpec, $pipes);
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+        $this->assertSame(0, $exit, trim($stderr !== false ? $stderr : ''));
+
+        return $stdout !== false ? $stdout : '';
+    }
+
+    private function curlPostMultipart(string $url, string $field, string $filePath): string
+    {
+        $cmd = [
+            'curl', '-sS', '--connect-timeout', '5', '--max-time', '15',
+            '-F', $field.'=@'.$filePath, $url,
+        ];
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open($cmd, $descriptorSpec, $pipes);
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+        $this->assertSame(0, $exit, trim($stderr !== false ? $stderr : ''));
+
+        return $stdout !== false ? $stdout : '';
+    }
+
     private function canBindLoopback(): bool
     {
         $repoRoot = dirname(__DIR__, 2);
@@ -1049,6 +1189,7 @@ PHP];
             '002-StaticWeb' => ['Hello World'],
             '004-ApiJson' => ['"ok":true', 'php-compiler'],
             '005-SessionsWeb' => ['SessionsWeb', 'No flash message yet'],
+            '006-FileUploadWeb' => ['FileUploadWeb', 'No upload yet'],
             default => ['Hello'],
         };
     }
@@ -1234,6 +1375,55 @@ PHP];
             0,
             $exit,
             'phpc build --project 005-SessionsWeb failed (#1946 link): '.$stderrText
+        );
+
+        return $project.'/.phpc/bin/app';
+    }
+
+    private function fileUploadWebProjectPath(): string
+    {
+        if (!self::isLlvmReady()) {
+            $this->markTestSkipped(
+                'LLVM 9 toolchain not available. Run make docker-build-22 or script/install-llvm9.sh from the repository root.'
+            );
+        }
+        $project = realpath(dirname(__DIR__, 2).'/examples/006-FileUploadWeb');
+        if (false === $project) {
+            $this->markTestSkipped('examples/006-FileUploadWeb missing (#1999)');
+        }
+
+        return $project;
+    }
+
+    private function build006FileUploadWebProject(string $project): string
+    {
+        $phpc = realpath(dirname(__DIR__, 2).'/phpc');
+        $this->assertNotFalse($phpc);
+        $repoRoot = dirname(__DIR__, 2);
+        $env = $this->llvmProcessEnv($repoRoot);
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open(
+            [$phpc, 'build', '--project', $project],
+            $descriptorSpec,
+            $pipes,
+            $repoRoot,
+            $env
+        );
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+        $stderrText = trim($stderr !== false ? $stderr : '');
+        $this->assertSame(
+            0,
+            $exit,
+            'phpc build --project 006-FileUploadWeb failed (#1999 link): '.$stderrText
         );
 
         return $project.'/.phpc/bin/app';

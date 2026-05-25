@@ -423,6 +423,23 @@ ci_guard_jit_compliance() {
   "$PHP_BIN" "${PHP_OPTS[@]}" script/check-jit-compliance-ran.php "$junit_path" "$llvm_dir"
 }
 
+# Shell curl harness for 006-FileUploadWeb multipart upload (issue #1999).
+ci_run_file_upload_web_smoke() {
+  if [[ "${FILE_UPLOAD_WEB_SMOKE_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  if [[ -n "${PHP_COMPILER_SKIP_SERVE_TESTS:-}" ]]; then
+    echo "examples-web-smoke (006): skipped (PHP_COMPILER_SKIP_SERVE_TESTS is set)"
+    return 0
+  fi
+  if ! ci_can_bind_loopback; then
+    echo "examples-web-smoke (006): skipped (cannot bind loopback TCP)"
+    return 0
+  fi
+  echo "examples-web-smoke (006): FileUploadWeb multipart curls (FILE_UPLOAD_WEB_SMOKE_GATE=1, #1999)..."
+  "$_CI_SCRIPT_DIR/examples-web-smoke.sh" --fileupload-only
+}
+
 # Shell curl harness for 005-SessionsWeb session flash (issue #1887).
 ci_run_sessions_web_smoke() {
   if [[ "${SESSIONS_WEB_SMOKE_GATE:-1}" != "1" ]]; then
@@ -523,9 +540,22 @@ ci_run_deploy_smoke() {
 # @group aot-link PHPUnit (link-only; execute is ci_run_miniwebapp_aot_execute — #775).
 # 005 link: ExamplesCompileTest::test005SessionsWebAotLink when SESSIONS_WEB_AOT_LINK_GATE=1 (#1946).
 ci_run_aot_link_phpunit() {
-  local -a aot_link_args=(--group aot-link --exclude-group serve --exclude-group miniwebapp-aot-execute --exclude-group miniwebapp-aot-serve --exclude-group sessionsweb-aot-execute)
+  local -a aot_link_args=(--group aot-link --exclude-group serve --exclude-group miniwebapp-aot-execute --exclude-group miniwebapp-aot-serve --exclude-group sessionsweb-aot-execute --exclude-group fileuploadweb-aot-execute)
   echo "PHPUnit: AOT link (@group aot-link; SESSIONS_WEB_AOT_LINK_GATE=${SESSIONS_WEB_AOT_LINK_GATE:-0})..."
   ci_run_phpunit "${aot_link_args[@]}" "$@"
+}
+
+# 006-FileUploadWeb AOT binary CLI execute (issue #1999); opt-in FILE_UPLOAD_WEB_AOT_SMOKE_GATE=1.
+ci_run_file_upload_web_aot_execute() {
+  if [[ "${FILE_UPLOAD_WEB_AOT_SMOKE_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  if ! ci_llvm_ready; then
+    echo "PHPUnit: FileUploadWeb AOT execute skipped (LLVM 9 not available)"
+    return 0
+  fi
+  echo "PHPUnit: FileUploadWeb AOT execute (@group fileuploadweb-aot-execute; FILE_UPLOAD_WEB_AOT_SMOKE_GATE=1, #1999)..."
+  ci_run_phpunit --group fileuploadweb-aot-execute "$@"
 }
 
 # 005-SessionsWeb AOT binary CLI execute (issue #1891); opt-in SESSIONS_WEB_AOT_SMOKE_GATE=1.

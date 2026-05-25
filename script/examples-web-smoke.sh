@@ -28,6 +28,7 @@ Usage: script/examples-web-smoke.sh [--aot] [--miniwebapp-only] [--sessions-only
          003-MiniWebApp: home + hello PATH_INFO + contact POST when stdout has MiniWebApp (#833, #676).
   --miniwebapp-only: curl only examples/003-MiniWebApp (MINIWEBAPP_WEB_SMOKE_GATE — #633).
   --sessions-only: curl only examples/005-SessionsWeb (SESSIONS_WEB_SMOKE_GATE — #1887).
+  --fileupload-only: curl only examples/006-FileUploadWeb (FILE_UPLOAD_WEB_SMOKE_GATE — #1999).
 
 Environment:
   PHP_COMPILER_SKIP_SERVE_TESTS=1  exit 0 without running HTTP checks
@@ -35,17 +36,20 @@ Environment:
   MINIWEBAPP_AOT_EXECUTE_GATE=1    fail instead of skip when 003 AOT probe empty (#747, #676)
   MINIWEBAPP_WEB_SMOKE_AOT_GATE=1  require 003 --aot curls to pass (#833)
   SESSIONS_WEB_SMOKE_GATE=1        include 005 session flash curls in default run (#1887)
+  FILE_UPLOAD_WEB_SMOKE_GATE=1     include 006 multipart upload curls (#1999)
 EOF
 }
 
 AOT=0
 MINIWEBAPP_ONLY=0
 SESSIONS_ONLY=0
+FILEUPLOAD_ONLY=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --aot) AOT=1; shift ;;
     --miniwebapp-only) MINIWEBAPP_ONLY=1; shift ;;
     --sessions-only) SESSIONS_ONLY=1; shift ;;
+    --fileupload-only) FILEUPLOAD_ONLY=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "examples-web-smoke: unknown argument: $1" >&2; usage >&2; exit 1 ;;
   esac
@@ -185,6 +189,37 @@ curl_expect_200_cookies() {
   body="$(mktemp)"
   status="$(curl -sS -o "$body" -w '%{http_code}' -b "$jar" -c "$jar" \
     --connect-timeout 5 --max-time 15 "$url" || echo "000")"
+  if [[ "$status" != "200" ]]; then
+    echo "examples-web-smoke: ${label}: expected HTTP 200, got ${status}" >&2
+    echo "  url: ${url}" >&2
+    cat "$body" >&2 || true
+    rm -f "$body"
+    return 1
+  fi
+  for needle in "${needles[@]}"; do
+    if ! grep -qF "$needle" "$body"; then
+      echo "examples-web-smoke: ${label}: response missing needle: ${needle}" >&2
+      echo "  url: ${url}" >&2
+      cat "$body" >&2 || true
+      rm -f "$body"
+      return 1
+    fi
+  done
+  rm -f "$body"
+  echo "examples-web-smoke: ${label}: ok"
+}
+
+curl_expect_200_multipart() {
+  local label="$1"
+  local url="$2"
+  local field_name="$3"
+  local file_path="$4"
+  shift 4
+  local needles=("$@")
+  local body status
+  body="$(mktemp)"
+  status="$(curl -sS -o "$body" -w '%{http_code}' --connect-timeout 5 --max-time 15 \
+    -F "${field_name}=@${file_path}" "$url" || echo "000")"
   if [[ "$status" != "200" ]]; then
     echo "examples-web-smoke: ${label}: expected HTTP 200, got ${status}" >&2
     echo "  url: ${url}" >&2
@@ -367,6 +402,56 @@ run_miniwebapp_oversized_post_smoke() {
   trap - RETURN
 }
 
+run_file_upload_web_smoke() {
+  local docroot="${ROOT}/examples/006-FileUploadWeb"
+  if [[ ! -d "$docroot" ]]; then
+    echo "examples-web-smoke: 006-FileUploadWeb: skip (missing docroot)"
+    return 0
+  fi
+  if [[ "$AOT" -eq 1 ]]; then
+    echo "examples-web-smoke: 006-FileUploadWeb: skip --aot (VM only until FILE_UPLOAD_WEB_AOT_SMOKE_GATE)"
+    return 0
+  fi
+
+  local upload_file="${docroot}/README.md"
+  if [[ ! -f "$upload_file" ]]; then
+    echo "examples-web-smoke: 006-FileUploadWeb: skip (missing README.md for -F doc=@)" >&2
+    return 1
+  fi
+
+  local port pid
+  port="$(find_free_port)"
+  echo "examples-web-smoke: 006-FileUploadWeb on 127.0.0.1:${port} (VM multipart POST)"
+  "${PHPC}" serve "127.0.0.1:${port}" "$docroot" >/dev/null 2>&1 &
+  pid=$!
+
+  stop_serve() {
+    kill "$pid" 2>/dev/null || true
+    local waited=0
+    while kill -0 "$pid" 2>/dev/null && ((waited < 40)); do
+      sleep 0.05
+      waited=$((waited + 1))
+    done
+    if kill -0 "$pid" 2>/dev/null; then
+      kill -9 "$pid" 2>/dev/null || true
+    fi
+    wait "$pid" 2>/dev/null || true
+  }
+  trap stop_serve RETURN
+
+  wait_for_serve "$port"
+
+  local base="http://127.0.0.1:${port}"
+  curl_expect_200 "006-FileUploadWeb / GET empty" "${base}/example.php" \
+    "No upload yet"
+  curl_expect_200_multipart "006-FileUploadWeb / POST multipart" \
+    "${base}/example.php" "doc" "$upload_file" \
+    "Uploaded: README.md"
+
+  stop_serve
+  trap - RETURN
+}
+
 run_sessions_web_smoke() {
   local docroot="${ROOT}/examples/005-SessionsWeb"
   if [[ ! -d "$docroot" ]]; then
@@ -495,7 +580,14 @@ mode_label="VM"
 [[ "$AOT" -eq 1 ]] && mode_label="--aot"
 [[ "$MINIWEBAPP_ONLY" -eq 1 ]] && mode_label="${mode_label}; --miniwebapp-only"
 [[ "$SESSIONS_ONLY" -eq 1 ]] && mode_label="${mode_label}; --sessions-only"
+[[ "$FILEUPLOAD_ONLY" -eq 1 ]] && mode_label="${mode_label}; --fileupload-only"
 echo "examples-web-smoke: starting (${mode_label})"
+
+if [[ "${FILEUPLOAD_ONLY}" -eq 1 ]]; then
+  run_file_upload_web_smoke
+  echo "examples-web-smoke: ok"
+  exit 0
+fi
 
 if [[ "${SESSIONS_ONLY}" -eq 1 ]]; then
   run_sessions_web_smoke
@@ -518,6 +610,10 @@ if [[ "${MINIWEBAPP_ONLY}" -eq 0 ]]; then
 
   if [[ "${SESSIONS_WEB_SMOKE_GATE:-1}" == "1" ]]; then
     run_sessions_web_smoke
+  fi
+
+  if [[ "${FILE_UPLOAD_WEB_SMOKE_GATE:-0}" == "1" ]]; then
+    run_file_upload_web_smoke
   fi
 fi
 
