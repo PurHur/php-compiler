@@ -150,7 +150,7 @@ make bootstrap-selfhost-link</code></pre>
             <strong>Compiler fully compiles itself:</strong> native binary from <code>lib/</code> (no <code>vendor/</code>),
             compiles PHP, then rebuilds the next compiler revision without Zend.
           </p>
-          <p><strong>Status:</strong> M0 ✅ · M1 ✅ · M2 🚧 (600/605) · M3 🚧 partial · M5 ⬜.</p>
+          <p><strong>Status:</strong> M0 ✅ · M1 ✅ · M2 ✅ link (600/605) · M3 HelloWorld strict ✅ · compile-smoke 🚧 · M5 ⬜.</p>
           <p><a href="/php-compiler/development-status.html#north-star-2-self-host">Full north-star doc →</a> · <a href="https://github.com/PurHur/php-compiler/blob/master/docs/self-host-target.md">Target doc</a> · <a href="https://github.com/PurHur/php-compiler/issues/1492">#1492</a></p>
         </article>
       </div>
@@ -195,7 +195,7 @@ make bootstrap-selfhost-link</code></pre>
         </div>
         <p class="overall-progress__note">
           Strong on VM and AOT linking; wave-3 language 10/13 and stdlib 12/13 on master; local/Docker CI while remote GHA/Circle are disabled.
-          North Star 1 achieved (#1044 closed); presenter check <code>make north-star1-verify</code>. North Star 2 M0–M1 done, M2 spine (600/605) + partial M3 HelloWorld; M5 full self-compile remains the stretch goal.
+          North Star 1 achieved (#1044 closed); presenter check <code>make north-star1-verify</code>. <strong>005-SessionsWeb</strong> AOT execute + deploy smoke opt-in (#1891, #1893). North Star 2 M0–M1 done, M2 spine link (600/605), M3 HelloWorld strict (#1493); M5 full self-compile remains the stretch goal.
         </p>
       </div>
     </section>
@@ -240,7 +240,7 @@ make bootstrap-selfhost-link</code></pre>
         <article class="card">
           <span class="phase-num">Self-host</span>
           <h3><span class="status-dot status-dot--wip"></span> Compile-itself</h3>
-          <p>M0–M1 ✅; M2 spine 600/605; partial M3 HelloWorld; M5 = full self-host.</p>
+          <p>M0–M1 ✅; M2 spine 600/605 link ✅; M3 HelloWorld strict ✅; compile-smoke 🚧; M5 = full self-host.</p>
           <div class="mini-progress"><div class="progress-track"><div class="progress-fill" data-width="54"></div></div></div>
         </article>
       </div>
@@ -266,15 +266,15 @@ make bootstrap-selfhost-link</code></pre>
           <h4>M1 — Compiler-shaped bundle</h4>
           <p>Compile-smoke native link + AOT echo; driver smoke ([#1025](https://github.com/PurHur/php-compiler/issues/1025)).</p>
         </li>
-        <li class="is-wip">
-          <span class="ladder__marker" aria-hidden="true">2</span>
+        <li class="is-done">
+          <span class="ladder__marker" aria-hidden="true">✓</span>
           <h4>M2 — Full top-level <code>lib/</code></h4>
-          <p>14/14 lint ✅; <strong>600/605</strong> spine units native link ✅ (M2 batches [#1419](https://github.com/PurHur/php-compiler/issues/1419), [#1497](https://github.com/PurHur/php-compiler/issues/1497)).</p>
+          <p>14/14 lint ✅; <strong>600/605</strong> spine units native link ✅ ([#1922](https://github.com/PurHur/php-compiler/issues/1922), [#1419](https://github.com/PurHur/php-compiler/issues/1419)).</p>
         </li>
         <li class="is-wip">
           <span class="ladder__marker" aria-hidden="true">3</span>
-          <h4>M3 — Native compiles HelloWorld</h4>
-          <p>HelloWorld AOT runs natively; emit still Zend fallback.</p>
+          <h4>M3 — Native compiles PHP</h4>
+          <p>HelloWorld strict native emit ✅ ([#1493](https://github.com/PurHur/php-compiler/issues/1493)); compile-smoke fixture 🚧 ([#1937](https://github.com/PurHur/php-compiler/issues/1937)).</p>
         </li>
         <li class="is-todo">
           <span class="ladder__marker" aria-hidden="true">4</span>
