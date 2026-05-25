@@ -80,7 +80,7 @@ ci_run_wave3_roadmap_sync_check() {
 }
 
 ci_run_m2_spine_issue_hygiene_check() {
-  if [[ "${M2_SPINE_ISSUE_HYGIENE_GATE:-0}" != "1" ]]; then
+  if [[ "${M2_SPINE_ISSUE_HYGIENE_GATE:-1}" != "1" ]]; then
     return 0
   fi
   echo "M2 spine issue hygiene (M2_SPINE_ISSUE_HYGIENE_GATE=1, issue #1808)..."

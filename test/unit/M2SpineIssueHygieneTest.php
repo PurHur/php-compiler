@@ -13,10 +13,6 @@ final class M2SpineIssueHygieneTest extends TestCase
 {
     public function testM2SpineIssueHygienePassesOnMaster(): void
     {
-        if ('1' !== getenv('M2_SPINE_ISSUE_HYGIENE_GATE')) {
-            $this->markTestSkipped('M2_SPINE_ISSUE_HYGIENE_GATE=1 required (opt-in gate, issue #1808)');
-        }
-
         $root = dirname(__DIR__, 2);
         $cmd = escapeshellarg(PHP_BINARY).' '
             .escapeshellarg($root.'/script/check-m2-spine-issue-hygiene.php').' 2>&1';
