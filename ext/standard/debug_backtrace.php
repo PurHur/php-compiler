@@ -13,8 +13,7 @@ use PHPLLVM\Value;
 /**
  * debug_backtrace() — minimal stack trace array (issue #1378).
  *
- * VM: walks Frame parent chain. JIT lowering in {@see JitDebugBacktrace} (deferred until MCJIT
- * nested frame hashtables are stable — see issue #1751).
+ * VM: walks Frame parent chain. JIT lowering in {@see JitDebugBacktrace} (call() enablement deferred, #1378, #1056).
  */
 final class debug_backtrace extends Internal
 {

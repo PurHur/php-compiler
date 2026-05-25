@@ -12,7 +12,7 @@ use PHPCompiler\VM\OutputBuffer;
 use PHPLLVM\Value;
 
 /**
- * ob_end_flush() — flush active buffer and end buffering (VM only; issue #118).
+ * ob_end_flush() — flush active buffer and end buffering (VM; JIT scaffold {@see JitObEndFlush}, #118, #1056).
  */
 final class ob_end_flush extends Internal
 {
@@ -41,6 +41,6 @@ final class ob_end_flush extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('ob_end_flush() is not implemented for JIT in this compiler build');
+        throw new \LogicException('ob_end_flush() is not implemented for JIT in this compiler build (#118)');
     }
 }
