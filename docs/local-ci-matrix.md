@@ -96,7 +96,7 @@ Defaults are exported from [`script/ci-defaults.env`](../script/ci-defaults.env)
 | `CI_FAST_BOOTSTRAP` | `0` | `ci-fast.sh` | Optional llvm tail: bootstrap aot-lint + probe + wave-check when LLVM 9 present |
 | `JIT_PREFLIGHT_GATE` | `0` | `ci-fast.sh` | Early MCJIT probe after `composer install` ([#728](https://github.com/PurHur/php-compiler/issues/728)) |
 | `M2_SPINE_ISSUE_HYGIENE_GATE` | `1` | `ci-fast.sh` (`ci_run_inventory_checks`) | `script/check-m2-spine-issue-hygiene.php` — stale `m2-spine-unit` tickets ([#1819](https://github.com/PurHur/php-compiler/issues/1819), [#1808](https://github.com/PurHur/php-compiler/issues/1808)); set `0` for bulk spine PRs |
-| `WAVE3_ROADMAP_SYNC_GATE` | `0` | `ci-fast.sh` (`ci_run_inventory_checks`) | `script/check-wave3-roadmap-sync.php` ([#1802](https://github.com/PurHur/php-compiler/issues/1802), [#1814](https://github.com/PurHur/php-compiler/issues/1814)) |
+| `WAVE3_ROADMAP_SYNC_GATE` | `1` | `ci-fast.sh` (`ci_run_inventory_checks`) | `script/check-wave3-roadmap-sync.php` ([#1802](https://github.com/PurHur/php-compiler/issues/1802), [#1814](https://github.com/PurHur/php-compiler/issues/1814)); set `0` for doc-only iteration |
 
 Ladder-only env vars (not in `ci-defaults.env`): `MINIWEBAPP_LINT_GATE` (default `1` in `web-smoke.sh`), `MINIWEBAPP_AOT_BISECT_GATE` (default `0` in `miniwebapp-gates.sh` — [#879](https://github.com/PurHur/php-compiler/issues/879)).
 

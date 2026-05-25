@@ -203,6 +203,29 @@ final class CiScriptsTest extends TestCase
         $this->assertStringNotContainsString('deploy-smoke.sh', $body);
     }
 
+    public function testCiDefaultsEnvDefinesWave3RoadmapSyncGateOn(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString('WAVE3_ROADMAP_SYNC_GATE="${WAVE3_ROADMAP_SYNC_GATE:-1}"', $defaults);
+    }
+
+    public function testCiFastRunsWave3RoadmapSyncViaInventoryChecks(): void
+    {
+        $fast = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-fast.sh');
+        $this->assertStringContainsString('ci_run_inventory_checks', $fast);
+
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('ci_run_wave3_roadmap_sync_check', $common);
+        $this->assertStringContainsString('check-wave3-roadmap-sync.php', $common);
+        $this->assertStringContainsString('WAVE3_ROADMAP_SYNC_GATE:-1', $common);
+    }
+
+    public function testCiDockerRunPassesWave3RoadmapSyncGateDefaultOn(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');
+        $this->assertStringContainsString('WAVE3_ROADMAP_SYNC_GATE=${WAVE3_ROADMAP_SYNC_GATE:-1}', $body);
+    }
+
     public function testCiDefaultsEnvDefinesExamplesAotSmokeGateOn(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
@@ -384,6 +407,14 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('JIT_PREFLIGHT_GATE', $doc);
         $this->assertStringContainsString('test-fast-jit-preflight', $doc);
         $this->assertStringContainsString('--preflight', $doc);
+    }
+
+    public function testLocalCiMatrixDocumentsWave3RoadmapSyncGate(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('WAVE3_ROADMAP_SYNC_GATE', $doc);
+        $this->assertStringContainsString('check-wave3-roadmap-sync.php', $doc);
+        $this->assertMatchesRegularExpression('/\| `WAVE3_ROADMAP_SYNC_GATE` \| `1` \|/', $doc);
     }
 
     public function testLocalCiMatrixDocumentsMiniWebAppGates(): void

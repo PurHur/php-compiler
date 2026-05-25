@@ -72,7 +72,7 @@ ci_run_capability_syntax_check() {
 }
 
 ci_run_wave3_roadmap_sync_check() {
-  if [[ "${WAVE3_ROADMAP_SYNC_GATE:-0}" != "1" ]]; then
+  if [[ "${WAVE3_ROADMAP_SYNC_GATE:-1}" != "1" ]]; then
     return 0
   fi
   echo "Wave 3 roadmap sync (WAVE3_ROADMAP_SYNC_GATE=1, issue #1802)..."
