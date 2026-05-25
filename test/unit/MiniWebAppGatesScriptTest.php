@@ -53,7 +53,10 @@ final class MiniWebAppGatesScriptTest extends TestCase
         $this->assertStringContainsString('Stage 4d deploy-smoke', $combined);
         $this->assertStringContainsString('issues/745', $combined);
         $this->assertStringContainsString('issues/683', $combined);
+        $this->assertStringContainsString('issues/881', $combined);
         $this->assertStringContainsString('issues/485', $combined);
+        $this->assertStringContainsString('EXAMPLES_AOT_SMOKE_GATE=1 default', $combined);
+        $this->assertStringNotContainsString('blocked #764', $combined);
         $this->assertStringContainsString('Stage 4b AOT link', $combined);
         $this->assertStringContainsString('Stage 4b2 bisect', $combined);
         $this->assertStringContainsString('issues/879', $combined);
