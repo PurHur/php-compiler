@@ -90,7 +90,7 @@ Needs LLVM + ~8 GiB RAM; includes JIT/AOT lint/link and example smokes.
 | `./phpc test` / `--fast` | Full / fast local CI |
 | `./phpc init --profile miniwebapp dir/` | Scaffold MiniWebApp layout |
 | `./phpc doctor` | Environment + optional gate probe |
-| `./phpc doctor --gates` | North Star / example gate ladder probe ([#1752](https://github.com/PurHur/php-compiler/issues/1752)) |
+| `./phpc doctor --gates` | North Star gate ladder + presenter steps (`make north-star1-verify`) ([#1752](https://github.com/PurHur/php-compiler/issues/1752), [#1857](https://github.com/PurHur/php-compiler/issues/1857)) |
 | `make north-star1-verify` | Single North Star 1 presenter gate before closing [#1044](https://github.com/PurHur/php-compiler/issues/1044) ([#1845](https://github.com/PurHur/php-compiler/issues/1845)) |
 
 Legacy entrypoints (`bin/vm.php`, `bin/jit.php`, `bin/compile.php`) still work.

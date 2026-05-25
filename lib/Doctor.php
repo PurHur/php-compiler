@@ -133,7 +133,38 @@ final class Doctor
             fwrite(STDOUT, "LLVM ready: unset EXAMPLES_AOT_SMOKE_GATE=0 for ci-local examples-aot-smoke (#674)\n");
         }
 
+        self::printNorthStar1PresenterSection($repoRoot);
+
         return is_int($exit) ? $exit : 1;
+    }
+
+    /**
+     * North Star 1 presenter commands after the gate ladder (issues #1845, #1857).
+     */
+    private static function printNorthStar1PresenterSection(string $repoRoot): void
+    {
+        $llvmInfo = self::resolveLlvmInfo($repoRoot);
+        $llvmReady = null !== $llvmInfo['dir'];
+        $llvmDetail = $llvmReady
+            ? 'ready at '.$llvmInfo['dir'].' ('.$llvmInfo['source'].')'
+            : 'missing — LLVM steps in north-star1-verify skip unless --require-llvm';
+
+        $skipServe = getenv('PHP_COMPILER_SKIP_SERVE_TESTS');
+        $serveSkipped = false !== $skipServe && '' !== $skipServe;
+        $loopback = self::checkLoopback($repoRoot);
+        $serveDetail = $serveSkipped
+            ? 'skipped (PHP_COMPILER_SKIP_SERVE_TESTS is set)'
+            : ($loopback['ok'] ? 'loopback bind OK' : 'loopback bind failed — serve / AOT web-smoke may skip');
+
+        fwrite(STDOUT, "\nNorth Star 1 presenter (#1044, #1845):\n");
+        fwrite(STDOUT, "  LLVM 9: {$llvmDetail}\n");
+        fwrite(STDOUT, "  Serve tests: {$serveDetail}\n");
+        fwrite(STDOUT, "  Gates ladder     make miniwebapp-gates              stages 0–4d (#472)\n");
+        fwrite(STDOUT, "  Fast CI          ./script/ci-fast.sh               VM/compliance\n");
+        fwrite(STDOUT, "  Full AOT tail    ./script/ci-local.sh --filter MiniWebAppAotExecuteTest   LLVM required\n");
+        fwrite(STDOUT, "  Presenter bundle make north-star1-verify            --require-llvm / --skip-llvm-tail\n");
+        fwrite(STDOUT, "  Script           ./script/north-star1-verify.sh    same as make target\n");
+        fwrite(STDOUT, "  Docs             docs/miniwebapp-gates.md\n");
     }
 
     /**
