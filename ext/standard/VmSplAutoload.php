@@ -6,11 +6,26 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Func\PHP as PhpFunc;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 
 /**
  * spl_autoload_register() stack and callback invocation (issue #1369).
  */
+final class VmSplAutoloadRunner
+{
+    public function __construct(
+        private PhpFunc $func,
+        private ?ObjectEntry $receiver = null
+    ) {
+    }
+
+    public function __invoke(Context $ctx, string $className): void
+    {
+        VmSplAutoload::dispatch($ctx, $this->func, $this->receiver, $className);
+    }
+}
+
 final class VmSplAutoload
 {
     public static function register(
@@ -49,10 +64,7 @@ final class VmSplAutoload
         return false;
     }
 
-    /**
-     * @return callable
-     */
-    private static function bindCallback(Context $ctx, Variable $callback)
+    private static function bindCallback(Context $ctx, Variable $callback): VmSplAutoloadRunner
     {
         $callback = $callback->resolveIndirect();
         if (Variable::TYPE_STRING === $callback->type) {
@@ -71,35 +83,19 @@ final class VmSplAutoload
         );
     }
 
-    /**
-     * @return callable
-     */
-    private static function bindFunction(Context $ctx, string $name)
+    private static function bindFunction(Context $ctx, string $name): VmSplAutoloadRunner
     {
-        $func = VmUserCall::resolveStringCallback($ctx, $name);
-
-        return static function (Context $ctx, string $className) use ($func): void {
-            self::invokeFunction($ctx, $func, $className);
-        };
+        return new VmSplAutoloadRunner(VmUserCall::resolveStringCallback($ctx, $name));
     }
 
-    /**
-     * @return callable
-     */
-    private static function bindStaticName(Context $ctx, string $callable)
+    private static function bindStaticName(Context $ctx, string $callable): VmSplAutoloadRunner
     {
         [$className, $methodName] = explode('::', $callable, 2);
-        $func = self::resolveStaticMethod($ctx, $className, $methodName);
 
-        return static function (Context $ctx, string $className) use ($func): void {
-            self::invokeFunction($ctx, $func, $className);
-        };
+        return new VmSplAutoloadRunner(self::resolveStaticMethod($ctx, $className, $methodName));
     }
 
-    /**
-     * @return callable
-     */
-    private static function bindArrayCallable(Context $ctx, Variable $callable)
+    private static function bindArrayCallable(Context $ctx, Variable $callable): VmSplAutoloadRunner
     {
         $table = $callable->toArray();
         $idx0 = new Variable(Variable::TYPE_INTEGER);
@@ -116,11 +112,7 @@ final class VmSplAutoload
         }
         $method = $methodName->toString();
         if (Variable::TYPE_STRING === $target->type) {
-            $func = self::resolveStaticMethod($ctx, $target->toString(), $method);
-
-            return static function (Context $ctx, string $className) use ($func): void {
-                self::invokeFunction($ctx, $func, $className);
-            };
+            return new VmSplAutoloadRunner(self::resolveStaticMethod($ctx, $target->toString(), $method));
         }
         if (Variable::TYPE_OBJECT === $target->type) {
             $class = $target->toObject()->class;
@@ -130,9 +122,7 @@ final class VmSplAutoload
             }
             $func = $class->methods[$methodLc];
 
-            return static function (Context $ctx, string $className) use ($func, $target): void {
-                self::invokeInstanceMethod($ctx, $func, $target->toObject(), $className);
-            };
+            return new VmSplAutoloadRunner($func, $target->toObject());
         }
         throw new \LogicException(
             'spl_autoload_register() array callback first element must be a class name string or object'
@@ -161,23 +151,23 @@ final class VmSplAutoload
         return $func;
     }
 
-    private static function invokeFunction(Context $ctx, PhpFunc $func, string $className): void
-    {
+    public static function dispatch(
+        Context $ctx,
+        PhpFunc $func,
+        ?ObjectEntry $receiver,
+        string $className
+    ): void {
+        if (null !== $receiver) {
+            $recv = new Variable();
+            $recv->object($receiver);
+            $arg = new Variable();
+            $arg->string($className);
+            $ctx->runtime->vm->invokePhpFunction($func, $recv, $arg);
+
+            return;
+        }
         $arg = new Variable();
         $arg->string($className);
         $ctx->runtime->vm->invokePhpFunction($func, $arg);
-    }
-
-    private static function invokeInstanceMethod(
-        Context $ctx,
-        PhpFunc $func,
-        \PHPCompiler\VM\ObjectEntry $receiver,
-        string $className
-    ): void {
-        $recv = new Variable();
-        $recv->object($receiver);
-        $arg = new Variable();
-        $arg->string($className);
-        $ctx->runtime->vm->invokePhpFunction($func, $recv, $arg);
     }
 }

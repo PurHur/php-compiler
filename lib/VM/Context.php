@@ -21,7 +21,7 @@ class Context {
     public array $enums = [];
     /** @var list<callable(string): bool> */
     public array $classAutoloaders = [];
-    /** @var list<callable(Context, string): void> spl_autoload_register() stack (#1369) */
+    /** @var list<\PHPCompiler\ext\standard\VmSplAutoloadRunner> spl_autoload_register() stack (#1369) */
     public array $splAutoloadCallbacks = [];
     /** @var array<string, true> */
     private array $loadedCompileUnits = [];

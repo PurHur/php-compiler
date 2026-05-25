@@ -1653,11 +1653,10 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 **Warnings** (review for bootstrap subset):
 - new Variable (line 105)
 - new Variable (line 107)
-- new Variable (line 166)
+- new Variable (line 170)
 - new Variable (line 177)
 - new Variable (line 179)
-- 9 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
-- 4 closure(s)
+- 11 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `ext/standard/VmSprintf.php`
 

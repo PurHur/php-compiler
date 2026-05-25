@@ -317,6 +317,7 @@ require_once __DIR__.'/../../../ext/standard/VmScope.php';
 require_once __DIR__.'/../../../ext/standard/VmSerialize.php';
 require_once __DIR__.'/../../../ext/standard/VmSession.php';
 require_once __DIR__.'/../../../ext/standard/VmSleep.php';
+require_once __DIR__.'/../../../ext/standard/VmSplAutoload.php';
 require_once __DIR__.'/../../../ext/standard/VmSprintf.php';
 require_once __DIR__.'/../../../ext/standard/VmStreamContext.php';
 require_once __DIR__.'/../../../ext/standard/VmString.php';
