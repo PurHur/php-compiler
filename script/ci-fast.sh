@@ -84,6 +84,12 @@ if [[ "${COALESCE_COMPLIANCE_GATE:-0}" == "1" ]]; then
   ci_run_phpunit --filter Coalesce
 fi
 
+# String-key array dim-assign JIT (#66, #1959). Default on when LLVM + MCJIT probe pass; set STRING_KEY_JIT_COMPLIANCE_GATE=0 to skip.
+if [[ "${STRING_KEY_JIT_COMPLIANCE_GATE:-1}" == "1" ]] && ci_llvm_ready && ci_should_run_jit; then
+  echo "PHPUnit (fast): string-key array JIT (array_rehash_string_keys_jit)..."
+  ci_run_phpunit --filter array_rehash_string_keys_jit
+fi
+
 # M4 bootstrap-loop dry-run when opt-in (issue #1929; default off in ci-defaults).
 ci_run_bootstrap_loop_probe
 

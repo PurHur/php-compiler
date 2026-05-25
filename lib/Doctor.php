@@ -176,12 +176,18 @@ final class Doctor
         $rehashDetail = $rehashOn
             ? 'default on — ci-fast array_rehash_string_keys (#1956)'
             : 'skipped (REHASH_COMPLIANCE_GATE=0)';
+        $stringKeyJitGate = getenv('STRING_KEY_JIT_COMPLIANCE_GATE');
+        $stringKeyJitOn = false === $stringKeyJitGate || '' === $stringKeyJitGate || '1' === $stringKeyJitGate;
+        $stringKeyJitDetail = $stringKeyJitOn
+            ? 'default on — ci-fast array_rehash_string_keys_jit (#1959, LLVM)'
+            : 'skipped (STRING_KEY_JIT_COMPLIANCE_GATE=0)';
 
         fwrite(STDOUT, "  Gates ladder     make miniwebapp-gates              stages 0–4d (#472)\n");
         fwrite(STDOUT, "  Fast CI          ./script/ci-fast.sh               VM/compliance\n");
         fwrite(STDOUT, "  Nested return    {$nestedReturnDetail}\n");
         fwrite(STDOUT, "  Attributes       {$attributesDetail}\n");
         fwrite(STDOUT, "  HashTable rehash {$rehashDetail}\n");
+        fwrite(STDOUT, "  String-key JIT   {$stringKeyJitDetail}\n");
         fwrite(STDOUT, "  Full AOT tail    ./script/ci-local.sh --filter MiniWebAppAotExecuteTest   LLVM required\n");
         fwrite(STDOUT, "  Presenter bundle make north-star1-verify            --require-llvm / --skip-llvm-tail\n");
         fwrite(STDOUT, "  Script           ./script/north-star1-verify.sh    same as make target\n");

@@ -3226,7 +3226,7 @@ class JIT {
                             $this->context->lookupFunction('__hashtable__setObjectKeyLong'),
                             $result->writableHt,
                             $result->writableObjectKey,
-                            $valueFrom
+                            $this->context->helper->loadValue($value)
                         );
 
                         return;
@@ -3236,7 +3236,7 @@ class JIT {
                             $this->context->lookupFunction('__hashtable__setStringKeyLong'),
                             $result->writableHt,
                             $result->writableStringKey,
-                            $valueFrom
+                            $this->context->helper->loadValue($value)
                         );
 
                         return;
