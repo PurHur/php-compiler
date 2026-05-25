@@ -120,6 +120,9 @@ patch_already_applied() {
     php-cfg-intersection-type.patch)
       [[ -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Type/Intersection.php" ]]
       ;;
+    php-cfg-ctor-promotion.patch)
+      grep -q 'promotionFlags' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Param.php" 2>/dev/null
+      ;;
     php-types-never-type.patch)
       grep -q 'Op\\Type\\Never_' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
       ;;

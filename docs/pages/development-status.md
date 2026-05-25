@@ -13,7 +13,7 @@ permalink: /development-status.html
 |---|---|
 | **Try it** | `git clone` → `composer install` → `./phpc test --fast` → [`docs/GETTING-STARTED.md`](https://github.com/PurHur/php-compiler/blob/master/docs/GETTING-STARTED.md) |
 | **Overall progress** | ~**50%** toward a self-hosting compiler (indicative) |
-| **Wave 3 (May 2026)** | Language **10/13** · Stdlib **12/13** ([#1380](https://github.com/PurHur/php-compiler/issues/1380)) |
+| **Wave 3 (May 2026)** | Language **12/12** · Stdlib **13/13** ([#1380](https://github.com/PurHur/php-compiler/issues/1380)) |
 | **North star (self-host)** | M0–M1 ✅ · M2 spine **606/611** native link ✅ ([#1960](https://github.com/PurHur/php-compiler/issues/1960)) · M3 HelloWorld strict ✅ ([#1493](https://github.com/PurHur/php-compiler/issues/1493)) · M5 ⬜ ([#1492](https://github.com/PurHur/php-compiler/issues/1492)) |
 | **Example tests** | `examples/000–006` — VM + AOT regression fixtures (not a project north star) |
 | **Not Zend parity** | Subset compiler (not full Zend PHP) |

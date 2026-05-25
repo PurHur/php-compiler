@@ -50,8 +50,8 @@
       </p>
       <div class="hero-badges">
         <span class="badge badge--live">VM + JIT + AOT</span>
-        <span class="badge badge--live">Wave 3 language 10/13</span>
-        <span class="badge badge--live">Wave 3 stdlib 12/13</span>
+        <span class="badge badge--live">Wave 3 language 12/12</span>
+        <span class="badge badge--live">Wave 3 stdlib 13/13</span>
         <span class="badge badge--wip">North star — self-host (#1492)</span>
         <span class="badge badge--live">Example gates — regression only</span>
       </div>
@@ -176,8 +176,8 @@ make bootstrap-selfhost-link</code></pre>
         </article>
         <article class="track-panel track-panel--selfhost">
           <h3>Language (#1354–#1366)</h3>
-          <p><strong>10 / 13 closed on master.</strong> Landed: <code>never</code>, enums, ctor promotion, intersection types, unpack, multi-catch, <code>__serialize</code>, first-class callable JIT, variable-variables JIT, WeakReference/WeakMap ([#1478](https://github.com/PurHur/php-compiler/pull/1478)).</p>
-          <p><strong>Open:</strong> attributes (#1354); readonly (#1473 rebase).</p>
+          <p><strong>12 / 12 closed on master.</strong> Includes attributes VM v1 ([#1354](https://github.com/PurHur/php-compiler/issues/1354)), readonly classes ([#1360](https://github.com/PurHur/php-compiler/issues/1360) / [#1473](https://github.com/PurHur/php-compiler/pull/1473)), <code>never</code>, enums, ctor promotion, intersection types, unpack, multi-catch, <code>__serialize</code>, first-class callable JIT, variable-variables JIT, WeakReference/WeakMap ([#1478](https://github.com/PurHur/php-compiler/pull/1478)).</p>
+          <p>JIT/AOT reflection for attributes deferred; see [roadmap-wave3.md](https://github.com/PurHur/php-compiler/blob/master/docs/roadmap-wave3.md).</p>
         </article>
       </div>
     </section>
@@ -197,7 +197,7 @@ make bootstrap-selfhost-link</code></pre>
           <div class="progress-fill" id="overall-progress-fill" data-width="50" style="width: 0"></div>
         </div>
         <p class="overall-progress__note">
-          Strong on VM and AOT linking; wave-3 language 10/13 and stdlib 12/13 on master; local/Docker CI while remote GHA/Circle are disabled.
+          Strong on VM and AOT linking; wave-3 language **12/12** and stdlib **13/13** on master; local/Docker CI while remote GHA/Circle are disabled.
           <strong>North star</strong> M0–M1 done, M2 spine link (606/611, #1960), M3 HelloWorld strict (#1493); M5 full self-compile is the stretch goal ([#1492](https://github.com/PurHur/php-compiler/issues/1492)).
           Example web gates (<code>make north-star1-verify</code>, <strong>005-SessionsWeb</strong> opt-in #1891/#1893) stay in CI as regression only.
         </p>
@@ -220,13 +220,13 @@ make bootstrap-selfhost-link</code></pre>
         <article class="card">
           <span class="phase-num">Phase 1</span>
           <h3><span class="status-dot status-dot--wip"></span> Language</h3>
-          <p>OOP VM/JIT; wave-3 language <strong>10/13</strong> on master; attributes + readonly open.</p>
+          <p>OOP VM/JIT; wave-3 language <strong>12/12</strong> on master ([#1380](https://github.com/PurHur/php-compiler/issues/1380)).</p>
           <div class="mini-progress"><div class="progress-track"><div class="progress-fill" data-width="72"></div></div></div>
         </article>
         <article class="card">
           <span class="phase-num">Phase 2</span>
           <h3><span class="status-dot status-dot--wip"></span> Stdlib</h3>
-          <p>Wave 3: 12/13 closed; JIT audit in repo.</p>
+          <p>Wave 3: <strong>13/13</strong> closed on master; JIT audit in repo.</p>
           <div class="mini-progress"><div class="progress-track"><div class="progress-fill" data-width="58"></div></div></div>
         </article>
         <article class="card">

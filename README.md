@@ -119,7 +119,7 @@ Also: `phpc doctor` (env probe), `phpc validate-manifest`, `phpc cgi`. See `./ph
 
 ### Capabilities
 
-Wave-3 gap tracker ([#1380](https://github.com/PurHur/php-compiler/issues/1380)): **language 10/13**, **stdlib 12/13** on master (May 2026). The compiler targets a **web-capable PHP subset** — many builtins and constructs are VM-only or in progress compared to Zend PHP.
+Wave-3 gap tracker ([#1380](https://github.com/PurHur/php-compiler/issues/1380)): **language 12/12**, **stdlib 13/13** on master (May 2026). The compiler targets a **web-capable PHP subset** — many builtins and constructs are VM-only or in progress compared to Zend PHP.
 
 **Contributor matrices** (not on the [public status site](https://purhur.github.io/php-compiler/docs/pages/index.html)): regenerate with `php script/capability-matrix.php` and `php script/capability-syntax.php` → [docs/capabilities.md](docs/capabilities.md), [docs/capabilities-syntax.md](docs/capabilities-syntax.md). See [docs/README.md](docs/README.md).
 
