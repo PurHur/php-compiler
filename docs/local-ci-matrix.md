@@ -107,7 +107,7 @@ Defaults are exported from [`script/ci-defaults.env`](../script/ci-defaults.env)
 | `BOOTSTRAP_LIB_SPINE_VM_SMOKE_GATE` | `1` | `ci-local.sh` (LLVM tail, after selfhost-probe) | `bootstrap-selfhost-lib-spine-vm-smoke.sh` — M2 spine binary via `bin/vm.php -r` path ([#1846](https://github.com/PurHur/php-compiler/issues/1846), [#1867](https://github.com/PurHur/php-compiler/issues/1867)); set `0` for spine-only link PRs |
 | `CI_FAST_BOOTSTRAP` | `0` | `ci-fast.sh` | Optional llvm tail: bootstrap aot-lint + probe + wave-check when LLVM 9 present |
 | `JIT_PREFLIGHT_GATE` | `0` | `ci-fast.sh` | Early MCJIT probe after `composer install` ([#728](https://github.com/PurHur/php-compiler/issues/728)) |
-| `NORTH_STAR2_VERIFY_GATE` | `0` | `ci-fast.sh` | `./script/north-star2-verify.sh` presenter when script exists ([#1928](https://github.com/PurHur/php-compiler/issues/1928), [#1865](https://github.com/PurHur/php-compiler/issues/1865)); skips with message until `#1865` lands |
+| `NORTH_STAR2_VERIFY_GATE` | `0` | `ci-fast.sh` | `make north-star2-verify` / `./script/north-star2-verify.sh` ([#1928](https://github.com/PurHur/php-compiler/issues/1928), [#1865](https://github.com/PurHur/php-compiler/issues/1865)); `--skip-llvm-tail` when LLVM missing |
 | `phpc test --bootstrap` | n/a | `script/bootstrap-test-subset.sh` | Inventory `--check` + `SELFHOST_SPINE_COUNT_SYNC_GATE` spine sync (no LLVM link by default); `BOOTSTRAP_TEST_SUBSET_VM_SMOKE=1` for M2 VM spine smoke; `--strict` sets `BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE=1` for M3 probe ([#1961](https://github.com/PurHur/php-compiler/issues/1961)) |
 | `M2_SPINE_ISSUE_HYGIENE_GATE` | `1` | `ci-fast.sh` (`ci_run_inventory_checks`) | `script/check-m2-spine-issue-hygiene.php` — stale `m2-spine-unit` tickets ([#1819](https://github.com/PurHur/php-compiler/issues/1819), [#1808](https://github.com/PurHur/php-compiler/issues/1808)); set `0` for bulk spine PRs |
 | `WAVE3_ROADMAP_SYNC_GATE` | `1` | `ci-fast.sh` (`ci_run_inventory_checks`) | `script/check-wave3-roadmap-sync.php` ([#1802](https://github.com/PurHur/php-compiler/issues/1802), [#1814](https://github.com/PurHur/php-compiler/issues/1814)); set `0` for doc-only iteration |
@@ -232,7 +232,7 @@ Exits **0** when LLVM 9 is missing (nothing to guard). Exits **non-zero** when L
 
 ### North Star 2 presenter on fast CI ([#1928](https://github.com/PurHur/php-compiler/issues/1928))
 
-Self-host iteration can run the NS2 presenter bundle from `ci-fast` without a full `ci-local.sh` LLVM tail. Default **off** until `script/north-star2-verify.sh` lands ([#1865](https://github.com/PurHur/php-compiler/issues/1865)):
+Self-host iteration can run the NS2 presenter bundle from `ci-fast` without a full `ci-local.sh` LLVM tail ([#1865](https://github.com/PurHur/php-compiler/issues/1865)):
 
 ```bash
 NORTH_STAR2_VERIFY_GATE=1 ./script/ci-fast.sh

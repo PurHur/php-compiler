@@ -8,7 +8,7 @@
 #   CI_FAST_BOOTSTRAP=1 ./script/ci-fast.sh
 # M4 bootstrap-loop dry-run when LLVM ready (default off; issue #1929):
 #   BOOTSTRAP_LOOP_PROBE_GATE=1 ./script/ci-fast.sh
-# North Star 2 presenter when opt-in (skips until #1865 script exists; issue #1928):
+# North Star 2 presenter when opt-in (issue #1928, script #1865):
 #   NORTH_STAR2_VERIFY_GATE=1 ./script/ci-fast.sh
 set -euo pipefail
 
@@ -88,7 +88,7 @@ fi
 # M4 bootstrap-loop dry-run when opt-in (issue #1929; default off in ci-defaults).
 ci_run_bootstrap_loop_probe
 
-# North Star 2 presenter when opt-in (issue #1928; script pending #1865).
+# North Star 2 presenter when opt-in (issue #1928, script #1865).
 ci_run_north_star2_verify
 
 # Optional bootstrap tail when LLVM 9 present (aot-lint + probe + wave-check; issue #436).

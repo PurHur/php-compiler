@@ -334,14 +334,14 @@ ci_run_bootstrap_lib_spine_vm_smoke() {
   "$_CI_SCRIPT_DIR/bootstrap-selfhost-lib-spine-vm-smoke.sh"
 }
 
-# North Star 2 presenter bundle in fast CI (issue #1928); default off until #1865 script lands.
+# North Star 2 presenter bundle in fast CI (issue #1928, script #1865).
 ci_run_north_star2_verify() {
   if [[ "${NORTH_STAR2_VERIFY_GATE:-0}" != "1" ]]; then
     return 0
   fi
   local ns2_script="$_CI_SCRIPT_DIR/north-star2-verify.sh"
   if [[ ! -x "$ns2_script" ]]; then
-    echo "north-star2-verify: skipped (script missing — pending #1865; NORTH_STAR2_VERIFY_GATE=1)"
+    echo "north-star2-verify: skipped (script not executable; NORTH_STAR2_VERIFY_GATE=1)"
     return 0
   fi
   echo "north-star2-verify (NORTH_STAR2_VERIFY_GATE=1, issue #1928)..."

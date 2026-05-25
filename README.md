@@ -44,7 +44,7 @@ Presenter script and troubleshooting: [`docs/GETTING-STARTED.md`](docs/GETTING-S
 | Self-host **M2** spine | 🚧 **603** / 606 units ([#1492](https://github.com/PurHur/php-compiler/issues/1492), [#2001](https://github.com/PurHur/php-compiler/issues/2001)) |
 | Full Zend PHP compatibility | ❌ — subset only (matrices in `docs/`, not on status site) |
 
-MiniWebApp gates: [docs/miniwebapp-gates.md](docs/miniwebapp-gates.md) ([#472](https://github.com/PurHur/php-compiler/issues/472)). Presenter verify: `make north-star1-verify` ([#1845](https://github.com/PurHur/php-compiler/issues/1845)). Docker image: `php-compiler:22.04-dev`.
+MiniWebApp gates: [docs/miniwebapp-gates.md](docs/miniwebapp-gates.md) ([#472](https://github.com/PurHur/php-compiler/issues/472)). Presenter verify: `make north-star1-verify` ([#1845](https://github.com/PurHur/php-compiler/issues/1845)), `make north-star2-verify` ([#1865](https://github.com/PurHur/php-compiler/issues/1865)). Docker image: `php-compiler:22.04-dev`.
 
 ## Quick start (host PHP)
 
