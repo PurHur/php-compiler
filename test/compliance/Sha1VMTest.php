@@ -18,4 +18,9 @@ final class Sha1VMTest extends BaseTest
             'sha1.phpt'
         );
     }
+
+    public function setUp(): void
+    {
+        $this->BIN = realpath(__DIR__.'/../../bin/vm.php');
+    }
 }
