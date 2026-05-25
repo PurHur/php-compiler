@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# North Star 1 presenter verify — single command before closing #1044 (issue #1845).
+# Example web integration verify (legacy make target north-star1-verify; #1044 closed, #1845).
 #
 #   ./script/north-star1-verify.sh
 #   make north-star1-verify
@@ -26,7 +26,7 @@ while [[ $# -gt 0 ]]; do
       cat <<'EOF'
 Usage: script/north-star1-verify.sh [--require-llvm] [--skip-llvm-tail]
 
-Runs North Star 1 checks in order (issue #1845, tracker #1044):
+Runs example web integration checks in order (issue #1845; #1044 closed):
 
   1. phpc doctor --gates
   2. script/miniwebapp-gates.sh

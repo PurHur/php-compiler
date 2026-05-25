@@ -73,6 +73,6 @@ Generated maps and large tables — **repo only**; exclude from `docs/pages/` co
 ## Living trackers (GitHub)
 
 - Roadmap umbrella: [#78](https://github.com/PurHur/php-compiler/issues/78)
-- North Star 1 (web app): [#1044](https://github.com/PurHur/php-compiler/issues/1044)
-- North Star 2 (self-host): [#1492](https://github.com/PurHur/php-compiler/issues/1492) (was [#1056](https://github.com/PurHur/php-compiler/issues/1056))
+- North star (self-host): [#1492](https://github.com/PurHur/php-compiler/issues/1492) (was [#1056](https://github.com/PurHur/php-compiler/issues/1056))
+- Example integration tests (003-MiniWebApp, …): regression only — closed [#1044](https://github.com/PurHur/php-compiler/issues/1044)
 - Wave 3 batch: [#1380](https://github.com/PurHur/php-compiler/issues/1380)

@@ -1,6 +1,6 @@
 # M5 fast path — incremental native emit (M3 compile driver)
 
-**North Star 2 target (full ladder):** [self-host-target.md](self-host-target.md)
+**Project north star (full ladder):** [self-host-target.md](self-host-target.md)
 
 Issue [#1056](https://github.com/PurHur/php-compiler/issues/1056); link segfault fix [#1402](https://github.com/PurHur/php-compiler/issues/1402).
 
@@ -44,7 +44,7 @@ Supporting fixes from #1402:
 | `runtime_ctor_smoke` | `php bin/compile.php -l test/bootstrap-aot/runtime_ctor_smoke.php`; int exit (#1514) |
 | `runtime_parse_compile_smoke` | `php bin/compile.php -l test/bootstrap-aot/runtime_parse_compile_smoke.php` |
 
-**Runtime emit:** compile driver uses env dispatch (`PHP_COMPILER_M3_COMPILE_MODE=compile`, `PHP_COMPILER_M3_SOURCE`, `PHP_COMPILER_M3_OUT`) so AOT entry avoids top-level `__DIR__` concat (#1493). With `BOOTSTRAP_M3_RUNTIME_COMPILE=1`, compile-driver **link** is OK; runtime dispatch no longer segfaults on `$result['message']` hashtable reads (#1514 — int exit + no assoc arrays in smoke). `emit_path=native` still blocked while `helloworld_compile_smoke` is link-stubbed (LLVM 9 real-lowering crash).
+**Runtime emit:** compile driver uses env dispatch (`PHP_COMPILER_M3_COMPILE_MODE=compile`, `PHP_COMPILER_M3_SOURCE`, `PHP_COMPILER_M3_OUT`) so AOT entry avoids top-level `__DIR__` concat (#1493). Probe with `BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING=1` links `compile_driver.php` with `PHP_COMPILER_M3_COMPILE_DRIVER=1` (not the separate emit-helper TU). With `BOOTSTRAP_M3_RUNTIME_COMPILE=1`, compile-driver **link** is OK; runtime still returns stubbed `helloworld_compile_smoke` (no `compile OK` stdout) until LLVM 9 real-lowering is safe. Separate `helloworld_m3_emit_native_entry.php` + `PHP_COMPILER_EMIT_HELPER_LINK=1` links intermittently but the emit binary segfaults in `internal_1` / `__string__separate` at startup (#1514).
 
 **Probe findings (2026-05):**
 

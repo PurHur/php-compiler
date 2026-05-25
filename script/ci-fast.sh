@@ -8,7 +8,7 @@
 #   CI_FAST_BOOTSTRAP=1 ./script/ci-fast.sh
 # M4 bootstrap-loop dry-run when LLVM ready (default off; issue #1929):
 #   BOOTSTRAP_LOOP_PROBE_GATE=1 ./script/ci-fast.sh
-# North Star 2 presenter (default on; issue #1928, #2051). Opt-out:
+# Self-host presenter (default on; issue #1928, #2051). Opt-out:
 #   NORTH_STAR2_VERIFY_GATE=0 ./script/ci-fast.sh
 # Bootstrap test subset (opt-in; issue #2069):
 #   BOOTSTRAP_TEST_SUBSET_GATE=1 ./script/ci-fast.sh
@@ -92,7 +92,7 @@ fi
 # M4 bootstrap-loop dry-run when opt-in (issue #1929; default off in ci-defaults).
 ci_run_bootstrap_loop_probe
 
-# North Star 2 presenter when opt-in (issue #1928; script pending #1865).
+# Self-host presenter when opt-in (issue #1928; script pending #1865).
 ci_run_north_star2_verify
 
 # Optional bootstrap tail when LLVM 9 present (aot-lint + probe + wave-check; issue #436).

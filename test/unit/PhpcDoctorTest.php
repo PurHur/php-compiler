@@ -118,11 +118,11 @@ final class PhpcDoctorTest extends TestCase
         $this->assertStringContainsString('MINIWEBAPP_WEB_SMOKE_AOT_GATE', $result['stdout']);
         $this->assertStringContainsString('Stage 3c', $result['stdout']);
         $this->assertStringContainsString('DEPLOY_SMOKE_003_EXECUTE=1 default', $result['stdout']);
-        $this->assertStringContainsString('North Star 1 presenter', $result['stdout']);
+        $this->assertStringContainsString('Example web integration gates', $result['stdout']);
         $this->assertStringContainsString('Nested return', $result['stdout']);
         $this->assertStringContainsString('north-star1-verify', $result['stdout']);
         $this->assertStringContainsString('make north-star1-verify', $result['stdout']);
-        $this->assertStringContainsString('North Star 2 presenter', $result['stdout']);
+        $this->assertStringContainsString('North star — self-host presenter', $result['stdout']);
         $this->assertStringContainsString('phpc test --bootstrap', $result['stdout']);
         $this->assertStringContainsString('bootstrap-test-subset.sh', $result['stdout']);
         $this->assertStringContainsString('north-star2-verify', $result['stdout']);

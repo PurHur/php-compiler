@@ -41,7 +41,7 @@ VM/compliance only — no LLVM link. Expect green after `./script/ci-fast.sh` or
 ./phpc serve examples/003-MiniWebApp
 ```
 
-Open `http://127.0.0.1:8080/` — home, hello (`/index.php/hello/world`), contact POST, JSON API (`/index.php/api/status`). **Talking point:** VM `phpc serve` is the day-to-day path; same routes also execute under native AOT + CGI ([#764](https://github.com/PurHur/php-compiler/issues/764) closed). North Star tracker: [#1044](https://github.com/PurHur/php-compiler/issues/1044). Deeper commands: [examples/003-MiniWebApp/README.md](../examples/003-MiniWebApp/README.md) ([#1531](https://github.com/PurHur/php-compiler/issues/1531)); root README + status site sync: [#1525](https://github.com/PurHur/php-compiler/issues/1525).
+Open `http://127.0.0.1:8080/` — home, hello (`/index.php/hello/world`), contact POST, JSON API (`/index.php/api/status`). **Talking point:** VM `phpc serve` is the day-to-day path; same routes also execute under native AOT + CGI ([#764](https://github.com/PurHur/php-compiler/issues/764) closed). This fixture is an **integration test**, not a project north star — see [#1492](https://github.com/PurHur/php-compiler/issues/1492). Deeper commands: [examples/003-MiniWebApp/README.md](../examples/003-MiniWebApp/README.md) ([#1531](https://github.com/PurHur/php-compiler/issues/1531)); root README + status site sync: [#1525](https://github.com/PurHur/php-compiler/issues/1525).
 
 ### 4. (Optional) Native AOT for MiniWebApp
 
@@ -107,8 +107,8 @@ Needs LLVM + ~8 GiB RAM; includes JIT/AOT lint/link and example smokes.
 | `./phpc init --profile sessionsweb dir/` | Scaffold 005-SessionsWeb layout (flat `example.php`) |
 | `./phpc init --profile fileupload dir/` | Scaffold 006-FileUploadWeb layout (flat `example.php`) |
 | `./phpc doctor` | Environment + optional gate probe |
-| `./phpc doctor --gates` | North Star gate ladder + NS1/NS2 presenter steps ([#1752](https://github.com/PurHur/php-compiler/issues/1752), [#1857](https://github.com/PurHur/php-compiler/issues/1857), [#1871](https://github.com/PurHur/php-compiler/issues/1871)); 005-SessionsWeb ladder: `./phpc doctor --gates \| grep -i sessions` ([#1903](https://github.com/PurHur/php-compiler/issues/1903)) |
-| `make north-star1-verify` | Single North Star 1 presenter gate before closing [#1044](https://github.com/PurHur/php-compiler/issues/1044) ([#1845](https://github.com/PurHur/php-compiler/issues/1845)) |
+| `./phpc doctor --gates` | Example web gates + self-host presenter steps ([#1752](https://github.com/PurHur/php-compiler/issues/1752), [#1857](https://github.com/PurHur/php-compiler/issues/1857), [#1871](https://github.com/PurHur/php-compiler/issues/1871)); 005-SessionsWeb ladder: `./phpc doctor --gates \| grep -i sessions` ([#1903](https://github.com/PurHur/php-compiler/issues/1903)) |
+| `make north-star1-verify` | Example web regression bundle (legacy name; [#1044](https://github.com/PurHur/php-compiler/issues/1044) closed) ([#1845](https://github.com/PurHur/php-compiler/issues/1845)) |
 | `make north-star2-verify` | Self-host M0–M4 presenter bundle ([#1865](https://github.com/PurHur/php-compiler/issues/1865); listed in `phpc doctor --gates` when script exists) |
 
 Legacy entrypoints (`bin/vm.php`, `bin/jit.php`, `bin/compile.php`) still work.
@@ -117,7 +117,7 @@ Legacy entrypoints (`bin/vm.php`, `bin/jit.php`, `bin/compile.php`) still work.
 
 | Path | Audience | Content |
 |------|----------|---------|
-| [README.md](../README.md) | Everyone | Quick start, north stars, CI |
+| [README.md](../README.md) | Everyone | Quick start, north star + CI |
 | [docs/pages/](pages/) | **Public** | GitHub Pages — overview + `development-status.md` |
 | [docs/deploy-web-aot.md](deploy-web-aot.md) | Operators | AOT deploy + nginx CGI sketch |
 | [docs/bootstrap-selfhost.md](bootstrap-selfhost.md) | Contributors | Self-host gates and workflow |
@@ -154,7 +154,7 @@ More: [README § Troubleshooting](../README.md#troubleshooting).
 
 1. Edit [`docs/pages/development-status.md`](pages/development-status.md) (authoritative written status — **no links** to capability/inventory/CI matrices).
 2. Adjust [`docs/pages/index.html`](pages/index.html) progress bars / badges if the composite % changed.
-3. Sync north-star tables in [README.md](../README.md).
+3. Sync north-star / example-gate tables in [README.md](../README.md).
 
 **Contributors only (not part of the public site):** regenerate `capabilities.md` / `capabilities-syntax.md` when builtins change (`php script/capability-matrix.php`, `php script/capability-syntax.php`).
 

@@ -391,7 +391,7 @@ ci_run_bootstrap_test_subset() {
   "$_CI_SCRIPT_DIR/bootstrap-test-subset.sh" "${subset_args[@]}"
 }
 
-# North Star 2 presenter bundle in fast CI (issue #1928, #2051); default on — opt-out with NORTH_STAR2_VERIFY_GATE=0.
+# Self-host presenter bundle in fast CI (issue #1928, #2051); default on — opt-out with NORTH_STAR2_VERIFY_GATE=0.
 ci_run_north_star2_verify() {
   if [[ "${NORTH_STAR2_VERIFY_GATE:-1}" != "1" ]]; then
     echo "north-star2-verify: skipped (NORTH_STAR2_VERIFY_GATE=0 opt-out)"

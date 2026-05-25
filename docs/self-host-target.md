@@ -1,7 +1,7 @@
 # Self-host target — compiler compiles itself
 
-**North Star 2 living tracker:** [#1492](https://github.com/PurHur/php-compiler/issues/1492) (was [#1056](https://github.com/PurHur/php-compiler/issues/1056))  
-**Public status:** [development-status § North Star 2](https://purhur.github.io/php-compiler/development-status.html#north-star-2-self-host)  
+**Project north star (living tracker):** [#1492](https://github.com/PurHur/php-compiler/issues/1492) (was [#1056](https://github.com/PurHur/php-compiler/issues/1056))  
+**Public status:** [development-status § North star](https://purhur.github.io/php-compiler/development-status.html#north-star-self-host)  
 **M2 batch tracker:** [#1419](https://github.com/PurHur/php-compiler/issues/1419) (closed — work landed in PRs)
 
 ---
@@ -25,7 +25,7 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | **Stub surface minimal** | `PHP_COMPILER_SELFHOST_AOT` stubs shrink; compiler behavior is real, not link-only |
 | **Small native floor OK** | `lib/AOT/runtime/*.c` + external `clang` via `lib/AOT/Linker.php` — **not** required to disappear |
 
-**Not required for M5:** 100% Zend parity · in-process linker · replacing North Star 1 (web apps).
+**Not required for M5:** 100% Zend parity · in-process linker · production web-app polish (examples stay as regression fixtures).
 
 ---
 
@@ -67,9 +67,9 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | **M4** | Self-host binary **rebuilds** the next compiler tree | ⬜ | 0% |
 | **M5** | Full self-host; Zend retired from loop | ⬜ north star | 0% |
 
-**Indicative North Star 2 composite:** **~54%** (weighted across M0–M5; see formula below).
+**Indicative north star composite:** **~54%** (weighted across M0–M5; see formula below).
 
-### North Star 2 % (single formula)
+### North star % (single formula)
 
 | Indicator | Formula | May 2026 |
 |-----------|---------|----------|
@@ -147,7 +147,7 @@ Parallel batches ([#1419](https://github.com/PurHur/php-compiler/issues/1419), [
 
 | Topic | Issue |
 |-------|-------|
-| North Star 2 tracker | [#1492](https://github.com/PurHur/php-compiler/issues/1492) |
+| North star tracker | [#1492](https://github.com/PurHur/php-compiler/issues/1492) |
 | M2 batch umbrella (done) | [#1419](https://github.com/PurHur/php-compiler/issues/1419) |
 | M3 compile driver / LLVM | [#1402](https://github.com/PurHur/php-compiler/issues/1402) |
 | M4 bootstrap loop scaffold | [#1498](https://github.com/PurHur/php-compiler/issues/1498) |
