@@ -144,8 +144,10 @@ ci_run_root_readme_sync_check() {
     "$PHP_BIN" "${PHP_OPTS[@]}" script/check-root-readme-sync.php
 }
 
+# development-status.md drift guard (issues #2067, #2083); default on — opt-out with DEVELOPMENT_STATUS_SYNC_GATE=0.
 ci_run_development_status_sync_check() {
-  if [[ "${DEVELOPMENT_STATUS_SYNC_GATE:-0}" != "1" ]]; then
+  if [[ "${DEVELOPMENT_STATUS_SYNC_GATE:-1}" != "1" ]]; then
+    echo "development-status sync: skipped (DEVELOPMENT_STATUS_SYNC_GATE=0 opt-out)"
     return 0
   fi
   echo "Development status sync (DEVELOPMENT_STATUS_SYNC_GATE=1, issue #2067)..."

@@ -9,7 +9,7 @@ declare(strict_types=1);
  * Usage:
  *   php script/check-development-status-sync.php
  *
- * Enable in CI: DEVELOPMENT_STATUS_SYNC_GATE=1 ./script/ci-fast.sh
+ * Default-on in ci-fast (issue #2083). Opt-out: DEVELOPMENT_STATUS_SYNC_GATE=0 ./script/ci-fast.sh
  */
 
 $root = dirname(__DIR__);
