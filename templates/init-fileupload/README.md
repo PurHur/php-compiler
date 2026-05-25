@@ -11,7 +11,7 @@ Project layout from `phpc init --profile fileupload` (issue #2004). Application 
 
 When you change `example.php` or `phpc.json` in the example, copy the same files into this template in the **same PR**.
 
-Verify before merge:
+Verify before merge (`ci-fast` runs this by default via `INIT_FILEUPLOAD_PARITY_GATE=1`, [#2020](https://github.com/PurHur/php-compiler/issues/2020)):
 
 ```console
 ./script/check-init-fileupload-parity.sh

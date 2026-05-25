@@ -110,7 +110,7 @@ Same manifest as **001-SimpleWeb**; docroot is the project root (no `public/`). 
 }
 ```
 
-Same manifest as **001-SimpleWeb**; docroot is the project root (no `public/`). Scaffold with `phpc init --profile fileupload` ([#2004](https://github.com/PurHur/php-compiler/issues/2004)); template parity: `script/check-init-fileupload-parity.sh` (opt-in gate **#2020**).
+Same manifest as **001-SimpleWeb**; docroot is the project root (no `public/`). Scaffold with `phpc init --profile fileupload` ([#2004](https://github.com/PurHur/php-compiler/issues/2004)); template parity: `script/check-init-fileupload-parity.sh` (default `INIT_FILEUPLOAD_PARITY_GATE=1` in `ci-fast`, **#2020**).
 
 ## `phpc init` profiles
 
