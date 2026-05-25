@@ -17,6 +17,7 @@ curl -sf -X POST -d 'email=bad' http://127.0.0.1:8080/example.php | grep -i inva
 |-------|-------|
 | VM `phpc run` | ✅ GET — empty state |
 | VM `phpc serve` | ✅ caught invalid POST (`THROWS_WEB_SMOKE_GATE=1` default, [#2093](https://github.com/PurHur/php-compiler/issues/2093), [#2125](https://github.com/PurHur/php-compiler/issues/2125)) |
+| VM uncaught → HTTP 500 | ✅ `uncaught.php` + opt-in `THROWSWEB_UNCAUGHT_500_GATE=1` ([#2200](https://github.com/PurHur/php-compiler/issues/2200), [#152](https://github.com/PurHur/php-compiler/issues/152)) |
 | AOT `phpc build` + execute | ✅ caught invalid POST ([#2157](https://github.com/PurHur/php-compiler/issues/2157), [#2135](https://github.com/PurHur/php-compiler/issues/2135)) |
 | JIT | 📋 deferred — [#2167](https://github.com/PurHur/php-compiler/issues/2167) |
 
@@ -31,6 +32,7 @@ Defaults from `script/ci-defaults.env`:
 | Stage | Gate | Default | Command |
 |-------|------|---------|---------|
 | VM serve | `THROWS_WEB_SMOKE_GATE` | `1` | `make examples-throws-smoke` · `ci-fast.sh` ([#2125](https://github.com/PurHur/php-compiler/issues/2125)) |
+| VM uncaught 500 | `THROWSWEB_UNCAUGHT_500_GATE` | `0` | `THROWSWEB_UNCAUGHT_500_GATE=1 ./script/examples-web-smoke.sh --throws-only` ([#2200](https://github.com/PurHur/php-compiler/issues/2200)) |
 | AOT link | `THROWSWEB_AOT_LINK_GATE` | `1` | `./script/ci-local.sh --filter test007ThrowsWebAotLink` ([#2135](https://github.com/PurHur/php-compiler/issues/2135)) |
 | AOT execute | `THROWSWEB_AOT_SMOKE_GATE` | `1` | `ThrowsWebAotExecuteTest` · `EXAMPLES_AOT_SMOKE_ONLY=007 make examples-aot-smoke` ([#2135](https://github.com/PurHur/php-compiler/issues/2135)) |
 

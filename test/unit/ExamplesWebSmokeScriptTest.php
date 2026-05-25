@@ -45,6 +45,55 @@ final class ExamplesWebSmokeScriptTest extends TestCase
         $this->assertStringContainsString('003-MiniWebApp', $body);
     }
 
+    public function testExamplesWebSmokeScriptSupportsThrowsWebUncaught500Slice(): void
+    {
+        $script = dirname(__DIR__, 2).'/script/examples-web-smoke.sh';
+        $body = (string) file_get_contents($script);
+        $this->assertStringContainsString('THROWSWEB_UNCAUGHT_500_GATE', $body);
+        $this->assertStringContainsString('curl_expect_500', $body);
+        $this->assertStringContainsString('uncaught.php', $body);
+        $this->assertStringContainsString('007-ThrowsWeb / uncaught.php', $body);
+    }
+
+    public function testExamplesWebSmokeScriptThrowsWebUncaught500WhenGateOn(): void
+    {
+        if (false !== getenv('PHP_COMPILER_SKIP_SERVE_TESTS') && '' !== getenv('PHP_COMPILER_SKIP_SERVE_TESTS')) {
+            $this->markTestSkipped('PHP_COMPILER_SKIP_SERVE_TESTS is set');
+        }
+        if (!$this->canBindLoopback()) {
+            $this->markTestSkipped('Cannot bind loopback TCP');
+        }
+        if (!$this->commandExists('curl')) {
+            $this->markTestSkipped('curl not available');
+        }
+
+        $repoRoot = dirname(__DIR__, 2);
+        $uncaught = $repoRoot.'/examples/007-ThrowsWeb/uncaught.php';
+        if (!is_file($uncaught)) {
+            $this->markTestSkipped('007-ThrowsWeb/uncaught.php missing');
+        }
+
+        $script = $repoRoot.'/script/examples-web-smoke.sh';
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $env = array_merge($this->baseEnv(), ['THROWSWEB_UNCAUGHT_500_GATE' => '1']);
+        $proc = proc_open(['bash', $script, '--throws-only'], $descriptorSpec, $pipes, $repoRoot, $env);
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+
+        $combined = trim(($stdout !== false ? $stdout : '')."\n".($stderr !== false ? $stderr : ''));
+        $this->assertSame(0, $exit, $combined);
+        $this->assertStringContainsString('007-ThrowsWeb / uncaught.php: ok (HTTP 500)', $combined);
+    }
+
     public function testExamplesWebSmokeScriptSupportsSessionsWebSlice(): void
     {
         $script = dirname(__DIR__, 2).'/script/examples-web-smoke.sh';

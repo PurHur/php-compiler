@@ -227,12 +227,14 @@ Progressive ladder (VM throw/catch → AOT link → AOT execute). VM smoke defau
 | Stage | Variable | Default | When enabled |
 |-------|----------|---------|--------------|
 | VM throw/catch | `THROWS_WEB_SMOKE_GATE` | `1` | `make examples-throws-smoke` · `ci-fast.sh` ([#2125](https://github.com/PurHur/php-compiler/issues/2125), [#2093](https://github.com/PurHur/php-compiler/issues/2093)) |
+| VM uncaught 500 | `THROWSWEB_UNCAUGHT_500_GATE` | `0` | `THROWSWEB_UNCAUGHT_500_GATE=1 ./script/examples-web-smoke.sh --throws-only` · `ci-fast.sh` ([#2200](https://github.com/PurHur/php-compiler/issues/2200)) |
 | AOT link | `THROWSWEB_AOT_LINK_GATE` | `1` | `./script/ci-local.sh --filter test007ThrowsWebAotLink` ([#2101](https://github.com/PurHur/php-compiler/issues/2101), [#2135](https://github.com/PurHur/php-compiler/issues/2135)); set `0` to skip during iteration |
 | AOT execute | `THROWSWEB_AOT_SMOKE_GATE` | `1` | `ThrowsWebAotExecuteTest` or `EXAMPLES_AOT_SMOKE_ONLY=007 ./script/examples-aot-smoke.sh` ([#2101](https://github.com/PurHur/php-compiler/issues/2101), [#2135](https://github.com/PurHur/php-compiler/issues/2135)) |
 
 ```bash
 ./phpc doctor --gates | grep -E 'THROWS|007-ThrowsWeb'
 THROWS_WEB_SMOKE_GATE=1 ./script/examples-web-smoke.sh --throws-only
+THROWSWEB_UNCAUGHT_500_GATE=1 ./script/examples-web-smoke.sh --throws-only
 THROWSWEB_AOT_LINK_GATE=1 THROWSWEB_AOT_SMOKE_GATE=1 ./script/ci-local.sh --filter ThrowsWebAot
 ```
 
