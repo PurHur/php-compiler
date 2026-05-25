@@ -89,7 +89,7 @@ See [003-MiniWebApp/README.md](003-MiniWebApp/README.md) for routes and gate lad
 
 ### 005-SessionsWeb
 
-`session_start()` plus a POST → redirect → GET flash message ([#1881](https://github.com/PurHur/php-compiler/issues/1881)). VM run shows the empty state; use `phpc serve` and a cookie jar for two-request persistence (presenter copy-paste: [docs/GETTING-STARTED.md](../docs/GETTING-STARTED.md) § 5; detail: [005-SessionsWeb/README.md](005-SessionsWeb/README.md)).
+`session_start()` plus a POST → redirect → GET flash message ([#1881](https://github.com/PurHur/php-compiler/issues/1881)). VM run shows the empty state; use `phpc serve` and a cookie jar for two-request persistence (presenter copy-paste: [docs/GETTING-STARTED.md](../docs/GETTING-STARTED.md) § 5; detail: [005-SessionsWeb/README.md](005-SessionsWeb/README.md)). Scaffold: `./phpc init --profile sessionsweb my-app` ([#1886](https://github.com/PurHur/php-compiler/issues/1886)).
 
 ```console
 ./phpc lint examples/005-SessionsWeb/example.php

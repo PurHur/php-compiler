@@ -79,6 +79,33 @@ Runtime template `include` / `require` paths (for example `include __DIR__ . '/l
 
 Compile unit order for `phpc build --project`: `src/Router.php`, `config.php`, then `public/index.php` (`ProjectManifest::resolveCompileUnitPaths`).
 
+### Session flash flat project (`examples/005-SessionsWeb/phpc.json`)
+
+```json
+{
+    "entry": "example.php",
+    "binary": ".phpc/bin/app"
+}
+```
+
+No `public/` directory — docroot is the project root. See [examples/005-SessionsWeb/README.md](../examples/005-SessionsWeb/README.md) for cookie-jar curls.
+
+## `phpc init` profiles
+
+| Profile | Template | Layout |
+|---------|----------|--------|
+| `default` | `templates/init/` | `public/index.php` hello world |
+| `miniwebapp` | `templates/init-miniwebapp/` | Router + templates (mirrors [examples/003-MiniWebApp](../examples/003-MiniWebApp/)) |
+| `sessionsweb` | `templates/init-sessionsweb/` | Flat `example.php` session flash (mirrors [examples/005-SessionsWeb](../examples/005-SessionsWeb/)) |
+
+```console
+./phpc init --profile sessionsweb my-app
+./phpc lint my-app/example.php
+./phpc serve 127.0.0.1:8080 my-app
+```
+
+`templates/init-sessionsweb/` stays byte-identical to `examples/005-SessionsWeb/` on `example.php` and `phpc.json` — see `script/check-init-sessionsweb-parity.sh` ([#1902](https://github.com/PurHur/php-compiler/issues/1902)).
+
 ## Commands
 
 | Command | Role |
