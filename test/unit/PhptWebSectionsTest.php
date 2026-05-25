@@ -56,4 +56,13 @@ final class PhptWebSectionsTest extends TestCase
 
         $this->assertSame(['-q', 'a=1', '-p', 'b=2'], $flags);
     }
+
+    public function testCompileArgvFlagsFromEnvQueryString(): void
+    {
+        $flags = PhptWebSections::compileArgvFlags([
+            'ENV' => "QUERY_STRING=op=strlen\n",
+        ]);
+
+        $this->assertSame(['-q', 'op=strlen'], $flags);
+    }
 }
