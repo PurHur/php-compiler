@@ -13,8 +13,6 @@ namespace PHPCompiler\BootstrapAot;
  * Lint: php bin/compile.php -l test/bootstrap-aot/compile_smoke_m3_emit.php
  */
 
-require_once __DIR__.'/runtime_ctor_smoke.php';
-
 function compile_smoke_m3_emit(string $sourceFile, string $outFile): int
 {
     if (!is_file($sourceFile)) {
@@ -40,11 +38,17 @@ function compile_smoke_m3_emit(string $sourceFile, string $outFile): int
         return 1;
     }
 
-    if (0 !== runtime_ctor_smoke()) {
-        return 1;
+    if (\function_exists('putenv')) {
+        putenv('PHP_COMPILER_M3_EMIT_MINIMAL=1');
     }
 
     $runtime = new \PHPCompiler\Runtime(\PHPCompiler\Runtime::MODE_AOT);
+    if (!isset($runtime->compiler, $runtime->vmContext)) {
+        echo "compile_smoke_m3_emit: MODE_AOT ctor incomplete (compiler/vmContext spine)\n";
+        echo "compile_smoke_m3_emit: native emit failed at phase=ctor\n";
+
+        return 1;
+    }
     $block = $runtime->parseAndCompile($code, $resolved);
     if (null === $block) {
         echo "compile_smoke_m3_emit: parseAndCompile returned null (CFG/compile spine)\n";
