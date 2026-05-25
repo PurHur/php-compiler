@@ -39,6 +39,7 @@ Environment:
   SESSIONS_WEB_SMOKE_GATE=1        include 005 session flash curls in default run (#1887)
   FILE_UPLOAD_WEB_SMOKE_GATE=1     include 006 multipart upload curls (#1999)
   THROWS_WEB_SMOKE_GATE=1          include 007 throw/catch POST curls (#2076)
+  THROWSWEB_UNCAUGHT_500_GATE=1    include 007 uncaught.php HTTP 500 curl (#2200)
 EOF
 }
 
@@ -181,6 +182,23 @@ curl_expect_post_not_200() {
   fi
   rm -f "$body"
   echo "examples-web-smoke: ${label}: ok (HTTP ${status})"
+}
+
+curl_expect_500() {
+  local label="$1"
+  local url="$2"
+  local body status
+  body="$(mktemp)"
+  status="$(curl -sS -o "$body" -w '%{http_code}' --connect-timeout 5 --max-time 15 "$url" || echo "000")"
+  if [[ "$status" != "500" ]]; then
+    echo "examples-web-smoke: ${label}: expected HTTP 500, got ${status}" >&2
+    echo "  url: ${url}" >&2
+    cat "$body" >&2 || true
+    rm -f "$body"
+    return 1
+  fi
+  rm -f "$body"
+  echo "examples-web-smoke: ${label}: ok (HTTP 500)"
 }
 
 curl_expect_200_cookies() {
@@ -445,6 +463,14 @@ run_throws_web_smoke() {
   curl_expect_200_post "007-ThrowsWeb / POST invalid" "${base}/example.php" \
     "email=bad" \
     "Invalid email"
+
+  if [[ "${THROWSWEB_UNCAUGHT_500_GATE:-0}" == "1" ]]; then
+    if [[ ! -f "${docroot}/uncaught.php" ]]; then
+      echo "examples-web-smoke: 007-ThrowsWeb: uncaught.php missing (THROWSWEB_UNCAUGHT_500_GATE=1)" >&2
+      return 1
+    fi
+    curl_expect_500 "007-ThrowsWeb / uncaught.php" "${base}/uncaught.php"
+  fi
 
   stop_serve
   trap - RETURN

@@ -580,10 +580,12 @@ final class Doctor
 
         $defaults = self::readCiDefaultsEnv($repoRoot);
         $smokeDefault = $defaults['THROWS_WEB_SMOKE_GATE'] ?? '0';
+        $uncaughtDefault = $defaults['THROWSWEB_UNCAUGHT_500_GATE'] ?? '0';
         $linkDefault = $defaults['THROWSWEB_AOT_LINK_GATE'] ?? '1';
         $aotDefault = $defaults['THROWSWEB_AOT_SMOKE_GATE'] ?? '1';
 
         $smokeOn = self::gateEnabled('THROWS_WEB_SMOKE_GATE', $smokeDefault);
+        $uncaughtOn = self::gateEnabled('THROWSWEB_UNCAUGHT_500_GATE', $uncaughtDefault);
         $linkOn = self::gateEnabled('THROWSWEB_AOT_LINK_GATE', $linkDefault);
         $aotOn = self::gateEnabled('THROWSWEB_AOT_SMOKE_GATE', $aotDefault);
 
@@ -620,6 +622,16 @@ final class Doctor
         );
         self::printSessionsWebGateRow(
             2,
+            'VM uncaught 500',
+            'THROWSWEB_UNCAUGHT_500_GATE',
+            $uncaughtDefault,
+            $uncaughtOn,
+            false,
+            'THROWSWEB_UNCAUGHT_500_GATE=1 ./script/examples-web-smoke.sh --throws-only · ci-fast (#2200)',
+            '#2200'
+        );
+        self::printSessionsWebGateRow(
+            3,
             'AOT link',
             'THROWSWEB_AOT_LINK_GATE',
             $linkDefault,
@@ -630,9 +642,9 @@ final class Doctor
         );
         $aotStatus = $aotOn && $llvmReady ? '✅' : '📋';
         $aotExecuteNote = $llvmReady
-            ? ($aotOn ? '#2101 · default-on #2135' : '#2101 · set THROWSWEB_AOT_SMOKE_GATE=1')
+            ? ($aotOn ? '#2101 · #2157 · default-on #2135' : '#2101 · set THROWSWEB_AOT_SMOKE_GATE=1')
             : 'LLVM required; #2101 when gate=1';
-        fwrite(STDOUT, "  [{$aotStatus}] Stage 3 AOT execute — THROWSWEB_AOT_SMOKE_GATE default {$aotDefault} ({$aotExecuteNote})\n");
+        fwrite(STDOUT, "  [{$aotStatus}] Stage 4 AOT execute — THROWSWEB_AOT_SMOKE_GATE default {$aotDefault} ({$aotExecuteNote})\n");
         fwrite(STDOUT, "      PHPUnit: ./script/ci-local.sh --filter ThrowsWebAotExecuteTest\n");
         fwrite(STDOUT, "      Shell:   THROWSWEB_AOT_SMOKE_GATE=1 EXAMPLES_AOT_SMOKE_ONLY=007 ./script/examples-aot-smoke.sh (#2104)\n");
 

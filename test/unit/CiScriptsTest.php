@@ -208,10 +208,21 @@ final class CiScriptsTest extends TestCase
         $fast = dirname(__DIR__, 2).'/script/ci-fast.sh';
         $body = (string) file_get_contents($fast);
         $this->assertStringContainsString('ci_run_throws_web_smoke', $body);
+        $this->assertStringContainsString('ci_run_throws_web_uncaught_smoke', $body);
 
         $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
         $this->assertStringContainsString('THROWS_WEB_SMOKE_GATE', $common);
+        $this->assertStringContainsString('THROWSWEB_UNCAUGHT_500_GATE', $common);
         $this->assertStringContainsString('--throws-only', $common);
+    }
+
+    public function testCiDefaultsEnvDefinesThrowsWebUncaught500GateOff(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString(
+            'THROWSWEB_UNCAUGHT_500_GATE="${THROWSWEB_UNCAUGHT_500_GATE:-0}"',
+            $defaults
+        );
     }
 
     public function testCiLocalRunsThrowsWebSmokeGate(): void
@@ -225,6 +236,9 @@ final class CiScriptsTest extends TestCase
         $smoke = (string) file_get_contents(dirname(__DIR__, 2).'/script/examples-web-smoke.sh');
         $this->assertStringContainsString('--throws-only', $smoke);
         $this->assertStringContainsString('THROWS_WEB_SMOKE_GATE', $smoke);
+        $this->assertStringContainsString('THROWSWEB_UNCAUGHT_500_GATE', $smoke);
+        $this->assertStringContainsString('curl_expect_500', $smoke);
+        $this->assertStringContainsString('uncaught.php', $smoke);
         $this->assertStringContainsString('007-ThrowsWeb', $smoke);
     }
 
