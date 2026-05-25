@@ -15,8 +15,6 @@ use PHPCompiler\Web\ProjectManifest;
  */
 final class PhpcBuild
 {
-    private const ISSUE_USER_CLASS = 'https://github.com/PurHur/php-compiler/issues/764';
-
     private const ISSUE_ROADMAP = 'https://github.com/PurHur/php-compiler/issues/78';
 
     /** Exit when --probe runs and linked binary prints 0 stdout bytes (#792, #773). */
@@ -242,7 +240,7 @@ final class PhpcBuild
 
         $classes = self::discoverUserClasses($graph['files'], $root);
         if ([] !== $classes) {
-            fwrite(STDERR, "native link (#764): user-defined classes may still fail AOT execute\n");
+            fwrite(STDERR, "native link: user-defined classes may still fail AOT execute (see phpc lint)\n");
             foreach ($classes as $classInfo) {
                 fwrite(STDERR, "  class {$classInfo['class']} ({$classInfo['file']})\n");
                 foreach ($classInfo['methods'] as $method) {
@@ -260,7 +258,7 @@ final class PhpcBuild
     }
 
     /**
-     * True when compile/link stderr matches known MiniWebApp AOT execute gaps (#764).
+     * True when compile/link stderr matches user-class AOT link/verify failures.
      */
     public static function isUserClassAotBlocked(string $stderr): bool
     {
@@ -295,8 +293,8 @@ final class PhpcBuild
         return implode("\n", [
             '',
             '---',
-            'phpc build --project: native AOT execute may still fail for user-class projects (#764).',
-            'Tracking: #764 — '.self::ISSUE_USER_CLASS.' (native AOT execute / MiniWebApp)',
+            'phpc build --project: user-class native AOT may fail LLVM verify or empty execute.',
+            'Regressions: MiniWebAppAotExecuteTest · MINIWEBAPP_AOT_EXECUTE_GATE',
             'Roadmap: '.self::ISSUE_ROADMAP,
             'Next steps:',
             '  ./phpc lint --all <project>',
@@ -345,7 +343,7 @@ final class PhpcBuild
             "Linked {$binaryRel} ({$sizeLabel}). Quick execute probe:",
             "  cd {$projectLabel} && {$probe}",
             '  # or: phpc run --project . --cgi-env QUERY_STRING=route=home --cgi-env REQUEST_METHOD=GET  (#774)',
-            'Empty stdout? Track #764 (execute), not link failure.',
+            'Empty stdout? Run MiniWebAppAotExecuteTest; not a link failure.',
             '---',
             '',
         ]);

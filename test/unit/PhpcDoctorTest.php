@@ -74,7 +74,7 @@ final class PhpcDoctorTest extends TestCase
             $this->markTestSkipped('LLVM probe skipped in subprocess: '.$combined);
         }
         if (!str_contains($combined, 'aot-project-probe OK')) {
-            $this->markTestSkipped('AOT project probe not green here (#764 execute may regress): '.$combined);
+            $this->markTestSkipped('AOT project probe not green (LLVM or user-class compile): '.$combined);
         }
         $this->assertSame(0, $result['exit'], $combined);
         $this->assertStringContainsString('aot-project-probe OK', $result['stdout']);
