@@ -58,4 +58,13 @@ final class BootstrapLibSpineVmSmokeTest extends TestCase
         $this->assertStringContainsString('--with-lib-spine-vm-smoke', $script);
         $this->assertStringContainsString('BOOTSTRAP_LIB_SPINE_VM_SMOKE', $script);
     }
+
+    public function testCiDefaultsEnvDefinesVmSpineSmokeGateOn(): void
+    {
+        $defaults = (string) file_get_contents(self::$root.'/script/ci-defaults.env');
+        $this->assertStringContainsString(
+            'BOOTSTRAP_LIB_SPINE_VM_SMOKE_GATE="${BOOTSTRAP_LIB_SPINE_VM_SMOKE_GATE:-1}"',
+            $defaults
+        );
+    }
 }

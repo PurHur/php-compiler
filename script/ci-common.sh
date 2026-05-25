@@ -230,9 +230,9 @@ ci_run_bootstrap_selfhost_probe() {
   "$_CI_SCRIPT_DIR/bootstrap-selfhost-compile-probe.sh" "${probe_args[@]}"
 }
 
-# M2 lib spine VM -r smoke (issue #1846); default off until green in llvm tail.
+# M2 lib spine VM -r smoke (issue #1846); default on in ci-defaults (#1867).
 ci_run_bootstrap_lib_spine_vm_smoke() {
-  if [[ "${BOOTSTRAP_LIB_SPINE_VM_SMOKE_GATE:-0}" != "1" ]]; then
+  if [[ "${BOOTSTRAP_LIB_SPINE_VM_SMOKE_GATE:-1}" != "1" ]]; then
     return 0
   fi
   if ! ci_llvm_ready; then
