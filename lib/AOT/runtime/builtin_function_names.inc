@@ -150,6 +150,7 @@ static const char *phpc_builtin_functions[] = {
     "lstat",
     "ltrim",
     "max",
+    "md5",
     "mb_strlen",
     "method_exists",
     "min",
