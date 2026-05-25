@@ -93,6 +93,7 @@ final class PhpcDoctorTest extends TestCase
         $this->assertStringContainsString('Stage 3c', $result['stdout']);
         $this->assertStringContainsString('DEPLOY_SMOKE_003_EXECUTE=1 default', $result['stdout']);
         $this->assertStringContainsString('North Star 1 presenter', $result['stdout']);
+        $this->assertStringContainsString('Nested return', $result['stdout']);
         $this->assertStringContainsString('north-star1-verify', $result['stdout']);
         $this->assertStringContainsString('make north-star1-verify', $result['stdout']);
         $this->assertStringContainsString('North Star 2 presenter', $result['stdout']);

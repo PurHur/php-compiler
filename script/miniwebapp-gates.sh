@@ -573,10 +573,13 @@ echo "Doc sync gates (ci-fast inventory — phpc doctor --gates does not run the
 root_readme_gate="${ROOT_README_SYNC_GATE:-1}"
 examples_readme_gate="${EXAMPLES_README_SYNC_GATE:-1}"
 wave3_gate="${WAVE3_ROADMAP_SYNC_GATE:-1}"
+nested_return_gate="${NESTED_RETURN_COMPLIANCE_GATE:-1}"
 echo "  ROOT_README_SYNC_GATE=${root_readme_gate}  script/check-root-readme-sync.php (#1832, #1525)"
 echo "  EXAMPLES_README_SYNC_GATE=${examples_readme_gate}  script/check-examples-readme-sync.php (#1822)"
 echo "  WAVE3_ROADMAP_SYNC_GATE=${wave3_gate}  script/check-wave3-roadmap-sync.php (#1802)"
+echo "  NESTED_RETURN_COMPLIANCE_GATE=${nested_return_gate}  ci-fast NestedReturn* (#1888, #1885)"
 echo "  Opt out: ROOT_README_SYNC_GATE=0 ./script/ci-fast.sh"
+echo "  Opt out: NESTED_RETURN_COMPLIANCE_GATE=0 ./script/ci-fast.sh"
 
 # Current focus
 if [[ "${lint_exit}" -ne 0 && "${lint_gate}" != "0" ]]; then
