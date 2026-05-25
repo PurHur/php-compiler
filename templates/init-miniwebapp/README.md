@@ -11,7 +11,7 @@ Project layout from `phpc init --profile miniwebapp` (issue #632). Application P
 
 When you change routes, `Router.php`, `public/index.php`, `config.php`, `phpc.json`, or template partials in the example, copy the same files into this template in the **same PR**.
 
-Verify before merge:
+Verify before merge (`ci-fast` runs this by default via `INIT_MINIWEBAPP_PARITY_GATE=1`, [#2057](https://github.com/PurHur/php-compiler/issues/2057)):
 
 ```console
 ./script/check-init-miniwebapp-parity.sh
