@@ -341,8 +341,12 @@ class Context {
 
         $this->functionProxies['is_null'] = new Builtin\IsNullFn();
         $this->functionProxies['phpcompiler\\is_null'] = new Builtin\IsNullFn();
+        $this->functionProxies['splobjectstorage::attach'] = new Call\SplObjectStorageMethod('attach');
         $this->functionProxies['splobjectstorage::contains'] = new Call\SplObjectStorageMethod('contains');
         $this->functionProxies['splobjectstorage::count'] = new Call\SplObjectStorageMethod('count');
+        $this->functionProxies['splobjectstorage::offsetexists'] = new Call\SplObjectStorageMethod('offsetexists');
+        $this->functionProxies['splobjectstorage::offsetget'] = new Call\SplObjectStorageMethod('offsetget');
+        $this->functionProxies['splobjectstorage::offsetset'] = new Call\SplObjectStorageMethod('offsetset');
     }
 
     public function compileToFile(string $file) {
