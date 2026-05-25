@@ -290,7 +290,7 @@ class String_ extends Type {
     $this->context->builder->positionAtEnd($block___c4ca4238a0b923820dcc509a6f75849b);
     $string = $fn___c4ca4238a0b923820dcc509a6f75849b->getParam(0);
     
-    $offset = $this->context->structFieldIndex($string, 'length');
+    $offset = $this->context->structFieldMap[$this->context->structNameForValue($string)]['length'];
                     $size = $this->context->builder->load(
                         $this->context->builder->structGep($string, $offset)
                     );
@@ -319,12 +319,12 @@ class String_ extends Type {
                             $allocSize = $this->context->builder->addNoSignedWrap($size, $__right);
     $type = $this->context->getTypeFromString('__string__');
                     $struct = $this->context->memory->mallocWithExtra($type, $size);
-    $offset = $this->context->structFieldIndex($struct, 'length');
+    $offset = $this->context->structFieldMap[$this->context->structNameForValue($struct)]['length'];
                 $this->context->builder->store(
                     $size,
                     $this->context->builder->structGep($struct, $offset)
                 );
-    $offset = $this->context->structFieldIndex($struct, 'value');
+    $offset = $this->context->structFieldMap[$this->context->structNameForValue($struct)]['value'];
                     $char = $this->context->builder->structGep($struct, $offset);
     $this->context->intrinsic->memset(
                     $char, 
@@ -511,7 +511,7 @@ class String_ extends Type {
                         $size
                         
                     );
-    $offset = $this->context->structFieldIndex($result, 'value');
+    $offset = $this->context->structFieldMap[$this->context->structNameForValue($result)]['value'];
                     $char = $this->context->builder->structGep($result, $offset);
     $this->context->intrinsic->memcpy($char, $value, $size, false);
     $this->context->builder->returnValue($result);
@@ -633,17 +633,17 @@ class String_ extends Type {
                 }
                 
                 $this->context->builder->positionAtEnd(array_pop($endBlock));
-    $offset = $this->context->structFieldIndex($destVar, 'length');
+    $offset = $this->context->structFieldMap[$this->context->structNameForValue($destVar)]['length'];
                     $oldSize = $this->context->builder->load(
                         $this->context->builder->structGep($destVar, $offset)
                     );
     $destValue = $this->context->memory->realloc($destVar, $newSize);
-    $offset = $this->context->structFieldIndex($destValue, 'length');
+    $offset = $this->context->structFieldMap[$this->context->structNameForValue($destValue)]['length'];
                 $this->context->builder->store(
                     $newSize,
                     $this->context->builder->structGep($destValue, $offset)
                 );
-    $offset = $this->context->structFieldIndex($destValue, 'value');
+    $offset = $this->context->structFieldMap[$this->context->structNameForValue($destValue)]['value'];
                     $char = $this->context->builder->structGep($destValue, $offset);
     $__right = $this->context->builder->intCast($oldSize, $newSize->typeOf());
                             
@@ -727,7 +727,7 @@ class String_ extends Type {
     $this->context->builder->positionAtEnd($block___6512bd43d9caa6e02c990b0a82652dca);
     $string = $fn___6512bd43d9caa6e02c990b0a82652dca->getParam(0);
     
-    $offset = $this->context->structFieldIndex($string, 'length');
+    $offset = $this->context->structFieldMap[$this->context->structNameForValue($string)]['length'];
                     $size = $this->context->builder->load(
                         $this->context->builder->structGep($string, $offset)
                     );
@@ -736,9 +736,9 @@ class String_ extends Type {
                         $size
                         
                     );
-    $offset = $this->context->structFieldIndex($string, 'value');
+    $offset = $this->context->structFieldMap[$this->context->structNameForValue($string)]['value'];
                     $char = $this->context->builder->structGep($string, $offset);
-    $offset = $this->context->structFieldIndex($new, 'value');
+    $offset = $this->context->structFieldMap[$this->context->structNameForValue($new)]['value'];
                     $dest = $this->context->builder->structGep($new, $offset);
     $__right = $size->typeOf()->constInt(1, false);
                             
@@ -896,69 +896,63 @@ class String_ extends Type {
     public function concat(Variable $dest, Variable $left, Variable $right): void {
         assert($dest->type === Variable::TYPE_STRING);
         if ($dest->kind === Variable::KIND_VALUE) {
-            throw new \LogicException('Unknown how to assign to a value');
+            // What do do?
+            throw new \LogicException("Unknown how to assign to a value");
+        } else {
+            $destVar = $dest->value;
         }
         $left = \PHPCompiler\JIT\JitNativeString::coerce($this->context, $left);
         $right = \PHPCompiler\JIT\JitNativeString::coerce($this->context, $right);
         $leftVar = $this->context->helper->loadValue($left);
         $rightVar = $this->context->helper->loadValue($right);
-        $map = $this->context->structFieldMap['__string__'];
 
-        $destSlotTy = $this->context->getStringFromType($dest->value->typeOf());
-        $destUsesValueBox = in_array($destSlotTy, ['__value__*', '__value__'], true);
-        if ($destUsesValueBox) {
-            $destStrPtr = \PHPCompiler\JIT\BasicBlockHelper::entryAlloca(
-                $this->context,
-                $this->context->getTypeFromString('__string__*')
-            );
-            $cur = \PHPCompiler\JIT\JitValueBox::normalizeValuePtr($this->context, $dest->value);
-            $str = (new \PHPCompiler\ext\standard\strval())->valueToString($this->context, $cur);
-            $this->context->builder->store($str, $destStrPtr);
-            $destVar = \PHPCompiler\JIT\BasicBlockHelper::entryAlloca(
-                $this->context,
-                $this->context->getTypeFromString('__string__**')
-            );
-            $this->context->builder->store($destStrPtr, $destVar);
-        } else {
-            $destVar = $dest->value;
-        }
+        $offset = $this->context->structFieldMap[$this->context->structNameForValue($leftVar)]['length'];
+                    $leftSize = $this->context->builder->load(
+                        $this->context->builder->structGep($leftVar, $offset)
+                    );
+    $offset = $this->context->structFieldMap[$this->context->structNameForValue($rightVar)]['length'];
+                    $rightSize = $this->context->builder->load(
+                        $this->context->builder->structGep($rightVar, $offset)
+                    );
+    $__right = $this->context->builder->intCast($rightSize, $leftSize->typeOf());
+                            
+                            
+                        
 
-        $leftSize = $this->context->builder->load(
-            $this->context->builder->structGep($leftVar, $map['length'])
-        );
-        $rightSize = $this->context->builder->load(
-            $this->context->builder->structGep($rightVar, $map['length'])
-        );
-        $size = $this->context->builder->addNoUnsignedWrap(
-            $leftSize,
-            $this->context->builder->intCast($rightSize, $leftSize->typeOf())
-        );
-        $this->context->builder->call(
-            $this->context->lookupFunction('__string__realloc'),
-            $destVar,
-            $size
-        );
-        $destValue = $this->context->builder->load($destVar);
-        $this->context->builder->store(
-            $size,
-            $this->context->builder->structGep($destValue, $map['length'])
-        );
-        $char = $this->context->builder->structGep($destValue, $map['value']);
-        $leftChar = $this->context->builder->structGep($leftVar, $map['value']);
-        $this->context->intrinsic->memcpy($char, $leftChar, $leftSize, false);
-        $char = $this->context->builder->gep($char, $leftSize);
-        $rightChar = $this->context->builder->structGep($rightVar, $map['value']);
-        $this->context->intrinsic->memcpy($char, $rightChar, $rightSize, false);
+                        
 
-        if ($destUsesValueBox) {
-            $this->context->builder->call(
-                $this->context->lookupFunction('__value__writeString'),
-                \PHPCompiler\JIT\JitValueBox::pointer($this->context, $dest->value),
-                $destValue
-            );
+                        
 
-            return;
-        }
+                        
+
+                        $size = $this->context->builder->addNoUnsignedWrap($leftSize, $__right);
+    $this->context->builder->call(
+                    $this->context->lookupFunction('__string__realloc') , 
+                    $destVar
+                    , $size
+                    
+                );
+    $destValue = $this->context->builder->load($destVar);
+    $offset = $this->context->structFieldMap[$this->context->structNameForValue($destValue)]['length'];
+                $this->context->builder->store(
+                    $size,
+                    $this->context->builder->structGep($destValue, $offset)
+                );
+    $offset = $this->context->structFieldMap[$this->context->structNameForValue($destValue)]['value'];
+                    $char = $this->context->builder->structGep($destValue, $offset);
+    $offset = $this->context->structFieldMap[$this->context->structNameForValue($leftVar)]['value'];
+                    $leftChar = $this->context->builder->structGep($leftVar, $offset);
+    $this->context->intrinsic->memcpy($char, $leftChar, $leftSize, false);
+    $char = $this->context->builder->gep(
+                        $char,
+                        //$this->context->context->int32Type()->constInt(0, false),
+                        //$this->context->context->int32Type()->constInt(0, false),
+                        $leftSize
+                    );
+    $offset = $this->context->structFieldMap[$this->context->structNameForValue($rightVar)]['value'];
+                    $rightChar = $this->context->builder->structGep($rightVar, $offset);
+    $this->context->intrinsic->memcpy($char, $rightChar, $rightSize, false);
+    
         $this->context->builder->store($destValue, $dest->value);
     }
 

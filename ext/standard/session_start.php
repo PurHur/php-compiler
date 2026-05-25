@@ -32,8 +32,10 @@ final class session_start extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'session_start() not implemented for JIT in this compiler build (issues #64, #1182–#1186)'
-        );
+        if (\count($args) > 0) {
+            throw new \LogicException('session_start() takes no arguments in this compiler build');
+        }
+
+        return JitSessionStart::invoke($context);
     }
 }

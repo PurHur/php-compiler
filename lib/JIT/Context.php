@@ -526,6 +526,19 @@ class Context {
         }
     }
 
+    /**
+     * Struct type name for structGep on an LLVM Value (pointer or by-value struct).
+     */
+    public function structNameForValue(PHPLLVM\Value $value): string
+    {
+        $ty = $value->typeOf();
+        if (PHPLLVM\Type::KIND_POINTER === $ty->getKind()) {
+            return $this->getStringFromType($ty->getElementType());
+        }
+
+        return $this->getStringFromType($ty);
+    }
+
     public function getStringFromType(PHPLLVM\Type $type): string {
         // else, try to figure it out:
         switch ($type->getKind()) {

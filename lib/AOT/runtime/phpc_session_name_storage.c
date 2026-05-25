@@ -7,4 +7,4 @@
 
 #define PHPC_SESSION_NAME_MAX 128
 
-char __phpc_session_name_storage[PHPC_SESSION_NAME_MAX + 1];
+char __phpc_session_name_storage[PHPC_SESSION_NAME_MAX + 1] = "PHPSESSID";
