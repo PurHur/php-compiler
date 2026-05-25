@@ -1,5 +1,5 @@
 --TEST--
-AOT sha1() raw_output (issue #2160)
+AOT sha1() raw_output (#2160)
 --FILE--
 <?php
 echo bin2hex(sha1('abc', true)), "\n";
