@@ -180,7 +180,17 @@ class Runtime {
     }
 
     public function jit(?Block $block) {
+        $this->jitCompileBlock($block);
+        $this->jitEmitInPlace();
+    }
+
+    /** Lower script block to LLVM IR (issue #1898 bench-compile phases). */
+    public function jitCompileBlock(?Block $block): void {
         $this->loadJit()->compile($block);
+    }
+
+    /** MCJIT link / engine creation; no-op when already compiled in-process (#153 warm). */
+    public function jitEmitInPlace(): void {
         $this->loadJitContext()->compileInPlace();
     }
 
