@@ -5,7 +5,7 @@ description: Authoritative snapshot of php-compiler — VM, JIT, AOT web deploym
 permalink: /development-status.html
 ---
 
-*Last updated: May 2026. Edit this file when milestones change; keep in sync with [issue #78](https://github.com/PurHur/php-compiler/issues/78), [#1044](https://github.com/PurHur/php-compiler/issues/1044) (North Star 1), [#1492](https://github.com/PurHur/php-compiler/issues/1492) (North Star 2; was [#1056](https://github.com/PurHur/php-compiler/issues/1056)), and the [README](https://github.com/PurHur/php-compiler/blob/master/README.md).*
+*Last updated: May 2026. Edit this file when milestones change; keep in sync with [issue #78](https://github.com/PurHur/php-compiler/issues/78), closed [#1044](https://github.com/PurHur/php-compiler/issues/1044) (North Star 1 achieved), [#1492](https://github.com/PurHur/php-compiler/issues/1492) (North Star 2; was [#1056](https://github.com/PurHur/php-compiler/issues/1056)), and the [README](https://github.com/PurHur/php-compiler/blob/master/README.md).*
 
 ## At a glance
 
@@ -14,7 +14,7 @@ permalink: /development-status.html
 | **Try it** | `git clone` → `composer install` → `./phpc test --fast` → [`docs/GETTING-STARTED.md`](https://github.com/PurHur/php-compiler/blob/master/docs/GETTING-STARTED.md) |
 | **Overall progress** | ~**50%** toward web-capable + self-hosting compiler (indicative) |
 | **Wave 3 (May 2026)** | Language **10/13** · Stdlib **12/13** ([#1380](https://github.com/PurHur/php-compiler/issues/1380)) |
-| **North Star 1** | Reference web app — VM ✅ · AOT link ✅ · AOT execute ✅ ([#764](https://github.com/PurHur/php-compiler/issues/764); close tracker [#1044](https://github.com/PurHur/php-compiler/issues/1044)) |
+| **North Star 1** | **Achieved** — reference web app VM + AOT execute + default-on CI gates ([#1044](https://github.com/PurHur/php-compiler/issues/1044) closed); follow-ups [#1750](https://github.com/PurHur/php-compiler/issues/1750), [#587](https://github.com/PurHur/php-compiler/issues/587), [#445](https://github.com/PurHur/php-compiler/issues/445), [#173](https://github.com/PurHur/php-compiler/issues/173) |
 | **North Star 2** | Self-compile — M0–M1 ✅ · M2 spine **584/588** · M5 ⬜ ([#1492](https://github.com/PurHur/php-compiler/issues/1492)
 | **Not Zend parity** | Subset compiler (not full Zend PHP) |
 
@@ -50,7 +50,7 @@ Indicative composite toward a **web-capable, self-hosting** compiler (not line-c
 | **Language** (OOP, types, CFG) | ~74% | VM/JIT OOP largely works; wave-3 language **11/12** on master; open: attributes ([#1354](https://github.com/PurHur/php-compiler/issues/1354)) |
 | **Stdlib** | ~58% | Wave-3 batch ([#1367](https://github.com/PurHur/php-compiler/issues/1367)–[#1379](https://github.com/PurHur/php-compiler/issues/1379)): **13/13** closed on master |
 | **Web AOT** (build, deploy) | ~70% | Project link ✅; CLI execute ✅; HTTP serve-aot / layout-edge bisect 🚧 |
-| **Reference app** (MiniWebApp) | ~65% | VM ✅; AOT link ✅; AOT execute ✅ |
+| **Reference app** (MiniWebApp) | ~90% | North Star 1 **achieved** — VM + AOT execute + default-on gates; optional bisect [#1750](https://github.com/PurHur/php-compiler/issues/1750) |
 | **Self-host** (North Star 2, M0–M5) | ~99% | M0–M1 ✅; M2 spine **584/588**; M3 partial (native run ✅, Zend emit); M4–M5 ⬜ — [self-host-target.md](https://github.com/PurHur/php-compiler/blob/master/docs/self-host-target.md
 
 **Overall (indicative): ~52%** toward the stated north stars below.
@@ -67,7 +67,7 @@ Work is prioritized along **two parallel tracks**:
 
 ### 1. Web-app north star {#north-star-1-web-app}
 
-**Living tracker:** [#1044](https://github.com/PurHur/php-compiler/issues/1044) · **Roadmap:** [#78](https://github.com/PurHur/php-compiler/issues/78) · **Gate ladder:** [#472](https://github.com/PurHur/php-compiler/issues/472)
+**Status:** **Achieved** (closed [#1044](https://github.com/PurHur/php-compiler/issues/1044), batch 77) · **Roadmap:** [#78](https://github.com/PurHur/php-compiler/issues/78) · **Gate ladder:** [#472](https://github.com/PurHur/php-compiler/issues/472) · **Presenter:** `make north-star1-verify` / `./phpc doctor --gates` · **Follow-ups:** [#1750](https://github.com/PurHur/php-compiler/issues/1750) (layout-edge bisect), [#587](https://github.com/PurHur/php-compiler/issues/587) (JIT project gate), [#445](https://github.com/PurHur/php-compiler/issues/445) (deploy docs), [#173](https://github.com/PurHur/php-compiler/issues/173) (FastCGI)
 
 #### Vision (definition of done)
 
@@ -80,7 +80,9 @@ Compile and run a **normal small PHP web application** end-to-end **without Zend
 - **`phpc build --project`** → native binary; **`phpc deploy`** → dist tree for CGI/FastCGI ([#609](https://github.com/PurHur/php-compiler/issues/609), [#718](https://github.com/PurHur/php-compiler/issues/718))
 - **Parity:** native `.phpc/bin/app` output matches `phpc serve` / VM for the reference route matrix
 
-This is **North Star 1**. It is **orthogonal** to [North Star 2 (self-host)](#north-star-2-self-host) — the compiler compiling its own `lib/` tree.
+This is **North Star 1**. **Achieved on `master`:** VM serve, AOT link, AOT execute (query + PATH_INFO), and default-on CI gates for MiniWebApp ([#1044](https://github.com/PurHur/php-compiler/issues/1044) closed). Remaining work is **optional polish** — layout-edge bisect ([#1750](https://github.com/PurHur/php-compiler/issues/1750)), JIT project smoke ([#587](https://github.com/PurHur/php-compiler/issues/587)), production deploy docs ([#445](https://github.com/PurHur/php-compiler/issues/445)), FastCGI adapter ([#173](https://github.com/PurHur/php-compiler/issues/173)) — not blocked on [#764](https://github.com/PurHur/php-compiler/issues/764).
+
+It is **orthogonal** to [North Star 2 (self-host)](#north-star-2-self-host) — the compiler compiling its own `lib/` tree.
 
 #### Reference application: `003-MiniWebApp`
 
@@ -108,11 +110,11 @@ Canonical app: [`examples/003-MiniWebApp`](https://github.com/PurHur/php-compile
 | **AOT execute** | ✅ **query + PATH_INFO** | Home, hello, contact, api/status via CLI + CGI ([#747](https://github.com/PurHur/php-compiler/issues/747), [#764](https://github.com/PurHur/php-compiler/issues/764)); optional layout-edge bisect ladder below |
 | **AOT HTTP / deploy 003** | 🚧 **partial** | `MiniWebAppServeAotTest` default-on in full CI ([#1524](https://github.com/PurHur/php-compiler/issues/1524), [#1067](https://github.com/PurHur/php-compiler/issues/1067)); shell `--aot` curls opt-in ([#833](https://github.com/PurHur/php-compiler/issues/833)) |
 
-Examples **000–002** and **004** already pass VM + AOT link + AOT execute. **003** is the integration stress test for real web apps.
+Examples **000–004** pass VM + AOT link + AOT execute. **003-MiniWebApp** is the integration stress test that closed North Star 1 ([#1044](https://github.com/PurHur/php-compiler/issues/1044)).
 
 #### CI gate ladder (stages 0 → 4d)
 
-Run `./script/miniwebapp-gates.sh` or `phpc doctor --gates`. Details: [miniwebapp-gates.md](https://github.com/PurHur/php-compiler/blob/master/docs/miniwebapp-gates.md) (repo only).
+Run `./script/miniwebapp-gates.sh`, `phpc doctor --gates`, or the presenter bundle `make north-star1-verify` ([#1845](https://github.com/PurHur/php-compiler/issues/1845)). Details: [miniwebapp-gates.md](https://github.com/PurHur/php-compiler/blob/master/docs/miniwebapp-gates.md) (repo only).
 
 | Stage | Check | Default on `master` |
 |-------|--------|---------------------|
@@ -127,7 +129,7 @@ Run `./script/miniwebapp-gates.sh` or `phpc doctor --gates`. Details: [miniwebap
 | 4c | `examples-aot-smoke` 003 slice | ✅ ([#683](https://github.com/PurHur/php-compiler/issues/683)) |
 | 4d | Deploy smoke (003) | ✅ `DEPLOY_SMOKE_003_EXECUTE=1` ([#745](https://github.com/PurHur/php-compiler/issues/745)) |
 
-#### AOT execute bisect ladder (layout-edge refinements; core execute ✅ #764)
+#### AOT execute bisect ladder (optional layout-edge refinements; core execute ✅ — tracked in [#1750](https://github.com/PurHur/php-compiler/issues/1750))
 
 `MiniWebAppAotExecuteTest` and `examples-aot-smoke` 003 are green on `master`. The ladder below tracks **optional** layout/include edge cases — see [#78](https://github.com/PurHur/php-compiler/issues/78) bisect table:
 
@@ -146,6 +148,8 @@ DevEx: [#879](https://github.com/PurHur/php-compiler/issues/879) `miniwebapp-aot
 #### Verify locally
 
 ```bash
+make north-star1-verify          # presenter: doctor --gates + ci-fast + AOT execute (#1044)
+./phpc doctor --gates          # gate ladder status without full CI
 ./phpc lint --all examples/003-MiniWebApp
 ./phpc serve examples/003-MiniWebApp
 cd examples/003-MiniWebApp && ../../phpc build --project .
@@ -285,9 +289,9 @@ GitHub issues use labels `phase-0:Foundation` … `phase-5:reference-app`. Deliv
 | **1 — Language** | OOP, types, includes, `::class` | VM/JIT strong; native AOT gaps remain |
 | **2 — Stdlib** | Web builtins, filesystem, JSON, regex | Ongoing batches; audit in repo |
 | **3 — Web AOT** | `phpc build --project`, deploy, runtime includes | Link ✅; execute ✅ ([North Star 1](#north-star-1-web-app)) |
-| **4 — Polish** | MiniWebApp gates, HTTP smokes, doc sync | Active |
+| **4 — Polish** | North Star 1 achieved ([#1044](https://github.com/PurHur/php-compiler/issues/1044)); optional bisect [#1750](https://github.com/PurHur/php-compiler/issues/1750), JIT [#587](https://github.com/PurHur/php-compiler/issues/587), deploy [#445](https://github.com/PurHur/php-compiler/issues/445) | Active |
 
-**Current active phase:** Phase 4 polish (AOT execute matrix + HTTP smokes) while self-host waves continue in parallel.
+**Current active phase:** Phase 4 polish (optional layout-edge bisect + HTTP/JIT/deploy follow-ups) while self-host waves continue in parallel.
 
 ---
 
@@ -326,11 +330,11 @@ Commands: `./phpc run`, `./phpc build`, `./phpc serve`, `make examples-aot-smoke
 ## How to contribute
 
 1. **Try the project:** [GETTING-STARTED.md](https://github.com/PurHur/php-compiler/blob/master/docs/GETTING-STARTED.md) (clone, demo script, `phpc` cheat sheet).
-2. Pick an issue by [phase label](https://github.com/PurHur/php-compiler/issues), [#1044](https://github.com/PurHur/php-compiler/issues/1044) (North Star 1), [#1492](https://github.com/PurHur/php-compiler/issues/1492) (North Star 2), or self-host bootstrap issues.
+2. Pick an issue by [phase label](https://github.com/PurHur/php-compiler/issues), [#1750](https://github.com/PurHur/php-compiler/issues/1750) / [#587](https://github.com/PurHur/php-compiler/issues/587) (North Star 1 follow-ups; [#1044](https://github.com/PurHur/php-compiler/issues/1044) closed), [#1492](https://github.com/PurHur/php-compiler/issues/1492) (North Star 2), or self-host bootstrap issues.
 3. For self-host work, run `./script/bootstrap-wave-check.sh` before opening a PR.
 4. Update **this file** (`docs/pages/development-status.md`) when a user-visible milestone lands (and sync [README](https://github.com/PurHur/php-compiler/blob/master/README.md) / [index.html](index.html) if the public story changed).
 
-- [North Star 1 tracker #1044](https://github.com/PurHur/php-compiler/issues/1044)
+- [North Star 1 (closed #1044)](https://github.com/PurHur/php-compiler/issues/1044) · [bisect follow-up #1750](https://github.com/PurHur/php-compiler/issues/1750)
 - [North Star 2 tracker #1492](https://github.com/PurHur/php-compiler/issues/1492)
 - [Open issues](https://github.com/PurHur/php-compiler/issues)
 - [Contributing guide](https://github.com/PurHur/php-compiler/blob/master/CONTRIBUTING.md)

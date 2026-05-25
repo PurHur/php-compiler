@@ -45,7 +45,7 @@ Do **not** publish `/docs` alone — that would expose bootstrap inventory and c
 2. **`index.html`** — badges and progress % if the story changed.
 3. **`README.md`** / **`docs/GETTING-STARTED.md`** — clone/demo commands; matrices stay in README contributor sections only.
 
-Keep aligned with [#78](https://github.com/PurHur/php-compiler/issues/78), [#1044](https://github.com/PurHur/php-compiler/issues/1044), [#1492](https://github.com/PurHur/php-compiler/issues/1492).
+Keep aligned with [#78](https://github.com/PurHur/php-compiler/issues/78), closed [#1044](https://github.com/PurHur/php-compiler/issues/1044) (North Star 1 achieved), [#1492](https://github.com/PurHur/php-compiler/issues/1492).
 
 ## Local preview
 
