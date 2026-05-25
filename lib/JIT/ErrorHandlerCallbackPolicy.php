@@ -26,4 +26,28 @@ final class ErrorHandlerCallbackPolicy
         return 'set_error_handler() callback must be null or a string user-function name in this compiler build; '
             .self::DEFERRED_KINDS.' are deferred (#1379, #142)';
     }
+
+    public static function isJitLowerable(Variable $callback): bool
+    {
+        return self::isJitLowerableScalar(
+            $callback->type,
+            $callback->isNullConstant,
+            $callback->compileTimeString
+        );
+    }
+
+    public static function isJitLowerableScalar(int $type, bool $isNullConstant, ?string $compileTimeString): bool
+    {
+        if ($isNullConstant) {
+            return false;
+        }
+
+        return Variable::TYPE_STRING === $type && null !== $compileTimeString;
+    }
+
+    public static function jitRejectionMessage(): string
+    {
+        return 'set_error_handler() callback must be a compile-time string function name in this compiler build; '
+            .self::DEFERRED_KINDS.' are deferred (#1379)';
+    }
 }

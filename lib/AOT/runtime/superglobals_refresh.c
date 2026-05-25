@@ -2165,9 +2165,17 @@ void __compiler_undefined_array_key_warning_long(long long key)
     fprintf(stderr, "Warning: Undefined array key %lld\n", key);
 }
 
+extern int __phpc_error_handler_dispatch(int errno, const char *msg, size_t msg_len, int line);
+
 void __compiler_trigger_error(const char *message, size_t len, int level)
 {
     if (!message) {
+        return;
+    }
+    if (__phpc_error_handler_dispatch(level, message, len, 0)) {
+        if (256 == level) {
+            abort();
+        }
         return;
     }
     const char *prefix = "Unknown error";

@@ -36,9 +36,10 @@ final class restore_error_handler_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        unset($context, $args);
-        throw new \LogicException(
-            'restore_error_handler() is not implemented for JIT in this compiler build (#1379)'
-        );
+        if (\count($args) > 0) {
+            throw new \LogicException('restore_error_handler() takes no arguments');
+        }
+
+        return JitErrorHandler::restore($context);
     }
 }
