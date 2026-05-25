@@ -275,6 +275,27 @@ ci_run_miniwebapp_web_smoke() {
   "$_CI_SCRIPT_DIR/examples-web-smoke.sh" --miniwebapp-only
 }
 
+# 003-MiniWebApp AOT HTTP curls via phpc serve --aot (issues #833, #1523); default MINIWEBAPP_WEB_SMOKE_AOT_GATE=1.
+ci_run_miniwebapp_web_smoke_aot() {
+  if [[ "${MINIWEBAPP_WEB_SMOKE_AOT_GATE:-1}" != "1" ]]; then
+    return 0
+  fi
+  if [[ -n "${PHP_COMPILER_SKIP_SERVE_TESTS:-}" ]]; then
+    echo "examples-web-smoke (003 AOT): skipped (PHP_COMPILER_SKIP_SERVE_TESTS is set)"
+    return 0
+  fi
+  if ! ci_can_bind_loopback; then
+    echo "examples-web-smoke (003 AOT): skipped (cannot bind loopback TCP)"
+    return 0
+  fi
+  if ! ci_llvm_ready; then
+    echo "examples-web-smoke (003 AOT): skipped (LLVM 9 not available)"
+    return 0
+  fi
+  echo "examples-web-smoke (003 AOT): MiniWebApp phpc serve --aot curls (MINIWEBAPP_WEB_SMOKE_AOT_GATE=1 default, #1523, #833)..."
+  "$_CI_SCRIPT_DIR/examples-web-smoke.sh" --miniwebapp-only --aot
+}
+
 # HTTP curl harness for shipped web examples via phpc serve --aot (issue #444).
 ci_run_examples_web_smoke_aot() {
   if [[ -n "${PHP_COMPILER_SKIP_SERVE_TESTS:-}" ]]; then

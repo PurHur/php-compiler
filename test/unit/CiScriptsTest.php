@@ -49,6 +49,29 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('--fail-on-skipped', $body);
     }
 
+    public function testCiLocalHonorsMiniWebAppWebSmokeAotGate(): void
+    {
+        $local = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-local.sh');
+        $this->assertStringContainsString('MINIWEBAPP_WEB_SMOKE_AOT_GATE', $local);
+        $this->assertStringContainsString('MINIWEBAPP_WEB_SMOKE_AOT_GATE:-1', $local);
+        $this->assertStringContainsString('ci_run_miniwebapp_web_smoke_aot', $local);
+
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('MINIWEBAPP_WEB_SMOKE_AOT_GATE', $common);
+        $this->assertStringContainsString('MINIWEBAPP_WEB_SMOKE_AOT_GATE:-1', $common);
+        $this->assertStringContainsString('--miniwebapp-only --aot', $common);
+    }
+
+    public function testCiDefaultsEnvDefinesMiniWebAppWebSmokeAotGateOn(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString(
+            'MINIWEBAPP_WEB_SMOKE_AOT_GATE="${MINIWEBAPP_WEB_SMOKE_AOT_GATE:-1}"',
+            $defaults
+        );
+        $this->assertStringContainsString('#1523', $defaults);
+    }
+
     public function testCiLocalHonorsMiniWebAppWebSmokeGate(): void
     {
         $local = dirname(__DIR__, 2).'/script/ci-local.sh';
@@ -396,6 +419,8 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('MINIWEBAPP_VM_CLI_GATE', $doc);
         $this->assertStringContainsString('MINIWEBAPP_SERVE_GATE', $doc);
         $this->assertStringContainsString('MINIWEBAPP_WEB_SMOKE_GATE', $doc);
+        $this->assertStringContainsString('MINIWEBAPP_WEB_SMOKE_AOT_GATE', $doc);
+        $this->assertStringContainsString('ci_run_miniwebapp_web_smoke_aot', $doc);
         $this->assertStringContainsString('MINIWEBAPP_AOT_LINK_GATE', $doc);
         $this->assertStringContainsString('MINIWEBAPP_AOT_EXECUTE_GATE', $doc);
         $this->assertStringContainsString('ci_run_miniwebapp_aot_execute', $doc);

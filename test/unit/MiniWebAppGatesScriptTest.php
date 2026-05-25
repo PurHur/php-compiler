@@ -43,7 +43,11 @@ final class MiniWebAppGatesScriptTest extends TestCase
         $this->assertStringContainsString('Stage 1b VM CLI', $combined);
         $this->assertStringContainsString('issues/597', $combined);
         $this->assertStringContainsString('issues/472', $combined);
-        $this->assertStringContainsString('Stage 4a AOT dry-run', $combined);
+        $this->assertStringContainsString('Stage 3b ci-local shell smoke', $combined);
+        $this->assertStringContainsString('Stage 3c ci-local AOT web-smoke', $combined);
+        $this->assertStringContainsString('MINIWEBAPP_WEB_SMOKE_AOT_GATE', $combined);
+        $this->assertStringContainsString('issues/1523', $combined);
+        $this->assertStringContainsString('DEPLOY_SMOKE_003_EXECUTE=1 default', $combined);
         $this->assertStringContainsString('issues/624', $combined);
         $this->assertStringContainsString('Stage 4c AOT smoke', $combined);
         $this->assertStringContainsString('Stage 4d deploy-smoke', $combined);

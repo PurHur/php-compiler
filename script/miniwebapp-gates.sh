@@ -32,6 +32,8 @@ Environment (enable next gates):
   MINIWEBAPP_SERVE_GATE=0     skip ServeTest miniwebapp during fast iteration
   MINIWEBAPP_WEB_SMOKE_GATE=1     003 PATH_INFO curls in ci-local (default on — #664)
   MINIWEBAPP_WEB_SMOKE_GATE=0     skip shell PATH_INFO curls during iteration
+  MINIWEBAPP_WEB_SMOKE_AOT_GATE=1 003 phpc serve --aot curls in ci-local (default on — #1523, #833)
+  MINIWEBAPP_WEB_SMOKE_AOT_GATE=0 skip 003 AOT HTTP curls during iteration
   MINIWEBAPP_AOT_LINK_GATE=1      phpc build --project in ExamplesCompileTest (default on — #754)
   MINIWEBAPP_AOT_LINK_GATE=0      skip 003 native link gate during iteration
   MINIWEBAPP_AOT_EXECUTE_GATE=1   run 003 AOT binary CLI execute in ci-local (default — #747)
@@ -80,6 +82,11 @@ web_smoke_gate_explicit=0
 if [[ -n "${MINIWEBAPP_WEB_SMOKE_GATE+x}" ]]; then
   web_smoke_gate_explicit=1
 fi
+web_smoke_aot_gate="${MINIWEBAPP_WEB_SMOKE_AOT_GATE:-1}"
+web_smoke_aot_gate_explicit=0
+if [[ -n "${MINIWEBAPP_WEB_SMOKE_AOT_GATE+x}" ]]; then
+  web_smoke_aot_gate_explicit=1
+fi
 
 stage0=0
 stage1=0
@@ -87,6 +94,8 @@ stage1b=0
 stage2=0
 stage3=0
 stage3b=0
+stage3c=0
+stage3c_wired=0
 stage4a=0
 stage4serve=0
 stage4c=0
@@ -108,6 +117,9 @@ AOT_SMOKE_003_STDERR=""
 deploy_smoke_003_exit=-1
 deploy_smoke_003_skipped=0
 DEPLOY_SMOKE_003_STDERR=""
+web_smoke_aot_003_exit=-1
+web_smoke_aot_003_skipped=0
+WEB_SMOKE_AOT_003_STDERR=""
 
 resolve_llvm_dir() {
   if [[ -n "${PHP_COMPILER_LLVM_PATH:-}" ]]; then
@@ -159,6 +171,14 @@ fi
 if [[ "${web_smoke_gate}" == "1" ]] \
   && grep -q 'MINIWEBAPP_WEB_SMOKE_GATE:-1' "${ROOT}/script/ci-local.sh" 2>/dev/null; then
   stage3b=1
+fi
+
+# Stage 3c: ci-local 003 AOT web-smoke gate default on (#1523, #833) — probe below after LLVM_DIR.
+stage3c_wired=0
+if [[ "${web_smoke_aot_gate}" == "1" ]] \
+  && grep -q 'MINIWEBAPP_WEB_SMOKE_AOT_GATE:-1' "${ROOT}/script/ci-defaults.env" 2>/dev/null \
+  && grep -q 'ci_run_miniwebapp_web_smoke_aot' "${ROOT}/script/ci-common.sh" 2>/dev/null; then
+  stage3c_wired=1
 fi
 
 # Stage 4a: phpc build --project --dry-run (#624, #675).
@@ -256,6 +276,28 @@ if [[ -n "${LLVM_DIR}" ]]; then
   rm -f "${deploy_smoke_log}"
 elif [[ "${aot_dry_run_skipped}" -eq 1 ]]; then
   deploy_smoke_003_skipped=1
+fi
+
+# Stage 3c probe: examples-web-smoke --miniwebapp-only --aot (#833, #1523).
+if [[ -n "${LLVM_DIR}" && "${web_smoke_aot_gate}" == "1" ]]; then
+  web_smoke_aot_log="$(mktemp)"
+  set +e
+  "${ROOT}/script/examples-web-smoke.sh" --miniwebapp-only --aot >"${web_smoke_aot_log}" 2>&1
+  web_smoke_aot_003_exit=$?
+  set -e
+  if [[ -s "${web_smoke_aot_log}" ]]; then
+    WEB_SMOKE_AOT_003_STDERR="$(tail -n 8 "${web_smoke_aot_log}")"
+  fi
+  if [[ "${web_smoke_aot_003_exit}" -eq 0 ]] \
+    && grep -qE '003-MiniWebApp: skip|skipped \(' "${web_smoke_aot_log}" 2>/dev/null; then
+    web_smoke_aot_003_skipped=1
+  elif [[ "${web_smoke_aot_003_exit}" -eq 0 ]] \
+    && grep -q 'examples-web-smoke: ok' "${web_smoke_aot_log}" 2>/dev/null; then
+    stage3c=1
+  fi
+  rm -f "${web_smoke_aot_log}"
+elif [[ "${aot_dry_run_skipped}" -eq 1 && "${web_smoke_aot_gate}" == "1" ]]; then
+  web_smoke_aot_003_skipped=1
 fi
 
 # Stage 4b2: ordered #764 AOT PHPT ladder (opt-in MINIWEBAPP_AOT_BISECT_GATE=1, #879).
@@ -360,6 +402,35 @@ fi
 echo "       ${REPO_URL}/issues/664"
 echo "       ${REPO_URL}/issues/633"
 
+echo "$(mark "${stage3c}") Stage 3c ci-local AOT web-smoke — MINIWEBAPP_WEB_SMOKE_AOT_GATE=1 default in ci-local (#1523, #833)"
+if [[ "${web_smoke_aot_gate_explicit}" -eq 1 ]]; then
+  echo "       env: MINIWEBAPP_WEB_SMOKE_AOT_GATE=${MINIWEBAPP_WEB_SMOKE_AOT_GATE} (explicit)"
+else
+  echo "       env: default on (unset → 1 via ci-defaults.env / ci-local.sh)"
+fi
+echo "       ${REPO_URL}/issues/1523"
+echo "       ${REPO_URL}/issues/833"
+echo "       MINIWEBAPP_WEB_SMOKE_AOT_GATE=0 skips 003 AOT HTTP curls during iteration"
+if [[ "${stage3c_wired}" -eq 0 ]]; then
+  echo "       gate not wired in ci-defaults.env / ci-common.sh"
+elif [[ "${aot_dry_run_skipped}" -eq 1 && -z "${LLVM_DIR}" ]]; then
+  echo "       LLVM 9 not available (script/install-llvm9.sh or .llvm/)"
+elif [[ "${web_smoke_aot_gate}" != "1" ]]; then
+  echo "       003 AOT web-smoke probe: skipped (MINIWEBAPP_WEB_SMOKE_AOT_GATE=0)"
+elif [[ "${web_smoke_aot_003_skipped}" -eq 1 ]]; then
+  echo "       003 AOT web-smoke probe: skipped (serve/loopback)"
+  if [[ -n "${WEB_SMOKE_AOT_003_STDERR}" ]]; then
+    echo "${WEB_SMOKE_AOT_003_STDERR}" | sed 's/^/         /'
+  fi
+elif [[ "${web_smoke_aot_003_exit}" -eq 0 && "${stage3c}" -eq 1 ]]; then
+  echo "       003 AOT web-smoke probe: green"
+elif [[ "${web_smoke_aot_003_exit}" -ge 0 ]]; then
+  echo "       003 AOT web-smoke probe: exit ${web_smoke_aot_003_exit} (see #833/#676)"
+  if [[ -n "${WEB_SMOKE_AOT_003_STDERR}" ]]; then
+    echo "${WEB_SMOKE_AOT_003_STDERR}" | sed 's/^/         /'
+  fi
+fi
+
 echo "$(mark "${stage4a}") Stage 4a AOT dry-run — phpc build --project --dry-run (#624, #675)"
 echo "       ${REPO_URL}/issues/624"
 if [[ "${aot_dry_run_skipped}" -eq 1 ]]; then
@@ -378,10 +449,11 @@ echo "       ${REPO_URL}/issues/1524"
 echo "       ${REPO_URL}/issues/1067"
 echo "       MINIWEBAPP_SERVE_AOT_GATE=0 skips serve-aot PHPUnit during iteration"
 
-echo "$(mark "${stage4d}") Stage 4d deploy-smoke — phpc deploy + PHPC_DEPLOY_ROOT 003 execute (#745, #718)"
+echo "$(mark "${stage4d}") Stage 4d deploy-smoke — phpc deploy + PHPC_DEPLOY_ROOT 003 execute (#745, #718, #1530)"
 echo "       ${REPO_URL}/issues/745"
 echo "       ${REPO_URL}/issues/718"
-echo "       DEPLOY_SMOKE_003_EXECUTE=1 ./script/deploy-smoke.sh --example 003"
+echo "       DEPLOY_SMOKE_003_EXECUTE=1 default in ci-defaults.env (#1530)"
+echo "       DEPLOY_SMOKE_003_EXECUTE=0 ./script/deploy-smoke.sh --example 003   # opt-out"
 if [[ "${aot_dry_run_skipped}" -eq 1 && -z "${LLVM_DIR}" ]]; then
   echo "       LLVM 9 not available (script/install-llvm9.sh or .llvm/)"
 elif [[ "${deploy_smoke_003_skipped}" -eq 1 ]]; then
@@ -466,6 +538,8 @@ echo "  ./script/ci-local.sh --filter ServeTest   # MINIWEBAPP_SERVE_GATE=1 by d
 echo "  MINIWEBAPP_SERVE_GATE=0 ./script/ci-local.sh   # skip miniwebapp ServeTest"
 echo "  ./script/ci-local.sh   # MINIWEBAPP_WEB_SMOKE_GATE=1 by default (#664)"
 echo "  MINIWEBAPP_WEB_SMOKE_GATE=0 ./script/ci-local.sh   # skip 003 shell curls"
+echo "  MINIWEBAPP_WEB_SMOKE_AOT_GATE=1 ./script/examples-web-smoke.sh --miniwebapp-only --aot   # stage 3c (#1523)"
+echo "  MINIWEBAPP_WEB_SMOKE_AOT_GATE=0 ./script/ci-local.sh   # skip 003 AOT HTTP curls"
 echo "  ./phpc build --project examples/003-MiniWebApp --dry-run   # stage 4a (#624)"
 echo "  eval \"\$(./script/miniwebapp-cgi-env.php --export shellQueryRouteHome)\"   # stage 4b2 (#773)"
 echo "  eval \"\$(./script/miniwebapp-cgi-env.php --export aotFrontController)\""

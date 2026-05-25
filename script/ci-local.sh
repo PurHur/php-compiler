@@ -37,6 +37,11 @@ if [[ "${MINIWEBAPP_WEB_SMOKE_GATE:-1}" == "1" && -n "${PHP_COMPILER_SKIP_SERVE_
   exit 1
 fi
 
+if [[ "${MINIWEBAPP_WEB_SMOKE_AOT_GATE:-1}" == "1" && -n "${PHP_COMPILER_SKIP_SERVE_TESTS:-}" ]]; then
+  echo "MINIWEBAPP_WEB_SMOKE_AOT_GATE=1 (default) requires serve tests; unset PHP_COMPILER_SKIP_SERVE_TESTS (#1523, #833)" >&2
+  exit 1
+fi
+
 if [[ -z "${PHP_COMPILER_SKIP_SERVE_TESTS:-}" ]]; then
   serve_groups=(--group serve)
   if [[ "${MINIWEBAPP_SERVE_GATE:-1}" == "1" ]]; then
@@ -90,6 +95,7 @@ if ci_llvm_ready; then
   fi
 
   ci_run_examples_web_smoke_aot
+  ci_run_miniwebapp_web_smoke_aot
   ci_run_examples_aot_smoke
   ci_run_deploy_smoke
 fi

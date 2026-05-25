@@ -135,9 +135,10 @@ Progressive stages from `script/miniwebapp-gates.sh` / `make miniwebapp-gates` (
 | 2 | `ServeTest` `@group miniwebapp` | ✅ default on |
 | 3 | `examples-web-smoke.sh` 003 curls | ✅ wired |
 | 3b | `MINIWEBAPP_WEB_SMOKE_GATE=1` shell smoke | ✅ default on |
+| 3c | `MINIWEBAPP_WEB_SMOKE_AOT_GATE=1` AOT HTTP curls | ✅ default on ([#1523](https://github.com/PurHur/php-compiler/issues/1523), [#833](https://github.com/PurHur/php-compiler/issues/833)) |
 | 4a | `phpc build --project --dry-run` | probe (LLVM) |
 | 4c | `EXAMPLES_AOT_SMOKE_ONLY=003` smoke slice | ✅ when `MINIWEBAPP_AOT_EXECUTE_GATE=1` (default) ([#683](https://github.com/PurHur/php-compiler/issues/683)) |
-| 4d | `DEPLOY_SMOKE_003_EXECUTE=1 deploy-smoke --example 003` | ✅ when gated ([#745](https://github.com/PurHur/php-compiler/issues/745)) |
+| 4d | `deploy-smoke --example 003` execute | ✅ default on ([#1530](https://github.com/PurHur/php-compiler/issues/1530), [#745](https://github.com/PurHur/php-compiler/issues/745)) |
 | 4b | `ExamplesCompileTest::test003MiniWebAppBuildLinks` | ✅ link gate ([#754](https://github.com/PurHur/php-compiler/issues/754)) |
 | 4b2 | `test003MiniWebAppExecutesWithCgiEnv` | ✅ default on ([#747](https://github.com/PurHur/php-compiler/issues/747), [#791](https://github.com/PurHur/php-compiler/issues/791)) |
 | 4b2 bisect | `script/miniwebapp-aot-bisect.sh` ordered PHPT ladder | opt-in `MINIWEBAPP_AOT_BISECT_GATE=1` ([#879](https://github.com/PurHur/php-compiler/issues/879), [#764](https://github.com/PurHur/php-compiler/issues/764)) |
@@ -164,6 +165,7 @@ MINIWEBAPP_VM_CLI_GATE=1 ../../script/ci-fast.sh --filter 'MiniWebApp.*VmCli'
 ../../script/ci-local.sh --filter ServeTest
 MINIWEBAPP_SERVE_GATE=0 ../../script/ci-local.sh   # skip miniwebapp ServeTest while iterating
 MINIWEBAPP_WEB_SMOKE_GATE=0 ../../script/ci-local.sh   # skip 003 shell PATH_INFO curls (#664)
+MINIWEBAPP_WEB_SMOKE_AOT_GATE=0 ../../script/ci-local.sh   # skip 003 AOT HTTP curls (#1523)
 MINIWEBAPP_AOT_LINK_GATE=0 ../../script/ci-local.sh --filter ExamplesCompileTest   # skip 003 link gate (#754)
 ../../script/ci-local.sh --filter test003MiniWebAppExecutesWithCgiEnv
 ../../script/miniwebapp-aot-bisect.sh --list   # bisect ladder (#879)

@@ -73,6 +73,13 @@ final class MiniWebAppUnskipMatrixTest extends TestCase
         $this->assertStringContainsString('#747', $body);
     }
 
+    public function testCiDefaultsDocumentsWebSmokeAotGate(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString('MINIWEBAPP_WEB_SMOKE_AOT_GATE="${MINIWEBAPP_WEB_SMOKE_AOT_GATE:-1}"', $body);
+        $this->assertStringContainsString('#1523', $body);
+    }
+
     public function testCiDefaultsDocumentsDeploySmoke003ExecuteGate(): void
     {
         $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');

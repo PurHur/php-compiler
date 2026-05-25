@@ -192,7 +192,7 @@ resolve_llvm_dir() {
 
 miniwebapp_aot_require_pass() {
   [[ "${MINIWEBAPP_AOT_EXECUTE_GATE:-0}" == "1" ]] \
-    || [[ "${MINIWEBAPP_WEB_SMOKE_AOT_GATE:-0}" == "1" ]]
+    || [[ "${MINIWEBAPP_WEB_SMOKE_AOT_GATE:-1}" == "1" ]]
 }
 
 # CLI byte probe aligned with MiniWebAppCgiEnv::shellQueryRouteHome (#773, #809).
@@ -236,7 +236,7 @@ ensure_miniwebapp_aot_binary() {
     return 1
   fi
   export PHP_COMPILER_LLVM_PATH="$llvm_dir"
-  echo "examples-web-smoke: 003-MiniWebApp: phpc build --project -> ${binary}"
+  echo "examples-web-smoke: 003-MiniWebApp: phpc build --project -> ${binary}" >&2
   if ! "$PHPC" build --project "$project_dir"; then
     return 1
   fi

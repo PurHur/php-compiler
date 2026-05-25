@@ -89,6 +89,9 @@ final class PhpcDoctorTest extends TestCase
         $this->assertStringContainsString('MINIWEBAPP_LINT_GATE', $result['stdout']);
         $this->assertStringContainsString('MINIWEBAPP_SERVE_GATE', $result['stdout']);
         $this->assertStringContainsString('MINIWEBAPP_WEB_SMOKE_GATE', $result['stdout']);
+        $this->assertStringContainsString('MINIWEBAPP_WEB_SMOKE_AOT_GATE', $result['stdout']);
+        $this->assertStringContainsString('Stage 3c', $result['stdout']);
+        $this->assertStringContainsString('DEPLOY_SMOKE_003_EXECUTE=1 default', $result['stdout']);
     }
 
     /**
