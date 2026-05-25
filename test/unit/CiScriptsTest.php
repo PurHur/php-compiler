@@ -303,6 +303,20 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('deploy-smoke.sh', $makefile);
     }
 
+    public function testMakefileHasExamplesFileuploadDeploySmokeTarget(): void
+    {
+        $makefile = (string) file_get_contents(dirname(__DIR__, 2).'/Makefile');
+        $this->assertStringContainsString('examples-fileupload-deploy-smoke:', $makefile);
+        $this->assertStringContainsString('examples-fileupload-deploy-smoke.sh', $makefile);
+
+        $script = dirname(__DIR__, 2).'/script/examples-fileupload-deploy-smoke.sh';
+        $this->assertFileExists($script);
+        $this->assertTrue(is_executable($script));
+        $body = (string) file_get_contents($script);
+        $this->assertStringContainsString('FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE=1', $body);
+        $this->assertStringContainsString('deploy-smoke.sh --example 006', $body);
+    }
+
     public function testCiLocalHonorsExamplesAotSmokeGate(): void
     {
         $local = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-local.sh');
