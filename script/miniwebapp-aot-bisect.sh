@@ -33,6 +33,8 @@ readonly -a BISECT_STEPS=(
   'layout_title_branch|layout_title_branch|784'
   'layout_partial_chain|layout_partial_chain|807'
   'method_include_void_array_property|method_include_void_array_property|846'
+  'render_hello_request_assign|render_hello_request_assign|846'
+  'class_method_json_api|class_method_json_api|849'
 )
 
 FROM_STEP=""

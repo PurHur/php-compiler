@@ -102,6 +102,7 @@ final class MiniWebAppAotExecuteTest extends TestCase
 
     public function testQueryRouteApiStatus(): void
     {
+        // Minimal fixture parity: test/aot/ClassMethodJsonApiAotTest.php (#849, #1820).
         $out = $this->runBinaryWithCgiEnv(MiniWebAppCgiEnv::queryRouteApiStatus());
         $this->assertStringContainsString('"ok":true', $out);
         $this->assertStringContainsString('"service":"003-MiniWebApp"', $out);

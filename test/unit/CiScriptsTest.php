@@ -500,6 +500,8 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('issues/879', $body);
         $this->assertStringContainsString('isset_object_property_array', $body);
         $this->assertStringContainsString('nested_include_two_tier', $body);
+        $this->assertStringContainsString('class_method_json_api', $body);
+        $this->assertStringContainsString('render_hello_request_assign', $body);
         $this->assertStringContainsString('--from', $body);
         $this->assertStringContainsString('--list', $body);
     }
@@ -510,6 +512,36 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('miniwebapp-bisect', $ciLocal);
         $bisectTest = (string) file_get_contents(dirname(__DIR__).'/aot/MiniWebAppBisectAotTest.php');
         $this->assertStringContainsString('@group miniwebapp-bisect', $bisectTest);
+    }
+
+    public function testClassMethodJsonApiAotFixtureRegistered(): void
+    {
+        $fixture = dirname(__DIR__).'/fixtures/aot/cases/class_method_json_api.phpt';
+        $this->assertFileExists($fixture);
+        $body = (string) file_get_contents($fixture);
+        $this->assertStringContainsString('renderApiStatus', $body);
+        $this->assertStringContainsString('"ok":true', $body);
+
+        $executeTest = (string) file_get_contents(dirname(__DIR__).'/aot/ClassMethodJsonApiAotTest.php');
+        $this->assertStringContainsString('@group miniwebapp-aot-execute', $executeTest);
+        $this->assertStringContainsString('class_method_json_api', $executeTest);
+    }
+
+    public function testMiniWebAppBisectLadderMatchesScript(): void
+    {
+        $phpTest = (string) file_get_contents(dirname(__DIR__).'/aot/MiniWebAppBisectAotTest.php');
+        preg_match('/private const BISECT_LADDER = \[(.*?)\];/s', $phpTest, $phpMatch);
+        $this->assertNotEmpty($phpMatch[1] ?? null);
+        preg_match_all("/'([^']+)'/", $phpMatch[1], $phpSteps);
+        $phpLadder = $phpSteps[1];
+
+        $script = (string) file_get_contents(dirname(__DIR__, 2).'/script/miniwebapp-aot-bisect.sh');
+        preg_match('/readonly -a BISECT_STEPS=\((.*?)\)/s', $script, $scriptMatch);
+        $this->assertNotEmpty($scriptMatch[1] ?? null);
+        preg_match_all("/'([^|']+)\|/", $scriptMatch[1], $scriptSteps);
+        $scriptLadder = $scriptSteps[1];
+
+        $this->assertSame($phpLadder, $scriptLadder, 'MiniWebAppBisectAotTest BISECT_LADDER must match miniwebapp-aot-bisect.sh BISECT_STEPS');
     }
 
     public function testMiniWebAppGatesScriptExists(): void
