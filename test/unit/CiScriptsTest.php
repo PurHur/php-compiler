@@ -436,10 +436,10 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('REBUILD_EXAMPLES_005_SYNC_GATE="${REBUILD_EXAMPLES_005_SYNC_GATE:-1}"', $defaults);
     }
 
-    public function testCiDefaultsEnvDefinesRebuildExamples006SyncGateOff(): void
+    public function testCiDefaultsEnvDefinesRebuildExamples006SyncGateOn(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
-        $this->assertStringContainsString('REBUILD_EXAMPLES_006_SYNC_GATE="${REBUILD_EXAMPLES_006_SYNC_GATE:-0}"', $defaults);
+        $this->assertStringContainsString('REBUILD_EXAMPLES_006_SYNC_GATE="${REBUILD_EXAMPLES_006_SYNC_GATE:-1}"', $defaults);
     }
 
     public function testCiFastRunsRebuildExamples005SyncViaInventoryChecks(): void
@@ -455,13 +455,13 @@ final class CiScriptsTest extends TestCase
         $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
         $this->assertStringContainsString('ci_run_rebuild_examples_006_sync_check', $common);
         $this->assertStringContainsString('check-rebuild-examples-006-row.php', $common);
-        $this->assertStringContainsString('REBUILD_EXAMPLES_006_SYNC_GATE:-0', $common);
+        $this->assertStringContainsString('REBUILD_EXAMPLES_006_SYNC_GATE:-1', $common);
     }
 
-    public function testCiDefaultsEnvDefinesCapabilities006SyncGateOff(): void
+    public function testCiDefaultsEnvDefinesCapabilities006SyncGateOn(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
-        $this->assertStringContainsString('CAPABILITIES_006_SYNC_GATE="${CAPABILITIES_006_SYNC_GATE:-0}"', $defaults);
+        $this->assertStringContainsString('CAPABILITIES_006_SYNC_GATE="${CAPABILITIES_006_SYNC_GATE:-1}"', $defaults);
     }
 
     public function testCiFastRunsCapabilities006SyncViaInventoryChecks(): void
@@ -469,7 +469,7 @@ final class CiScriptsTest extends TestCase
         $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
         $this->assertStringContainsString('ci_run_capabilities_fileuploadweb_sync_check', $common);
         $this->assertStringContainsString('check-capabilities-fileuploadweb-sync.php', $common);
-        $this->assertStringContainsString('CAPABILITIES_006_SYNC_GATE:-0', $common);
+        $this->assertStringContainsString('CAPABILITIES_006_SYNC_GATE:-1', $common);
     }
 
     public function testCiDockerRunPassesRebuildExamples005SyncGateDefaultOn(): void
@@ -478,10 +478,16 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('REBUILD_EXAMPLES_005_SYNC_GATE=${REBUILD_EXAMPLES_005_SYNC_GATE:-1}', $body);
     }
 
-    public function testCiDockerRunPassesRebuildExamples006SyncGateDefaultOff(): void
+    public function testCiDockerRunPassesRebuildExamples006SyncGateDefaultOn(): void
     {
         $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');
-        $this->assertStringContainsString('REBUILD_EXAMPLES_006_SYNC_GATE=${REBUILD_EXAMPLES_006_SYNC_GATE:-0}', $body);
+        $this->assertStringContainsString('REBUILD_EXAMPLES_006_SYNC_GATE=${REBUILD_EXAMPLES_006_SYNC_GATE:-1}', $body);
+    }
+
+    public function testCiDockerRunPassesCapabilities006SyncGateDefaultOn(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');
+        $this->assertStringContainsString('CAPABILITIES_006_SYNC_GATE=${CAPABILITIES_006_SYNC_GATE:-1}', $body);
     }
 
     public function testCiDefaultsEnvDefinesRootReadmeSyncGateOn(): void
@@ -956,7 +962,7 @@ final class CiScriptsTest extends TestCase
         $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
         $this->assertStringContainsString('REBUILD_EXAMPLES_006_SYNC_GATE', $doc);
         $this->assertStringContainsString('check-rebuild-examples-006-row.php', $doc);
-        $this->assertMatchesRegularExpression('/\| `REBUILD_EXAMPLES_006_SYNC_GATE` \| `0` \|/', $doc);
+        $this->assertMatchesRegularExpression('/\| `REBUILD_EXAMPLES_006_SYNC_GATE` \| `1` \|/', $doc);
     }
 
     public function testLocalCiMatrixDocumentsCapabilities006SyncGate(): void
@@ -964,7 +970,7 @@ final class CiScriptsTest extends TestCase
         $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
         $this->assertStringContainsString('CAPABILITIES_006_SYNC_GATE', $doc);
         $this->assertStringContainsString('check-capabilities-fileuploadweb-sync.php', $doc);
-        $this->assertMatchesRegularExpression('/\| `CAPABILITIES_006_SYNC_GATE` \| `0` \|/', $doc);
+        $this->assertMatchesRegularExpression('/\| `CAPABILITIES_006_SYNC_GATE` \| `1` \|/', $doc);
     }
 
     public function testLocalCiMatrixDocumentsBootstrapVendorInventorySyncGate(): void
@@ -983,30 +989,30 @@ final class CiScriptsTest extends TestCase
         $this->assertMatchesRegularExpression('/\| `ROOT_README_SYNC_GATE` \| `1` \|/', $doc);
     }
 
-    public function testCiDefaultsEnvDefinesRootReadme006SyncGateOff(): void
+    public function testCiDefaultsEnvDefinesRootReadme006SyncGateOn(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
-        $this->assertStringContainsString('ROOT_README_006_SYNC_GATE="${ROOT_README_006_SYNC_GATE:-0}"', $defaults);
+        $this->assertStringContainsString('ROOT_README_006_SYNC_GATE="${ROOT_README_006_SYNC_GATE:-1}"', $defaults);
     }
 
     public function testCiFastRunsRootReadme006SyncViaInventoryChecks(): void
     {
         $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
         $this->assertStringContainsString('ci_run_root_readme_006_sync_check', $common);
-        $this->assertStringContainsString('ROOT_README_006_SYNC_GATE:-0', $common);
+        $this->assertStringContainsString('ROOT_README_006_SYNC_GATE:-1', $common);
     }
 
-    public function testCiDockerRunPassesRootReadme006SyncGateDefaultOff(): void
+    public function testCiDockerRunPassesRootReadme006SyncGateDefaultOn(): void
     {
         $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');
-        $this->assertStringContainsString('ROOT_README_006_SYNC_GATE=${ROOT_README_006_SYNC_GATE:-0}', $body);
+        $this->assertStringContainsString('ROOT_README_006_SYNC_GATE=${ROOT_README_006_SYNC_GATE:-1}', $body);
     }
 
     public function testLocalCiMatrixDocumentsRootReadme006SyncGate(): void
     {
         $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
         $this->assertStringContainsString('ROOT_README_006_SYNC_GATE', $doc);
-        $this->assertMatchesRegularExpression('/\| `ROOT_README_006_SYNC_GATE` \| `0` \|/', $doc);
+        $this->assertMatchesRegularExpression('/\| `ROOT_README_006_SYNC_GATE` \| `1` \|/', $doc);
     }
 
     public function testLocalCiMatrixDocumentsSelfhostSpineCountSyncGate(): void

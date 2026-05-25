@@ -500,12 +500,22 @@ final class Doctor
         fwrite(STDOUT, "      Run:     FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE=1 make deploy-smoke\n");
         fwrite(STDOUT, "      Or:      FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE=1 ./script/deploy-smoke.sh --example 006\n");
 
-        $rebuild006Default = $defaults['REBUILD_EXAMPLES_006_SYNC_GATE'] ?? '0';
+        $rebuild006Default = $defaults['REBUILD_EXAMPLES_006_SYNC_GATE'] ?? '1';
         $rebuild006On = self::gateEnabled('REBUILD_EXAMPLES_006_SYNC_GATE', $rebuild006Default);
         $rebuild006Icon = $rebuild006On ? '✅' : '⬜';
+        $capabilities006Default = $defaults['CAPABILITIES_006_SYNC_GATE'] ?? '1';
+        $capabilities006On = self::gateEnabled('CAPABILITIES_006_SYNC_GATE', $capabilities006Default);
+        $capabilities006Icon = $capabilities006On ? '✅' : '⬜';
+        $rootReadme006Default = $defaults['ROOT_README_006_SYNC_GATE'] ?? '1';
+        $rootReadme006On = self::gateEnabled('ROOT_README_006_SYNC_GATE', $rootReadme006Default);
+        $rootReadme006Icon = $rootReadme006On ? '✅' : '⬜';
         fwrite(STDOUT, "\n  Doc sync (ci-fast inventory):\n");
-        fwrite(STDOUT, "  [{$rebuild006Icon}] examples/README 006 run matrix — REBUILD_EXAMPLES_006_SYNC_GATE default {$rebuild006Default} (#2018)\n");
+        fwrite(STDOUT, "  [{$rebuild006Icon}] examples/README 006 run matrix — REBUILD_EXAMPLES_006_SYNC_GATE default {$rebuild006Default} (#2018, #2052)\n");
         fwrite(STDOUT, "      Run: php script/check-rebuild-examples-006-row.php · ci-fast when gate=1\n");
+        fwrite(STDOUT, "  [{$capabilities006Icon}] capabilities 006 rows — CAPABILITIES_006_SYNC_GATE default {$capabilities006Default} (#2019, #2068)\n");
+        fwrite(STDOUT, "      Run: php script/check-capabilities-fileuploadweb-sync.php · ci-fast when gate=1\n");
+        fwrite(STDOUT, "  [{$rootReadme006Icon}] README 006 stale phrases — ROOT_README_006_SYNC_GATE default {$rootReadme006Default} (#2017, #2052)\n");
+        fwrite(STDOUT, "      Run: ROOT_README_006_SYNC_GATE=1 php script/check-root-readme-sync.php · ci-fast when gate=1\n");
 
         $initProfileLive = \PHPCompiler\Cli\PhpcInit::isKnownProfile('fileupload');
         $initTemplate = is_file($repoRoot.'/templates/init-fileupload/example.php');
