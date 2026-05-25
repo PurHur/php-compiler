@@ -62,6 +62,12 @@ if [[ "${NESTED_RETURN_COMPLIANCE_GATE:-1}" == "1" ]]; then
   ci_run_phpunit --filter NestedReturn
 fi
 
+# PHP 8 attributes VM compliance (#1354, #1904). Default on; set ATTRIBUTES_COMPLIANCE_GATE=0 to skip.
+if [[ "${ATTRIBUTES_COMPLIANCE_GATE:-1}" == "1" ]]; then
+  echo "PHPUnit (fast): attributes VM compliance (Attribute*)..."
+  ci_run_phpunit --filter Attribute
+fi
+
 # Optional bootstrap tail when LLVM 9 present (aot-lint + probe + wave-check; issue #436).
 if [[ "${CI_FAST_BOOTSTRAP:-0}" == "1" ]]; then
   if ci_llvm_ready; then
