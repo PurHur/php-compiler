@@ -808,6 +808,44 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('#2115', $doc);
     }
 
+    public function testCiDefaultsEnvDefinesBootstrapM3StrictSyncGateOff(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString('BOOTSTRAP_M3_STRICT_SYNC_GATE="${BOOTSTRAP_M3_STRICT_SYNC_GATE:-0}"', $defaults);
+    }
+
+    public function testCiFastRunsBootstrapM3StrictSyncViaInventoryChecks(): void
+    {
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('ci_run_bootstrap_m3_strict_sync_check', $common);
+        $this->assertStringContainsString('check-bootstrap-m3-strict-sync.php', $common);
+        $this->assertStringContainsString('BOOTSTRAP_M3_STRICT_SYNC_GATE:-0', $common);
+    }
+
+    public function testCiDockerRunPassesBootstrapM3StrictSyncGateDefaultOff(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');
+        $this->assertStringContainsString('BOOTSTRAP_M3_STRICT_SYNC_GATE=${BOOTSTRAP_M3_STRICT_SYNC_GATE:-0}', $body);
+    }
+
+    public function testLocalCiMatrixDocumentsBootstrapM3StrictSyncGate(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('BOOTSTRAP_M3_STRICT_SYNC_GATE', $doc);
+        $this->assertStringContainsString('check-bootstrap-m3-strict-sync.php', $doc);
+        $this->assertMatchesRegularExpression('/\| `BOOTSTRAP_M3_STRICT_SYNC_GATE` \| `0` \|/', $doc);
+        $this->assertStringContainsString('#2176', $doc);
+    }
+
+    public function testLocalCiMatrixDocumentsBootstrapM3CompileSmokeGates(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('BOOTSTRAP_M3_COMPILE_SMOKE_PROBE_GATE', $doc);
+        $this->assertStringContainsString('BOOTSTRAP_M3_COMPILE_SMOKE_STRICT_GATE', $doc);
+        $this->assertMatchesRegularExpression('/\| `BOOTSTRAP_M3_COMPILE_SMOKE_PROBE_GATE` \| `1` \|/', $doc);
+        $this->assertMatchesRegularExpression('/\| `BOOTSTRAP_M3_COMPILE_SMOKE_STRICT_GATE` \| `0` \|/', $doc);
+    }
+
     public function testCiDefaultsEnvDefinesBootstrapVendorInventorySyncGateOn(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');

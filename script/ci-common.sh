@@ -228,6 +228,14 @@ ci_run_selfhost_m4_gen2_sync_check() {
   "$PHP_BIN" "${PHP_OPTS[@]}" script/check-selfhost-m4-gen2-sync.php
 }
 
+ci_run_bootstrap_m3_strict_sync_check() {
+  if [[ "${BOOTSTRAP_M3_STRICT_SYNC_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  echo "Bootstrap M3 compile-smoke strict doc sync (BOOTSTRAP_M3_STRICT_SYNC_GATE=1, issue #2176)..."
+  "$PHP_BIN" "${PHP_OPTS[@]}" script/check-bootstrap-m3-strict-sync.php
+}
+
 ci_run_bootstrap_vendor_inventory_sync_check() {
   if [[ "${BOOTSTRAP_VENDOR_INVENTORY_SYNC_GATE:-0}" != "1" ]]; then
     return 0
@@ -316,6 +324,7 @@ ci_run_inventory_checks() {
   ci_run_m3_allowlist_sync_check
   ci_run_bootstrap_m5_doc_sync_check
   ci_run_selfhost_m4_gen2_sync_check
+  ci_run_bootstrap_m3_strict_sync_check
   ci_run_bootstrap_vendor_inventory_sync_check
 }
 

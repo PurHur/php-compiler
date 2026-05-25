@@ -164,6 +164,7 @@ Details: [self-host-target.md](https://github.com/PurHur/php-compiler/blob/maste
 | M2 spine native link | `BOOTSTRAP_LIB_SPINE_SMOKE=1 make bootstrap-selfhost-lib-spine-smoke` | ✅ `compiler_lib_spine_smoke bundle OK` (**609** / **611** units; [#2001](https://github.com/PurHur/php-compiler/issues/2001), [#2066](https://github.com/PurHur/php-compiler/issues/2066)) |
 | M3 HelloWorld strict | `BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE=1` → `bootstrap-selfhost-helloworld-probe.sh` | ✅ ([#1493](https://github.com/PurHur/php-compiler/issues/1493)); opt-in gate default `0` until default-on ([#1866](https://github.com/PurHur/php-compiler/issues/1866)) |
 | M3 compile-smoke probe | `BOOTSTRAP_M3_COMPILE_SMOKE_PROBE_GATE=1` (default) | ✅ partial — native **run** ✅; strict native emit 🚧 ([#1937](https://github.com/PurHur/php-compiler/issues/1937)) |
+| M3 compile-smoke strict | `BOOTSTRAP_M3_COMPILE_SMOKE_STRICT_GATE=1` → `bootstrap-selfhost-compile-smoke-probe.sh` | opt-in gate default `0` until native emit lands ([#1937](https://github.com/PurHur/php-compiler/issues/1937), [#2165](https://github.com/PurHur/php-compiler/issues/2165)) |
 | Wave gate | `./script/bootstrap-wave-check.sh` | ✅ locally / Docker; GHA workflow disabled |
 | Next includes probe | `php script/bootstrap-selfhost-next-includes.php` | 🚧 bundle growth |
 
