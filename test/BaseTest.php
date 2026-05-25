@@ -148,6 +148,9 @@ abstract class BaseTest extends TestCase {
         $extDir = getenv('PHP_COMPILER_EXT_DIR') ?: '/usr/lib/php/20220829';
         if (is_dir($extDir)) {
             foreach (['tokenizer', 'mbstring', 'dom', 'xml', 'xmlwriter', 'ffi', 'posix', 'phar'] as $ext) {
+                if (extension_loaded($ext)) {
+                    continue;
+                }
                 $so = $extDir.'/'.$ext.'.so';
                 if (is_file($so)) {
                     $cmd[] = '-d';

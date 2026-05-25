@@ -3,6 +3,11 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 LLVM_DIR="${PHP_COMPILER_LLVM_INSTALL_DIR:-$ROOT/.llvm}"
+
+# php-compiler:22.04-dev ships a complete toolchain at /opt/llvm9 (#237, #2055).
+if [[ -f /opt/llvm9/libLLVM-9.so.1 && -x /opt/llvm9/clang-9 ]]; then
+  exit 0
+fi
 DEB_BASE="http://deb.debian.org/debian/pool/main/l/llvm-toolchain-9"
 BINUTILS_BASE="http://deb.debian.org/debian/pool/main/b/binutils"
 GCC9_BASE="http://deb.debian.org/debian/pool/main/g/gcc-9"

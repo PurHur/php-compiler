@@ -54,5 +54,10 @@ function run(string $filename, string $code, array $options): void
     }
 }
 
+// libffi RTLD_GLOBAL preload before MCJIT segfaults on php-compiler:22.04-dev (#98, #2055).
+putenv('PHP_COMPILER_SKIP_LLVM_PRELOAD=1');
+$_ENV['PHP_COMPILER_SKIP_LLVM_PRELOAD'] = '1';
+$_SERVER['PHP_COMPILER_SKIP_LLVM_PRELOAD'] = '1';
+
 require_once __DIR__.'/../src/cli.php';
 require_once __DIR__.'/../src/cli_driver.php';

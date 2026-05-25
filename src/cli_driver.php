@@ -32,7 +32,10 @@ if ('-1' === $memoryLimit) {
     exit(1);
 }
 ini_set('memory_limit', $memoryLimit);
-error_reporting(~0);
+// Compliance subprocesses pass -d error_reporting=0; do not re-enable deprecations (#2055).
+if (0 !== (int) ini_get('error_reporting')) {
+    error_reporting(E_ALL);
+}
 
 $opts = $argv;
 // get rid of this

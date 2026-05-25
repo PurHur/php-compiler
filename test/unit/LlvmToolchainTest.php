@@ -55,6 +55,16 @@ final class LlvmToolchainTest extends TestCase
         $this->assertNotEmpty(LlvmToolchain::resolveDir(self::$root));
     }
 
+    public function testResolveDirPrefersOptLlvm9WhenPresent(): void
+    {
+        if (!is_file('/opt/llvm9/libLLVM-9.so.1')) {
+            $this->markTestSkipped('/opt/llvm9 not present (use php-compiler:22.04-dev image).');
+        }
+
+        $resolved = LlvmToolchain::resolveDir(self::$root);
+        $this->assertSame(realpath('/opt/llvm9') ?: '/opt/llvm9', $resolved);
+    }
+
     public function testApplyCurrentProcessEnvUsesAbsoluteLlvmPath(): void
     {
         if (!is_file(self::$root.'/.llvm/libLLVM-9.so.1') && !is_file('/opt/llvm9/libLLVM-9.so.1')) {
