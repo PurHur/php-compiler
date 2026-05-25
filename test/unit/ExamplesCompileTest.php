@@ -440,6 +440,11 @@ final class ExamplesCompileTest extends TestCase
         if (!self::throwsWebAotLinkGateEnabled()) {
             $this->markTestSkipped('THROWSWEB_AOT_LINK_GATE=0 — skip 007 project link gate (#2101)');
         }
+        if (!self::isLlvmReady()) {
+            $this->markTestSkipped(
+                'LLVM 9 toolchain not available. Run script/install-llvm9.sh from the repository root.'
+            );
+        }
         $project = $this->throwsWebProjectPath();
         $binary = $this->build007ThrowsWebProject($project);
         $this->assertFileExists($binary);
