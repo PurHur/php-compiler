@@ -38,13 +38,6 @@
 
         foreach ($node->catches as $i => $catch) {
             $this->block = $catchBlocks[$i];
-            if (null !== $catch->var) {
-                $this->block->children[] = new Op\Expr\Assign(
-                    $catchVars[$i],
-                    new Literal(null),
-                    $attrs
-                );
-            }
             $this->block = $this->parseNodes($catch->stmts, $catchBlocks[$i]);
             $this->block->children[] = new Jump($endBlock, $attrs);
             $endBlock->addParent($this->block);

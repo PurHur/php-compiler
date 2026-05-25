@@ -369,6 +369,8 @@ class Context {
                 Builtin\SessionName::emitResetForStandaloneMain($this);
                 Builtin\PendingHeaders::emitResetForStandaloneMain($this);
                 $this->builder->call($this->lookupFunction('__superglobals__refresh'));
+                Builtin\JitThrow::registerDeclarations($this);
+                $this->builder->call($this->lookupFunction('phpc_jit_clear_throw_pending'));
             }
             $this->builder->call($this->main);
             if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {

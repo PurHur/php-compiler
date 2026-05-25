@@ -8,6 +8,7 @@ use PHPCompiler\Block;
 use PHPCompiler\JIT\Builtin\JitThrow;
 use PHPCompiler\OpCode;
 use PHPLLVM\BasicBlock;
+use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_;
 
 /**
@@ -74,20 +75,16 @@ final class TryCatchHelper
         $context->tryCatch->mergeHandlers[spl_object_id($mergeBlock)] = $handler;
 
         $builder = $context->builder;
-        $branchBlock = $builder->getInsertBlock();
+        $branchBlock = $context->scope->blockStorage[$handlerBlock] ?? $builder->getInsertBlock();
+        if (null === $branchBlock) {
+            throw new \LogicException('TYPE_TRY lowering requires an active LLVM basic block');
+        }
         $builder->positionAtEnd($branchBlock);
-        $jit->compileSubBlock($func, $tryOp->block1, ...$args);
-        $tryEntry = $context->scope->blockStorage[$tryOp->block1];
-        $mergeBlock = $tryOp->block2;
         if (null === $handler->dispatchBb) {
             $handler->dispatchBb = self::buildDispatch($jit, $func, $context, $handler, $args);
         }
-        $mergeBb = $context->scope->blockStorage[$mergeBlock] ?? null;
-        if (null === $mergeBb) {
-            $mergeBb = JIT\BasicBlockHelper::append($context, 'try_merge');
-            $context->scope->blockStorage[$mergeBlock] = $mergeBb;
-        }
-        self::emitMergeEntryCheck($jit, $func, $context, $mergeBlock, $mergeBb, $args);
+        $jit->compileSubBlock($func, $tryOp->block1, ...$args);
+        $tryEntry = $context->scope->blockStorage[$tryOp->block1];
         $builder->positionAtEnd($branchBlock);
         if (0 === $context->inlineIncludeDepth) {
             $context->freeDeadVariables($func, $branchBlock, $handlerBlock);
@@ -116,13 +113,13 @@ final class TryCatchHelper
         $saved = $builder->getInsertBlock();
         $builder->positionAtEnd($mergeBb);
         $hasPending = $builder->call($context->lookupFunction('phpc_jit_has_throw_pending'));
-        $i1 = $context->getTypeFromString('int1');
+        $i32 = $context->getTypeFromString('int32');
         $hasBool = $builder->icmp(
-            PHPLLVM\Builder::INT_NE,
+            Builder::INT_NE,
             $hasPending,
-            $i1->constInt(0, false)
+            $i32->constInt(0, false)
         );
-        $fallthrough = JIT\BasicBlockHelper::append($context, 'try_merge_ok');
+        $fallthrough = BasicBlockHelper::append($context, 'try_merge_ok');
         $builder->branchIf($hasBool, $handler->dispatchBb, $fallthrough);
         $builder->positionAtEnd($fallthrough);
         if (null !== $saved) {
@@ -167,7 +164,6 @@ final class TryCatchHelper
         $context->freeDeadVariables($func, $throwBlock, $block);
         $builder->call($context->lookupFunction('phpc_jit_set_throw_pending'), $obj);
         $builder->branch($handler->dispatchBb);
-        $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
     }
 
     /**
@@ -180,7 +176,7 @@ final class TryCatchHelper
         TryCatchHandler $handler,
         array $args
     ): BasicBlock {
-        $dispatch = JIT\BasicBlockHelper::append($context, 'try_catch_dispatch');
+        $dispatch = BasicBlockHelper::append($context, 'try_catch_dispatch');
         $builder = $context->builder;
         $saved = $builder->getInsertBlock();
         $builder->positionAtEnd($dispatch);
@@ -190,14 +186,14 @@ final class TryCatchHelper
         $pendingObj = $builder->call($context->lookupFunction('phpc_jit_take_throw_pending'));
         $mergeEntry = $context->scope->blockStorage[$handler->mergeBlock] ?? null;
 
-        $uncaught = JIT\BasicBlockHelper::append($context, 'try_uncaught');
+        $uncaught = BasicBlockHelper::append($context, 'try_uncaught');
         $nextCatch = $dispatch;
 
         foreach ($handler->catchArms as $arm) {
             $catchOp = $arm['op'];
             $types = $arm['catchTypes'];
-            $matchBb = JIT\BasicBlockHelper::append($context, 'try_catch_match');
-            $noMatchBb = JIT\BasicBlockHelper::append($context, 'try_catch_nomatch');
+            $matchBb = BasicBlockHelper::append($context, 'try_catch_match');
+            $noMatchBb = BasicBlockHelper::append($context, 'try_catch_nomatch');
 
             $builder->positionAtEnd($nextCatch);
             if ([] === $types) {
@@ -213,7 +209,7 @@ final class TryCatchHelper
                     if ($isLast) {
                         $builder->branchIf($isBool, $matchBb, $noMatchBb);
                     } else {
-                        $nextCheck = JIT\BasicBlockHelper::append($context, 'try_catch_type_next');
+                        $nextCheck = BasicBlockHelper::append($context, 'try_catch_type_next');
                         $builder->branchIf($isBool, $matchBb, $nextCheck);
                         $checkBb = $nextCheck;
                         $builder->positionAtEnd($checkBb);

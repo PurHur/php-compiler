@@ -1188,9 +1188,12 @@ class Compiler {
 
     protected function compileStmt(Op\Stmt $stmt, Block $block) {
         if ($stmt instanceof Op\Stmt\Jump) {
-            $op = new OpCode(OpCode::TYPE_JUMP);
-            $op->block1 = $this->compileCfgBranch($stmt->target, $block);
-            $block->addOpCode($op);
+            $target = $this->compileCfgBranch($stmt->target, $block);
+            if (!$this->isRedundantTryEntryJump($block, $target)) {
+                $op = new OpCode(OpCode::TYPE_JUMP);
+                $op->block1 = $target;
+                $block->addOpCode($op);
+            }
         } elseif ($stmt instanceof Op\Stmt\JumpIf) {
             $op = new OpCode(OpCode::TYPE_JUMPIF, $this->compileOperand($stmt->cond, $block, true));
             $op->block1 = $this->compileCfgBranch($stmt->if, $block);
@@ -2198,6 +2201,26 @@ class Compiler {
     /**
      * @param list<string> $types
      */
+    /**
+     * php-cfg TryCatch emits a Stmt_Jump into the try body; TYPE_TRY already enters it (#2084).
+     */
+    private function isRedundantTryEntryJump(Block $block, Block $target): bool
+    {
+        for ($i = $block->nOpCodes - 1; $i >= 0; --$i) {
+            $op = $block->opCodes[$i];
+            if (OpCode::TYPE_CATCH === $op->type || OpCode::TYPE_FINALLY === $op->type) {
+                continue;
+            }
+            if (OpCode::TYPE_TRY === $op->type) {
+                return $op->block1 === $target;
+            }
+
+            break;
+        }
+
+        return false;
+    }
+
     protected function encodeCatchTypeList(array $types): string
     {
         $encoded = [];

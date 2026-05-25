@@ -429,6 +429,23 @@ final class ExamplesCompileTest extends TestCase
     }
 
     /**
+     * 007-ThrowsWeb: native AOT link via phpc build --project (#2101, #2143).
+     *
+     * @group llvm
+     * @group aot
+     * @group aot-link
+     */
+    public function test007ThrowsWebAotLink(): void
+    {
+        if (!self::throwsWebAotLinkGateEnabled()) {
+            $this->markTestSkipped('THROWSWEB_AOT_LINK_GATE=0 — skip 007 project link gate (#2101)');
+        }
+        $project = $this->throwsWebProjectPath();
+        $binary = $this->build007ThrowsWebProject($project);
+        $this->assertFileExists($binary);
+    }
+
+    /**
      * 007-ThrowsWeb: phpc serve + POST invalid email caught (issue #2076).
      *
      * @group serve
@@ -486,23 +503,6 @@ final class ExamplesCompileTest extends TestCase
             proc_terminate($proc);
             proc_close($proc);
         }
-    }
-
-    /**
-     * 007-ThrowsWeb: native AOT link via phpc build --project (#2101, #2143).
-     *
-     * @group llvm
-     * @group aot
-     * @group aot-link
-     */
-    public function test007ThrowsWebAotLink(): void
-    {
-        if (!self::throwsWebAotLinkGateEnabled()) {
-            $this->markTestSkipped('THROWSWEB_AOT_LINK_GATE=0 — skip 007 project link gate (#2101)');
-        }
-        $project = $this->throwsWebProjectPath();
-        $binary = $this->build007ThrowsWebProject($project);
-        $this->assertFileExists($binary);
     }
 
     /**
@@ -1064,16 +1064,16 @@ final class ExamplesCompileTest extends TestCase
         return false === $gate || '0' !== $gate;
     }
 
-    private static function fileUploadWebAotLinkGateEnabled(): bool
+    private static function throwsWebAotLinkGateEnabled(): bool
     {
-        $gate = getenv('FILE_UPLOAD_WEB_AOT_LINK_GATE');
+        $gate = getenv('THROWSWEB_AOT_LINK_GATE');
 
         return false !== $gate && '' !== $gate && '1' === $gate;
     }
 
-    private static function throwsWebAotLinkGateEnabled(): bool
+    private static function fileUploadWebAotLinkGateEnabled(): bool
     {
-        $gate = getenv('THROWSWEB_AOT_LINK_GATE');
+        $gate = getenv('FILE_UPLOAD_WEB_AOT_LINK_GATE');
 
         return false !== $gate && '' !== $gate && '1' === $gate;
     }
@@ -1591,6 +1591,11 @@ PHP];
             if (\PHPCompiler\Cli\PhpcBuild::isUserClassAotBlocked($stderrText)) {
                 $this->markTestSkipped(
                     '007-ThrowsWeb native AOT link blocked (user class): '.$stderrText
+                );
+            }
+            if (str_contains($stderrText, 'throw') || str_contains($stderrText, 'catch') || str_contains($stderrText, 'TryCatch')) {
+                $this->markTestSkipped(
+                    '007-ThrowsWeb AOT link not ready (#195, #57, #2101): '.$stderrText
                 );
             }
             $this->markTestSkipped(
