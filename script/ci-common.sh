@@ -95,6 +95,14 @@ ci_run_examples_readme_sync_check() {
   "$PHP_BIN" "${PHP_OPTS[@]}" script/check-examples-readme-sync.php
 }
 
+ci_run_examples_ladder_discovery_check() {
+  if [[ "${EXAMPLES_LADDER_DISCOVERY_GATE:-1}" != "1" ]]; then
+    return 0
+  fi
+  echo "Examples ladder discovery (EXAMPLES_LADDER_DISCOVERY_GATE=1, issue #1913)..."
+  "$PHP_BIN" "${PHP_OPTS[@]}" script/check-examples-ladder-discovery.php
+}
+
 ci_run_root_readme_sync_check() {
   if [[ "${ROOT_README_SYNC_GATE:-0}" != "1" ]]; then
     return 0
@@ -130,6 +138,7 @@ ci_run_inventory_checks() {
   ci_run_wave3_roadmap_sync_check
   ci_run_m2_spine_issue_hygiene_check
   ci_run_examples_readme_sync_check
+  ci_run_examples_ladder_discovery_check
   ci_run_root_readme_sync_check
   ci_run_selfhost_spine_count_sync_check
   ci_run_m3_allowlist_sync_check
