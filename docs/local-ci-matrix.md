@@ -126,7 +126,7 @@ Defaults are exported from [`script/ci-defaults.env`](../script/ci-defaults.env)
 | `M3_ALLOWLIST_SYNC_GATE` | `1` | `ci-fast.sh` (`ci_run_inventory_checks`) | `script/check-m3-allowlist-snapshot.php` ([#1905](https://github.com/PurHur/php-compiler/issues/1905)); set `0` for bulk symbol PRs |
 | `INIT_SESSIONSWEB_PARITY_GATE` | `1` | `ci-fast.sh` (`ci_run_inventory_checks`) | `script/check-init-sessionsweb-parity.sh` — `examples/005-SessionsWeb/` ↔ `templates/init-sessionsweb/` ([#1902](https://github.com/PurHur/php-compiler/issues/1902)); set `0` for doc-only iteration |
 | `INIT_FILEUPLOAD_PARITY_GATE` | `0` | `ci-fast.sh` (`ci_run_inventory_checks`) | `script/check-init-fileupload-parity.sh` — `examples/006-FileUploadWeb/` ↔ `templates/init-fileupload/` ([#2004](https://github.com/PurHur/php-compiler/issues/2004)); flip default-on ([#2020](https://github.com/PurHur/php-compiler/issues/2020)) |
-| `APIJSON_INIT_PARITY_GATE` | `0` | `ci-fast.sh` (`ci_run_inventory_checks`) | `script/check-init-apijson-parity.sh` — `examples/004-ApiJson/` ↔ `templates/init-apijson/` ([#2029](https://github.com/PurHur/php-compiler/issues/2029)); flip default-on after **#2000** lands |
+| `APIJSON_INIT_PARITY_GATE` | `1` | `ci-fast.sh` (`ci_run_inventory_checks`) | `script/check-init-apijson-parity.sh` — `examples/004-ApiJson/` ↔ `templates/init-apijson/` ([#2029](https://github.com/PurHur/php-compiler/issues/2029), default-on [#2037](https://github.com/PurHur/php-compiler/issues/2037)); set `0` for doc-only iteration |
 
 Ladder-only env vars (not in `ci-defaults.env`): `MINIWEBAPP_LINT_GATE` (default `1` in `web-smoke.sh`), `MINIWEBAPP_AOT_BISECT_GATE` (default `0` in `miniwebapp-gates.sh` — [#879](https://github.com/PurHur/php-compiler/issues/879)).
 
