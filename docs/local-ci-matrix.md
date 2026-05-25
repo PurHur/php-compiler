@@ -82,6 +82,7 @@ Defaults are exported from [`script/ci-defaults.env`](../script/ci-defaults.env)
 |----------|---------|--------|-------|
 | `MINIWEBAPP_VM_CLI_GATE` | `1` | `ci-fast.sh` | PHPUnit `MiniWebApp*VmCli` matrix ([#597](https://github.com/PurHur/php-compiler/issues/597)) |
 | `MINIWEBAPP_SERVE_GATE` | `1` | `ci-local.sh`, `ci-fast.sh` | `ServeTest` `@group miniwebapp` ([#641](https://github.com/PurHur/php-compiler/issues/641)) |
+| `SESSIONS_WEB_SMOKE_GATE` | `1` | `ci-fast.sh`, `ci-local.sh` | `examples-web-smoke.sh --sessions-only` / 005 cookie flash curls ([#1887](https://github.com/PurHur/php-compiler/issues/1887)) |
 | `MINIWEBAPP_WEB_SMOKE_GATE` | `1` | `ci-local.sh` | `examples-web-smoke.sh --miniwebapp-only` ([#664](https://github.com/PurHur/php-compiler/issues/664)) |
 | `MINIWEBAPP_WEB_SMOKE_AOT_GATE` | `1` | `ci-local.sh` | `ci_run_miniwebapp_web_smoke_aot` → `examples-web-smoke.sh --miniwebapp-only --aot` ([#1523](https://github.com/PurHur/php-compiler/issues/1523), [#833](https://github.com/PurHur/php-compiler/issues/833)) |
 | `MINIWEBAPP_AOT_LINK_GATE` | `1` | `ci-local.sh` (PHPUnit `@group aot-link`) | `ExamplesCompileTest` 003 native link ([#754](https://github.com/PurHur/php-compiler/issues/754)) |

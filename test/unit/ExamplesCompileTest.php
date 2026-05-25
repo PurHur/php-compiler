@@ -17,6 +17,7 @@ use PHPUnit\Framework\TestCase;
  * @see https://github.com/PurHur/php-compiler/issues/259 (001-SimpleWeb POST via $_REQUEST)
  * @see https://github.com/PurHur/php-compiler/issues/274 (minimal phpc.json beside web examples)
  * @see https://github.com/PurHur/php-compiler/issues/454 (003-MiniWebApp gate)
+ * @see https://github.com/PurHur/php-compiler/issues/1887 (005-SessionsWeb serve + session cookie)
  */
 final class ExamplesCompileTest extends TestCase
 {
@@ -253,6 +254,77 @@ final class ExamplesCompileTest extends TestCase
         $this->assertFileExists($examplePath);
         $out = $this->runCli('vm.php', ['-p', 'name=PostExample', $examplePath]);
         $this->assertStringContainsString('Hello PostExample', $out);
+    }
+
+    /**
+     * 005-SessionsWeb: phpc serve + cookie jar POST redirect flash (issue #1887).
+     *
+     * @group serve
+     */
+    public function test005SessionsWebServeFlashRoundTrip(): void
+    {
+        if (false !== getenv('PHP_COMPILER_SKIP_SERVE_TESTS') && '' !== getenv('PHP_COMPILER_SKIP_SERVE_TESTS')) {
+            $this->markTestSkipped('PHP_COMPILER_SKIP_SERVE_TESTS is set');
+        }
+        if (!self::sessionsWebSmokeGateEnabled()) {
+            $this->markTestSkipped('SESSIONS_WEB_SMOKE_GATE=0 — skip 005 serve flash gate (#1887)');
+        }
+        if (!$this->canBindLoopback()) {
+            $this->markTestSkipped('Cannot bind loopback TCP');
+        }
+        if (!$this->commandExists('curl')) {
+            $this->markTestSkipped('curl not available');
+        }
+
+        $repoRoot = dirname(__DIR__, 2);
+        $docroot = $repoRoot.'/examples/005-SessionsWeb';
+        $this->assertDirectoryExists($docroot);
+
+        $port = $this->findFreeTcpPort();
+        $addr = '127.0.0.1:'.$port;
+        $phpc = $repoRoot.'/phpc';
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open(
+            [$phpc, 'serve', $addr, $docroot],
+            $descriptorSpec,
+            $pipes,
+            $repoRoot,
+            null,
+            ['suppress_errors' => true]
+        );
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+
+        try {
+            $this->waitForTcpPort($port);
+            $jar = tempnam(sys_get_temp_dir(), 'phpc_sess_');
+            $this->assertNotFalse($jar);
+            $base = 'http://127.0.0.1:'.$port.'/example.php';
+
+            $empty = $this->curlGetWithJar($base, $jar);
+            $this->assertStringContainsString('No flash message yet', $empty);
+
+            $postStatus = $this->curlPostWithJar($base, $jar, 'message=Saved');
+            $this->assertSame('303', $postStatus);
+
+            $flash = $this->curlGetWithJar($base, $jar);
+            $this->assertStringContainsString('Flash: Saved', $flash);
+
+            $after = $this->curlGetWithJar($base, $jar);
+            $this->assertStringContainsString('No flash message yet', $after);
+        } finally {
+            proc_terminate($proc);
+            proc_close($proc);
+            if (isset($jar) && is_string($jar)) {
+                @unlink($jar);
+            }
+        }
     }
 
     /**
@@ -793,6 +865,152 @@ final class ExamplesCompileTest extends TestCase
     /**
      * @return list<string>
      */
+    private static function sessionsWebSmokeGateEnabled(): bool
+    {
+        $gate = getenv('SESSIONS_WEB_SMOKE_GATE');
+
+        return false === $gate || '0' !== $gate;
+    }
+
+    private function canBindLoopback(): bool
+    {
+        $repoRoot = dirname(__DIR__, 2);
+        $cmd = [$repoRoot.'/script/php-local.sh', $repoRoot.'/script/can-bind-loopback.php'];
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open($cmd, $descriptorSpec, $pipes, $repoRoot);
+        if (!is_resource($proc)) {
+            return false;
+        }
+        fclose($pipes[0]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+
+        return 0 === proc_close($proc);
+    }
+
+    private function commandExists(string $name): bool
+    {
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open(['bash', '-c', 'command -v '.escapeshellarg($name)], $descriptorSpec, $pipes);
+        if (!is_resource($proc)) {
+            return false;
+        }
+        fclose($pipes[0]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+
+        return 0 === proc_close($proc);
+    }
+
+    private function findFreeTcpPort(): int
+    {
+        $repoRoot = dirname(__DIR__, 2);
+        $cmd = [$repoRoot.'/script/php-local.sh', '-r', <<<'PHP'
+$s = @stream_socket_server('tcp://127.0.0.1:0', $errno, $errstr);
+if (false === $s) {
+    fwrite(STDERR, "find port: {$errstr}\n");
+    exit(1);
+}
+$name = stream_socket_get_name($s, false);
+fclose($s);
+if (!is_string($name) || !preg_match('#:(\d+)$#', $name, $m)) {
+    fwrite(STDERR, "find port: invalid name\n");
+    exit(1);
+}
+echo $m[1];
+PHP];
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open($cmd, $descriptorSpec, $pipes, $repoRoot);
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+        $this->assertSame(0, $exit);
+        $port = (int) trim($stdout !== false ? $stdout : '');
+        $this->assertGreaterThan(0, $port);
+
+        return $port;
+    }
+
+    private function waitForTcpPort(int $port, int $timeoutSeconds = 10): void
+    {
+        $deadline = time() + $timeoutSeconds;
+        while (time() < $deadline) {
+            $fp = @fsockopen('127.0.0.1', $port, $errno, $errstr, 0.2);
+            if (is_resource($fp)) {
+                fclose($fp);
+
+                return;
+            }
+            usleep(50_000);
+        }
+        $this->fail('TCP port '.$port.' did not become ready');
+    }
+
+    private function curlGetWithJar(string $url, string $jar): string
+    {
+        $cmd = [
+            'curl', '-sS', '-b', $jar, '-c', $jar,
+            '--connect-timeout', '5', '--max-time', '15', $url,
+        ];
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open($cmd, $descriptorSpec, $pipes);
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+        $this->assertSame(0, $exit, trim($stderr !== false ? $stderr : ''));
+
+        return $stdout !== false ? $stdout : '';
+    }
+
+    private function curlPostWithJar(string $url, string $jar, string $postBody): string
+    {
+        $cmd = [
+            'curl', '-sS', '-b', $jar, '-c', $jar,
+            '-X', 'POST', '-d', $postBody,
+            '-o', '/dev/null', '-w', '%{http_code}',
+            '--connect-timeout', '5', '--max-time', '15', $url,
+        ];
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open($cmd, $descriptorSpec, $pipes);
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+        $this->assertSame(0, $exit, trim($stderr !== false ? $stderr : ''));
+
+        return trim($stdout !== false ? $stdout : '');
+    }
+
     private static function vmExtraArgs(string $exampleName): array
     {
         if ('001-SimpleWeb' === $exampleName) {

@@ -61,7 +61,7 @@ mkdir my-app && ./phpc init my-app   # phpc.json + public/index.php scaffold (se
 ./phpc run -r 'echo 1;'        # VM mode (or: php bin/vm.php -r 'echo 1;')
 ./phpc run -q 'name=Dev' examples/001-SimpleWeb/example.php   # web example without TCP
 make web-smoke                 # lint shipped examples + 003-MiniWebApp tree, VM smoke 001-SimpleWeb
-make examples-web-smoke        # phpc serve + curl for 001-SimpleWeb, 002-StaticWeb, and 004-ApiJson
+make examples-web-smoke        # phpc serve + curl for 001–004 and 005-SessionsWeb (SESSIONS_WEB_SMOKE_GATE=1 default)
 make examples-aot-smoke        # phpc build + CLI execute for 000–004 when LLVM ready (#667)
 make deploy-smoke              # phpc deploy + PHPC_DEPLOY_ROOT CGI for 001/002 when LLVM ready (#718)
 ./phpc serve examples/001-SimpleWeb   # http://127.0.0.1:8080/ (or: make serve)

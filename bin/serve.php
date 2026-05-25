@@ -17,6 +17,7 @@ require __DIR__.'/../vendor/autoload.php';
 
 use PHPCompiler\Runtime;
 use PHPCompiler\VM\OutputBuffer;
+use PHPCompiler\VM\ScriptExit;
 use PHPCompiler\ext\standard\VmSession;
 use PHPCompiler\Web\DevServer;
 use PHPCompiler\Web\ProjectBootstrap;
@@ -40,8 +41,8 @@ DevServer::run($listen, $docroot, static function (string $script, array $cgiEnv
     }
 
     ob_start();
+    $runtime = new Runtime();
     try {
-        $runtime = new Runtime();
         Superglobals::populateFromEnvironment(
             $runtime->vmContext,
             $cgiEnv['QUERY_STRING'] ?? '',
@@ -52,6 +53,15 @@ DevServer::run($listen, $docroot, static function (string $script, array $cgiEnv
         $block = $runtime->parseAndCompile($code, $script);
         $runtime->run($block);
         $output = ob_get_clean();
+        if (VmSession::isActive()) {
+            VmSession::writeClose($runtime->vmContext);
+        }
+    } catch (ScriptExit $e) {
+        ob_end_clean();
+        $output = '';
+        if (VmSession::isActive()) {
+            VmSession::writeClose($runtime->vmContext);
+        }
     } catch (\Throwable $e) {
         ob_end_clean();
         throw $e;

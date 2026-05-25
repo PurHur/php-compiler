@@ -34,5 +34,5 @@ The last response should include `Flash: Saved`.
 
 ## Related
 
-- [#1887](https://github.com/PurHur/php-compiler/issues/1887) — `examples-web-smoke` gate
+- [#1887](https://github.com/PurHur/php-compiler/issues/1887) — `SESSIONS_WEB_SMOKE_GATE=1` (default): `make examples-sessions-smoke`, `ci-fast.sh`, `ExamplesCompileTest::test005SessionsWebServeFlashRoundTrip`
 - [#1893](https://github.com/PurHur/php-compiler/issues/1893) — deploy + `PHPC_DEPLOY_ROOT` smoke

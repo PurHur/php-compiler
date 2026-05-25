@@ -101,7 +101,7 @@ curl -s -b "$jar" -c "$jar" -X POST -d 'message=Saved' 'http://127.0.0.1:8080/ex
 curl -s -b "$jar" 'http://127.0.0.1:8080/example.php'
 ```
 
-AOT link/execute: [#1891](https://github.com/PurHur/php-compiler/issues/1891). `examples-web-smoke` gate: [#1887](https://github.com/PurHur/php-compiler/issues/1887).
+AOT link/execute: [#1891](https://github.com/PurHur/php-compiler/issues/1891). VM session curls: `SESSIONS_WEB_SMOKE_GATE=1` (default) in `ci-fast.sh` / `ci-local.sh` — `make examples-sessions-smoke` or `examples-web-smoke.sh --sessions-only` ([#1887](https://github.com/PurHur/php-compiler/issues/1887)).
 
 ### 002-StaticWeb
 
@@ -139,7 +139,8 @@ Before a PR that touches examples or `bin/serve.php`:
 
 ```console
 make web-smoke              # lint examples/*/example.php + 003 lint --all + VM ?name= smoke
-make examples-web-smoke     # phpc serve + curl GET/POST (001-SimpleWeb, 002-StaticWeb, 004-ApiJson)
+make examples-web-smoke     # phpc serve + curl GET/POST (001–004 + 005 session flash when SESSIONS_WEB_SMOKE_GATE=1)
+make examples-sessions-smoke   # 005-SessionsWeb cookie jar only (#1887)
 make examples-aot-smoke     # phpc build + CLI execute (000–004; skips when LLVM missing; 003 execute green #764)
 ```
 

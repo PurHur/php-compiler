@@ -21,27 +21,31 @@ PHPC="${ROOT}/phpc"
 
 usage() {
   cat <<'EOF'
-Usage: script/examples-web-smoke.sh [--aot] [--miniwebapp-only]
+Usage: script/examples-web-smoke.sh [--aot] [--miniwebapp-only] [--sessions-only]
 
   VM mode (default): phpc serve per example docroot.
   --aot: use phpc serve --aot when <docroot>/.phpc/bin/app exists; skip otherwise.
          003-MiniWebApp: home + hello PATH_INFO + contact POST when stdout has MiniWebApp (#833, #676).
   --miniwebapp-only: curl only examples/003-MiniWebApp (MINIWEBAPP_WEB_SMOKE_GATE — #633).
+  --sessions-only: curl only examples/005-SessionsWeb (SESSIONS_WEB_SMOKE_GATE — #1887).
 
 Environment:
   PHP_COMPILER_SKIP_SERVE_TESTS=1  exit 0 without running HTTP checks
   PHP_COMPILER_MAX_BODY            optional; 003 oversized POST check uses 1024 when unset (#705)
   MINIWEBAPP_AOT_EXECUTE_GATE=1    fail instead of skip when 003 AOT probe empty (#747, #676)
   MINIWEBAPP_WEB_SMOKE_AOT_GATE=1  require 003 --aot curls to pass (#833)
+  SESSIONS_WEB_SMOKE_GATE=1        include 005 session flash curls in default run (#1887)
 EOF
 }
 
 AOT=0
 MINIWEBAPP_ONLY=0
+SESSIONS_ONLY=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --aot) AOT=1; shift ;;
     --miniwebapp-only) MINIWEBAPP_ONLY=1; shift ;;
+    --sessions-only) SESSIONS_ONLY=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "examples-web-smoke: unknown argument: $1" >&2; usage >&2; exit 1 ;;
   esac
@@ -169,6 +173,56 @@ curl_expect_post_not_200() {
   fi
   rm -f "$body"
   echo "examples-web-smoke: ${label}: ok (HTTP ${status})"
+}
+
+curl_expect_200_cookies() {
+  local label="$1"
+  local url="$2"
+  local jar="$3"
+  shift 3
+  local needles=("$@")
+  local body status
+  body="$(mktemp)"
+  status="$(curl -sS -o "$body" -w '%{http_code}' -b "$jar" -c "$jar" \
+    --connect-timeout 5 --max-time 15 "$url" || echo "000")"
+  if [[ "$status" != "200" ]]; then
+    echo "examples-web-smoke: ${label}: expected HTTP 200, got ${status}" >&2
+    echo "  url: ${url}" >&2
+    cat "$body" >&2 || true
+    rm -f "$body"
+    return 1
+  fi
+  for needle in "${needles[@]}"; do
+    if ! grep -qF "$needle" "$body"; then
+      echo "examples-web-smoke: ${label}: response missing needle: ${needle}" >&2
+      echo "  url: ${url}" >&2
+      cat "$body" >&2 || true
+      rm -f "$body"
+      return 1
+    fi
+  done
+  rm -f "$body"
+  echo "examples-web-smoke: ${label}: ok"
+}
+
+curl_expect_303_post_cookies() {
+  local label="$1"
+  local url="$2"
+  local jar="$3"
+  local post_body="$4"
+  local body status
+  body="$(mktemp)"
+  status="$(curl -sS -o "$body" -w '%{http_code}' -b "$jar" -c "$jar" \
+    -X POST -d "$post_body" --connect-timeout 5 --max-time 15 "$url" || echo "000")"
+  if [[ "$status" != "303" ]]; then
+    echo "examples-web-smoke: ${label}: expected HTTP 303, got ${status}" >&2
+    echo "  url: ${url}" >&2
+    cat "$body" >&2 || true
+    rm -f "$body"
+    return 1
+  fi
+  rm -f "$body"
+  echo "examples-web-smoke: ${label}: ok"
 }
 
 resolve_llvm_dir() {
@@ -313,6 +367,55 @@ run_miniwebapp_oversized_post_smoke() {
   trap - RETURN
 }
 
+run_sessions_web_smoke() {
+  local docroot="${ROOT}/examples/005-SessionsWeb"
+  if [[ ! -d "$docroot" ]]; then
+    echo "examples-web-smoke: 005-SessionsWeb: skip (missing docroot)"
+    return 0
+  fi
+  if [[ "$AOT" -eq 1 ]]; then
+    echo "examples-web-smoke: 005-SessionsWeb: skip --aot (VM only until #1891)"
+    return 0
+  fi
+
+  local port pid jar
+  jar="$(mktemp)"
+  port="$(find_free_port)"
+  echo "examples-web-smoke: 005-SessionsWeb on 127.0.0.1:${port} (VM session flash)"
+  "${PHPC}" serve "127.0.0.1:${port}" "$docroot" >/dev/null 2>&1 &
+  pid=$!
+
+  stop_serve() {
+    kill "$pid" 2>/dev/null || true
+    local waited=0
+    while kill -0 "$pid" 2>/dev/null && ((waited < 40)); do
+      sleep 0.05
+      waited=$((waited + 1))
+    done
+    if kill -0 "$pid" 2>/dev/null; then
+      kill -9 "$pid" 2>/dev/null || true
+    fi
+    wait "$pid" 2>/dev/null || true
+  }
+  trap stop_serve RETURN
+
+  wait_for_serve "$port"
+
+  local base="http://127.0.0.1:${port}"
+  curl_expect_200_cookies "005-SessionsWeb / GET empty" "${base}/example.php" "$jar" \
+    "No flash message yet"
+  curl_expect_303_post_cookies "005-SessionsWeb / POST flash" "${base}/example.php" \
+    "$jar" "message=Saved"
+  curl_expect_200_cookies "005-SessionsWeb / GET flash" "${base}/example.php" "$jar" \
+    "Flash: Saved"
+  curl_expect_200_cookies "005-SessionsWeb / GET after flash" "${base}/example.php" "$jar" \
+    "No flash message yet"
+
+  rm -f "$jar"
+  stop_serve
+  trap - RETURN
+}
+
 run_docroot_smoke() {
   local name="$1"
   local docroot="${ROOT}/${2}"
@@ -391,7 +494,14 @@ run_docroot_smoke() {
 mode_label="VM"
 [[ "$AOT" -eq 1 ]] && mode_label="--aot"
 [[ "$MINIWEBAPP_ONLY" -eq 1 ]] && mode_label="${mode_label}; --miniwebapp-only"
+[[ "$SESSIONS_ONLY" -eq 1 ]] && mode_label="${mode_label}; --sessions-only"
 echo "examples-web-smoke: starting (${mode_label})"
+
+if [[ "${SESSIONS_ONLY}" -eq 1 ]]; then
+  run_sessions_web_smoke
+  echo "examples-web-smoke: ok"
+  exit 0
+fi
 
 if [[ "${MINIWEBAPP_ONLY}" -eq 0 ]]; then
   run_docroot_smoke "001-SimpleWeb" "examples/001-SimpleWeb" \
@@ -405,6 +515,10 @@ if [[ "${MINIWEBAPP_ONLY}" -eq 0 ]]; then
 
   run_docroot_smoke "004-ApiJson" "examples/004-ApiJson" \
     'GET|GET example.php|/example.php|-|"ok":true;php-compiler'
+
+  if [[ "${SESSIONS_WEB_SMOKE_GATE:-1}" == "1" ]]; then
+    run_sessions_web_smoke
+  fi
 fi
 
 MINIWEBAPP=examples/003-MiniWebApp

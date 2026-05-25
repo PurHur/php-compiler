@@ -123,9 +123,12 @@ miniwebapp-aot-bisect:
 	./script/miniwebapp-aot-bisect.sh
 
 # HTTP smoke: phpc serve + curl for 001-SimpleWeb and 002-StaticWeb (issue #298)
-.PHONY: examples-web-smoke examples-web-smoke-prebuild examples-aot-smoke deploy-smoke
+.PHONY: examples-web-smoke examples-sessions-smoke examples-web-smoke-prebuild examples-aot-smoke deploy-smoke
 examples-web-smoke:
 	./script/examples-web-smoke.sh
+
+examples-sessions-smoke:
+	./script/examples-web-smoke.sh --sessions-only
 
 examples-web-smoke-prebuild:
 	./script/examples-web-smoke-prebuild.sh
