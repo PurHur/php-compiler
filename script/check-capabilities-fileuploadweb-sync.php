@@ -47,6 +47,10 @@ if (!str_contains($capBody, '006-FileUploadWeb') || !str_contains($capBody, 'FIL
     $errors[] = 'docs/capabilities.md: `move_uploaded_file` notes must mention 006 and FILE_UPLOAD_WEB_AOT_SMOKE_GATE (#2019)';
 }
 
+if (!str_contains($capBody, 'FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE')) {
+    $errors[] = 'docs/capabilities.md: `move_uploaded_file` notes must mention FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE (#2045, #2028)';
+}
+
 if (!str_contains($capBody, '$_FILES') && !str_contains($capBody, 'nested $_FILES')) {
     $errors[] = 'docs/capabilities.md: move_uploaded_file or notes must reference $_FILES web runtime (#2019)';
 }
@@ -67,6 +71,17 @@ if (!preg_match(
 
 if (!str_contains($syntaxBody, 'FILE_UPLOAD_WEB_AOT_SMOKE_GATE')) {
     $errors[] = 'docs/capabilities-syntax.md: footer must mention FILE_UPLOAD_WEB_AOT_SMOKE_GATE (#2019)';
+}
+
+if (!str_contains($syntaxBody, 'FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE')) {
+    $errors[] = 'docs/capabilities-syntax.md: footer must mention FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE (#2045, #2028)';
+}
+
+if (!preg_match(
+    '/\|\s*AOT deploy CGI \(multipart upload smoke\)\s*\|\s*n\/a\s*\|\s*n\/a\s*\|\s*yes\s*\|/i',
+    $syntaxBody
+)) {
+    $errors[] = 'docs/capabilities-syntax.md: missing AOT deploy CGI row for 006 (#2045, #2028)';
 }
 
 if ([] !== $errors) {

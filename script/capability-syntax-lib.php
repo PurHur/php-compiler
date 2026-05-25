@@ -621,7 +621,7 @@ function builtinCapabilityCurations(): array
         'move_uploaded_file' => [
             'aot' => 'yes',
             'notes' => [
-                'nested $_FILES + multipart web runtime (#52, #87); 006-FileUploadWeb; opt-in FILE_UPLOAD_WEB_AOT_SMOKE_GATE (#2012)',
+                'nested $_FILES + multipart web runtime (#52, #87); 006-FileUploadWeb; FILE_UPLOAD_WEB_AOT_SMOKE_GATE (#2012); FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE (#2028)',
             ],
         ],
     ];
@@ -907,6 +907,14 @@ function fileUploadWebNorthStarDefinitions(): array
             'issue' => 2012,
             'notes' => ['FileUploadWebAotExecuteTest; FILE_UPLOAD_WEB_AOT_SMOKE_GATE default-on (#2012)'],
         ],
+        [
+            'construct' => 'AOT deploy CGI (multipart upload smoke)',
+            'vm' => 'n/a',
+            'jit' => 'n/a',
+            'aot' => 'yes',
+            'issue' => 2028,
+            'notes' => ['deploy-smoke.sh --example 006; opt-in FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE (#2028, #2038)'],
+        ],
     ];
 }
 
@@ -943,8 +951,9 @@ function renderFileUploadWebNorthStarMarkdown(array $rows): string
     $lines[] = '';
     $lines[] = '_File upload rows are curated from ROADMAP issue state; multipart [#52](' . CAPABILITY_ISSUE_URL_BASE
         . '52); nested FILES [#87](' . CAPABILITY_ISSUE_URL_BASE . '87); `move_uploaded_file` [#2005]('
-        . CAPABILITY_ISSUE_URL_BASE . '2005). Opt-in ci-local gates: `FILE_UPLOAD_WEB_SMOKE_GATE`, '
-        . '`FILE_UPLOAD_WEB_AOT_LINK_GATE`, `FILE_UPLOAD_WEB_AOT_SMOKE_GATE` (execute default-on #2012)._';
+        . CAPABILITY_ISSUE_URL_BASE . '2005); deploy [#2028](' . CAPABILITY_ISSUE_URL_BASE . '2028). '
+        . 'Opt-in ci-local gates: `FILE_UPLOAD_WEB_SMOKE_GATE`, `FILE_UPLOAD_WEB_AOT_LINK_GATE`, '
+        . '`FILE_UPLOAD_WEB_AOT_SMOKE_GATE` (execute default-on #2012), `FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE`._';
     $lines[] = '';
 
     return implode("\n", $lines);
