@@ -173,9 +173,75 @@ smoke_003_miniwebapp() {
   echo "examples-aot-smoke: 003-MiniWebApp: ok"
 }
 
+# 005-SessionsWeb project AOT + two-request session execute (#1891).
+smoke_005_sessionsweb() {
+  if [[ "${SESSIONS_WEB_AOT_SMOKE_GATE:-0}" != "1" ]]; then
+    echo "examples-aot-smoke: 005-SessionsWeb: skip (SESSIONS_WEB_AOT_SMOKE_GATE=0, #1891)"
+    return 0
+  fi
+  local project="${ROOT}/examples/005-SessionsWeb"
+  if [[ ! -f "${project}/example.php" ]]; then
+    echo "examples-aot-smoke: 005-SessionsWeb: skip (tree missing #1881)"
+    return 0
+  fi
+
+  local binary="${project}/.phpc/bin/app"
+  echo "examples-aot-smoke: 005-SessionsWeb: phpc build --project -> ${binary}"
+  if ! "$PHPC" build --project "${project}"; then
+    echo "examples-aot-smoke: 005-SessionsWeb: link failed" >&2
+    return 1
+  fi
+  if [[ ! -x "$binary" ]]; then
+    echo "examples-aot-smoke: 005-SessionsWeb: expected executable ${binary}" >&2
+    return 1
+  fi
+
+  local sess_dir jar cookie out post flash
+  sess_dir="$(mktemp -d "${SMOKE_ROOT}/sess.XXXXXX")"
+  jar="$(mktemp "${SMOKE_ROOT}/jar.XXXXXX")"
+  cookie=""
+  out="$(env REQUEST_METHOD=GET SCRIPT_NAME=/example.php REQUEST_URI=/example.php \
+    PHP_COMPILER_SESSION_DIR="$sess_dir" "$binary" 2>/dev/null)" || true
+  if [[ "$out" != *'No flash message yet'* ]]; then
+    echo "examples-aot-smoke: 005-SessionsWeb: GET empty failed" >&2
+    rm -rf "$sess_dir" "$jar"
+    return 1
+  fi
+  cookie="$(echo "$out" | grep -i '^Set-Cookie:.*PHPSESSID=' | head -1 | sed 's/.*PHPSESSID=\([^;]*\).*/\1/')"
+  if [[ -z "$cookie" ]]; then
+    echo "examples-aot-smoke: 005-SessionsWeb: missing PHPSESSID cookie" >&2
+    rm -rf "$sess_dir" "$jar"
+    return 1
+  fi
+  post="$(env REQUEST_METHOD=POST REQUEST_BODY=message=Saved HTTP_COOKIE="PHPSESSID=${cookie}" \
+    SCRIPT_NAME=/example.php REQUEST_URI=/example.php \
+    PHP_COMPILER_SESSION_DIR="$sess_dir" "$binary" 2>/dev/null)" || true
+  if [[ "$post" != *'303'* ]]; then
+    echo "examples-aot-smoke: 005-SessionsWeb: POST flash expected 303" >&2
+    rm -rf "$sess_dir" "$jar"
+    return 1
+  fi
+  flash="$(env REQUEST_METHOD=GET HTTP_COOKIE="PHPSESSID=${cookie}" \
+    SCRIPT_NAME=/example.php REQUEST_URI=/example.php \
+    PHP_COMPILER_SESSION_DIR="$sess_dir" "$binary" 2>/dev/null)" || true
+  if [[ "$flash" != *'Flash: Saved'* ]]; then
+    echo "examples-aot-smoke: 005-SessionsWeb: GET flash failed" >&2
+    rm -rf "$sess_dir" "$jar"
+    return 1
+  fi
+  rm -rf "$sess_dir" "$jar"
+  echo "examples-aot-smoke: 005-SessionsWeb: ok"
+}
+
 if [[ "${SMOKE_ONLY}" == "003" ]]; then
   echo "examples-aot-smoke: 003 slice (LLVM at ${LLVM_DIR})"
   smoke_003_miniwebapp
+  exit $?
+fi
+
+if [[ "${SMOKE_ONLY}" == "005" ]]; then
+  echo "examples-aot-smoke: 005 slice (LLVM at ${LLVM_DIR})"
+  smoke_005_sessionsweb
   exit $?
 fi
 
@@ -222,5 +288,9 @@ assert_needles '004-ApiJson' "$out" 'Content-Type: application/json' 'Status: 20
 echo "examples-aot-smoke: 004-ApiJson: ok"
 
 smoke_003_miniwebapp
+
+if [[ "${SESSIONS_WEB_AOT_SMOKE_GATE:-0}" == "1" ]]; then
+  smoke_005_sessionsweb
+fi
 
 echo "examples-aot-smoke: ok"

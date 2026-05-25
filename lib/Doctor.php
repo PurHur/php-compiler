@@ -141,6 +141,40 @@ final class Doctor
     }
 
     /**
+     * 005-SessionsWeb gate ladder (issues #1881, #1887, #1891, #1893, #1886).
+     */
+    private static function printSessionsWebSection(string $repoRoot): void
+    {
+        $example = $repoRoot.'/examples/005-SessionsWeb/example.php';
+        $manifest = $repoRoot.'/examples/005-SessionsWeb/phpc.json';
+        $treeOk = is_file($example) && is_file($manifest);
+
+        $vmGate = getenv('SESSIONS_WEB_SMOKE_GATE');
+        $vmOn = false === $vmGate || '' === $vmGate || '1' === $vmGate;
+
+        $llvmInfo = self::resolveLlvmInfo($repoRoot);
+        $llvmReady = null !== $llvmInfo['dir'];
+
+        $aotGate = getenv('SESSIONS_WEB_AOT_SMOKE_GATE');
+        $aotOn = false !== $aotGate && '1' === $aotGate;
+
+        fwrite(STDOUT, "\nSessionsWeb (005) - issue #1881:\n");
+        fwrite(STDOUT, '  '.($treeOk ? '[ok]' : '[ ]').' example.php + phpc.json present'."\n");
+        if ($treeOk) {
+            fwrite(STDOUT, '  '.($vmOn ? '[ok]' : '[plan]').' SESSIONS_WEB_SMOKE_GATE=1 (default) - make examples-sessions-smoke (#1887)'."\n");
+            fwrite(STDOUT, '  '.($llvmReady && $aotOn ? '[ok]' : '[plan]').' AOT two-request execute - SESSIONS_WEB_AOT_SMOKE_GATE=1 + LLVM (#1891)'."\n");
+            if (!$llvmReady) {
+                fwrite(STDOUT, "       LLVM missing - install script/install-llvm9.sh or use php-compiler:22.04-dev\n");
+            } elseif (!$aotOn) {
+                fwrite(STDOUT, "       Opt-in: SESSIONS_WEB_AOT_SMOKE_GATE=1 ./script/ci-local.sh --filter SessionsWebAot\n");
+            }
+            fwrite(STDOUT, "  [plan] phpc deploy + PHPC_DEPLOY_ROOT CGI - #1893\n");
+            fwrite(STDOUT, "  [plan] phpc init --profile sessionsweb - #1886\n");
+            fwrite(STDOUT, "  Gate env: SESSIONS_WEB_SMOKE_GATE default 1 (#1894); SESSIONS_WEB_AOT_SMOKE_GATE default 0 until #1923\n");
+        }
+    }
+
+    /**
      * North Star 1 presenter commands after the gate ladder (issues #1845, #1857).
      */
     private static function printNorthStar1PresenterSection(string $repoRoot): void

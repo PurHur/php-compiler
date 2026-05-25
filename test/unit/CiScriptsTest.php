@@ -118,6 +118,21 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('ci_run_sessions_web_smoke', $local);
     }
 
+    public function testCiDefaultsEnvDefinesSessionsWebAotSmokeGateOff(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString(
+            'SESSIONS_WEB_AOT_SMOKE_GATE="${SESSIONS_WEB_AOT_SMOKE_GATE:-0}"',
+            $defaults
+        );
+    }
+
+    public function testCiLocalRunsSessionsWebAotExecuteGate(): void
+    {
+        $local = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-local.sh');
+        $this->assertStringContainsString('ci_run_sessions_web_aot_execute', $local);
+    }
+
     public function testCiFastHonorsMiniWebAppServeGate(): void
     {
         $fast = dirname(__DIR__, 2).'/script/ci-fast.sh';
