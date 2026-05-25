@@ -8,7 +8,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 601 |
+| PHP files on vm.php path | 605 |
 | Source constructs flagged (blockers) | 0 |
 | Source constructs flagged (warnings) | 1558 |
 
