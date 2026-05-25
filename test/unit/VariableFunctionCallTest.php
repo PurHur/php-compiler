@@ -64,6 +64,24 @@ PHP;
      * @group llvm
      * @group jit
      */
+    public function testJitDynamicVariableFunctionCallCompiles(): void
+    {
+        if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
+            $this->markTestSkipped(LlvmToolchain::readyFailureReason() ?? 'LLVM not available');
+        }
+        $code = <<<'PHP'
+<?php
+$name = $_GET['op'] ?? 'strlen';
+echo $name('hi');
+PHP;
+        $stderr = $this->runJitCompileProbe($code);
+        $this->assertStringNotContainsString('Variable function calls not yet supported', $stderr);
+    }
+
+    /**
+     * @group llvm
+     * @group jit
+     */
     public function testAotLintVariableFunctionCall(): void
     {
         if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
@@ -93,6 +111,60 @@ PHP;
         $exit = proc_close($proc);
         $this->assertSame(0, $exit, trim((string) $stderr));
         $this->assertStringNotContainsString('Variable function calls not yet supported', (string) $stderr);
+    }
+
+    private function runJitCompileProbe(string $code): string
+    {
+        $repo = dirname(__DIR__, 2);
+        $sourcePath = tempnam(sys_get_temp_dir(), 'phpc_var_fn_jit_');
+        $this->assertNotFalse($sourcePath);
+        $phpPath = $sourcePath.'.php';
+        rename($sourcePath, $phpPath);
+        file_put_contents($phpPath, $code);
+
+        $probePath = tempnam(sys_get_temp_dir(), 'phpc_var_fn_probe_');
+        $this->assertNotFalse($probePath);
+        $probePhp = $probePath.'.php';
+        rename($probePath, $probePhp);
+        file_put_contents($probePhp, <<<'PROBE'
+<?php
+require 'test/bootstrap.php';
+PHPCompiler\LlvmToolchain::applyCurrentProcessEnv(dirname(__DIR__));
+$source = $argv[1];
+$code = file_get_contents($source);
+$runtime = new PHPCompiler\Runtime();
+$block = $runtime->parseAndCompile($code, basename($source));
+try {
+    $runtime->jit($block);
+} catch (Throwable $e) {
+    fwrite(STDERR, $e->getMessage());
+    exit(1);
+}
+PROBE
+        );
+
+        $env = [];
+        foreach (array_merge($_ENV, $_SERVER) as $key => $value) {
+            if (is_string($value)) {
+                $env[$key] = $value;
+            }
+        }
+        LlvmToolchain::applyProcessEnv($env, $repo);
+        $argv = array_merge(
+            LlvmToolchain::envPrefix($repo),
+            [PHP_BINARY, $probePhp, $phpPath]
+        );
+        $proc = proc_open($argv, [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, $repo, $env);
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        fclose($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[2]);
+        proc_close($proc);
+        @unlink($phpPath);
+        @unlink($probePhp);
+
+        return (string) $stderr;
     }
 
     private function runBin(string $bin): string
