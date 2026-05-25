@@ -679,6 +679,7 @@
         "test/bootstrap-aot/foreach_by_ref.php",
         "test/bootstrap-aot/global_var_link.php",
         "test/bootstrap-aot/helloworld_compile_smoke.php",
+        "test/bootstrap-aot/helloworld_m3_emit_native_entry.php",
         "test/bootstrap-aot/include_path_resolver.php",
         "test/bootstrap-aot/include_path_resolver_smoke.php",
         "test/bootstrap-aot/instanceof_check.php",
@@ -765,6 +766,7 @@
         "test/bootstrap-aot/file_exists_concat.php",
         "test/bootstrap-aot/foreach_by_ref.php",
         "test/bootstrap-aot/helloworld_compile_smoke.php",
+        "test/bootstrap-aot/helloworld_m3_emit_native_entry.php",
         "test/bootstrap-aot/include_path_resolver.php",
         "test/bootstrap-aot/include_path_resolver_smoke.php",
         "test/bootstrap-aot/instanceof_check.php",
@@ -821,8 +823,8 @@
         "inventory_files": 611,
         "excluded": 0,
         "eligible": 611,
-        "aot_lint_targets": 92,
-        "aot_link_targets": 79,
+        "aot_lint_targets": 93,
+        "aot_link_targets": 80,
         "aot_link_lib_targets": 1
     }
 }

@@ -3409,7 +3409,7 @@ These `LogicException` messages indicate CFG ops or expressions not yet lowered:
 ### `lib/Doctor.php`
 
 **Warnings** (review for bootstrap subset):
-- 27 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 28 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/Frame.php`
 
