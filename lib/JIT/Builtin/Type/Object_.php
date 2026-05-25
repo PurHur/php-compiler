@@ -787,6 +787,8 @@ class Object_ extends Type {
         $this->properties[$id] = [];
         $this->classConstants[$id] = [];
         $this->classes[$lcname] = $id;
+        // propertyFetch / copyProperties use classNameForId; declareClass sets this, externals must too (#1514, #1056).
+        $this->classIdToName[$id] = $lcname;
         $this->ensureExternalClassConstants($id, $lcname);
         $this->seedExternalClassProperties($id, $lcname);
         if ('phpcompiler\vm\context' === $lcname) {

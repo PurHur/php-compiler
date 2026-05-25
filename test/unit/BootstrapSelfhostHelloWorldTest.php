@@ -318,6 +318,46 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString('compile_smoke_m3_emit', $source);
     }
 
+    public function testHelloWorldM3EmitNativeEntryLinksWithRealLowering(): void
+    {
+        if (!LlvmToolchain::isReady(self::$root)) {
+            $this->markTestSkipped('LLVM 9 not available for M3 HelloWorld emit helper link test.');
+        }
+
+        $entry = self::$root.'/test/bootstrap-aot/helloworld_m3_emit_native_entry.php';
+        $out = self::$root.'/build/selfhost-helloworld-emit-test';
+        @unlink($out);
+
+        $prefix = LlvmToolchain::envPrefix(self::$root);
+        $cmd = implode(' ', array_map('escapeshellarg', [
+            ...$prefix,
+            'env',
+            'PHP_COMPILER_SELFHOST_AOT=1',
+            'PHP_COMPILER_M3_COMPILE_DRIVER=1',
+            'PHP_COMPILER_EMIT_HELPER_LINK=1',
+            'php',
+            self::$root.'/bin/compile.php',
+            '-o',
+            $out,
+            $entry,
+        ])).' 2>&1';
+        exec($cmd, $lines, $exitCode);
+
+        $this->assertSame(0, $exitCode, implode("\n", $lines));
+        $this->assertFileExists($out);
+        $this->assertTrue(is_executable($out));
+    }
+
+    public function testExternalJitClassRegistersIdToName(): void
+    {
+        $source = (string) file_get_contents(self::$root.'/lib/JIT/Builtin/Type/Object_.php');
+        $this->assertStringContainsString(
+            '$this->classIdToName[$id] = $lcname;',
+            $source,
+            'registerExternalClass must populate classIdToName for RuntimeInitVmContext propertyFetch (#1514)'
+        );
+    }
+
     public function testCiLocalDocumentsM3StrictGate(): void
     {
         $common = (string) file_get_contents(self::$root.'/script/ci-common.sh');
