@@ -12,7 +12,7 @@ use PHPCompiler\VM\OutputBuffer;
 use PHPLLVM\Value;
 
 /**
- * ob_start() — begin output buffering (VM only; issue #118).
+ * ob_start() — begin output buffering (VM; JIT scaffold {@see JitObStart}, #118, #1056).
  */
 final class ob_start extends Internal
 {
@@ -31,6 +31,6 @@ final class ob_start extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('ob_start() is not implemented for JIT in this compiler build');
+        throw new \LogicException('ob_start() is not implemented for JIT in this compiler build (#118)');
     }
 }

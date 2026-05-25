@@ -12,7 +12,7 @@ use PHPCompiler\VM\OutputBuffer;
 use PHPLLVM\Value;
 
 /**
- * ob_get_level() — active output buffer depth (VM only; issue #118).
+ * ob_get_level() — active output buffer depth (VM; JIT scaffold {@see JitObGetLevel}, #118, #1056).
  */
 final class ob_get_level extends Internal
 {
@@ -34,6 +34,6 @@ final class ob_get_level extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('ob_get_level() is not implemented for JIT in this compiler build');
+        throw new \LogicException('ob_get_level() is not implemented for JIT in this compiler build (#118)');
     }
 }
