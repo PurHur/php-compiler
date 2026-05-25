@@ -254,7 +254,7 @@ final class Doctor
     }
 
     /**
-     * 005-SessionsWeb gate ladder (issues #1881, #1903).
+     * 005-SessionsWeb gate ladder (issues #1881, #1903, #1969).
      */
     private static function printSessionsWebSection(string $repoRoot): void
     {
@@ -263,75 +263,141 @@ final class Doctor
             return;
         }
 
-        $hasExample = is_file($exampleDir.'/example.php');
-        $hasManifest = is_file($exampleDir.'/phpc.json');
+        $defaults = self::readCiDefaultsEnv($repoRoot);
+        $smokeDefault = $defaults['SESSIONS_WEB_SMOKE_GATE'] ?? '1';
+        $linkDefault = $defaults['SESSIONS_WEB_AOT_LINK_GATE'] ?? '1';
+        $aotDefault = $defaults['SESSIONS_WEB_AOT_SMOKE_GATE'] ?? '0';
+        $deployDefault = $defaults['SESSIONS_WEB_DEPLOY_SMOKE_GATE'] ?? '0';
 
-        $smokeGate = getenv('SESSIONS_WEB_SMOKE_GATE');
-        $smokeOn = false === $smokeGate || '' === $smokeGate || '1' === $smokeGate;
-
-        $linkGate = getenv('SESSIONS_WEB_AOT_LINK_GATE');
-        $linkOn = false !== $linkGate && '1' === $linkGate;
-
-        $aotGate = getenv('SESSIONS_WEB_AOT_SMOKE_GATE');
-        $aotOn = false !== $aotGate && '1' === $aotGate;
+        $smokeOn = self::gateEnabled('SESSIONS_WEB_SMOKE_GATE', $smokeDefault);
+        $linkOn = self::gateEnabled('SESSIONS_WEB_AOT_LINK_GATE', $linkDefault);
+        $aotOn = self::gateEnabled('SESSIONS_WEB_AOT_SMOKE_GATE', $aotDefault);
+        $deployOn = self::gateEnabled('SESSIONS_WEB_DEPLOY_SMOKE_GATE', $deployDefault);
 
         $llvmInfo = self::resolveLlvmInfo($repoRoot);
         $llvmReady = null !== $llvmInfo['dir'];
         $llvmDetail = $llvmReady
-            ? 'LLVM ready'
-            : 'LLVM missing — AOT rows need libLLVM-9.so.1';
+            ? 'LLVM ready at '.$llvmInfo['dir']
+            : 'LLVM missing — AOT + deploy rows need libLLVM-9.so.1';
 
-        $initProfileLive = \PHPCompiler\Cli\PhpcInit::isKnownProfile('sessionsweb');
-        $initTemplate = is_file($repoRoot.'/templates/init-sessionsweb/example.php');
+        $hasExample = is_file($exampleDir.'/example.php');
+        $hasManifest = is_file($exampleDir.'/phpc.json');
 
-        fwrite(STDOUT, "\nSessionsWeb (005) — issue #1881:\n");
+        fwrite(STDOUT, "\n005-SessionsWeb CI gates (#1969, ladder #1903):\n");
+        fwrite(STDOUT, "  Tree: examples/005-SessionsWeb\n");
+        fwrite(STDOUT, "  {$llvmDetail}\n");
+        fwrite(STDOUT, "  Defaults: script/ci-defaults.env\n\n");
 
         if ($hasExample && $hasManifest) {
             fwrite(STDOUT, "  [✅] example.php + phpc.json present\n");
         } else {
             fwrite(STDOUT, "  [⬜] example tree incomplete (expected example.php + phpc.json)\n");
         }
+        fwrite(STDOUT, "  Lint: ./phpc lint examples/005-SessionsWeb/example.php\n\n");
 
-        fwrite(STDOUT, "  [✅] Lint: ./phpc lint examples/005-SessionsWeb/example.php\n");
+        self::printSessionsWebGateRow(
+            1,
+            'VM session flash',
+            'SESSIONS_WEB_SMOKE_GATE',
+            $smokeDefault,
+            $smokeOn,
+            false,
+            'make examples-sessions-smoke · ci-fast (#1887)',
+            '#1887'
+        );
+        self::printSessionsWebGateRow(
+            2,
+            'AOT link',
+            'SESSIONS_WEB_AOT_LINK_GATE',
+            $linkDefault,
+            $linkOn,
+            true,
+            './script/ci-local.sh --filter test005SessionsWebAotLink (#1946)',
+            '#1946'
+        );
+        $aotStatus = $aotOn && $llvmReady ? '✅' : '📋';
+        $aotExecuteNote = $llvmReady
+            ? ($aotOn ? '#1891 ✅' : '#1891 ✅ · opt-in until #1923 (#1921)')
+            : 'LLVM required; #1891 ✅ when gate=1';
+        fwrite(STDOUT, "  [{$aotStatus}] Stage 3 AOT execute — SESSIONS_WEB_AOT_SMOKE_GATE default {$aotDefault} ({$aotExecuteNote})\n");
+        fwrite(STDOUT, "      PHPUnit: ./script/ci-local.sh --filter SessionsWebAotExecuteTest\n");
+        fwrite(STDOUT, "      Shell:   SESSIONS_WEB_AOT_SMOKE_GATE=1 EXAMPLES_AOT_SMOKE_ONLY=005 ./script/examples-aot-smoke.sh\n");
+        $deployStatus = $deployOn && $llvmReady ? '✅' : '📋';
+        $deployNote = $deployOn
+            ? '#1893 ✅ · ci-local when gate=1 (#1967)'
+            : 'opt-in default 0 — #1893 · #1962';
+        fwrite(STDOUT, "  [{$deployStatus}] Stage 4 Deploy CGI — SESSIONS_WEB_DEPLOY_SMOKE_GATE default {$deployDefault} ({$deployNote})\n");
+        fwrite(STDOUT, "      Run:     SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 make deploy-smoke\n");
+        fwrite(STDOUT, "      Or:      SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 ./script/deploy-smoke.sh --example 005\n");
 
-        if ($smokeOn) {
-            fwrite(STDOUT, "  [✅] SESSIONS_WEB_SMOKE_GATE=1 (default) — make examples-sessions-smoke · ci-fast (#1887)\n");
-        } else {
-            fwrite(STDOUT, "  [⬜] SESSIONS_WEB_SMOKE_GATE=0 — VM cookie curls skipped (#1887)\n");
-        }
-
-        if ($linkOn && $llvmReady) {
-            fwrite(STDOUT, "  [✅] SESSIONS_WEB_AOT_LINK_GATE=1 (default) — AOT link (#1946, ExamplesCompileTest::test005SessionsWebAotLink)\n");
-        } elseif ($llvmReady) {
-            fwrite(STDOUT, "  [⬜] SESSIONS_WEB_AOT_LINK_GATE=0 — AOT link skipped (#1946)\n");
-        } else {
-            fwrite(STDOUT, "  [📋] AOT link — #1946 ({$llvmDetail}; SESSIONS_WEB_AOT_LINK_GATE=1 default when LLVM ready)\n");
-        }
-
-        if ($aotOn && $llvmReady) {
-            fwrite(STDOUT, "  [✅] SESSIONS_WEB_AOT_SMOKE_GATE=1 — AOT two-request execute (#1891)\n");
-        } else {
-            $aotNote = $aotOn && !$llvmReady
-                ? "{$llvmDetail}; export SESSIONS_WEB_AOT_SMOKE_GATE=1 when LLVM ready"
-                : 'opt-in SESSIONS_WEB_AOT_SMOKE_GATE=0 until #1923';
-            fwrite(STDOUT, "  [📋] AOT two-request execute — #1891 ({$aotNote})\n");
-        }
-
-        fwrite(STDOUT, "  [📋] phpc deploy + PHPC_DEPLOY_ROOT CGI smoke — #1893\n");
-
+        $initProfileLive = \PHPCompiler\Cli\PhpcInit::isKnownProfile('sessionsweb');
+        $initTemplate = is_file($repoRoot.'/templates/init-sessionsweb/example.php');
+        fwrite(STDOUT, "\n  Related:\n");
         if ($initProfileLive) {
-            fwrite(STDOUT, "  [✅] phpc init --profile sessionsweb — templates/init-sessionsweb (#1886)\n");
+            fwrite(STDOUT, "  [✅] phpc init --profile sessionsweb (#1886)\n");
         } elseif ($initTemplate) {
             fwrite(STDOUT, "  [📋] phpc init --profile sessionsweb — template ready; CLI profile pending #1886\n");
         } else {
             fwrite(STDOUT, "  [📋] phpc init --profile sessionsweb — #1886\n");
         }
+        fwrite(STDOUT, "  Docs: examples/005-SessionsWeb/README.md · docs/local-ci-matrix.md\n");
+    }
 
-        fwrite(STDOUT, "  Gate env (script/ci-defaults.env):\n");
-        fwrite(STDOUT, "    SESSIONS_WEB_SMOKE_GATE      default 1 (#1894)\n");
-        fwrite(STDOUT, "    SESSIONS_WEB_AOT_LINK_GATE   default 1 (#1946)\n");
-        fwrite(STDOUT, "    SESSIONS_WEB_AOT_SMOKE_GATE  default 0 until #1923 (#1921)\n");
-        fwrite(STDOUT, "  Docs: examples/005-SessionsWeb/README.md · examples/README.md\n");
+    /**
+     * @param array<string, string> $defaults
+     */
+    private static function printSessionsWebGateRow(
+        int $stage,
+        string $label,
+        string $envVar,
+        string $default,
+        bool $enabled,
+        bool $needsLlvm,
+        string $runHint,
+        string $issueRef
+    ): void {
+        $icon = $enabled ? '✅' : '⬜';
+        $llvmTag = $needsLlvm ? ' · LLVM' : '';
+        fwrite(STDOUT, "  [{$icon}] Stage {$stage} {$label} — {$envVar} default {$default}{$llvmTag} ({$issueRef})\n");
+        fwrite(STDOUT, "      Run: {$runHint}\n");
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private static function readCiDefaultsEnv(string $repoRoot): array
+    {
+        $path = $repoRoot.'/script/ci-defaults.env';
+        if (!is_readable($path)) {
+            return [];
+        }
+        $content = file_get_contents($path);
+        if (false === $content) {
+            return [];
+        }
+        $defaults = [];
+        if (preg_match_all(
+            '/export\s+(SESSIONS_WEB_[A-Z_]+)="\$\{\1:-([^}]+)\}"/',
+            $content,
+            $matches,
+            PREG_SET_ORDER
+        )) {
+            foreach ($matches as $match) {
+                $defaults[$match[1]] = $match[2];
+            }
+        }
+
+        return $defaults;
+    }
+
+    private static function gateEnabled(string $name, string $default): bool
+    {
+        $value = getenv($name);
+        if (false === $value || '' === $value) {
+            return '1' === $default;
+        }
+
+        return '1' === $value;
     }
 
     /**

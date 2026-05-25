@@ -134,6 +134,26 @@ MINIWEBAPP_AOT_LINK_GATE=0 ./script/ci-local.sh --filter ExamplesCompileTest   #
 SESSIONS_WEB_AOT_LINK_GATE=0 ./script/ci-local.sh --filter ExamplesCompileTest   # skip 005 link
 ```
 
+## 005-SessionsWeb gates ([#1881](https://github.com/PurHur/php-compiler/issues/1881), [#1969](https://github.com/PurHur/php-compiler/issues/1969))
+
+Progressive ladder (VM → AOT link → AOT execute → deploy CGI). Probe with `phpc doctor --gates` or grep `005-SessionsWeb` in the output.
+
+| Stage | Variable | Default | When `=1` |
+|-------|----------|---------|-----------|
+| VM session flash | `SESSIONS_WEB_SMOKE_GATE` | `1` | `make examples-sessions-smoke` / `ci-fast` ([#1887](https://github.com/PurHur/php-compiler/issues/1887)) |
+| AOT link | `SESSIONS_WEB_AOT_LINK_GATE` | `1` | `./script/ci-local.sh --filter test005SessionsWebAotLink` ([#1946](https://github.com/PurHur/php-compiler/issues/1946)) |
+| AOT execute | `SESSIONS_WEB_AOT_SMOKE_GATE` | `0` | `SessionsWebAotExecuteTest` or `EXAMPLES_AOT_SMOKE_ONLY=005 ./script/examples-aot-smoke.sh` ([#1891](https://github.com/PurHur/php-compiler/issues/1891) ✅) |
+| Deploy CGI | `SESSIONS_WEB_DEPLOY_SMOKE_GATE` | `0` | `SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 make deploy-smoke` ([#1893](https://github.com/PurHur/php-compiler/issues/1893), [#1962](https://github.com/PurHur/php-compiler/issues/1962)) |
+
+Stages 2–4 require LLVM 9. Execute landed ([#1891](https://github.com/PurHur/php-compiler/issues/1891)); default-on for execute/deploy gates tracked in [#1923](https://github.com/PurHur/php-compiler/issues/1923) / [#1967](https://github.com/PurHur/php-compiler/issues/1967).
+
+```bash
+./phpc doctor --gates | grep -E 'SESSIONS_WEB|005-SessionsWeb'
+SESSIONS_WEB_AOT_SMOKE_GATE=1 ./script/ci-local.sh --filter SessionsWebAotExecuteTest
+SESSIONS_WEB_AOT_SMOKE_GATE=1 EXAMPLES_AOT_SMOKE_ONLY=005 ./script/examples-aot-smoke.sh
+SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 ./script/deploy-smoke.sh --example 005
+```
+
 **003 AOT execute** (`MINIWEBAPP_AOT_EXECUTE_GATE=1` default; set `0` to skip during iteration):
 
 ```bash

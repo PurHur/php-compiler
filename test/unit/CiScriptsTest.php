@@ -817,6 +817,15 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('DEPLOY_SMOKE_GATE="${DEPLOY_SMOKE_GATE:-1}"', $defaults);
     }
 
+    public function testLocalCiMatrixDocumentsSessionsWebGates(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('## 005-SessionsWeb gates', $doc);
+        $this->assertStringContainsString('SESSIONS_WEB_DEPLOY_SMOKE_GATE', $doc);
+        $this->assertStringContainsString('examples-aot-smoke.sh', $doc);
+        $this->assertStringContainsString('#1969', $doc);
+    }
+
     public function testCiFastRunsMiniWebAppVmCliGateByDefault(): void
     {
         $fast = dirname(__DIR__, 2).'/script/ci-fast.sh';
