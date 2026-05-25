@@ -17,18 +17,13 @@ final class RootReadmeSyncTest extends TestCase
         $this->assertFileExists($script);
     }
 
-    /**
-     * Master README still carries pre-#1525 north-star wording; guard must detect it.
-     */
-    public function testRootReadmeSyncDetectsStaleNorthStarWordingOnMaster(): void
+    public function testRootReadmeSyncPassesAfterNorthStarDocRefresh(): void
     {
         $root = dirname(__DIR__, 2);
         $cmd = escapeshellarg(PHP_BINARY).' '
             .escapeshellarg($root.'/script/check-root-readme-sync.php').' 2>&1';
         exec($cmd, $out, $code);
-        $this->assertSame(1, $code, 'expected failure until #1525 fixes README.md');
-        $joined = implode("\n", $out);
-        $this->assertStringContainsString('check-root-readme-sync:', $joined);
-        $this->assertMatchesRegularExpression('/README\.md:\d+:/', $joined);
+        $this->assertSame(0, $code, implode("\n", $out));
+        $this->assertStringContainsString('check-root-readme-sync: OK', implode("\n", $out));
     }
 }
