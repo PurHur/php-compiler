@@ -8,9 +8,13 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 FAIL_FAST=0
 WITH_COMPILE_SMOKE=0
 WITH_LIB_SPINE_SMOKE=0
+WITH_LIB_SPINE_VM_SMOKE=0
 WITH_HELLOWORLD=0
 if [[ "${BOOTSTRAP_LIB_SPINE_SMOKE:-0}" == "1" ]]; then
   WITH_LIB_SPINE_SMOKE=1
+fi
+if [[ "${BOOTSTRAP_LIB_SPINE_VM_SMOKE:-0}" == "1" ]]; then
+  WITH_LIB_SPINE_VM_SMOKE=1
 fi
 if [[ "${BOOTSTRAP_M3_HELLOWORLD:-0}" == "1" ]]; then
   WITH_HELLOWORLD=1
@@ -25,6 +29,9 @@ while [[ $# -gt 0 ]]; do
       ;;
     --with-lib-spine-smoke)
       WITH_LIB_SPINE_SMOKE=1
+      ;;
+    --with-lib-spine-vm-smoke)
+      WITH_LIB_SPINE_VM_SMOKE=1
       ;;
     --with-helloworld)
       WITH_HELLOWORLD=1
@@ -104,6 +111,11 @@ fi
 
 if [[ "${WITH_LIB_SPINE_SMOKE}" -eq 1 ]]; then
   run_step "selfhost-lib-spine-smoke" ./script/bootstrap-selfhost-lib-spine-smoke-link.sh
+  print_summary
+fi
+
+if [[ "${WITH_LIB_SPINE_VM_SMOKE}" -eq 1 ]]; then
+  run_step "selfhost-lib-spine-vm-smoke" ./script/bootstrap-selfhost-lib-spine-vm-smoke.sh
   print_summary
 fi
 

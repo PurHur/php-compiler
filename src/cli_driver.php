@@ -16,6 +16,7 @@ if (!function_exists('php_compiler_cli_should_skip_entry_driver')) {
 if (
     (defined('PHP_COMPILER_LIB_SPINE_SMOKE') && PHP_COMPILER_LIB_SPINE_SMOKE)
     || php_compiler_cli_should_skip_entry_driver()
+    || ('1' === getenv('PHP_COMPILER_VM_SPINE_SMOKE') || 'true' === strtolower((string) getenv('PHP_COMPILER_VM_SPINE_SMOKE')))
 ) {
     return;
 }
