@@ -2270,7 +2270,8 @@ class JIT {
                             }
                             $hints = array_values(array_unique(array_merge(
                                 JIT\VariableFunctionCallHelper::hintedCalleeNames($block, $nameSlot),
-                                JIT\VariableFunctionCallHelper::coalesceBranchLiteralHints($block)
+                                JIT\VariableFunctionCallHelper::coalesceBranchLiteralHints($block),
+                                JIT\VariableFunctionCallHelper::funDefNamesInCompilationUnit($block)
                             )));
                             $this->context->scope->toCall = new JIT\Call\RuntimeVariableFunction($nameVar, $hints);
                         } else {
