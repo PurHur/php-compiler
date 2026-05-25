@@ -88,7 +88,7 @@ ci_run_m2_spine_issue_hygiene_check() {
 }
 
 ci_run_examples_readme_sync_check() {
-  if [[ "${EXAMPLES_README_SYNC_GATE:-0}" != "1" ]]; then
+  if [[ "${EXAMPLES_README_SYNC_GATE:-1}" != "1" ]]; then
     return 0
   fi
   echo "Examples README sync (EXAMPLES_README_SYNC_GATE=1, issue #1822)..."
