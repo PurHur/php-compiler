@@ -590,7 +590,7 @@ final class Doctor
             $smokeDefault,
             $smokeOn,
             false,
-            'THROWS_WEB_SMOKE_GATE=1 ./script/examples-web-smoke.sh --throws-only · ci-fast when gate=1 (#2093)',
+            'make examples-throws-smoke · ci-fast/ci-local when THROWS_WEB_SMOKE_GATE=1 default (#2125)',
             '#2093'
         );
         self::printSessionsWebGateRow(

@@ -126,12 +126,15 @@ miniwebapp-aot-bisect:
 	./script/miniwebapp-aot-bisect.sh
 
 # HTTP smoke: phpc serve + curl for 001-SimpleWeb and 002-StaticWeb (issue #298)
-.PHONY: examples-web-smoke examples-sessions-smoke examples-fileupload-deploy-smoke examples-web-smoke-prebuild examples-aot-smoke deploy-smoke deploy-smoke-all
+.PHONY: examples-web-smoke examples-sessions-smoke examples-throws-smoke examples-fileupload-deploy-smoke examples-web-smoke-prebuild examples-aot-smoke deploy-smoke deploy-smoke-all
 examples-web-smoke:
 	./script/examples-web-smoke.sh
 
 examples-sessions-smoke:
 	./script/examples-web-smoke.sh --sessions-only
+
+examples-throws-smoke:
+	./script/examples-web-smoke.sh --throws-only
 
 # 006-FileUploadWeb deploy CGI only (FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE=1; issue #2044)
 examples-fileupload-deploy-smoke:

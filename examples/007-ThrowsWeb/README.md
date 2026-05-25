@@ -16,20 +16,22 @@ curl -sf -X POST -d 'email=bad' http://127.0.0.1:8080/example.php | grep -i inva
 | Layer | Notes |
 |-------|-------|
 | VM `phpc run` | ✅ GET — empty state |
-| VM `phpc serve` | ✅ caught invalid POST (`THROWS_WEB_SMOKE_GATE=1` opt-in, [#2093](https://github.com/PurHur/php-compiler/issues/2093)) |
+| VM `phpc serve` | ✅ caught invalid POST (`THROWS_WEB_SMOKE_GATE=1` default, [#2093](https://github.com/PurHur/php-compiler/issues/2093), [#2125](https://github.com/PurHur/php-compiler/issues/2125)) |
 | JIT / AOT | 📋 deferred — [#2101](https://github.com/PurHur/php-compiler/issues/2101) / [#2104](https://github.com/PurHur/php-compiler/issues/2104) |
 
 ## CI gates
 
-Defaults from `script/ci-defaults.env` (VM smoke **off** until stable):
+Defaults from `script/ci-defaults.env`:
 
 ```console
 ./phpc doctor --gates | grep -E 'THROWS_WEB|007-ThrowsWeb'
 ```
 
-| Stage | Gate | Default | Command when enabled |
-|-------|------|---------|----------------------|
-| VM serve | `THROWS_WEB_SMOKE_GATE` | `0` | `THROWS_WEB_SMOKE_GATE=1 ./script/examples-web-smoke.sh --throws-only` ([#2093](https://github.com/PurHur/php-compiler/issues/2093)) |
+| Stage | Gate | Default | Command |
+|-------|------|---------|---------|
+| VM serve | `THROWS_WEB_SMOKE_GATE` | `1` | `make examples-throws-smoke` · `ci-fast.sh` ([#2125](https://github.com/PurHur/php-compiler/issues/2125)) |
+
+Opt-out for doc-only iteration: `THROWS_WEB_SMOKE_GATE=0 ./script/ci-fast.sh`
 
 ## Benchmark row
 

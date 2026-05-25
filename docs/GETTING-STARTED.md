@@ -84,7 +84,7 @@ curl -s -F 'doc=@examples/006-FileUploadWeb/README.md' http://127.0.0.1:8080/exa
 
 ### 5b. (Optional) ThrowsWeb — caught invalid POST (VM)
 
-`throw` / `catch` on a bad form field ([#2076](https://github.com/PurHur/php-compiler/issues/2076)). Gate ladder: `./phpc doctor --gates | grep -i throws` ([#2102](https://github.com/PurHur/php-compiler/issues/2102)). VM curls: `THROWS_WEB_SMOKE_GATE=1 ./script/examples-web-smoke.sh --throws-only` ([#2093](https://github.com/PurHur/php-compiler/issues/2093)). AOT link/execute gates are opt-in ([#2101](https://github.com/PurHur/php-compiler/issues/2101)) — see [examples/007-ThrowsWeb/README.md](../examples/007-ThrowsWeb/README.md).
+`throw` / `catch` on a bad form field ([#2076](https://github.com/PurHur/php-compiler/issues/2076)). Gate ladder: `./phpc doctor --gates | grep -i throws` ([#2102](https://github.com/PurHur/php-compiler/issues/2102)). VM curls: `make examples-throws-smoke` (`THROWS_WEB_SMOKE_GATE=1` default — [#2125](https://github.com/PurHur/php-compiler/issues/2125), [#2093](https://github.com/PurHur/php-compiler/issues/2093)). AOT link/execute gates are opt-in ([#2101](https://github.com/PurHur/php-compiler/issues/2101)) — see [examples/007-ThrowsWeb/README.md](../examples/007-ThrowsWeb/README.md).
 
 ### 6. (Optional) Self-host smoke
 
