@@ -25,6 +25,12 @@ extern __string__ *__string__init(long long size, const char *value);
 extern void __value__writeBool(__value__ *out, int value);
 extern __string__ *__compiler_random_bytes(int64_t len);
 
+extern int phpc_session_apply_incoming_cookie(void);
+extern void phpc_session_emit_setcookie(void);
+extern void phpc_session_load_from_disk(void);
+extern void phpc_session_save_to_disk(void);
+extern void phpc_session_unlink_file(void);
+
 typedef uint64_t phpc_size;
 
 static phpc_size nf_strlen(__string__ *s)
@@ -109,12 +115,17 @@ void __phpc_session_start_apply(__value__ *out)
     }
 
     if (__phpc_session_id_len <= 0) {
-        __phpc_session_generate_new_id();
+        if (!phpc_session_apply_incoming_cookie()) {
+            __phpc_session_generate_new_id();
+            phpc_session_emit_setcookie();
+        }
     }
 
     if (0 == sg_SESSION) {
         sg_SESSION = __hashtable__alloc();
     }
+
+    phpc_session_load_from_disk();
 
     __phpc_session_active = 1;
     __value__writeBool(out, 1);
@@ -128,6 +139,7 @@ void __phpc_session_write_close_apply(__value__ *out)
         return;
     }
 
+    phpc_session_save_to_disk();
     __phpc_session_active = 0;
     __value__writeBool(out, 1);
 }
@@ -142,7 +154,12 @@ void __phpc_session_regenerate_id_apply(__value__ *out, int8_t delete_old)
         return;
     }
 
+    phpc_session_save_to_disk();
+    if (delete_old) {
+        phpc_session_unlink_file();
+    }
     __phpc_session_generate_new_id();
+    phpc_session_emit_setcookie();
     __value__writeBool(out, 1);
 }
 
@@ -154,6 +171,7 @@ void __phpc_session_destroy_apply(__value__ *out)
         return;
     }
 
+    phpc_session_unlink_file();
     __phpc_session_active = 0;
     __phpc_session_id_storage[0] = '\0';
     __phpc_session_id_len = 0;

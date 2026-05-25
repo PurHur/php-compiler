@@ -324,3 +324,21 @@ void __compiler_unserialize(__string__ *payload, __value__ *out)
     }
     phpc_unser_write_value(out, &item);
 }
+
+/* Session file persistence (#1938): decode PHP serialize assoc array to hashtable. */
+__hashtable__ *phpc_session_decode_payload(const char *body, size_t len)
+{
+    phpc_unser_ctx ctx;
+    phpc_unser_item item;
+
+    if (NULL == body || 0 == len || len > PHPC_UNSER_MAX_LEN) {
+        return __hashtable__alloc();
+    }
+    ctx.pos = body;
+    ctx.end = body + len;
+    if (!phpc_unser_parse_item(&ctx, &item) || PHPC_UNSER_ARRAY != item.kind || NULL == item.ht) {
+        return __hashtable__alloc();
+    }
+
+    return item.ht;
+}
