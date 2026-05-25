@@ -142,6 +142,78 @@ final class Doctor
     }
 
     /**
+     * North Star 2 self-host gate ladder only (issues #1492, #2053).
+     */
+    public static function runSelfhost(string $repoRoot): int
+    {
+        require_once $repoRoot.'/script/bootstrap-spine-count.php';
+        $counts = bootstrap_spine_counts($repoRoot);
+        $spine = $counts['spine'];
+        $inventory = $counts['inventory'];
+
+        $llvmInfo = self::resolveLlvmInfo($repoRoot);
+        $llvmReady = null !== $llvmInfo['dir'];
+        $llvmDetail = $llvmReady
+            ? 'ready at '.$llvmInfo['dir'].' ('.$llvmInfo['source'].')'
+            : 'missing — link/probe steps need LLVM 9 (script/install-llvm9.sh)';
+
+        $defaults = self::readCiDefaultsEnv($repoRoot);
+        $ns2Default = $defaults['NORTH_STAR2_VERIFY_GATE'] ?? '1';
+        $m3HelloStrictDefault = $defaults['BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE'] ?? '0';
+        $m3SmokeStrictDefault = $defaults['BOOTSTRAP_M3_COMPILE_SMOKE_STRICT_GATE'] ?? '0';
+        $m3SmokeProbeDefault = $defaults['BOOTSTRAP_M3_COMPILE_SMOKE_PROBE_GATE'] ?? '1';
+        $spineCountSyncDefault = $defaults['SELFHOST_SPINE_COUNT_SYNC_GATE'] ?? '1';
+        $spineCoverageDefault = $defaults['SELFHOST_SPINE_COVERAGE_SYNC_GATE'] ?? '1';
+        $loopProbeDefault = $defaults['BOOTSTRAP_LOOP_PROBE_GATE'] ?? '0';
+
+        $inventoryScript = $repoRoot.'/script/bootstrap-inventory.php';
+        $inventoryOk = is_file($inventoryScript);
+        $inventoryDetail = $inventoryOk
+            ? 'php script/bootstrap-inventory.php --check'
+            : 'script/bootstrap-inventory.php missing';
+
+        fwrite(STDOUT, "North Star 2 self-host gates (#1492, #1056):\n\n");
+
+        fwrite(STDOUT, "1. Inventory\n");
+        fwrite(STDOUT, "   {$inventoryDetail}\n");
+        fwrite(STDOUT, "   php script/bootstrap-spine-count.php  → {$spine}/{$inventory}\n\n");
+
+        fwrite(STDOUT, "2. M2 spine\n");
+        fwrite(STDOUT, "   SELFHOST_SPINE_COUNT_SYNC_GATE=".(self::gateEnabled('SELFHOST_SPINE_COUNT_SYNC_GATE', $spineCountSyncDefault) ? '1' : '0')." (default {$spineCountSyncDefault})\n");
+        fwrite(STDOUT, "   SELFHOST_SPINE_COVERAGE_SYNC_GATE=".(self::gateEnabled('SELFHOST_SPINE_COVERAGE_SYNC_GATE', $spineCoverageDefault) ? '1' : '0')." (default {$spineCoverageDefault})\n");
+        fwrite(STDOUT, "   BOOTSTRAP_LIB_SPINE_SMOKE=1 make bootstrap-selfhost-lib-spine-smoke\n");
+        fwrite(STDOUT, "   BOOTSTRAP_LIB_SPINE_VM_SMOKE=1 make bootstrap-selfhost-lib-spine-vm-smoke\n\n");
+
+        fwrite(STDOUT, "3. M3 emit (partial vs strict)\n");
+        fwrite(STDOUT, "   BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE=".(self::gateEnabled('BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE', $m3HelloStrictDefault) ? '1' : '0')." (default {$m3HelloStrictDefault}) — ci-local LLVM tail\n");
+        fwrite(STDOUT, "   BOOTSTRAP_M3_COMPILE_SMOKE_PROBE_GATE=".(self::gateEnabled('BOOTSTRAP_M3_COMPILE_SMOKE_PROBE_GATE', $m3SmokeProbeDefault) ? '1' : '0')." (default {$m3SmokeProbeDefault})\n");
+        fwrite(STDOUT, "   BOOTSTRAP_M3_COMPILE_SMOKE_STRICT_GATE=".(self::gateEnabled('BOOTSTRAP_M3_COMPILE_SMOKE_STRICT_GATE', $m3SmokeStrictDefault) ? '1' : '0')." (default {$m3SmokeStrictDefault})\n");
+        fwrite(STDOUT, "   BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1 BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING=1 BOOTSTRAP_M3_RUNTIME_COMPILE=1 ./script/bootstrap-selfhost-helloworld-probe.sh\n");
+        fwrite(STDOUT, "   BOOTSTRAP_M3_HELLOWORLD_STRICT=1 … helloworld-probe.sh  (no Zend fallback; #1493)\n");
+        fwrite(STDOUT, "   Emit TU: test/bootstrap-aot/helloworld_m3_emit_native_entry.php (#1768)\n\n");
+
+        fwrite(STDOUT, "4. Presenter / fast CI\n");
+        fwrite(STDOUT, "   NORTH_STAR2_VERIFY_GATE=".(self::gateEnabled('NORTH_STAR2_VERIFY_GATE', $ns2Default) ? '1' : '0')." (default {$ns2Default}) — ci-fast\n");
+        if (is_executable($repoRoot.'/script/north-star2-verify.sh')) {
+            fwrite(STDOUT, "   make north-star2-verify  or  ./script/north-star2-verify.sh\n");
+        }
+        fwrite(STDOUT, "   phpc test --bootstrap [--strict]\n");
+        fwrite(STDOUT, "   make bootstrap-wave-check  (opt-in --with-helloworld)\n\n");
+
+        fwrite(STDOUT, "5. M4 loop\n");
+        fwrite(STDOUT, "   BOOTSTRAP_LOOP_PROBE_GATE=".(self::gateEnabled('BOOTSTRAP_LOOP_PROBE_GATE', $loopProbeDefault) ? '1' : '0')." (default {$loopProbeDefault}) — ./script/bootstrap-loop-probe.sh --dry-run\n\n");
+
+        fwrite(STDOUT, "6. LLVM\n");
+        fwrite(STDOUT, "   {$llvmDetail}\n");
+        if ($llvmReady) {
+            fwrite(STDOUT, "   phpc doctor --jit-probe  (MCJIT smoke)\n");
+        }
+        fwrite(STDOUT, "\nDocs: docs/bootstrap-selfhost.md · docs/bootstrap-m5-fast-path.md · docs/self-host-target.md\n");
+
+        return 0;
+    }
+
+    /**
      * North Star 1 presenter commands after the gate ladder (issues #1845, #1857).
      */
     private static function printNorthStar1PresenterSection(string $repoRoot): void
