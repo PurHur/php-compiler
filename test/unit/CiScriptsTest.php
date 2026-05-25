@@ -103,6 +103,21 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('--sessions-only', $common);
     }
 
+    public function testCiDefaultsEnvDefinesSessionsWebAotSmokeGateOff(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString('SESSIONS_WEB_AOT_SMOKE_GATE="${SESSIONS_WEB_AOT_SMOKE_GATE:-0}"', $defaults);
+    }
+
+    public function testCiLocalExcludesSessionsWebAotExecuteUnlessGateOn(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('ci_run_sessions_web_aot_execute', $body);
+        $this->assertStringContainsString('--exclude-group sessionsweb-aot-execute', $body);
+        $this->assertStringContainsString('--group sessionsweb-aot-execute', $body);
+        $this->assertStringContainsString('SESSIONS_WEB_AOT_SMOKE_GATE:-0', $body);
+    }
+
     public function testCiDefaultsEnvDefinesSessionsWebSmokeGateOn(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');

@@ -52,6 +52,9 @@ final class ExamplesAotSmokeScriptTest extends TestCase
         $this->assertStringContainsString('.phpc/smoke', $body);
         $this->assertStringContainsString('EXAMPLES_AOT_SMOKE_ONLY=003', $body);
         $this->assertStringContainsString('smoke_003_miniwebapp', $body);
+        $this->assertStringContainsString('005-SessionsWeb', $body);
+        $this->assertStringContainsString('SESSIONS_WEB_AOT_SMOKE_GATE', $body);
+        $this->assertStringContainsString('smoke_005_sessionsweb', $body);
         $this->assertStringNotContainsString('#568', $body);
     }
 

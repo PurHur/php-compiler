@@ -453,9 +453,22 @@ ci_run_deploy_smoke() {
 
 # @group aot-link PHPUnit (link-only; execute is ci_run_miniwebapp_aot_execute — #775).
 ci_run_aot_link_phpunit() {
-  local -a aot_link_args=(--group aot-link --exclude-group serve --exclude-group miniwebapp-aot-execute --exclude-group miniwebapp-aot-serve)
+  local -a aot_link_args=(--group aot-link --exclude-group serve --exclude-group miniwebapp-aot-execute --exclude-group miniwebapp-aot-serve --exclude-group sessionsweb-aot-execute)
   echo "PHPUnit: AOT link (@group aot-link)..."
   ci_run_phpunit "${aot_link_args[@]}" "$@"
+}
+
+# 005-SessionsWeb AOT binary CLI execute (issue #1891); opt-in SESSIONS_WEB_AOT_SMOKE_GATE=1.
+ci_run_sessions_web_aot_execute() {
+  if [[ "${SESSIONS_WEB_AOT_SMOKE_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  if ! ci_llvm_ready; then
+    echo "PHPUnit: SessionsWeb AOT execute skipped (LLVM 9 not available)"
+    return 0
+  fi
+  echo "PHPUnit: SessionsWeb AOT execute (@group sessionsweb-aot-execute; SESSIONS_WEB_AOT_SMOKE_GATE=1, #1891)..."
+  ci_run_phpunit --group sessionsweb-aot-execute "$@"
 }
 
 # 003-MiniWebApp AOT binary CLI execute (issues #747, #775); default on via MINIWEBAPP_AOT_EXECUTE_GATE=1.
