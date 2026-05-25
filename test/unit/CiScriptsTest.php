@@ -1436,6 +1436,21 @@ final class CiScriptsTest extends TestCase
         $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
         $this->assertStringContainsString('ci_run_init_fileupload_parity_check', $common);
         $this->assertStringContainsString('check-init-fileupload-parity.sh', $common);
+        $this->assertStringContainsString('INIT_FILEUPLOAD_PARITY_GATE:-1', $common);
+    }
+
+    public function testCiDefaultsEnvDefinesInitFileuploadParityGateOn(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString('INIT_FILEUPLOAD_PARITY_GATE="${INIT_FILEUPLOAD_PARITY_GATE:-1}"', $defaults);
+    }
+
+    public function testLocalCiMatrixDocumentsInitFileuploadParityGate(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('INIT_FILEUPLOAD_PARITY_GATE', $doc);
+        $this->assertStringContainsString('check-init-fileupload-parity.sh', $doc);
+        $this->assertMatchesRegularExpression('/\| `INIT_FILEUPLOAD_PARITY_GATE` \| `1` \|/', $doc);
     }
 
     public function testCheckInitApiJsonParityScriptExists(): void

@@ -201,7 +201,7 @@ ci_run_init_sessionsweb_parity_check() {
 }
 
 ci_run_init_fileupload_parity_check() {
-  if [[ "${INIT_FILEUPLOAD_PARITY_GATE:-0}" != "1" ]]; then
+  if [[ "${INIT_FILEUPLOAD_PARITY_GATE:-1}" != "1" ]]; then
     return 0
   fi
   echo "init-fileupload template parity (INIT_FILEUPLOAD_PARITY_GATE=1, issue #2004)..."
