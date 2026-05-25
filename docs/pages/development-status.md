@@ -296,13 +296,14 @@ GitHub issues use labels `phase-0:Foundation` … `phase-5:reference-app`. Deliv
 
 ---
 
-## Shipped examples (000–005)
+## Shipped examples (000–006)
 
 | Example | VM | AOT link | AOT execute | Deploy / notes |
 |---------|----|----------|-------------|----------------|
 | 000–002, 004 | ✅ | ✅ | ✅ | — |
 | 003-MiniWebApp | ✅ | ✅ | ✅ ([#764](https://github.com/PurHur/php-compiler/issues/764), [#676](https://github.com/PurHur/php-compiler/issues/676)) | North Star 1 reference app |
 | 005-SessionsWeb | ✅ `phpc serve` + `SESSIONS_WEB_SMOKE_GATE=1` ([#1887](https://github.com/PurHur/php-compiler/issues/1887)) | ✅ `SESSIONS_WEB_AOT_LINK_GATE=1` ([#1946](https://github.com/PurHur/php-compiler/issues/1946)) | ✅ opt-in `SESSIONS_WEB_AOT_SMOKE_GATE=1` ([#1891](https://github.com/PurHur/php-compiler/issues/1891), [#1923](https://github.com/PurHur/php-compiler/issues/1923)) | Deploy smoke opt-in `SESSIONS_WEB_DEPLOY_SMOKE_GATE=1` ([#1893](https://github.com/PurHur/php-compiler/issues/1893)); default-on tracked in [#1954](https://github.com/PurHur/php-compiler/issues/1954) / [#1967](https://github.com/PurHur/php-compiler/issues/1967) |
+| 006-FileUploadWeb | ✅ `phpc serve` + `FILE_UPLOAD_WEB_SMOKE_GATE=1` ([#2009](https://github.com/PurHur/php-compiler/issues/2009)) | ✅ `FILE_UPLOAD_WEB_AOT_LINK_GATE=1` ([#2011](https://github.com/PurHur/php-compiler/issues/2011)) | ✅ `FILE_UPLOAD_WEB_AOT_SMOKE_GATE=1` ([#2012](https://github.com/PurHur/php-compiler/issues/2012)) | Deploy smoke opt-in `FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE=1` ([#2038](https://github.com/PurHur/php-compiler/issues/2038)); default-on tracked in [#2042](https://github.com/PurHur/php-compiler/issues/2042) |
 
 Commands: `./phpc run`, `./phpc build`, `./phpc serve`, `make examples-aot-smoke` (see [README](https://github.com/PurHur/php-compiler/blob/master/README.md) and [examples/README.md](https://github.com/PurHur/php-compiler/blob/master/examples/README.md)).
 
