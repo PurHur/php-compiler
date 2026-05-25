@@ -23,10 +23,13 @@ export PHP_COMPILER_EXT_DIR="${PHP_COMPILER_EXT_DIR:-/usr/lib/php/20220829}"
 _REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 _REPO_LLVM="$_REPO_ROOT/.llvm"
 _LLVM_DIR=""
-if [[ -f "$_REPO_LLVM/libLLVM-9.so.1" ]]; then
-  _LLVM_DIR="$_REPO_LLVM"
+# In php-compiler:22.04-dev, image LLVM is reliable; bind-mounted .llvm often breaks MCJIT (#2055).
+if [[ -f /.dockerenv && -f /opt/llvm9/libLLVM-9.so.1 ]]; then
+  _LLVM_DIR=/opt/llvm9
 elif [[ -n "${PHP_COMPILER_LLVM_PATH:-}" && -f "${PHP_COMPILER_LLVM_PATH}/libLLVM-9.so.1" ]]; then
   _LLVM_DIR="$PHP_COMPILER_LLVM_PATH"
+elif [[ -f "$_REPO_LLVM/libLLVM-9.so.1" ]]; then
+  _LLVM_DIR="$_REPO_LLVM"
 elif [[ -f /opt/llvm9/libLLVM-9.so.1 ]]; then
   _LLVM_DIR=/opt/llvm9
 fi
