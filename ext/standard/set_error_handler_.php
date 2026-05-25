@@ -43,9 +43,19 @@ final class set_error_handler_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        unset($context, $args);
-        throw new \LogicException(
-            'set_error_handler() is not implemented for JIT in this compiler build (#1379)'
-        );
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 2) {
+            throw new \LogicException('set_error_handler() requires one or two arguments');
+        }
+        if (!ErrorHandlerCallbackPolicy::isJitLowerable($args[0])) {
+            throw new \LogicException(ErrorHandlerCallbackPolicy::jitRejectionMessage());
+        }
+        $this->jitString($context, $args[0], 'set_error_handler() callback');
+        $maskArg = 2 === $argc ? $args[1] : null;
+        if (null !== $maskArg && JITVariable::TYPE_NATIVE_LONG !== $maskArg->type) {
+            throw new \LogicException('set_error_handler() error type mask must be a compile-time integer');
+        }
+
+        return JitErrorHandler::set($context, $args[0], $maskArg);
     }
 }
