@@ -269,6 +269,26 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('EXAMPLES_README_SYNC_GATE=${EXAMPLES_README_SYNC_GATE:-1}', $body);
     }
 
+    public function testCiDefaultsEnvDefinesSelfhostSpineCountSyncGateOn(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString('SELFHOST_SPINE_COUNT_SYNC_GATE="${SELFHOST_SPINE_COUNT_SYNC_GATE:-1}"', $defaults);
+    }
+
+    public function testCiFastRunsSelfhostSpineCountSyncViaInventoryChecks(): void
+    {
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('ci_run_selfhost_spine_count_sync_check', $common);
+        $this->assertStringContainsString('check-selfhost-spine-count-sync.php', $common);
+        $this->assertStringContainsString('SELFHOST_SPINE_COUNT_SYNC_GATE:-0', $common);
+    }
+
+    public function testCiDockerRunPassesSelfhostSpineCountSyncGateDefaultOn(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');
+        $this->assertStringContainsString('SELFHOST_SPINE_COUNT_SYNC_GATE=${SELFHOST_SPINE_COUNT_SYNC_GATE:-1}', $body);
+    }
+
     public function testCiDefaultsEnvDefinesExamplesAotSmokeGateOn(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
@@ -466,6 +486,14 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('EXAMPLES_README_SYNC_GATE', $doc);
         $this->assertStringContainsString('check-examples-readme-sync.php', $doc);
         $this->assertMatchesRegularExpression('/\| `EXAMPLES_README_SYNC_GATE` \| `1` \|/', $doc);
+    }
+
+    public function testLocalCiMatrixDocumentsSelfhostSpineCountSyncGate(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('SELFHOST_SPINE_COUNT_SYNC_GATE', $doc);
+        $this->assertStringContainsString('check-selfhost-spine-count-sync.php', $doc);
+        $this->assertMatchesRegularExpression('/\| `SELFHOST_SPINE_COUNT_SYNC_GATE` \| `1` \|/', $doc);
     }
 
     public function testLocalCiMatrixDocumentsMiniWebAppGates(): void
