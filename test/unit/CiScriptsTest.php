@@ -1797,6 +1797,43 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('INIT_MINIWEBAPP_PARITY_GATE=${INIT_MINIWEBAPP_PARITY_GATE:-1}', $body);
     }
 
+    public function testCheckMiniwebappLintZeroScriptExists(): void
+    {
+        $check = dirname(__DIR__, 2).'/script/check-miniwebapp-lint-zero.php';
+        $this->assertFileExists($check);
+        $body = (string) file_get_contents($check);
+        $this->assertStringContainsString('examples/003-MiniWebApp', $body);
+        $this->assertStringContainsString('lint --all', $body);
+    }
+
+    public function testCiInventoryRunsMiniwebappLintZeroCheck(): void
+    {
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('ci_run_miniwebapp_lint_zero_check', $common);
+        $this->assertStringContainsString('check-miniwebapp-lint-zero.php', $common);
+        $this->assertStringContainsString('MINIWEBAPP_LINT_ZERO_GATE:-1', $common);
+    }
+
+    public function testCiDefaultsEnvDefinesMiniwebappLintZeroGateOn(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString('MINIWEBAPP_LINT_ZERO_GATE="${MINIWEBAPP_LINT_ZERO_GATE:-1}"', $defaults);
+    }
+
+    public function testLocalCiMatrixDocumentsMiniwebappLintZeroGate(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('MINIWEBAPP_LINT_ZERO_GATE', $doc);
+        $this->assertStringContainsString('check-miniwebapp-lint-zero.php', $doc);
+        $this->assertMatchesRegularExpression('/\| `MINIWEBAPP_LINT_ZERO_GATE` \| `1` \|/', $doc);
+    }
+
+    public function testCiDockerRunPassesMiniwebappLintZeroGateDefaultOn(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');
+        $this->assertStringContainsString('MINIWEBAPP_LINT_ZERO_GATE=${MINIWEBAPP_LINT_ZERO_GATE:-1}', $body);
+    }
+
     public function testCheckInitSessionswebParityScriptExists(): void
     {
         $check = dirname(__DIR__, 2).'/script/check-init-sessionsweb-parity.sh';
