@@ -571,8 +571,8 @@ final class Doctor
 
         $defaults = self::readCiDefaultsEnv($repoRoot);
         $smokeDefault = $defaults['THROWS_WEB_SMOKE_GATE'] ?? '0';
-        $linkDefault = $defaults['THROWSWEB_AOT_LINK_GATE'] ?? '0';
-        $aotDefault = $defaults['THROWSWEB_AOT_SMOKE_GATE'] ?? '0';
+        $linkDefault = $defaults['THROWSWEB_AOT_LINK_GATE'] ?? '1';
+        $aotDefault = $defaults['THROWSWEB_AOT_SMOKE_GATE'] ?? '1';
 
         $smokeOn = self::gateEnabled('THROWS_WEB_SMOKE_GATE', $smokeDefault);
         $linkOn = self::gateEnabled('THROWSWEB_AOT_LINK_GATE', $linkDefault);
@@ -621,7 +621,7 @@ final class Doctor
         );
         $aotStatus = $aotOn && $llvmReady ? '✅' : '📋';
         $aotExecuteNote = $llvmReady
-            ? ($aotOn ? '#2101' : '#2101 · opt-in until throw/catch AOT green')
+            ? ($aotOn ? '#2101 · default-on #2135' : '#2101 · set THROWSWEB_AOT_SMOKE_GATE=1')
             : 'LLVM required; #2101 when gate=1';
         fwrite(STDOUT, "  [{$aotStatus}] Stage 3 AOT execute — THROWSWEB_AOT_SMOKE_GATE default {$aotDefault} ({$aotExecuteNote})\n");
         fwrite(STDOUT, "      PHPUnit: ./script/ci-local.sh --filter ThrowsWebAotExecuteTest\n");

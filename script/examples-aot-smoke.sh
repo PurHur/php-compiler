@@ -330,7 +330,7 @@ smoke_006_fileuploadweb() {
 
 # 007-ThrowsWeb project AOT + caught invalid POST CGI (#2101, #2104).
 smoke_007_throwsweb() {
-  if [[ "${THROWSWEB_AOT_SMOKE_GATE:-0}" != "1" ]]; then
+  if [[ "${THROWSWEB_AOT_SMOKE_GATE:-1}" != "1" ]]; then
     echo "examples-aot-smoke: 007-ThrowsWeb: skip (THROWSWEB_AOT_SMOKE_GATE=0)"
     return 0
   fi

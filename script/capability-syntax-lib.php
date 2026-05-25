@@ -978,35 +978,35 @@ function throwsWebNorthStarDefinitions(): array
             'construct' => '`007-ThrowsWeb` reference app',
             'vm' => 'yes',
             'jit' => 'yes',
-            'aot' => 'partial',
+            'aot' => 'yes',
             'issue' => 2076,
             'notes' => [
-                '#2076 VM serve + caught invalid POST (THROWS_WEB_SMOKE_GATE default #2125); AOT deferred #2101/#2104',
+                '#2076 VM serve + caught invalid POST (THROWS_WEB_SMOKE_GATE default #2125); AOT link/execute default #2135',
             ],
         ],
         [
             'construct' => '`throw` / `catch` on invalid POST (web serve)',
             'vm' => 'yes',
             'jit' => 'yes',
-            'aot' => 'partial',
+            'aot' => 'yes',
             'issue' => 195,
-            'notes' => ['#195 throw lowering; #57 catch; #2084 compliance PHPT pack'],
+            'notes' => ['#195 throw lowering; #57 catch; #2084 compliance PHPT pack; user empty class AOT #2157'],
         ],
         [
             'construct' => 'AOT project link (`phpc build --project`)',
             'vm' => 'n/a',
             'jit' => 'n/a',
-            'aot' => 'partial',
+            'aot' => 'yes',
             'issue' => 2101,
-            'notes' => ['ExamplesCompileTest 007 link; opt-in THROWSWEB_AOT_LINK_GATE (#2101)'],
+            'notes' => ['ExamplesCompileTest 007 link; THROWSWEB_AOT_LINK_GATE default-on (#2135)'],
         ],
         [
             'construct' => 'AOT CGI execute (caught throw probe)',
             'vm' => 'n/a',
             'jit' => 'n/a',
-            'aot' => 'partial',
+            'aot' => 'yes',
             'issue' => 2104,
-            'notes' => ['examples-aot-smoke 007 slice; opt-in THROWSWEB_AOT_SMOKE_GATE (#2104)'],
+            'notes' => ['examples-aot-smoke 007 slice; THROWSWEB_AOT_SMOKE_GATE default-on (#2135)'],
         ],
     ];
 }
@@ -1044,8 +1044,8 @@ function renderThrowsWebNorthStarMarkdown(array $rows): string
     $lines[] = '';
     $lines[] = '_Throws rows are curated from ROADMAP issue state; `throw` [#195](' . CAPABILITY_ISSUE_URL_BASE
         . '195); `try`/`catch` [#57](' . CAPABILITY_ISSUE_URL_BASE . '57); overlay [#2084](' . CAPABILITY_ISSUE_URL_BASE
-        . '2084). Opt-in ci-local gates: `THROWS_WEB_SMOKE_GATE` (VM serve default-on #2125), '
-        . '`THROWSWEB_AOT_LINK_GATE`, `THROWSWEB_AOT_SMOKE_GATE`._';
+        . '2084). ci-local gates: `THROWS_WEB_SMOKE_GATE` (VM serve default-on #2125), '
+        . '`THROWSWEB_AOT_LINK_GATE` / `THROWSWEB_AOT_SMOKE_GATE` (AOT default-on #2135; set `0` to skip)._';
     $lines[] = '';
 
     return implode("\n", $lines);

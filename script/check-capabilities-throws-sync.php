@@ -47,17 +47,17 @@ if (!preg_match('/\|\s*`007-ThrowsWeb` reference app\s*\|/i', $syntaxBody)) {
 }
 
 if (!preg_match(
-    '/\|\s*`007-ThrowsWeb` reference app\s*\|\s*yes\s*\|\s*yes\s*\|\s*partial\s*\|/i',
+    '/\|\s*`007-ThrowsWeb` reference app\s*\|\s*yes\s*\|\s*yes\s*\|\s*yes\s*\|/i',
     $syntaxBody
 )) {
-    $errors[] = 'docs/capabilities-syntax.md: 007-ThrowsWeb reference app must show VM yes, JIT yes, AOT partial (#2103)';
+    $errors[] = 'docs/capabilities-syntax.md: 007-ThrowsWeb reference app must show VM yes, JIT yes, AOT yes (#2135)';
 }
 
 if (!preg_match(
-    '/\|\s*`throw` \/ `catch` on invalid POST \(web serve\)\s*\|\s*yes\s*\|\s*yes\s*\|\s*partial\s*\|/i',
+    '/\|\s*`throw` \/ `catch` on invalid POST \(web serve\)\s*\|\s*yes\s*\|\s*yes\s*\|\s*yes\s*\|/i',
     $syntaxBody
 )) {
-    $errors[] = 'docs/capabilities-syntax.md: missing caught throw POST row with honest AOT partial (#2103)';
+    $errors[] = 'docs/capabilities-syntax.md: missing caught throw POST row with AOT yes (#2135)';
 }
 
 if (!str_contains($syntaxBody, 'THROWS_WEB_SMOKE_GATE')
