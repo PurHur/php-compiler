@@ -16,6 +16,7 @@ final class Linker
         __DIR__.'/runtime/superglobal_name.c',
         __DIR__.'/runtime/function_exists.c',
         __DIR__.'/runtime/hash_crypto.c',
+        __DIR__.'/runtime/phpc_microtime.c',
         __DIR__.'/runtime/password_crypto.c',
         __DIR__.'/runtime/crc32.c',
         __DIR__.'/runtime/strtr.c',

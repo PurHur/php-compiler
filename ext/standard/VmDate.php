@@ -24,4 +24,10 @@ final class VmDate
     {
         return \gmdate($format, $timestamp ?? self::time());
     }
+
+    /** @return string|float */
+    public static function microtime(bool $asFloat = false)
+    {
+        return \microtime($asFloat);
+    }
 }

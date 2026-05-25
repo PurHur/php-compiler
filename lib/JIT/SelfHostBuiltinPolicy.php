@@ -29,6 +29,7 @@ final class SelfHostBuiltinPolicy
         'is_null' => 'numeric',
         'is_numeric' => 'numeric',
         'time' => 'numeric',
+        'microtime' => 'numeric',
         'pi' => 'numeric',
     ];
 

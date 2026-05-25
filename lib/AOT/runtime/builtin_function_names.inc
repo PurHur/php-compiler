@@ -153,6 +153,7 @@ static const char *phpc_builtin_functions[] = {
     "md5",
     "mb_strlen",
     "method_exists",
+    "microtime",
     "min",
     "mkdir",
     "move_uploaded_file",

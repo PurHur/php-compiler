@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StringMicrotime;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 final class JitDate
@@ -22,6 +26,43 @@ final class JitDate
         return $raw->typeOf() === $timeT
             ? $raw
             : $context->builder->zExt($raw, $timeT);
+    }
+
+    public static function microtime(Context $context, Value $asFloat): Value
+    {
+        StringMicrotime::ensureLinked($context);
+
+        $slot = JitValueBox::alloc($context);
+        $slotPtr = JitValueBox::pointer($context, $slot);
+        $isFloat = $context->builder->icmp(
+            Builder::INT_NE,
+            $asFloat,
+            $context->constantFromBool(false)
+        );
+        $floatBb = BasicBlockHelper::append($context, 'microtime_float');
+        $stringBb = BasicBlockHelper::append($context, 'microtime_string');
+        $mergeBb = BasicBlockHelper::append($context, 'microtime_merge');
+        $context->builder->branchIf($isFloat, $floatBb, $stringBb);
+
+        $context->builder->positionAtEnd($floatBb);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeDouble'),
+            $slotPtr,
+            $context->builder->call($context->lookupFunction('__compiler_microtime_float'))
+        );
+        $context->builder->branch($mergeBb);
+
+        $context->builder->positionAtEnd($stringBb);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $slotPtr,
+            $context->builder->call($context->lookupFunction('__compiler_microtime_string'))
+        );
+        $context->builder->branch($mergeBb);
+
+        $context->builder->positionAtEnd($mergeBb);
+
+        return $slotPtr;
     }
 
     public static function formatDate(Context $context, bool $gmt, JITVariable ...$args): Value

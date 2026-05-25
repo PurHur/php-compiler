@@ -280,6 +280,7 @@ class Module extends ModuleAbstract
             new scandir(),
             new glob_(),
             new time(),
+            new microtime(),
             new date(),
             new gmdate(),
             new sleep(),
