@@ -226,6 +226,7 @@ class Module extends ModuleAbstract
             new chmod_(),
             new rename_(),
             new move_uploaded_file(),
+            new is_uploaded_file(),
             new copy_(),
             new move_uploaded_file(),
             new touch_(),

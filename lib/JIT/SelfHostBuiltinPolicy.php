@@ -78,7 +78,7 @@ final class SelfHostBuiltinPolicy
         'ftell' => 'filesystem', 'fseek' => 'filesystem', 'fclose' => 'filesystem',
         'feof' => 'filesystem', 'fflush' => 'filesystem', 'fpassthru' => 'filesystem',
         'pathinfo' => 'filesystem', 'readfile' => 'filesystem', 'readlink' => 'filesystem', 'rename' => 'filesystem',
-        'move_uploaded_file' => 'filesystem', 'touch' => 'filesystem',
+        'is_uploaded_file' => 'filesystem', 'move_uploaded_file' => 'filesystem', 'touch' => 'filesystem',
         'getenv' => 'filesystem', 'putenv' => 'filesystem', 'sys_get_temp_dir' => 'filesystem', 'tempnam' => 'filesystem',
         'getcwd' => 'filesystem', 'chdir' => 'filesystem',
         'stream_context_create' => 'filesystem',
