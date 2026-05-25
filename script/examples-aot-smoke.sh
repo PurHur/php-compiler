@@ -9,6 +9,8 @@
 #   EXAMPLES_AOT_SMOKE_ONLY=003 ./script/examples-aot-smoke.sh   # 003 slice only (#683)
 #   EXAMPLES_AOT_SMOKE_ONLY=005 ./script/examples-aot-smoke.sh   # 005 slice only (#1891)
 #   EXAMPLES_AOT_SMOKE_ONLY=006 ./script/examples-aot-smoke.sh   # 006 slice only (#2013)
+#   EXAMPLES_AOT_SMOKE_ONLY=007 ./script/examples-aot-smoke.sh   # 007 slice only (#2104)
+#   THROWSWEB_AOT_SMOKE_GATE=1 EXAMPLES_AOT_SMOKE_ONLY=007 ./script/examples-aot-smoke.sh
 #
 # Docker:
 #   docker run --rm -v "$(pwd):/compiler" -w /compiler php-compiler:22.04-dev make examples-aot-smoke
@@ -23,6 +25,7 @@ SMOKE_ROOT="${ROOT}/.phpc/smoke"
 MINIWEBAPP="${ROOT}/examples/003-MiniWebApp"
 SESSIONSWEB="${ROOT}/examples/005-SessionsWeb"
 FILEUPLOADWEB="${ROOT}/examples/006-FileUploadWeb"
+THROWSWEB="${ROOT}/examples/007-ThrowsWeb"
 SMOKE_ONLY="${EXAMPLES_AOT_SMOKE_ONLY:-}"
 
 resolve_llvm_dir() {
@@ -324,6 +327,63 @@ smoke_006_fileuploadweb() {
 
   echo "examples-aot-smoke: 006-FileUploadWeb: ok"
 }
+
+# 007-ThrowsWeb project AOT + caught invalid POST CGI (#2101, #2104).
+smoke_007_throwsweb() {
+  if [[ "${THROWSWEB_AOT_SMOKE_GATE:-0}" != "1" ]]; then
+    echo "examples-aot-smoke: 007-ThrowsWeb: skip (THROWSWEB_AOT_SMOKE_GATE=0)"
+    return 0
+  fi
+  if [[ ! -f "${THROWSWEB}/example.php" ]]; then
+    echo "examples-aot-smoke: 007-ThrowsWeb: skip (tree missing #2076)" >&2
+    return 0
+  fi
+
+  local binary="${THROWSWEB}/.phpc/bin/app"
+  echo "examples-aot-smoke: 007-ThrowsWeb: phpc build --project -> ${binary}"
+  if ! "$PHPC" build --project "${THROWSWEB}"; then
+    echo "examples-aot-smoke: 007-ThrowsWeb: link failed" >&2
+    return 1
+  fi
+  if [[ ! -x "$binary" ]]; then
+    echo "examples-aot-smoke: 007-ThrowsWeb: expected executable ${binary}" >&2
+    return 1
+  fi
+
+  local out stderr_file run_code stderr
+  stderr_file="$(mktemp "${SMOKE_ROOT}/007.XXXXXX")"
+  set +e
+  out="$(
+    REQUEST_METHOD='POST' \
+      REQUEST_BODY='email=bad' \
+      CONTENT_TYPE='application/x-www-form-urlencoded' \
+      SCRIPT_NAME='/example.php' \
+      REQUEST_URI='/example.php' \
+      "$binary" 2>"$stderr_file"
+  )"
+  run_code=$?
+  set -e
+  stderr="$(cat "$stderr_file" 2>/dev/null || true)"
+  rm -f "$stderr_file"
+  if [[ "$run_code" -ne 0 ]]; then
+    echo "examples-aot-smoke: 007-ThrowsWeb: invalid POST exited ${run_code}" >&2
+    [[ -n "$stderr" ]] && echo "$stderr" >&2
+    return 1
+  fi
+  if [[ ! "$out" =~ [Ii]nvalid ]]; then
+    echo "examples-aot-smoke: 007-ThrowsWeb: missing caught-error needle" >&2
+    [[ -n "$out" ]] && echo "--- stdout ---" >&2 && echo "$out" >&2 && echo "--- end ---" >&2
+    return 1
+  fi
+
+  echo "examples-aot-smoke: 007-ThrowsWeb: ok"
+}
+
+if [[ "${SMOKE_ONLY}" == "007" ]]; then
+  echo "examples-aot-smoke: 007 slice (LLVM at ${LLVM_DIR})"
+  smoke_007_throwsweb
+  exit $?
+fi
 
 if [[ "${SMOKE_ONLY}" == "006" ]]; then
   echo "examples-aot-smoke: 006 slice (LLVM at ${LLVM_DIR})"
