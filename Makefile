@@ -106,7 +106,7 @@ test-docker-fast-jit-preflight: docker-build-22
 	JIT_PREFLIGHT_GATE=1 ./script/docker-ci-local.sh fast
 
 # VM smoke: examples/001-SimpleWeb with ?name=Test
-.PHONY: web-smoke miniwebapp-gates miniwebapp-aot-bisect north-star1-verify
+.PHONY: web-smoke miniwebapp-gates miniwebapp-aot-bisect north-star1-verify north-star2-verify
 web-smoke:
 	./script/web-smoke.sh
 
@@ -117,6 +117,9 @@ miniwebapp-gates:
 # North Star 1 presenter verify before closing #1044 (issue #1845)
 north-star1-verify:
 	./script/north-star1-verify.sh
+
+north-star2-verify:
+	./script/north-star2-verify.sh
 
 # Ordered #764 AOT PHPT ladder (issue #879; requires LLVM 9)
 miniwebapp-aot-bisect:

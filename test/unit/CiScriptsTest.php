@@ -651,7 +651,7 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('NORTH_STAR2_VERIFY_GATE', $common);
         $this->assertStringContainsString('NORTH_STAR2_VERIFY_GATE:-0', $common);
         $this->assertStringContainsString('north-star2-verify.sh', $common);
-        $this->assertStringContainsString('pending #1865', $common);
+        $this->assertFileExists(dirname(__DIR__, 2).'/script/north-star2-verify.sh');
 
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
         $this->assertStringContainsString(
