@@ -436,6 +436,34 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('M3_ALLOWLIST_SYNC_GATE=${M3_ALLOWLIST_SYNC_GATE:-1}', $body);
     }
 
+    public function testCiDefaultsEnvDefinesBootstrapM5DocSyncGateOn(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString('BOOTSTRAP_M5_DOC_SYNC_GATE="${BOOTSTRAP_M5_DOC_SYNC_GATE:-1}"', $defaults);
+    }
+
+    public function testCiFastRunsBootstrapM5DocSyncViaInventoryChecks(): void
+    {
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('ci_run_bootstrap_m5_doc_sync_check', $common);
+        $this->assertStringContainsString('check-bootstrap-m5-doc-sync.php', $common);
+        $this->assertStringContainsString('BOOTSTRAP_M5_DOC_SYNC_GATE:-0', $common);
+    }
+
+    public function testCiDockerRunPassesBootstrapM5DocSyncGateDefaultOn(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');
+        $this->assertStringContainsString('BOOTSTRAP_M5_DOC_SYNC_GATE=${BOOTSTRAP_M5_DOC_SYNC_GATE:-1}', $body);
+    }
+
+    public function testLocalCiMatrixDocumentsBootstrapM5DocSyncGate(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('BOOTSTRAP_M5_DOC_SYNC_GATE', $doc);
+        $this->assertStringContainsString('check-bootstrap-m5-doc-sync.php', $doc);
+        $this->assertMatchesRegularExpression('/\| `BOOTSTRAP_M5_DOC_SYNC_GATE` \| `1` \|/', $doc);
+    }
+
     public function testCiDefaultsEnvDefinesExamplesAotSmokeGateOn(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');

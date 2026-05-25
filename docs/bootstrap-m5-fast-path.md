@@ -33,7 +33,7 @@ Supporting fixes from #1402:
 |--------------------------|------|
 | `Runtime::parseAndCompile` | On M3 allowlist when `PHP_COMPILER_M3_COMPILE_DRIVER=1` |
 | `Runtime::parse` / `Runtime::compile` | On M3 allowlist; compile-driver link OK (#1496) |
-| `Runtime::loadJitContext` | Compile-driver link OK (#1402) |
+| `Runtime::loadJitContext` | On deny list (stubbed); outer `loadJit` real-lowered (#1495) |
 | `Runtime::__construct` | Slim ctor via `compileRuntimeConstructM3Native` → `compileBlockPhpLowering` (#1494) |
 | `Runtime::initParsePipeline` / `Runtime::initCompiler` / `Runtime::loadCoreModules` | On deny list; `compileRuntime*M3Native` → PHP CFG lowering (#1494) |
 | `Runtime::initVmContext` | **Native** via `RuntimeInitVmContext::emit` (allocate `VM\Context`, set `runtime` + `vmContext`); wired in `compileBlock()`; off deny list (#1494). PHP CFG `new VMContext` still LLVM 9 link crash when combined with ctor spine. |
@@ -84,8 +84,10 @@ BOOTSTRAP_M3_RUNTIME_COMPILE=1 \
 
 | Symbol | Notes |
 |--------|-------|
-| `Block::slotIndexForVariableName` | Also in compiler hot-path skip |
+| `Block::slotIndexForVariableName` | On deny list + compiler hot-path skip |
+| `Runtime::__destruct` | Deny list (LLVM 9 spine; not on compile-driver path) |
 | `Runtime::initParsePipeline` / `initCompiler` / `loadCoreModules` | PHP CFG spine; deny while expanding (#1494) |
+| `Runtime::loadJitContext` | Deny list (stubbed); paired with `loadJit` expansion (#1495) |
 | `Runtime::createJit` / `jitContextForLoadJit` / `loadJitCompileModuleFuncs` | Split from `loadJit`; stay on deny list (stubbed) while outer `loadJit` is real-lowered (#1495) |
 
 **Next:** complete native `VM\Context` (hashtable props + sub-objects) without LLVM 9 link regression, or small `lib/AOT/runtime/` C floor (#1494).
