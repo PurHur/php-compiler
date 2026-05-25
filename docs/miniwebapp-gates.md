@@ -21,6 +21,7 @@ Matches [`script/miniwebapp-gates.sh`](../script/miniwebapp-gates.sh) output ord
 |-------|--------|-------------------|---------------------|---------|----------|
 | 0 | Skeleton opt-out | `MINIWEBAPP_LINT_GATE=0` | opt-out only | `web-smoke.sh` continues on lint failure | [#621](https://github.com/PurHur/php-compiler/issues/621) |
 | 1 | Lint green | `MINIWEBAPP_LINT_GATE=1` (default) | ✅ | `make web-smoke` fails on lint regression | [#539](https://github.com/PurHur/php-compiler/issues/539), [#621](https://github.com/PurHur/php-compiler/issues/621) |
+| 1z | Lint zero unsupported | `MINIWEBAPP_LINT_ZERO_GATE=1` (default) | ✅ | `ci-fast.sh` → `script/check-miniwebapp-lint-zero.php` | [#2078](https://github.com/PurHur/php-compiler/issues/2078) |
 | 1b | VM CLI route matrix | `MINIWEBAPP_VM_CLI_GATE=1` (default) | ✅ | `ci-fast.sh` → `MiniWebApp*VmCli` | [#597](https://github.com/PurHur/php-compiler/issues/597) |
 | 2 | PHPUnit serve | `MINIWEBAPP_SERVE_GATE=1` (default) | ✅ | `ci-local.sh`, `ci-fast.sh` → `ServeTest` `@group miniwebapp` | [#641](https://github.com/PurHur/php-compiler/issues/641), [#470](https://github.com/PurHur/php-compiler/issues/470) |
 | 3 | Examples web-smoke | wired in `examples-web-smoke.sh` | ✅ | `make examples-web-smoke` includes 003 curls | [#461](https://github.com/PurHur/php-compiler/issues/461) |
@@ -33,7 +34,14 @@ Matches [`script/miniwebapp-gates.sh`](../script/miniwebapp-gates.sh) output ord
 | 4c | AOT shell smoke (003 slice) | `EXAMPLES_AOT_SMOKE_GATE=1` (default), `EXAMPLES_AOT_SMOKE_ONLY=003` | ✅ probe when LLVM + execute green ([#764](https://github.com/PurHur/php-compiler/issues/764) closed) | `ci-local.sh` → `examples-aot-smoke.sh`; `miniwebapp-gates.sh` probe | [#683](https://github.com/PurHur/php-compiler/issues/683), [#881](https://github.com/PurHur/php-compiler/issues/881), [#485](https://github.com/PurHur/php-compiler/issues/485) |
 | 4d | Deploy smoke | `DEPLOY_SMOKE_GATE=1` (default) | 001/002 + 003 execute default-on | `ci-local.sh` → `deploy-smoke.sh`; 003 execute via `DEPLOY_SMOKE_003_EXECUTE=1` (default — [#1530](https://github.com/PurHur/php-compiler/issues/1530)) or `MINIWEBAPP_AOT_EXECUTE_GATE=1` ([#745](https://github.com/PurHur/php-compiler/issues/745)) | [#718](https://github.com/PurHur/php-compiler/issues/718) |
 
-Defaults for `MINIWEBAPP_SERVE_GATE`, `MINIWEBAPP_WEB_SMOKE_GATE`, `MINIWEBAPP_WEB_SMOKE_AOT_GATE`, `MINIWEBAPP_AOT_LINK_GATE`, `MINIWEBAPP_AOT_EXECUTE_GATE`, `EXAMPLES_AOT_SMOKE_GATE`, `DEPLOY_SMOKE_GATE`, and `DEPLOY_SMOKE_003_EXECUTE` are exported from [`script/ci-defaults.env`](../script/ci-defaults.env). Ladder-only vars (`MINIWEBAPP_LINT_GATE`, `MINIWEBAPP_AOT_BISECT_GATE`) are read directly by their scripts — see [local-ci-matrix.md § MiniWebApp gates](local-ci-matrix.md#miniwebapp-gates) for the full env table.
+Defaults for `MINIWEBAPP_SERVE_GATE`, `MINIWEBAPP_WEB_SMOKE_GATE`, `MINIWEBAPP_WEB_SMOKE_AOT_GATE`, `MINIWEBAPP_AOT_LINK_GATE`, `MINIWEBAPP_AOT_EXECUTE_GATE`, `MINIWEBAPP_LINT_ZERO_GATE`, `EXAMPLES_AOT_SMOKE_GATE`, `DEPLOY_SMOKE_GATE`, and `DEPLOY_SMOKE_003_EXECUTE` are exported from [`script/ci-defaults.env`](../script/ci-defaults.env). Ladder-only vars (`MINIWEBAPP_LINT_GATE`, `MINIWEBAPP_AOT_BISECT_GATE`) are read directly by their scripts — see [local-ci-matrix.md § MiniWebApp gates](local-ci-matrix.md#miniwebapp-gates) for the full env table.
+
+```bash
+php script/check-miniwebapp-lint-zero.php
+MINIWEBAPP_LINT_ZERO_GATE=0 ./script/ci-fast.sh   # opt-out during lint iteration (#2078)
+```
+
+Follow-on when OOP blockers close: [#2059](https://github.com/PurHur/php-compiler/issues/2059) VM serve e2e curls.
 
 ## Quick commands
 

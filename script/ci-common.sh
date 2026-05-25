@@ -244,6 +244,14 @@ ci_run_init_miniwebapp_parity_check() {
   script/check-init-miniwebapp-parity.sh
 }
 
+ci_run_miniwebapp_lint_zero_check() {
+  if [[ "${MINIWEBAPP_LINT_ZERO_GATE:-1}" != "1" ]]; then
+    return 0
+  fi
+  echo "MiniWebApp lint zero unsupported (MINIWEBAPP_LINT_ZERO_GATE=1, issue #2078)..."
+  "$PHP_BIN" "${PHP_OPTS[@]}" script/check-miniwebapp-lint-zero.php
+}
+
 ci_run_init_sessionsweb_parity_check() {
   if [[ "${INIT_SESSIONSWEB_PARITY_GATE:-1}" != "1" ]]; then
     return 0
@@ -280,6 +288,7 @@ ci_run_inventory_checks() {
   script/check-no-unlimited-memory.sh
   script/check-stale-issue-refs.sh
   ci_run_init_miniwebapp_parity_check
+  ci_run_miniwebapp_lint_zero_check
   ci_run_init_sessionsweb_parity_check
   ci_run_init_fileupload_parity_check
   ci_run_init_throwsweb_parity_check
