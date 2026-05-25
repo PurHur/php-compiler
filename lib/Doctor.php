@@ -218,6 +218,12 @@ final class Doctor
         fwrite(STDOUT, "  M0 link          ./script/bootstrap-selfhost-link.sh\n");
         fwrite(STDOUT, "  M2 spine link    BOOTSTRAP_LIB_SPINE_SMOKE=1 make bootstrap-selfhost-lib-spine-smoke\n");
         fwrite(STDOUT, "  M2 VM smoke      BOOTSTRAP_LIB_SPINE_VM_SMOKE=1 make bootstrap-selfhost-lib-spine-vm-smoke\n");
+        $loopProbeGate = getenv('BOOTSTRAP_LOOP_PROBE_GATE');
+        $loopProbeOn = false !== $loopProbeGate && '1' === $loopProbeGate;
+        $loopProbeDetail = $loopProbeOn
+            ? 'BOOTSTRAP_LOOP_PROBE_GATE=1 — ci-fast / ci-local dry-run (#1929)'
+            : 'opt-in BOOTSTRAP_LOOP_PROBE_GATE=1 for M4 dry-run in ci-fast (#1929)';
+        fwrite(STDOUT, "  M4 loop dry-run  {$loopProbeDetail}\n");
         if ($ns2Make) {
             fwrite(STDOUT, "  Presenter bundle make north-star2-verify            --require-llvm / --skip-llvm-tail\n");
             fwrite(STDOUT, "  Script           ./script/north-star2-verify.sh    same as make target\n");

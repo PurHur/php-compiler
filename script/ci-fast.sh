@@ -6,6 +6,8 @@
 #
 # Optional bootstrap tail (aot-lint + selfhost-probe + wave-check when LLVM ready):
 #   CI_FAST_BOOTSTRAP=1 ./script/ci-fast.sh
+# M4 bootstrap-loop dry-run when LLVM ready (default off; issue #1929):
+#   BOOTSTRAP_LOOP_PROBE_GATE=1 ./script/ci-fast.sh
 set -euo pipefail
 
 # shellcheck source=ci-common.sh
@@ -67,6 +69,9 @@ if [[ "${ATTRIBUTES_COMPLIANCE_GATE:-1}" == "1" ]]; then
   echo "PHPUnit (fast): attributes VM compliance (Attribute*)..."
   ci_run_phpunit --filter Attribute
 fi
+
+# M4 bootstrap-loop dry-run when opt-in (issue #1929; default off in ci-defaults).
+ci_run_bootstrap_loop_probe
 
 # Optional bootstrap tail when LLVM 9 present (aot-lint + probe + wave-check; issue #436).
 if [[ "${CI_FAST_BOOTSTRAP:-0}" == "1" ]]; then
