@@ -346,6 +346,15 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('deploy-smoke.sh', $makefile);
     }
 
+    public function testMakefileHasExamplesThrowsSmokeTarget(): void
+    {
+        $makefile = (string) file_get_contents(dirname(__DIR__, 2).'/Makefile');
+        $this->assertStringContainsString('examples-throws-smoke:', $makefile);
+        $this->assertStringContainsString('THROWS_WEB_SMOKE_GATE=1', $makefile);
+        $this->assertStringContainsString('examples-web-smoke.sh --throws-only', $makefile);
+        $this->assertStringContainsString('examples-throws-smoke', $makefile);
+    }
+
     public function testMakefileHasExamplesFileuploadDeploySmokeTarget(): void
     {
         $makefile = (string) file_get_contents(dirname(__DIR__, 2).'/Makefile');
