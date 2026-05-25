@@ -33,7 +33,7 @@ Do **not** publish `/docs` alone — that would expose bootstrap inventory and c
 
 | File | Role |
 |------|------|
-| `index.html` | Visual overview — progress bars, north stars, demo commands |
+| `index.html` | Visual overview — progress bars, north star + example fixtures, demo commands |
 | `development-status.md` | **Authoritative written status** |
 | `css/style.css`, `js/main.js` | Theme |
 | `_layouts/status.html` | Jekyll layout |
@@ -45,7 +45,7 @@ Do **not** publish `/docs` alone — that would expose bootstrap inventory and c
 2. **`index.html`** — badges and progress % if the story changed.
 3. **`README.md`** / **`docs/GETTING-STARTED.md`** — clone/demo commands; matrices stay in README contributor sections only.
 
-Keep aligned with [#78](https://github.com/PurHur/php-compiler/issues/78), closed [#1044](https://github.com/PurHur/php-compiler/issues/1044) (North Star 1 achieved), [#1492](https://github.com/PurHur/php-compiler/issues/1492).
+Keep aligned with [#78](https://github.com/PurHur/php-compiler/issues/78), project north star [#1492](https://github.com/PurHur/php-compiler/issues/1492). Example web gates ([#1044](https://github.com/PurHur/php-compiler/issues/1044) closed) are regression fixtures only.
 
 ## Local preview
 

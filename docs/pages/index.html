@@ -28,8 +28,8 @@
         <a href="#overview">Overview</a>
         <a href="#progress">Progress</a>
         <a href="#wave3">Wave 3</a>
-        <a href="/php-compiler/development-status.html#north-star-1-web-app">Web app</a>
-        <a href="#self-host">Self-host</a>
+        <a href="#self-host">North star</a>
+        <a href="/php-compiler/development-status.html#example-integration-tests">Examples</a>
         <a href="/php-compiler/development-status.html">Full status</a>
         <a href="https://github.com/PurHur/php-compiler">GitHub</a>
       </nav>
@@ -44,16 +44,16 @@
       <p class="lead">
         <strong>php-compiler</strong> lowers PHP to a CFG, executes on a VM, JIT-compiles with LLVM&nbsp;9,
         and links <strong>AOT native executables</strong> for CLI and web — deployed apps run
-        <strong>without Zend PHP at runtime</strong>. Active work: reference web app
-        (<a href="https://github.com/PurHur/php-compiler/tree/master/examples/003-MiniWebApp">MiniWebApp</a>)
-        and self-host bootstrap (compiler compiling its own <code>lib/</code>).
+        <strong>without Zend PHP at runtime</strong>. Active work: <strong>self-host bootstrap</strong>
+        (compiler compiling its own <code>lib/</code>). Web examples under
+        <code>examples/</code> stay as integration test fixtures.
       </p>
       <div class="hero-badges">
         <span class="badge badge--live">VM + JIT + AOT</span>
         <span class="badge badge--live">Wave 3 language 10/13</span>
         <span class="badge badge--live">Wave 3 stdlib 12/13</span>
-        <span class="badge badge--wip">Self-host bootstrap</span>
-        <span class="badge badge--live">North Star 1 — achieved (#1044)</span>
+        <span class="badge badge--wip">North star — self-host (#1492)</span>
+        <span class="badge badge--live">Example gates — regression only</span>
       </div>
       <div class="hero-actions">
         <a class="btn btn--primary" href="#demo">Try in 5 minutes</a>
@@ -122,7 +122,8 @@ make bootstrap-selfhost-link</code></pre>
       <p class="demo-disclaimer">
         <strong>Honest scope:</strong> not full Zend PHP — subset compiler (detailed capability matrices are
         contributor-only in the repo, not on this site).
-        North Star 1 is <strong>achieved</strong> on master (VM + AOT execute + default-on gates); optional layout-edge bisect in <a href="https://github.com/PurHur/php-compiler/issues/1750">#1750</a>.
+        <strong>North star:</strong> self-host bootstrap ([#1492](https://github.com/PurHur/php-compiler/issues/1492)).
+        <code>examples/003-MiniWebApp</code> and siblings are CI regression fixtures, not a product north star.
       </p>
     </section>
 
@@ -135,23 +136,25 @@ make bootstrap-selfhost-link</code></pre>
         <a href="https://github.com/PurHur/php-compiler/tree/master/docs">GitHub</a>.
       </p>
       <div class="dual-track">
-        <article class="track-panel track-panel--web">
-          <h3>🌐 North Star 1 — Web application</h3>
-          <p>
-            Multi-file app: routing, templates, forms, JSON API, native CGI deploy —
-            <a href="https://github.com/PurHur/php-compiler/tree/master/examples/003-MiniWebApp">003-MiniWebApp</a>.
-          </p>
-          <p><strong>Status:</strong> <strong>Achieved</strong> — VM ✅ · AOT link ✅ · AOT execute ✅ (default-on CI gates).</p>
-          <p><a href="/php-compiler/development-status.html#north-star-1-web-app">Full north-star doc →</a> · <a href="https://github.com/PurHur/php-compiler/issues/1044">#1044</a> (closed) · follow-ups <a href="https://github.com/PurHur/php-compiler/issues/1750">#1750</a></p>
-        </article>
         <article class="track-panel track-panel--selfhost">
-          <h3>🔄 North Star 2 — Self-host</h3>
+          <h3>🎯 Project north star — Self-host</h3>
           <p>
             <strong>Compiler fully compiles itself:</strong> native binary from <code>lib/</code> (no <code>vendor/</code>),
             compiles PHP, then rebuilds the next compiler revision without Zend.
           </p>
           <p><strong>Status:</strong> M0 ✅ · M1 ✅ · M2 ✅ link (606/611) · M3 HelloWorld strict ✅ · compile-smoke 🚧 · M5 ⬜.</p>
-          <p><a href="/php-compiler/development-status.html#north-star-2-self-host">Full north-star doc →</a> · <a href="https://github.com/PurHur/php-compiler/blob/master/docs/self-host-target.md">Target doc</a> · <a href="https://github.com/PurHur/php-compiler/issues/1492">#1492</a></p>
+          <p><a href="/php-compiler/development-status.html#north-star-self-host">Full north-star doc →</a> · <a href="https://github.com/PurHur/php-compiler/blob/master/docs/self-host-target.md">Target doc</a> · <a href="https://github.com/PurHur/php-compiler/issues/1492">#1492</a></p>
+        </article>
+        <article class="track-panel track-panel--web">
+          <h3>🧪 Example integration tests</h3>
+          <p>
+            <a href="https://github.com/PurHur/php-compiler/tree/master/examples/003-MiniWebApp">003-MiniWebApp</a>,
+            <a href="https://github.com/PurHur/php-compiler/tree/master/examples/005-SessionsWeb">005-SessionsWeb</a>,
+            <a href="https://github.com/PurHur/php-compiler/tree/master/examples/006-FileUploadWeb">006-FileUploadWeb</a>
+            — VM + AOT regression harness (not a north star).
+          </p>
+          <p><strong>Status:</strong> VM ✅ · AOT link/execute ✅ · default-on CI gates for 003.</p>
+          <p><a href="/php-compiler/development-status.html#example-integration-tests">Fixture doc →</a> · <code>make north-star1-verify</code> (legacy name)</p>
         </article>
       </div>
     </section>
@@ -187,7 +190,7 @@ make bootstrap-selfhost-link</code></pre>
       </p>
       <div class="overall-progress">
         <div class="overall-progress__label">
-          <span>Toward a production-ready web-capable compiler</span>
+          <span>Toward a self-hosting compiler</span>
           <span class="overall-progress__pct" id="overall-pct">~50%</span>
         </div>
         <div class="progress-track" role="progressbar" aria-valuenow="50" aria-valuemin="0" aria-valuemax="100" aria-label="Overall project progress">
@@ -195,7 +198,8 @@ make bootstrap-selfhost-link</code></pre>
         </div>
         <p class="overall-progress__note">
           Strong on VM and AOT linking; wave-3 language 10/13 and stdlib 12/13 on master; local/Docker CI while remote GHA/Circle are disabled.
-          North Star 1 achieved (#1044 closed); presenter check <code>make north-star1-verify</code>. <strong>005-SessionsWeb</strong> AOT execute + deploy smoke opt-in (#1891, #1893). North Star 2 M0–M1 done, M2 spine link (606/611, #1960), M3 HelloWorld strict (#1493); M5 full self-compile remains the stretch goal.
+          <strong>North star</strong> M0–M1 done, M2 spine link (606/611, #1960), M3 HelloWorld strict (#1493); M5 full self-compile is the stretch goal ([#1492](https://github.com/PurHur/php-compiler/issues/1492)).
+          Example web gates (<code>make north-star1-verify</code>, <strong>005-SessionsWeb</strong> opt-in #1891/#1893) stay in CI as regression only.
         </p>
       </div>
     </section>
@@ -228,13 +232,13 @@ make bootstrap-selfhost-link</code></pre>
         <article class="card">
           <span class="phase-num">Phase 3</span>
           <h3><span class="status-dot status-dot--wip"></span> Web AOT</h3>
-          <p>Project link ✅; execute ✅ (North Star 1 achieved).</p>
+          <p>Project link ✅; execute ✅ (example fixtures 003–006).</p>
           <div class="mini-progress"><div class="progress-track"><div class="progress-fill" data-width="58"></div></div></div>
         </article>
         <article class="card">
           <span class="phase-num">Phase 4</span>
-          <h3><span class="status-dot status-dot--wip"></span> Reference app</h3>
-          <p>North Star 1 achieved; optional bisect [#1750](https://github.com/PurHur/php-compiler/issues/1750).</p>
+          <h3><span class="status-dot status-dot--wip"></span> Example polish</h3>
+          <p>Regression maintenance only — optional bisect [#1750](https://github.com/PurHur/php-compiler/issues/1750).</p>
           <div class="mini-progress"><div class="progress-track"><div class="progress-fill" data-width="48"></div></div></div>
         </article>
         <article class="card">
@@ -251,7 +255,7 @@ make bootstrap-selfhost-link</code></pre>
       <p class="section-intro">
         Stretch goal: the compiler <strong>fully compiles itself</strong> (M5). Zend still runs
         <code>bin/compile.php</code> today; native output is a growing <code>lib/</code> bundle (~109 minimal → <strong>606</strong> spine units toward <strong>611</strong> vm.php-path files).
-        Full ladder: <a href="/php-compiler/development-status.html#north-star-2-self-host">development-status.md</a>
+        Full ladder: <a href="/php-compiler/development-status.html#north-star-self-host">development-status.md</a>
         · <a href="https://github.com/PurHur/php-compiler/blob/master/docs/self-host-target.md">self-host-target.md</a>
         · tracker <a href="https://github.com/PurHur/php-compiler/issues/1492">#1492</a>.
       </p>

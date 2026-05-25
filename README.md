@@ -5,13 +5,13 @@
 | | |
 |---|---|
 | **Status site** | [Overview](https://purhur.github.io/php-compiler/docs/pages/index.html) · [full report](https://purhur.github.io/php-compiler/development-status.html) |
-| **North stars** | [Web app #1044](https://github.com/PurHur/php-compiler/issues/1044) · [Self-host #1492](https://github.com/PurHur/php-compiler/issues/1492) |
+| **North star** | [Self-host #1492](https://github.com/PurHur/php-compiler/issues/1492) · [Example gates #1044](https://github.com/PurHur/php-compiler/issues/1044) (closed, regression only) |
 | **Docs index** | [`docs/README.md`](docs/README.md) · [`docs/GETTING-STARTED.md`](docs/GETTING-STARTED.md) |
 | **CI** | `./script/ci-local.sh` or `make test` ([#436](https://github.com/PurHur/php-compiler/issues/436) — remote GHA/Circle temporarily disabled) |
 
 > **Demo / showcase:** use [Demo in five minutes](#demo-in-five-minutes) below or the [public status overview](https://purhur.github.io/php-compiler/docs/pages/index.html).
 
-Originally a research compiler (pre-FFI); revived around [PHP FFI](https://wiki.php.net/rfc/ffi) and LLVM. Current focus: a **web-capable PHP subset**, reference [MiniWebApp](examples/003-MiniWebApp/), and experimental **self-host** (compiler compiling its own `lib/`).
+Originally a research compiler (pre-FFI); revived around [PHP FFI](https://wiki.php.net/rfc/ffi) and LLVM. Current focus: **self-host** (compiler compiling its own `lib/`, [#1492](https://github.com/PurHur/php-compiler/issues/1492)) on a **web-capable PHP subset**; [MiniWebApp](examples/003-MiniWebApp/) and siblings are integration test fixtures.
 
 ## Demo in five minutes
 
@@ -86,7 +86,7 @@ make test    # builds php-compiler:22.04-dev if needed, then memory-safe CI in D
 
 ## North-star status (2026)
 
-**Public status site:** [Overview](https://purhur.github.io/php-compiler/docs/pages/index.html) · [Full status](https://purhur.github.io/php-compiler/development-status.html) — [North Star 1](https://purhur.github.io/php-compiler/development-status.html#north-star-1-web-app) · [North Star 2 (self-host)](https://purhur.github.io/php-compiler/development-status.html#north-star-2-self-host) · wave 3 [#1380](https://github.com/PurHur/php-compiler/issues/1380) · presenter guide [`docs/GETTING-STARTED.md`](docs/GETTING-STARTED.md) · edit [`docs/pages/development-status.md`](docs/pages/development-status.md).
+**Public status site:** [Overview](https://purhur.github.io/php-compiler/docs/pages/index.html) · [Full status](https://purhur.github.io/php-compiler/development-status.html) — [North star (self-host)](https://purhur.github.io/php-compiler/development-status.html#north-star-self-host) · [Example integration tests](https://purhur.github.io/php-compiler/development-status.html#example-integration-tests) · wave 3 [#1380](https://github.com/PurHur/php-compiler/issues/1380) · presenter guide [`docs/GETTING-STARTED.md`](docs/GETTING-STARTED.md) · edit [`docs/pages/development-status.md`](docs/pages/development-status.md).
 
 Single-page snapshot for contributors; keep in sync with [examples/README.md](examples/README.md) ([#753](https://github.com/PurHur/php-compiler/issues/753)).
 
@@ -135,7 +135,7 @@ Matrix details: [docs/local-ci-matrix.md](docs/local-ci-matrix.md).
 
 ## Self-host bootstrap (experimental)
 
-**North star:** The **compiler fully compiles itself** — native binary from php-compiler’s own `lib/` tree (no `vendor/`), then that binary compiles PHP again and rebuilds the next compiler revision **without Zend PHP** in the loop. **Living tracker:** [#1492](https://github.com/PurHur/php-compiler/issues/1492) (was [#1056](https://github.com/PurHur/php-compiler/issues/1056)) · M2 batch [#1419](https://github.com/PurHur/php-compiler/issues/1419) · roadmap [#78](https://github.com/PurHur/php-compiler/issues/78) · process [#1025](https://github.com/PurHur/php-compiler/issues/1025). Orthogonal to **North Star 1 — web application** ([`examples/003-MiniWebApp`](examples/003-MiniWebApp/) — [#1044](https://github.com/PurHur/php-compiler/issues/1044)).
+**North star:** The **compiler fully compiles itself** — native binary from php-compiler’s own `lib/` tree (no `vendor/`), then that binary compiles PHP again and rebuilds the next compiler revision **without Zend PHP** in the loop. **Living tracker:** [#1492](https://github.com/PurHur/php-compiler/issues/1492) (was [#1056](https://github.com/PurHur/php-compiler/issues/1056)) · M2 batch [#1419](https://github.com/PurHur/php-compiler/issues/1419) · roadmap [#78](https://github.com/PurHur/php-compiler/issues/78) · process [#1025](https://github.com/PurHur/php-compiler/issues/1025). Web examples under [`examples/`](examples/) (e.g. [`003-MiniWebApp`](examples/003-MiniWebApp/)) are **integration test fixtures** only — not a parallel product goal ([#1044](https://github.com/PurHur/php-compiler/issues/1044) closed).
 
 **Target + critical path:** [docs/self-host-target.md](docs/self-host-target.md) · gates: [docs/bootstrap-selfhost.md](docs/bootstrap-selfhost.md) · M3 playbook: [docs/bootstrap-m5-fast-path.md](docs/bootstrap-m5-fast-path.md) · inventory: [docs/bootstrap-inventory.md](docs/bootstrap-inventory.md) (`php script/bootstrap-inventory.php`) · process: [#1025](https://github.com/PurHur/php-compiler/issues/1025).
 

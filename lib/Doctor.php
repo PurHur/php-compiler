@@ -133,8 +133,8 @@ final class Doctor
             fwrite(STDOUT, "LLVM ready: unset EXAMPLES_AOT_SMOKE_GATE=0 for ci-local examples-aot-smoke (#674)\n");
         }
 
-        self::printNorthStar1PresenterSection($repoRoot);
-        self::printNorthStar2PresenterSection($repoRoot);
+        self::printExampleWebGatesSection($repoRoot);
+        self::printSelfHostPresenterSection($repoRoot);
         self::printSessionsWebSection($repoRoot);
         self::printFileUploadWebSection($repoRoot);
 
@@ -142,7 +142,7 @@ final class Doctor
     }
 
     /**
-     * North Star 2 self-host gate ladder only (issues #1492, #2053).
+     * Project north star — self-host gate ladder only (issues #1492, #2053).
      */
     public static function runSelfhost(string $repoRoot): int
     {
@@ -174,7 +174,7 @@ final class Doctor
             ? 'php script/bootstrap-inventory.php --check'
             : 'script/bootstrap-inventory.php missing';
 
-        fwrite(STDOUT, "North Star 2 self-host gates (#1492, #1056):\n\n");
+        fwrite(STDOUT, "North star — self-host gates (#1492, #1056):\n\n");
 
         fwrite(STDOUT, "1. Inventory\n");
         fwrite(STDOUT, "   {$inventoryDetail}\n");
@@ -218,9 +218,9 @@ final class Doctor
     }
 
     /**
-     * North Star 1 presenter commands after the gate ladder (issues #1845, #1857).
+     * Example web integration gates (003-MiniWebApp ladder; issues #1845, #1857).
      */
-    private static function printNorthStar1PresenterSection(string $repoRoot): void
+    private static function printExampleWebGatesSection(string $repoRoot): void
     {
         $llvmInfo = self::resolveLlvmInfo($repoRoot);
         $llvmReady = null !== $llvmInfo['dir'];
@@ -235,7 +235,7 @@ final class Doctor
             ? 'skipped (PHP_COMPILER_SKIP_SERVE_TESTS is set)'
             : ($loopback['ok'] ? 'loopback bind OK' : 'loopback bind failed — serve / AOT web-smoke may skip');
 
-        fwrite(STDOUT, "\nNorth Star 1 presenter (#1044, #1845):\n");
+        fwrite(STDOUT, "\nExample web integration gates (#1044 closed, #1845):\n");
         fwrite(STDOUT, "  LLVM 9: {$llvmDetail}\n");
         fwrite(STDOUT, "  Serve tests: {$serveDetail}\n");
         $nestedReturnGate = getenv('NESTED_RETURN_COMPLIANCE_GATE');
@@ -272,9 +272,9 @@ final class Doctor
     }
 
     /**
-     * North Star 2 self-host presenter commands (issues #1492, #1871; bundle #1865).
+     * Project north star — self-host presenter commands (issues #1492, #1871; bundle #1865).
      */
-    private static function printNorthStar2PresenterSection(string $repoRoot): void
+    private static function printSelfHostPresenterSection(string $repoRoot): void
     {
         require_once $repoRoot.'/script/bootstrap-spine-count.php';
         $counts = bootstrap_spine_counts($repoRoot);
@@ -298,7 +298,7 @@ final class Doctor
         $ns2Script = $repoRoot.'/script/north-star2-verify.sh';
         $ns2Make = is_executable($ns2Script);
 
-        fwrite(STDOUT, "\nNorth Star 2 presenter (#1492, #1871):\n");
+        fwrite(STDOUT, "\nNorth star — self-host presenter (#1492, #1871):\n");
         fwrite(STDOUT, "  M2 spine: {$spine}/{$inventory} (php script/bootstrap-spine-count.php)\n");
         fwrite(STDOUT, "  LLVM 9: {$llvmDetail}\n");
         fwrite(STDOUT, "  M3 strict: {$m3Detail}\n");

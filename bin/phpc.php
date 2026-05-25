@@ -71,8 +71,8 @@ php-compiler CLI
   phpc test --bootstrap [--strict]              Bootstrap subset (inventory + spine sync; #1961)
   phpc doctor [--gates] [--selfhost] [--no-lint] [--jit-probe] [--aot-project-probe [dir]]
                                               Probe environment; LLVM/JIT readiness (#717, #746)
-      --gates                                     MiniWebApp ladder + NS1/NS2 + 005-SessionsWeb (#1969)
-      --selfhost                                  North Star 2 bootstrap gates only (#2053, #1492)
+      --gates                                     MiniWebApp ladder + self-host + 005-SessionsWeb (#1969)
+      --selfhost                                  Self-host bootstrap gates only (#2053, #1492)
       --jit-probe                                 Run MCJIT smoke (script/jit-runtime-probe.php)
       --aot-project-probe [dir]                   AOT build + execute on 003-MiniWebApp (or dir)
   phpc validate-manifest [dir]                  Validate phpc.json (default: cwd)

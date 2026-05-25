@@ -114,7 +114,7 @@ web-smoke:
 miniwebapp-gates:
 	./script/miniwebapp-gates.sh
 
-# North Star 1 presenter verify before closing #1044 (issue #1845)
+# Example web integration verify (legacy target name north-star1-verify; issue #1845)
 north-star1-verify:
 	./script/north-star1-verify.sh
 
