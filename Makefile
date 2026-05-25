@@ -126,7 +126,7 @@ miniwebapp-aot-bisect:
 	./script/miniwebapp-aot-bisect.sh
 
 # HTTP smoke: phpc serve + curl for 001-SimpleWeb and 002-StaticWeb (issue #298)
-.PHONY: examples-web-smoke examples-sessions-smoke examples-fileupload-deploy-smoke examples-web-smoke-prebuild examples-aot-smoke deploy-smoke
+.PHONY: examples-web-smoke examples-sessions-smoke examples-fileupload-deploy-smoke examples-web-smoke-prebuild examples-aot-smoke deploy-smoke deploy-smoke-all
 examples-web-smoke:
 	./script/examples-web-smoke.sh
 
@@ -145,12 +145,19 @@ examples-aot-smoke:
 	./script/examples-aot-smoke.sh
 
 # phpc deploy + PHPC_DEPLOY_ROOT CGI smoke for 001/002 (issue #718); skips when LLVM missing
+# DEPLOY_SMOKE_ALL=1 runs full ladder with skip reasons for 005/006 (#2077)
 deploy-smoke:
-	./script/deploy-smoke.sh --example 001
-	./script/deploy-smoke.sh --example 002
-	@if [ "$${DEPLOY_SMOKE_003_EXECUTE:-1}" = "1" ]; then ./script/deploy-smoke.sh --example 003; fi
-	@if [ "$${SESSIONS_WEB_DEPLOY_SMOKE_GATE:-0}" = "1" ]; then ./script/deploy-smoke.sh --example 005; fi
-	@if [ "$${FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE:-0}" = "1" ]; then ./script/deploy-smoke.sh --example 006; fi
+	@if [ "$${DEPLOY_SMOKE_ALL:-0}" = "1" ]; then ./script/deploy-smoke-all.sh; else \
+		./script/deploy-smoke.sh --example 001; \
+		./script/deploy-smoke.sh --example 002; \
+		if [ "$${DEPLOY_SMOKE_003_EXECUTE:-1}" = "1" ]; then ./script/deploy-smoke.sh --example 003; fi; \
+		if [ "$${SESSIONS_WEB_DEPLOY_SMOKE_GATE:-0}" = "1" ]; then ./script/deploy-smoke.sh --example 005; fi; \
+		if [ "$${FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE:-0}" = "1" ]; then ./script/deploy-smoke.sh --example 006; fi; \
+	fi
+
+# Full deploy ladder 001–006 with explicit skip messages when gates=0 (#2077)
+deploy-smoke-all:
+	./script/deploy-smoke-all.sh
 
 # Local HTTP dev server (see bin/serve.php)
 SERVE_ADDR ?= 127.0.0.1:8080

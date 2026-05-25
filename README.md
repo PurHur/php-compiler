@@ -65,7 +65,8 @@ mkdir my-app && ./phpc init my-app   # phpc.json + public/index.php scaffold (se
 make web-smoke                 # lint shipped examples + 003-MiniWebApp tree, VM smoke 001-SimpleWeb
 make examples-web-smoke        # phpc serve + curl for 001–004 and 005-SessionsWeb (SESSIONS_WEB_SMOKE_GATE=1 default)
 make examples-aot-smoke        # phpc build + CLI execute for 000–004 and 006 (FILE_UPLOAD_WEB_AOT_SMOKE_GATE=1 default) when LLVM ready (#667)
-make deploy-smoke              # phpc deploy + PHPC_DEPLOY_ROOT CGI for 001/002/003; 005 when SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 (#718, #1893)
+make deploy-smoke              # phpc deploy + PHPC_DEPLOY_ROOT CGI for 001/002/003; 005/006 when opt-in gates=1 (#718, #1893)
+make deploy-smoke-all          # full 001–006 ladder; prints skip hints when 005/006 gates=0 (#2077)
 ./phpc serve examples/001-SimpleWeb   # http://127.0.0.1:8080/ (or: make serve)
 ./phpc lint --all examples/003-MiniWebApp && ./phpc serve examples/003-MiniWebApp   # VM green; AOT link ✅, native execute ✅ (#764)
 ```

@@ -172,6 +172,7 @@ make web-smoke              # lint examples/*/example.php + 003 lint --all + VM 
 make examples-web-smoke     # phpc serve + curl GET/POST (001–004 + 005 session flash when SESSIONS_WEB_SMOKE_GATE=1)
 make examples-sessions-smoke   # 005-SessionsWeb cookie jar only (#1887)
 make examples-fileupload-deploy-smoke   # 006-FileUploadWeb deploy CGI only (#2044)
+make deploy-smoke-all       # 001–003 deploy + 005/006 when SESSIONS_WEB_DEPLOY_SMOKE_GATE / FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE=1; skip hints when gates=0 (#2077)
 make examples-aot-smoke     # phpc build + CLI execute (000–004 + 006 when gate on; skips when LLVM missing; 003 execute green #764)
 ```
 

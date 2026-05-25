@@ -410,8 +410,9 @@ final class Doctor
             ? '#1893 ✅ · ci-local when gate=1 (#1967)'
             : 'opt-in default 0 — #1893 · #1962';
         fwrite(STDOUT, "  [{$deployStatus}] Stage 4 Deploy CGI — SESSIONS_WEB_DEPLOY_SMOKE_GATE default {$deployDefault} ({$deployNote})\n");
-        fwrite(STDOUT, "      Run:     SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 make deploy-smoke\n");
+        fwrite(STDOUT, "      Run:     SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 make deploy-smoke-all\n");
         fwrite(STDOUT, "      Or:      SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 ./script/deploy-smoke.sh --example 005\n");
+        fwrite(STDOUT, "      Ladder:  make deploy-smoke-all (skips 005/006 with hints when gates=0; #2077)\n");
 
         $rebuild005Default = $defaults['REBUILD_EXAMPLES_005_SYNC_GATE'] ?? '1';
         $rebuild005On = self::gateEnabled('REBUILD_EXAMPLES_005_SYNC_GATE', $rebuild005Default);
@@ -507,8 +508,9 @@ final class Doctor
             ? '#2028 ✅ · ci-local when gate=1 (#2042)'
             : 'opt-in default 0 — #2028 · #2038';
         fwrite(STDOUT, "  [{$deployStatus}] Stage 4 Deploy CGI — FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE default {$deployDefault} ({$deployNote})\n");
-        fwrite(STDOUT, "      Run:     make examples-fileupload-deploy-smoke\n");
-        fwrite(STDOUT, "      Or:      FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE=1 ./script/deploy-smoke.sh --example 006\n");
+        fwrite(STDOUT, "      Run:     FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE=1 make deploy-smoke-all\n");
+        fwrite(STDOUT, "      Or:      make examples-fileupload-deploy-smoke\n");
+        fwrite(STDOUT, "      Ladder:  make deploy-smoke-all (skips 005/006 with hints when gates=0; #2077)\n");
 
         $rebuild006Default = $defaults['REBUILD_EXAMPLES_006_SYNC_GATE'] ?? '1';
         $rebuild006On = self::gateEnabled('REBUILD_EXAMPLES_006_SYNC_GATE', $rebuild006Default);
