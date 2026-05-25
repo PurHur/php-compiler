@@ -425,7 +425,7 @@ ci_guard_jit_compliance() {
 
 # Shell curl harness for 006-FileUploadWeb multipart upload (issue #1999).
 ci_run_file_upload_web_smoke() {
-  if [[ "${FILE_UPLOAD_WEB_SMOKE_GATE:-0}" != "1" ]]; then
+  if [[ "${FILE_UPLOAD_WEB_SMOKE_GATE:-1}" != "1" ]]; then
     return 0
   fi
   if [[ -n "${PHP_COMPILER_SKIP_SERVE_TESTS:-}" ]]; then
@@ -436,7 +436,7 @@ ci_run_file_upload_web_smoke() {
     echo "examples-web-smoke (006): skipped (cannot bind loopback TCP)"
     return 0
   fi
-  echo "examples-web-smoke (006): FileUploadWeb multipart curls (FILE_UPLOAD_WEB_SMOKE_GATE=1, #1999)..."
+  echo "examples-web-smoke (006): FileUploadWeb multipart curls (FILE_UPLOAD_WEB_SMOKE_GATE=1 default, #2009)..."
   "$_CI_SCRIPT_DIR/examples-web-smoke.sh" --fileupload-only
 }
 

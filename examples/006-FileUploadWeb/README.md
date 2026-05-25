@@ -20,21 +20,21 @@ The curl response should include `Uploaded: README.md` and a non-zero byte count
 | Layer | Notes |
 |-------|-------|
 | VM `phpc run` | ✅ GET — shows empty state |
-| VM `phpc serve` | ✅ multipart POST when `FILE_UPLOAD_WEB_SMOKE_GATE=1` |
+| VM `phpc serve` | ✅ multipart POST (`FILE_UPLOAD_WEB_SMOKE_GATE=1` default, [#2009](https://github.com/PurHur/php-compiler/issues/2009)) |
 | AOT link | ✅ `ExamplesCompileTest::test006FileUploadWebAotLink` when `FILE_UPLOAD_WEB_AOT_LINK_GATE=1` |
 | AOT execute | ✅ opt-in `FILE_UPLOAD_WEB_AOT_SMOKE_GATE=1` — CGI `REQUEST_BODY` multipart |
 
 ## CI gates
 
-Defaults from `script/ci-defaults.env` (all `0` until promoted):
+Defaults from `script/ci-defaults.env` (VM smoke default-on; AOT stages opt-in):
 
 ```console
 ./phpc doctor --gates | grep -E 'FILE_UPLOAD_WEB|006-FileUploadWeb'
 ```
 
-| Stage | Gate | Command when `=1` |
-|-------|------|-------------------|
-| VM multipart | `FILE_UPLOAD_WEB_SMOKE_GATE` | `FILE_UPLOAD_WEB_SMOKE_GATE=1 ./script/examples-web-smoke.sh` |
+| Stage | Gate | Default | Command when enabled |
+|-------|------|---------|----------------------|
+| VM multipart | `FILE_UPLOAD_WEB_SMOKE_GATE` | `1` | `./script/examples-web-smoke.sh --fileupload-only` or `ci-fast` ([#2009](https://github.com/PurHur/php-compiler/issues/2009)) |
 | AOT link | `FILE_UPLOAD_WEB_AOT_LINK_GATE` | `./script/ci-local.sh --filter test006FileUploadWebAotLink` |
 | AOT execute | `FILE_UPLOAD_WEB_AOT_SMOKE_GATE` | `./script/ci-local.sh --filter test006FileUploadWebMultipartAotExecute` |
 

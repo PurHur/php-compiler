@@ -612,7 +612,7 @@ if [[ "${MINIWEBAPP_ONLY}" -eq 0 ]]; then
     run_sessions_web_smoke
   fi
 
-  if [[ "${FILE_UPLOAD_WEB_SMOKE_GATE:-0}" == "1" ]]; then
+  if [[ "${FILE_UPLOAD_WEB_SMOKE_GATE:-1}" == "1" ]]; then
     run_file_upload_web_smoke
   fi
 fi

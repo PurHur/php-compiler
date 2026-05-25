@@ -358,7 +358,7 @@ final class ExamplesCompileTest extends TestCase
             $this->markTestSkipped('PHP_COMPILER_SKIP_SERVE_TESTS is set');
         }
         if (!self::fileUploadWebSmokeGateEnabled()) {
-            $this->markTestSkipped('FILE_UPLOAD_WEB_SMOKE_GATE=0 — skip 006 multipart serve gate (#1999)');
+            $this->markTestSkipped('FILE_UPLOAD_WEB_SMOKE_GATE=0 — skip 006 multipart serve gate (#2009)');
         }
         if (!$this->canBindLoopback()) {
             $this->markTestSkipped('Cannot bind loopback TCP');
@@ -975,7 +975,7 @@ final class ExamplesCompileTest extends TestCase
     {
         $gate = getenv('FILE_UPLOAD_WEB_SMOKE_GATE');
 
-        return false !== $gate && '' !== $gate && '1' === $gate;
+        return false === $gate || '0' !== $gate;
     }
 
     private static function fileUploadWebAotLinkGateEnabled(): bool
