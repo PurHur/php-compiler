@@ -258,6 +258,16 @@ class Type extends Builtin {
             $fntypeMoveUploaded
         );
         $this->context->registerFunction('__compiler_move_uploaded_file', $fnMoveUploaded);
+        $fntypeIsUploaded = $this->context->context->functionType(
+            $i32,
+            false,
+            $this->context->getTypeFromString('__string__*')
+        );
+        $fnIsUploaded = $this->context->module->addFunction(
+            '__compiler_is_uploaded_file',
+            $fntypeIsUploaded
+        );
+        $this->context->registerFunction('__compiler_is_uploaded_file', $fnIsUploaded);
         $fntypeTouch = $this->context->context->functionType(
             $i32,
             false,
