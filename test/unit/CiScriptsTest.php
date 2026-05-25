@@ -315,6 +315,26 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('EXAMPLES_LADDER_DISCOVERY_GATE=${EXAMPLES_LADDER_DISCOVERY_GATE:-1}', $body);
     }
 
+    public function testCiDefaultsEnvDefinesRebuildExamples005SyncGateOff(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString('REBUILD_EXAMPLES_005_SYNC_GATE="${REBUILD_EXAMPLES_005_SYNC_GATE:-0}"', $defaults);
+    }
+
+    public function testCiFastRunsRebuildExamples005SyncViaInventoryChecks(): void
+    {
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('ci_run_rebuild_examples_005_sync_check', $common);
+        $this->assertStringContainsString('check-rebuild-examples-005-row.php', $common);
+        $this->assertStringContainsString('REBUILD_EXAMPLES_005_SYNC_GATE:-0', $common);
+    }
+
+    public function testCiDockerRunPassesRebuildExamples005SyncGateDefaultOff(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');
+        $this->assertStringContainsString('REBUILD_EXAMPLES_005_SYNC_GATE=${REBUILD_EXAMPLES_005_SYNC_GATE:-0}', $body);
+    }
+
     public function testCiDefaultsEnvDefinesRootReadmeSyncGateOn(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
@@ -652,6 +672,14 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('EXAMPLES_LADDER_DISCOVERY_GATE', $doc);
         $this->assertStringContainsString('check-examples-ladder-discovery.php', $doc);
         $this->assertMatchesRegularExpression('/\| `EXAMPLES_LADDER_DISCOVERY_GATE` \| `1` \|/', $doc);
+    }
+
+    public function testLocalCiMatrixDocumentsRebuildExamples005SyncGate(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('REBUILD_EXAMPLES_005_SYNC_GATE', $doc);
+        $this->assertStringContainsString('check-rebuild-examples-005-row.php', $doc);
+        $this->assertMatchesRegularExpression('/\| `REBUILD_EXAMPLES_005_SYNC_GATE` \| `0` \|/', $doc);
     }
 
     public function testLocalCiMatrixDocumentsRootReadmeSyncGate(): void
