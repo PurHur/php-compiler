@@ -223,7 +223,7 @@ class Object_ extends Type {
 
         $map = $this->context->structFieldMap['__object__'];
         $this->context->builder->store(
-            $this->context->constantFromInteger($classId),
+            $this->context->constantFromInteger($classId, 'int64'),
             $this->context->builder->structGep($obj, $map['class_id'])
         );
         $constructedInit = $this->hasConstructor($classId) ? 0 : 1;

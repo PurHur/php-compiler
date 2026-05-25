@@ -134,7 +134,7 @@ examples-sessions-smoke:
 	./script/examples-web-smoke.sh --sessions-only
 
 examples-throws-smoke:
-	./script/examples-web-smoke.sh --throws-only
+	THROWS_WEB_SMOKE_GATE=1 ./script/examples-web-smoke.sh --throws-only
 
 # 006-FileUploadWeb deploy CGI only (FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE=1; issue #2044)
 examples-fileupload-deploy-smoke:
