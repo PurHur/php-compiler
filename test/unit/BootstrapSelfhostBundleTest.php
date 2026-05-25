@@ -13,6 +13,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
 
     /** @var list<string> */
     private const LIB_SPINE_SMOKE_NEW_UNITS = [
+        'lib/JIT/Builtin/IniGet.php',
         'lib/JIT/Builtin/Type.php',
         'lib/JIT/Builtin/Type/String_.php',
         'lib/Doctor.php',
@@ -196,6 +197,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/JitTraitExists.php',
         'ext/standard/Module.php',
         'lib/Lint/SwitchDetector.php',
+        'test/bootstrap-aot/vm_run_smoke.php',
         'ext/standard/VmCrc32.php',
         'ext/standard/VmDate.php',
         'ext/standard/VmErrorHandler.php',
@@ -212,6 +214,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/VmSprintf.php',
         'ext/standard/VmStreamContext.php',
         'ext/standard/VmUserCall.php',
+        'ext/standard/VmPregReplaceCallback.php',
         'ext/standard/VmDebugBacktrace.php',
         'ext/standard/VmSerialize.php',
         'ext/standard/filter_input.php',
@@ -371,7 +374,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         $this->assertFileExists($entry);
         $contents = (string) file_get_contents($entry);
         $count = substr_count($contents, 'require_once __DIR__');
-        $this->assertSame(600, $count, 'M2 spine; Linker/yay/vm_run_smoke tail excluded from native link (#1960)');
+        $this->assertSame(603, $count, 'M2 spine; Linker/llvm-env/yay tail excluded from native link (#2001)');
         foreach (self::LIB_SPINE_SMOKE_NEW_UNITS as $unit) {
             $this->assertStringContainsString(
                 "require_once __DIR__.'/../../../{$unit}';",
