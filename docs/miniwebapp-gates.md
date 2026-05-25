@@ -8,6 +8,7 @@ Progressive stages for [`examples/003-MiniWebApp/`](../examples/003-MiniWebApp/)
 make miniwebapp-gates
 # or: ./script/miniwebapp-gates.sh
 # or: ./phpc doctor --gates
+# presenter bundle (gates + ci-fast + AOT execute): make north-star1-verify (#1845)
 ```
 
 The script prints `[x]` / `[ ]` per stage and suggests the next blocker. Use `--no-lint` to skip the `phpc lint --all` probe when iterating on later stages.

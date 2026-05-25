@@ -531,6 +531,7 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('## MiniWebApp gates', $doc);
         $this->assertStringContainsString('miniwebapp-gates.sh', $doc);
         $this->assertStringContainsString('phpc doctor --gates', $doc);
+        $this->assertStringContainsString('north-star1-verify', $doc);
         $this->assertStringContainsString('MINIWEBAPP_VM_CLI_GATE', $doc);
         $this->assertStringContainsString('MINIWEBAPP_SERVE_GATE', $doc);
         $this->assertStringContainsString('MINIWEBAPP_WEB_SMOKE_GATE', $doc);
