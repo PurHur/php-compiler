@@ -4,7 +4,7 @@
 declare(strict_types=1);
 
 /**
- * Guard docs/pages/development-status.md against examples/README.md drift (issues #2039, #2067).
+ * Guard docs/pages/development-status.md against examples/README.md drift (issues #2039, #2067, #2145).
  *
  * Usage:
  *   php script/check-development-status-sync.php
@@ -28,12 +28,12 @@ if (!str_contains($body, '006-FileUploadWeb')) {
     $errors[] = 'development-status.md: missing 006-FileUploadWeb row (sync examples/README.md; #2039)';
 }
 
-if (preg_match('/Shipped examples \(000–005\)/', $body)) {
-    $errors[] = 'development-status.md: section title still says 000–005 (update to 000–006; #2039)';
+if (preg_match('/Shipped examples \(000–00[0-5]\)/', $body)) {
+    $errors[] = 'development-status.md: section title stale (update to 000–007; #2145)';
 }
 
-if (!preg_match('/Shipped examples \(000–006\)/', $body)) {
-    $errors[] = 'development-status.md: missing "Shipped examples (000–006)" section header (#2039)';
+if (!preg_match('/Shipped examples \(000–007\)/', $body)) {
+    $errors[] = 'development-status.md: missing "Shipped examples (000–007)" section header (#2145)';
 }
 
 if (!preg_match('/\| 006-FileUploadWeb \|/', $body)) {
@@ -80,6 +80,34 @@ if ('1' === $aotDefault && !preg_match('/FILE_UPLOAD_WEB_AOT_SMOKE_GATE=1/', $bo
 $m3SmokeDefault = ci_defaults_gate_default($root, 'BOOTSTRAP_M3_COMPILE_SMOKE_PROBE_GATE');
 if ('1' === $m3SmokeDefault && !str_contains($body, 'BOOTSTRAP_M3_COMPILE_SMOKE_PROBE_GATE')) {
     $errors[] = 'development-status.md: missing BOOTSTRAP_M3_COMPILE_SMOKE_PROBE_GATE (NS2 M3 ladder)';
+}
+
+$check007 = (getenv('DEVELOPMENT_STATUS_007_SYNC_GATE') ?: ci_defaults_gate_default($root, 'DEVELOPMENT_STATUS_007_SYNC_GATE')) === '1';
+if ($check007) {
+    if (!str_contains($body, '007-ThrowsWeb')) {
+        $errors[] = 'development-status.md: missing 007-ThrowsWeb row (#2145)';
+    }
+    if (!preg_match('/\| 007-ThrowsWeb \|/', $body)) {
+        $errors[] = 'development-status.md: shipped table missing | 007-ThrowsWeb | row (#2145)';
+    }
+    if (!str_contains($body, 'THROWS_WEB_SMOKE_GATE')) {
+        $errors[] = 'development-status.md: missing THROWS_WEB_SMOKE_GATE wording (#2145, #2093)';
+    }
+    if (!str_contains($body, '#2093') || !str_contains($body, '#2101')) {
+        $errors[] = 'development-status.md: 007 row must link #2093 and #2101 (#2145)';
+    }
+    $throwsSmokeDefault = ci_defaults_gate_default($root, 'THROWS_WEB_SMOKE_GATE');
+    if ('1' === $throwsSmokeDefault && !preg_match('/THROWS_WEB_SMOKE_GATE=1/', $body)) {
+        $errors[] = 'development-status.md: THROWS_WEB_SMOKE_GATE=1 expected (ci-defaults default-on #2125)';
+    }
+    if (is_readable($examplesReadme)) {
+        $examples = (string) file_get_contents($examplesReadme);
+        if (preg_match('/\| \[007-ThrowsWeb\][^\n]*✅/u', $examples)
+            && preg_match('/\| 007-ThrowsWeb \|[^\n]*📋/u', $body)
+            && !preg_match('/\| 007-ThrowsWeb \|[^\n]*✅/u', $body)) {
+            $errors[] = 'development-status.md: 007 VM column should be ✅ when examples/README.md VM is ✅ (#2145)';
+        }
+    }
 }
 
 if ([] !== $errors) {

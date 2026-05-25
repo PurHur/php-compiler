@@ -152,7 +152,16 @@ ci_run_development_status_sync_check() {
     return 0
   fi
   echo "Development status sync (DEVELOPMENT_STATUS_SYNC_GATE=1, issue #2067)..."
-  "$PHP_BIN" "${PHP_OPTS[@]}" script/check-development-status-sync.php
+  DEVELOPMENT_STATUS_007_SYNC_GATE="${DEVELOPMENT_STATUS_007_SYNC_GATE:-0}" \
+    "$PHP_BIN" "${PHP_OPTS[@]}" script/check-development-status-sync.php
+}
+
+ci_run_development_status_007_sync_check() {
+  if [[ "${DEVELOPMENT_STATUS_007_SYNC_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  echo "Development status 007 sync (DEVELOPMENT_STATUS_007_SYNC_GATE=1, issue #2145)..."
+  DEVELOPMENT_STATUS_007_SYNC_GATE=1 "$PHP_BIN" "${PHP_OPTS[@]}" script/check-development-status-sync.php
 }
 
 ci_run_root_readme_006_sync_check() {
@@ -283,6 +292,7 @@ ci_run_inventory_checks() {
   ci_run_root_readme_006_sync_check
   ci_run_root_readme_007_sync_check
   ci_run_development_status_sync_check
+  ci_run_development_status_007_sync_check
   ci_run_selfhost_spine_count_sync_check
   ci_run_selfhost_spine_coverage_sync_check
   ci_run_m3_allowlist_sync_check
