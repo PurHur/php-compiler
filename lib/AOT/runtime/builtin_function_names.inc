@@ -12,6 +12,7 @@ static const char *phpc_builtin_functions[] = {
     "array_flip",
     "array_intersect",
     "array_key_exists",
+    "array_is_list",
     "array_keys",
     "array_map",
     "array_merge",
