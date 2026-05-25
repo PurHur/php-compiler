@@ -463,9 +463,7 @@ restart:
                     break;
                 case OpCode::TYPE_RETURN_VOID:
                     $this->enforceReturnType($frame, null);
-                    if (!is_null($frame->returnVar)) {
-                        $frame->returnVar->null();
-                    }
+                    // Do not null returnVar: it may alias the caller result slot (#1885).
                     $this->markObjectConstructedIfLeavingConstruct($frame);
                     if ($frame->ephemeral && null !== $frame->parent) {
                         $frame = $frame->parent;
@@ -473,7 +471,13 @@ restart:
                     }
                     goto nextframe;
                 case OpCode::TYPE_RETURN:
-                    $returnValue = $frame->scope[$op->arg1];
+                    if (isset($frame->scope[$op->arg1])) {
+                        $returnValue = $frame->scope[$op->arg1]->resolveIndirect();
+                    } elseif (isset($frame->block->constants[$op->arg1])) {
+                        $returnValue = $frame->block->constants[$op->arg1];
+                    } else {
+                        $returnValue = new Variable(Variable::TYPE_NULL);
+                    }
                     $this->enforceReturnType($frame, $returnValue);
                     if (!is_null($frame->returnVar)) {
                         $frame->returnVar->copyFrom($returnValue);
@@ -571,6 +575,8 @@ restart:
                     $new->returnVar = null;
                     if ($op->type === OpCode::TYPE_FUNCCALL_EXEC_RETURN) {
                         $new->returnVar = $this->scopeSlot($frame, (int) $op->arg1);
+                    } else {
+                        $new->returnVar = null;
                     }
                     try {
                         $new->calledArgs = $this->resolveOutgoingCallArgs($frame);
