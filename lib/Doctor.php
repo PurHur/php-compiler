@@ -137,6 +137,7 @@ final class Doctor
         self::printSelfHostPresenterSection($repoRoot);
         self::printSessionsWebSection($repoRoot);
         self::printFileUploadWebSection($repoRoot);
+        self::printThrowsWebSection($repoRoot);
 
         return is_int($exit) ? $exit : 1;
     }
@@ -540,6 +541,87 @@ final class Doctor
             fwrite(STDOUT, "  [📋] phpc init --profile fileupload — #2004\n");
         }
         fwrite(STDOUT, "  Docs: examples/006-FileUploadWeb/README.md · docs/local-ci-matrix.md (#2010)\n");
+    }
+
+    /**
+     * 007-ThrowsWeb gate ladder (issues #2076, #2102).
+     */
+    private static function printThrowsWebSection(string $repoRoot): void
+    {
+        $exampleDir = $repoRoot.'/examples/007-ThrowsWeb';
+        if (!is_dir($exampleDir)) {
+            return;
+        }
+
+        $defaults = self::readCiDefaultsEnv($repoRoot);
+        $smokeDefault = $defaults['THROWS_WEB_SMOKE_GATE'] ?? '0';
+        $linkDefault = $defaults['THROWSWEB_AOT_LINK_GATE'] ?? '0';
+        $aotDefault = $defaults['THROWSWEB_AOT_SMOKE_GATE'] ?? '0';
+
+        $smokeOn = self::gateEnabled('THROWS_WEB_SMOKE_GATE', $smokeDefault);
+        $linkOn = self::gateEnabled('THROWSWEB_AOT_LINK_GATE', $linkDefault);
+        $aotOn = self::gateEnabled('THROWSWEB_AOT_SMOKE_GATE', $aotDefault);
+
+        $llvmInfo = self::resolveLlvmInfo($repoRoot);
+        $llvmReady = null !== $llvmInfo['dir'];
+        $llvmDetail = $llvmReady
+            ? 'LLVM ready at '.$llvmInfo['dir']
+            : 'LLVM missing — AOT rows need libLLVM-9.so.1';
+
+        $hasExample = is_file($exampleDir.'/example.php');
+        $hasManifest = is_file($exampleDir.'/phpc.json');
+
+        fwrite(STDOUT, "\n007-ThrowsWeb CI gates (#2102, ladder #2076–#2101):\n");
+        fwrite(STDOUT, "  Tree: examples/007-ThrowsWeb\n");
+        fwrite(STDOUT, "  {$llvmDetail}\n");
+        fwrite(STDOUT, "  Defaults: script/ci-defaults.env\n\n");
+
+        if ($hasExample && $hasManifest) {
+            fwrite(STDOUT, "  [✅] example.php + phpc.json present\n");
+        } else {
+            fwrite(STDOUT, "  [⬜] example tree incomplete (expected example.php + phpc.json)\n");
+        }
+        fwrite(STDOUT, "  Lint: ./phpc lint examples/007-ThrowsWeb/example.php\n\n");
+
+        self::printSessionsWebGateRow(
+            1,
+            'VM throw/catch',
+            'THROWS_WEB_SMOKE_GATE',
+            $smokeDefault,
+            $smokeOn,
+            false,
+            'THROWS_WEB_SMOKE_GATE=1 ./script/examples-web-smoke.sh --throws-only · ci-fast when gate=1 (#2093)',
+            '#2093'
+        );
+        self::printSessionsWebGateRow(
+            2,
+            'AOT link',
+            'THROWSWEB_AOT_LINK_GATE',
+            $linkDefault,
+            $linkOn,
+            true,
+            './script/ci-local.sh --filter ThrowsWebAotLinkTest (#2101)',
+            '#2101'
+        );
+        $aotStatus = $aotOn && $llvmReady ? '✅' : '📋';
+        $aotExecuteNote = $llvmReady
+            ? ($aotOn ? '#2101' : '#2101 · opt-in until throw/catch AOT green')
+            : 'LLVM required; #2101 when gate=1';
+        fwrite(STDOUT, "  [{$aotStatus}] Stage 3 AOT execute — THROWSWEB_AOT_SMOKE_GATE default {$aotDefault} ({$aotExecuteNote})\n");
+        fwrite(STDOUT, "      PHPUnit: ./script/ci-local.sh --filter ThrowsWebAotExecuteTest\n");
+        fwrite(STDOUT, "      Shell:   THROWSWEB_AOT_SMOKE_GATE=1 EXAMPLES_AOT_SMOKE_ONLY=007 ./script/examples-aot-smoke.sh (#2104)\n");
+
+        $initProfileLive = \PHPCompiler\Cli\PhpcInit::isKnownProfile('throwsweb');
+        $initTemplate = is_file($repoRoot.'/templates/init-throwsweb/example.php');
+        fwrite(STDOUT, "\n  Related:\n");
+        if ($initProfileLive) {
+            fwrite(STDOUT, "  [✅] phpc init --profile throwsweb (#2092)\n");
+        } elseif ($initTemplate) {
+            fwrite(STDOUT, "  [📋] phpc init --profile throwsweb — template ready; CLI profile pending #2092\n");
+        } else {
+            fwrite(STDOUT, "  [📋] phpc init --profile throwsweb — #2092\n");
+        }
+        fwrite(STDOUT, "  Docs: examples/007-ThrowsWeb/README.md · docs/local-ci-matrix.md (#2102)\n");
     }
 
     /**

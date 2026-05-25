@@ -167,6 +167,16 @@ final class PhpcDoctorTest extends TestCase
         $this->assertStringContainsString('FileUploadWebAotExecuteTest', $result['stdout']);
         $this->assertStringContainsString('#2004', $result['stdout']);
         $this->assertStringContainsString('#2010', $result['stdout']);
+        $this->assertStringContainsString('007-ThrowsWeb CI gates', $result['stdout']);
+        $this->assertStringContainsString('007-ThrowsWeb', $result['stdout']);
+        $this->assertStringContainsString('THROWS_WEB_SMOKE_GATE', $result['stdout']);
+        $this->assertStringContainsString('THROWSWEB_AOT_LINK_GATE', $result['stdout']);
+        $this->assertStringContainsString('THROWSWEB_AOT_SMOKE_GATE', $result['stdout']);
+        $this->assertStringContainsString('--throws-only', $result['stdout']);
+        $this->assertStringContainsString('#2102', $result['stdout']);
+        $this->assertStringContainsString('#2093', $result['stdout']);
+        $this->assertStringContainsString('#2101', $result['stdout']);
+        $this->assertStringContainsString('examples/007-ThrowsWeb/README.md', $result['stdout']);
     }
 
     /**

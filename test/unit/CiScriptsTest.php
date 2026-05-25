@@ -1202,6 +1202,23 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('#1969', $doc);
     }
 
+    public function testLocalCiMatrixDocumentsThrowsWebGates(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('## 007-ThrowsWeb gates', $doc);
+        $this->assertStringContainsString('THROWS_WEB_SMOKE_GATE', $doc);
+        $this->assertStringContainsString('THROWSWEB_AOT_LINK_GATE', $doc);
+        $this->assertStringContainsString('THROWSWEB_AOT_SMOKE_GATE', $doc);
+        $this->assertStringContainsString('#2102', $doc);
+    }
+
+    public function testCiDefaultsEnvDefinesThrowsWebAotGatesOff(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString('THROWSWEB_AOT_LINK_GATE="${THROWSWEB_AOT_LINK_GATE:-0}"', $defaults);
+        $this->assertStringContainsString('THROWSWEB_AOT_SMOKE_GATE="${THROWSWEB_AOT_SMOKE_GATE:-0}"', $defaults);
+    }
+
     public function testCiFastRunsMiniWebAppVmCliGateByDefault(): void
     {
         $fast = dirname(__DIR__, 2).'/script/ci-fast.sh';
