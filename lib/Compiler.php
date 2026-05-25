@@ -1567,12 +1567,14 @@ class Compiler {
         $rightBlock->inheritUndefinedLocals = true;
         $rightBlock->inheritScopeFrom($block);
         $rightSlot = $this->compileOperand($expr->right, $rightBlock, true);
-        if (
-            null !== $dimFetch
-            && null !== $resultOverride
-            && $this->operandsChainEqual($resultOverride, $dimFetch->result)
-        ) {
-            $this->compileArrayDimFetchWrite($dimFetch, $rightBlock);
+        if (null !== $dimFetch) {
+            $assignTarget = $resultOverride ?? $resultOperand;
+            // ??= stores through the dim-fetch result (stmt tail or echo/expr assign-op form, #1235, #1960).
+            $coalesceAssignForm = $this->operandsChainEqual($resultOperand, $expr->left)
+                || $this->operandsChainEqual($assignTarget, $dimFetch->result);
+            if ($coalesceAssignForm) {
+                $this->compileArrayDimFetchWrite($dimFetch, $rightBlock);
+            }
         }
         $rightBlock->addOpCode(new OpCode(
             OpCode::TYPE_ASSIGN,

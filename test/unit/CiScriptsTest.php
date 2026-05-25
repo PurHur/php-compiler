@@ -885,6 +885,38 @@ final class CiScriptsTest extends TestCase
         $this->assertMatchesRegularExpression('/\| `REHASH_COMPLIANCE_GATE` \| `1` \|/', $doc);
     }
 
+    public function testCiDefaultsEnvDefinesCoalesceComplianceGateOptIn(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString(
+            'COALESCE_COMPLIANCE_GATE="${COALESCE_COMPLIANCE_GATE:-0}"',
+            $defaults
+        );
+        $this->assertStringContainsString('#1960', $defaults);
+    }
+
+    public function testCiFastRunsCoalesceComplianceGateWhenOptIn(): void
+    {
+        $fast = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-fast.sh');
+        $this->assertStringContainsString('COALESCE_COMPLIANCE_GATE', $fast);
+        $this->assertStringContainsString('COALESCE_COMPLIANCE_GATE:-0', $fast);
+        $this->assertStringContainsString('--filter Coalesce', $fast);
+    }
+
+    public function testLocalCiMatrixDocumentsCoalesceComplianceGate(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('COALESCE_COMPLIANCE_GATE', $doc);
+        $this->assertStringContainsString('Coalesce*', $doc);
+        $this->assertMatchesRegularExpression('/\| `COALESCE_COMPLIANCE_GATE` \| `0` \|/', $doc);
+    }
+
+    public function testCiDockerRunPassesCoalesceComplianceGateEnv(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');
+        $this->assertStringContainsString('COALESCE_COMPLIANCE_GATE', $body);
+    }
+
     public function testCiDockerRunPassesRehashComplianceGateEnv(): void
     {
         $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');
