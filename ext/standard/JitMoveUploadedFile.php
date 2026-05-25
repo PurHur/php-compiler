@@ -8,10 +8,10 @@ use PHPCompiler\JIT\Context;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for move_uploaded_file() via __compiler_move_uploaded_file. */
+/** LLVM lowering for move_uploaded_file() via __compiler_move_uploaded_file (issue #2005). */
 final class JitMoveUploadedFile
 {
-    /** @return Value */
+    /** @return Value true when __compiler_move_uploaded_file returns 1 */
     public static function invoke(Context $context, Value $fromStr, Value $toStr): Value
     {
         $i32 = $context->getTypeFromString('int32');

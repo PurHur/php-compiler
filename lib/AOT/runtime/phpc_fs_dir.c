@@ -107,96 +107,6 @@ static int phpc_mkdir_recursive(const char *path, mode_t mode)
     return phpc_mkdir_one(buf, mode);
 }
 
-static int phpc_is_uploaded_temp_path(const char *path)
-{
-    char resolved[PATH_MAX];
-    char tmpdir[PATH_MAX];
-    const char *td;
-    const char *base;
-    size_t tlen;
-    size_t plen;
-
-    if (NULL == path || '\0' == *path) {
-        return 0;
-    }
-    if (realpath(path, resolved) == NULL) {
-        return 0;
-    }
-    td = getenv("TMPDIR");
-    if (NULL == td || '\0' == *td) {
-        td = "/tmp";
-    }
-    if (realpath(td, tmpdir) == NULL) {
-        if (strlen(td) >= sizeof(tmpdir)) {
-            return 0;
-        }
-        strncpy(tmpdir, td, sizeof(tmpdir) - 1);
-        tmpdir[sizeof(tmpdir) - 1] = '\0';
-    }
-    tlen = strlen(tmpdir);
-    plen = strlen(resolved);
-    if (plen < tlen) {
-        return 0;
-    }
-    if (0 != strcmp(resolved, tmpdir)) {
-        if (tlen > 0 && '/' != tmpdir[tlen - 1]) {
-            if (plen <= tlen || '/' != resolved[tlen]) {
-                return 0;
-            }
-        } else if (0 != strncmp(resolved, tmpdir, tlen)) {
-            return 0;
-        }
-    }
-    base = strrchr(resolved, '/');
-    base = (NULL == base) ? resolved : base + 1;
-    if (0 != strncmp(base, "phpc_upload_", 12)) {
-        return 0;
-    }
-    {
-        struct stat st;
-        if (stat(resolved, &st) != 0 || !S_ISREG(st.st_mode)) {
-            return 0;
-        }
-    }
-
-    return 1;
-}
-
-static int phpc_safe_destination_path(const char *path)
-{
-    const char *p;
-
-    if (NULL == path || '\0' == *path) {
-        return 0;
-    }
-    for (p = path; '\0' != *p; p++) {
-        if ('.' == *p && '.' == p[1]
-            && ('\0' == p[2] || '/' == p[2] || '\\' == p[2])) {
-            return 0;
-        }
-    }
-
-    return 1;
-}
-
-/** move_uploaded_file() runtime (issue #2005): returns 1 on success, 0 on failure. */
-int __compiler_move_uploaded_file(__string__ *from, __string__ *to)
-{
-    const char *src;
-    const char *dst;
-
-    if (NULL == from || NULL == to) {
-        return 0;
-    }
-    src = phpc_strdata(from);
-    dst = phpc_strdata(to);
-    if (!phpc_is_uploaded_temp_path(src) || !phpc_safe_destination_path(dst)) {
-        return 0;
-    }
-
-    return rename(src, dst) == 0 ? 1 : 0;
-}
-
 /** copy() runtime: returns 1 on success, 0 on failure. */
 int __compiler_copy(__string__ *from, __string__ *to)
 {
@@ -479,20 +389,130 @@ __string__ *__compiler_sys_get_temp_dir(void)
     return cstr_to_string(dir);
 }
 
-/** tempnam() — unique temp path in directory with prefix (issue #1201). */
+#define PHPC_UPLOAD_TEMP_PREFIX "phpc_upload_"
+
+static int phpc_path_has_parent_traversal(const char *path)
+{
+    const char *p;
+    const char *start;
+
+    if (NULL == path) {
+        return 1;
+    }
+    start = path;
+    for (p = path; ; p++) {
+        if ('\0' == *p || '/' == *p) {
+            size_t len = (size_t) (p - start);
+            if (2 == len && 0 == strncmp(start, "..", 2)) {
+                return 1;
+            }
+            if ('\0' == *p) {
+                break;
+            }
+            start = p + 1;
+        }
+    }
+
+    return 0;
+}
+
+static int phpc_is_valid_upload_temp(const char *path)
+{
+    char resolved[PATH_MAX];
+    char tmpdir[PATH_MAX];
+    const char *base;
+    const char *dir;
+    char *real_from;
+    char *real_tmp;
+    size_t tmp_len;
+
+    if (NULL == path || '\0' == path[0] || phpc_path_has_parent_traversal(path)) {
+        return 0;
+    }
+    base = strrchr(path, '/');
+    base = (NULL != base) ? base + 1 : path;
+    if (0 != strncmp(base, PHPC_UPLOAD_TEMP_PREFIX, strlen(PHPC_UPLOAD_TEMP_PREFIX))) {
+        return 0;
+    }
+    real_from = realpath(path, resolved);
+    if (NULL == real_from) {
+        return 0;
+    }
+    dir = getenv("TMPDIR");
+    if (NULL == dir || '\0' == *dir) {
+        dir = getenv("TEMP");
+    }
+    if (NULL == dir || '\0' == *dir) {
+        dir = getenv("TMP");
+    }
+    if (NULL == dir || '\0' == *dir) {
+        dir = "/tmp";
+    }
+    real_tmp = realpath(dir, tmpdir);
+    if (NULL == real_tmp) {
+        return 0;
+    }
+    tmp_len = strlen(real_tmp);
+    if (tmp_len + 1 >= sizeof(tmpdir)) {
+        return 0;
+    }
+    if ('/' != real_tmp[tmp_len - 1]) {
+        real_tmp[tmp_len] = '/';
+        real_tmp[tmp_len + 1] = '\0';
+        tmp_len++;
+    }
+    if (0 != strncmp(real_from, real_tmp, tmp_len)) {
+        return 0;
+    }
+
+    return 1;
+}
+
+/** move_uploaded_file() — rename upload temp only under system temp (issue #2005). */
+int __compiler_move_uploaded_file(__string__ *from, __string__ *to)
+{
+    const char *src;
+    const char *dst;
+
+    if (NULL == from || NULL == to) {
+        return 0;
+    }
+    src = phpc_strdata(from);
+    dst = phpc_strdata(to);
+    if (!phpc_is_valid_upload_temp(src) || phpc_path_has_parent_traversal(dst) || '\0' == dst[0]) {
+        return 0;
+    }
+    if (0 != rename(src, dst)) {
+        return 0;
+    }
+
+    return 1;
+}
+
+/** tempnam() — unique temp path in directory with prefix (issue #1201, #2005). */
 __string__ *__compiler_tempnam(__string__ *directory, __string__ *prefix)
 {
-    char *path;
+    const char *dir;
+    const char *pfx;
+    char template[PATH_MAX];
+    int fd;
 
     if (NULL == directory || NULL == prefix) {
         return NULL;
     }
-    path = tempnam(phpc_strdata(directory), phpc_strdata(prefix));
-    if (NULL == path) {
+    dir = phpc_strdata(directory);
+    pfx = phpc_strdata(prefix);
+    if ('\0' == dir[0] || '\0' == pfx[0]) {
         return NULL;
     }
-    __string__ *result = cstr_to_string(path);
-    free(path);
+    if (snprintf(template, sizeof(template), "%s/%sXXXXXX", dir, pfx) >= (int) sizeof(template)) {
+        return NULL;
+    }
+    fd = mkstemp(template);
+    if (fd < 0) {
+        return NULL;
+    }
+    close(fd);
 
-    return result;
+    return cstr_to_string(template);
 }

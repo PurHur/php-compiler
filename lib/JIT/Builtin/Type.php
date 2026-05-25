@@ -114,6 +114,7 @@ class Type extends Builtin {
         SessionName::implement($this->context);
         ObOutput::registerExternals($this->context);
         ErrorHandlerOutput::registerExternals($this->context);
+        SplAutoloadOutput::registerExternals($this->context);
         CallArgv::implement($this->context);
         $i8p = $this->context->getTypeFromString('int8*');
         $i32 = $this->context->getTypeFromString('int32');
@@ -246,6 +247,17 @@ class Type extends Builtin {
         );
         $fnCopy = $this->context->module->addFunction('__compiler_copy', $fntypeCopy);
         $this->context->registerFunction('__compiler_copy', $fnCopy);
+        $fntypeMoveUploaded = $this->context->context->functionType(
+            $i32,
+            false,
+            $this->context->getTypeFromString('__string__*'),
+            $this->context->getTypeFromString('__string__*')
+        );
+        $fnMoveUploaded = $this->context->module->addFunction(
+            '__compiler_move_uploaded_file',
+            $fntypeMoveUploaded
+        );
+        $this->context->registerFunction('__compiler_move_uploaded_file', $fnMoveUploaded);
         $fntypeTouch = $this->context->context->functionType(
             $i32,
             false,
@@ -254,14 +266,6 @@ class Type extends Builtin {
         );
         $fnTouch = $this->context->module->addFunction('__compiler_touch', $fntypeTouch);
         $this->context->registerFunction('__compiler_touch', $fnTouch);
-        $fntypeMoveUploaded = $this->context->context->functionType(
-            $i32,
-            false,
-            $this->context->getTypeFromString('__string__*'),
-            $this->context->getTypeFromString('__string__*')
-        );
-        $fnMoveUploaded = $this->context->module->addFunction('__compiler_move_uploaded_file', $fntypeMoveUploaded);
-        $this->context->registerFunction('__compiler_move_uploaded_file', $fnMoveUploaded);
         $void = $this->context->getTypeFromString('void');
         $fntypeRandomBytes = $this->context->context->functionType(
             $this->context->getTypeFromString('__string__*'),

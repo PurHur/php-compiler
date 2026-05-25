@@ -52,7 +52,6 @@ $spineNativeLinkDeferred = [
 
 /** Inventory paths not yet in spine (regenerated inventory ahead of bundle — #1922). */
 $spineInventoryAheadDeferred = [
-    'ext/standard/ini_get_.php',
     'lib/JIT/Builtin/IniGet.php',
 ];
 

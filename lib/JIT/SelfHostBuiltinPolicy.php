@@ -43,7 +43,6 @@ final class SelfHostBuiltinPolicy
 
     /** @var array<string, string> */
     private const VM_ONLY_DEFERRED = [
-        'spl_autoload_register' => 'spl',
         'password_hash' => 'password', 'password_verify' => 'password',
     ];
 

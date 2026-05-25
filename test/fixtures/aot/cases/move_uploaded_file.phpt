@@ -1,22 +1,22 @@
 --TEST--
-AOT: move_uploaded_file() persists multipart temp (issue #2005)
+AOT: move_uploaded_file() via __compiler_move_uploaded_file (issue #2005)
 --FILE--
 <?php
-$tmp = tempnam(sys_get_temp_dir(), 'phpc_upload_');
-file_put_contents($tmp, 'aot-payload');
-$dest = tempnam(sys_get_temp_dir(), 'phpc_saved_');
+$tmpdir = sys_get_temp_dir();
+$from = tempnam($tmpdir, 'phpc_upload_');
+$dest = tempnam($tmpdir, 'phpc_aot_move_');
 @unlink($dest);
-if (move_uploaded_file($tmp, $dest)) {
-    echo "ok\n";
+if (move_uploaded_file($from, $dest)) {
+    echo 'ok', "\n";
 } else {
-    echo "fail\n";
+    echo 'fail', "\n";
 }
-if (is_file($tmp)) {
-    echo "src\n";
+if (is_file($dest)) {
+    echo 'moved', "\n";
 } else {
-    echo "gone\n";
+    echo 'nomoved', "\n";
 }
 @unlink($dest);
 --EXPECT--
 ok
-gone
+moved

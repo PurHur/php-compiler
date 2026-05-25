@@ -150,7 +150,7 @@ make bootstrap-selfhost-link</code></pre>
             <strong>Compiler fully compiles itself:</strong> native binary from <code>lib/</code> (no <code>vendor/</code>),
             compiles PHP, then rebuilds the next compiler revision without Zend.
           </p>
-          <p><strong>Status:</strong> M0 ✅ · M1 ✅ · M2 ✅ link (594/605) · M3 HelloWorld strict ✅ · compile-smoke 🚧 · M5 ⬜.</p>
+          <p><strong>Status:</strong> M0 ✅ · M1 ✅ · M2 ✅ link (594/606) · M3 HelloWorld strict ✅ · compile-smoke 🚧 · M5 ⬜.</p>
           <p><a href="/php-compiler/development-status.html#north-star-2-self-host">Full north-star doc →</a> · <a href="https://github.com/PurHur/php-compiler/blob/master/docs/self-host-target.md">Target doc</a> · <a href="https://github.com/PurHur/php-compiler/issues/1492">#1492</a></p>
         </article>
       </div>
@@ -195,7 +195,7 @@ make bootstrap-selfhost-link</code></pre>
         </div>
         <p class="overall-progress__note">
           Strong on VM and AOT linking; wave-3 language 10/13 and stdlib 12/13 on master; local/Docker CI while remote GHA/Circle are disabled.
-          North Star 1 achieved (#1044 closed); presenter check <code>make north-star1-verify</code>. <strong>005-SessionsWeb</strong> AOT execute + deploy smoke opt-in (#1891, #1893). North Star 2 M0–M1 done, M2 spine link (594/605, #1960), M3 HelloWorld strict (#1493); M5 full self-compile remains the stretch goal.
+          North Star 1 achieved (#1044 closed); presenter check <code>make north-star1-verify</code>. <strong>005-SessionsWeb</strong> AOT execute + deploy smoke opt-in (#1891, #1893). North Star 2 M0–M1 done, M2 spine link (594/606, #1960), M3 HelloWorld strict (#1493); M5 full self-compile remains the stretch goal.
         </p>
       </div>
     </section>
@@ -240,7 +240,7 @@ make bootstrap-selfhost-link</code></pre>
         <article class="card">
           <span class="phase-num">Self-host</span>
           <h3><span class="status-dot status-dot--wip"></span> Compile-itself</h3>
-          <p>M0–M1 ✅; M2 spine 594/605 link ✅; M3 HelloWorld strict ✅; compile-smoke 🚧; M5 = full self-host.</p>
+          <p>M0–M1 ✅; M2 spine 594/606 link ✅; M3 HelloWorld strict ✅; compile-smoke 🚧; M5 = full self-host.</p>
           <div class="mini-progress"><div class="progress-track"><div class="progress-fill" data-width="54"></div></div></div>
         </article>
       </div>
@@ -250,7 +250,7 @@ make bootstrap-selfhost-link</code></pre>
       <h2>Self-host bootstrap</h2>
       <p class="section-intro">
         Stretch goal: the compiler <strong>fully compiles itself</strong> (M5). Zend still runs
-        <code>bin/compile.php</code> today; native output is a growing <code>lib/</code> bundle (~109 minimal → <strong>594</strong> spine units toward <strong>605</strong> vm.php-path files).
+        <code>bin/compile.php</code> today; native output is a growing <code>lib/</code> bundle (~109 minimal → <strong>594</strong> spine units toward <strong>606</strong> vm.php-path files).
         Full ladder: <a href="/php-compiler/development-status.html#north-star-2-self-host">development-status.md</a>
         · <a href="https://github.com/PurHur/php-compiler/blob/master/docs/self-host-target.md">self-host-target.md</a>
         · tracker <a href="https://github.com/PurHur/php-compiler/issues/1492">#1492</a>.
@@ -269,7 +269,7 @@ make bootstrap-selfhost-link</code></pre>
         <li class="is-done">
           <span class="ladder__marker" aria-hidden="true">✓</span>
           <h4>M2 — Full top-level <code>lib/</code></h4>
-          <p>14/14 lint ✅; <strong>594/605</strong> spine units native link ✅ ([#1960](https://github.com/PurHur/php-compiler/issues/1960), [#1419](https://github.com/PurHur/php-compiler/issues/1419)).</p>
+          <p>14/14 lint ✅; <strong>594/606</strong> spine units native link ✅ ([#1960](https://github.com/PurHur/php-compiler/issues/1960), [#1419](https://github.com/PurHur/php-compiler/issues/1419)).</p>
         </li>
         <li class="is-wip">
           <span class="ladder__marker" aria-hidden="true">3</span>

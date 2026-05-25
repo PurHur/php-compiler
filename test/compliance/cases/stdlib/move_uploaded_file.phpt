@@ -1,49 +1,54 @@
 --TEST--
-stdlib move_uploaded_file()
+stdlib move_uploaded_file() (issue #2005)
 --FILE--
 <?php
-$tmp = tempnam(sys_get_temp_dir(), 'phpc_upload_');
-file_put_contents($tmp, 'payload');
-$dest = tempnam(sys_get_temp_dir(), 'phpc_saved_');
+declare(strict_types=1);
+$base = 'test/compliance/cases/stdlib/move_uploaded_file_fixture';
+$dest = $base . '/saved.txt';
 @unlink($dest);
+
+$tmp = tempnam(sys_get_temp_dir(), 'phpc_upload_');
+if (false === $tmp) {
+    echo "notmp\n";
+    exit(1);
+}
+$n = file_put_contents($tmp, 'upload-bytes');
+if (false === $n) {
+    echo "nowrite\n";
+    exit(1);
+}
+
 if (move_uploaded_file($tmp, $dest)) {
     echo "ok\n";
 } else {
     echo "fail\n";
 }
 if (is_file($tmp)) {
-    echo "src\n";
+    echo "left\n";
 } else {
     echo "gone\n";
 }
-if (is_file($dest)) {
-    echo "dest\n";
+$size = filesize($dest);
+echo 'size:', false === $size ? 'fail' : (string) $size, "\n";
+
+$bogus = $base . '/from.txt';
+$n = file_put_contents($bogus, 'x');
+if (move_uploaded_file($bogus, $dest . '.2')) {
+    echo "bad\n";
 } else {
-    echo "nodest\n";
+    echo "reject\n";
 }
-$other = tempnam(sys_get_temp_dir(), 'other_');
-file_put_contents($other, 'x');
-if (move_uploaded_file($other, $dest)) {
-    echo "bad_ok\n";
+@unlink($bogus);
+$evil = sys_get_temp_dir() . '/../evil.txt';
+if (move_uploaded_file(tempnam(sys_get_temp_dir(), 'phpc_upload_'), $evil)) {
+    echo "traversal\n";
 } else {
-    echo "rej\n";
-}
-@unlink($other);
-if (move_uploaded_file($dest, tempnam(sys_get_temp_dir(), 'phpc_nope_'))) {
-    echo "bad_src\n";
-} else {
-    echo "rej_src\n";
+    echo "noevil\n";
 }
 @unlink($dest);
-if (move_uploaded_file('phpc_upload_fake', sys_get_temp_dir() . '/../outside.txt')) {
-    echo "traversal_ok\n";
-} else {
-    echo "rej_dot\n";
-}
 --EXPECT--
 ok
 gone
-dest
-rej
-rej_src
-rej_dot
+size:12
+reject
+noevil

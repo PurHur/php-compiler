@@ -11,11 +11,8 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/**
- * move_uploaded_file() — VM via VmUpload; AOT via __compiler_move_uploaded_file (#2005).
- * JIT lowering deferred (VM compliance + AOT fixture first).
- */
-final class move_uploaded_file_ extends Internal
+/** move_uploaded_file() — VM via VmFs; JIT/AOT via __compiler_move_uploaded_file (issue #2005). */
+final class move_uploaded_file extends Internal
 {
     public function __construct()
     {
@@ -35,9 +32,7 @@ final class move_uploaded_file_ extends Internal
         if (Variable::TYPE_STRING !== $fromVar->type || Variable::TYPE_STRING !== $toVar->type) {
             throw new \LogicException('move_uploaded_file() requires string paths in this compiler build');
         }
-        $from = $fromVar->toString();
-        $to = $toVar->toString();
-        $frame->returnVar->bool(VmUpload::moveUploadedFile($from, $to));
+        $frame->returnVar->bool(VmFs::moveUploadedFile($fromVar->toString(), $toVar->toString()));
     }
 
     public function call(Context $context, JITVariable ...$args): Value

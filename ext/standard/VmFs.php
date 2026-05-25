@@ -134,6 +134,57 @@ final class VmFs
         return @rename($from, $to);
     }
 
+    /** Prefix for multipart upload temps (lib/Web/Superglobals.php, AOT sg_set_file_entry). */
+    public const UPLOAD_TEMP_PREFIX = 'phpc_upload_';
+
+    public static function pathHasParentTraversal(string $path): bool
+    {
+        if (str_contains($path, "\0")) {
+            return true;
+        }
+        foreach (explode('/', str_replace('\\', '/', $path)) as $part) {
+            if ('..' === $part) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static function isValidUploadTempPath(string $path): bool
+    {
+        if ('' === $path || self::pathHasParentTraversal($path)) {
+            return false;
+        }
+        $base = basename($path);
+        if (!str_starts_with($base, self::UPLOAD_TEMP_PREFIX)) {
+            return false;
+        }
+        if (!is_file($path)) {
+            return false;
+        }
+        $real = realpath($path);
+        if (false === $real) {
+            return false;
+        }
+        $tmpdir = realpath(self::tempDir());
+        if (false === $tmpdir) {
+            return false;
+        }
+        $prefix = $tmpdir.\DIRECTORY_SEPARATOR;
+
+        return str_starts_with($real, $prefix);
+    }
+
+    public static function moveUploadedFile(string $from, string $to): bool
+    {
+        if (!self::isValidUploadTempPath($from) || self::pathHasParentTraversal($to) || '' === $to) {
+            return false;
+        }
+
+        return @rename($from, $to);
+    }
+
     public static function copy(string $from, string $to): bool
     {
         return @copy($from, $to);

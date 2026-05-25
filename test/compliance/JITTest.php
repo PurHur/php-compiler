@@ -26,10 +26,6 @@ class JITTest extends BaseTest {
             if (str_contains(strtolower($case[0]), 'password')) {
                 continue;
             }
-            // move_uploaded_file() JIT deferred (#2005); VM + AOT cover it.
-            if (str_contains(strtolower($case[0]), 'move_uploaded_file')) {
-                continue;
-            }
             // SplObjectStorage JIT-only (#1998); see SplObjectStorageJITTest.
             if (str_contains(strtolower($case[0]), 'splobjectstorage')) {
                 continue;

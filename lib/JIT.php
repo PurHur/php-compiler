@@ -2364,6 +2364,14 @@ class JIT {
                     break;
                 case OpCode::TYPE_NEW:
                     $classOp = $block->getOperand($op->arg2);
+                    if ($classOp instanceof Operand\Literal
+                        && !$this->context->type->object->hasUserDeclaredClass($classOp->value)
+                    ) {
+                        \PHPCompiler\ext\standard\JitSplAutoload::dispatchLiteral(
+                            $this->context,
+                            $classOp->value
+                        );
+                    }
                     if ($classOp instanceof Operand\Literal && 0 === strcasecmp($classOp->value, 'SplObjectStorage')) {
                         $classId = $this->context->type->object->lookup('SplObjectStorage');
                         $obj = new Variable(
