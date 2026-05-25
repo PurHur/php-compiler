@@ -9,21 +9,21 @@ Regenerate capability truth: `php script/capability-matrix.php`, `php script/cap
 | Track | Done | Open |
 |-------|-----:|-----:|
 | Stdlib (#1367–#1379) | 13 | 0 |
-| Language (#1354–#1366) | 11 | 1 ([#1354](https://github.com/PurHur/php-compiler/issues/1354)) |
+| Language (#1354–#1366) | 12 | 0 |
 
 **Language landed (master):** `never` ([#1358](https://github.com/PurHur/php-compiler/issues/1358) / [#1466](https://github.com/PurHur/php-compiler/pull/1466)), enums ([#1356](https://github.com/PurHur/php-compiler/issues/1356) / [#1463](https://github.com/PurHur/php-compiler/pull/1463)), ctor promotion ([#1359](https://github.com/PurHur/php-compiler/issues/1359) / [#1464](https://github.com/PurHur/php-compiler/pull/1464)), multi-catch ([#1362](https://github.com/PurHur/php-compiler/issues/1362) / [#1468](https://github.com/PurHur/php-compiler/pull/1468)), intersection types ([#1357](https://github.com/PurHur/php-compiler/issues/1357) / [#1474](https://github.com/PurHur/php-compiler/pull/1474)), unpack ([#1361](https://github.com/PurHur/php-compiler/issues/1361) / [#1476](https://github.com/PurHur/php-compiler/pull/1476)), `__serialize` ([#1365](https://github.com/PurHur/php-compiler/issues/1365) / [#1477](https://github.com/PurHur/php-compiler/pull/1477)), first-class callable JIT ([#1363](https://github.com/PurHur/php-compiler/issues/1363) / [#1472](https://github.com/PurHur/php-compiler/pull/1472)), variable-variables JIT ([#1364](https://github.com/PurHur/php-compiler/issues/1364) / [#1381](https://github.com/PurHur/php-compiler/pull/1381)), readonly classes ([#1360](https://github.com/PurHur/php-compiler/issues/1360) / [#1473](https://github.com/PurHur/php-compiler/pull/1473)), WeakReference/WeakMap ([#1366](https://github.com/PurHur/php-compiler/issues/1366) / [#1478](https://github.com/PurHur/php-compiler/pull/1478)).
 
-**Language open (1):** attributes ([#1354](https://github.com/PurHur/php-compiler/issues/1354) — no PR yet).
+**Language:** wave 3 language track complete on master (attributes [#1354](https://github.com/PurHur/php-compiler/issues/1354) — VM v1 ignores at runtime; JIT/AOT reflection deferred).
 
 Related merges outside this wave: `goto` ([#1228](https://github.com/PurHur/php-compiler/issues/1228) / [#1333](https://github.com/PurHur/php-compiler/pull/1333)), anonymous classes ([#1233](https://github.com/PurHur/php-compiler/issues/1233) / [#1386](https://github.com/PurHur/php-compiler/pull/1386)).
 
-**M2 spine:** **589** / **593** inventory (`compiler_lib_spine_smoke` native link ✅; [#1492](https://github.com/PurHur/php-compiler/issues/1492), M2 batches [#1419](https://github.com/PurHur/php-compiler/issues/1419), [#1497](https://github.com/PurHur/php-compiler/issues/1497)). Target doc: [self-host-target.md](self-host-target.m
+**M2 spine:** **589** / **601** inventory (`compiler_lib_spine_smoke` native link ✅; [#1492](https://github.com/PurHur/php-compiler/issues/1492), M2 batches [#1419](https://github.com/PurHur/php-compiler/issues/1419), [#1497](https://github.com/PurHur/php-compiler/issues/1497)). Target doc: [self-host-target.md](self-host-target.m
 
 ## Language (#1354–#1366)
 
 | Issue | Topic | Status | PR / notes |
 |-------|--------|--------|------------|
-| [#1354](https://github.com/PurHur/php-compiler/issues/1354) | PHP 8 attributes | Open | No open PR; parser/VM work not on master |
+| [#1354](https://github.com/PurHur/php-compiler/issues/1354) | PHP 8 attributes | Closed (VM v1) | Compliance PHPTs `attribute_*.phpt`; ignored at runtime; JIT/AOT reflection deferred |
 | [#1356](https://github.com/PurHur/php-compiler/issues/1356) | Enum declarations | Closed | [#1463](https://github.com/PurHur/php-compiler/pull/1463) |
 | [#1357](https://github.com/PurHur/php-compiler/issues/1357) | Intersection types | Closed (master) | [#1474](https://github.com/PurHur/php-compiler/pull/1474); JIT deferred — `capabilities-syntax.md` |
 | [#1358](https://github.com/PurHur/php-compiler/issues/1358) | `never` return type | Closed | [#1466](https://github.com/PurHur/php-compiler/pull/1466) |
