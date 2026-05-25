@@ -6,7 +6,6 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
-use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -23,15 +22,15 @@ final class JitStreamContextCreate
             );
         }
 
-        $packed = HashTableHelper::emptyVariable($context);
-        $slot = JitValueBox::alloc($context);
-        $ptr = JitValueBox::pointer($context, $slot);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeHashtable'),
-            $ptr,
-            $context->helper->loadValue($packed)
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $placeholder = new JITVariable(
+            $context,
+            JITVariable::TYPE_NATIVE_LONG,
+            JITVariable::KIND_VALUE,
+            $context->getTypeFromString('int64')->constInt(0, false)
         );
 
-        return $ptr;
+        return HashTableHelper::buildArrayFill($context, $zero, $zero, $placeholder);
     }
 }
