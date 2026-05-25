@@ -194,6 +194,20 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('006-FileUploadWeb', $smoke);
     }
 
+    public function testCiDefaultsEnvDefinesThrowsWebSmokeGateOff(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString('THROWS_WEB_SMOKE_GATE="${THROWS_WEB_SMOKE_GATE:-0}"', $defaults);
+    }
+
+    public function testExamplesWebSmokeDefinesThrowsOnlyFlag(): void
+    {
+        $smoke = (string) file_get_contents(dirname(__DIR__, 2).'/script/examples-web-smoke.sh');
+        $this->assertStringContainsString('--throws-only', $smoke);
+        $this->assertStringContainsString('THROWS_WEB_SMOKE_GATE', $smoke);
+        $this->assertStringContainsString('007-ThrowsWeb', $smoke);
+    }
+
     public function testExamplesCompileTestHonorsFileUploadWebAotLinkGate(): void
     {
         $source = (string) file_get_contents(dirname(__DIR__).'/unit/ExamplesCompileTest.php');

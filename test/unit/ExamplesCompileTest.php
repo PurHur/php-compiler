@@ -20,6 +20,7 @@ use PHPUnit\Framework\TestCase;
  * @see https://github.com/PurHur/php-compiler/issues/1887 (005-SessionsWeb serve + session cookie)
  * @see https://github.com/PurHur/php-compiler/issues/1946 (005-SessionsWeb AOT link gate)
  * @see https://github.com/PurHur/php-compiler/issues/1999 (006-FileUploadWeb multipart reference)
+ * @see https://github.com/PurHur/php-compiler/issues/2076 (007-ThrowsWeb throw/catch presenter)
  */
 final class ExamplesCompileTest extends TestCase
 {
@@ -191,6 +192,7 @@ final class ExamplesCompileTest extends TestCase
             '004-ApiJson' => [$root.'/004-ApiJson'],
             '005-SessionsWeb' => [$root.'/005-SessionsWeb'],
             '006-FileUploadWeb' => [$root.'/006-FileUploadWeb'],
+            '007-ThrowsWeb' => [$root.'/007-ThrowsWeb'],
         ];
     }
 
@@ -424,6 +426,66 @@ final class ExamplesCompileTest extends TestCase
         $project = $this->fileUploadWebProjectPath();
         $binary = $this->build006FileUploadWebProject($project);
         $this->assertFileExists($binary);
+    }
+
+    /**
+     * 007-ThrowsWeb: phpc serve + POST invalid email caught (issue #2076).
+     *
+     * @group serve
+     */
+    public function test007ThrowsWebServeCaughtInvalidPost(): void
+    {
+        if (false !== getenv('PHP_COMPILER_SKIP_SERVE_TESTS') && '' !== getenv('PHP_COMPILER_SKIP_SERVE_TESTS')) {
+            $this->markTestSkipped('PHP_COMPILER_SKIP_SERVE_TESTS is set');
+        }
+        if (!self::throwsWebSmokeGateEnabled()) {
+            $this->markTestSkipped('THROWS_WEB_SMOKE_GATE=0 — skip 007 serve throw/catch gate (#2076)');
+        }
+        if (!$this->canBindLoopback()) {
+            $this->markTestSkipped('Cannot bind loopback TCP');
+        }
+        if (!$this->commandExists('curl')) {
+            $this->markTestSkipped('curl not available');
+        }
+
+        $repoRoot = dirname(__DIR__, 2);
+        $docroot = $repoRoot.'/examples/007-ThrowsWeb';
+        $this->assertDirectoryExists($docroot);
+
+        $port = $this->findFreeTcpPort();
+        $addr = '127.0.0.1:'.$port;
+        $phpc = $repoRoot.'/phpc';
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open(
+            [$phpc, 'serve', $addr, $docroot],
+            $descriptorSpec,
+            $pipes,
+            $repoRoot,
+            null,
+            ['suppress_errors' => true]
+        );
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+
+        try {
+            $this->waitForTcpPort($port);
+            $url = 'http://127.0.0.1:'.$port.'/example.php';
+
+            $empty = $this->curlGet($url);
+            $this->assertStringContainsString('Submit an email', $empty);
+
+            $invalid = $this->curlPost($url, 'email=bad');
+            $this->assertMatchesRegularExpression('/invalid/i', $invalid);
+        } finally {
+            proc_terminate($proc);
+            proc_close($proc);
+        }
     }
 
     /**
@@ -978,6 +1040,13 @@ final class ExamplesCompileTest extends TestCase
         return false === $gate || '0' !== $gate;
     }
 
+    private static function throwsWebSmokeGateEnabled(): bool
+    {
+        $gate = getenv('THROWS_WEB_SMOKE_GATE');
+
+        return false !== $gate && '' !== $gate && '1' === $gate;
+    }
+
     private static function fileUploadWebAotLinkGateEnabled(): bool
     {
         $gate = getenv('FILE_UPLOAD_WEB_AOT_LINK_GATE');
@@ -988,6 +1057,30 @@ final class ExamplesCompileTest extends TestCase
     private function curlGet(string $url): string
     {
         $cmd = ['curl', '-sS', '--connect-timeout', '5', '--max-time', '15', $url];
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open($cmd, $descriptorSpec, $pipes);
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+        $this->assertSame(0, $exit, trim($stderr !== false ? $stderr : ''));
+
+        return $stdout !== false ? $stdout : '';
+    }
+
+    private function curlPost(string $url, string $postBody): string
+    {
+        $cmd = [
+            'curl', '-sS', '--connect-timeout', '5', '--max-time', '15',
+            '-X', 'POST', '-d', $postBody, $url,
+        ];
         $descriptorSpec = [
             0 => ['pipe', 'r'],
             1 => ['pipe', 'w'],
@@ -1190,6 +1283,7 @@ PHP];
             '004-ApiJson' => ['"ok":true', 'php-compiler'],
             '005-SessionsWeb' => ['SessionsWeb', 'No flash message yet'],
             '006-FileUploadWeb' => ['FileUploadWeb', 'No upload yet'],
+            '007-ThrowsWeb' => ['ThrowsWeb', 'Submit an email'],
             default => ['Hello'],
         };
     }
