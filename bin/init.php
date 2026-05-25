@@ -7,8 +7,8 @@ declare(strict_types=1);
  * Scaffold a minimal web project (phpc.json + public/index.php).
  *
  * Usage:
- *   bin/init.php [--profile default|miniwebapp|sessionsweb|apijson|fileupload] [--force] [target-dir]
- *   phpc init [--profile miniwebapp|sessionsweb|apijson|fileupload] [--force] [target-dir]
+ *   bin/init.php [--profile default|miniwebapp|sessionsweb|apijson|fileupload|throwsweb] [--force] [target-dir]
+ *   phpc init [--profile miniwebapp|sessionsweb|apijson|fileupload|throwsweb] [--force] [target-dir]
  */
 
 use PHPCompiler\Cli\PhpcInit;
@@ -39,7 +39,7 @@ while ([] !== $args) {
         fwrite(STDOUT, <<<'HELP'
 phpc init — scaffold a minimal web project
 
-  phpc init [--profile default|miniwebapp|sessionsweb|apijson|fileupload] [--force] [target-dir]
+  phpc init [--profile default|miniwebapp|sessionsweb|apijson|fileupload|throwsweb] [--force] [target-dir]
 
 Profiles:
   default     phpc.json + public/index.php hello page (issue #312)
@@ -47,6 +47,7 @@ Profiles:
   sessionsweb Flat example.php session flash (issue #1886; see examples/005-SessionsWeb)
   apijson     Flat example.php JSON API (issue #2000; see examples/004-ApiJson)
   fileupload  Flat example.php multipart upload (issue #2004; see examples/006-FileUploadWeb)
+  throwsweb   Flat example.php throw/catch validation (issue #2092; see examples/007-ThrowsWeb)
 
 HELP);
         exit(0);

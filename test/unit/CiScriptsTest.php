@@ -1670,6 +1670,37 @@ final class CiScriptsTest extends TestCase
         $this->assertMatchesRegularExpression('/\| `INIT_FILEUPLOAD_PARITY_GATE` \| `1` \|/', $doc);
     }
 
+    public function testCheckInitThrowswebParityScriptExists(): void
+    {
+        $check = dirname(__DIR__, 2).'/script/check-init-throwsweb-parity.sh';
+        $this->assertFileExists($check);
+        $this->assertTrue(is_executable($check));
+        $body = (string) file_get_contents($check);
+        $this->assertStringContainsString('examples/007-ThrowsWeb', $body);
+        $this->assertStringContainsString('templates/init-throwsweb', $body);
+    }
+
+    public function testCheckInitThrowswebParityPassesInRepo(): void
+    {
+        $check = dirname(__DIR__, 2).'/script/check-init-throwsweb-parity.sh';
+        exec('bash '.escapeshellarg($check).' 2>&1', $out, $code);
+        $this->assertSame(0, $code, implode("\n", $out));
+    }
+
+    public function testCiInventoryRunsInitThrowswebParityCheck(): void
+    {
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('ci_run_init_throwsweb_parity_check', $common);
+        $this->assertStringContainsString('check-init-throwsweb-parity.sh', $common);
+        $this->assertStringContainsString('INIT_THROWSWEB_PARITY_GATE:-0', $common);
+    }
+
+    public function testCiDefaultsEnvDefinesThrowswebInitParityGateOff(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString('INIT_THROWSWEB_PARITY_GATE="${INIT_THROWSWEB_PARITY_GATE:-0}"', $defaults);
+    }
+
     public function testCheckInitApiJsonParityScriptExists(): void
     {
         $check = dirname(__DIR__, 2).'/script/check-init-apijson-parity.sh';
