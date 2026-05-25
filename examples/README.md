@@ -17,6 +17,9 @@ Shipped demos live under `examples/00x-*/` with an `example.php` entry script. U
 
 ./phpc lint examples/004-ApiJson/example.php
 ./phpc run examples/004-ApiJson/example.php
+
+./phpc lint examples/005-SessionsWeb/example.php
+./phpc run examples/005-SessionsWeb/example.php
 ```
 
 AOT (needs LLVM 9 — see `script/install-llvm9.sh` or the `php-compiler:22.04-dev` Docker image):
@@ -38,6 +41,7 @@ Legacy entrypoints still work: `php bin/vm.php`, `php bin/jit.php`, `php bin/com
 | [001-SimpleWeb](001-SimpleWeb/) | ✅ `-q` / `-p` / env / `phpc serve` | ✅ `bin/jit.php` | ✅ `phpc build` | runtime `QUERY_STRING` / POST ([#201](https://github.com/PurHur/php-compiler/issues/201), [#257](https://github.com/PurHur/php-compiler/issues/257), [#259](https://github.com/PurHur/php-compiler/issues/259)) |
 | [002-StaticWeb](002-StaticWeb/) | ✅ `./phpc run` | ✅ `bin/jit.php` | ✅ recommended | no superglobals — [#247](https://github.com/PurHur/php-compiler/issues/247) execute smoke |
 | [004-ApiJson](004-ApiJson/) | ✅ `./phpc run` | ✅ `bin/jit.php` | ✅ `phpc build` | JSON + `http_response_code` — [#270](https://github.com/PurHur/php-compiler/issues/270), [#61](https://github.com/PurHur/php-compiler/issues/61) |
+| [005-SessionsWeb](005-SessionsWeb/) | ✅ `./phpc run` / `phpc serve` | ✅ `session_start` JIT ([#1882](https://github.com/PurHur/php-compiler/issues/1882)) | 📋 `phpc build` | `$_SESSION` flash across requests — [#1881](https://github.com/PurHur/php-compiler/issues/1881); AOT execute [#1891](https://github.com/PurHur/php-compiler/issues/1891) |
 | [003-MiniWebApp](003-MiniWebApp/) | ✅ `phpc serve` | partial | ✅ `phpc build --project` | PATH_INFO — [#489](https://github.com/PurHur/php-compiler/issues/489), runtime [#539](https://github.com/PurHur/php-compiler/issues/539); AOT link ✅ ([#752](https://github.com/PurHur/php-compiler/issues/752)); native execute ✅ ([#764](https://github.com/PurHur/php-compiler/issues/764) closed) |
 
 ### 000-HelloWorld
@@ -83,6 +87,22 @@ make web-smoke
 
 See [003-MiniWebApp/README.md](003-MiniWebApp/README.md) for routes and gate ladder (`make miniwebapp-gates`). AOT deploy quickstart: [docs/deploy-web-aot.md](../docs/deploy-web-aot.md).
 
+### 005-SessionsWeb
+
+`session_start()` plus a POST → redirect → GET flash message ([#1881](https://github.com/PurHur/php-compiler/issues/1881)). VM run shows the empty state; use `phpc serve` and a cookie jar for two-request persistence (see [005-SessionsWeb/README.md](005-SessionsWeb/README.md)).
+
+```console
+./phpc lint examples/005-SessionsWeb/example.php
+./phpc run examples/005-SessionsWeb/example.php
+./phpc serve 127.0.0.1:8080 examples/005-SessionsWeb
+jar=/tmp/phpc-sessionsweb.jar
+curl -s -c "$jar" 'http://127.0.0.1:8080/example.php'
+curl -s -b "$jar" -c "$jar" -X POST -d 'message=Saved' 'http://127.0.0.1:8080/example.php'
+curl -s -b "$jar" 'http://127.0.0.1:8080/example.php'
+```
+
+AOT link/execute: [#1891](https://github.com/PurHur/php-compiler/issues/1891). `examples-web-smoke` gate: [#1887](https://github.com/PurHur/php-compiler/issues/1887).
+
 ### 002-StaticWeb
 
 Static page (no superglobals); good default for first AOT compile.
@@ -100,7 +120,7 @@ cd examples/002-StaticWeb
 
 Full field reference: [docs/phpc-json.md](../docs/phpc-json.md) ([#727](https://github.com/PurHur/php-compiler/issues/727)).
 
-**001-SimpleWeb**, **002-StaticWeb**, and **004-ApiJson** ship a minimal manifest beside `example.php` ([#274](https://github.com/PurHur/php-compiler/issues/274)):
+**001-SimpleWeb**, **002-StaticWeb**, **004-ApiJson**, and **005-SessionsWeb** ship a minimal manifest beside `example.php` ([#274](https://github.com/PurHur/php-compiler/issues/274)):
 
 ```json
 {

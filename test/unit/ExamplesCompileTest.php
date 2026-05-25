@@ -186,6 +186,7 @@ final class ExamplesCompileTest extends TestCase
             '001-SimpleWeb' => [$root.'/001-SimpleWeb'],
             '002-StaticWeb' => [$root.'/002-StaticWeb'],
             '004-ApiJson' => [$root.'/004-ApiJson'],
+            '005-SessionsWeb' => [$root.'/005-SessionsWeb'],
         ];
     }
 
@@ -811,6 +812,7 @@ final class ExamplesCompileTest extends TestCase
             '001-SimpleWeb' => ['Hello Example'],
             '002-StaticWeb' => ['Hello World'],
             '004-ApiJson' => ['"ok":true', 'php-compiler'],
+            '005-SessionsWeb' => ['SessionsWeb', 'No flash message yet'],
             default => ['Hello'],
         };
     }
