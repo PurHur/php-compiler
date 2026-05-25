@@ -507,7 +507,7 @@ final class Doctor
             ? '#2028 ✅ · ci-local when gate=1 (#2042)'
             : 'opt-in default 0 — #2028 · #2038';
         fwrite(STDOUT, "  [{$deployStatus}] Stage 4 Deploy CGI — FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE default {$deployDefault} ({$deployNote})\n");
-        fwrite(STDOUT, "      Run:     FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE=1 make deploy-smoke\n");
+        fwrite(STDOUT, "      Run:     make examples-fileupload-deploy-smoke\n");
         fwrite(STDOUT, "      Or:      FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE=1 ./script/deploy-smoke.sh --example 006\n");
 
         $rebuild006Default = $defaults['REBUILD_EXAMPLES_006_SYNC_GATE'] ?? '1';

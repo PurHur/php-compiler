@@ -177,7 +177,7 @@ Progressive ladder (VM multipart → AOT link → AOT execute → deploy CGI). V
 | VM multipart | `FILE_UPLOAD_WEB_SMOKE_GATE` | `1` | `ci-fast` / `ci-local` / `examples-web-smoke.sh --fileupload-only` ([#2009](https://github.com/PurHur/php-compiler/issues/2009)) |
 | AOT link | `FILE_UPLOAD_WEB_AOT_LINK_GATE` | `1` | `./script/ci-local.sh --filter test006FileUploadWebAotLink` ([#2011](https://github.com/PurHur/php-compiler/issues/2011)); set `0` to skip during iteration |
 | AOT execute | `FILE_UPLOAD_WEB_AOT_SMOKE_GATE` | `1` | `FileUploadWebAotExecuteTest` or `EXAMPLES_AOT_SMOKE_ONLY=006 ./script/examples-aot-smoke.sh` ([#2012](https://github.com/PurHur/php-compiler/issues/2012)) |
-| Deploy CGI | `FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE` | `0` | `FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE=1 ./script/deploy-smoke.sh --example 006` ([#2028](https://github.com/PurHur/php-compiler/issues/2028), [#2042](https://github.com/PurHur/php-compiler/issues/2042)) |
+| Deploy CGI | `FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE` | `0` | `make examples-fileupload-deploy-smoke` ([#2044](https://github.com/PurHur/php-compiler/issues/2044)); `ci-local` opt-in ([#2038](https://github.com/PurHur/php-compiler/issues/2038), [#2042](https://github.com/PurHur/php-compiler/issues/2042)) |
 
 ```bash
 FILE_UPLOAD_WEB_SMOKE_GATE=0 ./script/ci-fast.sh   # skip 006 multipart curls
@@ -186,6 +186,7 @@ FILE_UPLOAD_WEB_AOT_LINK_GATE=0 ./script/ci-local.sh   # skip 006 AOT link (@gro
 ./script/ci-local.sh --filter FileUploadWebAotExecuteTest
 EXAMPLES_AOT_SMOKE_ONLY=006 ./script/examples-aot-smoke.sh
 FILE_UPLOAD_WEB_AOT_SMOKE_GATE=0 ./script/ci-local.sh   # skip 006 AOT execute during iteration
+make examples-fileupload-deploy-smoke
 FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE=1 ./script/deploy-smoke.sh --example 006
 ```
 
