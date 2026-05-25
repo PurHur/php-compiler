@@ -479,11 +479,22 @@ restart:
                         $frame->returnVar->copyFrom($returnValue);
                     }
                     $this->markObjectConstructedIfLeavingConstruct($frame);
+                    $caller = $this->context->pop();
+                    if (null !== $caller) {
+                        $frame = $caller;
+                        goto restart;
+                    }
+                    // Nested return <call>(): callee may finish with an empty run stack (#1885).
+                    if (null !== $frame->parent && null !== $frame->returnVar) {
+                        $frame = $frame->parent;
+                        goto restart;
+                    }
                     if ($frame->ephemeral && null !== $frame->parent) {
                         $frame = $frame->parent;
                         goto restart;
                     }
-                    goto nextframe;
+
+                    return self::SUCCESS;
                 case OpCode::TYPE_FUNCDEF:
                     $name = $frame->scope[$op->arg1]->toString();
                     $lcname = strtolower($name);
@@ -557,6 +568,7 @@ restart:
                     }
                     $new = $frame->call->getFrame($this->context, $frame);
                     $new->calledClass = $this->inferCalledClass($frame);
+                    $new->returnVar = null;
                     if ($op->type === OpCode::TYPE_FUNCCALL_EXEC_RETURN) {
                         $new->returnVar = $this->scopeSlot($frame, (int) $op->arg1);
                     }

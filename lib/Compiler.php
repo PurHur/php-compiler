@@ -2175,7 +2175,7 @@ class Compiler {
     /**
      * `return foo()` lowers call opcodes then return; reuse FUNCCALL_EXEC_RETURN slot (#1885).
      */
-    private function funcCallExecReturnSlotForReturn(Block $block): ?int
+    private function funcCallExecReturnSlotForReturn(Block $block, Operand $returnExpr): ?int
     {
         $n = $block->nOpCodes;
         if (0 === $n) {
@@ -2183,6 +2183,9 @@ class Compiler {
         }
         $last = $block->opCodes[$n - 1];
         if (OpCode::TYPE_FUNCCALL_EXEC_RETURN !== $last->type) {
+            return null;
+        }
+        if (!$block->callResultFeedsReturn($returnExpr)) {
             return null;
         }
 
@@ -2227,7 +2230,7 @@ class Compiler {
                     )];
                 }
 
-                $callResultSlot = $this->funcCallExecReturnSlotForReturn($block);
+                $callResultSlot = $this->funcCallExecReturnSlotForReturn($block, $terminal->expr);
                 if (null !== $callResultSlot) {
                     return [new OpCode(OpCode::TYPE_RETURN, $callResultSlot)];
                 }
