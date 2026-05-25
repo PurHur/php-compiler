@@ -53,6 +53,11 @@ foreach ($exampleDirs as $dir) {
     runProcess($jitArgv, $benchEnv, $repoRoot);
     file_put_contents($dir.'/example.output', '');
 
+    if ('005-SessionsWeb' === basename($dir) && !shouldBenchSessionsWeb($repoRoot)) {
+        echo " - Skipping 005-SessionsWeb benchmark row (lint gate; BENCH_SESSIONSWEB=1 to force)\n";
+        continue;
+    }
+
     $benchmarks .= "\n".benchmarkExample($example, $phpCmd, $benchEnv, $repoRoot, $llvmReady);
 }
 
@@ -90,6 +95,56 @@ function shouldBenchMiniWebApp(string $repoRoot): bool
     }
 
     return miniWebAppLintPasses($repoRoot);
+}
+
+/**
+ * Include 005-SessionsWeb when lint is green (issue #1889).
+ *
+ * BENCH_SESSIONSWEB=1 forces inclusion; SESSIONSWEB_LINT_GATE=0 skips the lint probe.
+ */
+function shouldBenchSessionsWeb(string $repoRoot): bool
+{
+    $example = $repoRoot.'/examples/005-SessionsWeb/example.php';
+    if (!is_file($example)) {
+        return false;
+    }
+    if ('1' === getenv('BENCH_SESSIONSWEB')) {
+        return true;
+    }
+    if ('0' === getenv('SESSIONSWEB_LINT_GATE')) {
+        return false;
+    }
+
+    return sessionsWebLintPasses($repoRoot);
+}
+
+function sessionsWebLintPasses(string $repoRoot): bool
+{
+    $phpc = $repoRoot.'/phpc';
+    if (!is_executable($phpc)) {
+        return false;
+    }
+    $descriptorSpec = [
+        0 => ['pipe', 'r'],
+        1 => ['pipe', 'w'],
+        2 => ['pipe', 'w'],
+    ];
+    $proc = proc_open(
+        [$phpc, 'lint', '--all', $repoRoot.'/examples/005-SessionsWeb'],
+        $descriptorSpec,
+        $pipes,
+        $repoRoot
+    );
+    if (!is_resource($proc)) {
+        return false;
+    }
+    fclose($pipes[0]);
+    stream_get_contents($pipes[1]);
+    stream_get_contents($pipes[2]);
+    fclose($pipes[1]);
+    fclose($pipes[2]);
+
+    return 0 === proc_close($proc);
 }
 
 function miniWebAppLintPasses(string $repoRoot): bool
