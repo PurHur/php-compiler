@@ -44,10 +44,24 @@ final class RebuildExamplesTest extends TestCase
         $this->assertStringContainsString('BENCH_SESSIONSWEB', $script);
         $this->assertStringContainsString('SESSIONSWEB_LINT_GATE', $script);
         $this->assertStringContainsString('examples/005-SessionsWeb', $script);
+        $this->assertStringContainsString("'skip_aot' => true", $script);
+        $this->assertStringContainsString('#1891', $script);
 
         $readme = file_get_contents(dirname(__DIR__, 2).'/examples/README.md');
         $this->assertNotFalse($readme);
         $this->assertStringContainsString('BENCH_SESSIONSWEB', $readme);
         $this->assertStringContainsString('005-SessionsWeb', $readme);
+    }
+
+    public function testCiWiresRebuildExamples005SyncGate(): void
+    {
+        $common = file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $defaults = file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertNotFalse($common);
+        $this->assertNotFalse($defaults);
+        $this->assertStringContainsString('ci_run_rebuild_examples_005_sync_check', $common);
+        $this->assertStringContainsString('check-rebuild-examples-005-row.php', $common);
+        $this->assertStringContainsString('REBUILD_EXAMPLES_005_SYNC_GATE:-0', $common);
+        $this->assertStringContainsString('REBUILD_EXAMPLES_005_SYNC_GATE="${REBUILD_EXAMPLES_005_SYNC_GATE:-0}"', $defaults);
     }
 }

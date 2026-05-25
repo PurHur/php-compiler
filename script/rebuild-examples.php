@@ -215,6 +215,18 @@ function exampleProfile(string $example): array
         ];
     }
 
+    if ('005-SessionsWeb' === exampleDisplayName($example)) {
+        // AOT columns stay n/a until two-request session execute is green (#1891).
+        return [
+            'query' => null,
+            'cgi_env' => [],
+            'aot_compile_time_query' => true,
+            'aot_run_env' => [],
+            'skip_aot' => true,
+            'project_aot' => false,
+        ];
+    }
+
     if ('001-SimpleWeb' === exampleDisplayName($example)) {
         // Runtime superglobals (#201): compile once without -q; benchmark run uses QUERY_STRING.
         return [
