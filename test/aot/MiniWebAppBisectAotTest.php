@@ -36,6 +36,7 @@ final class MiniWebAppBisectAotTest extends AotTest
         'layout_partial_chain',
         'method_include_void_array_property',
         'render_hello_request_assign',
+        'class_method_json_api',
     ];
 
     public static function providePHPTests(): \Generator
