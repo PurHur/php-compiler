@@ -87,4 +87,22 @@ final class RebuildExamplesTest extends TestCase
         $this->assertStringContainsString('REBUILD_EXAMPLES_005_SYNC_GATE:-1', $common);
         $this->assertStringContainsString('REBUILD_EXAMPLES_005_SYNC_GATE="${REBUILD_EXAMPLES_005_SYNC_GATE:-1}"', $defaults);
     }
+
+    public function testRebuildExamplesDocumentsThrowsWebBenchmarkGate(): void
+    {
+        $script = file_get_contents(dirname(__DIR__, 2).'/script/rebuild-examples.php');
+        $this->assertNotFalse($script);
+        $this->assertStringContainsString('shouldBenchThrowsWeb', $script);
+        $this->assertStringContainsString('BENCH_THROWSWEB', $script);
+        $this->assertStringContainsString('THROWSWEB_LINT_GATE', $script);
+        $this->assertStringContainsString('examples/007-ThrowsWeb', $script);
+        $this->assertStringContainsString('throwsWebPostCgiEnv', $script);
+        $this->assertStringContainsString("'skip_aot' => true", $script);
+        $this->assertStringContainsString('#2113', $script);
+
+        $readme = file_get_contents(dirname(__DIR__, 2).'/examples/README.md');
+        $this->assertNotFalse($readme);
+        $this->assertStringContainsString('BENCH_THROWSWEB', $readme);
+        $this->assertStringContainsString('007-ThrowsWeb', $readme);
+    }
 }

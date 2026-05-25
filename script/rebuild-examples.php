@@ -65,6 +65,11 @@ foreach ($exampleDirs as $dir) {
         continue;
     }
 
+    if ('007-ThrowsWeb' === basename($dir) && !shouldBenchThrowsWeb($repoRoot)) {
+        echo " - Skipping 007-ThrowsWeb benchmark row (lint gate; BENCH_THROWSWEB=1 to force)\n";
+        continue;
+    }
+
     $benchmarks .= "\n".benchmarkExample($example, $phpCmd, $benchEnv, $repoRoot, $llvmReady);
 }
 
@@ -144,6 +149,56 @@ function shouldBenchFileUploadWeb(string $repoRoot): bool
     }
 
     return fileUploadWebLintPasses($repoRoot);
+}
+
+/**
+ * Include 007-ThrowsWeb when lint is green (issue #2113).
+ *
+ * BENCH_THROWSWEB=1 forces inclusion; THROWSWEB_LINT_GATE=0 skips the lint probe.
+ */
+function shouldBenchThrowsWeb(string $repoRoot): bool
+{
+    $example = $repoRoot.'/examples/007-ThrowsWeb/example.php';
+    if (!is_file($example)) {
+        return false;
+    }
+    if ('1' === getenv('BENCH_THROWSWEB')) {
+        return true;
+    }
+    if ('0' === getenv('THROWSWEB_LINT_GATE')) {
+        return false;
+    }
+
+    return throwsWebLintPasses($repoRoot);
+}
+
+function throwsWebLintPasses(string $repoRoot): bool
+{
+    $phpc = $repoRoot.'/phpc';
+    if (!is_executable($phpc)) {
+        return false;
+    }
+    $descriptorSpec = [
+        0 => ['pipe', 'r'],
+        1 => ['pipe', 'w'],
+        2 => ['pipe', 'w'],
+    ];
+    $proc = proc_open(
+        [$phpc, 'lint', '--all', $repoRoot.'/examples/007-ThrowsWeb'],
+        $descriptorSpec,
+        $pipes,
+        $repoRoot
+    );
+    if (!is_resource($proc)) {
+        return false;
+    }
+    fclose($pipes[0]);
+    stream_get_contents($pipes[1]);
+    stream_get_contents($pipes[2]);
+    fclose($pipes[1]);
+    fclose($pipes[2]);
+
+    return 0 === proc_close($proc);
 }
 
 function fileUploadWebLintPasses(string $repoRoot): bool
@@ -302,6 +357,19 @@ function exampleProfile(string $example): array
         ];
     }
 
+    if ('007-ThrowsWeb' === exampleDisplayName($example)) {
+        return [
+            'query' => null,
+            'cgi_env' => throwsWebPostCgiEnv(),
+            'aot_compile_time_query' => true,
+            'aot_run_env' => [],
+            'skip_aot' => true,
+            'project_aot' => false,
+            'sessions_web_project_aot' => false,
+            'fileupload_web_project_aot' => false,
+        ];
+    }
+
     if ('001-SimpleWeb' === exampleDisplayName($example)) {
         // Runtime superglobals (#201): compile once without -q; benchmark run uses QUERY_STRING.
         return [
@@ -329,6 +397,22 @@ function exampleProfile(string $example): array
         'project_aot' => false,
         'sessions_web_project_aot' => false,
         'fileupload_web_project_aot' => false,
+    ];
+}
+
+/**
+ * POST invalid-email CGI overlay for 007-ThrowsWeb VM/JIT benches (#2113).
+ *
+ * @return array<string, string>
+ */
+function throwsWebPostCgiEnv(): array
+{
+    return [
+        'REQUEST_METHOD' => 'POST',
+        'REQUEST_BODY' => 'email=bad',
+        'CONTENT_TYPE' => 'application/x-www-form-urlencoded',
+        'SCRIPT_NAME' => '/example.php',
+        'REQUEST_URI' => '/example.php',
     ];
 }
 
