@@ -263,25 +263,6 @@ class String_ extends Type {
         $rightVar = $this->context->helper->loadValue($right);
         $map = $this->context->structFieldMap['__string__'];
 
-        $destSlotTy = $this->context->getStringFromType($dest->value->typeOf());
-        $destUsesValueBox = in_array($destSlotTy, ['__value__*', '__value__'], true);
-        if ($destUsesValueBox) {
-            $destStrPtr = \PHPCompiler\JIT\BasicBlockHelper::entryAlloca(
-                $this->context,
-                $this->context->getTypeFromString('__string__*')
-            );
-            $cur = \PHPCompiler\JIT\JitValueBox::normalizeValuePtr($this->context, $dest->value);
-            $str = (new \PHPCompiler\ext\standard\strval())->valueToString($this->context, $cur);
-            $this->context->builder->store($str, $destStrPtr);
-            $destVar = \PHPCompiler\JIT\BasicBlockHelper::entryAlloca(
-                $this->context,
-                $this->context->getTypeFromString('__string__**')
-            );
-            $this->context->builder->store($destStrPtr, $destVar);
-        } else {
-            $destVar = $dest->value;
-        }
-
         $leftSize = $this->context->builder->load(
             $this->context->builder->structGep($leftVar, $map['length'])
         );
@@ -292,6 +273,30 @@ class String_ extends Type {
             $leftSize,
             $this->context->builder->intCast($rightSize, $leftSize->typeOf())
         );
+
+        $destSlotTy = $this->context->getStringFromType($dest->value->typeOf());
+        $destUsesValueBox = in_array($destSlotTy, ['__value__*', '__value__'], true);
+        if ($destUsesValueBox) {
+            $result = $this->context->builder->call(
+                $this->context->lookupFunction('__string__alloc'),
+                $size
+            );
+            $char = $this->context->builder->structGep($result, $map['value']);
+            $leftChar = $this->context->builder->structGep($leftVar, $map['value']);
+            $this->context->intrinsic->memcpy($char, $leftChar, $leftSize, false);
+            $char = $this->context->builder->gep($char, $leftSize);
+            $rightChar = $this->context->builder->structGep($rightVar, $map['value']);
+            $this->context->intrinsic->memcpy($char, $rightChar, $rightSize, false);
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeString'),
+                \PHPCompiler\JIT\JitValueBox::pointer($this->context, $dest->value),
+                $result
+            );
+
+            return;
+        }
+
+        $destVar = $dest->value;
         $this->context->builder->call(
             $this->context->lookupFunction('__string__realloc'),
             $destVar,
@@ -308,16 +313,6 @@ class String_ extends Type {
         $char = $this->context->builder->gep($char, $leftSize);
         $rightChar = $this->context->builder->structGep($rightVar, $map['value']);
         $this->context->intrinsic->memcpy($char, $rightChar, $rightSize, false);
-
-        if ($destUsesValueBox) {
-            $this->context->builder->call(
-                $this->context->lookupFunction('__value__writeString'),
-                \PHPCompiler\JIT\JitValueBox::pointer($this->context, $dest->value),
-                $destValue
-            );
-
-            return;
-        }
         $this->context->builder->store($destValue, $dest->value);
     }
 

@@ -757,7 +757,8 @@ class JIT {
             || str_ends_with($lower, '\\compiler::compile')
             || 'type_pair' === $lower
             || $this->isBootstrapRuntimeCtorSmokeName($lower)
-            || $this->isBootstrapHelloWorldSmokeName($lower);
+            || $this->isBootstrapHelloWorldSmokeName($lower)
+            || str_contains($lower, 'vm_run_smoke');
     }
 
     private function isSkippedWebBootstrapHotPathName(string $name): bool
@@ -2384,7 +2385,7 @@ class JIT {
                     $obj = $block->getOperand($op->arg2);
                     $name = $block->getOperand($op->arg3);
                     assert($obj->type->type === Type::TYPE_OBJECT);
-                    $declaringClass = $obj->type->userType;
+                    $declaringClass = $obj->type->userType ?? null;
                     if (null === $declaringClass && null !== $block->func && null !== $block->func->class) {
                         $declaringClass = $block->func->class->value;
                     }
