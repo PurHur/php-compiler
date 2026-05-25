@@ -730,6 +730,38 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('NESTED_RETURN_COMPLIANCE_GATE', $body);
     }
 
+    public function testCiDefaultsEnvDefinesAttributesComplianceGateOn(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString(
+            'ATTRIBUTES_COMPLIANCE_GATE="${ATTRIBUTES_COMPLIANCE_GATE:-1}"',
+            $defaults
+        );
+        $this->assertStringContainsString('#1904', $defaults);
+    }
+
+    public function testCiFastRunsAttributesComplianceGateByDefault(): void
+    {
+        $fast = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-fast.sh');
+        $this->assertStringContainsString('ATTRIBUTES_COMPLIANCE_GATE', $fast);
+        $this->assertStringContainsString('ATTRIBUTES_COMPLIANCE_GATE:-1', $fast);
+        $this->assertStringContainsString('--filter Attribute', $fast);
+    }
+
+    public function testLocalCiMatrixDocumentsAttributesComplianceGate(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('ATTRIBUTES_COMPLIANCE_GATE', $doc);
+        $this->assertStringContainsString('Attribute*', $doc);
+        $this->assertMatchesRegularExpression('/\| `ATTRIBUTES_COMPLIANCE_GATE` \| `1` \|/', $doc);
+    }
+
+    public function testCiDockerRunPassesAttributesComplianceGateEnv(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');
+        $this->assertStringContainsString('ATTRIBUTES_COMPLIANCE_GATE', $body);
+    }
+
     public function testCiFastRunsCgiDriverTest(): void
     {
         $fast = dirname(__DIR__, 2).'/script/ci-fast.sh';
