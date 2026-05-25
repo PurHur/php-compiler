@@ -83,7 +83,7 @@ cd php-compiler
 make test    # builds php-compiler:22.04-dev if needed, then memory-safe CI in Docker (see script/ci-defaults.env)
 ```
 
-`make test` is the same CI path as `make test-docker` when the bind-mount works; on harness hosts it falls back to `script/docker-ci-local.sh` (tar copy) like `make test-harness`.
+`make test` is the same CI path as `make test-docker` when the bind-mount works; on harness hosts it falls back to `script/docker-ci-local.sh` (tar copy) like `make test-harness`. Harness verification commands: [docs/local-ci-matrix.md#runforge--harness-verification](docs/local-ci-matrix.md#runforge--harness-verification).
 
 ## North-star status (2026)
 
