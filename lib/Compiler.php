@@ -260,7 +260,7 @@ class Compiler {
                         if ($this->needsCfgSplitBeforeStringDimFetch($child, $block, $ops, $i)) {
                             $block = $this->splitCfgBlockAfterStringKeyedArray($block);
                         }
-                        $echoBlock = $this->compileEchoWithEmbeddedCoalesce($child, $block);
+                        $echoBlock = $this->compileEchoWithEmbeddedCoalesce($child, $block, $ops, $i);
                         if (null !== $echoBlock) {
                             $block = $echoBlock;
                             break;
@@ -378,30 +378,159 @@ class Compiler {
     }
 
     /**
-     * Echo with embedded ?? / ??= must use compileCoalesce and continue on the merge block (#99, #1960).
+     * Echo with embedded ?? / ??= must use compileCoalesce and continue on the merge block (#99, #1960, #1980).
+     *
+     * @param Op[] $ops
      */
-    private function compileEchoWithEmbeddedCoalesce(Op $op, Block $block): ?Block
+    private function compileEchoWithEmbeddedCoalesce(Op $op, Block $block, array $ops, int $echoIndex): ?Block
     {
         if (!$op instanceof Op\Terminal || 'Terminal_Echo' !== $op->getType()) {
             return null;
+        }
+        $echoAfterAssign = $this->resolveEchoAfterCoalesceAssign($ops, $echoIndex, $op->expr);
+        if (null !== $echoAfterAssign && $this->isStmtCoalesceLoweredBeforeEcho($ops, $echoIndex)) {
+            $var = $this->compileOperand($echoAfterAssign, $block, true);
+            $block->addOpCode(new OpCode(OpCode::TYPE_ECHO, $var));
+
+            return $block;
         }
         $coalesces = $this->findEmbeddedCoalesces($op->expr);
         if ([] === $coalesces) {
             return null;
         }
+        $echoOperand = $op->expr;
         foreach ($coalesces as $coalesce) {
-            $block = $this->compileCoalesceForAssign($coalesce, $block);
+            $resultOverride = $this->findEchoCoalesceAssignTarget($ops, $echoIndex, $coalesce);
+            if (!$this->isCoalesceLoweredBeforeEcho($ops, $echoIndex, $coalesce)) {
+                $block = $this->compileCoalesceForAssign($coalesce, $block, $resultOverride);
+            }
+            if (
+                null === $this->unwrapConcatListExpr($echoOperand)
+                && $this->operandsChainEqual($echoOperand, $coalesce->result)
+            ) {
+                $echoOperand = $resultOverride ?? $coalesce->result;
+            }
         }
         $concat = $this->unwrapConcatListExpr($op->expr);
         if (null !== $concat) {
             $this->compileOp($concat, $block);
             $var = $this->compileOperand($concat->result, $block, true);
         } else {
-            $var = $this->compileOperand($coalesces[0]->result, $block, true);
+            $var = $this->compileOperand($echoOperand, $block, true);
         }
         $block->addOpCode(new OpCode(OpCode::TYPE_ECHO, $var));
 
         return $block;
+    }
+
+    /**
+     * php-cfg: Coalesce; Assign; Terminal_Echo(expr=coalesce.result) — echo the ??= lvalue (#1980).
+     *
+     * @param Op[] $ops
+     */
+    private function resolveEchoAfterCoalesceAssign(array $ops, int $echoIndex, Operand $echoExpr): ?Operand
+    {
+        if ($echoIndex < 2) {
+            return null;
+        }
+        $assign = $ops[$echoIndex - 1];
+        $coalesce = $ops[$echoIndex - 2];
+        if (!$assign instanceof Op\Expr\Assign || !$coalesce instanceof Op\Expr\BinaryOp\Coalesce) {
+            if (
+                $echoIndex >= 3
+                && $ops[$echoIndex - 1] instanceof Op\Expr\Assign
+                && $ops[$echoIndex - 2] instanceof Op\Expr\ArrayDimFetch
+                && $ops[$echoIndex - 3] instanceof Op\Expr\BinaryOp\Coalesce
+            ) {
+                /** @var Op\Expr\Assign $assign */
+                $assign = $ops[$echoIndex - 1];
+                /** @var Op\Expr\ArrayDimFetch $fetch */
+                $fetch = $ops[$echoIndex - 2];
+                /** @var Op\Expr\BinaryOp\Coalesce $coalesce */
+                $coalesce = $ops[$echoIndex - 3];
+                if (
+                    $this->isRedundantCoalesceTailAssign($assign, $fetch, $coalesce)
+                    && $this->operandsChainEqual($echoExpr, $coalesce->result)
+                ) {
+                    return $assign->var;
+                }
+            }
+
+            return null;
+        }
+        if (
+            $this->isCoalesceAssignTail($assign, $coalesce)
+            && $this->operandsChainEqual($echoExpr, $coalesce->result)
+        ) {
+            return $assign->var;
+        }
+
+        return null;
+    }
+
+    /**
+     * @param Op[] $ops
+     */
+    private function isStmtCoalesceLoweredBeforeEcho(array $ops, int $echoIndex): bool
+    {
+        if ($echoIndex >= 2 && $ops[$echoIndex - 2] instanceof Op\Expr\BinaryOp\Coalesce) {
+            return true;
+        }
+        if ($echoIndex >= 3 && $ops[$echoIndex - 3] instanceof Op\Expr\BinaryOp\Coalesce) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * php-cfg: Coalesce; Assign; Terminal_Echo(expr=coalesce.result) for inline ??= (#1980).
+     *
+     * @param Op[] $ops
+     */
+    private function findEchoCoalesceAssignTarget(
+        array $ops,
+        int $echoIndex,
+        Op\Expr\BinaryOp\Coalesce $coalesce
+    ): ?Operand {
+        if ($echoIndex > 0) {
+            $prev = $ops[$echoIndex - 1];
+            if ($prev instanceof Op\Expr\Assign && $this->isCoalesceAssignTail($prev, $coalesce)) {
+                return $prev->var;
+            }
+        }
+        if (
+            $echoIndex > 2
+            && $ops[$echoIndex - 2] instanceof Op\Expr\Assign
+            && $ops[$echoIndex - 3] instanceof Op\Expr\ArrayDimFetch
+        ) {
+            /** @var Op\Expr\Assign $assign */
+            $assign = $ops[$echoIndex - 2];
+            /** @var Op\Expr\ArrayDimFetch $fetch */
+            $fetch = $ops[$echoIndex - 3];
+            if ($this->isRedundantCoalesceTailAssign($assign, $fetch, $coalesce)) {
+                return $assign->var;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param Op[] $ops
+     */
+    private function isCoalesceLoweredBeforeEcho(
+        array $ops,
+        int $echoIndex,
+        Op\Expr\BinaryOp\Coalesce $coalesce
+    ): bool {
+        for ($j = $echoIndex - 1; $j >= 0; --$j) {
+            if ($ops[$j] === $coalesce) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

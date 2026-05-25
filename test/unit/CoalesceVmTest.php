@@ -63,6 +63,25 @@ echo $_GET["missing"], "\n";
         );
     }
 
+    public function testNullCoalesceAssignEchoInline(): void
+    {
+        $this->assertVmOutput(
+            '<?php
+echo $_GET["k"] ??= "default";
+echo "\n";
+
+$a = null;
+echo $a ??= "default";
+echo "\n";
+
+$items = [];
+echo $items["page"] ??= "home";
+echo "\n";
+',
+            "default\ndefault\nhome\n"
+        );
+    }
+
     private function assertVmOutput(string $code, string $expected): void
     {
         $runtime = new Runtime();
