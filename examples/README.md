@@ -176,16 +176,16 @@ For **001-SimpleWeb**, `bin/compile.php` is timed **without** compile-time `-q`;
 
 For **003-MiniWebApp**, VM/JIT/native columns run `public/index.php` with `PATH_INFO=/home` (and related CGI env) from the example `public/` directory ([#491](https://github.com/PurHur/php-compiler/issues/491), runtime [#539](https://github.com/PurHur/php-compiler/issues/539)). AOT columns time `phpc build --project` and `.phpc/bin/app` with the same CGI overlay when LLVM is ready and execute returns HTML ([#716](https://github.com/PurHur/php-compiler/issues/716); execute [#764](https://github.com/PurHur/php-compiler/issues/764) closed). The row is omitted when `phpc lint --all examples/003-MiniWebApp` fails unless `BENCH_MINIWEBAPP=1`.
 
-For **005-SessionsWeb**, the benchmark row is omitted until `phpc lint --all examples/005-SessionsWeb` passes unless `BENCH_SESSIONSWEB=1` ([#1889](https://github.com/PurHur/php-compiler/issues/1889)). AOT columns stay `n/a` until two-request session execute is green ([#1891](https://github.com/PurHur/php-compiler/issues/1891)).
+For **005-SessionsWeb**, the benchmark row is omitted until `phpc lint --all examples/005-SessionsWeb` passes unless `BENCH_SESSIONSWEB=1` ([#1889](https://github.com/PurHur/php-compiler/issues/1889)). AOT columns time `phpc build --project` and a two-request session flash on `.phpc/bin/app` when LLVM is ready ([#1891](https://github.com/PurHur/php-compiler/issues/1891), [#1973](https://github.com/PurHur/php-compiler/issues/1973)); use `BENCH_SESSIONSWEB_AOT=1 ./script/rebuild-examples.php` to force AOT columns on harness regen.
 
 <!-- benchmark table start -->
 
 |         Example Name |      Native PHP |      bin/vm.php |     bin/jit.php | bin/compile.php |      ./compiled |
 |----------------------|-----------------|-----------------|-----------------|-----------------|-----------------|
-|       000-HelloWorld |         0.00760 |         0.04387 |         0.17749 |         1.33163 |         0.00109 |
-|        001-SimpleWeb |         0.00764 |         0.04682 |         0.18321 |         1.34592 |         0.00109 |
-|        002-StaticWeb |         0.00770 |         0.04771 |         0.17846 |         1.35182 |         0.00111 |
-|       003-MiniWebApp |         0.00838 |         0.08591 |         0.45166 |         1.75921 |         0.00098 |
-|          004-ApiJson |         0.00837 |         0.04503 |         0.17964 |         1.36437 |         0.00128 |
-|      005-SessionsWeb |         0.00855 |         0.04840 |         0.19095 |             n/a |             n/a |
+|       000-HelloWorld |         0.00792 |         0.04623 |         0.20762 |         1.87538 |         0.00156 |
+|        001-SimpleWeb |         0.00895 |         0.04740 |         0.18640 |         1.35069 |         0.00118 |
+|        002-StaticWeb |         0.00980 |         0.05066 |         0.18906 |         1.36219 |         0.00123 |
+|       003-MiniWebApp |         0.00771 |         0.09690 |         0.52931 |         1.83640 |         0.00106 |
+|          004-ApiJson |         0.00850 |         0.04705 |         0.19092 |         2.98758 |         0.00116 |
+|      005-SessionsWeb |         0.01742 |         0.05082 |         0.19587 |         1.43149 |         0.00277 |
 <!-- benchmark table end -->
