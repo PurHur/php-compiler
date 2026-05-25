@@ -192,11 +192,9 @@ class Context {
     }
 
     public function push(Frame $frame): void {
-        if (is_null($this->runStack)) {
-            $this->runStack = new RunStackEntry($frame);
-        } else {
-            $this->runStack = $this->runStack->prev = new RunStackEntry($frame);
-        }
+        $entry = new RunStackEntry($frame);
+        $entry->prev = $this->runStack;
+        $this->runStack = $entry;
     }
 
     public function pop(): ?Frame {
