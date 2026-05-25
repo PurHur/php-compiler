@@ -111,6 +111,14 @@ ci_run_selfhost_spine_count_sync_check() {
   "$PHP_BIN" "${PHP_OPTS[@]}" script/check-selfhost-spine-count-sync.php
 }
 
+ci_run_m3_allowlist_sync_check() {
+  if [[ "${M3_ALLOWLIST_SYNC_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  echo "M3 allowlist snapshot sync (M3_ALLOWLIST_SYNC_GATE=1, issue #1905)..."
+  "$PHP_BIN" "${PHP_OPTS[@]}" script/check-m3-allowlist-snapshot.php
+}
+
 ci_run_inventory_checks() {
   script/check-no-unlimited-memory.sh
   script/check-stale-issue-refs.sh
@@ -124,6 +132,7 @@ ci_run_inventory_checks() {
   ci_run_examples_readme_sync_check
   ci_run_root_readme_sync_check
   ci_run_selfhost_spine_count_sync_check
+  ci_run_m3_allowlist_sync_check
 }
 
 ci_llvm_dir() {

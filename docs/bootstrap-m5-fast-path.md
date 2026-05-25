@@ -12,6 +12,8 @@ Self-host HelloWorld bundle emits AOT without Zend `bin/compile.php` fallback (`
 
 Expand `JIT::isM3CompileDriverRealLoweringName()` **one function at a time** while `PHP_COMPILER_M3_COMPILE_DRIVER=1` links `test/selfhost/compiler_helloworld_smoke/compile_driver.php`.
 
+**Allowlist SSOT:** committed `script/m3-allowlist-snapshot.txt` mirrors `lib/JIT.php` allow/deny names; CI fails on drift (`M3_ALLOWLIST_SYNC_GATE=1`, issue [#1905](https://github.com/PurHur/php-compiler/issues/1905)). Regenerate after each batch: `php script/bootstrap-m3-allowlist-snapshot.php --write`. Batch tracker: [#1768](https://github.com/PurHur/php-compiler/issues/1768).
+
 Supporting fixes from #1402:
 
 - `jitFunctionSkipName()` — FUNCDEF short names → scoped names for stub/M3 gates
