@@ -159,19 +159,21 @@ SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 ./script/deploy-smoke.sh --example 005
 
 ## 006-FileUploadWeb gates ([#1999](https://github.com/PurHur/php-compiler/issues/1999), [#2009](https://github.com/PurHur/php-compiler/issues/2009))
 
-Progressive ladder (VM multipart → AOT link → AOT execute). VM smoke default-on ([#2009](https://github.com/PurHur/php-compiler/issues/2009)); AOT link default-on ([#2011](https://github.com/PurHur/php-compiler/issues/2011)); AOT execute tracked in [#2012](https://github.com/PurHur/php-compiler/issues/2012). Copy-paste ladder: `./phpc doctor --gates` (**#2010**).
+Progressive ladder (VM multipart → AOT link → AOT execute). VM smoke default-on ([#2009](https://github.com/PurHur/php-compiler/issues/2009)); AOT link default-on ([#2011](https://github.com/PurHur/php-compiler/issues/2011)); AOT execute default-on ([#2012](https://github.com/PurHur/php-compiler/issues/2012)). Copy-paste ladder: `./phpc doctor --gates` (**#2010**).
 
 | Stage | Variable | Default | When enabled |
 |-------|----------|---------|--------------|
 | VM multipart | `FILE_UPLOAD_WEB_SMOKE_GATE` | `1` | `ci-fast` / `ci-local` / `examples-web-smoke.sh --fileupload-only` ([#2009](https://github.com/PurHur/php-compiler/issues/2009)) |
 | AOT link | `FILE_UPLOAD_WEB_AOT_LINK_GATE` | `1` | `./script/ci-local.sh --filter test006FileUploadWebAotLink` ([#2011](https://github.com/PurHur/php-compiler/issues/2011)); set `0` to skip during iteration |
-| AOT execute | `FILE_UPLOAD_WEB_AOT_SMOKE_GATE` | `0` | `FileUploadWebAotExecuteTest` ([#2012](https://github.com/PurHur/php-compiler/issues/2012)) |
+| AOT execute | `FILE_UPLOAD_WEB_AOT_SMOKE_GATE` | `1` | `FileUploadWebAotExecuteTest` or `EXAMPLES_AOT_SMOKE_ONLY=006 ./script/examples-aot-smoke.sh` ([#2012](https://github.com/PurHur/php-compiler/issues/2012)) |
 
 ```bash
 FILE_UPLOAD_WEB_SMOKE_GATE=0 ./script/ci-fast.sh   # skip 006 multipart curls
 FILE_UPLOAD_WEB_AOT_LINK_GATE=0 ./script/ci-local.sh   # skip 006 AOT link (@group aot-link)
 ./script/ci-local.sh --filter test006FileUploadWebAotLink
-FILE_UPLOAD_WEB_AOT_SMOKE_GATE=1 ./script/ci-local.sh --filter FileUploadWebAotExecuteTest
+./script/ci-local.sh --filter FileUploadWebAotExecuteTest
+EXAMPLES_AOT_SMOKE_ONLY=006 ./script/examples-aot-smoke.sh
+FILE_UPLOAD_WEB_AOT_SMOKE_GATE=0 ./script/ci-local.sh   # skip 006 AOT execute during iteration
 ```
 
 **003 AOT execute** (`MINIWEBAPP_AOT_EXECUTE_GATE=1` default; set `0` to skip during iteration):

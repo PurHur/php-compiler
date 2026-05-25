@@ -364,7 +364,7 @@ final class Doctor
         $defaults = self::readCiDefaultsEnv($repoRoot);
         $smokeDefault = $defaults['FILE_UPLOAD_WEB_SMOKE_GATE'] ?? '1';
         $linkDefault = $defaults['FILE_UPLOAD_WEB_AOT_LINK_GATE'] ?? '1';
-        $aotDefault = $defaults['FILE_UPLOAD_WEB_AOT_SMOKE_GATE'] ?? '0';
+        $aotDefault = $defaults['FILE_UPLOAD_WEB_AOT_SMOKE_GATE'] ?? '1';
 
         $smokeOn = self::gateEnabled('FILE_UPLOAD_WEB_SMOKE_GATE', $smokeDefault);
         $linkOn = self::gateEnabled('FILE_UPLOAD_WEB_AOT_LINK_GATE', $linkDefault);
@@ -413,11 +413,11 @@ final class Doctor
         );
         $aotStatus = $aotOn && $llvmReady ? '✅' : '📋';
         $aotExecuteNote = $llvmReady
-            ? ($aotOn ? '#1999 ✅' : '#1999 ✅ · opt-in until #2012')
+            ? ($aotOn ? '#1999 ✅' : '#1999 ✅ · set gate=1 (#2012)')
             : 'LLVM required; #1999 ✅ when gate=1';
         fwrite(STDOUT, "  [{$aotStatus}] Stage 3 AOT execute — FILE_UPLOAD_WEB_AOT_SMOKE_GATE default {$aotDefault} ({$aotExecuteNote})\n");
         fwrite(STDOUT, "      PHPUnit: ./script/ci-local.sh --filter FileUploadWebAotExecuteTest\n");
-        fwrite(STDOUT, "      Shell:   FILE_UPLOAD_WEB_AOT_SMOKE_GATE=1 ./script/ci-local.sh --filter FileUploadWebAotExecuteTest\n");
+        fwrite(STDOUT, "      Shell:   EXAMPLES_AOT_SMOKE_ONLY=006 ./script/examples-aot-smoke.sh\n");
 
         $initProfileLive = \PHPCompiler\Cli\PhpcInit::isKnownProfile('fileupload');
         $initTemplate = is_file($repoRoot.'/templates/init-fileupload/example.php');

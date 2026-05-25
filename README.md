@@ -63,7 +63,7 @@ mkdir my-app && ./phpc init my-app   # phpc.json + public/index.php scaffold (se
 ./phpc run -q 'name=Dev' examples/001-SimpleWeb/example.php   # web example without TCP
 make web-smoke                 # lint shipped examples + 003-MiniWebApp tree, VM smoke 001-SimpleWeb
 make examples-web-smoke        # phpc serve + curl for 001–004 and 005-SessionsWeb (SESSIONS_WEB_SMOKE_GATE=1 default)
-make examples-aot-smoke        # phpc build + CLI execute for 000–004 when LLVM ready (#667)
+make examples-aot-smoke        # phpc build + CLI execute for 000–004 (+ 006 when gate on) when LLVM ready (#667)
 make deploy-smoke              # phpc deploy + PHPC_DEPLOY_ROOT CGI for 001/002/003; 005 when SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 (#718, #1893)
 ./phpc serve examples/001-SimpleWeb   # http://127.0.0.1:8080/ (or: make serve)
 ./phpc lint --all examples/003-MiniWebApp && ./phpc serve examples/003-MiniWebApp   # VM green; AOT link ✅, native execute ✅ (#764)
@@ -112,9 +112,9 @@ Also: `phpc doctor` (env probe), `phpc validate-manifest`, `phpc cgi`. See `./ph
 | [000–002](examples/000-HelloWorld/), [004-ApiJson](examples/004-ApiJson/) | ✅ `./phpc run` / `serve` | ✅ `phpc build` | ✅ CLI | 001/002 ✅ ([#718](https://github.com/PurHur/php-compiler/issues/718)) |
 | [003-MiniWebApp](examples/003-MiniWebApp/) | ✅ `phpc serve` ([#539](https://github.com/PurHur/php-compiler/issues/539)) | ✅ `phpc build --project` ([#752](https://github.com/PurHur/php-compiler/issues/752)) | ✅ native execute ([#764](https://github.com/PurHur/php-compiler/issues/764); [#1044](https://github.com/PurHur/php-compiler/issues/1044)) | ✅ deploy smoke ([#676](https://github.com/PurHur/php-compiler/issues/676), [#1530](https://github.com/PurHur/php-compiler/issues/1530)) |
 | [005-SessionsWeb](examples/005-SessionsWeb/) | ✅ `phpc serve` + session smoke ([#1881](https://github.com/PurHur/php-compiler/issues/1881), [#1887](https://github.com/PurHur/php-compiler/issues/1887)) | ✅ `phpc build` ([#1946](https://github.com/PurHur/php-compiler/issues/1946)) | ✅ AOT execute (`SESSIONS_WEB_AOT_SMOKE_GATE=1`, [#1891](https://github.com/PurHur/php-compiler/issues/1891)) | ✅ deploy smoke opt-in ([#1893](https://github.com/PurHur/php-compiler/issues/1893)) |
-| [006-FileUploadWeb](examples/006-FileUploadWeb/) | ✅ `phpc serve` + multipart smoke ([#1999](https://github.com/PurHur/php-compiler/issues/1999), [#2009](https://github.com/PurHur/php-compiler/issues/2009)) | ✅ `phpc build` ([#2011](https://github.com/PurHur/php-compiler/issues/2011)) | ✅ opt-in `FILE_UPLOAD_WEB_AOT_SMOKE_GATE=1` | — |
+| [006-FileUploadWeb](examples/006-FileUploadWeb/) | ✅ `phpc serve` + multipart smoke ([#1999](https://github.com/PurHur/php-compiler/issues/1999), [#2009](https://github.com/PurHur/php-compiler/issues/2009)) | ✅ `phpc build` ([#2011](https://github.com/PurHur/php-compiler/issues/2011)) | ✅ AOT execute (`FILE_UPLOAD_WEB_AOT_SMOKE_GATE=1` default, [#2012](https://github.com/PurHur/php-compiler/issues/2012)) | — |
 
-`make examples-aot-smoke` links and executes 000–004 when LLVM is ready (003 execute green — [#764](https://github.com/PurHur/php-compiler/issues/764)). **005-SessionsWeb** VM/session curls: `make examples-web-smoke` ([#1887](https://github.com/PurHur/php-compiler/issues/1887)). Per-example commands: [examples/README.md](examples/README.md).
+`make examples-aot-smoke` links and executes 000–004 when LLVM is ready (003 execute green — [#764](https://github.com/PurHur/php-compiler/issues/764)); **006-FileUploadWeb** multipart execute when `FILE_UPLOAD_WEB_AOT_SMOKE_GATE=1` (default — [#2012](https://github.com/PurHur/php-compiler/issues/2012), [#2013](https://github.com/PurHur/php-compiler/issues/2013)). **005-SessionsWeb** VM/session curls: `make examples-web-smoke` ([#1887](https://github.com/PurHur/php-compiler/issues/1887)). Per-example commands: [examples/README.md](examples/README.md).
 
 ### Capabilities
 

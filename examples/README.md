@@ -45,7 +45,7 @@ Legacy entrypoints still work: `php bin/vm.php`, `php bin/jit.php`, `php bin/com
 | [002-StaticWeb](002-StaticWeb/) | ✅ `./phpc run` | ✅ `bin/jit.php` | ✅ recommended | no superglobals — [#247](https://github.com/PurHur/php-compiler/issues/247) execute smoke |
 | [004-ApiJson](004-ApiJson/) | ✅ `./phpc run` | ✅ `bin/jit.php` | ✅ `phpc build` | JSON + `http_response_code` — [#270](https://github.com/PurHur/php-compiler/issues/270), [#61](https://github.com/PurHur/php-compiler/issues/61) |
 | [005-SessionsWeb](005-SessionsWeb/) | ✅ `./phpc run` / `phpc serve` | ✅ `session_start` JIT ([#1882](https://github.com/PurHur/php-compiler/issues/1882)) | ✅ `phpc build` link ([#1946](https://github.com/PurHur/php-compiler/issues/1946)); execute [#1891](https://github.com/PurHur/php-compiler/issues/1891); deploy smoke opt-in ([#1893](https://github.com/PurHur/php-compiler/issues/1893)) | `$_SESSION` flash across requests — [#1881](https://github.com/PurHur/php-compiler/issues/1881) |
-| [006-FileUploadWeb](006-FileUploadWeb/) | ✅ `./phpc run` / `phpc serve` | ✅ nested `$_FILES` JIT ([#87](https://github.com/PurHur/php-compiler/issues/87)) | ✅ `phpc build` link opt-in ([#1999](https://github.com/PurHur/php-compiler/issues/1999)); execute opt-in | `multipart/form-data` + `$_FILES['doc']` — [#1999](https://github.com/PurHur/php-compiler/issues/1999) |
+| [006-FileUploadWeb](006-FileUploadWeb/) | ✅ `./phpc run` / `phpc serve` | ✅ nested `$_FILES` JIT ([#87](https://github.com/PurHur/php-compiler/issues/87)) | ✅ `phpc build` link ([#2011](https://github.com/PurHur/php-compiler/issues/2011)); execute default-on ([#2012](https://github.com/PurHur/php-compiler/issues/2012)) | `multipart/form-data` + `$_FILES['doc']` — [#1999](https://github.com/PurHur/php-compiler/issues/1999) |
 | [003-MiniWebApp](003-MiniWebApp/) | ✅ `phpc serve` | partial | ✅ `phpc build --project` | PATH_INFO — [#489](https://github.com/PurHur/php-compiler/issues/489), runtime [#539](https://github.com/PurHur/php-compiler/issues/539); AOT link ✅ ([#752](https://github.com/PurHur/php-compiler/issues/752)); native execute ✅ ([#764](https://github.com/PurHur/php-compiler/issues/764) closed) |
 
 ### 000-HelloWorld
@@ -118,7 +118,7 @@ AOT link/execute: [#1891](https://github.com/PurHur/php-compiler/issues/1891). A
 curl -s -F 'doc=@examples/006-FileUploadWeb/README.md' http://127.0.0.1:8080/example.php
 ```
 
-VM multipart curls: `make examples-web-smoke` / `ci-fast` (default `FILE_UPLOAD_WEB_SMOKE_GATE=1`, [#2009](https://github.com/PurHur/php-compiler/issues/2009)). AOT link: default `FILE_UPLOAD_WEB_AOT_LINK_GATE=1` ([#2011](https://github.com/PurHur/php-compiler/issues/2011)); AOT execute opt-in `FILE_UPLOAD_WEB_AOT_SMOKE_GATE=1` — see [006-FileUploadWeb/README.md](006-FileUploadWeb/README.md).
+VM multipart curls: `make examples-web-smoke` / `ci-fast` (default `FILE_UPLOAD_WEB_SMOKE_GATE=1`, [#2009](https://github.com/PurHur/php-compiler/issues/2009)). AOT link: default `FILE_UPLOAD_WEB_AOT_LINK_GATE=1` ([#2011](https://github.com/PurHur/php-compiler/issues/2011)); AOT execute: default `FILE_UPLOAD_WEB_AOT_SMOKE_GATE=1` ([#2012](https://github.com/PurHur/php-compiler/issues/2012)); shell slice `EXAMPLES_AOT_SMOKE_ONLY=006 make examples-aot-smoke` ([#2013](https://github.com/PurHur/php-compiler/issues/2013)) — see [006-FileUploadWeb/README.md](006-FileUploadWeb/README.md).
 
 ### 002-StaticWeb
 
@@ -158,7 +158,7 @@ Before a PR that touches examples or `bin/serve.php`:
 make web-smoke              # lint examples/*/example.php + 003 lint --all + VM ?name= smoke
 make examples-web-smoke     # phpc serve + curl GET/POST (001–004 + 005 session flash when SESSIONS_WEB_SMOKE_GATE=1)
 make examples-sessions-smoke   # 005-SessionsWeb cookie jar only (#1887)
-make examples-aot-smoke     # phpc build + CLI execute (000–004; skips when LLVM missing; 003 execute green #764)
+make examples-aot-smoke     # phpc build + CLI execute (000–004 + 006 when gate on; skips when LLVM missing; 003 execute green #764)
 ```
 
 Full CI (`./script/ci-local.sh`) runs `examples-aot-smoke.sh` after PHPUnit `@group aot-link` when LLVM is available (`EXAMPLES_AOT_SMOKE_GATE=1` default in `script/ci-defaults.env`; set `EXAMPLES_AOT_SMOKE_GATE=0` to skip during iteration — [#674](https://github.com/PurHur/php-compiler/issues/674)). Not run in `ci-fast.sh`.

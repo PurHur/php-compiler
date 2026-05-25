@@ -8,6 +8,7 @@
 #   ./script/examples-aot-smoke.sh
 #   EXAMPLES_AOT_SMOKE_ONLY=003 ./script/examples-aot-smoke.sh   # 003 slice only (#683)
 #   EXAMPLES_AOT_SMOKE_ONLY=005 ./script/examples-aot-smoke.sh   # 005 slice only (#1891)
+#   EXAMPLES_AOT_SMOKE_ONLY=006 ./script/examples-aot-smoke.sh   # 006 slice only (#2013)
 #
 # Docker:
 #   docker run --rm -v "$(pwd):/compiler" -w /compiler php-compiler:22.04-dev make examples-aot-smoke
@@ -21,6 +22,7 @@ PHPC="${ROOT}/phpc"
 SMOKE_ROOT="${ROOT}/.phpc/smoke"
 MINIWEBAPP="${ROOT}/examples/003-MiniWebApp"
 SESSIONSWEB="${ROOT}/examples/005-SessionsWeb"
+FILEUPLOADWEB="${ROOT}/examples/006-FileUploadWeb"
 SMOKE_ONLY="${EXAMPLES_AOT_SMOKE_ONLY:-}"
 
 resolve_llvm_dir() {
@@ -271,6 +273,64 @@ smoke_005_sessionsweb() {
   echo "examples-aot-smoke: 005-SessionsWeb: ok"
 }
 
+# 006-FileUploadWeb project AOT + multipart CGI REQUEST_BODY (#1999, #2013).
+smoke_006_fileuploadweb() {
+  if [[ "${FILE_UPLOAD_WEB_AOT_SMOKE_GATE:-1}" != "1" ]]; then
+    echo "examples-aot-smoke: 006-FileUploadWeb: skip (FILE_UPLOAD_WEB_AOT_SMOKE_GATE=0)"
+    return 0
+  fi
+  if [[ ! -f "${FILEUPLOADWEB}/example.php" ]]; then
+    echo "examples-aot-smoke: 006-FileUploadWeb: skip (tree missing #1999)" >&2
+    return 0
+  fi
+
+  local binary="${FILEUPLOADWEB}/.phpc/bin/app"
+  echo "examples-aot-smoke: 006-FileUploadWeb: phpc build --project -> ${binary}"
+  if ! "$PHPC" build --project "${FILEUPLOADWEB}"; then
+    echo "examples-aot-smoke: 006-FileUploadWeb: link failed" >&2
+    return 1
+  fi
+  if [[ ! -x "$binary" ]]; then
+    echo "examples-aot-smoke: 006-FileUploadWeb: expected executable ${binary}" >&2
+    return 1
+  fi
+
+  local out stderr_file run_code stderr multipart_body
+  multipart_body=$'--phpcFileB\r\nContent-Disposition: form-data; name="doc"; filename="README.md"\r\nContent-Type: text/plain\r\n\r\nbytes\r\n--phpcFileB--\r\n'
+  stderr_file="$(mktemp "${SMOKE_ROOT}/006.XXXXXX")"
+  set +e
+  out="$(
+    REQUEST_METHOD='POST' \
+      REQUEST_BODY="$multipart_body" \
+      CONTENT_TYPE='multipart/form-data; boundary=phpcFileB' \
+      SCRIPT_NAME='/example.php' \
+      REQUEST_URI='/example.php' \
+      "$binary" 2>"$stderr_file"
+  )"
+  run_code=$?
+  set -e
+  stderr="$(cat "$stderr_file" 2>/dev/null || true)"
+  rm -f "$stderr_file"
+  if [[ "$run_code" -ne 0 ]]; then
+    echo "examples-aot-smoke: 006-FileUploadWeb: multipart POST exited ${run_code}" >&2
+    [[ -n "$stderr" ]] && echo "$stderr" >&2
+    return 1
+  fi
+  if [[ "$out" != *'Uploaded: README.md'* ]]; then
+    echo "examples-aot-smoke: 006-FileUploadWeb: missing upload needle" >&2
+    [[ -n "$out" ]] && echo "--- stdout ---" >&2 && echo "$out" >&2 && echo "--- end ---" >&2
+    return 1
+  fi
+
+  echo "examples-aot-smoke: 006-FileUploadWeb: ok"
+}
+
+if [[ "${SMOKE_ONLY}" == "006" ]]; then
+  echo "examples-aot-smoke: 006 slice (LLVM at ${LLVM_DIR})"
+  smoke_006_fileuploadweb
+  exit $?
+fi
+
 if [[ "${SMOKE_ONLY}" == "005" ]]; then
   echo "examples-aot-smoke: 005 slice (LLVM at ${LLVM_DIR})"
   smoke_005_sessionsweb
@@ -327,5 +387,6 @@ echo "examples-aot-smoke: 004-ApiJson: ok"
 
 smoke_003_miniwebapp
 smoke_005_sessionsweb
+smoke_006_fileuploadweb
 
 echo "examples-aot-smoke: ok"
