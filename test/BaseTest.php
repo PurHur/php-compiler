@@ -208,11 +208,15 @@ abstract class BaseTest extends TestCase {
             $stdin = $code;
         }
         $cmd = array_merge(self::llvmEnvPrefix(), $vmCmd);
-        [$result, $exitCode] = self::runVmSubprocess($cmd, $cwd, $env, $stdin, $name);
+        [$result, $exitCode, $stderr] = self::runVmSubprocess($cmd, $cwd, $env, $stdin, $name);
         if (isset($sections['EXPECT_EXIT'])) {
             $this->assertSame((int) trim($sections['EXPECT_EXIT']), $exitCode, "VM exit for {$name}");
         } elseif (0 !== $exitCode) {
-            $this->fail("VM exited with code {$exitCode} for {$name}");
+            $detail = trim($stderr);
+            if ('' === $detail) {
+                $detail = '(no stderr)';
+            }
+            $this->fail("VM exited with code {$exitCode} for {$name}: {$detail}");
         }
         if (isset($sections['EXPECT']) || isset($sections['EXPECTF']) || isset($sections['EXPECTREGEX'])) {
             $this->assertExpect($result, $sections);
@@ -297,7 +301,7 @@ abstract class BaseTest extends TestCase {
      * @param array<string, string> $env
      */
     /**
-     * @return array{0: string, 1: int}
+     * @return array{0: string, 1: int, 2: string}
      */
     protected static function runVmSubprocess(array $cmd, string $cwd, array $env, ?string $stdin, string $testName): array
     {
@@ -345,6 +349,7 @@ abstract class BaseTest extends TestCase {
         }
 
         $result = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
         fclose($pipes[1]);
         fclose($pipes[2]);
         $exitCode = proc_close($proc);
@@ -357,7 +362,11 @@ abstract class BaseTest extends TestCase {
             ));
         }
 
-        return [$result !== false ? $result : '', (int) $exitCode];
+        return [
+            $result !== false ? $result : '',
+            (int) $exitCode,
+            $stderr !== false ? $stderr : '',
+        ];
     }
 
     private static function peakRssKbForTree(int $rootPid): int

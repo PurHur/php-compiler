@@ -9,9 +9,8 @@ use PHPUnit\Framework\TestCase;
 /**
  * JIT compile coverage for runtime-resolved variable function calls (#1997, phase 2 of #56).
  *
- * MCJIT execute for this pattern is covered when {@see JITTest} runs the PHPT; full
- * execute may be gated on harness MCJIT stability (#2055). VM: {@see VMTest} +
- * variable_function_dynamic.phpt.
+ * MCJIT execute: {@see JITTest} + {@see VariableFunctionCallTest} in-process probes (#2055).
+ * VM: {@see VMTest} + variable_function_dynamic.phpt.
  *
  * @group llvm
  * @group jit

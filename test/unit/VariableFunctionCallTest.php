@@ -102,6 +102,35 @@ PHP;
      * @group llvm
      * @group jit
      */
+    public function testJitVariableFunctionBuiltinExecute(): void
+    {
+        if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
+            $this->markTestSkipped(LlvmToolchain::readyFailureReason() ?? 'LLVM not available');
+        }
+        $this->assertSame(self::EXPECT, $this->runJitInProcess(self::CODE));
+    }
+
+    /**
+     * @group llvm
+     * @group jit
+     */
+    public function testJitVariableFunctionDynamicExecute(): void
+    {
+        if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
+            $this->markTestSkipped(LlvmToolchain::readyFailureReason() ?? 'LLVM not available');
+        }
+        $code = <<<'PHP'
+<?php
+$name = $_GET['op'] ?? 'strlen';
+echo $name('hi'), "\n";
+PHP;
+        $this->assertSame("2\n", $this->runJitInProcess($code, 'op=strlen'));
+    }
+
+    /**
+     * @group llvm
+     * @group jit
+     */
     public function testAotLintVariableFunctionCall(): void
     {
         if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
@@ -131,6 +160,24 @@ PHP;
         $exit = proc_close($proc);
         $this->assertSame(0, $exit, trim((string) $stderr));
         $this->assertStringNotContainsString('Variable function calls not yet supported', (string) $stderr);
+    }
+
+    private function runJitInProcess(string $code, ?string $queryString = null): string
+    {
+        LlvmToolchain::applyCurrentProcessEnv(dirname(__DIR__, 2));
+        $runtime = new Runtime();
+        if (null !== $queryString) {
+            Superglobals::populateFromEnvironment($runtime->vmContext, $queryString, null);
+        }
+        $block = $runtime->parseAndCompile($code, 'test.php');
+        $runtime->jit($block);
+        ob_start();
+        $runtime->syncJitSuperglobals($queryString, null);
+        $runtime->run($block);
+        $out = ob_get_clean();
+        $this->assertIsString($out);
+
+        return $out;
     }
 
     private function runJitCompileProbe(string $code): string

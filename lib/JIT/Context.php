@@ -335,8 +335,10 @@ class Context {
         }
 
         SuperglobalInit::initialize($this);
-        if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
+        if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType
+            || Builtin::LOAD_TYPE_EMBED === $this->loadType) {
             SuperglobalInit::declareRefresh($this);
+            SuperglobalInit::implementRefresh($this);
         }
 
         $this->functionProxies['is_null'] = new Builtin\IsNullFn();

@@ -48,6 +48,18 @@ final class PhptWebSections
             $qs = self::normalizeSection($sections['GET']);
             $argv[] = '-q';
             $argv[] = $qs;
+        } elseif (isset($sections['ENV'])) {
+            foreach (explode("\n", trim($sections['ENV'])) as $line) {
+                $line = trim($line);
+                if (str_starts_with($line, 'QUERY_STRING=')) {
+                    $qs = substr($line, strlen('QUERY_STRING='));
+                    if ('' !== $qs) {
+                        $argv[] = '-q';
+                        $argv[] = $qs;
+                    }
+                    break;
+                }
+            }
         }
         if (isset($sections['POST'])) {
             $body = self::normalizeSection($sections['POST']);

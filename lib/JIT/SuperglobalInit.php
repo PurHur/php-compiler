@@ -57,6 +57,31 @@ final class SuperglobalInit
     }
 
     /**
+     * MCJIT embed: LLVM body that repopulates sg_* from the VM (issue #642, #2055).
+     * Standalone AOT links {@see __superglobals__refresh} from C runtime instead.
+     */
+    public static function implementRefresh(Context $context): void
+    {
+        if (Builtin::LOAD_TYPE_EMBED !== $context->loadType) {
+            return;
+        }
+        $fn = $context->lookupFunction('__superglobals__refresh');
+        $entry = $fn->appendBasicBlock('entry');
+        $oldBuilder = $context->builder;
+        $context->builder->positionAtEnd($entry);
+        foreach (self::STANDALONE_REFRESHED as $name) {
+            if (!isset(self::$globals[$name])) {
+                continue;
+            }
+            $ht = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+            self::populateFromVm($context, $ht, $name);
+            $context->builder->store($ht, self::$globals[$name]);
+        }
+        $context->builder->returnVoid();
+        $context->builder = $oldBuilder;
+    }
+
+    /**
      * Re-copy VM superglobals into LLVM sg_* globals (MCJIT embed, issue #642).
      */
     public static function refreshFromVm(Context $context): void
@@ -64,8 +89,8 @@ final class SuperglobalInit
         if (null === $context->jitResult()) {
             return;
         }
-        $init = $context->jitResult()->getCallable('__init__', 'void(*)()');
-        $init();
+        $refresh = $context->jitResult()->getCallable('__superglobals__refresh', 'void(*)()');
+        $refresh();
     }
 
     public static function initialize(Context $context): void
