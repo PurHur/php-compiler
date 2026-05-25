@@ -39,6 +39,10 @@ function compile_smoke_m3_emit(string $sourceFile, string $outFile): int
     }
 
     if (\function_exists('putenv')) {
+        // Native emit TU is linked with self-host stubs; runtime must not re-read those flags (#1937).
+        putenv('PHP_COMPILER_SELFHOST_AOT');
+        putenv('PHP_COMPILER_M3_COMPILE_DRIVER');
+        putenv('PHP_COMPILER_EMIT_HELPER_LINK');
         putenv('PHP_COMPILER_M3_EMIT_MINIMAL=1');
     }
 

@@ -40,7 +40,8 @@ Supporting fixes from #1402:
 | `Runtime::loadJit` | `compileRuntimeLoadJitM3Native` + nested `createJit` helpers (#1495) |
 | `Runtime::standalone` | Compile-driver link OK (#1402, #1056) |
 | `helloworld_compile_smoke` | Deny-listed for link (LLVM 9); smoke uses int+echo (#1514); compile_driver calls stub until link fixed |
-| `compile_smoke_m3_emit` | Deny-listed for self-host `compile_driver` link (LLVM 9); native emit via `compile_smoke_m3_emit_native_entry.php` + `PHP_COMPILER_SELFHOST_AOT=1` `PHP_COMPILER_M3_COMPILE_DRIVER=1` (#1983, #1937) |
+| `compile_smoke_m3_emit` | Deny-listed for self-host `compile_driver` link (LLVM 9); native emit via `compile_smoke_m3_emit_native_entry.php` + `PHP_COMPILER_SELFHOST_AOT=1` `PHP_COMPILER_M3_COMPILE_DRIVER=1` `PHP_COMPILER_EMIT_HELPER_LINK=1` (#1983, #1937) |
+| `Compiler::compile` / `compileFunc` | PHP CFG lowering in emit TU when `PHP_COMPILER_EMIT_HELPER_LINK=1` (link OK; runtime emit still blocked by emit-binary global init segfault — #1937) |
 | Native emit runtime | `BOOTSTRAP_M3_RUNTIME_COMPILE=1` + `PHP_COMPILER_M3_EMIT_MINIMAL=1` skips eager `loadJitCompileModuleFuncs` during smoke emit |
 | `runtime_ctor_smoke` | `php bin/compile.php -l test/bootstrap-aot/runtime_ctor_smoke.php`; int exit (#1514) |
 | `runtime_parse_compile_smoke` | `php bin/compile.php -l test/bootstrap-aot/runtime_parse_compile_smoke.php` |

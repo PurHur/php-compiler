@@ -305,6 +305,9 @@ class JIT {
             if (str_ends_with($m3Spine, '\\runtime::loadcoremodules')) {
                 return $this->compileRuntimeLoadCoreModulesM3Native($internalName, $block, $logicalName);
             }
+            if ($this->isM3EmitHelperCompilerPhpLoweringName($m3Spine)) {
+                return $this->compileRuntimeSpinePhpLowering($internalName, $block, $logicalName);
+            }
         }
         if (
             $this->shouldUseSelfHostJitStubs()
@@ -641,7 +644,6 @@ class JIT {
         if ($this->isSkippedSelfHostEntryName($name)) {
             return false;
         }
-
         if (str_contains($lower, '\\vm::')
             || str_contains($lower, '\\block::')
             || str_contains($lower, '\\frame::')
@@ -694,10 +696,24 @@ class JIT {
         return str_contains(strtolower($name), '\\jit\\issethelper::');
     }
 
+    /** M3 emit TU: PHP CFG lowering for compile spine only (#1937, #1983). */
+    private function isM3EmitHelperCompilerPhpLoweringName(string $lower): bool
+    {
+        if (!$this->shouldUseEmitHelperLinkStubs()) {
+            return false;
+        }
+
+        return str_ends_with($lower, '\\compiler::compile')
+            || str_ends_with($lower, '\\compiler::compilefunc');
+    }
+
     private function isSkippedCompilerHotPathName(string $name): bool
     {
         $lower = strtolower($name);
         if ($this->isM3CompileDriverRealLoweringName($lower)) {
+            return false;
+        }
+        if ($this->isM3EmitHelperCompilerPhpLoweringName($lower)) {
             return false;
         }
         if ($this->shouldUseSelfHostJitStubs() && str_contains($lower, '\\compiler::')) {
