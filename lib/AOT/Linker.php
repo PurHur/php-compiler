@@ -22,6 +22,7 @@ final class Linker
         __DIR__.'/runtime/phpc_fs_dir.c',
         __DIR__.'/runtime/phpc_session_id_storage.c',
         __DIR__.'/runtime/phpc_session_name_storage.c',
+        __DIR__.'/runtime/phpc_session_lifecycle.c',
         __DIR__.'/runtime/phpc_ob_storage.c',
         __DIR__.'/runtime/phpc_ob.c',
         __DIR__.'/runtime/phpc_parse_url.c',

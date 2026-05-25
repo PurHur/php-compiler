@@ -446,6 +446,16 @@ class Type extends Builtin {
             $this->context->context->functionType($void, false, $strPtr, $strPtr, $i64, $strPtr, $strPtr, $i32, $i32)
         );
         $this->context->registerFunction('__phpc_setcookie_add', $fnSetcookieAdd);
+        $fntypeSessionApply = $this->context->context->functionType($void, false, $valuePtr);
+        $fnSessionStart = $this->context->module->addFunction('__phpc_session_start_apply', $fntypeSessionApply);
+        $this->context->registerFunction('__phpc_session_start_apply', $fnSessionStart);
+        $fnSessionWriteClose = $this->context->module->addFunction(
+            '__phpc_session_write_close_apply',
+            $fntypeSessionApply
+        );
+        $this->context->registerFunction('__phpc_session_write_close_apply', $fnSessionWriteClose);
+        SessionStart::implement($this->context);
+        SessionWriteClose::implement($this->context);
         $fntypeJsonEncode = $this->context->context->functionType(
             $this->context->getTypeFromString('__string__*'),
             false,

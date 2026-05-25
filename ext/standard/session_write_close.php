@@ -32,8 +32,10 @@ final class session_write_close extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'session_write_close() not implemented for JIT in this compiler build (issue #1185)'
-        );
+        if (\count($args) > 0) {
+            throw new \LogicException('session_write_close() takes no arguments in this compiler build');
+        }
+
+        return JitSessionWriteClose::invoke($context);
     }
 }
