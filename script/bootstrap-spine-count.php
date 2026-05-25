@@ -41,6 +41,25 @@ function bootstrap_spine_counts(string $root): array
     return ['spine' => $spine, 'inventory' => $inventory];
 }
 
+/**
+ * @return list<string> repo-relative paths from require_once lines
+ */
+function bootstrap_spine_require_paths(string $spineMain): array
+{
+    if (!is_readable($spineMain)) {
+        return [];
+    }
+    $paths = [];
+    foreach (file($spineMain, FILE_IGNORE_NEW_LINES) as $line) {
+        if (preg_match("#require_once __DIR__\\.'/\\.\\./\\.\\./\\.\\./([^']+)';#", $line, $match)) {
+            $paths[] = $match[1];
+        }
+    }
+    sort($paths, SORT_STRING);
+
+    return $paths;
+}
+
 function bootstrap_count_spine_requires(string $spineMain): int
 {
     if (!is_readable($spineMain)) {

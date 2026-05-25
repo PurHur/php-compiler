@@ -127,6 +127,14 @@ ci_run_selfhost_spine_count_sync_check() {
   "$PHP_BIN" "${PHP_OPTS[@]}" script/check-selfhost-spine-count-sync.php
 }
 
+ci_run_selfhost_spine_coverage_sync_check() {
+  if [[ "${SELFHOST_SPINE_COVERAGE_SYNC_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  echo "Self-host spine coverage sync (SELFHOST_SPINE_COVERAGE_SYNC_GATE=1, issue #1945)..."
+  "$PHP_BIN" "${PHP_OPTS[@]}" script/check-selfhost-spine-coverage-sync.php
+}
+
 ci_run_m3_allowlist_sync_check() {
   if [[ "${M3_ALLOWLIST_SYNC_GATE:-0}" != "1" ]]; then
     return 0
@@ -159,6 +167,7 @@ ci_run_inventory_checks() {
   ci_run_rebuild_examples_005_sync_check
   ci_run_root_readme_sync_check
   ci_run_selfhost_spine_count_sync_check
+  ci_run_selfhost_spine_coverage_sync_check
   ci_run_m3_allowlist_sync_check
 }
 
