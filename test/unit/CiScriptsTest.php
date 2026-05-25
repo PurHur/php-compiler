@@ -567,6 +567,26 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('BOOTSTRAP_M5_DOC_SYNC_GATE=${BOOTSTRAP_M5_DOC_SYNC_GATE:-1}', $body);
     }
 
+    public function testCiDefaultsEnvDefinesBootstrapVendorInventorySyncGateOff(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString('BOOTSTRAP_VENDOR_INVENTORY_SYNC_GATE="${BOOTSTRAP_VENDOR_INVENTORY_SYNC_GATE:-0}"', $defaults);
+    }
+
+    public function testCiFastRunsBootstrapVendorInventorySyncViaInventoryChecks(): void
+    {
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('ci_run_bootstrap_vendor_inventory_sync_check', $common);
+        $this->assertStringContainsString('bootstrap-vendor-inventory.php', $common);
+        $this->assertStringContainsString('BOOTSTRAP_VENDOR_INVENTORY_SYNC_GATE:-0', $common);
+    }
+
+    public function testCiDockerRunPassesBootstrapVendorInventorySyncGateDefaultOff(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');
+        $this->assertStringContainsString('BOOTSTRAP_VENDOR_INVENTORY_SYNC_GATE=${BOOTSTRAP_VENDOR_INVENTORY_SYNC_GATE:-0}', $body);
+    }
+
     public function testCiDefaultsEnvDefinesExamplesAotSmokeGateOn(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
@@ -911,6 +931,14 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('REBUILD_EXAMPLES_006_SYNC_GATE', $doc);
         $this->assertStringContainsString('check-rebuild-examples-006-row.php', $doc);
         $this->assertMatchesRegularExpression('/\| `REBUILD_EXAMPLES_006_SYNC_GATE` \| `0` \|/', $doc);
+    }
+
+    public function testLocalCiMatrixDocumentsBootstrapVendorInventorySyncGate(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('BOOTSTRAP_VENDOR_INVENTORY_SYNC_GATE', $doc);
+        $this->assertStringContainsString('bootstrap-vendor-inventory.php', $doc);
+        $this->assertMatchesRegularExpression('/\| `BOOTSTRAP_VENDOR_INVENTORY_SYNC_GATE` \| `0` \|/', $doc);
     }
 
     public function testLocalCiMatrixDocumentsRootReadmeSyncGate(): void
