@@ -204,7 +204,8 @@ final class TryCatchHelper
                 foreach ($types as $idx => $typeName) {
                     $thrownVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $pendingObj);
                     $isInstance = ReflectionBuiltinHelper::emitInstanceOf($context, $thrownVar, $typeName);
-                    $isBool = $context->castToBool($context->helper->loadValue($isInstance));
+                    // emitInstanceOf is int1; avoid castToBool(loadValue(...)) which broke AOT catch (#2101).
+                    $isBool = $context->helper->loadValue($isInstance);
                     $isLast = $idx === $typeCount - 1;
                     if ($isLast) {
                         $builder->branchIf($isBool, $matchBb, $noMatchBb);
