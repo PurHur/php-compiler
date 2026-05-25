@@ -49,7 +49,7 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | M3 compile-smoke probe (partial) | ✅ `bootstrap-selfhost-compile-smoke-probe.sh` (Zend emit; strict opt-in #1937) |
 | M2 `BOOTSTRAP_LIB_SPINE_SMOKE=1` spine link | ✅ `compiler_lib_spine_smoke bundle OK` |
 | M3 `make bootstrap-selfhost-helloworld` | 🚧 partial — HelloWorld runs natively; emit uses Zend |
-| M4 `make bootstrap-loop-gen1-link` | 🚧 partial — gen-1 link + gen-2 Zend emit; native gen-2 blocked on M3 ([#1498](https://github.com/PurHur/php-compiler/issues/1498)) |
+| M4 `make bootstrap-loop-gen1-link` | 🚧 partial — gen-1 link + gen-2 **Zend** emit (`emit_path=zend partial`); `BOOTSTRAP_M4_LINK_COMPILE_DRIVER=1` for `emit_path=native`; `BOOTSTRAP_M4_GEN2_STRICT=1` refuses Zend fallback ([#1498](https://github.com/PurHur/php-compiler/issues/1498), [#2115](https://github.com/PurHur/php-compiler/issues/2115)) |
 | M4 `make bootstrap-loop-probe` | 🚧 ladder — `--dry-run` validates lint+M2+M3 partial+gen-1; full exits **2** until M3 strict ([#1498](https://github.com/PurHur/php-compiler/issues/1498)) |
 | `make bootstrap-aot-link` | ✅ **71/71** |
 | `php script/bootstrap-inventory.php --check` | ✅ **611** files, **0** source blockers |
