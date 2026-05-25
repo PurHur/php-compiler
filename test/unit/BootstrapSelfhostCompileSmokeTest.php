@@ -95,7 +95,8 @@ final class BootstrapSelfhostCompileSmokeTest extends TestCase
         $script = self::$root.'/script/bootstrap-selfhost-compile-smoke-probe.sh';
         $source = (string) file_get_contents($script);
         $this->assertStringContainsString('BOOTSTRAP_M3_LINK_COMPILE_DRIVER', $source);
-        $this->assertStringContainsString('compile_smoke_m3_emit_entry.php', $source);
+        $this->assertStringContainsString('compile_smoke_m3_emit_native_entry.php', $source);
+        $this->assertStringContainsString('PHP_COMPILER_EMIT_HELPER_LINK', $source);
         $this->assertStringContainsString('compile_smoke_m3_emit: compile OK', $source);
     }
 

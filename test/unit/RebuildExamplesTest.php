@@ -61,7 +61,7 @@ final class RebuildExamplesTest extends TestCase
         $this->assertNotFalse($defaults);
         $this->assertStringContainsString('ci_run_rebuild_examples_005_sync_check', $common);
         $this->assertStringContainsString('check-rebuild-examples-005-row.php', $common);
-        $this->assertStringContainsString('REBUILD_EXAMPLES_005_SYNC_GATE:-0', $common);
-        $this->assertStringContainsString('REBUILD_EXAMPLES_005_SYNC_GATE="${REBUILD_EXAMPLES_005_SYNC_GATE:-0}"', $defaults);
+        $this->assertStringContainsString('REBUILD_EXAMPLES_005_SYNC_GATE:-1', $common);
+        $this->assertStringContainsString('REBUILD_EXAMPLES_005_SYNC_GATE="${REBUILD_EXAMPLES_005_SYNC_GATE:-1}"', $defaults);
     }
 }

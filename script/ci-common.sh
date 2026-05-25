@@ -104,7 +104,7 @@ ci_run_examples_ladder_discovery_check() {
 }
 
 ci_run_rebuild_examples_005_sync_check() {
-  if [[ "${REBUILD_EXAMPLES_005_SYNC_GATE:-0}" != "1" ]]; then
+  if [[ "${REBUILD_EXAMPLES_005_SYNC_GATE:-1}" != "1" ]]; then
     return 0
   fi
   echo "Rebuild examples 005 row sync (REBUILD_EXAMPLES_005_SYNC_GATE=1, issue #1930)..."
@@ -151,6 +151,14 @@ ci_run_m3_allowlist_sync_check() {
   "$PHP_BIN" "${PHP_OPTS[@]}" script/check-m3-allowlist-snapshot.php
 }
 
+ci_run_bootstrap_m5_doc_sync_check() {
+  if [[ "${BOOTSTRAP_M5_DOC_SYNC_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  echo "Bootstrap M5 doc sync (BOOTSTRAP_M5_DOC_SYNC_GATE=1, issue #1984)..."
+  "$PHP_BIN" "${PHP_OPTS[@]}" script/check-bootstrap-m5-doc-sync.php
+}
+
 ci_run_init_sessionsweb_parity_check() {
   if [[ "${INIT_SESSIONSWEB_PARITY_GATE:-1}" != "1" ]]; then
     return 0
@@ -178,6 +186,7 @@ ci_run_inventory_checks() {
   ci_run_selfhost_spine_count_sync_check
   ci_run_selfhost_spine_coverage_sync_check
   ci_run_m3_allowlist_sync_check
+  ci_run_bootstrap_m5_doc_sync_check
 }
 
 ci_llvm_dir() {

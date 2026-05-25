@@ -21,7 +21,7 @@ declare(strict_types=1);
  *   phpc lint [-r 'code'] [--json] entry.php
  *   phpc lint --project <entry.php> [--json]
  *   phpc lint --all <dir-or-file> [--json]
- *   phpc init [--profile default|miniwebapp] [--force] [target-dir]
+ *   phpc init [--profile default|miniwebapp|sessionsweb] [--force] [target-dir]
  *   phpc test [--fast] [--bootstrap] [--bootstrap-strict] [-- phpunit/ci-local args...]
  *   phpc doctor [--gates] [--no-lint] [--jit-probe] [--aot-project-probe [dir]]  Env probes; --gates adds 005-SessionsWeb ladder (#1903, #1969)
  *   phpc validate-manifest [dir]                 Validate phpc.json schema and paths (issue #263)
@@ -65,8 +65,8 @@ php-compiler CLI
   phpc lint --project <entry.php> [--json]    Entry + literal include/require chain
   phpc lint --all <dir-or-file> [--json]      All .php under a tree (aggregated)
       --json fields: file, line, kind, message, issue, issue_url (when tracked)
-  phpc init [--profile default|miniwebapp] [--force] [target-dir]
-                                              Scaffold web project (default hello or miniwebapp)
+  phpc init [--profile default|miniwebapp|sessionsweb] [--force] [target-dir]
+                                              Scaffold web project (default, miniwebapp, or sessionsweb)
   phpc test [--fast] [args...]                  Run ci-local.sh (full) or ci-fast.sh (no LLVM)
   phpc test --bootstrap [--strict]              Bootstrap subset (inventory + spine sync; #1961)
   phpc doctor [--gates] [--no-lint] [--jit-probe] [--aot-project-probe [dir]]

@@ -86,4 +86,4 @@ See [#1969](https://github.com/PurHur/php-compiler/issues/1969) and `docs/local-
 - [#1946](https://github.com/PurHur/php-compiler/issues/1946) — `SESSIONS_WEB_AOT_LINK_GATE=1`: `ExamplesCompileTest::test005SessionsWebAotLink`
 - [#1891](https://github.com/PurHur/php-compiler/issues/1891) — `SESSIONS_WEB_AOT_SMOKE_GATE=1`: `SessionsWebAotExecuteTest`
 - [#1893](https://github.com/PurHur/php-compiler/issues/1893) — `SESSIONS_WEB_DEPLOY_SMOKE_GATE=1`: `deploy-smoke.sh --example 005`, `docs/deploy-web-aot.md`
-- [#1886](https://github.com/PurHur/php-compiler/issues/1886) — `phpc init --profile sessionsweb` copies from `templates/init-sessionsweb/`
+- [#1886](https://github.com/PurHur/php-compiler/issues/1886) — `phpc init --profile sessionsweb` copies from `templates/init-sessionsweb/` (see `PhpcInitSessionsWebTest`)
