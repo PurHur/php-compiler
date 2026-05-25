@@ -99,6 +99,7 @@ stage3c_wired=0
 stage4a=0
 stage4serve=0
 stage4c=0
+stage4c_wired=0
 stage4d=0
 stage4=0
 stage4b2=0
@@ -234,7 +235,13 @@ elif [[ "${aot_dry_run_skipped}" -eq 1 ]]; then
   aot_execute_probe_skipped=1
 fi
 
-# Stage 4c: examples-aot-smoke 003 slice (#683, #485; execute default on #747).
+# Stage 4c wired: EXAMPLES_AOT_SMOKE_GATE default on in ci-local (#674, #764 closed).
+if grep -q 'EXAMPLES_AOT_SMOKE_GATE:-1' "${ROOT}/script/ci-defaults.env" 2>/dev/null \
+  && grep -q 'ci_run_examples_aot_smoke' "${ROOT}/script/ci-common.sh" 2>/dev/null; then
+  stage4c_wired=1
+fi
+
+# Stage 4c: examples-aot-smoke 003 slice (#683, #881, #485; execute default on #747).
 if [[ -n "${LLVM_DIR}" ]]; then
   aot_smoke_log="$(mktemp)"
   set +e
@@ -470,20 +477,25 @@ elif [[ "${deploy_smoke_003_exit}" -ge 0 ]]; then
   fi
 fi
 
-echo "$(mark "${stage4c}") Stage 4c AOT smoke — examples-aot-smoke 003 slice (#683, #485)"
+echo "$(mark "${stage4c}") Stage 4c AOT smoke — examples-aot-smoke 003 slice (#683, #881, #485)"
 echo "       ${REPO_URL}/issues/683"
+echo "       ${REPO_URL}/issues/881"
 echo "       ${REPO_URL}/issues/485"
-if [[ "${aot_dry_run_skipped}" -eq 1 && -z "${LLVM_DIR}" ]]; then
+echo "       EXAMPLES_AOT_SMOKE_GATE=1 default in ci-defaults.env (#674); EXAMPLES_AOT_SMOKE_ONLY=003 for ladder probe"
+echo "       EXAMPLES_AOT_SMOKE_GATE=0 ./script/ci-local.sh   # skip examples-aot-smoke during iteration"
+if [[ "${stage4c_wired}" -eq 0 ]]; then
+  echo "       gate not wired in ci-defaults.env / ci-common.sh"
+elif [[ "${aot_dry_run_skipped}" -eq 1 && -z "${LLVM_DIR}" ]]; then
   echo "       LLVM 9 not available (script/install-llvm9.sh or .llvm/)"
 elif [[ "${aot_smoke_003_skipped}" -eq 1 ]]; then
-  echo "       003 slice probe: skipped (MINIWEBAPP_AOT_EXECUTE_GATE=0)"
+  echo "       003 slice probe: skipped (MINIWEBAPP_AOT_EXECUTE_GATE=0 or examples-aot-smoke skip)"
   if [[ -n "${AOT_SMOKE_003_STDERR}" ]]; then
     echo "${AOT_SMOKE_003_STDERR}" | sed 's/^/         /'
   fi
 elif [[ "${aot_smoke_003_exit}" -eq 0 && "${stage4c}" -eq 1 ]]; then
   echo "       003 slice probe: green"
 elif [[ "${aot_smoke_003_exit}" -ge 0 ]]; then
-  echo "       003 slice probe: exit ${aot_smoke_003_exit} (see #764/#485)"
+  echo "       003 slice probe: exit ${aot_smoke_003_exit} (see #683/#881/#485)"
   if [[ -n "${AOT_SMOKE_003_STDERR}" ]]; then
     echo "${AOT_SMOKE_003_STDERR}" | sed 's/^/         /'
   fi
