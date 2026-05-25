@@ -89,4 +89,22 @@ final class BootstrapSelfhostCompileSmokeTest extends TestCase
         $this->assertStringContainsString('compiler smoke', $out);
         $this->assertTrue(is_executable(self::$root.'/build/compile-smoke-aot'));
     }
+
+    public function testCompileSmokeProbeScriptWiresNativeCompileDriver(): void
+    {
+        $script = self::$root.'/script/bootstrap-selfhost-compile-smoke-probe.sh';
+        $source = (string) file_get_contents($script);
+        $this->assertStringContainsString('BOOTSTRAP_M3_LINK_COMPILE_DRIVER', $source);
+        $this->assertStringContainsString('compile_smoke_m3_emit_entry.php', $source);
+        $this->assertStringContainsString('compile_smoke_m3_emit: compile OK', $source);
+    }
+
+    public function testCompileDriverLintPasses(): void
+    {
+        $driver = self::$root.'/test/selfhost/compiler_compile_smoke/compile_driver.php';
+        $this->assertFileExists($driver);
+        $cmd = 'php '.escapeshellarg(self::$root.'/bin/compile.php').' -l '.escapeshellarg($driver).' 2>&1';
+        exec($cmd, $lines, $exitCode);
+        $this->assertSame(0, $exitCode, implode("\n", $lines));
+    }
 }

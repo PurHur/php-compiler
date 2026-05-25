@@ -40,6 +40,7 @@ Supporting fixes from #1402:
 | `Runtime::loadJit` | `compileRuntimeLoadJitM3Native` + nested `createJit` helpers (#1495) |
 | `Runtime::standalone` | Compile-driver link OK (#1402, #1056) |
 | `helloworld_compile_smoke` | Deny-listed for link (LLVM 9); smoke uses int+echo (#1514); compile_driver calls stub until link fixed |
+| `compile_smoke_m3_emit` | Real-lowered via standalone `compile_smoke_m3_emit_entry.php` link (#1977); runtime emit still segfaults on `parseAndCompile` spine (same as HelloWorld) |
 | `runtime_ctor_smoke` | `php bin/compile.php -l test/bootstrap-aot/runtime_ctor_smoke.php`; int exit (#1514) |
 | `runtime_parse_compile_smoke` | `php bin/compile.php -l test/bootstrap-aot/runtime_parse_compile_smoke.php` |
 

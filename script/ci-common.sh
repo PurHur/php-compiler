@@ -366,8 +366,11 @@ ci_run_bootstrap_m3_compile_smoke_strict() {
     echo "bootstrap-m3-compile-smoke-strict: skipped (LLVM 9 not available)"
     return 0
   fi
-  echo "bootstrap-m3-compile-smoke-strict (BOOTSTRAP_M3_COMPILE_SMOKE_STRICT_GATE=1, issue #1937)..."
-  BOOTSTRAP_M3_COMPILE_SMOKE_STRICT=1 \
+  echo "bootstrap-m3-compile-smoke-strict (BOOTSTRAP_M3_COMPILE_SMOKE_STRICT_GATE=1, issue #1937/#1977)..."
+  BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1 \
+    BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING=1 \
+    BOOTSTRAP_M3_RUNTIME_COMPILE=1 \
+    BOOTSTRAP_M3_COMPILE_SMOKE_STRICT=1 \
     "$_CI_SCRIPT_DIR/bootstrap-selfhost-compile-smoke-probe.sh"
 }
 
