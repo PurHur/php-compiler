@@ -260,6 +260,11 @@ final class Doctor
         $coalesceDetail = $coalesceOn
             ? 'default on — ci-fast Coalesce* (#1960)'
             : 'skipped (COALESCE_COMPLIANCE_GATE=0)';
+        $jitVarFnGate = getenv('JIT_VARIABLE_FUNCTION_COMPLIANCE_GATE');
+        $jitVarFnOn = false === $jitVarFnGate || '' === $jitVarFnGate || '1' === $jitVarFnGate;
+        $jitVarFnDetail = $jitVarFnOn
+            ? 'default on — ci-fast/ci-local VariableFunction* JIT (#2060)'
+            : 'skipped (JIT_VARIABLE_FUNCTION_COMPLIANCE_GATE=0)';
 
         fwrite(STDOUT, "  Gates ladder     make miniwebapp-gates              stages 0–4d (#472)\n");
         fwrite(STDOUT, "  Fast CI          ./script/ci-fast.sh               VM/compliance\n");
@@ -267,6 +272,7 @@ final class Doctor
         fwrite(STDOUT, "  Attributes       {$attributesDetail}\n");
         fwrite(STDOUT, "  HashTable rehash {$rehashDetail}\n");
         fwrite(STDOUT, "  Null coalescing  {$coalesceDetail}\n");
+        fwrite(STDOUT, "  JIT \$fn() calls  {$jitVarFnDetail}\n");
         fwrite(STDOUT, "  Full AOT tail    ./script/ci-local.sh --filter MiniWebAppAotExecuteTest   LLVM required\n");
         fwrite(STDOUT, "  Presenter bundle make north-star1-verify            --require-llvm / --skip-llvm-tail\n");
         fwrite(STDOUT, "  Script           ./script/north-star1-verify.sh    same as make target\n");
