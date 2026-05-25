@@ -22,7 +22,7 @@ declare(strict_types=1);
  *   phpc lint --project <entry.php> [--json]
  *   phpc lint --all <dir-or-file> [--json]
  *   phpc init [--profile default|miniwebapp] [--force] [target-dir]
- *   phpc test [--fast] [-- phpunit/ci-local args...]
+ *   phpc test [--fast] [--bootstrap] [--bootstrap-strict] [-- phpunit/ci-local args...]
  *   phpc doctor [--gates] [--no-lint] [--jit-probe] [--aot-project-probe [dir]]  Env probes; --gates adds 005-SessionsWeb ladder (#1903)
  *   phpc validate-manifest [dir]                 Validate phpc.json schema and paths (issue #263)
  */
@@ -68,6 +68,7 @@ php-compiler CLI
   phpc init [--profile default|miniwebapp] [--force] [target-dir]
                                               Scaffold web project (default hello or miniwebapp)
   phpc test [--fast] [args...]                  Run ci-local.sh (full) or ci-fast.sh (no LLVM)
+  phpc test --bootstrap [--strict]              Bootstrap subset (inventory + spine sync; #1961)
   phpc doctor [--gates] [--no-lint] [--jit-probe] [--aot-project-probe [dir]]
                                               Probe environment; LLVM/JIT readiness (#717, #746)
       --gates                                     MiniWebApp ladder + NS1/NS2 + 005-SessionsWeb (#1903)
@@ -203,9 +204,51 @@ switch ($command) {
 
     case 'test':
         $fast = false;
-        if ([] !== $args && in_array($args[0], ['--fast', 'fast'], true)) {
-            $fast = true;
-            array_shift($args);
+        $bootstrap = false;
+        $bootstrapStrict = false;
+        while ([] !== $args) {
+            if (in_array($args[0], ['--fast', 'fast'], true)) {
+                $fast = true;
+                array_shift($args);
+                continue;
+            }
+            if ('--bootstrap' === $args[0]) {
+                $bootstrap = true;
+                array_shift($args);
+                continue;
+            }
+            if ('--bootstrap-strict' === $args[0]) {
+                $bootstrap = true;
+                $bootstrapStrict = true;
+                array_shift($args);
+                continue;
+            }
+            if ('--strict' === $args[0]) {
+                if (!$bootstrap) {
+                    fwrite(STDERR, "phpc test: --strict requires --bootstrap\n");
+                    exit(1);
+                }
+                $bootstrapStrict = true;
+                array_shift($args);
+                continue;
+            }
+            break;
+        }
+        if ($bootstrap) {
+            if ($fast) {
+                fwrite(STDERR, "phpc test: --bootstrap cannot be combined with --fast\n");
+                exit(1);
+            }
+            $bootstrapScript = $repoRoot.'/script/bootstrap-test-subset.sh';
+            if (!is_executable($bootstrapScript)) {
+                fwrite(STDERR, "phpc test: {$bootstrapScript} is not executable\n");
+                exit(1);
+            }
+            $bootstrapArgs = [$bootstrapScript];
+            if ($bootstrapStrict) {
+                $bootstrapArgs[] = '--strict';
+            }
+            exit(runProcess($bootstrapArgs, $repoRoot));
         }
         $testScript = $repoRoot.'/script/'.($fast ? 'ci-fast.sh' : 'ci-local.sh');
         if (!is_executable($testScript)) {
