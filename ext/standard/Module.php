@@ -152,6 +152,7 @@ class Module extends ModuleAbstract
             new base64_decode(),
             new hash_(),
             new hash_hmac(),
+            new hash_equals(),
             new md5(),
             new sha1(),
             new crc32(),
