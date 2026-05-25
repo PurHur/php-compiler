@@ -29,6 +29,8 @@ class Object_ extends Type {
     private array $enums = [];
     /** @var array<int, string> class id => canonical name */
     private array $classIdToName = [];
+    /** @var array<string, string> declaring class lc => parent class lc (#1858) */
+    private array $classParentLc = [];
     private array $properties = [];
     private array $propNameMap = [];
     /** @var array<int, array<string, int>> class id => method lc => visibility flags */
@@ -397,6 +399,21 @@ class Object_ extends Type {
         $this->classIdToName[$id] = $name->value;
 
         return $this->classes[strtolower($name->value)] = $id;
+    }
+
+    public function setClassParentName(string $className, string $parentName): void
+    {
+        $childLc = strtolower(ltrim($className, '\\'));
+        $parentLc = strtolower(ltrim($parentName, '\\'));
+        if (!isset($this->classes[$parentLc])) {
+            throw new \LogicException("Class {$className} extends unknown class {$parentName}");
+        }
+        $this->classParentLc[$childLc] = $parentLc;
+    }
+
+    public function parentClassLc(string $declaringClassLc): ?string
+    {
+        return $this->classParentLc[strtolower(ltrim($declaringClassLc, '\\'))] ?? null;
     }
 
     public function declareEnum(Operand $name): int
@@ -973,7 +990,7 @@ class Object_ extends Type {
             throw new \LogicException('static:: used outside of class scope');
         }
         if ('parent' === $name) {
-            throw new \LogicException('parent:: is not supported');
+            throw new \LogicException('parent::class is not supported (issue #1858)');
         }
 
         return $this->lookup($classOp->value);

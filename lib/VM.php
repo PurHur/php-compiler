@@ -380,6 +380,9 @@ restart:
                         return $this->raise("Unknown class for constant fetch: {$className}", $frame);
                     }
                     $constName = strtolower($frame->scope[$op->arg3]->toString());
+                    if ('class' === $constName && $this->isParentClassDispatch($frame, $lcClass)) {
+                        return $this->raise('parent::class is not supported (issue #1858)', $frame);
+                    }
                     $classEntry = $this->context->classes[$lcClass];
                     if ('class' === $constName) {
                         $frame->scope[$op->arg1]->string($classEntry->name);
@@ -407,6 +410,9 @@ restart:
                     break;
                 case OpCode::TYPE_STATIC_PROPERTY_FETCH:
                     $rawClass = $frame->scope[$op->arg2]->toString();
+                    if ('parent' === strtolower($rawClass)) {
+                        return $this->raise('parent::$property is not supported (issue #1858)', $frame);
+                    }
                     $lcClass = $this->resolveStaticClassName(
                         $rawClass,
                         $frame
@@ -552,7 +558,7 @@ restart:
                     $new = $frame->call->getFrame($this->context, $frame);
                     $new->calledClass = $this->inferCalledClass($frame);
                     if ($op->type === OpCode::TYPE_FUNCCALL_EXEC_RETURN) {
-                        $new->returnVar = $frame->scope[$op->arg1];
+                        $new->returnVar = $this->scopeSlot($frame, (int) $op->arg1);
                     }
                     try {
                         $new->calledArgs = $this->resolveOutgoingCallArgs($frame);
@@ -1140,6 +1146,15 @@ restart:
         return [[], null];
     }
 
+    protected function scopeSlot(Frame $frame, int $slot): Variable
+    {
+        if (!isset($frame->scope[$slot])) {
+            $frame->scope[$slot] = new Variable();
+        }
+
+        return $frame->scope[$slot];
+    }
+
     protected function resolveStaticClassName(string $className, Frame $frame): string
     {
         return $this->resolveClassScopeName($className, $frame);
@@ -1176,7 +1191,7 @@ restart:
             throw new \LogicException('self:: used outside of class scope');
         }
 
-        return strtolower($frame->block->func->class->name);
+        return strtolower($frame->block->func->class->value);
     }
 
     protected function lateStaticClassLc(Frame $frame): string
@@ -1256,7 +1271,87 @@ restart:
             $methodName
         );
         $frame->call = $class->methods[$methodLc];
-        $frame->callArgs = [];
+        $frame->callArgs = $this->callArgsForStaticMethod($frame, $lcClass, $frame->call);
+    }
+
+    /**
+     * @return list<Variable>
+     */
+    protected function callArgsForStaticMethod(Frame $frame, string $resolvedLc, Func $call): array
+    {
+        $args = $this->implicitThisArgsForStaticInstanceCall($frame, $call);
+        if ([] !== $args) {
+            return $args;
+        }
+        if ($this->isParentClassDispatch($frame, $resolvedLc)) {
+            $thisVar = $this->resolveCallerThis($frame);
+            if (null !== $thisVar) {
+                return [$thisVar];
+            }
+        }
+
+        return [];
+    }
+
+    protected function isParentClassDispatch(Frame $frame, string $resolvedLc): bool
+    {
+        if (null === $frame->block->func || null === $frame->block->func->class) {
+            return false;
+        }
+        $declaring = strtolower($frame->block->func->class->value);
+        if (!isset($this->context->classes[$declaring])) {
+            return false;
+        }
+        $parentLc = $this->context->classes[$declaring]->parentLc;
+
+        return null !== $parentLc && $resolvedLc === $parentLc;
+    }
+
+    protected function resolveCallerThis(Frame $frame): ?Variable
+    {
+        if (null === $frame->block->func || null === $frame->block->func->class) {
+            return null;
+        }
+        if (($frame->block->func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC) {
+            return null;
+        }
+        if (!empty($frame->callArgs)) {
+            return $frame->callArgs[0];
+        }
+        if (!empty($frame->calledArgs)) {
+            return $frame->calledArgs[0];
+        }
+        $idx = $frame->block->slotIndexForVariableName('this');
+        if (null !== $idx && isset($frame->scope[$idx])) {
+            return $frame->scope[$idx];
+        }
+
+        return $frame->block->findVariableByRuntimeName('this', $frame);
+    }
+
+    /**
+     * Non-parent static calls to instance methods pass $this from the caller (#1858).
+     *
+     * @return list<Variable>
+     */
+    protected function implicitThisArgsForStaticInstanceCall(Frame $frame, Func $call): array
+    {
+        if (!$call instanceof Func\PHP) {
+            return [];
+        }
+        $callee = $call->block;
+        if (null === $callee->func || null === $callee->func->class) {
+            return [];
+        }
+        if (($callee->func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC) {
+            return [];
+        }
+        $thisVar = $this->resolveCallerThis($frame);
+        if (null === $thisVar) {
+            return [];
+        }
+
+        return [$thisVar];
     }
 
     protected function inheritFromParent(ClassEntry $entry): void

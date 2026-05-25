@@ -2248,7 +2248,7 @@ class JIT {
                         // short circuit
                         break;
                     }
-                    $callArgs = $this->prependImplicitThisForStaticConstruct(
+                    $callArgs = $this->prependImplicitThisForStaticInstanceCall(
                         $block,
                         $this->context->scope->toCall,
                         $this->finalizeJitCallArgs($this->context->scope->args)
@@ -2259,7 +2259,7 @@ class JIT {
                     $this->context->callerStrictTypes = $prevStrict;
                     break;
                 case OpCode::TYPE_FUNCCALL_EXEC_RETURN:
-                    $callArgs = $this->prependImplicitThisForStaticConstruct(
+                    $callArgs = $this->prependImplicitThisForStaticInstanceCall(
                         $block,
                         $this->context->scope->toCall,
                         $this->finalizeJitCallArgs($this->context->scope->args)
@@ -2328,6 +2328,11 @@ class JIT {
                     $this->context->pushScope();
                     $this->context->scope->classId = $this->context->type->object->declareClass($nameOp);
                     $this->context->scope->className = strtolower($nameOp->value);
+                    if (null !== $op->arg2) {
+                        $parentOp = $block->getOperand($op->arg2);
+                        assert($parentOp instanceof Operand\Literal);
+                        $this->context->type->object->setClassParentName($nameOp->value, $parentOp->value);
+                    }
                     $this->compileClass($op->block1, $this->context->scope->classId);
                     $this->context->popScope();
                     break;
@@ -3958,7 +3963,15 @@ class JIT {
             throw new \LogicException('static:: used outside of class scope');
         }
         if ('parent' === $lc) {
-            throw new \LogicException('parent:: is not supported');
+            if (null === $block->func || null === $block->func->class) {
+                throw new \LogicException('parent:: used outside of class scope');
+            }
+            $parentLc = $this->context->type->object->parentClassLc($block->func->class->value);
+            if (null === $parentLc) {
+                throw new \LogicException('parent:: used when class has no parent');
+            }
+
+            return $parentLc;
         }
 
         return $classOp->value;
@@ -4043,15 +4056,15 @@ class JIT {
         return $argEntries;
     }
 
-    private function prependImplicitThisForStaticConstruct(
+    /**
+     * Static parent::instanceMethod() from an instance method passes implicit $this (#1858).
+     */
+    private function prependImplicitThisForStaticInstanceCall(
         Block $block,
         JIT\Call $toCall,
         array $args
     ): array {
         if (!$toCall instanceof JIT\Call\Native) {
-            return $args;
-        }
-        if (!str_ends_with(strtolower($toCall->name), '::__construct')) {
             return $args;
         }
         if ([] === $toCall->argTypes) {
@@ -4064,6 +4077,9 @@ class JIT {
             return $args;
         }
         if (null === $block->func || null === $block->func->cfg) {
+            return $args;
+        }
+        if (($block->func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC) {
             return $args;
         }
         $thisVar = $this->resolveThisVariable($block);

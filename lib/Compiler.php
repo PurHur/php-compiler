@@ -620,6 +620,34 @@ class Compiler {
         return null;
     }
 
+    protected function rejectDeferredParentAccess(?string $className, string $construct): void
+    {
+        if (null === $className || 'parent' !== strtolower($className)) {
+            return;
+        }
+        throw new \CompileError("{$construct} is not supported (issue #1858)");
+    }
+
+    protected function literalScopeClassName(Operand $class): ?string
+    {
+        if ($class instanceof Operand\Literal && is_string($class->value)) {
+            return $class->value;
+        }
+        if ($class instanceof Operand\Variable) {
+            return $this->literalScopeClassName($class->name);
+        }
+        if (null !== $class->original) {
+            if ($class->original instanceof \PhpParser\Node\Name) {
+                return $class->original->toString();
+            }
+            if ($class->original instanceof Operand) {
+                return $this->literalScopeClassName($class->original);
+            }
+        }
+
+        return $this->staticNameFromOperand($class);
+    }
+
     /**
      * @return list<string>
      */
@@ -1257,6 +1285,11 @@ class Compiler {
             case Op\Expr\ClassConstFetch::class:
                 return $this->compileClassConstFetch($expr, $block);
             case Op\Expr\StaticPropertyFetch::class:
+                $this->rejectDeferredParentAccess(
+                    $this->literalScopeClassName($expr->class),
+                    'parent::$property'
+                );
+
                 return [new OpCode(
                     OpCode::TYPE_STATIC_PROPERTY_FETCH,
                     $this->compileOperand($expr->result, $block, false),
@@ -2233,6 +2266,13 @@ class Compiler {
      */
     protected function compileClassConstFetch(Op\Expr\ClassConstFetch $expr, Block $block): array
     {
+        if (
+            'parent' === strtolower((string) $this->literalScopeClassName($expr->class))
+            && 'class' === strtolower((string) $this->literalScopeClassName($expr->name))
+        ) {
+            throw new \CompileError('parent::class is not supported (issue #1858)');
+        }
+
         return [new OpCode(
             OpCode::TYPE_CLASS_CONST_FETCH,
             $this->compileOperand($expr->result, $block, false),
