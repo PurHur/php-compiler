@@ -19,32 +19,24 @@ final class JitDebugBacktrace
     /** @return Value */
     public static function invoke(Context $context): Value
     {
-        $ht = HashTableHelper::alloc($context);
-        $sizeT = $context->getTypeFromString('size_t');
-        $zero = $sizeT->constInt(0, false);
-        $one = $sizeT->constInt(1, false);
-
         $block = $context->jitEnclosingBlock;
         $file = $block instanceof Block
             ? ScriptMagic::stringForBlock($block, OpCode::SCRIPT_MAGIC_FILE)
             : '';
 
-        self::appendFrame($context, $ht, $zero, 'debug_backtrace', $file);
+        $frames = [
+            self::frameVariable($context, 'debug_backtrace', $file),
+        ];
         if ($block instanceof Block && null !== $block->func) {
             $function = $block->func->getScopedName();
             if ('' === $function) {
                 $function = $block->func->name ?? '';
             }
             $enclosingFile = ScriptMagic::stringForBlock($block, OpCode::SCRIPT_MAGIC_FILE);
-            self::appendFrame($context, $ht, $one, $function, $enclosingFile);
+            $frames[] = self::frameVariable($context, $function, $enclosingFile);
         }
 
-        $packed = new JITVariable(
-            $context,
-            JITVariable::TYPE_HASHTABLE,
-            JITVariable::KIND_VALUE,
-            $ht
-        );
+        $packed = HashTableHelper::packVariables($context, $frames);
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
         $context->builder->call(
@@ -56,13 +48,8 @@ final class JitDebugBacktrace
         return $ptr;
     }
 
-    private static function appendFrame(
-        Context $context,
-        Value $arr,
-        Value $idx,
-        string $fn,
-        string $path
-    ): void {
+    private static function frameVariable(Context $context, string $fn, string $path): JITVariable
+    {
         $entry = HashTableHelper::alloc($context);
         $context->builder->call(
             $context->lookupFunction('__hashtable__setStringKeyString'),
@@ -82,24 +69,12 @@ final class JitDebugBacktrace
             $context->builder->load($context->constantStringFromString('function')),
             $context->builder->load($context->constantStringFromString($fn))
         );
-        $context->builder->call(
-            $context->lookupFunction('__hashtable__setHashtableAt'),
-            $arr,
-            $idx,
+
+        return new JITVariable(
+            $context,
+            JITVariable::TYPE_HASHTABLE,
+            JITVariable::KIND_VALUE,
             $entry
-        );
-        $map = $context->structFieldMap['__hashtable__'];
-        $sizeT = $context->getTypeFromString('size_t');
-        $one = $sizeT->constInt(1, false);
-        $count = $context->builder->load($context->builder->structGep($arr, $map['numElements']));
-        $next = $context->builder->add($idx, $one);
-        $context->builder->store(
-            $context->builder->select(
-                $context->builder->icmp(\PHPLLVM\Builder::INT_UGT, $next, $count),
-                $next,
-                $count
-            ),
-            $context->builder->structGep($arr, $map['numElements'])
         );
     }
 }

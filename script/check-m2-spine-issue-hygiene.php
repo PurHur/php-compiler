@@ -38,7 +38,7 @@ $spinePaths = parse_spine_paths($spineMain);
 $spineSet = array_flip($spinePaths);
 $spineCount = count($spinePaths);
 
-$inventoryTotal = 586;
+$inventoryTotal = 588;
 if (is_readable($inventoryDoc)
     && preg_match('/\| PHP files on vm\.php path \| (\d+) \|/', (string) file_get_contents($inventoryDoc), $invMatch)) {
     $inventoryTotal = (int) $invMatch[1];
