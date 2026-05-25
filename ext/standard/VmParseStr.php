@@ -34,7 +34,7 @@ final class VmParseStr
     /**
      * @param int|string $key
      */
-    private static function ensureArrayChild(HashTable $ht, $key): HashTable
+    public static function ensureArrayChild(HashTable $ht, $key): HashTable
     {
         $existing = \is_int($key) ? $ht->findIndex($key) : $ht->find((string) $key);
         if (null !== $existing) {
@@ -62,7 +62,7 @@ final class VmParseStr
      * @param int|string $key
      * @param bool|float|int|string $value
      */
-    private static function setScalarEntry(HashTable $ht, $key, $value): void
+    public static function setScalarEntry(HashTable $ht, $key, $value): void
     {
         $var = new Variable();
         if (\is_int($value)) {

@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Web;
 
+use PHPCompiler\ext\standard\VmFs;
 use PHPCompiler\ext\standard\VmParseStr;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\HashTable;
@@ -504,25 +505,25 @@ final class Superglobals
         string $rawHeaders,
         string $content
     ): void {
-        $entry = self::ensureArrayChild($files, $fieldName);
+        $entry = VmParseStr::ensureArrayChild($files, $fieldName);
         self::setStringEntry($entry, 'name', $filename);
         $partType = self::multipartHeaderValue($rawHeaders, 'Content-Type');
         self::setStringEntry($entry, 'type', null !== $partType && '' !== $partType ? $partType : 'application/octet-stream');
-        $tmp = tempnam(sys_get_temp_dir(), 'phpc_upload_');
+        $tmp = tempnam(sys_get_temp_dir(), VmFs::UPLOAD_TEMP_PREFIX);
         if (false === $tmp) {
-            self::setScalarEntry($entry, 'error', 1);
+            VmParseStr::setScalarEntry($entry, 'error', 1);
 
             return;
         }
         if (false === file_put_contents($tmp, $content)) {
             @unlink($tmp);
-            self::setScalarEntry($entry, 'error', 1);
+            VmParseStr::setScalarEntry($entry, 'error', 1);
 
             return;
         }
         self::setStringEntry($entry, 'tmp_name', $tmp);
-        self::setScalarEntry($entry, 'error', 0);
-        self::setScalarEntry($entry, 'size', strlen($content));
+        VmParseStr::setScalarEntry($entry, 'error', 0);
+        VmParseStr::setScalarEntry($entry, 'size', strlen($content));
     }
 
     /**
