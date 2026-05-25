@@ -1,0 +1,6 @@
+[
+  {"number": 1547, "title": "M2 spine: add `ext/standard/array_multisort.php` to compiler_lib_spine_smoke"},
+  {"number": 1544, "title": "M2 spine: add `ext/standard/VmString.php` to compiler_lib_spine_smoke"},
+  {"number": 1543, "title": "M2 spine: add `ext/standard/VmSplAutoload.php` to compiler_lib_spine_smoke"},
+  {"number": 1540, "title": "M2 spine: add `ext/standard/VmPregReplaceCallback.php` to compiler_lib_spine_smoke"}
+]
