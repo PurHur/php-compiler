@@ -200,6 +200,14 @@ ci_run_bootstrap_vendor_inventory_sync_check() {
   ci_ensure_generated_doc script/bootstrap-vendor-inventory.php docs/bootstrap-vendor-inventory.md
 }
 
+ci_run_init_miniwebapp_parity_check() {
+  if [[ "${INIT_MINIWEBAPP_PARITY_GATE:-1}" != "1" ]]; then
+    return 0
+  fi
+  echo "init-miniwebapp template parity (INIT_MINIWEBAPP_PARITY_GATE=1, issue #2057)..."
+  script/check-init-miniwebapp-parity.sh
+}
+
 ci_run_init_sessionsweb_parity_check() {
   if [[ "${INIT_SESSIONSWEB_PARITY_GATE:-1}" != "1" ]]; then
     return 0
@@ -227,7 +235,7 @@ ci_run_init_apijson_parity_check() {
 ci_run_inventory_checks() {
   script/check-no-unlimited-memory.sh
   script/check-stale-issue-refs.sh
-  script/check-init-miniwebapp-parity.sh
+  ci_run_init_miniwebapp_parity_check
   ci_run_init_sessionsweb_parity_check
   ci_run_init_fileupload_parity_check
   ci_run_init_apijson_parity_check

@@ -1387,7 +1387,29 @@ final class CiScriptsTest extends TestCase
     public function testCiInventoryRunsInitMiniWebAppParityCheck(): void
     {
         $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('ci_run_init_miniwebapp_parity_check', $common);
         $this->assertStringContainsString('check-init-miniwebapp-parity.sh', $common);
+        $this->assertStringContainsString('INIT_MINIWEBAPP_PARITY_GATE:-1', $common);
+    }
+
+    public function testCiDefaultsEnvDefinesMiniwebappInitParityGateOn(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString('INIT_MINIWEBAPP_PARITY_GATE="${INIT_MINIWEBAPP_PARITY_GATE:-1}"', $defaults);
+    }
+
+    public function testLocalCiMatrixDocumentsMiniwebappInitParityGate(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('INIT_MINIWEBAPP_PARITY_GATE', $doc);
+        $this->assertStringContainsString('check-init-miniwebapp-parity.sh', $doc);
+        $this->assertMatchesRegularExpression('/\| `INIT_MINIWEBAPP_PARITY_GATE` \| `1` \|/', $doc);
+    }
+
+    public function testCiDockerRunPassesMiniwebappInitParityGateDefaultOn(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');
+        $this->assertStringContainsString('INIT_MINIWEBAPP_PARITY_GATE=${INIT_MINIWEBAPP_PARITY_GATE:-1}', $body);
     }
 
     public function testCheckInitSessionswebParityScriptExists(): void
