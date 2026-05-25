@@ -1014,7 +1014,7 @@ class Compiler {
 
     protected function isPromotedParam(Op\Expr\Param $param): bool
     {
-        return 0 !== $param->promotionFlags;
+        return property_exists($param, 'promotionFlags') && 0 !== $param->promotionFlags;
     }
 
     protected function compilePromotedPropertyDeclaration(Op\Expr\Param $param, Block $result): void
