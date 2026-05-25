@@ -244,8 +244,12 @@ class Runtime {
 
     public function run(?Block $block) {
         $this->ensureVm();
-
-        return $this->vm->run($block);
+        Superglobals::setActiveContext($this->vmContext);
+        try {
+            return $this->vm->run($block);
+        } finally {
+            Superglobals::setActiveContext(null);
+        }
     }
 
 }
