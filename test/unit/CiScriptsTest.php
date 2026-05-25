@@ -263,6 +263,16 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('THROWSWEB_AOT_SMOKE_GATE:-1}', $body);
     }
 
+    public function testCiLocalRunsThrowsWebAotLinkBeforeExecute(): void
+    {
+        $local = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-local.sh');
+        $linkPos = strpos($local, 'ci_run_aot_link_phpunit');
+        $executePos = strpos($local, 'ci_run_throws_web_aot_execute');
+        $this->assertNotFalse($linkPos, 'ci-local.sh must call ci_run_aot_link_phpunit');
+        $this->assertNotFalse($executePos, 'ci-local.sh must call ci_run_throws_web_aot_execute');
+        $this->assertLessThan($executePos, $linkPos, 'AOT link must run before ThrowsWeb AOT execute (#2178)');
+    }
+
     public function testCiFastHonorsMiniWebAppServeGate(): void
     {
         $fast = dirname(__DIR__, 2).'/script/ci-fast.sh';
@@ -1423,6 +1433,10 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('test007ThrowsWebAotLink', $doc);
         $this->assertStringContainsString('ThrowsWebAotExecuteTest', $doc);
         $this->assertStringContainsString('#2102', $doc);
+        $this->assertStringContainsString('ci_run_aot_link_phpunit', $doc);
+        $this->assertStringContainsString('ci_run_throws_web_aot_execute', $doc);
+        $this->assertStringContainsString('#2178', $doc);
+        $this->assertStringContainsString('#2157', $doc);
     }
 
     public function testCiDefaultsEnvDefinesThrowsWebAotGatesOn(): void
