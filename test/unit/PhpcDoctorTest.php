@@ -139,6 +139,8 @@ final class PhpcDoctorTest extends TestCase
         $this->assertStringContainsString('INIT_MINIWEBAPP_PARITY_GATE', $result['stdout']);
         $this->assertStringContainsString('check-init-miniwebapp-parity.sh', $result['stdout']);
         $this->assertStringContainsString('NORTH_STAR2_VERIFY_GATE', $result['stdout']);
+        $this->assertStringContainsString('NORTH_STAR2_THROWSWEB_GATE', $result['stdout']);
+        $this->assertStringContainsString('examples-throws-smoke', $result['stdout']);
         $this->assertStringContainsString('Bootstrap subset', $result['stdout']);
         $this->assertStringContainsString('BOOTSTRAP_TEST_SUBSET_GATE', $result['stdout']);
         $this->assertStringContainsString('Fast CI hook', $result['stdout']);

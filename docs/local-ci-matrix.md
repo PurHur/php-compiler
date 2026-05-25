@@ -128,6 +128,7 @@ Defaults are exported from [`script/ci-defaults.env`](../script/ci-defaults.env)
 | `CI_FAST_BOOTSTRAP` | `0` | `ci-fast.sh` | Optional llvm tail: bootstrap aot-lint + probe + wave-check when LLVM 9 present |
 | `JIT_PREFLIGHT_GATE` | `0` | `ci-fast.sh` | Early MCJIT probe after `composer install` ([#728](https://github.com/PurHur/php-compiler/issues/728)) |
 | `NORTH_STAR2_VERIFY_GATE` | `1` | `ci-fast.sh` | `./script/north-star2-verify.sh` presenter when script exists ([#1928](https://github.com/PurHur/php-compiler/issues/1928), [#2051](https://github.com/PurHur/php-compiler/issues/2051)); set `0` to opt out (no LLVM / doc-only iteration) |
+| `NORTH_STAR2_THROWSWEB_GATE` | `1` | `north-star2-verify.sh` | Optional step 6: `check-init-throwsweb-parity.sh` + `make examples-throws-smoke` when 007 tree present ([#2177](https://github.com/PurHur/php-compiler/issues/2177)); skips when loopback bind fails; set `0` on harness hosts without TCP loopback |
 | `BOOTSTRAP_TEST_SUBSET_GATE` | `0` | `ci-fast.sh` (after inventory checks) | `./script/bootstrap-test-subset.sh` — same as `phpc test --bootstrap` ([#2069](https://github.com/PurHur/php-compiler/issues/2069)); set `1` for NS2 fast path hook |
 | `BOOTSTRAP_TEST_SUBSET_STRICT` | `0` | `ci_run_bootstrap_test_subset` | Pass `--strict` to subset script (M3 HelloWorld strict when LLVM ready); does not run in ci-fast by default |
 | `phpc test --bootstrap` | n/a | `script/bootstrap-test-subset.sh` | Inventory `--check` + `SELFHOST_SPINE_COUNT_SYNC_GATE` spine sync (no LLVM link by default); `BOOTSTRAP_TEST_SUBSET_VM_SMOKE=1` for M2 VM spine smoke; `--strict` sets `BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE=1` for M3 probe ([#1961](https://github.com/PurHur/php-compiler/issues/1961)) |
@@ -298,7 +299,7 @@ NORTH_STAR2_VERIFY_GATE=0 ./script/ci-fast.sh
 docker run --rm -v "$(pwd):/compiler" -w /compiler php-compiler:22.04-dev ./script/ci-fast.sh
 ```
 
-When the script is missing, CI prints a skip message and exits **0**. With LLVM 9 present, runs `./script/north-star2-verify.sh` (full tail); without LLVM, passes `--skip-llvm-tail`.
+When the script is missing, CI prints a skip message and exits **0**. With LLVM 9 present, runs `./script/north-star2-verify.sh` (full tail); without LLVM, passes `--skip-llvm-tail`. Step 6 (**007-ThrowsWeb**) runs when `NORTH_STAR2_THROWSWEB_GATE=1` (default) even without LLVM; VM smoke skips when loopback bind fails (`NORTH_STAR2_THROWSWEB_GATE=0` to opt out).
 
 ### AOT project preflight ([#746](https://github.com/PurHur/php-compiler/issues/746))
 

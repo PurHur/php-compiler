@@ -160,6 +160,7 @@ final class Doctor
 
         $defaults = self::readCiDefaultsEnv($repoRoot);
         $ns2Default = $defaults['NORTH_STAR2_VERIFY_GATE'] ?? '1';
+        $ns2ThrowswebDefault = $defaults['NORTH_STAR2_THROWSWEB_GATE'] ?? '1';
         $m3HelloStrictDefault = $defaults['BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE'] ?? '0';
         $m3SmokeStrictDefault = $defaults['BOOTSTRAP_M3_COMPILE_SMOKE_STRICT_GATE'] ?? '0';
         $m3SmokeProbeDefault = $defaults['BOOTSTRAP_M3_COMPILE_SMOKE_PROBE_GATE'] ?? '1';
@@ -203,6 +204,7 @@ final class Doctor
         fwrite(STDOUT, "   BOOTSTRAP_TEST_SUBSET_STRICT=".(self::gateEnabled('BOOTSTRAP_TEST_SUBSET_STRICT', $testSubsetStrictDefault) ? '1' : '0')." (default {$testSubsetStrictDefault}) — strict M3 tail when subset gate on\n");
         if (is_executable($repoRoot.'/script/north-star2-verify.sh')) {
             fwrite(STDOUT, "   make north-star2-verify  or  ./script/north-star2-verify.sh\n");
+            fwrite(STDOUT, "   NORTH_STAR2_THROWSWEB_GATE=".(self::gateEnabled('NORTH_STAR2_THROWSWEB_GATE', $ns2ThrowswebDefault) ? '1' : '0')." (default {$ns2ThrowswebDefault}) — 007 init parity + VM smoke in presenter (#2177)\n");
         }
         fwrite(STDOUT, "   phpc test --bootstrap [--strict]\n");
         fwrite(STDOUT, "   make bootstrap-wave-check  (opt-in --with-helloworld)\n\n");
@@ -337,14 +339,21 @@ final class Doctor
         $ns2CiDetail = $ns2CiOn
             ? 'NORTH_STAR2_VERIFY_GATE=1 (default) — ci-fast runs presenter (#1928, #2051)'
             : 'opt-out NORTH_STAR2_VERIFY_GATE=0 skips presenter in ci-fast (#1928)';
+        $defaults = self::readCiDefaultsEnv($repoRoot);
+        $ns2ThrowswebDefault = $defaults['NORTH_STAR2_THROWSWEB_GATE'] ?? '1';
+        $ns2ThrowswebOn = self::gateEnabled('NORTH_STAR2_THROWSWEB_GATE', $ns2ThrowswebDefault);
+        $ns2ThrowswebDetail = $ns2ThrowswebOn
+            ? 'NORTH_STAR2_THROWSWEB_GATE=1 (default) — init parity + make examples-throws-smoke (#2177)'
+            : 'opt-out NORTH_STAR2_THROWSWEB_GATE=0 skips 007 ladder in north-star2-verify (#2177)';
         $subsetGate = getenv('BOOTSTRAP_TEST_SUBSET_GATE');
         $subsetOn = false !== $subsetGate && '1' === $subsetGate;
         $subsetDetail = $subsetOn
             ? 'BOOTSTRAP_TEST_SUBSET_GATE=1 — ci-fast runs bootstrap-test-subset (#2069)'
             : 'opt-in BOOTSTRAP_TEST_SUBSET_GATE=1 for phpc test --bootstrap in ci-fast (#2069)';
         if ($ns2Make) {
-            fwrite(STDOUT, "  Presenter bundle make north-star2-verify            --require-llvm / --skip-llvm-tail\n");
+            fwrite(STDOUT, "  Presenter bundle make north-star2-verify            --require-llvm / --skip-llvm-tail / --skip-throwsweb\n");
             fwrite(STDOUT, "  Script           ./script/north-star2-verify.sh    same as make target\n");
+            fwrite(STDOUT, "  007 ladder       {$ns2ThrowswebDetail}\n");
         } else {
             fwrite(STDOUT, "  Presenter bundle make north-star2-verify            script missing in tree\n");
         }
