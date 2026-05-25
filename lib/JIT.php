@@ -1383,23 +1383,23 @@ class JIT {
                     if (
                         $value->type === Variable::TYPE_OBJECT
                         && 'splobjectstorage' === strtolower($containerUserType)
+                        && Variable::TYPE_OBJECT === $dim->type
                     ) {
                         $ht = $this->context->type->object->splBackingHashtable($value);
-                        $keyStr = JIT\HashTableHelper::objectPointerAsStringKey($this->context, $dim);
                         $htVal = $this->context->helper->loadValue($ht);
-                        $keyVal = $this->context->helper->loadValue($keyStr);
+                        $keyObj = $this->context->helper->loadValue($dim);
                         if ($forWrite) {
-                            $fetched = JIT\HashTableHelper::writableStringKeyValueBox(
+                            $fetched = JIT\HashTableHelper::writableObjectKeyValueBox(
                                 $this->context,
                                 $htVal,
-                                $keyVal
+                                $keyObj
                             );
                             $this->context->setVariableOp($resultOp, $fetched);
                         } else {
-                            $fetched = JIT\HashTableHelper::readStringKeyToValueBox(
+                            $fetched = JIT\HashTableHelper::readObjectKeyToValueBox(
                                 $this->context,
                                 $htVal,
-                                $keyVal
+                                $keyObj
                             );
                             $this->assignOperand($resultOp, $fetched);
                         }

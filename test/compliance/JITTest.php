@@ -26,6 +26,10 @@ class JITTest extends BaseTest {
             if (str_contains(strtolower($case[0]), 'password')) {
                 continue;
             }
+            // SplObjectStorage JIT-only (#1998); see SplObjectStorageJITTest.
+            if (str_contains(strtolower($case[0]), 'splobjectstorage')) {
+                continue;
+            }
             yield $case;
         }
     }
