@@ -68,7 +68,6 @@ if ci_llvm_ready; then
   ci_apply_llvm_memory_env
   ci_run_bootstrap_aot_lint
   BOOTSTRAP_SELFHOST_PROBE_GATE="${BOOTSTRAP_SELFHOST_PROBE_GATE:-1}" ci_run_bootstrap_selfhost_probe
-  ci_run_bootstrap_loop_probe
   ci_run_bootstrap_lib_spine_vm_smoke
   ci_run_bootstrap_compiler_driver_smoke
 
@@ -80,6 +79,7 @@ if ci_llvm_ready; then
     ci_run_bootstrap_compile_smoke_probe
     ci_run_bootstrap_m3_strict
     ci_run_bootstrap_m3_compile_smoke_strict
+    ci_run_bootstrap_m4_loop_probe
 
     echo "PHPUnit: JIT compliance (@group jit)..."
     LLVM_JUNIT="$(mktemp "${TMPDIR:-/tmp}/llvm-jit-junit.XXXXXX.xml")"
@@ -103,6 +103,7 @@ if ci_llvm_ready; then
     ci_run_bootstrap_compile_smoke_probe
     ci_run_bootstrap_m3_strict
     ci_run_bootstrap_m3_compile_smoke_strict
+    ci_run_bootstrap_m4_loop_probe
 
     ci_run_aot_link_phpunit "$@"
     ci_run_miniwebapp_aot_execute "$@"

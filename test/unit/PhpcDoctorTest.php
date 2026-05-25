@@ -62,6 +62,7 @@ final class PhpcDoctorTest extends TestCase
         $this->assertStringContainsString('SELFHOST_SPINE_COUNT_SYNC_GATE', $result['stdout']);
         $this->assertStringContainsString('SELFHOST_SPINE_COVERAGE_SYNC_GATE', $result['stdout']);
         $this->assertStringContainsString('BOOTSTRAP_LOOP_PROBE_GATE', $result['stdout']);
+        $this->assertStringContainsString('BOOTSTRAP_M4_LOOP_PROBE', $result['stdout']);
         $this->assertStringContainsString('BOOTSTRAP_TEST_SUBSET_GATE', $result['stdout']);
         $this->assertStringContainsString('BOOTSTRAP_TEST_SUBSET_STRICT', $result['stdout']);
         $this->assertStringContainsString('bootstrap-selfhost-helloworld-probe.sh', $result['stdout']);
@@ -132,7 +133,9 @@ final class PhpcDoctorTest extends TestCase
         $this->assertStringContainsString('M2 spine:', $result['stdout']);
         $this->assertStringContainsString('M3 strict:', $result['stdout']);
         $this->assertStringContainsString('M4 loop dry-run', $result['stdout']);
+        $this->assertStringContainsString('M4 ci-local', $result['stdout']);
         $this->assertStringContainsString('BOOTSTRAP_LOOP_PROBE_GATE', $result['stdout']);
+        $this->assertStringContainsString('BOOTSTRAP_M4_LOOP_PROBE', $result['stdout']);
         $this->assertStringContainsString('INIT_MINIWEBAPP_PARITY_GATE', $result['stdout']);
         $this->assertStringContainsString('check-init-miniwebapp-parity.sh', $result['stdout']);
         $this->assertStringContainsString('NORTH_STAR2_VERIFY_GATE', $result['stdout']);
