@@ -521,6 +521,26 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('#1928', $doc);
     }
 
+    public function testBootstrapTestSubsetScriptExists(): void
+    {
+        $script = dirname(__DIR__, 2).'/script/bootstrap-test-subset.sh';
+        $this->assertFileExists($script);
+        $body = (string) file_get_contents($script);
+        $this->assertStringContainsString('ci_run_selfhost_spine_count_sync_check', $body);
+        $this->assertStringContainsString('ci_ensure_generated_doc script/bootstrap-inventory.php', $body);
+    }
+
+    public function testLocalCiMatrixDocumentsPhpcTestBootstrap(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('phpc test --bootstrap', $doc);
+        $this->assertStringContainsString('bootstrap-test-subset.sh', $doc);
+        $this->assertStringContainsString('#1961', $doc);
+
+        $docSelfhost = (string) file_get_contents(dirname(__DIR__, 2).'/docs/bootstrap-selfhost.md');
+        $this->assertStringContainsString('phpc test --bootstrap', $docSelfhost);
+    }
+
     public function testCiLocalHonorsBootstrapWaveCheckGate(): void
     {
         $local = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-local.sh');

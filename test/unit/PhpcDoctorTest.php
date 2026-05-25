@@ -97,6 +97,8 @@ final class PhpcDoctorTest extends TestCase
         $this->assertStringContainsString('north-star1-verify', $result['stdout']);
         $this->assertStringContainsString('make north-star1-verify', $result['stdout']);
         $this->assertStringContainsString('North Star 2 presenter', $result['stdout']);
+        $this->assertStringContainsString('phpc test --bootstrap', $result['stdout']);
+        $this->assertStringContainsString('bootstrap-test-subset.sh', $result['stdout']);
         $this->assertStringContainsString('north-star2-verify', $result['stdout']);
         $this->assertStringContainsString('bootstrap-selfhost-lib-spine-smoke', $result['stdout']);
         $this->assertStringContainsString('bootstrap-selfhost-lib-spine-vm-smoke', $result['stdout']);

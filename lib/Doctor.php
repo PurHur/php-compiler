@@ -225,6 +225,8 @@ final class Doctor
         fwrite(STDOUT, "  M2 spine: {$spine}/{$inventory} (php script/bootstrap-spine-count.php)\n");
         fwrite(STDOUT, "  LLVM 9: {$llvmDetail}\n");
         fwrite(STDOUT, "  M3 strict: {$m3Detail}\n");
+        fwrite(STDOUT, "  Fast CLI         phpc test --bootstrap [--strict]   inventory + spine sync (#1961)\n");
+        fwrite(STDOUT, "  Subset script    ./script/bootstrap-test-subset.sh [--strict]\n");
         fwrite(STDOUT, "  Inventory        php script/bootstrap-inventory.php --check\n");
         fwrite(STDOUT, "  Wave gate        make bootstrap-wave-check\n");
         fwrite(STDOUT, "  M0 link          ./script/bootstrap-selfhost-link.sh\n");
