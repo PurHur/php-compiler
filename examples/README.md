@@ -93,7 +93,7 @@ curl -s 'http://127.0.0.1:8080/index.php/hello?name=Dev'
 make web-smoke
 ```
 
-See [003-MiniWebApp/README.md](003-MiniWebApp/README.md) for routes and gate ladder (`make miniwebapp-gates`). AOT deploy quickstart: [docs/deploy-web-aot.md](../docs/deploy-web-aot.md).
+See [003-MiniWebApp/README.md](003-MiniWebApp/README.md) for routes and gate ladder (`make miniwebapp-gates`). AOT deploy quickstart: [docs/deploy-web-aot.md](../docs/deploy-web-aot.md). OOP subset rows (`ClassMethod`, `Expr_MethodCall`, `__construct`): [docs/capabilities-syntax.md](../docs/capabilities-syntax.md#oop-reference-examples003-miniwebapp) ([#2190](https://github.com/PurHur/php-compiler/issues/2190)).
 
 ### 004-ApiJson
 
