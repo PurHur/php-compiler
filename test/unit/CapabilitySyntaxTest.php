@@ -46,6 +46,10 @@ final class CapabilitySyntaxTest extends TestCase
         $this->assertStringContainsString('#665', $body);
         $this->assertStringContainsString('#489', $body);
         $this->assertStringContainsString('#173', $body);
+        $this->assertStringContainsString('#195', $body);
+        $this->assertStringContainsString('## Throws reference (`examples/007-ThrowsWeb`)', $body);
+        $this->assertStringContainsString('`007-ThrowsWeb` reference app', $body);
+        $this->assertStringContainsString('THROWS_WEB_SMOKE_GATE', $body);
     }
 
     public function testCapabilitiesMdLinksToSyntaxMatrix(): void
