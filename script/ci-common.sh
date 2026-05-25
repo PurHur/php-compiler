@@ -209,7 +209,7 @@ ci_run_init_fileupload_parity_check() {
 }
 
 ci_run_init_apijson_parity_check() {
-  if [[ "${APIJSON_INIT_PARITY_GATE:-0}" != "1" ]]; then
+  if [[ "${APIJSON_INIT_PARITY_GATE:-1}" != "1" ]]; then
     return 0
   fi
   echo "init-apijson template parity (APIJSON_INIT_PARITY_GATE=1, issue #2029)..."

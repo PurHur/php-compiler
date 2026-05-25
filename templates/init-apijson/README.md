@@ -11,7 +11,7 @@ Project layout from `phpc init --profile apijson` (issue #2000). Application PHP
 
 When you change `example.php` or `phpc.json` in the example, copy the same files into this template in the **same PR**.
 
-Verify before merge (when **#2029** lands):
+Verify before merge (`ci-fast` runs this by default via `APIJSON_INIT_PARITY_GATE=1`, [#2037](https://github.com/PurHur/php-compiler/issues/2037)):
 
 ```console
 ./script/check-init-apijson-parity.sh
