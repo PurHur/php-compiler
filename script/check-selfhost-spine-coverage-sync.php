@@ -34,6 +34,8 @@ $spinePaths = array_flip(bootstrap_spine_require_paths($spineMain));
 /** Inventory paths covered by spine substitutes (not literal require_once) — issue #1423, #1945. */
 $spineSubstitutes = [
     'bin/vm.php' => 'test/bootstrap-aot/vm_run_smoke.php',
+    'src/cli.php' => 'test/bootstrap-aot/cli_spine_shim.php',
+    'src/cli_driver.php' => 'test/bootstrap-aot/cli_spine_shim.php',
 ];
 
 /**

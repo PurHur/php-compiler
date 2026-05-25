@@ -1666,6 +1666,25 @@ class JIT {
                                 $label = (string) $ns->value.'\\'.$label;
                             }
                         }
+                        if (
+                            $this->shouldUseSelfHostJitStubs()
+                            && (
+                                'PHP_COMPILER_LIB_SPINE_SMOKE' === $label
+                                || str_ends_with($label, '\\PHP_COMPILER_LIB_SPINE_SMOKE')
+                            )
+                        ) {
+                            $i1 = $this->context->getTypeFromString('int1');
+                            $this->assignOperand(
+                                $block->getOperand($op->arg1),
+                                new JIT\Variable(
+                                    $this->context,
+                                    JIT\Variable::TYPE_NATIVE_BOOL,
+                                    JIT\Variable::KIND_VALUE,
+                                    $i1->constInt(1, false)
+                                )
+                            );
+                            break;
+                        }
                         throw new \RuntimeException('Unknown constant fetch: '.$label);
                     }
                     $this->assignOperand($block->getOperand($op->arg1), $value);
