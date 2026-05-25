@@ -921,6 +921,32 @@ final class CiScriptsTest extends TestCase
         $this->assertMatchesRegularExpression('/\| `ROOT_README_SYNC_GATE` \| `1` \|/', $doc);
     }
 
+    public function testCiDefaultsEnvDefinesRootReadme006SyncGateOff(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString('ROOT_README_006_SYNC_GATE="${ROOT_README_006_SYNC_GATE:-0}"', $defaults);
+    }
+
+    public function testCiFastRunsRootReadme006SyncViaInventoryChecks(): void
+    {
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('ci_run_root_readme_006_sync_check', $common);
+        $this->assertStringContainsString('ROOT_README_006_SYNC_GATE:-0', $common);
+    }
+
+    public function testCiDockerRunPassesRootReadme006SyncGateDefaultOff(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');
+        $this->assertStringContainsString('ROOT_README_006_SYNC_GATE=${ROOT_README_006_SYNC_GATE:-0}', $body);
+    }
+
+    public function testLocalCiMatrixDocumentsRootReadme006SyncGate(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('ROOT_README_006_SYNC_GATE', $doc);
+        $this->assertMatchesRegularExpression('/\| `ROOT_README_006_SYNC_GATE` \| `0` \|/', $doc);
+    }
+
     public function testLocalCiMatrixDocumentsSelfhostSpineCountSyncGate(): void
     {
         $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');

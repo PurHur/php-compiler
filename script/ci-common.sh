@@ -132,7 +132,16 @@ ci_run_root_readme_sync_check() {
     return 0
   fi
   echo "Root README sync (ROOT_README_SYNC_GATE=1, issue #1832)..."
-  "$PHP_BIN" "${PHP_OPTS[@]}" script/check-root-readme-sync.php
+  ROOT_README_006_SYNC_GATE="${ROOT_README_006_SYNC_GATE:-0}" \
+    "$PHP_BIN" "${PHP_OPTS[@]}" script/check-root-readme-sync.php
+}
+
+ci_run_root_readme_006_sync_check() {
+  if [[ "${ROOT_README_006_SYNC_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  echo "Root README 006 sync (ROOT_README_006_SYNC_GATE=1, issue #2017)..."
+  ROOT_README_006_SYNC_GATE=1 "$PHP_BIN" "${PHP_OPTS[@]}" script/check-root-readme-sync.php
 }
 
 ci_run_selfhost_spine_count_sync_check() {
@@ -192,6 +201,7 @@ ci_run_inventory_checks() {
   ci_run_rebuild_examples_006_sync_check
   ci_run_capabilities_sessionsweb_sync_check
   ci_run_root_readme_sync_check
+  ci_run_root_readme_006_sync_check
   ci_run_selfhost_spine_count_sync_check
   ci_run_selfhost_spine_coverage_sync_check
   ci_run_m3_allowlist_sync_check
