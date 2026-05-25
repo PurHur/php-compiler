@@ -10,6 +10,8 @@
 #   BOOTSTRAP_LOOP_PROBE_GATE=1 ./script/ci-fast.sh
 # Self-host presenter (default on; issue #1928, #2051). Opt-out:
 #   NORTH_STAR2_VERIFY_GATE=0 ./script/ci-fast.sh
+# Development status page sync (default on; issue #2083). Opt-out:
+#   DEVELOPMENT_STATUS_SYNC_GATE=0 ./script/ci-fast.sh
 # Bootstrap test subset (opt-in; issue #2069):
 #   BOOTSTRAP_TEST_SUBSET_GATE=1 ./script/ci-fast.sh
 #   BOOTSTRAP_TEST_SUBSET_STRICT=1 for M3 strict tail when LLVM ready

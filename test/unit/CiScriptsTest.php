@@ -546,6 +546,42 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('ROOT_README_SYNC_GATE=${ROOT_README_SYNC_GATE:-1}', $body);
     }
 
+    public function testCiDefaultsEnvDefinesDevelopmentStatusSyncGateOn(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString(
+            'DEVELOPMENT_STATUS_SYNC_GATE="${DEVELOPMENT_STATUS_SYNC_GATE:-1}"',
+            $defaults
+        );
+    }
+
+    public function testCiFastRunsDevelopmentStatusSyncViaInventoryChecks(): void
+    {
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('ci_run_development_status_sync_check', $common);
+        $this->assertStringContainsString('check-development-status-sync.php', $common);
+        $this->assertStringContainsString('DEVELOPMENT_STATUS_SYNC_GATE:-1', $common);
+        $this->assertStringContainsString('DEVELOPMENT_STATUS_SYNC_GATE=0 opt-out', $common);
+    }
+
+    public function testCiDockerRunPassesDevelopmentStatusSyncGateDefaultOn(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');
+        $this->assertStringContainsString(
+            'DEVELOPMENT_STATUS_SYNC_GATE=${DEVELOPMENT_STATUS_SYNC_GATE:-1}',
+            $body
+        );
+    }
+
+    public function testLocalCiMatrixDocumentsDevelopmentStatusSyncGate(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('DEVELOPMENT_STATUS_SYNC_GATE', $doc);
+        $this->assertStringContainsString('check-development-status-sync.php', $doc);
+        $this->assertMatchesRegularExpression('/\| `DEVELOPMENT_STATUS_SYNC_GATE` \| `1` \|/', $doc);
+        $this->assertStringContainsString('#2083', $doc);
+    }
+
     public function testCiDefaultsEnvDefinesSelfhostSpineCountSyncGateOn(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
