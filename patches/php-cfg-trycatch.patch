@@ -1,7 +1,6 @@
 --- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
 +++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
-@@ -672,7 +672,63 @@
- 
+@@ -658,6 +658,62 @@
      protected function parseStmt_TryCatch(Stmt\TryCatch $node)
      {
 -        // TODO: implement this!!!
@@ -67,7 +66,7 @@
      protected function parseStmt_Unset(Stmt\Unset_ $node)
 --- vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/TryCatch.php
 +++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/TryCatch.php
-@@ -0,0 +1,68 @@
+@@ -0,0 +1,63 @@
 +<?php
 +
 +declare(strict_types=1);

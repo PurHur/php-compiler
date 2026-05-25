@@ -27,7 +27,7 @@ abstract class BaseTest extends TestCase {
 
     const REQUIRED_SECTIONS = [
         ['FILE', 'RUNFILE'],
-        self::EXPECTATIONS,
+        ['EXPECT', 'EXPECTF', 'EXPECTREGEX', 'EXPECT_EXIT'],
     ];
 
     const UNSUPPORTED_SECTIONS = [
@@ -208,8 +208,15 @@ abstract class BaseTest extends TestCase {
             $stdin = $code;
         }
         $cmd = array_merge(self::llvmEnvPrefix(), $vmCmd);
-        $result = self::runVmSubprocess($cmd, $cwd, $env, $stdin, $name);
-        $this->assertExpect($result, $sections);
+        [$result, $exitCode] = self::runVmSubprocess($cmd, $cwd, $env, $stdin, $name);
+        if (isset($sections['EXPECT_EXIT'])) {
+            $this->assertSame((int) trim($sections['EXPECT_EXIT']), $exitCode, "VM exit for {$name}");
+        } elseif (0 !== $exitCode) {
+            $this->fail("VM exited with code {$exitCode} for {$name}");
+        }
+        if (isset($sections['EXPECT']) || isset($sections['EXPECTF']) || isset($sections['EXPECTREGEX'])) {
+            $this->assertExpect($result, $sections);
+        }
     }
 
     const ASSERTIONS = [
@@ -289,7 +296,10 @@ abstract class BaseTest extends TestCase {
      * @param list<string>  $cmd
      * @param array<string, string> $env
      */
-    protected static function runVmSubprocess(array $cmd, string $cwd, array $env, ?string $stdin, string $testName): string
+    /**
+     * @return array{0: string, 1: int}
+     */
+    protected static function runVmSubprocess(array $cmd, string $cwd, array $env, ?string $stdin, string $testName): array
     {
         $descriptorSpec = [
             0 => ['pipe', 'r'],
@@ -337,7 +347,7 @@ abstract class BaseTest extends TestCase {
         $result = stream_get_contents($pipes[1]);
         fclose($pipes[1]);
         fclose($pipes[2]);
-        proc_close($proc);
+        $exitCode = proc_close($proc);
 
         if ($guard && $peakKb > 0) {
             fwrite(STDERR, sprintf(
@@ -347,7 +357,7 @@ abstract class BaseTest extends TestCase {
             ));
         }
 
-        return $result;
+        return [$result !== false ? $result : '', (int) $exitCode];
     }
 
     private static function peakRssKbForTree(int $rootPid): int

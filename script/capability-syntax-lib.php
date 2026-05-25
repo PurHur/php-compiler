@@ -317,6 +317,17 @@ function syntaxRowDefinitions(): array
             'probe' => 'class A {} class B {} try { throw new A(); } catch (A|B $e) { echo "ok"; }',
         ],
         [
+            'id' => 'try_catch_throw',
+            'construct' => '`try` / `catch` / `throw`',
+            'opcodes' => ['TYPE_TRY', 'TYPE_CATCH', 'TYPE_THROW'],
+            'issue' => 57,
+            'notes' => [
+                'php-cfg TryCatch overlay (#2084); VM TYPE_TRY/CATCH/THROW; TryCatchComplianceTest + try_*.phpt',
+                'finally after catch still #57',
+            ],
+            'probe' => 'class E {} try { throw new E(); } catch (E $e) { echo "ok"; }',
+        ],
+        [
             'id' => 'readonly_class',
             'construct' => 'readonly classes',
             'opcodes' => ['TYPE_DECLARE_CLASS', 'TYPE_NEW', 'TYPE_ASSIGN', 'TYPE_PROPERTY_FETCH'],
@@ -476,6 +487,7 @@ function collectSyntaxPhptCoverage(string $root, array $definitions): array
         'variable_variables' => '/\$\$/',
         'array_argument_unpack' => '/\.\.\.\s*\$/',
         'multi_catch' => '/catch\s*\([^)]*\|/',
+        'try_catch_throw' => '/\btry\s*\{/',
     ];
 
     $scan = [];

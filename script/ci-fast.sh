@@ -89,6 +89,12 @@ if [[ "${COALESCE_COMPLIANCE_GATE:-1}" == "1" ]]; then
   ci_run_phpunit --filter Coalesce
 fi
 
+# try/catch/throw VM compliance (#2084, #57). Default on; set TRY_CATCH_COMPLIANCE_GATE=0 to skip.
+if [[ "${TRY_CATCH_COMPLIANCE_GATE:-1}" == "1" ]]; then
+  echo "PHPUnit (fast): try/catch VM compliance (TryCatch*)..."
+  ci_run_phpunit --filter TryCatch
+fi
+
 # M4 bootstrap-loop dry-run when opt-in (issue #1929; default off in ci-defaults).
 ci_run_bootstrap_loop_probe
 
