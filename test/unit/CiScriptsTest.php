@@ -405,6 +405,37 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE=1', $docSelfhost);
     }
 
+    public function testCiDefaultsEnvDefinesBootstrapLibSpineVmSmokeGateOn(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString(
+            'BOOTSTRAP_LIB_SPINE_VM_SMOKE_GATE="${BOOTSTRAP_LIB_SPINE_VM_SMOKE_GATE:-1}"',
+            $defaults
+        );
+        $this->assertStringContainsString('#1867', $defaults);
+    }
+
+    public function testCiLocalHonorsBootstrapLibSpineVmSmokeGate(): void
+    {
+        $local = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-local.sh');
+        $this->assertStringContainsString('ci_run_bootstrap_lib_spine_vm_smoke', $local);
+
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('BOOTSTRAP_LIB_SPINE_VM_SMOKE_GATE', $common);
+        $this->assertStringContainsString('BOOTSTRAP_LIB_SPINE_VM_SMOKE_GATE:-1', $common);
+        $this->assertStringContainsString('bootstrap-selfhost-lib-spine-vm-smoke.sh', $common);
+    }
+
+    public function testLocalCiMatrixDocumentsBootstrapLibSpineVmSmokeGate(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('BOOTSTRAP_LIB_SPINE_VM_SMOKE_GATE', $doc);
+        $this->assertStringContainsString('bootstrap-selfhost-lib-spine-vm-smoke.sh', $doc);
+
+        $docSelfhost = (string) file_get_contents(dirname(__DIR__, 2).'/docs/bootstrap-selfhost.md');
+        $this->assertStringContainsString('BOOTSTRAP_LIB_SPINE_VM_SMOKE_GATE=1', $docSelfhost);
+    }
+
     public function testCiDefaultsEnvDefinesBootstrapSelfhostProbeUpdateOff(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
