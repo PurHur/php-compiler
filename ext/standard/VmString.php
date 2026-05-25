@@ -555,22 +555,20 @@ final class VmString
         if (false === $fp) {
             throw new \Exception('Could not gather sufficient random data');
         }
-        try {
-            $buf = '';
-            $remaining = $length;
-            while ($remaining > 0) {
-                $chunk = \fread($fp, $remaining);
-                if (false === $chunk || '' === $chunk) {
-                    throw new \Exception('Could not gather sufficient random data');
-                }
-                $buf .= $chunk;
-                $remaining -= self::byteLength($chunk);
+        $buf = '';
+        $remaining = $length;
+        while ($remaining > 0) {
+            $chunk = \fread($fp, $remaining);
+            if (false === $chunk || '' === $chunk) {
+                \fclose($fp);
+                throw new \Exception('Could not gather sufficient random data');
             }
-
-            return $buf;
-        } finally {
-            \fclose($fp);
+            $buf .= $chunk;
+            $remaining -= self::byteLength($chunk);
         }
+        \fclose($fp);
+
+        return $buf;
     }
 
     /**

@@ -319,6 +319,7 @@ require_once __DIR__.'/../../../ext/standard/VmSession.php';
 require_once __DIR__.'/../../../ext/standard/VmSleep.php';
 require_once __DIR__.'/../../../ext/standard/VmSprintf.php';
 require_once __DIR__.'/../../../ext/standard/VmStreamContext.php';
+require_once __DIR__.'/../../../ext/standard/VmString.php';
 require_once __DIR__.'/../../../ext/standard/VmUserCall.php';
 require_once __DIR__.'/../../../ext/standard/abs.php';
 require_once __DIR__.'/../../../ext/standard/addslashes.php';
