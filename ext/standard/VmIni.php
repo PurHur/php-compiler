@@ -30,6 +30,27 @@ final class VmIni
         }
     }
 
+    /** @return string|false */
+    public static function get(Context $ctx, string $option) {
+        $key = strtolower($option);
+        if (!in_array($key, self::SUPPORTED_KEYS, true)) {
+            return false;
+        }
+
+        switch ($key) {
+            case 'error_reporting':
+                return (string) $ctx->errors->getErrorReporting();
+            case 'display_errors':
+                return $ctx->errors->getDisplayErrors() ? '1' : '0';
+            case 'memory_limit':
+                return self::$memoryLimit;
+            default:
+                return false;
+        }
+    }
+
+    private static string $memoryLimit = '128M';
+
     private static function setErrorReporting(Context $ctx, string $newValue) {
         $old = (string) $ctx->errors->getErrorReporting();
         $ctx->errors->setErrorReporting(self::parseErrorReporting($newValue));
@@ -48,12 +69,10 @@ final class VmIni
         if ('-1' === $newValue) {
             return false;
         }
-        $old = ini_get('memory_limit');
-        if (false === ini_set('memory_limit', $newValue)) {
-            return false;
-        }
+        $old = self::$memoryLimit;
+        self::$memoryLimit = $newValue;
 
-        return false !== $old ? $old : '';
+        return $old;
     }
 
     public static function parseErrorReporting(string $value): int

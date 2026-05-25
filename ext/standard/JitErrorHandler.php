@@ -149,7 +149,6 @@ final class JitErrorHandler
         $context->builder->returnValue(
             $context->builder->zext($truthy, $i32)
         );
-        $context->builder->clearInsertionPosition();
         $context->builder->positionAtEnd($resumeBlock);
 
         self::$handlerShims[$cacheKey] = $shimFn;
