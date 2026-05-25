@@ -1217,6 +1217,7 @@ class JIT {
     public function compileSubBlock(
         PHPLLVM\Value $func,
         Block $block,
+        ?PHPLLVM\BasicBlock $entryBlock = null,
         Variable ...$args
     ): PHPLLVM\BasicBlock {
         $limit = $block->nOpCodes;
@@ -1224,7 +1225,7 @@ class JIT {
             --$limit;
         }
 
-        return $this->compileBlockInternal($func, $block, $limit, null, ...$args);
+        return $this->compileBlockInternal($func, $block, $limit, $entryBlock, ...$args);
     }
 
     /**

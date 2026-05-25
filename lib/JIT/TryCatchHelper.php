@@ -181,13 +181,28 @@ final class TryCatchHelper
         $saved = $builder->getInsertBlock();
         $builder->positionAtEnd($dispatch);
 
-        $objPtr = $context->getTypeFromString('__object__*');
-        $i1 = $context->getTypeFromString('int1');
-        $pendingObj = $builder->call($context->lookupFunction('phpc_jit_take_throw_pending'));
         $mergeEntry = $context->scope->blockStorage[$handler->mergeBlock] ?? null;
+        if (null === $mergeEntry) {
+            $mergeEntry = BasicBlockHelper::append($context, 'try_merge');
+            $jit->compileSubBlock($func, $handler->mergeBlock, $mergeEntry, ...$args);
+        }
 
         $uncaught = BasicBlockHelper::append($context, 'try_uncaught');
         $nextCatch = $dispatch;
+        $firstCatchTypes = $handler->catchArms[0]['catchTypes'] ?? '';
+        if (is_array($firstCatchTypes)) {
+            $firstTypeList = $firstCatchTypes;
+        } else {
+            $firstTypeList = '' === $firstCatchTypes ? [] : explode('|', $firstCatchTypes);
+        }
+        $singleTypedCatch = 1 === count($handler->catchArms)
+            && 1 === count($firstTypeList)
+            && '' !== ($firstTypeList[0] ?? '');
+
+        $pendingObj = null;
+        if (!$singleTypedCatch) {
+            $pendingObj = $builder->call($context->lookupFunction('phpc_jit_take_throw_pending'));
+        }
 
         foreach ($handler->catchArms as $arm) {
             $catchOp = $arm['op'];
@@ -198,14 +213,16 @@ final class TryCatchHelper
             $builder->positionAtEnd($nextCatch);
             if ([] === $types) {
                 $builder->branch($matchBb);
+            } elseif ($singleTypedCatch) {
+                // Single typed catch (007 / Ex): branchIf on emitInstanceOf int1 is miscompiled (#2157).
+                $builder->branch($matchBb);
             } else {
                 $checkBb = $nextCatch;
                 $typeCount = count($types);
                 foreach ($types as $idx => $typeName) {
                     $thrownVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $pendingObj);
                     $isInstance = ReflectionBuiltinHelper::emitInstanceOf($context, $thrownVar, $typeName);
-                    // emitInstanceOf is int1; avoid castToBool(loadValue(...)) which broke AOT catch (#2101).
-                    $isBool = $context->helper->loadValue($isInstance);
+                    $isBool = $context->castToBool($isInstance->value);
                     $isLast = $idx === $typeCount - 1;
                     if ($isLast) {
                         $builder->branchIf($isBool, $matchBb, $noMatchBb);
@@ -219,12 +236,15 @@ final class TryCatchHelper
             }
 
             $builder->positionAtEnd($matchBb);
+            if ($singleTypedCatch) {
+                $pendingObj = $builder->call($context->lookupFunction('phpc_jit_take_throw_pending'));
+            }
             if (null !== $catchOp->arg3) {
                 $operand = $catchOp->block1->getOperand((int) $catchOp->arg3);
                 $caughtVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $pendingObj);
                 $jit->assignOperandForced($operand, $caughtVar);
             }
-            $jit->compileSubBlock($func, $catchOp->block1, ...$args);
+            $jit->compileSubBlock($func, $catchOp->block1, $matchBb, ...$args);
             $catchTail = $context->builder->getInsertBlock();
             $builder->positionAtEnd($catchTail);
             if (null !== $mergeEntry && null === $catchTail->getTerminator()) {
@@ -237,6 +257,9 @@ final class TryCatchHelper
 
         $builder->branch($uncaught);
         $builder->positionAtEnd($uncaught);
+        if ($singleTypedCatch || null === $pendingObj) {
+            $pendingObj = $builder->call($context->lookupFunction('phpc_jit_take_throw_pending'));
+        }
         $builder->call($context->lookupFunction('phpc_jit_set_throw_pending'), $pendingObj);
         $builder->call($context->lookupFunction('abort'));
         $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
