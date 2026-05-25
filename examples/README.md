@@ -91,6 +91,19 @@ make web-smoke
 
 See [003-MiniWebApp/README.md](003-MiniWebApp/README.md) for routes and gate ladder (`make miniwebapp-gates`). AOT deploy quickstart: [docs/deploy-web-aot.md](../docs/deploy-web-aot.md).
 
+### 004-ApiJson
+
+Minimal JSON API (`json_encode`, `http_response_code`) ([#270](https://github.com/PurHur/php-compiler/issues/270)).
+
+```console
+./phpc lint examples/004-ApiJson/example.php
+./phpc run examples/004-ApiJson/example.php
+./phpc serve 127.0.0.1:8080 examples/004-ApiJson
+curl -s -D - 'http://127.0.0.1:8080/example.php'
+```
+
+Init scaffold: `./phpc init --profile apijson my-api` ([#2000](https://github.com/PurHur/php-compiler/issues/2000)); template parity: [#2029](https://github.com/PurHur/php-compiler/issues/2029).
+
 ### 005-SessionsWeb
 
 `session_start()` plus a POST → redirect → GET flash message ([#1881](https://github.com/PurHur/php-compiler/issues/1881)). VM run shows the empty state; use `phpc serve` and a cookie jar for two-request persistence (presenter copy-paste: [docs/GETTING-STARTED.md](../docs/GETTING-STARTED.md) § 5; detail: [005-SessionsWeb/README.md](005-SessionsWeb/README.md)).

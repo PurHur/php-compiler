@@ -7,8 +7,8 @@ declare(strict_types=1);
  * Scaffold a minimal web project (phpc.json + public/index.php).
  *
  * Usage:
- *   bin/init.php [--profile default|miniwebapp] [--force] [target-dir]
- *   phpc init [--profile miniwebapp] [--force] [target-dir]
+ *   bin/init.php [--profile default|miniwebapp|sessionsweb|apijson] [--force] [target-dir]
+ *   phpc init [--profile miniwebapp|sessionsweb|apijson] [--force] [target-dir]
  */
 
 use PHPCompiler\Cli\PhpcInit;
@@ -39,11 +39,13 @@ while ([] !== $args) {
         fwrite(STDOUT, <<<'HELP'
 phpc init — scaffold a minimal web project
 
-  phpc init [--profile default|miniwebapp] [--force] [target-dir]
+  phpc init [--profile default|miniwebapp|sessionsweb|apijson] [--force] [target-dir]
 
 Profiles:
   default     phpc.json + public/index.php hello page (issue #312)
   miniwebapp  Router + templates scaffold (issue #632; see examples/003-MiniWebApp)
+  sessionsweb Flat example.php session flash (issue #1886; see examples/005-SessionsWeb)
+  apijson     Flat example.php JSON API (issue #2000; see examples/004-ApiJson)
 
 HELP);
         exit(0);

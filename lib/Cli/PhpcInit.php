@@ -15,11 +15,18 @@ final class PhpcInit
 
     public const PROFILE_SESSIONSWEB = 'sessionsweb';
 
+    public const PROFILE_APIJSON = 'apijson';
+
     /** @var array<string, list<string>> */
     private const PROFILE_TEMPLATES = [
         self::PROFILE_DEFAULT => [
             'phpc.json',
             'public/index.php',
+            'README.md',
+        ],
+        self::PROFILE_APIJSON => [
+            'phpc.json',
+            'example.php',
             'README.md',
         ],
         self::PROFILE_SESSIONSWEB => [
@@ -127,6 +134,11 @@ final class PhpcInit
             fwrite(STDOUT, "  phpc lint --all .\n");
             fwrite(STDOUT, "  phpc serve 127.0.0.1:8080 .\n");
             fwrite(STDOUT, "  curl -s 'http://127.0.0.1:8080/index.php/hello?name=Dev'\n");
+        } elseif (self::PROFILE_APIJSON === $profile) {
+            fwrite(STDOUT, "  phpc lint example.php\n");
+            fwrite(STDOUT, "  phpc run example.php\n");
+            fwrite(STDOUT, "  phpc serve 127.0.0.1:8080 .\n");
+            fwrite(STDOUT, "  curl -s -D - 'http://127.0.0.1:8080/example.php'\n");
         } elseif (self::PROFILE_SESSIONSWEB === $profile) {
             fwrite(STDOUT, "  phpc lint example.php\n");
             fwrite(STDOUT, "  phpc serve 127.0.0.1:8080 .\n");
