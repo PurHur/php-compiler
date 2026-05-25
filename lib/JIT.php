@@ -213,7 +213,7 @@ class JIT {
     {
         return [
             'slotindexforvariablename',
-            // Real-lowering bootstrapaot\\helloworld_compile_smoke LLVM 9 link crash (#1514); namespace fixed #1515.
+            // Real-lowering bootstrapaot\\helloworld_compile_smoke LLVM 9 link crash (#1514); int+echo smoke ready when link fixed.
             '\\bootstrapaot\\helloworld_compile_smoke',
             '\\runtime::__destruct',
             '\\runtime::initparsepipeline',

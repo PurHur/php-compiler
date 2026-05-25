@@ -13,27 +13,15 @@ declare(strict_types=1);
 
 require_once __DIR__.'/helloworld_compile_smoke.php';
 
-/**
- * @return array{ok: bool, message: string, phase: string, emit_path: string}
- */
-function bootstrap_loop_compile_smoke(string $sourceFile, string $outFile): array
+function bootstrap_loop_compile_smoke(string $sourceFile, string $outFile): int
 {
-    $result = helloworld_compile_smoke($sourceFile, $outFile);
-    $emitPath = $result['ok'] ? 'native' : 'native_blocked';
+    if (0 !== helloworld_compile_smoke($sourceFile, $outFile)) {
+        echo "bootstrap_loop_compile_smoke: gen-2 compile failed (see helloworld_compile_smoke output above)\n";
 
-    if ($result['ok']) {
-        return [
-            'ok' => true,
-            'message' => 'bootstrap_loop_compile_smoke: gen-2 compile OK -> '.$outFile,
-            'phase' => $result['phase'],
-            'emit_path' => $emitPath,
-        ];
+        return 1;
     }
 
-    return [
-        'ok' => false,
-        'message' => 'bootstrap_loop_compile_smoke: '.$result['message'],
-        'phase' => $result['phase'],
-        'emit_path' => $emitPath,
-    ];
+    echo 'bootstrap_loop_compile_smoke: gen-2 compile OK -> '.$outFile."\n";
+
+    return 0;
 }
