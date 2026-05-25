@@ -8,7 +8,7 @@ declare(strict_types=1);
  *
  * Fails when known post-#764 blocker phrases remain while examples/README.md
  * documents native execute as green. Enable in CI via ROOT_README_SYNC_GATE=1
- * after #48 / #1525 refresh root README (gate defaults off).
+ * (default in ci-defaults.env after #1525). Opt out: ROOT_README_SYNC_GATE=0.
  *
  * Usage:
  *   php script/check-root-readme-sync.php

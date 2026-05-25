@@ -39,7 +39,7 @@ Presenter script and troubleshooting: [`docs/GETTING-STARTED.md`](docs/GETTING-S
 | `phpc` CLI (`run`, `serve`, `build`, `deploy`, `lint`, `test`, `init`) | ✅ |
 | Examples **000–002**, **004** (VM + AOT link + execute) | ✅ |
 | **003-MiniWebApp** VM + AOT link | ✅ |
-| **003** AOT execute (all routes) | 🚧 partial — home ✅ ([#1044](https://github.com/PurHur/php-compiler/issues/1044)) |
+| **003** AOT execute (home, hello, PATH_INFO, contact) | ✅ native execute ([#764](https://github.com/PurHur/php-compiler/issues/764) closed; close tracker [#1044](https://github.com/PurHur/php-compiler/issues/1044)) |
 | Self-host **M0–M1** | ✅ |
 | Self-host **M2** spine | 🚧 **584** / 588 units ([#1492](https://github.com/PurHur/php-compiler/issues/1492)) |
 | Full Zend PHP compatibility | ❌ — subset only (matrices in `docs/`, not on status site) |
@@ -65,7 +65,7 @@ make examples-web-smoke        # phpc serve + curl for 001-SimpleWeb, 002-Static
 make examples-aot-smoke        # phpc build + CLI execute for 000–004 when LLVM ready (#667)
 make deploy-smoke              # phpc deploy + PHPC_DEPLOY_ROOT CGI for 001/002 when LLVM ready (#718)
 ./phpc serve examples/001-SimpleWeb   # http://127.0.0.1:8080/ (or: make serve)
-./phpc lint --all examples/003-MiniWebApp && ./phpc serve examples/003-MiniWebApp   # VM green; AOT link ✅, native execute blocked #764
+./phpc lint --all examples/003-MiniWebApp && ./phpc serve examples/003-MiniWebApp   # VM green; AOT link ✅, native execute ✅ (#764)
 ```
 
 The first `ci-local.sh` run downloads a bundled LLVM 9 toolchain into `.llvm/` (see `script/install-llvm9.sh`) and applies vendor patches. No Docker required.
@@ -109,9 +109,9 @@ Also: `phpc doctor` (env probe), `phpc validate-manifest`, `phpc cgi`. See `./ph
 | Example | VM | AOT link | AOT execute | Deploy smoke |
 |---------|----|----------|-------------|--------------|
 | [000–002](examples/000-HelloWorld/), [004-ApiJson](examples/004-ApiJson/) | ✅ `./phpc run` / `serve` | ✅ `phpc build` | ✅ CLI | 001/002 ✅ ([#718](https://github.com/PurHur/php-compiler/issues/718)) |
-| [003-MiniWebApp](examples/003-MiniWebApp/) | ✅ `phpc serve` ([#539](https://github.com/PurHur/php-compiler/issues/539)) | ✅ `phpc build --project` ([#752](https://github.com/PurHur/php-compiler/issues/752)) | 🚧 partial ([#764](https://github.com/PurHur/php-compiler/issues/764) home ✅; [#1044](https://github.com/PurHur/php-compiler/issues/1044)) | blocked [#676](https://github.com/PurHur/php-compiler/issues/676) |
+| [003-MiniWebApp](examples/003-MiniWebApp/) | ✅ `phpc serve` ([#539](https://github.com/PurHur/php-compiler/issues/539)) | ✅ `phpc build --project` ([#752](https://github.com/PurHur/php-compiler/issues/752)) | ✅ native execute ([#764](https://github.com/PurHur/php-compiler/issues/764); [#1044](https://github.com/PurHur/php-compiler/issues/1044)) | ✅ deploy smoke ([#676](https://github.com/PurHur/php-compiler/issues/676), [#1530](https://github.com/PurHur/php-compiler/issues/1530)) |
 
-`make examples-aot-smoke` links and executes 000–002 and 004; 003 **links**; native execute partial — see [#1044](https://github.com/PurHur/php-compiler/issues/1044). Per-example commands: [examples/README.md](examples/README.md).
+`make examples-aot-smoke` links and executes 000–004 when LLVM is ready (003 execute green — [#764](https://github.com/PurHur/php-compiler/issues/764)). Per-example commands: [examples/README.md](examples/README.md).
 
 ### Capabilities
 

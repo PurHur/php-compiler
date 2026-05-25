@@ -14,7 +14,7 @@ permalink: /development-status.html
 | **Try it** | `git clone` → `composer install` → `./phpc test --fast` → [`docs/GETTING-STARTED.md`](https://github.com/PurHur/php-compiler/blob/master/docs/GETTING-STARTED.md) |
 | **Overall progress** | ~**50%** toward web-capable + self-hosting compiler (indicative) |
 | **Wave 3 (May 2026)** | Language **10/13** · Stdlib **12/13** ([#1380](https://github.com/PurHur/php-compiler/issues/1380)) |
-| **North Star 1** | Reference web app — VM ✅ · AOT link ✅ · AOT execute **partial** ([#1044](https://github.com/PurHur/php-compiler/issues/1044)) |
+| **North Star 1** | Reference web app — VM ✅ · AOT link ✅ · AOT execute ✅ ([#764](https://github.com/PurHur/php-compiler/issues/764); close tracker [#1044](https://github.com/PurHur/php-compiler/issues/1044)) |
 | **North Star 2** | Self-compile — M0–M1 ✅ · M2 spine **584/588** · M5 ⬜ ([#1492](https://github.com/PurHur/php-compiler/issues/1492)
 | **Not Zend parity** | Subset compiler (not full Zend PHP) |
 
@@ -49,8 +49,8 @@ Indicative composite toward a **web-capable, self-hosting** compiler (not line-c
 | **Foundation** (CI, CLI, Docker) | ~88% | `phpc` CLI, local/Docker CI; GitHub Actions + CircleCI disabled ([#1338](https://github.com/PurHur/php-compiler/pull/1338), [#1340](https://github.com/PurHur/php-compiler/pull/1340)); contributor CI matrix doc in repo only |
 | **Language** (OOP, types, CFG) | ~74% | VM/JIT OOP largely works; wave-3 language **11/12** on master; open: attributes ([#1354](https://github.com/PurHur/php-compiler/issues/1354)) |
 | **Stdlib** | ~58% | Wave-3 batch ([#1367](https://github.com/PurHur/php-compiler/issues/1367)–[#1379](https://github.com/PurHur/php-compiler/issues/1379)): **13/13** closed on master |
-| **Web AOT** (build, deploy) | ~65% | Project link ✅; home-route execute ✅; PATH_INFO / layout chain 🚧 |
-| **Reference app** (MiniWebApp) | ~55% | VM ✅; AOT link ✅; AOT execute **partial** |
+| **Web AOT** (build, deploy) | ~70% | Project link ✅; CLI execute ✅; HTTP serve-aot / layout-edge bisect 🚧 |
+| **Reference app** (MiniWebApp) | ~65% | VM ✅; AOT link ✅; AOT execute ✅ |
 | **Self-host** (North Star 2, M0–M5) | ~99% | M0–M1 ✅; M2 spine **584/588**; M3 partial (native run ✅, Zend emit); M4–M5 ⬜ — [self-host-target.md](https://github.com/PurHur/php-compiler/blob/master/docs/self-host-target.md
 
 **Overall (indicative): ~52%** toward the stated north stars below.
@@ -105,7 +105,7 @@ Canonical app: [`examples/003-MiniWebApp`](https://github.com/PurHur/php-compile
 | **VM CLI matrix** | ✅ | `MiniWebApp*VmCli` in `ci-fast.sh` ([#597](https://github.com/PurHur/php-compiler/issues/597)) |
 | **Web shell smoke** | ✅ | `examples-web-smoke.sh` ([#664](https://github.com/PurHur/php-compiler/issues/664)) |
 | **AOT link** | ✅ | `phpc build --project` ([#752](https://github.com/PurHur/php-compiler/issues/752)) |
-| **AOT execute** | ✅ **query + PATH_INFO** | Home, hello, contact, api/status via CLI + CGI ([#747](https://github.com/PurHur/php-compiler/issues/747), [#764](https://github.com/PurHur/php-compiler/issues/764)); layout-chain edges remain in bisect ladder |
+| **AOT execute** | ✅ **query + PATH_INFO** | Home, hello, contact, api/status via CLI + CGI ([#747](https://github.com/PurHur/php-compiler/issues/747), [#764](https://github.com/PurHur/php-compiler/issues/764)); optional layout-edge bisect ladder below |
 | **AOT HTTP / deploy 003** | 🚧 **partial** | `MiniWebAppServeAotTest` default-on in full CI ([#1524](https://github.com/PurHur/php-compiler/issues/1524), [#1067](https://github.com/PurHur/php-compiler/issues/1067)); shell `--aot` curls opt-in ([#833](https://github.com/PurHur/php-compiler/issues/833)) |
 
 Examples **000–002** and **004** already pass VM + AOT link + AOT execute. **003** is the integration stress test for real web apps.
@@ -127,9 +127,9 @@ Run `./script/miniwebapp-gates.sh` or `phpc doctor --gates`. Details: [miniwebap
 | 4c | `examples-aot-smoke` 003 slice | ✅ ([#683](https://github.com/PurHur/php-compiler/issues/683)) |
 | 4d | Deploy smoke (003) | ✅ `DEPLOY_SMOKE_003_EXECUTE=1` ([#745](https://github.com/PurHur/php-compiler/issues/745)) |
 
-#### AOT execute bisect ladder (after #764 home fix)
+#### AOT execute bisect ladder (layout-edge refinements; core execute ✅ #764)
 
-Smallest reproducers first — see [#78](https://github.com/PurHur/php-compiler/issues/78) bisect table:
+`MiniWebAppAotExecuteTest` and `examples-aot-smoke` 003 are green on `master`. The ladder below tracks **optional** layout/include edge cases — see [#78](https://github.com/PurHur/php-compiler/issues/78) bisect table:
 
 | Step | Issue | Focus |
 |------|-------|--------|
@@ -284,7 +284,7 @@ GitHub issues use labels `phase-0:Foundation` … `phase-5:reference-app`. Deliv
 | **0 — Foundation** | CI, `phpc` CLI, Docker, docs, JIT compliance | Largely ✅ |
 | **1 — Language** | OOP, types, includes, `::class` | VM/JIT strong; native AOT gaps remain |
 | **2 — Stdlib** | Web builtins, filesystem, JSON, regex | Ongoing batches; audit in repo |
-| **3 — Web AOT** | `phpc build --project`, deploy, runtime includes | Link ✅; execute partial ([North Star 1](#north-star-1-web-app)) |
+| **3 — Web AOT** | `phpc build --project`, deploy, runtime includes | Link ✅; execute ✅ ([North Star 1](#north-star-1-web-app)) |
 | **4 — Polish** | MiniWebApp gates, HTTP smokes, doc sync | Active |
 
 **Current active phase:** Phase 4 polish (AOT execute matrix + HTTP smokes) while self-host waves continue in parallel.
@@ -296,7 +296,7 @@ GitHub issues use labels `phase-0:Foundation` … `phase-5:reference-app`. Deliv
 | Example | VM | AOT link | AOT execute |
 |---------|----|----------|-------------|
 | 000–002, 004 | ✅ | ✅ | ✅ |
-| 003-MiniWebApp | ✅ | ✅ | 🚧 partial (home ✅; [#676](https://github.com/PurHur/php-compiler/issues/676)) |
+| 003-MiniWebApp | ✅ | ✅ | ✅ ([#764](https://github.com/PurHur/php-compiler/issues/764), [#676](https://github.com/PurHur/php-compiler/issues/676)) |
 
 Commands: `./phpc run`, `./phpc build`, `./phpc serve`, `make examples-aot-smoke` (see [README](https://github.com/PurHur/php-compiler/blob/master/README.md)).
 
@@ -315,8 +315,7 @@ Commands: `./phpc run`, `./phpc build`, `./phpc serve`, `make examples-aot-smoke
 
 | Issue | Area | Impact |
 |-------|------|--------|
-| [#676](https://github.com/PurHur/php-compiler/issues/676) | North Star 1 execute | Unskip MiniWebApp PHPUnit + shell smokes |
-| [#878](https://github.com/PurHur/php-compiler/issues/878)–[#849](https://github.com/PurHur/php-compiler/issues/849) | AOT bisect | Layout/includes/superglobals in native 003 |
+| [#878](https://github.com/PurHur/php-compiler/issues/878)–[#849](https://github.com/PurHur/php-compiler/issues/849) | AOT bisect (optional) | Layout/includes edge refinements in native 003 |
 | [#828](https://github.com/PurHur/php-compiler/issues/828) | Self-host JIT | `Object_.php` external property children |
 | [#84](https://github.com/PurHur/php-compiler/issues/84) | Self-host tree | Full `lib/` bundle growth + namespaces |
 | [#57](https://github.com/PurHur/php-compiler/issues/57) | Self-host runtime | Try/catch unwind in native bundle |

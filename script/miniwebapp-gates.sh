@@ -568,6 +568,15 @@ echo "  MINIWEBAPP_AOT_BISECT_GATE=1 ./script/miniwebapp-aot-bisect.sh   # stage
 echo "  ./script/miniwebapp-aot-bisect.sh --list"
 echo
 echo "Tracking: ${REPO_URL}/issues/472 (gate ladder spec)"
+echo
+echo "Doc sync gates (ci-fast inventory — phpc doctor --gates does not run these):"
+root_readme_gate="${ROOT_README_SYNC_GATE:-1}"
+examples_readme_gate="${EXAMPLES_README_SYNC_GATE:-1}"
+wave3_gate="${WAVE3_ROADMAP_SYNC_GATE:-1}"
+echo "  ROOT_README_SYNC_GATE=${root_readme_gate}  script/check-root-readme-sync.php (#1832, #1525)"
+echo "  EXAMPLES_README_SYNC_GATE=${examples_readme_gate}  script/check-examples-readme-sync.php (#1822)"
+echo "  WAVE3_ROADMAP_SYNC_GATE=${wave3_gate}  script/check-wave3-roadmap-sync.php (#1802)"
+echo "  Opt out: ROOT_README_SYNC_GATE=0 ./script/ci-fast.sh"
 
 # Current focus
 if [[ "${lint_exit}" -ne 0 && "${lint_gate}" != "0" ]]; then
