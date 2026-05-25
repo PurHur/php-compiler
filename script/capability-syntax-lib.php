@@ -309,6 +309,17 @@ function syntaxRowDefinitions(): array
             'probe' => 'class B { private int $n = 0; public function __construct(int $n = 0) { $this->n = $n; } public function __serialize(): array { return ["n" => $this->n]; } public function __unserialize(array $d): void { $this->n = $d["n"]; } public function get(): int { return $this->n; } } $r = unserialize(serialize(new B(3))); echo $r->get();',
         ],
         [
+            'id' => 'try_catch_finally',
+            'construct' => 'try/catch/finally + `throw`',
+            'opcodes' => ['TYPE_TRY', 'TYPE_CATCH', 'TYPE_FINALLY', 'TYPE_THROW'],
+            'issue' => 57,
+            'notes' => [
+                'VM unwind via TYPE_TRY/CATCH/FINALLY/THROW; compliance PHPT pack #2084',
+                'Builtin Exception (#195) follow-up; user classes in PHPT today',
+            ],
+            'probe' => 'class E {} try { throw new E(); } catch (E $e) { echo "ok"; } finally { echo "!"; }',
+        ],
+        [
             'id' => 'multi_catch',
             'construct' => 'Multi-type catch `catch (A|B $e)`',
             'opcodes' => ['TYPE_TRY', 'TYPE_CATCH', 'TYPE_THROW'],

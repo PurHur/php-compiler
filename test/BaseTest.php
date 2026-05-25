@@ -208,8 +208,21 @@ abstract class BaseTest extends TestCase {
             $stdin = $code;
         }
         $cmd = array_merge(self::llvmEnvPrefix(), $vmCmd);
-        $result = self::runVmSubprocess($cmd, $cwd, $env, $stdin, $name);
-        $this->assertExpect($result, $sections);
+        $run = self::runVmSubprocess($cmd, $cwd, $env, $stdin, $name);
+        if (isset($sections['EXPECT_EXIT'])) {
+            $expectedExit = (int) trim($sections['EXPECT_EXIT']);
+            $actualExit = $run['exitCode'];
+            // `env` llvm prefix + proc_close may report -1 when the PHP child exited non-zero (#2084).
+            if (-1 === $actualExit && 0 !== $expectedExit) {
+                $actualExit = 255;
+            }
+            $this->assertSame(
+                $expectedExit,
+                $actualExit,
+                "VM exit for {$name} stderr: {$run['stderr']}"
+            );
+        }
+        $this->assertExpect($run['stdout'], $sections);
     }
 
     const ASSERTIONS = [
@@ -289,7 +302,10 @@ abstract class BaseTest extends TestCase {
      * @param list<string>  $cmd
      * @param array<string, string> $env
      */
-    protected static function runVmSubprocess(array $cmd, string $cwd, array $env, ?string $stdin, string $testName): string
+    /**
+     * @return array{stdout: string, stderr: string, exitCode: int}
+     */
+    protected static function runVmSubprocess(array $cmd, string $cwd, array $env, ?string $stdin, string $testName): array
     {
         $descriptorSpec = [
             0 => ['pipe', 'r'],
@@ -334,10 +350,11 @@ abstract class BaseTest extends TestCase {
             usleep(150000);
         }
 
-        $result = stream_get_contents($pipes[1]);
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
         fclose($pipes[1]);
         fclose($pipes[2]);
-        proc_close($proc);
+        $exitCode = proc_close($proc);
 
         if ($guard && $peakKb > 0) {
             fwrite(STDERR, sprintf(
@@ -347,7 +364,11 @@ abstract class BaseTest extends TestCase {
             ));
         }
 
-        return $result;
+        return [
+            'stdout' => $stdout !== false ? $stdout : '',
+            'stderr' => $stderr !== false ? $stderr : '',
+            'exitCode' => $exitCode,
+        ];
     }
 
     private static function peakRssKbForTree(int $rootPid): int
