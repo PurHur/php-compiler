@@ -331,6 +331,8 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('--example 003', $common);
         $this->assertStringContainsString('SESSIONS_WEB_DEPLOY_SMOKE_GATE', $common);
         $this->assertStringContainsString('--example 005', $common);
+        $this->assertStringContainsString('FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE', $common);
+        $this->assertStringContainsString('--example 006', $common);
     }
 
     public function testCiDefaultsEnvDefinesSessionsWebDeploySmokeGateOff(): void
@@ -338,6 +340,15 @@ final class CiScriptsTest extends TestCase
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
         $this->assertStringContainsString(
             'SESSIONS_WEB_DEPLOY_SMOKE_GATE="${SESSIONS_WEB_DEPLOY_SMOKE_GATE:-0}"',
+            $defaults
+        );
+    }
+
+    public function testCiDefaultsEnvDefinesFileUploadWebDeploySmokeGateOff(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString(
+            'FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE="${FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE:-0}"',
             $defaults
         );
     }

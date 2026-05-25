@@ -15,6 +15,7 @@
 #   DEPLOY_SMOKE_003_EXECUTE=0 ./script/deploy-smoke.sh --example 003
 #   DEPLOY_SMOKE_ONLY=003 make deploy-smoke
 #   SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 ./script/deploy-smoke.sh --example 005
+#   FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE=1 ./script/deploy-smoke.sh --example 006
 #
 # Docker:
 #   docker run --rm -v "$(pwd):/compiler" -w /compiler php-compiler:22.04-dev make deploy-smoke
@@ -26,12 +27,13 @@ PHPC="${ROOT}/phpc"
 SMOKE_ROOT="${ROOT}/.phpc/smoke/deploy"
 MINIWEBAPP="${ROOT}/examples/003-MiniWebApp"
 SESSIONS_WEB="${ROOT}/examples/005-SessionsWeb"
+FILE_UPLOAD_WEB="${ROOT}/examples/006-FileUploadWeb"
 EXAMPLE="002"
 DEPLOY_SMOKE_ONLY="${DEPLOY_SMOKE_ONLY:-}"
 
 usage() {
   cat <<'EOF' >&2
-Usage: script/deploy-smoke.sh [--example 001|002|003|005]
+Usage: script/deploy-smoke.sh [--example 001|002|003|005|006]
 
   001  examples/001-SimpleWeb (QUERY_STRING=name=…)
   002  examples/002-StaticWeb (default; static HTML)
@@ -39,9 +41,11 @@ Usage: script/deploy-smoke.sh [--example 001|002|003|005]
                                execute: default on DEPLOY_SMOKE_003_EXECUTE=1 #1530;
                                or MINIWEBAPP_AOT_EXECUTE_GATE=1 #745)
   005  examples/005-SessionsWeb (SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 #1893; cookie + POST redirect flash)
+  006  examples/006-FileUploadWeb (FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE=1 #2028; multipart POST upload)
 
 003 execute smoke is default on (DEPLOY_SMOKE_003_EXECUTE=1); set DEPLOY_SMOKE_003_EXECUTE=0 to skip (#1530, #745).
 005 requires SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 (default 0 until stable — #1893).
+006 requires FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE=1 (default 0 until stable — #2028).
 EOF
   exit 1
 }
@@ -138,6 +142,52 @@ run_deployed_app() {
 
 deploy_smoke_005_enabled() {
   [[ "${SESSIONS_WEB_DEPLOY_SMOKE_GATE:-0}" == "1" ]]
+}
+
+deploy_smoke_006_enabled() {
+  [[ "${FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE:-0}" == "1" ]]
+}
+
+# Write multipart/form-data body for field doc=@file (issue #2028).
+write_multipart_doc_body() {
+  local out="$1"
+  local upload_file="$2"
+  local boundary="deploySmoke006B"
+  local filename
+  filename="$(basename "$upload_file")"
+  {
+    printf -- '--%s\r\n' "$boundary"
+    printf 'Content-Disposition: form-data; name="doc"; filename="%s"\r\n' "$filename"
+    printf 'Content-Type: application/octet-stream\r\n\r\n'
+    cat "$upload_file"
+    printf '\r\n--%s--\r\n' "$boundary"
+  } >"$out"
+}
+
+run_deployed_cgi() {
+  local label="$1"
+  local dist="$2"
+  local body_file="$3"
+  shift 3
+  local stderr_file stdout stderr exit_code content_length
+  stderr_file="$(mktemp "${SMOKE_ROOT}/run.XXXXXX")"
+  content_length="$(wc -c <"$body_file" | tr -d ' ')"
+  local -a run_env=(PHPC_DEPLOY_ROOT="$dist" REQUEST_BODY_FILE="$body_file" "CONTENT_LENGTH=${content_length}")
+  run_env+=("$@")
+  stdout="$(env "${run_env[@]}" "${dist}/bin/app" 2>"$stderr_file")"
+  exit_code=$?
+  stderr="$(cat "$stderr_file" 2>/dev/null || true)"
+  rm -f "$stderr_file"
+  if [[ "$exit_code" -ne 0 ]]; then
+    echo "deploy-smoke: ${label}: bin/app exited ${exit_code}" >&2
+    [[ -n "$stderr" ]] && echo "$stderr" >&2
+    exit 1
+  fi
+  if [[ -n "$stderr" ]]; then
+    echo "deploy-smoke: ${label}: stderr: ${stderr}" >&2
+    exit 1
+  fi
+  printf '%s' "$stdout"
 }
 
 extract_http_cookie_from_cgi() {
@@ -486,14 +536,75 @@ smoke_005_sessions_web() {
   echo "deploy-smoke: ${label}: ok"
 }
 
+smoke_006_file_upload_web() {
+  local label="006-FileUploadWeb"
+  local dist="${SMOKE_ROOT}/006-FileUploadWeb"
+  local readme="${dist}/README.deploy"
+  local upload_file="${FILE_UPLOAD_WEB}/README.md"
+  local body_file out
+
+  if ! deploy_smoke_006_enabled; then
+    echo "deploy-smoke: ${label}: skip (FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE=0 #2028)" >&2
+    return 0
+  fi
+
+  if [[ ! -d "${FILE_UPLOAD_WEB}" ]]; then
+    echo "deploy-smoke: ${label}: skip (tree missing #1999)" >&2
+    return 0
+  fi
+  if [[ ! -f "$upload_file" ]]; then
+    echo "deploy-smoke: ${label}: skip (missing README.md for multipart doc=@)" >&2
+    return 0
+  fi
+
+  rm -rf "$dist"
+  mkdir -p "$SMOKE_ROOT"
+
+  echo "deploy-smoke: ${label}: phpc build --project"
+  "$PHPC" build --project "${FILE_UPLOAD_WEB}"
+
+  echo "deploy-smoke: ${label}: phpc deploy -> ${dist}"
+  "$PHPC" deploy "${FILE_UPLOAD_WEB}" -o "$dist"
+
+  if [[ ! -x "${dist}/bin/app" ]]; then
+    echo "deploy-smoke: ${label}: expected executable ${dist}/bin/app" >&2
+    exit 1
+  fi
+  if [[ ! -f "$readme" ]]; then
+    echo "deploy-smoke: ${label}: expected ${readme}" >&2
+    exit 1
+  fi
+  if ! grep -q 'PHPC_DEPLOY_ROOT' "$readme"; then
+    echo "deploy-smoke: ${label}: README.deploy missing PHPC_DEPLOY_ROOT" >&2
+    exit 1
+  fi
+
+  out="$(run_deployed_app "${label} GET empty" "$dist" \
+    REQUEST_METHOD=GET SCRIPT_NAME=/example.php REQUEST_URI=/example.php QUERY_STRING=)"
+  assert_needle "${label} GET empty" "$out" 'No upload yet'
+  echo "deploy-smoke: ${label}: GET empty ok"
+
+  body_file="$(mktemp "${SMOKE_ROOT}/multipart.XXXXXX")"
+  write_multipart_doc_body "$body_file" "$upload_file"
+  out="$(run_deployed_cgi "${label} POST multipart" "$dist" "$body_file" \
+    REQUEST_METHOD=POST SCRIPT_NAME=/example.php REQUEST_URI=/example.php \
+    'CONTENT_TYPE=multipart/form-data; boundary=deploySmoke006B')"
+  rm -f "$body_file"
+  assert_needle "${label} POST multipart" "$out" 'Uploaded: README.md'
+  echo "deploy-smoke: ${label}: multipart upload ok"
+
+  echo "deploy-smoke: ${label}: ok"
+}
+
 run_deploy_smoke_example() {
   case "$1" in
     001) smoke_deploy_example '001-SimpleWeb' 'examples/001-SimpleWeb' '001-SimpleWeb' ;;
     002) smoke_deploy_example '002-StaticWeb' 'examples/002-StaticWeb' '002-StaticWeb' ;;
     003) smoke_003_miniwebapp ;;
     005) smoke_005_sessions_web ;;
+    006) smoke_006_file_upload_web ;;
     *)
-      echo "deploy-smoke: unknown example ${1} (use 001, 002, 003, or 005)" >&2
+      echo "deploy-smoke: unknown example ${1} (use 001, 002, 003, 005, or 006)" >&2
       exit 1
       ;;
   esac
