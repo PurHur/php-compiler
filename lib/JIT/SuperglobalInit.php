@@ -171,8 +171,21 @@ final class SuperglobalInit
      */
     private static function isStandaloneRuntimeSuperglobal(Context $context, string $superglobalName): bool
     {
+        return self::requiresRuntimeOffsetIsSet($context, $superglobalName);
+    }
+
+    /**
+     * sg_* tables repopulated per run (MCJIT embed #642, standalone AOT refresh).
+     * isset/empty on these must not fold from compile-time VM snapshots.
+     */
+    public static function requiresRuntimeOffsetIsSet(Context $context, string $superglobalName): bool
+    {
+        if (!in_array($superglobalName, self::STANDALONE_REFRESHED, true)) {
+            return false;
+        }
+
         return Builtin::LOAD_TYPE_STANDALONE === $context->loadType
-            && in_array($superglobalName, self::STANDALONE_REFRESHED, true);
+            || Builtin::LOAD_TYPE_EMBED === $context->loadType;
     }
 
     /**
