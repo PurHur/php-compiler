@@ -7,6 +7,8 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\SplAutoloadCallbackPolicy;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -14,7 +16,7 @@ use PHPLLVM\Value;
 /**
  * spl_autoload_register() — register class autoload callbacks on VM context (issue #1369).
  *
- * VM: string and array callables. JIT/AOT deferred.
+ * VM: string callables. JIT: compile-time string user-function names (#1776).
  */
 final class spl_autoload_register extends Internal
 {
@@ -37,6 +39,8 @@ final class spl_autoload_register extends Internal
             $callback = $frame->calledArgs[0]->resolveIndirect();
             if (Variable::TYPE_NULL === $callback->type) {
                 $callback = null;
+            } elseif (!SplAutoloadCallbackPolicy::isVmSupportedType($callback->type)) {
+                throw new \LogicException(SplAutoloadCallbackPolicy::vmRejectionMessage());
             }
         }
         $throw = true;
@@ -70,6 +74,29 @@ final class spl_autoload_register extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('spl_autoload_register() is not implemented for JIT in this compiler build');
+        $argc = \count($args);
+        if ($argc > 3) {
+            throw new \LogicException(
+                'spl_autoload_register() accepts zero to three arguments in this compiler build'
+            );
+        }
+        if ($argc < 1) {
+            throw new \LogicException(
+                'spl_autoload_register() without a callback is not supported in this compiler build'
+            );
+        }
+        if (!SplAutoloadCallbackPolicy::isJitLowerable($args[0])) {
+            throw new \LogicException(SplAutoloadCallbackPolicy::jitRejectionMessage());
+        }
+        $this->jitString($context, $args[0], 'spl_autoload_register() callback');
+        $prependArg = 3 === $argc ? $args[2] : null;
+        if (null !== $prependArg
+            && JITVariable::TYPE_NATIVE_LONG !== $prependArg->type
+            && JITVariable::TYPE_NATIVE_BOOL !== $prependArg->type
+        ) {
+            throw new \LogicException('spl_autoload_register() prepend must be a compile-time boolean');
+        }
+
+        return JitSplAutoload::register($context, $args[0], $prependArg);
     }
 }

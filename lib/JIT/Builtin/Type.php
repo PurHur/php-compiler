@@ -114,6 +114,7 @@ class Type extends Builtin {
         SessionName::implement($this->context);
         ObOutput::registerExternals($this->context);
         ErrorHandlerOutput::registerExternals($this->context);
+        SplAutoloadOutput::registerExternals($this->context);
         CallArgv::implement($this->context);
         $i8p = $this->context->getTypeFromString('int8*');
         $i32 = $this->context->getTypeFromString('int32');
