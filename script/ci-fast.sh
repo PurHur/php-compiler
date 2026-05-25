@@ -10,6 +10,9 @@
 #   BOOTSTRAP_LOOP_PROBE_GATE=1 ./script/ci-fast.sh
 # North Star 2 presenter (default on; issue #1928, #2051). Opt-out:
 #   NORTH_STAR2_VERIFY_GATE=0 ./script/ci-fast.sh
+# Bootstrap test subset (opt-in; issue #2069):
+#   BOOTSTRAP_TEST_SUBSET_GATE=1 ./script/ci-fast.sh
+#   BOOTSTRAP_TEST_SUBSET_STRICT=1 for M3 strict tail when LLVM ready
 set -euo pipefail
 
 # shellcheck source=ci-common.sh
@@ -20,6 +23,7 @@ ci_prepare_test_runtime
 ci_install_deps
 ci_jit_preflight_gate
 ci_run_inventory_checks
+ci_run_bootstrap_test_subset
 ci_report_llvm_status
 ci_configure_serve_tests
 

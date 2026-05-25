@@ -165,6 +165,8 @@ final class Doctor
         $spineCountSyncDefault = $defaults['SELFHOST_SPINE_COUNT_SYNC_GATE'] ?? '1';
         $spineCoverageDefault = $defaults['SELFHOST_SPINE_COVERAGE_SYNC_GATE'] ?? '1';
         $loopProbeDefault = $defaults['BOOTSTRAP_LOOP_PROBE_GATE'] ?? '0';
+        $testSubsetDefault = $defaults['BOOTSTRAP_TEST_SUBSET_GATE'] ?? '0';
+        $testSubsetStrictDefault = $defaults['BOOTSTRAP_TEST_SUBSET_STRICT'] ?? '0';
 
         $inventoryScript = $repoRoot.'/script/bootstrap-inventory.php';
         $inventoryOk = is_file($inventoryScript);
@@ -194,6 +196,8 @@ final class Doctor
 
         fwrite(STDOUT, "4. Presenter / fast CI\n");
         fwrite(STDOUT, "   NORTH_STAR2_VERIFY_GATE=".(self::gateEnabled('NORTH_STAR2_VERIFY_GATE', $ns2Default) ? '1' : '0')." (default {$ns2Default}) — ci-fast\n");
+        fwrite(STDOUT, "   BOOTSTRAP_TEST_SUBSET_GATE=".(self::gateEnabled('BOOTSTRAP_TEST_SUBSET_GATE', $testSubsetDefault) ? '1' : '0')." (default {$testSubsetDefault}) — ci-fast after inventory; phpc test --bootstrap ([#2069](https://github.com/PurHur/php-compiler/issues/2069))\n");
+        fwrite(STDOUT, "   BOOTSTRAP_TEST_SUBSET_STRICT=".(self::gateEnabled('BOOTSTRAP_TEST_SUBSET_STRICT', $testSubsetStrictDefault) ? '1' : '0')." (default {$testSubsetStrictDefault}) — strict M3 tail when subset gate on\n");
         if (is_executable($repoRoot.'/script/north-star2-verify.sh')) {
             fwrite(STDOUT, "   make north-star2-verify  or  ./script/north-star2-verify.sh\n");
         }
@@ -316,6 +320,11 @@ final class Doctor
         $ns2CiDetail = $ns2CiOn
             ? 'NORTH_STAR2_VERIFY_GATE=1 (default) — ci-fast runs presenter (#1928, #2051)'
             : 'opt-out NORTH_STAR2_VERIFY_GATE=0 skips presenter in ci-fast (#1928)';
+        $subsetGate = getenv('BOOTSTRAP_TEST_SUBSET_GATE');
+        $subsetOn = false !== $subsetGate && '1' === $subsetGate;
+        $subsetDetail = $subsetOn
+            ? 'BOOTSTRAP_TEST_SUBSET_GATE=1 — ci-fast runs bootstrap-test-subset (#2069)'
+            : 'opt-in BOOTSTRAP_TEST_SUBSET_GATE=1 for phpc test --bootstrap in ci-fast (#2069)';
         if ($ns2Make) {
             fwrite(STDOUT, "  Presenter bundle make north-star2-verify            --require-llvm / --skip-llvm-tail\n");
             fwrite(STDOUT, "  Script           ./script/north-star2-verify.sh    same as make target\n");
@@ -323,6 +332,7 @@ final class Doctor
             fwrite(STDOUT, "  Presenter bundle make north-star2-verify            script missing in tree\n");
         }
         fwrite(STDOUT, "  Fast CI hook     {$ns2CiDetail}\n");
+        fwrite(STDOUT, "  Bootstrap subset {$subsetDetail}\n");
         fwrite(STDOUT, "  Docs             docs/bootstrap-selfhost.md · docs/self-host-target.md (#1492)\n");
     }
 
