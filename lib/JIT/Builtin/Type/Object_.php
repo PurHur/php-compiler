@@ -407,6 +407,10 @@ class Object_ extends Type {
         if (!$name instanceof Literal) {
             throw new \LogicException('JIT only supports constant named classes');
         }
+        $lc = strtolower($name->value);
+        if (isset($this->classes[$lc])) {
+            return $this->classes[$lc];
+        }
         $id = count($this->classes);
         $this->properties[$id] = [];
         $this->classConstants[$id] = [];
