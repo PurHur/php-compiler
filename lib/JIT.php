@@ -783,8 +783,12 @@ class JIT {
         if ($this->isM3CompileDriverRealLoweringName($lower)) {
             return false;
         }
-        // M3 compile-smoke emit (not helloworld_compile_smoke — LLVM 9 link crash #1514).
+        // M3 compile-smoke wrapper: native bridge in emit TU (#1983 approach 3).
         if ($this->shouldUseM3CompileDriverRealLowering() && $this->isBootstrapCompileSmokeM3EmitName($lower)) {
+            if ($this->shouldUseEmitHelperLinkStubs()) {
+                return true;
+            }
+
             return false;
         }
         // Self-host bundle includes Runtime/VM/Func for closure only; stub non-Compiler bodies (#913).
@@ -1083,12 +1087,54 @@ class JIT {
         return $func;
     }
 
+    /** Thin native LLVM bridge for compile_smoke_m3_emit when emit-helper link is active (#1983). */
+    private function compileBootstrapCompileSmokeM3EmitNative(
+        string $internalName,
+        Block $block,
+        string $logicalName
+    ): PHPLLVM\Value {
+        $lcname = strtolower($logicalName);
+        if (isset($this->context->functions[$lcname])) {
+            return $this->context->functions[$lcname];
+        }
+        $strPtr = $this->context->getTypeFromString('__string__*');
+        $i64 = $this->context->getTypeFromString('int64');
+        $func = $this->context->module->addFunction(
+            $this->llvmInternalName($internalName),
+            $this->context->context->functionType($i64, false, $strPtr, $strPtr)
+        );
+        $bb = $func->appendBasicBlock('entry');
+        $saved = $this->context->builder;
+        $this->context->builder = $this->context->context->builderCreate();
+        $this->context->builder->positionAtEnd($bb);
+        \PHPCompiler\JIT\BootstrapCompileSmokeM3Emit::emit(
+            $this->context,
+            $func->getParam(0),
+            $func->getParam(1)
+        );
+        $this->context->builder->clearInsertionPosition();
+        $this->context->builder = $saved;
+        $this->context->functions[$lcname] = $func;
+        $this->context->functionReturnType[$lcname] = 'int64';
+        $this->context->functionProxies[$lcname] = new JIT\Call\Native(
+            $func,
+            $logicalName,
+            [$strPtr, $strPtr],
+            $this->collectParamDefaults($block)
+        );
+
+        return $func;
+    }
+
     /** Stub Compiler CFG helpers that crash LLVM 9 during self-host AOT (#816). */
     private function compileSkippedCompilerSplitCfgStub(string $internalName, Block $block, string $logicalName): PHPLLVM\Value
     {
         $lcname = strtolower($logicalName);
         if (isset($this->context->functions[$lcname])) {
             return $this->context->functions[$lcname];
+        }
+        if ($this->shouldUseEmitHelperLinkStubs() && $this->isBootstrapCompileSmokeM3EmitName($lcname)) {
+            return $this->compileBootstrapCompileSmokeM3EmitNative($internalName, $block, $logicalName);
         }
         if ($this->shouldUseSelfHostJitStubs() && str_contains($lcname, 'operandschainequal')) {
             $objectPtr = $this->context->getTypeFromString('__object__*');

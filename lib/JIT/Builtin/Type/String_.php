@@ -727,7 +727,15 @@ class String_ extends Type {
     $block___6512bd43d9caa6e02c990b0a82652dca = $fn___6512bd43d9caa6e02c990b0a82652dca->appendBasicBlock('main');
     $this->context->builder->positionAtEnd($block___6512bd43d9caa6e02c990b0a82652dca);
     $string = $fn___6512bd43d9caa6e02c990b0a82652dca->getParam(0);
-    
+    $stringPtrType = $this->context->getTypeFromString('__string__*');
+    $nullString = $stringPtrType->constNull();
+    $isNull = $this->context->builder->icmp(\PHPLLVM\Builder::INT_EQ, $string, $nullString);
+    $ifNull = $fn___6512bd43d9caa6e02c990b0a82652dca->appendBasicBlock('separate_null');
+    $body = $fn___6512bd43d9caa6e02c990b0a82652dca->appendBasicBlock('separate_body');
+    $this->context->builder->branchIf($this->context->castToBool($isNull), $ifNull, $body);
+    $this->context->builder->positionAtEnd($ifNull);
+    $this->context->builder->returnValue($nullString);
+    $this->context->builder->positionAtEnd($body);
     $offset = $this->context->structFieldMap[$this->context->structNameForValue($string)]['length'];
                     $size = $this->context->builder->load(
                         $this->context->builder->structGep($string, $offset)
