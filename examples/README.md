@@ -38,7 +38,7 @@ Legacy entrypoints still work: `php bin/vm.php`, `php bin/jit.php`, `php bin/com
 | [001-SimpleWeb](001-SimpleWeb/) | ✅ `-q` / `-p` / env / `phpc serve` | ✅ `bin/jit.php` | ✅ `phpc build` | runtime `QUERY_STRING` / POST ([#201](https://github.com/PurHur/php-compiler/issues/201), [#257](https://github.com/PurHur/php-compiler/issues/257), [#259](https://github.com/PurHur/php-compiler/issues/259)) |
 | [002-StaticWeb](002-StaticWeb/) | ✅ `./phpc run` | ✅ `bin/jit.php` | ✅ recommended | no superglobals — [#247](https://github.com/PurHur/php-compiler/issues/247) execute smoke |
 | [004-ApiJson](004-ApiJson/) | ✅ `./phpc run` | ✅ `bin/jit.php` | ✅ `phpc build` | JSON + `http_response_code` — [#270](https://github.com/PurHur/php-compiler/issues/270), [#61](https://github.com/PurHur/php-compiler/issues/61) |
-| [003-MiniWebApp](003-MiniWebApp/) | ✅ `phpc serve` | partial | ✅ `phpc build --project` | PATH_INFO — [#489](https://github.com/PurHur/php-compiler/issues/489), runtime [#539](https://github.com/PurHur/php-compiler/issues/539); AOT link ✅ ([#752](https://github.com/PurHur/php-compiler/issues/752)); native execute 📋 ([#764](https://github.com/PurHur/php-compiler/issues/764)) |
+| [003-MiniWebApp](003-MiniWebApp/) | ✅ `phpc serve` | partial | ✅ `phpc build --project` | PATH_INFO — [#489](https://github.com/PurHur/php-compiler/issues/489), runtime [#539](https://github.com/PurHur/php-compiler/issues/539); AOT link ✅ ([#752](https://github.com/PurHur/php-compiler/issues/752)); native execute ✅ ([#764](https://github.com/PurHur/php-compiler/issues/764) closed) |
 
 ### 000-HelloWorld
 
@@ -71,7 +71,7 @@ AOT binaries refresh `$_GET` / `$_POST` / `$_REQUEST` from CGI env on each reque
 
 ### 003-MiniWebApp
 
-Reference front controller with PATH_INFO routes ([#489](https://github.com/PurHur/php-compiler/issues/489)). VM serve and `examples-web-smoke.sh` curls are green. `phpc build --project` **links** when LLVM is available ([#752](https://github.com/PurHur/php-compiler/issues/752)); native **execute** still returns empty stdout until [#764](https://github.com/PurHur/php-compiler/issues/764) (`ExamplesCompileTest` documents the gap).
+Reference front controller with PATH_INFO routes ([#489](https://github.com/PurHur/php-compiler/issues/489)). VM serve and `examples-web-smoke.sh` curls are green. `phpc build --project` **links** when LLVM is available ([#752](https://github.com/PurHur/php-compiler/issues/752)); native **execute** is green ([#764](https://github.com/PurHur/php-compiler/issues/764) closed — `MiniWebAppAotExecuteTest`, `make miniwebapp-gates`).
 
 ```console
 ./phpc lint --all examples/003-MiniWebApp
@@ -120,7 +120,7 @@ Before a PR that touches examples or `bin/serve.php`:
 ```console
 make web-smoke              # lint examples/*/example.php + 003 lint --all + VM ?name= smoke
 make examples-web-smoke     # phpc serve + curl GET/POST (001-SimpleWeb, 002-StaticWeb, 004-ApiJson)
-make examples-aot-smoke     # phpc build + CLI execute (000–004; skips when LLVM missing; 003 execute #764)
+make examples-aot-smoke     # phpc build + CLI execute (000–004; skips when LLVM missing; 003 execute green #764)
 ```
 
 Full CI (`./script/ci-local.sh`) runs `examples-aot-smoke.sh` after PHPUnit `@group aot-link` when LLVM is available (`EXAMPLES_AOT_SMOKE_GATE=1` default in `script/ci-defaults.env`; set `EXAMPLES_AOT_SMOKE_GATE=0` to skip during iteration — [#674](https://github.com/PurHur/php-compiler/issues/674)). Not run in `ci-fast.sh`.

@@ -32,7 +32,7 @@ final class ExamplesReadmeTest extends TestCase
         $this->assertStringContainsString('make test-docker', $readme);
     }
 
-    public function testMiniWebAppAotStatusReflectsLinkGreenExecute764(): void
+    public function testMiniWebAppAotStatusReflectsLinkAndExecuteGreen(): void
     {
         $root = dirname(__DIR__, 2);
         $readme = (string) file_get_contents($root.'/examples/README.md');
@@ -41,11 +41,15 @@ final class ExamplesReadmeTest extends TestCase
         foreach ([$readme, $mini] as $body) {
             $this->assertStringNotContainsString('blocked #568', $body);
             $this->assertStringNotContainsString('❌ blocked', $body);
+            $this->assertStringNotContainsString('empty stdout until', $body);
+            $this->assertStringNotContainsString('native execute 📋', $body);
         }
 
+        $this->assertStringContainsString('native execute ✅', $readme);
         $this->assertStringContainsString('#764', $readme);
         $this->assertStringContainsString('phpc build --project', $readme);
         $this->assertStringContainsString('AOT link', $mini);
+        $this->assertStringContainsString('native execute ✅', $mini);
         $this->assertStringContainsString('#764', $mini);
     }
 }

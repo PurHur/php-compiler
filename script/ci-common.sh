@@ -87,6 +87,14 @@ ci_run_m2_spine_issue_hygiene_check() {
   "$PHP_BIN" "${PHP_OPTS[@]}" script/check-m2-spine-issue-hygiene.php
 }
 
+ci_run_examples_readme_sync_check() {
+  if [[ "${EXAMPLES_README_SYNC_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  echo "Examples README sync (EXAMPLES_README_SYNC_GATE=1, issue #1822)..."
+  "$PHP_BIN" "${PHP_OPTS[@]}" script/check-examples-readme-sync.php
+}
+
 ci_run_inventory_checks() {
   script/check-no-unlimited-memory.sh
   script/check-stale-issue-refs.sh
@@ -97,6 +105,7 @@ ci_run_inventory_checks() {
   ci_ensure_generated_doc script/bootstrap-profile.php docs/bootstrap-profile.json
   ci_run_wave3_roadmap_sync_check
   ci_run_m2_spine_issue_hygiene_check
+  ci_run_examples_readme_sync_check
 }
 
 ci_llvm_dir() {
