@@ -204,7 +204,7 @@ class Compiler {
                             $tailAssign = $ops[$i + 1];
                             $resultOverride = $tailAssign->var;
                         }
-                        $block = $this->compileCoalesce($child, $block, $resultOverride);
+                        $block = $this->compileCoalesceForAssign($child, $block, $resultOverride);
                         if (null !== $resultOverride) {
                             ++$i;
                         }
@@ -230,7 +230,7 @@ class Compiler {
                             $tailAssign = $ops[$i + 2];
                             $resultOverride = $tailAssign->var;
                         }
-                        $block = $this->compileCoalesce($coalesce, $block, $resultOverride);
+                        $block = $this->compileCoalesceForAssign($coalesce, $block, $resultOverride);
                         ++$i;
                         if (null !== $resultOverride) {
                             ++$i;
@@ -259,6 +259,11 @@ class Compiler {
                     } else {
                         if ($this->needsCfgSplitBeforeStringDimFetch($child, $block, $ops, $i)) {
                             $block = $this->splitCfgBlockAfterStringKeyedArray($block);
+                        }
+                        $echoBlock = $this->compileEchoWithEmbeddedCoalesce($child, $block);
+                        if (null !== $echoBlock) {
+                            $block = $echoBlock;
+                            break;
                         }
                         $this->compileOp($child, $block);
                     }
@@ -370,6 +375,114 @@ class Compiler {
         Op\Expr\BinaryOp\Coalesce $coalesce
     ): bool {
         return $this->operandsChainEqual($assign->expr, $coalesce->result);
+    }
+
+    /**
+     * Echo with embedded ?? / ??= must use compileCoalesce and continue on the merge block (#99, #1960).
+     */
+    private function compileEchoWithEmbeddedCoalesce(Op $op, Block $block): ?Block
+    {
+        if (!$op instanceof Op\Terminal || 'Terminal_Echo' !== $op->getType()) {
+            return null;
+        }
+        $coalesces = $this->findEmbeddedCoalesces($op->expr);
+        if ([] === $coalesces) {
+            return null;
+        }
+        foreach ($coalesces as $coalesce) {
+            $block = $this->compileCoalesceForAssign($coalesce, $block);
+        }
+        $concat = $this->unwrapConcatListExpr($op->expr);
+        if (null !== $concat) {
+            $this->compileOp($concat, $block);
+            $var = $this->compileOperand($concat->result, $block, true);
+        } else {
+            $var = $this->compileOperand($coalesces[0]->result, $block, true);
+        }
+        $block->addOpCode(new OpCode(OpCode::TYPE_ECHO, $var));
+
+        return $block;
+    }
+
+    /**
+     * @return list<Op\Expr\BinaryOp\Coalesce>
+     */
+    private function findEmbeddedCoalesces(Operand $operand): array
+    {
+        $found = [];
+        $coalesce = $this->unwrapCoalesceExpr($operand);
+        if (null !== $coalesce) {
+            $found[] = $coalesce;
+        }
+        $concat = $this->unwrapConcatListExpr($operand);
+        if (null !== $concat) {
+            foreach ($concat->list as $part) {
+                foreach ($this->findEmbeddedCoalesces($part) as $nested) {
+                    $found[] = $nested;
+                }
+            }
+        }
+
+        return $found;
+    }
+
+    private function compileCoalesceForAssign(
+        Op\Expr\BinaryOp\Coalesce $coalesce,
+        Block $block,
+        ?Operand $resultOverride = null
+    ): Block {
+        if (null === $resultOverride) {
+            $dimFetch = $this->findCoalesceArrayDimFetch($coalesce->left, $block);
+            if (null !== $dimFetch && $this->operandsChainEqual($coalesce->result, $dimFetch->result)) {
+                $resultOverride = $dimFetch->result;
+            } elseif ($this->operandsChainEqual($coalesce->result, $coalesce->left)) {
+                $resultOverride = $coalesce->left;
+            }
+        }
+
+        return $this->compileCoalesce($coalesce, $block, $resultOverride);
+    }
+
+    /**
+     * @return ?Op\Expr\ConcatList
+     */
+    private function unwrapConcatListExpr(Operand $operand): ?Op\Expr\ConcatList
+    {
+        while ($operand instanceof Temporary) {
+            if ($operand->original instanceof Op\Expr\ConcatList) {
+                return $operand->original;
+            }
+            if (null === $operand->original) {
+                return null;
+            }
+            $operand = $operand->original;
+        }
+        if ($operand instanceof Op\Expr\ConcatList) {
+            return $operand;
+        }
+
+        return null;
+    }
+
+    /**
+     * @return ?Op\Expr\BinaryOp\Coalesce
+     */
+    private function unwrapCoalesceExpr(Operand $operand): ?Op\Expr\BinaryOp\Coalesce
+    {
+        while ($operand instanceof Temporary) {
+            if ($operand->original instanceof Op\Expr\BinaryOp\Coalesce) {
+                return $operand->original;
+            }
+            if (null === $operand->original) {
+                return null;
+            }
+            $operand = $operand->original;
+        }
+        if ($operand instanceof Op\Expr\BinaryOp\Coalesce) {
+            return $operand;
+        }
+
+        return null;
     }
 
     private function operandsChainEqual(Operand $a, Operand $b): bool
@@ -1567,14 +1680,12 @@ class Compiler {
         $rightBlock->inheritUndefinedLocals = true;
         $rightBlock->inheritScopeFrom($block);
         $rightSlot = $this->compileOperand($expr->right, $rightBlock, true);
-        if (null !== $dimFetch) {
-            $assignTarget = $resultOverride ?? $resultOperand;
-            // ??= stores through the dim-fetch result (stmt tail or echo/expr assign-op form, #1235, #1960).
-            $coalesceAssignForm = $this->operandsChainEqual($resultOperand, $expr->left)
-                || $this->operandsChainEqual($assignTarget, $dimFetch->result);
-            if ($coalesceAssignForm) {
-                $this->compileArrayDimFetchWrite($dimFetch, $rightBlock);
-            }
+        $coalesceAssignTarget = $resultOverride ?? $expr->result;
+        if (
+            null !== $dimFetch
+            && $this->operandsChainEqual($coalesceAssignTarget, $dimFetch->result)
+        ) {
+            $this->compileArrayDimFetchWrite($dimFetch, $rightBlock);
         }
         $rightBlock->addOpCode(new OpCode(
             OpCode::TYPE_ASSIGN,
