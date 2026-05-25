@@ -153,6 +153,14 @@ function syntaxRowDefinitions(): array
             'probe' => 'class A {} echo A::class;',
         ],
         [
+            'id' => 'class_member_const',
+            'construct' => 'Class member constants `public` / `private` / `protected const`',
+            'opcodes' => ['TYPE_DECLARE_CLASS_CONST', 'TYPE_CLASS_CONST_FETCH'],
+            'issue' => 2199,
+            'notes' => ['MiniWebApp `Router::DEFAULT_CONTACT_NAME_MAX` (#2059)'],
+            'probe' => 'class C { private const M = 1; public function f(): int { return self::M; } } echo (new C())->f();',
+        ],
+        [
             'id' => 'late_static_binding',
             'construct' => 'Late static binding `static::method()` / `static::class`',
             'opcodes' => ['TYPE_STATICCALL_INIT', 'TYPE_CLASS_CONST_FETCH'],
@@ -510,6 +518,7 @@ function collectSyntaxPhptCoverage(string $root, array $definitions): array
         'match_expr' => '/\bmatch\s*\(/',
         'arrow_functions' => '/\bfn\s*\(/',
         'class_name_const' => '/::class\b/',
+        'class_member_const' => '/\b(?:public|private|protected)\s+const\b/',
         'magic_const_class_method' => '/__CLASS__|__FUNCTION__|__METHOD__/',
         'magic_const_namespace' => '/__NAMESPACE__/',
         'magic_const_dir_file' => '/__DIR__|__FILE__/',
