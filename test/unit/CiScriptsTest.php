@@ -269,6 +269,32 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('EXAMPLES_README_SYNC_GATE=${EXAMPLES_README_SYNC_GATE:-1}', $body);
     }
 
+    public function testCiDefaultsEnvDefinesExamplesLadderDiscoveryGateOn(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString(
+            'EXAMPLES_LADDER_DISCOVERY_GATE="${EXAMPLES_LADDER_DISCOVERY_GATE:-1}"',
+            $defaults
+        );
+    }
+
+    public function testCiFastRunsExamplesLadderDiscoveryViaInventoryChecks(): void
+    {
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('ci_run_examples_ladder_discovery_check', $common);
+        $this->assertStringContainsString('check-examples-ladder-discovery.php', $common);
+        $this->assertStringContainsString('EXAMPLES_LADDER_DISCOVERY_GATE:-1', $common);
+    }
+
+    public function testCiDockerRunPassesExamplesLadderDiscoveryGateDefaultOn(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');
+        $this->assertStringContainsString(
+            'EXAMPLES_LADDER_DISCOVERY_GATE=${EXAMPLES_LADDER_DISCOVERY_GATE:-1}',
+            $body
+        );
+    }
+
     public function testCiDefaultsEnvDefinesRootReadmeSyncGateOn(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
@@ -590,6 +616,14 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('EXAMPLES_README_SYNC_GATE', $doc);
         $this->assertStringContainsString('check-examples-readme-sync.php', $doc);
         $this->assertMatchesRegularExpression('/\| `EXAMPLES_README_SYNC_GATE` \| `1` \|/', $doc);
+    }
+
+    public function testLocalCiMatrixDocumentsExamplesLadderDiscoveryGate(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('EXAMPLES_LADDER_DISCOVERY_GATE', $doc);
+        $this->assertStringContainsString('check-examples-ladder-discovery.php', $doc);
+        $this->assertMatchesRegularExpression('/\| `EXAMPLES_LADDER_DISCOVERY_GATE` \| `1` \|/', $doc);
     }
 
     public function testLocalCiMatrixDocumentsRootReadmeSyncGate(): void
