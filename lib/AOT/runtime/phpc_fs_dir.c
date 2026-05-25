@@ -107,6 +107,96 @@ static int phpc_mkdir_recursive(const char *path, mode_t mode)
     return phpc_mkdir_one(buf, mode);
 }
 
+static int phpc_is_uploaded_temp_path(const char *path)
+{
+    char resolved[PATH_MAX];
+    char tmpdir[PATH_MAX];
+    const char *td;
+    const char *base;
+    size_t tlen;
+    size_t plen;
+
+    if (NULL == path || '\0' == *path) {
+        return 0;
+    }
+    if (realpath(path, resolved) == NULL) {
+        return 0;
+    }
+    td = getenv("TMPDIR");
+    if (NULL == td || '\0' == *td) {
+        td = "/tmp";
+    }
+    if (realpath(td, tmpdir) == NULL) {
+        if (strlen(td) >= sizeof(tmpdir)) {
+            return 0;
+        }
+        strncpy(tmpdir, td, sizeof(tmpdir) - 1);
+        tmpdir[sizeof(tmpdir) - 1] = '\0';
+    }
+    tlen = strlen(tmpdir);
+    plen = strlen(resolved);
+    if (plen < tlen) {
+        return 0;
+    }
+    if (0 != strcmp(resolved, tmpdir)) {
+        if (tlen > 0 && '/' != tmpdir[tlen - 1]) {
+            if (plen <= tlen || '/' != resolved[tlen]) {
+                return 0;
+            }
+        } else if (0 != strncmp(resolved, tmpdir, tlen)) {
+            return 0;
+        }
+    }
+    base = strrchr(resolved, '/');
+    base = (NULL == base) ? resolved : base + 1;
+    if (0 != strncmp(base, "phpc_upload_", 12)) {
+        return 0;
+    }
+    {
+        struct stat st;
+        if (stat(resolved, &st) != 0 || !S_ISREG(st.st_mode)) {
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
+static int phpc_safe_destination_path(const char *path)
+{
+    const char *p;
+
+    if (NULL == path || '\0' == *path) {
+        return 0;
+    }
+    for (p = path; '\0' != *p; p++) {
+        if ('.' == *p && '.' == p[1]
+            && ('\0' == p[2] || '/' == p[2] || '\\' == p[2])) {
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
+/** move_uploaded_file() runtime (issue #2005): returns 1 on success, 0 on failure. */
+int __compiler_move_uploaded_file(__string__ *from, __string__ *to)
+{
+    const char *src;
+    const char *dst;
+
+    if (NULL == from || NULL == to) {
+        return 0;
+    }
+    src = phpc_strdata(from);
+    dst = phpc_strdata(to);
+    if (!phpc_is_uploaded_temp_path(src) || !phpc_safe_destination_path(dst)) {
+        return 0;
+    }
+
+    return rename(src, dst) == 0 ? 1 : 0;
+}
+
 /** copy() runtime: returns 1 on success, 0 on failure. */
 int __compiler_copy(__string__ *from, __string__ *to)
 {
