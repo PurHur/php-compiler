@@ -72,6 +72,7 @@ if ci_llvm_ready; then
     ci_run_phpunit --group aot-lint "$@"
 
     BOOTSTRAP_WAVE_CHECK="${BOOTSTRAP_WAVE_CHECK:-1}" ci_run_bootstrap_wave_check
+    ci_run_bootstrap_m3_strict
 
     echo "PHPUnit: JIT compliance (@group jit)..."
     LLVM_JUNIT="$(mktemp "${TMPDIR:-/tmp}/llvm-jit-junit.XXXXXX.xml")"
@@ -88,6 +89,7 @@ if ci_llvm_ready; then
     ci_run_phpunit --group aot-lint "$@"
 
     BOOTSTRAP_WAVE_CHECK="${BOOTSTRAP_WAVE_CHECK:-1}" ci_run_bootstrap_wave_check
+    ci_run_bootstrap_m3_strict
 
     ci_run_aot_link_phpunit "$@"
     ci_run_miniwebapp_aot_execute "$@"

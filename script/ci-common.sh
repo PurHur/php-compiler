@@ -269,6 +269,23 @@ ci_run_bootstrap_wave_check() {
   "$_CI_SCRIPT_DIR/bootstrap-wave-check.sh" --fail-fast
 }
 
+# M3 HelloWorld strict native emit (issue #1526); default off until emit_path=native stable in Docker.
+ci_run_bootstrap_m3_strict() {
+  if [[ "${BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  if ! ci_llvm_ready; then
+    echo "bootstrap-m3-strict: skipped (LLVM 9 not available)"
+    return 0
+  fi
+  echo "bootstrap-m3-strict (BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE=1, issue #1526)..."
+  BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1 \
+    BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING=1 \
+    BOOTSTRAP_M3_RUNTIME_COMPILE=1 \
+    BOOTSTRAP_M3_HELLOWORLD_STRICT=1 \
+    "$_CI_SCRIPT_DIR/bootstrap-selfhost-helloworld-probe.sh"
+}
+
 ci_should_run_jit() {
   if [[ -n "${PHP_COMPILER_FORCE_JIT_TESTS:-}" ]]; then
     echo "JIT compliance forced (PHP_COMPILER_FORCE_JIT_TESTS=1)."
