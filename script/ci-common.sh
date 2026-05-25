@@ -279,8 +279,11 @@ ci_run_bootstrap_loop_probe() {
     echo "bootstrap-loop-probe: skipped (LLVM 9 not available)"
     return 0
   fi
-  echo "bootstrap-loop-probe (BOOTSTRAP_LOOP_PROBE_GATE=1, --dry-run, issue #1777, #1498)..."
-  "$_CI_SCRIPT_DIR/bootstrap-loop-probe.sh" --dry-run
+  echo "bootstrap-loop-probe (BOOTSTRAP_LOOP_PROBE_GATE=1, --dry-run, issue #1777, #1498, #1929)..."
+  if ! "$_CI_SCRIPT_DIR/bootstrap-loop-probe.sh" --dry-run; then
+    echo "bootstrap-loop-probe: failed — see docs/bootstrap-selfhost.md (#1498)" >&2
+    return 1
+  fi
 }
 
 # Wave gate: selfhost-lint → aot-lint → probe (default on when LLVM ready; BOOTSTRAP_WAVE_CHECK=0 to skip).

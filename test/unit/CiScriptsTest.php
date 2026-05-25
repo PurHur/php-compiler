@@ -393,6 +393,12 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('BOOTSTRAP_SELFHOST_PROBE_UPDATE', $common);
     }
 
+    public function testCiFastHonorsBootstrapLoopProbeGate(): void
+    {
+        $fast = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-fast.sh');
+        $this->assertStringContainsString('ci_run_bootstrap_loop_probe', $fast);
+    }
+
     public function testCiLocalHonorsBootstrapLoopProbeGate(): void
     {
         $local = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-local.sh');
@@ -419,6 +425,8 @@ final class CiScriptsTest extends TestCase
 
         $docSelfhost = (string) file_get_contents(dirname(__DIR__, 2).'/docs/bootstrap-selfhost.md');
         $this->assertStringContainsString('BOOTSTRAP_LOOP_PROBE_GATE=1', $docSelfhost);
+        $this->assertStringContainsString('ci-fast.sh', $doc);
+        $this->assertStringContainsString('#1929', $doc);
     }
 
     public function testCiLocalHonorsBootstrapWaveCheckGate(): void
