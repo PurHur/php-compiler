@@ -285,6 +285,13 @@ class Type extends Builtin {
         $fntypeHashEquals = $this->context->context->functionType($i32, false, $strPtr, $strPtr);
         $fnHashEquals = $this->context->module->addFunction('__compiler_hash_equals', $fntypeHashEquals);
         $this->context->registerFunction('__compiler_hash_equals', $fnHashEquals);
+        $double = $this->context->getTypeFromString('double');
+        $fntypeMicrotimeStr = $this->context->context->functionType($strPtr, false);
+        $fnMicrotimeStr = $this->context->module->addFunction('__compiler_microtime_string', $fntypeMicrotimeStr);
+        $this->context->registerFunction('__compiler_microtime_string', $fnMicrotimeStr);
+        $fntypeMicrotimeFloat = $this->context->context->functionType($double, false);
+        $fnMicrotimeFloat = $this->context->module->addFunction('__compiler_microtime_float', $fntypeMicrotimeFloat);
+        $this->context->registerFunction('__compiler_microtime_float', $fnMicrotimeFloat);
         $i64 = $this->context->getTypeFromString('int64');
         $fntypePasswordHash = $this->context->context->functionType($strPtr, false, $strPtr, $i64);
         $fnPasswordHash = $this->context->module->addFunction('__compiler_password_hash', $fntypePasswordHash);
