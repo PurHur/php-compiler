@@ -236,6 +236,15 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('test006FileUploadWebAotLink', $source);
     }
 
+    public function testExamplesCompileTestHonorsThrowsWebAotLinkGate(): void
+    {
+        $source = (string) file_get_contents(dirname(__DIR__).'/unit/ExamplesCompileTest.php');
+        $this->assertStringContainsString('THROWSWEB_AOT_LINK_GATE', $source);
+        $this->assertStringContainsString('throwsWebAotLinkGateEnabled', $source);
+        $this->assertStringContainsString('test007ThrowsWebAotLink', $source);
+        $this->assertStringContainsString('@group aot-link', $source);
+    }
+
     public function testCiLocalExcludesFileUploadWebAotExecuteUnlessGateOn(): void
     {
         $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');

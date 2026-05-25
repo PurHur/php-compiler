@@ -602,7 +602,7 @@ final class Doctor
             $linkDefault,
             $linkOn,
             true,
-            './script/ci-local.sh --filter ThrowsWebAotLinkTest (#2101)',
+            './script/ci-local.sh --filter test007ThrowsWebAotLink (#2101, #2143)',
             '#2101'
         );
         $aotStatus = $aotOn && $llvmReady ? '✅' : '📋';
