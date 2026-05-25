@@ -35,4 +35,9 @@ if ('' !== $pathInfo) {
 $method = (string) ($_SERVER['REQUEST_METHOD'] ?? 'GET');
 
 $router = new Router($config);
+if (!$router instanceof Router) {
+    http_response_code(500);
+    echo "Router bootstrap failed\n";
+    exit(1);
+}
 $router->dispatch($method, (string) $route);

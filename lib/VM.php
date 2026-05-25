@@ -595,7 +595,11 @@ restart:
                 case OpCode::TYPE_ARG_RECV:
                     $arg1 = $frame->scope[$op->arg1];
                     $recvIdx = $op->arg2;
-                    if (null !== $frame->block->func && null !== $frame->block->func->class) {
+                    if (
+                        null !== $frame->block->func
+                        && null !== $frame->block->func->class
+                        && !(($frame->block->func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC)
+                    ) {
                         ++$recvIdx;
                     }
                     $isVariadicSlot = null !== $frame->block->variadicParamIndex

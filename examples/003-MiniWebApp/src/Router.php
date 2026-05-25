@@ -38,6 +38,16 @@ class Router
         $this->config = $config;
     }
 
+    /**
+     * Front-controller bootstrap (static call + ::class slice for AOT graph, #2185).
+     *
+     * @param array<string, mixed> $config
+     */
+    public static function fromConfig(array $config): self
+    {
+        return new self($config);
+    }
+
     public function dispatch(string $method, string $route): void
     {
         if ('api/status' !== $route) {
