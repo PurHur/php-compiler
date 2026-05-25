@@ -138,6 +138,17 @@ class JIT {
         return '1' === $flag || 'true' === strtolower((string) $flag);
     }
 
+    /**
+     * Link-time only: skip non-jittable ext/ class bodies when building native emit helper (#1983).
+     * Does not enable self-host Runtime/Compiler stubs (unlike PHP_COMPILER_SELFHOST_AOT).
+     */
+    private function shouldUseEmitHelperLinkStubs(): bool
+    {
+        $flag = getenv('PHP_COMPILER_EMIT_HELPER_LINK');
+
+        return '1' === $flag || 'true' === strtolower((string) $flag);
+    }
+
     /** Opt-in when linking test/selfhost/compiler_helloworld_smoke/compile_driver.php (#1056). */
     private function shouldUseM3CompileDriverRealLowering(): bool
     {
@@ -209,12 +220,6 @@ class JIT {
         if (str_ends_with($lower, '\\runtime::loadjit')) {
             return true;
         }
-        if ($this->isBootstrapCompileSmokeM3EmitName($lower)) {
-            return true;
-        }
-        if (str_ends_with($lower, '\\bootstrapaot\\compile_smoke_m3_emit')) {
-            return true;
-        }
 
         return false;
     }
@@ -228,8 +233,9 @@ class JIT {
     {
         return [
             'slotindexforvariablename',
-            // Full emit chain LLVM 9 link crash (#1514); use compile_smoke_m3_emit for M3 compile-smoke (#1977).
+            // Full emit FUNCDEF LLVM 9 link crash (#1514); inline emit in compile_driver compile mode (#1983).
             '\\bootstrapaot\\helloworld_compile_smoke',
+            // compile_smoke_m3_emit real-lowers only in native emit TU (#1983), not compile_driver.
             '\\runtime::__destruct',
             '\\runtime::initparsepipeline',
             '\\runtime::initcompiler',
@@ -3036,7 +3042,10 @@ class JIT {
                     $name = $block->getOperand($op->arg1);
                     assert($name instanceof Operand\Literal);
                     if (!isset($block->constants[$op->arg2])) {
-                        if ($this->shouldUseSelfHostJitStubs() || $this->isBundledSuperglobalsClass($classId)) {
+                        if ($this->shouldUseSelfHostJitStubs()
+                            || $this->shouldUseEmitHelperLinkStubs()
+                            || $this->isBundledSuperglobalsClass($classId)
+                        ) {
                             break;
                         }
                         throw new \LogicException('Class constant value must be a compile-time constant');
@@ -3048,7 +3057,10 @@ class JIT {
                     );
                     break;
                 default:
-                    if ($this->shouldUseSelfHostJitStubs() || $this->isBundledSuperglobalsClass($classId)) {
+                    if ($this->shouldUseSelfHostJitStubs()
+                        || $this->shouldUseEmitHelperLinkStubs()
+                        || $this->isBundledSuperglobalsClass($classId)
+                    ) {
                         break;
                     }
                     throw new \LogicException('Other class body types are not jittable for now');

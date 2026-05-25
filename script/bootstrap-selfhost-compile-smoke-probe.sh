@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# M3 compile-smoke self-host probe (issues #1056, #1492, #1937, #1977): link bundle, native or Zend emit, run natively.
+# M3 compile-smoke self-host probe (issues #1056, #1492, #1937, #1983): link bundle, native or Zend emit, run natively.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "${ROOT}"
@@ -38,9 +38,9 @@ if [[ ! -f "${SOURCE}" ]]; then
   exit 1
 fi
 
-EMIT_ENTRY="${ROOT}/test/bootstrap-aot/compile_smoke_m3_emit_entry.php"
+EMIT_ENTRY="${ROOT}/test/bootstrap-aot/compile_smoke_m3_emit_native_entry.php"
 if [[ ! -f "${EMIT_ENTRY}" ]]; then
-  echo "bootstrap-selfhost-compile-smoke-probe: missing ${EMIT_ENTRY} (#1977)" >&2
+  echo "bootstrap-selfhost-compile-smoke-probe: missing ${EMIT_ENTRY} (#1983)" >&2
   exit 1
 fi
 
@@ -57,14 +57,14 @@ if [[ "${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
   m3_link_env=()
   m3_link_mode="stub"
   if [[ "${BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING:-0}" == "1" ]]; then
-    m3_link_env=(env PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_M3_COMPILE_DRIVER=1)
-    m3_link_mode="real-lowering (compile_smoke_m3_emit_entry)"
+    m3_link_env=(env PHP_COMPILER_EMIT_HELPER_LINK=1)
+    m3_link_mode="native emit TU (compile_smoke_m3_emit_native_entry.php, full Runtime JIT)"
   else
-    m3_link_env=(env PHP_COMPILER_SELFHOST_AOT=1)
-    m3_link_mode="selfhost stubs (no PHP_COMPILER_M3_COMPILE_DRIVER)"
+    m3_link_env=()
+    m3_link_mode="standard JIT emit TU"
   fi
   set +e
-  "${m3_link_env[@]}" php bin/compile.php -o build/selfhost-compile-smoke-emit test/bootstrap-aot/compile_smoke_m3_emit_entry.php >/dev/null 2>&1
+  "${m3_link_env[@]}" php bin/compile.php -o build/selfhost-compile-smoke-emit "${EMIT_ENTRY}" >/dev/null 2>&1
   m3_link_code=$?
   set -e
   if [[ -x "${EMIT_HELPER}" ]]; then
@@ -72,8 +72,10 @@ if [[ "${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
     if [[ "${BOOTSTRAP_M3_RUNTIME_COMPILE:-0}" == "1" ]]; then
       set +e
       compile_out="$(
-        env PHP_COMPILER_M3_SOURCE="${SOURCE}" PHP_COMPILER_M3_OUT="${AOT_OUT}" \
-          env -u PHP_COMPILER_SELFHOST_AOT "${EMIT_HELPER}" 2>&1
+        env PHP_COMPILER_M3_EMIT_MINIMAL=1 \
+          PHP_COMPILER_M3_SOURCE="${SOURCE}" \
+          PHP_COMPILER_M3_OUT="${AOT_OUT}" \
+          "${EMIT_HELPER}" 2>&1
       )"
       native_compile_code=$?
       set -e

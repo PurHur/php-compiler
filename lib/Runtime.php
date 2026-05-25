@@ -109,9 +109,19 @@ class Runtime {
     public function loadJit(): JIT {
         if (is_null($this->jit)) {
             $this->jit = $this->createJit($this->jitContextForLoadJit());
-            $this->loadJitCompileModuleFuncs($this->jit);
+            if (!$this->shouldSkipLoadJitCompileModuleFuncs()) {
+                $this->loadJitCompileModuleFuncs($this->jit);
+            }
         }
         return $this->jit;
+    }
+
+    /** M3 emit smoke: compile main block only; skip eager ext/ JIT (#1983). */
+    private function shouldSkipLoadJitCompileModuleFuncs(): bool
+    {
+        $flag = getenv('PHP_COMPILER_M3_EMIT_MINIMAL');
+
+        return '1' === $flag || 'true' === strtolower((string) $flag);
     }
 
     /** Avoid inlining loadJitContext into loadJit (LLVM 9 crash when both are real-lowered #1402). */
