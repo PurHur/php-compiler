@@ -12,7 +12,7 @@ use PHPCompiler\VM\OutputBuffer;
 use PHPLLVM\Value;
 
 /**
- * ob_get_clean() — return active buffer and end buffering (VM only; issue #118).
+ * ob_get_clean() — return active buffer and end buffering (VM; JIT scaffold {@see JitObGetClean}, #118, #1056).
  */
 final class ob_get_clean extends Internal
 {
@@ -39,6 +39,6 @@ final class ob_get_clean extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('ob_get_clean() is not implemented for JIT in this compiler build');
+        throw new \LogicException('ob_get_clean() is not implemented for JIT in this compiler build (#118)');
     }
 }

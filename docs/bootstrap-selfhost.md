@@ -6,7 +6,7 @@
 
 | Gate | Command | Status |
 |------|---------|--------|
-| Phase A inventory | `php script/bootstrap-inventory.php --check` | ✅ **588** files on `bin/vm.php` path; **0** source blockers (excluded paths: `lib/AOT/Linker.php`, `lib/JIT/Builtin/StringPregMatch.php`; `lib/VM/HashTable.php` bundled via `ArrayIterator`) |
+| Phase A inventory | `php script/bootstrap-inventory.php --check` | ✅ **593** files on `bin/vm.php` path; **0** source blockers (excluded paths: `lib/AOT/Linker.php`, `lib/JIT/Builtin/StringPregMatch.php`; `lib/VM/HashTable.php` bundled via `ArrayIterator`) |
 | Phase B lib AOT lint | `php bin/compile.php -l lib/*.php` (with `script/php-env.sh`) | ✅ **14/14** top-level `lib/*.php` units ([#534](https://github.com/PurHur/php-compiler/pull/534)) |
 | Phase B fixture lint | `php script/bootstrap-aot-lint.php` | ✅ **13** procedural targets under `test/bootstrap-aot/` + `examples/000-HelloWorld` |
 | Phase C native run | `make bootstrap-aot-link` or `./script/bootstrap-aot-link.sh` | ✅ **71/71** link targets OK |
@@ -20,7 +20,7 @@
 | Self-host probe in full CI | `./script/ci-local.sh` (LLVM tail) | ✅ default-on when LLVM 9 present; `BOOTSTRAP_SELFHOST_PROBE_GATE=0` to skip ([#829](https://github.com/PurHur/php-compiler/issues/829)) |
 | Wave gate in full CI | `./script/ci-local.sh` (LLVM tail) | ✅ default-on when LLVM 9 present; `BOOTSTRAP_WAVE_CHECK=0` to skip; `./script/bootstrap-wave-check.sh --fail-fast` |
 | Self-host native link | `./script/bootstrap-selfhost-link.sh` | ✅ `build/selfhost` prints `compiler_minimal bundle OK` ([#557](https://github.com/PurHur/php-compiler/issues/557), [#913](https://github.com/PurHur/php-compiler/issues/913)) |
-| M2 lib spine smoke lint | `php bin/compile.php -l test/selfhost/compiler_lib_spine_smoke/main.php` | ✅ **584** units ([#1492](https://github.com/PurHur/php-compiler/issues/1492), [#1419](https://github.com/PurHur/php-compiler/issues/1419)
+| M2 lib spine smoke lint | `php bin/compile.php -l test/selfhost/compiler_lib_spine_smoke/main.php` | ✅ **589** units ([#1492](https://github.com/PurHur/php-compiler/issues/1492), [#1419](https://github.com/PurHur/php-compiler/issues/1419)
 | M2 lib spine smoke native run | `./script/bootstrap-selfhost-lib-spine-smoke-link.sh` or `BOOTSTRAP_LIB_SPINE_SMOKE=1 make bootstrap-selfhost-lib-spine-smoke` | ✅ `build/selfhost-lib-spine-smoke` prints `compiler_lib_spine_smoke bundle OK` |
 | M2 lib spine VM `-r` smoke | `./script/bootstrap-selfhost-lib-spine-vm-smoke.sh` or `BOOTSTRAP_LIB_SPINE_VM_SMOKE=1 make bootstrap-selfhost-lib-spine-vm-smoke` | ✅ same binary + `PHP_COMPILER_VM_SPINE_SMOKE=1` prints `vm-spine-ok` ([#1846](https://github.com/PurHur/php-compiler/issues/1846); CI opt-in `BOOTSTRAP_LIB_SPINE_VM_SMOKE_GATE=1`) |
 | M3 HelloWorld self-host probe lint | `php bin/compile.php -l test/selfhost/compiler_helloworld_smoke/main.php` | ✅ `compiler_compile_smoke` spine + `helloworld_compile_smoke` driver (linkable) |

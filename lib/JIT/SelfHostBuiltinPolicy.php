@@ -40,11 +40,11 @@ final class SelfHostBuiltinPolicy
     /** @var array<string, string> */
     private const VM_ONLY_DEFERRED = [
         'debug_backtrace' => 'debug',
+        'ob_start' => 'output', 'ob_get_clean' => 'output', 'ob_end_flush' => 'output',
+        'ob_get_level' => 'output',
         'spl_autoload_register' => 'spl',
         'set_error_handler' => 'error',
         'restore_error_handler' => 'error',
-        'ob_start' => 'output', 'ob_get_clean' => 'output', 'ob_end_flush' => 'output',
-        'ob_get_level' => 'output',
         'password_hash' => 'password', 'password_verify' => 'password',
         'session_start' => 'session',
         'session_destroy' => 'session', 'session_write_close' => 'session',
