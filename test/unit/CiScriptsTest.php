@@ -1403,4 +1403,28 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('ci_run_init_fileupload_parity_check', $common);
         $this->assertStringContainsString('check-init-fileupload-parity.sh', $common);
     }
+
+    public function testCheckInitApiJsonParityScriptExists(): void
+    {
+        $check = dirname(__DIR__, 2).'/script/check-init-apijson-parity.sh';
+        $this->assertFileExists($check);
+        $this->assertTrue(is_executable($check));
+        $body = (string) file_get_contents($check);
+        $this->assertStringContainsString('examples/004-ApiJson', $body);
+        $this->assertStringContainsString('templates/init-apijson', $body);
+    }
+
+    public function testCheckInitApiJsonParityPassesInRepo(): void
+    {
+        $check = dirname(__DIR__, 2).'/script/check-init-apijson-parity.sh';
+        exec('bash '.escapeshellarg($check).' 2>&1', $out, $code);
+        $this->assertSame(0, $code, implode("\n", $out));
+    }
+
+    public function testCiInventoryRunsInitApiJsonParityCheck(): void
+    {
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('ci_run_init_apijson_parity_check', $common);
+        $this->assertStringContainsString('check-init-apijson-parity.sh', $common);
+    }
 }

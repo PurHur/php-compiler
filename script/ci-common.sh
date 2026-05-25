@@ -200,12 +200,21 @@ ci_run_init_fileupload_parity_check() {
   script/check-init-fileupload-parity.sh
 }
 
+ci_run_init_apijson_parity_check() {
+  if [[ "${APIJSON_INIT_PARITY_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  echo "init-apijson template parity (APIJSON_INIT_PARITY_GATE=1, issue #2029)..."
+  script/check-init-apijson-parity.sh
+}
+
 ci_run_inventory_checks() {
   script/check-no-unlimited-memory.sh
   script/check-stale-issue-refs.sh
   script/check-init-miniwebapp-parity.sh
   ci_run_init_sessionsweb_parity_check
   ci_run_init_fileupload_parity_check
+  ci_run_init_apijson_parity_check
   "$PHP_BIN" "${PHP_OPTS[@]}" script/capability-matrix.php --check
   ci_run_capability_syntax_check
   ci_ensure_generated_doc script/bootstrap-inventory.php docs/bootstrap-inventory.md
