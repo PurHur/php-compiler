@@ -28,6 +28,16 @@ final class JitDate
             : $context->builder->zExt($raw, $timeT);
     }
 
+    public static function getmypid(Context $context): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $raw = $context->builder->call($context->lookupFunction('getpid'));
+
+        return $raw->typeOf() === $i64
+            ? $raw
+            : $context->builder->zExt($raw, $i64);
+    }
+
     public static function microtime(Context $context, Value $asFloat): Value
     {
         StringMicrotime::ensureLinked($context);

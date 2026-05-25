@@ -387,6 +387,7 @@ class Type extends Builtin {
         $i64p = $this->context->getTypeFromString('int64*');
         $libcFns = [
             'time' => [$i64, false, [$i8p]],
+            'getpid' => [$i32, false, []],
             'localtime' => [$i8p, false, [$i64p]],
             'gmtime' => [$i8p, false, [$i64p]],
             'sleep' => [$i32, false, [$i32]],

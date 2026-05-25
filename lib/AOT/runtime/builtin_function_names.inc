@@ -97,6 +97,7 @@ static const char *phpc_builtin_functions[] = {
     "getallheaders",
     "getcwd",
     "getenv",
+    "getmypid",
     "gettype",
     "glob",
     "gmdate",
