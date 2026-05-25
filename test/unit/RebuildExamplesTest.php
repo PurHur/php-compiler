@@ -56,6 +56,26 @@ final class RebuildExamplesTest extends TestCase
         $this->assertStringContainsString('005-SessionsWeb', $readme);
     }
 
+    public function testRebuildExamplesDocumentsFileUploadWebBenchmarkGate(): void
+    {
+        $script = file_get_contents(dirname(__DIR__, 2).'/script/rebuild-examples.php');
+        $this->assertNotFalse($script);
+        $this->assertStringContainsString('shouldBenchFileUploadWeb', $script);
+        $this->assertStringContainsString('BENCH_FILEUPLOADWEB', $script);
+        $this->assertStringContainsString('FILEUPLOADWEB_LINT_GATE', $script);
+        $this->assertStringContainsString('examples/006-FileUploadWeb', $script);
+        $this->assertStringContainsString("'fileupload_web_project_aot' => true", $script);
+        $this->assertStringContainsString('tryBenchmarkFileUploadWebProjectAot', $script);
+        $this->assertStringContainsString('BENCH_FILEUPLOADWEB_AOT', $script);
+        $this->assertStringContainsString('fileUploadWebMultipartCgiEnv', $script);
+        $this->assertStringContainsString('#2027', $script);
+
+        $readme = file_get_contents(dirname(__DIR__, 2).'/examples/README.md');
+        $this->assertNotFalse($readme);
+        $this->assertStringContainsString('BENCH_FILEUPLOADWEB', $readme);
+        $this->assertStringContainsString('006-FileUploadWeb', $readme);
+    }
+
     public function testCiWiresRebuildExamples005SyncGate(): void
     {
         $common = file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');

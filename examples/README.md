@@ -200,6 +200,7 @@ Each example includes a benchmark that compares VM, JIT, and (when LLVM is prese
 MINIWEBAPP_LINT_GATE=1 ./script/rebuild-examples.php
 # or: BENCH_MINIWEBAPP=1 ./script/rebuild-examples.php
 # or: BENCH_SESSIONSWEB=1 ./script/rebuild-examples.php   # 005 row (#1889)
+# or: BENCH_FILEUPLOADWEB=1 ./script/rebuild-examples.php   # 006 row (#2027)
 ```
 
 For **001-SimpleWeb**, `bin/compile.php` is timed **without** compile-time `-q`; the `./compiled` column runs the binary with runtime `QUERY_STRING` (and related CGI env), matching production AOT web binaries.
@@ -208,14 +209,17 @@ For **003-MiniWebApp**, VM/JIT/native columns run `public/index.php` with `PATH_
 
 For **005-SessionsWeb**, the benchmark row is omitted until `phpc lint --all examples/005-SessionsWeb` passes unless `BENCH_SESSIONSWEB=1` ([#1889](https://github.com/PurHur/php-compiler/issues/1889)). AOT columns time `phpc build --project` and a two-request session flash on `.phpc/bin/app` when LLVM is ready ([#1891](https://github.com/PurHur/php-compiler/issues/1891), [#1973](https://github.com/PurHur/php-compiler/issues/1973)); use `BENCH_SESSIONSWEB_AOT=1 ./script/rebuild-examples.php` to force AOT columns on harness regen.
 
+For **006-FileUploadWeb**, the benchmark row is omitted until `phpc lint --all examples/006-FileUploadWeb` passes unless `BENCH_FILEUPLOADWEB=1` ([#2027](https://github.com/PurHur/php-compiler/issues/2027)). VM/JIT/native columns use a multipart POST CGI overlay (same body as `FileUploadWebAotExecuteTest`). AOT columns time `phpc build --project` and a multipart upload probe on `.phpc/bin/app` when LLVM is ready ([#2011](https://github.com/PurHur/php-compiler/issues/2011), [#2012](https://github.com/PurHur/php-compiler/issues/2012)); use `BENCH_FILEUPLOADWEB_AOT=1 ./script/rebuild-examples.php` to force AOT columns on harness regen.
+
 <!-- benchmark table start -->
 
 |         Example Name |      Native PHP |      bin/vm.php |     bin/jit.php | bin/compile.php |      ./compiled |
 |----------------------|-----------------|-----------------|-----------------|-----------------|-----------------|
-|       000-HelloWorld |         0.00792 |         0.04623 |         0.20762 |         1.87538 |         0.00156 |
-|        001-SimpleWeb |         0.00895 |         0.04740 |         0.18640 |         1.35069 |         0.00118 |
-|        002-StaticWeb |         0.00980 |         0.05066 |         0.18906 |         1.36219 |         0.00123 |
-|       003-MiniWebApp |         0.00771 |         0.09690 |         0.52931 |         1.83640 |         0.00106 |
-|          004-ApiJson |         0.00850 |         0.04705 |         0.19092 |         2.98758 |         0.00116 |
-|      005-SessionsWeb |         0.01742 |         0.05082 |         0.19587 |         1.43149 |         0.00277 |
+|       000-HelloWorld |         0.00884 |         0.04714 |         0.19026 |         1.42065 |         0.00106 |
+|        001-SimpleWeb |         0.00806 |         0.05033 |         0.22790 |         1.63049 |         0.00135 |
+|        002-StaticWeb |         0.01006 |         0.05586 |         0.24027 |         1.56620 |         0.00159 |
+|       003-MiniWebApp |         0.01090 |         0.14402 |         0.83622 |         2.32867 |         0.00112 |
+|          004-ApiJson |         0.01123 |         0.05639 |         0.23968 |         1.60864 |         0.00147 |
+|      005-SessionsWeb |         0.01110 |         0.06242 |         0.24382 |         1.59660 |         0.00387 |
+|    006-FileUploadWeb |         0.01033 |         0.05973 |         0.20998 |         1.51074 |         0.00101 |
 <!-- benchmark table end -->
