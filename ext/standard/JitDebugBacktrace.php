@@ -5,76 +5,63 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Block;
+use PHPCompiler\JIT\Builtin\StringDebugBacktrace;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\ScriptMagic;
-use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\OpCode;
 use PHPLLVM\Value;
 
-/** LLVM lowering for debug_backtrace() (#1378). */
+/** LLVM lowering for debug_backtrace() (#1378, #1056). */
 final class JitDebugBacktrace
 {
     /** @return Value */
     public static function invoke(Context $context): Value
     {
-        $block = $context->jitEnclosingBlock;
-        $file = $block instanceof Block
-            ? ScriptMagic::stringForBlock($block, OpCode::SCRIPT_MAGIC_FILE)
-            : '';
+        StringDebugBacktrace::ensureLinked($context);
 
-        $frames = [
-            self::frameVariable($context, 'debug_backtrace', $file),
-        ];
+        $block = $context->jitEnclosingBlock;
+        $file0 = $block instanceof Block
+            ? $context->builder->load(ScriptMagic::stringForBlock($block, OpCode::SCRIPT_MAGIC_FILE))
+            : $context->builder->load($context->constantStringFromString(''));
+
+        $fn0 = $context->builder->load($context->constantStringFromString('debug_backtrace'));
+
+        $hasFrame1 = $context->getTypeFromString('int1')->constInt(0, false);
+        $file1 = $context->builder->load($context->constantStringFromString(''));
+        $fn1 = $context->builder->load($context->constantStringFromString(''));
+
         if ($block instanceof Block && null !== $block->func) {
             $function = $block->func->getScopedName();
             if ('' === $function) {
                 $function = $block->func->name ?? '';
             }
-            $enclosingFile = ScriptMagic::stringForBlock($block, OpCode::SCRIPT_MAGIC_FILE);
-            $frames[] = self::frameVariable($context, $function, $enclosingFile);
+            if ('' !== $function) {
+                $hasFrame1 = $context->getTypeFromString('int1')->constInt(1, false);
+                $file1 = $context->builder->load(
+                    ScriptMagic::stringForBlock($block, OpCode::SCRIPT_MAGIC_FILE)
+                );
+                $fn1 = $context->builder->load($context->constantStringFromString($function));
+            }
         }
 
-        $packed = HashTableHelper::packVariables($context, $frames);
+        $raw = $context->builder->call(
+            $context->lookupFunction('__compiler_jit_debug_backtrace'),
+            $file0,
+            $fn0,
+            $file1,
+            $fn1,
+            $hasFrame1
+        );
+
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
         $context->builder->call(
             $context->lookupFunction('__value__writeHashtable'),
             $ptr,
-            $context->helper->loadValue($packed)
+            $raw
         );
 
         return $ptr;
-    }
-
-    private static function frameVariable(Context $context, string $fn, string $path): JITVariable
-    {
-        $entry = HashTableHelper::alloc($context);
-        $context->builder->call(
-            $context->lookupFunction('__hashtable__setStringKeyString'),
-            $entry,
-            $context->builder->load($context->constantStringFromString('file')),
-            $context->builder->load($context->constantStringFromString($path))
-        );
-        $context->builder->call(
-            $context->lookupFunction('__hashtable__setStringKeyLong'),
-            $entry,
-            $context->builder->load($context->constantStringFromString('line')),
-            $context->getTypeFromString('int64')->constInt(0, false)
-        );
-        $context->builder->call(
-            $context->lookupFunction('__hashtable__setStringKeyString'),
-            $entry,
-            $context->builder->load($context->constantStringFromString('function')),
-            $context->builder->load($context->constantStringFromString($fn))
-        );
-
-        return new JITVariable(
-            $context,
-            JITVariable::TYPE_HASHTABLE,
-            JITVariable::KIND_VALUE,
-            $entry
-        );
     }
 }

@@ -70,6 +70,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringRandomBytes.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringReadfile.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringSerialize.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringStripslashes.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/StringDebugBacktrace.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringSuperglobalName.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringUcwords.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringUnserialize.php';
@@ -611,8 +612,10 @@ require_once __DIR__.'/../../../ext/types/Module.php';
 require_once __DIR__.'/../../../ext/types/is_type.php';
 require_once __DIR__.'/../../../ext/types/mb_strlen.php';
 require_once __DIR__.'/../../../ext/types/strlen.php';
+require_once __DIR__.'/../../../src/tokenizer-compat.php';
+require_once __DIR__.'/../../../test/bootstrap-aot/cli_spine_shim.php';
 require_once __DIR__.'/../../../test/bootstrap-aot/vm_run_smoke.php';
-// src/llvm-env.php: FFI dlopen at bundle init — native run segfault under self-host AOT (#2001).
+// src/llvm-env.php: loaded via src/cli.php; keep out of literal require_once for spine count (#2001).
 // src/yay-php8-compat.php, src/macro_functions.php: deferred with llvm-env / Linker (#2001).
 // lib/AOT/Linker.php: shell_exec external link — M5 deferred (#1960).
 // VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh when vm_run_smoke links under LLVM 9.
