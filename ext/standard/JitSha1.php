@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\Builtin\StringHashCrypto;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Value;
 
@@ -12,6 +13,8 @@ final class JitSha1
 {
     public static function digest(Context $context, Value $data, Value $raw): Value
     {
+        StringHashCrypto::ensureLinked($context);
+
         $i8p = $context->getTypeFromString('int8*');
         $len = $context->getTypeFromString('int64')->constInt(4, false);
         $algo = $context->builder->call(

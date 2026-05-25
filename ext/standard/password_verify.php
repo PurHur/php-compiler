@@ -7,11 +7,12 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** password_verify() — VM only (issue #172). */
+/** password_verify() — VM via host PHP; JIT/AOT via libcrypt (issue #172). */
 final class password_verify extends Internal
 {
     public function __construct()
@@ -39,6 +40,14 @@ final class password_verify extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('password_verify() is not implemented for JIT in this compiler build');
+        if (2 !== \count($args)) {
+            throw new \LogicException('password_verify() requires exactly two arguments');
+        }
+
+        return JitPassword::verify(
+            $context,
+            JitStringArg::lower($context, $args[0], 'password_verify() password'),
+            JitStringArg::lower($context, $args[1], 'password_verify() hash')
+        );
     }
 }

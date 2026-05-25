@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\Builtin\StringHashCrypto;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
@@ -17,22 +18,28 @@ final class JitHash
 
     public static function hash(Context $context, Value $algo, Value $data, Value $raw): Value
     {
+        StringHashCrypto::ensureLinked($context);
+        $rawI32 = $context->builder->zExt($raw, $context->getTypeFromString('int32'));
+
         return self::digestToValue($context, $context->builder->call(
             $context->lookupFunction('__compiler_hash'),
             $algo,
             $data,
-            $raw
+            $rawI32
         ));
     }
 
     public static function hashHmac(Context $context, Value $algo, Value $data, Value $key, Value $raw): Value
     {
+        StringHashCrypto::ensureLinked($context);
+        $rawI32 = $context->builder->zExt($raw, $context->getTypeFromString('int32'));
+
         return self::digestToValue($context, $context->builder->call(
             $context->lookupFunction('__compiler_hash_hmac'),
             $algo,
             $data,
             $key,
-            $raw
+            $rawI32
         ));
     }
 

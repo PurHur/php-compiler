@@ -7,11 +7,12 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** password_hash() — PASSWORD_DEFAULT / PASSWORD_BCRYPT only; VM only (issue #172). */
+/** password_hash() — PASSWORD_DEFAULT / PASSWORD_BCRYPT; JIT/AOT via libcrypt (issue #172). */
 final class password_hash extends Internal
 {
     public function __construct()
@@ -59,6 +60,22 @@ final class password_hash extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('password_hash() is not implemented for JIT in this compiler build');
+        $argc = \count($args);
+        if ($argc < 2 || $argc > 3) {
+            throw new \LogicException('password_hash() requires two or three arguments in this compiler build');
+        }
+        if (3 === $argc) {
+            throw new \LogicException('password_hash() options are not supported for JIT in this compiler build');
+        }
+        $i64 = $context->getTypeFromString('int64');
+
+        return JitPassword::hash(
+            $context,
+            $this->jitString($context, $args[0], 'password_hash() password'),
+            $context->builder->truncOrBitCast(
+                JitLongArg::lower($context, $args[1], 'password_hash() algorithm'),
+                $i64
+            )
+        );
     }
 }
