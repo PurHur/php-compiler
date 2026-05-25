@@ -7,7 +7,7 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Capability docs drift guard for 005-SessionsWeb + session AOT columns (issue #1947).
+ * Capability docs drift guard for 005-SessionsWeb + session AOT columns (issue #1947, #1976).
  */
 final class CapabilitiesSessionsWebSyncTest extends TestCase
 {

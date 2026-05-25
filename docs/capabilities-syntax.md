@@ -71,9 +71,9 @@ ROADMAP Phase 4/5: [#78](https://github.com/PurHur/php-compiler/issues/78), trac
 
 | Construct | VM | JIT | AOT | Issue | Notes |
 |-----------|:--:|:---:|:---:|-------|-------|
-| `005-SessionsWeb` reference app | yes | yes | partial | [#1881](https://github.com/PurHur/php-compiler/issues/1881) | #1881 VM serve + session smoke (#1887); AOT link #1946; execute #1891 (SESSIONS_WEB_AOT_SMOKE_GATE=0) |
-| `session_start` / `$_SESSION` flash across requests | yes | yes | partial | [#1938](https://github.com/PurHur/php-compiler/issues/1938) | #1882 JIT; AOT persistence #1938; two-request execute #1891 |
-| AOT project link (`phpc build --project`) | n/a | n/a | partial | [#1946](https://github.com/PurHur/php-compiler/issues/1946) | ExamplesCompileTest link-before-execute gate (#1946) |
-| AOT CLI execute (two-request session flash) | n/a | n/a | partial | [#1891](https://github.com/PurHur/php-compiler/issues/1891) | SessionsWebAotExecuteTest; opt-in SESSIONS_WEB_AOT_SMOKE_GATE=1 (#1923) |
+| `005-SessionsWeb` reference app | yes | yes | yes | [#1881](https://github.com/PurHur/php-compiler/issues/1881) | #1881 VM serve + session smoke (#1887); AOT link #1946; execute #1891; ci-local gates opt-in (#1923, #1967) |
+| `session_start` / `$_SESSION` flash across requests | yes | yes | yes | [#1938](https://github.com/PurHur/php-compiler/issues/1938) | #1882 JIT; AOT persistence #1938; two-request execute #1891 |
+| AOT project link (`phpc build --project`) | n/a | n/a | yes | [#1946](https://github.com/PurHur/php-compiler/issues/1946) | ExamplesCompileTest link-before-execute (#1946); SESSIONS_WEB_AOT_LINK_GATE opt-in |
+| AOT CLI execute (two-request session flash) | n/a | n/a | yes | [#1891](https://github.com/PurHur/php-compiler/issues/1891) | SessionsWebAotExecuteTest; opt-in SESSIONS_WEB_AOT_SMOKE_GATE (#1923) |
 
-_Sessions rows are curated from ROADMAP issue state; AOT persistence [#1938](https://github.com/PurHur/php-compiler/issues/1938); link gate [#1946](https://github.com/PurHur/php-compiler/issues/1946); execute [#1891](https://github.com/PurHur/php-compiler/issues/1891) (opt-in `SESSIONS_WEB_AOT_SMOKE_GATE`)._
+_Sessions rows are curated from ROADMAP issue state; AOT persistence [#1938](https://github.com/PurHur/php-compiler/issues/1938); link [#1946](https://github.com/PurHur/php-compiler/issues/1946); execute [#1891](https://github.com/PurHur/php-compiler/issues/1891). Opt-in ci-local gates: `SESSIONS_WEB_AOT_SMOKE_GATE`, `SESSIONS_WEB_DEPLOY_SMOKE_GATE`._
