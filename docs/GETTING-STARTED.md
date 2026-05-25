@@ -35,15 +35,29 @@ VM/compliance only — no LLVM link. Expect green after `./script/ci-fast.sh` or
 
 **Talking point:** AOT output is a real native executable; deployed apps do not need Zend PHP at runtime.
 
-### 3. Web app in the VM
+### 3. Web app in the VM (primary dev)
 
 ```bash
 ./phpc serve examples/003-MiniWebApp
 ```
 
-Open `http://127.0.0.1:8080/` — home, hello, contact form, JSON API (`/index.php/api/status`). Mention: VM path is production-stable today; native AOT execute for all routes is still partial ([#1044](https://github.com/PurHur/php-compiler/issues/1044)).
+Open `http://127.0.0.1:8080/` — home, hello (`/index.php/hello/world`), contact POST, JSON API (`/index.php/api/status`). **Talking point:** VM `phpc serve` is the day-to-day path; same routes also execute under native AOT + CGI ([#764](https://github.com/PurHur/php-compiler/issues/764) closed). North Star tracker: [#1044](https://github.com/PurHur/php-compiler/issues/1044). Deeper commands: [examples/003-MiniWebApp/README.md](../examples/003-MiniWebApp/README.md) ([#1531](https://github.com/PurHur/php-compiler/issues/1531)); root README + status site sync: [#1525](https://github.com/PurHur/php-compiler/issues/1525).
 
-### 4. (Optional) Self-host smoke
+### 4. (Optional) Native AOT for MiniWebApp
+
+Requires LLVM (see prerequisites). From repo root:
+
+```bash
+./phpc lint --all examples/003-MiniWebApp
+./phpc build --project examples/003-MiniWebApp
+./phpc run --project examples/003-MiniWebApp --cgi-env-file test/fixtures/cgi-env/miniwebapp-home.env
+```
+
+**Talking point:** `phpc run --project` drives the linked binary with CGI env — no TCP. With LLVM present you can also try `./phpc serve examples/003-MiniWebApp --aot` for HTTP over the native binary.
+
+Layout-edge AOT bisect polish ([#1750](https://github.com/PurHur/php-compiler/issues/1750)) is opt-in and does not block the execute story above.
+
+### 5. (Optional) Self-host smoke
 
 ```bash
 script/apply-patches.sh
@@ -52,7 +66,7 @@ make bootstrap-selfhost-link
 
 Expect stdout: `compiler_minimal bundle OK`. **Talking point:** experimental path toward the compiler compiling its own `lib/` tree ([#1492](https://github.com/PurHur/php-compiler/issues/1492)).
 
-### 5. (Optional) Full local CI
+### 6. (Optional) Full local CI
 
 ```bash
 ./script/ci-local.sh
@@ -69,11 +83,14 @@ Needs LLVM + ~8 GiB RAM; includes JIT/AOT lint/link and example smokes.
 | `./phpc serve <docroot>` | HTTP dev server (VM) |
 | `./phpc build -o bin/app script.php` | AOT compile to native binary |
 | `./phpc build --project .` | Project link from `phpc.json` |
+| `./phpc run --project . --cgi-env-file env` | Execute linked binary with CGI env (no TCP) |
+| `./phpc serve <docroot> --aot` | HTTP dev server over native binary (LLVM) |
 | `./phpc deploy -o dist/` | Package binary + `public/` for CGI deploy |
 | `./phpc lint --all path/` | Unsupported-syntax report |
 | `./phpc test` / `--fast` | Full / fast local CI |
 | `./phpc init --profile miniwebapp dir/` | Scaffold MiniWebApp layout |
 | `./phpc doctor` | Environment + optional gate probe |
+| `./phpc doctor --gates` | North Star / example gate ladder probe ([#1752](https://github.com/PurHur/php-compiler/issues/1752)) |
 
 Legacy entrypoints (`bin/vm.php`, `bin/jit.php`, `bin/compile.php`) still work.
 
@@ -110,6 +127,7 @@ Full list: [README § Environment variables](../README.md#environment-variables)
 | Empty `/compiler` in Docker | `make test-harness` or `./script/docker-ci-local.sh` |
 | Parser errors on PHP 8.2+ | `script/apply-patches.sh` |
 | Serve tests skipped | Loopback bind; or set `PHP_COMPILER_SKIP_SERVE_TESTS=1` only in sandboxes |
+| MiniWebApp AOT gates unclear | `./phpc doctor --gates` (see [miniwebapp-gates.md](miniwebapp-gates.md); default-on flips: [#1760](https://github.com/PurHur/php-compiler/issues/1760)) |
 
 More: [README § Troubleshooting](../README.md#troubleshooting).
 
