@@ -44,8 +44,10 @@ final class session_regenerate_id extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'session_regenerate_id() not implemented for JIT in this compiler build (issue #1186)'
-        );
+        if (\count($args) > 1) {
+            throw new \LogicException('session_regenerate_id() accepts at most one argument in this compiler build');
+        }
+
+        return JitSessionRegenerateId::invoke($context, $args[0] ?? null);
     }
 }
