@@ -4,6 +4,15 @@ Minimal session + flash message reference app ([#1881](https://github.com/PurHur
 
 Uses `session_start()` and `$_SESSION['flash']` with a POST → redirect → GET flow when served over HTTP.
 
+## Routes and session keys
+
+| Method | Path | Behavior |
+|--------|------|----------|
+| GET | `/example.php` | Renders form; shows `$_SESSION['flash']` once then clears it |
+| POST | `/example.php` | Sets `$_SESSION['flash']` from `message`, redirects 303 to GET |
+
+Session file name: default `PHPSESSID` cookie from `phpc serve` (requires `PHP_COMPILER_SESSION_DIR` when set in CI).
+
 ## Run
 
 ```console

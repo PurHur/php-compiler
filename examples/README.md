@@ -101,7 +101,7 @@ curl -s -b "$jar" -c "$jar" -X POST -d 'message=Saved' 'http://127.0.0.1:8080/ex
 curl -s -b "$jar" 'http://127.0.0.1:8080/example.php'
 ```
 
-AOT link/execute: [#1891](https://github.com/PurHur/php-compiler/issues/1891). VM session curls: `SESSIONS_WEB_SMOKE_GATE=1` (default) in `ci-fast.sh` / `ci-local.sh` — `make examples-sessions-smoke` or `examples-web-smoke.sh --sessions-only` ([#1887](https://github.com/PurHur/php-compiler/issues/1887)).
+AOT link/execute: [#1891](https://github.com/PurHur/php-compiler/issues/1891). VM session curls: `SESSIONS_WEB_SMOKE_GATE=1` (default) in `ci-fast.sh` / `ci-local.sh` — `make examples-sessions-smoke` or `examples-web-smoke.sh --sessions-only` ([#1887](https://github.com/PurHur/php-compiler/issues/1887)). Init template parity: [#1902](https://github.com/PurHur/php-compiler/issues/1902). Gate ladder in `phpc doctor --gates`: [#1903](https://github.com/PurHur/php-compiler/issues/1903). Deploy smoke: [#1893](https://github.com/PurHur/php-compiler/issues/1893).
 
 ### 002-StaticWeb
 
@@ -169,11 +169,14 @@ Each example includes a benchmark that compares VM, JIT, and (when LLVM is prese
 ```console
 MINIWEBAPP_LINT_GATE=1 ./script/rebuild-examples.php
 # or: BENCH_MINIWEBAPP=1 ./script/rebuild-examples.php
+# or: BENCH_SESSIONSWEB=1 ./script/rebuild-examples.php   # 005 row (#1889)
 ```
 
 For **001-SimpleWeb**, `bin/compile.php` is timed **without** compile-time `-q`; the `./compiled` column runs the binary with runtime `QUERY_STRING` (and related CGI env), matching production AOT web binaries.
 
 For **003-MiniWebApp**, VM/JIT/native columns run `public/index.php` with `PATH_INFO=/home` (and related CGI env) from the example `public/` directory ([#491](https://github.com/PurHur/php-compiler/issues/491), runtime [#539](https://github.com/PurHur/php-compiler/issues/539)). AOT columns time `phpc build --project` and `.phpc/bin/app` with the same CGI overlay when LLVM is ready and execute returns HTML ([#716](https://github.com/PurHur/php-compiler/issues/716); execute [#764](https://github.com/PurHur/php-compiler/issues/764) closed). The row is omitted when `phpc lint --all examples/003-MiniWebApp` fails unless `BENCH_MINIWEBAPP=1`.
+
+For **005-SessionsWeb**, the benchmark row is omitted until `phpc lint --all examples/005-SessionsWeb` passes unless `BENCH_SESSIONSWEB=1` ([#1889](https://github.com/PurHur/php-compiler/issues/1889)). AOT columns stay `n/a` until two-request session execute is green ([#1891](https://github.com/PurHur/php-compiler/issues/1891)).
 
 <!-- benchmark table start -->
 

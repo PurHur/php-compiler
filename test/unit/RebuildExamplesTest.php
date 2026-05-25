@@ -35,4 +35,19 @@ final class RebuildExamplesTest extends TestCase
         $this->assertStringContainsString("'build', '--project'", $script);
         $this->assertStringContainsString('003-MiniWebApp/public/index.php', $script);
     }
+
+    public function testRebuildExamplesDocumentsSessionsWebBenchmarkGate(): void
+    {
+        $script = file_get_contents(dirname(__DIR__, 2).'/script/rebuild-examples.php');
+        $this->assertNotFalse($script);
+        $this->assertStringContainsString('shouldBenchSessionsWeb', $script);
+        $this->assertStringContainsString('BENCH_SESSIONSWEB', $script);
+        $this->assertStringContainsString('SESSIONSWEB_LINT_GATE', $script);
+        $this->assertStringContainsString('examples/005-SessionsWeb', $script);
+
+        $readme = file_get_contents(dirname(__DIR__, 2).'/examples/README.md');
+        $this->assertNotFalse($readme);
+        $this->assertStringContainsString('BENCH_SESSIONSWEB', $readme);
+        $this->assertStringContainsString('005-SessionsWeb', $readme);
+    }
 }
