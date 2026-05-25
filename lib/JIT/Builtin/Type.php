@@ -454,8 +454,24 @@ class Type extends Builtin {
             $fntypeSessionApply
         );
         $this->context->registerFunction('__phpc_session_write_close_apply', $fnSessionWriteClose);
+        $fnSessionGenerateId = $this->context->module->addFunction(
+            '__phpc_session_generate_new_id',
+            $this->context->context->functionType($void, false)
+        );
+        $this->context->registerFunction('__phpc_session_generate_new_id', $fnSessionGenerateId);
+        $fnSessionRegenerate = $this->context->module->addFunction(
+            '__phpc_session_regenerate_id_apply',
+            $this->context->context->functionType(
+                $void,
+                false,
+                $valuePtr,
+                $this->context->getTypeFromString('int8')
+            )
+        );
+        $this->context->registerFunction('__phpc_session_regenerate_id_apply', $fnSessionRegenerate);
         SessionStart::implement($this->context);
         SessionWriteClose::implement($this->context);
+        SessionRegenerateId::implement($this->context);
         $fntypeJsonEncode = $this->context->context->functionType(
             $this->context->getTypeFromString('__string__*'),
             false,

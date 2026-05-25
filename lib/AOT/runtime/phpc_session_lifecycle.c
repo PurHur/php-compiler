@@ -64,7 +64,7 @@ static void session_store_id(const char *id, phpc_size len)
     __phpc_session_id_len = (int64_t) len;
 }
 
-static void session_generate_id(void)
+void __phpc_session_generate_new_id(void)
 {
     static const char hex[] = "0123456789abcdef";
     __string__ *raw;
@@ -109,7 +109,7 @@ void __phpc_session_start_apply(__value__ *out)
     }
 
     if (__phpc_session_id_len <= 0) {
-        session_generate_id();
+        __phpc_session_generate_new_id();
     }
 
     if (0 == sg_SESSION) {
@@ -129,5 +129,19 @@ void __phpc_session_write_close_apply(__value__ *out)
     }
 
     __phpc_session_active = 0;
+    __value__writeBool(out, 1);
+}
+
+void __phpc_session_regenerate_id_apply(__value__ *out, int8_t delete_old)
+{
+    (void) delete_old;
+
+    if (!__phpc_session_active) {
+        __value__writeBool(out, 0);
+
+        return;
+    }
+
+    __phpc_session_generate_new_id();
     __value__writeBool(out, 1);
 }
