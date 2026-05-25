@@ -606,7 +606,7 @@ final class Doctor
             $smokeDefault,
             $smokeOn,
             false,
-            'make examples-throws-smoke · ci-fast/ci-local when THROWS_WEB_SMOKE_GATE=1 default (#2125)',
+            'make examples-throws-smoke · examples-web-smoke.sh --throws-only · ci-fast (#2125)',
             '#2093'
         );
         self::printSessionsWebGateRow(
@@ -621,9 +621,12 @@ final class Doctor
         );
         $aotStatus = $aotOn && $llvmReady ? '✅' : '📋';
         $aotExecuteNote = $llvmReady
-            ? ($aotOn ? '#2101' : '#2101 · opt-in until throw/catch AOT green')
+            ? ($aotOn ? '#2101' : '#2101 · opt-in until #2157 AOT throw/catch green; default-on follow-up #2135')
             : 'LLVM required; #2101 when gate=1';
         fwrite(STDOUT, "  [{$aotStatus}] Stage 3 AOT execute — THROWSWEB_AOT_SMOKE_GATE default {$aotDefault} ({$aotExecuteNote})\n");
+        if (!$aotOn && $llvmReady) {
+            fwrite(STDOUT, "      Blocker: #2157 user-class ValidationError AOT execute before #2135 default flip\n");
+        }
         fwrite(STDOUT, "      PHPUnit: ./script/ci-local.sh --filter ThrowsWebAotExecuteTest\n");
         fwrite(STDOUT, "      Shell:   THROWSWEB_AOT_SMOKE_GATE=1 EXAMPLES_AOT_SMOKE_ONLY=007 ./script/examples-aot-smoke.sh (#2104)\n");
 
