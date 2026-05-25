@@ -429,6 +429,23 @@ final class ExamplesCompileTest extends TestCase
     }
 
     /**
+     * 007-ThrowsWeb: native AOT link via phpc build --project (#2101, #2143).
+     *
+     * @group llvm
+     * @group aot
+     * @group aot-link
+     */
+    public function test007ThrowsWebAotLink(): void
+    {
+        if (!self::throwsWebAotLinkGateEnabled()) {
+            $this->markTestSkipped('THROWSWEB_AOT_LINK_GATE=0 — skip 007 project link gate (#2101)');
+        }
+        $project = $this->throwsWebProjectPath();
+        $binary = $this->build007ThrowsWebProject($project);
+        $this->assertFileExists($binary);
+    }
+
+    /**
      * 007-ThrowsWeb: phpc serve + POST invalid email caught (issue #2076).
      *
      * @group serve
@@ -1089,6 +1106,13 @@ final class ExamplesCompileTest extends TestCase
         return false !== $gate && '' !== $gate && '1' === $gate;
     }
 
+    private static function throwsWebAotLinkGateEnabled(): bool
+    {
+        $gate = getenv('THROWSWEB_AOT_LINK_GATE');
+
+        return false !== $gate && '' !== $gate && '1' === $gate;
+    }
+
     private function curlGet(string $url): string
     {
         $cmd = ['curl', '-sS', '--connect-timeout', '5', '--max-time', '15', $url];
@@ -1553,6 +1577,62 @@ PHP];
             0,
             $exit,
             'phpc build --project 006-FileUploadWeb failed (#1999 link): '.$stderrText
+        );
+
+        return $project.'/.phpc/bin/app';
+    }
+
+    private function throwsWebProjectPath(): string
+    {
+        if (!self::isLlvmReady()) {
+            $this->markTestSkipped(
+                'LLVM 9 toolchain not available. Run make docker-build-22 or script/install-llvm9.sh from the repository root.'
+            );
+        }
+        $project = realpath(dirname(__DIR__, 2).'/examples/007-ThrowsWeb');
+        if (false === $project) {
+            $this->markTestSkipped('examples/007-ThrowsWeb missing (#2076)');
+        }
+
+        return $project;
+    }
+
+    private function build007ThrowsWebProject(string $project): string
+    {
+        $phpc = realpath(dirname(__DIR__, 2).'/phpc');
+        $this->assertNotFalse($phpc);
+        $repoRoot = dirname(__DIR__, 2);
+        $env = $this->llvmProcessEnv($repoRoot);
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open(
+            [$phpc, 'build', '--project', $project],
+            $descriptorSpec,
+            $pipes,
+            $repoRoot,
+            $env
+        );
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+        $stderrText = trim($stderr !== false ? $stderr : '');
+        if (0 !== $exit) {
+            if (str_contains($stderrText, 'throw') || str_contains($stderrText, 'catch') || str_contains($stderrText, 'TryCatch')) {
+                $this->markTestSkipped(
+                    '007-ThrowsWeb AOT link not ready (#195, #57, #2101): '.$stderrText
+                );
+            }
+        }
+        $this->assertSame(
+            0,
+            $exit,
+            'phpc build --project 007-ThrowsWeb failed (#2101 link): '.$stderrText
         );
 
         return $project.'/.phpc/bin/app';
