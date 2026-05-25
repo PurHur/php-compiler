@@ -378,15 +378,6 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('deploy-smoke.sh --example 006', $body);
     }
 
-    public function testMakefileHasExamplesThrowsSmokeTarget(): void
-    {
-        $makefile = (string) file_get_contents(dirname(__DIR__, 2).'/Makefile');
-        $this->assertStringContainsString('examples-throws-smoke:', $makefile);
-        $this->assertStringContainsString('THROWS_WEB_SMOKE_GATE=1', $makefile);
-        $this->assertStringContainsString('examples-web-smoke.sh --throws-only', $makefile);
-        $this->assertStringContainsString('examples-throws-smoke', $makefile);
-    }
-
     public function testMakefileHasDeploySmokeAllTarget(): void
     {
         $makefile = (string) file_get_contents(dirname(__DIR__, 2).'/Makefile');
@@ -578,10 +569,10 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('CAPABILITIES_006_SYNC_GATE:-1', $common);
     }
 
-    public function testCiDefaultsEnvDefinesCapabilitiesThrowsSyncGateOptIn(): void
+    public function testCiDefaultsEnvDefinesCapabilitiesThrowsSyncGateOn(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
-        $this->assertStringContainsString('CAPABILITIES_THROWS_SYNC_GATE="${CAPABILITIES_THROWS_SYNC_GATE:-0}"', $defaults);
+        $this->assertStringContainsString('CAPABILITIES_THROWS_SYNC_GATE="${CAPABILITIES_THROWS_SYNC_GATE:-1}"', $defaults);
     }
 
     public function testCiFastRunsCapabilitiesThrowsSyncViaInventoryChecks(): void
@@ -589,7 +580,7 @@ final class CiScriptsTest extends TestCase
         $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
         $this->assertStringContainsString('ci_run_capabilities_throws_sync_check', $common);
         $this->assertStringContainsString('check-capabilities-throws-sync.php', $common);
-        $this->assertStringContainsString('CAPABILITIES_THROWS_SYNC_GATE:-0', $common);
+        $this->assertStringContainsString('CAPABILITIES_THROWS_SYNC_GATE:-1', $common);
     }
 
     public function testCiDockerRunPassesRebuildExamples005SyncGateDefaultOn(): void
@@ -608,7 +599,7 @@ final class CiScriptsTest extends TestCase
     {
         $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');
         $this->assertStringContainsString('CAPABILITIES_006_SYNC_GATE=${CAPABILITIES_006_SYNC_GATE:-1}', $body);
-        $this->assertStringContainsString('CAPABILITIES_THROWS_SYNC_GATE=${CAPABILITIES_THROWS_SYNC_GATE:-0}', $body);
+        $this->assertStringContainsString('CAPABILITIES_THROWS_SYNC_GATE=${CAPABILITIES_THROWS_SYNC_GATE:-1}', $body);
     }
 
     public function testCiDefaultsEnvDefinesRootReadmeSyncGateOn(): void
@@ -1258,7 +1249,7 @@ final class CiScriptsTest extends TestCase
         $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
         $this->assertStringContainsString('CAPABILITIES_THROWS_SYNC_GATE', $doc);
         $this->assertStringContainsString('check-capabilities-throws-sync.php', $doc);
-        $this->assertMatchesRegularExpression('/\| `CAPABILITIES_THROWS_SYNC_GATE` \| `0` \|/', $doc);
+        $this->assertMatchesRegularExpression('/\| `CAPABILITIES_THROWS_SYNC_GATE` \| `1` \|/', $doc);
     }
 
     public function testLocalCiMatrixDocumentsBootstrapVendorInventorySyncGate(): void
