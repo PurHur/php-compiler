@@ -43,6 +43,32 @@ final class VariableFunctionCallHelper
     }
 
     /**
+     * User FUNCDEF names in the current TU (not every registered stdlib native).
+     *
+     * @return list<string>
+     */
+    public static function funDefNamesInCompilationUnit(Block $block): array
+    {
+        $names = [];
+        foreach (self::blocksForHintScan($block) as $scanBlock) {
+            foreach ($scanBlock->opCodes as $op) {
+                if (OpCode::TYPE_FUNCDEF !== $op->type || null === $op->arg1) {
+                    continue;
+                }
+                $nameOp = $scanBlock->getOperand($op->arg1);
+                if ($nameOp instanceof Operand\Literal) {
+                    $literal = strtolower((string) $nameOp->value);
+                    if ('' !== $literal && !str_contains($literal, '::')) {
+                        $names[] = $literal;
+                    }
+                }
+            }
+        }
+
+        return array_values(array_unique($names));
+    }
+
+    /**
      * String literals assigned on ?? right-hand blocks (e.g. $_GET['op'] ?? 'strlen').
      *
      * @return list<string>
@@ -147,15 +173,6 @@ final class VariableFunctionCallHelper
         $out = [];
         foreach ($hintedNames as $hint) {
             $lc = strtolower($hint);
-            if (isset($out[$lc])) {
-                continue;
-            }
-            $resolved = self::acceptDispatchProxy($context, $lc, null);
-            if (null !== $resolved) {
-                $out[$lc] = $resolved;
-            }
-        }
-        foreach ($context->userFunctionNames() as $lc) {
             if (isset($out[$lc])) {
                 continue;
             }
