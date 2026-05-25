@@ -148,7 +148,7 @@ POST email validation with `throw` / `catch` ([#2076](https://github.com/PurHur/
 curl -sf -X POST -d 'email=bad' http://127.0.0.1:8080/example.php | grep -i invalid
 ```
 
-VM serve curls: `make examples-throws-smoke` or `make examples-web-smoke` (`THROWS_WEB_SMOKE_GATE=1` default — [#2125](https://github.com/PurHur/php-compiler/issues/2125), [#2093](https://github.com/PurHur/php-compiler/issues/2093)). JIT/AOT deferred ([#2101](https://github.com/PurHur/php-compiler/issues/2101)). Init scaffold: `./phpc init --profile throwsweb my-app` ([#2092](https://github.com/PurHur/php-compiler/issues/2092)); template parity: [#2086](https://github.com/PurHur/php-compiler/issues/2086) (`INIT_THROWSWEB_PARITY_GATE=1` default in `ci-fast`, [#2127](https://github.com/PurHur/php-compiler/issues/2127)).
+VM serve curls: `make examples-throws-smoke` or `make examples-web-smoke` (`THROWS_WEB_SMOKE_GATE=1` default — [#2125](https://github.com/PurHur/php-compiler/issues/2125), [#2093](https://github.com/PurHur/php-compiler/issues/2093)). Presenter copy-paste: [docs/GETTING-STARTED.md](../docs/GETTING-STARTED.md) § 5b ([#2158](https://github.com/PurHur/php-compiler/issues/2158)). JIT/AOT deferred ([#2101](https://github.com/PurHur/php-compiler/issues/2101), [#2157](https://github.com/PurHur/php-compiler/issues/2157)). Init scaffold: `./phpc init --profile throwsweb my-app` ([#2092](https://github.com/PurHur/php-compiler/issues/2092)); template parity: [#2086](https://github.com/PurHur/php-compiler/issues/2086) (`INIT_THROWSWEB_PARITY_GATE=1` default in `ci-fast`, [#2127](https://github.com/PurHur/php-compiler/issues/2127)).
 
 ### 002-StaticWeb
 
