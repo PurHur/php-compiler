@@ -13,7 +13,7 @@ Ordered checklist for [`examples/003-MiniWebApp/`](../examples/003-MiniWebApp/) 
 | 4 assets | [#610](https://github.com/PurHur/php-compiler/issues/610) | `GET /assets/style.css` | ✅ | Static CSS via AOT serve (#1067) |
 | 4d execute | [#745](https://github.com/PurHur/php-compiler/issues/745) | `deploy-smoke.sh --example 003` execute | ✅ | `DEPLOY_SMOKE_003_EXECUTE=1` or `MINIWEBAPP_AOT_EXECUTE_GATE=1`; home + hello + contact via `MiniWebAppCgiEnv` (#1065) |
 
-**Legend:** ✅ green / default-on · 🚧 wired, blocked on execute parity · ⬜ deferred (explicit gate off)
+**Legend:** ✅ green / default-on · 🚧 wired, gate off until flip · ⬜ deferred (explicit gate off)
 
 ## How to flip
 
@@ -36,4 +36,4 @@ MINIWEBAPP_WEB_SMOKE_AOT_GATE=0 ./script/ci-local.sh   # skip 003 AOT HTTP curls
 DEPLOY_SMOKE_003_EXECUTE=0 ./script/deploy-smoke.sh --example 003
 ```
 
-See also: [miniwebapp-gates.md](miniwebapp-gates.md), [#472](https://github.com/PurHur/php-compiler/issues/472) gate ladder.
+See also: [miniwebapp-gates.md](miniwebapp-gates.md), [#472](https://github.com/PurHur/php-compiler/issues/472) gate ladder, [#1525](https://github.com/PurHur/php-compiler/issues/1525) (root README + `development-status.md` + #1044 body).

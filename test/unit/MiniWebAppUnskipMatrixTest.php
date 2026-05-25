@@ -42,6 +42,8 @@ final class MiniWebAppUnskipMatrixTest extends TestCase
         $this->assertStringContainsString('MINIWEBAPP_SERVE_AOT_GATE', $body);
         $this->assertStringContainsString('MINIWEBAPP_WEB_SMOKE_AOT_GATE', $body);
         $this->assertStringContainsString('EXAMPLES_AOT_SMOKE_ONLY=003', $body);
+        $this->assertStringNotContainsString('blocked on execute parity', $body);
+        $this->assertMatchesRegularExpression('/#1525\b/', $body);
     }
 
     public function testExamplesWebSmokeReferences003AotWithoutStale568(): void
