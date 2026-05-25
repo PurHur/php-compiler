@@ -44,8 +44,11 @@ final class RebuildExamplesTest extends TestCase
         $this->assertStringContainsString('BENCH_SESSIONSWEB', $script);
         $this->assertStringContainsString('SESSIONSWEB_LINT_GATE', $script);
         $this->assertStringContainsString('examples/005-SessionsWeb', $script);
-        $this->assertStringContainsString("'skip_aot' => true", $script);
+        $this->assertStringContainsString("'sessions_web_project_aot' => true", $script);
+        $this->assertStringContainsString('tryBenchmarkSessionsWebProjectAot', $script);
+        $this->assertStringContainsString('BENCH_SESSIONSWEB_AOT', $script);
         $this->assertStringContainsString('#1891', $script);
+        $this->assertStringContainsString('#1973', $script);
 
         $readme = file_get_contents(dirname(__DIR__, 2).'/examples/README.md');
         $this->assertNotFalse($readme);
