@@ -17,6 +17,7 @@ Supporting fixes from #1402:
 - `jitFunctionSkipName()` — FUNCDEF short names → scoped names for stub/M3 gates
 - `isSkippedCompilerHotPathName()` — always stub `Block::slotIndexForVariableName`
 - `m3CompileDriverSpineDenyNames()` — documented LLVM 9 crashers during spine expansion
+- `script/bootstrap-m3-allowlist-snapshot.php` + `script/check-m3-allowlist-snapshot.php` — drift guard vs `script/m3-allowlist-snapshot.txt` ([#1905](https://github.com/PurHur/php-compiler/issues/1905), [#1768](https://github.com/PurHur/php-compiler/issues/1768)); `M3_ALLOWLIST_SYNC_GATE=1` in `ci-fast`
 - `compileBlockPhpLowering()` + `compileRuntime*M3Native()` — PHP CFG lowering for split `Runtime` ctor spine (#1494)
 
 ## Step 1 (done — #1402)
@@ -76,6 +77,17 @@ BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING=1 \
 BOOTSTRAP_M3_RUNTIME_COMPILE=1 \
 ./script/bootstrap-selfhost-helloworld-probe.sh
 ```
+
+### Allowlist snapshot (SSOT)
+
+Regenerate after editing `JIT::isM3CompileDriverRealLoweringName()` or `m3CompileDriverSpineDenyNames()`:
+
+```bash
+php script/bootstrap-m3-allowlist-snapshot.php --write
+./script/check-m3-allowlist-snapshot.php
+```
+
+Committed lines: `script/m3-allowlist-snapshot.txt` (`allow:` / `deny:` prefixes, sorted). Bulk M3 symbol PRs may set `M3_ALLOWLIST_SYNC_GATE=0` for one commit, then refresh the snapshot before merge.
 
 ### Known LLVM 9 link crashers (deny list)
 

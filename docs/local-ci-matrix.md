@@ -103,6 +103,7 @@ Defaults are exported from [`script/ci-defaults.env`](../script/ci-defaults.env)
 | `EXAMPLES_README_SYNC_GATE` | `1` | `ci-fast.sh` (`ci_run_inventory_checks`) | `script/check-examples-readme-sync.php` ([#1822](https://github.com/PurHur/php-compiler/issues/1822), [#1531](https://github.com/PurHur/php-compiler/issues/1531)); set `0` for doc-only iteration |
 | `ROOT_README_SYNC_GATE` | `1` | `ci-fast.sh` (`ci_run_inventory_checks`) | `script/check-root-readme-sync.php` ([#1832](https://github.com/PurHur/php-compiler/issues/1832), [#1525](https://github.com/PurHur/php-compiler/issues/1525)); set `0` for doc-only iteration |
 | `SELFHOST_SPINE_COUNT_SYNC_GATE` | `1` | `ci-fast.sh` (`ci_run_inventory_checks`) | `script/check-selfhost-spine-count-sync.php` (canonical `script/bootstrap-spine-count.php`, [#1834](https://github.com/PurHur/php-compiler/issues/1834), [#1872](https://github.com/PurHur/php-compiler/issues/1872)); set `0` for bulk spine PRs |
+| `M3_ALLOWLIST_SYNC_GATE` | `1` | `ci-fast.sh` (`ci_run_inventory_checks`) | `script/check-m3-allowlist-snapshot.php` (canonical `script/bootstrap-m3-allowlist-snapshot.php`, [#1905](https://github.com/PurHur/php-compiler/issues/1905), [#1768](https://github.com/PurHur/php-compiler/issues/1768)); set `0` for bulk M3 symbol PRs |
 
 Ladder-only env vars (not in `ci-defaults.env`): `MINIWEBAPP_LINT_GATE` (default `1` in `web-smoke.sh`), `MINIWEBAPP_AOT_BISECT_GATE` (default `0` in `miniwebapp-gates.sh` — [#879](https://github.com/PurHur/php-compiler/issues/879)).
 
