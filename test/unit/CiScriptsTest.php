@@ -103,10 +103,25 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('--sessions-only', $common);
     }
 
+    public function testCiDefaultsEnvDefinesSessionsWebAotLinkGateOff(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString('SESSIONS_WEB_AOT_LINK_GATE="${SESSIONS_WEB_AOT_LINK_GATE:-0}"', $defaults);
+    }
+
     public function testCiDefaultsEnvDefinesSessionsWebAotSmokeGateOff(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
         $this->assertStringContainsString('SESSIONS_WEB_AOT_SMOKE_GATE="${SESSIONS_WEB_AOT_SMOKE_GATE:-0}"', $defaults);
+    }
+
+    public function testExamplesCompileTestHonorsSessionsWebAotLinkGate(): void
+    {
+        $source = (string) file_get_contents(dirname(__DIR__).'/unit/ExamplesCompileTest.php');
+        $this->assertStringContainsString('SESSIONS_WEB_AOT_LINK_GATE', $source);
+        $this->assertStringContainsString('sessionsWebAotLinkGateEnabled', $source);
+        $this->assertStringContainsString('test005SessionsWebAotLink', $source);
+        $this->assertStringContainsString('@group aot-link', $source);
     }
 
     public function testCiLocalExcludesSessionsWebAotExecuteUnlessGateOn(): void

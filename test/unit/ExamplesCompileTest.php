@@ -18,6 +18,7 @@ use PHPUnit\Framework\TestCase;
  * @see https://github.com/PurHur/php-compiler/issues/274 (minimal phpc.json beside web examples)
  * @see https://github.com/PurHur/php-compiler/issues/454 (003-MiniWebApp gate)
  * @see https://github.com/PurHur/php-compiler/issues/1887 (005-SessionsWeb serve + session cookie)
+ * @see https://github.com/PurHur/php-compiler/issues/1946 (005-SessionsWeb AOT link-only gate)
  */
 final class ExamplesCompileTest extends TestCase
 {
@@ -254,6 +255,29 @@ final class ExamplesCompileTest extends TestCase
         $this->assertFileExists($examplePath);
         $out = $this->runCli('vm.php', ['-p', 'name=PostExample', $examplePath]);
         $this->assertStringContainsString('Hello PostExample', $out);
+    }
+
+    /**
+     * 005-SessionsWeb: phpc build --project native link only (#1946; execute #1891).
+     *
+     * @group llvm
+     * @group aot
+     * @group aot-link
+     * @group sessionsweb
+     */
+    public function test005SessionsWebAotLink(): void
+    {
+        if (!self::sessionsWebAotLinkGateEnabled()) {
+            $this->markTestSkipped('SESSIONS_WEB_AOT_LINK_GATE=0 — skip 005 project link gate (#1946)');
+        }
+        $repoRoot = dirname(__DIR__, 2);
+        $project = realpath($repoRoot.'/examples/005-SessionsWeb');
+        if (false === $project) {
+            $this->markTestSkipped('examples/005-SessionsWeb missing (#1881)');
+        }
+        $binary = $this->build005SessionsWebProject($project);
+        $this->assertFileExists($binary);
+        $this->assertTrue(is_executable($binary));
     }
 
     /**
@@ -872,6 +896,13 @@ final class ExamplesCompileTest extends TestCase
         return false === $gate || '0' !== $gate;
     }
 
+    private static function sessionsWebAotLinkGateEnabled(): bool
+    {
+        $gate = getenv('SESSIONS_WEB_AOT_LINK_GATE');
+
+        return false !== $gate && '' !== $gate && '1' === $gate;
+    }
+
     private function canBindLoopback(): bool
     {
         $repoRoot = dirname(__DIR__, 2);
@@ -1160,6 +1191,45 @@ PHP];
             0,
             $exit,
             'phpc build --project 003-MiniWebApp failed (#754 link): '.$stderrText
+        );
+
+        return $project.'/.phpc/bin/app';
+    }
+
+    private function build005SessionsWebProject(string $project): string
+    {
+        if (!self::isLlvmReady()) {
+            $this->markTestSkipped(
+                'LLVM 9 toolchain not available. Run make docker-build-22 or script/install-llvm9.sh.'
+            );
+        }
+        $phpc = realpath(dirname(__DIR__, 2).'/phpc');
+        $this->assertNotFalse($phpc);
+        $repoRoot = dirname(__DIR__, 2);
+        $env = $this->llvmProcessEnv($repoRoot);
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open(
+            [$phpc, 'build', '--project', $project],
+            $descriptorSpec,
+            $pipes,
+            $repoRoot,
+            $env
+        );
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+        $stderrText = trim($stderr !== false ? $stderr : '');
+        $this->assertSame(
+            0,
+            $exit,
+            'phpc build --project 005-SessionsWeb failed (#1946 link): '.$stderrText
         );
 
         return $project.'/.phpc/bin/app';

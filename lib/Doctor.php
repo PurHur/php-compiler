@@ -255,6 +255,9 @@ final class Doctor
         $smokeGate = getenv('SESSIONS_WEB_SMOKE_GATE');
         $smokeOn = false === $smokeGate || '' === $smokeGate || '1' === $smokeGate;
 
+        $linkGate = getenv('SESSIONS_WEB_AOT_LINK_GATE');
+        $linkOn = false !== $linkGate && '1' === $linkGate;
+
         $aotGate = getenv('SESSIONS_WEB_AOT_SMOKE_GATE');
         $aotOn = false !== $aotGate && '1' === $aotGate;
 
@@ -283,13 +286,22 @@ final class Doctor
             fwrite(STDOUT, "  [⬜] SESSIONS_WEB_SMOKE_GATE=0 — VM cookie curls skipped (#1887)\n");
         }
 
+        if ($linkOn && $llvmReady) {
+            fwrite(STDOUT, "  [✅] SESSIONS_WEB_AOT_LINK_GATE=1 — phpc build --project link (#1946)\n");
+        } else {
+            $linkNote = $linkOn && !$llvmReady
+                ? "{$llvmDetail}; export SESSIONS_WEB_AOT_LINK_GATE=1 when LLVM ready"
+                : 'opt-in SESSIONS_WEB_AOT_LINK_GATE=0 until #1954';
+            fwrite(STDOUT, "  [📋] AOT link — ExamplesCompileTest::test005SessionsWebAotLink (#1946; {$linkNote})\n");
+        }
+
         if ($aotOn && $llvmReady) {
             fwrite(STDOUT, "  [✅] SESSIONS_WEB_AOT_SMOKE_GATE=1 — AOT two-request execute (#1891)\n");
         } else {
             $aotNote = $aotOn && !$llvmReady
                 ? "{$llvmDetail}; export SESSIONS_WEB_AOT_SMOKE_GATE=1 when LLVM ready"
                 : 'opt-in SESSIONS_WEB_AOT_SMOKE_GATE=0 until #1923';
-            fwrite(STDOUT, "  [📋] AOT link + two-request execute — #1891 ({$aotNote})\n");
+            fwrite(STDOUT, "  [📋] AOT two-request execute — #1891 ({$aotNote})\n");
         }
 
         fwrite(STDOUT, "  [📋] phpc deploy + PHPC_DEPLOY_ROOT CGI smoke — #1893\n");
@@ -304,6 +316,7 @@ final class Doctor
 
         fwrite(STDOUT, "  Gate env (script/ci-defaults.env):\n");
         fwrite(STDOUT, "    SESSIONS_WEB_SMOKE_GATE      default 1 (#1894)\n");
+        fwrite(STDOUT, "    SESSIONS_WEB_AOT_LINK_GATE   default 0 until #1954 (#1946)\n");
         fwrite(STDOUT, "    SESSIONS_WEB_AOT_SMOKE_GATE  default 0 until #1923 (#1921)\n");
         fwrite(STDOUT, "  Docs: examples/005-SessionsWeb/README.md · examples/README.md\n");
     }

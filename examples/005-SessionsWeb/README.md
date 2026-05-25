@@ -39,7 +39,8 @@ The last response should include `Flash: Saved`.
 | VM `phpc run` | ✅ single request (no flash until POST via serve) |
 | VM `phpc serve` | ✅ with `PHP_COMPILER_SESSION_DIR` + cookie jar |
 | JIT | ✅ `session_start` ([#1882](https://github.com/PurHur/php-compiler/issues/1882)) |
-| AOT link/execute | ✅ `SessionsWebAotExecuteTest` ([#1891](https://github.com/PurHur/php-compiler/issues/1891); gate `SESSIONS_WEB_AOT_SMOKE_GATE=1`) |
+| AOT link | 📋 `ExamplesCompileTest::test005SessionsWebAotLink` ([#1946](https://github.com/PurHur/php-compiler/issues/1946); `SESSIONS_WEB_AOT_LINK_GATE=1`) |
+| AOT execute | ✅ `SessionsWebAotExecuteTest` ([#1891](https://github.com/PurHur/php-compiler/issues/1891); `SESSIONS_WEB_AOT_SMOKE_GATE=1`) |
 
 ## Template parity
 
@@ -52,5 +53,6 @@ The last response should include `Flash: Saved`.
 ## Related
 
 - [#1887](https://github.com/PurHur/php-compiler/issues/1887) — `SESSIONS_WEB_SMOKE_GATE=1` (default): `make examples-sessions-smoke`, `ci-fast.sh`, `ExamplesCompileTest::test005SessionsWebServeFlashRoundTrip`
+- [#1946](https://github.com/PurHur/php-compiler/issues/1946) — `SESSIONS_WEB_AOT_LINK_GATE=1`: `vendor/bin/phpunit --filter test005SessionsWebAotLink`
 - [#1893](https://github.com/PurHur/php-compiler/issues/1893) — deploy + `PHPC_DEPLOY_ROOT` smoke
 - [#1886](https://github.com/PurHur/php-compiler/issues/1886) — `phpc init --profile sessionsweb` copies from `templates/init-sessionsweb/`
