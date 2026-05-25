@@ -6,7 +6,7 @@ namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
 
-/** ini_set() VM and AOT smoke (issue #1374). Supported: error_reporting, display_errors, memory_limit. */
+/** ini_set() / ini_get() VM and AOT smoke (issue #1374, #1492). */
 final class IniSetBuiltinTest extends TestCase
 {
     private const CODE = <<<'PHP'
@@ -15,9 +15,12 @@ echo is_string($old) ? "er-ok\n" : "er-fail\n";
 echo ini_set('unknown_ini_key', 'x') === false ? "unknown-false\n" : "unknown-bad\n";
 $unlimited = '-'.'1';
 echo ini_set('memory_limit', $unlimited) === false ? "ml-reject\n" : "ml-bad\n";
+ini_set('display_errors', '1');
+echo ini_get('display_errors') === '1' ? "get-ok\n" : "get-fail\n";
+echo ini_get('unknown_ini_key') === false ? "get-false\n" : "get-bad\n";
 PHP;
 
-    private const EXPECT = "er-ok\nunknown-false\nml-reject\n";
+    private const EXPECT = "er-ok\nunknown-false\nml-reject\nget-ok\nget-false\n";
 
     public function testVmIniSetSubset(): void
     {

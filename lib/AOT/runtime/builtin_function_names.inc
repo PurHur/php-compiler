@@ -113,6 +113,7 @@ static const char *phpc_builtin_functions[] = {
     "hypot",
     "implode",
     "in_array",
+    "ini_get",
     "ini_set",
     "intdiv",
     "interface_exists",
