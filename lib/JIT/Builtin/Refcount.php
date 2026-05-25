@@ -185,7 +185,7 @@ class Refcount extends Builtin {
     $typeinfo = $fn___c4ca4238a0b923820dcc509a6f75849b->getParam(0);
     $refVirtual = $fn___c4ca4238a0b923820dcc509a6f75849b->getParam(1);
     
-    $offset = $this->context->structFieldMap[$refVirtual->typeOf()->getElementType()->getName()]['ref'];
+    $offset = $this->context->structFieldIndex($refVirtual, 'ref');
                     $ref = $this->context->builder->load(
                         $this->context->builder->structGep($refVirtual, $offset)
                     );
@@ -231,7 +231,7 @@ class Refcount extends Builtin {
                 }
                 
                 $this->context->builder->positionAtEnd(array_pop($endBlock));
-    $offset = $this->context->structFieldMap[$refVirtual->typeOf()->getElementType()->getName()]['ref'];
+    $offset = $this->context->structFieldIndex($refVirtual, 'ref');
                     $ref = $this->context->builder->load(
                         $this->context->builder->structGep($refVirtual, $offset)
                     );
@@ -373,7 +373,7 @@ class Refcount extends Builtin {
                 }
                 
                 $this->context->builder->positionAtEnd(array_pop($endBlock));
-    $offset = $this->context->structFieldMap[$refVirtual->typeOf()->getElementType()->getName()]['ref'];
+    $offset = $this->context->structFieldIndex($refVirtual, 'ref');
                     $ref = $this->context->builder->load(
                         $this->context->builder->structGep($refVirtual, $offset)
                     );
@@ -559,7 +559,7 @@ class Refcount extends Builtin {
                 }
                 
                 $this->context->builder->positionAtEnd(array_pop($endBlock));
-    $offset = $this->context->structFieldMap[$virtual->typeOf()->getElementType()->getName()]['ref'];
+    $offset = $this->context->structFieldIndex($virtual, 'ref');
                     $ref = $this->context->builder->load(
                         $this->context->builder->structGep($virtual, $offset)
                     );
@@ -731,7 +731,7 @@ class Refcount extends Builtin {
                     $virtual
                     
                 );
-    $offset = $this->context->structFieldMap[$virtual->typeOf()->getElementType()->getName()]['ref'];
+    $offset = $this->context->structFieldIndex($virtual, 'ref');
                     $ref = $this->context->builder->load(
                         $this->context->builder->structGep($virtual, $offset)
                     );
@@ -1188,7 +1188,7 @@ class Refcount extends Builtin {
                         default:
                             throw new \LogicException("Unsupported type cast: " . $__type->toString());
                     }
-    $offset = $this->context->structFieldMap[$virtual->typeOf()->getElementType()->getName()]['ref'];
+    $offset = $this->context->structFieldIndex($virtual, 'ref');
                     $ref = $this->context->builder->load(
                         $this->context->builder->structGep($virtual, $offset)
                     );

@@ -72,7 +72,7 @@ final class mb_strlen extends Internal
             throw new \LogicException('mb_strlen() only supports strings in this compiler build');
         }
         $argValue = $context->helper->loadValue($args[0]);
-        $offset = $context->structFieldMap[$argValue->typeOf()->getElementType()->getName()]['length'];
+        $offset = $context->structFieldIndex($argValue, 'length');
 
         return $context->builder->load(
             $context->builder->structGep($argValue, $offset)

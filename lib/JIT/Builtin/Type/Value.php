@@ -243,7 +243,7 @@ class Value extends Type {
     $this->context->builder->positionAtEnd($block___c4ca4238a0b923820dcc509a6f75849b);
     $value = $fn___c4ca4238a0b923820dcc509a6f75849b->getParam(0);
     
-    $offset = $this->context->structFieldMap[$value->typeOf()->getElementType()->getName()]['type'];
+    $offset = $this->context->structFieldIndex($value, 'type');
                     $oldType = $this->context->builder->load(
                         $this->context->builder->structGep($value, $offset)
                     );
@@ -348,7 +348,7 @@ class Value extends Type {
                     $this->context->builder->branchIf($bool, $ifBlock, $tmp);
                 
                 $this->context->builder->positionAtEnd($ifBlock);
-                { $offset = $this->context->structFieldMap[$value->typeOf()->getElementType()->getName()]['value'];
+                { $offset = $this->context->structFieldIndex($value, 'value');
                     $ptr = $this->context->builder->structGep($value, $offset);
     $__type = $this->context->getTypeFromString('__ref__virtual*');
                         
@@ -450,7 +450,7 @@ class Value extends Type {
     $this->context->builder->positionAtEnd($block___a87ff679a2f3e71d9181a67b7542122c);
     $value = $fn___a87ff679a2f3e71d9181a67b7542122c->getParam(0);
     
-    $offset = $this->context->structFieldMap[$value->typeOf()->getElementType()->getName()]['type'];
+    $offset = $this->context->structFieldIndex($value, 'type');
                     $type = $this->context->builder->load(
                         $this->context->builder->structGep($value, $offset)
                     );
@@ -672,7 +672,7 @@ class Value extends Type {
                     } else {
                         throw new \LogicException("Unknown type for switch case");
                     }
-                    {  $offset = $this->context->structFieldMap[$value->typeOf()->getElementType()->getName()]['value'];
+                    {  $offset = $this->context->structFieldIndex($value, 'value');
                     $var = $this->context->builder->structGep($value, $offset);
     $__type = $this->context->getTypeFromString('__value__value*');
                         
@@ -752,7 +752,7 @@ class Value extends Type {
                         default:
                             throw new \LogicException("Unsupported type cast: " . $__type->toString());
                     }
-    $offset = $this->context->structFieldMap[$ptr->typeOf()->getElementType()->getName()]['value'];
+    $offset = $this->context->structFieldIndex($ptr, 'value');
                     $num = $this->context->builder->structGep($ptr, $offset);
     $result = $this->context->builder->call(
                         $this->context->lookupFunction('__value__toNumeric') , 
@@ -1003,7 +1003,7 @@ class Value extends Type {
     $this->context->builder->positionAtEnd($block___d3d9446802a44259755d38e6d163e820);
     $value = $fn___d3d9446802a44259755d38e6d163e820->getParam(0);
     
-    $offset = $this->context->structFieldMap[$value->typeOf()->getElementType()->getName()]['type'];
+    $offset = $this->context->structFieldIndex($value, 'type');
                     $type = $this->context->builder->load(
                         $this->context->builder->structGep($value, $offset)
                     );
@@ -1029,7 +1029,7 @@ class Value extends Type {
                     } else {
                         throw new \LogicException("Unknown type for switch case");
                     }
-                    {  $offset = $this->context->structFieldMap[$value->typeOf()->getElementType()->getName()]['value'];
+                    {  $offset = $this->context->structFieldIndex($value, 'value');
                     $ptr = $this->context->builder->structGep($value, $offset);
     $__type = $this->context->getTypeFromString('int64*');
                         
@@ -1208,7 +1208,7 @@ class Value extends Type {
                     } else {
                         throw new \LogicException("Unknown type for switch case");
                     }
-                    {  $offset = $this->context->structFieldMap[$value->typeOf()->getElementType()->getName()]['value'];
+                    {  $offset = $this->context->structFieldIndex($value, 'value');
                     $ptr = $this->context->builder->structGep($value, $offset);
     $__type = $this->context->getTypeFromString('double*');
                         
@@ -1465,7 +1465,7 @@ class Value extends Type {
                     } else {
                         throw new \LogicException("Unknown type for switch case");
                     }
-                    {  $offset = $this->context->structFieldMap[$value->typeOf()->getElementType()->getName()]['value'];
+                    {  $offset = $this->context->structFieldIndex($value, 'value');
                     $var = $this->context->builder->structGep($value, $offset);
     $__type = $this->context->getTypeFromString('__value__value*');
                         
@@ -1545,7 +1545,7 @@ class Value extends Type {
                         default:
                             throw new \LogicException("Unsupported type cast: " . $__type->toString());
                     }
-    $offset = $this->context->structFieldMap[$ptr->typeOf()->getElementType()->getName()]['value'];
+    $offset = $this->context->structFieldIndex($ptr, 'value');
                     $varPtr = $this->context->builder->structGep($ptr, $offset);
     $result = $this->context->builder->call(
                         $this->context->lookupFunction('__value__readLong') , 
@@ -1744,12 +1744,12 @@ class Value extends Type {
                         default:
                             throw new \LogicException("Unsupported type cast: " . $__type->toString());
                     }
-    $offset = $this->context->structFieldMap[$value->typeOf()->getElementType()->getName()]['type'];
+    $offset = $this->context->structFieldIndex($value, 'type');
                 $this->context->builder->store(
                     $type,
                     $this->context->builder->structGep($value, $offset)
                 );
-    $offset = $this->context->structFieldMap[$value->typeOf()->getElementType()->getName()]['value'];
+    $offset = $this->context->structFieldIndex($value, 'value');
                     $ptr = $this->context->builder->structGep($value, $offset);
     $__type = $this->context->getTypeFromString('int64*');
                         
@@ -1924,7 +1924,7 @@ class Value extends Type {
     $this->context->builder->positionAtEnd($block___70efdf2ec9b086079795c442636b55fb);
     $value = $fn___70efdf2ec9b086079795c442636b55fb->getParam(0);
     
-    $offset = $this->context->structFieldMap[$value->typeOf()->getElementType()->getName()]['type'];
+    $offset = $this->context->structFieldIndex($value, 'type');
                     $type = $this->context->builder->load(
                         $this->context->builder->structGep($value, $offset)
                     );
@@ -1950,7 +1950,7 @@ class Value extends Type {
                     } else {
                         throw new \LogicException("Unknown type for switch case");
                     }
-                    {  $offset = $this->context->structFieldMap[$value->typeOf()->getElementType()->getName()]['value'];
+                    {  $offset = $this->context->structFieldIndex($value, 'value');
                     $ptr = $this->context->builder->structGep($value, $offset);
     $__type = $this->context->getTypeFromString('int64*');
                         
@@ -2208,7 +2208,7 @@ class Value extends Type {
                     } else {
                         throw new \LogicException("Unknown type for switch case");
                     }
-                    {  $offset = $this->context->structFieldMap[$value->typeOf()->getElementType()->getName()]['value'];
+                    {  $offset = $this->context->structFieldIndex($value, 'value');
                     $ptr = $this->context->builder->structGep($value, $offset);
     $__type = $this->context->getTypeFromString('double*');
                         
@@ -2387,7 +2387,7 @@ class Value extends Type {
                     } else {
                         throw new \LogicException("Unknown type for switch case");
                     }
-                    {  $offset = $this->context->structFieldMap[$value->typeOf()->getElementType()->getName()]['value'];
+                    {  $offset = $this->context->structFieldIndex($value, 'value');
                     $var = $this->context->builder->structGep($value, $offset);
     $__type = $this->context->getTypeFromString('__value__value*');
                         
@@ -2467,7 +2467,7 @@ class Value extends Type {
                         default:
                             throw new \LogicException("Unsupported type cast: " . $__type->toString());
                     }
-    $offset = $this->context->structFieldMap[$ptr->typeOf()->getElementType()->getName()]['value'];
+    $offset = $this->context->structFieldIndex($ptr, 'value');
                     $varPtr = $this->context->builder->structGep($ptr, $offset);
     $result = $this->context->builder->call(
                         $this->context->lookupFunction('__value__readDouble') , 
@@ -2667,12 +2667,12 @@ class Value extends Type {
                         default:
                             throw new \LogicException("Unsupported type cast: " . $__type->toString());
                     }
-    $offset = $this->context->structFieldMap[$value->typeOf()->getElementType()->getName()]['type'];
+    $offset = $this->context->structFieldIndex($value, 'type');
                 $this->context->builder->store(
                     $type,
                     $this->context->builder->structGep($value, $offset)
                 );
-    $offset = $this->context->structFieldMap[$value->typeOf()->getElementType()->getName()]['value'];
+    $offset = $this->context->structFieldIndex($value, 'value');
                     $ptr = $this->context->builder->structGep($value, $offset);
     $__type = $this->context->getTypeFromString('double*');
                         
@@ -2956,12 +2956,12 @@ class Value extends Type {
                         default:
                             throw new \LogicException("Unsupported type cast: " . $__type->toString());
                     }
-    $offset = $this->context->structFieldMap[$value->typeOf()->getElementType()->getName()]['type'];
+    $offset = $this->context->structFieldIndex($value, 'type');
                 $this->context->builder->store(
                     $type,
                     $this->context->builder->structGep($value, $offset)
                 );
-    $offset = $this->context->structFieldMap[$value->typeOf()->getElementType()->getName()]['value'];
+    $offset = $this->context->structFieldIndex($value, 'value');
         $ptr = $this->context->builder->structGep($value, $offset);
         $stringSlot = $this->context->builder->pointerCast(
             $ptr,
@@ -3062,7 +3062,7 @@ class Value extends Type {
                         default:
                             throw new \LogicException("Unsupported type cast: " . $__type->toString());
                     }
-    $offset = $this->context->structFieldMap[$value->typeOf()->getElementType()->getName()]['type'];
+    $offset = $this->context->structFieldIndex($value, 'type');
                 $this->context->builder->store(
                     $type,
                     $this->context->builder->structGep($value, $offset)

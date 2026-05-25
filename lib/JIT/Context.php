@@ -545,6 +545,49 @@ class Context {
         return 'unknown';
     }
 
+    /** structFieldMap index for a struct value or pointer (issue #1880). */
+    public function structFieldIndex(PHPLLVM\Value $structOrPtr, string $field): int
+    {
+        $ty = $structOrPtr->typeOf();
+        $structTy = PHPLLVM\Type::KIND_POINTER === $ty->getKind()
+            ? $ty->getElementType()
+            : $ty;
+        $structName = $this->resolveStructMapName($structTy);
+        if (!isset($this->structFieldMap[$structName][$field])) {
+            throw new \LogicException(
+                "structFieldIndex: struct {$structName} has no field {$field} (llvm {$ty->toString()})"
+            );
+        }
+
+        return $this->structFieldMap[$structName][$field];
+    }
+
+    /** Map an LLVM struct type to a structFieldMap key (issue #1880). */
+    private function resolveStructMapName(PHPLLVM\Type $structTy): string
+    {
+        $name = $this->getStringFromType($structTy);
+        if ('unknown' !== $name) {
+            $base = rtrim($name, '*');
+            if (isset($this->structFieldMap[$base])) {
+                return $base;
+            }
+        }
+        if (method_exists($structTy, 'getName')) {
+            $llvmName = $structTy->getName();
+            if (isset($this->structFieldMap[$llvmName])) {
+                return $llvmName;
+            }
+        }
+        $repr = $structTy->toString();
+        foreach (array_keys($this->structFieldMap) as $candidate) {
+            if (str_contains($repr, $candidate)) {
+                return $candidate;
+            }
+        }
+
+        return $name;
+    }
+
     public function getTypeFromString(string $type): PHPLLVM\Type {
         if (!isset($this->typeMap[$type])) {
             $this->typeMap[$type] = $this->_getTypeFromString($type);

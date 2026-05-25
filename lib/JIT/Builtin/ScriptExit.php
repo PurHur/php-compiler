@@ -86,9 +86,9 @@ final class ScriptExit
 
     private static function echoString(Context $context, Value $strPtr): void
     {
-        $offset = $context->structFieldMap[$strPtr->typeOf()->getElementType()->getName()]['length'];
+        $offset = $context->structFieldIndex($strPtr, 'length');
         $length = $context->builder->load($context->builder->structGep($strPtr, $offset));
-        $offset = $context->structFieldMap[$strPtr->typeOf()->getElementType()->getName()]['value'];
+        $offset = $context->structFieldIndex($strPtr, 'value');
         $valuePtr = $context->builder->structGep($strPtr, $offset);
         $fmt = $context->builder->pointerCast(
             $context->constantFromString('%.*s'),
