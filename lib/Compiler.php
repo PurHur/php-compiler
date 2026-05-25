@@ -2132,6 +2132,23 @@ class Compiler {
     }
 
     /**
+     * `return foo()` lowers call opcodes then return; reuse FUNCCALL_EXEC_RETURN slot (#1858, #1231).
+     */
+    private function funcCallExecReturnSlotForReturn(Block $block): ?int
+    {
+        $n = $block->nOpCodes;
+        if (0 === $n) {
+            return null;
+        }
+        $last = $block->opCodes[$n - 1];
+        if (OpCode::TYPE_FUNCCALL_EXEC_RETURN !== $last->type) {
+            return null;
+        }
+
+        return $last->arg1;
+    }
+
+    /**
      * @return list<OpCode>
      */
     protected function compileTerminal(Op\Terminal $terminal, Block $block): array {
@@ -2169,9 +2186,14 @@ class Compiler {
                     )];
                 }
 
+                $callResultSlot = $this->funcCallExecReturnSlotForReturn($block);
+                if (null !== $callResultSlot) {
+                    return [new OpCode(OpCode::TYPE_RETURN, $callResultSlot)];
+                }
+
                 return [new OpCode(
                     OpCode::TYPE_RETURN,
-                    $this->compileOperand($terminal->expr, $block, true)
+                    $this->compileOperand($terminal->expr, $block, false)
                 )];
             case 'Iterator_Reset':
                 return [new OpCode(

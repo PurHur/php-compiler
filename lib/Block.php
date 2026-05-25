@@ -183,6 +183,20 @@ class Block {
                     return $existing;
                 }
             }
+            $cfgVar = self::cfgVarRoot($operand);
+            if (null !== $cfgVar) {
+                foreach ($this->scope as $scopedOp) {
+                    if (self::cfgVarRoot($scopedOp) === $cfgVar) {
+                        $existing = $this->scope[$scopedOp];
+                        $this->scope[$operand] = $existing;
+                        if ($isRead) {
+                            $this->args[$operand] = $existing;
+                        }
+
+                        return $existing;
+                    }
+                }
+            }
             $next = $this->nextScopeSlot();
             $this->scope[$operand] = $next;
             if ($isRead) {
@@ -466,7 +480,10 @@ class Block {
         return $var;
     }
 
-    private static function resolveVariableName(Operand $op): ?string
+    /**
+     * php-cfg may wrap the same Var in distinct Operand objects (e.g. call result vs return expr).
+     */
+    private static function cfgVarRoot(Operand $op): ?VarOperand
     {
         while ($op instanceof Temporary) {
             if (null === $op->original) {
@@ -474,10 +491,17 @@ class Block {
             }
             $op = $op->original;
         }
-        if (!$op instanceof VarOperand) {
+
+        return $op instanceof VarOperand ? $op : null;
+    }
+
+    private static function resolveVariableName(Operand $op): ?string
+    {
+        $root = self::cfgVarRoot($op);
+        if (null === $root) {
             return null;
         }
-        $nameOp = $op->name;
+        $nameOp = $root->name;
         if (!$nameOp instanceof Literal) {
             return null;
         }
