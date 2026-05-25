@@ -69,6 +69,14 @@ final class LlvmToolchain
         return self::$readyFailure;
     }
 
+    /**
+     * True when libLLVM-9 is present — does not dlopen (safe before spawning bin/jit.php, #98).
+     */
+    public static function hasLibrary(?string $repoRoot = null): bool
+    {
+        return null !== self::resolveDir($repoRoot);
+    }
+
     public static function isReady(?string $repoRoot = null): bool
     {
         if (null !== self::$ready) {

@@ -67,7 +67,10 @@ if ('' !== $llvmDir && is_file($llvmDir . '/libLLVM-9.so.1')) {
     putenv('LD_LIBRARY_PATH=' . $llvmDir . (false === $ldPath || '' === $ldPath ? '' : ':' . $ldPath));
     $_ENV['LD_LIBRARY_PATH'] = getenv('LD_LIBRARY_PATH');
     $_SERVER['LD_LIBRARY_PATH'] = $_ENV['LD_LIBRARY_PATH'];
-    php_compiler_preload_llvm_deps($llvmDir, ['libffi.so.7']);
+    // PHPUnit spawns bin/jit.php children; RTLD_GLOBAL preload here segfaults MCJIT (#98, #2055).
+    if ('1' !== getenv('PHP_COMPILER_SKIP_LLVM_PRELOAD')) {
+        php_compiler_preload_llvm_deps($llvmDir, ['libffi.so.7']);
+    }
 }
 if ('' !== $llvmDir && is_executable($llvmDir . '/clang-9')) {
     $path = getenv('PATH');

@@ -18,6 +18,22 @@ final class LlvmToolchainTest extends TestCase
         self::$root = dirname(__DIR__, 2);
     }
 
+    public function testHasLibraryWhenBundledLlvmPresent(): void
+    {
+        if (!is_file(self::$root.'/.llvm/libLLVM-9.so.1') && !is_file('/opt/llvm9/libLLVM-9.so.1')) {
+            $this->markTestSkipped('LLVM 9 not installed in this environment.');
+        }
+
+        $this->assertTrue(LlvmToolchain::hasLibrary(self::$root));
+    }
+
+    public function testBootstrapSkipsLlvmPreloadAndIsReady(): void
+    {
+        $bootstrap = (string) file_get_contents(self::$root.'/test/bootstrap.php');
+        $this->assertStringContainsString('PHP_COMPILER_SKIP_LLVM_PRELOAD=1', $bootstrap);
+        $this->assertStringNotContainsString('LlvmToolchain::isReady', $bootstrap);
+    }
+
     public function testIsReadyWhenBundledLlvmPresent(): void
     {
         if (!is_file(self::$root.'/.llvm/libLLVM-9.so.1') && !is_file('/opt/llvm9/libLLVM-9.so.1')) {
