@@ -23,6 +23,9 @@ Shipped demos live under `examples/00x-*/` with an `example.php` entry script. U
 
 ./phpc lint examples/006-FileUploadWeb/example.php
 ./phpc run examples/006-FileUploadWeb/example.php
+
+./phpc lint examples/007-ThrowsWeb/example.php
+./phpc run examples/007-ThrowsWeb/example.php
 ```
 
 AOT (needs LLVM 9 — see `script/install-llvm9.sh` or the `php-compiler:22.04-dev` Docker image):
@@ -46,6 +49,7 @@ Legacy entrypoints still work: `php bin/vm.php`, `php bin/jit.php`, `php bin/com
 | [004-ApiJson](004-ApiJson/) | ✅ `./phpc run` | ✅ `bin/jit.php` | ✅ `phpc build` | JSON + `http_response_code` — [#270](https://github.com/PurHur/php-compiler/issues/270), [#61](https://github.com/PurHur/php-compiler/issues/61) |
 | [005-SessionsWeb](005-SessionsWeb/) | ✅ `./phpc run` / `phpc serve` | ✅ `session_start` JIT ([#1882](https://github.com/PurHur/php-compiler/issues/1882)) | ✅ `phpc build` link ([#1946](https://github.com/PurHur/php-compiler/issues/1946)); execute [#1891](https://github.com/PurHur/php-compiler/issues/1891); deploy smoke opt-in ([#1893](https://github.com/PurHur/php-compiler/issues/1893)) | `$_SESSION` flash across requests — [#1881](https://github.com/PurHur/php-compiler/issues/1881) |
 | [006-FileUploadWeb](006-FileUploadWeb/) | ✅ `./phpc run` / `phpc serve` | ✅ nested `$_FILES` JIT ([#87](https://github.com/PurHur/php-compiler/issues/87)) | ✅ `phpc build` link ([#2011](https://github.com/PurHur/php-compiler/issues/2011)); execute default-on ([#2012](https://github.com/PurHur/php-compiler/issues/2012)) | `multipart/form-data` + `$_FILES['doc']` — [#1999](https://github.com/PurHur/php-compiler/issues/1999) |
+| [007-ThrowsWeb](007-ThrowsWeb/) | ✅ `./phpc run` / `phpc serve` | 📋 deferred | 📋 deferred | `throw` / `catch` on invalid POST — [#2076](https://github.com/PurHur/php-compiler/issues/2076); VM smoke opt-in `THROWS_WEB_SMOKE_GATE=0` ([#2093](https://github.com/PurHur/php-compiler/issues/2093)) |
 | [003-MiniWebApp](003-MiniWebApp/) | ✅ `phpc serve` | partial | ✅ `phpc build --project` | PATH_INFO — [#489](https://github.com/PurHur/php-compiler/issues/489), runtime [#539](https://github.com/PurHur/php-compiler/issues/539); AOT link ✅ ([#752](https://github.com/PurHur/php-compiler/issues/752)); native execute ✅ ([#764](https://github.com/PurHur/php-compiler/issues/764) closed) |
 
 ### 000-HelloWorld
@@ -133,6 +137,19 @@ curl -s -F 'doc=@examples/006-FileUploadWeb/README.md' http://127.0.0.1:8080/exa
 
 VM multipart curls: `make examples-web-smoke` / `ci-fast` (default `FILE_UPLOAD_WEB_SMOKE_GATE=1`, [#2009](https://github.com/PurHur/php-compiler/issues/2009)). AOT link: default `FILE_UPLOAD_WEB_AOT_LINK_GATE=1` ([#2011](https://github.com/PurHur/php-compiler/issues/2011)); AOT execute: default `FILE_UPLOAD_WEB_AOT_SMOKE_GATE=1` ([#2012](https://github.com/PurHur/php-compiler/issues/2012)); shell slice `EXAMPLES_AOT_SMOKE_ONLY=006 make examples-aot-smoke` ([#2013](https://github.com/PurHur/php-compiler/issues/2013)) — see [006-FileUploadWeb/README.md](006-FileUploadWeb/README.md). Init scaffold: `./phpc init --profile fileupload my-upload` ([#2004](https://github.com/PurHur/php-compiler/issues/2004)); template parity: [#2020](https://github.com/PurHur/php-compiler/issues/2020) (default in `ci-fast`).
 
+### 007-ThrowsWeb
+
+POST email validation with `throw` / `catch` ([#2076](https://github.com/PurHur/php-compiler/issues/2076)). Invalid input renders an **invalid** message; valid input shows **Accepted**.
+
+```console
+./phpc lint examples/007-ThrowsWeb/example.php
+./phpc run examples/007-ThrowsWeb/example.php
+./phpc serve 127.0.0.1:8080 examples/007-ThrowsWeb
+curl -sf -X POST -d 'email=bad' http://127.0.0.1:8080/example.php | grep -i invalid
+```
+
+VM serve curls: opt-in `THROWS_WEB_SMOKE_GATE=1` — `make examples-web-smoke` with gate export or `examples-web-smoke.sh --throws-only` ([#2093](https://github.com/PurHur/php-compiler/issues/2093)). JIT/AOT deferred ([#2101](https://github.com/PurHur/php-compiler/issues/2101)).
+
 ### 002-StaticWeb
 
 Static page (no superglobals); good default for first AOT compile.
@@ -150,7 +167,7 @@ cd examples/002-StaticWeb
 
 Full field reference: [docs/phpc-json.md](../docs/phpc-json.md) ([#727](https://github.com/PurHur/php-compiler/issues/727)).
 
-**001-SimpleWeb**, **002-StaticWeb**, **004-ApiJson**, **005-SessionsWeb**, and **006-FileUploadWeb** ship a minimal manifest beside `example.php` ([#274](https://github.com/PurHur/php-compiler/issues/274)):
+**001-SimpleWeb**, **002-StaticWeb**, **004-ApiJson**, **005-SessionsWeb**, **006-FileUploadWeb**, and **007-ThrowsWeb** ship a minimal manifest beside `example.php` ([#274](https://github.com/PurHur/php-compiler/issues/274)):
 
 ```json
 {
