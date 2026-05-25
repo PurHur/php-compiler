@@ -8,8 +8,8 @@
 #   CI_FAST_BOOTSTRAP=1 ./script/ci-fast.sh
 # M4 bootstrap-loop dry-run when LLVM ready (default off; issue #1929):
 #   BOOTSTRAP_LOOP_PROBE_GATE=1 ./script/ci-fast.sh
-# North Star 2 presenter when opt-in (skips until #1865 script exists; issue #1928):
-#   NORTH_STAR2_VERIFY_GATE=1 ./script/ci-fast.sh
+# North Star 2 presenter (default on; issue #1928, #2051). Opt-out:
+#   NORTH_STAR2_VERIFY_GATE=0 ./script/ci-fast.sh
 set -euo pipefail
 
 # shellcheck source=ci-common.sh
