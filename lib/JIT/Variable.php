@@ -110,6 +110,15 @@ final class Variable {
     /** Declared JIT property type when {@see $objectPropertySlot} is set. */
     public ?int $objectPropertyType = null;
 
+    /** Owning {@see __object__} when this variable is an instance property lvalue (#1360). */
+    public ?\PHPLLVM\Value $objectPropertyReceiver = null;
+
+    /** Declared property name for readonly diagnostics (#1360). */
+    public ?string $objectPropertyName = null;
+
+    /** Declaring class name for readonly diagnostics (#1360). */
+    public ?string $objectPropertyClassName = null;
+
     private static int $lvalueCounter = 0;
     public int $nextFreeElement = 0;
 

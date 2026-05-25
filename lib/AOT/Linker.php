@@ -39,6 +39,7 @@ final class Linker
         __DIR__.'/runtime/phpc_error_handler.c',
         __DIR__.'/runtime/phpc_spl_autoload.c',
         __DIR__.'/runtime/phpc_debug_backtrace.c',
+        __DIR__.'/runtime/phpc_readonly_raise.c',
     ];
 
     private const RUNTIME_LINK_LIBS = '-lpcre2-8';
