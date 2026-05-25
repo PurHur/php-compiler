@@ -159,7 +159,7 @@ SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 ./script/deploy-smoke.sh --example 005
 
 ## 006-FileUploadWeb gates ([#1999](https://github.com/PurHur/php-compiler/issues/1999), [#2009](https://github.com/PurHur/php-compiler/issues/2009))
 
-Progressive ladder (VM multipart → AOT link → AOT execute). VM smoke default-on ([#2009](https://github.com/PurHur/php-compiler/issues/2009)); AOT link default-on ([#2011](https://github.com/PurHur/php-compiler/issues/2011)); AOT execute tracked in [#2012](https://github.com/PurHur/php-compiler/issues/2012).
+Progressive ladder (VM multipart → AOT link → AOT execute). VM smoke default-on ([#2009](https://github.com/PurHur/php-compiler/issues/2009)); AOT link default-on ([#2011](https://github.com/PurHur/php-compiler/issues/2011)); AOT execute tracked in [#2012](https://github.com/PurHur/php-compiler/issues/2012). Copy-paste ladder: `./phpc doctor --gates` (**#2010**).
 
 | Stage | Variable | Default | When enabled |
 |-------|----------|---------|--------------|

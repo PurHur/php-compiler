@@ -126,6 +126,16 @@ final class PhpcDoctorTest extends TestCase
         $this->assertStringContainsString('#1893', $result['stdout']);
         $this->assertStringContainsString('#1886', $result['stdout']);
         $this->assertStringContainsString('ci-defaults.env', $result['stdout']);
+        $this->assertStringContainsString('006-FileUploadWeb CI gates', $result['stdout']);
+        $this->assertStringContainsString('006-FileUploadWeb', $result['stdout']);
+        $this->assertStringContainsString('FILE_UPLOAD_WEB_SMOKE_GATE', $result['stdout']);
+        $this->assertStringContainsString('FILE_UPLOAD_WEB_AOT_LINK_GATE', $result['stdout']);
+        $this->assertStringContainsString('FILE_UPLOAD_WEB_AOT_SMOKE_GATE', $result['stdout']);
+        $this->assertStringContainsString('--fileupload-only', $result['stdout']);
+        $this->assertStringContainsString('test006FileUploadWebAotLink', $result['stdout']);
+        $this->assertStringContainsString('FileUploadWebAotExecuteTest', $result['stdout']);
+        $this->assertStringContainsString('#2004', $result['stdout']);
+        $this->assertStringContainsString('#2010', $result['stdout']);
     }
 
     /**
