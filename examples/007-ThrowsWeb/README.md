@@ -17,7 +17,8 @@ curl -sf -X POST -d 'email=bad' http://127.0.0.1:8080/example.php | grep -i inva
 |-------|-------|
 | VM `phpc run` | ✅ GET — empty state |
 | VM `phpc serve` | ✅ caught invalid POST (`THROWS_WEB_SMOKE_GATE=1` default, [#2093](https://github.com/PurHur/php-compiler/issues/2093), [#2125](https://github.com/PurHur/php-compiler/issues/2125)) |
-| JIT / AOT | 📋 deferred — [#2101](https://github.com/PurHur/php-compiler/issues/2101) / [#2104](https://github.com/PurHur/php-compiler/issues/2104) |
+| AOT `phpc build` + execute | ✅ caught invalid POST ([#2157](https://github.com/PurHur/php-compiler/issues/2157), [#2135](https://github.com/PurHur/php-compiler/issues/2135)) |
+| JIT | 📋 deferred — [#2167](https://github.com/PurHur/php-compiler/issues/2167) |
 
 ## CI gates
 
@@ -30,8 +31,10 @@ Defaults from `script/ci-defaults.env`:
 | Stage | Gate | Default | Command |
 |-------|------|---------|---------|
 | VM serve | `THROWS_WEB_SMOKE_GATE` | `1` | `make examples-throws-smoke` · `ci-fast.sh` ([#2125](https://github.com/PurHur/php-compiler/issues/2125)) |
+| AOT link | `THROWSWEB_AOT_LINK_GATE` | `1` | `./script/ci-local.sh --filter test007ThrowsWebAotLink` ([#2135](https://github.com/PurHur/php-compiler/issues/2135)) |
+| AOT execute | `THROWSWEB_AOT_SMOKE_GATE` | `1` | `ThrowsWebAotExecuteTest` · `EXAMPLES_AOT_SMOKE_ONLY=007 make examples-aot-smoke` ([#2135](https://github.com/PurHur/php-compiler/issues/2135)) |
 
-Opt-out for doc-only iteration: `THROWS_WEB_SMOKE_GATE=0 ./script/ci-fast.sh`
+Opt-out for doc-only iteration: `THROWS_WEB_SMOKE_GATE=0 THROWSWEB_AOT_LINK_GATE=0 THROWSWEB_AOT_SMOKE_GATE=0 ./script/ci-fast.sh`
 
 ## Benchmark row
 

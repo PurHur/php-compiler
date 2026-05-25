@@ -260,7 +260,7 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('ci_run_throws_web_aot_execute', $body);
         $this->assertStringContainsString('--exclude-group throwsweb-aot-execute', $body);
         $this->assertStringContainsString('--group throwsweb-aot-execute', $body);
-        $this->assertStringContainsString('THROWSWEB_AOT_SMOKE_GATE:-0}', $body);
+        $this->assertStringContainsString('THROWSWEB_AOT_SMOKE_GATE:-1}', $body);
     }
 
     public function testCiLocalRunsThrowsWebAotLinkBeforeExecute(): void
@@ -1439,11 +1439,11 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('#2157', $doc);
     }
 
-    public function testCiDefaultsEnvDefinesThrowsWebAotGatesOff(): void
+    public function testCiDefaultsEnvDefinesThrowsWebAotGatesOn(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
-        $this->assertStringContainsString('THROWSWEB_AOT_LINK_GATE="${THROWSWEB_AOT_LINK_GATE:-0}"', $defaults);
-        $this->assertStringContainsString('THROWSWEB_AOT_SMOKE_GATE="${THROWSWEB_AOT_SMOKE_GATE:-0}"', $defaults);
+        $this->assertStringContainsString('THROWSWEB_AOT_LINK_GATE="${THROWSWEB_AOT_LINK_GATE:-1}"', $defaults);
+        $this->assertStringContainsString('THROWSWEB_AOT_SMOKE_GATE="${THROWSWEB_AOT_SMOKE_GATE:-1}"', $defaults);
     }
 
     public function testCiFastRunsMiniWebAppVmCliGateByDefault(): void

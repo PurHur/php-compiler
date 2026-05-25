@@ -218,15 +218,15 @@ FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE=1 ./script/deploy-smoke.sh --example 006
 
 ## 007-ThrowsWeb gates ([#2076](https://github.com/PurHur/php-compiler/issues/2076), [#2093](https://github.com/PurHur/php-compiler/issues/2093))
 
-Progressive ladder (VM throw/catch → AOT link → AOT execute). VM smoke default-on ([#2125](https://github.com/PurHur/php-compiler/issues/2125), [#2093](https://github.com/PurHur/php-compiler/issues/2093)); AOT gates opt-in until **#195** / **#57** / **#2101** land; execute default-on blocked on **#2157** (follow-up **#2135**). Copy-paste ladder: `./phpc doctor --gates` (**#2102**).
+Progressive ladder (VM throw/catch → AOT link → AOT execute). VM smoke default-on ([#2125](https://github.com/PurHur/php-compiler/issues/2125), [#2093](https://github.com/PurHur/php-compiler/issues/2093)); AOT gates default-on ([#2135](https://github.com/PurHur/php-compiler/issues/2135), [#2157](https://github.com/PurHur/php-compiler/issues/2157)). Copy-paste ladder: `./phpc doctor --gates` (**#2102**).
 
-**`ci-local.sh` llvm tail** (mirror **006** link → execute): `ci_run_aot_link_phpunit` (`@group aot-link`, honors `THROWSWEB_AOT_LINK_GATE`) runs before `ci_run_throws_web_aot_execute` (`@group throwsweb-aot-execute`, honors `THROWSWEB_AOT_SMOKE_GATE`) — audit **#2178**; default-on flip **#2135** after **#2157** ✅.
+**`ci-local.sh` llvm tail** (mirror **006** link → execute): `ci_run_aot_link_phpunit` (`@group aot-link`, honors `THROWSWEB_AOT_LINK_GATE`) runs before `ci_run_throws_web_aot_execute` (`@group throwsweb-aot-execute`, honors `THROWSWEB_AOT_SMOKE_GATE`) — audit **#2178**; default-on **#2135** after **#2157** ✅.
 
 | Stage | Variable | Default | When enabled |
 |-------|----------|---------|--------------|
 | VM throw/catch | `THROWS_WEB_SMOKE_GATE` | `1` | `make examples-throws-smoke` · `ci-fast.sh` ([#2125](https://github.com/PurHur/php-compiler/issues/2125), [#2093](https://github.com/PurHur/php-compiler/issues/2093)) |
-| AOT link | `THROWSWEB_AOT_LINK_GATE` | `0` | `./script/ci-local.sh --filter test007ThrowsWebAotLink` ([#2101](https://github.com/PurHur/php-compiler/issues/2101), [#2143](https://github.com/PurHur/php-compiler/issues/2143)) |
-| AOT execute | `THROWSWEB_AOT_SMOKE_GATE` | `0` | `ThrowsWebAotExecuteTest` or `EXAMPLES_AOT_SMOKE_ONLY=007 ./script/examples-aot-smoke.sh` ([#2101](https://github.com/PurHur/php-compiler/issues/2101), [#2104](https://github.com/PurHur/php-compiler/issues/2104)) |
+| AOT link | `THROWSWEB_AOT_LINK_GATE` | `1` | `./script/ci-local.sh --filter test007ThrowsWebAotLink` ([#2101](https://github.com/PurHur/php-compiler/issues/2101), [#2135](https://github.com/PurHur/php-compiler/issues/2135)); set `0` to skip during iteration |
+| AOT execute | `THROWSWEB_AOT_SMOKE_GATE` | `1` | `ThrowsWebAotExecuteTest` or `EXAMPLES_AOT_SMOKE_ONLY=007 ./script/examples-aot-smoke.sh` ([#2101](https://github.com/PurHur/php-compiler/issues/2101), [#2135](https://github.com/PurHur/php-compiler/issues/2135)) |
 
 ```bash
 ./phpc doctor --gates | grep -E 'THROWS|007-ThrowsWeb'
