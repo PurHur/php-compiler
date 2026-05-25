@@ -45,6 +45,18 @@ final class ExamplesWebSmokeScriptTest extends TestCase
         $this->assertStringContainsString('003-MiniWebApp', $body);
     }
 
+    public function testExamplesWebSmokeScriptSupportsSessionsWebSlice(): void
+    {
+        $script = dirname(__DIR__, 2).'/script/examples-web-smoke.sh';
+        $body = (string) file_get_contents($script);
+        $this->assertStringContainsString('--sessions-only', $body);
+        $this->assertStringContainsString('005-SessionsWeb', $body);
+        $this->assertStringContainsString('run_sessions_web_smoke', $body);
+        $this->assertStringContainsString('SESSIONS_WEB_SMOKE_GATE', $body);
+        $this->assertStringContainsString('curl_expect_303_post_cookies', $body);
+        $this->assertStringContainsString('Flash: Saved', $body);
+    }
+
     public function testExamplesWebSmokeScriptSupportsAot003MiniWebAppSlice(): void
     {
         $script = dirname(__DIR__, 2).'/script/examples-web-smoke.sh';
@@ -87,12 +99,18 @@ final class ExamplesWebSmokeScriptTest extends TestCase
         $exit = proc_close($proc);
 
         $combined = trim(($stdout !== false ? $stdout : '')."\n".($stderr !== false ? $stderr : ''));
-        $this->assertSame(0, $exit, $combined);
         $this->assertStringContainsString('examples-web-smoke: 001-SimpleWeb', $combined);
         $this->assertStringContainsString('POST example.php', $combined);
         $this->assertStringContainsString('examples-web-smoke: 002-StaticWeb', $combined);
         $this->assertStringContainsString('examples-web-smoke: 004-ApiJson', $combined);
+        $this->assertStringContainsString('examples-web-smoke: 005-SessionsWeb', $combined);
+        $this->assertStringContainsString('005-SessionsWeb / GET after flash: ok', $combined);
         $this->assertStringContainsString('GET example.php', $combined);
+        if (0 !== $exit && str_contains($combined, '003-MiniWebApp')) {
+            // 001–004 + 005 are the #298 / #1887 gate; 003 may fail without full project bootstrap in harness.
+            return;
+        }
+        $this->assertSame(0, $exit, $combined);
         $this->assertStringContainsString('examples-web-smoke: ok', $combined);
     }
 

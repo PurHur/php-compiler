@@ -318,6 +318,23 @@ ci_guard_jit_compliance() {
   "$PHP_BIN" "${PHP_OPTS[@]}" script/check-jit-compliance-ran.php "$junit_path" "$llvm_dir"
 }
 
+# Shell curl harness for 005-SessionsWeb session flash (issue #1887).
+ci_run_sessions_web_smoke() {
+  if [[ "${SESSIONS_WEB_SMOKE_GATE:-1}" != "1" ]]; then
+    return 0
+  fi
+  if [[ -n "${PHP_COMPILER_SKIP_SERVE_TESTS:-}" ]]; then
+    echo "examples-web-smoke (005): skipped (PHP_COMPILER_SKIP_SERVE_TESTS is set)"
+    return 0
+  fi
+  if ! ci_can_bind_loopback; then
+    echo "examples-web-smoke (005): skipped (cannot bind loopback TCP)"
+    return 0
+  fi
+  echo "examples-web-smoke (005): SessionsWeb cookie curls (SESSIONS_WEB_SMOKE_GATE=1 default, #1887)..."
+  "$_CI_SCRIPT_DIR/examples-web-smoke.sh" --sessions-only
+}
+
 # Shell curl harness for 003-MiniWebApp PATH_INFO routes (issue #633).
 ci_run_miniwebapp_web_smoke() {
   if [[ -n "${PHP_COMPILER_SKIP_SERVE_TESTS:-}" ]]; then

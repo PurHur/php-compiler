@@ -58,6 +58,8 @@ if [[ -z "${PHP_COMPILER_SKIP_SERVE_TESTS:-}" ]]; then
   if [[ "${MINIWEBAPP_WEB_SMOKE_GATE:-1}" == "1" ]]; then
     ci_run_miniwebapp_web_smoke
   fi
+
+  ci_run_sessions_web_smoke
 fi
 
 if ci_llvm_ready; then

@@ -89,7 +89,33 @@ final class CiScriptsTest extends TestCase
         $fast = dirname(__DIR__, 2).'/script/ci-fast.sh';
         $body = (string) file_get_contents($fast);
         $this->assertStringNotContainsString('ci_run_miniwebapp_web_smoke', $body);
-        $this->assertStringNotContainsString('examples-web-smoke.sh', $body);
+        $this->assertStringNotContainsString('examples-web-smoke.sh --miniwebapp-only', $body);
+    }
+
+    public function testCiFastRunsSessionsWebSmokeGate(): void
+    {
+        $fast = dirname(__DIR__, 2).'/script/ci-fast.sh';
+        $body = (string) file_get_contents($fast);
+        $this->assertStringContainsString('ci_run_sessions_web_smoke', $body);
+
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('SESSIONS_WEB_SMOKE_GATE', $common);
+        $this->assertStringContainsString('--sessions-only', $common);
+    }
+
+    public function testCiDefaultsEnvDefinesSessionsWebSmokeGateOn(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString(
+            'SESSIONS_WEB_SMOKE_GATE="${SESSIONS_WEB_SMOKE_GATE:-1}"',
+            $defaults
+        );
+    }
+
+    public function testCiLocalRunsSessionsWebSmokeGate(): void
+    {
+        $local = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-local.sh');
+        $this->assertStringContainsString('ci_run_sessions_web_smoke', $local);
     }
 
     public function testCiFastHonorsMiniWebAppServeGate(): void
