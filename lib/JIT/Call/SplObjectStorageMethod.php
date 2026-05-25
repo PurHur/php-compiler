@@ -23,7 +23,7 @@ final class SplObjectStorageMethod implements Call
 
     public function call(Context $context, Variable ...$args): Value
     {
-        switch ($this->method) {
+        switch (strtolower($this->method)) {
             case 'attach':
                 return $this->callAttach($context, ...$args);
             case 'contains':
