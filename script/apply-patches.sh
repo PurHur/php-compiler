@@ -123,6 +123,9 @@ patch_already_applied() {
     php-cfg-ctor-promotion.patch)
       grep -q 'promotionFlags' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Param.php" 2>/dev/null
       ;;
+    php-cfg-attribute-groups.patch)
+      grep -q "attrGroups' = \$expr->attrGroups" "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
+      ;;
     php-types-never-type.patch)
       grep -q 'Op\\Type\\Never_' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
       ;;
@@ -236,6 +239,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-never-type.patch"
   apply_patch "$PATCH_DIR/php-cfg-intersection-type.patch"
   apply_patch "$PATCH_DIR/php-cfg-ctor-promotion.patch"
+  apply_patch "$PATCH_DIR/php-cfg-attribute-groups.patch"
 fi
 
 if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then

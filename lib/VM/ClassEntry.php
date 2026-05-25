@@ -40,6 +40,10 @@ class ClassEntry {
     public array $staticProperties = [];
     /** Readonly class: instance properties cannot change after construction (issue #1360). */
     public bool $readonly = false;
+    /** @var list<string> PHP 8 attribute names on this class (#1936). */
+    public array $attributeNames = [];
+    /** @var array<string, list<string>> method (lowercase) => attribute names (#1936). */
+    public array $methodAttributeNames = [];
 
     public function __construct(string $name) {
         $this->name = $name;

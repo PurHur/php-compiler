@@ -1,0 +1,21 @@
+--- a/lib/PHPCfg/Parser.php
++++ b/lib/PHPCfg/Parser.php
+@@ -1678,12 +1678,16 @@ class Parser
+ 
+     private function mapAttributes(Node $expr)
+     {
+-        return array_merge(
++        $attrs = array_merge(
+             [
+                 'filename' => $this->fileName,
+                 'doccomment' => $expr->getDocComment(),
+             ],
+             $expr->getAttributes()
+         );
++        if (property_exists($expr, 'attrGroups') && [] !== $expr->attrGroups) {
++            $attrs['attrGroups'] = $expr->attrGroups;
++        }
++        return $attrs;
+     }
+ 
+     private function readVariable(Operand $var)

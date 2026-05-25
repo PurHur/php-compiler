@@ -47,7 +47,7 @@ Indicative composite toward a **web-capable, self-hosting** compiler (not line-c
 | Area | Progress | Summary |
 |------|----------|---------|
 | **Foundation** (CI, CLI, Docker) | ~88% | `phpc` CLI, local/Docker CI; GitHub Actions + CircleCI disabled ([#1338](https://github.com/PurHur/php-compiler/pull/1338), [#1340](https://github.com/PurHur/php-compiler/pull/1340)); contributor CI matrix doc in repo only |
-| **Language** (OOP, types, CFG) | ~76% | VM/JIT OOP largely works; wave-3 language **12/12** on master; PHP 8 attributes VM v1 ([#1354](https://github.com/PurHur/php-compiler/issues/1354)) |
+| **Language** (OOP, types, CFG) | ~76% | VM/JIT OOP largely works; wave-3 language **12/12** on master; PHP 8 attributes VM v1 ([#1354](https://github.com/PurHur/php-compiler/issues/1354)); reflection phase-2 ([#1936](https://github.com/PurHur/php-compiler/issues/1936)) |
 | **Stdlib** | ~58% | Wave-3 batch ([#1367](https://github.com/PurHur/php-compiler/issues/1367)–[#1379](https://github.com/PurHur/php-compiler/issues/1379)): **13/13** closed on master |
 | **Web AOT** (build, deploy) | ~70% | Project link ✅; CLI execute ✅; examples **003–006** as integration tests |
 | **Example harness** (003-MiniWebApp, 005-SessionsWeb, …) | ~90% | VM + AOT execute + default-on CI gates — **regression fixtures only** |
@@ -55,7 +55,7 @@ Indicative composite toward a **web-capable, self-hosting** compiler (not line-c
 
 **Overall (indicative): ~52%** toward the [project north star](#north-star-self-host) below.
 
-**Roadmap wave 3** ([#1380](https://github.com/PurHur/php-compiler/issues/1380)): tracker in repo [docs/roadmap-wave3.md](https://github.com/PurHur/php-compiler/blob/master/docs/roadmap-wave3.md).
+**Roadmap wave 3** ([#1380](https://github.com/PurHur/php-compiler/issues/1380)): language **12/12** + stdlib **13/13** on master — tracker in repo [docs/roadmap-wave3.md](https://github.com/PurHur/php-compiler/blob/master/docs/roadmap-wave3.md). Attributes reflection phase-2: [#1936](https://github.com/PurHur/php-compiler/issues/1936).
 
 Per-builtin and per-construct coverage detail is in generated contributor matrices in the repo (not published or linked from this site).
 

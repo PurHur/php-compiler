@@ -336,6 +336,18 @@ function syntaxRowDefinitions(): array
             'probe' => 'readonly class R { public int $x = 0; } $o = new R(); $o->x = 1;',
         ],
         [
+            'id' => 'php8_attribute_reflection',
+            'construct' => 'PHP 8 attributes — `ReflectionClass` / `ReflectionMethod` metadata',
+            'opcodes' => ['TYPE_DECLARE_CLASS', 'TYPE_DECLARE_METHOD'],
+            'issue' => 1936,
+            'jit' => false,
+            'notes' => [
+                'php-cfg preserves `attrGroups`; VM `ClassEntry` stores names; Reflection* builtins are VM-only (no JIT lowering)',
+                'Read path: `getAttributes()` count + `ReflectionAttribute::getName()`; no `newInstance()` or parameter attributes',
+            ],
+            'probe' => '#[\AllowDynamicProperties] class B {} $a = (new ReflectionClass(B::class))->getAttributes(); echo count($a).$a[0]->getName();',
+        ],
+        [
             'id' => 'weak_reference_weak_map',
             'construct' => 'WeakReference / WeakMap',
             'opcodes' => [],

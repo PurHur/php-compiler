@@ -686,6 +686,7 @@ restart:
                     if (null !== $op->arg3 && isset($frame->block->constants[$op->arg3])) {
                         $classEntry->readonly = (bool) $frame->block->constants[$op->arg3]->toInt();
                     }
+                    $classEntry->attributeNames = $op->attributeNames;
                     self::defineClass($classEntry, $op->block1);
                     if (null !== $classEntry->parentLc) {
                         $this->inheritFromParent($classEntry);
@@ -1490,6 +1491,9 @@ restart:
                         $vis = MethodVisibility::mask($block->constants[$op->arg3]->toInt());
                     }
                     $entry->methodVisibility[$name] = $vis;
+                    if ([] !== $op->attributeNames) {
+                        $entry->methodAttributeNames[$name] = $op->attributeNames;
+                    }
                     if (null !== $op->block1) {
                         $method = new Func\PHP($entry->name.'::'.$name, $op->block1);
                         $entry->methods[$name] = $method;

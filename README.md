@@ -119,7 +119,7 @@ Also: `phpc doctor` (env probe), `phpc validate-manifest`, `phpc cgi`. See `./ph
 
 ### Capabilities
 
-Wave-3 gap tracker ([#1380](https://github.com/PurHur/php-compiler/issues/1380)): **language 12/12**, **stdlib 13/13** on master (May 2026). The compiler targets a **web-capable PHP subset** — many builtins and constructs are VM-only or in progress compared to Zend PHP.
+Wave-3 gap tracker ([#1380](https://github.com/PurHur/php-compiler/issues/1380)): **language 12/12**, **stdlib 13/13** on master (May 2026). Attributes reflection phase-2 tracked separately ([#1936](https://github.com/PurHur/php-compiler/issues/1936)). The compiler targets a **web-capable PHP subset** — many builtins and constructs are VM-only or in progress compared to Zend PHP.
 
 **Contributor matrices** (not on the [public status site](https://purhur.github.io/php-compiler/docs/pages/index.html)): regenerate with `php script/capability-matrix.php` and `php script/capability-syntax.php` → [docs/capabilities.md](docs/capabilities.md), [docs/capabilities-syntax.md](docs/capabilities-syntax.md). See [docs/README.md](docs/README.md).
 
@@ -449,7 +449,7 @@ block_0:
 
 # Roadmap
 
-Development targets a **web-capable PHP subset**: CGI/superglobals, stdlib for small apps, JIT/AOT deployment, and a reference MiniWebApp. See open [GitHub issues](https://github.com/PurHur/php-compiler/issues) for phase labels (`phase-0:Foundation` through `phase-5:reference-app`).
+Development targets a **web-capable PHP subset**: CGI/superglobals, stdlib for small apps, JIT/AOT deployment, and a reference MiniWebApp. Wave 3 language/stdlib batch ([#1380](https://github.com/PurHur/php-compiler/issues/1380)) is **12/12 + 13/13** on master; attributes reflection phase-2 ([#1936](https://github.com/PurHur/php-compiler/issues/1936)) is tracked separately. See open [GitHub issues](https://github.com/PurHur/php-compiler/issues) for phase labels (`phase-0:Foundation` through `phase-5:reference-app`).
 
 The compiler still supports a limited language subset compared to Zend PHP; many builtins and constructs are VM-only or in progress. See the generated [builtin capability matrix](docs/capabilities.md) and [language construct matrix](docs/capabilities-syntax.md) (classes, methods, visibility, `instanceof`, native user-class link, `match`, arrow functions).
 
