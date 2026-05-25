@@ -43,6 +43,23 @@ final class JitHash
         ));
     }
 
+    public static function equals(Context $context, Value $known, Value $user): Value
+    {
+        StringHashCrypto::ensureLinked($context);
+        $i32 = $context->getTypeFromString('int32');
+        $result = $context->builder->call(
+            $context->lookupFunction('__compiler_hash_equals'),
+            $known,
+            $user
+        );
+
+        return $context->builder->icmp(
+            Builder::INT_NE,
+            $result,
+            $i32->constInt(0, false)
+        );
+    }
+
     private static function digestToValue(Context $context, Value $digest): Value
     {
         $id = (string) (++self::$blockSerial);

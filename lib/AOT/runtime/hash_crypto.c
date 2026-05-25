@@ -653,3 +653,23 @@ __string__ *__compiler_hash_hmac(__string__ *algo, __string__ *data, __string__ 
 
     return hc_result_string(id, digest, raw);
 }
+
+/** Timing-safe string compare for hash_equals() (issue #2179). */
+int __compiler_hash_equals(__string__ *known, __string__ *user)
+{
+    size_t known_len = hc_strlen(known);
+    size_t user_len = hc_strlen(user);
+    const unsigned char *ka = (const unsigned char *) hc_strdata(known);
+    const unsigned char *ua = (const unsigned char *) hc_strdata(user);
+    size_t len = known_len;
+    int result = 0;
+
+    if (known_len != user_len) {
+        return 0;
+    }
+    for (size_t i = 0; i < len; i++) {
+        result |= ka[i] ^ ua[i];
+    }
+
+    return result == 0 ? 1 : 0;
+}

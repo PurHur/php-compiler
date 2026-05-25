@@ -28,4 +28,19 @@ final class VmHash
 
         return \hash_hmac($algo, $data, $key, $raw);
     }
+
+    /** Timing-safe string compare for hash_equals() (issue #2179). */
+    public static function equals(string $known, string $user): bool
+    {
+        if (\strlen($known) !== \strlen($user)) {
+            return false;
+        }
+        $result = 0;
+        $len = \strlen($known);
+        for ($i = 0; $i < $len; $i++) {
+            $result |= \ord($known[$i]) ^ \ord($user[$i]);
+        }
+
+        return 0 === $result;
+    }
 }
