@@ -5,6 +5,7 @@ declare(strict_types=1);
 /**
  * Self-host compile driver smoke: compiler_minimal bundle + bin/compile.php run() closure.
  * Gate: php bin/compile.php -l test/selfhost/compiler_driver_smoke/main.php
+ * Native: ./script/bootstrap-selfhost-compiler-driver-smoke-link.sh (#2136)
  */
 
 require_once __DIR__.'/../../../lib/OpCode.php';
