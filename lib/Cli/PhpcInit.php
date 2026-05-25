@@ -17,6 +17,8 @@ final class PhpcInit
 
     public const PROFILE_APIJSON = 'apijson';
 
+    public const PROFILE_FILEUPLOAD = 'fileupload';
+
     /** @var array<string, list<string>> */
     private const PROFILE_TEMPLATES = [
         self::PROFILE_DEFAULT => [
@@ -30,6 +32,11 @@ final class PhpcInit
             'README.md',
         ],
         self::PROFILE_SESSIONSWEB => [
+            'phpc.json',
+            'example.php',
+            'README.md',
+        ],
+        self::PROFILE_FILEUPLOAD => [
             'phpc.json',
             'example.php',
             'README.md',
@@ -146,6 +153,10 @@ final class PhpcInit
             fwrite(STDOUT, "  curl -s -c \"\$jar\" 'http://127.0.0.1:8080/example.php'\n");
             fwrite(STDOUT, "  curl -s -b \"\$jar\" -c \"\$jar\" -X POST -d 'message=Saved' 'http://127.0.0.1:8080/example.php'\n");
             fwrite(STDOUT, "  curl -s -b \"\$jar\" 'http://127.0.0.1:8080/example.php'\n");
+        } elseif (self::PROFILE_FILEUPLOAD === $profile) {
+            fwrite(STDOUT, "  phpc lint example.php\n");
+            fwrite(STDOUT, "  phpc serve 127.0.0.1:8080 .\n");
+            fwrite(STDOUT, "  curl -s -F 'doc=@README.md' http://127.0.0.1:8080/example.php\n");
         } else {
             fwrite(STDOUT, "  phpc lint public/index.php\n");
             fwrite(STDOUT, "  phpc run public/index.php\n");

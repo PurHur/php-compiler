@@ -101,6 +101,17 @@ Same manifest as **001-SimpleWeb**; docroot is the project root (no `public/`). 
 
 Same manifest as **001-SimpleWeb**; docroot is the project root (no `public/`). Scaffold with `phpc init --profile sessionsweb` ([#1886](https://github.com/PurHur/php-compiler/issues/1886)); template parity: `script/check-init-sessionsweb-parity.sh` ([#1902](https://github.com/PurHur/php-compiler/issues/1902)).
 
+### Multipart upload flat project (`examples/006-FileUploadWeb/phpc.json`)
+
+```json
+{
+    "entry": "example.php",
+    "binary": ".phpc/bin/app"
+}
+```
+
+Same manifest as **001-SimpleWeb**; docroot is the project root (no `public/`). Scaffold with `phpc init --profile fileupload` ([#2004](https://github.com/PurHur/php-compiler/issues/2004)); template parity: `script/check-init-fileupload-parity.sh` (opt-in gate **#2020**).
+
 ## `phpc init` profiles
 
 | Profile | Template | Layout |
@@ -109,6 +120,7 @@ Same manifest as **001-SimpleWeb**; docroot is the project root (no `public/`). 
 | `miniwebapp` | `templates/init-miniwebapp/` | Router + templates ([**003-MiniWebApp**](../examples/003-MiniWebApp/)) |
 | `apijson` | `templates/init-apijson/` | Flat `example.php` JSON API ([**004-ApiJson**](../examples/004-ApiJson/)) |
 | `sessionsweb` | `templates/init-sessionsweb/` | Flat `example.php` session flash ([**005-SessionsWeb**](../examples/005-SessionsWeb/)) |
+| `fileupload` | `templates/init-fileupload/` | Flat `example.php` multipart upload ([**006-FileUploadWeb**](../examples/006-FileUploadWeb/)) |
 
 ## Commands
 

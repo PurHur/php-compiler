@@ -1379,4 +1379,28 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('ci_run_init_sessionsweb_parity_check', $common);
         $this->assertStringContainsString('check-init-sessionsweb-parity.sh', $common);
     }
+
+    public function testCheckInitFileuploadParityScriptExists(): void
+    {
+        $check = dirname(__DIR__, 2).'/script/check-init-fileupload-parity.sh';
+        $this->assertFileExists($check);
+        $this->assertTrue(is_executable($check));
+        $body = (string) file_get_contents($check);
+        $this->assertStringContainsString('examples/006-FileUploadWeb', $body);
+        $this->assertStringContainsString('templates/init-fileupload', $body);
+    }
+
+    public function testCheckInitFileuploadParityPassesInRepo(): void
+    {
+        $check = dirname(__DIR__, 2).'/script/check-init-fileupload-parity.sh';
+        exec('bash '.escapeshellarg($check).' 2>&1', $out, $code);
+        $this->assertSame(0, $code, implode("\n", $out));
+    }
+
+    public function testCiInventoryRunsInitFileuploadParityCheck(): void
+    {
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('ci_run_init_fileupload_parity_check', $common);
+        $this->assertStringContainsString('check-init-fileupload-parity.sh', $common);
+    }
 }
