@@ -76,7 +76,7 @@ docker run --rm -v "$(pwd):/compiler" -w /compiler php-compiler:22.04-dev bash -
 
 ## MiniWebApp gates ([#472](https://github.com/PurHur/php-compiler/issues/472), [#664](https://github.com/PurHur/php-compiler/issues/664))
 
-Defaults are exported from [`script/ci-defaults.env`](../script/ci-defaults.env) and read by `ci-local.sh`, `ci-fast.sh`, and helpers in [`script/ci-common.sh`](../script/ci-common.sh). For the progressive stage ladder (lint → serve → AOT link → execute), see **[miniwebapp-gates.md](miniwebapp-gates.md)** ([#472](https://github.com/PurHur/php-compiler/issues/472)); probe status with [`script/miniwebapp-gates.sh`](../script/miniwebapp-gates.sh), `make miniwebapp-gates`, or `phpc doctor --gates`.
+Defaults are exported from [`script/ci-defaults.env`](../script/ci-defaults.env) and read by `ci-local.sh`, `ci-fast.sh`, and helpers in [`script/ci-common.sh`](../script/ci-common.sh). For the progressive stage ladder (lint → serve → AOT link → execute), see **[miniwebapp-gates.md](miniwebapp-gates.md)** ([#472](https://github.com/PurHur/php-compiler/issues/472)); probe status with [`script/miniwebapp-gates.sh`](../script/miniwebapp-gates.sh), `make miniwebapp-gates`, or `phpc doctor --gates`. **Presenter bundle** (gates + `ci-fast` MiniWebApp + AOT execute + optional AOT web-smoke): [`script/north-star1-verify.sh`](../script/north-star1-verify.sh) / `make north-star1-verify` ([#1845](https://github.com/PurHur/php-compiler/issues/1845), [#1044](https://github.com/PurHur/php-compiler/issues/1044)).
 
 | Variable | Default | Script | Notes |
 |----------|---------|--------|-------|
@@ -120,6 +120,7 @@ MINIWEBAPP_AOT_EXECUTE_GATE=1 ./script/ci-local.sh --filter MiniWebAppAotExecute
 EXAMPLES_AOT_SMOKE_ONLY=003 ./script/examples-aot-smoke.sh
 DEPLOY_SMOKE_GATE=0 ./script/ci-local.sh   # skip 001/002 deploy smoke (#737)
 MINIWEBAPP_AOT_BISECT_GATE=1 ./script/miniwebapp-gates.sh
+make north-star1-verify   # doctor --gates + ladder + ci-fast + AOT execute (#1845)
 ```
 
 Set any gate to `0` to skip that stage during iteration (e.g. `MINIWEBAPP_SERVE_GATE=0 ./script/ci-fast.sh`, `MINIWEBAPP_AOT_EXECUTE_GATE=0 ./script/ci-local.sh`).
