@@ -64,4 +64,15 @@ final class CapabilitySyntaxTest extends TestCase
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
         $this->assertStringContainsString('CAPABILITY_SYNTAX_CHECK="${CAPABILITY_SYNTAX_CHECK:-1}"', $defaults);
     }
+
+    public function testCapabilitiesThrowsSyncGateAndScriptWired(): void
+    {
+        $script = dirname(__DIR__, 2).'/script/check-capabilities-throws-sync.php';
+        $this->assertFileExists($script);
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString('CAPABILITIES_THROWS_SYNC_GATE="${CAPABILITIES_THROWS_SYNC_GATE:-0}"', $defaults);
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('ci_run_capabilities_throws_sync_check', $common);
+        $this->assertStringContainsString('check-capabilities-throws-sync.php', $common);
+    }
 }

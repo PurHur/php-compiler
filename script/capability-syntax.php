@@ -23,7 +23,8 @@ $syntax = collectSyntaxCapabilities($root, syntaxRowDefinitions(), $handlers);
 $markdown = renderSyntaxMarkdown($syntax)
     . renderWebNorthStarMarkdown(webNorthStarDefinitions())
     . renderSessionsWebNorthStarMarkdown(sessionsWebNorthStarDefinitions())
-    . renderFileUploadWebNorthStarMarkdown(fileUploadWebNorthStarDefinitions());
+    . renderFileUploadWebNorthStarMarkdown(fileUploadWebNorthStarDefinitions())
+    . renderThrowsWebNorthStarMarkdown(throwsWebNorthStarDefinitions());
 
 if ($check) {
     if (!is_file($outFile)) {

@@ -45,7 +45,7 @@ Tracking issues: [#58](https://github.com/PurHur/php-compiler/issues/58), [#145]
 | Array/argument unpack `...$x` | yes | yes | yes | [#1361](https://github.com/PurHur/php-compiler/issues/1361) | php-cfg spread.patch (#141); VM HashTable::spreadFrom; JIT HashTableHelper::spreadInto + mergeCallArgEntries; compliance PHPT |
 | `__serialize` / `__unserialize` magic methods | no | no | yes | [#1365](https://github.com/PurHur/php-compiler/issues/1365) | serialize()/unserialize() call __serialize/__unserialize when present; VM via VmSerialize |
 | Multi-type catch `catch (A|B $e)` | yes | yes | yes | [#1362](https://github.com/PurHur/php-compiler/issues/1362) | php-cfg records union types per catch; VM filters TYPE_CATCH via OpCode.catchTypes; compliance PHPT |
-| `try` / `catch` / `throw` | yes | yes | yes | [#57](https://github.com/PurHur/php-compiler/issues/57) | php-cfg TryCatch overlay (#2084); VM TYPE_TRY/CATCH/THROW; TryCatchComplianceTest + try_*.phpt; finally after catch still #57; compliance PHPT; bootstrap AOT |
+| `try` / `catch` / `throw` | yes | yes | yes | [#57](https://github.com/PurHur/php-compiler/issues/57) | php-cfg TryCatch overlay (#2084); VM throw (#195); TYPE_TRY/CATCH/THROW; TryCatchComplianceTest + try_*.phpt; finally after catch still #57; compliance PHPT; bootstrap AOT |
 | readonly classes | yes | yes | yes | [#1360](https://github.com/PurHur/php-compiler/issues/1360) | php-cfg Class_::flags MODIFIER_READONLY; VM rejects instance property writes after __construct |
 | PHP 8 attributes — `ReflectionClass` / `ReflectionMethod` metadata | yes | no | yes | [#1936](https://github.com/PurHur/php-compiler/issues/1936) | php-cfg preserves `attrGroups`; VM `ClassEntry` stores names; Reflection* builtins are VM-only (no JIT lowering); Read path: `getAttributes()` count + `ReflectionAttribute::getName()`; no `newInstance()` or parameter attributes; VM-only lowering |
 | WeakReference / WeakMap | yes | no | yes | [#1366](https://github.com/PurHur/php-compiler/issues/1366) | VM stub: WeakReference::create/get via indirect target slot (unset clears get); not cycle-collecting GC weak refs; WeakMap uses object-id string keys; JIT may compile references but method bodies are VM-only; VM-only lowering |
@@ -93,3 +93,15 @@ ROADMAP Phase 4/5: [#78](https://github.com/PurHur/php-compiler/issues/78), trac
 | AOT deploy CGI (multipart upload smoke) | n/a | n/a | yes | [#2028](https://github.com/PurHur/php-compiler/issues/2028) | deploy-smoke.sh --example 006; opt-in FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE (#2028, #2038) |
 
 _File upload rows are curated from ROADMAP issue state; multipart [#52](https://github.com/PurHur/php-compiler/issues/52); nested FILES [#87](https://github.com/PurHur/php-compiler/issues/87); `move_uploaded_file` [#2005](https://github.com/PurHur/php-compiler/issues/2005); deploy [#2028](https://github.com/PurHur/php-compiler/issues/2028). Opt-in ci-local gates: `FILE_UPLOAD_WEB_SMOKE_GATE`, `FILE_UPLOAD_WEB_AOT_LINK_GATE`, `FILE_UPLOAD_WEB_AOT_SMOKE_GATE` (execute default-on #2012), `FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE`._
+## Throws reference (`examples/007-ThrowsWeb`)
+
+`throw` / `catch` for form validation in the throws north-star example.
+ROADMAP Phase 4/5: [#78](https://github.com/PurHur/php-compiler/issues/78), tracker [#2076](https://github.com/PurHur/php-compiler/issues/2076). Builtin matrix: [capabilities.md](capabilities.md).
+
+| Construct | VM | JIT | AOT | Issue | Notes |
+|-----------|:--:|:---:|:---:|-------|-------|
+| `007-ThrowsWeb` reference app | yes | yes | partial | [#2076](https://github.com/PurHur/php-compiler/issues/2076) | #2076 VM serve + throw/catch smoke (#2093, THROWS_WEB_SMOKE_GATE default-on); AOT link/execute opt-in #2101 |
+| `try` / `catch` / `throw` (web form validation) | yes | yes | partial | [#57](https://github.com/PurHur/php-compiler/issues/57) | VM throw #195; php-cfg TryCatch #2084; THROWSWEB_AOT_LINK_GATE / THROWSWEB_AOT_SMOKE_GATE opt-in (#2101) |
+| AOT project link (`phpc build --project`) | n/a | n/a | partial | [#2101](https://github.com/PurHur/php-compiler/issues/2101) | ExamplesCompileTest::test007ThrowsWebAotLink (#2143); THROWSWEB_AOT_LINK_GATE opt-in |
+
+_Throws rows are curated from ROADMAP issue state; VM throw [#195](https://github.com/PurHur/php-compiler/issues/195); catch/try [#57](https://github.com/PurHur/php-compiler/issues/57); PHPT overlay [#2084](https://github.com/PurHur/php-compiler/issues/2084). Opt-in ci-local gates: `THROWS_WEB_SMOKE_GATE`, `THROWSWEB_AOT_LINK_GATE`, `THROWSWEB_AOT_SMOKE_GATE`._
