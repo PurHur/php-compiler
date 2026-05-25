@@ -56,6 +56,8 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'lib/JIT/Builtin/IniSet.php',
         'lib/JIT/Builtin/SessionId.php',
         'lib/JIT/Builtin/SessionName.php',
+        'lib/JIT/Builtin/SessionStart.php',
+        'lib/JIT/Builtin/SessionWriteClose.php',
         'lib/JIT/Builtin/StringFunctionExists.php',
         'lib/JIT/Builtin/StringHttpBuildQuery.php',
         'lib/JIT/Builtin/StringSerialize.php',
@@ -373,7 +375,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         $this->assertFileExists($entry);
         $contents = (string) file_get_contents($entry);
         $count = substr_count($contents, 'require_once __DIR__');
-        $this->assertSame(589, $count, '108 compiler_minimal overlap + 481 M2 spine units; bin/vm.php + src/cli.php deferred (#1423, #1467)');
+        $this->assertSame(593, $count, '108 compiler_minimal overlap + 485 M2 spine units; bin/vm.php + src/cli.php deferred (#1423, #1467, #1922)');
         foreach (self::LIB_SPINE_SMOKE_NEW_UNITS as $unit) {
             $this->assertStringContainsString(
                 "require_once __DIR__.'/../../../{$unit}';",
