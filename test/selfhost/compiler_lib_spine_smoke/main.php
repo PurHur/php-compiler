@@ -615,8 +615,9 @@ require_once __DIR__.'/../../../ext/types/strlen.php';
 require_once __DIR__.'/../../../src/tokenizer-compat.php';
 require_once __DIR__.'/../../../test/bootstrap-aot/cli_spine_shim.php';
 require_once __DIR__.'/../../../test/bootstrap-aot/vm_run_smoke.php';
-// src/llvm-env.php: loaded via src/cli.php; keep out of literal require_once for spine count (#2001).
-// src/yay-php8-compat.php, src/macro_functions.php: deferred with llvm-env / Linker (#2001).
+require_once __DIR__.'/../../../src/yay-php8-compat.php';
+require_once __DIR__.'/../../../test/bootstrap-aot/llvm_env_spine_shim.php';
+require_once __DIR__.'/../../../test/bootstrap-aot/macro_functions_spine_shim.php';
 // lib/AOT/Linker.php: shell_exec external link — M5 deferred (#1960).
 // VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh when vm_run_smoke links under LLVM 9.
 
