@@ -4,15 +4,16 @@
 # Builds a shipped web example, runs phpc deploy, and executes bin/app under
 # PHPC_DEPLOY_ROOT with CGI-style env (no HTTP server). Skips with exit 0 when
 # LLVM 9 is missing. 003-MiniWebApp layout-only smoke: DEPLOY_SMOKE_003_LAYOUT=1 (#804).
-# Full 003 execute: DEPLOY_SMOKE_003_EXECUTE=1 or MINIWEBAPP_AOT_EXECUTE_GATE=1 (#745).
+# Full 003 execute: default on via DEPLOY_SMOKE_003_EXECUTE=1 (#1530); or MINIWEBAPP_AOT_EXECUTE_GATE=1 (#745).
 #
 # Usage:
 #   ./script/deploy-smoke.sh
 #   ./script/deploy-smoke.sh --example 001
 #   ./script/deploy-smoke.sh --example 002
 #   DEPLOY_SMOKE_003_LAYOUT=1 ./script/deploy-smoke.sh --example 003
-#   DEPLOY_SMOKE_003_EXECUTE=1 ./script/deploy-smoke.sh --example 003
-#   DEPLOY_SMOKE_ONLY=003 DEPLOY_SMOKE_003_EXECUTE=1 make deploy-smoke
+#   ./script/deploy-smoke.sh --example 003
+#   DEPLOY_SMOKE_003_EXECUTE=0 ./script/deploy-smoke.sh --example 003
+#   DEPLOY_SMOKE_ONLY=003 make deploy-smoke
 #
 # Docker:
 #   docker run --rm -v "$(pwd):/compiler" -w /compiler php-compiler:22.04-dev make deploy-smoke
@@ -33,9 +34,10 @@ Usage: script/deploy-smoke.sh [--example 001|002|003]
   001  examples/001-SimpleWeb (QUERY_STRING=name=…)
   002  examples/002-StaticWeb (default; static HTML)
   003  examples/003-MiniWebApp (layout: DEPLOY_SMOKE_003_LAYOUT=1 #804;
-                               execute: DEPLOY_SMOKE_003_EXECUTE=1 or MINIWEBAPP_AOT_EXECUTE_GATE=1 #745)
+                               execute: default on DEPLOY_SMOKE_003_EXECUTE=1 #1530;
+                               or MINIWEBAPP_AOT_EXECUTE_GATE=1 #745)
 
-003 execute smoke is gated (default off via DEPLOY_SMOKE_003_EXECUTE=0); see #745.
+003 execute smoke is default on (DEPLOY_SMOKE_003_EXECUTE=1); set DEPLOY_SMOKE_003_EXECUTE=0 to skip (#1530, #745).
 EOF
   exit 1
 }
@@ -253,7 +255,7 @@ smoke_003_layout_only() {
 }
 
 deploy_smoke_003_execute_enabled() {
-  [[ "${DEPLOY_SMOKE_003_EXECUTE:-0}" == "1" ]] \
+  [[ "${DEPLOY_SMOKE_003_EXECUTE:-1}" == "1" ]] \
     || [[ "${MINIWEBAPP_AOT_EXECUTE_GATE:-0}" == "1" ]]
 }
 

@@ -300,10 +300,10 @@ ci_run_deploy_smoke() {
     echo "deploy-smoke: skipped (LLVM 9 not available)"
     return 0
   fi
-  echo "deploy-smoke: phpc deploy + PHPC_DEPLOY_ROOT (DEPLOY_SMOKE_GATE=1 default, #718, #737)..."
+  echo "deploy-smoke: phpc deploy + PHPC_DEPLOY_ROOT (DEPLOY_SMOKE_GATE=1 default, #718, #737; 003 execute DEPLOY_SMOKE_003_EXECUTE=1 default, #1530)..."
   "$_CI_SCRIPT_DIR/deploy-smoke.sh" --example 001
   "$_CI_SCRIPT_DIR/deploy-smoke.sh" --example 002
-  if [[ "${DEPLOY_SMOKE_003_EXECUTE:-0}" == "1" || "${MINIWEBAPP_AOT_EXECUTE_GATE:-0}" == "1" ]]; then
+  if [[ "${DEPLOY_SMOKE_003_EXECUTE:-1}" == "1" || "${MINIWEBAPP_AOT_EXECUTE_GATE:-0}" == "1" ]]; then
     "$_CI_SCRIPT_DIR/deploy-smoke.sh" --example 003
   fi
 }
