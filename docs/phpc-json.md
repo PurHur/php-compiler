@@ -79,6 +79,25 @@ Runtime template `include` / `require` paths (for example `include __DIR__ . '/l
 
 Compile unit order for `phpc build --project`: `src/Router.php`, `config.php`, then `public/index.php` (`ProjectManifest::resolveCompileUnitPaths`).
 
+### Session flash flat project (`examples/005-SessionsWeb/phpc.json`)
+
+```json
+{
+    "entry": "example.php",
+    "binary": ".phpc/bin/app"
+}
+```
+
+Same manifest as **001-SimpleWeb**; docroot is the project root (no `public/`). Scaffold with `phpc init --profile sessionsweb` ([#1886](https://github.com/PurHur/php-compiler/issues/1886)); template parity: `script/check-init-sessionsweb-parity.sh` ([#1902](https://github.com/PurHur/php-compiler/issues/1902)).
+
+## `phpc init` profiles
+
+| Profile | Template | Layout |
+|---------|----------|--------|
+| `default` | `templates/init/` | `public/index.php` hello world |
+| `miniwebapp` | `templates/init-miniwebapp/` | Router + templates ([**003-MiniWebApp**](../examples/003-MiniWebApp/)) |
+| `sessionsweb` | `templates/init-sessionsweb/` | Flat `example.php` session flash ([**005-SessionsWeb**](../examples/005-SessionsWeb/)) |
+
 ## Commands
 
 | Command | Role |
