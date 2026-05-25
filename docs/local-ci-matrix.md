@@ -33,6 +33,18 @@ Repository defaults live in [`script/ci-defaults.env`](../script/ci-defaults.env
 | Explicit memory-capped Docker | — | `./script/ci-docker-safe.sh ci-local.sh` or `make test-docker-safe` |
 | Single PHPUnit filter | Append args: `./script/ci-fast.sh --filter VMTest` | Same inside Docker wrappers |
 
+## Runforge / harness verification
+
+On **Runforge harness** hosts (and similar agent sandboxes), `docker run -v "$(pwd):/compiler"` often mounts an **empty** tree at `/compiler`, so JIT/AOT and `vendor/` lookups fail ([#245](https://github.com/PurHur/php-compiler/issues/245), workspace rule `local-ci-only`). Use the tar-copy wrappers below instead of raw bind-mount `docker run`.
+
+| Use case | Command |
+|----------|---------|
+| Full CI gate | `make test-harness` or `./script/docker-ci-local.sh` |
+| Targeted PHPUnit | `./script/docker-exec.sh -- bash -lc 'source script/php-env.sh && vendor/bin/phpunit …'` |
+| Never on harness | Raw `docker run -v "$(pwd):/compiler"` (empty tree) |
+
+Agent environments may set `HARNESS_DOCKER_RUN_OPTS` (or `PHP_COMPILER_DOCKER_RUN_OPTS`); `script/docker-exec.sh` and `script/ci-docker-run.sh` pass those through to `docker run`. Run `docker info` before heavy Docker work.
+
 ## GitHub Actions: bootstrap self-host (disabled mirror)
 
 Workflow (inactive): [`.github/workflows-disabled/bootstrap-selfhost.yml`](../.github/workflows-disabled/bootstrap-selfhost.yml). When re-enabled, triggers on **push** and **pull_request** to `master` (timeout **30 minutes**). **Do not rely on this for merge** — run the local equivalents below.
