@@ -218,7 +218,9 @@ FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE=1 ./script/deploy-smoke.sh --example 006
 
 ## 007-ThrowsWeb gates ([#2076](https://github.com/PurHur/php-compiler/issues/2076), [#2093](https://github.com/PurHur/php-compiler/issues/2093))
 
-Progressive ladder (VM throw/catch → AOT link → AOT execute). VM smoke default-on ([#2125](https://github.com/PurHur/php-compiler/issues/2125), [#2093](https://github.com/PurHur/php-compiler/issues/2093)); AOT gates opt-in until **#195** / **#57** / **#2101** land. Copy-paste ladder: `./phpc doctor --gates` (**#2102**).
+Progressive ladder (VM throw/catch → AOT link → AOT execute). VM smoke default-on ([#2125](https://github.com/PurHur/php-compiler/issues/2125), [#2093](https://github.com/PurHur/php-compiler/issues/2093)); AOT gates opt-in until **#195** / **#57** / **#2101** land; execute default-on blocked on **#2157** (follow-up **#2135**). Copy-paste ladder: `./phpc doctor --gates` (**#2102**).
+
+**`ci-local.sh` llvm tail** (mirror **006** link → execute): `ci_run_aot_link_phpunit` (`@group aot-link`, honors `THROWSWEB_AOT_LINK_GATE`) runs before `ci_run_throws_web_aot_execute` (`@group throwsweb-aot-execute`, honors `THROWSWEB_AOT_SMOKE_GATE`) — audit **#2178**; default-on flip **#2135** after **#2157** ✅.
 
 | Stage | Variable | Default | When enabled |
 |-------|----------|---------|--------------|
