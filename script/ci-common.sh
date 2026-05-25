@@ -221,6 +221,19 @@ ci_run_bootstrap_selfhost_probe() {
   "$_CI_SCRIPT_DIR/bootstrap-selfhost-compile-probe.sh" "${probe_args[@]}"
 }
 
+# M2 lib spine VM -r smoke (issue #1846); default off until green in llvm tail.
+ci_run_bootstrap_lib_spine_vm_smoke() {
+  if [[ "${BOOTSTRAP_LIB_SPINE_VM_SMOKE_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  if ! ci_llvm_ready; then
+    echo "bootstrap-selfhost-lib-spine-vm-smoke: skipped (LLVM 9 not available)"
+    return 0
+  fi
+  echo "bootstrap-selfhost-lib-spine-vm-smoke (BOOTSTRAP_LIB_SPINE_VM_SMOKE_GATE=1, issue #1846)..."
+  "$_CI_SCRIPT_DIR/bootstrap-selfhost-lib-spine-vm-smoke.sh"
+}
+
 # M4 bootstrap-loop dry-run probe (issue #1777, #1498); default off until M3 strict is stable.
 ci_run_bootstrap_loop_probe() {
   if [[ "${BOOTSTRAP_LOOP_PROBE_GATE:-0}" != "1" ]]; then

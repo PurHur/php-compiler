@@ -6,6 +6,7 @@ declare(strict_types=1);
  * M2 lib spine smoke: compiler_minimal closure plus vm.php-path lib and ext/standard units (issue #1056).
  * Gate: php bin/compile.php -l test/selfhost/compiler_lib_spine_smoke/main.php
  * Native: ./script/bootstrap-selfhost-lib-spine-smoke-link.sh
+ * VM -r: ./script/bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846)
  */
 
 require_once __DIR__.'/../../../lib/AOT/ProjectGraph.php';
@@ -593,5 +594,11 @@ require_once __DIR__.'/../../../src/macro_functions.php';
 require_once __DIR__.'/../../../src/yay-php8-compat.php';
 // src/cli.php + compat shims — deferred (#1467): String_.php JIT link failure when bundled; cli_driver split ready for M4.
 // bin/vm.php — deferred (#1423 M4): entry pulls src/cli.php + vendor/autoload argv driver; bundle vm_run_smoke.php instead.
+require_once __DIR__.'/../../../test/bootstrap-aot/vm_run_smoke.php';
 
-echo "compiler_lib_spine_smoke bundle OK\n";
+$vmSpineSmoke = getenv('PHP_COMPILER_VM_SPINE_SMOKE');
+if ('1' === $vmSpineSmoke || 'true' === strtolower((string) $vmSpineSmoke)) {
+    vm_run_smoke('Command line code', '<?php echo "vm-spine-ok\n";', []);
+} else {
+    echo "compiler_lib_spine_smoke bundle OK\n";
+}
