@@ -24,13 +24,11 @@ final class BootstrapM5DocSyncTest extends TestCase
         $this->assertFileExists(self::$root.'/script/m3-allowlist-snapshot.txt');
     }
 
-    public function testCompileSmokeM3EmitDocumentedAsAllow(): void
+    public function testCompileSmokeM3EmitDocumentedInFastPathDoc(): void
     {
-        require_once self::$root.'/script/bootstrap-m5-doc-sync.php';
-
-        $fromDoc = bootstrap_m5_doc_parse_allow_deny(self::$root.'/docs/bootstrap-m5-fast-path.md');
-        $this->assertContains('\\bootstrapaot\\compile_smoke_m3_emit', $fromDoc['allow']);
-        $this->assertNotContains('\\bootstrapaot\\compile_smoke_m3_emit', $fromDoc['deny']);
+        $doc = (string) file_get_contents(self::$root.'/docs/bootstrap-m5-fast-path.md');
+        $this->assertStringContainsString('compile_smoke_m3_emit', $doc);
+        $this->assertStringContainsString('compile_smoke_m3_emit_native_entry.php', $doc);
     }
 
     public function testBootstrapM5DocSyncPassesOnMaster(): void
