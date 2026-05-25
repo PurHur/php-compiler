@@ -891,6 +891,40 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('REHASH_COMPLIANCE_GATE', $body);
     }
 
+    public function testCiDefaultsEnvDefinesStringKeyJitComplianceGateOn(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString(
+            'STRING_KEY_JIT_COMPLIANCE_GATE="${STRING_KEY_JIT_COMPLIANCE_GATE:-1}"',
+            $defaults
+        );
+        $this->assertStringContainsString('#1959', $defaults);
+    }
+
+    public function testCiFastRunsStringKeyJitComplianceGateByDefault(): void
+    {
+        $fast = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-fast.sh');
+        $this->assertStringContainsString('STRING_KEY_JIT_COMPLIANCE_GATE', $fast);
+        $this->assertStringContainsString('STRING_KEY_JIT_COMPLIANCE_GATE:-1', $fast);
+        $this->assertStringContainsString('ci_llvm_ready', $fast);
+        $this->assertStringContainsString('ci_should_run_jit', $fast);
+        $this->assertStringContainsString('--filter array_rehash_string_keys_jit', $fast);
+    }
+
+    public function testLocalCiMatrixDocumentsStringKeyJitComplianceGate(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('STRING_KEY_JIT_COMPLIANCE_GATE', $doc);
+        $this->assertStringContainsString('array_rehash_string_keys_jit', $doc);
+        $this->assertMatchesRegularExpression('/\| `STRING_KEY_JIT_COMPLIANCE_GATE` \| `1` \|/', $doc);
+    }
+
+    public function testCiDockerRunPassesStringKeyJitComplianceGateEnv(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');
+        $this->assertStringContainsString('STRING_KEY_JIT_COMPLIANCE_GATE', $body);
+    }
+
     public function testCiFastRunsCgiDriverTest(): void
     {
         $fast = dirname(__DIR__, 2).'/script/ci-fast.sh';
