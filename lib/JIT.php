@@ -2325,6 +2325,7 @@ class JIT {
                     $prevStrict = $this->context->callerStrictTypes;
                     $this->context->callerStrictTypes = $block->strictTypes;
                     $this->context->scope->toCall->call($this->context, ...$callArgs);
+                    $this->markNewObjectConstructedAfterCall($this->context->scope->toCall, $callArgs);
                     $this->context->callerStrictTypes = $prevStrict;
                     break;
                 case OpCode::TYPE_FUNCCALL_EXEC_RETURN:
@@ -2352,6 +2353,7 @@ class JIT {
                     $prevStrict = $this->context->callerStrictTypes;
                     $this->context->callerStrictTypes = $block->strictTypes;
                     $result = $this->context->scope->toCall->call($this->context, ...$callArgs);
+                    $this->markNewObjectConstructedAfterCall($this->context->scope->toCall, $callArgs);
                     $this->context->callerStrictTypes = $prevStrict;
                     $this->assignOperandValue($block->getOperand($op->arg1), $result);
                     break;
@@ -2397,20 +2399,25 @@ class JIT {
                     $this->context->pushScope();
                     $this->context->scope->classId = $this->context->type->object->declareClass($nameOp);
                     $this->context->scope->className = strtolower($nameOp->value);
+                    if (null !== $op->arg3 && isset($block->constants[$op->arg3])) {
+                        $this->context->type->object->setClassReadonly(
+                            $this->context->scope->classId,
+                            (bool) $block->constants[$op->arg3]->toInt()
+                        );
+                    }
+                    $parentOp = null;
                     if (null !== $op->arg2) {
                         $parentOp = $block->getOperand($op->arg2);
                         assert($parentOp instanceof Operand\Literal);
                         $this->context->type->object->setClassParentName($nameOp->value, $parentOp->value);
                     }
-                    if (null !== $this->context->runtime->vmContext) {
-                        $lc = strtolower($nameOp->value);
-                        if (!isset($this->context->runtime->vmContext->classes[$lc])) {
-                            $entry = new \PHPCompiler\VM\ClassEntry($nameOp->value);
-                            $entry->attributeNames = $op->attributeNames;
-                            $this->context->runtime->vmContext->classes[$lc] = $entry;
-                        }
-                    }
                     $this->compileClass($op->block1, $this->context->scope->classId);
+                    if ($parentOp instanceof Operand\Literal) {
+                        $this->context->type->object->inheritReadonlyFromParent(
+                            $this->context->scope->classId,
+                            $parentOp->value
+                        );
+                    }
                     $this->context->popScope();
                     break;
                 case OpCode::TYPE_NEW:
@@ -3203,7 +3210,11 @@ class JIT {
             if (null === $result->objectPropertyType) {
                 throw new \LogicException('objectPropertySlot requires objectPropertyType');
             }
-            JIT\ReadonlyClassGuard::emitBeforePropertyStore($this->context, $result);
+            JIT\ReadonlyClassGuard::emitBeforePropertyStore(
+                $this->context,
+                $result,
+                $this->context->jitEnclosingBlock
+            );
             $this->context->type->object->propertyStore(
                 $result->objectPropertySlot,
                 $value,
@@ -3892,7 +3903,7 @@ class JIT {
         if (!$this->isJitConstructFrame($block)) {
             return;
         }
-        $thisVar = $this->context->implicitThisArgument;
+        $thisVar = $this->resolveThisVariable($block);
         if (null === $thisVar || Variable::TYPE_OBJECT !== $thisVar->type) {
             return;
         }
@@ -3910,6 +3921,39 @@ class JIT {
         $name = strtolower($func->name);
 
         return '__construct' === $name || str_ends_with($name, '::__construct');
+    }
+
+    /**
+     * @param list<JIT\Variable|array{unpack: JIT\Variable}> $callArgs
+     */
+    private function markNewObjectConstructedAfterCall(?JIT\Call $toCall, array $callArgs): void
+    {
+        if (null === $toCall) {
+            return;
+        }
+        if ($toCall instanceof JIT\Call\Native) {
+            $name = strtolower($toCall->name);
+        } elseif ($toCall instanceof JIT\Call\ExternalMethod) {
+            $name = strtolower($toCall->proxyName);
+        } else {
+            return;
+        }
+        if (!str_ends_with($name, '::__construct')) {
+            return;
+        }
+        if ([] === $callArgs) {
+            return;
+        }
+        $first = $callArgs[0];
+        if (is_array($first)) {
+            $first = $first['unpack'] ?? null;
+        }
+        if (!$first instanceof JIT\Variable || Variable::TYPE_OBJECT !== $first->type) {
+            return;
+        }
+        $this->context->type->object->markObjectConstructed(
+            $this->context->helper->loadValue($first)
+        );
     }
 
     private function jitTypeFromLlvmValue(PHPLLVM\Value $value): int

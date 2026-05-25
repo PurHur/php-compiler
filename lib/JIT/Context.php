@@ -409,6 +409,7 @@ class Context {
                 $engine,
                 $this->loadType
             );
+            Builtin\ReadonlyRaise::bindJitEngine($engine);
             foreach ($this->exports as $export) {
                 $export[2]->handler = $this->result->getHandler($export[0], $export[1]);
             }

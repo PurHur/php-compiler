@@ -49,6 +49,12 @@ class Object_ extends Type {
 
     private ?int $splObjectStorageClassId = null;
 
+    /** @var array<int, true> class ids declared readonly (issue #1360) */
+    private array $readonlyClassIds = [];
+
+    /** @var array<int, PHPLLVM\Value> property slot handle => owning __object__* */
+    private array $slotReceivers = [];
+
     public function register(): void
     {
         $struct = $this->context->context->namedStructType('__object__');
@@ -58,12 +64,16 @@ class Object_ extends Type {
             false,
             $this->context->getTypeFromString('__ref__'),
             $this->context->getTypeFromString('int64'),
+            $this->context->getTypeFromString('int8'),
         );
         $this->context->structFieldMap['__object__'] = [
             'ref' => 0,
             'class_id' => 1,
+            'constructed' => 2,
         ];
         $this->pointer = $this->context->getTypeFromString('__object__*');
+        \PHPCompiler\JIT\Builtin\ReadonlyRaise::registerDeclarations($this->context);
+        \PHPCompiler\JIT\Builtin\ReadonlyRaise::ensureLinked($this->context);
 
         $this->registerFn('__object__load_value_slot', 'void', ['void**', '__value__*']);
         $this->registerFn('__value__readObject', '__object__*', ['__value__*']);
@@ -214,6 +224,11 @@ class Object_ extends Type {
         $this->context->builder->store(
             $this->context->constantFromInteger($classId),
             $this->context->builder->structGep($obj, $map['class_id'])
+        );
+        $constructedInit = $this->hasConstructor($classId) ? 0 : 1;
+        $this->context->builder->store(
+            $this->context->getTypeFromString('int8')->constInt($constructedInit, false),
+            $this->context->builder->structGep($obj, $map['constructed'])
         );
 
         $typeinfo = $this->context->getTypeFromString('int32')->constInt(
@@ -399,6 +414,54 @@ class Object_ extends Type {
         $this->classIdToName[$id] = $name->value;
 
         return $this->classes[strtolower($name->value)] = $id;
+    }
+
+    public function setClassReadonly(int $classId, bool $readonly): void
+    {
+        if ($readonly) {
+            $this->readonlyClassIds[$classId] = true;
+        } else {
+            unset($this->readonlyClassIds[$classId]);
+        }
+    }
+
+    public function inheritReadonlyFromParent(int $childId, string $parentLc): void
+    {
+        $parentLc = strtolower(ltrim($parentLc, '\\'));
+        if (!isset($this->classes[$parentLc])) {
+            return;
+        }
+        $parentId = $this->classes[$parentLc];
+        if (isset($this->readonlyClassIds[$parentId])) {
+            $this->readonlyClassIds[$childId] = true;
+        }
+    }
+
+    public function hasReadonlyClasses(): bool
+    {
+        return [] !== $this->readonlyClassIds;
+    }
+
+    /**
+     * @return list<int>
+     */
+    public function readonlyClassIds(): array
+    {
+        return array_keys($this->readonlyClassIds);
+    }
+
+    public function markObjectConstructed(PHPLLVM\Value $obj): void
+    {
+        $map = $this->context->structFieldMap['__object__'];
+        $this->context->builder->store(
+            $this->context->getTypeFromString('int8')->constInt(1, false),
+            $this->context->builder->structGep($obj, $map['constructed'])
+        );
+    }
+
+    public function receiverForPropertySlot(PHPLLVM\Value $slot): ?PHPLLVM\Value
+    {
+        return $this->slotReceivers[spl_object_id($slot)] ?? null;
     }
 
     public function setClassParentName(string $className, string $parentName): void
@@ -1381,6 +1444,7 @@ class Object_ extends Type {
     public function propertyFetch(PHPLLVM\Value $obj, string $class, string $name): Variable
     {
         $classId = $this->lookup('' !== $class ? $class : 'stdclass');
+        $className = $this->classNameForId($classId);
         $nameId = $this->propNameMap[$name] ?? null;
         $hasProp = false;
         if (null !== $nameId) {
@@ -1420,6 +1484,10 @@ class Object_ extends Type {
                     );
                     $var->objectPropertySlot = $slot;
                     $var->objectPropertyType = $propset[2];
+                    $var->objectPropertyReceiver = $obj;
+                    $var->objectPropertyName = $propset[1];
+                    $var->objectPropertyClassName = $className;
+                    $this->slotReceivers[spl_object_id($slot)] = $obj;
 
                     return $var;
                 }
@@ -1436,6 +1504,10 @@ class Object_ extends Type {
                     );
                     $var->objectPropertySlot = $slot;
                     $var->objectPropertyType = $propset[2];
+                    $var->objectPropertyReceiver = $obj;
+                    $var->objectPropertyName = $propset[1];
+                    $var->objectPropertyClassName = $className;
+                    $this->slotReceivers[spl_object_id($slot)] = $obj;
 
                     return $var;
                 }
@@ -1452,6 +1524,10 @@ class Object_ extends Type {
                 );
                 $var->objectPropertySlot = $slot;
                 $var->objectPropertyType = $propset[2];
+                $var->objectPropertyReceiver = $obj;
+                $var->objectPropertyName = $propset[1];
+                $var->objectPropertyClassName = $className;
+                $this->slotReceivers[spl_object_id($slot)] = $obj;
 
                 return $var;
             }

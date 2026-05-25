@@ -34,7 +34,9 @@ class JIT extends Func implements Handler {
     public function execute(Frame $frame): void {
         // TODO: handle argument passing
         assert(empty($frame->calledArgs));
+        \PHPCompiler\JIT\Builtin\ReadonlyRaise::clearPendingAtRunEntry();
         ($this->callback)();
+        \PHPCompiler\JIT\Builtin\ReadonlyRaise::throwPendingIfAny();
     }
 
 }
