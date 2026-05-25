@@ -201,6 +201,7 @@ class JIT {
         if (str_ends_with($lower, '\\runtime::loadjit')) {
             return true;
         }
+
         return false;
     }
 
@@ -2384,7 +2385,7 @@ class JIT {
                     $obj = $block->getOperand($op->arg2);
                     $name = $block->getOperand($op->arg3);
                     assert($obj->type->type === Type::TYPE_OBJECT);
-                    $declaringClass = $obj->type->userType;
+                    $declaringClass = $obj->type->userType ?? null;
                     if (null === $declaringClass && null !== $block->func && null !== $block->func->class) {
                         $declaringClass = $block->func->class->value;
                     }
