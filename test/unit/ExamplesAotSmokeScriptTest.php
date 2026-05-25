@@ -44,7 +44,8 @@ final class ExamplesAotSmokeScriptTest extends TestCase
     {
         $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/examples-aot-smoke.sh');
         $this->assertStringContainsString('003-MiniWebApp', $body);
-        $this->assertStringContainsString('#764', $body);
+        $this->assertStringContainsString('MINIWEBAPP_AOT_EXECUTE_GATE', $body);
+        $this->assertStringNotContainsString('blocked #764', $body);
         $this->assertStringContainsString('phpc build --project', $body);
         $this->assertStringContainsString('.phpc/bin/app', $body);
         $this->assertStringContainsString('MINIWEBAPP_AOT_EXECUTE_GATE', $body);
@@ -95,7 +96,7 @@ final class ExamplesAotSmokeScriptTest extends TestCase
             $this->assertStringContainsString('MiniWebApp', $combined);
         } elseif (str_contains($combined, '003-MiniWebApp: skip')) {
             $this->assertSame(0, $exit, $combined);
-            $this->assertStringContainsString('#764', $combined);
+            $this->assertStringContainsString('MINIWEBAPP_AOT_EXECUTE_GATE', $combined);
         } else {
             $this->assertSame(1, $exit, $combined);
             $this->assertStringContainsString('003-MiniWebApp: link failed', $combined);
@@ -148,7 +149,7 @@ final class ExamplesAotSmokeScriptTest extends TestCase
             $this->assertStringContainsString('003-MiniWebApp: ok', $combined);
         } elseif (
             str_contains($combined, '003-MiniWebApp: skip')
-            && str_contains($combined, '#764')
+            && str_contains($combined, 'MINIWEBAPP_AOT_EXECUTE_GATE')
         ) {
             $this->assertSame(0, $exit, $combined);
         } elseif (str_contains($combined, '003-MiniWebApp: link failed')) {

@@ -28,11 +28,11 @@ ERR;
         $this->assertTrue(PhpcBuild::isUserClassAotBlocked($stderr));
     }
 
-    public function testTrailerContainsIssue764AndGuidance(): void
+    public function testTrailerContainsUserClassGuidance(): void
     {
         $trailer = PhpcBuild::formatUserClassTrailer();
-        $this->assertStringContainsString('#764', $trailer);
-        $this->assertStringContainsString('user-class projects', $trailer);
+        $this->assertStringContainsString('MiniWebAppAotExecuteTest', $trailer);
+        $this->assertStringContainsString('user-class', $trailer);
         $this->assertStringContainsString('phpc lint', $trailer);
         $this->assertStringContainsString('phpc serve', $trailer);
         $this->assertStringContainsString('miniwebapp-gates', $trailer);
@@ -46,13 +46,13 @@ ERR;
         $this->assertFalse(PhpcBuild::isWebProjectForExecuteProbe($repoRoot.'/examples/001-SimpleWeb'));
     }
 
-    public function testWebProjectSuccessTrailerMentions764AndProbe(): void
+    public function testWebProjectSuccessTrailerMentionsExecuteProbe(): void
     {
         $repoRoot = dirname(__DIR__, 2);
         $project = $repoRoot.'/examples/003-MiniWebApp';
         $binary = $project.'/.phpc/bin/app';
         $trailer = PhpcBuild::formatWebProjectSuccessTrailer($project, $binary);
-        $this->assertStringContainsString('#764', $trailer);
+        $this->assertStringContainsString('MiniWebAppAotExecuteTest', $trailer);
         $this->assertStringContainsString('wc -c', $trailer);
         $this->assertStringContainsString('QUERY_STRING=route=home', $trailer);
         $this->assertStringContainsString('phpc run --project', $trailer);
@@ -72,7 +72,7 @@ ERR;
             $binary
         );
         $this->assertStringContainsString('Quick execute probe', $out);
-        $this->assertStringContainsString('#764', $out);
+        $this->assertStringContainsString('MiniWebAppAotExecuteTest', $out);
         $this->assertStringContainsString('wc -c', $out);
     }
 
@@ -98,7 +98,7 @@ ERR;
             false
         );
         $this->assertStringNotContainsString('terminator', $out);
-        $this->assertStringContainsString('#764', $out);
+        $this->assertStringContainsString('MiniWebAppAotExecuteTest', $out);
     }
 
     public function testEmitBuildOutputKeepsLlvmStderrWhenVerbose(): void
@@ -108,7 +108,7 @@ ERR;
             true
         );
         $this->assertStringContainsString('terminator', $out);
-        $this->assertStringContainsString('#764', $out);
+        $this->assertStringContainsString('MiniWebAppAotExecuteTest', $out);
     }
 
     public function testListUnitsMiniWebAppPrintsEntryUnitsBinary(): void
@@ -221,7 +221,7 @@ ERR;
         $stderr = false !== $stderr ? $stderr : '';
         if (0 !== $exit && PhpcBuild::isUserClassAotBlocked($stderr)) {
             $this->markTestSkipped(
-                '003-MiniWebApp native AOT execute blocked (#764): '.trim($stderr)
+                '003-MiniWebApp user-class AOT link failed (LLVM verify): '.trim($stderr)
             );
         }
         $this->assertSame(0, $exit, 'phpc build --project failed: '.substr($stderr, 0, 500));
