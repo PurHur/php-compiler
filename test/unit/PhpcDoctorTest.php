@@ -128,6 +128,7 @@ final class PhpcDoctorTest extends TestCase
         $this->assertStringContainsString('north-star2-verify', $result['stdout']);
         $this->assertStringContainsString('bootstrap-selfhost-lib-spine-smoke', $result['stdout']);
         $this->assertStringContainsString('bootstrap-selfhost-lib-spine-vm-smoke', $result['stdout']);
+        $this->assertStringContainsString('bootstrap-selfhost-compiler-driver-smoke', $result['stdout']);
         $this->assertStringContainsString('M2 spine:', $result['stdout']);
         $this->assertStringContainsString('M3 strict:', $result['stdout']);
         $this->assertStringContainsString('M4 loop dry-run', $result['stdout']);
