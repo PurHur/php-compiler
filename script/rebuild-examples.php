@@ -10,6 +10,8 @@ declare(strict_types=1);
  */
 
 require_once __DIR__.'/../vendor/autoload.php';
+require_once __DIR__.'/../test/support/CgiCookieJar.php';
+require_once __DIR__.'/../test/support/SessionsWebCgiEnv.php';
 
 echo "Rebuilding Examples\n";
 
@@ -194,7 +196,8 @@ function exampleDisplayName(string $example): string
  *     aot_compile_time_query: bool,
  *     aot_run_env: array<string, string>,
  *     skip_aot: bool,
- *     project_aot: bool
+ *     project_aot: bool,
+ *     sessions_web_project_aot: bool
  * }
  */
 function exampleProfile(string $example): array
@@ -212,18 +215,19 @@ function exampleProfile(string $example): array
             'aot_run_env' => [],
             'skip_aot' => false,
             'project_aot' => true,
+            'sessions_web_project_aot' => false,
         ];
     }
 
     if ('005-SessionsWeb' === exampleDisplayName($example)) {
-        // AOT columns stay n/a until two-request session execute is green (#1891).
         return [
             'query' => null,
             'cgi_env' => [],
             'aot_compile_time_query' => true,
             'aot_run_env' => [],
-            'skip_aot' => true,
+            'skip_aot' => false,
             'project_aot' => false,
+            'sessions_web_project_aot' => true,
         ];
     }
 
@@ -240,6 +244,7 @@ function exampleProfile(string $example): array
             ],
             'skip_aot' => false,
             'project_aot' => false,
+            'sessions_web_project_aot' => false,
         ];
     }
 
@@ -250,6 +255,7 @@ function exampleProfile(string $example): array
         'aot_run_env' => [],
         'skip_aot' => false,
         'project_aot' => false,
+        'sessions_web_project_aot' => false,
     ];
 }
 
@@ -480,6 +486,139 @@ function tryBenchmarkMiniWebAppProjectAot(string $repoRoot, array $benchEnv, arr
 }
 
 /**
+ * phpc build --project + two-request session flash for 005-SessionsWeb (#1891, #1973).
+ *
+ * @param array<string, string> $benchEnv
+ *
+ * @return array{compile: float, compiled: float}|null
+ */
+function tryBenchmarkSessionsWebProjectAot(string $repoRoot, array $benchEnv): ?array
+{
+    if ('0' === getenv('BENCH_SESSIONSWEB_AOT')) {
+        echo "  005-SessionsWeb AOT: skip (BENCH_SESSIONSWEB_AOT=0)\n";
+
+        return null;
+    }
+
+    $project = $repoRoot.'/examples/005-SessionsWeb';
+    $phpc = $repoRoot.'/phpc';
+    $binary = $project.'/.phpc/bin/app';
+
+    if (!is_executable($phpc)) {
+        echo "  005-SessionsWeb AOT: skip (phpc not executable)\n";
+
+        return null;
+    }
+
+    $sessionDir = sys_get_temp_dir().'/phpc_bench_sessionsweb_'.uniqid('', true);
+    if (!@mkdir($sessionDir, 0700, true) && !is_dir($sessionDir)) {
+        echo "  005-SessionsWeb AOT: skip (session temp dir)\n";
+
+        return null;
+    }
+
+    $aotEnv = $benchEnv;
+    $aotEnv['PHP_COMPILER_SESSION_DIR'] = $sessionDir;
+
+    $compileStart = microtime(true);
+    $build = runProcessCapturing(
+        [$phpc, 'build', '--project', $project],
+        $aotEnv,
+        $repoRoot
+    );
+    $compileTime = microtime(true) - $compileStart;
+
+    if (0 !== $build['exit']) {
+        $stderr = $build['stderr'];
+        if (\PHPCompiler\Cli\PhpcBuild::isUserClassAotBlocked($stderr)) {
+            echo '  005-SessionsWeb AOT: skip (link blocked: '.trim(substr($stderr, 0, 120))."…)\n";
+        } else {
+            echo "  005-SessionsWeb AOT: skip (phpc build --project exit {$build['exit']})\n";
+        }
+        sessionsWebBenchCleanup($sessionDir);
+
+        return null;
+    }
+
+    if (!is_executable($binary)) {
+        echo "  005-SessionsWeb AOT: skip (binary missing after link)\n";
+        sessionsWebBenchCleanup($sessionDir);
+
+        return null;
+    }
+
+    if (!sessionsWebAotFlashProbe($repoRoot, $binary, $aotEnv)) {
+        echo "  005-SessionsWeb AOT: skip (two-request flash probe failed)\n";
+        sessionsWebBenchCleanup($sessionDir);
+
+        return null;
+    }
+
+    $iterations = 10;
+    $compiledStart = microtime(true);
+    for ($i = 0; $i < $iterations; ++$i) {
+        sessionsWebAotFlashProbe($repoRoot, $binary, $aotEnv);
+    }
+    $compiledTime = (microtime(true) - $compiledStart) / $iterations;
+
+    sessionsWebBenchCleanup($sessionDir);
+
+    return ['compile' => $compileTime, 'compiled' => $compiledTime];
+}
+
+/**
+ * @param array<string, string> $baseEnv
+ */
+function sessionsWebAotFlashProbe(string $repoRoot, string $binary, array $baseEnv): bool
+{
+    $jar = new \PHPCompiler\CgiCookieJar();
+    $empty = runProcessCapturing(
+        [$binary],
+        array_merge($baseEnv, \PHPCompiler\SessionsWebCgiEnv::getEmpty()),
+        $repoRoot
+    );
+    if (0 !== $empty['exit']) {
+        return false;
+    }
+    $jar->absorbFromCgiOutput($empty['stdout']);
+    if (!$jar->hasCookie('PHPSESSID')) {
+        return false;
+    }
+
+    $cookie = $jar->httpCookieHeader();
+    $post = runProcessCapturing(
+        [$binary],
+        array_merge($baseEnv, \PHPCompiler\SessionsWebCgiEnv::postFlash('Saved'), ['HTTP_COOKIE' => $cookie]),
+        $repoRoot
+    );
+    if (0 !== $post['exit']) {
+        return false;
+    }
+
+    $flash = runProcessCapturing(
+        [$binary],
+        array_merge($baseEnv, \PHPCompiler\SessionsWebCgiEnv::getEmpty(), ['HTTP_COOKIE' => $jar->httpCookieHeader()]),
+        $repoRoot
+    );
+    if (0 !== $flash['exit']) {
+        return false;
+    }
+
+    return str_contains($flash['stdout'], 'Flash: Saved');
+}
+
+function sessionsWebBenchCleanup(string $sessionDir): void
+{
+    if (!is_dir($sessionDir)) {
+        return;
+    }
+    foreach (glob($sessionDir.'/sess_*') ?: [] as $file) {
+        @unlink($file);
+    }
+    @rmdir($sessionDir);
+}
+
+/**
  * @param list<string> $argv
  * @param array<string, string> $env
  */
@@ -543,7 +682,13 @@ function benchmarkExample(string $example, array $phpCmd, array $benchEnv, strin
 
     $compileTime = null;
     $compiledTime = null;
-    if ($llvmReady && !empty($profile['project_aot'])) {
+    if ($llvmReady && !empty($profile['sessions_web_project_aot'])) {
+        $sessionsAot = tryBenchmarkSessionsWebProjectAot($repoRoot, $benchEnv);
+        if (null !== $sessionsAot) {
+            $compileTime = $sessionsAot['compile'];
+            $compiledTime = $sessionsAot['compiled'];
+        }
+    } elseif ($llvmReady && !empty($profile['project_aot'])) {
         $projectAot = tryBenchmarkMiniWebAppProjectAot($repoRoot, $benchEnv, $profile);
         if (null !== $projectAot) {
             $compileTime = $projectAot['compile'];

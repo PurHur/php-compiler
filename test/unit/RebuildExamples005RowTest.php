@@ -29,5 +29,8 @@ final class RebuildExamples005RowTest extends TestCase
         $this->assertStringContainsString('005-SessionsWeb', $script);
         $this->assertStringContainsString('benchmark table start', $script);
         $this->assertStringContainsString('#1891', $script);
+        $this->assertStringContainsString('BENCH_SESSIONSWEB_AOT', $script);
+        $this->assertStringContainsString('sessions_web_aot_execute_probe', $script);
+        $this->assertStringContainsString('#1973', $script);
     }
 }
