@@ -101,7 +101,7 @@ curl -s -b "$jar" -c "$jar" -X POST -d 'message=Saved' 'http://127.0.0.1:8080/ex
 curl -s -b "$jar" 'http://127.0.0.1:8080/example.php'
 ```
 
-AOT link/execute: [#1891](https://github.com/PurHur/php-compiler/issues/1891). AOT deploy + `PHPC_DEPLOY_ROOT` CGI flash: `SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 ./script/deploy-smoke.sh --example 005` ([#1893](https://github.com/PurHur/php-compiler/issues/1893)). VM session curls: `SESSIONS_WEB_SMOKE_GATE=1` (default) in `ci-fast.sh` / `ci-local.sh` — `make examples-sessions-smoke` or `examples-web-smoke.sh --sessions-only` ([#1887](https://github.com/PurHur/php-compiler/issues/1887)). Init template parity: [#1902](https://github.com/PurHur/php-compiler/issues/1902). Gate ladder in `phpc doctor --gates`: [#1903](https://github.com/PurHur/php-compiler/issues/1903).
+AOT link/execute: [#1891](https://github.com/PurHur/php-compiler/issues/1891). AOT deploy + `PHPC_DEPLOY_ROOT` CGI flash: `SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 ./script/deploy-smoke.sh --example 005` ([#1893](https://github.com/PurHur/php-compiler/issues/1893)). VM session curls: `SESSIONS_WEB_SMOKE_GATE=1` (default) in `ci-fast.sh` / `ci-local.sh` — `make examples-sessions-smoke` or `examples-web-smoke.sh --sessions-only` ([#1887](https://github.com/PurHur/php-compiler/issues/1887)). Init scaffold: `./phpc init --profile sessionsweb my-app` ([#1886](https://github.com/PurHur/php-compiler/issues/1886)); template parity: [#1902](https://github.com/PurHur/php-compiler/issues/1902). Gate ladder in `phpc doctor --gates`: [#1903](https://github.com/PurHur/php-compiler/issues/1903).
 
 ### 002-StaticWeb
 

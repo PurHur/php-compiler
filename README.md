@@ -58,6 +58,7 @@ composer install
 ./phpc test                    # full suite (VM, JIT, AOT lint + link)
 mkdir my-app && ./phpc init my-app   # phpc.json + public/index.php scaffold (see docs/phpc-json.md)
 ./phpc init --profile miniwebapp my-app   # Router + templates (see examples/003-MiniWebApp/)
+./phpc init --profile sessionsweb my-app  # Session flash demo (see examples/005-SessionsWeb/)
 ./phpc run -r 'echo 1;'        # VM mode (or: php bin/vm.php -r 'echo 1;')
 ./phpc run -q 'name=Dev' examples/001-SimpleWeb/example.php   # web example without TCP
 make web-smoke                 # lint shipped examples + 003-MiniWebApp tree, VM smoke 001-SimpleWeb
@@ -100,7 +101,7 @@ Unified wrapper (`./phpc` → `bin/phpc.php`); legacy `bin/vm.php`, `bin/jit.php
 | `phpc deploy` | Package binary + `public/` + assets into deploy tree ([#635](https://github.com/PurHur/php-compiler/issues/635)) |
 | `phpc lint` | Unsupported syntax report; `--project` / `--all` for trees |
 | `phpc test` | `./script/ci-local.sh` (full) or `--fast` → `ci-fast.sh` |
-| `phpc init` | Scaffold `phpc.json`; `--profile miniwebapp` for Router + templates ([#632](https://github.com/PurHur/php-compiler/issues/632)) |
+| `phpc init` | Scaffold `phpc.json`; `--profile miniwebapp` (Router + templates, [#632](https://github.com/PurHur/php-compiler/issues/632)); `--profile sessionsweb` (005-SessionsWeb, [#1886](https://github.com/PurHur/php-compiler/issues/1886)) |
 
 Also: `phpc doctor` (env probe), `phpc validate-manifest`, `phpc cgi`. See `./phpc help`.
 
