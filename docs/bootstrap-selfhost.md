@@ -47,6 +47,14 @@ Regenerate: `make bootstrap-profile` (inventory + profile + optional `bootstrap-
 
 CI enforces freshness via `php script/bootstrap-inventory.php --check` in `script/ci-common.sh` ([#765](https://github.com/PurHur/php-compiler/issues/765)). Do not hand-edit inventory tables.
 
+### When to regenerate `docs/bootstrap-vendor-inventory.md` ([#2030](https://github.com/PurHur/php-compiler/issues/2030))
+
+| Change | Command |
+|--------|---------|
+| `composer.lock` / `vendor/` bump on M5 packages | `php script/bootstrap-vendor-inventory.php` |
+
+Opt-in CI: `BOOTSTRAP_VENDOR_INVENTORY_SYNC_GATE=1 ./script/ci-fast.sh` runs `--check` (default gate `0` until stable on master). See [`bootstrap-vendor-inventory.md`](bootstrap-vendor-inventory.md).
+
 **Docker** (optional; LLVM 9 in `php-compiler:22.04-dev` — see README):
 
 ```console
