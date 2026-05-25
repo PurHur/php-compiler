@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\Block;
+use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Builtin\JitThrow;
 use PHPCompiler\OpCode;
 use PHPLLVM\BasicBlock;
@@ -80,9 +81,7 @@ final class TryCatchHelper
             throw new \LogicException('TYPE_TRY lowering requires an active LLVM basic block');
         }
         $builder->positionAtEnd($branchBlock);
-        if (null === $handler->dispatchBb) {
-            $handler->dispatchBb = self::buildDispatch($jit, $func, $context, $handler, $args);
-        }
+        // Defer dispatch lowering until emitThrow/merge so DECLARE_CLASS ids exist (#2157).
         $jit->compileSubBlock($func, $tryOp->block1, ...$args);
         $tryEntry = $context->scope->blockStorage[$tryOp->block1];
         $builder->positionAtEnd($branchBlock);
@@ -137,12 +136,15 @@ final class TryCatchHelper
         JitThrow::registerDeclarations($context);
         JitThrow::ensureLinked($context);
         $handler = $context->tryCatch->handlerStack[array_key_last($context->tryCatch->handlerStack)] ?? null;
+        if (null === $handler && [] !== $context->tryCatch->mergeHandlers) {
+            $handler = end($context->tryCatch->mergeHandlers);
+        }
         if (null === $handler) {
             $builder = $context->builder;
             $throwBlock = $builder->getInsertBlock();
             $builder->positionAtEnd($throwBlock);
             $context->freeDeadVariables($func, $throwBlock, $block);
-            $context->builder->call($context->lookupFunction('abort'));
+            $context->builder->call($context->lookupFunction('phpc_jit_uncaught_throw_abort'));
             $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
 
             return;
@@ -182,12 +184,27 @@ final class TryCatchHelper
         $builder->positionAtEnd($dispatch);
 
         $objPtr = $context->getTypeFromString('__object__*');
-        $i1 = $context->getTypeFromString('int1');
         $pendingObj = $builder->call($context->lookupFunction('phpc_jit_take_throw_pending'));
         $mergeEntry = $context->scope->blockStorage[$handler->mergeBlock] ?? null;
 
         $uncaught = BasicBlockHelper::append($context, 'try_uncaught');
-        $nextCatch = $dispatch;
+        $afterTake = BasicBlockHelper::append($context, 'try_after_take');
+        $noPending = BasicBlockHelper::append($context, 'try_no_pending');
+        $hasObj = $builder->icmp(
+            Builder::INT_NE,
+            $pendingObj,
+            $objPtr->constNull()
+        );
+        $builder->branchIf($hasObj, $afterTake, $noPending);
+        $builder->positionAtEnd($noPending);
+        if (null !== $mergeEntry) {
+            $builder->branch($mergeEntry);
+        } else {
+            $builder->branch($uncaught);
+        }
+
+        $nextCatch = $afterTake;
+        $builder->positionAtEnd($afterTake);
 
         foreach ($handler->catchArms as $arm) {
             $catchOp = $arm['op'];
@@ -196,14 +213,16 @@ final class TryCatchHelper
             $noMatchBb = BasicBlockHelper::append($context, 'try_catch_nomatch');
 
             $builder->positionAtEnd($nextCatch);
-            if ([] === $types) {
+            if ([] === $types
+                || (Builtin::LOAD_TYPE_STANDALONE === $context->loadType && 1 === count($handler->catchArms))
+            ) {
                 $builder->branch($matchBb);
             } else {
+                $thrownVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $pendingObj);
                 $checkBb = $nextCatch;
                 $typeCount = count($types);
                 foreach ($types as $idx => $typeName) {
-                    $thrownVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $pendingObj);
-                    $isInstance = ReflectionBuiltinHelper::emitInstanceOf($context, $thrownVar, $typeName);
+                    $isInstance = self::emitCatchInstanceOf($context, $thrownVar, $typeName);
                     $isBool = $context->castToBool($context->helper->loadValue($isInstance));
                     $isLast = $idx === $typeCount - 1;
                     if ($isLast) {
@@ -218,7 +237,7 @@ final class TryCatchHelper
             }
 
             $builder->positionAtEnd($matchBb);
-            if (null !== $catchOp->arg3) {
+            if (null !== $catchOp->arg3 && Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
                 $operand = $catchOp->block1->getOperand((int) $catchOp->arg3);
                 $caughtVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $pendingObj);
                 $jit->assignOperandForced($operand, $caughtVar);
@@ -237,7 +256,7 @@ final class TryCatchHelper
         $builder->branch($uncaught);
         $builder->positionAtEnd($uncaught);
         $builder->call($context->lookupFunction('phpc_jit_set_throw_pending'), $pendingObj);
-        $builder->call($context->lookupFunction('abort'));
+        $builder->call($context->lookupFunction('phpc_jit_uncaught_throw_abort'));
         $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
 
         if (null !== $saved) {
@@ -254,6 +273,32 @@ final class TryCatchHelper
         }
         $handler = array_pop($context->tryCatch->handlerStack);
         unset($context->tryCatch->mergeHandlers[spl_object_id($handler->mergeBlock)]);
+    }
+
+    /**
+     * Typed catch instanceof for dispatch (#2157). Standalone AOT uses the C runtime
+     * layout helper; embed/JIT keeps pure LLVM compare from emitInstanceOf.
+     */
+    private static function emitCatchInstanceOf(Context $context, Variable $thrownVar, string $typeName): Variable
+    {
+        if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
+            return ReflectionBuiltinHelper::emitInstanceOf($context, $thrownVar, $typeName);
+        }
+
+        $obj = $context->helper->loadValue($thrownVar);
+        $namePtr = $context->constantFromString(strtolower(ltrim($typeName, '\\')));
+        $isInstance = $context->builder->call(
+            $context->lookupFunction('phpc_jit_object_is_instance_lcname'),
+            $obj,
+            $context->builder->pointerCast($namePtr, $context->getTypeFromString('int8*'))
+        );
+
+        return new Variable(
+            $context,
+            Variable::TYPE_NATIVE_BOOL,
+            Variable::KIND_VALUE,
+            $isInstance
+        );
     }
 }
 

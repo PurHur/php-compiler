@@ -200,7 +200,9 @@ final class ReadonlyRaise
             if (null !== $context->module->getNamedFunction($name)) {
                 continue;
             }
-            $ft = $context->context->functionType($ret, $vararg, ...$params);
+            $ft = [] === $params
+                ? $context->context->functionType($ret, $vararg)
+                : $context->context->functionType($ret, $vararg, ...$params);
             $fn = $context->module->addFunction($name, $ft);
             $context->registerFunction($name, $fn);
         }

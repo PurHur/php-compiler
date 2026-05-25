@@ -45,17 +45,25 @@ final class JitThrow
         $i32 = $context->getTypeFromString('int32');
         $objPtr = $context->getTypeFromString('__object__*');
 
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
         $decls = [
             'phpc_jit_clear_throw_pending' => [$void, false, []],
             'phpc_jit_has_throw_pending' => [$i32, false, []],
             'phpc_jit_set_throw_pending' => [$void, false, [$objPtr]],
             'phpc_jit_take_throw_pending' => [$objPtr, false, []],
+            'phpc_jit_register_class' => [$void, false, [$i8p, $i64]],
+            'phpc_jit_object_is_instance' => [$i32, false, [$objPtr, $i64]],
+            'phpc_jit_object_is_instance_lcname' => [$i32, false, [$objPtr, $i8p]],
+            'phpc_jit_uncaught_throw_abort' => [$void, false, []],
         ];
         foreach ($decls as $name => [$ret, $vararg, $params]) {
             if (null !== $context->module->getNamedFunction($name)) {
                 continue;
             }
-            $ft = $context->context->functionType($ret, $vararg, ...$params);
+            $ft = [] === $params
+                ? $context->context->functionType($ret, $vararg)
+                : $context->context->functionType($ret, $vararg, ...$params);
             $fn = $context->module->addFunction($name, $ft);
             $context->registerFunction($name, $fn);
         }

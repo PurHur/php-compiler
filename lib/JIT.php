@@ -2451,6 +2451,19 @@ class JIT {
                     $this->context->pushScope();
                     $this->context->scope->classId = $this->context->type->object->declareClass($nameOp);
                     $this->context->scope->className = strtolower($nameOp->value);
+                    if (JIT\Builtin::LOAD_TYPE_STANDALONE === $this->context->loadType) {
+                        JIT\Builtin\JitThrow::registerDeclarations($this->context);
+                        $lc = $this->context->scope->className;
+                        $namePtr = $this->context->constantFromString($lc);
+                        $this->context->builder->call(
+                            $this->context->lookupFunction('phpc_jit_register_class'),
+                            $this->context->builder->pointerCast(
+                                $namePtr,
+                                $this->context->getTypeFromString('int8*')
+                            ),
+                            $this->context->constantFromInteger($this->context->scope->classId, 'int64')
+                        );
+                    }
                     if (null !== $op->arg3 && isset($block->constants[$op->arg3])) {
                         $this->context->type->object->setClassReadonly(
                             $this->context->scope->classId,
