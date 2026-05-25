@@ -16,6 +16,7 @@ ci_prepare_test_runtime
 ci_install_deps
 ci_jit_preflight_gate
 ci_run_inventory_checks
+ci_run_selfhost_spine_count_sync_check
 ci_report_llvm_status
 ci_configure_serve_tests
 
