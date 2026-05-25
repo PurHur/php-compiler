@@ -698,6 +698,37 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('#1928', $doc);
     }
 
+    public function testCiFastHonorsBootstrapTestSubsetGate(): void
+    {
+        $fast = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-fast.sh');
+        $this->assertStringContainsString('ci_run_bootstrap_test_subset', $fast);
+
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('BOOTSTRAP_TEST_SUBSET_GATE', $common);
+        $this->assertStringContainsString('BOOTSTRAP_TEST_SUBSET_GATE:-0', $common);
+        $this->assertStringContainsString('BOOTSTRAP_TEST_SUBSET_STRICT', $common);
+        $this->assertStringContainsString('bootstrap-test-subset.sh', $common);
+
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString(
+            'BOOTSTRAP_TEST_SUBSET_GATE="${BOOTSTRAP_TEST_SUBSET_GATE:-0}"',
+            $defaults
+        );
+        $this->assertStringContainsString(
+            'BOOTSTRAP_TEST_SUBSET_STRICT="${BOOTSTRAP_TEST_SUBSET_STRICT:-0}"',
+            $defaults
+        );
+    }
+
+    public function testLocalCiMatrixDocumentsBootstrapTestSubsetGate(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('BOOTSTRAP_TEST_SUBSET_GATE', $doc);
+        $this->assertStringContainsString('bootstrap-test-subset.sh', $doc);
+        $this->assertMatchesRegularExpression('/\| `BOOTSTRAP_TEST_SUBSET_GATE` \| `0` \|/', $doc);
+        $this->assertStringContainsString('#2069', $doc);
+    }
+
     public function testBootstrapTestSubsetScriptExists(): void
     {
         $script = dirname(__DIR__, 2).'/script/bootstrap-test-subset.sh';

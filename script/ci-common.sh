@@ -378,6 +378,19 @@ ci_run_bootstrap_lib_spine_vm_smoke() {
   "$_CI_SCRIPT_DIR/bootstrap-selfhost-lib-spine-vm-smoke.sh"
 }
 
+# Bootstrap test subset in fast CI (issue #2069); default off — opt-in BOOTSTRAP_TEST_SUBSET_GATE=1.
+ci_run_bootstrap_test_subset() {
+  if [[ "${BOOTSTRAP_TEST_SUBSET_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  echo "bootstrap-test-subset (BOOTSTRAP_TEST_SUBSET_GATE=1, issue #2069)..."
+  local -a subset_args=()
+  if [[ "${BOOTSTRAP_TEST_SUBSET_STRICT:-0}" == "1" ]]; then
+    subset_args+=(--strict)
+  fi
+  "$_CI_SCRIPT_DIR/bootstrap-test-subset.sh" "${subset_args[@]}"
+}
+
 # North Star 2 presenter bundle in fast CI (issue #1928, #2051); default on — opt-out with NORTH_STAR2_VERIFY_GATE=0.
 ci_run_north_star2_verify() {
   if [[ "${NORTH_STAR2_VERIFY_GATE:-1}" != "1" ]]; then
