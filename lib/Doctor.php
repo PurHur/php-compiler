@@ -136,6 +136,7 @@ final class Doctor
         self::printNorthStar1PresenterSection($repoRoot);
         self::printNorthStar2PresenterSection($repoRoot);
         self::printSessionsWebSection($repoRoot);
+        self::printFileUploadWebSection($repoRoot);
 
         return is_int($exit) ? $exit : 1;
     }
@@ -348,6 +349,87 @@ final class Doctor
             fwrite(STDOUT, "  [📋] phpc init --profile sessionsweb — #1886\n");
         }
         fwrite(STDOUT, "  Docs: examples/005-SessionsWeb/README.md · docs/local-ci-matrix.md\n");
+    }
+
+    /**
+     * 006-FileUploadWeb gate ladder (issues #1999, #2010).
+     */
+    private static function printFileUploadWebSection(string $repoRoot): void
+    {
+        $exampleDir = $repoRoot.'/examples/006-FileUploadWeb';
+        if (!is_dir($exampleDir)) {
+            return;
+        }
+
+        $defaults = self::readCiDefaultsEnv($repoRoot);
+        $smokeDefault = $defaults['FILE_UPLOAD_WEB_SMOKE_GATE'] ?? '1';
+        $linkDefault = $defaults['FILE_UPLOAD_WEB_AOT_LINK_GATE'] ?? '1';
+        $aotDefault = $defaults['FILE_UPLOAD_WEB_AOT_SMOKE_GATE'] ?? '0';
+
+        $smokeOn = self::gateEnabled('FILE_UPLOAD_WEB_SMOKE_GATE', $smokeDefault);
+        $linkOn = self::gateEnabled('FILE_UPLOAD_WEB_AOT_LINK_GATE', $linkDefault);
+        $aotOn = self::gateEnabled('FILE_UPLOAD_WEB_AOT_SMOKE_GATE', $aotDefault);
+
+        $llvmInfo = self::resolveLlvmInfo($repoRoot);
+        $llvmReady = null !== $llvmInfo['dir'];
+        $llvmDetail = $llvmReady
+            ? 'LLVM ready at '.$llvmInfo['dir']
+            : 'LLVM missing — AOT rows need libLLVM-9.so.1';
+
+        $hasExample = is_file($exampleDir.'/example.php');
+        $hasManifest = is_file($exampleDir.'/phpc.json');
+
+        fwrite(STDOUT, "\n006-FileUploadWeb CI gates (#2010, ladder #1999–#2012):\n");
+        fwrite(STDOUT, "  Tree: examples/006-FileUploadWeb\n");
+        fwrite(STDOUT, "  {$llvmDetail}\n");
+        fwrite(STDOUT, "  Defaults: script/ci-defaults.env\n\n");
+
+        if ($hasExample && $hasManifest) {
+            fwrite(STDOUT, "  [✅] example.php + phpc.json present\n");
+        } else {
+            fwrite(STDOUT, "  [⬜] example tree incomplete (expected example.php + phpc.json)\n");
+        }
+        fwrite(STDOUT, "  Lint: ./phpc lint examples/006-FileUploadWeb/example.php\n\n");
+
+        self::printSessionsWebGateRow(
+            1,
+            'VM multipart',
+            'FILE_UPLOAD_WEB_SMOKE_GATE',
+            $smokeDefault,
+            $smokeOn,
+            false,
+            './script/examples-web-smoke.sh --fileupload-only · ci-fast (#2009)',
+            '#2009'
+        );
+        self::printSessionsWebGateRow(
+            2,
+            'AOT link',
+            'FILE_UPLOAD_WEB_AOT_LINK_GATE',
+            $linkDefault,
+            $linkOn,
+            true,
+            './script/ci-local.sh --filter test006FileUploadWebAotLink (#2011)',
+            '#2011'
+        );
+        $aotStatus = $aotOn && $llvmReady ? '✅' : '📋';
+        $aotExecuteNote = $llvmReady
+            ? ($aotOn ? '#1999 ✅' : '#1999 ✅ · opt-in until #2012')
+            : 'LLVM required; #1999 ✅ when gate=1';
+        fwrite(STDOUT, "  [{$aotStatus}] Stage 3 AOT execute — FILE_UPLOAD_WEB_AOT_SMOKE_GATE default {$aotDefault} ({$aotExecuteNote})\n");
+        fwrite(STDOUT, "      PHPUnit: ./script/ci-local.sh --filter FileUploadWebAotExecuteTest\n");
+        fwrite(STDOUT, "      Shell:   FILE_UPLOAD_WEB_AOT_SMOKE_GATE=1 ./script/ci-local.sh --filter FileUploadWebAotExecuteTest\n");
+
+        $initProfileLive = \PHPCompiler\Cli\PhpcInit::isKnownProfile('fileupload');
+        $initTemplate = is_file($repoRoot.'/templates/init-fileupload/example.php');
+        fwrite(STDOUT, "\n  Related:\n");
+        if ($initProfileLive) {
+            fwrite(STDOUT, "  [✅] phpc init --profile fileupload (#2004)\n");
+        } elseif ($initTemplate) {
+            fwrite(STDOUT, "  [📋] phpc init --profile fileupload — template ready; CLI profile pending #2004\n");
+        } else {
+            fwrite(STDOUT, "  [📋] phpc init --profile fileupload — #2004\n");
+        }
+        fwrite(STDOUT, "  Docs: examples/006-FileUploadWeb/README.md · docs/local-ci-matrix.md (#2010)\n");
     }
 
     /**
