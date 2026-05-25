@@ -7,6 +7,7 @@
 # Usage:
 #   ./script/examples-aot-smoke.sh
 #   EXAMPLES_AOT_SMOKE_ONLY=003 ./script/examples-aot-smoke.sh   # 003 slice only (#683)
+#   EXAMPLES_AOT_SMOKE_ONLY=005 ./script/examples-aot-smoke.sh   # 005 slice only (#1891)
 #
 # Docker:
 #   docker run --rm -v "$(pwd):/compiler" -w /compiler php-compiler:22.04-dev make examples-aot-smoke
@@ -19,6 +20,7 @@ ROOT="$PWD"
 PHPC="${ROOT}/phpc"
 SMOKE_ROOT="${ROOT}/.phpc/smoke"
 MINIWEBAPP="${ROOT}/examples/003-MiniWebApp"
+SESSIONSWEB="${ROOT}/examples/005-SessionsWeb"
 SMOKE_ONLY="${EXAMPLES_AOT_SMOKE_ONLY:-}"
 
 resolve_llvm_dir() {
@@ -173,6 +175,108 @@ smoke_003_miniwebapp() {
   echo "examples-aot-smoke: 003-MiniWebApp: ok"
 }
 
+# 005-SessionsWeb project AOT + two-request session flash (#1891).
+smoke_005_sessionsweb() {
+  if [[ "${SESSIONS_WEB_AOT_SMOKE_GATE:-0}" != "1" ]]; then
+    echo "examples-aot-smoke: 005-SessionsWeb: skip (SESSIONS_WEB_AOT_SMOKE_GATE=0)"
+    return 0
+  fi
+  if [[ ! -f "${SESSIONSWEB}/example.php" ]]; then
+    echo "examples-aot-smoke: 005-SessionsWeb: skip (tree missing #1881)" >&2
+    return 0
+  fi
+
+  local binary="${SESSIONSWEB}/.phpc/bin/app"
+  local session_dir
+  session_dir="$(mktemp -d "${SMOKE_ROOT}/sess.XXXXXX")"
+  echo "examples-aot-smoke: 005-SessionsWeb: phpc build --project -> ${binary}"
+  if ! PHP_COMPILER_SESSION_DIR="$session_dir" "$PHPC" build --project "${SESSIONSWEB}"; then
+    echo "examples-aot-smoke: 005-SessionsWeb: link failed" >&2
+    rm -rf "$session_dir"
+    return 1
+  fi
+  if [[ ! -x "$binary" ]]; then
+    echo "examples-aot-smoke: 005-SessionsWeb: expected executable ${binary}" >&2
+    rm -rf "$session_dir"
+    return 1
+  fi
+
+  local cookie="" out stderr_file run_code stderr
+  stderr_file="$(mktemp "${SMOKE_ROOT}/005.XXXXXX")"
+  set +e
+  out="$(
+    PHP_COMPILER_SESSION_DIR="$session_dir" \
+      REQUEST_METHOD='GET' SCRIPT_NAME='/example.php' REQUEST_URI='/example.php' \
+      "$binary" 2>"$stderr_file"
+  )"
+  run_code=$?
+  set -e
+  stderr="$(cat "$stderr_file" 2>/dev/null || true)"
+  rm -f "$stderr_file"
+  if [[ "$run_code" -ne 0 ]]; then
+    echo "examples-aot-smoke: 005-SessionsWeb: GET empty exited ${run_code}" >&2
+    [[ -n "$stderr" ]] && echo "$stderr" >&2
+    rm -rf "$session_dir"
+    return 1
+  fi
+  if [[ "$out" != *'No flash message yet'* ]]; then
+    echo "examples-aot-smoke: 005-SessionsWeb: GET empty missing needle" >&2
+    rm -rf "$session_dir"
+    return 1
+  fi
+  cookie="$(printf '%s' "$out" | awk '/^Set-Cookie: PHPSESSID=/{sub(/^Set-Cookie: /,""); sub(/;.*/,""); print; exit}')"
+  if [[ -z "$cookie" ]]; then
+    echo "examples-aot-smoke: 005-SessionsWeb: missing PHPSESSID Set-Cookie" >&2
+    rm -rf "$session_dir"
+    return 1
+  fi
+
+  stderr_file="$(mktemp "${SMOKE_ROOT}/005.XXXXXX")"
+  set +e
+  out="$(
+    PHP_COMPILER_SESSION_DIR="$session_dir" HTTP_COOKIE="$cookie" \
+      REQUEST_METHOD='POST' SCRIPT_NAME='/example.php' REQUEST_URI='/example.php' \
+      REQUEST_BODY='message=Saved' CONTENT_LENGTH='13' \
+      "$binary" 2>"$stderr_file"
+  )"
+  run_code=$?
+  set -e
+  stderr="$(cat "$stderr_file" 2>/dev/null || true)"
+  rm -f "$stderr_file"
+  if [[ "$run_code" -ne 0 ]]; then
+    echo "examples-aot-smoke: 005-SessionsWeb: POST flash exited ${run_code}" >&2
+    [[ -n "$stderr" ]] && echo "$stderr" >&2
+    rm -rf "$session_dir"
+    return 1
+  fi
+  stderr_file="$(mktemp "${SMOKE_ROOT}/005.XXXXXX")"
+  set +e
+  out="$(
+    PHP_COMPILER_SESSION_DIR="$session_dir" HTTP_COOKIE="$cookie" \
+      REQUEST_METHOD='GET' SCRIPT_NAME='/example.php' REQUEST_URI='/example.php' \
+      "$binary" 2>"$stderr_file"
+  )"
+  run_code=$?
+  set -e
+  stderr="$(cat "$stderr_file" 2>/dev/null || true)"
+  rm -f "$stderr_file"
+  if [[ "$run_code" -ne 0 || "$out" != *'Flash: Saved'* ]]; then
+    echo "examples-aot-smoke: 005-SessionsWeb: GET flash failed" >&2
+    [[ -n "$stderr" ]] && echo "$stderr" >&2
+    rm -rf "$session_dir"
+    return 1
+  fi
+
+  rm -rf "$session_dir"
+  echo "examples-aot-smoke: 005-SessionsWeb: ok"
+}
+
+if [[ "${SMOKE_ONLY}" == "005" ]]; then
+  echo "examples-aot-smoke: 005 slice (LLVM at ${LLVM_DIR})"
+  smoke_005_sessionsweb
+  exit $?
+fi
+
 if [[ "${SMOKE_ONLY}" == "003" ]]; then
   echo "examples-aot-smoke: 003 slice (LLVM at ${LLVM_DIR})"
   smoke_003_miniwebapp
@@ -222,5 +326,6 @@ assert_needles '004-ApiJson' "$out" 'Content-Type: application/json' 'Status: 20
 echo "examples-aot-smoke: 004-ApiJson: ok"
 
 smoke_003_miniwebapp
+smoke_005_sessionsweb
 
 echo "examples-aot-smoke: ok"

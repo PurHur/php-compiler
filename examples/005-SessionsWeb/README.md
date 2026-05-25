@@ -39,7 +39,7 @@ The last response should include `Flash: Saved`.
 | VM `phpc run` | ✅ single request (no flash until POST via serve) |
 | VM `phpc serve` | ✅ with `PHP_COMPILER_SESSION_DIR` + cookie jar |
 | JIT | ✅ `session_start` ([#1882](https://github.com/PurHur/php-compiler/issues/1882)) |
-| AOT link/execute | 📋 [#1891](https://github.com/PurHur/php-compiler/issues/1891) |
+| AOT link/execute | ✅ `SessionsWebAotExecuteTest` ([#1891](https://github.com/PurHur/php-compiler/issues/1891); gate `SESSIONS_WEB_AOT_SMOKE_GATE=1`) |
 
 ## Template parity
 
