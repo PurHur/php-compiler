@@ -144,6 +144,7 @@ examples-web-smoke-prebuild:
 	./script/examples-web-smoke-prebuild.sh
 
 # AOT build + CLI execute for 000-004 (issue #667); skips when LLVM missing
+# Slice: EXAMPLES_AOT_SMOKE_ONLY=007 THROWSWEB_AOT_SMOKE_GATE=1 (#2104)
 examples-aot-smoke:
 	./script/examples-aot-smoke.sh
 
