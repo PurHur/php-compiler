@@ -193,6 +193,22 @@ make examples-fileupload-deploy-smoke
 FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE=1 ./script/deploy-smoke.sh --example 006
 ```
 
+## 007-ThrowsWeb gates ([#2076](https://github.com/PurHur/php-compiler/issues/2076), [#2093](https://github.com/PurHur/php-compiler/issues/2093))
+
+Progressive ladder (VM throw/catch → AOT link → AOT execute). VM smoke opt-in ([#2093](https://github.com/PurHur/php-compiler/issues/2093)); AOT gates opt-in until **#195** / **#57** / **#2101** land. Copy-paste ladder: `./phpc doctor --gates` (**#2102**).
+
+| Stage | Variable | Default | When enabled |
+|-------|----------|---------|--------------|
+| VM throw/catch | `THROWS_WEB_SMOKE_GATE` | `0` | `THROWS_WEB_SMOKE_GATE=1 ./script/examples-web-smoke.sh --throws-only` ([#2093](https://github.com/PurHur/php-compiler/issues/2093)) |
+| AOT link | `THROWSWEB_AOT_LINK_GATE` | `0` | `./script/ci-local.sh --filter ThrowsWebAotLinkTest` ([#2101](https://github.com/PurHur/php-compiler/issues/2101)) |
+| AOT execute | `THROWSWEB_AOT_SMOKE_GATE` | `0` | `ThrowsWebAotExecuteTest` or `EXAMPLES_AOT_SMOKE_ONLY=007 ./script/examples-aot-smoke.sh` ([#2101](https://github.com/PurHur/php-compiler/issues/2101), [#2104](https://github.com/PurHur/php-compiler/issues/2104)) |
+
+```bash
+./phpc doctor --gates | grep -E 'THROWS|007-ThrowsWeb'
+THROWS_WEB_SMOKE_GATE=1 ./script/examples-web-smoke.sh --throws-only
+THROWSWEB_AOT_LINK_GATE=1 THROWSWEB_AOT_SMOKE_GATE=1 ./script/ci-local.sh --filter ThrowsWebAot
+```
+
 **003 AOT execute** (`MINIWEBAPP_AOT_EXECUTE_GATE=1` default; set `0` to skip during iteration):
 
 ```bash

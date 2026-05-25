@@ -71,6 +71,10 @@ curl -s -b "$jar" 'http://127.0.0.1:8080/example.php'   # expect Flash: Saved
 
 **Talking point:** Real session cookies without Zend PHP at dev time — same pattern as production CGI apps. Automated curls: `make examples-sessions-smoke` ([#1887](https://github.com/PurHur/php-compiler/issues/1887)). Gate ladder: `./phpc doctor --gates | grep -i sessions` ([#1903](https://github.com/PurHur/php-compiler/issues/1903)). AOT two-request execute ([#1891](https://github.com/PurHur/php-compiler/issues/1891)) and deploy smoke ([#1893](https://github.com/PurHur/php-compiler/issues/1893)) are opt-in when LLVM is green — see [examples/005-SessionsWeb/README.md](../examples/005-SessionsWeb/README.md) and ROADMAP [#78](https://github.com/PurHur/php-compiler/issues/78).
 
+### 5b. (Optional) ThrowsWeb — caught invalid POST (VM)
+
+`throw` / `catch` on a bad form field ([#2076](https://github.com/PurHur/php-compiler/issues/2076)). Gate ladder: `./phpc doctor --gates | grep -i throws` ([#2102](https://github.com/PurHur/php-compiler/issues/2102)). VM curls: `THROWS_WEB_SMOKE_GATE=1 ./script/examples-web-smoke.sh --throws-only` ([#2093](https://github.com/PurHur/php-compiler/issues/2093)). AOT link/execute gates are opt-in ([#2101](https://github.com/PurHur/php-compiler/issues/2101)) — see [examples/007-ThrowsWeb/README.md](../examples/007-ThrowsWeb/README.md).
+
 ### 6. (Optional) Self-host smoke
 
 ```bash
@@ -107,7 +111,7 @@ Needs LLVM + ~8 GiB RAM; includes JIT/AOT lint/link and example smokes.
 | `./phpc init --profile sessionsweb dir/` | Scaffold 005-SessionsWeb layout (flat `example.php`) |
 | `./phpc init --profile fileupload dir/` | Scaffold 006-FileUploadWeb layout (flat `example.php`) |
 | `./phpc doctor` | Environment + optional gate probe |
-| `./phpc doctor --gates` | Example web gates + self-host presenter steps ([#1752](https://github.com/PurHur/php-compiler/issues/1752), [#1857](https://github.com/PurHur/php-compiler/issues/1857), [#1871](https://github.com/PurHur/php-compiler/issues/1871)); 005-SessionsWeb ladder: `./phpc doctor --gates \| grep -i sessions` ([#1903](https://github.com/PurHur/php-compiler/issues/1903)) |
+| `./phpc doctor --gates` | Example web gates + self-host presenter steps ([#1752](https://github.com/PurHur/php-compiler/issues/1752), [#1857](https://github.com/PurHur/php-compiler/issues/1857), [#1871](https://github.com/PurHur/php-compiler/issues/1871)); 005 ladder: `grep -i sessions` ([#1903](https://github.com/PurHur/php-compiler/issues/1903)); 007 ThrowsWeb: `grep -i throws` ([#2102](https://github.com/PurHur/php-compiler/issues/2102)) |
 | `make north-star1-verify` | Example web regression bundle (legacy name; [#1044](https://github.com/PurHur/php-compiler/issues/1044) closed) ([#1845](https://github.com/PurHur/php-compiler/issues/1845)) |
 | `make north-star2-verify` | Self-host M0–M4 presenter bundle ([#1865](https://github.com/PurHur/php-compiler/issues/1865); listed in `phpc doctor --gates` when script exists) |
 | `make deploy-smoke-all` | Full `PHPC_DEPLOY_ROOT` deploy ladder 001–003 + opt-in 005/006; skip hints when gates `0` — see `./phpc doctor --gates` ([#2077](https://github.com/PurHur/php-compiler/issues/2077)) |
