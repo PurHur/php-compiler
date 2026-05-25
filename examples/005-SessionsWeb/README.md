@@ -32,7 +32,16 @@ The last response should include `Flash: Saved`.
 | JIT | ✅ `session_start` ([#1882](https://github.com/PurHur/php-compiler/issues/1882)) |
 | AOT link/execute | 📋 [#1891](https://github.com/PurHur/php-compiler/issues/1891) |
 
+## Template parity
+
+`templates/init-sessionsweb/` stays byte-identical to this tree on key files ([#1902](https://github.com/PurHur/php-compiler/issues/1902), [#695](https://github.com/PurHur/php-compiler/issues/695) policy):
+
+```console
+./script/check-init-sessionsweb-parity.sh   # wired into ci-fast inventory checks
+```
+
 ## Related
 
 - [#1887](https://github.com/PurHur/php-compiler/issues/1887) — `SESSIONS_WEB_SMOKE_GATE=1` (default): `make examples-sessions-smoke`, `ci-fast.sh`, `ExamplesCompileTest::test005SessionsWebServeFlashRoundTrip`
 - [#1893](https://github.com/PurHur/php-compiler/issues/1893) — deploy + `PHPC_DEPLOY_ROOT` smoke
+- [#1886](https://github.com/PurHur/php-compiler/issues/1886) — `phpc init --profile sessionsweb` copies from `templates/init-sessionsweb/`

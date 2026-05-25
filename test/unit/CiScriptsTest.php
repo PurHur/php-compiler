@@ -929,4 +929,28 @@ final class CiScriptsTest extends TestCase
         $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
         $this->assertStringContainsString('check-init-miniwebapp-parity.sh', $common);
     }
+
+    public function testCheckInitSessionswebParityScriptExists(): void
+    {
+        $check = dirname(__DIR__, 2).'/script/check-init-sessionsweb-parity.sh';
+        $this->assertFileExists($check);
+        $this->assertTrue(is_executable($check));
+        $body = (string) file_get_contents($check);
+        $this->assertStringContainsString('examples/005-SessionsWeb', $body);
+        $this->assertStringContainsString('templates/init-sessionsweb', $body);
+    }
+
+    public function testCheckInitSessionswebParityPassesInRepo(): void
+    {
+        $check = dirname(__DIR__, 2).'/script/check-init-sessionsweb-parity.sh';
+        exec('bash '.escapeshellarg($check).' 2>&1', $out, $code);
+        $this->assertSame(0, $code, implode("\n", $out));
+    }
+
+    public function testCiInventoryRunsInitSessionswebParityCheck(): void
+    {
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('ci_run_init_sessionsweb_parity_check', $common);
+        $this->assertStringContainsString('check-init-sessionsweb-parity.sh', $common);
+    }
 }
