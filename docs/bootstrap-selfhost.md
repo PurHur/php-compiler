@@ -1,6 +1,6 @@
 # Self-host bootstrap roadmap
 
-**North Star 2:** The **compiler fully compiles itself** — native AOT from `lib/` (no `vendor/` at cold boot), then compiles PHP and rebuilds the next compiler revision without Zend. **M2 spine:** **589/593** (`php script/bootstrap-spine-count.php`). **Living tracker:** [#1492](https://github.com/PurHur/php-compiler/issues/1492) (was [#1056](https://github.com/PurHur/php-compiler/issues/1056)) · **re-root doc:** [self-host-target.md](self-host-target.md) · public status: [development-status § North Star 2](https://purhur.github.io/php-compiler/development-status.html#north-star-2-self-host). Parent tracking: [#78](https://github.com/PurHur/php-compiler/issues/78) (roadmap), [#212](https://github.com/PurHur/php-compiler/issues/212) (closed umbrella).
+**North Star 2:** The **compiler fully compiles itself** — native AOT from `lib/` (no `vendor/` at cold boot), then compiles PHP and rebuilds the next compiler revision without Zend. **M2 spine:** **589** / **593** (`php script/bootstrap-spine-count.php`). **Living tracker:** [#1492](https://github.com/PurHur/php-compiler/issues/1492) (was [#1056](https://github.com/PurHur/php-compiler/issues/1056)) · **re-root doc:** [self-host-target.md](self-host-target.md) · public status: [development-status § North Star 2](https://purhur.github.io/php-compiler/development-status.html#north-star-2-self-host). Parent tracking: [#78](https://github.com/PurHur/php-compiler/issues/78) (roadmap), [#212](https://github.com/PurHur/php-compiler/issues/212) (closed umbrella).
 
 ## Current gates
 
