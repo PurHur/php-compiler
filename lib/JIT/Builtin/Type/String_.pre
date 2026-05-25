@@ -255,29 +255,68 @@ class String_ extends Type {
     public function concat(Variable $dest, Variable $left, Variable $right): void {
         assert($dest->type === Variable::TYPE_STRING);
         if ($dest->kind === Variable::KIND_VALUE) {
-            // What do do?
-            throw new \LogicException("Unknown how to assign to a value");
+            throw new \LogicException('Unknown how to assign to a value');
+        }
+        $left = \PHPCompiler\JIT\JitNativeString::coerce($this->context, $left);
+        $right = \PHPCompiler\JIT\JitNativeString::coerce($this->context, $right);
+        $leftVar = $this->context->helper->loadValue($left);
+        $rightVar = $this->context->helper->loadValue($right);
+        $map = $this->context->structFieldMap['__string__'];
+
+        $destSlotTy = $this->context->getStringFromType($dest->value->typeOf());
+        $destUsesValueBox = in_array($destSlotTy, ['__value__*', '__value__'], true);
+        if ($destUsesValueBox) {
+            $destStrPtr = \PHPCompiler\JIT\BasicBlockHelper::entryAlloca(
+                $this->context,
+                $this->context->getTypeFromString('__string__*')
+            );
+            $cur = \PHPCompiler\JIT\JitValueBox::normalizeValuePtr($this->context, $dest->value);
+            $str = (new \PHPCompiler\ext\standard\strval())->valueToString($this->context, $cur);
+            $this->context->builder->store($str, $destStrPtr);
+            $destVar = \PHPCompiler\JIT\BasicBlockHelper::entryAlloca(
+                $this->context,
+                $this->context->getTypeFromString('__string__**')
+            );
+            $this->context->builder->store($destStrPtr, $destVar);
         } else {
             $destVar = $dest->value;
         }
-        $leftVar = $this->context->helper->loadValue($left);
-        $rightVar = $this->context->helper->loadValue($right);
 
-        unsigned compile {
-            $leftSize = $leftVar->length;
-            $rightSize = $rightVar->length;
-            $size = $leftSize + $rightSize;
-            __string__realloc($destVar, $size);
-            $destValue = load $destVar;
+        $leftSize = $this->context->builder->load(
+            $this->context->builder->structGep($leftVar, $map['length'])
+        );
+        $rightSize = $this->context->builder->load(
+            $this->context->builder->structGep($rightVar, $map['length'])
+        );
+        $size = $this->context->builder->addNoUnsignedWrap(
+            $leftSize,
+            $this->context->builder->intCast($rightSize, $leftSize->typeOf())
+        );
+        $this->context->builder->call(
+            $this->context->lookupFunction('__string__realloc'),
+            $destVar,
+            $size
+        );
+        $destValue = $this->context->builder->load($destVar);
+        $this->context->builder->store(
+            $size,
+            $this->context->builder->structGep($destValue, $map['length'])
+        );
+        $char = $this->context->builder->structGep($destValue, $map['value']);
+        $leftChar = $this->context->builder->structGep($leftVar, $map['value']);
+        $this->context->intrinsic->memcpy($char, $leftChar, $leftSize, false);
+        $char = $this->context->builder->gep($char, $leftSize);
+        $rightChar = $this->context->builder->structGep($rightVar, $map['value']);
+        $this->context->intrinsic->memcpy($char, $rightChar, $rightSize, false);
 
-            $destValue->length = $size;
-            $char = &$destValue->value;
-            $leftChar = &$leftVar->value;
-            memcpy $char $leftChar $leftSize;
+        if ($destUsesValueBox) {
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeString'),
+                \PHPCompiler\JIT\JitValueBox::pointer($this->context, $dest->value),
+                $destValue
+            );
 
-            $char = &$char[$leftSize];
-            $rightChar = &$rightVar->value;
-            memcpy $char $rightChar $rightSize;
+            return;
         }
         $this->context->builder->store($destValue, $dest->value);
     }

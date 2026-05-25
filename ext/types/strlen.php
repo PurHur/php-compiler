@@ -40,7 +40,7 @@ class strlen extends Internal {
             throw new \LogicException('Too few args passed to strlen()');
         }
         $argValue = JitStringArg::lower($context, $args[0], 'strlen() string');
-        $offset = $context->structFieldMap[$argValue->typeOf()->getElementType()->getName()]['length'];
+        $offset = $context->structFieldIndex($argValue, 'length');
 
         return $context->builder->load(
             $context->builder->structGep($argValue, $offset)

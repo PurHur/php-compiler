@@ -436,7 +436,7 @@ $(macro :unsafe :recursive) {
                 })
 
                 $(field_deref ? ... {
-                    $offset = $this->context->structFieldMap[$(field_deref_var)->typeOf()->getElementType()->getName()][$$(stringify($(field_deref_field)))];
+                    $offset = $this->context->structFieldIndex($(field_deref_var), $$(stringify($(field_deref_field)));
                     $(result) = $this->context->builder->load(
                         $this->context->builder->structGep($(field_deref_var), $offset)
                     );
@@ -452,7 +452,7 @@ $(macro :unsafe :recursive) {
                 })
 
                 $(field_deref_ref ? ... {
-                    $offset = $this->context->structFieldMap[$(field_deref_ref_var)->typeOf()->getElementType()->getName()][$$(stringify($(field_deref_ref_field)))];
+                    $offset = $this->context->structFieldIndex($(field_deref_ref_var), $$(stringify($(field_deref_ref_field)));
                     $(result) = $this->context->builder->structGep($(field_deref_ref_var), $offset);
                 })
 
@@ -645,7 +645,7 @@ $(macro :unsafe :recursive) {
             })
 
             $(field_deref_write ? ... {
-                $offset = $this->context->structFieldMap[$(field_deref_write_result)->typeOf()->getElementType()->getName()][$$(stringify($(field_deref_write_field)))];
+                $offset = $this->context->structFieldIndex($(field_deref_write_result), $$(stringify($(field_deref_write_field)));
                 $this->context->builder->store(
                     $(field_deref_write_value),
                     $this->context->builder->structGep($(field_deref_write_result), $offset)

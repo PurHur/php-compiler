@@ -66,8 +66,7 @@ abstract class Internal extends Func implements Handler, Call
 
     protected function stringDataPtr(JITContext $context, Value $strPtr): Value
     {
-        $structName = $strPtr->typeOf()->getElementType()->getName();
-        $off = $context->structFieldMap[$structName]['value'];
+        $off = $context->structFieldIndex($strPtr, 'value');
 
         return $context->builder->structGep($strPtr, $off);
     }

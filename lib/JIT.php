@@ -1786,11 +1786,11 @@ class JIT {
                                 break;
                             }
                             $argValue = $this->context->helper->loadValue($arg);
-                            $offset = $this->context->structFieldMap[$argValue->typeOf()->getElementType()->getName()]['length'];
+                            $offset = $this->context->structFieldIndex($argValue, 'length');
                             $__str__length = $this->context->builder->load(
                                 $this->context->builder->structGep($argValue, $offset)
                             );
-                            $offset = $this->context->structFieldMap[$argValue->typeOf()->getElementType()->getName()]['value'];
+                            $offset = $this->context->structFieldIndex($argValue, 'value');
                             $__str__value = $this->context->builder->structGep($argValue, $offset);
                             $sizeT = $this->context->getTypeFromString('size_t');
                             $this->context->builder->call(
