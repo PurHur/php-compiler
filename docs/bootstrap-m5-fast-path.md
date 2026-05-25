@@ -37,11 +37,11 @@ Supporting fixes from #1402:
 | `Runtime::initVmContext` | **Native** via `RuntimeInitVmContext::emit` (allocate `VM\Context`, set `runtime` + `vmContext`); wired in `compileBlock()`; off deny list (#1494). PHP CFG `new VMContext` still LLVM 9 link crash when combined with ctor spine. |
 | `Runtime::loadJit` | `compileRuntimeLoadJitM3Native` + nested `createJit` helpers (#1495) |
 | `Runtime::standalone` | Compile-driver link OK (#1402, #1056) |
-| `helloworld_compile_smoke` | Link OK with real lowering |
-| `runtime_ctor_smoke` | `php bin/compile.php -l test/bootstrap-aot/runtime_ctor_smoke.php` |
+| `helloworld_compile_smoke` | Deny-listed for link (LLVM 9); smoke uses int+echo (#1514); compile_driver calls stub until link fixed |
+| `runtime_ctor_smoke` | `php bin/compile.php -l test/bootstrap-aot/runtime_ctor_smoke.php`; int exit (#1514) |
 | `runtime_parse_compile_smoke` | `php bin/compile.php -l test/bootstrap-aot/runtime_parse_compile_smoke.php` |
 
-**Runtime emit:** compile driver uses env dispatch (`PHP_COMPILER_M3_COMPILE_MODE=compile`, `PHP_COMPILER_M3_SOURCE`, `PHP_COMPILER_M3_OUT`) so AOT entry avoids top-level `__DIR__` concat (#1493). With `BOOTSTRAP_M3_RUNTIME_COMPILE=1`, compile-driver **link** is OK; native runtime compile still often segfaults (139) in `__hashtable__readStringKeyValue` until native `VM\Context` seeds hashtable slots + `ErrorReporter` / `ScriptStack` (registering extra `VM\Context` hashtable props in `Object_` currently re-triggers LLVM 9 link crash).
+**Runtime emit:** compile driver uses env dispatch (`PHP_COMPILER_M3_COMPILE_MODE=compile`, `PHP_COMPILER_M3_SOURCE`, `PHP_COMPILER_M3_OUT`) so AOT entry avoids top-level `__DIR__` concat (#1493). With `BOOTSTRAP_M3_RUNTIME_COMPILE=1`, compile-driver **link** is OK; runtime dispatch no longer segfaults on `$result['message']` hashtable reads (#1514 — int exit + no assoc arrays in smoke). `emit_path=native` still blocked while `helloworld_compile_smoke` is link-stubbed (LLVM 9 real-lowering crash).
 
 **Probe findings (2026-05):**
 

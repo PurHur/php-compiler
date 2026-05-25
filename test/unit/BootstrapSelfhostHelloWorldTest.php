@@ -229,6 +229,65 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString('emit path blocked', $driver);
     }
 
+    /** Issue #1514: compile_driver must not read assoc arrays from stubbed smoke (hashtable segfault). */
+    public function testM3SmokeUsesIntExitCodesNotAssocArrays(): void
+    {
+        $smoke = (string) file_get_contents(self::$root.'/test/bootstrap-aot/helloworld_compile_smoke.php');
+        $ctor = (string) file_get_contents(self::$root.'/test/bootstrap-aot/runtime_ctor_smoke.php');
+        $driver = (string) file_get_contents(self::$root.'/test/selfhost/compiler_helloworld_smoke/compile_driver.php');
+
+        $this->assertStringContainsString('function helloworld_compile_smoke(string $sourceFile, string $outFile): int', $smoke);
+        $this->assertStringContainsString('function runtime_ctor_smoke(): int', $ctor);
+        $this->assertStringNotContainsString("\$result['message']", $driver);
+        $this->assertStringNotContainsString("\$result['ok']", $driver);
+        $this->assertStringNotContainsString('array{ok: bool', $smoke);
+    }
+
+    public function testM3CompileDriverRuntimeCompileModeDoesNotSegfault(): void
+    {
+        if (!LlvmToolchain::isReady(self::$root)) {
+            $this->markTestSkipped('LLVM 9 not available for M3 compile-driver runtime test.');
+        }
+
+        $prefix = LlvmToolchain::envPrefix(self::$root);
+        $linkCmd = implode(' ', array_map('escapeshellarg', [
+            ...$prefix,
+            'env',
+            'BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1',
+            'BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING=1',
+            'PHP_COMPILER_M3_COMPILE_DRIVER=1',
+            'make',
+            '-C',
+            self::$root,
+            'bootstrap-selfhost-helloworld',
+        ])).' 2>&1';
+        exec($linkCmd, $linkLines, $linkCode);
+        $linkOut = implode("\n", $linkLines);
+        if (0 !== $linkCode || !is_executable(self::$root.'/build/selfhost-helloworld-compile')) {
+            $this->markTestSkipped('compile driver link failed: '.$linkOut);
+        }
+
+        $outDir = sys_get_temp_dir().'/m3-hw-'.getmypid();
+        @mkdir($outDir, 0777, true);
+        $runCmd = implode(' ', array_map('escapeshellarg', [
+            ...$prefix,
+            'env',
+            'PHP_COMPILER_M3_COMPILE_MODE=compile',
+            'PHP_COMPILER_M3_RUNTIME_COMPILE=1',
+            'PHP_COMPILER_M3_SOURCE='.self::$root.'/examples/000-HelloWorld/example.php',
+            'PHP_COMPILER_M3_OUT='.$outDir.'/out',
+            'env',
+            '-u',
+            'PHP_COMPILER_SELFHOST_AOT',
+            self::$root.'/build/selfhost-helloworld-compile',
+        ])).' 2>&1';
+        exec($runCmd, $runLines, $runCode);
+        $runOut = implode("\n", $runLines);
+
+        $this->assertNotSame(139, $runCode, 'segfault in native compile driver: '.$runOut);
+        $this->assertSame(0, $runCode, $runOut);
+    }
+
     public function testRuntimeCtorSmokeFixtureExists(): void
     {
         $fixture = self::$root.'/test/bootstrap-aot/runtime_ctor_smoke.php';

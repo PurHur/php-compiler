@@ -12,38 +12,28 @@ declare(strict_types=1);
 
 require_once __DIR__.'/runtime_ctor_smoke.php';
 
-/**
- * @return array{ok: bool, message: string, phase: string}
- */
-function runtime_parse_compile_smoke(string $source = '<?php echo "parse compile smoke";'): array
+function runtime_parse_compile_smoke(string $source = '<?php echo "parse compile smoke";'): int
 {
-    $ctor = \PHPCompiler\BootstrapAot\runtime_ctor_smoke();
-    if (!$ctor['ok']) {
-        return $ctor;
+    if (0 !== \PHPCompiler\BootstrapAot\runtime_ctor_smoke()) {
+        return 1;
     }
 
     $runtime = new \PHPCompiler\Runtime(\PHPCompiler\Runtime::MODE_AOT);
     $script = $runtime->parse($source, 'runtime_parse_compile_smoke.php');
     if (!($script instanceof \PHPCfg\Script)) {
-        return [
-            'ok' => false,
-            'message' => 'runtime_parse_compile_smoke: parse did not return Script',
-            'phase' => 'parse',
-        ];
+        echo "runtime_parse_compile_smoke: parse did not return Script\n";
+
+        return 1;
     }
 
     $block = $runtime->compile($script);
     if (null === $block) {
-        return [
-            'ok' => false,
-            'message' => 'runtime_parse_compile_smoke: compile returned null',
-            'phase' => 'compile',
-        ];
+        echo "runtime_parse_compile_smoke: compile returned null\n";
+
+        return 1;
     }
 
-    return [
-        'ok' => true,
-        'message' => 'runtime_parse_compile_smoke: parse + compile OK',
-        'phase' => 'compile',
-    ];
+    echo "runtime_parse_compile_smoke: parse + compile OK\n";
+
+    return 0;
 }
