@@ -53,7 +53,7 @@ CI enforces freshness via `php script/bootstrap-inventory.php --check` in `scrip
 |--------|---------|
 | `composer.lock` / `vendor/` bump on M5 packages | `php script/bootstrap-vendor-inventory.php` |
 
-Opt-in CI: `BOOTSTRAP_VENDOR_INVENTORY_SYNC_GATE=1 ./script/ci-fast.sh` runs `--check` (default gate `0` until stable on master). See [`bootstrap-vendor-inventory.md`](bootstrap-vendor-inventory.md).
+CI: `./script/ci-fast.sh` runs `--check` by default (`BOOTSTRAP_VENDOR_INVENTORY_SYNC_GATE=1`, [#2040](https://github.com/PurHur/php-compiler/issues/2040)). Opt out with `BOOTSTRAP_VENDOR_INVENTORY_SYNC_GATE=0` during vendor-only iteration. See [`bootstrap-vendor-inventory.md`](bootstrap-vendor-inventory.md).
 
 **Docker** (optional; LLVM 9 in `php-compiler:22.04-dev` — see README):
 
