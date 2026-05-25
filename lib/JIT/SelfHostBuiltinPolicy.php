@@ -39,15 +39,14 @@ final class SelfHostBuiltinPolicy
         + self::CATEGORY_PREG
         + self::CATEGORY_FILTER
         + self::CATEGORY_JSON
-        + self::CATEGORY_NUMERIC;
+        + self::CATEGORY_NUMERIC
+        + self::CATEGORY_PASSWORD;
 
     /** @var array<string, string> */
-    private const VM_ONLY_DEFERRED = [
-        'password_hash' => 'password', 'password_verify' => 'password',
-    ];
+    private const VM_ONLY_DEFERRED = [];
 
     /** @var array<string, string> */
-    private const CATEGORY_OUTPUT = self::VM_ONLY_DEFERRED + [
+    private const CATEGORY_OUTPUT = [
         'ob_start' => 'output', 'ob_get_clean' => 'output', 'ob_end_flush' => 'output',
         'ob_get_level' => 'output',
         'getallheaders' => 'output', 'header_list' => 'output',

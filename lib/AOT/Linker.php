@@ -16,6 +16,7 @@ final class Linker
         __DIR__.'/runtime/superglobal_name.c',
         __DIR__.'/runtime/function_exists.c',
         __DIR__.'/runtime/hash_crypto.c',
+        __DIR__.'/runtime/password_crypto.c',
         __DIR__.'/runtime/crc32.c',
         __DIR__.'/runtime/strtr.c',
         __DIR__.'/runtime/filter_validate.c',
@@ -43,12 +44,13 @@ final class Linker
         __DIR__.'/runtime/phpc_jit_throw.c',
     ];
 
-    private const RUNTIME_LINK_LIBS = '-lpcre2-8';
+    private const RUNTIME_LINK_LIBS = '-lpcre2-8 -lcrypt';
 
     /** Runtime units that need host libc headers (glob/scandir; llvm sysroot lacks linux/limits.h). */
     private const RUNTIME_HOST_LIBC_BASENAMES = [
         'phpc_fs_dir.c',
         'preg_match.c',
+        'password_crypto.c',
     ];
 
     public static function link(string $objectFile, string $executable): void
