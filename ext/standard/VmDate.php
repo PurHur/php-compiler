@@ -15,6 +15,11 @@ final class VmDate
         return (int) \time();
     }
 
+    public static function getmypid(): int
+    {
+        return (int) \getmypid();
+    }
+
     public static function date(string $format, ?int $timestamp = null): string
     {
         return \date($format, $timestamp ?? self::time());
