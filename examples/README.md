@@ -118,7 +118,7 @@ AOT link/execute: [#1891](https://github.com/PurHur/php-compiler/issues/1891). A
 curl -s -F 'doc=@examples/006-FileUploadWeb/README.md' http://127.0.0.1:8080/example.php
 ```
 
-VM multipart curls: `make examples-web-smoke` / `ci-fast` (default `FILE_UPLOAD_WEB_SMOKE_GATE=1`, [#2009](https://github.com/PurHur/php-compiler/issues/2009)). AOT link/execute: opt-in `FILE_UPLOAD_WEB_AOT_LINK_GATE=1` / `FILE_UPLOAD_WEB_AOT_SMOKE_GATE=1` in `ci-local.sh` — see [006-FileUploadWeb/README.md](006-FileUploadWeb/README.md).
+VM multipart curls: `make examples-web-smoke` / `ci-fast` (default `FILE_UPLOAD_WEB_SMOKE_GATE=1`, [#2009](https://github.com/PurHur/php-compiler/issues/2009)). AOT link: default `FILE_UPLOAD_WEB_AOT_LINK_GATE=1` ([#2011](https://github.com/PurHur/php-compiler/issues/2011)); AOT execute opt-in `FILE_UPLOAD_WEB_AOT_SMOKE_GATE=1` — see [006-FileUploadWeb/README.md](006-FileUploadWeb/README.md).
 
 ### 002-StaticWeb
 

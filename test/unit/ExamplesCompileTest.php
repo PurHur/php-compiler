@@ -419,7 +419,7 @@ final class ExamplesCompileTest extends TestCase
     public function test006FileUploadWebAotLink(): void
     {
         if (!self::fileUploadWebAotLinkGateEnabled()) {
-            $this->markTestSkipped('FILE_UPLOAD_WEB_AOT_LINK_GATE=0 — skip 006 project link gate (#1999)');
+            $this->markTestSkipped('FILE_UPLOAD_WEB_AOT_LINK_GATE=0 — skip 006 project link gate (#2011)');
         }
         $project = $this->fileUploadWebProjectPath();
         $binary = $this->build006FileUploadWebProject($project);

@@ -157,10 +157,15 @@ final class CiScriptsTest extends TestCase
         );
     }
 
-    public function testCiDefaultsEnvDefinesFileUploadWebAotGatesOff(): void
+    public function testCiDefaultsEnvDefinesFileUploadWebAotLinkGateOn(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
-        $this->assertStringContainsString('FILE_UPLOAD_WEB_AOT_LINK_GATE="${FILE_UPLOAD_WEB_AOT_LINK_GATE:-0}"', $defaults);
+        $this->assertStringContainsString('FILE_UPLOAD_WEB_AOT_LINK_GATE="${FILE_UPLOAD_WEB_AOT_LINK_GATE:-1}"', $defaults);
+    }
+
+    public function testCiDefaultsEnvDefinesFileUploadWebAotSmokeGateOff(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
         $this->assertStringContainsString('FILE_UPLOAD_WEB_AOT_SMOKE_GATE="${FILE_UPLOAD_WEB_AOT_SMOKE_GATE:-0}"', $defaults);
     }
 
