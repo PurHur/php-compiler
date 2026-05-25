@@ -304,7 +304,10 @@ final class IssetHelper
         $superglobalName = self::superglobalName($container, $containerOp);
         if (null !== $superglobalName) {
             $key = $dim->compileTimeString ?? self::literalStringKey($dimOp);
-            if (null !== $key) {
+            if (
+                null !== $key
+                && !SuperglobalInit::requiresRuntimeOffsetIsSet($context, $superglobalName)
+            ) {
                 $known = SuperglobalInit::compileTimeOffsetIsSet(
                     $context,
                     $superglobalName,

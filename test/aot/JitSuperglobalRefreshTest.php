@@ -54,6 +54,35 @@ final class JitSuperglobalRefreshTest extends TestCase
         $this->assertStringNotContainsString('Hello Alice', $outBob);
     }
 
+    public function testDynamicGetKeyIssetAfterRefresh(): void
+    {
+        $code = <<<'PHP'
+<?php
+$key = 'name';
+if (isset($_GET[$key])) {
+    echo $_GET[$key];
+} else {
+    echo 'no';
+}
+PHP;
+        $runtime = new Runtime();
+        Superglobals::populateFromEnvironment($runtime->vmContext, 'name=Alice', null);
+        $block = $runtime->parseAndCompile($code, 'dynamic_get_isset.php');
+        $runtime->jit($block);
+
+        ob_start();
+        $runtime->syncJitSuperglobals('name=Alice', null);
+        $runtime->run($block);
+        $alice = ob_get_clean();
+        $this->assertSame('Alice', $alice);
+
+        ob_start();
+        $runtime->syncJitSuperglobals('', null);
+        $runtime->run($block);
+        $empty = ob_get_clean();
+        $this->assertSame('no', $empty);
+    }
+
     public function testJitCliTwoInvocations(): void
     {
         $jitBin = realpath(__DIR__ . '/../../bin/jit.php');
