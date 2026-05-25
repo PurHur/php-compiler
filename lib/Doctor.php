@@ -330,6 +330,13 @@ final class Doctor
         fwrite(STDOUT, "      Run:     SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 make deploy-smoke\n");
         fwrite(STDOUT, "      Or:      SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 ./script/deploy-smoke.sh --example 005\n");
 
+        $rebuild005Default = $defaults['REBUILD_EXAMPLES_005_SYNC_GATE'] ?? '1';
+        $rebuild005On = self::gateEnabled('REBUILD_EXAMPLES_005_SYNC_GATE', $rebuild005Default);
+        $rebuild005Icon = $rebuild005On ? '✅' : '⬜';
+        fwrite(STDOUT, "\n  Doc sync (ci-fast inventory):\n");
+        fwrite(STDOUT, "  [{$rebuild005Icon}] examples/README 005 benchmark row — REBUILD_EXAMPLES_005_SYNC_GATE default {$rebuild005Default} (#1953)\n");
+        fwrite(STDOUT, "      Run: php script/check-rebuild-examples-005-row.php · ci-fast (#1930)\n");
+
         $initProfileLive = \PHPCompiler\Cli\PhpcInit::isKnownProfile('sessionsweb');
         $initTemplate = is_file($repoRoot.'/templates/init-sessionsweb/example.php');
         fwrite(STDOUT, "\n  Related:\n");
@@ -377,7 +384,7 @@ final class Doctor
         }
         $defaults = [];
         if (preg_match_all(
-            '/export\s+(SESSIONS_WEB_[A-Z_]+)="\$\{\1:-([^}]+)\}"/',
+            '/export\s+([A-Z][A-Z0-9_]+)="\$\{\1:-([^}]+)\}"/',
             $content,
             $matches,
             PREG_SET_ORDER

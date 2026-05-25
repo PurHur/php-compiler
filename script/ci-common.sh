@@ -104,7 +104,7 @@ ci_run_examples_ladder_discovery_check() {
 }
 
 ci_run_rebuild_examples_005_sync_check() {
-  if [[ "${REBUILD_EXAMPLES_005_SYNC_GATE:-0}" != "1" ]]; then
+  if [[ "${REBUILD_EXAMPLES_005_SYNC_GATE:-1}" != "1" ]]; then
     return 0
   fi
   echo "Rebuild examples 005 row sync (REBUILD_EXAMPLES_005_SYNC_GATE=1, issue #1930)..."
