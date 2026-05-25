@@ -7,11 +7,12 @@ declare(strict_types=1);
  * Guard root README.md against stale MiniWebApp north-star wording (issue #1832).
  *
  * Fails when known post-#764 blocker phrases remain while examples/README.md
- * documents native execute as green. Also guards 005-SessionsWeb and
- * 006-FileUploadWeb shipped-example rows (#1924, #2017). Enable in CI via
- * ROOT_README_SYNC_GATE=1 (default in ci-defaults.env after #1525). Stricter
- * 006 stale-phrase checks: ROOT_README_006_SYNC_GATE=1 (default 0 in ci-fast
- * until #2017 lands; flip follow-up). Opt out: ROOT_README_SYNC_GATE=0.
+ * documents native execute as green. Also guards 005-SessionsWeb,
+ * 006-FileUploadWeb, and 007-ThrowsWeb shipped-example rows (#1924, #2017,
+ * #2094). Enable in CI via ROOT_README_SYNC_GATE=1 (default in ci-defaults.env
+ * after #1525). Stricter 006/007 stale-phrase checks: ROOT_README_006_SYNC_GATE
+ * / ROOT_README_007_SYNC_GATE (default on in ci-fast). Opt out:
+ * ROOT_README_SYNC_GATE=0.
  *
  * Usage:
  *   php script/check-root-readme-sync.php
@@ -70,10 +71,18 @@ if (is_readable($examplesReadme)) {
     if (str_contains($examples, '006-FileUploadWeb') && !str_contains($body, '006-FileUploadWeb')) {
         $errors[] = 'README.md: missing 006-FileUploadWeb row (sync examples/README.md; #2017)';
     }
+    if (str_contains($examples, '007-ThrowsWeb') && !str_contains($body, '007-ThrowsWeb')) {
+        $errors[] = 'README.md: missing 007-ThrowsWeb row (sync examples/README.md; #2094)';
+    }
     if (str_contains($examples, '| [006-FileUploadWeb]')
         && preg_match('/\| \[006-FileUploadWeb\][^\n]*✅/u', $examples)
         && preg_match('/\| \[006-FileUploadWeb\][^\n]*🚧/u', $body)) {
         $errors[] = 'README.md: 006-FileUploadWeb row shows 🚧 but examples/README.md is ✅ (#2017)';
+    }
+    if (str_contains($examples, '| [007-ThrowsWeb]')
+        && preg_match('/\| \[007-ThrowsWeb\][^\n]*✅/u', $examples)
+        && preg_match('/\| \[007-ThrowsWeb\][^\n]*🚧/u', $body)) {
+        $errors[] = 'README.md: 007-ThrowsWeb row shows 🚧 but examples/README.md is ✅ (#2094)';
     }
 }
 
@@ -112,11 +121,36 @@ if ($check006Stale) {
     }
 }
 
+$check007Stale = (getenv('ROOT_README_007_SYNC_GATE') ?: '0') === '1';
+if ($check007Stale) {
+    $throwsSmokeDefault = ci_defaults_gate_default($root, 'THROWS_WEB_SMOKE_GATE');
+    $stale007 = [];
+    if ('1' === $throwsSmokeDefault) {
+        $stale007[] = 'THROWS_WEB_SMOKE_GATE=0';
+        $stale007[] = '007 throw/catch smoke opt-in';
+    }
+    foreach ($stale007 as $phrase) {
+        if (!str_contains($body, $phrase)) {
+            continue;
+        }
+        foreach ($lines as $num => $line) {
+            if (!str_contains($line, $phrase)) {
+                continue;
+            }
+            if (!preg_match('/007|ThrowsWeb|THROWS_WEB/i', $line)) {
+                continue;
+            }
+            $lineNo = $num + 1;
+            $errors[] = "stale 007 phrase in README.md:{$lineNo}: {$phrase} (gate default-on; #2094)";
+        }
+    }
+}
+
 if ([] !== $errors) {
     foreach ($errors as $err) {
         fwrite(STDERR, "check-root-readme-sync: {$err}\n");
     }
-    fwrite(STDERR, "check-root-readme-sync: FAILED (fix README.md; see #48, #1525, #1832, #2017)\n");
+    fwrite(STDERR, "check-root-readme-sync: FAILED (fix README.md; see #48, #1525, #1832, #2017, #2094)\n");
     exit(1);
 }
 
