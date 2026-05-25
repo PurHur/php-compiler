@@ -365,10 +365,12 @@ final class Doctor
         $smokeDefault = $defaults['FILE_UPLOAD_WEB_SMOKE_GATE'] ?? '1';
         $linkDefault = $defaults['FILE_UPLOAD_WEB_AOT_LINK_GATE'] ?? '1';
         $aotDefault = $defaults['FILE_UPLOAD_WEB_AOT_SMOKE_GATE'] ?? '1';
+        $deployDefault = $defaults['FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE'] ?? '0';
 
         $smokeOn = self::gateEnabled('FILE_UPLOAD_WEB_SMOKE_GATE', $smokeDefault);
         $linkOn = self::gateEnabled('FILE_UPLOAD_WEB_AOT_LINK_GATE', $linkDefault);
         $aotOn = self::gateEnabled('FILE_UPLOAD_WEB_AOT_SMOKE_GATE', $aotDefault);
+        $deployOn = self::gateEnabled('FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE', $deployDefault);
 
         $llvmInfo = self::resolveLlvmInfo($repoRoot);
         $llvmReady = null !== $llvmInfo['dir'];
@@ -418,6 +420,13 @@ final class Doctor
         fwrite(STDOUT, "  [{$aotStatus}] Stage 3 AOT execute — FILE_UPLOAD_WEB_AOT_SMOKE_GATE default {$aotDefault} ({$aotExecuteNote})\n");
         fwrite(STDOUT, "      PHPUnit: ./script/ci-local.sh --filter FileUploadWebAotExecuteTest\n");
         fwrite(STDOUT, "      Shell:   EXAMPLES_AOT_SMOKE_ONLY=006 ./script/examples-aot-smoke.sh\n");
+        $deployStatus = $deployOn && $llvmReady ? '✅' : '📋';
+        $deployNote = $deployOn
+            ? '#2028 ✅ · ci-local when gate=1 (#2042)'
+            : 'opt-in default 0 — #2028 · #2038';
+        fwrite(STDOUT, "  [{$deployStatus}] Stage 4 Deploy CGI — FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE default {$deployDefault} ({$deployNote})\n");
+        fwrite(STDOUT, "      Run:     FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE=1 make deploy-smoke\n");
+        fwrite(STDOUT, "      Or:      FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE=1 ./script/deploy-smoke.sh --example 006\n");
 
         $rebuild006Default = $defaults['REBUILD_EXAMPLES_006_SYNC_GATE'] ?? '0';
         $rebuild006On = self::gateEnabled('REBUILD_EXAMPLES_006_SYNC_GATE', $rebuild006Default);

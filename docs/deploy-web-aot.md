@@ -77,6 +77,25 @@ SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 make deploy-smoke
 
 The gate runs GET → POST (`message=Saved`) → GET flash → GET after flash under `PHPC_DEPLOY_ROOT`, parsing `Set-Cookie: PHPSESSID` from CGI stdout. VM serve curls remain in `SESSIONS_WEB_SMOKE_GATE=1` ([#1887](https://github.com/PurHur/php-compiler/issues/1887)).
 
+### `examples/006-FileUploadWeb` (deploy + multipart upload CGI)
+
+Single-file multipart demo ([#1999](https://github.com/PurHur/php-compiler/issues/1999)); deploy smoke posts `doc=@README.md` via `REQUEST_BODY_FILE` + `CONTENT_TYPE` ([#2028](https://github.com/PurHur/php-compiler/issues/2028)).
+
+```bash
+./phpc build --project examples/006-FileUploadWeb
+./phpc deploy examples/006-FileUploadWeb -o /tmp/fileupload-dist
+export PHPC_DEPLOY_ROOT=/tmp/fileupload-dist
+```
+
+Deploy smoke (opt-in until stable):
+
+```bash
+FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE=1 ./script/deploy-smoke.sh --example 006
+FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE=1 make deploy-smoke
+```
+
+The gate runs GET (empty state) then POST multipart under `PHPC_DEPLOY_ROOT` and expects `Uploaded: README.md` in the body. VM serve curls remain in `FILE_UPLOAD_WEB_SMOKE_GATE=1` ([#2009](https://github.com/PurHur/php-compiler/issues/2009)).
+
 Implementation: [`lib/Web/ProjectDeploy.php`](../lib/Web/ProjectDeploy.php).
 
 ## 2. Dist layout

@@ -67,6 +67,86 @@ final class DeploySmokeScriptTest extends TestCase
         $this->assertStringContainsString('SESSIONS_WEB_DEPLOY_SMOKE_GATE', $body);
         $this->assertStringContainsString('smoke_005_sessions_web', $body);
         $this->assertStringContainsString('#1893', $body);
+        $this->assertStringContainsString('006-FileUploadWeb', $body);
+        $this->assertStringContainsString('FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE', $body);
+        $this->assertStringContainsString('smoke_006_file_upload_web', $body);
+        $this->assertStringContainsString('#2028', $body);
+    }
+
+    public function testDeploySmokeExample006SkipsWhenGateOff(): void
+    {
+        $repoRoot = dirname(__DIR__, 2);
+        $script = $repoRoot.'/script/deploy-smoke.sh';
+
+        $env = $this->baseEnv();
+        $env['FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE'] = '0';
+
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open(['bash', $script, '--example', '006'], $descriptorSpec, $pipes, $repoRoot, $env);
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+
+        $combined = trim(($stdout !== false ? $stdout : '')."\n".($stderr !== false ? $stderr : ''));
+        $this->assertSame(0, $exit, $combined);
+        $this->assertStringContainsString('006-FileUploadWeb: skip', $combined);
+        $this->assertStringContainsString('FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE=0', $combined);
+    }
+
+    /**
+     * Requires 006 AOT link green (#2011); opt-in gate FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE=1 (#2028).
+     *
+     * @group llvm
+     * @group fileuploadweb-deploy
+     */
+    public function testDeploySmokeExample006ExecuteWhenGateOn(): void
+    {
+        if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
+            $this->markTestSkipped(
+                'LLVM 9 toolchain not available. Run script/install-llvm9.sh from the repository root.'
+            );
+        }
+
+        $repoRoot = dirname(__DIR__, 2);
+        $phpc = $repoRoot.'/phpc';
+        if (!is_executable($phpc)) {
+            $this->markTestSkipped('phpc wrapper not executable');
+        }
+        if (!is_dir($repoRoot.'/examples/006-FileUploadWeb')) {
+            $this->markTestSkipped('examples/006-FileUploadWeb missing (#1999)');
+        }
+
+        $script = $repoRoot.'/script/deploy-smoke.sh';
+        $env = $this->baseEnv();
+        $env['FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE'] = '1';
+
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open(['bash', $script, '--example', '006'], $descriptorSpec, $pipes, $repoRoot, $env);
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+
+        $combined = trim(($stdout !== false ? $stdout : '')."\n".($stderr !== false ? $stderr : ''));
+        $this->assertSame(0, $exit, $combined);
+        $this->assertStringContainsString('deploy-smoke: 006-FileUploadWeb: multipart upload ok', $combined);
+        $this->assertStringContainsString('deploy-smoke: 006-FileUploadWeb: ok', $combined);
+        $this->assertStringContainsString('deploy-smoke: ok', $combined);
     }
 
     public function testDeploySmokeExample005SkipsWhenGateOff(): void

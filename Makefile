@@ -146,6 +146,7 @@ deploy-smoke:
 	./script/deploy-smoke.sh --example 002
 	@if [ "$${DEPLOY_SMOKE_003_EXECUTE:-1}" = "1" ]; then ./script/deploy-smoke.sh --example 003; fi
 	@if [ "$${SESSIONS_WEB_DEPLOY_SMOKE_GATE:-0}" = "1" ]; then ./script/deploy-smoke.sh --example 005; fi
+	@if [ "$${FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE:-0}" = "1" ]; then ./script/deploy-smoke.sh --example 006; fi
 
 # Local HTTP dev server (see bin/serve.php)
 SERVE_ADDR ?= 127.0.0.1:8080
