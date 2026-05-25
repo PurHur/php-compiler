@@ -134,52 +134,60 @@ final class VmFs
         return @rename($from, $to);
     }
 
-    public static function copy(string $from, string $to): bool
-    {
-        return @copy($from, $to);
-    }
-
-    /** Multipart upload temp prefix from {@see \PHPCompiler\Web\Superglobals::populateMultipartFile}. */
+    /** Prefix for multipart upload temps (lib/Web/Superglobals.php, AOT sg_set_file_entry). */
     public const UPLOAD_TEMP_PREFIX = 'phpc_upload_';
 
-    /**
-     * Whether $path is a compiler-managed multipart upload temp file (issue #2005).
-     */
-    public static function isCompilerUploadTempPath(string $path): bool
+    public static function pathHasParentTraversal(string $path): bool
     {
-        if (str_contains($path, "\0") || !is_file($path)) {
+        if (str_contains($path, "\0")) {
+            return true;
+        }
+        foreach (explode('/', str_replace('\\', '/', $path)) as $part) {
+            if ('..' === $part) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static function isValidUploadTempPath(string $path): bool
+    {
+        if ('' === $path || self::pathHasParentTraversal($path)) {
+            return false;
+        }
+        $base = basename($path);
+        if (!str_starts_with($base, self::UPLOAD_TEMP_PREFIX)) {
+            return false;
+        }
+        if (!is_file($path)) {
+            return false;
+        }
+        $real = realpath($path);
+        if (false === $real) {
             return false;
         }
         $tmpdir = realpath(self::tempDir());
-        $real = realpath($path);
-        if (false === $tmpdir || false === $real) {
+        if (false === $tmpdir) {
             return false;
         }
-        $prefix = $tmpdir.DIRECTORY_SEPARATOR;
-        if (!str_starts_with($real, $prefix)) {
-            return false;
-        }
-        $base = basename($real);
+        $prefix = $tmpdir.\DIRECTORY_SEPARATOR;
 
-        return str_starts_with($base, self::UPLOAD_TEMP_PREFIX);
+        return str_starts_with($real, $prefix);
     }
 
-    /**
-     * move_uploaded_file() subset: only compiler upload temps; rejects unsafe destinations.
-     */
     public static function moveUploadedFile(string $from, string $to): bool
     {
-        if (str_contains($from, "\0") || str_contains($to, "\0")) {
-            return false;
-        }
-        if (!self::isCompilerUploadTempPath($from)) {
-            return false;
-        }
-        if (preg_match('#(^|[/\\\\])\.\.([/\\\\]|$)#', $to)) {
+        if (!self::isValidUploadTempPath($from) || self::pathHasParentTraversal($to) || '' === $to) {
             return false;
         }
 
         return @rename($from, $to);
+    }
+
+    public static function copy(string $from, string $to): bool
+    {
+        return @copy($from, $to);
     }
 
     public static function touch(string $path, ?int $mtime = null): bool
