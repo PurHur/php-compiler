@@ -34,8 +34,8 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | Layer | Today | Target |
 |-------|-------|--------|
 | **Bootstrap driver** | Zend runs `php bin/compile.php` | Compiled `bin/compile.php` |
-| **Bundle size** | **606** curated `require_once` in spine smoke (108 minimal overlap + **495** M2-only) | **606** inventory files |
-| **Inventory coverage** | **100%** of vm.php path in spine smoke (**606/606**) | **100%*
+| **Bundle size** | **606** curated `require_once` in spine smoke (108 minimal overlap + **495** M2-only) | **611** inventory files |
+| **Inventory coverage** | **100%** of vm.php path in spine smoke (**606/611**) | **100%*
 | **HelloWorld** | Native **run** ✅; **emit** still Zend fallback | Native compile + emit |
 | **Bootstrap loop (M4)** | Gen-1 link + gen-2 Zend partial | Native gen-2 emit + full tree rebuild |
 | **Vendor** | `composer install` + patches on host | Prelinked artifacts only |
@@ -62,7 +62,7 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 |-----------|----------------|--------|-----|
 | **M0** | AOT can link a **small** honest `lib/` subset | ✅ | 100% |
 | **M1** | Bundle is **compiler-shaped** (lint + compile-smoke) | ✅ | 100% |
-| **M2** | Spine grows toward full `bin/vm.php` inventory | 🚧 **606/606** units | **100%*
+| **M2** | Spine grows toward full `bin/vm.php` inventory | 🚧 **606/611** units | **100%*
 | **M3** | Self-host binary **compiles external PHP** (HelloWorld) without Zend emit | 🚧 partial | **~45%** |
 | **M4** | Self-host binary **rebuilds** the next compiler tree | ⬜ | 0% |
 | **M5** | Full self-host; Zend retired from loop | ⬜ north star | 0% |
@@ -73,7 +73,7 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 
 | Indicator | Formula | May 2026 |
 |-----------|---------|----------|
-| **M2 spine progress** | `require_once` units in `compiler_lib_spine_smoke` ÷ Phase A inventory file count | **606 / 606 ≈ 99.7%*
+| **M2 spine progress** | `require_once` units in `compiler_lib_spine_smoke` ÷ Phase A inventory file count | **606 / 611** (5 deferred native-link)
 | **Public “Self-host” row** | Same M2 ratio until M3–M5 gates add weight ([`development-status.md`](pages/development-status.md)) | **~61%** |
 | **Composite (internal)** | Milestone weights in table above (M0–M1 = 100%, M2 = spine %, M3–M5 = gate %) | **~54%** |
 
