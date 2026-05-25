@@ -126,7 +126,7 @@ AOT link/execute: [#1891](https://github.com/PurHur/php-compiler/issues/1891). A
 
 ### 006-FileUploadWeb
 
-`multipart/form-data` upload with nested `$_FILES['doc']` ([#1999](https://github.com/PurHur/php-compiler/issues/1999)). VM run shows the empty state; use `phpc serve` and `curl -F` for upload smoke.
+`multipart/form-data` upload with nested `$_FILES['doc']` ([#1999](https://github.com/PurHur/php-compiler/issues/1999)). VM run shows the empty state; use `phpc serve` and `curl -F` for upload smoke (presenter copy-paste: [docs/GETTING-STARTED.md](../docs/GETTING-STARTED.md) § 5a; detail: [006-FileUploadWeb/README.md](006-FileUploadWeb/README.md)).
 
 ```console
 ./phpc lint examples/006-FileUploadWeb/example.php
