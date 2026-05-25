@@ -153,6 +153,7 @@ class Module extends ModuleAbstract
             new hash_(),
             new hash_hmac(),
             new md5(),
+            new sha1(),
             new crc32(),
             new password_hash(),
             new password_verify(),
