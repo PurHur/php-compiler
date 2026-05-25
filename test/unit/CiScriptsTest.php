@@ -148,6 +148,39 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('ci_run_sessions_web_smoke', $local);
     }
 
+    public function testCiDefaultsEnvDefinesFileUploadWebGatesOff(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString('FILE_UPLOAD_WEB_SMOKE_GATE="${FILE_UPLOAD_WEB_SMOKE_GATE:-0}"', $defaults);
+        $this->assertStringContainsString('FILE_UPLOAD_WEB_AOT_LINK_GATE="${FILE_UPLOAD_WEB_AOT_LINK_GATE:-0}"', $defaults);
+        $this->assertStringContainsString('FILE_UPLOAD_WEB_AOT_SMOKE_GATE="${FILE_UPLOAD_WEB_AOT_SMOKE_GATE:-0}"', $defaults);
+    }
+
+    public function testExamplesWebSmokeDefinesFileUploadOnlyFlag(): void
+    {
+        $smoke = (string) file_get_contents(dirname(__DIR__, 2).'/script/examples-web-smoke.sh');
+        $this->assertStringContainsString('--fileupload-only', $smoke);
+        $this->assertStringContainsString('FILE_UPLOAD_WEB_SMOKE_GATE', $smoke);
+        $this->assertStringContainsString('006-FileUploadWeb', $smoke);
+    }
+
+    public function testExamplesCompileTestHonorsFileUploadWebAotLinkGate(): void
+    {
+        $source = (string) file_get_contents(dirname(__DIR__).'/unit/ExamplesCompileTest.php');
+        $this->assertStringContainsString('FILE_UPLOAD_WEB_AOT_LINK_GATE', $source);
+        $this->assertStringContainsString('fileUploadWebAotLinkGateEnabled', $source);
+        $this->assertStringContainsString('test006FileUploadWebAotLink', $source);
+    }
+
+    public function testCiLocalExcludesFileUploadWebAotExecuteUnlessGateOn(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('ci_run_file_upload_web_aot_execute', $body);
+        $this->assertStringContainsString('--exclude-group fileuploadweb-aot-execute', $body);
+        $this->assertStringContainsString('--group fileuploadweb-aot-execute', $body);
+        $this->assertStringContainsString('FILE_UPLOAD_WEB_AOT_SMOKE_GATE:-0', $body);
+    }
+
     public function testCiFastHonorsMiniWebAppServeGate(): void
     {
         $fast = dirname(__DIR__, 2).'/script/ci-fast.sh';

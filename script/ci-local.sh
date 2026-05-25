@@ -60,6 +60,7 @@ if [[ -z "${PHP_COMPILER_SKIP_SERVE_TESTS:-}" ]]; then
   fi
 
   ci_run_sessions_web_smoke
+  ci_run_file_upload_web_smoke
 fi
 
 if ci_llvm_ready; then
@@ -87,6 +88,7 @@ if ci_llvm_ready; then
     ci_run_aot_link_phpunit "$@"
     ci_run_miniwebapp_aot_execute "$@"
     ci_run_sessions_web_aot_execute "$@"
+    ci_run_file_upload_web_aot_execute "$@"
     ci_run_miniwebapp_serve_aot "$@"
     ci_run_miniwebapp_jit_project "$@"
   else
@@ -101,6 +103,7 @@ if ci_llvm_ready; then
     ci_run_aot_link_phpunit "$@"
     ci_run_miniwebapp_aot_execute "$@"
     ci_run_sessions_web_aot_execute "$@"
+    ci_run_file_upload_web_aot_execute "$@"
     ci_run_miniwebapp_serve_aot "$@"
     ci_run_miniwebapp_jit_project "$@"
   fi
