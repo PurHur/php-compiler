@@ -30,6 +30,10 @@ class JITTest extends BaseTest {
             if (str_contains(strtolower($case[0]), 'splobjectstorage')) {
                 continue;
             }
+            // Dynamic $fn() JIT compile: VariableFunctionDynamicJITTest; execute MCJIT (#2055).
+            if (str_contains(strtolower($case[0]), 'variable_function_dynamic')) {
+                continue;
+            }
             yield $case;
         }
     }

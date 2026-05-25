@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
+use PHPCompiler\Web\Superglobals;
 
 /** Variable function calls ($fn()) — issue #56. */
 final class VariableFunctionCallTest extends TestCase
@@ -58,6 +59,25 @@ PHP;
     public function testVmVariableFunctionCompliance(): void
     {
         $this->assertSame(self::EXPECT, $this->runBin('bin/vm.php'));
+    }
+
+    /**
+     * @group llvm
+     * @group jit
+     */
+    public function testVmDynamicVariableFunctionFromGet(): void
+    {
+        $code = <<<'PHP'
+<?php
+$name = $_GET['op'] ?? 'strlen';
+echo $name('hi');
+PHP;
+        $rt = new Runtime();
+        Superglobals::populateFromEnvironment($rt->vmContext, 'op=strlen', null);
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame('2', ob_get_clean());
     }
 
     /**
