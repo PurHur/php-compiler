@@ -12,7 +12,7 @@ use PHPCompiler\JIT\Variable;
 use PHPLLVM\Value;
 
 /**
- * SplObjectStorage::contains / ::count for self-host Block::scope (issue #816).
+ * SplObjectStorage instance methods for self-host spine (#816, #1998).
  */
 final class SplObjectStorageMethod implements Call
 {
@@ -24,15 +24,66 @@ final class SplObjectStorageMethod implements Call
     public function call(Context $context, Variable ...$args): Value
     {
         switch ($this->method) {
+            case 'attach':
+                return $this->callAttach($context, ...$args);
             case 'contains':
+            case 'offsetexists':
                 return $this->callContains($context, ...$args);
             case 'count':
                 return $this->callCount($context, ...$args);
+            case 'offsetget':
+                return $this->callOffsetGet($context, ...$args);
+            case 'offsetset':
+                return $this->callOffsetSet($context, ...$args);
             default:
                 throw new \LogicException(
                     'SplObjectStorage JIT lowering is not implemented for '.$this->method.'()'
                 );
         }
+    }
+
+    private function callAttach(Context $context, Variable ...$args): Value
+    {
+        if (count($args) < 2) {
+            throw new \LogicException('SplObjectStorage::attach() requires an object key');
+        }
+        $ht = self::backingHashtable($context, $args[0]);
+        $keyObj = self::loadKeyObject($context, $args[1]);
+        if (count($args) >= 3) {
+            HashTableHelper::setAtObjectKey($context, $ht, $keyObj, $args[2]);
+        } else {
+            $writable = HashTableHelper::writableObjectKeyValueBox($context, $ht, $keyObj);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeNull'),
+                JitValueBox::pointer($context, $writable->value)
+            );
+        }
+
+        return self::voidResult($context);
+    }
+
+    private function callOffsetSet(Context $context, Variable ...$args): Value
+    {
+        if (count($args) < 3) {
+            throw new \LogicException('SplObjectStorage::offsetSet() requires object key and value');
+        }
+        $ht = self::backingHashtable($context, $args[0]);
+        $keyObj = self::loadKeyObject($context, $args[1]);
+        HashTableHelper::setAtObjectKey($context, $ht, $keyObj, $args[2]);
+
+        return self::voidResult($context);
+    }
+
+    private function callOffsetGet(Context $context, Variable ...$args): Value
+    {
+        if (count($args) < 2) {
+            throw new \LogicException('SplObjectStorage::offsetGet() requires an object key');
+        }
+        $ht = self::backingHashtable($context, $args[0]);
+        $keyObj = self::loadKeyObject($context, $args[1]);
+        $fetched = HashTableHelper::readObjectKeyToValueBox($context, $ht, $keyObj);
+
+        return $fetched->value;
     }
 
     private function callContains(Context $context, Variable ...$args): Value
@@ -41,15 +92,7 @@ final class SplObjectStorageMethod implements Call
             throw new \LogicException('SplObjectStorage::contains() requires an object key');
         }
         $ht = self::backingHashtable($context, $args[0]);
-        $key = $args[1];
-        $keyObj = Variable::TYPE_OBJECT === $key->type
-            ? $context->helper->loadValue($key)
-            : $context->builder->call(
-                $context->lookupFunction('__value__readObject'),
-                Variable::KIND_VARIABLE === $key->kind
-                    ? JitValueBox::pointer($context, $key->value)
-                    : $context->helper->loadValue($key)
-            );
+        $keyObj = self::loadKeyObject($context, $args[1]);
 
         return $context->builder->call(
             $context->lookupFunction('__hashtable__offsetIsSetObjectKey'),
@@ -68,6 +111,31 @@ final class SplObjectStorageMethod implements Call
         $num = $context->builder->load($context->builder->structGep($ht, $map['numElements']));
 
         return $context->builder->truncOrBitCast($num, $context->getTypeFromString('int64'));
+    }
+
+    private static function loadKeyObject(Context $context, Variable $key): Value
+    {
+        if (Variable::TYPE_OBJECT === $key->type) {
+            return $context->helper->loadValue($key);
+        }
+
+        return $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            Variable::KIND_VARIABLE === $key->kind
+                ? JitValueBox::pointer($context, $key->value)
+                : $context->helper->loadValue($key)
+        );
+    }
+
+    private static function voidResult(Context $context): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            JitValueBox::pointer($context, $slot)
+        );
+
+        return $slot;
     }
 
     private static function backingHashtable(Context $context, Variable $receiver): Value

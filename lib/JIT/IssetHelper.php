@@ -185,9 +185,14 @@ final class IssetHelper
                 'splobjectstorage' === strtolower($containerUserType)
                 && Variable::TYPE_OBJECT === $dim->type
             ) {
-                $keyStr = HashTableHelper::objectPointerAsStringKey($context, $dim);
+                $ht = $context->helper->loadValue($htVar);
+                $keyObj = $context->helper->loadValue($dim);
 
-                return self::compileHashTableOffsetIsSet($context, $htVar, $keyStr, $dimOp, $containerOp);
+                return $context->builder->call(
+                    $context->lookupFunction('__hashtable__offsetIsSetObjectKey'),
+                    $ht,
+                    $keyObj
+                );
             }
 
             return self::compileHashTableOffsetIsSet($context, $htVar, $dim, $dimOp, $containerOp);
