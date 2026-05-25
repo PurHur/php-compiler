@@ -48,6 +48,7 @@ if [[ -z "${PHP_COMPILER_SKIP_SERVE_TESTS:-}" ]]; then
   fi
 
   ci_run_sessions_web_smoke
+  ci_run_file_upload_web_smoke
 fi
 
 # Always lint 003-MiniWebApp even when callers pass --filter (issue #570, #539).
