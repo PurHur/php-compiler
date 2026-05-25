@@ -304,8 +304,18 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString('BOOTSTRAP_M3_HELLOWORLD_STRICT=1', $script);
         $this->assertStringContainsString('block_reason=', $script);
         $this->assertStringContainsString('M3_NATIVE_COMPILE=1', $script);
-        $this->assertStringContainsString('helloworld_compile_smoke: compile OK', $script);
+        $this->assertStringContainsString('compile_smoke_m3_emit: compile OK', $script);
+        $this->assertStringContainsString('helloworld_m3_emit_native_entry.php', $script);
+        $this->assertStringContainsString('PHP_COMPILER_EMIT_HELPER_LINK=1', $script);
         $this->assertStringContainsString('missing executable', $script);
+    }
+
+    public function testHelloWorldM3EmitNativeEntryExists(): void
+    {
+        $entry = self::$root.'/test/bootstrap-aot/helloworld_m3_emit_native_entry.php';
+        $this->assertFileExists($entry);
+        $source = (string) file_get_contents($entry);
+        $this->assertStringContainsString('compile_smoke_m3_emit', $source);
     }
 
     public function testCiLocalDocumentsM3StrictGate(): void

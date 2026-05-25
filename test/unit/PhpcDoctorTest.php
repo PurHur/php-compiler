@@ -44,6 +44,30 @@ final class PhpcDoctorTest extends TestCase
         $this->assertStringContainsString('--aot-project-probe', $result['stdout']);
     }
 
+    public function testHelpDocumentsSelfhostFlag(): void
+    {
+        $result = $this->runPhpc(['help']);
+        $this->assertSame(0, $result['exit']);
+        $this->assertStringContainsString('--selfhost', $result['stdout']);
+    }
+
+    public function testDoctorSelfhostPrintsBootstrapGates(): void
+    {
+        $result = $this->runPhpc(['doctor', '--selfhost']);
+        $this->assertSame(0, $result['exit'], $result['stdout']."\n".$result['stderr']);
+        $this->assertStringContainsString('North Star 2 self-host gates', $result['stdout']);
+        $this->assertStringContainsString('BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE', $result['stdout']);
+        $this->assertStringContainsString('BOOTSTRAP_M3_COMPILE_SMOKE_STRICT_GATE', $result['stdout']);
+        $this->assertStringContainsString('NORTH_STAR2_VERIFY_GATE', $result['stdout']);
+        $this->assertStringContainsString('SELFHOST_SPINE_COUNT_SYNC_GATE', $result['stdout']);
+        $this->assertStringContainsString('SELFHOST_SPINE_COVERAGE_SYNC_GATE', $result['stdout']);
+        $this->assertStringContainsString('BOOTSTRAP_LOOP_PROBE_GATE', $result['stdout']);
+        $this->assertStringContainsString('bootstrap-selfhost-helloworld-probe.sh', $result['stdout']);
+        $this->assertStringContainsString('helloworld_m3_emit_native_entry.php', $result['stdout']);
+        $this->assertStringContainsString('2. M2 spine', $result['stdout']);
+        $this->assertStringContainsString('bootstrap-spine-count.php', $result['stdout']);
+    }
+
     public function testDoctorJitProbeWhenLlvmPresent(): void
     {
         $repoRoot = dirname(__DIR__, 2);
