@@ -55,7 +55,7 @@ final class PhpcDoctorTest extends TestCase
     {
         $result = $this->runPhpc(['doctor', '--selfhost']);
         $this->assertSame(0, $result['exit'], $result['stdout']."\n".$result['stderr']);
-        $this->assertStringContainsString('North Star 2 self-host gates', $result['stdout']);
+        $this->assertStringContainsString('North star — self-host gates', $result['stdout']);
         $this->assertStringContainsString('BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE', $result['stdout']);
         $this->assertStringContainsString('BOOTSTRAP_M3_COMPILE_SMOKE_STRICT_GATE', $result['stdout']);
         $this->assertStringContainsString('NORTH_STAR2_VERIFY_GATE', $result['stdout']);
