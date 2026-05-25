@@ -21,7 +21,7 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | **Compiler in PHP** | Front/middle/back end stay in `lib/`, `ext/` — not rewritten in C |
 | **No `vendor/` at cold boot** | Parser/types/LLVM FFI prelinked once ([#1416](https://github.com/PurHur/php-compiler/issues/1416)); see [`bootstrap-vendor-inventory.md`](bootstrap-vendor-inventory.md) |
 | **No Zend bootstrap** | `bin/compile.php` / `bin/vm.php` run as **compiled** code, not `php bin/compile.php` |
-| **Full inventory** | Honest bundle covers the `bin/vm.php` path (~**606** files; [`bootstrap-inventory.md`](bootstrap-inventory.md)) |
+| **Full inventory** | Honest bundle covers the `bin/vm.php` path (~**611** files; [`bootstrap-inventory.md`](bootstrap-inventory.md)) |
 | **Stub surface minimal** | `PHP_COMPILER_SELFHOST_AOT` stubs shrink; compiler behavior is real, not link-only |
 | **Small native floor OK** | `lib/AOT/runtime/*.c` + external `clang` via `lib/AOT/Linker.php` — **not** required to disappear |
 
@@ -35,7 +35,7 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 |-------|-------|--------|
 | **Bootstrap driver** | Zend runs `php bin/compile.php` | Compiled `bin/compile.php` |
 | **Bundle size** | **606** curated `require_once` in spine smoke (108 minimal overlap + **495** M2-only) | **611** inventory files |
-| **Inventory coverage** | **100%** of vm.php path in spine smoke (**606/611**) | **100%*
+| **Inventory coverage** | **100%** of vm.php path in spine smoke (**606/611**; 5 deferred) | **100%*
 | **HelloWorld** | Native **run** ✅; **emit** still Zend fallback | Native compile + emit |
 | **Bootstrap loop (M4)** | Gen-1 link + gen-2 Zend partial | Native gen-2 emit + full tree rebuild |
 | **Vendor** | `composer install` + patches on host | Prelinked artifacts only |
@@ -52,7 +52,7 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | M4 `make bootstrap-loop-gen1-link` | 🚧 partial — gen-1 link + gen-2 Zend emit; native gen-2 blocked on M3 ([#1498](https://github.com/PurHur/php-compiler/issues/1498)) |
 | M4 `make bootstrap-loop-probe` | 🚧 ladder — `--dry-run` validates lint+M2+M3 partial+gen-1; full exits **2** until M3 strict ([#1498](https://github.com/PurHur/php-compiler/issues/1498)) |
 | `make bootstrap-aot-link` | ✅ **71/71** |
-| `php script/bootstrap-inventory.php --check` | ✅ **606** files, **0** source blockers |
+| `php script/bootstrap-inventory.php --check` | ✅ **611** files, **0** source blockers |
 
 ---
 
@@ -73,7 +73,7 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 
 | Indicator | Formula | May 2026 |
 |-----------|---------|----------|
-| **M2 spine progress** | `require_once` units in `compiler_lib_spine_smoke` ÷ Phase A inventory file count | **606 / 611** (5 deferred native-link)
+| **M2 spine progress** | `require_once` units in `compiler_lib_spine_smoke` ÷ Phase A inventory file count | **606 / 611** (5 deferred [#2066](https://github.com/PurHur/php-compiler/issues/2066))
 | **Public “Self-host” row** | Same M2 ratio until M3–M5 gates add weight ([`development-status.md`](pages/development-status.md)) | **~61%** |
 | **Composite (internal)** | Milestone weights in table above (M0–M1 = 100%, M2 = spine %, M3–M5 = gate %) | **~54%** |
 
