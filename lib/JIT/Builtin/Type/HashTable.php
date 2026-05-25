@@ -1519,14 +1519,7 @@ class HashTable extends Type
         PHPLLVM\Value $ht,
         PHPLLVM\Value $key
     ): PHPLLVM\Value {
-        $htMap = $this->context->structFieldMap['__hashtable__'];
-        $nodeMap = $this->context->structFieldMap['__strkey_node__'];
-        $head = $this->context->builder->load($this->context->builder->structGep($ht, $htMap['strKeys']));
         $valuePtrType = $this->context->getTypeFromString('__value__*');
-        $nodePtrType = $head->typeOf();
-
-        $currentSlot = $this->context->builder->alloca($nodePtrType, 1, 'strkey_current');
-        $this->context->builder->store($head, $currentSlot);
 
         $resultSlot = $this->context->builder->alloca($valuePtrType, 1, 'strkey_lookup_result');
         $this->context->builder->store($valuePtrType->constNull(), $resultSlot);
@@ -1536,7 +1529,18 @@ class HashTable extends Type
         $loopBody = $fn->appendBasicBlock('strkey_lookup_body');
         $found = $fn->appendBasicBlock('strkey_lookup_found');
         $done = $fn->appendBasicBlock('strkey_lookup_done');
-        $this->context->builder->branch($loopHead);
+
+        // Uninitialized/null hashtable: avoid segfault in native AOT (#1514, #1761).
+        $htNull = $this->context->builder->icmp(Builder::INT_EQ, $ht, $ht->typeOf()->constNull());
+        $this->context->builder->branchIf($htNull, $notFound, $loopHead);
+
+        $htMap = $this->context->structFieldMap['__hashtable__'];
+        $nodeMap = $this->context->structFieldMap['__strkey_node__'];
+        $head = $this->context->builder->load($this->context->builder->structGep($ht, $htMap['strKeys']));
+        $nodePtrType = $head->typeOf();
+
+        $currentSlot = $this->context->builder->alloca($nodePtrType, 1, 'strkey_current');
+        $this->context->builder->store($head, $currentSlot);
 
         $this->context->builder->positionAtEnd($loopHead);
         $node = $this->context->builder->load($currentSlot);
