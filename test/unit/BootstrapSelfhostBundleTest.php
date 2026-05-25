@@ -346,11 +346,6 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/pack.php',
         'ext/standard/date.php',
         'ext/standard/session_start.php',
-        'src/llvm-env.php',
-        'src/macro_functions.php',
-        'src/yay-php8-compat.php',
-        'lib/AOT/Linker.php',
-        'ext/standard/VmPregReplaceCallback.php',
         'ext/standard/VmSplAutoload.php',
         'ext/standard/uasort_.php',
         'ext/standard/usort_.php',
@@ -375,7 +370,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         $this->assertFileExists($entry);
         $contents = (string) file_get_contents($entry);
         $count = substr_count($contents, 'require_once __DIR__');
-        $this->assertSame(600, $count, '108 compiler_minimal overlap + 492 M2 spine units; bin/vm.php + src/cli.php deferred (#1423, #1467, #1922)');
+        $this->assertSame(594, $count, 'M2 spine; Linker/yay/vm_run_smoke tail excluded from native link (#1960)');
         foreach (self::LIB_SPINE_SMOKE_NEW_UNITS as $unit) {
             $this->assertStringContainsString(
                 "require_once __DIR__.'/../../../{$unit}';",

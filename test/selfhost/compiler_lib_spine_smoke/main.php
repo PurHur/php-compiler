@@ -603,19 +603,7 @@ require_once __DIR__.'/../../../ext/types/Module.php';
 require_once __DIR__.'/../../../ext/types/is_type.php';
 require_once __DIR__.'/../../../ext/types/mb_strlen.php';
 require_once __DIR__.'/../../../ext/types/strlen.php';
-require_once __DIR__.'/../../../src/llvm-env.php';
-// M2 spine close-out (#1492): VmSplAutoload + usort/uasort + Linker + VmPregReplaceCallback + macro_functions.
-require_once __DIR__.'/../../../lib/AOT/Linker.php';
-require_once __DIR__.'/../../../ext/standard/VmPregReplaceCallback.php';
-require_once __DIR__.'/../../../src/macro_functions.php';
-require_once __DIR__.'/../../../src/yay-php8-compat.php';
-// src/cli.php + compat shims — deferred (#1467): String_.php JIT link failure when bundled; cli_driver split ready for M4.
-// bin/vm.php — deferred (#1423 M4): entry pulls src/cli.php + vendor/autoload argv driver; bundle vm_run_smoke.php instead.
-require_once __DIR__.'/../../../test/bootstrap-aot/vm_run_smoke.php';
+// llvm-env, lib/AOT/Linker.php, yay-php8-compat, vm_run_smoke: excluded from native spine link (#1960).
+// VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (follow-up when vm_run_smoke links under LLVM 9).
 
-$vmSpineSmoke = getenv('PHP_COMPILER_VM_SPINE_SMOKE');
-if ('1' === $vmSpineSmoke || 'true' === strtolower((string) $vmSpineSmoke)) {
-    vm_run_smoke('Command line code', '<?php echo "vm-spine-ok\n";', []);
-} else {
-    echo "compiler_lib_spine_smoke bundle OK\n";
-}
+echo "compiler_lib_spine_smoke bundle OK\n";
