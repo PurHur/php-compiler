@@ -2233,16 +2233,21 @@ class JIT {
                                 $this->context->scope->args = [];
                                 break;
                             }
-                            throw new \LogicException('Variable function calls not yet supported');
-                        }
-                        $lcname = strtolower($nameVar->compileTimeString);
-                        if (!$this->context->functionIsRegistered($lcname)) {
-                            if (str_contains($nameVar->compileTimeString, '::')) {
-                                throw new \LogicException("Call to undefined static method {$nameVar->compileTimeString}()");
+                            $hints = array_values(array_unique(array_merge(
+                                JIT\VariableFunctionCallHelper::hintedCalleeNames($block, $nameSlot),
+                                JIT\VariableFunctionCallHelper::coalesceBranchLiteralHints($block)
+                            )));
+                            $this->context->scope->toCall = new JIT\Call\RuntimeVariableFunction($nameVar, $hints);
+                        } else {
+                            $lcname = strtolower($nameVar->compileTimeString);
+                            if (!$this->context->functionIsRegistered($lcname)) {
+                                if (str_contains($nameVar->compileTimeString, '::')) {
+                                    throw new \LogicException("Call to undefined static method {$nameVar->compileTimeString}()");
+                                }
+                                throw new \LogicException("Call to undefined function {$lcname}()");
                             }
-                            throw new \LogicException("Call to undefined function {$lcname}()");
+                            $this->context->scope->toCall = $this->context->resolveFunctionProxy($lcname);
                         }
-                        $this->context->scope->toCall = $this->context->resolveFunctionProxy($lcname);
                     }
                     $this->context->scope->args = [];
                     break;
@@ -4359,6 +4364,16 @@ class JIT {
                 continue;
             }
             $resolved = $this->resolveJitCompileTimeStringSlot($block, (int) $prior->arg3, $visited);
+            if (null !== $resolved) {
+                return $resolved;
+            }
+        }
+
+        foreach ($block->parents as $parent) {
+            if (!$parent instanceof Block) {
+                continue;
+            }
+            $resolved = $this->resolveJitCompileTimeStringSlot($parent, $slot, $visited);
             if (null !== $resolved) {
                 return $resolved;
             }

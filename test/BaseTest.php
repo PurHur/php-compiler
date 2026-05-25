@@ -199,6 +199,9 @@ abstract class BaseTest extends TestCase {
             $stdin = null;
         } else {
             $vmCmd = array_merge($this->phpCommand(), [$this->BIN]);
+            if (str_contains((string) $this->BIN, 'jit.php')) {
+                $vmCmd = array_merge($vmCmd, PhptWebSections::compileArgvFlags($sections));
+            }
             $cwd = $repoRoot;
             $stdin = $code;
         }

@@ -2900,6 +2900,16 @@ class Compiler {
             }
         }
 
+        foreach ($block->parents as $parent) {
+            if (!$parent instanceof Block) {
+                continue;
+            }
+            $resolved = $this->resolveCompileTimeStringSlot($slot, $parent, $visited);
+            if (null !== $resolved) {
+                return $resolved;
+            }
+        }
+
         return null;
     }
 
