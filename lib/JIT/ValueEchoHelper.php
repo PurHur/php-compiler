@@ -19,11 +19,7 @@ final class ValueEchoHelper
     {
         $charPtr = $context->getTypeFromString('char*');
         $context->builder->call(
-            $context->lookupFunction('printf'),
-            $context->builder->pointerCast(
-                $context->constantFromString('%s'),
-                $charPtr
-            ),
+            $context->lookupFunction('__phpc_ob_echo_cstr'),
             $context->builder->pointerCast(
                 $context->constantFromString($literal),
                 $charPtr
@@ -100,14 +96,10 @@ final class ValueEchoHelper
             $context->lookupFunction('__value__readLong'),
             $valuePtr
         );
-        $charPtr = $context->getTypeFromString('char*');
+        $i64 = $context->getTypeFromString('int64');
         $context->builder->call(
-            $context->lookupFunction('printf'),
-            $context->builder->pointerCast(
-                $context->constantFromString('%lld'),
-                $charPtr
-            ),
-            $longVal
+            $context->lookupFunction('__phpc_ob_echo_ll'),
+            $context->builder->zExt($longVal, $i64)
         );
         $context->builder->branch($doneBlock);
 
@@ -130,8 +122,9 @@ final class ValueEchoHelper
         $boolDone = BasicBlockHelper::append($context, 'echo_value_bool_done_'.$tag);
         $context->builder->branchIf($isTrue, $trueBlock, $falseBlock);
         $context->builder->positionAtEnd($trueBlock);
+        $charPtr = $context->getTypeFromString('char*');
         $context->builder->call(
-            $context->lookupFunction('printf'),
+            $context->lookupFunction('__phpc_ob_echo_cstr'),
             $context->builder->pointerCast($context->constantFromString('1'), $charPtr)
         );
         $context->builder->branch($boolDone);
@@ -150,11 +143,7 @@ final class ValueEchoHelper
             $valuePtr
         );
         $context->builder->call(
-            $context->lookupFunction('printf'),
-            $context->builder->pointerCast(
-                $context->constantFromString('%G'),
-                $charPtr
-            ),
+            $context->lookupFunction('__phpc_ob_echo_double'),
             $doubleVal
         );
         $context->builder->branch($doneBlock);
@@ -188,14 +177,11 @@ final class ValueEchoHelper
             $context->builder->structGep($strPtr, $strMap['length'])
         );
         $strChars = $context->builder->structGep($strPtr, $strMap['value']);
+        $sizeT = $context->getTypeFromString('size_t');
         $context->builder->call(
-            $context->lookupFunction('printf'),
-            $context->builder->pointerCast(
-                $context->constantFromString('%.*s'),
-                $charPtr
-            ),
-            $strLen,
-            $strChars
+            $context->lookupFunction('__phpc_ob_echo_substr'),
+            $strChars,
+            $context->builder->zExt($strLen, $sizeT)
         );
         $context->builder->branch($doneBlock);
 
