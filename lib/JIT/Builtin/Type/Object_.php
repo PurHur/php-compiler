@@ -470,7 +470,7 @@ class Object_ extends Type {
         $parentLc = strtolower(ltrim($parentName, '\\'));
         if (!isset($this->classes[$parentLc])) {
             if (class_exists($parentName)) {
-                $this->registerExternalClass($parentLc);
+                $this->registerExternalClass($parentLc, $parentName);
             } else {
                 throw new \LogicException("Class {$className} extends unknown class {$parentName}");
             }
@@ -717,7 +717,7 @@ class Object_ extends Type {
     {
         $lcname = strtolower($name);
         if (!isset($this->classes[$lcname])) {
-            $this->registerExternalClass($lcname);
+            $this->registerExternalClass($lcname, $name);
         } else {
             $this->ensureExternalClassConstants($this->classes[$lcname], $lcname);
         }
@@ -780,11 +780,12 @@ class Object_ extends Type {
         }
     }
 
-    private function registerExternalClass(string $lcname): void
+    private function registerExternalClass(string $lcname, string $displayName): void
     {
         $id = count($this->classes);
         $this->properties[$id] = [];
         $this->classConstants[$id] = [];
+        $this->classIdToName[$id] = $displayName;
         $this->classes[$lcname] = $id;
         $this->ensureExternalClassConstants($id, $lcname);
         $this->seedExternalClassProperties($id, $lcname);
