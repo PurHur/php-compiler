@@ -171,13 +171,13 @@ make bootstrap-selfhost-link</code></pre>
       <div class="dual-track">
         <article class="track-panel track-panel--web">
           <h3>Stdlib (#1367–#1379)</h3>
-          <p><strong>12 / 13 closed.</strong> Landed: <code>parse_str</code>, reflection helpers, <code>pack</code>, <code>sleep</code>, cookies, autoload (VM), error handlers (VM), and more.</p>
-          <p><strong>Open:</strong> <code>debug_backtrace</code> — <a href="https://github.com/PurHur/php-compiler/pull/1404">#1404</a>.</p>
+          <p><strong>13 / 13 closed on master.</strong> Landed: <code>parse_str</code>, reflection helpers, <code>pack</code>, <code>sleep</code>, cookies, autoload (VM), <code>debug_backtrace</code>, error handlers (VM), and more.</p>
+          <p>Some stdlib items remain VM-only or JIT-deferred — see <a href="https://github.com/PurHur/php-compiler/blob/master/docs/stdlib-jit-audit.md">stdlib-jit-audit.md</a> ([#1776](https://github.com/PurHur/php-compiler/issues/1776)).</p>
         </article>
         <article class="track-panel track-panel--selfhost">
           <h3>Language (#1354–#1366)</h3>
           <p><strong>12 / 12 closed on master.</strong> Includes attributes VM v1 ([#1354](https://github.com/PurHur/php-compiler/issues/1354)), readonly classes ([#1360](https://github.com/PurHur/php-compiler/issues/1360) / [#1473](https://github.com/PurHur/php-compiler/pull/1473)), <code>never</code>, enums, ctor promotion, intersection types, unpack, multi-catch, <code>__serialize</code>, first-class callable JIT, variable-variables JIT, WeakReference/WeakMap ([#1478](https://github.com/PurHur/php-compiler/pull/1478)).</p>
-          <p>JIT/AOT reflection for attributes deferred; see [roadmap-wave3.md](https://github.com/PurHur/php-compiler/blob/master/docs/roadmap-wave3.md).</p>
+          <p>Attributes phase-2 (JIT/AOT reflection) tracked separately in <a href="https://github.com/PurHur/php-compiler/issues/1936">#1936</a>; wave-3 umbrella <a href="https://github.com/PurHur/php-compiler/issues/1380">#1380</a> is language <strong>12/12</strong> + stdlib <strong>13/13</strong> on master.</p>
         </article>
       </div>
     </section>

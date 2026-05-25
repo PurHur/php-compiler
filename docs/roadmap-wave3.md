@@ -1,5 +1,7 @@
 # Roadmap wave 3 tracker (#1354–#1379)
 
+> **Wave 3 complete on master (May 2026):** language **12/12** + stdlib **13/13** ([#1380](https://github.com/PurHur/php-compiler/issues/1380)). Phase-2 / JIT-only deferrals: [#1936](https://github.com/PurHur/php-compiler/issues/1936) (attributes reflection), [#1776](https://github.com/PurHur/php-compiler/issues/1776) (stdlib JIT audit), [#1238](https://github.com/PurHur/php-compiler/issues/1238).
+
 Living status for the **25 issues** filed May 2026 toward full PHP language + stdlib coverage. Umbrella: [#1380](https://github.com/PurHur/php-compiler/issues/1380). North stars: [#1044](https://github.com/PurHur/php-compiler/issues/1044), [#1492](https://github.com/PurHur/php-compiler/issues/1492) (self-host; was [#1056](https://github.com/PurHur/php-compiler/issues/1056)).
 
 Regenerate capability truth: `php script/capability-matrix.php`, `php script/capability-syntax.php`, `php script/audit-stdlib-jit.php`.
@@ -13,7 +15,7 @@ Regenerate capability truth: `php script/capability-matrix.php`, `php script/cap
 
 **Language landed (master):** `never` ([#1358](https://github.com/PurHur/php-compiler/issues/1358) / [#1466](https://github.com/PurHur/php-compiler/pull/1466)), enums ([#1356](https://github.com/PurHur/php-compiler/issues/1356) / [#1463](https://github.com/PurHur/php-compiler/pull/1463)), ctor promotion ([#1359](https://github.com/PurHur/php-compiler/issues/1359) / [#1464](https://github.com/PurHur/php-compiler/pull/1464)), multi-catch ([#1362](https://github.com/PurHur/php-compiler/issues/1362) / [#1468](https://github.com/PurHur/php-compiler/pull/1468)), intersection types ([#1357](https://github.com/PurHur/php-compiler/issues/1357) / [#1474](https://github.com/PurHur/php-compiler/pull/1474)), unpack ([#1361](https://github.com/PurHur/php-compiler/issues/1361) / [#1476](https://github.com/PurHur/php-compiler/pull/1476)), `__serialize` ([#1365](https://github.com/PurHur/php-compiler/issues/1365) / [#1477](https://github.com/PurHur/php-compiler/pull/1477)), first-class callable JIT ([#1363](https://github.com/PurHur/php-compiler/issues/1363) / [#1472](https://github.com/PurHur/php-compiler/pull/1472)), variable-variables JIT ([#1364](https://github.com/PurHur/php-compiler/issues/1364) / [#1381](https://github.com/PurHur/php-compiler/pull/1381)), readonly classes ([#1360](https://github.com/PurHur/php-compiler/issues/1360) / [#1473](https://github.com/PurHur/php-compiler/pull/1473)), WeakReference/WeakMap ([#1366](https://github.com/PurHur/php-compiler/issues/1366) / [#1478](https://github.com/PurHur/php-compiler/pull/1478)).
 
-**Language:** wave 3 language track complete on master (attributes [#1354](https://github.com/PurHur/php-compiler/issues/1354) — VM v1 ignores at runtime; JIT/AOT reflection deferred).
+**Language:** wave 3 language track complete on master (attributes [#1354](https://github.com/PurHur/php-compiler/issues/1354) — VM v1 ignores at runtime; JIT/AOT reflection deferred to phase-2 [#1936](https://github.com/PurHur/php-compiler/issues/1936)).
 
 Related merges outside this wave: `goto` ([#1228](https://github.com/PurHur/php-compiler/issues/1228) / [#1333](https://github.com/PurHur/php-compiler/pull/1333)), anonymous classes ([#1233](https://github.com/PurHur/php-compiler/issues/1233) / [#1386](https://github.com/PurHur/php-compiler/pull/1386)).
 
@@ -23,7 +25,7 @@ Related merges outside this wave: `goto` ([#1228](https://github.com/PurHur/php-
 
 | Issue | Topic | Status | PR / notes |
 |-------|--------|--------|------------|
-| [#1354](https://github.com/PurHur/php-compiler/issues/1354) | PHP 8 attributes | Closed (VM v1) | Compliance PHPTs `attribute_*.phpt`; ignored at runtime; JIT/AOT reflection deferred |
+| [#1354](https://github.com/PurHur/php-compiler/issues/1354) | PHP 8 attributes | Closed (VM v1) | Compliance PHPTs `attribute_*.phpt`; ignored at runtime; phase-2 reflection [#1936](https://github.com/PurHur/php-compiler/issues/1936) |
 | [#1356](https://github.com/PurHur/php-compiler/issues/1356) | Enum declarations | Closed | [#1463](https://github.com/PurHur/php-compiler/pull/1463) |
 | [#1357](https://github.com/PurHur/php-compiler/issues/1357) | Intersection types | Closed (master) | [#1474](https://github.com/PurHur/php-compiler/pull/1474); JIT deferred — `capabilities-syntax.md` |
 | [#1358](https://github.com/PurHur/php-compiler/issues/1358) | `never` return type | Closed | [#1466](https://github.com/PurHur/php-compiler/pull/1466) |
@@ -64,3 +66,7 @@ Related merges outside this wave: `goto` ([#1228](https://github.com/PurHur/php-
 - [capabilities.md](capabilities.md) · [capabilities-syntax.md](capabilities-syntax.md) · [stdlib-jit-audit.md](stdlib-jit-audit.md)
 - [local-ci-matrix.md](local-ci-matrix.md) — remote CI disabled; use `./script/ci-local.sh`
 - [#78](https://github.com/PurHur/php-compiler/issues/78) roadmap
+
+---
+
+**Wave 3 close-out (May 2026):** language **12/12**, stdlib **13/13** on master. Do not reopen [#1354](https://github.com/PurHur/php-compiler/issues/1354)–[#1379](https://github.com/PurHur/php-compiler/issues/1379) for phase-1 gaps — use phase-2 trackers [#1936](https://github.com/PurHur/php-compiler/issues/1936) (attributes reflection), [#1776](https://github.com/PurHur/php-compiler/issues/1776) (stdlib JIT audit), [#1238](https://github.com/PurHur/php-compiler/issues/1238).
