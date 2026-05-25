@@ -160,8 +160,15 @@ final class Doctor
         fwrite(STDOUT, "\nNorth Star 1 presenter (#1044, #1845):\n");
         fwrite(STDOUT, "  LLVM 9: {$llvmDetail}\n");
         fwrite(STDOUT, "  Serve tests: {$serveDetail}\n");
+        $nestedReturnGate = getenv('NESTED_RETURN_COMPLIANCE_GATE');
+        $nestedReturnOn = false === $nestedReturnGate || '' === $nestedReturnGate || '1' === $nestedReturnGate;
+        $nestedReturnDetail = $nestedReturnOn
+            ? 'default on — ci-fast NestedReturn* (#1888)'
+            : 'skipped (NESTED_RETURN_COMPLIANCE_GATE=0)';
+
         fwrite(STDOUT, "  Gates ladder     make miniwebapp-gates              stages 0–4d (#472)\n");
         fwrite(STDOUT, "  Fast CI          ./script/ci-fast.sh               VM/compliance\n");
+        fwrite(STDOUT, "  Nested return    {$nestedReturnDetail}\n");
         fwrite(STDOUT, "  Full AOT tail    ./script/ci-local.sh --filter MiniWebAppAotExecuteTest   LLVM required\n");
         fwrite(STDOUT, "  Presenter bundle make north-star1-verify            --require-llvm / --skip-llvm-tail\n");
         fwrite(STDOUT, "  Script           ./script/north-star1-verify.sh    same as make target\n");

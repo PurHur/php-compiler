@@ -54,6 +54,12 @@ if [[ "${MINIWEBAPP_VM_CLI_GATE:-1}" == "1" ]]; then
   ci_run_phpunit --filter 'MiniWebApp.*VmCli'
 fi
 
+# Nested return <call>() VM compliance (#1885, #1888). Default on; set NESTED_RETURN_COMPLIANCE_GATE=0 to skip.
+if [[ "${NESTED_RETURN_COMPLIANCE_GATE:-1}" == "1" ]]; then
+  echo "PHPUnit (fast): nested return VM compliance (NestedReturn*)..."
+  ci_run_phpunit --filter NestedReturn
+fi
+
 # Optional bootstrap tail when LLVM 9 present (aot-lint + probe + wave-check; issue #436).
 if [[ "${CI_FAST_BOOTSTRAP:-0}" == "1" ]]; then
   if ci_llvm_ready; then
