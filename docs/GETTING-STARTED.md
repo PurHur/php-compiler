@@ -105,6 +105,7 @@ Needs LLVM + ~8 GiB RAM; includes JIT/AOT lint/link and example smokes.
 | `./phpc init --profile miniwebapp dir/` | Scaffold MiniWebApp layout |
 | `./phpc init --profile apijson dir/` | Scaffold 004-ApiJson layout (flat `example.php`) |
 | `./phpc init --profile sessionsweb dir/` | Scaffold 005-SessionsWeb layout (flat `example.php`) |
+| `./phpc init --profile fileupload dir/` | Scaffold 006-FileUploadWeb layout (flat `example.php`) |
 | `./phpc doctor` | Environment + optional gate probe |
 | `./phpc doctor --gates` | North Star gate ladder + NS1/NS2 presenter steps ([#1752](https://github.com/PurHur/php-compiler/issues/1752), [#1857](https://github.com/PurHur/php-compiler/issues/1857), [#1871](https://github.com/PurHur/php-compiler/issues/1871)); 005-SessionsWeb ladder: `./phpc doctor --gates \| grep -i sessions` ([#1903](https://github.com/PurHur/php-compiler/issues/1903)) |
 | `make north-star1-verify` | Single North Star 1 presenter gate before closing [#1044](https://github.com/PurHur/php-compiler/issues/1044) ([#1845](https://github.com/PurHur/php-compiler/issues/1845)) |

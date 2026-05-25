@@ -123,6 +123,7 @@ Defaults are exported from [`script/ci-defaults.env`](../script/ci-defaults.env)
 | `BOOTSTRAP_VENDOR_INVENTORY_SYNC_GATE` | `0` | `ci-fast.sh` (`ci_run_inventory_checks`) | `php script/bootstrap-vendor-inventory.php --check` — [`docs/bootstrap-vendor-inventory.md`](bootstrap-vendor-inventory.md) vs live `vendor/` scan ([#2030](https://github.com/PurHur/php-compiler/issues/2030)); set `1` after vendor bump regen |
 | `M3_ALLOWLIST_SYNC_GATE` | `1` | `ci-fast.sh` (`ci_run_inventory_checks`) | `script/check-m3-allowlist-snapshot.php` ([#1905](https://github.com/PurHur/php-compiler/issues/1905)); set `0` for bulk symbol PRs |
 | `INIT_SESSIONSWEB_PARITY_GATE` | `1` | `ci-fast.sh` (`ci_run_inventory_checks`) | `script/check-init-sessionsweb-parity.sh` — `examples/005-SessionsWeb/` ↔ `templates/init-sessionsweb/` ([#1902](https://github.com/PurHur/php-compiler/issues/1902)); set `0` for doc-only iteration |
+| `INIT_FILEUPLOAD_PARITY_GATE` | `0` | `ci-fast.sh` (`ci_run_inventory_checks`) | `script/check-init-fileupload-parity.sh` — `examples/006-FileUploadWeb/` ↔ `templates/init-fileupload/` ([#2004](https://github.com/PurHur/php-compiler/issues/2004)); flip default-on ([#2020](https://github.com/PurHur/php-compiler/issues/2020)) |
 
 Ladder-only env vars (not in `ci-defaults.env`): `MINIWEBAPP_LINT_GATE` (default `1` in `web-smoke.sh`), `MINIWEBAPP_AOT_BISECT_GATE` (default `0` in `miniwebapp-gates.sh` — [#879](https://github.com/PurHur/php-compiler/issues/879)).
 
