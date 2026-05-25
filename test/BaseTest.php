@@ -188,6 +188,8 @@ abstract class BaseTest extends TestCase {
         self::applyLlvmToolchainEnv($env);
         self::applyEnvSection($env, $sections);
         PhptWebSections::applyToEnv($env, $sections);
+        // JIT/VM children must run llvm-env preload; PHPUnit parent skips it (#98, #2055).
+        unset($env['PHP_COMPILER_SKIP_LLVM_PRELOAD']);
         $runfile = isset($sections['RUNFILE']) ? trim($sections['RUNFILE']) : '';
         if ('' !== $runfile) {
             $runPath = realpath(($sections['__phpt_dir'] ?? $repoRoot) . '/' . $runfile);
