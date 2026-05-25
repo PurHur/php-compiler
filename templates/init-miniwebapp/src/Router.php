@@ -13,7 +13,7 @@ function miniwebapp_contact_name_is_valid(): bool
     if ($name == '') {
         return false;
     }
-    if ($name != substr($name, 0, 200)) {
+    if ($name != substr($name, 0, Router::DEFAULT_CONTACT_NAME_MAX)) {
         return false;
     }
 
@@ -25,7 +25,7 @@ function miniwebapp_contact_name_is_valid(): bool
  */
 class Router
 {
-    private const DEFAULT_CONTACT_NAME_MAX = 200;
+    public const DEFAULT_CONTACT_NAME_MAX = 200;
 
     /** @var array<string, mixed> */
     private array $config;
@@ -36,6 +36,16 @@ class Router
     public function __construct(array $config)
     {
         $this->config = $config;
+    }
+
+    /**
+     * Front-controller bootstrap (static call + ::class slice for AOT graph, #2185).
+     *
+     * @param array<string, mixed> $config
+     */
+    public static function fromConfig(array $config): self
+    {
+        return new self($config);
     }
 
     public function dispatch(string $method, string $route): void

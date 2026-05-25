@@ -10,7 +10,7 @@ Tracking issues: [#58](https://github.com/PurHur/php-compiler/issues/58), [#145]
 | Construct | VM | JIT | AOT | Issue | Notes |
 |-----------|:--:|:---:|:---:|-------|-------|
 | `class` / `new` | yes | yes | yes | [#58](https://github.com/PurHur/php-compiler/issues/58) | compliance PHPT; bootstrap AOT |
-| Anonymous class `new class { }` | yes | yes | yes | [#1233](https://github.com/PurHur/php-compiler/issues/1233) | php-cfg inline Stmt\Class_ in parseExpr_New; synthetic AnonymousClass@line name |
+| Anonymous class `new class { }` | yes | yes | no | [#1233](https://github.com/PurHur/php-compiler/issues/1233) | php-cfg inline Stmt\Class_ in parseExpr_New; synthetic AnonymousClass@line name |
 | Enum declarations `enum Foo: string { case Bar = 'x'; }` | yes | yes | no | [#1356](https://github.com/PurHur/php-compiler/issues/1356) | Backed enum cases as class constants; `Foo::Bar` const-like fetch; `enum_exists` registry |
 | Instance methods (`ClassMethod` / `Expr_MethodCall`) | yes | yes | yes | [#58](https://github.com/PurHur/php-compiler/issues/58) | MiniWebApp `$router->dispatch()` (#2059); compliance PHPT; bootstrap AOT |
 | Constructors (`__construct`) | yes | yes | yes | [#145](https://github.com/PurHur/php-compiler/issues/145) | Router `__construct(array $config)` (#2059); compliance PHPT; bootstrap AOT |
@@ -25,6 +25,7 @@ Tracking issues: [#58](https://github.com/PurHur/php-compiler/issues/58), [#145]
 | `match` expression | yes | yes | yes | [#143](https://github.com/PurHur/php-compiler/issues/143) | Lowered in php-cfg to === / jump-if / assign (#143); compliance PHPT; bootstrap AOT |
 | Arrow functions `fn () =>` | no | no | no | [#142](https://github.com/PurHur/php-compiler/issues/142) | compliance PHPT |
 | `ClassName::class` / `static::class` | yes | yes | yes | [#740](https://github.com/PurHur/php-compiler/issues/740) | Compile-time class name string; related to __CLASS__ (#199); compliance PHPT; bootstrap AOT |
+| Class member constants `public` / `private` / `protected const` | yes | yes | yes | [#2199](https://github.com/PurHur/php-compiler/issues/2199) | MiniWebApp `Router::DEFAULT_CONTACT_NAME_MAX` (#2059); compliance PHPT; bootstrap AOT |
 | Late static binding `static::method()` / `static::class` | yes | yes | yes | [#1231](https://github.com/PurHur/php-compiler/issues/1231) | VM/JIT called-class propagation; parent::method() and static:: LSB (#1858) |
 | Magic constants `__CLASS__`, `__METHOD__`, `__FUNCTION__` | yes | yes | yes | [#199](https://github.com/PurHur/php-compiler/issues/199) | Lowered at parse time via php-cfg MagicStringResolver; compliance PHPT |
 | Magic constant `__NAMESPACE__` | yes | yes | yes | [#199](https://github.com/PurHur/php-compiler/issues/199) | Requires `namespace` declaration (#84); compliance PHPT |
@@ -41,7 +42,7 @@ Tracking issues: [#58](https://github.com/PurHur/php-compiler/issues/58), [#145]
 | Variable variables (`$$name`) | yes | yes | yes | [#1226](https://github.com/PurHur/php-compiler/issues/1226) | php-cfg nests Operand\Variable name; VM resolves runtime local by name; JIT compile-time name fold (#1226); compliance PHPT |
 | Variable function calls (`$fn()`) | yes | yes | yes | [#56](https://github.com/PurHur/php-compiler/issues/56) | VM resolves callee at runtime; compiler folds literal assignment; JIT uses compile-time string |
 | Invokable objects (`$obj()` / `__invoke`) | yes | yes | yes | [#1232](https://github.com/PurHur/php-compiler/issues/1232) | Object-typed FuncCall lowered to __invoke method dispatch; VM runtime fallback |
-| First-class callable syntax (`foo(...)`, `Class::m(...)`) | yes | yes | yes | [#1363](https://github.com/PurHur/php-compiler/issues/1363) | php-cfg Expr_FirstClassCallable (#1230); VM stores string or [obj, method] array; JIT folds strlen(...) / Class::m(...) via compileTimeString assign chains (#1363) |
+| First-class callable syntax (`foo(...)`, `Class::m(...)`) | yes | yes | no | [#1363](https://github.com/PurHur/php-compiler/issues/1363) | php-cfg Expr_FirstClassCallable (#1230); VM stores string or [obj, method] array; JIT folds strlen(...) / Class::m(...) via compileTimeString assign chains (#1363) |
 | `never` return type | yes | yes | yes | [#1358](https://github.com/PurHur/php-compiler/issues/1358) | php-cfg Op\Type\Never_; any `return` in body is a compile error; normal completion via throw/exit |
 | Intersection types (`A&B`) | yes | yes | no | [#1357](https://github.com/PurHur/php-compiler/issues/1357) | php-cfg Op\Type\Intersection; VM checks object implements each interface at call |
 | Array/argument unpack `...$x` | yes | yes | yes | [#1361](https://github.com/PurHur/php-compiler/issues/1361) | php-cfg spread.patch (#141); VM HashTable::spreadFrom; JIT HashTableHelper::spreadInto + mergeCallArgEntries; compliance PHPT |
