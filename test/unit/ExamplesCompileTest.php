@@ -489,6 +489,34 @@ final class ExamplesCompileTest extends TestCase
     }
 
     /**
+     * 007-ThrowsWeb: native AOT link via compile.php (#2101, #2143).
+     *
+     * @group llvm
+     * @group aot
+     * @group aot-link
+     */
+    public function test007ThrowsWebAotLink(): void
+    {
+        if (!self::throwsWebAotLinkGateEnabled()) {
+            $this->markTestSkipped('THROWSWEB_AOT_LINK_GATE=0 — skip 007 AOT link gate (#2101)');
+        }
+        if (!self::isLlvmReady()) {
+            $this->markTestSkipped(
+                'LLVM 9 toolchain not available. Run script/install-llvm9.sh from the repository root.'
+            );
+        }
+        $source = realpath(dirname(__DIR__, 2).'/examples/007-ThrowsWeb/example.php');
+        $this->assertNotFalse($source);
+
+        $repoRoot = dirname(__DIR__, 2);
+        $env = $this->llvmProcessEnv($repoRoot);
+        $binary = $this->compileAotBinaryNoQueryBaking($source, $repoRoot, $env);
+        $this->assertFileExists($binary);
+
+        @unlink($binary);
+    }
+
+    /**
      * @dataProvider provideExamples
      *
      * @group llvm
@@ -1045,6 +1073,13 @@ final class ExamplesCompileTest extends TestCase
         $gate = getenv('THROWS_WEB_SMOKE_GATE');
 
         return false === $gate || '0' !== $gate;
+    }
+
+    private static function throwsWebAotLinkGateEnabled(): bool
+    {
+        $gate = getenv('THROWSWEB_AOT_LINK_GATE');
+
+        return false !== $gate && '' !== $gate && '1' === $gate;
     }
 
     private static function fileUploadWebAotLinkGateEnabled(): bool

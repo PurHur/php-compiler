@@ -1030,11 +1030,32 @@ restart:
             if (null !== $op->arg3) {
                 $catchFrame->scope[$op->arg3]->copyFrom($caught);
             }
+            $this->skipTryCatchHandlerTail($handler);
 
             return $catchFrame;
         }
 
         return null;
+    }
+
+    /**
+     * After a catch match, skip remaining TYPE_CATCH / CFG entry TYPE_JUMP on the handler
+     * block so merge fallthrough does not re-enter the try body (#2084).
+     */
+    private function skipTryCatchHandlerTail(Frame $handler): void
+    {
+        while ($handler->pos < $handler->block->nOpCodes) {
+            $op = $handler->block->opCodes[$handler->pos];
+            if (OpCode::TYPE_CATCH === $op->type || OpCode::TYPE_FINALLY === $op->type) {
+                $handler->pos++;
+                continue;
+            }
+            if (OpCode::TYPE_JUMP === $op->type) {
+                $handler->pos++;
+                continue;
+            }
+            break;
+        }
     }
 
     private function catchTypesMatch(OpCode $op, Variable $thrown): bool
