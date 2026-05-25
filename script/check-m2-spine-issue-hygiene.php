@@ -16,7 +16,8 @@ declare(strict_types=1);
  *   php script/check-m2-spine-issue-hygiene.php --close      # close stale via gh
  *   php script/check-m2-spine-issue-hygiene.php --update-fixture  # refresh docs/fixtures (needs gh)
  *
- * Opt-in CI gate: M2_SPINE_ISSUE_HYGIENE_GATE=1 (see script/ci-common.sh).
+ * CI gate (default on): M2_SPINE_ISSUE_HYGIENE_GATE=1 in script/ci-defaults.env (#1819).
+ * Opt-out: M2_SPINE_ISSUE_HYGIENE_GATE=0 for bulk spine PRs.
  */
 
 $root = dirname(__DIR__);
