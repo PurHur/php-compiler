@@ -31,6 +31,17 @@ Defaults from `script/ci-defaults.env` (VM smoke **off** until stable):
 |-------|------|---------|----------------------|
 | VM serve | `THROWS_WEB_SMOKE_GATE` | `0` | `THROWS_WEB_SMOKE_GATE=1 ./script/examples-web-smoke.sh --throws-only` ([#2093](https://github.com/PurHur/php-compiler/issues/2093)) |
 
+## Benchmark row
+
+Regenerate `examples/README.md` timings when lint is green:
+
+```console
+BENCH_THROWSWEB=1 ./script/rebuild-examples.php
+grep '007-ThrowsWeb' examples/README.md
+```
+
+Omitted by default until `phpc lint --all examples/007-ThrowsWeb` passes (same gate as **005** / **006**). See [#2113](https://github.com/PurHur/php-compiler/issues/2113).
+
 ## Related
 
 - [#195](https://github.com/PurHur/php-compiler/issues/195) — `throw` lowering
