@@ -11,10 +11,10 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * debug_backtrace() — minimal stack trace array (VM only; issue #1378).
+ * debug_backtrace() — minimal stack trace array (issue #1378).
  *
- * Each frame includes file, line (0 when unknown), and function name only.
- * JIT/AOT deferred — see SelfHostBuiltinPolicy::VM_ONLY_DEFERRED.
+ * VM: walks Frame parent chain. JIT lowering in {@see JitDebugBacktrace} (deferred in
+ * {@see \PHPCompiler\JIT\SelfHostBuiltinPolicy::VM_ONLY_DEFERRED} until MCJIT frame arrays are stable).
  */
 final class debug_backtrace extends Internal
 {
