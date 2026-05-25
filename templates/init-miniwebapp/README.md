@@ -33,10 +33,28 @@ curl -s 'http://127.0.0.1:8080/index.php/home'
 phpc build --project .
 ```
 
-`phpc.json` sets `entry`, `public`, `assets`, `includes`, and the default AOT binary path (`.phpc/bin/app`). Native AOT execute is tracked in [#764](https://github.com/PurHur/php-compiler/issues/764) (link [#568](https://github.com/PurHur/php-compiler/issues/568) closed).
+`phpc.json` sets `entry`, `public`, `assets`, `includes`, and the default AOT binary path (`.phpc/bin/app`). Native AOT link and execute are green on `master` ([#752](https://github.com/PurHur/php-compiler/issues/752), [#764](https://github.com/PurHur/php-compiler/issues/764) closed).
+
+## Run matrix
+
+| Mode | Status | Command |
+|------|--------|---------|
+| Lint | ✅ | `phpc lint --all .` |
+| VM serve | ✅ | `phpc serve 127.0.0.1:8080 .` |
+| AOT link | ✅ | `phpc build --project .` when LLVM ready |
+| AOT execute | ✅ | native home/hello/contact routes ([#764](https://github.com/PurHur/php-compiler/issues/764) closed) |
+| Deploy smoke | opt-in | `DEPLOY_SMOKE_003_EXECUTE=1` in php-compiler `deploy-smoke.sh` ([#1530](https://github.com/PurHur/php-compiler/issues/1530)) |
 
 ## CI gate ladder
 
-Progressive checks for this layout are tracked in [issue #472](https://github.com/PurHur/php-compiler/issues/472) (`script/miniwebapp-gates.sh`).
+Progressive checks for this layout are tracked in [issue #472](https://github.com/PurHur/php-compiler/issues/472) (`script/miniwebapp-gates.sh` in the php-compiler repo). Full ladder table: [docs/miniwebapp-gates.md](https://github.com/PurHur/php-compiler/blob/master/docs/miniwebapp-gates.md).
+
+| Stage | Check | Status |
+|-------|--------|--------|
+| 1 | `phpc lint --all` | ✅ |
+| 2 | `ServeTest` `@group miniwebapp` | ✅ |
+| 4b | AOT link (`phpc build --project`) | ✅ |
+| 4b2 | AOT execute (CGI env) | ✅ ([#764](https://github.com/PurHur/php-compiler/issues/764) closed) |
+| 4d | `deploy-smoke --example 003` | opt-in ([#1530](https://github.com/PurHur/php-compiler/issues/1530)) |
 
 See the [php-compiler README](https://github.com/PurHur/php-compiler#quick-start-host-php) for Docker CI and the capability matrix.
