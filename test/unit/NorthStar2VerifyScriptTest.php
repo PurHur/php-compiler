@@ -42,6 +42,9 @@ final class NorthStar2VerifyScriptTest extends TestCase
         $this->assertStringContainsString('HelloWorld', $combined);
         $this->assertStringContainsString('#1492', $combined);
         $this->assertStringContainsString('#1865', $combined);
+        $this->assertStringContainsString('NORTH_STAR2_THROWSWEB_GATE', $combined);
+        $this->assertStringContainsString('examples-throws-smoke', $combined);
+        $this->assertStringContainsString('#2177', $combined);
     }
 
     public function testNorthStar2VerifyScriptDocumentsSteps(): void
@@ -57,6 +60,11 @@ final class NorthStar2VerifyScriptTest extends TestCase
         $this->assertStringContainsString('bootstrap-loop-probe.sh', $body);
         $this->assertStringContainsString('ci_llvm_ready', $body);
         $this->assertStringContainsString('--strict', $body);
+        $this->assertStringContainsString('check-init-throwsweb-parity.sh', $body);
+        $this->assertStringContainsString('examples-throws-smoke', $body);
+        $this->assertStringContainsString('NORTH_STAR2_THROWSWEB_GATE', $body);
+        $this->assertStringContainsString('ns2_run_throwsweb_tail', $body);
+        $this->assertStringContainsString('--skip-throwsweb', $body);
     }
 
     public function testMakefileDeclaresNorthStar2VerifyTarget(): void

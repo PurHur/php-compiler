@@ -973,6 +973,16 @@ final class CiScriptsTest extends TestCase
             'NORTH_STAR2_VERIFY_GATE="${NORTH_STAR2_VERIFY_GATE:-1}"',
             $defaults
         );
+        $this->assertStringContainsString(
+            'NORTH_STAR2_THROWSWEB_GATE="${NORTH_STAR2_THROWSWEB_GATE:-1}"',
+            $defaults
+        );
+
+        $docker = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');
+        $this->assertStringContainsString(
+            'NORTH_STAR2_THROWSWEB_GATE=${NORTH_STAR2_THROWSWEB_GATE:-1}',
+            $docker
+        );
     }
 
     public function testLocalCiMatrixDocumentsNorthStar2VerifyGate(): void
@@ -981,6 +991,9 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('NORTH_STAR2_VERIFY_GATE', $doc);
         $this->assertStringContainsString('north-star2-verify.sh', $doc);
         $this->assertMatchesRegularExpression('/\| `NORTH_STAR2_VERIFY_GATE` \| `1` \|/', $doc);
+        $this->assertStringContainsString('NORTH_STAR2_THROWSWEB_GATE', $doc);
+        $this->assertMatchesRegularExpression('/\| `NORTH_STAR2_THROWSWEB_GATE` \| `1` \|/', $doc);
+        $this->assertStringContainsString('examples-throws-smoke', $doc);
 
         $docSelfhost = (string) file_get_contents(dirname(__DIR__, 2).'/docs/bootstrap-selfhost.md');
         $this->assertStringContainsString('NORTH_STAR2_VERIFY_GATE=0', $docSelfhost);
