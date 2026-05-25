@@ -4,10 +4,14 @@
 declare(strict_types=1);
 
 /**
- * Guard examples/README.md 006-FileUploadWeb run matrix vs ci-defaults.env gate defaults (issue #2018).
+ * Guard examples/README.md 006-FileUploadWeb run matrix + benchmark row (issues #2018, #2027).
  *
- * Asserts VM multipart, AOT link, and AOT execute columns track:
+ * Run matrix vs ci-defaults.env:
  *   FILE_UPLOAD_WEB_SMOKE_GATE, FILE_UPLOAD_WEB_AOT_LINK_GATE, FILE_UPLOAD_WEB_AOT_SMOKE_GATE
+ *
+ * Benchmark row policy matches script/rebuild-examples.php (#2027):
+ *   - Include when BENCH_FILEUPLOADWEB=1 or phpc lint --all examples/006-FileUploadWeb passes
+ *   - AOT columns: n/a when LLVM/multipart probe fails; real timings when probe passes
  *
  * Usage:
  *   php script/check-rebuild-examples-006-row.php
@@ -33,6 +37,24 @@ $errors = [];
 
 if (!preg_match('/\| \[006-FileUploadWeb\]/', $body)) {
     $errors[] = 'examples/README.md: run matrix missing [006-FileUploadWeb] row (tree exists; see #1999)';
+}
+
+$expectBenchRow = should_expect_fileupload_benchmark_row($root);
+$hasBenchRow = benchmark_table_has_fileupload_web_row($body);
+
+if ($expectBenchRow && !$hasBenchRow) {
+    $errors[] = 'examples/README.md: benchmark table missing 006-FileUploadWeb row (lint green or BENCH_FILEUPLOADWEB=1; run: ./script/rebuild-examples.php)';
+}
+
+if (!$expectBenchRow && $hasBenchRow) {
+    $errors[] = 'examples/README.md: benchmark table has stale 006-FileUploadWeb row (lint failing; remove row or fix lint; FILEUPLOADWEB_LINT_GATE=0 only for rebuild script)';
+}
+
+if ($hasBenchRow) {
+    $benchLine = extract_fileupload_web_benchmark_line($body);
+    if (null !== $benchLine && !fileupload_benchmark_row_aot_columns_honest($benchLine, $root)) {
+        $errors[] = 'examples/README.md: 006-FileUploadWeb benchmark AOT columns out of sync (run: BENCH_FILEUPLOADWEB=1 BENCH_FILEUPLOADWEB_AOT=1 ./script/rebuild-examples.php; #2027)';
+    }
 }
 
 $matrixLine = extract_fileupload_run_matrix_line($body);
@@ -137,8 +159,234 @@ if ([] !== $errors) {
     exit(1);
 }
 
-fwrite(STDOUT, "check-rebuild-examples-006-row: OK (gates smoke={$smokeDefault} link={$linkDefault} aot={$aotDefault})\n");
+fwrite(
+    STDOUT,
+    'check-rebuild-examples-006-row: OK (gates smoke='.$smokeDefault.' link='.$linkDefault.' aot='.$aotDefault
+    .'; benchmark row '.($expectBenchRow ? 'expected' : 'omitted').")\n"
+);
 exit(0);
+
+function should_expect_fileupload_benchmark_row(string $repoRoot): bool
+{
+    if ('1' === getenv('BENCH_FILEUPLOADWEB')) {
+        return true;
+    }
+    if ('0' === getenv('FILEUPLOADWEB_LINT_GATE')) {
+        return false;
+    }
+
+    return fileupload_web_lint_passes($repoRoot);
+}
+
+function fileupload_web_lint_passes(string $repoRoot): bool
+{
+    $phpc = $repoRoot.'/phpc';
+    if (!is_executable($phpc)) {
+        return false;
+    }
+    $descriptorSpec = [
+        0 => ['pipe', 'r'],
+        1 => ['pipe', 'w'],
+        2 => ['pipe', 'w'],
+    ];
+    $proc = proc_open(
+        [$phpc, 'lint', '--all', $repoRoot.'/examples/006-FileUploadWeb'],
+        $descriptorSpec,
+        $pipes,
+        $repoRoot
+    );
+    if (!is_resource($proc)) {
+        return false;
+    }
+    fclose($pipes[0]);
+    stream_get_contents($pipes[1]);
+    stream_get_contents($pipes[2]);
+    fclose($pipes[1]);
+    fclose($pipes[2]);
+
+    return 0 === proc_close($proc);
+}
+
+function benchmark_table_has_fileupload_web_row(string $readmeBody): bool
+{
+    if (!preg_match('/<!-- benchmark table start -->(.*)<!-- benchmark table end -->/ims', $readmeBody, $m)) {
+        return false;
+    }
+
+    return (bool) preg_match('/\|\s*006-FileUploadWeb\s*\|/i', $m[1]);
+}
+
+function extract_fileupload_web_benchmark_line(string $readmeBody): ?string
+{
+    if (!preg_match('/<!-- benchmark table start -->(.*)<!-- benchmark table end -->/ims', $readmeBody, $m)) {
+        return null;
+    }
+    if (!preg_match('/^.*\|\s*006-FileUploadWeb\s*\|.*$/mi', $m[1], $line)) {
+        return null;
+    }
+
+    return trim($line[0]);
+}
+
+function fileupload_benchmark_row_aot_columns_honest(string $rowLine, string $repoRoot): bool
+{
+    $parts = array_map('trim', explode('|', $rowLine));
+    $parts = array_values(array_filter($parts, static fn (string $p): bool => '' !== $p));
+    if (count($parts) < 6) {
+        return true;
+    }
+    $compileCol = $parts[4] ?? '';
+    $compiledCol = $parts[5] ?? '';
+    $compileNa = (bool) preg_match('/n\/a/i', $compileCol);
+    $compiledNa = (bool) preg_match('/n\/a/i', $compiledCol);
+
+    if (!llvm_ready_for_fileupload_check($repoRoot)) {
+        return true;
+    }
+
+    if ('1' === getenv('BENCH_FILEUPLOADWEB_AOT')) {
+        return !$compileNa && !$compiledNa;
+    }
+
+    if (fileupload_web_aot_execute_probe($repoRoot)) {
+        return !$compileNa && !$compiledNa;
+    }
+
+    return $compileNa && $compiledNa;
+}
+
+function llvm_ready_for_fileupload_check(string $repoRoot): bool
+{
+    $candidates = [];
+    $fromEnv = getenv('PHP_COMPILER_LLVM_PATH');
+    if (false !== $fromEnv && '' !== $fromEnv) {
+        $candidates[] = $fromEnv;
+    }
+    $candidates[] = $repoRoot.'/.llvm';
+    $candidates[] = '/opt/llvm9';
+    foreach ($candidates as $dir) {
+        if (is_file($dir.'/libLLVM-9.so.1')) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function fileupload_web_aot_execute_probe(string $repoRoot): bool
+{
+    if ('0' === getenv('FILE_UPLOAD_WEB_AOT_PROBE')) {
+        return false;
+    }
+    if (!llvm_ready_for_fileupload_check($repoRoot)) {
+        return false;
+    }
+    $phpc = $repoRoot.'/phpc';
+    $project = $repoRoot.'/examples/006-FileUploadWeb';
+    $binary = $project.'/.phpc/bin/app';
+    if (!is_executable($phpc) || !is_file($project.'/example.php')) {
+        return false;
+    }
+
+    $env = [];
+    foreach ($_ENV as $key => $value) {
+        if (is_string($value)) {
+            $env[$key] = $value;
+        }
+    }
+    $llvmDir = null;
+    foreach ([getenv('PHP_COMPILER_LLVM_PATH') ?: '', $repoRoot.'/.llvm', '/opt/llvm9'] as $dir) {
+        if ('' !== $dir && is_file($dir.'/libLLVM-9.so.1')) {
+            $llvmDir = realpath($dir) ?: $dir;
+            break;
+        }
+    }
+    if (null !== $llvmDir) {
+        $env['PHP_COMPILER_LLVM_PATH'] = $llvmDir;
+        $ld = $env['LD_LIBRARY_PATH'] ?? '';
+        $env['LD_LIBRARY_PATH'] = '' === $ld ? $llvmDir : $llvmDir.':'.$ld;
+    }
+
+    if (!is_executable($binary)) {
+        $build = proc_open(
+            [$phpc, 'build', '--project', $project],
+            [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+            $pipes,
+            $repoRoot,
+            $env
+        );
+        if (!is_resource($build)) {
+            return false;
+        }
+        fclose($pipes[0]);
+        stream_get_contents($pipes[1]);
+        stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        if (0 !== proc_close($build)) {
+            return false;
+        }
+    }
+
+    if (!is_executable($binary)) {
+        return false;
+    }
+
+    foreach (fileupload_web_multipart_cgi_env() as $key => $value) {
+        $env[$key] = $value;
+    }
+
+    $stdout = check_fileupload_run_binary($repoRoot, $binary, $env);
+    if (null === $stdout) {
+        return false;
+    }
+
+    return str_contains($stdout, 'Uploaded: README.md');
+}
+
+/**
+ * @return array<string, string>
+ */
+function fileupload_web_multipart_cgi_env(): array
+{
+    return [
+        'REQUEST_METHOD' => 'POST',
+        'REQUEST_BODY' => "--phpcFileB\r\n"
+            ."Content-Disposition: form-data; name=\"doc\"; filename=\"README.md\"\r\n"
+            ."Content-Type: text/plain\r\n\r\n"
+            ."bytes\r\n"
+            ."--phpcFileB--\r\n",
+        'CONTENT_TYPE' => 'multipart/form-data; boundary=phpcFileB',
+        'SCRIPT_NAME' => '/example.php',
+        'REQUEST_URI' => '/example.php',
+    ];
+}
+
+/**
+ * @param array<string, string> $env
+ */
+function check_fileupload_run_binary(string $repoRoot, string $binary, array $env): ?string
+{
+    $proc = proc_open(
+        [$binary],
+        [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+        $pipes,
+        $repoRoot,
+        $env
+    );
+    if (!is_resource($proc)) {
+        return null;
+    }
+    fclose($pipes[0]);
+    $stdout = stream_get_contents($pipes[1]);
+    fclose($pipes[1]);
+    fclose($pipes[2]);
+    if (0 !== proc_close($proc)) {
+        return null;
+    }
+
+    return false !== $stdout ? $stdout : '';
+}
 
 function ci_defaults_gate_default(string $repoRoot, string $gate): string
 {

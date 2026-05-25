@@ -31,5 +31,11 @@ final class RebuildExamples006RowTest extends TestCase
         $this->assertStringContainsString('ci-defaults.env', $script);
         $this->assertStringContainsString('move_uploaded_file', $script);
         $this->assertStringContainsString('#2018', $script);
+        $this->assertStringContainsString('BENCH_FILEUPLOADWEB', $script);
+        $this->assertStringContainsString('FILEUPLOADWEB_LINT_GATE', $script);
+        $this->assertStringContainsString('benchmark table start', $script);
+        $this->assertStringContainsString('BENCH_FILEUPLOADWEB_AOT', $script);
+        $this->assertStringContainsString('fileupload_web_aot_execute_probe', $script);
+        $this->assertStringContainsString('#2027', $script);
     }
 }

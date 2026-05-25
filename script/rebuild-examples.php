@@ -60,6 +60,11 @@ foreach ($exampleDirs as $dir) {
         continue;
     }
 
+    if ('006-FileUploadWeb' === basename($dir) && !shouldBenchFileUploadWeb($repoRoot)) {
+        echo " - Skipping 006-FileUploadWeb benchmark row (lint gate; BENCH_FILEUPLOADWEB=1 to force)\n";
+        continue;
+    }
+
     $benchmarks .= "\n".benchmarkExample($example, $phpCmd, $benchEnv, $repoRoot, $llvmReady);
 }
 
@@ -118,6 +123,56 @@ function shouldBenchSessionsWeb(string $repoRoot): bool
     }
 
     return sessionsWebLintPasses($repoRoot);
+}
+
+/**
+ * Include 006-FileUploadWeb when lint is green (issue #2027).
+ *
+ * BENCH_FILEUPLOADWEB=1 forces inclusion; FILEUPLOADWEB_LINT_GATE=0 skips the lint probe.
+ */
+function shouldBenchFileUploadWeb(string $repoRoot): bool
+{
+    $example = $repoRoot.'/examples/006-FileUploadWeb/example.php';
+    if (!is_file($example)) {
+        return false;
+    }
+    if ('1' === getenv('BENCH_FILEUPLOADWEB')) {
+        return true;
+    }
+    if ('0' === getenv('FILEUPLOADWEB_LINT_GATE')) {
+        return false;
+    }
+
+    return fileUploadWebLintPasses($repoRoot);
+}
+
+function fileUploadWebLintPasses(string $repoRoot): bool
+{
+    $phpc = $repoRoot.'/phpc';
+    if (!is_executable($phpc)) {
+        return false;
+    }
+    $descriptorSpec = [
+        0 => ['pipe', 'r'],
+        1 => ['pipe', 'w'],
+        2 => ['pipe', 'w'],
+    ];
+    $proc = proc_open(
+        [$phpc, 'lint', '--all', $repoRoot.'/examples/006-FileUploadWeb'],
+        $descriptorSpec,
+        $pipes,
+        $repoRoot
+    );
+    if (!is_resource($proc)) {
+        return false;
+    }
+    fclose($pipes[0]);
+    stream_get_contents($pipes[1]);
+    stream_get_contents($pipes[2]);
+    fclose($pipes[1]);
+    fclose($pipes[2]);
+
+    return 0 === proc_close($proc);
 }
 
 function sessionsWebLintPasses(string $repoRoot): bool
@@ -197,7 +252,8 @@ function exampleDisplayName(string $example): string
  *     aot_run_env: array<string, string>,
  *     skip_aot: bool,
  *     project_aot: bool,
- *     sessions_web_project_aot: bool
+ *     sessions_web_project_aot: bool,
+ *     fileupload_web_project_aot: bool
  * }
  */
 function exampleProfile(string $example): array
@@ -216,6 +272,7 @@ function exampleProfile(string $example): array
             'skip_aot' => false,
             'project_aot' => true,
             'sessions_web_project_aot' => false,
+            'fileupload_web_project_aot' => false,
         ];
     }
 
@@ -228,6 +285,20 @@ function exampleProfile(string $example): array
             'skip_aot' => false,
             'project_aot' => false,
             'sessions_web_project_aot' => true,
+            'fileupload_web_project_aot' => false,
+        ];
+    }
+
+    if ('006-FileUploadWeb' === exampleDisplayName($example)) {
+        return [
+            'query' => null,
+            'cgi_env' => fileUploadWebMultipartCgiEnv(),
+            'aot_compile_time_query' => true,
+            'aot_run_env' => [],
+            'skip_aot' => false,
+            'project_aot' => false,
+            'sessions_web_project_aot' => false,
+            'fileupload_web_project_aot' => true,
         ];
     }
 
@@ -245,6 +316,7 @@ function exampleProfile(string $example): array
             'skip_aot' => false,
             'project_aot' => false,
             'sessions_web_project_aot' => false,
+            'fileupload_web_project_aot' => false,
         ];
     }
 
@@ -256,6 +328,27 @@ function exampleProfile(string $example): array
         'skip_aot' => false,
         'project_aot' => false,
         'sessions_web_project_aot' => false,
+        'fileupload_web_project_aot' => false,
+    ];
+}
+
+/**
+ * Multipart POST CGI overlay for 006-FileUploadWeb VM/JIT/AOT benches (#2027).
+ *
+ * @return array<string, string>
+ */
+function fileUploadWebMultipartCgiEnv(): array
+{
+    return [
+        'REQUEST_METHOD' => 'POST',
+        'REQUEST_BODY' => "--phpcFileB\r\n"
+            ."Content-Disposition: form-data; name=\"doc\"; filename=\"README.md\"\r\n"
+            ."Content-Type: text/plain\r\n\r\n"
+            ."bytes\r\n"
+            ."--phpcFileB--\r\n",
+        'CONTENT_TYPE' => 'multipart/form-data; boundary=phpcFileB',
+        'SCRIPT_NAME' => '/example.php',
+        'REQUEST_URI' => '/example.php',
     ];
 }
 
@@ -619,6 +712,90 @@ function sessionsWebBenchCleanup(string $sessionDir): void
 }
 
 /**
+ * phpc build --project + multipart upload probe for 006-FileUploadWeb (#2027).
+ *
+ * @param array<string, string> $benchEnv
+ *
+ * @return array{compile: float, compiled: float}|null
+ */
+function tryBenchmarkFileUploadWebProjectAot(string $repoRoot, array $benchEnv): ?array
+{
+    if ('0' === getenv('BENCH_FILEUPLOADWEB_AOT')) {
+        echo "  006-FileUploadWeb AOT: skip (BENCH_FILEUPLOADWEB_AOT=0)\n";
+
+        return null;
+    }
+
+    $project = $repoRoot.'/examples/006-FileUploadWeb';
+    $phpc = $repoRoot.'/phpc';
+    $binary = $project.'/.phpc/bin/app';
+
+    if (!is_executable($phpc)) {
+        echo "  006-FileUploadWeb AOT: skip (phpc not executable)\n";
+
+        return null;
+    }
+
+    $compileStart = microtime(true);
+    $build = runProcessCapturing(
+        [$phpc, 'build', '--project', $project],
+        $benchEnv,
+        $repoRoot
+    );
+    $compileTime = microtime(true) - $compileStart;
+
+    if (0 !== $build['exit']) {
+        $stderr = $build['stderr'];
+        if (\PHPCompiler\Cli\PhpcBuild::isUserClassAotBlocked($stderr)) {
+            echo '  006-FileUploadWeb AOT: skip (link blocked: '.trim(substr($stderr, 0, 120))."…)\n";
+        } else {
+            echo "  006-FileUploadWeb AOT: skip (phpc build --project exit {$build['exit']})\n";
+        }
+
+        return null;
+    }
+
+    if (!is_executable($binary)) {
+        echo "  006-FileUploadWeb AOT: skip (binary missing after link)\n";
+
+        return null;
+    }
+
+    $aotEnv = $benchEnv;
+    foreach (fileUploadWebMultipartCgiEnv() as $key => $value) {
+        $aotEnv[$key] = $value;
+    }
+
+    if (!fileUploadWebAotMultipartProbe($repoRoot, $binary, $aotEnv)) {
+        echo "  006-FileUploadWeb AOT: skip (multipart upload probe failed)\n";
+
+        return null;
+    }
+
+    $iterations = 10;
+    $compiledStart = microtime(true);
+    for ($i = 0; $i < $iterations; ++$i) {
+        fileUploadWebAotMultipartProbe($repoRoot, $binary, $aotEnv);
+    }
+    $compiledTime = (microtime(true) - $compiledStart) / $iterations;
+
+    return ['compile' => $compileTime, 'compiled' => $compiledTime];
+}
+
+/**
+ * @param array<string, string> $baseEnv
+ */
+function fileUploadWebAotMultipartProbe(string $repoRoot, string $binary, array $baseEnv): bool
+{
+    $probe = runProcessCapturing([$binary], $baseEnv, $repoRoot);
+    if (0 !== $probe['exit']) {
+        return false;
+    }
+
+    return str_contains($probe['stdout'], 'Uploaded: README.md');
+}
+
+/**
  * @param list<string> $argv
  * @param array<string, string> $env
  */
@@ -687,6 +864,12 @@ function benchmarkExample(string $example, array $phpCmd, array $benchEnv, strin
         if (null !== $sessionsAot) {
             $compileTime = $sessionsAot['compile'];
             $compiledTime = $sessionsAot['compiled'];
+        }
+    } elseif ($llvmReady && !empty($profile['fileupload_web_project_aot'])) {
+        $fileUploadAot = tryBenchmarkFileUploadWebProjectAot($repoRoot, $benchEnv);
+        if (null !== $fileUploadAot) {
+            $compileTime = $fileUploadAot['compile'];
+            $compiledTime = $fileUploadAot['compiled'];
         }
     } elseif ($llvmReady && !empty($profile['project_aot'])) {
         $projectAot = tryBenchmarkMiniWebAppProjectAot($repoRoot, $benchEnv, $profile);
