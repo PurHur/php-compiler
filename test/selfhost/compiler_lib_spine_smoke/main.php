@@ -572,6 +572,7 @@ require_once __DIR__.'/../../../ext/standard/urlencode.php';
 require_once __DIR__.'/../../../ext/standard/usleep.php';
 require_once __DIR__.'/../../../ext/standard/var_dump.php';
 require_once __DIR__.'/../../../ext/standard/var_export.php';
+require_once __DIR__.'/../../../ext/standard/VmString.php';
 require_once __DIR__.'/../../../ext/standard/web_bool.php';
 require_once __DIR__.'/../../../ext/standard/web_int.php';
 require_once __DIR__.'/../../../ext/standard/web_string.php';
