@@ -406,7 +406,11 @@ class Object_ extends Type {
         $childLc = strtolower(ltrim($className, '\\'));
         $parentLc = strtolower(ltrim($parentName, '\\'));
         if (!isset($this->classes[$parentLc])) {
-            throw new \LogicException("Class {$className} extends unknown class {$parentName}");
+            if ('1' === getenv('PHP_COMPILER_SELFHOST_AOT') && class_exists($parentName)) {
+                $this->registerExternalClass($parentLc);
+            } else {
+                throw new \LogicException("Class {$className} extends unknown class {$parentName}");
+            }
         }
         $this->classParentLc[$childLc] = $parentLc;
     }
