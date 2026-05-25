@@ -19,6 +19,8 @@ Ordered smallest → largest for **#764** triage (issues **#880**, **#879**). Sa
 | 11 | `layout_title_branch` | #784 |
 | 12 | `layout_partial_chain` | #807 |
 | 13 | `method_include_void_array_property` | #846 |
+| 14 | `render_hello_request_assign` | #764 / request assign |
+| 15 | `class_method_json_api` | [#849](https://github.com/PurHur/php-compiler/issues/849) / [#1820](https://github.com/PurHur/php-compiler/issues/1820) |
 
 Run (LLVM 9 required):
 
@@ -32,9 +34,10 @@ vendor/bin/phpunit --group miniwebapp-bisect
 
 Optional full **003** CLI execute after the ladder: `MINIWEBAPP_AOT_BISECT_INCLUDE_APP=1 ./script/miniwebapp-aot-bisect.sh`.
 
+Dedicated PHPUnit entry (same PHPT, explicit filter): `ClassMethodJsonApiAotTest` in `test/aot/`.
+
 ## Related fixtures (outside bisect order)
 
 | Fixture | Tracks |
 |---------|--------|
-| `class_method_json_api` | [#849](https://github.com/PurHur/php-compiler/issues/849) — `Router::renderApiStatus()` JSON + `$this->resolveAppName()` |
 | `json_encode_api` | procedural JSON headers |
