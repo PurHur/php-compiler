@@ -594,6 +594,12 @@ function builtinCapabilityCurations(): array
             'aot' => 'yes',
             'notes' => [$persistenceNote],
         ],
+        'move_uploaded_file' => [
+            'aot' => 'yes',
+            'notes' => [
+                'nested $_FILES + multipart web runtime (#52, #87); 006-FileUploadWeb; opt-in FILE_UPLOAD_WEB_AOT_SMOKE_GATE (#2012)',
+            ],
+        ],
     ];
 }
 
@@ -823,6 +829,98 @@ function renderSessionsWebNorthStarMarkdown(array $rows): string
     $lines[] = '_Sessions rows are curated from ROADMAP issue state; AOT persistence [#1938](' . CAPABILITY_ISSUE_URL_BASE
         . '1938); link [#1946](' . CAPABILITY_ISSUE_URL_BASE . '1946); execute [#1891](' . CAPABILITY_ISSUE_URL_BASE
         . '1891). Opt-in ci-local gates: `SESSIONS_WEB_AOT_SMOKE_GATE`, `SESSIONS_WEB_DEPLOY_SMOKE_GATE`._';
+    $lines[] = '';
+
+    return implode("\n", $lines);
+}
+
+/**
+ * File upload reference app constructs for examples/006-FileUploadWeb (issue #2019).
+ *
+ * @return list<array{
+ *   construct: string,
+ *   vm: string,
+ *   jit: string,
+ *   aot: string,
+ *   issue: int,
+ *   notes: list<string>
+ * }>
+ */
+function fileUploadWebNorthStarDefinitions(): array
+{
+    return [
+        [
+            'construct' => '`006-FileUploadWeb` reference app',
+            'vm' => 'yes',
+            'jit' => 'yes',
+            'aot' => 'yes',
+            'issue' => 1999,
+            'notes' => [
+                '#1999 VM serve + multipart smoke (#2009); AOT link #2011; execute #2012 (FILE_UPLOAD_WEB_AOT_SMOKE_GATE default-on)',
+            ],
+        ],
+        [
+            'construct' => 'multipart `$_POST` / nested `$_FILES` (web runtime)',
+            'vm' => 'yes',
+            'jit' => 'yes',
+            'aot' => 'yes',
+            'issue' => 87,
+            'notes' => ['#52 multipart POST; #87 nested keys; AOT CGI REQUEST_BODY (#2012)'],
+        ],
+        [
+            'construct' => 'AOT project link (`phpc build --project`)',
+            'vm' => 'n/a',
+            'jit' => 'n/a',
+            'aot' => 'yes',
+            'issue' => 2011,
+            'notes' => ['ExamplesCompileTest::test006FileUploadWebAotLink; FILE_UPLOAD_WEB_AOT_LINK_GATE default-on'],
+        ],
+        [
+            'construct' => 'AOT CGI execute (multipart upload probe)',
+            'vm' => 'n/a',
+            'jit' => 'n/a',
+            'aot' => 'yes',
+            'issue' => 2012,
+            'notes' => ['FileUploadWebAotExecuteTest; FILE_UPLOAD_WEB_AOT_SMOKE_GATE default-on (#2012)'],
+        ],
+    ];
+}
+
+/**
+ * @param list<array{construct: string, vm: string, jit: string, aot: string, issue: int, notes: list<string>}> $rows
+ */
+function renderFileUploadWebNorthStarMarkdown(array $rows): string
+{
+    $lines = [
+        '## File upload reference (`examples/006-FileUploadWeb`)',
+        '',
+        'Nested `$_FILES` and `move_uploaded_file()` for the multipart upload north-star example.',
+        'ROADMAP Phase 4/5: [#78](' . CAPABILITY_ISSUE_URL_BASE . '78), tracker [#1999]('
+        . CAPABILITY_ISSUE_URL_BASE . '1999). Builtin matrix: [capabilities.md](capabilities.md).',
+        '',
+        '| Construct | VM | JIT | AOT | Issue | Notes |',
+        '|-----------|:--:|:---:|:---:|-------|-------|',
+    ];
+
+    foreach ($rows as $row) {
+        $lines[] = sprintf(
+            '| %s | %s | %s | %s | [#%d](%s%d) | %s |',
+            $row['construct'],
+            capabilityStatusLabel($row['vm']),
+            capabilityStatusLabel($row['jit']),
+            capabilityStatusLabel($row['aot']),
+            $row['issue'],
+            CAPABILITY_ISSUE_URL_BASE,
+            $row['issue'],
+            $row['notes'] === [] ? '' : implode('; ', $row['notes'])
+        );
+    }
+
+    $lines[] = '';
+    $lines[] = '_File upload rows are curated from ROADMAP issue state; multipart [#52](' . CAPABILITY_ISSUE_URL_BASE
+        . '52); nested FILES [#87](' . CAPABILITY_ISSUE_URL_BASE . '87); `move_uploaded_file` [#2005]('
+        . CAPABILITY_ISSUE_URL_BASE . '2005). Opt-in ci-local gates: `FILE_UPLOAD_WEB_SMOKE_GATE`, '
+        . '`FILE_UPLOAD_WEB_AOT_LINK_GATE`, `FILE_UPLOAD_WEB_AOT_SMOKE_GATE` (execute default-on #2012)._';
     $lines[] = '';
 
     return implode("\n", $lines);

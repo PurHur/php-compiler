@@ -22,7 +22,8 @@ $handlers = collectOpcodeHandlers($root);
 $syntax = collectSyntaxCapabilities($root, syntaxRowDefinitions(), $handlers);
 $markdown = renderSyntaxMarkdown($syntax)
     . renderWebNorthStarMarkdown(webNorthStarDefinitions())
-    . renderSessionsWebNorthStarMarkdown(sessionsWebNorthStarDefinitions());
+    . renderSessionsWebNorthStarMarkdown(sessionsWebNorthStarDefinitions())
+    . renderFileUploadWebNorthStarMarkdown(fileUploadWebNorthStarDefinitions());
 
 if ($check) {
     if (!is_file($outFile)) {

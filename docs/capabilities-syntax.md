@@ -77,3 +77,16 @@ ROADMAP Phase 4/5: [#78](https://github.com/PurHur/php-compiler/issues/78), trac
 | AOT CLI execute (two-request session flash) | n/a | n/a | yes | [#1891](https://github.com/PurHur/php-compiler/issues/1891) | SessionsWebAotExecuteTest; opt-in SESSIONS_WEB_AOT_SMOKE_GATE (#1923) |
 
 _Sessions rows are curated from ROADMAP issue state; AOT persistence [#1938](https://github.com/PurHur/php-compiler/issues/1938); link [#1946](https://github.com/PurHur/php-compiler/issues/1946); execute [#1891](https://github.com/PurHur/php-compiler/issues/1891). Opt-in ci-local gates: `SESSIONS_WEB_AOT_SMOKE_GATE`, `SESSIONS_WEB_DEPLOY_SMOKE_GATE`._
+## File upload reference (`examples/006-FileUploadWeb`)
+
+Nested `$_FILES` and `move_uploaded_file()` for the multipart upload north-star example.
+ROADMAP Phase 4/5: [#78](https://github.com/PurHur/php-compiler/issues/78), tracker [#1999](https://github.com/PurHur/php-compiler/issues/1999). Builtin matrix: [capabilities.md](capabilities.md).
+
+| Construct | VM | JIT | AOT | Issue | Notes |
+|-----------|:--:|:---:|:---:|-------|-------|
+| `006-FileUploadWeb` reference app | yes | yes | yes | [#1999](https://github.com/PurHur/php-compiler/issues/1999) | #1999 VM serve + multipart smoke (#2009); AOT link #2011; execute #2012 (FILE_UPLOAD_WEB_AOT_SMOKE_GATE default-on) |
+| multipart `$_POST` / nested `$_FILES` (web runtime) | yes | yes | yes | [#87](https://github.com/PurHur/php-compiler/issues/87) | #52 multipart POST; #87 nested keys; AOT CGI REQUEST_BODY (#2012) |
+| AOT project link (`phpc build --project`) | n/a | n/a | yes | [#2011](https://github.com/PurHur/php-compiler/issues/2011) | ExamplesCompileTest::test006FileUploadWebAotLink; FILE_UPLOAD_WEB_AOT_LINK_GATE default-on |
+| AOT CGI execute (multipart upload probe) | n/a | n/a | yes | [#2012](https://github.com/PurHur/php-compiler/issues/2012) | FileUploadWebAotExecuteTest; FILE_UPLOAD_WEB_AOT_SMOKE_GATE default-on (#2012) |
+
+_File upload rows are curated from ROADMAP issue state; multipart [#52](https://github.com/PurHur/php-compiler/issues/52); nested FILES [#87](https://github.com/PurHur/php-compiler/issues/87); `move_uploaded_file` [#2005](https://github.com/PurHur/php-compiler/issues/2005). Opt-in ci-local gates: `FILE_UPLOAD_WEB_SMOKE_GATE`, `FILE_UPLOAD_WEB_AOT_LINK_GATE`, `FILE_UPLOAD_WEB_AOT_SMOKE_GATE` (execute default-on #2012)._
