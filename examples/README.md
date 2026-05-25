@@ -41,7 +41,7 @@ Legacy entrypoints still work: `php bin/vm.php`, `php bin/jit.php`, `php bin/com
 | [001-SimpleWeb](001-SimpleWeb/) | ✅ `-q` / `-p` / env / `phpc serve` | ✅ `bin/jit.php` | ✅ `phpc build` | runtime `QUERY_STRING` / POST ([#201](https://github.com/PurHur/php-compiler/issues/201), [#257](https://github.com/PurHur/php-compiler/issues/257), [#259](https://github.com/PurHur/php-compiler/issues/259)) |
 | [002-StaticWeb](002-StaticWeb/) | ✅ `./phpc run` | ✅ `bin/jit.php` | ✅ recommended | no superglobals — [#247](https://github.com/PurHur/php-compiler/issues/247) execute smoke |
 | [004-ApiJson](004-ApiJson/) | ✅ `./phpc run` | ✅ `bin/jit.php` | ✅ `phpc build` | JSON + `http_response_code` — [#270](https://github.com/PurHur/php-compiler/issues/270), [#61](https://github.com/PurHur/php-compiler/issues/61) |
-| [005-SessionsWeb](005-SessionsWeb/) | ✅ `./phpc run` / `phpc serve` | ✅ `session_start` JIT ([#1882](https://github.com/PurHur/php-compiler/issues/1882)) | ✅ deploy smoke opt-in ([#1893](https://github.com/PurHur/php-compiler/issues/1893)) | `$_SESSION` flash — [#1881](https://github.com/PurHur/php-compiler/issues/1881); standalone AOT [#1891](https://github.com/PurHur/php-compiler/issues/1891) |
+| [005-SessionsWeb](005-SessionsWeb/) | ✅ `./phpc run` / `phpc serve` | ✅ `session_start` JIT ([#1882](https://github.com/PurHur/php-compiler/issues/1882)) | ✅ `phpc build` link ([#1946](https://github.com/PurHur/php-compiler/issues/1946)); execute [#1891](https://github.com/PurHur/php-compiler/issues/1891); deploy smoke opt-in ([#1893](https://github.com/PurHur/php-compiler/issues/1893)) | `$_SESSION` flash across requests — [#1881](https://github.com/PurHur/php-compiler/issues/1881) |
 | [003-MiniWebApp](003-MiniWebApp/) | ✅ `phpc serve` | partial | ✅ `phpc build --project` | PATH_INFO — [#489](https://github.com/PurHur/php-compiler/issues/489), runtime [#539](https://github.com/PurHur/php-compiler/issues/539); AOT link ✅ ([#752](https://github.com/PurHur/php-compiler/issues/752)); native execute ✅ ([#764](https://github.com/PurHur/php-compiler/issues/764) closed) |
 
 ### 000-HelloWorld
@@ -101,7 +101,7 @@ curl -s -b "$jar" -c "$jar" -X POST -d 'message=Saved' 'http://127.0.0.1:8080/ex
 curl -s -b "$jar" 'http://127.0.0.1:8080/example.php'
 ```
 
-AOT deploy + `PHPC_DEPLOY_ROOT` CGI flash: `SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 ./script/deploy-smoke.sh --example 005` ([#1893](https://github.com/PurHur/php-compiler/issues/1893)). VM session curls: `SESSIONS_WEB_SMOKE_GATE=1` (default) — `make examples-sessions-smoke` ([#1887](https://github.com/PurHur/php-compiler/issues/1887)). Standalone AOT execute: [#1891](https://github.com/PurHur/php-compiler/issues/1891).
+AOT link/execute: [#1891](https://github.com/PurHur/php-compiler/issues/1891). AOT deploy + `PHPC_DEPLOY_ROOT` CGI flash: `SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 ./script/deploy-smoke.sh --example 005` ([#1893](https://github.com/PurHur/php-compiler/issues/1893)). VM session curls: `SESSIONS_WEB_SMOKE_GATE=1` (default) in `ci-fast.sh` / `ci-local.sh` — `make examples-sessions-smoke` or `examples-web-smoke.sh --sessions-only` ([#1887](https://github.com/PurHur/php-compiler/issues/1887)). Init template parity: [#1902](https://github.com/PurHur/php-compiler/issues/1902). Gate ladder in `phpc doctor --gates`: [#1903](https://github.com/PurHur/php-compiler/issues/1903).
 
 ### 002-StaticWeb
 
@@ -169,19 +169,23 @@ Each example includes a benchmark that compares VM, JIT, and (when LLVM is prese
 ```console
 MINIWEBAPP_LINT_GATE=1 ./script/rebuild-examples.php
 # or: BENCH_MINIWEBAPP=1 ./script/rebuild-examples.php
+# or: BENCH_SESSIONSWEB=1 ./script/rebuild-examples.php   # 005 row (#1889)
 ```
 
 For **001-SimpleWeb**, `bin/compile.php` is timed **without** compile-time `-q`; the `./compiled` column runs the binary with runtime `QUERY_STRING` (and related CGI env), matching production AOT web binaries.
 
 For **003-MiniWebApp**, VM/JIT/native columns run `public/index.php` with `PATH_INFO=/home` (and related CGI env) from the example `public/` directory ([#491](https://github.com/PurHur/php-compiler/issues/491), runtime [#539](https://github.com/PurHur/php-compiler/issues/539)). AOT columns time `phpc build --project` and `.phpc/bin/app` with the same CGI overlay when LLVM is ready and execute returns HTML ([#716](https://github.com/PurHur/php-compiler/issues/716); execute [#764](https://github.com/PurHur/php-compiler/issues/764) closed). The row is omitted when `phpc lint --all examples/003-MiniWebApp` fails unless `BENCH_MINIWEBAPP=1`.
 
+For **005-SessionsWeb**, the benchmark row is omitted until `phpc lint --all examples/005-SessionsWeb` passes unless `BENCH_SESSIONSWEB=1` ([#1889](https://github.com/PurHur/php-compiler/issues/1889)). AOT columns stay `n/a` until two-request session execute is green ([#1891](https://github.com/PurHur/php-compiler/issues/1891)).
+
 <!-- benchmark table start -->
 
 |         Example Name |      Native PHP |      bin/vm.php |     bin/jit.php | bin/compile.php |      ./compiled |
 |----------------------|-----------------|-----------------|-----------------|-----------------|-----------------|
-|       000-HelloWorld |         0.01013 |         0.04243 |         0.17881 |         0.73837 |         0.00114 |
-|        001-SimpleWeb |         0.00853 |         0.04411 |         0.18525 |         0.72047 |         0.00124 |
-|        002-StaticWeb |         0.00879 |         0.04392 |         0.17811 |         0.71660 |         0.00105 |
-|       003-MiniWebApp |         0.00867 |         0.09493 |         0.55299 |         1.20217 |         0.00101 |
-|          004-ApiJson |         0.00824 |         0.04377 |         0.18179 |         0.73902 |         0.00112 |
+|       000-HelloWorld |         0.00760 |         0.04387 |         0.17749 |         1.33163 |         0.00109 |
+|        001-SimpleWeb |         0.00764 |         0.04682 |         0.18321 |         1.34592 |         0.00109 |
+|        002-StaticWeb |         0.00770 |         0.04771 |         0.17846 |         1.35182 |         0.00111 |
+|       003-MiniWebApp |         0.00838 |         0.08591 |         0.45166 |         1.75921 |         0.00098 |
+|          004-ApiJson |         0.00837 |         0.04503 |         0.17964 |         1.36437 |         0.00128 |
+|      005-SessionsWeb |         0.00855 |         0.04840 |         0.19095 |             n/a |             n/a |
 <!-- benchmark table end -->

@@ -103,6 +103,22 @@ ci_run_examples_ladder_discovery_check() {
   "$PHP_BIN" "${PHP_OPTS[@]}" script/check-examples-ladder-discovery.php
 }
 
+ci_run_rebuild_examples_005_sync_check() {
+  if [[ "${REBUILD_EXAMPLES_005_SYNC_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  echo "Rebuild examples 005 row sync (REBUILD_EXAMPLES_005_SYNC_GATE=1, issue #1930)..."
+  "$PHP_BIN" "${PHP_OPTS[@]}" script/check-rebuild-examples-005-row.php
+}
+
+ci_run_capabilities_sessionsweb_sync_check() {
+  if [[ "${CAPABILITIES_SESSIONSWEB_SYNC_GATE:-1}" != "1" ]]; then
+    return 0
+  fi
+  echo "Capabilities SessionsWeb sync (CAPABILITIES_SESSIONSWEB_SYNC_GATE=1, issue #1947)..."
+  "$PHP_BIN" "${PHP_OPTS[@]}" script/check-capabilities-sessionsweb-sync.php
+}
+
 ci_run_root_readme_sync_check() {
   if [[ "${ROOT_README_SYNC_GATE:-0}" != "1" ]]; then
     return 0
@@ -119,6 +135,14 @@ ci_run_selfhost_spine_count_sync_check() {
   "$PHP_BIN" "${PHP_OPTS[@]}" script/check-selfhost-spine-count-sync.php
 }
 
+ci_run_selfhost_spine_coverage_sync_check() {
+  if [[ "${SELFHOST_SPINE_COVERAGE_SYNC_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  echo "Self-host spine coverage sync (SELFHOST_SPINE_COVERAGE_SYNC_GATE=1, issue #1945)..."
+  "$PHP_BIN" "${PHP_OPTS[@]}" script/check-selfhost-spine-coverage-sync.php
+}
+
 ci_run_m3_allowlist_sync_check() {
   if [[ "${M3_ALLOWLIST_SYNC_GATE:-0}" != "1" ]]; then
     return 0
@@ -127,10 +151,19 @@ ci_run_m3_allowlist_sync_check() {
   "$PHP_BIN" "${PHP_OPTS[@]}" script/check-m3-allowlist-snapshot.php
 }
 
+ci_run_init_sessionsweb_parity_check() {
+  if [[ "${INIT_SESSIONSWEB_PARITY_GATE:-1}" != "1" ]]; then
+    return 0
+  fi
+  echo "init-sessionsweb template parity (INIT_SESSIONSWEB_PARITY_GATE=1, issue #1902)..."
+  script/check-init-sessionsweb-parity.sh
+}
+
 ci_run_inventory_checks() {
   script/check-no-unlimited-memory.sh
   script/check-stale-issue-refs.sh
   script/check-init-miniwebapp-parity.sh
+  ci_run_init_sessionsweb_parity_check
   "$PHP_BIN" "${PHP_OPTS[@]}" script/capability-matrix.php --check
   ci_run_capability_syntax_check
   ci_ensure_generated_doc script/bootstrap-inventory.php docs/bootstrap-inventory.md
@@ -139,8 +172,11 @@ ci_run_inventory_checks() {
   ci_run_m2_spine_issue_hygiene_check
   ci_run_examples_readme_sync_check
   ci_run_examples_ladder_discovery_check
+  ci_run_rebuild_examples_005_sync_check
+  ci_run_capabilities_sessionsweb_sync_check
   ci_run_root_readme_sync_check
   ci_run_selfhost_spine_count_sync_check
+  ci_run_selfhost_spine_coverage_sync_check
   ci_run_m3_allowlist_sync_check
 }
 
@@ -261,6 +297,24 @@ ci_run_bootstrap_lib_spine_vm_smoke() {
   "$_CI_SCRIPT_DIR/bootstrap-selfhost-lib-spine-vm-smoke.sh"
 }
 
+# North Star 2 presenter bundle in fast CI (issue #1928); default off until #1865 script lands.
+ci_run_north_star2_verify() {
+  if [[ "${NORTH_STAR2_VERIFY_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  local ns2_script="$_CI_SCRIPT_DIR/north-star2-verify.sh"
+  if [[ ! -x "$ns2_script" ]]; then
+    echo "north-star2-verify: skipped (script missing — pending #1865; NORTH_STAR2_VERIFY_GATE=1)"
+    return 0
+  fi
+  echo "north-star2-verify (NORTH_STAR2_VERIFY_GATE=1, issue #1928)..."
+  local ns2_args=(--skip-llvm-tail)
+  if ci_llvm_ready; then
+    ns2_args=()
+  fi
+  "$ns2_script" "${ns2_args[@]}"
+}
+
 # M4 bootstrap-loop dry-run probe (issue #1777, #1498); default off until M3 strict is stable.
 ci_run_bootstrap_loop_probe() {
   if [[ "${BOOTSTRAP_LOOP_PROBE_GATE:-0}" != "1" ]]; then
@@ -270,8 +324,11 @@ ci_run_bootstrap_loop_probe() {
     echo "bootstrap-loop-probe: skipped (LLVM 9 not available)"
     return 0
   fi
-  echo "bootstrap-loop-probe (BOOTSTRAP_LOOP_PROBE_GATE=1, --dry-run, issue #1777, #1498)..."
-  "$_CI_SCRIPT_DIR/bootstrap-loop-probe.sh" --dry-run
+  echo "bootstrap-loop-probe (BOOTSTRAP_LOOP_PROBE_GATE=1, --dry-run, issue #1777, #1498, #1929)..."
+  if ! "$_CI_SCRIPT_DIR/bootstrap-loop-probe.sh" --dry-run; then
+    echo "bootstrap-loop-probe: failed — see docs/bootstrap-selfhost.md (#1498)" >&2
+    return 1
+  fi
 }
 
 # Wave gate: selfhost-lint → aot-lint → probe (default on when LLVM ready; BOOTSTRAP_WAVE_CHECK=0 to skip).
@@ -425,10 +482,24 @@ ci_run_deploy_smoke() {
 }
 
 # @group aot-link PHPUnit (link-only; execute is ci_run_miniwebapp_aot_execute — #775).
+# 005 link: ExamplesCompileTest::test005SessionsWebAotLink when SESSIONS_WEB_AOT_LINK_GATE=1 (#1946).
 ci_run_aot_link_phpunit() {
-  local -a aot_link_args=(--group aot-link --exclude-group serve --exclude-group miniwebapp-aot-execute --exclude-group miniwebapp-aot-serve)
-  echo "PHPUnit: AOT link (@group aot-link)..."
+  local -a aot_link_args=(--group aot-link --exclude-group serve --exclude-group miniwebapp-aot-execute --exclude-group miniwebapp-aot-serve --exclude-group sessionsweb-aot-execute)
+  echo "PHPUnit: AOT link (@group aot-link; SESSIONS_WEB_AOT_LINK_GATE=${SESSIONS_WEB_AOT_LINK_GATE:-0})..."
   ci_run_phpunit "${aot_link_args[@]}" "$@"
+}
+
+# 005-SessionsWeb AOT binary CLI execute (issue #1891); opt-in SESSIONS_WEB_AOT_SMOKE_GATE=1.
+ci_run_sessions_web_aot_execute() {
+  if [[ "${SESSIONS_WEB_AOT_SMOKE_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  if ! ci_llvm_ready; then
+    echo "PHPUnit: SessionsWeb AOT execute skipped (LLVM 9 not available)"
+    return 0
+  fi
+  echo "PHPUnit: SessionsWeb AOT execute (@group sessionsweb-aot-execute; SESSIONS_WEB_AOT_SMOKE_GATE=1, #1891)..."
+  ci_run_phpunit --group sessionsweb-aot-execute "$@"
 }
 
 # 003-MiniWebApp AOT binary CLI execute (issues #747, #775); default on via MINIWEBAPP_AOT_EXECUTE_GATE=1.

@@ -23,6 +23,11 @@ final class Superglobals
 {
     private static ?Context $activeContext = null;
 
+    public static function setActiveContext(?Context $context): void
+    {
+        self::$activeContext = $context;
+    }
+
     /** Maximum incoming request headers mapped into $_SERVER (issue #77). */
     public const MAX_HTTP_HEADERS = 64;
 
@@ -146,7 +151,7 @@ final class Superglobals
         );
         self::populateServer($context, $queryString, $postBody);
         self::populateRequest($context);
-        self::$activeContext = null;
+        // Keep context for putenv() → $_ENV/$_SERVER sync during script execution (#1058, #1960).
     }
 
     /**
@@ -727,8 +732,22 @@ final class Superglobals
         return $resolved->toString();
     }
 
+    /** CGI keys mirrored into $_SERVER when updated via putenv() during a VM request. */
+    private const PUTENV_SERVER_KEYS = [
+        'REQUEST_METHOD',
+        'PATH_INFO',
+        'SCRIPT_NAME',
+        'SCRIPT_FILENAME',
+        'QUERY_STRING',
+        'REQUEST_URI',
+        'SERVER_PROTOCOL',
+        'DOCUMENT_ROOT',
+        'REMOTE_ADDR',
+        'REMOTE_PORT',
+    ];
+
     /**
-     * Keep $_ENV superglobal in sync after putenv() (assignment form only).
+     * Keep $_ENV / $_SERVER superglobals in sync after putenv() (assignment form only).
      */
     public static function syncEnvAfterPutenv(string $assignment): void
     {
@@ -744,7 +763,12 @@ final class Superglobals
             return;
         }
         $env = self::$activeContext->ensureSuperglobal('_ENV')->toArray();
-        self::setStringEntry($env, $key, $fromEnv);
+        self::setOrUpdateStringEntry($env, $key, $fromEnv);
+        if (!in_array($key, self::PUTENV_SERVER_KEYS, true)) {
+            return;
+        }
+        $server = self::$activeContext->ensureSuperglobal('_SERVER')->toArray();
+        self::setOrUpdateStringEntry($server, $key, $fromEnv);
     }
 
     private static function populateRequest(Context $context): void
@@ -846,5 +870,18 @@ final class Superglobals
         $v = new Variable(Variable::TYPE_STRING);
         $v->string($value);
         $ht->add($key, $v);
+    }
+
+    private static function setOrUpdateStringEntry(HashTable $ht, string $key, string $value): void
+    {
+        $v = new Variable(Variable::TYPE_STRING);
+        $v->string($value);
+        $keyVar = new Variable(Variable::TYPE_STRING);
+        $keyVar->string($key);
+        if ($ht->offsetIsSet($keyVar)) {
+            $ht->update($key, $v);
+        } else {
+            $ht->add($key, $v);
+        }
     }
 }

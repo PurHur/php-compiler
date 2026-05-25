@@ -110,6 +110,37 @@ static char *ini_copy_cstr(__string__ *str, size_t *out_len)
     return buf;
 }
 
+void __compiler_ini_get(__string__ *option, __value__ *out)
+{
+    char *opt;
+    size_t opt_len;
+    char buf[64];
+
+    if (NULL == out) {
+        return;
+    }
+    opt = ini_copy_cstr(option, &opt_len);
+    if (NULL == opt) {
+        ini_write_bool_false(out);
+
+        return;
+    }
+
+    if (0 == strcasecmp(opt, "error_reporting")) {
+        snprintf(buf, sizeof(buf), "%d", phpc_ini_error_reporting);
+        ini_write_cstr(out, buf);
+    } else if (0 == strcasecmp(opt, "display_errors")) {
+        snprintf(buf, sizeof(buf), "%d", phpc_ini_display_errors ? 1 : 0);
+        ini_write_cstr(out, buf);
+    } else if (0 == strcasecmp(opt, "memory_limit")) {
+        ini_write_cstr(out, phpc_ini_memory_limit);
+    } else {
+        ini_write_bool_false(out);
+    }
+
+    free(opt);
+}
+
 void __compiler_ini_set(__string__ *option, __string__ *new_value, __value__ *out)
 {
     char *opt;

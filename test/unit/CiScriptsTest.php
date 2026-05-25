@@ -103,6 +103,36 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('--sessions-only', $common);
     }
 
+    public function testCiDefaultsEnvDefinesSessionsWebAotSmokeGateOff(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString('SESSIONS_WEB_AOT_SMOKE_GATE="${SESSIONS_WEB_AOT_SMOKE_GATE:-0}"', $defaults);
+    }
+
+    public function testCiDefaultsEnvDefinesSessionsWebAotLinkGateOn(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString('SESSIONS_WEB_AOT_LINK_GATE="${SESSIONS_WEB_AOT_LINK_GATE:-1}"', $defaults);
+    }
+
+    public function testExamplesCompileTestHonorsSessionsWebAotLinkGate(): void
+    {
+        $source = (string) file_get_contents(dirname(__DIR__).'/unit/ExamplesCompileTest.php');
+        $this->assertStringContainsString('SESSIONS_WEB_AOT_LINK_GATE', $source);
+        $this->assertStringContainsString('sessionsWebAotLinkGateEnabled', $source);
+        $this->assertStringContainsString('test005SessionsWebAotLink', $source);
+        $this->assertStringContainsString('@group aot-link', $source);
+    }
+
+    public function testCiLocalExcludesSessionsWebAotExecuteUnlessGateOn(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('ci_run_sessions_web_aot_execute', $body);
+        $this->assertStringContainsString('--exclude-group sessionsweb-aot-execute', $body);
+        $this->assertStringContainsString('--group sessionsweb-aot-execute', $body);
+        $this->assertStringContainsString('SESSIONS_WEB_AOT_SMOKE_GATE:-0', $body);
+    }
+
     public function testCiDefaultsEnvDefinesSessionsWebSmokeGateOn(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
@@ -326,6 +356,26 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('EXAMPLES_LADDER_DISCOVERY_GATE=${EXAMPLES_LADDER_DISCOVERY_GATE:-1}', $body);
     }
 
+    public function testCiDefaultsEnvDefinesRebuildExamples005SyncGateOff(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString('REBUILD_EXAMPLES_005_SYNC_GATE="${REBUILD_EXAMPLES_005_SYNC_GATE:-0}"', $defaults);
+    }
+
+    public function testCiFastRunsRebuildExamples005SyncViaInventoryChecks(): void
+    {
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('ci_run_rebuild_examples_005_sync_check', $common);
+        $this->assertStringContainsString('check-rebuild-examples-005-row.php', $common);
+        $this->assertStringContainsString('REBUILD_EXAMPLES_005_SYNC_GATE:-0', $common);
+    }
+
+    public function testCiDockerRunPassesRebuildExamples005SyncGateDefaultOff(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');
+        $this->assertStringContainsString('REBUILD_EXAMPLES_005_SYNC_GATE=${REBUILD_EXAMPLES_005_SYNC_GATE:-0}', $body);
+    }
+
     public function testCiDefaultsEnvDefinesRootReadmeSyncGateOn(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
@@ -404,6 +454,12 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('BOOTSTRAP_SELFHOST_PROBE_UPDATE', $common);
     }
 
+    public function testCiFastHonorsBootstrapLoopProbeGate(): void
+    {
+        $fast = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-fast.sh');
+        $this->assertStringContainsString('ci_run_bootstrap_loop_probe', $fast);
+    }
+
     public function testCiLocalHonorsBootstrapLoopProbeGate(): void
     {
         $local = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-local.sh');
@@ -430,6 +486,39 @@ final class CiScriptsTest extends TestCase
 
         $docSelfhost = (string) file_get_contents(dirname(__DIR__, 2).'/docs/bootstrap-selfhost.md');
         $this->assertStringContainsString('BOOTSTRAP_LOOP_PROBE_GATE=1', $docSelfhost);
+        $this->assertStringContainsString('ci-fast.sh', $doc);
+        $this->assertStringContainsString('#1929', $doc);
+    }
+
+    public function testCiFastHonorsNorthStar2VerifyGate(): void
+    {
+        $fast = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-fast.sh');
+        $this->assertStringContainsString('ci_run_north_star2_verify', $fast);
+        $this->assertStringContainsString('NORTH_STAR2_VERIFY_GATE=1', $fast);
+
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('NORTH_STAR2_VERIFY_GATE', $common);
+        $this->assertStringContainsString('NORTH_STAR2_VERIFY_GATE:-0', $common);
+        $this->assertStringContainsString('north-star2-verify.sh', $common);
+        $this->assertStringContainsString('pending #1865', $common);
+
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString(
+            'NORTH_STAR2_VERIFY_GATE="${NORTH_STAR2_VERIFY_GATE:-0}"',
+            $defaults
+        );
+    }
+
+    public function testLocalCiMatrixDocumentsNorthStar2VerifyGate(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('NORTH_STAR2_VERIFY_GATE', $doc);
+        $this->assertStringContainsString('north-star2-verify.sh', $doc);
+        $this->assertMatchesRegularExpression('/\| `NORTH_STAR2_VERIFY_GATE` \| `0` \|/', $doc);
+
+        $docSelfhost = (string) file_get_contents(dirname(__DIR__, 2).'/docs/bootstrap-selfhost.md');
+        $this->assertStringContainsString('NORTH_STAR2_VERIFY_GATE=1', $docSelfhost);
+        $this->assertStringContainsString('#1928', $doc);
     }
 
     public function testCiLocalHonorsBootstrapWaveCheckGate(): void
@@ -657,6 +746,14 @@ final class CiScriptsTest extends TestCase
         $this->assertMatchesRegularExpression('/\| `EXAMPLES_LADDER_DISCOVERY_GATE` \| `1` \|/', $doc);
     }
 
+    public function testLocalCiMatrixDocumentsRebuildExamples005SyncGate(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('REBUILD_EXAMPLES_005_SYNC_GATE', $doc);
+        $this->assertStringContainsString('check-rebuild-examples-005-row.php', $doc);
+        $this->assertMatchesRegularExpression('/\| `REBUILD_EXAMPLES_005_SYNC_GATE` \| `0` \|/', $doc);
+    }
+
     public function testLocalCiMatrixDocumentsRootReadmeSyncGate(): void
     {
         $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
@@ -739,6 +836,136 @@ final class CiScriptsTest extends TestCase
     {
         $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');
         $this->assertStringContainsString('NESTED_RETURN_COMPLIANCE_GATE', $body);
+    }
+
+    public function testCiDefaultsEnvDefinesAttributesComplianceGateOn(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString(
+            'ATTRIBUTES_COMPLIANCE_GATE="${ATTRIBUTES_COMPLIANCE_GATE:-1}"',
+            $defaults
+        );
+        $this->assertStringContainsString('#1904', $defaults);
+    }
+
+    public function testCiFastRunsAttributesComplianceGateByDefault(): void
+    {
+        $fast = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-fast.sh');
+        $this->assertStringContainsString('ATTRIBUTES_COMPLIANCE_GATE', $fast);
+        $this->assertStringContainsString('ATTRIBUTES_COMPLIANCE_GATE:-1', $fast);
+        $this->assertStringContainsString('--filter Attribute', $fast);
+    }
+
+    public function testLocalCiMatrixDocumentsAttributesComplianceGate(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('ATTRIBUTES_COMPLIANCE_GATE', $doc);
+        $this->assertStringContainsString('Attribute*', $doc);
+        $this->assertMatchesRegularExpression('/\| `ATTRIBUTES_COMPLIANCE_GATE` \| `1` \|/', $doc);
+    }
+
+    public function testCiDockerRunPassesAttributesComplianceGateEnv(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');
+        $this->assertStringContainsString('ATTRIBUTES_COMPLIANCE_GATE', $body);
+    }
+
+    public function testCiDefaultsEnvDefinesRehashComplianceGateOn(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString(
+            'REHASH_COMPLIANCE_GATE="${REHASH_COMPLIANCE_GATE:-1}"',
+            $defaults
+        );
+        $this->assertStringContainsString('#1956', $defaults);
+    }
+
+    public function testCiFastRunsRehashComplianceGateByDefault(): void
+    {
+        $fast = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-fast.sh');
+        $this->assertStringContainsString('REHASH_COMPLIANCE_GATE', $fast);
+        $this->assertStringContainsString('REHASH_COMPLIANCE_GATE:-1', $fast);
+        $this->assertStringContainsString('--filter array_rehash_string_keys', $fast);
+    }
+
+    public function testLocalCiMatrixDocumentsRehashComplianceGate(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('REHASH_COMPLIANCE_GATE', $doc);
+        $this->assertStringContainsString('array_rehash_string_keys', $doc);
+        $this->assertMatchesRegularExpression('/\| `REHASH_COMPLIANCE_GATE` \| `1` \|/', $doc);
+    }
+
+    public function testCiDefaultsEnvDefinesCoalesceComplianceGateOptIn(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString(
+            'COALESCE_COMPLIANCE_GATE="${COALESCE_COMPLIANCE_GATE:-0}"',
+            $defaults
+        );
+        $this->assertStringContainsString('#1960', $defaults);
+    }
+
+    public function testCiFastRunsCoalesceComplianceGateWhenOptIn(): void
+    {
+        $fast = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-fast.sh');
+        $this->assertStringContainsString('COALESCE_COMPLIANCE_GATE', $fast);
+        $this->assertStringContainsString('COALESCE_COMPLIANCE_GATE:-0', $fast);
+        $this->assertStringContainsString('--filter Coalesce', $fast);
+    }
+
+    public function testLocalCiMatrixDocumentsCoalesceComplianceGate(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('COALESCE_COMPLIANCE_GATE', $doc);
+        $this->assertStringContainsString('Coalesce*', $doc);
+        $this->assertMatchesRegularExpression('/\| `COALESCE_COMPLIANCE_GATE` \| `0` \|/', $doc);
+    }
+
+    public function testCiDockerRunPassesCoalesceComplianceGateEnv(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');
+        $this->assertStringContainsString('COALESCE_COMPLIANCE_GATE', $body);
+    }
+
+    public function testCiDockerRunPassesRehashComplianceGateEnv(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');
+        $this->assertStringContainsString('REHASH_COMPLIANCE_GATE', $body);
+    }
+
+    public function testCiDefaultsEnvDefinesStringKeyJitComplianceGateOn(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString(
+            'STRING_KEY_JIT_COMPLIANCE_GATE="${STRING_KEY_JIT_COMPLIANCE_GATE:-1}"',
+            $defaults
+        );
+        $this->assertStringContainsString('#1959', $defaults);
+    }
+
+    public function testCiFastRunsStringKeyJitComplianceGateByDefault(): void
+    {
+        $fast = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-fast.sh');
+        $this->assertStringContainsString('STRING_KEY_JIT_COMPLIANCE_GATE', $fast);
+        $this->assertStringContainsString('STRING_KEY_JIT_COMPLIANCE_GATE:-1', $fast);
+        $this->assertStringContainsString('ci_llvm_ready', $fast);
+        $this->assertStringContainsString('ci_should_run_jit', $fast);
+        $this->assertStringContainsString('--filter array_rehash_string_keys_jit', $fast);
+    }
+
+    public function testLocalCiMatrixDocumentsStringKeyJitComplianceGate(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('STRING_KEY_JIT_COMPLIANCE_GATE', $doc);
+        $this->assertStringContainsString('array_rehash_string_keys_jit', $doc);
+        $this->assertMatchesRegularExpression('/\| `STRING_KEY_JIT_COMPLIANCE_GATE` \| `1` \|/', $doc);
+    }
+
+    public function testCiDockerRunPassesStringKeyJitComplianceGateEnv(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');
+        $this->assertStringContainsString('STRING_KEY_JIT_COMPLIANCE_GATE', $body);
     }
 
     public function testCiFastRunsCgiDriverTest(): void
@@ -939,5 +1166,29 @@ final class CiScriptsTest extends TestCase
     {
         $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
         $this->assertStringContainsString('check-init-miniwebapp-parity.sh', $common);
+    }
+
+    public function testCheckInitSessionswebParityScriptExists(): void
+    {
+        $check = dirname(__DIR__, 2).'/script/check-init-sessionsweb-parity.sh';
+        $this->assertFileExists($check);
+        $this->assertTrue(is_executable($check));
+        $body = (string) file_get_contents($check);
+        $this->assertStringContainsString('examples/005-SessionsWeb', $body);
+        $this->assertStringContainsString('templates/init-sessionsweb', $body);
+    }
+
+    public function testCheckInitSessionswebParityPassesInRepo(): void
+    {
+        $check = dirname(__DIR__, 2).'/script/check-init-sessionsweb-parity.sh';
+        exec('bash '.escapeshellarg($check).' 2>&1', $out, $code);
+        $this->assertSame(0, $code, implode("\n", $out));
+    }
+
+    public function testCiInventoryRunsInitSessionswebParityCheck(): void
+    {
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('ci_run_init_sessionsweb_parity_check', $common);
+        $this->assertStringContainsString('check-init-sessionsweb-parity.sh', $common);
     }
 }

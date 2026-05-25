@@ -85,6 +85,14 @@ class Type extends Builtin {
         );
         $fnIniSet = $this->context->module->addFunction('__compiler_ini_set', $fntypeIniSet);
         $this->context->registerFunction('__compiler_ini_set', $fnIniSet);
+        $fntypeIniGet = $this->context->context->functionType(
+            $this->context->getTypeFromString('void'),
+            false,
+            $this->context->getTypeFromString('__string__*'),
+            $this->context->getTypeFromString('__value__*')
+        );
+        $fnIniGet = $this->context->module->addFunction('__compiler_ini_get', $fntypeIniGet);
+        $this->context->registerFunction('__compiler_ini_get', $fnIniGet);
         $fntypeStripTags = $this->context->context->functionType(
             $this->context->getTypeFromString('__string__*'),
             false,
@@ -105,6 +113,7 @@ class Type extends Builtin {
         SessionId::implement($this->context);
         SessionName::implement($this->context);
         ObOutput::registerExternals($this->context);
+        ErrorHandlerOutput::registerExternals($this->context);
         CallArgv::implement($this->context);
         $i8p = $this->context->getTypeFromString('int8*');
         $i32 = $this->context->getTypeFromString('int32');

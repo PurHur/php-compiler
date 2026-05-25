@@ -64,3 +64,16 @@ ROADMAP Phase 3/4: [#78](https://github.com/PurHur/php-compiler/issues/78), runt
 | FastCGI loop | no | no | no | [#173](https://github.com/PurHur/php-compiler/issues/173) |  |
 
 _Web rows are curated from ROADMAP issue state; native link [#568](https://github.com/PurHur/php-compiler/issues/568) closed; AOT execute [#764](https://github.com/PurHur/php-compiler/issues/764) closed; default-off CI gates [#1760](https://github.com/PurHur/php-compiler/issues/1760)._
+## Sessions reference (`examples/005-SessionsWeb`)
+
+File-backed `$_SESSION` flash across HTTP requests for the sessions north-star example.
+ROADMAP Phase 4/5: [#78](https://github.com/PurHur/php-compiler/issues/78), tracker [#1881](https://github.com/PurHur/php-compiler/issues/1881). Builtin matrix: [capabilities.md](capabilities.md).
+
+| Construct | VM | JIT | AOT | Issue | Notes |
+|-----------|:--:|:---:|:---:|-------|-------|
+| `005-SessionsWeb` reference app | yes | yes | partial | [#1881](https://github.com/PurHur/php-compiler/issues/1881) | #1881 VM serve + session smoke (#1887); AOT link #1946; execute #1891 (SESSIONS_WEB_AOT_SMOKE_GATE=0) |
+| `session_start` / `$_SESSION` flash across requests | yes | yes | partial | [#1938](https://github.com/PurHur/php-compiler/issues/1938) | #1882 JIT; AOT persistence #1938; two-request execute #1891 |
+| AOT project link (`phpc build --project`) | n/a | n/a | partial | [#1946](https://github.com/PurHur/php-compiler/issues/1946) | ExamplesCompileTest link-before-execute gate (#1946) |
+| AOT CLI execute (two-request session flash) | n/a | n/a | partial | [#1891](https://github.com/PurHur/php-compiler/issues/1891) | SessionsWebAotExecuteTest; opt-in SESSIONS_WEB_AOT_SMOKE_GATE=1 (#1923) |
+
+_Sessions rows are curated from ROADMAP issue state; AOT persistence [#1938](https://github.com/PurHur/php-compiler/issues/1938); link gate [#1946](https://github.com/PurHur/php-compiler/issues/1946); execute [#1891](https://github.com/PurHur/php-compiler/issues/1891) (opt-in `SESSIONS_WEB_AOT_SMOKE_GATE`)._

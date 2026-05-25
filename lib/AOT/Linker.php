@@ -24,6 +24,7 @@ final class Linker
         __DIR__.'/runtime/phpc_session_name_storage.c',
         __DIR__.'/runtime/phpc_value_box.c',
         __DIR__.'/runtime/phpc_session_lifecycle.c',
+        __DIR__.'/runtime/phpc_session_storage.c',
         __DIR__.'/runtime/phpc_ob_storage.c',
         __DIR__.'/runtime/phpc_ob.c',
         __DIR__.'/runtime/phpc_parse_url.c',
@@ -35,6 +36,7 @@ final class Linker
         __DIR__.'/runtime/preg_match.c',
         __DIR__.'/runtime/phpc_pack.c',
         __DIR__.'/runtime/phpc_ini_set.c',
+        __DIR__.'/runtime/phpc_error_handler.c',
     ];
 
     private const RUNTIME_LINK_LIBS = '-lpcre2-8';

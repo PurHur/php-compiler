@@ -247,6 +247,7 @@ class Module extends ModuleAbstract
             new chdir_(),
             new putenv_(),
             new ini_set_(),
+            new ini_get_(),
             new define_(),
             new defined_(),
             new debug_backtrace(),

@@ -1525,6 +1525,7 @@ class HashTable extends Type
         $this->context->builder->store($valuePtrType->constNull(), $resultSlot);
 
         $notFound = $fn->appendBasicBlock('strkey_lookup_not_found');
+        $init = $fn->appendBasicBlock('strkey_lookup_init');
         $loopHead = $fn->appendBasicBlock('strkey_lookup_head');
         $loopBody = $fn->appendBasicBlock('strkey_lookup_body');
         $found = $fn->appendBasicBlock('strkey_lookup_found');
@@ -1532,8 +1533,9 @@ class HashTable extends Type
 
         // Uninitialized/null hashtable: avoid segfault in native AOT (#1514, #1761).
         $htNull = $this->context->builder->icmp(Builder::INT_EQ, $ht, $ht->typeOf()->constNull());
-        $this->context->builder->branchIf($htNull, $notFound, $loopHead);
+        $this->context->builder->branchIf($htNull, $notFound, $init);
 
+        $this->context->builder->positionAtEnd($init);
         $htMap = $this->context->structFieldMap['__hashtable__'];
         $nodeMap = $this->context->structFieldMap['__strkey_node__'];
         $head = $this->context->builder->load($this->context->builder->structGep($ht, $htMap['strKeys']));
@@ -1541,6 +1543,7 @@ class HashTable extends Type
 
         $currentSlot = $this->context->builder->alloca($nodePtrType, 1, 'strkey_current');
         $this->context->builder->store($head, $currentSlot);
+        $this->context->builder->branch($loopHead);
 
         $this->context->builder->positionAtEnd($loopHead);
         $node = $this->context->builder->load($currentSlot);

@@ -82,8 +82,14 @@ Defaults are exported from [`script/ci-defaults.env`](../script/ci-defaults.env)
 |----------|---------|--------|-------|
 | `MINIWEBAPP_VM_CLI_GATE` | `1` | `ci-fast.sh` | PHPUnit `MiniWebApp*VmCli` matrix ([#597](https://github.com/PurHur/php-compiler/issues/597)) |
 | `NESTED_RETURN_COMPLIANCE_GATE` | `1` | `ci-fast.sh` | PHPUnit `NestedReturn*` — nested `return <call>()` / late static binding VM ([#1888](https://github.com/PurHur/php-compiler/issues/1888), [#1885](https://github.com/PurHur/php-compiler/issues/1885)); set `0` to skip |
+| `ATTRIBUTES_COMPLIANCE_GATE` | `1` | `ci-fast.sh` | PHPUnit `Attribute*` — PHP 8 attributes VM v1 ([#1904](https://github.com/PurHur/php-compiler/issues/1904), [#1354](https://github.com/PurHur/php-compiler/issues/1354)); set `0` to skip |
+| `REHASH_COMPLIANCE_GATE` | `1` | `ci-fast.sh` | PHPUnit `array_rehash_string_keys` — HashTable mixed-key rehash ([#1956](https://github.com/PurHur/php-compiler/issues/1956), [#66](https://github.com/PurHur/php-compiler/issues/66)); set `0` to skip |
+| `COALESCE_COMPLIANCE_GATE` | `0` | `ci-fast.sh` | PHPUnit `Coalesce*` — null coalescing `??` VM/JIT compliance ([#1960](https://github.com/PurHur/php-compiler/issues/1960), [#99](https://github.com/PurHur/php-compiler/issues/99)); set `1` when PHPT slice green |
+| `STRING_KEY_JIT_COMPLIANCE_GATE` | `1` | `ci-fast.sh` (LLVM + MCJIT probe) | PHPUnit `array_rehash_string_keys_jit` — string-key dim assign ([#1959](https://github.com/PurHur/php-compiler/issues/1959), [#66](https://github.com/PurHur/php-compiler/issues/66)); set `0` to skip |
 | `MINIWEBAPP_SERVE_GATE` | `1` | `ci-local.sh`, `ci-fast.sh` | `ServeTest` `@group miniwebapp` ([#641](https://github.com/PurHur/php-compiler/issues/641)) |
 | `SESSIONS_WEB_SMOKE_GATE` | `1` | `ci-fast.sh`, `ci-local.sh` | `examples-web-smoke.sh --sessions-only` / 005 cookie flash curls ([#1887](https://github.com/PurHur/php-compiler/issues/1887)) |
+| `SESSIONS_WEB_AOT_LINK_GATE` | `1` | `ci-local.sh` (PHPUnit `@group aot-link`) | `ExamplesCompileTest::test005SessionsWebAotLink` — 005 native link ([#1946](https://github.com/PurHur/php-compiler/issues/1946)); set `0` to skip during iteration |
+| `SESSIONS_WEB_AOT_SMOKE_GATE` | `0` | `ci-local.sh` (`ci_run_sessions_web_aot_execute`) | `SessionsWebAotExecuteTest` two-request execute ([#1891](https://github.com/PurHur/php-compiler/issues/1891), [#1923](https://github.com/PurHur/php-compiler/issues/1923)) |
 | `MINIWEBAPP_WEB_SMOKE_GATE` | `1` | `ci-local.sh` | `examples-web-smoke.sh --miniwebapp-only` ([#664](https://github.com/PurHur/php-compiler/issues/664)) |
 | `MINIWEBAPP_WEB_SMOKE_AOT_GATE` | `1` | `ci-local.sh` | `ci_run_miniwebapp_web_smoke_aot` → `examples-web-smoke.sh --miniwebapp-only --aot` ([#1523](https://github.com/PurHur/php-compiler/issues/1523), [#833](https://github.com/PurHur/php-compiler/issues/833)) |
 | `MINIWEBAPP_AOT_LINK_GATE` | `1` | `ci-local.sh` (PHPUnit `@group aot-link`) | `ExamplesCompileTest` 003 native link ([#754](https://github.com/PurHur/php-compiler/issues/754)) |
@@ -95,18 +101,21 @@ Defaults are exported from [`script/ci-defaults.env`](../script/ci-defaults.env)
 | `SESSIONS_WEB_DEPLOY_SMOKE_GATE` | `0` | `deploy-smoke.sh`, `ci-local.sh` | Opt-in 005 deploy + `PHPC_DEPLOY_ROOT` session flash CGI ([#1893](https://github.com/PurHur/php-compiler/issues/1893)); VM curls stay on `SESSIONS_WEB_SMOKE_GATE=1` ([#1887](https://github.com/PurHur/php-compiler/issues/1887)) |
 | `BOOTSTRAP_SELFHOST_PROBE_GATE` | unset → `1` in `ci-local.sh` llvm tail; set `0` to skip | `ci-local.sh`, `ci-fast.sh` (`CI_FAST_BOOTSTRAP=1`) | `make bootstrap-selfhost-probe` on `compiler_minimal` ([#829](https://github.com/PurHur/php-compiler/issues/829)) |
 | `BOOTSTRAP_SELFHOST_PROBE_UPDATE` | `0` | `ci_run_bootstrap_selfhost_probe` | Pass `--update-inventory` to probe (dev only) |
-| `BOOTSTRAP_LOOP_PROBE_GATE` | `0` | `ci-local.sh` (LLVM tail, after selfhost-probe) | `./script/bootstrap-loop-probe.sh --dry-run` M4 ladder ([#1777](https://github.com/PurHur/php-compiler/issues/1777), [#1498](https://github.com/PurHur/php-compiler/issues/1498)) |
+| `BOOTSTRAP_LOOP_PROBE_GATE` | `0` | `ci-fast.sh` (LLVM opt-in), `ci-local.sh` (LLVM tail, after selfhost-probe) | `./script/bootstrap-loop-probe.sh --dry-run` M4 ladder ([#1777](https://github.com/PurHur/php-compiler/issues/1777), [#1498](https://github.com/PurHur/php-compiler/issues/1498), [#1929](https://github.com/PurHur/php-compiler/issues/1929)) |
 | `BOOTSTRAP_WAVE_CHECK` | unset → `1` in `ci-local.sh` llvm tail; set `0` to skip | `ci-local.sh`, `ci-fast.sh` (`CI_FAST_BOOTSTRAP=1`) | `./script/bootstrap-wave-check.sh --fail-fast` after `@group aot-lint` |
 | `BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE` | `0` | `ci-local.sh` (LLVM tail, after wave-check) | `bootstrap-selfhost-helloworld-probe.sh` with strict native emit ([#1526](https://github.com/PurHur/php-compiler/issues/1526)); set `1` when `emit_path=native` stable |
 | `BOOTSTRAP_LIB_SPINE_VM_SMOKE_GATE` | `1` | `ci-local.sh` (LLVM tail, after selfhost-probe) | `bootstrap-selfhost-lib-spine-vm-smoke.sh` — M2 spine binary via `bin/vm.php -r` path ([#1846](https://github.com/PurHur/php-compiler/issues/1846), [#1867](https://github.com/PurHur/php-compiler/issues/1867)); set `0` for spine-only link PRs |
 | `CI_FAST_BOOTSTRAP` | `0` | `ci-fast.sh` | Optional llvm tail: bootstrap aot-lint + probe + wave-check when LLVM 9 present |
 | `JIT_PREFLIGHT_GATE` | `0` | `ci-fast.sh` | Early MCJIT probe after `composer install` ([#728](https://github.com/PurHur/php-compiler/issues/728)) |
+| `NORTH_STAR2_VERIFY_GATE` | `0` | `ci-fast.sh` | `./script/north-star2-verify.sh` presenter when script exists ([#1928](https://github.com/PurHur/php-compiler/issues/1928), [#1865](https://github.com/PurHur/php-compiler/issues/1865)); skips with message until `#1865` lands |
 | `M2_SPINE_ISSUE_HYGIENE_GATE` | `1` | `ci-fast.sh` (`ci_run_inventory_checks`) | `script/check-m2-spine-issue-hygiene.php` — stale `m2-spine-unit` tickets ([#1819](https://github.com/PurHur/php-compiler/issues/1819), [#1808](https://github.com/PurHur/php-compiler/issues/1808)); set `0` for bulk spine PRs |
 | `WAVE3_ROADMAP_SYNC_GATE` | `1` | `ci-fast.sh` (`ci_run_inventory_checks`) | `script/check-wave3-roadmap-sync.php` ([#1802](https://github.com/PurHur/php-compiler/issues/1802), [#1814](https://github.com/PurHur/php-compiler/issues/1814)); set `0` for doc-only iteration |
 | `EXAMPLES_README_SYNC_GATE` | `1` | `ci-fast.sh` (`ci_run_inventory_checks`) | `script/check-examples-readme-sync.php` ([#1822](https://github.com/PurHur/php-compiler/issues/1822), [#1531](https://github.com/PurHur/php-compiler/issues/1531)); set `0` for doc-only iteration |
 | `EXAMPLES_LADDER_DISCOVERY_GATE` | `1` | `ci-fast.sh` (`ci_run_inventory_checks`) | `script/check-examples-ladder-discovery.php` — `examples/` dirs ↔ `ExamplesCompileTest` ([#1913](https://github.com/PurHur/php-compiler/issues/1913)); set `0` for doc-only iteration |
+| `REBUILD_EXAMPLES_005_SYNC_GATE` | `0` | `ci-fast.sh` (`ci_run_inventory_checks`) | `script/check-rebuild-examples-005-row.php` — `005-SessionsWeb` run matrix + benchmark row vs `rebuild-examples.php` ([#1930](https://github.com/PurHur/php-compiler/issues/1930)); set `1` after row policy stable |
 | `ROOT_README_SYNC_GATE` | `1` | `ci-fast.sh` (`ci_run_inventory_checks`) | `script/check-root-readme-sync.php` ([#1832](https://github.com/PurHur/php-compiler/issues/1832), [#1525](https://github.com/PurHur/php-compiler/issues/1525)); set `0` for doc-only iteration |
 | `SELFHOST_SPINE_COUNT_SYNC_GATE` | `1` | `ci-fast.sh` (`ci_run_inventory_checks`) | `script/check-selfhost-spine-count-sync.php` (canonical `script/bootstrap-spine-count.php`, [#1834](https://github.com/PurHur/php-compiler/issues/1834), [#1872](https://github.com/PurHur/php-compiler/issues/1872)); set `0` for bulk spine PRs |
+| `INIT_SESSIONSWEB_PARITY_GATE` | `1` | `ci-fast.sh` (`ci_run_inventory_checks`) | `script/check-init-sessionsweb-parity.sh` — `examples/005-SessionsWeb/` ↔ `templates/init-sessionsweb/` ([#1902](https://github.com/PurHur/php-compiler/issues/1902)); set `0` for doc-only iteration |
 
 Ladder-only env vars (not in `ci-defaults.env`): `MINIWEBAPP_LINT_GATE` (default `1` in `web-smoke.sh`), `MINIWEBAPP_AOT_BISECT_GATE` (default `0` in `miniwebapp-gates.sh` — [#879](https://github.com/PurHur/php-compiler/issues/879)).
 
@@ -115,6 +124,13 @@ Ladder-only env vars (not in `ci-defaults.env`): `MINIWEBAPP_LINT_GATE` (default
 ```bash
 ./script/ci-local.sh --filter 'ExamplesCompileTest::test003MiniWebAppBuildLinks'
 MINIWEBAPP_AOT_LINK_GATE=0 ./script/ci-local.sh --filter ExamplesCompileTest   # skip 003 link (#754)
+```
+
+**005 AOT link** (`SESSIONS_WEB_AOT_LINK_GATE=1` default — [#1946](https://github.com/PurHur/php-compiler/issues/1946)):
+
+```bash
+./script/ci-local.sh --filter test005SessionsWebAotLink
+SESSIONS_WEB_AOT_LINK_GATE=0 ./script/ci-local.sh --filter ExamplesCompileTest   # skip 005 link
 ```
 
 **003 AOT execute** (`MINIWEBAPP_AOT_EXECUTE_GATE=1` default; set `0` to skip during iteration):
@@ -127,6 +143,7 @@ EXAMPLES_AOT_SMOKE_ONLY=003 ./script/examples-aot-smoke.sh
 DEPLOY_SMOKE_GATE=0 ./script/ci-local.sh   # skip 001/002 deploy smoke (#737)
 MINIWEBAPP_AOT_BISECT_GATE=1 ./script/miniwebapp-gates.sh
 make north-star1-verify   # doctor --gates + ladder + ci-fast + AOT execute (#1845)
+NORTH_STAR2_VERIFY_GATE=1 ./script/ci-fast.sh   # NS2 presenter when script exists (#1928, #1865)
 ```
 
 Set any gate to `0` to skip that stage during iteration (e.g. `MINIWEBAPP_SERVE_GATE=0 ./script/ci-fast.sh`, `MINIWEBAPP_AOT_EXECUTE_GATE=0 ./script/ci-local.sh`).
@@ -166,6 +183,19 @@ php script/check-jit-compliance-ran.php --preflight
 ```
 
 Exits **0** when LLVM 9 is missing (nothing to guard). Exits **non-zero** when LLVM is present but PHPLLVM/MCJIT cannot bootstrap ([#98](https://github.com/PurHur/php-compiler/issues/98)). Default **off** until contributors opt in.
+
+### North Star 2 presenter on fast CI ([#1928](https://github.com/PurHur/php-compiler/issues/1928))
+
+Self-host iteration can run the NS2 presenter bundle from `ci-fast` without a full `ci-local.sh` LLVM tail. Default **off** until `script/north-star2-verify.sh` lands ([#1865](https://github.com/PurHur/php-compiler/issues/1865)):
+
+```bash
+NORTH_STAR2_VERIFY_GATE=1 ./script/ci-fast.sh
+# Docker:
+docker run --rm -v "$(pwd):/compiler" -w /compiler php-compiler:22.04-dev \
+  env NORTH_STAR2_VERIFY_GATE=1 ./script/ci-fast.sh
+```
+
+When the script is missing, CI prints a skip message and exits **0**. With LLVM 9 present, runs `./script/north-star2-verify.sh` (full tail); without LLVM, passes `--skip-llvm-tail`.
 
 ### AOT project preflight ([#746](https://github.com/PurHur/php-compiler/issues/746))
 

@@ -21,6 +21,7 @@ session_start();
 $method = isset($_SERVER['REQUEST_METHOD']) ? (string) $_SERVER['REQUEST_METHOD'] : 'GET';
 if ('POST' === $method) {
     $_SESSION['flash'] = isset($_POST['message']) ? (string) $_POST['message'] : 'saved';
+    session_write_close();
     header('Location: /example.php', true, 303);
     exit;
 }
@@ -35,10 +36,11 @@ header('Content-Type: text/html; charset=UTF-8');
 echo '<!DOCTYPE html><html><head><title>SessionsWeb</title></head><body>';
 echo '<h1>SessionsWeb</h1>';
 if ('' !== $flash) {
-    echo '<p class="flash">Flash: ', htmlspecialchars($flash), "</p>\n";
+    echo '<p class="flash">Flash: ', $flash, "</p>\n";
 } else {
     echo "<p>No flash message yet.</p>\n";
 }
 echo '<form method="post"><label>Message <input name="message" value="hello"></label> ';
 echo '<button type="submit">Set flash</button></form>';
 echo "</body></html>\n";
+session_write_close();

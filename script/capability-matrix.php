@@ -169,7 +169,7 @@ function tagPhptFunctions(string $phpt, array &$bucket, string $tag): void
 }
 
 /**
- * @param array<string, array{vm: bool, jit: bool, aot: bool, notes: list<string>, module: string}> $capabilities
+ * @param array<string, array{vm: bool, jit: bool, aot: bool|string, notes: list<string>, module: string}> $capabilities
  */
 function renderBuiltinMarkdown(array $capabilities, array $phpt): string
 {
@@ -196,9 +196,9 @@ function renderBuiltinMarkdown(array $capabilities, array $phpt): string
         $lines[] = sprintf(
             '| `%s` | %s | %s | %s | %s | %s |',
             $name,
-            capabilityYesNo($row['vm']),
-            capabilityYesNo($row['jit']),
-            capabilityYesNo($row['aot']),
+            capabilityCell($row['vm']),
+            capabilityCell($row['jit']),
+            capabilityCell($row['aot']),
             $row['module'],
             $notes === [] ? '' : implode('; ', $notes)
         );
@@ -216,7 +216,7 @@ function renderBuiltinMarkdown(array $capabilities, array $phpt): string
     return implode("\n", $lines);
 }
 
-$capabilities = collectCapabilities($root);
+$capabilities = applyBuiltinCapabilityCurations(collectCapabilities($root));
 $phpt = collectPhptCoverage($root);
 $markdown = renderBuiltinMarkdown($capabilities, $phpt);
 

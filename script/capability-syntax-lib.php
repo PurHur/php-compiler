@@ -562,6 +562,67 @@ function capabilityYesNo(bool $value): string
     return $value ? 'yes' : 'no';
 }
 
+/** @param bool|string $value */
+function capabilityCell($value): string
+{
+    return is_string($value) ? capabilityStatusLabel($value) : capabilityYesNo((bool) $value);
+}
+
+/**
+ * Curated builtin overrides (issue #1947): honest AOT session persistence vs compile probes.
+ *
+ * @return array<string, array{aot?: string, notes?: list<string>}>
+ */
+function builtinCapabilityCurations(): array
+{
+    $persistenceNote = 'AOT CGI file persistence (#1938); compile/link may pass';
+
+    return [
+        'session_start' => [
+            'aot' => 'partial',
+            'notes' => [$persistenceNote],
+        ],
+        'session_destroy' => [
+            'aot' => 'partial',
+            'notes' => [$persistenceNote],
+        ],
+        'session_regenerate_id' => [
+            'aot' => 'partial',
+            'notes' => [$persistenceNote],
+        ],
+        'session_write_close' => [
+            'aot' => 'partial',
+            'notes' => [$persistenceNote],
+        ],
+    ];
+}
+
+/**
+ * @param array<string, array{vm: bool, jit: bool, aot: bool|string, notes: list<string>, module: string}> $capabilities
+ *
+ * @return array<string, array{vm: bool, jit: bool, aot: bool|string, notes: list<string>, module: string}>
+ */
+function applyBuiltinCapabilityCurations(array $capabilities): array
+{
+    foreach (builtinCapabilityCurations() as $name => $patch) {
+        if (!isset($capabilities[$name])) {
+            continue;
+        }
+        if (isset($patch['aot'])) {
+            $capabilities[$name]['aot'] = $patch['aot'];
+        }
+        if (isset($patch['notes'])) {
+            foreach ($patch['notes'] as $note) {
+                if (!in_array($note, $capabilities[$name]['notes'], true)) {
+                    $capabilities[$name]['notes'][] = $note;
+                }
+            }
+        }
+    }
+
+    return $capabilities;
+}
+
 /**
  * Web north-star constructs for examples/003-MiniWebApp (issue #655).
  *
@@ -671,6 +732,97 @@ function renderWebNorthStarMarkdown(array $web): string
     $lines[] = '_Web rows are curated from ROADMAP issue state; native link [#568](' . CAPABILITY_ISSUE_URL_BASE
         . '568) closed; AOT execute [#764](' . CAPABILITY_ISSUE_URL_BASE . '764) closed; default-off CI gates [#1760]('
         . CAPABILITY_ISSUE_URL_BASE . '1760)._';
+    $lines[] = '';
+
+    return implode("\n", $lines);
+}
+
+/**
+ * Session reference app constructs for examples/005-SessionsWeb (issue #1947).
+ *
+ * @return list<array{
+ *   construct: string,
+ *   vm: string,
+ *   jit: string,
+ *   aot: string,
+ *   issue: int,
+ *   notes: list<string>
+ * }>
+ */
+function sessionsWebNorthStarDefinitions(): array
+{
+    return [
+        [
+            'construct' => '`005-SessionsWeb` reference app',
+            'vm' => 'yes',
+            'jit' => 'yes',
+            'aot' => 'partial',
+            'issue' => 1881,
+            'notes' => [
+                '#1881 VM serve + session smoke (#1887); AOT link #1946; execute #1891 (SESSIONS_WEB_AOT_SMOKE_GATE=0)',
+            ],
+        ],
+        [
+            'construct' => '`session_start` / `$_SESSION` flash across requests',
+            'vm' => 'yes',
+            'jit' => 'yes',
+            'aot' => 'partial',
+            'issue' => 1938,
+            'notes' => ['#1882 JIT; AOT persistence #1938; two-request execute #1891'],
+        ],
+        [
+            'construct' => 'AOT project link (`phpc build --project`)',
+            'vm' => 'n/a',
+            'jit' => 'n/a',
+            'aot' => 'partial',
+            'issue' => 1946,
+            'notes' => ['ExamplesCompileTest link-before-execute gate (#1946)'],
+        ],
+        [
+            'construct' => 'AOT CLI execute (two-request session flash)',
+            'vm' => 'n/a',
+            'jit' => 'n/a',
+            'aot' => 'partial',
+            'issue' => 1891,
+            'notes' => ['SessionsWebAotExecuteTest; opt-in SESSIONS_WEB_AOT_SMOKE_GATE=1 (#1923)'],
+        ],
+    ];
+}
+
+/**
+ * @param list<array{construct: string, vm: string, jit: string, aot: string, issue: int, notes: list<string>}> $rows
+ */
+function renderSessionsWebNorthStarMarkdown(array $rows): string
+{
+    $lines = [
+        '## Sessions reference (`examples/005-SessionsWeb`)',
+        '',
+        'File-backed `$_SESSION` flash across HTTP requests for the sessions north-star example.',
+        'ROADMAP Phase 4/5: [#78](' . CAPABILITY_ISSUE_URL_BASE . '78), tracker [#1881]('
+        . CAPABILITY_ISSUE_URL_BASE . '1881). Builtin matrix: [capabilities.md](capabilities.md).',
+        '',
+        '| Construct | VM | JIT | AOT | Issue | Notes |',
+        '|-----------|:--:|:---:|:---:|-------|-------|',
+    ];
+
+    foreach ($rows as $row) {
+        $lines[] = sprintf(
+            '| %s | %s | %s | %s | [#%d](%s%d) | %s |',
+            $row['construct'],
+            capabilityStatusLabel($row['vm']),
+            capabilityStatusLabel($row['jit']),
+            capabilityStatusLabel($row['aot']),
+            $row['issue'],
+            CAPABILITY_ISSUE_URL_BASE,
+            $row['issue'],
+            $row['notes'] === [] ? '' : implode('; ', $row['notes'])
+        );
+    }
+
+    $lines[] = '';
+    $lines[] = '_Sessions rows are curated from ROADMAP issue state; AOT persistence [#1938](' . CAPABILITY_ISSUE_URL_BASE
+        . '1938); link gate [#1946](' . CAPABILITY_ISSUE_URL_BASE . '1946); execute [#1891](' . CAPABILITY_ISSUE_URL_BASE
+        . '1891) (opt-in `SESSIONS_WEB_AOT_SMOKE_GATE`)._';
     $lines[] = '';
 
     return implode("\n", $lines);

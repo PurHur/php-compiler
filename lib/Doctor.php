@@ -135,6 +135,7 @@ final class Doctor
 
         self::printNorthStar1PresenterSection($repoRoot);
         self::printNorthStar2PresenterSection($repoRoot);
+        self::printSessionsWebSection($repoRoot);
 
         return is_int($exit) ? $exit : 1;
     }
@@ -165,10 +166,28 @@ final class Doctor
         $nestedReturnDetail = $nestedReturnOn
             ? 'default on — ci-fast NestedReturn* (#1888)'
             : 'skipped (NESTED_RETURN_COMPLIANCE_GATE=0)';
+        $attributesGate = getenv('ATTRIBUTES_COMPLIANCE_GATE');
+        $attributesOn = false === $attributesGate || '' === $attributesGate || '1' === $attributesGate;
+        $attributesDetail = $attributesOn
+            ? 'default on — ci-fast Attribute* (#1904)'
+            : 'skipped (ATTRIBUTES_COMPLIANCE_GATE=0)';
+        $rehashGate = getenv('REHASH_COMPLIANCE_GATE');
+        $rehashOn = false === $rehashGate || '' === $rehashGate || '1' === $rehashGate;
+        $rehashDetail = $rehashOn
+            ? 'default on — ci-fast array_rehash_string_keys (#1956)'
+            : 'skipped (REHASH_COMPLIANCE_GATE=0)';
+        $stringKeyJitGate = getenv('STRING_KEY_JIT_COMPLIANCE_GATE');
+        $stringKeyJitOn = false === $stringKeyJitGate || '' === $stringKeyJitGate || '1' === $stringKeyJitGate;
+        $stringKeyJitDetail = $stringKeyJitOn
+            ? 'default on — ci-fast array_rehash_string_keys_jit (#1959, LLVM)'
+            : 'skipped (STRING_KEY_JIT_COMPLIANCE_GATE=0)';
 
         fwrite(STDOUT, "  Gates ladder     make miniwebapp-gates              stages 0–4d (#472)\n");
         fwrite(STDOUT, "  Fast CI          ./script/ci-fast.sh               VM/compliance\n");
         fwrite(STDOUT, "  Nested return    {$nestedReturnDetail}\n");
+        fwrite(STDOUT, "  Attributes       {$attributesDetail}\n");
+        fwrite(STDOUT, "  HashTable rehash {$rehashDetail}\n");
+        fwrite(STDOUT, "  String-key JIT   {$stringKeyJitDetail}\n");
         fwrite(STDOUT, "  Full AOT tail    ./script/ci-local.sh --filter MiniWebAppAotExecuteTest   LLVM required\n");
         fwrite(STDOUT, "  Presenter bundle make north-star1-verify            --require-llvm / --skip-llvm-tail\n");
         fwrite(STDOUT, "  Script           ./script/north-star1-verify.sh    same as make target\n");
@@ -211,13 +230,106 @@ final class Doctor
         fwrite(STDOUT, "  M0 link          ./script/bootstrap-selfhost-link.sh\n");
         fwrite(STDOUT, "  M2 spine link    BOOTSTRAP_LIB_SPINE_SMOKE=1 make bootstrap-selfhost-lib-spine-smoke\n");
         fwrite(STDOUT, "  M2 VM smoke      BOOTSTRAP_LIB_SPINE_VM_SMOKE=1 make bootstrap-selfhost-lib-spine-vm-smoke\n");
+        $loopProbeGate = getenv('BOOTSTRAP_LOOP_PROBE_GATE');
+        $loopProbeOn = false !== $loopProbeGate && '1' === $loopProbeGate;
+        $loopProbeDetail = $loopProbeOn
+            ? 'BOOTSTRAP_LOOP_PROBE_GATE=1 — ci-fast / ci-local dry-run (#1929)'
+            : 'opt-in BOOTSTRAP_LOOP_PROBE_GATE=1 for M4 dry-run in ci-fast (#1929)';
+        fwrite(STDOUT, "  M4 loop dry-run  {$loopProbeDetail}\n");
+        $ns2CiGate = getenv('NORTH_STAR2_VERIFY_GATE');
+        $ns2CiOn = false !== $ns2CiGate && '1' === $ns2CiGate;
+        $ns2CiDetail = $ns2CiOn
+            ? 'NORTH_STAR2_VERIFY_GATE=1 — ci-fast runs presenter (#1928)'
+            : 'opt-in NORTH_STAR2_VERIFY_GATE=1 for ci-fast hook (#1928)';
         if ($ns2Make) {
             fwrite(STDOUT, "  Presenter bundle make north-star2-verify            --require-llvm / --skip-llvm-tail\n");
             fwrite(STDOUT, "  Script           ./script/north-star2-verify.sh    same as make target\n");
         } else {
             fwrite(STDOUT, "  Presenter bundle make north-star2-verify            pending — see #1865\n");
         }
+        fwrite(STDOUT, "  Fast CI hook     {$ns2CiDetail}\n");
         fwrite(STDOUT, "  Docs             docs/bootstrap-selfhost.md · docs/self-host-target.md (#1492)\n");
+    }
+
+    /**
+     * 005-SessionsWeb gate ladder (issues #1881, #1903).
+     */
+    private static function printSessionsWebSection(string $repoRoot): void
+    {
+        $exampleDir = $repoRoot.'/examples/005-SessionsWeb';
+        if (!is_dir($exampleDir)) {
+            return;
+        }
+
+        $hasExample = is_file($exampleDir.'/example.php');
+        $hasManifest = is_file($exampleDir.'/phpc.json');
+
+        $smokeGate = getenv('SESSIONS_WEB_SMOKE_GATE');
+        $smokeOn = false === $smokeGate || '' === $smokeGate || '1' === $smokeGate;
+
+        $linkGate = getenv('SESSIONS_WEB_AOT_LINK_GATE');
+        $linkOn = false !== $linkGate && '1' === $linkGate;
+
+        $aotGate = getenv('SESSIONS_WEB_AOT_SMOKE_GATE');
+        $aotOn = false !== $aotGate && '1' === $aotGate;
+
+        $llvmInfo = self::resolveLlvmInfo($repoRoot);
+        $llvmReady = null !== $llvmInfo['dir'];
+        $llvmDetail = $llvmReady
+            ? 'LLVM ready'
+            : 'LLVM missing — AOT rows need libLLVM-9.so.1';
+
+        $initProfileLive = \PHPCompiler\Cli\PhpcInit::isKnownProfile('sessionsweb');
+        $initTemplate = is_file($repoRoot.'/templates/init-sessionsweb/example.php');
+
+        fwrite(STDOUT, "\nSessionsWeb (005) — issue #1881:\n");
+
+        if ($hasExample && $hasManifest) {
+            fwrite(STDOUT, "  [✅] example.php + phpc.json present\n");
+        } else {
+            fwrite(STDOUT, "  [⬜] example tree incomplete (expected example.php + phpc.json)\n");
+        }
+
+        fwrite(STDOUT, "  [✅] Lint: ./phpc lint examples/005-SessionsWeb/example.php\n");
+
+        if ($smokeOn) {
+            fwrite(STDOUT, "  [✅] SESSIONS_WEB_SMOKE_GATE=1 (default) — make examples-sessions-smoke · ci-fast (#1887)\n");
+        } else {
+            fwrite(STDOUT, "  [⬜] SESSIONS_WEB_SMOKE_GATE=0 — VM cookie curls skipped (#1887)\n");
+        }
+
+        if ($linkOn && $llvmReady) {
+            fwrite(STDOUT, "  [✅] SESSIONS_WEB_AOT_LINK_GATE=1 (default) — AOT link (#1946, ExamplesCompileTest::test005SessionsWebAotLink)\n");
+        } elseif ($llvmReady) {
+            fwrite(STDOUT, "  [⬜] SESSIONS_WEB_AOT_LINK_GATE=0 — AOT link skipped (#1946)\n");
+        } else {
+            fwrite(STDOUT, "  [📋] AOT link — #1946 ({$llvmDetail}; SESSIONS_WEB_AOT_LINK_GATE=1 default when LLVM ready)\n");
+        }
+
+        if ($aotOn && $llvmReady) {
+            fwrite(STDOUT, "  [✅] SESSIONS_WEB_AOT_SMOKE_GATE=1 — AOT two-request execute (#1891)\n");
+        } else {
+            $aotNote = $aotOn && !$llvmReady
+                ? "{$llvmDetail}; export SESSIONS_WEB_AOT_SMOKE_GATE=1 when LLVM ready"
+                : 'opt-in SESSIONS_WEB_AOT_SMOKE_GATE=0 until #1923';
+            fwrite(STDOUT, "  [📋] AOT two-request execute — #1891 ({$aotNote})\n");
+        }
+
+        fwrite(STDOUT, "  [📋] phpc deploy + PHPC_DEPLOY_ROOT CGI smoke — #1893\n");
+
+        if ($initProfileLive) {
+            fwrite(STDOUT, "  [✅] phpc init --profile sessionsweb — templates/init-sessionsweb (#1886)\n");
+        } elseif ($initTemplate) {
+            fwrite(STDOUT, "  [📋] phpc init --profile sessionsweb — template ready; CLI profile pending #1886\n");
+        } else {
+            fwrite(STDOUT, "  [📋] phpc init --profile sessionsweb — #1886\n");
+        }
+
+        fwrite(STDOUT, "  Gate env (script/ci-defaults.env):\n");
+        fwrite(STDOUT, "    SESSIONS_WEB_SMOKE_GATE      default 1 (#1894)\n");
+        fwrite(STDOUT, "    SESSIONS_WEB_AOT_LINK_GATE   default 1 (#1946)\n");
+        fwrite(STDOUT, "    SESSIONS_WEB_AOT_SMOKE_GATE  default 0 until #1923 (#1921)\n");
+        fwrite(STDOUT, "  Docs: examples/005-SessionsWeb/README.md · examples/README.md\n");
     }
 
     /**

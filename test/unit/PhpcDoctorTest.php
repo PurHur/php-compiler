@@ -102,8 +102,20 @@ final class PhpcDoctorTest extends TestCase
         $this->assertStringContainsString('bootstrap-selfhost-lib-spine-vm-smoke', $result['stdout']);
         $this->assertStringContainsString('M2 spine:', $result['stdout']);
         $this->assertStringContainsString('M3 strict:', $result['stdout']);
+        $this->assertStringContainsString('M4 loop dry-run', $result['stdout']);
+        $this->assertStringContainsString('BOOTSTRAP_LOOP_PROBE_GATE', $result['stdout']);
+        $this->assertStringContainsString('NORTH_STAR2_VERIFY_GATE', $result['stdout']);
+        $this->assertStringContainsString('Fast CI hook', $result['stdout']);
         $this->assertStringContainsString('LLVM 9:', $result['stdout']);
         $this->assertStringContainsString('Serve tests:', $result['stdout']);
+        $this->assertStringContainsString('SessionsWeb (005)', $result['stdout']);
+        $this->assertStringContainsString('005-SessionsWeb', $result['stdout']);
+        $this->assertStringContainsString('SESSIONS_WEB_SMOKE_GATE', $result['stdout']);
+        $this->assertStringContainsString('SESSIONS_WEB_AOT_LINK_GATE', $result['stdout']);
+        $this->assertStringContainsString('SESSIONS_WEB_AOT_SMOKE_GATE', $result['stdout']);
+        $this->assertStringContainsString('examples-sessions-smoke', $result['stdout']);
+        $this->assertStringContainsString('#1891', $result['stdout']);
+        $this->assertStringContainsString('#1886', $result['stdout']);
     }
 
     /**

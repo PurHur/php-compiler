@@ -6,6 +6,10 @@
 #
 # Optional bootstrap tail (aot-lint + selfhost-probe + wave-check when LLVM ready):
 #   CI_FAST_BOOTSTRAP=1 ./script/ci-fast.sh
+# M4 bootstrap-loop dry-run when LLVM ready (default off; issue #1929):
+#   BOOTSTRAP_LOOP_PROBE_GATE=1 ./script/ci-fast.sh
+# North Star 2 presenter when opt-in (skips until #1865 script exists; issue #1928):
+#   NORTH_STAR2_VERIFY_GATE=1 ./script/ci-fast.sh
 set -euo pipefail
 
 # shellcheck source=ci-common.sh
@@ -61,6 +65,36 @@ if [[ "${NESTED_RETURN_COMPLIANCE_GATE:-1}" == "1" ]]; then
   echo "PHPUnit (fast): nested return VM compliance (NestedReturn*)..."
   ci_run_phpunit --filter NestedReturn
 fi
+
+# PHP 8 attributes VM compliance (#1354, #1904). Default on; set ATTRIBUTES_COMPLIANCE_GATE=0 to skip.
+if [[ "${ATTRIBUTES_COMPLIANCE_GATE:-1}" == "1" ]]; then
+  echo "PHPUnit (fast): attributes VM compliance (Attribute*)..."
+  ci_run_phpunit --filter Attribute
+fi
+
+# HashTable rehash with string keys (#66, #1956). Default on; set REHASH_COMPLIANCE_GATE=0 to skip.
+if [[ "${REHASH_COMPLIANCE_GATE:-1}" == "1" ]]; then
+  echo "PHPUnit (fast): hashtable rehash VM compliance (array_rehash_string_keys)..."
+  ci_run_phpunit --filter array_rehash_string_keys
+fi
+
+# Null coalescing ?? VM/JIT compliance (#99, #1960). Opt-in until PHPT slice green; set COALESCE_COMPLIANCE_GATE=1 to run.
+if [[ "${COALESCE_COMPLIANCE_GATE:-0}" == "1" ]]; then
+  echo "PHPUnit (fast): coalesce VM/JIT compliance (Coalesce*)..."
+  ci_run_phpunit --filter Coalesce
+fi
+
+# String-key array dim-assign JIT (#66, #1959). Default on when LLVM + MCJIT probe pass; set STRING_KEY_JIT_COMPLIANCE_GATE=0 to skip.
+if [[ "${STRING_KEY_JIT_COMPLIANCE_GATE:-1}" == "1" ]] && ci_llvm_ready && ci_should_run_jit; then
+  echo "PHPUnit (fast): string-key array JIT (array_rehash_string_keys_jit)..."
+  ci_run_phpunit --filter array_rehash_string_keys_jit
+fi
+
+# M4 bootstrap-loop dry-run when opt-in (issue #1929; default off in ci-defaults).
+ci_run_bootstrap_loop_probe
+
+# North Star 2 presenter when opt-in (issue #1928; script pending #1865).
+ci_run_north_star2_verify
 
 # Optional bootstrap tail when LLVM 9 present (aot-lint + probe + wave-check; issue #436).
 if [[ "${CI_FAST_BOOTSTRAP:-0}" == "1" ]]; then
