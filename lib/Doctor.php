@@ -419,6 +419,13 @@ final class Doctor
         fwrite(STDOUT, "      PHPUnit: ./script/ci-local.sh --filter FileUploadWebAotExecuteTest\n");
         fwrite(STDOUT, "      Shell:   EXAMPLES_AOT_SMOKE_ONLY=006 ./script/examples-aot-smoke.sh\n");
 
+        $rebuild006Default = $defaults['REBUILD_EXAMPLES_006_SYNC_GATE'] ?? '0';
+        $rebuild006On = self::gateEnabled('REBUILD_EXAMPLES_006_SYNC_GATE', $rebuild006Default);
+        $rebuild006Icon = $rebuild006On ? '✅' : '⬜';
+        fwrite(STDOUT, "\n  Doc sync (ci-fast inventory):\n");
+        fwrite(STDOUT, "  [{$rebuild006Icon}] examples/README 006 run matrix — REBUILD_EXAMPLES_006_SYNC_GATE default {$rebuild006Default} (#2018)\n");
+        fwrite(STDOUT, "      Run: php script/check-rebuild-examples-006-row.php · ci-fast when gate=1\n");
+
         $initProfileLive = \PHPCompiler\Cli\PhpcInit::isKnownProfile('fileupload');
         $initTemplate = is_file($repoRoot.'/templates/init-fileupload/example.php');
         fwrite(STDOUT, "\n  Related:\n");

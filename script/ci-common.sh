@@ -111,6 +111,14 @@ ci_run_rebuild_examples_005_sync_check() {
   "$PHP_BIN" "${PHP_OPTS[@]}" script/check-rebuild-examples-005-row.php
 }
 
+ci_run_rebuild_examples_006_sync_check() {
+  if [[ "${REBUILD_EXAMPLES_006_SYNC_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  echo "Rebuild examples 006 row sync (REBUILD_EXAMPLES_006_SYNC_GATE=1, issue #2018)..."
+  "$PHP_BIN" "${PHP_OPTS[@]}" script/check-rebuild-examples-006-row.php
+}
+
 ci_run_capabilities_sessionsweb_sync_check() {
   if [[ "${CAPABILITIES_SESSIONSWEB_SYNC_GATE:-1}" != "1" ]]; then
     return 0
@@ -181,6 +189,7 @@ ci_run_inventory_checks() {
   ci_run_examples_readme_sync_check
   ci_run_examples_ladder_discovery_check
   ci_run_rebuild_examples_005_sync_check
+  ci_run_rebuild_examples_006_sync_check
   ci_run_capabilities_sessionsweb_sync_check
   ci_run_root_readme_sync_check
   ci_run_selfhost_spine_count_sync_check
