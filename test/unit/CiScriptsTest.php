@@ -616,6 +616,39 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('#2083', $doc);
     }
 
+    public function testCiDefaultsEnvDefinesDevelopmentStatus007SyncGateOff(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString(
+            'DEVELOPMENT_STATUS_007_SYNC_GATE="${DEVELOPMENT_STATUS_007_SYNC_GATE:-0}"',
+            $defaults
+        );
+    }
+
+    public function testCiFastRunsDevelopmentStatus007SyncViaInventoryChecks(): void
+    {
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('ci_run_development_status_007_sync_check', $common);
+        $this->assertStringContainsString('DEVELOPMENT_STATUS_007_SYNC_GATE=1', $common);
+    }
+
+    public function testCiDockerRunPassesDevelopmentStatus007SyncGateDefaultOff(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');
+        $this->assertStringContainsString(
+            'DEVELOPMENT_STATUS_007_SYNC_GATE=${DEVELOPMENT_STATUS_007_SYNC_GATE:-0}',
+            $body
+        );
+    }
+
+    public function testLocalCiMatrixDocumentsDevelopmentStatus007SyncGate(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('DEVELOPMENT_STATUS_007_SYNC_GATE', $doc);
+        $this->assertMatchesRegularExpression('/\| `DEVELOPMENT_STATUS_007_SYNC_GATE` \| `0` \|/', $doc);
+        $this->assertStringContainsString('#2145', $doc);
+    }
+
     public function testCiDefaultsEnvDefinesSelfhostSpineCountSyncGateOn(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
