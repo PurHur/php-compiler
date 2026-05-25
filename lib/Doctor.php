@@ -134,6 +134,7 @@ final class Doctor
         }
 
         self::printNorthStar1PresenterSection($repoRoot);
+        self::printNorthStar2PresenterSection($repoRoot);
 
         return is_int($exit) ? $exit : 1;
     }
@@ -165,6 +166,51 @@ final class Doctor
         fwrite(STDOUT, "  Presenter bundle make north-star1-verify            --require-llvm / --skip-llvm-tail\n");
         fwrite(STDOUT, "  Script           ./script/north-star1-verify.sh    same as make target\n");
         fwrite(STDOUT, "  Docs             docs/miniwebapp-gates.md\n");
+    }
+
+    /**
+     * North Star 2 self-host presenter commands (issues #1492, #1871; bundle #1865).
+     */
+    private static function printNorthStar2PresenterSection(string $repoRoot): void
+    {
+        require_once $repoRoot.'/script/bootstrap-spine-count.php';
+        $counts = bootstrap_spine_counts($repoRoot);
+        $spine = $counts['spine'];
+        $inventory = $counts['inventory'];
+
+        $llvmInfo = self::resolveLlvmInfo($repoRoot);
+        $llvmReady = null !== $llvmInfo['dir'];
+        $llvmDetail = $llvmReady
+            ? 'ready at '.$llvmInfo['dir'].' ('.$llvmInfo['source'].')'
+            : 'missing — M0/M2 link steps need LLVM 9';
+
+        $m3StrictGate = getenv('BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE');
+        $m3StrictOn = false !== $m3StrictGate && '1' === $m3StrictGate;
+        $m3StrictEnv = getenv('BOOTSTRAP_M3_HELLOWORLD_STRICT');
+        $m3StrictProbe = false !== $m3StrictEnv && '1' === $m3StrictEnv;
+        $m3Detail = $m3StrictOn || $m3StrictProbe
+            ? 'strict probe enabled (GATE or BOOTSTRAP_M3_HELLOWORLD_STRICT=1)'
+            : 'default off — export BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE=1 for ci-local LLVM tail (#1493)';
+
+        $ns2Script = $repoRoot.'/script/north-star2-verify.sh';
+        $ns2Make = is_executable($ns2Script);
+
+        fwrite(STDOUT, "\nNorth Star 2 presenter (#1492, #1871):\n");
+        fwrite(STDOUT, "  M2 spine: {$spine}/{$inventory} (php script/bootstrap-spine-count.php)\n");
+        fwrite(STDOUT, "  LLVM 9: {$llvmDetail}\n");
+        fwrite(STDOUT, "  M3 strict: {$m3Detail}\n");
+        fwrite(STDOUT, "  Inventory        php script/bootstrap-inventory.php --check\n");
+        fwrite(STDOUT, "  Wave gate        make bootstrap-wave-check\n");
+        fwrite(STDOUT, "  M0 link          ./script/bootstrap-selfhost-link.sh\n");
+        fwrite(STDOUT, "  M2 spine link    BOOTSTRAP_LIB_SPINE_SMOKE=1 make bootstrap-selfhost-lib-spine-smoke\n");
+        fwrite(STDOUT, "  M2 VM smoke      BOOTSTRAP_LIB_SPINE_VM_SMOKE=1 make bootstrap-selfhost-lib-spine-vm-smoke\n");
+        if ($ns2Make) {
+            fwrite(STDOUT, "  Presenter bundle make north-star2-verify            --require-llvm / --skip-llvm-tail\n");
+            fwrite(STDOUT, "  Script           ./script/north-star2-verify.sh    same as make target\n");
+        } else {
+            fwrite(STDOUT, "  Presenter bundle make north-star2-verify            pending — see #1865\n");
+        }
+        fwrite(STDOUT, "  Docs             docs/bootstrap-selfhost.md · docs/self-host-target.md (#1492)\n");
     }
 
     /**
