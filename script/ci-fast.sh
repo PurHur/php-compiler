@@ -98,6 +98,9 @@ if [[ "${TRY_CATCH_COMPLIANCE_GATE:-1}" == "1" ]]; then
   ci_run_phpunit --filter TryCatch
 fi
 
+# Dynamic $fn() JIT slice when LLVM + MCJIT ready (#2060). Default on; set JIT_VARIABLE_FUNCTION_COMPLIANCE_GATE=0 to skip.
+ci_run_jit_variable_function_compliance "$@"
+
 # M4 bootstrap-loop dry-run when opt-in (issue #1929; default off in ci-defaults).
 ci_run_bootstrap_loop_probe
 

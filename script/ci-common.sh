@@ -571,6 +571,24 @@ ci_guard_jit_compliance() {
   "$PHP_BIN" "${PHP_OPTS[@]}" script/check-jit-compliance-ran.php "$junit_path" "$llvm_dir"
 }
 
+# Dynamic $fn() JIT execute + lint (#1997, #2055); default on in ci-fast/ci-local when LLVM + MCJIT ready (#2060).
+ci_run_jit_variable_function_compliance() {
+  if [[ "${JIT_VARIABLE_FUNCTION_COMPLIANCE_GATE:-1}" != "1" ]]; then
+    return 0
+  fi
+  if ! ci_llvm_ready; then
+    echo "JIT variable-function compliance: skipped (LLVM 9 not available)"
+    return 0
+  fi
+  if ! ci_should_run_jit; then
+    echo "JIT variable-function compliance: skipped (JIT MCJIT probe failed)"
+    return 0
+  fi
+  ci_apply_llvm_memory_env
+  echo "PHPUnit: JIT variable-function compliance (VariableFunction*, #2060)..."
+  ci_run_phpunit --filter VariableFunction --group jit --fail-on-skipped "$@"
+}
+
 # Shell curl harness for 006-FileUploadWeb multipart upload (issue #1999).
 ci_run_file_upload_web_smoke() {
   if [[ "${FILE_UPLOAD_WEB_SMOKE_GATE:-1}" != "1" ]]; then

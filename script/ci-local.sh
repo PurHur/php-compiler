@@ -86,6 +86,7 @@ if ci_llvm_ready; then
     ci_run_phpunit --group jit --log-junit "$LLVM_JUNIT" "$@"
     ci_guard_jit_compliance "$LLVM_JUNIT" "$(ci_llvm_dir)"
     rm -f "$LLVM_JUNIT"
+    ci_run_jit_variable_function_compliance "$@"
 
     ci_run_aot_link_phpunit "$@"
     ci_run_miniwebapp_aot_execute "$@"

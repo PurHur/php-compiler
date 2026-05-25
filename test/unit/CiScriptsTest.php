@@ -1520,6 +1520,50 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('COALESCE_COMPLIANCE_GATE', $body);
     }
 
+    public function testCiDefaultsEnvDefinesJitVariableFunctionComplianceGateOn(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString(
+            'JIT_VARIABLE_FUNCTION_COMPLIANCE_GATE="${JIT_VARIABLE_FUNCTION_COMPLIANCE_GATE:-1}"',
+            $defaults
+        );
+        $this->assertStringContainsString('#2060', $defaults);
+    }
+
+    public function testCiCommonDefinesJitVariableFunctionComplianceRunner(): void
+    {
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('ci_run_jit_variable_function_compliance()', $common);
+        $this->assertStringContainsString('JIT_VARIABLE_FUNCTION_COMPLIANCE_GATE:-1', $common);
+        $this->assertStringContainsString('--filter VariableFunction', $common);
+    }
+
+    public function testCiFastRunsJitVariableFunctionComplianceGateByDefault(): void
+    {
+        $fast = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-fast.sh');
+        $this->assertStringContainsString('ci_run_jit_variable_function_compliance', $fast);
+    }
+
+    public function testCiLocalRunsJitVariableFunctionComplianceAfterJitGroup(): void
+    {
+        $local = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-local.sh');
+        $this->assertStringContainsString('ci_run_jit_variable_function_compliance', $local);
+    }
+
+    public function testLocalCiMatrixDocumentsJitVariableFunctionComplianceGate(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('JIT_VARIABLE_FUNCTION_COMPLIANCE_GATE', $doc);
+        $this->assertStringContainsString('VariableFunction*', $doc);
+        $this->assertMatchesRegularExpression('/\| `JIT_VARIABLE_FUNCTION_COMPLIANCE_GATE` \| `1` \|/', $doc);
+    }
+
+    public function testCiDockerRunPassesJitVariableFunctionComplianceGateEnv(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');
+        $this->assertStringContainsString('JIT_VARIABLE_FUNCTION_COMPLIANCE_GATE', $body);
+    }
+
     public function testCiFastRunsCgiDriverTest(): void
     {
         $fast = dirname(__DIR__, 2).'/script/ci-fast.sh';
