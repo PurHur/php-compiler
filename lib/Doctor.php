@@ -135,6 +135,7 @@ final class Doctor
 
         self::printNorthStar1PresenterSection($repoRoot);
         self::printNorthStar2PresenterSection($repoRoot);
+        self::printSessionsWebSection($repoRoot);
 
         return is_int($exit) ? $exit : 1;
     }
@@ -218,6 +219,75 @@ final class Doctor
             fwrite(STDOUT, "  Presenter bundle make north-star2-verify            pending — see #1865\n");
         }
         fwrite(STDOUT, "  Docs             docs/bootstrap-selfhost.md · docs/self-host-target.md (#1492)\n");
+    }
+
+    /**
+     * 005-SessionsWeb gate ladder (issues #1881, #1903).
+     */
+    private static function printSessionsWebSection(string $repoRoot): void
+    {
+        $exampleDir = $repoRoot.'/examples/005-SessionsWeb';
+        if (!is_dir($exampleDir)) {
+            return;
+        }
+
+        $hasExample = is_file($exampleDir.'/example.php');
+        $hasManifest = is_file($exampleDir.'/phpc.json');
+
+        $smokeGate = getenv('SESSIONS_WEB_SMOKE_GATE');
+        $smokeOn = false === $smokeGate || '' === $smokeGate || '1' === $smokeGate;
+
+        $aotGate = getenv('SESSIONS_WEB_AOT_SMOKE_GATE');
+        $aotOn = false !== $aotGate && '1' === $aotGate;
+
+        $llvmInfo = self::resolveLlvmInfo($repoRoot);
+        $llvmReady = null !== $llvmInfo['dir'];
+        $llvmDetail = $llvmReady
+            ? 'LLVM ready'
+            : 'LLVM missing — AOT rows need libLLVM-9.so.1';
+
+        $initProfileLive = \PHPCompiler\Cli\PhpcInit::isKnownProfile('sessionsweb');
+        $initTemplate = is_file($repoRoot.'/templates/init-sessionsweb/example.php');
+
+        fwrite(STDOUT, "\nSessionsWeb (005) — issue #1881:\n");
+
+        if ($hasExample && $hasManifest) {
+            fwrite(STDOUT, "  [✅] example.php + phpc.json present\n");
+        } else {
+            fwrite(STDOUT, "  [⬜] example tree incomplete (expected example.php + phpc.json)\n");
+        }
+
+        fwrite(STDOUT, "  [✅] Lint: ./phpc lint examples/005-SessionsWeb/example.php\n");
+
+        if ($smokeOn) {
+            fwrite(STDOUT, "  [✅] SESSIONS_WEB_SMOKE_GATE=1 (default) — make examples-sessions-smoke · ci-fast (#1887)\n");
+        } else {
+            fwrite(STDOUT, "  [⬜] SESSIONS_WEB_SMOKE_GATE=0 — VM cookie curls skipped (#1887)\n");
+        }
+
+        if ($aotOn && $llvmReady) {
+            fwrite(STDOUT, "  [✅] SESSIONS_WEB_AOT_SMOKE_GATE=1 — AOT two-request execute (#1891)\n");
+        } else {
+            $aotNote = $aotOn && !$llvmReady
+                ? "{$llvmDetail}; export SESSIONS_WEB_AOT_SMOKE_GATE=1 when LLVM ready"
+                : 'opt-in SESSIONS_WEB_AOT_SMOKE_GATE=0 until #1923';
+            fwrite(STDOUT, "  [📋] AOT link + two-request execute — #1891 ({$aotNote})\n");
+        }
+
+        fwrite(STDOUT, "  [📋] phpc deploy + PHPC_DEPLOY_ROOT CGI smoke — #1893\n");
+
+        if ($initProfileLive) {
+            fwrite(STDOUT, "  [✅] phpc init --profile sessionsweb — templates/init-sessionsweb (#1886)\n");
+        } elseif ($initTemplate) {
+            fwrite(STDOUT, "  [📋] phpc init --profile sessionsweb — template ready; CLI profile pending #1886\n");
+        } else {
+            fwrite(STDOUT, "  [📋] phpc init --profile sessionsweb — #1886\n");
+        }
+
+        fwrite(STDOUT, "  Gate env (script/ci-defaults.env):\n");
+        fwrite(STDOUT, "    SESSIONS_WEB_SMOKE_GATE      default 1 (#1894)\n");
+        fwrite(STDOUT, "    SESSIONS_WEB_AOT_SMOKE_GATE  default 0 until #1923 (#1921)\n");
+        fwrite(STDOUT, "  Docs: examples/005-SessionsWeb/README.md · examples/README.md\n");
     }
 
     /**

@@ -23,7 +23,7 @@ declare(strict_types=1);
  *   phpc lint --all <dir-or-file> [--json]
  *   phpc init [--profile default|miniwebapp] [--force] [target-dir]
  *   phpc test [--fast] [-- phpunit/ci-local args...]
- *   phpc doctor [--gates] [--no-lint] [--jit-probe] [--aot-project-probe [dir]]  Env probes (#717, #746)
+ *   phpc doctor [--gates] [--no-lint] [--jit-probe] [--aot-project-probe [dir]]  Env probes; --gates adds 005-SessionsWeb ladder (#1903)
  *   phpc validate-manifest [dir]                 Validate phpc.json schema and paths (issue #263)
  */
 
@@ -70,6 +70,7 @@ php-compiler CLI
   phpc test [--fast] [args...]                  Run ci-local.sh (full) or ci-fast.sh (no LLVM)
   phpc doctor [--gates] [--no-lint] [--jit-probe] [--aot-project-probe [dir]]
                                               Probe environment; LLVM/JIT readiness (#717, #746)
+      --gates                                     MiniWebApp ladder + NS1/NS2 + 005-SessionsWeb (#1903)
       --jit-probe                                 Run MCJIT smoke (script/jit-runtime-probe.php)
       --aot-project-probe [dir]                   AOT build + execute on 003-MiniWebApp (or dir)
   phpc validate-manifest [dir]                  Validate phpc.json (default: cwd)
