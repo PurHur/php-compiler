@@ -354,7 +354,7 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString(
             '$this->classIdToName[$id] = $lcname;',
             $source,
-            'registerExternalClass must populate classIdToName for RuntimeInitVmContext propertyFetch (#1514)'
+            'registerExternalClass must populate classIdToName for RuntimeInitVmContext propertyFetch (#1514, #2126)'
         );
     }
 

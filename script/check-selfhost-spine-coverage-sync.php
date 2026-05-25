@@ -36,6 +36,8 @@ $spineSubstitutes = [
     'bin/vm.php' => 'test/bootstrap-aot/vm_run_smoke.php',
     'src/cli.php' => 'test/bootstrap-aot/cli_spine_shim.php',
     'src/cli_driver.php' => 'test/bootstrap-aot/cli_spine_shim.php',
+    'src/llvm-env.php' => 'test/bootstrap-aot/llvm_env_spine_shim.php',
+    'src/macro_functions.php' => 'test/bootstrap-aot/macro_functions_spine_shim.php',
 ];
 
 /**
@@ -45,9 +47,6 @@ $spineSubstitutes = [
 $spineNativeLinkDeferred = [
     'bin/vm.php',
     'lib/AOT/Linker.php',
-    'src/llvm-env.php',
-    'src/macro_functions.php',
-    'src/yay-php8-compat.php',
 ];
 
 /** Inventory paths not yet in spine (regenerated inventory ahead of bundle — #1922). */

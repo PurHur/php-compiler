@@ -36,7 +36,7 @@ Supporting fixes from #1402:
 | `Runtime::loadJitContext` | Deny-listed (LLVM 9 link crash; same fragment as JIT deny list) |
 | `Runtime::__construct` | Slim ctor via `compileRuntimeConstructM3Native` → `compileBlockPhpLowering` (#1494) |
 | `Runtime::initParsePipeline` / `Runtime::initCompiler` / `Runtime::loadCoreModules` | On deny list; `compileRuntime*M3Native` → PHP CFG lowering (#1494) |
-| `Runtime::initVmContext` | **Native** via `RuntimeInitVmContext::emit` (allocate `VM\Context`, set `runtime` + `vmContext`); wired in `compileBlock()`; off deny list (#1494). PHP CFG `new VMContext` still LLVM 9 link crash when combined with ctor spine. |
+| `Runtime::initVmContext` | **Native** via `RuntimeInitVmContext::emit` (allocate `VM\Context` + `ErrorReporter` + `ScriptStack`, wire `runtime` + `vmContext`); wired in `compileBlock()`; off deny list (#1494, #2126). PHP CFG `new VMContext` still LLVM 9 link crash when combined with ctor spine. |
 | `Runtime::loadJit` | `compileRuntimeLoadJitM3Native` + nested `createJit` helpers (#1495) |
 | `Runtime::standalone` | Compile-driver link OK (#1402, #1056) |
 | `helloworld_compile_smoke` | Deny-listed for link (LLVM 9); compile_driver bundle keeps stub; runtime emit via `helloworld_m3_emit_native_entry.php` / `compile_smoke_m3_emit_native_entry.php` + `PHP_COMPILER_EMIT_HELPER_LINK=1` (#1768, #1983) |
