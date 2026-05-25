@@ -161,63 +161,103 @@ final class VmString
         }
 
         if (1 === $breakLen && !$cut) {
-            $breakByte = $break[0];
-            $out = $text;
-            $laststart = 0;
-            $lastspace = 0;
-            for ($current = 0; $current < $len; ++$current) {
-                $ch = $text[$current];
-                if ($ch === $breakByte) {
-                    $laststart = $lastspace = $current + 1;
-                } elseif (' ' === $ch) {
-                    if ($current - $laststart >= $width) {
-                        $out = self::byteReplaceAt($out, $current, $breakByte);
-                        $laststart = $current + 1;
-                    }
-                    $lastspace = $current;
-                } elseif ($current - $laststart >= $width && $laststart !== $lastspace) {
-                    $out = self::byteReplaceAt($out, $lastspace, $breakByte);
-                    $laststart = $lastspace + 1;
-                }
-            }
-
-            return $out;
+            return self::wordwrapFastSingleByteBreak($text, $len, $width, $break[0]);
+        }
+        if (1 === $breakLen && $cut) {
+            return self::wordwrapCutFixedWidth($text, $len, $width, $break[0]);
         }
 
-        $pieces = [];
-        $newtextlen = 0;
+        return self::wordwrapGeneral($text, $len, $width, $break, $breakLen);
+    }
+
+    /** cut=true, single-byte break — fixed-width chunks (AOT self-host safe). */
+    private static function wordwrapCutFixedWidth(string $text, int $len, int $width, string $breakByte): string
+    {
+        if ($width < 1) {
+            return $text;
+        }
+        $out = '';
+        for ($i = 0; $i < $len; $i += $width) {
+            if ($i > 0) {
+                $out .= $breakByte;
+            }
+            $out .= self::byteSlice($text, $i, $width);
+        }
+
+        return $out;
+    }
+
+    /** Fast path: single-byte break, cut=false (while/continue CFG for AOT self-host). */
+    private static function wordwrapFastSingleByteBreak(string $text, int $len, int $width, string $breakByte): string
+    {
+        $chars = [];
+        for ($i = 0; $i < $len; ++$i) {
+            $chars[$i] = $text[$i];
+        }
         $laststart = 0;
         $lastspace = 0;
         for ($current = 0; $current < $len; ++$current) {
-            if ($text[$current] === $break[0]
-                && $current + $breakLen < $len
+            $ch = $chars[$current];
+            if ($ch === $breakByte) {
+                $laststart = $current + 1;
+                $lastspace = $current + 1;
+            }
+            if ($ch !== $breakByte && ' ' === $ch) {
+                if ($current - $laststart >= $width) {
+                    $chars[$current] = $breakByte;
+                    $laststart = $current + 1;
+                }
+                $lastspace = $current;
+            }
+            if ($ch !== $breakByte && ' ' !== $ch && $current - $laststart >= $width && $laststart !== $lastspace) {
+                $chars[$lastspace] = $breakByte;
+                $laststart = $lastspace + 1;
+            }
+        }
+
+        return \implode('', $chars);
+    }
+
+    /** General path: multi-byte break, cut=false (space wrapping with explicit break match). */
+    private static function wordwrapGeneral(
+        string $text,
+        int $len,
+        int $width,
+        string $break,
+        int $breakLen
+    ): string {
+        $pieces = [];
+        $laststart = 0;
+        $lastspace = 0;
+        $current = 0;
+        while ($current < $len) {
+            if ($current + $breakLen <= $len
+                && $text[$current] === $break[0]
                 && 0 === self::byteCompareN($text, $current, $break, 0, $breakLen)) {
                 $pieces[] = self::byteSlice($text, $laststart, $current - $laststart + $breakLen);
-                $newtextlen += $current - $laststart + $breakLen;
-                $current += $breakLen - 1;
-                $laststart = $lastspace = $current + 1;
+                $current += $breakLen;
+                $laststart = $current;
+                $lastspace = $current;
             } elseif (' ' === $text[$current]) {
                 if ($current - $laststart >= $width) {
                     $pieces[] = self::byteSlice($text, $laststart, $current - $laststart);
                     $pieces[] = $break;
-                    $newtextlen += $current - $laststart + $breakLen;
                     $laststart = $current + 1;
                 }
                 $lastspace = $current;
-            } elseif ($current - $laststart >= $width && $cut && $laststart >= $lastspace) {
-                $pieces[] = self::byteSlice($text, $laststart, $current - $laststart);
-                $pieces[] = $break;
-                $newtextlen += $current - $laststart + $breakLen;
-                $laststart = $lastspace = $current;
+                ++$current;
             } elseif ($current - $laststart >= $width && $laststart < $lastspace) {
                 $pieces[] = self::byteSlice($text, $laststart, $lastspace - $laststart);
                 $pieces[] = $break;
-                $newtextlen += $lastspace - $laststart + $breakLen;
-                $laststart = $lastspace = $lastspace + 1;
+                $laststart = $lastspace + 1;
+                $lastspace = $laststart;
+                ++$current;
+            } else {
+                ++$current;
             }
         }
-        if ($laststart !== $current) {
-            $pieces[] = self::byteSlice($text, $laststart, $current - $laststart);
+        if ($laststart < $len) {
+            $pieces[] = self::byteSlice($text, $laststart, $len - $laststart);
         }
 
         return \implode('', $pieces);
