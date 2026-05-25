@@ -138,10 +138,48 @@ patch_already_applied() {
   esac
 }
 
+apply_php_cfg_trycatch_overlay() {
+  local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
+  local op="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/TryCatch.php"
+  local overlay="$PATCH_DIR/overlays/php-cfg"
+  if grep -q 'new Op\\Stmt\\TryCatch' "$parser" 2>/dev/null; then
+    echo "Skip php-cfg-trycatch.patch (already applied)"
+    return 0
+  fi
+  if [[ ! -f "$overlay/Op/Stmt/TryCatch.php" || ! -f "$overlay/trycatch-parser-method.php" ]]; then
+    echo "Skip php-cfg-trycatch.patch (overlay files missing)" >&2
+    return 1
+  fi
+  mkdir -p "$(dirname "$op")"
+  cp "$overlay/Op/Stmt/TryCatch.php" "$op"
+  python3 - "$parser" "$overlay/trycatch-parser-method.php" <<'PY'
+import sys
+from pathlib import Path
+
+parser_path = Path(sys.argv[1])
+method_path = Path(sys.argv[2])
+text = parser_path.read_text()
+old = """    protected function parseStmt_TryCatch(Stmt\\TryCatch $node)
+    {
+        // TODO: implement this!!!
+    }"""
+new = method_path.read_text()
+if old not in text:
+    sys.stderr.write("php-cfg-trycatch: parseStmt_TryCatch stub not found in Parser.php\n")
+    sys.exit(1)
+parser_path.write_text(text.replace(old, new.rstrip("\n"), 1))
+PY
+  echo "Applied php-cfg-trycatch.patch (overlay)"
+}
+
 apply_patch() {
   local patch="$1"
   if [[ ! -f "$patch" ]]; then
     return 0
+  fi
+  if [[ "$(basename "$patch")" == "php-cfg-trycatch.patch" ]]; then
+    apply_php_cfg_trycatch_overlay
+    return $?
   fi
   if patch_already_applied "$patch"; then
     echo "Skip $(basename "$patch") (already applied)"
