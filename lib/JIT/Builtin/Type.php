@@ -246,6 +246,17 @@ class Type extends Builtin {
         );
         $fnCopy = $this->context->module->addFunction('__compiler_copy', $fntypeCopy);
         $this->context->registerFunction('__compiler_copy', $fnCopy);
+        $fntypeMoveUploaded = $this->context->context->functionType(
+            $i32,
+            false,
+            $this->context->getTypeFromString('__string__*'),
+            $this->context->getTypeFromString('__string__*')
+        );
+        $fnMoveUploaded = $this->context->module->addFunction(
+            '__compiler_move_uploaded_file',
+            $fntypeMoveUploaded
+        );
+        $this->context->registerFunction('__compiler_move_uploaded_file', $fnMoveUploaded);
         $fntypeTouch = $this->context->context->functionType(
             $i32,
             false,

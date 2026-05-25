@@ -12,8 +12,8 @@ if (false === $tmp) {
     echo "notmp\n";
     exit(1);
 }
-@unlink($tmp);
-if (false === file_put_contents($tmp, 'upload-bytes')) {
+$n = file_put_contents($tmp, 'upload-bytes');
+if (false === $n) {
     echo "nowrite\n";
     exit(1);
 }
@@ -32,16 +32,23 @@ $size = filesize($dest);
 echo 'size:', false === $size ? 'fail' : (string) $size, "\n";
 
 $bogus = $base . '/from.txt';
-file_put_contents($bogus, 'x');
+$n = file_put_contents($bogus, 'x');
 if (move_uploaded_file($bogus, $dest . '.2')) {
     echo "bad\n";
 } else {
     echo "reject\n";
 }
 @unlink($bogus);
+$evil = sys_get_temp_dir() . '/../evil.txt';
+if (move_uploaded_file(tempnam(sys_get_temp_dir(), 'phpc_upload_'), $evil)) {
+    echo "traversal\n";
+} else {
+    echo "noevil\n";
+}
 @unlink($dest);
 --EXPECT--
 ok
 gone
 size:12
 reject
+noevil

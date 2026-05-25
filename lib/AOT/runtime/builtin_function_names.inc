@@ -154,6 +154,7 @@ static const char *phpc_builtin_functions[] = {
     "method_exists",
     "min",
     "mkdir",
+    "move_uploaded_file",
     "nl2br",
     "number_format",
     "ob_end_flush",
