@@ -22,6 +22,7 @@ use PHPCfg\Script;
 use PHPTypes\Type;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\JIT\OperandName;
+use PHPCompiler\Compiler\AttributeNames;
 use PHPCompiler\Web\ConstStringFolder;
 use PHPCompiler\Web\IncludePathResolver;
 use PHPCompiler\Web\Superglobals;
@@ -827,6 +828,7 @@ class Compiler {
             $readonlySlot
         );
         $return->classImplements = $this->interfaceNamesFromOperands($class->implements);
+        $return->attributeNames = AttributeNames::fromOp($class);
         $return->block1 = $this->compileClassBody($class->stmts, $type);
         return $return;
     }
@@ -992,6 +994,7 @@ class Compiler {
                         $methodBlock = $this->compileCfgBlock($child->func->cfg, $child->func->params, $child->func);
                         $declare->block1 = $methodBlock;
                     }
+                    $declare->attributeNames = AttributeNames::fromOp($child);
                     $result->addOpCode($declare);
                     break;
                 case Op\Terminal\Const_::class:

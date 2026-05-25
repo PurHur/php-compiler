@@ -134,6 +134,8 @@ class OpCode {
 
     /** @var list<string> */
     public array $classImplements = [];
+    /** Declared PHP 8 attribute class names on class/method (#1936). */
+    public array $attributeNames = [];
     /** Pipe-separated lowercase catch class names for TYPE_CATCH (#1362). */
     public ?string $catchTypes = null;
 
