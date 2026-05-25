@@ -23,23 +23,7 @@ final class JitStreamContextCreate
             );
         }
 
-        $ht = HashTableHelper::alloc($context);
-        $markerKey = $context->builder->load(
-            $context->constantStringFromString(VmStreamContext::MARKER_KEY)
-        );
-        $context->builder->call(
-            $context->lookupFunction('__hashtable__setStringKeyLong'),
-            $ht,
-            $markerKey,
-            $context->getTypeFromString('int64')->constInt(1, false)
-        );
-
-        $packed = new JITVariable(
-            $context,
-            JITVariable::TYPE_HASHTABLE,
-            JITVariable::KIND_VALUE,
-            $ht
-        );
+        $packed = HashTableHelper::emptyVariable($context);
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
         $context->builder->call(

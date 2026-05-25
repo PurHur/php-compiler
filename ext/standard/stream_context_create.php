@@ -14,7 +14,7 @@ use PHPLLVM\Value;
 /**
  * stream_context_create() — VM returns array stream-context representation (#1377).
  *
- * JIT lowering scaffolded in JitStreamContextCreate (#1377); still VM-deferred in this build.
+ * JIT lowering in {@see JitStreamContextCreate}; enablement deferred (#1377).
  */
 final class stream_context_create extends Internal
 {
