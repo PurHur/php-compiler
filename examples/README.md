@@ -148,7 +148,7 @@ POST email validation with `throw` / `catch` ([#2076](https://github.com/PurHur/
 curl -sf -X POST -d 'email=bad' http://127.0.0.1:8080/example.php | grep -i invalid
 ```
 
-VM serve curls: opt-in `THROWS_WEB_SMOKE_GATE=1` — `make examples-web-smoke` with gate export or `examples-web-smoke.sh --throws-only` ([#2093](https://github.com/PurHur/php-compiler/issues/2093)). JIT/AOT deferred ([#2101](https://github.com/PurHur/php-compiler/issues/2101)). Init scaffold: `./phpc init --profile throwsweb my-app` ([#2092](https://github.com/PurHur/php-compiler/issues/2092)); template parity: [#2086](https://github.com/PurHur/php-compiler/issues/2086) (opt-in `INIT_THROWSWEB_PARITY_GATE=1`; default-on [#2127](https://github.com/PurHur/php-compiler/issues/2127)).
+VM serve curls: opt-in `THROWS_WEB_SMOKE_GATE=1` — `make examples-web-smoke` with gate export or `examples-web-smoke.sh --throws-only` ([#2093](https://github.com/PurHur/php-compiler/issues/2093)). JIT/AOT deferred ([#2101](https://github.com/PurHur/php-compiler/issues/2101)). Init scaffold: `./phpc init --profile throwsweb my-app` ([#2092](https://github.com/PurHur/php-compiler/issues/2092)); template parity: [#2086](https://github.com/PurHur/php-compiler/issues/2086) (`INIT_THROWSWEB_PARITY_GATE=1` default in `ci-fast`, [#2127](https://github.com/PurHur/php-compiler/issues/2127)).
 
 ### 002-StaticWeb
 

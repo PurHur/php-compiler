@@ -121,7 +121,7 @@ Same manifest as **001-SimpleWeb**; docroot is the project root (no `public/`). 
 }
 ```
 
-Same manifest as **001-SimpleWeb**; docroot is the project root (no `public/`). Scaffold with `phpc init --profile throwsweb` ([#2092](https://github.com/PurHur/php-compiler/issues/2092)); template parity: `script/check-init-throwsweb-parity.sh` (opt-in `INIT_THROWSWEB_PARITY_GATE=1` in `ci-fast`, **#2086**; default-on **#2127**).
+Same manifest as **001-SimpleWeb**; docroot is the project root (no `public/`). Scaffold with `phpc init --profile throwsweb` ([#2092](https://github.com/PurHur/php-compiler/issues/2092)); template parity: `script/check-init-throwsweb-parity.sh` (default `INIT_THROWSWEB_PARITY_GATE=1` in `ci-fast`, **#2127**).
 
 ## `phpc init` profiles
 

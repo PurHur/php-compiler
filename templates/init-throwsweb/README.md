@@ -11,7 +11,7 @@ Project layout from `phpc init --profile throwsweb` (issue #2092). Application P
 
 When you change `example.php` or `phpc.json` in the example, copy the same files into this template in the **same PR**.
 
-Verify before merge (opt-in `INIT_THROWSWEB_PARITY_GATE=1` in `ci-fast`, [#2086](https://github.com/PurHur/php-compiler/issues/2086); default-on follow-up [#2127](https://github.com/PurHur/php-compiler/issues/2127)):
+Verify before merge (`ci-fast` runs this by default via `INIT_THROWSWEB_PARITY_GATE=1`, [#2127](https://github.com/PurHur/php-compiler/issues/2127)):
 
 ```console
 ./script/check-init-throwsweb-parity.sh
