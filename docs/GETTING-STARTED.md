@@ -110,6 +110,7 @@ Needs LLVM + ~8 GiB RAM; includes JIT/AOT lint/link and example smokes.
 | `./phpc doctor --gates` | Example web gates + self-host presenter steps ([#1752](https://github.com/PurHur/php-compiler/issues/1752), [#1857](https://github.com/PurHur/php-compiler/issues/1857), [#1871](https://github.com/PurHur/php-compiler/issues/1871)); 005-SessionsWeb ladder: `./phpc doctor --gates \| grep -i sessions` ([#1903](https://github.com/PurHur/php-compiler/issues/1903)) |
 | `make north-star1-verify` | Example web regression bundle (legacy name; [#1044](https://github.com/PurHur/php-compiler/issues/1044) closed) ([#1845](https://github.com/PurHur/php-compiler/issues/1845)) |
 | `make north-star2-verify` | Self-host M0–M4 presenter bundle ([#1865](https://github.com/PurHur/php-compiler/issues/1865); listed in `phpc doctor --gates` when script exists) |
+| `make deploy-smoke-all` | Full `PHPC_DEPLOY_ROOT` deploy ladder 001–003 + opt-in 005/006; skip hints when gates `0` — see `./phpc doctor --gates` ([#2077](https://github.com/PurHur/php-compiler/issues/2077)) |
 
 Legacy entrypoints (`bin/vm.php`, `bin/jit.php`, `bin/compile.php`) still work.
 

@@ -317,6 +317,28 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('deploy-smoke.sh --example 006', $body);
     }
 
+    public function testMakefileHasDeploySmokeAllTarget(): void
+    {
+        $makefile = (string) file_get_contents(dirname(__DIR__, 2).'/Makefile');
+        $this->assertStringContainsString('deploy-smoke-all:', $makefile);
+        $this->assertStringContainsString('deploy-smoke-all.sh', $makefile);
+        $this->assertStringContainsString('DEPLOY_SMOKE_ALL', $makefile);
+
+        $script = dirname(__DIR__, 2).'/script/deploy-smoke-all.sh';
+        $this->assertFileExists($script);
+        $this->assertTrue(is_executable($script));
+        $body = (string) file_get_contents($script);
+        $this->assertStringContainsString('deploy-smoke.sh', $body);
+        $this->assertStringContainsString('run_example 001', $body);
+        $this->assertStringContainsString('run_example 005', $body);
+        $this->assertStringContainsString('run_example 006', $body);
+        $this->assertStringContainsString('SESSIONS_WEB_DEPLOY_SMOKE_GATE', $body);
+        $this->assertStringContainsString('FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE', $body);
+        $this->assertStringContainsString('skip (SESSIONS_WEB_DEPLOY_SMOKE_GATE=0', $body);
+        $this->assertStringContainsString('skip (FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE=0', $body);
+        $this->assertStringContainsString('deploy-smoke-all: ok', $body);
+    }
+
     public function testCiLocalHonorsExamplesAotSmokeGate(): void
     {
         $local = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-local.sh');
