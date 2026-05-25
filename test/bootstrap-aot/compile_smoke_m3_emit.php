@@ -10,6 +10,8 @@ namespace PHPCompiler\BootstrapAot;
  * Smaller than helloworld_compile_smoke for compile-driver link: Runtime parseAndCompile + standalone
  * only (int exit + echo fixture — no assoc arrays, #1514).
  *
+ * Emit-helper link uses thin native LLVM bridge (BootstrapCompileSmokeM3Emit) instead of CFG lowering (#1983).
+ *
  * Lint: php bin/compile.php -l test/bootstrap-aot/compile_smoke_m3_emit.php
  */
 
