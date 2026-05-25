@@ -61,6 +61,9 @@ if (is_readable($examplesReadme)) {
     if (str_contains($examples, 'native execute ✅') && !str_contains($body, 'native execute ✅')) {
         $errors[] = 'README.md: out of sync with examples/README.md (003 native execute status)';
     }
+    if (str_contains($examples, '005-SessionsWeb') && !str_contains($body, '005-SessionsWeb')) {
+        $errors[] = 'README.md: missing 005-SessionsWeb row (sync examples/README.md; #1924)';
+    }
 }
 
 if ([] !== $errors) {

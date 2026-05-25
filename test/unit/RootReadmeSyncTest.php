@@ -26,4 +26,13 @@ final class RootReadmeSyncTest extends TestCase
         $this->assertSame(0, $code, implode("\n", $out));
         $this->assertStringContainsString('check-root-readme-sync: OK', implode("\n", $out));
     }
+
+    public function testRootReadmeLists005SessionsWeb(): void
+    {
+        $readme = dirname(__DIR__, 2).'/README.md';
+        $this->assertFileExists($readme);
+        $body = (string) file_get_contents($readme);
+        $this->assertStringContainsString('005-SessionsWeb', $body);
+        $this->assertStringContainsString('examples/005-SessionsWeb/', $body);
+    }
 }
