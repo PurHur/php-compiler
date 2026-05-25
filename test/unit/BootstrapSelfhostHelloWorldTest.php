@@ -308,6 +308,15 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString('missing executable', $script);
     }
 
+    public function testCiLocalDocumentsM3StrictGate(): void
+    {
+        $common = (string) file_get_contents(self::$root.'/script/ci-common.sh');
+        $local = (string) file_get_contents(self::$root.'/script/ci-local.sh');
+        $this->assertStringContainsString('ci_run_bootstrap_m3_strict', $common);
+        $this->assertStringContainsString('BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE', $common);
+        $this->assertStringContainsString('ci_run_bootstrap_m3_strict', $local);
+    }
+
     public function testHelloWorldProbeStrictFailsWhenRuntimeNativeEmitBlocked(): void
     {
         if (!LlvmToolchain::isReady(self::$root)) {

@@ -372,6 +372,39 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('ci_run_bootstrap_wave_check', $fast);
     }
 
+    public function testCiLocalHonorsBootstrapM3StrictGate(): void
+    {
+        $local = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-local.sh');
+        $this->assertStringContainsString('ci_run_bootstrap_m3_strict', $local);
+
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE', $common);
+        $this->assertStringContainsString('BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE:-0', $common);
+        $this->assertStringContainsString('bootstrap-selfhost-helloworld-probe.sh', $common);
+        $this->assertStringContainsString('BOOTSTRAP_M3_HELLOWORLD_STRICT=1', $common);
+        $this->assertStringContainsString('BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1', $common);
+        $probe = (string) file_get_contents(dirname(__DIR__, 2).'/script/bootstrap-selfhost-helloworld-probe.sh');
+        $this->assertStringContainsString('block_reason=', $probe);
+        $this->assertStringContainsString('NEXT_LOWER', $probe);
+
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString(
+            'BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE="${BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE:-0}"',
+            $defaults
+        );
+        $this->assertStringContainsString('#1526', $defaults);
+    }
+
+    public function testLocalCiMatrixDocumentsBootstrapM3StrictGate(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE', $doc);
+        $this->assertStringContainsString('bootstrap-selfhost-helloworld-probe.sh', $doc);
+
+        $docSelfhost = (string) file_get_contents(dirname(__DIR__, 2).'/docs/bootstrap-selfhost.md');
+        $this->assertStringContainsString('BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE=1', $docSelfhost);
+    }
+
     public function testCiDefaultsEnvDefinesBootstrapSelfhostProbeUpdateOff(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
