@@ -363,6 +363,7 @@ class Context {
             }
             $this->builder->call($this->main);
             if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
+                Builtin\SessionPersist::emitShutdownPersistForStandalone($this);
                 Builtin\PendingHeaders::emitFlushForStandalone($this);
             }
             $this->builder->call($this->shutdownFunc);

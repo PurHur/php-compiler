@@ -30,6 +30,7 @@ final class SessionsWebCgiEnv
     {
         return [
             'REQUEST_METHOD' => 'POST',
+            'QUERY_STRING' => 'message='.$message,
             'REQUEST_BODY' => 'message='.$message,
             'SCRIPT_NAME' => '/example.php',
             'REQUEST_URI' => '/example.php',

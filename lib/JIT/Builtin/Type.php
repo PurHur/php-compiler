@@ -483,6 +483,11 @@ class Type extends Builtin {
             $fntypeSessionApply
         );
         $this->context->registerFunction('__phpc_session_destroy_apply', $fnSessionDestroy);
+        $fnSessionShutdown = $this->context->module->addFunction(
+            '__phpc_session_shutdown_persist',
+            $this->context->context->functionType($void, false)
+        );
+        $this->context->registerFunction('__phpc_session_shutdown_persist', $fnSessionShutdown);
         SessionStart::implement($this->context);
         SessionWriteClose::implement($this->context);
         SessionRegenerateId::implement($this->context);

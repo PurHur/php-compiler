@@ -123,14 +123,28 @@ final class SessionsWebAotExecuteTest extends TestCase
         foreach (SessionsWebCgiEnv::aotFrontController($this->repoRoot) as $key => $value) {
             $env[$key] = $value;
         }
+        $bodyFile = null;
         foreach ($cgiEnv as $key => $value) {
+            if ('REQUEST_BODY' === $key && '' !== $value) {
+                $bodyFile = tempnam(sys_get_temp_dir(), 'phpc_sess_post_');
+                $this->assertNotFalse($bodyFile);
+                file_put_contents($bodyFile, $value);
+                $env['REQUEST_BODY_FILE'] = $bodyFile;
+                continue;
+            }
             $env[$key] = $value;
         }
         if ('' !== $httpCookie) {
             $env['HTTP_COOKIE'] = $httpCookie;
         }
 
-        return $this->runCommand([$this->binary], $this->repoRoot, $env)['stdout'];
+        try {
+            return $this->runCommand([$this->binary], $this->repoRoot, $env)['stdout'];
+        } finally {
+            if (null !== $bodyFile && is_file($bodyFile)) {
+                @unlink($bodyFile);
+            }
+        }
     }
 
     /**

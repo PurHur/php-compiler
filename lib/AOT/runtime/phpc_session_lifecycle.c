@@ -94,6 +94,9 @@ void __phpc_session_generate_new_id(void)
     session_store_id(out, 32);
 }
 
+extern void __phpc_session_storage_on_start(void);
+extern void __phpc_session_storage_on_write_close(void);
+
 void __phpc_session_start_apply(__value__ *out)
 {
     if (__phpc_session_active) {
@@ -108,13 +111,11 @@ void __phpc_session_start_apply(__value__ *out)
         __phpc_session_name_len = 9;
     }
 
-    if (__phpc_session_id_len <= 0) {
-        __phpc_session_generate_new_id();
-    }
-
     if (0 == sg_SESSION) {
         sg_SESSION = __hashtable__alloc();
     }
+
+    __phpc_session_storage_on_start();
 
     __phpc_session_active = 1;
     __value__writeBool(out, 1);
@@ -128,6 +129,7 @@ void __phpc_session_write_close_apply(__value__ *out)
         return;
     }
 
+    __phpc_session_storage_on_write_close();
     __phpc_session_active = 0;
     __value__writeBool(out, 1);
 }
