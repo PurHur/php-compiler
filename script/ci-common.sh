@@ -143,6 +143,14 @@ ci_run_capabilities_throws_sync_check() {
   "$PHP_BIN" "${PHP_OPTS[@]}" script/check-capabilities-throws-sync.php
 }
 
+ci_run_capabilities_oop_sync_check() {
+  if [[ "${CAPABILITIES_OOP_SYNC_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  echo "Capabilities MiniWebApp OOP sync (CAPABILITIES_OOP_SYNC_GATE=1, issue #2190)..."
+  "$PHP_BIN" "${PHP_OPTS[@]}" script/check-capabilities-oop-sync.php
+}
+
 ci_run_root_readme_sync_check() {
   if [[ "${ROOT_README_SYNC_GATE:-0}" != "1" ]]; then
     return 0
@@ -314,6 +322,7 @@ ci_run_inventory_checks() {
   ci_run_capabilities_sessionsweb_sync_check
   ci_run_capabilities_fileuploadweb_sync_check
   ci_run_capabilities_throws_sync_check
+  ci_run_capabilities_oop_sync_check
   ci_run_root_readme_sync_check
   ci_run_root_readme_006_sync_check
   ci_run_root_readme_007_sync_check

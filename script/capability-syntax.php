@@ -22,6 +22,7 @@ $handlers = collectOpcodeHandlers($root);
 $syntax = collectSyntaxCapabilities($root, syntaxRowDefinitions(), $handlers);
 $markdown = renderSyntaxMarkdown($syntax)
     . renderWebNorthStarMarkdown(webNorthStarDefinitions())
+    . renderMiniWebAppOopNorthStarMarkdown(miniWebAppOopNorthStarDefinitions())
     . renderSessionsWebNorthStarMarkdown(sessionsWebNorthStarDefinitions())
     . renderFileUploadWebNorthStarMarkdown(fileUploadWebNorthStarDefinitions())
     . renderThrowsWebNorthStarMarkdown(throwsWebNorthStarDefinitions());

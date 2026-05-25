@@ -48,18 +48,26 @@ function syntaxRowDefinitions(): array
         ],
         [
             'id' => 'instance_methods',
-            'construct' => 'Instance methods',
+            'construct' => 'Instance methods (`ClassMethod` / `Expr_MethodCall`)',
             'opcodes' => ['TYPE_DECLARE_METHOD', 'TYPE_METHODCALL_INIT'],
             'issue' => 58,
-            'notes' => [],
+            'notes' => ['MiniWebApp `$router->dispatch()` (#2059)'],
             'probe' => 'class C { public function f(): string { return "ok"; } } echo (new C())->f();',
+        ],
+        [
+            'id' => 'construct_method',
+            'construct' => 'Constructors (`__construct`)',
+            'opcodes' => ['TYPE_DECLARE_METHOD', 'TYPE_NEW', 'TYPE_METHODCALL_INIT', 'TYPE_ARG_RECV'],
+            'issue' => 145,
+            'notes' => ['Router `__construct(array $config)` (#2059)'],
+            'probe' => 'class C { private string $x; public function __construct(string $x = "a") { $this->x = $x; } public function get(): string { return $this->x; } } echo (new C())->get();',
         ],
         [
             'id' => 'private_methods',
             'construct' => 'Private methods',
             'opcodes' => ['TYPE_DECLARE_METHOD', 'TYPE_METHODCALL_INIT'],
             'issue' => 145,
-            'notes' => [],
+            'notes' => ['Router private `render*` paths (#2059)'],
             'probe' => 'class C { private function f(): string { return "ok"; } public function g(): string { return $this->f(); } } echo (new C())->g();',
         ],
         [
@@ -77,6 +85,15 @@ function syntaxRowDefinitions(): array
             'issue' => 1359,
             'notes' => ['Promoted params declare property + assign in __construct'],
             'probe' => 'class C { public function __construct(private string $x = "a") {} public function get(): string { return $this->x; } } echo (new C())->get();',
+        ],
+        [
+            'id' => 'method_return_types',
+            'construct' => 'Method return types (`: string` / `: void`)',
+            'opcodes' => ['TYPE_DECLARE_METHOD', 'TYPE_RETURN', 'TYPE_RETURN_VOID'],
+            'issue' => 55,
+            'jit' => false,
+            'notes' => ['Router `dispatch(): void`; JIT non-void deferred (#55)'],
+            'probe' => 'class C { public function f(): string { return "ok"; } public function g(): void {} } echo (new C())->f();',
         ],
         [
             'id' => 'dynamic_property_fetch',
@@ -483,7 +500,9 @@ function collectSyntaxPhptCoverage(string $root, array $definitions): array
     $patterns = [
         'class_new' => '/\b(?:class\s+\w+|new\s+\w+)/',
         'instance_methods' => '/function\s+\w+\s*\(/',
+        'construct_method' => '/function\s+__construct\s*\(/',
         'private_methods' => '/\bprivate\s+function\b/',
+        'method_return_types' => '/function\s+\w+\([^)]*\)\s*:\s*(?:string|void|int)/',
         'property_fetch' => '/\$this->\w+/',
         'dynamic_property_fetch' => '/->\$/',
         'native_user_class' => '/\b(?:class\s+\w+|new\s+\w+)/',
@@ -762,6 +781,98 @@ function renderWebNorthStarMarkdown(array $web): string
     $lines[] = '_Web rows are curated from ROADMAP issue state; native link [#568](' . CAPABILITY_ISSUE_URL_BASE
         . '568) closed; AOT execute [#764](' . CAPABILITY_ISSUE_URL_BASE . '764) closed; default-off CI gates [#1760]('
         . CAPABILITY_ISSUE_URL_BASE . '1760)._';
+    $lines[] = '';
+
+    return implode("\n", $lines);
+}
+
+/**
+ * OOP constructs blocking MiniWebApp VM parity (issue #2190, #2059).
+ *
+ * @return list<array{
+ *   construct: string,
+ *   vm: string,
+ *   jit: string,
+ *   aot: string,
+ *   issue: int,
+ *   notes: list<string>
+ * }>
+ */
+function miniWebAppOopNorthStarDefinitions(): array
+{
+    return [
+        [
+            'construct' => '`003-MiniWebApp` Router OOP (VM serve)',
+            'vm' => 'yes',
+            'jit' => 'partial',
+            'aot' => 'yes',
+            'issue' => 2059,
+            'notes' => [
+                '#2059 VM OOP e2e; lint zero (#2078); serve smoke default-on; JIT project opt-in (#587)',
+            ],
+        ],
+        [
+            'construct' => 'Public instance methods (`Expr_MethodCall`)',
+            'vm' => 'yes',
+            'jit' => 'partial',
+            'aot' => 'yes',
+            'issue' => 58,
+            'notes' => ['#58 ClassMethod + method dispatch; compliance PHPT; AOT execute #764'],
+        ],
+        [
+            'construct' => 'Private methods + `__construct`',
+            'vm' => 'yes',
+            'jit' => 'partial',
+            'aot' => 'yes',
+            'issue' => 145,
+            'notes' => ['#145 visibility + ctor; Router private render paths'],
+        ],
+        [
+            'construct' => 'Method return types (`: string` / `: void`)',
+            'vm' => 'yes',
+            'jit' => 'no',
+            'aot' => 'partial',
+            'issue' => 55,
+            'notes' => ['#55 JIT non-void return types; VM `: void` on Router::dispatch'],
+        ],
+    ];
+}
+
+/**
+ * @param list<array{construct: string, vm: string, jit: string, aot: string, issue: int, notes: list<string>}> $rows
+ */
+function renderMiniWebAppOopNorthStarMarkdown(array $rows): string
+{
+    $lines = [
+        '## OOP reference (`examples/003-MiniWebApp`)',
+        '',
+        'Class methods, visibility, constructors, and return types for the MiniWebApp Router.',
+        'ROADMAP Phase 1/4: [#78](' . CAPABILITY_ISSUE_URL_BASE . '78), acceptance [#2059]('
+        . CAPABILITY_ISSUE_URL_BASE . '2059). Builtin matrix: [capabilities.md](capabilities.md).',
+        '',
+        '| Construct | VM | JIT | AOT | Issue | Notes |',
+        '|-----------|:--:|:---:|:---:|-------|-------|',
+    ];
+
+    foreach ($rows as $row) {
+        $lines[] = sprintf(
+            '| %s | %s | %s | %s | [#%d](%s%d) | %s |',
+            $row['construct'],
+            capabilityStatusLabel($row['vm']),
+            capabilityStatusLabel($row['jit']),
+            capabilityStatusLabel($row['aot']),
+            $row['issue'],
+            CAPABILITY_ISSUE_URL_BASE,
+            $row['issue'],
+            $row['notes'] === [] ? '' : implode('; ', $row['notes'])
+        );
+    }
+
+    $lines[] = '';
+    $lines[] = '_OOP rows are curated from ROADMAP issue state; methods [#58](' . CAPABILITY_ISSUE_URL_BASE
+        . '58); visibility/ctor [#145](' . CAPABILITY_ISSUE_URL_BASE . '145); return types [#55]('
+        . CAPABILITY_ISSUE_URL_BASE . '55). Opt-in gates: `MINIWEBAPP_VM_OOP_GATE` (#2189), '
+        . '`MINIWEBAPP_JIT_PROJECT_GATE` (#587); drift guard `CAPABILITIES_OOP_SYNC_GATE` (#2190)._';
     $lines[] = '';
 
     return implode("\n", $lines);
