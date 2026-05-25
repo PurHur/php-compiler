@@ -7,7 +7,7 @@ Ordered checklist for [`examples/003-MiniWebApp/`](../examples/003-MiniWebApp/) 
 | 4b | [#754](https://github.com/PurHur/php-compiler/issues/754) | `MINIWEBAPP_AOT_LINK_GATE=1` → `ExamplesCompileTest::test003MiniWebAppBuildLinks` | ✅ | Native link default-on in `ci-defaults.env` / `ci-local.sh` |
 | 4b2 execute | [#747](https://github.com/PurHur/php-compiler/issues/747) | `MINIWEBAPP_AOT_EXECUTE_GATE=1` → `MiniWebAppAotExecuteTest` | ✅ | Query + PATH_INFO hello + POST contact (#485 thank-you via direct template include) |
 | 4c | [#738](https://github.com/PurHur/php-compiler/issues/738) | `EXAMPLES_AOT_SMOKE_ONLY=003` → `examples-aot-smoke.sh` | ✅ | Home CLI probe passes when stdout contains `MiniWebApp`; fails (not skip) when gate on and empty |
-| 3 AOT | [#833](https://github.com/PurHur/php-compiler/issues/833) | `examples-web-smoke.sh --aot` 003 | 🚧 | Home + hello PATH_INFO + contact POST when binary ready; opt-in `MINIWEBAPP_WEB_SMOKE_AOT_GATE=1` |
+| 3 AOT | [#833](https://github.com/PurHur/php-compiler/issues/833) | `examples-web-smoke.sh --aot` 003 | ✅ | Home + hello PATH_INFO + contact POST when binary ready; default-on `MINIWEBAPP_WEB_SMOKE_AOT_GATE=1` ([#1523](https://github.com/PurHur/php-compiler/issues/1523)) |
 | 4 PHPUnit HTTP | [#478](https://github.com/PurHur/php-compiler/issues/478) | `MiniWebAppServeAotTest` | ✅ | 6/6 including PATH_INFO hello via serve-aot (#1067, #747) |
 | 6 AOT CGI | [#682](https://github.com/PurHur/php-compiler/issues/682) | `CgiDriverTest::testMiniWebApp*ViaAotCgiWrapper` | ✅ | home + PATH_INFO hello + api/status via `bin/cgi-aot.php` (#764) |
 | 4 assets | [#610](https://github.com/PurHur/php-compiler/issues/610) | `GET /assets/style.css` | ✅ | Static CSS via AOT serve (#1067) |
@@ -21,7 +21,7 @@ Ordered checklist for [`examples/003-MiniWebApp/`](../examples/003-MiniWebApp/) 
 |-----|--------|
 | `MINIWEBAPP_AOT_EXECUTE_GATE=1` | Run `MiniWebAppAotExecuteTest` in `ci-local.sh` (default-on) |
 | `MINIWEBAPP_SERVE_AOT_GATE=1` | Run `MiniWebAppServeAotTest` in `ci-local.sh` (default-on — #1524) |
-| `MINIWEBAPP_WEB_SMOKE_AOT_GATE=1` | Run `examples-web-smoke.sh --aot` 003 slice in full CI |
+| `MINIWEBAPP_WEB_SMOKE_AOT_GATE=1` | Run `examples-web-smoke.sh --miniwebapp-only --aot` in `ci-local.sh` (default-on — #1523) |
 | `EXAMPLES_AOT_SMOKE_ONLY=003` | Limit `examples-aot-smoke.sh` to 003-MiniWebApp only |
 
 ## Quick probes
@@ -30,7 +30,10 @@ Ordered checklist for [`examples/003-MiniWebApp/`](../examples/003-MiniWebApp/) 
 MINIWEBAPP_AOT_EXECUTE_GATE=1 ./script/ci-local.sh --filter MiniWebAppAotExecuteTest
 ./script/ci-local.sh --filter MiniWebAppServeAot
 MINIWEBAPP_SERVE_AOT_GATE=0 ./script/ci-local.sh --filter MiniWebAppServeAot  # skips
-DEPLOY_SMOKE_003_EXECUTE=1 ./script/deploy-smoke.sh --example 003
+MINIWEBAPP_WEB_SMOKE_AOT_GATE=1 ./script/examples-web-smoke.sh --miniwebapp-only --aot
+MINIWEBAPP_WEB_SMOKE_AOT_GATE=0 ./script/ci-local.sh   # skip 003 AOT HTTP curls
+./script/deploy-smoke.sh --example 003   # DEPLOY_SMOKE_003_EXECUTE=1 default (#1530)
+DEPLOY_SMOKE_003_EXECUTE=0 ./script/deploy-smoke.sh --example 003
 ```
 
 See also: [miniwebapp-gates.md](miniwebapp-gates.md), [#472](https://github.com/PurHur/php-compiler/issues/472) gate ladder.
