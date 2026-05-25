@@ -199,9 +199,13 @@ test-docker-fast-safe: docker-build-22
 
 # Runforge / harness CI: uses docker-ci-local.sh tar fallback when bind-mount is empty (#272).
 # Optional: make test-harness ARGS='--filter VMTest'
-.PHONY: test-harness
+.PHONY: test-harness test-docker-exec
 test-harness:
 	./script/docker-ci-local.sh $(ARGS)
+
+# Ad-hoc commands in the dev image (tar fallback when bind-mount is incomplete).
+test-docker-exec:
+	./script/docker-exec.sh $(ARGS)
 
 # Quick PHPUnit in 22.04 dev image (deprecated: prefer test-docker-fast / ci-fast.sh)
 .PHONY: test-docker-quick

@@ -10,10 +10,12 @@ declare(strict_types=1);
  */
 $repoRoot = dirname(__DIR__);
 $llvmDir = '';
-if (is_file($repoRoot.'/.llvm/libLLVM-9.so.1')) {
-    $llvmDir = $repoRoot.'/.llvm';
+if (is_file('/opt/llvm9/libLLVM-9.so.1') && (is_file('/.dockerenv') || '1' === getenv('PHP_COMPILER_PREFER_IMAGE_LLVM'))) {
+    $llvmDir = '/opt/llvm9';
 } elseif (getenv('PHP_COMPILER_LLVM_PATH') && is_file(getenv('PHP_COMPILER_LLVM_PATH').'/libLLVM-9.so.1')) {
     $llvmDir = getenv('PHP_COMPILER_LLVM_PATH');
+} elseif (is_file($repoRoot.'/.llvm/libLLVM-9.so.1')) {
+    $llvmDir = $repoRoot.'/.llvm';
 } elseif (is_file('/opt/llvm9/libLLVM-9.so.1')) {
     $llvmDir = '/opt/llvm9';
 }

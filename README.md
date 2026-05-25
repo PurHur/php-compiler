@@ -311,6 +311,8 @@ make test
 # equivalent:
 make test-harness
 ./script/docker-ci-local.sh
+# targeted tests (same tar fallback as test-harness):
+./script/docker-exec.sh -- vendor/bin/phpunit test/unit/FooTest.php
 # optional filter:
 make test-harness ARGS='--filter VMTest'
 ```

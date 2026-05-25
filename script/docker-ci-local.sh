@@ -30,4 +30,11 @@ fi
 
 echo "Bind-mount has no vendor/; copying repo into container via tar..."
 quoted=$(printf '%q ' "$@")
-tar -cf - --exclude='.git' --exclude='.llvm' . | ci_docker_run -i -w /compiler "$IMAGE" bash -c "tar -xf - && ./script/${CI_SCRIPT} ${quoted}"
+tar -cf - --exclude='.git' --exclude='.llvm' . | ci_docker_run -i -w /compiler "$IMAGE" bash -c "
+  tar -xf -
+  chmod +x bin/*.php script/*.sh 2>/dev/null || true
+  export PHP_COMPILER_LLVM_PATH=/opt/llvm9
+  export LD_LIBRARY_PATH=/opt/llvm9:\${LD_LIBRARY_PATH:-}
+  unset PHP_COMPILER_SKIP_LLVM_PRELOAD
+  ./script/${CI_SCRIPT} ${quoted}
+"
