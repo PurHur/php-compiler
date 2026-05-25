@@ -72,6 +72,12 @@ if [[ "${ATTRIBUTES_COMPLIANCE_GATE:-1}" == "1" ]]; then
   ci_run_phpunit --filter Attribute
 fi
 
+# HashTable rehash with string keys (#66, #1956). Default on; set REHASH_COMPLIANCE_GATE=0 to skip.
+if [[ "${REHASH_COMPLIANCE_GATE:-1}" == "1" ]]; then
+  echo "PHPUnit (fast): hashtable rehash VM compliance (array_rehash_string_keys)..."
+  ci_run_phpunit --filter array_rehash_string_keys
+fi
+
 # M4 bootstrap-loop dry-run when opt-in (issue #1929; default off in ci-defaults).
 ci_run_bootstrap_loop_probe
 

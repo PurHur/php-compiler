@@ -844,6 +844,38 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('ATTRIBUTES_COMPLIANCE_GATE', $body);
     }
 
+    public function testCiDefaultsEnvDefinesRehashComplianceGateOn(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString(
+            'REHASH_COMPLIANCE_GATE="${REHASH_COMPLIANCE_GATE:-1}"',
+            $defaults
+        );
+        $this->assertStringContainsString('#1956', $defaults);
+    }
+
+    public function testCiFastRunsRehashComplianceGateByDefault(): void
+    {
+        $fast = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-fast.sh');
+        $this->assertStringContainsString('REHASH_COMPLIANCE_GATE', $fast);
+        $this->assertStringContainsString('REHASH_COMPLIANCE_GATE:-1', $fast);
+        $this->assertStringContainsString('--filter array_rehash_string_keys', $fast);
+    }
+
+    public function testLocalCiMatrixDocumentsRehashComplianceGate(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('REHASH_COMPLIANCE_GATE', $doc);
+        $this->assertStringContainsString('array_rehash_string_keys', $doc);
+        $this->assertMatchesRegularExpression('/\| `REHASH_COMPLIANCE_GATE` \| `1` \|/', $doc);
+    }
+
+    public function testCiDockerRunPassesRehashComplianceGateEnv(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');
+        $this->assertStringContainsString('REHASH_COMPLIANCE_GATE', $body);
+    }
+
     public function testCiFastRunsCgiDriverTest(): void
     {
         $fast = dirname(__DIR__, 2).'/script/ci-fast.sh';
