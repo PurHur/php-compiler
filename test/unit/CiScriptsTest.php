@@ -254,6 +254,15 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('FILE_UPLOAD_WEB_AOT_SMOKE_GATE:-1', $body);
     }
 
+    public function testCiLocalExcludesThrowsWebAotExecuteUnlessGateOn(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('ci_run_throws_web_aot_execute', $body);
+        $this->assertStringContainsString('--exclude-group throwsweb-aot-execute', $body);
+        $this->assertStringContainsString('--group throwsweb-aot-execute', $body);
+        $this->assertStringContainsString('THROWSWEB_AOT_SMOKE_GATE:-0}', $body);
+    }
+
     public function testCiFastHonorsMiniWebAppServeGate(): void
     {
         $fast = dirname(__DIR__, 2).'/script/ci-fast.sh';
@@ -1353,6 +1362,8 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('THROWS_WEB_SMOKE_GATE', $doc);
         $this->assertStringContainsString('THROWSWEB_AOT_LINK_GATE', $doc);
         $this->assertStringContainsString('THROWSWEB_AOT_SMOKE_GATE', $doc);
+        $this->assertStringContainsString('test007ThrowsWebAotLink', $doc);
+        $this->assertStringContainsString('ThrowsWebAotExecuteTest', $doc);
         $this->assertStringContainsString('#2102', $doc);
     }
 

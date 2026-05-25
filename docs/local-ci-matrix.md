@@ -205,7 +205,7 @@ Progressive ladder (VM throw/catch → AOT link → AOT execute). VM smoke defau
 | Stage | Variable | Default | When enabled |
 |-------|----------|---------|--------------|
 | VM throw/catch | `THROWS_WEB_SMOKE_GATE` | `1` | `make examples-throws-smoke` · `ci-fast.sh` ([#2125](https://github.com/PurHur/php-compiler/issues/2125), [#2093](https://github.com/PurHur/php-compiler/issues/2093)) |
-| AOT link | `THROWSWEB_AOT_LINK_GATE` | `0` | `./script/ci-local.sh --filter ThrowsWebAotLinkTest` ([#2101](https://github.com/PurHur/php-compiler/issues/2101)) |
+| AOT link | `THROWSWEB_AOT_LINK_GATE` | `0` | `./script/ci-local.sh --filter test007ThrowsWebAotLink` ([#2101](https://github.com/PurHur/php-compiler/issues/2101), [#2143](https://github.com/PurHur/php-compiler/issues/2143)) |
 | AOT execute | `THROWSWEB_AOT_SMOKE_GATE` | `0` | `ThrowsWebAotExecuteTest` or `EXAMPLES_AOT_SMOKE_ONLY=007 ./script/examples-aot-smoke.sh` ([#2101](https://github.com/PurHur/php-compiler/issues/2101), [#2104](https://github.com/PurHur/php-compiler/issues/2104)) |
 
 ```bash
