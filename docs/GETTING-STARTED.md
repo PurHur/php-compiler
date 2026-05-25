@@ -84,7 +84,14 @@ curl -s -F 'doc=@examples/006-FileUploadWeb/README.md' http://127.0.0.1:8080/exa
 
 ### 5b. (Optional) ThrowsWeb — caught invalid POST (VM)
 
-`throw` / `catch` on a bad form field ([#2076](https://github.com/PurHur/php-compiler/issues/2076)). Gate ladder: `./phpc doctor --gates | grep -i throws` ([#2102](https://github.com/PurHur/php-compiler/issues/2102)). VM curls: `make examples-throws-smoke` (`THROWS_WEB_SMOKE_GATE=1` default — [#2125](https://github.com/PurHur/php-compiler/issues/2125), [#2093](https://github.com/PurHur/php-compiler/issues/2093)). AOT link/execute gates are opt-in ([#2101](https://github.com/PurHur/php-compiler/issues/2101)) — see [examples/007-ThrowsWeb/README.md](../examples/007-ThrowsWeb/README.md).
+`throw` / `catch` on a bad form field ([#2076](https://github.com/PurHur/php-compiler/issues/2076)). `./phpc run` shows the empty form only; use `phpc serve` and a POST with invalid email for the caught error HTML.
+
+```bash
+./phpc serve 127.0.0.1:8080 examples/007-ThrowsWeb
+curl -sf -X POST -d 'email=bad' http://127.0.0.1:8080/example.php | grep -i invalid
+```
+
+**Talking point:** Caught exceptions in a web form without Zend PHP at dev time — same `throw` / `catch` path as production CGI. Automated curls: `make examples-throws-smoke` ([#2141](https://github.com/PurHur/php-compiler/issues/2141), [#2125](https://github.com/PurHur/php-compiler/issues/2125), [#2093](https://github.com/PurHur/php-compiler/issues/2093)). Gate ladder: `./phpc doctor --gates | grep -i throws` ([#2102](https://github.com/PurHur/php-compiler/issues/2102)). Native AOT link/execute for user-defined `ValidationError` is deferred ([#2157](https://github.com/PurHur/php-compiler/issues/2157); opt-in `THROWSWEB_AOT_*_GATE` — [#2101](https://github.com/PurHur/php-compiler/issues/2101)) — see [examples/007-ThrowsWeb/README.md](../examples/007-ThrowsWeb/README.md) and ROADMAP [#78](https://github.com/PurHur/php-compiler/issues/78).
 
 ### 6. (Optional) Self-host smoke
 
