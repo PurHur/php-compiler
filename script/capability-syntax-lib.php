@@ -140,7 +140,7 @@ function syntaxRowDefinitions(): array
             'construct' => 'Late static binding `static::method()` / `static::class`',
             'opcodes' => ['TYPE_STATICCALL_INIT', 'TYPE_CLASS_CONST_FETCH'],
             'issue' => 1231,
-            'notes' => ['VM called-class propagation; JIT resolves static:: scope; inheritance awaits #101'],
+            'notes' => ['VM/JIT called-class propagation; parent::method() and static:: LSB (#1858)'],
             'probe' => 'class C { public static function id(): string { return static::class; } } echo C::id();',
         ],
         [
