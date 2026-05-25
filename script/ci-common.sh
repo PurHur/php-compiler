@@ -244,10 +244,10 @@ ci_run_init_fileupload_parity_check() {
 }
 
 ci_run_init_throwsweb_parity_check() {
-  if [[ "${INIT_THROWSWEB_PARITY_GATE:-0}" != "1" ]]; then
+  if [[ "${INIT_THROWSWEB_PARITY_GATE:-1}" != "1" ]]; then
     return 0
   fi
-  echo "init-throwsweb template parity (INIT_THROWSWEB_PARITY_GATE=1, issue #2086)..."
+  echo "init-throwsweb template parity (INIT_THROWSWEB_PARITY_GATE=1, issue #2127)..."
   script/check-init-throwsweb-parity.sh
 }
 
