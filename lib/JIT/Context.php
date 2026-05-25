@@ -74,6 +74,8 @@ class Context {
 
     public Scope $scope;
 
+    public TryCatchState $tryCatch;
+
     /** ?? result operands that must receive branch assigns even when php-cfg marks them dead (#99). */
     public \SplObjectStorage $coalesceAssignTargets;
 
@@ -144,6 +146,7 @@ class Context {
     public function __construct(Runtime $runtime, int $loadType) {
         $this->runtime = $runtime;
         $this->scope = new Scope;
+        $this->tryCatch = new TryCatchState();
         $this->coalesceAssignTargets = new \SplObjectStorage();
         $this->loadType = $loadType;
         $this->llvm = PHPLLVM\Chooser::choose();
@@ -410,6 +413,7 @@ class Context {
                 $this->loadType
             );
             Builtin\ReadonlyRaise::bindJitEngine($engine);
+            Builtin\JitThrow::bindJitEngine($engine);
             foreach ($this->exports as $export) {
                 $export[2]->handler = $this->result->getHandler($export[0], $export[1]);
             }

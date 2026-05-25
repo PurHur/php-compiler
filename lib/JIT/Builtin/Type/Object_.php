@@ -74,6 +74,7 @@ class Object_ extends Type {
         $this->pointer = $this->context->getTypeFromString('__object__*');
         \PHPCompiler\JIT\Builtin\ReadonlyRaise::registerDeclarations($this->context);
         \PHPCompiler\JIT\Builtin\ReadonlyRaise::ensureLinked($this->context);
+        // JitThrow linked on demand when compiling try/catch (#1056).
 
         $this->registerFn('__object__load_value_slot', 'void', ['void**', '__value__*']);
         $this->registerFn('__value__readObject', '__object__*', ['__value__*']);

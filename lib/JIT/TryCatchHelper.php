@@ -1,0 +1,278 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\JIT;
+
+use PHPCompiler\Block;
+use PHPCompiler\JIT\Builtin\JitThrow;
+use PHPCompiler\OpCode;
+use PHPLLVM\BasicBlock;
+use PHPLLVM\Value\Function_;
+
+/**
+ * LLVM lowering for try/catch/throw within a single JIT function (issues #57, #2084, #1056).
+ */
+final class TryCatchHelper
+{
+    /** @var list<TryCatchHandler> */
+    public array $handlerStack = [];
+
+    /** @var array<int, TryCatchHandler> merge block id => handler */
+    public array $mergeHandlers = [];
+
+    /**
+     * @return list<array{op: OpCode, catchTypes: list<string>}>
+     */
+    public static function collectCatchOps(Block $handlerBlock, int $afterTryIndex): array
+    {
+        $arms = [];
+        $n = $handlerBlock->nOpCodes;
+        for ($j = $afterTryIndex + 1; $j < $n; ++$j) {
+            $next = $handlerBlock->opCodes[$j];
+            if (OpCode::TYPE_CATCH === $next->type) {
+                $types = [];
+                $encoded = $next->catchTypes;
+                if (null !== $encoded && '' !== $encoded) {
+                    foreach (explode('|', $encoded) as $typeName) {
+                        $typeName = strtolower(ltrim($typeName, '\\'));
+                        if ('' !== $typeName) {
+                            $types[] = $typeName;
+                        }
+                    }
+                }
+                $arms[] = ['op' => $next, 'catchTypes' => $types];
+                continue;
+            }
+            if (OpCode::TYPE_FINALLY === $next->type) {
+                break;
+            }
+            break;
+        }
+
+        return $arms;
+    }
+
+    public static function beginTry(
+        \PHPCompiler\JIT $jit,
+        Function_ $func,
+        Context $context,
+        Block $handlerBlock,
+        OpCode $tryOp,
+        int $tryOpcodeIndex,
+        array $args
+    ): void {
+        JitThrow::registerDeclarations($context);
+        JitThrow::ensureLinked($context);
+        $mergeBlock = $tryOp->block2;
+        if (null === $mergeBlock) {
+            throw new \LogicException('TYPE_TRY requires merge block (block2)');
+        }
+        $arms = self::collectCatchOps($handlerBlock, $tryOpcodeIndex);
+        $handler = new TryCatchHandler($mergeBlock, $arms);
+        $context->tryCatch->handlerStack[] = $handler;
+        $context->tryCatch->mergeHandlers[spl_object_id($mergeBlock)] = $handler;
+
+        $builder = $context->builder;
+        $branchBlock = $builder->getInsertBlock();
+        $builder->positionAtEnd($branchBlock);
+        $jit->compileSubBlock($func, $tryOp->block1, ...$args);
+        $tryEntry = $context->scope->blockStorage[$tryOp->block1];
+        $mergeBlock = $tryOp->block2;
+        if (null === $handler->dispatchBb) {
+            $handler->dispatchBb = self::buildDispatch($jit, $func, $context, $handler, $args);
+        }
+        $mergeBb = $context->scope->blockStorage[$mergeBlock] ?? null;
+        if (null === $mergeBb) {
+            $mergeBb = JIT\BasicBlockHelper::append($context, 'try_merge');
+            $context->scope->blockStorage[$mergeBlock] = $mergeBb;
+        }
+        self::emitMergeEntryCheck($jit, $func, $context, $mergeBlock, $mergeBb, $args);
+        $builder->positionAtEnd($branchBlock);
+        if (0 === $context->inlineIncludeDepth) {
+            $context->freeDeadVariables($func, $branchBlock, $handlerBlock);
+        }
+        $builder->branch($tryEntry);
+    }
+
+    public static function emitMergeEntryCheck(
+        \PHPCompiler\JIT $jit,
+        Function_ $func,
+        Context $context,
+        Block $mergeCfgBlock,
+        BasicBlock $mergeBb,
+        array $args
+    ): void {
+        $handler = $context->tryCatch->mergeHandlers[spl_object_id($mergeCfgBlock)] ?? null;
+        if (null === $handler || $handler->mergeEntryEmitted) {
+            return;
+        }
+        $handler->mergeEntryEmitted = true;
+        if (null === $handler->dispatchBb) {
+            $handler->dispatchBb = self::buildDispatch($jit, $func, $context, $handler, $args);
+        }
+
+        $builder = $context->builder;
+        $saved = $builder->getInsertBlock();
+        $builder->positionAtEnd($mergeBb);
+        $hasPending = $builder->call($context->lookupFunction('phpc_jit_has_throw_pending'));
+        $i1 = $context->getTypeFromString('int1');
+        $hasBool = $builder->icmp(
+            PHPLLVM\Builder::INT_NE,
+            $hasPending,
+            $i1->constInt(0, false)
+        );
+        $fallthrough = JIT\BasicBlockHelper::append($context, 'try_merge_ok');
+        $builder->branchIf($hasBool, $handler->dispatchBb, $fallthrough);
+        $builder->positionAtEnd($fallthrough);
+        if (null !== $saved) {
+            $builder->positionAtEnd($saved);
+        }
+    }
+
+    public static function emitThrow(
+        \PHPCompiler\JIT $jit,
+        Context $context,
+        Function_ $func,
+        Block $block,
+        OpCode $op
+    ): void {
+        JitThrow::registerDeclarations($context);
+        JitThrow::ensureLinked($context);
+        $handler = $context->tryCatch->handlerStack[array_key_last($context->tryCatch->handlerStack)] ?? null;
+        if (null === $handler) {
+            $builder = $context->builder;
+            $throwBlock = $builder->getInsertBlock();
+            $builder->positionAtEnd($throwBlock);
+            $context->freeDeadVariables($func, $throwBlock, $block);
+            $context->builder->call($context->lookupFunction('abort'));
+            $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
+
+            return;
+        }
+        if (null === $handler->dispatchBb) {
+            $handler->dispatchBb = self::buildDispatch($jit, $func, $context, $handler, []);
+        }
+
+        $thrown = $context->getVariableFromOp($block->getOperand($op->arg1));
+        $obj = $context->helper->loadValue($thrown);
+        if (Variable::TYPE_OBJECT !== $thrown->type) {
+            $valuePtr = JIT\JitValueBox::valuePtrFromVariable($context, $thrown);
+            $obj = $context->builder->call($context->lookupFunction('__value__readObject'), $valuePtr);
+        }
+
+        $builder = $context->builder;
+        $throwBlock = $builder->getInsertBlock();
+        $builder->positionAtEnd($throwBlock);
+        $context->freeDeadVariables($func, $throwBlock, $block);
+        $builder->call($context->lookupFunction('phpc_jit_set_throw_pending'), $obj);
+        $builder->branch($handler->dispatchBb);
+        $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
+    }
+
+    /**
+     * @param list<Variable> $args
+     */
+    private static function buildDispatch(
+        \PHPCompiler\JIT $jit,
+        Function_ $func,
+        Context $context,
+        TryCatchHandler $handler,
+        array $args
+    ): BasicBlock {
+        $dispatch = JIT\BasicBlockHelper::append($context, 'try_catch_dispatch');
+        $builder = $context->builder;
+        $saved = $builder->getInsertBlock();
+        $builder->positionAtEnd($dispatch);
+
+        $objPtr = $context->getTypeFromString('__object__*');
+        $i1 = $context->getTypeFromString('int1');
+        $pendingObj = $builder->call($context->lookupFunction('phpc_jit_take_throw_pending'));
+        $mergeEntry = $context->scope->blockStorage[$handler->mergeBlock] ?? null;
+
+        $uncaught = JIT\BasicBlockHelper::append($context, 'try_uncaught');
+        $nextCatch = $dispatch;
+
+        foreach ($handler->catchArms as $arm) {
+            $catchOp = $arm['op'];
+            $types = $arm['catchTypes'];
+            $matchBb = JIT\BasicBlockHelper::append($context, 'try_catch_match');
+            $noMatchBb = JIT\BasicBlockHelper::append($context, 'try_catch_nomatch');
+
+            $builder->positionAtEnd($nextCatch);
+            if ([] === $types) {
+                $builder->branch($matchBb);
+            } else {
+                $checkBb = $nextCatch;
+                $typeCount = count($types);
+                foreach ($types as $idx => $typeName) {
+                    $thrownVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $pendingObj);
+                    $isInstance = ReflectionBuiltinHelper::emitInstanceOf($context, $thrownVar, $typeName);
+                    $isBool = $context->castToBool($context->helper->loadValue($isInstance));
+                    $isLast = $idx === $typeCount - 1;
+                    if ($isLast) {
+                        $builder->branchIf($isBool, $matchBb, $noMatchBb);
+                    } else {
+                        $nextCheck = JIT\BasicBlockHelper::append($context, 'try_catch_type_next');
+                        $builder->branchIf($isBool, $matchBb, $nextCheck);
+                        $checkBb = $nextCheck;
+                        $builder->positionAtEnd($checkBb);
+                    }
+                }
+            }
+
+            $builder->positionAtEnd($matchBb);
+            if (null !== $catchOp->arg3) {
+                $operand = $catchOp->block1->getOperand((int) $catchOp->arg3);
+                $caughtVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $pendingObj);
+                $jit->assignOperandForced($operand, $caughtVar);
+            }
+            $jit->compileSubBlock($func, $catchOp->block1, ...$args);
+            $catchTail = $context->builder->getInsertBlock();
+            $builder->positionAtEnd($catchTail);
+            if (null !== $mergeEntry && null === $catchTail->getTerminator()) {
+                $builder->branch($mergeEntry);
+            }
+
+            $nextCatch = $noMatchBb;
+            $builder->positionAtEnd($nextCatch);
+        }
+
+        $builder->branch($uncaught);
+        $builder->positionAtEnd($uncaught);
+        $builder->call($context->lookupFunction('phpc_jit_set_throw_pending'), $pendingObj);
+        $builder->call($context->lookupFunction('abort'));
+        $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
+
+        if (null !== $saved) {
+            $builder->positionAtEnd($saved);
+        }
+
+        return $dispatch;
+    }
+
+    public static function popHandler(Context $context): void
+    {
+        if ([] === $context->tryCatch->handlerStack) {
+            return;
+        }
+        $handler = array_pop($context->tryCatch->handlerStack);
+        unset($context->tryCatch->mergeHandlers[spl_object_id($handler->mergeBlock)]);
+    }
+}
+
+final class TryCatchHandler
+{
+    public bool $mergeEntryEmitted = false;
+
+    public ?BasicBlock $dispatchBb = null;
+
+    /**
+     * @param list<array{op: OpCode, catchTypes: list<string>}> $catchArms
+     */
+    public function __construct(
+        public Block $mergeBlock,
+        public array $catchArms,
+    ) {
+    }
+}

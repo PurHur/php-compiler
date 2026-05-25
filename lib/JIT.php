@@ -217,7 +217,13 @@ class JIT {
         if (str_ends_with($lower, '\\runtime::initvmcontext')) {
             return true;
         }
-        if (str_ends_with($lower, '\\runtime::loadjit')) {
+        if (str_ends_with($lower, '\\runtime::initparsepipeline')) {
+            return true;
+        }
+        if (str_ends_with($lower, '\\runtime::initcompiler')) {
+            return true;
+        }
+        if (str_ends_with($lower, '\\runtime::loadcoremodules')) {
             return true;
         }
 
@@ -237,9 +243,6 @@ class JIT {
             '\\bootstrapaot\\helloworld_compile_smoke',
             // compile_smoke_m3_emit real-lowers only in native emit TU (#1983), not compile_driver.
             '\\runtime::__destruct',
-            '\\runtime::initparsepipeline',
-            '\\runtime::initcompiler',
-            '\\runtime::loadcoremodules',
             '\\runtime::loadjitcontext',
             '\\runtime::createjit',
             '\\runtime::jitcontextforloadjit',
@@ -2162,27 +2165,30 @@ class JIT {
                     $builder->branchIf($condition, $ifEntry, $elseEntry);
                     return $origBasicBlock;
                 case OpCode::TYPE_TRY:
-                    $branchBlock = $builder->getInsertBlock();
-                    $builder->positionAtEnd($branchBlock);
-                    $tryBb = $this->compileBlockInternal($func, $op->block1, null, null, ...$args);
-                    $builder->positionAtEnd($branchBlock);
-                    if ($this->shouldFreeDeadVariablesBeforeBranch()) {
-                        $this->context->freeDeadVariables($func, $branchBlock, $block);
-                    }
-                    $builder->branch($tryBb);
+                    JIT\TryCatchHelper::beginTry($this, $func, $this->context, $block, $op, $i, $args);
+
                     return $origBasicBlock;
                 case OpCode::TYPE_CATCH:
-                case OpCode::TYPE_FINALLY:
+                    if ([] !== $this->context->tryCatch->handlerStack) {
+                        break;
+                    }
                     if (null !== $op->block1) {
                         $this->compileBlockInternal($func, $op->block1, null, null, ...$args);
                     }
+
+                    return $origBasicBlock;
+                case OpCode::TYPE_FINALLY:
+                    if ([] !== $this->context->tryCatch->handlerStack) {
+                        break;
+                    }
+                    if (null !== $op->block1) {
+                        $this->compileBlockInternal($func, $op->block1, null, null, ...$args);
+                    }
+
                     return $origBasicBlock;
                 case OpCode::TYPE_THROW:
-                    $throwBlock = $builder->getInsertBlock();
-                    $builder->positionAtEnd($throwBlock);
-                    $this->context->freeDeadVariables($func, $throwBlock, $block);
-                    $this->context->builder->call($this->context->lookupFunction('abort'));
-                    $this->context->llvm->lib->LLVMBuildUnreachable($this->context->builder->builder);
+                    JIT\TryCatchHelper::emitThrow($this, $this->context, $func, $block, $op);
+
                     return $origBasicBlock;
                 case OpCode::TYPE_RETURN_VOID:
                     $returnBlock = $builder->getInsertBlock();
