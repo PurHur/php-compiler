@@ -177,6 +177,8 @@ final class PhpcDoctorTest extends TestCase
         $this->assertStringContainsString('#2102', $result['stdout']);
         $this->assertStringContainsString('#2093', $result['stdout']);
         $this->assertStringContainsString('#2101', $result['stdout']);
+        $this->assertStringContainsString('test007ThrowsWebAotLink', $result['stdout']);
+        $this->assertStringContainsString('ThrowsWebAotExecuteTest', $result['stdout']);
         $this->assertStringContainsString('examples/007-ThrowsWeb/README.md', $result['stdout']);
     }
 
