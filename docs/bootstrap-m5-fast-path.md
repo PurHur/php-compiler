@@ -116,6 +116,15 @@ BOOTSTRAP_M3_RUNTIME_COMPILE=1 \
 
 **Vendor inventory:** `php script/bootstrap-vendor-inventory.php` → [`docs/bootstrap-vendor-inventory.md`](bootstrap-vendor-inventory.md).
 
+**Vendor prelink (#1416):** literal-require bundles + manifest (committed); AOT objects when LLVM vendor JIT is stable:
+
+```bash
+make bootstrap-vendor-prelink-bundles   # test/bootstrap-vendor-prelink/generated/*_bundle.php + prelinked/bootstrap-vendor/manifest.json
+make bootstrap-vendor-objects           # also AOT → prelinked/bootstrap-vendor/*.o (PHP_COMPILER_KEEP_OBJECT_FILE=1)
+```
+
+`lib/AOT/Linker.php::prelinkedVendorObjectPaths()` reads `object_ok` entries from the manifest. CI: `BOOTSTRAP_VENDOR_PRELINK_SYNC_GATE=1` (bundles); `BOOTSTRAP_VENDOR_PRELINK_GATE=1` for compile probe in wave-check (opt-in).
+
 **Stub policy:** shrink `PHP_COMPILER_SELFHOST_AOT` stubs on the **compile spine first** (`parseAndCompile` → `standalone` → `Compiler::compile`), not whole-tree at once.
 
 **Related:** [self-host-target.md](self-host-target.md) · [bootstrap-selfhost.md](bootstrap-selfhost.md) · [#1056](https://github.com/PurHur/php-compiler/issues/1056) · vendor prelink [#1416](https://github.com/PurHur/php-compiler/issues/1416)

@@ -430,4 +430,37 @@ final class Linker
             );
         }
     }
+
+    /**
+     * Repo-relative paths to committed M5 vendor prelink objects (issue #1416).
+     *
+     * @return list<string>
+     */
+    public static function prelinkedVendorObjectPaths(string $projectRoot): array
+    {
+        $manifest = $projectRoot.'/prelinked/bootstrap-vendor/manifest.json';
+        if (!is_file($manifest)) {
+            return [];
+        }
+        $data = json_decode((string) file_get_contents($manifest), true);
+        if (!is_array($data) || !isset($data['packages']) || !is_array($data['packages'])) {
+            return [];
+        }
+        $paths = [];
+        foreach ($data['packages'] as $info) {
+            if (!is_array($info)) {
+                continue;
+            }
+            $rel = $info['object'] ?? '';
+            if (!is_string($rel) || '' === $rel) {
+                continue;
+            }
+            $abs = $projectRoot.'/'.$rel;
+            if (is_file($abs) && ($info['status'] ?? '') === 'object_ok') {
+                $paths[] = $rel;
+            }
+        }
+
+        return $paths;
+    }
 }
