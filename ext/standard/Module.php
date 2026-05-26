@@ -191,6 +191,8 @@ class Module extends ModuleAbstract
             new wordwrap(),
             new htmlspecialchars(),
             new htmlspecialchars_decode(),
+            new htmlentities(),
+            new html_entity_decode(),
             new strip_tags(),
             new header_(),
             new setcookie(),

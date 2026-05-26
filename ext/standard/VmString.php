@@ -1281,7 +1281,7 @@ final class VmString
             throw new \LogicException('htmlspecialchars() only supports UTF-8 in this compiler build');
         }
         unset($doubleEncode);
-        $quoteBoth = 0 !== ($flags & ENT_QUOTES);
+        $quoteBoth = ENT_QUOTES === ($flags & ENT_QUOTES);
         $quoteDouble = !$quoteBoth && (0 !== ($flags & ENT_COMPAT));
         $out = '';
         $len = self::byteLength($string);
@@ -1309,6 +1309,18 @@ final class VmString
         }
 
         return $out;
+    }
+
+    /**
+     * htmlentities() — same entity subset as {@see htmlspecialchars()} in this compiler build (#2472).
+     */
+    public static function htmlentities(
+        string $string,
+        int $flags = ENT_QUOTES | ENT_SUBSTITUTE,
+        string $encoding = 'UTF-8',
+        bool $doubleEncode = true
+    ): string {
+        return self::htmlspecialchars($string, $flags, $encoding, $doubleEncode);
     }
 
     /**
@@ -1353,6 +1365,16 @@ final class VmString
         }
 
         return $out;
+    }
+
+    /**
+     * html_entity_decode() — same entity subset as {@see htmlspecialchars_decode()} (#2472).
+     */
+    public static function html_entity_decode(
+        string $string,
+        int $flags = ENT_QUOTES | ENT_SUBSTITUTE
+    ): string {
+        return self::htmlspecialchars_decode($string, $flags);
     }
 
     private static function entityAt(string $string, int $pos, int $len, string $entity, int $entityLen): bool

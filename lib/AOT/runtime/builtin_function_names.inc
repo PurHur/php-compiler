@@ -121,6 +121,8 @@ static const char *phpc_builtin_functions[] = {
     "header_remove",
     "hex2bin",
     "hexdec",
+    "htmlentities",
+    "html_entity_decode",
     "htmlspecialchars",
     "http_build_query",
     "http_response_code",
