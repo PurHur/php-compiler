@@ -1321,6 +1321,46 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('.php-compiler-ci.lock', $doc);
     }
 
+    public function testCiDockerRunPassesHarnessDockerRunOpts(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');
+        $this->assertStringContainsString('HARNESS_DOCKER_RUN_OPTS', $body);
+        $this->assertStringContainsString('PHP_COMPILER_DOCKER_RUN_OPTS', $body);
+        $this->assertStringContainsString('PHP_COMPILER_REQUIRE_DOCKER_RUN_OPTS', $body);
+        $this->assertStringContainsString('ci_docker_harness_context', $body);
+        $this->assertStringContainsString('_ci_docker_common_args', $body);
+    }
+
+    public function testDockerWrappersSourceCiDockerRun(): void
+    {
+        $root = dirname(__DIR__, 2);
+        foreach (['docker-ci-local.sh', 'docker-exec.sh', 'ci-docker-safe.sh', 'docker-ci.sh'] as $script) {
+            $body = (string) file_get_contents($root.'/script/'.$script);
+            $this->assertStringContainsString('ci-docker-run.sh', $body, $script);
+            $this->assertStringContainsString('ci_docker_run', $body, $script);
+        }
+        $cap = (string) file_get_contents($root.'/script/docker-capability-matrix.sh');
+        $this->assertStringContainsString('ci-docker-run.sh', $cap);
+        $this->assertStringContainsString('ci_docker_create', $cap);
+    }
+
+    public function testLocalCiMatrixDocumentsHarnessDockerRunOpts(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('HARNESS_DOCKER_RUN_OPTS', $doc);
+        $this->assertStringContainsString('PHP_COMPILER_REQUIRE_DOCKER_RUN_OPTS', $doc);
+        $this->assertStringContainsString('#2249', $doc);
+        $this->assertStringContainsString('make test-harness', $doc);
+    }
+
+    public function testMakefileTestHarnessRequiresDockerRunOpts(): void
+    {
+        $makefile = (string) file_get_contents(dirname(__DIR__, 2).'/Makefile');
+        $this->assertStringContainsString('PHP_COMPILER_REQUIRE_DOCKER_RUN_OPTS=1', $makefile);
+        $this->assertStringContainsString('test-harness:', $makefile);
+        $this->assertStringContainsString('test-docker-exec:', $makefile);
+    }
+
     public function testCiDockerRunPassesJitPreflightGateEnv(): void
     {
         $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');

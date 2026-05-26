@@ -6,14 +6,12 @@ IMAGE="${PHP_COMPILER_DOCKER_IMAGE:-php:8.2-cli-bookworm}"
 EXTRA_PHPUNIT_ARGS=("$@")
 
 cd "$ROOT"
-DOCKER_EXTRA=()
-if [[ -n "${PHP_COMPILER_DOCKER_RUN_OPTS:-${HARNESS_DOCKER_RUN_OPTS:-}}" ]]; then
-  # shellcheck disable=SC2206
-  DOCKER_EXTRA=(${PHP_COMPILER_DOCKER_RUN_OPTS:-${HARNESS_DOCKER_RUN_OPTS}})
-fi
+
+# shellcheck source=ci-docker-run.sh
+source "$(dirname "$0")/ci-docker-run.sh"
 
 quoted_args=$(printf '%q ' "${EXTRA_PHPUNIT_ARGS[@]}")
-tar cf - --exclude='.git' . | docker run -i --rm "${DOCKER_EXTRA[@]}" "$IMAGE" bash -lc "
+tar cf - --exclude='.git' . | ci_docker_run -i -w /compiler "$IMAGE" bash -lc "
 set -euo pipefail
 mkdir -p /compiler && tar xf - -C /compiler
 cd /compiler
