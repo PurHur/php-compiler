@@ -18,9 +18,12 @@ echo ini_set('memory_limit', $unlimited) === false ? "ml-reject\n" : "ml-bad\n";
 ini_set('display_errors', '1');
 echo ini_get('display_errors') === '1' ? "get-ok\n" : "get-fail\n";
 echo ini_get('unknown_ini_key') === false ? "get-false\n" : "get-bad\n";
+$key = 'error_reporting';
+ini_set($key, '0');
+echo ini_get($key) === '0' ? "var-key-ok\n" : "var-key-fail\n";
 PHP;
 
-    private const EXPECT = "er-ok\nunknown-false\nml-reject\nget-ok\nget-false\n";
+    private const EXPECT = "er-ok\nunknown-false\nml-reject\nget-ok\nget-false\nvar-key-ok\n";
 
     public function testVmIniSetSubset(): void
     {

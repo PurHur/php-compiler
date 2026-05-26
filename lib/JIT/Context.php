@@ -539,6 +539,13 @@ class Context {
                     $this,
                     new Variable($this, Variable::TYPE_VALUE, Variable::KIND_VALUE, $ptr)
                 );
+            case '__string__':
+                $slot = BasicBlockHelper::entryAlloca($this, $type);
+                $this->builder->store($value, $slot);
+
+                return \PHPCompiler\ext\standard\boolval::stringTruthy($this, $slot);
+            case '__string__*':
+                return \PHPCompiler\ext\standard\boolval::stringTruthy($this, $value);
         }
         throw new \LogicException("Unknown bool cast from type: " . $this->getStringFromType($type));
     }
