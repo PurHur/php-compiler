@@ -340,6 +340,8 @@ function bootstrapRenderMarkdown(array $report): string
         $lines[] = '- `'.$msg.'`';
     }
     $lines[] = '';
+    $lines[] = 'Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triage.php` ([#2254](https://github.com/PurHur/php-compiler/issues/2254); `phpc doctor --selfhost` prints top 3).';
+    $lines[] = '';
     $lines[] = '## Files';
     $lines[] = '';
     $lines[] = '| File | Blockers | Warnings |';

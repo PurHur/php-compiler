@@ -71,6 +71,13 @@ final class PhpcDoctorTest extends TestCase
         $this->assertStringContainsString('2. M2 spine', $result['stdout']);
         $this->assertStringContainsString('bootstrap-spine-count.php', $result['stdout']);
         $this->assertStringContainsString('COMPILER_DRIVER_SMOKE_GATE', $result['stdout']);
+        $this->assertStringContainsString('Inventory triage', $result['stdout']);
+        $script = dirname(__DIR__, 2).'/script/bootstrap-inventory-triage.php';
+        if (!is_file($script)) {
+            $this->assertStringContainsString('pending #2254', $result['stdout']);
+        } else {
+            $this->assertStringContainsString('bootstrap-inventory-triage.php', $result['stdout']);
+        }
     }
 
     public function testDoctorJitProbeWhenLlvmPresent(): void
