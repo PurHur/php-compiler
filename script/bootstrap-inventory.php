@@ -52,4 +52,10 @@ if (!is_dir(dirname($outFile))) {
     mkdir(dirname($outFile), 0775, true);
 }
 file_put_contents($outFile, $markdown);
-fwrite(STDOUT, "Wrote {$outFile} ({$report['totals']['files']} files, {$report['totals']['blockers']} blockers)\n");
+$phaseA = $report['phase_a'];
+fwrite(
+    STDOUT,
+    "Wrote {$outFile} ({$report['totals']['files']} files on vm.php path, "
+    ."{$phaseA['phase_a_inventory_files']} Phase A inventory files, "
+    ."{$report['totals']['blockers']} blockers)\n"
+);
