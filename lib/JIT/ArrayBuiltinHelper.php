@@ -11,6 +11,7 @@ namespace PHPCompiler\JIT;
 use PHPCompiler\ext\standard\boolval;
 use PHPCompiler\ext\standard\floatval;
 use PHPCompiler\ext\standard\intval;
+use PHPCompiler\ext\standard\lcfirst;
 use PHPCompiler\ext\standard\strval;
 use PHPCompiler\ext\standard\string_ltrim;
 use PHPCompiler\ext\standard\string_rtrim;
@@ -1192,6 +1193,18 @@ final class ArrayBuiltinHelper
     }
 
     /**
+     * array_change_key_case() — copy hashtable with ASCII-normalized string keys (#78 Phase 2 stdlib).
+     */
+    public static function buildChangeKeyCaseArray(Context $context, Variable $array, Value $case): Value
+    {
+        if (self::isNativeArray($array->type)) {
+            return self::buildChangeKeyCaseHashTable($context, self::nativeListToHashTable($context, $array), $case);
+        }
+
+        return self::buildChangeKeyCaseHashTable($context, self::loadHashTable($context, $array), $case);
+    }
+
+    /**
      * Copy a zero-based native list array into a packed hashtable (indices 0..n-1).
      */
     private static function nativeListToHashTable(Context $context, Variable $array): Value
@@ -1325,6 +1338,106 @@ final class ArrayBuiltinHelper
 
         $context->builder->positionAtEnd($strDone);
         BasicBlockHelper::branchToFreshContinue($context, 'array_flip_ht_continue');
+
+        return $dest;
+    }
+
+    private static function buildChangeKeyCaseHashTable(Context $context, Value $src, Value $case): Value
+    {
+        $dest = HashTableHelper::alloc($context);
+        $map = $context->structFieldMap['__hashtable__'];
+        $nodeMap = $context->structFieldMap['__strkey_node__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $nodePtrType = $context->getTypeFromString('__strkey_node__*');
+        $caseUpper = $context->builder->icmp(
+            Builder::INT_EQ,
+            $case,
+            $i64->constInt(\CASE_UPPER, false)
+        );
+
+        $nextFree = $context->builder->load($context->builder->structGep($src, $map['nextFreeElement']));
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'array_ckc_packed_idx');
+        $context->builder->store($zero, $idxSlot);
+
+        $packedHead = BasicBlockHelper::append($context, 'array_ckc_packed_head');
+        $packedBody = BasicBlockHelper::append($context, 'array_ckc_packed_body');
+        $packedCopy = BasicBlockHelper::append($context, 'array_ckc_packed_copy');
+        $packedNext = BasicBlockHelper::append($context, 'array_ckc_packed_next');
+        $packedDone = BasicBlockHelper::append($context, 'array_ckc_packed_done');
+        $context->builder->branch($packedHead);
+
+        $context->builder->positionAtEnd($packedHead);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $nextFree);
+        $context->builder->branchIf($atEnd, $packedDone, $packedBody);
+
+        $context->builder->positionAtEnd($packedBody);
+        $isSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $src,
+            $idx
+        );
+        $context->builder->branchIf($isSet, $packedCopy, $packedNext);
+
+        $context->builder->positionAtEnd($packedCopy);
+        $valEntry = self::listEntryAt($context, $src, $idx);
+        self::flipStoreValueAtIndex($context, $dest, $idx, $valEntry);
+        $context->builder->branch($packedNext);
+
+        $context->builder->positionAtEnd($packedNext);
+        $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+        $context->builder->branch($packedHead);
+
+        $strInit = BasicBlockHelper::append($context, 'array_ckc_str_init');
+        $strHead = BasicBlockHelper::append($context, 'array_ckc_str_head');
+        $context->builder->positionAtEnd($packedDone);
+        $context->builder->branch($strInit);
+
+        $context->builder->positionAtEnd($strInit);
+        $walkSlot = $context->builder->alloca($nodePtrType, 1, 'array_ckc_walk');
+        $head = $context->builder->load($context->builder->structGep($src, $map['strKeys']));
+        $context->builder->store($head, $walkSlot);
+        $strBody = BasicBlockHelper::append($context, 'array_ckc_str_body');
+        $strNext = BasicBlockHelper::append($context, 'array_ckc_str_next');
+        $strDone = BasicBlockHelper::append($context, 'array_ckc_str_done');
+        $context->builder->branch($strHead);
+
+        $context->builder->positionAtEnd($strHead);
+        $node = $context->builder->load($walkSlot);
+        $nodeNull = $context->builder->icmp(Builder::INT_EQ, $node, $nodePtrType->constNull());
+        $context->builder->branchIf($nodeNull, $strDone, $strBody);
+
+        $context->builder->positionAtEnd($strBody);
+        $valEntry = $context->builder->structGep($node, $nodeMap['value']);
+        $keyStr = $context->builder->load($context->builder->structGep($node, $nodeMap['key']));
+        $owned = $context->builder->call($context->lookupFunction('__string__separate'), $keyStr);
+        $lowerBb = BasicBlockHelper::append($context, 'array_ckc_key_lower');
+        $upperBb = BasicBlockHelper::append($context, 'array_ckc_key_upper');
+        $afterCase = BasicBlockHelper::append($context, 'array_ckc_key_done');
+        $context->builder->branchIf($caseUpper, $upperBb, $lowerBb);
+
+        $context->builder->positionAtEnd($lowerBb);
+        lcfirst::transformAllAscii($context, $owned, ord('A'), ord('Z'), 32);
+        $context->builder->branch($afterCase);
+
+        $context->builder->positionAtEnd($upperBb);
+        lcfirst::transformAllAscii($context, $owned, ord('a'), ord('z'), -32);
+        $context->builder->branch($afterCase);
+
+        $context->builder->positionAtEnd($afterCase);
+        self::flipStoreValueAtStringKey($context, $dest, $owned, $valEntry);
+        $context->builder->branch($strNext);
+
+        $context->builder->positionAtEnd($strNext);
+        $nextNode = $context->builder->load($context->builder->structGep($node, $nodeMap['next']));
+        $context->builder->store($nextNode, $walkSlot);
+        $context->builder->branch($strHead);
+
+        $context->builder->positionAtEnd($strDone);
+        BasicBlockHelper::branchToFreshContinue($context, 'array_ckc_ht_continue');
 
         return $dest;
     }

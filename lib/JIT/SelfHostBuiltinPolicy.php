@@ -112,7 +112,7 @@ final class SelfHostBuiltinPolicy
         'array_is_list' => 'array', 'array_map' => 'array', 'array_count' => 'array',
         // array_map: null + compile-time string builtins only; closures deferred (#1154)
         'array_push' => 'array', 'array_pop' => 'array', 'array_shift' => 'array', 'array_unshift' => 'array',
-        'array_reverse' => 'array', 'array_filter' => 'array', 'array_walk' => 'array', 'array_reduce' => 'array', 'array_combine' => 'array', 'array_fill_keys' => 'array', 'array_pad' => 'array', 'array_flip' => 'array',
+        'array_reverse' => 'array', 'array_filter' => 'array', 'array_walk' => 'array', 'array_reduce' => 'array', 'array_combine' => 'array', 'array_fill_keys' => 'array', 'array_pad' => 'array', 'array_flip' => 'array', 'array_change_key_case' => 'array',
         'array_chunk' => 'array', 'array_column' => 'array',
         'array_product' => 'array', 'array_unique' => 'array', 'array_diff' => 'array', 'array_intersect' => 'array',
         'array_replace' => 'array', 'array_sum' => 'array', 'sort' => 'array', 'rsort' => 'array',

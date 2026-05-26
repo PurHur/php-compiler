@@ -249,6 +249,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/array_diff.php',
         'ext/standard/array_fill.php',
         'ext/standard/array_flip.php',
+        'ext/standard/array_change_key_case.php',
         'ext/standard/array_key_exists.php',
         'ext/standard/array_keys.php',
         'ext/standard/array_intersect.php',

@@ -4,6 +4,7 @@ static const char *phpc_builtin_functions[] = {
     "abs",
     "addslashes",
     "array_chunk",
+    "array_change_key_case",
     "array_column",
     "array_combine",
     "array_count_values",
