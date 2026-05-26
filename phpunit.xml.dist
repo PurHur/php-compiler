@@ -31,6 +31,7 @@
             <file>./test/compliance/VisibilityJitTest.php</file>
             <file>./test/compliance/IncludeScopeVMTest.php</file>
             <file>./test/compliance/ClassMemberConstVMTest.php</file>
+            <file>./test/compliance/ClassConstFetchVMTest.php</file>
         </testsuite>
         <testsuite name="PHPCompiler Unit Test Suites">
             <directory suffix=".php">./test/unit</directory>
