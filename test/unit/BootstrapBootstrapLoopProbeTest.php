@@ -46,6 +46,7 @@ final class BootstrapBootstrapLoopProbeTest extends TestCase
         $this->assertStringContainsString('bootstrap-loop-gen1-link.sh', $script);
         $this->assertStringContainsString('BOOTSTRAP_M3_HELLOWORLD_STRICT=1', $script);
         $this->assertStringContainsString('BOOTSTRAP_M4_LINK_COMPILE_DRIVER=1', $script);
+        $this->assertStringContainsString('BOOTSTRAP_M4_COMPILE_DRIVER_REAL_LOWERING', $script);
         $this->assertStringContainsString('gen-1 link', $script);
     }
 
@@ -154,6 +155,11 @@ final class BootstrapBootstrapLoopProbeTest extends TestCase
         $this->assertStringContainsString('M4 gen-1 link', $out);
         $this->assertStringContainsString('M3 strict native emit', $out);
         $this->assertStringNotContainsString('M3 native-emit prerequisite (strict)', $out);
+        $this->assertStringNotContainsString(
+            'emit helper link failed (exit 255, mode=selfhost stubs (no PHP_COMPILER_M3_COMPILE_DRIVER))',
+            $out,
+            'M4 probe must link emit helper with PHP_COMPILER_M3_COMPILE_DRIVER (#2571)'
+        );
     }
 
     public function testGen1LinkPartialGreenWhenLlvmPresent(): void
@@ -175,6 +181,11 @@ final class BootstrapBootstrapLoopProbeTest extends TestCase
         $this->assertSame(0, $exitCode, $out);
         $this->assertStringContainsString('bootstrap-loop-gen1-link: OK', $out);
         $this->assertStringContainsString('compiler smoke', $out);
+        $this->assertStringContainsString('emit helper link OK', $out);
+        $this->assertStringNotContainsString(
+            'emit helper link failed (exit 255, mode=selfhost stubs (no PHP_COMPILER_M3_COMPILE_DRIVER))',
+            $out
+        );
         $this->assertTrue(is_executable(self::$root.'/build/bootstrap-loop-gen1'));
         $this->assertTrue(is_executable(self::$root.'/build/bootstrap-loop-gen2'));
     }
