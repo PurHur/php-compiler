@@ -15,6 +15,7 @@ declare(strict_types=1);
  */
 
 require __DIR__.'/bootstrap-spine-count.php';
+require_once __DIR__.'/bootstrap-spine-deferred-lib.php';
 
 $root = dirname(__DIR__);
 $verbose = in_array('--verbose', $argv, true);
@@ -40,14 +41,8 @@ $spineSubstitutes = [
     'src/macro_functions.php' => 'test/bootstrap-aot/macro_functions_spine_shim.php',
 ];
 
-/**
- * Deferred from compiler_lib_spine_smoke until native link/JIT stubs land (#1960, PR #1988).
- * bin/vm.php: vm_run_smoke substitute also blocked under LLVM 9 native link.
- */
-$spineNativeLinkDeferred = [
-    'bin/vm.php',
-    'lib/AOT/Linker.php',
-];
+/** Deferred from compiler_lib_spine_smoke until native link lands (#1960, #2134, #2202). */
+$spineNativeLinkDeferred = bootstrap_spine_native_link_deferred();
 
 /** Inventory paths not yet in spine (regenerated inventory ahead of bundle — #1922). */
 $spineInventoryAheadDeferred = [];

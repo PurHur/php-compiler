@@ -212,6 +212,14 @@ ci_run_selfhost_spine_coverage_sync_check() {
   "$PHP_BIN" "${PHP_OPTS[@]}" script/check-selfhost-spine-coverage-sync.php
 }
 
+ci_run_selfhost_spine_deferred_sync_check() {
+  if [[ "${SELFHOST_SPINE_DEFERRED_SYNC_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  echo "Self-host spine deferred sync (SELFHOST_SPINE_DEFERRED_SYNC_GATE=1, issue #2202)..."
+  "$PHP_BIN" "${PHP_OPTS[@]}" script/check-selfhost-spine-deferred-sync.php
+}
+
 ci_run_m3_allowlist_sync_check() {
   if [[ "${M3_ALLOWLIST_SYNC_GATE:-0}" != "1" ]]; then
     return 0
@@ -330,6 +338,7 @@ ci_run_inventory_checks() {
   ci_run_development_status_007_sync_check
   ci_run_selfhost_spine_count_sync_check
   ci_run_selfhost_spine_coverage_sync_check
+  ci_run_selfhost_spine_deferred_sync_check
   ci_run_m3_allowlist_sync_check
   ci_run_bootstrap_m5_doc_sync_check
   ci_run_selfhost_m4_gen2_sync_check

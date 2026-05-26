@@ -60,6 +60,7 @@ final class PhpcDoctorTest extends TestCase
         $this->assertStringContainsString('BOOTSTRAP_M3_COMPILE_SMOKE_STRICT_GATE', $result['stdout']);
         $this->assertStringContainsString('NORTH_STAR2_VERIFY_GATE', $result['stdout']);
         $this->assertStringContainsString('SELFHOST_SPINE_COUNT_SYNC_GATE', $result['stdout']);
+        $this->assertStringContainsString('SELFHOST_SPINE_DEFERRED_SYNC_GATE', $result['stdout']);
         $this->assertStringContainsString('SELFHOST_SPINE_COVERAGE_SYNC_GATE', $result['stdout']);
         $this->assertStringContainsString('BOOTSTRAP_LOOP_PROBE_GATE', $result['stdout']);
         $this->assertStringContainsString('BOOTSTRAP_M4_LOOP_PROBE', $result['stdout']);
