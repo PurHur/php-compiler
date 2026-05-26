@@ -50,6 +50,11 @@ final class CapabilitySyntaxTest extends TestCase
         $this->assertStringContainsString('## Throws reference (`examples/007-ThrowsWeb`)', $body);
         $this->assertStringContainsString('`007-ThrowsWeb` reference app', $body);
         $this->assertStringContainsString('THROWS_WEB_SMOKE_GATE', $body);
+        $this->assertStringContainsString('## Stdlib / array builtins', $body);
+        $this->assertStringContainsString('`ksort` (string-key assoc)', $body);
+        $this->assertStringContainsString('`array_merge` (string-key assoc)', $body);
+        $this->assertStringContainsString('#2271', $body);
+        $this->assertStringContainsString('#2287', $body);
     }
 
     public function testCapabilitiesMdLinksToSyntaxMatrix(): void

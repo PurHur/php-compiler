@@ -25,7 +25,8 @@ $markdown = renderSyntaxMarkdown($syntax)
     . renderMiniWebAppOopNorthStarMarkdown(miniWebAppOopNorthStarDefinitions())
     . renderSessionsWebNorthStarMarkdown(sessionsWebNorthStarDefinitions())
     . renderFileUploadWebNorthStarMarkdown(fileUploadWebNorthStarDefinitions())
-    . renderThrowsWebNorthStarMarkdown(throwsWebNorthStarDefinitions());
+    . renderThrowsWebNorthStarMarkdown(throwsWebNorthStarDefinitions())
+    . renderStdlibArrayBuiltinMarkdown(stdlibArrayBuiltinDefinitions());
 
 if ($check) {
     if (!is_file($outFile)) {

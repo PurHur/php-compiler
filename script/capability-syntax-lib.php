@@ -1197,3 +1197,100 @@ function renderThrowsWebNorthStarMarkdown(array $rows): string
 
     return implode("\n", $lines);
 }
+
+/**
+ * Stdlib array builtins on string-keyed assoc maps (issues #2271, #2282, #2290, #2296, #2287).
+ *
+ * @return list<array{
+ *   construct: string,
+ *   vm: string,
+ *   jit: string,
+ *   aot: string,
+ *   issue: int,
+ *   notes: list<string>
+ * }>
+ */
+function stdlibArrayBuiltinDefinitions(): array
+{
+    return [
+        [
+            'construct' => '`ksort` (string-key assoc)',
+            'vm' => 'yes',
+            'jit' => 'yes',
+            'aot' => 'yes',
+            'issue' => 2271,
+            'notes' => ['String-key HashTable sort; JIT PHPT + AOT PHPT (#2271); assoc subset #66'],
+        ],
+        [
+            'construct' => '`krsort` (string-key assoc)',
+            'vm' => 'yes',
+            'jit' => 'yes',
+            'aot' => 'yes',
+            'issue' => 2282,
+            'notes' => ['Reverse key sort on string-key maps (#2282); assoc subset #66'],
+        ],
+        [
+            'construct' => '`asort` (string-key assoc)',
+            'vm' => 'yes',
+            'jit' => 'yes',
+            'aot' => 'yes',
+            'issue' => 2290,
+            'notes' => ['Sort by value preserving keys (#2290); assoc subset #66'],
+        ],
+        [
+            'construct' => '`arsort` (string-key assoc)',
+            'vm' => 'yes',
+            'jit' => 'yes',
+            'aot' => 'yes',
+            'issue' => 2296,
+            'notes' => ['Reverse value sort preserving keys (#2296); assoc subset #66'],
+        ],
+        [
+            'construct' => '`array_merge` (string-key assoc)',
+            'vm' => 'yes',
+            'jit' => 'yes',
+            'aot' => 'yes',
+            'issue' => 2287,
+            'notes' => ['Later keys overwrite on string-key maps (#2287); JIT PHPT + AOT PHPT; assoc subset #66'],
+        ],
+    ];
+}
+
+/**
+ * @param list<array{construct: string, vm: string, jit: string, aot: string, issue: int, notes: list<string>}> $rows
+ */
+function renderStdlibArrayBuiltinMarkdown(array $rows): string
+{
+    $lines = [
+        '## Stdlib / array builtins',
+        '',
+        'Associative array helpers on string-keyed maps (ROADMAP Phase 2 stdlib, [#66]('
+        . CAPABILITY_ISSUE_URL_BASE . '66) assoc subset). Full builtin matrix: [capabilities.md](capabilities.md).',
+        '',
+        '| Builtin | VM | JIT | AOT | Issue | Notes |',
+        '|---------|:--:|:---:|:---:|-------|-------|',
+    ];
+
+    foreach ($rows as $row) {
+        $lines[] = sprintf(
+            '| %s | %s | %s | %s | [#%d](%s%d) | %s |',
+            $row['construct'],
+            capabilityStatusLabel($row['vm']),
+            capabilityStatusLabel($row['jit']),
+            capabilityStatusLabel($row['aot']),
+            $row['issue'],
+            CAPABILITY_ISSUE_URL_BASE,
+            $row['issue'],
+            $row['notes'] === [] ? '' : implode('; ', $row['notes'])
+        );
+    }
+
+    $lines[] = '';
+    $lines[] = '_Rows mirror [capabilities.md](capabilities.md) (`ksort`, `krsort`, `asort`, `arsort`, `array_merge`); '
+        . 'closed on master ([#2271](' . CAPABILITY_ISSUE_URL_BASE . '2271), [#2282](' . CAPABILITY_ISSUE_URL_BASE
+        . '2282), [#2290](' . CAPABILITY_ISSUE_URL_BASE . '2290), [#2296](' . CAPABILITY_ISSUE_URL_BASE
+        . '2296), [#2287](' . CAPABILITY_ISSUE_URL_BASE . '2287))._';
+    $lines[] = '';
+
+    return implode("\n", $lines);
+}
