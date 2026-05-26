@@ -7,6 +7,15 @@ Minimal multi-request fixture for **`phpc deploy`** + future FastCGI adapter ([#
 | `GET /example.php` (empty `PATH_INFO`) | `ok` (health) |
 | `GET /example.php/...` (non-empty `PATH_INFO`) | Plain-text `REQUEST_URI`, `SCRIPT_NAME`, `PATH_INFO` |
 
+## Scaffold
+
+```console
+./phpc init --profile fastcgiweb /tmp/my-fastcgiweb
+./phpc lint /tmp/my-fastcgiweb/example.php
+```
+
+Template parity: `./script/check-init-fastcgiweb-parity.sh` ([#2342](https://github.com/PurHur/php-compiler/issues/2342)).
+
 ## Run (VM / serve)
 
 ```console

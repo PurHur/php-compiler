@@ -134,6 +134,7 @@ Same manifest as **001-SimpleWeb**; docroot is the project root (no `public/`). 
 | `fileupload` | `templates/init-fileupload/` | Flat `example.php` multipart upload ([**006-FileUploadWeb**](../examples/006-FileUploadWeb/)) |
 | `throwsweb` | `templates/init-throwsweb/` | Flat `example.php` throw/catch validation ([**007-ThrowsWeb**](../examples/007-ThrowsWeb/)) |
 | `selfhostprobe` | `templates/init-selfhostprobe/` | Flat `example.php` North Star 2 bootstrap presenter ([**008-SelfHostProbe**](../examples/008-SelfHostProbe/)) |
+| `fastcgiweb` | `templates/init-fastcgiweb/` | Flat `example.php` FastCGI / deploy health + PATH_INFO ([**009-FastCGIWeb**](../examples/009-FastCGIWeb/)) |
 
 ### Self-host presenter flat project (`examples/008-SelfHostProbe/phpc.json`)
 
@@ -145,6 +146,17 @@ Same manifest as **001-SimpleWeb**; docroot is the project root (no `public/`). 
 ```
 
 CLI presenter only (no superglobals). Scaffold with `phpc init --profile selfhostprobe` ([#2220](https://github.com/PurHur/php-compiler/issues/2220)); template parity: `script/check-init-selfhostprobe-parity.sh` (default `INIT_SELFHOSTPROBE_PARITY_GATE=1` in `ci-fast`).
+
+### FastCGI / deploy flat project (`examples/009-FastCGIWeb/phpc.json`)
+
+```json
+{
+    "entry": "example.php",
+    "binary": ".phpc/bin/app"
+}
+```
+
+Health `ok` and PATH_INFO diagnostics via CGI superglobals. Scaffold with `phpc init --profile fastcgiweb` ([#2342](https://github.com/PurHur/php-compiler/issues/2342)); template parity: `script/check-init-fastcgiweb-parity.sh` (default `INIT_FASTCGIWEB_PARITY_GATE=1` in `ci-fast`).
 
 ## Commands
 

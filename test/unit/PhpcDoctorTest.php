@@ -209,6 +209,8 @@ final class PhpcDoctorTest extends TestCase
         $this->assertStringContainsString('examples-fastcgiweb-smoke', $result['stdout']);
         $this->assertStringContainsString('--fastcgi-only', $result['stdout']);
         $this->assertStringContainsString('#2351', $result['stdout']);
+        $this->assertStringContainsString('phpc init --profile fastcgiweb', $result['stdout']);
+        $this->assertStringContainsString('check-init-fastcgiweb-parity.sh', $result['stdout']);
         $this->assertStringContainsString('Bootstrap inventory lint', $result['stdout']);
         $this->assertStringContainsString('bootstrap-inventory', $result['stdout']);
         $this->assertStringContainsString('BOOTSTRAP_INVENTORY_LINT_SYNC_GATE', $result['stdout']);

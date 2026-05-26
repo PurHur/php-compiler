@@ -317,6 +317,14 @@ ci_run_init_selfhostprobe_parity_check() {
   script/check-init-selfhostprobe-parity.sh
 }
 
+ci_run_init_fastcgiweb_parity_check() {
+  if [[ "${INIT_FASTCGIWEB_PARITY_GATE:-1}" != "1" ]]; then
+    return 0
+  fi
+  echo "init-fastcgiweb template parity (INIT_FASTCGIWEB_PARITY_GATE=1, issue #2342)..."
+  script/check-init-fastcgiweb-parity.sh
+}
+
 ci_run_init_apijson_parity_check() {
   if [[ "${APIJSON_INIT_PARITY_GATE:-1}" != "1" ]]; then
     return 0
@@ -334,6 +342,7 @@ ci_run_inventory_checks() {
   ci_run_init_fileupload_parity_check
   ci_run_init_throwsweb_parity_check
   ci_run_init_selfhostprobe_parity_check
+  ci_run_init_fastcgiweb_parity_check
   ci_run_init_apijson_parity_check
   "$PHP_BIN" "${PHP_OPTS[@]}" script/capability-matrix.php --check
   ci_run_capability_syntax_check
