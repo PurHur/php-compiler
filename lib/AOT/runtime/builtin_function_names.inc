@@ -201,6 +201,7 @@ static const char *phpc_builtin_functions[] = {
     "quotemeta",
     "rad2deg",
     "random_bytes",
+    "random_int",
     "range",
     "rawurldecode",
     "rawurlencode",

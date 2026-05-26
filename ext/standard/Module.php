@@ -172,6 +172,7 @@ class Module extends ModuleAbstract
             new password_hash(),
             new password_verify(),
             new random_bytes(),
+            new random_int(),
             new uniqid(),
             new str_pad(),
             new str_split(),
