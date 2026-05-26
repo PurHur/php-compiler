@@ -484,6 +484,53 @@ final class HashTable {
     }
 
     /**
+     * Fisher–Yates shuffle in place for packed list arrays (shuffle() subset; issue #2310).
+     */
+    public function shuffleInPlace(): void
+    {
+        if (!$this->isWithoutHoles()) {
+            throw new \LogicException('shuffleInPlace() only supports packed list arrays without holes');
+        }
+        $values = [];
+        foreach ($this->iterate(true) as $value) {
+            $copy = new Variable();
+            $copy->copyFrom($value);
+            $values[] = $copy;
+        }
+        $n = \count($values);
+        if ($n < 2) {
+            return;
+        }
+        for ($i = $n - 1; $i > 0; --$i) {
+            $j = self::csprngIndex($i + 1);
+            if ($j !== $i) {
+                $tmp = $values[$i];
+                $values[$i] = $values[$j];
+                $values[$j] = $tmp;
+            }
+        }
+        $this->replacePackedValues($values);
+    }
+
+    /**
+     * Uniform index in [0, $upperExclusive) using 8 CSPRNG bytes.
+     */
+    private static function csprngIndex(int $upperExclusive): int
+    {
+        $rand = \PHPCompiler\ext\standard\VmString::randomBytes(8);
+        $pick = 0;
+        for ($b = 0; $b < 8; ++$b) {
+            $pick = ($pick << 8) | \ord($rand[$b]);
+        }
+        $j = $pick % $upperExclusive;
+        if ($j < 0) {
+            $j += $upperExclusive;
+        }
+
+        return $j;
+    }
+
+    /**
      * Pad a packed list to {@param $length} elements with {@param $value} (array_pad subset).
      */
     public function padCopy(int $length, Variable $value): HashTable

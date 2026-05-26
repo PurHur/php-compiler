@@ -11,6 +11,7 @@ namespace PHPCompiler\JIT;
 use PHPCompiler\ext\standard\boolval;
 use PHPCompiler\ext\standard\floatval;
 use PHPCompiler\ext\standard\intval;
+use PHPCompiler\ext\standard\JitStrShuffle;
 use PHPCompiler\ext\standard\strval;
 use PHPCompiler\ext\standard\string_ltrim;
 use PHPCompiler\ext\standard\string_rtrim;
@@ -1978,6 +1979,92 @@ final class ArrayBuiltinHelper
         $context->builder->branch($head);
 
         $context->builder->positionAtEnd($doneBlock);
+    }
+
+    /**
+     * shuffle() — Fisher–Yates in place on a packed list array (issue #2310).
+     */
+    public static function shufflePackedInPlace(Context $context, Variable $array): void
+    {
+        if (self::isNativeArray($array->type)) {
+            throw new \LogicException(
+                'shuffle() cannot compile fixed-size literal arrays in JIT/AOT yet; assign to variables first'
+            );
+        }
+        $ht = self::loadHashTable($context, $array);
+        $sizeT = $context->getTypeFromString('size_t');
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $two = $sizeT->constInt(2, false);
+        $num = $context->builder->call(
+            $context->lookupFunction('__hashtable__getNumElements'),
+            $ht
+        );
+        $tooSmall = $context->builder->icmp(Builder::INT_ULT, $num, $two);
+        $done = BasicBlockHelper::append($context, 'shuffle_done');
+        $work = BasicBlockHelper::append($context, 'shuffle_work');
+        $context->builder->branchIf($tooSmall, $done, $work);
+
+        $context->builder->positionAtEnd($work);
+        $iSlot = $context->builder->alloca($sizeT, 1, 'shuffle_i');
+        $last = $context->builder->sub($num, $one);
+        $context->builder->store($last, $iSlot);
+
+        $head = BasicBlockHelper::append($context, 'shuffle_head');
+        $body = BasicBlockHelper::append($context, 'shuffle_body');
+        $loopDone = BasicBlockHelper::append($context, 'shuffle_loop_done');
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $i = $context->builder->load($iSlot);
+        $stop = $context->builder->icmp(Builder::INT_EQ, $i, $zero);
+        $context->builder->branchIf($stop, $loopDone, $body);
+
+        $context->builder->positionAtEnd($body);
+        $upper = $context->builder->addNoSignedWrap($i, $one);
+        $jI64 = JitStrShuffle::randomIndex(
+            $context,
+            $context->builder->zext($upper, $i64)
+        );
+        $j = $context->builder->trunc($jI64, $sizeT);
+        $iI64 = $context->builder->zext($i, $i64);
+        $needsSwap = $context->builder->icmp(Builder::INT_NE, $jI64, $iI64);
+        $swapBlock = BasicBlockHelper::append($context, 'shuffle_swap');
+        $noSwap = BasicBlockHelper::append($context, 'shuffle_no_swap');
+        $afterSwap = BasicBlockHelper::append($context, 'shuffle_after_swap');
+        $context->builder->branchIf($needsSwap, $swapBlock, $noSwap);
+
+        $context->builder->positionAtEnd($swapBlock);
+        self::swapPackedEntries($context, $ht, $i, $j);
+        $context->builder->branch($afterSwap);
+
+        $context->builder->positionAtEnd($noSwap);
+        $context->builder->branch($afterSwap);
+
+        $context->builder->positionAtEnd($afterSwap);
+        $context->builder->store($context->builder->sub($i, $one), $iSlot);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($loopDone);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+    }
+
+    private static function swapPackedEntries(
+        Context $context,
+        Value $ht,
+        Value $idxA,
+        Value $idxB
+    ): void {
+        $entryA = self::listEntryAt($context, $ht, $idxA);
+        $entryB = self::listEntryAt($context, $ht, $idxB);
+        $tmpSlot = JitValueBox::alloc($context);
+        $tmpPtr = JitValueBox::pointer($context, $tmpSlot);
+        self::copyValueEntrySlot($context, $entryA, $tmpPtr);
+        self::copyValueEntrySlot($context, $entryB, $entryA);
+        self::copyValueEntrySlot($context, $tmpPtr, $entryB);
     }
 
     /**

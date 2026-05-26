@@ -115,7 +115,7 @@ final class JitStrShuffle
     }
 
     /** Uniform index in [0, $upperExclusive) using 8 CSPRNG bytes. */
-    private static function randomIndex(Context $context, Value $upperExclusive): Value
+    public static function randomIndex(Context $context, Value $upperExclusive): Value
     {
         $i64 = $context->getTypeFromString('int64');
         $randStr = JitRandomBytes::generate($context, $i64->constInt(8, false));

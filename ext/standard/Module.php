@@ -139,6 +139,7 @@ class Module extends ModuleAbstract
             new preg_last_error_(),
             new nl2br(),
             new array_reverse(),
+            new shuffle(),
             new array_search(),
             new array_sum(),
             new array_product(),
