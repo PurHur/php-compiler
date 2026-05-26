@@ -233,6 +233,9 @@ final class Doctor
         if (is_executable($repoRoot.'/script/north-star3-verify.sh')) {
             fwrite(STDOUT, "   make north-star3-verify  or  ./script/north-star3-verify.sh  (#2360 M3 unit probes)\n");
         }
+        if (is_executable($repoRoot.'/script/north-star4-verify.sh')) {
+            fwrite(STDOUT, "   make north-star4-verify  or  ./script/north-star4-verify.sh  (#2379 M4 strict loop; --dry-run-only on partial M4)\n");
+        }
         fwrite(STDOUT, "   phpc test --bootstrap [--strict]\n");
         fwrite(STDOUT, "   make bootstrap-wave-check  (opt-in --with-helloworld)\n");
         fwrite(STDOUT, "   ./phpc doctor --gates | grep -i bootstrap_inventory  (#2228)\n\n");
@@ -538,6 +541,11 @@ final class Doctor
         if (is_executable($ns3Script)) {
             fwrite(STDOUT, "  M3 unit probes   make north-star3-verify            008 + compiler/JIT/VM/parser/PHPTypes (#2360, #2434)\n");
             fwrite(STDOUT, "  Script           ./script/north-star3-verify.sh    --require-llvm when probes must run\n");
+        }
+        $ns4Script = $repoRoot.'/script/north-star4-verify.sh';
+        if (is_executable($ns4Script)) {
+            fwrite(STDOUT, "  M4 strict loop   make north-star4-verify            inventory + M3 strict + gen-1 link + loop probe (#2379)\n");
+            fwrite(STDOUT, "  Script           ./script/north-star4-verify.sh    --dry-run-only / --strict / --require-llvm\n");
         }
         fwrite(STDOUT, "  Fast CI hook     {$ns2CiDetail}\n");
         fwrite(STDOUT, "  Bootstrap subset {$subsetDetail}\n");
