@@ -1,0 +1,18 @@
+--- vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
+@@ -320,6 +320,15 @@
+             return self::mixed();
+         }
+ 
++        if ($decl instanceof CfgType\Union_) {
++            $subs = [];
++            foreach ($decl->types as $sub) {
++                $subs[] = self::fromTypeDecl($sub);
++            }
++
++            return new self(self::TYPE_UNION, $subs);
++        }
++
+         throw new \LogicException('Unsupported declaration type: '.get_class($decl));
+     }
+ 
