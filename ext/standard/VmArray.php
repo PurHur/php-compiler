@@ -31,6 +31,27 @@ final class VmArray
         return $expected === $n;
     }
 
+    /**
+     * array_merge() subset: packed 0..n-1 lists append; string-key maps overwrite later keys (#2287).
+     *
+     * @param HashTable ...$others
+     */
+    public static function merge(HashTable $first, HashTable ...$others): HashTable
+    {
+        foreach ([$first, ...$others] as $ht) {
+            if (!self::isList($ht)) {
+                $out = $first->replaceCopy();
+                foreach ($others as $other) {
+                    $out->mergeStringKeysFrom($other, true);
+                }
+
+                return $out;
+            }
+        }
+
+        return $first->mergeCopy(...$others);
+    }
+
     public static function keyFirst(HashTable $ht): ?Variable
     {
         $ht->iterReset();

@@ -20,7 +20,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * array_merge() for packed list arrays (subset of PHP; JIT via ArrayBuiltinHelper).
+ * array_merge() for packed lists and string-key maps (subset of PHP; JIT via ArrayBuiltinHelper).
  */
 final class array_merge extends Internal
 {
@@ -44,7 +44,7 @@ final class array_merge extends Internal
             }
             $others[] = $arg->toArray();
         }
-        $frame->returnVar->array($first->toArray()->mergeCopy(...$others));
+        $frame->returnVar->array(VmArray::merge($first->toArray(), ...$others));
     }
 
     public Context $context;

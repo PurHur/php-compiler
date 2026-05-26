@@ -3321,15 +3321,112 @@ final class ArrayBuiltinHelper
         if (\count($arrays) < 2) {
             throw new \LogicException('array_merge() requires at least two arguments');
         }
-        $result = HashTableHelper::alloc($context);
+
+        $allNative = true;
         foreach ($arrays as $array) {
-            $ht = self::isNativeArray($array->type)
-                ? self::nativeListToHashTable($context, $array)
-                : self::loadHashTable($context, $array);
-            self::copyInto($context, $result, $ht);
+            if (!self::isNativeArray($array->type)) {
+                $allNative = false;
+                break;
+            }
+        }
+        if ($allNative) {
+            $result = HashTableHelper::alloc($context);
+            foreach ($arrays as $array) {
+                self::copyInto($context, $result, self::nativeListToHashTable($context, $array));
+            }
+
+            return $result;
         }
 
-        return $result;
+        $i1 = $context->getTypeFromString('int1');
+        $allListsSlot = $context->builder->alloca($i1, 1, 'array_merge_all_lists');
+        $context->builder->store($context->constantFromBool(true), $allListsSlot);
+
+        $hts = [];
+        foreach ($arrays as $array) {
+            $ht = self::loadHashTable($context, $array);
+            $hts[] = $ht;
+            $isList = \PHPCompiler\ext\standard\JitArrayIsList::hashTableIsList($context, $ht);
+            $context->builder->store(
+                $context->builder->and($context->builder->load($allListsSlot), $isList),
+                $allListsSlot
+            );
+        }
+
+        $listBb = BasicBlockHelper::append($context, 'array_merge_list');
+        $assocBb = BasicBlockHelper::append($context, 'array_merge_assoc');
+        $mergeDone = BasicBlockHelper::append($context, 'array_merge_done');
+        $context->builder->branchIf($context->builder->load($allListsSlot), $listBb, $assocBb);
+
+        $context->builder->positionAtEnd($listBb);
+        $listResult = HashTableHelper::alloc($context);
+        foreach ($hts as $ht) {
+            self::copyInto($context, $listResult, $ht);
+        }
+        $listEndBb = $context->builder->getInsertBlock();
+        $context->builder->branch($mergeDone);
+
+        $context->builder->positionAtEnd($assocBb);
+        $assocResult = HashTableHelper::alloc($context);
+        self::overlayHashTable($context, $assocResult, $hts[0]);
+        $otherCount = \count($hts);
+        for ($i = 1; $i < $otherCount; ++$i) {
+            self::mergeStringKeysInto($context, $assocResult, $hts[$i]);
+        }
+        $assocEndBb = $context->builder->getInsertBlock();
+        $context->builder->branch($mergeDone);
+
+        $context->builder->positionAtEnd($mergeDone);
+        $phi = $context->builder->phi($listResult->typeOf());
+        $phi->addIncoming($listResult, $listEndBb);
+        $phi->addIncoming($assocResult, $assocEndBb);
+
+        return $phi;
+    }
+
+    /**
+     * Copy string-key entries from {@param $src} into {@param $dest}, overwriting duplicates (#2287).
+     */
+    private static function mergeStringKeysInto(Context $context, Value $dest, Value $src): void
+    {
+        $map = $context->structFieldMap['__hashtable__'];
+        $nodeMap = $context->structFieldMap['__strkey_node__'];
+        $nodePtrType = $context->getTypeFromString('__strkey_node__*');
+
+        $strInit = BasicBlockHelper::append($context, 'array_merge_str_init');
+        $strHead = BasicBlockHelper::append($context, 'array_merge_str_head');
+        $context->builder->branch($strInit);
+
+        $context->builder->positionAtEnd($strInit);
+        $walkSlot = $context->builder->alloca($nodePtrType, 1, 'array_merge_str_walk');
+        $head = $context->builder->load($context->builder->structGep($src, $map['strKeys']));
+        $context->builder->store($head, $walkSlot);
+        $strBody = BasicBlockHelper::append($context, 'array_merge_str_body');
+        $strSet = BasicBlockHelper::append($context, 'array_merge_str_set');
+        $strNext = BasicBlockHelper::append($context, 'array_merge_str_next');
+        $strDone = BasicBlockHelper::append($context, 'array_merge_str_done');
+        $context->builder->branch($strHead);
+
+        $context->builder->positionAtEnd($strHead);
+        $node = $context->builder->load($walkSlot);
+        $nodeNull = $context->builder->icmp(Builder::INT_EQ, $node, $nodePtrType->constNull());
+        $context->builder->branchIf($nodeNull, $strDone, $strBody);
+
+        $context->builder->positionAtEnd($strBody);
+        $valEntry = $context->builder->structGep($node, $nodeMap['value']);
+        $keyStr = $context->builder->load($context->builder->structGep($node, $nodeMap['key']));
+        $context->builder->branch($strSet);
+
+        $context->builder->positionAtEnd($strSet);
+        self::storeValueEntryAtStringKey($context, $dest, $keyStr, $valEntry);
+        $context->builder->branch($strNext);
+
+        $context->builder->positionAtEnd($strNext);
+        $nextNode = $context->builder->load($context->builder->structGep($node, $nodeMap['next']));
+        $context->builder->store($nextNode, $walkSlot);
+        $context->builder->branch($strHead);
+
+        $context->builder->positionAtEnd($strDone);
     }
 
     /**
