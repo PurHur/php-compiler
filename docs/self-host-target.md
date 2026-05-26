@@ -65,6 +65,8 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | **M1** | Bundle is **compiler-shaped** (lint + compile-smoke) | ✅ | 100% |
 | **M2** | Spine grows toward full `bin/vm.php` inventory | ✅ **655/657** units (link) | **~93%** |
 | **M3** | Self-host binary **compiles external PHP** (HelloWorld) without Zend emit | 🚧 partial (run ✅, emit 🚧) | **~35%** |
+
+**M3 unit probe presenter** ([#2360](https://github.com/PurHur/php-compiler/issues/2360)): `make north-star3-verify` runs `008-SelfHostProbe` plus optional `bootstrap-selfhost-{compiler,jit,vm}-unit-probe.sh` when LLVM 9 and probe scripts are present (issues [#2216](https://github.com/PurHur/php-compiler/issues/2216), [#2332](https://github.com/PurHur/php-compiler/issues/2332), [#2354](https://github.com/PurHur/php-compiler/issues/2354)).
 | **M4** | Self-host binary **rebuilds** the next compiler tree | ⬜ | 0% |
 | **M5** | Full self-host; Zend retired from loop | ⬜ north star | 0% |
 
@@ -175,6 +177,13 @@ M3 strict (fails until native emit):
 
 ```bash
 BOOTSTRAP_M3_HELLOWORLD_STRICT=1 make bootstrap-selfhost-helloworld
+```
+
+M3 unit probe bundle ([#2360](https://github.com/PurHur/php-compiler/issues/2360)):
+
+```bash
+make north-star3-verify
+# Docker: ./script/docker-exec.sh -- bash -lc 'make north-star3-verify'
 ```
 
 M4 bootstrap-loop probe ([#1498](https://github.com/PurHur/php-compiler/issues/1498)):
