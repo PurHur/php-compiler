@@ -39,4 +39,5 @@ echo "Harness-safe Docker:\n";
 echo "  ./script/docker-exec.sh -- bash -lc 'make north-star2-verify'\n\n";
 
 echo "Next spine slices: #2201 (bin/vm.php link+execute), #2134 (deferred paths).\n";
+echo "M3 unit probes: make north-star3-verify  (#2360; parser #2418, PHPTypes #2434)\n";
 echo "Compiler unit probe: #2216. Docs: docs/bootstrap-selfhost.md, docs/self-host-target.md\n";

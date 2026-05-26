@@ -28,8 +28,10 @@ Runs North Star 3 M3 unit-probe bundle (issue #2360, epic #1492):
   2. BOOTSTRAP_COMPILER_UNIT_PROBE_GATE=1 bootstrap-selfhost-compiler-unit-probe.sh (#2216)
   3. BOOTSTRAP_JIT_UNIT_PROBE_GATE=1 bootstrap-selfhost-jit-unit-probe.sh (#2332)
   4. BOOTSTRAP_VM_UNIT_PROBE_GATE=1 bootstrap-selfhost-vm-unit-probe.sh (#2354)
+  5. BOOTSTRAP_PARSER_UNIT_PROBE_GATE=1 bootstrap-selfhost-parser-unit-probe.sh (#2409, #2418)
+  6. BOOTSTRAP_PHPTYPES_UNIT_PROBE_GATE=1 bootstrap-selfhost-types-unit-probe.sh (#2430, #2434)
 
-Steps 2–4 require LLVM 9 and skip with a message when absent or when probe scripts are missing.
+Steps 2–6 require LLVM 9 and skip with a message when absent or when probe scripts are missing.
 Use --require-llvm to fail if LLVM is missing (default: skip LLVM probes, exit 0).
 
 Environment: script/ci-defaults.env. See docs/bootstrap-selfhost.md · docs/self-host-target.md.
@@ -50,6 +52,8 @@ ns3_hint() {
     2) echo "Next: bootstrap-selfhost-compiler-unit-probe.sh (#2216)" ;;
     3) echo "Next: bootstrap-selfhost-jit-unit-probe.sh (#2332)" ;;
     4) echo "Next: bootstrap-selfhost-vm-unit-probe.sh (#2354)" ;;
+    5) echo "Next: bootstrap-selfhost-parser-unit-probe.sh (#2409, #2418)" ;;
+    6) echo "Next: bootstrap-selfhost-types-unit-probe.sh (#2430, #2434)" ;;
     *) echo "Next: see https://github.com/PurHur/php-compiler/issues/2360" ;;
   esac
 }
@@ -125,7 +129,7 @@ if ! ci_llvm_ready; then
     exit 1
   fi
   echo
-  echo "=== north-star3-verify: steps 2–4 skipped (LLVM 9 not available) ==="
+  echo "=== north-star3-verify: steps 2–6 skipped (LLVM 9 not available) ==="
   echo "north-star3-verify: OK"
   exit 0
 fi
@@ -143,6 +147,14 @@ ns3_run_unit_probe 3 "JIT codegen unit probe" \
 ns3_run_unit_probe 4 "VM interpreter unit probe" \
   "bootstrap-selfhost-vm-unit-probe.sh" \
   "BOOTSTRAP_VM_UNIT_PROBE_GATE" "#2354"
+
+ns3_run_unit_probe 5 "CFG parse front-end unit probe" \
+  "bootstrap-selfhost-parser-unit-probe.sh" \
+  "BOOTSTRAP_PARSER_UNIT_PROBE_GATE" "#2409, #2418"
+
+ns3_run_unit_probe 6 "PHPTypes coercion unit probe" \
+  "bootstrap-selfhost-types-unit-probe.sh" \
+  "BOOTSTRAP_PHPTYPES_UNIT_PROBE_GATE" "#2430, #2434"
 
 echo
 echo "north-star3-verify: OK"

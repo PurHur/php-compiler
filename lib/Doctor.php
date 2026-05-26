@@ -536,7 +536,7 @@ final class Doctor
         }
         $ns3Script = $repoRoot.'/script/north-star3-verify.sh';
         if (is_executable($ns3Script)) {
-            fwrite(STDOUT, "  M3 unit probes   make north-star3-verify            008 + compiler/JIT/VM unit probes (#2360)\n");
+            fwrite(STDOUT, "  M3 unit probes   make north-star3-verify            008 + compiler/JIT/VM/parser/PHPTypes (#2360, #2434)\n");
             fwrite(STDOUT, "  Script           ./script/north-star3-verify.sh    --require-llvm when probes must run\n");
         }
         fwrite(STDOUT, "  Fast CI hook     {$ns2CiDetail}\n");
