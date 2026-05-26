@@ -607,6 +607,19 @@ ci_run_bootstrap_phptypes_unit_probe() {
   "$_CI_SCRIPT_DIR/bootstrap-selfhost-types-unit-probe.sh"
 }
 
+# M3 emit-TU native execute PHPUnit guard (issue #2444); default off until #2442 green.
+ci_run_bootstrap_m3_emit_tu_execute() {
+  if [[ "${BOOTSTRAP_M3_EMIT_TU_EXECUTE_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  if ! ci_llvm_ready; then
+    echo "bootstrap-m3-emit-tu-execute: skipped (LLVM 9 not available)"
+    return 0
+  fi
+  echo "bootstrap-m3-emit-tu-execute (BOOTSTRAP_M3_EMIT_TU_EXECUTE_GATE=1, issue #2444)..."
+  ci_run_phpunit --group selfhost-m3-emit
+}
+
 # Bootstrap test subset in fast CI (issue #2069); default off — opt-in BOOTSTRAP_TEST_SUBSET_GATE=1.
 ci_run_bootstrap_test_subset() {
   if [[ "${BOOTSTRAP_TEST_SUBSET_GATE:-0}" != "1" ]]; then
