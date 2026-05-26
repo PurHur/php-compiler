@@ -118,9 +118,7 @@ final class BootstrapCompileSmokeM3Emit
                 $mode
             );
         }
-        $parseAndCompileMethod = str_starts_with($logPrefix, 'runtime_compile_smoke_m3_emit')
-            ? 'parseandcompile'
-            : 'parseandcompileemitsmoke';
+        $parseAndCompileMethod = 'parseandcompileemitsmoke';
         $block = $context->builder->call(
             self::runtimeSpine($context, $parseAndCompileMethod, '__object__*', ['__object__*', '__string__*', '__string__*']),
             $runtime,
@@ -164,10 +162,9 @@ final class BootstrapCompileSmokeM3Emit
 
     private static function shouldUseEmitTuRealLowering(Context $context): bool
     {
-        $flag = getenv('PHP_COMPILER_M3_COMPILE_DRIVER');
+        $minimal = getenv('PHP_COMPILER_M3_EMIT_MINIMAL');
 
-        return ('1' === $flag || 'true' === strtolower((string) $flag))
-            && ('1' === getenv('PHP_COMPILER_M3_EMIT_TU') || 'true' === strtolower((string) getenv('PHP_COMPILER_M3_EMIT_TU')));
+        return '1' === $minimal || 'true' === strtolower((string) $minimal);
     }
 
     private static function echoPhaseError(Context $context, string $logPrefix, string $line1, string $phase): void

@@ -1663,9 +1663,10 @@ class JIT {
         $stubBlock = $this->m3EmitTuMainBlock;
         if ($this->shouldUseM3CompileDriverRealLowering()) {
             $this->compileM3EmitTuRuntimeSpineMethodsForRealLowering();
-            foreach (['initparsepipeline', 'initcompiler', 'initvmcontext', 'loadcoremodules'] as $methodLc) {
+            foreach (['initparsepipeline', 'initcompiler', 'initvmcontext', 'loadcoremodules', 'standalone'] as $methodLc) {
                 $this->compileM3EmitTuRuntimeMethodFromQueue($methodLc);
             }
+            $this->compileM3EmitTuCompilerSpineMethodsFromMainBlock(['compileemitsmoke']);
             $this->runQueue();
             $this->compileM3EmitTuRuntimeParseAndCompileNativeDecl([
                 'parseandcompile' => true,
@@ -1696,14 +1697,12 @@ class JIT {
                 'PHPCompiler\\Runtime::compile',
                 $stubBlock
             );
-        }
-        $this->emitM3EmitTuRuntimeStandaloneStubNative(
-            $this->llvmInternalName('PHPCompiler\\Runtime::standalone'),
-            'PHPCompiler\\Runtime::standalone',
-            $stubBlock
-        );
-        $this->compileM3EmitTuCompilerEmitSmokeNativeDecl();
-        if (!$this->shouldUseM3CompileDriverRealLowering()) {
+            $this->emitM3EmitTuRuntimeStandaloneStubNative(
+                $this->llvmInternalName('PHPCompiler\\Runtime::standalone'),
+                'PHPCompiler\\Runtime::standalone',
+                $stubBlock
+            );
+            $this->compileM3EmitTuCompilerEmitSmokeNativeDecl();
             $this->runQueue();
         }
     }
