@@ -236,6 +236,14 @@ ci_run_bootstrap_m5_doc_sync_check() {
   "$PHP_BIN" "${PHP_OPTS[@]}" script/check-bootstrap-m5-doc-sync.php
 }
 
+ci_run_bootstrap_inventory_lint_sync_check() {
+  if [[ "${BOOTSTRAP_INVENTORY_LINT_SYNC_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  echo "Bootstrap inventory lint snapshot sync (BOOTSTRAP_INVENTORY_LINT_SYNC_GATE=1, issue #2210)..."
+  "$PHP_BIN" "${PHP_OPTS[@]}" script/check-bootstrap-inventory-lint-sync.php
+}
+
 ci_run_selfhost_m4_gen2_sync_check() {
   if [[ "${SELFHOST_M4_GEN2_SYNC_GATE:-1}" != "1" ]]; then
     echo "Self-host M4 gen-2 doc sync: skipped (SELFHOST_M4_GEN2_SYNC_GATE=0 opt-out)"
@@ -345,6 +353,7 @@ ci_run_inventory_checks() {
   ci_run_selfhost_m4_gen2_sync_check
   ci_run_bootstrap_m3_strict_sync_check
   ci_run_bootstrap_vendor_inventory_sync_check
+  ci_run_bootstrap_inventory_lint_sync_check
 }
 
 ci_llvm_dir() {
