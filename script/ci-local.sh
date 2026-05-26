@@ -73,6 +73,7 @@ if ci_llvm_ready; then
   ci_run_bootstrap_jit_unit_probe
   ci_run_bootstrap_vm_unit_probe
   ci_run_bootstrap_phptypes_unit_probe
+  ci_run_bootstrap_m3_emit_tu_execute
 
   if ci_should_run_jit; then
     echo "PHPUnit: AOT lint only (@group aot-lint)..."
