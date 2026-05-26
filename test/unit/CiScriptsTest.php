@@ -1830,6 +1830,44 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('JIT_VARIABLE_FUNCTION_COMPLIANCE_GATE', $body);
     }
 
+    public function testCiDefaultsEnvDefinesJitServerSuperglobalGateOff(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString(
+            'JIT_SERVER_SUPERGLOBAL_GATE="${JIT_SERVER_SUPERGLOBAL_GATE:-0}"',
+            $defaults
+        );
+        $this->assertStringContainsString('#2275', $defaults);
+    }
+
+    public function testCiCommonDefinesJitServerSuperglobalRunner(): void
+    {
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('ci_run_jit_server_superglobal()', $common);
+        $this->assertStringContainsString('JIT_SERVER_SUPERGLOBAL_GATE:-0', $common);
+        $this->assertStringContainsString('--filter JitServerSuperglobal', $common);
+    }
+
+    public function testCiLocalRunsJitServerSuperglobalGateInLlvmTail(): void
+    {
+        $local = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-local.sh');
+        $this->assertStringContainsString('ci_run_jit_server_superglobal', $local);
+    }
+
+    public function testLocalCiMatrixDocumentsJitServerSuperglobalGate(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('JIT_SERVER_SUPERGLOBAL_GATE', $doc);
+        $this->assertStringContainsString('JitServerSuperglobal', $doc);
+        $this->assertMatchesRegularExpression('/\| `JIT_SERVER_SUPERGLOBAL_GATE` \| `0` \|/', $doc);
+    }
+
+    public function testCiDockerRunPassesJitServerSuperglobalGateEnv(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');
+        $this->assertStringContainsString('JIT_SERVER_SUPERGLOBAL_GATE', $body);
+    }
+
     public function testCiFastRunsCgiDriverTest(): void
     {
         $fast = dirname(__DIR__, 2).'/script/ci-fast.sh';
