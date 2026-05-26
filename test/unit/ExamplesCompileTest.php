@@ -21,6 +21,7 @@ use PHPUnit\Framework\TestCase;
  * @see https://github.com/PurHur/php-compiler/issues/1946 (005-SessionsWeb AOT link gate)
  * @see https://github.com/PurHur/php-compiler/issues/1999 (006-FileUploadWeb multipart reference)
  * @see https://github.com/PurHur/php-compiler/issues/2076 (007-ThrowsWeb throw/catch presenter)
+ * @see https://github.com/PurHur/php-compiler/issues/2239 (008-SelfHostProbe VM lint discovery row)
  */
 final class ExamplesCompileTest extends TestCase
 {
@@ -426,6 +427,22 @@ final class ExamplesCompileTest extends TestCase
         $project = $this->fileUploadWebProjectPath();
         $binary = $this->build006FileUploadWebProject($project);
         $this->assertFileExists($binary);
+    }
+
+    /**
+     * 008-SelfHostProbe: phpc lint discovery row (#2239; example tree #2207).
+     */
+    public function test008SelfHostProbeVmLint(): void
+    {
+        $repoRoot = dirname(__DIR__, 2);
+        $examplePath = $repoRoot.'/examples/008-SelfHostProbe/example.php';
+        if (!is_file($examplePath)) {
+            $this->markTestSkipped(
+                'examples/008-SelfHostProbe/ not shipped yet — unblock https://github.com/PurHur/php-compiler/issues/2207'
+            );
+        }
+        $exit = $this->runLint([$examplePath]);
+        $this->assertSame(0, $exit['code'], $exit['stderr']."\n".$exit['stdout']);
     }
 
     /**
@@ -1313,6 +1330,7 @@ PHP];
             '005-SessionsWeb' => ['SessionsWeb', 'No flash message yet'],
             '006-FileUploadWeb' => ['FileUploadWeb', 'No upload yet'],
             '007-ThrowsWeb' => ['ThrowsWeb', 'Submit an email'],
+            '008-SelfHostProbe' => ['SelfHostProbe', 'north-star2-verify'],
             default => ['Hello'],
         };
     }

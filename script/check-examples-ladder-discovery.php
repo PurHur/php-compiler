@@ -31,12 +31,23 @@ if (!is_readable($testFile)) {
 $testBody = (string) file_get_contents($testFile);
 $onDisk = discover_shipped_examples($examplesRoot);
 
+/** Ladder slots with dedicated ExamplesCompileTest methods (#2239; tree may follow in #2207). */
+$ladderDedicatedTests = [
+    '008-SelfHostProbe' => 'test008SelfHostProbeVmLint',
+];
+
 if (!str_contains($testBody, "glob(\$root.'/*/example.php')")) {
     $errors[] = 'ExamplesCompileTest: provideExamples must glob examples/*/example.php';
 }
 
 $manifestDirs = parse_web_manifest_dirs($testBody);
 $testRefs = parse_test_example_refs($testBody);
+
+foreach ($ladderDedicatedTests as $name => $method) {
+    if (!str_contains($testBody, 'function '.$method)) {
+        $errors[] = "ExamplesCompileTest: missing dedicated method {$method} for {$name} (#2239)";
+    }
+}
 
 foreach ($onDisk as $name => $meta) {
     if ('example.php' === $meta['entry_kind']) {
@@ -48,10 +59,22 @@ foreach ($onDisk as $name => $meta) {
     }
 }
 
+foreach ($ladderDedicatedTests as $name => $method) {
+    if (!isset($onDisk[$name])) {
+        continue;
+    }
+    if (!path_ref_in_test($testRefs, 'examples/'.$name)) {
+        $errors[] = "ExamplesCompileTest: {$method} must reference examples/{$name} when shipped (#2239)";
+    }
+}
+
 foreach ($testRefs as $ref) {
     $rel = substr($ref, strlen('examples/'));
     $dir = $examplesRoot.'/'.$rel;
     if (!is_dir($dir)) {
+        if (isset($ladderDedicatedTests[$rel])) {
+            continue;
+        }
         $errors[] = "ExamplesCompileTest: references missing directory {$ref}";
         continue;
     }
@@ -104,7 +127,18 @@ if ([] !== $errors) {
     exit(1);
 }
 
-fwrite(STDOUT, 'check-examples-ladder-discovery: OK ('.count($onDisk)." examples)\n");
+$pendingLadder = [];
+foreach (array_keys($ladderDedicatedTests) as $name) {
+    if (!isset($onDisk[$name])) {
+        $pendingLadder[] = $name;
+    }
+}
+$msg = 'check-examples-ladder-discovery: OK ('.count($onDisk).' examples';
+if ([] !== $pendingLadder) {
+    $msg .= '; ladder pending: '.implode(', ', $pendingLadder).' (#2207)';
+}
+$msg .= ")\n";
+fwrite(STDOUT, $msg);
 exit(0);
 
 /**
