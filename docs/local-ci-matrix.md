@@ -94,10 +94,10 @@ Both paths run `composer install`, `script/apply-patches.sh`, then the three boo
 | `PHP_COMPILER_SELFHOST_AOT` | Set by probe/link scripts for stub gating |
 | `BOOTSTRAP_WAVE_CHECK` | N/A in workflow (always runs wave-check); set `0` in `ci-local.sh` to skip locally |
 
-**Local equivalent (Docker)** — canonical today:
+**Local equivalent (Docker)** — canonical today (harness-safe; tar-copies when bind-mount is empty):
 
 ```bash
-docker run --rm -v "$(pwd):/compiler" -w /compiler php-compiler:22.04-dev bash -lc \
+./script/docker-exec.sh -- bash -lc \
   'make bootstrap-selfhost-probe && ./script/bootstrap-selfhost-link.sh && ./script/bootstrap-wave-check.sh'
 ```
 
@@ -318,8 +318,10 @@ Self-host iteration runs the NS2 presenter bundle from `ci-fast` without a full 
 ./script/ci-fast.sh
 # Opt-out (doc-only / no presenter):
 NORTH_STAR2_VERIFY_GATE=0 ./script/ci-fast.sh
-# Docker:
-docker run --rm -v "$(pwd):/compiler" -w /compiler php-compiler:22.04-dev ./script/ci-fast.sh
+# Docker (harness-safe):
+./script/docker-ci-local.sh fast
+# or targeted:
+./script/docker-exec.sh -- ./script/ci-fast.sh
 ```
 
 When the script is missing, CI prints a skip message and exits **0**. With LLVM 9 present, runs `./script/north-star2-verify.sh` (full tail); without LLVM, passes `--skip-llvm-tail`. Step 6 (**007-ThrowsWeb**) runs when `NORTH_STAR2_THROWSWEB_GATE=1` (default) even without LLVM; VM smoke skips when loopback bind fails (`NORTH_STAR2_THROWSWEB_GATE=0` to opt out).

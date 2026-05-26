@@ -10,7 +10,7 @@
 #   FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE=1 SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 make deploy-smoke-all
 #
 # Docker:
-#   docker run --rm -v "$(pwd):/compiler" -w /compiler php-compiler:22.04-dev \
+#   ./script/docker-exec.sh -- \
 #     make deploy-smoke-all
 set -euo pipefail
 

@@ -8,7 +8,7 @@
 #   make examples-fileupload-deploy-smoke
 #
 # Docker:
-#   docker run --rm -v "$(pwd):/compiler" -w /compiler php-compiler:22.04-dev \
+#   ./script/docker-exec.sh -- \
 #     make examples-fileupload-deploy-smoke
 set -euo pipefail
 

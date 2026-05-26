@@ -205,8 +205,8 @@ EXAMPLES_AOT_SMOKE_GATE=0 ./script/ci-local.sh   # skip 000–004 CLI AOT execut
 In Docker (preferred on harness hosts without host PHP/LLVM):
 
 ```console
-make test-docker            # or: ./script/docker-ci-local.sh
-docker run --rm -v "$(pwd):/compiler" -w /compiler php-compiler:22.04-dev ./script/ci-local.sh
+make test-harness           # or: ./script/docker-ci-local.sh
+./script/docker-exec.sh -- ./script/ci-local.sh
 ```
 
 Root README quick start and local CI matrix: [#48](https://github.com/PurHur/php-compiler/issues/48), [#245](https://github.com/PurHur/php-compiler/issues/245).

@@ -13,7 +13,7 @@
 #   THROWSWEB_AOT_SMOKE_GATE=1 EXAMPLES_AOT_SMOKE_ONLY=007 ./script/examples-aot-smoke.sh
 #
 # Docker:
-#   docker run --rm -v "$(pwd):/compiler" -w /compiler php-compiler:22.04-dev make examples-aot-smoke
+#   ./script/docker-exec.sh -- make examples-aot-smoke
 #
 # 003-MiniWebApp: link probe + execute bytes; fails when MINIWEBAPP_AOT_EXECUTE_GATE=1 and stdout empty (#747, #676).
 set -euo pipefail

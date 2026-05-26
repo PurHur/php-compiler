@@ -182,11 +182,13 @@ make bootstrap-aot-link                      # link/run test/bootstrap-aot fixtu
 **Docker** (`php-compiler:22.04-dev`; `make docker-build-22` once) — same bootstrap gates as the disabled workflow [`.github/workflows-disabled/bootstrap-selfhost.yml`](.github/workflows-disabled/bootstrap-selfhost.yml) (local/Docker is canonical; [#394](https://github.com/PurHur/php-compiler/issues/394)):
 
 ```console
-docker run --rm -v "$(pwd):/compiler" -w /compiler php-compiler:22.04-dev bash -lc \
+./script/docker-exec.sh -- bash -lc \
   'make bootstrap-selfhost-probe && ./script/bootstrap-selfhost-link.sh && ./script/bootstrap-wave-check.sh --with-compile-smoke --fail-fast'
+# full CI gate (tar-copies repo on harness when bind-mount is empty):
+make test-harness
 ```
 
-On harness hosts with an empty bind-mount, use `./script/docker-ci-local.sh` or tar-copy the tree first (see [Troubleshooting](#troubleshooting)).
+On Runforge/harness hosts, always use `make test-harness`, `./script/docker-ci-local.sh`, or `./script/docker-exec.sh` — never raw `docker run -v "$(pwd):/compiler"` (see [Troubleshooting](#troubleshooting)).
 
 ### Gate reference
 
@@ -299,12 +301,12 @@ When you bind-mount the repo, a host `.llvm/` directory (if present) overrides t
 Run the full local CI suite inside the container (same as `./script/ci-local.sh` on the host). This includes HTTP serve integration tests (`ServeTest`, `ServeAotTest`) unless `PHP_COMPILER_SKIP_SERVE_TESTS=1` is set:
 
 ```console
-make test-docker
+make test-harness
 # or:
-docker run --rm -v "$(pwd):/compiler" -w /compiler php-compiler:22.04-dev ./script/ci-local.sh
+./script/docker-ci-local.sh
 ```
 
-On **Runforge / harness** hosts (empty bind-mount at `/compiler`), `make test` falls back to copying the repo via tar when the mount has no `vendor/` or `script/ci-local.sh` (same as `make test-harness`):
+On **Runforge / harness** hosts (empty bind-mount at `/compiler`), `make test` and `make test-docker` fall back to copying the repo via tar when the mount has no `vendor/` or `script/ci-local.sh` (same as `make test-harness`). Harness hosts should set `$HARNESS_DOCKER_RUN_OPTS` (passed through by `script/ci-docker-run.sh`):
 
 ```console
 make test

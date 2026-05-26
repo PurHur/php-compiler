@@ -8,8 +8,8 @@
 #   ./script/examples-web-smoke.sh
 #   ./script/examples-web-smoke.sh --aot    # when .phpc/bin/app exists per example
 #
-# Docker (same image as make test-docker):
-#   docker run --rm -v "$(pwd):/compiler" -w /compiler php-compiler:22.04-dev ./script/examples-web-smoke.sh
+# Docker (harness-safe; same image as make test-harness):
+#   ./script/docker-exec.sh -- ./script/examples-web-smoke.sh
 #
 # Skips with exit 0 when PHP_COMPILER_SKIP_SERVE_TESTS is set or loopback bind fails.
 # 003-MiniWebApp --aot: home + hello PATH_INFO curls when .phpc/bin/app exists (#833, #676).
