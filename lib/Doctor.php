@@ -206,7 +206,8 @@ final class Doctor
         fwrite(STDOUT, "   make bootstrap-selfhost-jit-unit-probe\n");
         fwrite(STDOUT, '   BOOTSTRAP_JIT_UNIT_PROBE_GATE='.(self::gateEnabled('BOOTSTRAP_JIT_UNIT_PROBE_GATE', $jitUnitProbeDefault) ? '1' : '0')." (default {$jitUnitProbeDefault}) — ci-local LLVM tail ([#2332](https://github.com/PurHur/php-compiler/issues/2332), [#2361](https://github.com/PurHur/php-compiler/issues/2361))\n");
         fwrite(STDOUT, "   make bootstrap-selfhost-vm-unit-probe\n");
-        fwrite(STDOUT, '   BOOTSTRAP_VM_UNIT_PROBE_GATE='.(self::gateEnabled('BOOTSTRAP_VM_UNIT_PROBE_GATE', $vmUnitProbeDefault) ? '1' : '0')." (default {$vmUnitProbeDefault}) — ci-local LLVM tail ([#2354](https://github.com/PurHur/php-compiler/issues/2354), [#2368](https://github.com/PurHur/php-compiler/issues/2368))\n\n");
+        fwrite(STDOUT, '   BOOTSTRAP_VM_UNIT_PROBE_GATE='.(self::gateEnabled('BOOTSTRAP_VM_UNIT_PROBE_GATE', $vmUnitProbeDefault) ? '1' : '0')." (default {$vmUnitProbeDefault}) — ci-local LLVM tail ([#2354](https://github.com/PurHur/php-compiler/issues/2354), [#2368](https://github.com/PurHur/php-compiler/issues/2368))\n");
+        fwrite(STDOUT, "   make bootstrap-selfhost-parser-unit-probe  (#2409 CFG parse front-end)\n\n");
 
         fwrite(STDOUT, "3. M3 emit (partial vs strict)\n");
         fwrite(STDOUT, "   BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE=".(self::gateEnabled('BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE', $m3HelloStrictDefault) ? '1' : '0')." (default {$m3HelloStrictDefault}) — ci-local LLVM tail\n");
@@ -483,6 +484,7 @@ final class Doctor
             : 'opt-in BOOTSTRAP_VM_UNIT_PROBE_GATE=1 for lib/VM.php native link (#2354, #2368)';
         fwrite(STDOUT, "  M3 VM probe      make bootstrap-selfhost-vm-unit-probe\n");
         fwrite(STDOUT, "                   {$vmUnitProbeDetail}\n");
+        fwrite(STDOUT, "  M3 parser probe  make bootstrap-selfhost-parser-unit-probe  (#2409)\n");
         $loopProbeGate = getenv('BOOTSTRAP_LOOP_PROBE_GATE');
         $loopProbeOn = false !== $loopProbeGate && '1' === $loopProbeGate;
         $m4LoopProbeGate = getenv('BOOTSTRAP_M4_LOOP_PROBE');
