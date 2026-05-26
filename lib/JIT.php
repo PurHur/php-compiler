@@ -1695,6 +1695,16 @@ class JIT {
             ]);
         } else {
             $this->compileM3EmitTuRuntimeSpineMethodsForRealLowering();
+            if ($this->shouldUseM3EmitTuEmitHelperSpineRealLowering()) {
+                foreach (['initparsepipeline', 'initcompiler', 'loadcoremodules'] as $methodLc) {
+                    $logical = 'PHPCompiler\\Runtime::'.$methodLc;
+                    $this->emitM3EmitTuRuntimeInitVoidStub(
+                        $this->llvmInternalName($logical),
+                        $logical,
+                        $stubBlock
+                    );
+                }
+            }
             $this->emitM3EmitTuRuntimeParseStubNative(
                 $this->llvmInternalName('PHPCompiler\\Runtime::parse'),
                 'PHPCompiler\\Runtime::parse',
@@ -1776,23 +1786,29 @@ class JIT {
     }
 
     /**
-     * Pre-lower emit spine for emit-helper link (#2559).
+     * Pre-lower emit spine before native emit bridge (#2550, #2559).
      *
-     * Host-parses runtime_trivial_echo.php at link time (Zend), links AOT bytes, and
-     * registers native parseAndCompile and standalone helpers for PHP_COMPILER_M3_EMIT_MINIMAL.
+     * Compile-driver path: host-lowers Runtime::__construct/parse/compileEmitSmoke from modules.
+     * Emit-helper path: link-time trivial-echo AOT sidecar for parseAndCompile* / standalone.
      */
     private function compileM3EmitTuRuntimeSpineMethodsForRealLowering(): void
     {
-        if (!$this->shouldUseM3EmitTuEmitHelperSpineRealLowering()) {
+        if ($this->shouldUseM3EmitTuEmitHelperSpineRealLowering()) {
+            $this->cacheM3EmitTuTrivialEchoAtLinkTime();
+        }
+        if (!$this->shouldUseM3EmitTuNativeBridge() || !$this->shouldUseM3CompileDriverRealLowering()) {
             return;
         }
-        $this->cacheM3EmitTuTrivialEchoAtLinkTime();
+        foreach (['__construct', 'parse', 'compileemitsmoke'] as $methodLc) {
+            $this->compileM3EmitTuRuntimeMethodFromModules($methodLc);
+        }
+        $this->runQueue();
     }
 
     /** Host-parse trivial echo and cache linked AOT bytes at emit-helper link (#2559). */
     private function cacheM3EmitTuTrivialEchoAtLinkTime(): void
     {
-        if (null !== $this->m3EmitTuTrivialEchoBlock) {
+        if (null !== $this->m3EmitTuTrivialEchoSource) {
             return;
         }
         $path = __DIR__.'/../test/bootstrap-aot/runtime_trivial_echo.php';
@@ -1806,12 +1822,7 @@ class JIT {
         $this->m3EmitTuTrivialEchoSource = $code;
         $this->context->m3EmitTuTrivialEchoSource = $code;
         $this->context->m3EmitTuTrivialEchoPath = $path;
-        $script = $this->context->runtime->parse($code, $path);
-        $this->m3EmitTuTrivialEchoBlock = $this->context->runtime->compileEmitSmoke($script);
-        if (null === $this->m3EmitTuTrivialEchoBlock) {
-            return;
-        }
-        $this->context->m3EmitTuTrivialEchoCompiledBlock = $this->m3EmitTuTrivialEchoBlock;
+        // Sidecar-only: avoid host compileEmitSmoke in emit TU LLVM module (#2540).
         $tmpOut = sys_get_temp_dir().'/m3_trivial_echo_aot_'.getmypid();
         @unlink($tmpOut);
         $repoRoot = dirname(__DIR__);
@@ -2167,20 +2178,11 @@ class JIT {
         $this->compileM3EmitTuRuntimeMethodFromModules($methodLc);
     }
 
-    /** Pre-lower Runtime spine callees before native emit {main} bridge (#2550). */
-    private function compileM3EmitTuRuntimeSpineMethodsForRealLowering(): void
-    {
-        if (!$this->shouldUseM3EmitTuNativeBridge() || !$this->shouldUseM3CompileDriverRealLowering()) {
-            return;
-        }
-        foreach (['__construct', 'parse', 'compileemitsmoke'] as $methodLc) {
-            $this->compileM3EmitTuRuntimeMethodFromModules($methodLc);
-        }
-        $this->runQueue();
-    }
-
     private function compileM3EmitTuRuntimeMethodFromModules(string $methodLc): void
     {
+        if ($this->shouldUseM3EmitTuEmitHelperSpineRealLowering()) {
+            return;
+        }
         $logical = 'PHPCompiler\\Runtime::'.$methodLc;
         $lc = strtolower($logical);
         if (isset($this->context->functions[$lc])) {
