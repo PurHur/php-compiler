@@ -67,7 +67,7 @@ final class BootstrapRuntimeCompileSmokeTest extends TestCase
         $this->assertStringContainsString('compileRuntimeParseAndCompileM3Native', $jit);
         $emit = (string) file_get_contents(self::$root.'/lib/JIT/BootstrapCompileSmokeM3Emit.php');
         $this->assertStringContainsString('declareRuntimeParseAndCompileNative', $emit);
-        $this->assertStringContainsString("'parseandcompile'", $emit);
+        $this->assertStringContainsString("'parseandcompileemitsmoke'", $emit);
     }
 
     public function testCompilePhpPreservesSelfhostAotForRuntimeM3NativeEmitEntry(): void
@@ -117,10 +117,15 @@ final class BootstrapRuntimeCompileSmokeTest extends TestCase
         $this->assertStringContainsString('shouldUseM3CompileDriverRealLowering()', $jit);
         $this->assertStringContainsString('compileM3EmitTuRuntimeSpineMethodsForRealLowering', $jit);
         $this->assertStringContainsString('emitMainEntry', $jit);
-        $this->assertStringContainsString("dirname(__DIR__).'/Runtime.php'", $jit);
+        $this->assertStringContainsString('M3EmitTuTrivialEchoAot::registerLinktime', $jit);
+        $this->assertStringContainsString('runtime_trivial_echo.php', $jit);
         $this->assertMatchesRegularExpression(
             '/compileM3EmitTuRuntimeSpineDecls\(\): void[\s\S]*?compileM3EmitTuRuntimeSpineMethodsForRealLowering/',
             $jit
         );
+        $compile = (string) file_get_contents(self::$root.'/bin/compile.php');
+        $this->assertStringContainsString('PHP_COMPILER_M3_EMIT_HELPER_SPINE=1', $compile);
+        $aot = (string) file_get_contents(self::$root.'/lib/JIT/M3EmitTuTrivialEchoAot.php');
+        $this->assertStringContainsString('emitParseAndCompileWithTrivialFallback', $aot);
     }
 }

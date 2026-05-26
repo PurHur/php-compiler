@@ -118,9 +118,8 @@ final class BootstrapCompileSmokeM3Emit
                 $mode
             );
         }
-        $parseAndCompileMethod = 'parseandcompileemitsmoke';
         $block = $context->builder->call(
-            self::runtimeSpine($context, $parseAndCompileMethod, '__object__*', ['__object__*', '__string__*', '__string__*']),
+            self::runtimeSpine($context, 'parseandcompileemitsmoke', '__object__*', ['__object__*', '__string__*', '__string__*']),
             $runtime,
             $code,
             $sourceFile
@@ -192,17 +191,25 @@ final class BootstrapCompileSmokeM3Emit
         Value $code,
         Value $filename
     ): Value {
-        $script = $context->builder->call(
-            self::runtimeSpine($context, 'parse', '__object__*', ['__object__*', '__string__*', '__string__*']),
+        return M3EmitTuTrivialEchoAot::emitParseAndCompileWithTrivialFallback(
+            $context,
             $runtimeThis,
             $code,
-            $filename
-        );
+            $filename,
+            static function (Value $runtimeThis, Value $code, Value $filename) use ($context): Value {
+                $script = $context->builder->call(
+                    self::runtimeSpine($context, 'parse', '__object__*', ['__object__*', '__string__*', '__string__*']),
+                    $runtimeThis,
+                    $code,
+                    $filename
+                );
 
-        return $context->builder->call(
-            self::runtimeSpine($context, 'compileemitsmoke', '__object__*', ['__object__*', '__object__*']),
-            $runtimeThis,
-            $script
+                return $context->builder->call(
+                    self::runtimeSpine($context, 'compileemitsmoke', '__object__*', ['__object__*', '__object__*']),
+                    $runtimeThis,
+                    $script
+                );
+            }
         );
     }
 
