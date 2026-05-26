@@ -8,11 +8,12 @@ Technical documentation for **php-compiler** contributors and operators. End-use
 
 | Page | URL |
 |------|-----|
-| **Overview** (demo-friendly) | [purhur.github.io/php-compiler/docs/pages/index.html](https://purhur.github.io/php-compiler/docs/pages/index.html) |
-| **Full development status** | [purhur.github.io/php-compiler/development-status.html](https://purhur.github.io/php-compiler/development-status.html) |
+| **Overview** | [purhur.github.io/php-compiler/docs/pages/index.html](https://purhur.github.io/php-compiler/docs/pages/index.html) |
+| **Development status** (short) | [purhur.github.io/php-compiler/development-status.html](https://purhur.github.io/php-compiler/development-status.html) |
+| **Missing implementation** (gap tables) | [purhur.github.io/php-compiler/missing-implementation.html](https://purhur.github.io/php-compiler/missing-implementation.html) |
 | **Repository** | [github.com/PurHur/php-compiler](https://github.com/PurHur/php-compiler) |
 
-**Edit sources:** [`pages/development-status.md`](pages/development-status.md) · [`pages/index.html`](pages/index.html) · publish guide [`pages/PAGES.md`](pages/PAGES.md).
+**Edit sources:** [`pages/index.html`](pages/index.html) · [`pages/development-status.md`](pages/development-status.md) · [`pages/missing-implementation.html`](pages/missing-implementation.html) · [`pages/PAGES.md`](pages/PAGES.md).
 
 ## Start here
 
@@ -20,7 +21,8 @@ Technical documentation for **php-compiler** contributors and operators. End-use
 |-----|----------|
 | [**GETTING-STARTED.md**](GETTING-STARTED.md) | First clone, **demo script**, `phpc` cheat sheet |
 | [**../README.md**](../README.md) | Install, CI, north stars, examples table |
-| [**pages/development-status.md**](pages/development-status.md) | Milestones, blockers, phase progress (sync to site) |
+| [**pages/development-status.md**](pages/development-status.md) | Short public status (sync to site) |
+| [**pages/missing-implementation.html**](pages/missing-implementation.html) | Gap tables for self-host / M3 emit |
 
 ## Contributor-only (not on GitHub Pages)
 

@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="php-compiler — what is still missing for self-host and native emit (May 2026).">
+  <title>Missing implementation — php-compiler</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><ellipse cx='50' cy='55' rx='42' ry='32' fill='%23777BB4'/><ellipse cx='50' cy='48' rx='38' ry='28' fill='%234F5B93'/><circle cx='35' cy='42' r='4' fill='%231a1a2e'/><circle cx='65' cy='42' r='4' fill='%231a1a2e'/></svg>">
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="logo" href="index.html">
+        <svg viewBox="0 0 48 48" aria-hidden="true" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <ellipse cx="24" cy="28" rx="20" ry="14" fill="#777BB4"/>
+          <ellipse cx="24" cy="24" rx="18" ry="12" fill="#4F5B93"/>
+          <circle cx="16" cy="22" r="2.5" fill="#0f0f1a"/>
+          <circle cx="32" cy="22" r="2.5" fill="#0f0f1a"/>
+        </svg>
+        php-compiler
+      </a>
+      <nav class="nav" aria-label="Primary">
+        <a href="index.html">Overview</a>
+        <a href="development-status.html">Status</a>
+        <a href="missing-implementation.html" aria-current="page">Gaps</a>
+        <a href="https://github.com/PurHur/php-compiler">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="status-page">
+    <article class="status-prose">
+      <header class="status-prose__head">
+        <h1>Missing implementation</h1>
+        <p class="section-intro" style="margin-top: 0.5rem">
+          Real gaps toward the
+          <a href="https://github.com/PurHur/php-compiler/issues/1492">self-host north star (#1492)</a>.
+          Updated May 2026.
+          VM, examples, and wave-3 language/stdlib batches are largely done; this page lists what is
+          <strong>not</strong> implemented yet for compiling the compiler without Zend.
+        </p>
+      </header>
+
+      <section>
+        <h2>North star — still open</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Milestone</th>
+                <th>Missing</th>
+                <th>Tracker</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>M3</strong> native compile</td>
+                <td>Emit TU: <code>parseAndCompile</code> → real <code>Compiler</code> CFG (not Zend / empty stub)</td>
+                <td><a href="https://github.com/PurHur/php-compiler/issues/1937">#1937</a>, <a href="https://github.com/PurHur/php-compiler/issues/1402">#1402</a></td>
+              </tr>
+              <tr>
+                <td><strong>M4</strong> bootstrap loop</td>
+                <td>Native binary rebuilds next compiler tree; gen-2 emit without Zend</td>
+                <td><a href="https://github.com/PurHur/php-compiler/issues/1498">#1498</a></td>
+              </tr>
+              <tr>
+                <td><strong>M5</strong> full self-host</td>
+                <td>Compiled <code>bin/compile.php</code> / <code>bin/vm.php</code>; no <code>vendor/</code> cold boot</td>
+                <td><a href="https://github.com/PurHur/php-compiler/issues/1492">#1492</a>, <a href="https://github.com/PurHur/php-compiler/issues/1416">#1416</a></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2>M3 native emit spine</h2>
+        <p>Emit helper links; runtime smoke still uses <span class="status-wip">Zend partial</span> until the chain below is real in the emit TU.</p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Component</th>
+                <th>Status</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>Runtime::parseAndCompileEmitSmoke</code></td>
+                <td class="status-wip">Partial</td>
+                <td>Lowered; depends on <code>Compiler::compileEmitSmoke</code></td>
+              </tr>
+              <tr>
+                <td><code>Compiler::compileEmitSmoke</code></td>
+                <td class="status-no">Missing / stub</td>
+                <td>Native stub must register before <code>runQueue</code>; must call real CFG compile</td>
+              </tr>
+              <tr>
+                <td><code>Compiler::compileCfgBlock</code> (+ callees)</td>
+                <td class="status-no">Not in emit binary</td>
+                <td>Pre-lowering crashes LLVM 9 if pulled too early; needed for echo scripts</td>
+              </tr>
+              <tr>
+                <td>PHPCfg property typing (<code>Script</code>, <code>Func</code>)</td>
+                <td class="status-wip">In progress</td>
+                <td>Wrong slots → segfault in full <code>compile()</code> path</td>
+              </tr>
+              <tr>
+                <td>Strict gates <code>BOOTSTRAP_M3_*_STRICT=1</code></td>
+                <td class="status-no">Fail</td>
+                <td>Require <code>emit_path=native</code> and <code>compile OK</code> stdout</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2>M3 LLVM 9 deny list (link-time)</h2>
+        <p>Still stubbed or PHP-only while expanding M3 real lowering (<code>lib/JIT.php</code>).</p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Symbol / path</th>
+                <th>Reason</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td><code>Block::slotIndexForVariableName</code></td><td>LLVM 9 link crash</td></tr>
+              <tr><td><code>Runtime::__destruct</code></td><td>Not on compile spine; deny-listed</td></tr>
+              <tr><td><code>Runtime::loadJitContext</code></td><td>LLVM 9 link crash</td></tr>
+              <tr><td><code>Runtime::createJit</code></td><td>Split from <code>loadJit</code>; stubbed</td></tr>
+              <tr><td><code>Runtime::jitContextForLoadJit</code></td><td>Split from <code>loadJit</code>; stubbed</td></tr>
+              <tr><td><code>Runtime::loadJitCompileModuleFuncs</code></td><td>Nested foreach + <code>compileFunc</code> crash</td></tr>
+              <tr><td><code>Runtime::initParsePipeline</code> / <code>initCompiler</code> / <code>loadCoreModules</code></td><td>PHP CFG spine; deny during expansion</td></tr>
+              <tr><td><code>BootstrapAot\helloworld_compile_smoke</code> (in compile driver)</td><td>FUNCDEF link crash; separate emit entry</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2>M2 spine — deferred from native link</h2>
+        <p>SSOT: <code>script/bootstrap-spine-deferred-lib.php</code> — <strong>661/657</strong> units link; these paths stay out of spine smoke.</p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Path</th>
+                <th>Why deferred</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>bin/vm.php</code></td>
+                <td>Full driver entry; M5 / inventory closure</td>
+              </tr>
+              <tr>
+                <td><code>lib/AOT/Linker.php</code></td>
+                <td>Uses <code>shell_exec</code> / external <code>clang</code> — not in self-host bundle</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2>Language &amp; compiler (subset gaps)</h2>
+        <p>Not full Zend parity — selected constructs still missing or VM-only. Detail: repo <code>docs/unsupported-syntax.md</code>.</p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Area</th>
+                <th>VM</th>
+                <th>JIT / AOT</th>
+                <th>Issue</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Try / catch / finally</td>
+                <td class="status-wip">Partial</td>
+                <td class="status-no">Unwind incomplete</td>
+                <td><a href="https://github.com/PurHur/php-compiler/issues/57">#57</a></td>
+              </tr>
+              <tr>
+                <td>Closures / arrow functions</td>
+                <td class="status-wip">Limited</td>
+                <td class="status-no">Not lowered</td>
+                <td><a href="https://github.com/PurHur/php-compiler/issues/72">#72</a>, <a href="https://github.com/PurHur/php-compiler/issues/142">#142</a></td>
+              </tr>
+              <tr>
+                <td>Generators (<code>yield</code>)</td>
+                <td class="status-no">No</td>
+                <td class="status-no">No</td>
+                <td><a href="https://github.com/PurHur/php-compiler/issues/167">#167</a></td>
+              </tr>
+              <tr>
+                <td>Method calls / class methods (general)</td>
+                <td class="status-wip">Subset</td>
+                <td class="status-wip">Gaps</td>
+                <td><a href="https://github.com/PurHur/php-compiler/issues/58">#58</a>, <a href="https://github.com/PurHur/php-compiler/issues/145">#145</a></td>
+              </tr>
+              <tr>
+                <td>Namespaces + full <code>lib/</code> bundle</td>
+                <td class="status-wip">Growing</td>
+                <td class="status-wip">Self-host</td>
+                <td><a href="https://github.com/PurHur/php-compiler/issues/84">#84</a></td>
+              </tr>
+              <tr>
+                <td>External JIT object properties</td>
+                <td>—</td>
+                <td class="status-no">Stubbed</td>
+                <td><a href="https://github.com/PurHur/php-compiler/issues/828">#828</a></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2>Vendor &amp; infrastructure</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Status</th>
+                <th>Issue</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Prelinked php-cfg / php-types / php-llvm (no Composer at cold boot)</td>
+                <td class="status-no">Not done</td>
+                <td><a href="https://github.com/PurHur/php-compiler/issues/1416">#1416</a></td>
+              </tr>
+              <tr>
+                <td>Attributes reflection in JIT/AOT</td>
+                <td class="status-wip">VM v1 only</td>
+                <td><a href="https://github.com/PurHur/php-compiler/issues/1936">#1936</a></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <p style="margin-top: 2rem">
+        <a href="index.html">← Overview</a> ·
+        <a href="development-status.html">Development status</a> ·
+        <a href="https://github.com/PurHur/php-compiler/blob/master/docs/self-host-target.md">self-host-target.md</a> (contributors)
+      </p>
+    </article>
+  </main>
+
+  <footer class="site-footer">
+    <p>
+      <a href="https://github.com/PurHur/php-compiler">PurHur/php-compiler</a>
+      · MIT · tables reflect <code>master</code> May 2026
+    </p>
+  </footer>
+</body>
+</html>
