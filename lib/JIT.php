@@ -1905,13 +1905,22 @@ class JIT {
         return \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::isRegistered($this->context);
     }
 
-    /** Host-parse trivial echo and cache linked AOT bytes at emit-helper link (#2559). */
+    /** Host-compile emit-helper probe source and cache linked AOT bytes at link time (#2559, #2567). */
     private function cacheM3EmitTuTrivialEchoAtLinkTime(): void
     {
         if (null !== $this->m3EmitTuTrivialEchoSource) {
             return;
         }
-        $path = __DIR__.'/../test/bootstrap-aot/runtime_trivial_echo.php';
+        $logPrefix = getenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX');
+        if ('helloworld_compile_smoke' === $logPrefix) {
+            $path = __DIR__.'/../examples/000-HelloWorld/example.php';
+            $sidecarRel = \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::HELLOWORLD_SIDECAR_REL;
+            $sentinelLogical = 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::helloworldSentinelBlock';
+        } else {
+            $path = __DIR__.'/../test/bootstrap-aot/runtime_trivial_echo.php';
+            $sidecarRel = \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::TRIVIAL_ECHO_SIDECAR_REL;
+            $sentinelLogical = 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::sentinelBlock';
+        }
         if (!is_readable($path)) {
             return;
         }
@@ -1923,7 +1932,7 @@ class JIT {
         $this->context->m3EmitTuTrivialEchoSource = $code;
         $this->context->m3EmitTuTrivialEchoPath = $path;
         // Sidecar-only: avoid host compileEmitSmoke in emit TU LLVM module (#2540).
-        $tmpOut = sys_get_temp_dir().'/m3_trivial_echo_aot_'.getmypid();
+        $tmpOut = sys_get_temp_dir().'/m3_emit_sidecar_aot_'.getmypid();
         @unlink($tmpOut);
         $repoRoot = dirname(__DIR__);
         $compileCmd = 'php '.escapeshellarg($repoRoot.'/bin/compile.php')
@@ -1951,7 +1960,14 @@ class JIT {
         if (!is_string($aotBytes) || '' === $aotBytes) {
             return;
         }
-        \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::registerLinktime($this->context, $repoRoot, $code, $aotBytes);
+        \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::registerLinktime(
+            $this->context,
+            $repoRoot,
+            $code,
+            $aotBytes,
+            $sidecarRel,
+            $sentinelLogical
+        );
     }
 
     /**
@@ -2135,6 +2151,7 @@ class JIT {
         if (\PHPCompiler\JIT\M3EmitTuTrivialEchoAot::isRegistered($this->context)) {
             \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::emitStandaloneWriteCachedAot(
                 $this->context,
+                $func->getParam(1),
                 $func->getParam(2)
             );
         } else {

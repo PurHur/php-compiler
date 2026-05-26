@@ -121,6 +121,8 @@ final class BootstrapRuntimeCompileSmokeTest extends TestCase
         $this->assertStringContainsString('shouldUseEmitHelperLinkStubs()', $jit);
         $this->assertStringContainsString('M3EmitTuTrivialEchoAot::isRegistered', $jit);
         $this->assertStringContainsString('runtime_trivial_echo.php', $jit);
+        $this->assertStringContainsString('helloworld_compile_smoke', $jit);
+        $this->assertStringContainsString('HELLOWORLD_SIDECAR_REL', $jit);
         $this->assertMatchesRegularExpression(
             '/compileM3EmitTuRuntimeSpineDecls\(\): void[\s\S]*?compileM3EmitTuRuntimeSpineMethodsForRealLowering/',
             $jit

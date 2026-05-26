@@ -7,51 +7,59 @@ namespace PHPCompiler\JIT;
 use PHPLLVM\Value;
 
 /**
- * Link-time cached AOT for runtime_trivial_echo.php in M3 emit-helper TU (#2559).
+ * Link-time cached AOT sidecars for M3 emit-helper TU (#2559, #2567).
  *
- * Host-compiles the probe source during emit-helper link (Zend subprocess) and stores
- * the executable bytes in a repo-local sidecar file. Native parseAndCompile* returns a
+ * Host-compiles probe sources during emit-helper link (Zend subprocess) and stores
+ * executable bytes in repo-local sidecar files. Native parseAndCompile* returns a
  * sentinel Block* when source matches; standalone copies the sidecar to the output path.
  */
 final class M3EmitTuTrivialEchoAot
 {
     private const SENTINEL_LOGICAL = 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::sentinelBlock';
 
-    public const SIDECAR_REL = 'build/.m3_trivial_echo_aot_blob';
+    private const HELLOWORLD_SENTINEL_LOGICAL = 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::helloworldSentinelBlock';
 
-    /** @var bool */
-    private static bool $registered = false;
+    public const TRIVIAL_ECHO_SIDECAR_REL = 'build/.m3_trivial_echo_aot_blob';
 
-    public static function sidecarPath(string $repoRoot): string
+    public const HELLOWORLD_SIDECAR_REL = 'build/.m3_helloworld_aot_blob';
+
+    /** @var list<string> */
+    private static array $registeredSidecarRels = [];
+
+    public static function sidecarPath(string $repoRoot, string $sidecarRel = self::TRIVIAL_ECHO_SIDECAR_REL): string
     {
-        return $repoRoot.'/'.self::SIDECAR_REL;
+        return $repoRoot.'/'.$sidecarRel;
     }
 
-    public static function registerLinktime(Context $context, string $repoRoot, string $source, string $aotBytes): void
-    {
-        if ('' === $aotBytes || self::$registered) {
+    public static function registerLinktime(
+        Context $context,
+        string $repoRoot,
+        string $source,
+        string $aotBytes,
+        string $sidecarRel = self::TRIVIAL_ECHO_SIDECAR_REL,
+        ?string $sentinelLogical = null
+    ): void {
+        if ('' === $aotBytes || in_array($sidecarRel, self::$registeredSidecarRels, true)) {
             return;
         }
-        $sidecar = self::sidecarPath($repoRoot);
+        $sidecar = self::sidecarPath($repoRoot, $sidecarRel);
         if (false === @file_put_contents($sidecar, $aotBytes)) {
             return;
         }
         @chmod($sidecar, 0755);
-        self::$registered = true;
-        $context->m3EmitTuTrivialEchoSource = $source;
-        $context->m3EmitTuTrivialEchoAotBytes = $aotBytes;
-        $context->m3EmitTuTrivialEchoSidecarPath = $sidecar;
+        self::$registeredSidecarRels[] = $sidecarRel;
+
+        $sentinelLogical ??= self::TRIVIAL_ECHO_SIDECAR_REL === $sidecarRel
+            ? self::SENTINEL_LOGICAL
+            : self::HELLOWORLD_SENTINEL_LOGICAL;
 
         $sourceGlobal = $context->constantStringFromString($source);
-        $context->m3EmitTuTrivialEchoSourceGlobal = $sourceGlobal;
         $sidecarGlobal = $context->constantStringFromString($sidecar);
-        $context->m3EmitTuTrivialEchoSidecarPathGlobal = $sidecarGlobal;
-
-        $objPtr = $context->getTypeFromString('__object__*');
-        $lc = strtolower(self::SENTINEL_LOGICAL);
-        if (!isset($context->functions[$lc])) {
+        $sentinelLc = strtolower($sentinelLogical);
+        if (!isset($context->functions[$sentinelLc])) {
+            $objPtr = $context->getTypeFromString('__object__*');
             $func = $context->module->addFunction(
-                self::mangle(self::SENTINEL_LOGICAL),
+                self::mangle($sentinelLogical),
                 $context->context->functionType($objPtr, false)
             );
             $bb = $func->appendBasicBlock('entry');
@@ -65,20 +73,33 @@ final class M3EmitTuTrivialEchoAot
             $context->builder->returnValue($sentinel);
             $context->builder->clearInsertionPosition();
             $context->builder = $saved;
-            $context->functions[$lc] = $func;
-            $context->functionReturnType[$lc] = '__object__*';
-            $context->functionProxies[$lc] = new Call\Native($func, self::SENTINEL_LOGICAL, [], []);
+            $context->functions[$sentinelLc] = $func;
+            $context->functionReturnType[$sentinelLc] = '__object__*';
+            $context->functionProxies[$sentinelLc] = new Call\Native($func, $sentinelLogical, [], []);
+        }
+
+        $context->m3EmitTuLinktimeSidecarEntries[] = [
+            'sourceGlobal' => $sourceGlobal,
+            'sidecarGlobal' => $sidecarGlobal,
+            'sentinelLc' => $sentinelLc,
+        ];
+
+        if (null === $context->m3EmitTuTrivialEchoSourceGlobal) {
+            $context->m3EmitTuTrivialEchoSource = $source;
+            $context->m3EmitTuTrivialEchoAotBytes = $aotBytes;
+            $context->m3EmitTuTrivialEchoSidecarPath = $sidecar;
+            $context->m3EmitTuTrivialEchoSourceGlobal = $sourceGlobal;
+            $context->m3EmitTuTrivialEchoSidecarPathGlobal = $sidecarGlobal;
         }
     }
 
     public static function isRegistered(Context $context): bool
     {
-        return null !== $context->m3EmitTuTrivialEchoSourceGlobal
-            && null !== $context->m3EmitTuTrivialEchoSidecarPathGlobal;
+        return [] !== $context->m3EmitTuLinktimeSidecarEntries;
     }
 
     /**
-     * parseAndCompile* native bridge with link-time trivial-echo fast path (#2559).
+     * parseAndCompile* native bridge with link-time sidecar fast paths (#2559, #2567).
      */
     public static function emitParseAndCompileWithTrivialFallback(
         Context $context,
@@ -91,46 +112,41 @@ final class M3EmitTuTrivialEchoAot
             return $defaultEmit($context, $runtimeThis, $code, $filename);
         }
         $objPtr = $context->getTypeFromString('__object__*');
-        $sourceGlobal = $context->m3EmitTuTrivialEchoSourceGlobal;
-        if (null === $sourceGlobal) {
-            return $defaultEmit($context, $runtimeThis, $code, $filename);
+        $current = $defaultEmit($context, $runtimeThis, $code, $filename);
+        foreach (array_reverse($context->m3EmitTuLinktimeSidecarEntries) as $index => $entry) {
+            $tag = 'e'.(string) $index;
+            $cached = $context->builder->load($entry['sourceGlobal']);
+            $matches = JitStringCompare::identical($context, $code, $cached);
+            $fail = BasicBlockHelper::append($context, 'm3te_pac_prev_'.$tag);
+            $ok = BasicBlockHelper::append($context, 'm3te_pac_sidecar_'.$tag);
+            $merge = BasicBlockHelper::append($context, 'm3te_pac_done_'.$tag);
+            $context->builder->branchIf($matches, $ok, $fail);
+            $context->builder->positionAtEnd($fail);
+            $context->builder->branch($merge);
+            $context->builder->positionAtEnd($ok);
+            $sidecarBlock = $context->builder->call($context->functions[$entry['sentinelLc']]);
+            $context->builder->branch($merge);
+            $context->builder->positionAtEnd($merge);
+            $phi = $context->builder->phi($objPtr);
+            $phi->addIncoming($current, $fail);
+            $phi->addIncoming($sidecarBlock, $ok);
+            $current = $phi;
         }
-        $cached = $context->builder->load($sourceGlobal);
-        $matches = JitStringCompare::identical($context, $code, $cached);
-        $fail = BasicBlockHelper::append($context, 'm3te_pac_default');
-        $ok = BasicBlockHelper::append($context, 'm3te_pac_trivial');
-        $merge = BasicBlockHelper::append($context, 'm3te_pac_done');
-        $context->builder->branchIf($matches, $ok, $fail);
-        $context->builder->positionAtEnd($fail);
-        $defaultBlock = $defaultEmit($context, $runtimeThis, $code, $filename);
-        $context->builder->branch($merge);
-        $context->builder->positionAtEnd($ok);
-        $lc = strtolower(self::SENTINEL_LOGICAL);
-        $trivialBlock = $context->builder->call($context->functions[$lc]);
-        $context->builder->branch($merge);
-        $context->builder->positionAtEnd($merge);
-        $phi = $context->builder->phi($objPtr);
-        $phi->addIncoming($defaultBlock, $fail);
-        $phi->addIncoming($trivialBlock, $ok);
 
-        return $phi;
+        return $current;
     }
 
-    /** Runtime::standalone native for emit-helper SPINE — copy cached AOT sidecar to outfile. */
-    public static function emitStandaloneWriteCachedAot(Context $context, Value $outFile): void
+    /** Runtime::standalone native for emit-helper SPINE — copy matched sidecar to outfile. */
+    public static function emitStandaloneWriteCachedAot(Context $context, Value $block, Value $outFile): void
     {
+        unset($block);
         if (!self::isRegistered($context)) {
             $context->builder->returnVoid();
 
             return;
         }
-        $sidecarGlobal = $context->m3EmitTuTrivialEchoSidecarPathGlobal;
-        if (null === $sidecarGlobal) {
-            $context->builder->returnVoid();
-
-            return;
-        }
-        $sidecarPath = $context->builder->load($sidecarGlobal);
+        $entry = $context->m3EmitTuLinktimeSidecarEntries[array_key_last($context->m3EmitTuLinktimeSidecarEntries)];
+        $sidecarPath = $context->builder->load($entry['sidecarGlobal']);
         $context->builder->call(
             $context->lookupFunction('__compiler_copy'),
             $sidecarPath,
