@@ -70,6 +70,7 @@ if ci_llvm_ready; then
   BOOTSTRAP_SELFHOST_PROBE_GATE="${BOOTSTRAP_SELFHOST_PROBE_GATE:-1}" ci_run_bootstrap_selfhost_probe
   ci_run_bootstrap_lib_spine_vm_smoke
   ci_run_bootstrap_compiler_driver_smoke
+  ci_run_bootstrap_vm_unit_probe
 
   if ci_should_run_jit; then
     echo "PHPUnit: AOT lint only (@group aot-lint)..."
