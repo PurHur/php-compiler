@@ -36,6 +36,7 @@ Defaults from `script/ci-defaults.env`:
 | VM uncaught 500 | `THROWSWEB_UNCAUGHT_500_GATE` | `0` | `THROWSWEB_UNCAUGHT_500_GATE=1 ./script/examples-web-smoke.sh --throws-only` ([#2200](https://github.com/PurHur/php-compiler/issues/2200)) |
 | AOT serve | `THROWSWEB_SERVE_AOT_SMOKE_GATE` | `1` | `ci-local.sh` · `examples-web-smoke.sh --throws-only --aot` ([#2390](https://github.com/PurHur/php-compiler/issues/2390), [#2387](https://github.com/PurHur/php-compiler/issues/2387)); set `0` to skip |
 | JIT serve | `THROWSWEB_SERVE_JIT_SMOKE_GATE` | `1` | `make examples-throws-jit-smoke` · `ci-fast.sh` ([#2435](https://github.com/PurHur/php-compiler/issues/2435), [#2408](https://github.com/PurHur/php-compiler/issues/2408)); set `0` to skip |
+| JIT serve ladder | `SERVE_JIT_SMOKE_GATE` | `0` | `SERVE_JIT_SMOKE_GATE=1 make examples-serve-jit-smoke` — 001/003/007 `phpc serve --jit` ([#2478](https://github.com/PurHur/php-compiler/issues/2478), [#2274](https://github.com/PurHur/php-compiler/issues/2274)); 007 block respects `THROWSWEB_SERVE_JIT_SMOKE_GATE` |
 | AOT link | `THROWSWEB_AOT_LINK_GATE` | `1` | `./script/ci-local.sh --filter test007ThrowsWebAotLink` ([#2135](https://github.com/PurHur/php-compiler/issues/2135)) |
 | AOT execute | `THROWSWEB_AOT_SMOKE_GATE` | `1` | `ThrowsWebAotExecuteTest` · `EXAMPLES_AOT_SMOKE_ONLY=007 make examples-aot-smoke` ([#2135](https://github.com/PurHur/php-compiler/issues/2135)) |
 

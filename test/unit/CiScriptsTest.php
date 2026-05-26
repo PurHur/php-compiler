@@ -519,6 +519,10 @@ final class CiScriptsTest extends TestCase
         $script = dirname(__DIR__, 2).'/script/examples-serve-jit-smoke.sh';
         $this->assertFileExists($script);
         $this->assertTrue(is_executable($script));
+        $body = (string) file_get_contents($script);
+        $this->assertStringContainsString('007-ThrowsWeb', $body);
+        $this->assertStringContainsString('THROWSWEB_SERVE_JIT_SMOKE_GATE', $body);
+        $this->assertStringContainsString('#2478', $body);
     }
 
     public function testCiDefaultsEnvDefinesServeJitSmokeGateOff(): void

@@ -86,7 +86,7 @@ cd examples/001-SimpleWeb
 ../../phpc build -o .phpc/bin/app example.php
 ../../phpc serve --aot 127.0.0.1:8080 .
 ../../phpc serve --jit 127.0.0.1:8080 examples/001-SimpleWeb   # MCJIT per script (#207, #2274)
-SERVE_JIT_SMOKE_GATE=1 make examples-serve-jit-smoke            # automated two-request curl (#2274)
+SERVE_JIT_SMOKE_GATE=1 make examples-serve-jit-smoke            # 001/003/007 phpc serve --jit curls (#2274, #2478)
 ```
 
 AOT binaries refresh `$_GET` / `$_POST` / `$_REQUEST` from CGI env on each request unless you bake values at compile time with `-q` on `phpc build`.

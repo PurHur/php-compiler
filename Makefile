@@ -153,6 +153,7 @@ examples-fastcgiweb-smoke:
 examples-selfhostprobe-smoke:
 	./script/examples-selfhostprobe-smoke.sh
 
+# 001 (+ 003 when lint green, + 007 caught POST when lint green; SERVE_JIT_SMOKE_GATE=1; #2274, #2478)
 examples-serve-jit-smoke:
 	SERVE_JIT_SMOKE_GATE=1 ./script/examples-serve-jit-smoke.sh
 
