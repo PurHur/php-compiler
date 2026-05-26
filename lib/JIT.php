@@ -3846,6 +3846,10 @@ class JIT {
                         $nameOp->value,
                         $block->constants[$op->arg2]
                     )) {
+                        // Spine may require bin/vm.php after tokenizer-compat shims (#2134).
+                        if ($this->shouldUseSelfHostJitStubs()) {
+                            break;
+                        }
                         throw new \LogicException("Cannot redefine constant {$nameOp->value}");
                     }
                     break;
