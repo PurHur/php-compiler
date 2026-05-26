@@ -1694,15 +1694,16 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('#2361', $docSelfhost);
     }
 
-    public function testCiDefaultsEnvDefinesParserUnitProbeGateDefaultOff(): void
+    public function testCiDefaultsEnvDefinesParserUnitProbeGateDefaultOn(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
         $this->assertStringContainsString(
-            'BOOTSTRAP_PARSER_UNIT_PROBE_GATE="${BOOTSTRAP_PARSER_UNIT_PROBE_GATE:-0}"',
+            'BOOTSTRAP_PARSER_UNIT_PROBE_GATE="${BOOTSTRAP_PARSER_UNIT_PROBE_GATE:-1}"',
             $defaults
         );
         $this->assertStringContainsString('#2409', $defaults);
         $this->assertStringContainsString('#2417', $defaults);
+        $this->assertStringContainsString('#2419', $defaults);
     }
 
     public function testCiLocalHonorsParserUnitProbeGate(): void
@@ -1712,7 +1713,7 @@ final class CiScriptsTest extends TestCase
 
         $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
         $this->assertStringContainsString('BOOTSTRAP_PARSER_UNIT_PROBE_GATE', $common);
-        $this->assertStringContainsString('BOOTSTRAP_PARSER_UNIT_PROBE_GATE:-0', $common);
+        $this->assertStringContainsString('BOOTSTRAP_PARSER_UNIT_PROBE_GATE:-1', $common);
         $this->assertStringContainsString('bootstrap-selfhost-parser-unit-probe.sh', $common);
     }
 
@@ -1722,10 +1723,12 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('BOOTSTRAP_PARSER_UNIT_PROBE_GATE', $doc);
         $this->assertStringContainsString('bootstrap-selfhost-parser-unit-probe.sh', $doc);
         $this->assertStringContainsString('#2417', $doc);
+        $this->assertStringContainsString('#2419', $doc);
 
         $docSelfhost = (string) file_get_contents(dirname(__DIR__, 2).'/docs/bootstrap-selfhost.md');
         $this->assertStringContainsString('parser_unit_probe bundle OK', $docSelfhost);
         $this->assertStringContainsString('#2417', $docSelfhost);
+        $this->assertStringContainsString('#2419', $docSelfhost);
     }
 
     public function testCiDefaultsEnvDefinesPhptypesUnitProbeGateDefaultOn(): void
