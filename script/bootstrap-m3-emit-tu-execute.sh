@@ -43,10 +43,8 @@ mkdir -p "${ROOT}/build"
 export PHP_COMPILER_JIT_PROGRESS_FILE="${ROOT}/build/.last-jit-func-m3-emit-tu-phpunit"
 rm -f "${EMIT_HELPER}" "${AOT_OUT}" "${PHP_COMPILER_JIT_PROGRESS_FILE}"
 
-m3_link_env=(env PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_EMIT_HELPER_LINK=1)
-if [[ "${BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING:-0}" == "1" ]]; then
-  m3_link_env+=(PHP_COMPILER_M3_COMPILE_DRIVER=1)
-fi
+# Real Runtime::parse lowering required for native emit-TU execute (#2442, #2552).
+m3_link_env=(env PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_EMIT_HELPER_LINK=1 PHP_COMPILER_M3_COMPILE_DRIVER=1)
 
 set +e
 m3_link_code=1
