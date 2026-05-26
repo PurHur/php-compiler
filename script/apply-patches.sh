@@ -63,7 +63,8 @@ patch_already_applied() {
       grep -q 'function xor(' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php" 2>/dev/null
       ;;
     php-llvm-memory-buffer-bitcode.patch)
-      grep -q 'use llvm\\string_ptr;' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/MemoryBuffer.php" 2>/dev/null
+      grep -q 'use llvm\\string_ptr;' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/MemoryBuffer.php" 2>/dev/null \
+        && grep -q '\$this->llvm->lib->getFFI()' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/MemoryBuffer.php" 2>/dev/null
       ;;
     php-cfg-nullsafe.patch)
       [[ -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/NullsafePropertyFetch.php" ]]
@@ -144,6 +145,21 @@ patch_already_applied() {
   esac
 }
 
+apply_php_llvm_memory_buffer_overlay() {
+  local target="$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/MemoryBuffer.php"
+  local overlay="$PATCH_DIR/overlays/php-llvm/MemoryBuffer.php"
+  if patch_already_applied "$PATCH_DIR/php-llvm-memory-buffer-bitcode.patch"; then
+    echo "Skip php-llvm-memory-buffer-bitcode.patch (already applied)"
+    return 0
+  fi
+  if [[ ! -f "$overlay" ]]; then
+    echo "Skip php-llvm-memory-buffer-bitcode.patch (overlay missing)" >&2
+    return 1
+  fi
+  cp "$overlay" "$target"
+  echo "Applied php-llvm-memory-buffer-bitcode.patch (overlay)"
+}
+
 apply_php_cfg_trycatch_overlay() {
   local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
   local op="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/TryCatch.php"
@@ -185,6 +201,10 @@ apply_patch() {
   fi
   if [[ "$(basename "$patch")" == "php-cfg-trycatch.patch" ]]; then
     apply_php_cfg_trycatch_overlay
+    return $?
+  fi
+  if [[ "$(basename "$patch")" == "php-llvm-memory-buffer-bitcode.patch" ]]; then
+    apply_php_llvm_memory_buffer_overlay
     return $?
   fi
   if patch_already_applied "$patch"; then
