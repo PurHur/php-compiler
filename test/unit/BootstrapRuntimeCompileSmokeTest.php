@@ -90,10 +90,16 @@ final class BootstrapRuntimeCompileSmokeTest extends TestCase
     {
         $emit = (string) file_get_contents(self::$root.'/lib/JIT/BootstrapCompileSmokeM3Emit.php');
         $this->assertStringContainsString('RuntimeEmitTuAlloc::emit', $emit);
+        $this->assertStringContainsString('RuntimeEmitTuInit::emitInitSequence', $emit);
+        $init = (string) file_get_contents(self::$root.'/lib/JIT/RuntimeEmitTuInit.php');
+        $this->assertStringContainsString('RuntimeInitVmContext::emit', $init);
         $object = (string) file_get_contents(self::$root.'/lib/JIT/Builtin/Type/Object_.php');
         $this->assertStringContainsString('allocateEmitTuShell', $object);
         $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
         $this->assertStringContainsString('emitMainEntry', $jit);
         $this->assertStringContainsString('compileM3EmitTuRuntimeMethodFromQueue', $jit);
+        $this->assertStringContainsString('compileM3EmitTuRuntimeMethodFromDeclareClassBlocks', $jit);
+        $execute = (string) file_get_contents(self::$root.'/script/bootstrap-m3-emit-tu-execute.sh');
+        $this->assertStringContainsString('PHP_COMPILER_M3_COMPILE_DRIVER=1', $execute);
     }
 }

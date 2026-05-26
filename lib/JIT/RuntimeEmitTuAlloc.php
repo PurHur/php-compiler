@@ -9,7 +9,7 @@ use PHPLLVM\Value;
 /**
  * Allocate Runtime shell in M3 emit-helper TU without PHP CFG `new Runtime` (#2540, #2442).
  *
- * Caller must run initParsePipeline / initCompiler / initVmContext / loadCoreModules (#2550).
+ * Caller must run RuntimeEmitTuInit::emitInitSequence after alloc (#2550).
  */
 final class RuntimeEmitTuAlloc
 {
