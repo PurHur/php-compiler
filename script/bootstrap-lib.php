@@ -171,6 +171,8 @@ function bootstrapVmPathPhpFiles(string $root): array
  */
 function bootstrapCollectInventoryReport(string $root): array
 {
+    require_once __DIR__.'/bootstrap-phase-a-deferred.php';
+
     $compilerBlockers = bootstrapExtractCompilerBlockers($root.'/lib/Compiler.php');
     $fileReports = [];
     $totals = ['files' => 0, 'blockers' => 0, 'warnings' => 0];
@@ -186,12 +188,16 @@ function bootstrapCollectInventoryReport(string $root): array
         $totals['warnings'] += count($constructs['warnings']);
     }
 
-    return [
+    $report = [
         'entry' => 'bin/vm.php',
         'compiler_blockers' => $compilerBlockers,
         'totals' => $totals,
         'files' => $fileReports,
     ];
+    $report['phase_a'] = bootstrap_phase_a_inventory_counts($report);
+    $report['phase_a']['ratio_deferred_paths'] = bootstrap_phase_a_ratio_deferred();
+
+    return $report;
 }
 
 /**
@@ -317,6 +323,8 @@ function bootstrapBuildProfile(array $inventory, string $root): array
  */
 function bootstrapRenderMarkdown(array $report): string
 {
+    require_once __DIR__.'/bootstrap-phase-a-deferred.php';
+
     $lines = [];
     $lines[] = '# Bootstrap inventory (vm.php path)';
     $lines[] = '';
@@ -326,12 +334,25 @@ function bootstrapRenderMarkdown(array $report): string
     $lines[] = '';
     $lines[] = '## Summary';
     $lines[] = '';
+    $phaseA = $report['phase_a'] ?? bootstrap_phase_a_inventory_counts($report);
     $lines[] = '| Metric | Count |';
     $lines[] = '|--------|------:|';
     $lines[] = '| PHP files on vm.php path | '.$report['totals']['files'].' |';
+    $lines[] = '| Phase A inventory files (M2 ratio SSOT) | '.$phaseA['phase_a_inventory_files'].' |';
+    $lines[] = '| Phase A ratio-deferred paths | '.$phaseA['phase_a_ratio_deferred'].' |';
     $lines[] = '| Source constructs flagged (blockers) | '.$report['totals']['blockers'].' |';
     $lines[] = '| Source constructs flagged (warnings) | '.$report['totals']['warnings'].' |';
     $lines[] = '';
+    if (($phaseA['phase_a_ratio_deferred'] ?? 0) > 0) {
+        $lines[] = 'Phase A ratio-deferred (still inventoried; excluded from M2 spine ratio denominator only — [#2543](https://github.com/PurHur/php-compiler/issues/2543)):';
+        $lines[] = '';
+        foreach ($report['phase_a']['ratio_deferred_paths'] ?? bootstrap_phase_a_ratio_deferred() as $path => $note) {
+            $lines[] = '- `'.$path.'` — '.$note;
+        }
+        $lines[] = '';
+        $lines[] = 'Included on Phase A path and in `compiler_lib_spine_smoke` (not ratio-deferred): `lib/JIT/Builtin/StringPregMatch.php`, `lib/AOT/Linker.php` (external `clang` / `shell_exec` native floor).';
+        $lines[] = '';
+    }
     $lines[] = '## Compiler CFG gaps (`lib/Compiler.php`)';
     $lines[] = '';
     $lines[] = 'These `LogicException` messages indicate CFG ops or expressions not yet lowered:';

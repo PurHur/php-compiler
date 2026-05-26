@@ -80,9 +80,13 @@ function bootstrap_read_inventory_total(string $inventoryDoc): int
     if (!is_readable($inventoryDoc)) {
         return 0;
     }
-    if (!preg_match('/\| PHP files on vm\.php path \| (\d+) \|/', (string) file_get_contents($inventoryDoc), $match)) {
-        return 0;
+    $content = (string) file_get_contents($inventoryDoc);
+    if (preg_match('/\| Phase A inventory files \(M2 ratio SSOT\) \| (\d+) \|/', $content, $match)) {
+        return (int) $match[1];
+    }
+    if (preg_match('/\| PHP files on vm\.php path \| (\d+) \|/', $content, $match)) {
+        return (int) $match[1];
     }
 
-    return (int) $match[1];
+    return 0;
 }

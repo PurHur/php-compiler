@@ -12,6 +12,9 @@ use PHPCompiler\JIT\Context;
  *
  * Reuses {@see lib/AOT/runtime/preg_match.c} via cached LLVM bitcode so JIT and AOT
  * share the same libpcre2-backed implementation.
+ *
+ * Phase A / M2 spine: bundled in compiler_lib_spine_smoke (not ratio-deferred).
+ * Bitcode build uses external clang via shell_exec — permitted native floor ([#2543](https://github.com/PurHur/php-compiler/issues/2543)).
  */
 final class StringPregMatch
 {
