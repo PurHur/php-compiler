@@ -20,6 +20,7 @@ use PHPCfg\Operand\Literal;
 use PHPCfg\Operand\Temporary;
 use PHPCfg\Script;
 use PHPTypes\Type;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\JIT\OperandName;
 use PHPCompiler\Compiler\AttributeNames;
@@ -2140,21 +2141,7 @@ class Compiler {
         $keySlot = $block->registerConstant($keyOperand, $keyVar);
         $defaultSlot = null;
         if (null !== $terminal->defaultVar) {
-            $defaultSlot = $this->compileOperand($terminal->defaultVar, $block, true);
-            if (!isset($block->constants[$defaultSlot])) {
-                throw new \LogicException(
-                    'Function-local static initializer must be a literal int or string in v1 (#2286)'
-                );
-            }
-            $defaultVm = $block->constants[$defaultSlot];
-            if (
-                Variable::TYPE_INTEGER !== $defaultVm->type
-                && Variable::TYPE_STRING !== $defaultVm->type
-            ) {
-                throw new \LogicException(
-                    'Function-local static initializer must be a literal int or string in v1 (#2286)'
-                );
-            }
+            $defaultSlot = $this->compileFunctionStaticDefaultSlot($terminal, $block);
         }
 
         return new OpCode(
@@ -2163,6 +2150,160 @@ class Compiler {
             $keySlot,
             $defaultSlot
         );
+    }
+
+    /**
+     * @param Op\Terminal\StaticVar $terminal
+     */
+    protected function compileFunctionStaticDefaultSlot(Op\Terminal $terminal, Block $block): ?int
+    {
+        $defaultVar = $terminal->defaultVar;
+        $arrayExpr = $this->arrayExprFromFunctionStaticTerminal($terminal);
+        if (null !== $arrayExpr) {
+            $arrayConst = $this->compileTimeArrayFromLiteralExpr($arrayExpr);
+            if (null !== $arrayConst) {
+                return $block->registerConstant($defaultVar, $arrayConst);
+            }
+        }
+
+        $defaultSlot = $this->compileOperand($defaultVar, $block, true);
+        if (!isset($block->constants[$defaultSlot])) {
+            throw new \LogicException(
+                'Function-local static initializer must be a compile-time literal (int, string, or literal array) (#2286)'
+            );
+        }
+        $defaultVm = $block->constants[$defaultSlot];
+        if (
+            Variable::TYPE_INTEGER !== $defaultVm->type
+            && Variable::TYPE_STRING !== $defaultVm->type
+            && Variable::TYPE_ARRAY !== $defaultVm->type
+        ) {
+            throw new \LogicException(
+                'Function-local static initializer must be a compile-time literal (int, string, or literal array) (#2286)'
+            );
+        }
+
+        return $defaultSlot;
+    }
+
+    /**
+     * php-cfg puts non-trivial static defaults in {@see Op\Terminal\StaticVar::$defaultBlock}.
+     *
+     * @param Op\Terminal\StaticVar $terminal
+     */
+    protected function arrayExprFromFunctionStaticTerminal(Op\Terminal $terminal): ?Op\Expr\Array_
+    {
+        if (property_exists($terminal, 'defaultBlock') && null !== $terminal->defaultBlock) {
+            foreach ($terminal->defaultBlock->children as $child) {
+                if ($child instanceof Op\Expr\Array_) {
+                    return $child;
+                }
+            }
+        }
+
+        return $this->unwrapOperandToArrayExpr($terminal->defaultVar);
+    }
+
+    protected function unwrapOperandToArrayExpr(Operand $operand): ?Op\Expr\Array_
+    {
+        while ($operand instanceof Operand\Temporary) {
+            if (null === $operand->original) {
+                break;
+            }
+            $operand = $operand->original;
+        }
+        if ($operand instanceof Op\Expr\Array_) {
+            return $operand;
+        }
+
+        return null;
+    }
+
+    protected function compileTimeArrayFromLiteralExpr(Op\Expr\Array_ $expr): ?Variable
+    {
+        $unpackFlags = property_exists($expr, 'unpack') ? $expr->unpack : [];
+        $ht = new HashTable();
+        for ($i = 0, $n = count($expr->values); $i < $n; ++$i) {
+            if (!empty($unpackFlags[$i])) {
+                return null;
+            }
+            $valueVar = $this->compileTimeLiteralFromOperand($expr->values[$i]);
+            if (null === $valueVar) {
+                return null;
+            }
+            $keyVar = $this->compileTimeLiteralFromOperand($expr->keys[$i]);
+            if (null === $keyVar) {
+                $ht->append($valueVar);
+                continue;
+            }
+            if ($keyVar->is(Variable::TYPE_INTEGER)) {
+                $ht->addIndex($keyVar->toInt(), $valueVar);
+            } elseif ($keyVar->is(Variable::TYPE_STRING)) {
+                $ht->add($keyVar->toString(), $valueVar);
+            } else {
+                return null;
+            }
+        }
+        $container = new Variable(Variable::TYPE_ARRAY);
+        $container->array($ht);
+
+        return $container;
+    }
+
+    protected function compileTimeLiteralFromOperand(Operand $operand): ?Variable
+    {
+        while ($operand instanceof Operand\Temporary) {
+            if (null === $operand->original) {
+                break;
+            }
+            $operand = $operand->original;
+        }
+        if (!$operand instanceof Operand\Literal) {
+            return null;
+        }
+
+        return $this->literalOperandToVariable($operand);
+    }
+
+    protected function literalOperandToVariable(Operand\Literal $operand): Variable
+    {
+        $mappedType = null !== $operand->type
+            ? Variable::mapFromType($operand->type)
+            : Variable::TYPE_UNDEFINED;
+        if ($mappedType === Variable::TYPE_UNDEFINED) {
+            if (is_int($operand->value)) {
+                $mappedType = Variable::TYPE_INTEGER;
+            } elseif (is_float($operand->value)) {
+                $mappedType = Variable::TYPE_FLOAT;
+            } elseif (is_string($operand->value)) {
+                $mappedType = Variable::TYPE_STRING;
+            } elseif (is_bool($operand->value)) {
+                $mappedType = Variable::TYPE_BOOLEAN;
+            } elseif (null === $operand->value) {
+                $mappedType = Variable::TYPE_NULL;
+            }
+        }
+        $return = new Variable($mappedType);
+        switch ($mappedType) {
+            case Variable::TYPE_STRING:
+                $return->string($operand->value);
+                break;
+            case Variable::TYPE_INTEGER:
+                $return->int($operand->value);
+                break;
+            case Variable::TYPE_FLOAT:
+                $return->float($operand->value);
+                break;
+            case Variable::TYPE_BOOLEAN:
+                $return->bool($operand->value);
+                break;
+            case Variable::TYPE_NULL:
+                break;
+            default:
+                throw new \LogicException('Unknown Literal Operand Type: ' . ($operand->type ?? 'untyped'));
+        }
+
+        return $return;
     }
 
     protected function resolveSimpleVariableName(Operand $var): string
@@ -2514,42 +2655,8 @@ class Compiler {
             return null;
         } elseif ($operand instanceof Operand\Literal) {
             assert($isRead === true);
-            $mappedType = null !== $operand->type
-                ? Variable::mapFromType($operand->type)
-                : Variable::TYPE_UNDEFINED;
-            if ($mappedType === Variable::TYPE_UNDEFINED) {
-                if (is_int($operand->value)) {
-                    $mappedType = Variable::TYPE_INTEGER;
-                } elseif (is_float($operand->value)) {
-                    $mappedType = Variable::TYPE_FLOAT;
-                } elseif (is_string($operand->value)) {
-                    $mappedType = Variable::TYPE_STRING;
-                } elseif (is_bool($operand->value)) {
-                    $mappedType = Variable::TYPE_BOOLEAN;
-                } elseif (null === $operand->value) {
-                    $mappedType = Variable::TYPE_NULL;
-                }
-            }
-            $return = new Variable($mappedType);
-            switch ($mappedType) {
-                case Variable::TYPE_STRING:
-                    $return->string($operand->value);
-                    break;
-                case Variable::TYPE_INTEGER:
-                    $return->int($operand->value);
-                    break;
-                case Variable::TYPE_FLOAT:
-                    $return->float($operand->value);
-                    break;
-                case Variable::TYPE_BOOLEAN:
-                    $return->bool($operand->value);
-                    break;
-                case Variable::TYPE_NULL:
-                    break;
-                default:
-                    throw new \LogicException('Unknown Literal Operand Type: ' . ($operand->type ?? 'untyped'));
-            }
-            return $block->registerConstant($operand, $return);
+
+            return $block->registerConstant($operand, $this->literalOperandToVariable($operand));
         } elseif ($operand instanceof Operand\Variable) {
             if ($this->isDynamicVariableOperand($operand)) {
                 $slot = $block->getVarSlot($operand, $isRead);
