@@ -82,4 +82,27 @@ final class VmArray
 
         return $dest;
     }
+
+    /** ksort() — return array sorted by key; packed lists are unchanged. */
+    public static function ksortCopy(HashTable $ht): HashTable
+    {
+        if ($ht->getNumElements() < 2 || self::isList($ht)) {
+            return $ht;
+        }
+        $pairs = [];
+        foreach ($ht->iterateKeyed(true) as [$key, $value]) {
+            $keyCopy = new Variable();
+            $keyCopy->copyFrom($key);
+            $valCopy = new Variable();
+            $valCopy->copyFrom($value);
+            $pairs[] = [$keyCopy, $valCopy];
+        }
+        VmInternalCompare::sortKeyedPairsByKey($pairs);
+        $sorted = new HashTable();
+        foreach ($pairs as [$key, $value]) {
+            array_map::appendKeyedCopy($sorted, $key, $value);
+        }
+
+        return $sorted;
+    }
 }

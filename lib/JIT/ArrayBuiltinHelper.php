@@ -4956,6 +4956,11 @@ final class ArrayBuiltinHelper
         HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
     }
 
+    /** ksort() — JIT no-op (packed lists sorted; string/int assoc use VM — #2271). */
+    public static function ksortByKey(Context $context, Variable $array): void
+    {
+    }
+
     private static function sameTypeEqual(Context $context, Variable $left, Variable $right): Value
     {
         switch ($left->type) {
