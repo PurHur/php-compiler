@@ -2151,6 +2151,43 @@ final class CiScriptsTest extends TestCase
         $this->assertMatchesRegularExpression('/\| `ROOT_README_008_SYNC_GATE` \| `0` \|/', $doc);
     }
 
+    public function testCiDefaultsEnvDefinesGettingStartedSelfhostprobeSyncGateOff(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString(
+            'GETTING_STARTED_SELFHOSTPROBE_SYNC_GATE="${GETTING_STARTED_SELFHOSTPROBE_SYNC_GATE:-0}"',
+            $defaults
+        );
+    }
+
+    public function testCiFastRunsGettingStartedSelfhostprobeSyncViaInventoryChecks(): void
+    {
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('ci_run_getting_started_selfhostprobe_sync_check', $common);
+        $this->assertStringContainsString('check-getting-started-selfhostprobe-sync.php', $common);
+        $this->assertStringContainsString('GETTING_STARTED_SELFHOSTPROBE_SYNC_GATE:-0', $common);
+    }
+
+    public function testCiDockerRunPassesGettingStartedSelfhostprobeSyncGateDefaultOff(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');
+        $this->assertStringContainsString(
+            'GETTING_STARTED_SELFHOSTPROBE_SYNC_GATE=${GETTING_STARTED_SELFHOSTPROBE_SYNC_GATE:-0}',
+            $body
+        );
+    }
+
+    public function testLocalCiMatrixDocumentsGettingStartedSelfhostprobeSyncGate(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('GETTING_STARTED_SELFHOSTPROBE_SYNC_GATE', $doc);
+        $this->assertStringContainsString('check-getting-started-selfhostprobe-sync.php', $doc);
+        $this->assertMatchesRegularExpression(
+            '/\| `GETTING_STARTED_SELFHOSTPROBE_SYNC_GATE` \| `0` \|/',
+            $doc
+        );
+    }
+
     public function testCiDefaultsEnvDefinesRootReadme009SyncGateOn(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
