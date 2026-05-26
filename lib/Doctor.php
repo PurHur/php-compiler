@@ -986,8 +986,8 @@ final class Doctor
         );
         $serveAotStatus = $serveAotOn && $llvmReady ? '✅' : '📋';
         $serveAotNote = $llvmReady
-            ? ($serveAotOn ? '#2387 ✅' : 'opt-in — phpc serve --aot caught invalid POST (#2387)')
-            : 'LLVM required; #2387 when gate=1';
+            ? ($serveAotOn ? '#2390 ✅' : 'opt-out — phpc serve --aot caught invalid POST (#2390, #2387)')
+            : 'LLVM required; #2390 when gate=1';
         fwrite(STDOUT, "  [{$serveAotStatus}] Stage 2b AOT serve — THROWSWEB_SERVE_AOT_SMOKE_GATE default {$serveAotDefault} ({$serveAotNote})\n");
         fwrite(STDOUT, "      Run:     THROWSWEB_SERVE_AOT_SMOKE_GATE=1 ./script/examples-web-smoke.sh --throws-only --aot\n");
         $serveJitStatus = $serveJitOn && $llvmReady ? '✅' : '📋';
