@@ -3351,6 +3351,129 @@ final class ArrayBuiltinHelper
         );
     }
 
+    /**
+     * array_fill_keys() — values of {@param $keys} become keys; uniform {@param $value} (returns __value__*).
+     */
+    public static function fillKeys(Context $context, Variable $keys, Variable $value): Value
+    {
+        $keysHt = self::isNativeArray($keys->type)
+            ? HashTableHelper::materializeNativeArrayForCall($context, $keys)
+            : self::loadHashTable($context, $keys);
+
+        return self::fillKeysHashTable($context, $keysHt, $value);
+    }
+
+    private static function fillKeysHashTable(Context $context, Value $keysHt, Variable $value): Value
+    {
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $keysNum = $context->builder->call(
+            $context->lookupFunction('__hashtable__getNumElements'),
+            $keysHt
+        );
+        $dest = HashTableHelper::alloc($context);
+        $valEntry = self::valueEntryPtrForFill($context, $value);
+        $resultSlot = JitValueBox::alloc($context);
+        $resultPtr = JitValueBox::pointer($context, $resultSlot);
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'array_fill_keys_idx');
+        $context->builder->store($zero, $idxSlot);
+        $head = BasicBlockHelper::append($context, 'array_fill_keys_head');
+        $body = BasicBlockHelper::append($context, 'array_fill_keys_body');
+        $advance = BasicBlockHelper::append($context, 'array_fill_keys_advance');
+        $loopDone = BasicBlockHelper::append($context, 'array_fill_keys_loop_done');
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $keysNum);
+        $context->builder->branchIf($atEnd, $loopDone, $body);
+
+        $context->builder->positionAtEnd($body);
+        $keyEntry = self::listEntryAt($context, $keysHt, $idx);
+        $valSlot = JitValueBox::alloc($context);
+        JitValueBox::copyFromPointer($context, $valSlot, $valEntry);
+        self::storeCombinedEntry(
+            $context,
+            $dest,
+            $keyEntry,
+            JitValueBox::pointer($context, $valSlot)
+        );
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($advance);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($idx, $one),
+            $idxSlot
+        );
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($loopDone);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            $resultPtr,
+            $dest
+        );
+
+        return $resultPtr;
+    }
+
+    private static function valueEntryPtrForFill(Context $context, Variable $value): Value
+    {
+        if (Variable::TYPE_VALUE === $value->type) {
+            return JitValueBox::valuePtrFromVariable($context, $value);
+        }
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        switch ($value->type) {
+            case Variable::TYPE_NATIVE_LONG:
+                JitValueBox::writeLong($context, $slot, $context->helper->loadValue($value));
+                break;
+            case Variable::TYPE_NATIVE_BOOL:
+                JitValueBox::writeBool(
+                    $context,
+                    $slot,
+                    $context->builder->truncOrBitCast($context->helper->loadValue($value), $context->getTypeFromString('int1'))
+                );
+                break;
+            case Variable::TYPE_NATIVE_DOUBLE:
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeDouble'),
+                    $ptr,
+                    $context->helper->loadValue($value)
+                );
+                break;
+            case Variable::TYPE_STRING:
+                $str = $context->helper->loadValue($value);
+                $strMap = $context->structFieldMap['__string__'];
+                $hayPtr = $context->builder->structGep($str, $strMap['value']);
+                $len = $context->builder->load(
+                    $context->builder->structGep($str, $strMap['length'])
+                );
+                $owned = string_trim::jitCopySlice(
+                    $context,
+                    $str,
+                    $hayPtr,
+                    $context->getTypeFromString('int64')->constInt(0, false),
+                    $len,
+                    'fill_keys_val'
+                );
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeString'),
+                    $ptr,
+                    $owned
+                );
+                break;
+            default:
+                throw new \LogicException(
+                    'array_fill_keys() value type not supported for JIT: '
+                    .Variable::getStringType($value->type)
+                );
+        }
+
+        return $ptr;
+    }
+
     private static function combineHashTables(Context $context, Value $keysHt, Value $valsHt): Value
     {
         $sizeT = $context->getTypeFromString('size_t');
