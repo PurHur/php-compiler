@@ -308,7 +308,8 @@ function exampleDisplayName(string $example): string
  *     skip_aot: bool,
  *     project_aot: bool,
  *     sessions_web_project_aot: bool,
- *     fileupload_web_project_aot: bool
+ *     fileupload_web_project_aot: bool,
+ *     throws_web_project_aot: bool
  * }
  */
 function exampleProfile(string $example): array
@@ -328,6 +329,7 @@ function exampleProfile(string $example): array
             'project_aot' => true,
             'sessions_web_project_aot' => false,
             'fileupload_web_project_aot' => false,
+            'throws_web_project_aot' => false,
         ];
     }
 
@@ -341,6 +343,7 @@ function exampleProfile(string $example): array
             'project_aot' => false,
             'sessions_web_project_aot' => true,
             'fileupload_web_project_aot' => false,
+            'throws_web_project_aot' => false,
         ];
     }
 
@@ -354,6 +357,7 @@ function exampleProfile(string $example): array
             'project_aot' => false,
             'sessions_web_project_aot' => false,
             'fileupload_web_project_aot' => true,
+            'throws_web_project_aot' => false,
         ];
     }
 
@@ -367,6 +371,7 @@ function exampleProfile(string $example): array
             'project_aot' => false,
             'sessions_web_project_aot' => false,
             'fileupload_web_project_aot' => false,
+            'throws_web_project_aot' => true,
         ];
     }
 
@@ -385,6 +390,7 @@ function exampleProfile(string $example): array
             'project_aot' => false,
             'sessions_web_project_aot' => false,
             'fileupload_web_project_aot' => false,
+            'throws_web_project_aot' => false,
         ];
     }
 
@@ -397,6 +403,7 @@ function exampleProfile(string $example): array
         'project_aot' => false,
         'sessions_web_project_aot' => false,
         'fileupload_web_project_aot' => false,
+        'throws_web_project_aot' => false,
     ];
 }
 
@@ -880,6 +887,90 @@ function fileUploadWebAotMultipartProbe(string $repoRoot, string $binary, array 
 }
 
 /**
+ * phpc build --project + invalid POST for 007-ThrowsWeb (#2166, #2157).
+ *
+ * @param array<string, string> $benchEnv
+ *
+ * @return array{compile: float, compiled: float}|null
+ */
+function tryBenchmarkThrowsWebProjectAot(string $repoRoot, array $benchEnv): ?array
+{
+    if ('0' === getenv('BENCH_THROWSWEB_AOT')) {
+        echo "  007-ThrowsWeb AOT: skip (BENCH_THROWSWEB_AOT=0)\n";
+
+        return null;
+    }
+
+    $project = $repoRoot.'/examples/007-ThrowsWeb';
+    $phpc = $repoRoot.'/phpc';
+    $binary = $project.'/.phpc/bin/app';
+
+    if (!is_executable($phpc)) {
+        echo "  007-ThrowsWeb AOT: skip (phpc not executable)\n";
+
+        return null;
+    }
+
+    $compileStart = microtime(true);
+    $build = runProcessCapturing(
+        [$phpc, 'build', '--project', $project],
+        $benchEnv,
+        $repoRoot
+    );
+    $compileTime = microtime(true) - $compileStart;
+
+    if (0 !== $build['exit']) {
+        $stderr = $build['stderr'];
+        if (\PHPCompiler\Cli\PhpcBuild::isUserClassAotBlocked($stderr)) {
+            echo '  007-ThrowsWeb AOT: skip (link blocked: '.trim(substr($stderr, 0, 120))."…)\n";
+        } else {
+            echo "  007-ThrowsWeb AOT: skip (phpc build --project exit {$build['exit']})\n";
+        }
+
+        return null;
+    }
+
+    if (!is_executable($binary)) {
+        echo "  007-ThrowsWeb AOT: skip (binary missing after link)\n";
+
+        return null;
+    }
+
+    $aotEnv = $benchEnv;
+    foreach (throwsWebPostCgiEnv() as $key => $value) {
+        $aotEnv[$key] = $value;
+    }
+
+    if (!throwsWebAotInvalidPostProbe($repoRoot, $binary, $aotEnv)) {
+        echo "  007-ThrowsWeb AOT: skip (invalid POST probe failed)\n";
+
+        return null;
+    }
+
+    $iterations = 10;
+    $compiledStart = microtime(true);
+    for ($i = 0; $i < $iterations; ++$i) {
+        throwsWebAotInvalidPostProbe($repoRoot, $binary, $aotEnv);
+    }
+    $compiledTime = (microtime(true) - $compiledStart) / $iterations;
+
+    return ['compile' => $compileTime, 'compiled' => $compiledTime];
+}
+
+/**
+ * @param array<string, string> $baseEnv
+ */
+function throwsWebAotInvalidPostProbe(string $repoRoot, string $binary, array $baseEnv): bool
+{
+    $probe = runProcessCapturing([$binary], $baseEnv, $repoRoot);
+    if (0 !== $probe['exit']) {
+        return false;
+    }
+
+    return (bool) preg_match('/invalid/i', $probe['stdout']);
+}
+
+/**
  * @param list<string> $argv
  * @param array<string, string> $env
  */
@@ -954,6 +1045,12 @@ function benchmarkExample(string $example, array $phpCmd, array $benchEnv, strin
         if (null !== $fileUploadAot) {
             $compileTime = $fileUploadAot['compile'];
             $compiledTime = $fileUploadAot['compiled'];
+        }
+    } elseif ($llvmReady && !empty($profile['throws_web_project_aot'])) {
+        $throwsAot = tryBenchmarkThrowsWebProjectAot($repoRoot, $benchEnv);
+        if (null !== $throwsAot) {
+            $compileTime = $throwsAot['compile'];
+            $compiledTime = $throwsAot['compiled'];
         }
     } elseif ($llvmReady && !empty($profile['project_aot'])) {
         $projectAot = tryBenchmarkMiniWebAppProjectAot($repoRoot, $benchEnv, $profile);

@@ -221,6 +221,7 @@ MINIWEBAPP_LINT_GATE=1 ./script/rebuild-examples.php
 # or: BENCH_SESSIONSWEB=1 ./script/rebuild-examples.php   # 005 row (#1889)
 # or: BENCH_FILEUPLOADWEB=1 ./script/rebuild-examples.php   # 006 row (#2027)
 # or: BENCH_THROWSWEB=1 ./script/rebuild-examples.php   # 007 row (#2113)
+# or: BENCH_THROWSWEB=1 BENCH_THROWSWEB_AOT=1 ./script/rebuild-examples.php   # 007 AOT columns (#2166)
 ```
 
 For **001-SimpleWeb**, `bin/compile.php` is timed **without** compile-time `-q`; the `./compiled` column runs the binary with runtime `QUERY_STRING` (and related CGI env), matching production AOT web binaries.
@@ -231,7 +232,7 @@ For **005-SessionsWeb**, the benchmark row is omitted until `phpc lint --all exa
 
 For **006-FileUploadWeb**, the benchmark row is omitted until `phpc lint --all examples/006-FileUploadWeb` passes unless `BENCH_FILEUPLOADWEB=1` ([#2027](https://github.com/PurHur/php-compiler/issues/2027)). VM/JIT/native columns use a multipart POST CGI overlay (same body as `FileUploadWebAotExecuteTest`). AOT columns time `phpc build --project` and a multipart upload probe on `.phpc/bin/app` when LLVM is ready ([#2011](https://github.com/PurHur/php-compiler/issues/2011), [#2012](https://github.com/PurHur/php-compiler/issues/2012)); use `BENCH_FILEUPLOADWEB_AOT=1 ./script/rebuild-examples.php` to force AOT columns on harness regen.
 
-For **007-ThrowsWeb**, the benchmark row is omitted until `phpc lint --all examples/007-ThrowsWeb` passes unless `BENCH_THROWSWEB=1` ([#2113](https://github.com/PurHur/php-compiler/issues/2113)). VM/JIT/native columns use a POST `email=bad` CGI overlay (caught invalid path, same as `examples-web-smoke.sh --throws-only`). AOT columns run when `BENCH_THROWSWEB=1` and `THROWSWEB_AOT_SMOKE_GATE=1` (default — [#2135](https://github.com/PurHur/php-compiler/issues/2135)).
+For **007-ThrowsWeb**, the benchmark row is omitted until `phpc lint --all examples/007-ThrowsWeb` passes unless `BENCH_THROWSWEB=1` ([#2113](https://github.com/PurHur/php-compiler/issues/2113)). VM/JIT/native columns use a POST `email=bad` CGI overlay (caught invalid path, same as `examples-web-smoke.sh --throws-only`). AOT columns time `phpc build --project` and an invalid POST probe on `.phpc/bin/app` when LLVM is ready ([#2157](https://github.com/PurHur/php-compiler/issues/2157), [#2166](https://github.com/PurHur/php-compiler/issues/2166)); use `BENCH_THROWSWEB=1 BENCH_THROWSWEB_AOT=1 ./script/rebuild-examples.php` to force AOT columns on harness regen. Set `BENCH_THROWSWEB_AOT=0` to omit AOT columns.
 
 <!-- benchmark table start -->
 

@@ -47,7 +47,13 @@ BENCH_THROWSWEB=1 ./script/rebuild-examples.php
 grep '007-ThrowsWeb' examples/README.md
 ```
 
-Omitted by default until `phpc lint --all examples/007-ThrowsWeb` passes (same gate as **005** / **006**). See [#2113](https://github.com/PurHur/php-compiler/issues/2113).
+AOT link + native execute columns (invalid POST probe) after [#2157](https://github.com/PurHur/php-compiler/issues/2157):
+
+```console
+BENCH_THROWSWEB=1 BENCH_THROWSWEB_AOT=1 ./script/rebuild-examples.php
+```
+
+Set `BENCH_THROWSWEB_AOT=0` to omit AOT columns. Omitted by default until `phpc lint --all examples/007-ThrowsWeb` passes (same gate as **005** / **006**). See [#2113](https://github.com/PurHur/php-compiler/issues/2113) · AOT columns [#2166](https://github.com/PurHur/php-compiler/issues/2166).
 
 ## Related
 
