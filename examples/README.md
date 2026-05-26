@@ -256,6 +256,8 @@ MINIWEBAPP_LINT_GATE=1 ./script/rebuild-examples.php
 # or: BENCH_FILEUPLOADWEB=1 ./script/rebuild-examples.php   # 006 row (#2027)
 # or: BENCH_THROWSWEB=1 ./script/rebuild-examples.php   # 007 row (#2113)
 # or: BENCH_THROWSWEB=1 BENCH_THROWSWEB_AOT=1 ./script/rebuild-examples.php   # 007 AOT columns (#2166)
+# or: BENCH_FASTCGIWEB=1 ./script/rebuild-examples.php   # 009 row (#2370)
+# or: BENCH_FASTCGIWEB=1 BENCH_FASTCGIWEB_AOT=1 ./script/rebuild-examples.php   # 009 AOT columns (#2370)
 ```
 
 For **001-SimpleWeb**, `bin/compile.php` is timed **without** compile-time `-q`; the `./compiled` column runs the binary with runtime `QUERY_STRING` (and related CGI env), matching production AOT web binaries.
@@ -268,15 +270,20 @@ For **006-FileUploadWeb**, the benchmark row is omitted until `phpc lint --all e
 
 For **007-ThrowsWeb**, the benchmark row is omitted until `phpc lint --all examples/007-ThrowsWeb` passes unless `BENCH_THROWSWEB=1` ([#2113](https://github.com/PurHur/php-compiler/issues/2113)). VM/JIT/native columns use a POST `email=bad` CGI overlay (caught invalid path, same as `examples-web-smoke.sh --throws-only`). AOT columns time `phpc build --project` and an invalid POST probe on `.phpc/bin/app` when LLVM is ready ([#2157](https://github.com/PurHur/php-compiler/issues/2157), [#2166](https://github.com/PurHur/php-compiler/issues/2166)); use `BENCH_THROWSWEB=1 BENCH_THROWSWEB_AOT=1 ./script/rebuild-examples.php` to force AOT columns on harness regen. Set `BENCH_THROWSWEB_AOT=0` to omit AOT columns.
 
+For **009-FastCGIWeb**, the benchmark row is omitted until `phpc lint --all examples/009-FastCGIWeb` passes unless `BENCH_FASTCGIWEB=1` ([#2370](https://github.com/PurHur/php-compiler/issues/2370)). VM/JIT/native columns use a `PATH_INFO=/ping` CGI overlay (same needles as `examples-web-smoke.sh --fastcgi-only` / `FastCGIWebAotExecuteTest`). AOT columns time `phpc build --project` and health + PATH_INFO probes on `.phpc/bin/app` when LLVM is ready ([#2352](https://github.com/PurHur/php-compiler/issues/2352)); use `BENCH_FASTCGIWEB=1 BENCH_FASTCGIWEB_AOT=1 ./script/rebuild-examples.php` to force AOT columns on harness regen. Set `BENCH_FASTCGIWEB_AOT=0` to omit AOT columns.
+
 <!-- benchmark table start -->
 
 |         Example Name |      Native PHP |      bin/vm.php |     bin/jit.php | bin/compile.php |      ./compiled |
 |----------------------|-----------------|-----------------|-----------------|-----------------|-----------------|
-|       000-HelloWorld |         0.00884 |         0.04714 |         0.19026 |         1.42065 |         0.00106 |
-|        001-SimpleWeb |         0.00806 |         0.05033 |         0.22790 |         1.63049 |         0.00135 |
-|        002-StaticWeb |         0.01006 |         0.05586 |         0.24027 |         1.56620 |         0.00159 |
-|       003-MiniWebApp |         0.01090 |         0.14402 |         0.83622 |         2.32867 |         0.00112 |
-|          004-ApiJson |         0.01123 |         0.05639 |         0.23968 |         1.60864 |         0.00147 |
-|      005-SessionsWeb |         0.01110 |         0.06242 |         0.24382 |         1.59660 |         0.00387 |
-|    006-FileUploadWeb |         0.01033 |         0.05973 |         0.20998 |         1.51074 |         0.00101 |
+|       000-HelloWorld |         0.00890 |         0.04950 |         0.19440 |         1.64668 |         0.00106 |
+|        001-SimpleWeb |         0.00828 |         0.05050 |         0.20123 |         1.60901 |         0.00112 |
+|        002-StaticWeb |         0.00948 |         0.05241 |         0.19791 |         1.60500 |         0.00116 |
+|       003-MiniWebApp |         0.00832 |         0.09853 |         0.37581 |             n/a |             n/a |
+|          004-ApiJson |         0.00868 |         0.04865 |         0.19223 |         1.57579 |         0.00112 |
+|      005-SessionsWeb |         0.00962 |         0.05271 |         0.20867 |         1.66392 |         0.00340 |
+|    006-FileUploadWeb |         0.00886 |         0.05306 |         0.21228 |         1.64037 |         0.00111 |
+|        007-ThrowsWeb |         0.00807 |         0.05077 |         0.20271 |         1.65134 |         0.00097 |
+|    008-SelfHostProbe |         0.00839 |         0.04889 |         0.19755 |         1.61155 |         0.00117 |
+|       009-FastCGIWeb |         0.00880 |         0.04914 |         0.20435 |         1.65361 |         0.00104 |
 <!-- benchmark table end -->

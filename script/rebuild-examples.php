@@ -71,6 +71,11 @@ foreach ($exampleDirs as $dir) {
         continue;
     }
 
+    if ('009-FastCGIWeb' === basename($dir) && !shouldBenchFastCGIWeb($repoRoot)) {
+        echo " - Skipping 009-FastCGIWeb benchmark row (lint gate; BENCH_FASTCGIWEB=1 to force)\n";
+        continue;
+    }
+
     $benchmarks .= "\n".benchmarkExample($example, $phpCmd, $benchEnv, $repoRoot, $llvmReady);
 }
 
@@ -171,6 +176,56 @@ function shouldBenchThrowsWeb(string $repoRoot): bool
     }
 
     return throwsWebLintPasses($repoRoot);
+}
+
+/**
+ * Include 009-FastCGIWeb when lint is green (issue #2370).
+ *
+ * BENCH_FASTCGIWEB=1 forces inclusion; FASTCGIWEB_LINT_GATE=0 skips the lint probe.
+ */
+function shouldBenchFastCGIWeb(string $repoRoot): bool
+{
+    $example = $repoRoot.'/examples/009-FastCGIWeb/example.php';
+    if (!is_file($example)) {
+        return false;
+    }
+    if ('1' === getenv('BENCH_FASTCGIWEB')) {
+        return true;
+    }
+    if ('0' === getenv('FASTCGIWEB_LINT_GATE')) {
+        return false;
+    }
+
+    return fastCGIWebLintPasses($repoRoot);
+}
+
+function fastCGIWebLintPasses(string $repoRoot): bool
+{
+    $phpc = $repoRoot.'/phpc';
+    if (!is_executable($phpc)) {
+        return false;
+    }
+    $descriptorSpec = [
+        0 => ['pipe', 'r'],
+        1 => ['pipe', 'w'],
+        2 => ['pipe', 'w'],
+    ];
+    $proc = proc_open(
+        [$phpc, 'lint', '--all', $repoRoot.'/examples/009-FastCGIWeb'],
+        $descriptorSpec,
+        $pipes,
+        $repoRoot
+    );
+    if (!is_resource($proc)) {
+        return false;
+    }
+    fclose($pipes[0]);
+    stream_get_contents($pipes[1]);
+    stream_get_contents($pipes[2]);
+    fclose($pipes[1]);
+    fclose($pipes[2]);
+
+    return 0 === proc_close($proc);
 }
 
 function throwsWebLintPasses(string $repoRoot): bool
@@ -310,7 +365,8 @@ function exampleDisplayName(string $example): string
  *     project_aot: bool,
  *     sessions_web_project_aot: bool,
  *     fileupload_web_project_aot: bool,
- *     throws_web_project_aot: bool
+ *     throws_web_project_aot: bool,
+ *     fastcgi_web_project_aot: bool
  * }
  */
 function exampleProfile(string $example): array
@@ -331,6 +387,7 @@ function exampleProfile(string $example): array
             'sessions_web_project_aot' => false,
             'fileupload_web_project_aot' => false,
             'throws_web_project_aot' => false,
+            'fastcgi_web_project_aot' => false,
         ];
     }
 
@@ -345,6 +402,7 @@ function exampleProfile(string $example): array
             'sessions_web_project_aot' => true,
             'fileupload_web_project_aot' => false,
             'throws_web_project_aot' => false,
+            'fastcgi_web_project_aot' => false,
         ];
     }
 
@@ -359,6 +417,7 @@ function exampleProfile(string $example): array
             'sessions_web_project_aot' => false,
             'fileupload_web_project_aot' => true,
             'throws_web_project_aot' => false,
+            'fastcgi_web_project_aot' => false,
         ];
     }
 
@@ -373,6 +432,22 @@ function exampleProfile(string $example): array
             'sessions_web_project_aot' => false,
             'fileupload_web_project_aot' => false,
             'throws_web_project_aot' => true,
+            'fastcgi_web_project_aot' => false,
+        ];
+    }
+
+    if ('009-FastCGIWeb' === exampleDisplayName($example)) {
+        return [
+            'query' => null,
+            'cgi_env' => fastcgiWebPathInfoCgiEnv(),
+            'aot_compile_time_query' => true,
+            'aot_run_env' => [],
+            'skip_aot' => true,
+            'project_aot' => false,
+            'sessions_web_project_aot' => false,
+            'fileupload_web_project_aot' => false,
+            'throws_web_project_aot' => false,
+            'fastcgi_web_project_aot' => true,
         ];
     }
 
@@ -392,6 +467,7 @@ function exampleProfile(string $example): array
             'sessions_web_project_aot' => false,
             'fileupload_web_project_aot' => false,
             'throws_web_project_aot' => false,
+            'fastcgi_web_project_aot' => false,
         ];
     }
 
@@ -405,6 +481,7 @@ function exampleProfile(string $example): array
         'sessions_web_project_aot' => false,
         'fileupload_web_project_aot' => false,
         'throws_web_project_aot' => false,
+        'fastcgi_web_project_aot' => false,
     ];
 }
 
@@ -421,6 +498,34 @@ function throwsWebPostCgiEnv(): array
         'CONTENT_TYPE' => 'application/x-www-form-urlencoded',
         'SCRIPT_NAME' => '/example.php',
         'REQUEST_URI' => '/example.php',
+    ];
+}
+
+/**
+ * PATH_INFO /ping CGI overlay for 009-FastCGIWeb VM/JIT benches (#2351, #2370).
+ *
+ * @return array<string, string>
+ */
+function fastcgiWebPathInfoCgiEnv(): array
+{
+    return [
+        'PATH_INFO' => '/ping',
+        'REQUEST_URI' => '/example.php/ping',
+        'SCRIPT_NAME' => '/example.php',
+    ];
+}
+
+/**
+ * Health CGI overlay for 009-FastCGIWeb AOT probe (#2352, #2370).
+ *
+ * @return array<string, string>
+ */
+function fastcgiWebHealthCgiEnv(): array
+{
+    return [
+        'QUERY_STRING' => '',
+        'REQUEST_URI' => '/example.php',
+        'SCRIPT_NAME' => '/example.php',
     ];
 }
 
@@ -972,6 +1077,108 @@ function throwsWebAotInvalidPostProbe(string $repoRoot, string $binary, array $b
 }
 
 /**
+ * phpc build --project + health + PATH_INFO for 009-FastCGIWeb (#2352, #2370).
+ *
+ * @param array<string, string> $benchEnv
+ *
+ * @return array{compile: float, compiled: float}|null
+ */
+function tryBenchmarkFastCGIWebProjectAot(string $repoRoot, array $benchEnv): ?array
+{
+    if ('0' === getenv('BENCH_FASTCGIWEB_AOT')) {
+        echo "  009-FastCGIWeb AOT: skip (BENCH_FASTCGIWEB_AOT=0)\n";
+
+        return null;
+    }
+
+    $project = $repoRoot.'/examples/009-FastCGIWeb';
+    $phpc = $repoRoot.'/phpc';
+    $binary = $project.'/.phpc/bin/app';
+
+    if (!is_executable($phpc)) {
+        echo "  009-FastCGIWeb AOT: skip (phpc not executable)\n";
+
+        return null;
+    }
+
+    $compileStart = microtime(true);
+    $build = runProcessCapturing(
+        [$phpc, 'build', '--project', $project],
+        $benchEnv,
+        $repoRoot
+    );
+    $compileTime = microtime(true) - $compileStart;
+
+    if (0 !== $build['exit']) {
+        $stderr = $build['stderr'];
+        if (\PHPCompiler\Cli\PhpcBuild::isUserClassAotBlocked($stderr)) {
+            echo '  009-FastCGIWeb AOT: skip (link blocked: '.trim(substr($stderr, 0, 120))."…)\n";
+        } else {
+            echo "  009-FastCGIWeb AOT: skip (phpc build --project exit {$build['exit']})\n";
+        }
+
+        return null;
+    }
+
+    if (!is_executable($binary)) {
+        echo "  009-FastCGIWeb AOT: skip (binary missing after link)\n";
+
+        return null;
+    }
+
+    $aotEnv = $benchEnv;
+    if (!fastcgiWebAotHealthProbe($repoRoot, $binary, array_merge($aotEnv, fastcgiWebHealthCgiEnv()))) {
+        echo "  009-FastCGIWeb AOT: skip (health probe failed)\n";
+
+        return null;
+    }
+
+    $pathEnv = array_merge($aotEnv, fastcgiWebPathInfoCgiEnv());
+    if (!fastcgiWebAotPathInfoProbe($repoRoot, $binary, $pathEnv)) {
+        echo "  009-FastCGIWeb AOT: skip (PATH_INFO probe failed)\n";
+
+        return null;
+    }
+
+    $iterations = 10;
+    $compiledStart = microtime(true);
+    for ($i = 0; $i < $iterations; ++$i) {
+        fastcgiWebAotPathInfoProbe($repoRoot, $binary, $pathEnv);
+    }
+    $compiledTime = (microtime(true) - $compiledStart) / $iterations;
+
+    return ['compile' => $compileTime, 'compiled' => $compiledTime];
+}
+
+/**
+ * @param array<string, string> $baseEnv
+ */
+function fastcgiWebAotHealthProbe(string $repoRoot, string $binary, array $baseEnv): bool
+{
+    $probe = runProcessCapturing([$binary], $baseEnv, $repoRoot);
+    if (0 !== $probe['exit']) {
+        return false;
+    }
+
+    return str_contains($probe['stdout'], 'ok');
+}
+
+/**
+ * @param array<string, string> $baseEnv
+ */
+function fastcgiWebAotPathInfoProbe(string $repoRoot, string $binary, array $baseEnv): bool
+{
+    $probe = runProcessCapturing([$binary], $baseEnv, $repoRoot);
+    if (0 !== $probe['exit']) {
+        return false;
+    }
+
+    return str_contains($probe['stdout'], 'PATH_INFO=')
+        && str_contains($probe['stdout'], 'REQUEST_URI=')
+        && str_contains($probe['stdout'], 'SCRIPT_NAME=');
+}
+
+/**
  * @param list<string> $argv
  * @param array<string, string> $env
  */
@@ -1052,6 +1259,12 @@ function benchmarkExample(string $example, array $phpCmd, array $benchEnv, strin
         if (null !== $throwsAot) {
             $compileTime = $throwsAot['compile'];
             $compiledTime = $throwsAot['compiled'];
+        }
+    } elseif ($llvmReady && !empty($profile['fastcgi_web_project_aot'])) {
+        $fastcgiAot = tryBenchmarkFastCGIWebProjectAot($repoRoot, $benchEnv);
+        if (null !== $fastcgiAot) {
+            $compileTime = $fastcgiAot['compile'];
+            $compiledTime = $fastcgiAot['compiled'];
         }
     } elseif ($llvmReady && !empty($profile['project_aot'])) {
         $projectAot = tryBenchmarkMiniWebAppProjectAot($repoRoot, $benchEnv, $profile);

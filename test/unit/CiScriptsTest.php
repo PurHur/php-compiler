@@ -734,6 +734,12 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('REBUILD_EXAMPLES_006_SYNC_GATE="${REBUILD_EXAMPLES_006_SYNC_GATE:-1}"', $defaults);
     }
 
+    public function testCiDefaultsEnvDefinesRebuildExamples009SyncGateOn(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString('REBUILD_EXAMPLES_009_SYNC_GATE="${REBUILD_EXAMPLES_009_SYNC_GATE:-1}"', $defaults);
+    }
+
     public function testCiDefaultsEnvDefinesRebuildExamples003JitProjectSyncGateOptIn(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
@@ -757,6 +763,14 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('ci_run_rebuild_examples_006_sync_check', $common);
         $this->assertStringContainsString('check-rebuild-examples-006-row.php', $common);
         $this->assertStringContainsString('REBUILD_EXAMPLES_006_SYNC_GATE:-1', $common);
+    }
+
+    public function testCiFastRunsRebuildExamples009SyncViaInventoryChecks(): void
+    {
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('ci_run_rebuild_examples_009_sync_check', $common);
+        $this->assertStringContainsString('check-rebuild-examples-009-sync.php', $common);
+        $this->assertStringContainsString('REBUILD_EXAMPLES_009_SYNC_GATE:-1', $common);
     }
 
     public function testCiFastRunsRebuildExamples003JitProjectSyncViaInventoryChecks(): void
@@ -819,6 +833,12 @@ final class CiScriptsTest extends TestCase
     {
         $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');
         $this->assertStringContainsString('REBUILD_EXAMPLES_006_SYNC_GATE=${REBUILD_EXAMPLES_006_SYNC_GATE:-1}', $body);
+    }
+
+    public function testCiDockerRunPassesRebuildExamples009SyncGateDefaultOn(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');
+        $this->assertStringContainsString('REBUILD_EXAMPLES_009_SYNC_GATE=${REBUILD_EXAMPLES_009_SYNC_GATE:-1}', $body);
     }
 
     public function testCiDockerRunPassesRebuildExamples003JitProjectSyncGateDefaultOptIn(): void
@@ -1714,6 +1734,14 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('REBUILD_EXAMPLES_006_SYNC_GATE', $doc);
         $this->assertStringContainsString('check-rebuild-examples-006-row.php', $doc);
         $this->assertMatchesRegularExpression('/\| `REBUILD_EXAMPLES_006_SYNC_GATE` \| `1` \|/', $doc);
+    }
+
+    public function testLocalCiMatrixDocumentsRebuildExamples009SyncGate(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('REBUILD_EXAMPLES_009_SYNC_GATE', $doc);
+        $this->assertStringContainsString('check-rebuild-examples-009-sync.php', $doc);
+        $this->assertMatchesRegularExpression('/\| `REBUILD_EXAMPLES_009_SYNC_GATE` \| `1` \|/', $doc);
     }
 
     public function testLocalCiMatrixDocumentsRebuildExamples003JitProjectSyncGate(): void
