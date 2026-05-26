@@ -32,10 +32,12 @@ final class BootstrapLibSpineVmSmokeTest extends TestCase
         $this->assertStringContainsString('bootstrap-selfhost-lib-spine-smoke-link.sh', $script);
     }
 
-    public function testSpineEntryDocumentsVmRunSmokeDeferredFromNativeLink(): void
+    public function testSpineEntryBundlesVmRunSmokeDispatch(): void
     {
         $entry = (string) file_get_contents(self::$root.'/test/selfhost/compiler_lib_spine_smoke/main.php');
-        $this->assertStringContainsString('vm_run_smoke', $entry);
+        $this->assertStringContainsString('vm_run_smoke.php', $entry);
+        $this->assertStringContainsString('PHP_COMPILER_VM_SPINE_SMOKE', $entry);
+        $this->assertStringContainsString('vm-spine-ok', $entry);
         $this->assertStringContainsString('bootstrap-selfhost-lib-spine-vm-smoke', $entry);
     }
 
