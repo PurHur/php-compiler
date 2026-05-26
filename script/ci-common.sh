@@ -652,6 +652,24 @@ ci_run_jit_variable_function_compliance() {
   ci_run_phpunit --filter VariableFunction --group jit --fail-on-skipped "$@"
 }
 
+# bin/jit.php $_SERVER / PATH_INFO refresh without recompile (issues #2257, #2275); opt-in JIT_SERVER_SUPERGLOBAL_GATE=1.
+ci_run_jit_server_superglobal() {
+  if [[ "${JIT_SERVER_SUPERGLOBAL_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  if ! ci_llvm_ready; then
+    echo "PHPUnit: JitServerSuperglobal skipped (LLVM 9 not available)"
+    return 0
+  fi
+  if ! ci_should_run_jit; then
+    echo "PHPUnit: JitServerSuperglobal skipped (JIT MCJIT probe failed)"
+    return 0
+  fi
+  ci_apply_llvm_memory_env
+  echo "PHPUnit: JIT \$_SERVER refresh (JitServerSuperglobal; JIT_SERVER_SUPERGLOBAL_GATE=1, #2257, #2275)..."
+  ci_run_phpunit --filter JitServerSuperglobal --fail-on-skipped "$@"
+}
+
 # Shell curl harness for 006-FileUploadWeb multipart upload (issue #1999).
 ci_run_file_upload_web_smoke() {
   if [[ "${FILE_UPLOAD_WEB_SMOKE_GATE:-1}" != "1" ]]; then

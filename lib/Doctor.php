@@ -277,6 +277,11 @@ final class Doctor
         $jitVarFnDetail = $jitVarFnOn
             ? 'default on — ci-fast/ci-local VariableFunction* JIT (#2060)'
             : 'skipped (JIT_VARIABLE_FUNCTION_COMPLIANCE_GATE=0)';
+        $jitServerGate = getenv('JIT_SERVER_SUPERGLOBAL_GATE');
+        $jitServerOn = '1' === $jitServerGate;
+        $jitServerDetail = $jitServerOn
+            ? 'opt-in on — ci-local JitServerSuperglobal (#2257, #2275)'
+            : 'skipped (JIT_SERVER_SUPERGLOBAL_GATE=0 — set 1 for bin/jit.php $_SERVER refresh)';
 
         fwrite(STDOUT, "  Gates ladder     make miniwebapp-gates              stages 0–4d (#472)\n");
         fwrite(STDOUT, "  Fast CI          ./script/ci-fast.sh               VM/compliance\n");
@@ -285,6 +290,7 @@ final class Doctor
         fwrite(STDOUT, "  HashTable rehash {$rehashDetail}\n");
         fwrite(STDOUT, "  Null coalescing  {$coalesceDetail}\n");
         fwrite(STDOUT, "  JIT \$fn() calls  {$jitVarFnDetail}\n");
+        fwrite(STDOUT, "  JIT \$_SERVER     {$jitServerDetail}\n");
         fwrite(STDOUT, "  Full AOT tail    ./script/ci-local.sh --filter MiniWebAppAotExecuteTest   LLVM required\n");
         fwrite(STDOUT, "  Presenter bundle make north-star1-verify            --require-llvm / --skip-llvm-tail\n");
         fwrite(STDOUT, "  Script           ./script/north-star1-verify.sh    same as make target\n");

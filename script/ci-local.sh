@@ -87,6 +87,7 @@ if ci_llvm_ready; then
     ci_guard_jit_compliance "$LLVM_JUNIT" "$(ci_llvm_dir)"
     rm -f "$LLVM_JUNIT"
     ci_run_jit_variable_function_compliance "$@"
+    ci_run_jit_server_superglobal "$@"
 
     ci_run_aot_link_phpunit "$@"
     ci_run_miniwebapp_aot_execute "$@"
@@ -112,6 +113,7 @@ if ci_llvm_ready; then
     ci_run_throws_web_aot_execute "$@"
     ci_run_miniwebapp_serve_aot "$@"
     ci_run_miniwebapp_jit_project "$@"
+    ci_run_jit_server_superglobal "$@"
   fi
 
   ci_run_examples_web_smoke_aot

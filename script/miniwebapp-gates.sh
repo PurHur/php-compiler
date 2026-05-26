@@ -578,6 +578,7 @@ attributes_gate="${ATTRIBUTES_COMPLIANCE_GATE:-1}"
 rehash_gate="${REHASH_COMPLIANCE_GATE:-1}"
 coalesce_gate="${COALESCE_COMPLIANCE_GATE:-1}"
 jit_var_fn_gate="${JIT_VARIABLE_FUNCTION_COMPLIANCE_GATE:-1}"
+jit_server_gate="${JIT_SERVER_SUPERGLOBAL_GATE:-0}"
 echo "  ROOT_README_SYNC_GATE=${root_readme_gate}  script/check-root-readme-sync.php (#1832, #1525)"
 echo "  EXAMPLES_README_SYNC_GATE=${examples_readme_gate}  script/check-examples-readme-sync.php (#1822)"
 echo "  WAVE3_ROADMAP_SYNC_GATE=${wave3_gate}  script/check-wave3-roadmap-sync.php (#1802)"
@@ -590,6 +591,7 @@ echo "  ATTRIBUTES_COMPLIANCE_GATE=${attributes_gate}  ci-fast Attribute* (#1904
 echo "  REHASH_COMPLIANCE_GATE=${rehash_gate}  ci-fast array_rehash_string_keys (#1956, #66)"
 echo "  COALESCE_COMPLIANCE_GATE=${coalesce_gate}  ci-fast Coalesce* (#1960, #99)"
 echo "  JIT_VARIABLE_FUNCTION_COMPLIANCE_GATE=${jit_var_fn_gate}  ci-fast/ci-local VariableFunction* JIT (#2060, #2055)"
+echo "  JIT_SERVER_SUPERGLOBAL_GATE=${jit_server_gate}  ci-local JitServerSuperglobal (#2257, #2275)"
 miniwebapp_parity_gate="${INIT_MINIWEBAPP_PARITY_GATE:-1}"
 echo "  INIT_MINIWEBAPP_PARITY_GATE=${miniwebapp_parity_gate}  script/check-init-miniwebapp-parity.sh (#2057, #695)"
 lint_zero_gate="${MINIWEBAPP_LINT_ZERO_GATE:-1}"
@@ -603,6 +605,7 @@ echo "  Opt out: ATTRIBUTES_COMPLIANCE_GATE=0 ./script/ci-fast.sh"
 echo "  Opt out: REHASH_COMPLIANCE_GATE=0 ./script/ci-fast.sh"
 echo "  Opt out: COALESCE_COMPLIANCE_GATE=0 ./script/ci-fast.sh"
 echo "  Opt out: JIT_VARIABLE_FUNCTION_COMPLIANCE_GATE=0 ./script/ci-fast.sh"
+echo "  Opt in:  JIT_SERVER_SUPERGLOBAL_GATE=1 ./script/ci-local.sh --filter JitServerSuperglobal"
 
 # Current focus
 if [[ "${lint_exit}" -ne 0 && "${lint_gate}" != "0" ]]; then
