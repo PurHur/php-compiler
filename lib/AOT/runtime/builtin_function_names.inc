@@ -164,6 +164,7 @@ static const char *phpc_builtin_functions[] = {
     "ksort",
     "lcfirst",
     "levenshtein",
+    "similar_text",
     "log",
     "lstat",
     "ltrim",

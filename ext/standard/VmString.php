@@ -599,6 +599,86 @@ final class VmString
     }
 
     /**
+     * similar_text() — Oliver string similarity (subset of PHP; issue #2445).
+     */
+    public static function similarText(string $string1, string $string2, ?float &$percent = null): int
+    {
+        $len1 = self::byteLength($string1);
+        $len2 = self::byteLength($string2);
+        if (0 === $len1 + $len2) {
+            if (null !== $percent) {
+                $percent = 0.0;
+            }
+
+            return 0;
+        }
+        $sim = (int) self::similarChar($string1, $len1, $string2, $len2);
+        if (null !== $percent) {
+            $percent = $sim * 200.0 / ($len1 + $len2);
+        }
+
+        return $sim;
+    }
+
+    private static function similarStr(
+        string $txt1,
+        int $len1,
+        string $txt2,
+        int $len2,
+        int &$pos1,
+        int &$pos2,
+        int &$max,
+        int &$count
+    ): void {
+        $max = 0;
+        $count = 0;
+        for ($p = 0; $p < $len1; ++$p) {
+            for ($q = 0; $q < $len2; ++$q) {
+                $l = 0;
+                while ($p + $l < $len1 && $q + $l < $len2 && $txt1[$p + $l] === $txt2[$q + $l]) {
+                    ++$l;
+                }
+                if ($l > $max) {
+                    $max = $l;
+                    ++$count;
+                    $pos1 = $p;
+                    $pos2 = $q;
+                }
+            }
+        }
+    }
+
+    private static function similarChar(string $txt1, int $len1, string $txt2, int $len2): int
+    {
+        $pos1 = 0;
+        $pos2 = 0;
+        $max = 0;
+        $count = 0;
+        self::similarStr($txt1, $len1, $txt2, $len2, $pos1, $pos2, $max, $count);
+        $sum = $max;
+        if ($sum > 0) {
+            if ($pos1 > 0 && $pos2 > 0 && $count > 1) {
+                $sum += self::similarChar(
+                    substr($txt1, 0, $pos1),
+                    $pos1,
+                    substr($txt2, 0, $pos2),
+                    $pos2
+                );
+            }
+            if ($pos1 + $max < $len1 && $pos2 + $max < $len2) {
+                $sum += self::similarChar(
+                    substr($txt1, $pos1 + $max),
+                    $len1 - $pos1 - $max,
+                    substr($txt2, $pos2 + $max),
+                    $len2 - $pos2 - $max
+                );
+            }
+        }
+
+        return $sum;
+    }
+
+    /**
      * metaphone() — PHP-compatible Metaphone on ASCII letters (issue #2423).
      */
     public static function metaphone(string $string, int $maxPhonemes = 0): string
