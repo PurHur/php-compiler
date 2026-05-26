@@ -371,6 +371,10 @@ final class Doctor
         $subsetDetail = $subsetOn
             ? 'BOOTSTRAP_TEST_SUBSET_GATE=1 — ci-fast runs bootstrap-test-subset (#2069)'
             : 'opt-in BOOTSTRAP_TEST_SUBSET_GATE=1 for phpc test --bootstrap in ci-fast (#2069)';
+        $selfhostProbeExample = $repoRoot.'/examples/008-SelfHostProbe/example.php';
+        if (is_file($selfhostProbeExample)) {
+            fwrite(STDOUT, "  008 VM smoke       make examples-selfhostprobe-smoke (#2240)\n");
+        }
         if ($ns2Make) {
             fwrite(STDOUT, "  Presenter bundle make north-star2-verify            --require-llvm / --skip-llvm-tail / --skip-throwsweb\n");
             fwrite(STDOUT, "  Script           ./script/north-star2-verify.sh    same as make target\n");
