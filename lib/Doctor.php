@@ -186,7 +186,9 @@ final class Doctor
 
         fwrite(STDOUT, "1. Inventory\n");
         fwrite(STDOUT, "   {$inventoryDetail}\n");
-        fwrite(STDOUT, "   php script/bootstrap-spine-count.php  → {$spine}/{$inventory}\n\n");
+        fwrite(STDOUT, "   php script/bootstrap-spine-count.php  → {$spine}/{$inventory}\n");
+        self::printInventoryTriageSection($repoRoot);
+        fwrite(STDOUT, "\n");
 
         fwrite(STDOUT, "2. M2 spine\n");
         fwrite(STDOUT, "   SELFHOST_SPINE_COUNT_SYNC_GATE=".(self::gateEnabled('SELFHOST_SPINE_COUNT_SYNC_GATE', $spineCountSyncDefault) ? '1' : '0')." (default {$spineCountSyncDefault})\n");
@@ -230,6 +232,102 @@ final class Doctor
         fwrite(STDOUT, "\nDocs: docs/bootstrap-selfhost.md · docs/bootstrap-m5-fast-path.md · docs/self-host-target.md\n");
 
         return 0;
+    }
+
+    /**
+     * Ranked CFG gaps from bootstrap-inventory-triage.php (#2254, #2285).
+     */
+    private static function printInventoryTriageSection(string $repoRoot): void
+    {
+        fwrite(STDOUT, "\n   Inventory triage\n");
+        $script = $repoRoot.'/script/bootstrap-inventory-triage.php';
+        if (!is_file($script)) {
+            fwrite(STDOUT, "   pending #2254 — php script/bootstrap-inventory-triage.php\n");
+
+            return;
+        }
+
+        $cmd = array_merge(self::phpBinary(), [$script, '--top', '3']);
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open($cmd, $descriptorSpec, $pipes, $repoRoot);
+        if (!is_resource($proc)) {
+            fwrite(STDOUT, "   (triage subprocess failed to start)\n");
+
+            return;
+        }
+        fclose($pipes[0]);
+        stream_set_blocking($pipes[1], false);
+        stream_set_blocking($pipes[2], false);
+        $stdout = '';
+        $deadline = microtime(true) + 5.0;
+        $timedOut = false;
+        while (true) {
+            $read = [$pipes[1], $pipes[2]];
+            $write = null;
+            $except = null;
+            $remaining = $deadline - microtime(true);
+            if ($remaining <= 0) {
+                $timedOut = true;
+                proc_terminate($proc);
+                break;
+            }
+            $sec = (int) floor($remaining);
+            $usec = (int) (($remaining - $sec) * 1_000_000);
+            $ready = @stream_select($read, $write, $except, $sec, $usec);
+            if (false === $ready) {
+                break;
+            }
+            if (0 === $ready) {
+                $status = proc_get_status($proc);
+                if (!$status['running']) {
+                    break;
+                }
+                continue;
+            }
+            foreach ($read as $stream) {
+                $chunk = stream_get_contents($stream);
+                if (false !== $chunk && '' !== $chunk && $stream === $pipes[1]) {
+                    $stdout .= $chunk;
+                }
+            }
+            $status = proc_get_status($proc);
+            if (!$status['running']) {
+                break;
+            }
+        }
+        if (!$timedOut) {
+            $stdout .= (string) stream_get_contents($pipes[1]);
+        }
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        proc_close($proc);
+
+        if ($timedOut) {
+            fwrite(STDOUT, "   (triage timed out after 5s — run: php script/bootstrap-inventory-triage.php --top 10)\n");
+
+            return;
+        }
+        if ('' === trim($stdout)) {
+            fwrite(STDOUT, "   (triage produced no output)\n");
+
+            return;
+        }
+        foreach (preg_split('/\R/', trim($stdout)) as $line) {
+            if (str_starts_with($line, 'bootstrap-inventory-triage:')) {
+                fwrite(STDOUT, '   '.$line."\n");
+                continue;
+            }
+            if ('' === trim($line)) {
+                fwrite(STDOUT, "\n");
+                continue;
+            }
+            fwrite(STDOUT, $line."\n");
+        }
+        fwrite(STDOUT, "   Full table: php script/bootstrap-inventory-triage.php\n");
     }
 
     /**
