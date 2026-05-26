@@ -17,6 +17,82 @@ final class VmMetaphone
         1, 16, 4, 16, 9, 2, 4, 16, 9, 2, 0, 2, 2, 2, 1, 4, 0, 2, 4, 4, 1, 0, 0, 0, 8, 0,
     ];
 
+    private static function upperAt(string $word, int $len, int $index): string
+    {
+        if ($index < 0 || $index >= $len) {
+            return '';
+        }
+        $ord = \ord($word[$index]);
+        if ($ord >= 97 && $ord <= 122) {
+            return \chr($ord - 32);
+        }
+
+        return $word[$index];
+    }
+
+    private static function isAlpha(string $c): bool
+    {
+        if ('' === $c) {
+            return false;
+        }
+        $ord = \ord($c);
+
+        return ($ord >= 65 && $ord <= 90) || ($ord >= 97 && $ord <= 122);
+    }
+
+    private static function toUpper(string $c): string
+    {
+        $o = \ord($c);
+        if ($o >= 97 && $o <= 122) {
+            return \chr($o - 32);
+        }
+
+        return $c;
+    }
+
+    private static function encodeChar(string $c): int
+    {
+        if (!self::isAlpha($c)) {
+            return 0;
+        }
+        $o = \ord(self::toUpper($c));
+
+        return self::CODES[$o - 65];
+    }
+
+    private static function isVowel(string $c): bool
+    {
+        return 0 !== (self::encodeChar($c) & 1);
+    }
+
+    private static function makeSoft(string $c): bool
+    {
+        return 0 !== (self::encodeChar($c) & 8);
+    }
+
+    private static function affectH(string $c): bool
+    {
+        return 0 !== (self::encodeChar($c) & 4);
+    }
+
+    private static function noGhToF(string $c): bool
+    {
+        return 0 !== (self::encodeChar($c) & 16);
+    }
+
+    private static function isBreak(string $c): bool
+    {
+        return !self::isAlpha($c);
+    }
+
+    private static function phonize(string &$out, string $c, int $maxPhonemes): void
+    {
+        if (0 !== $maxPhonemes && \strlen($out) >= $maxPhonemes) {
+            return;
+        }
+        $out .= $c;
+    }
+
     public static function encode(string $word, int $maxPhonemes = 0): string
     {
         if ($maxPhonemes < 0) {
@@ -26,255 +102,192 @@ final class VmMetaphone
         $out = '';
         $wIdx = 0;
         $traditional = true;
-        $upperAt = static function (int $index) use ($word, $len): string {
-            if ($index < 0 || $index >= $len) {
-                return '';
-            }
-            $ord = \ord($word[$index]);
-            if ($ord >= 97 && $ord <= 122) {
-                return \chr($ord - 32);
-            }
 
-            return $word[$index];
-        };
-
-        $curr = static function () use ($upperAt, &$wIdx): string {
-            return $upperAt($wIdx);
-        };
-        $next = static function () use ($upperAt, &$wIdx): string {
-            return $upperAt($wIdx + 1);
-        };
-        $prev = static function () use ($upperAt, &$wIdx): string {
-            return $upperAt($wIdx - 1);
-        };
-        $afterNext = static function () use ($upperAt, &$wIdx): string {
-            return $upperAt($wIdx + 2);
-        };
-        $lookBack = static function (int $n) use ($upperAt, &$wIdx): string {
-            return $upperAt($wIdx - $n);
-        };
-        $lookAhead = static function (int $n) use ($upperAt, &$wIdx): string {
-            return $upperAt($wIdx + $n);
-        };
-        $phonize = static function (string $c) use (&$out, $maxPhonemes): void {
-            if (0 !== $maxPhonemes && \strlen($out) >= $maxPhonemes) {
-                return;
-            }
-            $out .= $c;
-        };
-        $isAlpha = static function (string $c): bool {
-            if ('' === $c) {
-                return false;
-            }
-            $ord = \ord($c);
-
-            return ($ord >= 65 && $ord <= 90) || ($ord >= 97 && $ord <= 122);
-        };
-        $toUpper = static function (string $c): string {
-            $o = \ord($c);
-            if ($o >= 97 && $o <= 122) {
-                return \chr($o - 32);
-            }
-
-            return $c;
-        };
-        $encode = static function (string $c) use ($isAlpha, $toUpper): int {
-            if (!$isAlpha($c)) {
-                return 0;
-            }
-            $o = \ord($toUpper($c));
-
-            return self::CODES[$o - 65];
-        };
-        $isVowel = static function (string $c) use ($encode): bool {
-            return 0 !== ($encode($c) & 1);
-        };
-        $makeSoft = static function (string $c) use ($encode): bool {
-            return 0 !== ($encode($c) & 8);
-        };
-        $affectH = static function (string $c) use ($encode): bool {
-            return 0 !== ($encode($c) & 4);
-        };
-        $noGhToF = static function (string $c) use ($encode): bool {
-            return 0 !== ($encode($c) & 16);
-        };
-        $isBreak = static function (string $c) use ($isAlpha): bool {
-            return !$isAlpha($c);
-        };
-
-        while (!$isAlpha($curr())) {
-            if ('' === $curr()) {
+        while (!self::isAlpha(self::upperAt($word, $len, $wIdx))) {
+            if ('' === self::upperAt($word, $len, $wIdx)) {
                 return '';
             }
             ++$wIdx;
         }
 
-        switch ($curr()) {
+        $curr = self::upperAt($word, $len, $wIdx);
+        $next = self::upperAt($word, $len, $wIdx + 1);
+        $afterNext = self::upperAt($word, $len, $wIdx + 2);
+
+        switch ($curr) {
             case 'A':
-                if ('E' === $next()) {
-                    $phonize('E');
+                if ('E' === $next) {
+                    self::phonize($out, 'E', $maxPhonemes);
                     $wIdx += 2;
                 } else {
-                    $phonize('A');
+                    self::phonize($out, 'A', $maxPhonemes);
                     ++$wIdx;
                 }
                 break;
             case 'G':
             case 'K':
             case 'P':
-                if ('N' === $next()) {
-                    $phonize('N');
+                if ('N' === $next) {
+                    self::phonize($out, 'N', $maxPhonemes);
                     $wIdx += 2;
                 }
                 break;
             case 'W':
-                if ('R' === $next()) {
-                    $phonize($next());
+                if ('R' === $next) {
+                    self::phonize($out, $next, $maxPhonemes);
                     $wIdx += 2;
-                } elseif ('H' === $next() || $isVowel($next())) {
-                    $phonize('W');
+                } elseif ('H' === $next || self::isVowel($next)) {
+                    self::phonize($out, 'W', $maxPhonemes);
                     $wIdx += 2;
                 }
                 break;
             case 'X':
-                $phonize('S');
+                self::phonize($out, 'S', $maxPhonemes);
                 ++$wIdx;
                 break;
             case 'E':
             case 'I':
             case 'O':
             case 'U':
-                $phonize($curr());
+                self::phonize($out, $curr, $maxPhonemes);
                 ++$wIdx;
                 break;
         }
 
-        while ('' !== $curr() && (0 === $maxPhonemes || \strlen($out) < $maxPhonemes)) {
+        while ('' !== self::upperAt($word, $len, $wIdx) && (0 === $maxPhonemes || \strlen($out) < $maxPhonemes)) {
             $skip = 0;
-            if (!$isAlpha($curr())) {
+            $curr = self::upperAt($word, $len, $wIdx);
+            $next = self::upperAt($word, $len, $wIdx + 1);
+            $prev = self::upperAt($word, $len, $wIdx - 1);
+            $afterNext = self::upperAt($word, $len, $wIdx + 2);
+
+            if (!self::isAlpha($curr)) {
                 ++$wIdx;
                 continue;
             }
-            if ($curr() === $prev() && 'C' !== $curr()) {
+            if ($curr === $prev && 'C' !== $curr) {
                 ++$wIdx;
                 continue;
             }
 
-            switch ($curr()) {
+            switch ($curr) {
                 case 'B':
-                    if ('M' !== $prev()) {
-                        $phonize('B');
+                    if ('M' !== $prev) {
+                        self::phonize($out, 'B', $maxPhonemes);
                     }
                     break;
                 case 'C':
-                    if ($makeSoft($next())) {
-                        if ('A' === $afterNext() && 'I' === $next()) {
-                            $phonize(self::SH);
-                        } elseif ('S' !== $prev()) {
-                            $phonize('S');
+                    if (self::makeSoft($next)) {
+                        if ('A' === $afterNext && 'I' === $next) {
+                            self::phonize($out, self::SH, $maxPhonemes);
+                        } elseif ('S' !== $prev) {
+                            self::phonize($out, 'S', $maxPhonemes);
                         }
-                    } elseif ('H' === $next()) {
-                        if (!$traditional && ('R' === $afterNext() || 'S' === $prev())) {
-                            $phonize('K');
+                    } elseif ('H' === $next) {
+                        if (!$traditional && ('R' === $afterNext || 'S' === $prev)) {
+                            self::phonize($out, 'K', $maxPhonemes);
                         } else {
-                            $phonize(self::SH);
+                            self::phonize($out, self::SH, $maxPhonemes);
                         }
                         $skip = 1;
                     } else {
-                        $phonize('K');
+                        self::phonize($out, 'K', $maxPhonemes);
                     }
                     break;
                 case 'D':
-                    if ('G' === $next() && $makeSoft($afterNext())) {
-                        $phonize('J');
+                    if ('G' === $next && self::makeSoft($afterNext)) {
+                        self::phonize($out, 'J', $maxPhonemes);
                         $skip = 1;
                     } else {
-                        $phonize('T');
+                        self::phonize($out, 'T', $maxPhonemes);
                     }
                     break;
                 case 'G':
-                    if ('H' === $next()) {
-                        if (!$noGhToF($lookBack(3)) && 'H' !== $lookBack(4)) {
-                            $phonize('F');
+                    if ('H' === $next) {
+                        $lookBack3 = self::upperAt($word, $len, $wIdx - 3);
+                        $lookBack4 = self::upperAt($word, $len, $wIdx - 4);
+                        if (!self::noGhToF($lookBack3) && 'H' !== $lookBack4) {
+                            self::phonize($out, 'F', $maxPhonemes);
                             $skip = 1;
                         }
-                    } elseif ('N' === $next()) {
-                        if (!$isBreak($afterNext()) && ('E' !== $afterNext() || 'D' !== $lookAhead(3))) {
-                            $phonize('K');
+                    } elseif ('N' === $next) {
+                        $lookAhead3 = self::upperAt($word, $len, $wIdx + 3);
+                        if (!self::isBreak($afterNext) && ('E' !== $afterNext || 'D' !== $lookAhead3)) {
+                            self::phonize($out, 'K', $maxPhonemes);
                         }
-                    } elseif ($makeSoft($next()) && 'G' !== $prev()) {
-                        $phonize('J');
+                    } elseif (self::makeSoft($next) && 'G' !== $prev) {
+                        self::phonize($out, 'J', $maxPhonemes);
                     } else {
-                        $phonize('K');
+                        self::phonize($out, 'K', $maxPhonemes);
                     }
                     break;
                 case 'H':
-                    if ($isVowel($next()) && !$affectH($prev())) {
-                        $phonize('H');
+                    if (self::isVowel($next) && !self::affectH($prev)) {
+                        self::phonize($out, 'H', $maxPhonemes);
                     }
                     break;
                 case 'K':
-                    if ('C' !== $prev()) {
-                        $phonize('K');
+                    if ('C' !== $prev) {
+                        self::phonize($out, 'K', $maxPhonemes);
                     }
                     break;
                 case 'P':
-                    if ('H' === $next()) {
-                        $phonize('F');
+                    if ('H' === $next) {
+                        self::phonize($out, 'F', $maxPhonemes);
                     } else {
-                        $phonize('P');
+                        self::phonize($out, 'P', $maxPhonemes);
                     }
                     break;
                 case 'Q':
-                    $phonize('K');
+                    self::phonize($out, 'K', $maxPhonemes);
                     break;
                 case 'S':
-                    if ('I' === $next() && ('O' === $afterNext() || 'A' === $afterNext())) {
-                        $phonize(self::SH);
-                    } elseif ('H' === $next()) {
-                        $phonize(self::SH);
+                    if ('I' === $next && ('O' === $afterNext || 'A' === $afterNext)) {
+                        self::phonize($out, self::SH, $maxPhonemes);
+                    } elseif ('H' === $next) {
+                        self::phonize($out, self::SH, $maxPhonemes);
                         $skip = 1;
                     } elseif (
                         !$traditional
-                        && 'C' === $next()
-                        && 'H' === $lookAhead(2)
-                        && 'W' === $lookAhead(3)
+                        && 'C' === $next
+                        && 'H' === self::upperAt($word, $len, $wIdx + 2)
+                        && 'W' === self::upperAt($word, $len, $wIdx + 3)
                     ) {
-                        $phonize(self::SH);
+                        self::phonize($out, self::SH, $maxPhonemes);
                         $skip = 2;
                     } else {
-                        $phonize('S');
+                        self::phonize($out, 'S', $maxPhonemes);
                     }
                     break;
                 case 'T':
-                    if ('I' === $next() && ('O' === $afterNext() || 'A' === $afterNext())) {
-                        $phonize(self::SH);
-                    } elseif ('H' === $next()) {
-                        $phonize(self::TH);
+                    if ('I' === $next && ('O' === $afterNext || 'A' === $afterNext)) {
+                        self::phonize($out, self::SH, $maxPhonemes);
+                    } elseif ('H' === $next) {
+                        self::phonize($out, self::TH, $maxPhonemes);
                         $skip = 1;
-                    } elseif (!('C' === $next() && 'H' === $afterNext())) {
-                        $phonize('T');
+                    } elseif (!('C' === $next && 'H' === $afterNext)) {
+                        self::phonize($out, 'T', $maxPhonemes);
                     }
                     break;
                 case 'V':
-                    $phonize('F');
+                    self::phonize($out, 'F', $maxPhonemes);
                     break;
                 case 'W':
-                    if ($isVowel($next())) {
-                        $phonize('W');
+                    if (self::isVowel($next)) {
+                        self::phonize($out, 'W', $maxPhonemes);
                     }
                     break;
                 case 'X':
-                    $phonize('K');
-                    $phonize('S');
+                    self::phonize($out, 'K', $maxPhonemes);
+                    self::phonize($out, 'S', $maxPhonemes);
                     break;
                 case 'Y':
-                    if ($isVowel($next())) {
-                        $phonize('Y');
+                    if (self::isVowel($next)) {
+                        self::phonize($out, 'Y', $maxPhonemes);
                     }
                     break;
                 case 'Z':
-                    $phonize('S');
+                    self::phonize($out, 'S', $maxPhonemes);
                     break;
                 case 'F':
                 case 'J':
@@ -282,7 +295,7 @@ final class VmMetaphone
                 case 'M':
                 case 'N':
                 case 'R':
-                    $phonize($curr());
+                    self::phonize($out, $curr, $maxPhonemes);
                     break;
             }
 
