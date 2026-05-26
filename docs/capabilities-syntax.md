@@ -10,7 +10,7 @@ Tracking issues: [#58](https://github.com/PurHur/php-compiler/issues/58), [#145]
 | Construct | VM | JIT | AOT | Issue | Notes |
 |-----------|:--:|:---:|:---:|-------|-------|
 | `class` / `new` | yes | yes | yes | [#58](https://github.com/PurHur/php-compiler/issues/58) | compliance PHPT; bootstrap AOT |
-| Anonymous class `new class { }` | yes | yes | no | [#1233](https://github.com/PurHur/php-compiler/issues/1233) | php-cfg inline Stmt\Class_ in parseExpr_New; synthetic AnonymousClass@line name |
+| Anonymous class `new class { }` | yes | yes | yes | [#1233](https://github.com/PurHur/php-compiler/issues/1233) | php-cfg inline Stmt\Class_ in parseExpr_New; synthetic AnonymousClass@line name |
 | Enum declarations `enum Foo: string { case Bar = 'x'; }` | yes | yes | no | [#1356](https://github.com/PurHur/php-compiler/issues/1356) | Backed enum cases as class constants; `Foo::Bar` const-like fetch; `enum_exists` registry |
 | Instance methods (`ClassMethod` / `Expr_MethodCall`) | yes | yes | yes | [#58](https://github.com/PurHur/php-compiler/issues/58) | MiniWebApp `$router->dispatch()` (#2059); compliance PHPT; bootstrap AOT |
 | Static methods on user classes (`Expr_StaticCall`) | yes | yes | yes | [#2209](https://github.com/PurHur/php-compiler/issues/2209) | Public static methods without $this; `Router::fromConfig()` factory (#2059); Late static `static::method()` tracked separately (#1231) |
@@ -37,7 +37,7 @@ Tracking issues: [#58](https://github.com/PurHur/php-compiler/issues/58), [#145]
 | By-reference parameters (`function f(&$x)`) | yes | no | no | [#140](https://github.com/PurHur/php-compiler/issues/140) | VM aliases caller slots via TYPE_INDIRECT; JIT pointer args deferred; VM-only lowering |
 | Static property `Class::$prop` | yes | yes | yes | [#1225](https://github.com/PurHur/php-compiler/issues/1225) | Class-scoped storage; `self::` / `static::`; literal property names in JIT |
 | `unset()` on variables, array offsets, and object properties | yes | yes | yes | [#2273](https://github.com/PurHur/php-compiler/issues/2273) | Locals, `$this->prop`, public properties, string/int keys (#1224); Static properties via TYPE_STATIC_PROPERTY_UNSET (#2256) |
-| Function-local `static $var = <literal>` | yes | yes | no | [#2286](https://github.com/PurHur/php-compiler/issues/2286) | Literal int/string init only in v1; VM + JIT + AOT |
+| Function-local `static $var = <literal>` | yes | yes | yes | [#2286](https://github.com/PurHur/php-compiler/issues/2286) | Literal int/string init only in v1; VM + JIT + AOT |
 | Keyed array destructuring (`["a" => $x]`) | yes | yes | yes | [#1234](https://github.com/PurHur/php-compiler/issues/1234) | Skip string-key CFG split for fetch+assign destructuring pairs (#1234) |
 | `goto` / labels (function scope) | yes | yes | yes | [#1228](https://github.com/PurHur/php-compiler/issues/1228) | php-cfg lowers labels to CFG Jump; VM avoids frame nesting on same-block back-edges; compliance PHPT |
 | `declare(strict_types=1)` scalar parameter checks | yes | yes | yes | [#1229](https://github.com/PurHur/php-compiler/issues/1229) | VM #156; JIT enforces at user call sites via JIT\TypeCheck + Native::compileArg weak casts |
