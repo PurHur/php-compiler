@@ -42,6 +42,7 @@ class JIT {
     private array $queue = [];
 
     private ?Block $m3EmitTuMainBlock = null;
+    private bool $m3EmitTuRuntimeSpineLowered = false;
 
     public Context $context;
 
@@ -52,6 +53,10 @@ class JIT {
     public function compile(Block $block): PHPLLVM\Value {
         if ($this->shouldUseM3EmitTuNativeBridge() && $this->isM3EmitTuScriptMain($block)) {
             $this->m3EmitTuMainBlock = $block;
+            if (!$this->m3EmitTuRuntimeSpineLowered) {
+                $this->m3EmitTuRuntimeSpineLowered = true;
+                $this->compileM3EmitTuRuntimeSpineDecls();
+            }
         }
         $return = $this->compileBlock($block);
         $this->runQueue();
