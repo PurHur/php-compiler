@@ -10,6 +10,7 @@ declare(strict_types=1);
  */
 
 require_once __DIR__.'/../vendor/autoload.php';
+require_once __DIR__.'/rebuild-examples-ssot.php';
 require_once __DIR__.'/../test/support/CgiCookieJar.php';
 require_once __DIR__.'/../test/support/SessionsWebCgiEnv.php';
 

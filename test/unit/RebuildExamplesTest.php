@@ -88,6 +88,18 @@ final class RebuildExamplesTest extends TestCase
         $this->assertStringContainsString('REBUILD_EXAMPLES_005_SYNC_GATE="${REBUILD_EXAMPLES_005_SYNC_GATE:-1}"', $defaults);
     }
 
+    public function testRebuildExamplesSsotDefinesMiniWebAppJitProjectRowLabel(): void
+    {
+        require_once dirname(__DIR__, 2).'/script/rebuild-examples-ssot.php';
+        $this->assertSame('003-MiniWebApp (project JIT)', rebuild_examples_miniwebapp_jit_project_row_label());
+
+        $check = file_get_contents(dirname(__DIR__, 2).'/script/check-rebuild-examples-003-jit-project-sync.php');
+        $this->assertNotFalse($check);
+        $this->assertStringContainsString('rebuild-examples-ssot.php', $check);
+        $this->assertStringContainsString('miniwebapp_jit_project_test_would_run', $check);
+        $this->assertStringContainsString('BENCH_MINIWEBAPP_JIT_PROJECT=1', $check);
+    }
+
     public function testRebuildExamplesDocumentsThrowsWebBenchmarkGate(): void
     {
         $script = file_get_contents(dirname(__DIR__, 2).'/script/rebuild-examples.php');
