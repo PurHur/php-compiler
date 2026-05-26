@@ -7,6 +7,7 @@ final class RuntimeInitVmContext {
     public static function emit(Context $context, ObjectType $object, Value $runtimeThis): void {
         $ctxId = $object->lookup('PHPCompiler\\VM\\Context');
         $ctx = $object->allocate($ctxId);
+        $object->markObjectConstructed($ctx);
 
         foreach ([
             'functions',
@@ -34,12 +35,14 @@ final class RuntimeInitVmContext {
 
         $errorsId = $object->lookup('PHPCompiler\\VM\\ErrorReporter');
         $errors = $object->allocate($errorsId);
+        $object->markObjectConstructed($errors);
         $errorsVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $errors);
         $errorsSlot = $object->propertyFetch($ctx, 'PHPCompiler\\VM\\Context', 'errors');
         $object->propertyStore($errorsSlot->objectPropertySlot, $errorsVar, Variable::TYPE_OBJECT);
 
         $stackId = $object->lookup('PHPCompiler\\VM\\ScriptStack');
         $scriptStack = $object->allocate($stackId);
+        $object->markObjectConstructed($scriptStack);
         $stackVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $scriptStack);
         $stackSlot = $object->propertyFetch($ctx, 'PHPCompiler\\VM\\Context', 'scriptStack');
         $object->propertyStore($stackSlot->objectPropertySlot, $stackVar, Variable::TYPE_OBJECT);
