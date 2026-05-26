@@ -53,9 +53,13 @@ final class M3EmitTuTrivialEchoAot
         @chmod($sidecar, 0755);
         self::$registeredSidecarRels[] = $sidecarRel;
 
-        $sentinelLogical ??= self::TRIVIAL_ECHO_SIDECAR_REL === $sidecarRel
-            ? self::SENTINEL_LOGICAL
-            : self::HELLOWORLD_SENTINEL_LOGICAL;
+        if (null === $sentinelLogical) {
+            $sentinelLogical = match ($sidecarRel) {
+                self::TRIVIAL_ECHO_SIDECAR_REL => self::SENTINEL_LOGICAL,
+                self::COMPILE_SMOKE_SIDECAR_REL => self::COMPILE_SMOKE_SENTINEL_LOGICAL,
+                default => self::HELLOWORLD_SENTINEL_LOGICAL,
+            };
+        }
 
         $sourceGlobal = $context->constantStringFromString($source);
         $sidecarGlobal = $context->constantStringFromString($sidecar);
