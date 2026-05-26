@@ -77,8 +77,10 @@ if ci_llvm_ready; then
 
     BOOTSTRAP_WAVE_CHECK="${BOOTSTRAP_WAVE_CHECK:-1}" ci_run_bootstrap_wave_check
     ci_run_bootstrap_compile_smoke_probe
+    ci_run_bootstrap_runtime_compile_smoke_probe
     ci_run_bootstrap_m3_strict
     ci_run_bootstrap_m3_compile_smoke_strict
+    ci_run_bootstrap_runtime_compile_smoke_strict
     ci_run_bootstrap_m4_loop_probe
 
     echo "PHPUnit: JIT compliance (@group jit)..."
@@ -102,8 +104,10 @@ if ci_llvm_ready; then
 
     BOOTSTRAP_WAVE_CHECK="${BOOTSTRAP_WAVE_CHECK:-1}" ci_run_bootstrap_wave_check
     ci_run_bootstrap_compile_smoke_probe
+    ci_run_bootstrap_runtime_compile_smoke_probe
     ci_run_bootstrap_m3_strict
     ci_run_bootstrap_m3_compile_smoke_strict
+    ci_run_bootstrap_runtime_compile_smoke_strict
     ci_run_bootstrap_m4_loop_probe
 
     ci_run_aot_link_phpunit "$@"

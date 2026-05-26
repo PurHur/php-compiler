@@ -22,6 +22,7 @@ function run(string $filename, string $code, array $options): void
         // M3 native emit TU: self-host M3 allowlist (not full bootstrap JIT) (#1937, #1983).
         $m3Driver = getenv('PHP_COMPILER_M3_COMPILE_DRIVER');
         $m3EmitNative = (str_contains($normalized, 'compile_smoke_m3_emit_native_entry.php')
+                || str_contains($normalized, 'runtime_m3_emit_native_entry.php')
                 || str_contains($normalized, 'helloworld_m3_emit_native_entry.php'))
             && ('1' === $m3Driver || 'true' === strtolower((string) $m3Driver));
         if ($m3EmitNative) {

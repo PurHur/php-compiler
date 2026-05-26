@@ -47,6 +47,7 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | M0 `bootstrap-selfhost-link.sh` | ✅ `compiler_minimal bundle OK` |
 | M1 compile-smoke AOT echo | ✅ `compiler smoke` |
 | M3 compile-smoke probe (partial) | ✅ `bootstrap-selfhost-compile-smoke-probe.sh` (Zend emit; strict opt-in #1937) |
+| M3 Runtime compile smoke (partial) | ✅ `bootstrap-selfhost-runtime-compile-smoke.sh` (Zend emit; strict opt-in #2294) |
 | M2 `BOOTSTRAP_LIB_SPINE_SMOKE=1` spine link | ✅ `compiler_lib_spine_smoke bundle OK` |
 | M3 `make bootstrap-selfhost-helloworld` | 🚧 partial — HelloWorld runs natively; emit uses Zend |
 | M4 `make bootstrap-loop-gen1-link` | 🚧 partial — gen-1 link + gen-2 **Zend** emit (`emit_path=zend partial`); `BOOTSTRAP_M4_LINK_COMPILE_DRIVER=1` for `emit_path=native`; `BOOTSTRAP_M4_GEN2_STRICT=1` refuses Zend fallback ([#1498](https://github.com/PurHur/php-compiler/issues/1498), [#2115](https://github.com/PurHur/php-compiler/issues/2115)) |
