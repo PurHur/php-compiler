@@ -15,6 +15,15 @@ final class RuntimeInitVmContextTest extends TestCase
         $this->assertStringContainsString('ScriptStack', $source);
         $this->assertStringContainsString("'errors'", $source);
         $this->assertStringContainsString("'scriptStack'", $source);
+        $this->assertStringContainsString("'functions'", $source);
+        $this->assertStringContainsString('HashTableHelper::alloc', $source);
+    }
+
+    public function testM3EmitTuConstructCallsInitVmContextFloor(): void
+    {
+        $jit = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT.php');
+        $this->assertStringContainsString('RuntimeInitVmContext::emit', $jit);
+        $this->assertStringContainsString('emitM3EmitTuRuntimeConstructNativeFunction', $jit);
     }
 
     public function testSpineShimsExist(): void

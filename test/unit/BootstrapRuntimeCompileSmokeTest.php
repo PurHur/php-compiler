@@ -96,4 +96,12 @@ final class BootstrapRuntimeCompileSmokeTest extends TestCase
         $this->assertStringContainsString('emitMainEntry', $jit);
         $this->assertStringContainsString('compileM3EmitTuRuntimeMethodFromQueue', $jit);
     }
+
+    public function testM3EmitTuMainUsesNativeBridgeEntry(): void
+    {
+        $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
+        $this->assertStringContainsString('compileM3EmitTuMainNative', $jit);
+        $this->assertStringContainsString('BootstrapCompileSmokeM3Emit::emitMainEntry', $jit);
+        $this->assertStringContainsString('compileM3EmitTuRuntimeMethodFromQueue', $jit);
+    }
 }
