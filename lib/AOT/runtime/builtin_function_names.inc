@@ -235,6 +235,7 @@ static const char *phpc_builtin_functions[] = {
     "sizeof",
     "sleep",
     "sort",
+    "soundex",
     "spl_autoload_register",
     "sprintf",
     "sqrt",

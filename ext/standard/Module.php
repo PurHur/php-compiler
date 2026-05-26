@@ -57,6 +57,7 @@ class Module extends ModuleAbstract
             new chr(),
             new strcmp(),
             new levenshtein(),
+            new soundex(),
             new strnatcmp(),
             new strnatcasecmp(),
             new strcasecmp(),

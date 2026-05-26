@@ -549,6 +549,57 @@ final class VmString
     }
 
     /**
+     * soundex() — byte-oriented American Soundex (subset of PHP; issue #2416).
+     */
+    public static function soundex(string $str): string
+    {
+        $len = self::byteLength($str);
+        if (0 === $len) {
+            return '0000';
+        }
+
+        $i = 0;
+        while ($i < $len && !ctype_alpha($str[$i])) {
+            ++$i;
+        }
+        if ($i >= $len) {
+            return '0000';
+        }
+
+        $out = strtoupper($str[$i]);
+        $last = self::soundexCode($str[$i]);
+        $j = 1;
+        for (++$i; $i < $len && $j < 4; ++$i) {
+            if (!ctype_alpha($str[$i])) {
+                continue;
+            }
+            $code = self::soundexCode($str[$i]);
+            if (0 !== $code && $code !== $last) {
+                $out .= (string) $code;
+                ++$j;
+            }
+            $last = $code;
+        }
+
+        return str_pad($out, 4, '0');
+    }
+
+    private static function soundexCode(string $c): int
+    {
+        $c = strtolower($c);
+
+        return match ($c) {
+            'b', 'f', 'p', 'v' => 1,
+            'c', 'g', 'j', 'k', 'q', 's', 'x', 'z' => 2,
+            'd', 't' => 3,
+            'l' => 4,
+            'm', 'n' => 5,
+            'r' => 6,
+            default => 0,
+        };
+    }
+
+    /**
      * levenshtein() — byte-oriented edit distance (subset of PHP; issue #2406).
      */
     public static function levenshtein(
