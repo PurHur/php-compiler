@@ -8,10 +8,11 @@ declare(strict_types=1);
  *
  * Fails when known post-#764 blocker phrases remain while examples/README.md
  * documents native execute as green. Also guards 005-SessionsWeb,
- * 006-FileUploadWeb, and 007-ThrowsWeb shipped-example rows (#1924, #2017,
- * #2094). Enable in CI via ROOT_README_SYNC_GATE=1 (default in ci-defaults.env
- * after #1525). Stricter 006/007 stale-phrase checks: ROOT_README_006_SYNC_GATE
- * / ROOT_README_007_SYNC_GATE (default on in ci-fast). Opt out:
+ * 006-FileUploadWeb, 007-ThrowsWeb, and 008-SelfHostProbe shipped-example rows
+ * (#1924, #2017, #2094, #2229). Enable in CI via ROOT_README_SYNC_GATE=1
+ * (default in ci-defaults.env after #1525). Stricter 006/007/008 stale-phrase
+ * checks: ROOT_README_006_SYNC_GATE / ROOT_README_007_SYNC_GATE /
+ * ROOT_README_008_SYNC_GATE (006/007 default on; 008 opt-in). Opt out:
  * ROOT_README_SYNC_GATE=0.
  *
  * Usage:
@@ -74,6 +75,9 @@ if (is_readable($examplesReadme)) {
     if (str_contains($examples, '007-ThrowsWeb') && !str_contains($body, '007-ThrowsWeb')) {
         $errors[] = 'README.md: missing 007-ThrowsWeb row (sync examples/README.md; #2094)';
     }
+    if (str_contains($examples, '008-SelfHostProbe') && !str_contains($body, '008-SelfHostProbe')) {
+        $errors[] = 'README.md: missing 008-SelfHostProbe row (sync examples/README.md; #2229)';
+    }
     if (str_contains($examples, '009-FastCGIWeb') && !str_contains($body, '009-FastCGIWeb')) {
         $errors[] = 'README.md: missing 009-FastCGIWeb row (sync examples/README.md; #2353)';
     }
@@ -86,6 +90,11 @@ if (is_readable($examplesReadme)) {
         && preg_match('/\| \[007-ThrowsWeb\][^\n]*✅/u', $examples)
         && preg_match('/\| \[007-ThrowsWeb\][^\n]*🚧/u', $body)) {
         $errors[] = 'README.md: 007-ThrowsWeb row shows 🚧 but examples/README.md is ✅ (#2094)';
+    }
+    if (str_contains($examples, '| [008-SelfHostProbe]')
+        && preg_match('/\| \[008-SelfHostProbe\][^\n]*✅/u', $examples)
+        && preg_match('/\| \[008-SelfHostProbe\][^\n]*🚧/u', $body)) {
+        $errors[] = 'README.md: 008-SelfHostProbe row shows 🚧 but examples/README.md is ✅ (#2229)';
     }
 }
 
@@ -149,11 +158,41 @@ if ($check007Stale) {
     }
 }
 
+$check008Stale = (getenv('ROOT_README_008_SYNC_GATE') ?: '0') === '1';
+if ($check008Stale) {
+    $selfhostSmokeDefault = ci_defaults_gate_default($root, 'EXAMPLES_SELFHOSTPROBE_SMOKE_GATE');
+    $selfhostAotDefault = ci_defaults_gate_default($root, 'SELFHOSTPROBE_AOT_SMOKE_GATE');
+    $stale008 = [];
+    if ('1' === $selfhostSmokeDefault) {
+        $stale008[] = 'EXAMPLES_SELFHOSTPROBE_SMOKE_GATE=0';
+        $stale008[] = '008-SelfHostProbe smoke opt-in';
+    }
+    if ('1' === $selfhostAotDefault) {
+        $stale008[] = 'SELFHOSTPROBE_AOT_SMOKE_GATE=0';
+        $stale008[] = '008 AOT opt-in';
+    }
+    foreach ($stale008 as $phrase) {
+        if (!str_contains($body, $phrase)) {
+            continue;
+        }
+        foreach ($lines as $num => $line) {
+            if (!str_contains($line, $phrase)) {
+                continue;
+            }
+            if (!preg_match('/008|SelfHostProbe|SELFHOSTPROBE|EXAMPLES_SELFHOSTPROBE/i', $line)) {
+                continue;
+            }
+            $lineNo = $num + 1;
+            $errors[] = "stale 008 phrase in README.md:{$lineNo}: {$phrase} (gate default-on; #2229)";
+        }
+    }
+}
+
 if ([] !== $errors) {
     foreach ($errors as $err) {
         fwrite(STDERR, "check-root-readme-sync: {$err}\n");
     }
-    fwrite(STDERR, "check-root-readme-sync: FAILED (fix README.md; see #48, #1525, #1832, #2017, #2094)\n");
+    fwrite(STDERR, "check-root-readme-sync: FAILED (fix README.md; see #48, #1525, #1832, #2017, #2094, #2229)\n");
     exit(1);
 }
 

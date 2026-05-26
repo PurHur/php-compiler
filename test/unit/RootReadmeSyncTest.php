@@ -54,6 +54,15 @@ final class RootReadmeSyncTest extends TestCase
         $this->assertStringContainsString('examples/007-ThrowsWeb/', $body);
     }
 
+    public function testRootReadmeLists008SelfHostProbe(): void
+    {
+        $readme = dirname(__DIR__, 2).'/README.md';
+        $this->assertFileExists($readme);
+        $body = (string) file_get_contents($readme);
+        $this->assertStringContainsString('008-SelfHostProbe', $body);
+        $this->assertStringContainsString('examples/008-SelfHostProbe/', $body);
+    }
+
     public function testRootReadmeSync006StaleGatePassesOnMaster(): void
     {
         $root = dirname(__DIR__, 2);
@@ -69,6 +78,17 @@ final class RootReadmeSyncTest extends TestCase
     {
         $root = dirname(__DIR__, 2);
         $env = 'ROOT_README_007_SYNC_GATE=1';
+        $cmd = $env.' '.escapeshellarg(PHP_BINARY).' '
+            .escapeshellarg($root.'/script/check-root-readme-sync.php').' 2>&1';
+        exec($cmd, $out, $code);
+        $this->assertSame(0, $code, implode("\n", $out));
+        $this->assertStringContainsString('check-root-readme-sync: OK', implode("\n", $out));
+    }
+
+    public function testRootReadmeSync008StaleGatePassesOnMaster(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $env = 'ROOT_README_008_SYNC_GATE=1';
         $cmd = $env.' '.escapeshellarg(PHP_BINARY).' '
             .escapeshellarg($root.'/script/check-root-readme-sync.php').' 2>&1';
         exec($cmd, $out, $code);
