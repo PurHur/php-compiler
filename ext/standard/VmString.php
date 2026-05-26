@@ -1586,6 +1586,101 @@ final class VmString
     }
 
     /**
+     * str_word_count() — count words or return word list (ASCII subset of PHP; issue #2382).
+     *
+     * @return int|list<string>|array<int, string>
+     */
+    public static function str_word_count(string $string, int $format = 0, string $chars = ''): int|array
+    {
+        if ($format < 0 || $format > 2) {
+            throw new \ValueError('str_word_count(): Argument #2 ($format) must be a valid format value');
+        }
+        $extra = self::strWordCountExtraMask($chars);
+        $len = self::byteLength($string);
+        $words = [];
+        $positions = [];
+        $count = 0;
+        $inWord = false;
+        $wordStart = 0;
+        for ($i = 0; $i < $len; ++$i) {
+            $ch = $string[$i];
+            if (self::isStrWordChar($ch, $inWord, $extra)) {
+                if (!$inWord) {
+                    $wordStart = $i;
+                    $inWord = true;
+                    ++$count;
+                }
+            } elseif ($inWord) {
+                if (1 === $format || 2 === $format) {
+                    $word = self::byteSlice($string, $wordStart, $i - $wordStart);
+                    if (1 === $format) {
+                        $words[] = $word;
+                    } else {
+                        $positions[$wordStart] = $word;
+                    }
+                }
+                $inWord = false;
+            }
+        }
+        if ($inWord && (1 === $format || 2 === $format)) {
+            $word = self::byteSlice($string, $wordStart);
+            if (1 === $format) {
+                $words[] = $word;
+            } else {
+                $positions[$wordStart] = $word;
+            }
+        }
+        if (0 === $format) {
+            return $count;
+        }
+        if (1 === $format) {
+            return $words;
+        }
+
+        return $positions;
+    }
+
+    /**
+     * @return array<int, bool>
+     */
+    private static function strWordCountExtraMask(string $chars): array
+    {
+        if ('' === $chars) {
+            return [];
+        }
+        $mask = [];
+        $clen = self::byteLength($chars);
+        for ($i = 0; $i < $clen; ++$i) {
+            $mask[self::byteOrd($chars[$i])] = true;
+        }
+
+        return $mask;
+    }
+
+    /**
+     * @param array<int, bool> $extra
+     */
+    private static function isStrWordLetter(string $ch): bool
+    {
+        $ord = self::byteOrd($ch);
+
+        return ($ord >= 65 && $ord <= 90) || ($ord >= 97 && $ord <= 122);
+    }
+
+    private static function isStrWordChar(string $ch, bool $inWord, array $extra): bool
+    {
+        $ord = self::byteOrd($ch);
+        if (isset($extra[$ord])) {
+            return true;
+        }
+        if (self::isStrWordLetter($ch)) {
+            return true;
+        }
+
+        return $inWord && (39 === $ord || 45 === $ord);
+    }
+
+    /**
      * Count non-overlapping occurrences of $needle in $haystack (byte-safe subset of PHP).
      */
     public static function substr_count(
