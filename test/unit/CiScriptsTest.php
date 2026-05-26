@@ -1260,6 +1260,36 @@ final class CiScriptsTest extends TestCase
         $this->assertMatchesRegularExpression('/\| `DOCTOR_GATES_MATRIX_SYNC_GATE` \| `1` \|/', $doc);
     }
 
+    public function testCiDefaultsEnvDefinesDocsHarnessHygieneGateOn(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString('DOCS_HARNESS_HYGIENE_GATE="${DOCS_HARNESS_HYGIENE_GATE:-1}"', $defaults);
+        $this->assertStringContainsString('#2485', $defaults);
+    }
+
+    public function testCiFastRunsDocsHarnessHygieneViaInventoryChecks(): void
+    {
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('ci_run_docs_harness_hygiene_check', $common);
+        $this->assertStringContainsString('check-docs-harness-hygiene.php', $common);
+        $this->assertStringContainsString('DOCS_HARNESS_HYGIENE_GATE:-1', $common);
+    }
+
+    public function testCiDockerRunPassesDocsHarnessHygieneGateDefaultOn(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');
+        $this->assertStringContainsString('DOCS_HARNESS_HYGIENE_GATE=${DOCS_HARNESS_HYGIENE_GATE:-1}', $body);
+    }
+
+    public function testLocalCiMatrixDocumentsDocsHarnessHygieneGate(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('DOCS_HARNESS_HYGIENE_GATE', $doc);
+        $this->assertStringContainsString('check-docs-harness-hygiene.php', $doc);
+        $this->assertMatchesRegularExpression('/\| `DOCS_HARNESS_HYGIENE_GATE` \| `1` \|/', $doc);
+        $this->assertStringContainsString('#2485', $doc);
+    }
+
     public function testCiDefaultsEnvDefinesSelfhostM4Gen2SyncGateOn(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
