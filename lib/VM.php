@@ -1577,8 +1577,12 @@ restart:
 
     protected function defineClass(ClassEntry $entry, Block $block): void {
         $frame = $block->getFrame($this->context);
-        // TODO
         foreach ($block->opCodes as $op) {
+            if ($this->isClassBodyDefaultInitOpcode($op->type)) {
+                $this->executeClassBodyDefaultInitOpcode($frame, $op);
+
+                continue;
+            }
             switch ($op->type) {
                 case OpCode::TYPE_DECLARE_PROPERTY:
                     $name = $frame->scope[$op->arg1];
@@ -1626,10 +1630,61 @@ restart:
                     $this->applyTraitUse($entry, $frame->scope[$op->arg1]->toString());
                     break;
                 default:
-                    var_dump($op);
-                    throw new \LogicException('Other class body types are not jittable for now');
+                    throw new \LogicException(
+                        'Other class body types are not jittable for now: '.opcode_type_name($op->type)
+                    );
             }
-            
+        }
+    }
+
+    private function isClassBodyDefaultInitOpcode(int $type): bool
+    {
+        return OpCode::TYPE_INIT_ARRAY === $type
+            || OpCode::TYPE_ADD_ARRAY_ELEMENT === $type
+            || OpCode::TYPE_ARRAY_SPREAD === $type;
+    }
+
+    private function executeClassBodyDefaultInitOpcode(Frame $frame, OpCode $op): void
+    {
+        switch ($op->type) {
+            case OpCode::TYPE_INIT_ARRAY:
+                $result = $frame->scope[$op->arg1];
+                $result->newArray();
+                if (is_null($op->arg2)) {
+                    break;
+                }
+                // Fall through intentional
+            case OpCode::TYPE_ADD_ARRAY_ELEMENT:
+                $result = $frame->scope[$op->arg1];
+                $ht = $result->toArray();
+                if (is_null($op->arg3)) {
+                    $ht->append($frame->scope[$op->arg2]);
+
+                    break;
+                }
+                $key = $frame->scope[$op->arg3]->resolveIndirect();
+                if ($key->is(Variable::TYPE_INTEGER)) {
+                    $ht->addIndex($key->toInt(), $frame->scope[$op->arg2]);
+                } else {
+                    $ht->add($key->toString(), $frame->scope[$op->arg2]);
+                }
+                break;
+            case OpCode::TYPE_ARRAY_SPREAD:
+                $result = $frame->scope[$op->arg1];
+                $source = $frame->scope[$op->arg2]->resolveIndirect();
+                if (Variable::TYPE_ARRAY !== $source->type) {
+                    throw new \LogicException(
+                        Variable::TYPE_NULL === $source->type
+                            ? 'Cannot spread null'
+                            : 'Only arrays can be spread'
+                    );
+                }
+                $result->toArray()->spreadFrom($source->toArray());
+                break;
+            default:
+                throw new \LogicException(
+                    'Unexpected class body init opcode: '.opcode_type_name($op->type)
+                );
         }
     }
 
