@@ -38,6 +38,7 @@ final class CapabilitySyntaxTest extends TestCase
         $this->assertStringContainsString('`ksort()`', $body);
         $this->assertStringContainsString('`array_merge()` on string-key associative arrays', $body);
         $this->assertStringContainsString('`rsort()`', $body);
+        $this->assertStringContainsString('`shuffle()`', $body);
         $this->assertStringContainsString('#2271', $body);
         $this->assertStringContainsString('#2287', $body);
         $this->assertStringContainsString('## Web north-star', $body);

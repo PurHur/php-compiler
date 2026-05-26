@@ -108,6 +108,7 @@ class HashTable extends Type
         $this->registerFn('__value__writeHashtable', 'void', ['__value__*', '__hashtable__*']);
         $this->registerFn('__hashtable__sortPacked', 'void', ['__hashtable__*']);
         $this->registerFn('__hashtable__sortPackedReverse', 'void', ['__hashtable__*']);
+        $this->registerFn('__hashtable__shufflePacked', 'void', ['__hashtable__*']);
         $this->registerFn('__hashtable__sortStringKeys', 'void', ['__hashtable__*']);
         $this->registerFn('__hashtable__sortStringKeysReverse', 'void', ['__hashtable__*']);
         $this->registerFn('__hashtable__sortStringKeyValues', 'void', ['__hashtable__*']);
@@ -169,6 +170,7 @@ class HashTable extends Type
         $this->implementValueWriteHashtable();
         $this->implementSortPacked();
         $this->implementSortPackedReverse();
+        $this->implementShufflePacked();
         $this->implementSortStringKeys();
         $this->implementSortStringKeysReverse();
         $this->implementSortStringKeyValues();
@@ -1672,6 +1674,47 @@ class HashTable extends Type
         $this->context->builder->returnVoid();
     }
 
+    private function implementShufflePacked(): void
+    {
+        $fn = $this->context->lookupFunction('__hashtable__shufflePacked');
+        $main = $fn->appendBasicBlock('main');
+        $this->context->builder->positionAtEnd($main);
+        $ht = $fn->getParam(0);
+        $map = $this->context->structFieldMap['__hashtable__'];
+        $sizeT = $this->context->getTypeFromString('size_t');
+        $two = $sizeT->constInt(2, false);
+        $num = $this->context->builder->load($this->context->builder->structGep($ht, $map['nextFreeElement']));
+        $tooSmall = $this->context->builder->icmp(Builder::INT_ULT, $num, $two);
+        $done = $fn->appendBasicBlock('shuffle_done');
+        $work = $fn->appendBasicBlock('shuffle_work');
+        $this->context->builder->branchIf($tooSmall, $done, $work);
+
+        $this->context->builder->positionAtEnd($work);
+        $zero = $sizeT->constInt(0, false);
+        $firstEntry = $this->listEntryAt($ht, $map, $zero);
+        $valueMap = $this->context->structFieldMap['__value__'];
+        $firstType = $this->context->builder->load(
+            $this->context->builder->structGep($firstEntry, $valueMap['type'])
+        );
+        $i8 = $this->context->getTypeFromString('int8');
+        $stringTag = $i8->constInt(Variable::TYPE_STRING, false);
+        $isString = $this->context->builder->icmp(Builder::INT_EQ, $firstType, $stringTag);
+        $shuffleStrings = $fn->appendBasicBlock('shuffle_strings');
+        $shuffleLongs = $fn->appendBasicBlock('shuffle_longs');
+        $this->context->builder->branchIf($isString, $shuffleStrings, $shuffleLongs);
+
+        $this->context->builder->positionAtEnd($shuffleStrings);
+        $this->emitShufflePackedStrings($fn, $ht, $map, $num);
+        $this->context->builder->branch($done);
+
+        $this->context->builder->positionAtEnd($shuffleLongs);
+        $this->emitShufflePackedLongs($fn, $ht, $map, $num);
+        $this->context->builder->branch($done);
+
+        $this->context->builder->positionAtEnd($done);
+        $this->context->builder->returnVoid();
+    }
+
     private function implementSortStringKeys(): void
     {
         $fn = $this->context->lookupFunction('__hashtable__sortStringKeys');
@@ -2374,6 +2417,169 @@ class HashTable extends Type
         $this->context->builder->branch($outerHead);
 
         $this->context->builder->positionAtEnd($outerDone);
+    }
+
+    /**
+     * @param array<string, int> $map
+     */
+    private function emitShufflePackedLongs(
+        PHPLLVM\LLVMAbstract\Value\Function_ $fn,
+        PHPLLVM\Value $ht,
+        array $map,
+        PHPLLVM\Value $num
+    ): void {
+        $sizeT = $this->context->getTypeFromString('size_t');
+        $one = $sizeT->constInt(1, false);
+        $iSlot = $this->context->builder->alloca($sizeT, 1, 'shuffle_long_i');
+        $this->context->builder->store($this->context->builder->sub($num, $one), $iSlot);
+
+        $head = $fn->appendBasicBlock('shuffle_long_head');
+        $body = $fn->appendBasicBlock('shuffle_long_body');
+        $loopDone = $fn->appendBasicBlock('shuffle_long_done');
+        $this->context->builder->branch($head);
+
+        $this->context->builder->positionAtEnd($head);
+        $iVal = $this->context->builder->load($iSlot);
+        $stop = $this->context->builder->icmp(Builder::INT_EQ, $iVal, $sizeT->constInt(0, false));
+        $this->context->builder->branchIf($stop, $loopDone, $body);
+
+        $this->context->builder->positionAtEnd($body);
+        $upper = $this->context->builder->addNoSignedWrap(
+            $this->context->builder->load($iSlot),
+            $one
+        );
+        $jVal = $this->emitRandomIndexMod($fn, $upper);
+        $iAtSwap = $this->context->builder->load($iSlot);
+        $longA = $this->context->builder->call(
+            $this->context->lookupFunction('__hashtable__readLongAt'),
+            $ht,
+            $iAtSwap
+        );
+        $longB = $this->context->builder->call(
+            $this->context->lookupFunction('__hashtable__readLongAt'),
+            $ht,
+            $jVal
+        );
+        $entryA = $this->listEntryAt($ht, $map, $iAtSwap);
+        $entryB = $this->listEntryAt($ht, $map, $jVal);
+        $this->context->builder->call($this->context->lookupFunction('__value__writeLong'), $entryA, $longB);
+        $this->context->builder->call($this->context->lookupFunction('__value__writeLong'), $entryB, $longA);
+        $this->context->builder->store(
+            $this->context->builder->subNoSignedWrap($iAtSwap, $one),
+            $iSlot
+        );
+        $this->context->builder->branch($head);
+
+        $this->context->builder->positionAtEnd($loopDone);
+    }
+
+    /**
+     * @param array<string, int> $map
+     */
+    private function emitShufflePackedStrings(
+        PHPLLVM\LLVMAbstract\Value\Function_ $fn,
+        PHPLLVM\Value $ht,
+        array $map,
+        PHPLLVM\Value $num
+    ): void {
+        $sizeT = $this->context->getTypeFromString('size_t');
+        $one = $sizeT->constInt(1, false);
+        $iSlot = $this->context->builder->alloca($sizeT, 1, 'shuffle_str_i');
+        $this->context->builder->store($this->context->builder->sub($num, $one), $iSlot);
+
+        $head = $fn->appendBasicBlock('shuffle_str_head');
+        $body = $fn->appendBasicBlock('shuffle_str_body');
+        $loopDone = $fn->appendBasicBlock('shuffle_str_done');
+        $this->context->builder->branch($head);
+
+        $this->context->builder->positionAtEnd($head);
+        $iVal = $this->context->builder->load($iSlot);
+        $stop = $this->context->builder->icmp(Builder::INT_EQ, $iVal, $sizeT->constInt(0, false));
+        $this->context->builder->branchIf($stop, $loopDone, $body);
+
+        $this->context->builder->positionAtEnd($body);
+        $upper = $this->context->builder->addNoSignedWrap(
+            $this->context->builder->load($iSlot),
+            $one
+        );
+        $jVal = $this->emitRandomIndexMod($fn, $upper);
+        $iAtSwap = $this->context->builder->load($iSlot);
+        $strA = $this->context->builder->call(
+            $this->context->lookupFunction('__hashtable__readStringAt'),
+            $ht,
+            $iAtSwap
+        );
+        $strB = $this->context->builder->call(
+            $this->context->lookupFunction('__hashtable__readStringAt'),
+            $ht,
+            $jVal
+        );
+        $entryA = $this->listEntryAt($ht, $map, $iAtSwap);
+        $entryB = $this->listEntryAt($ht, $map, $jVal);
+        $this->context->builder->call($this->context->lookupFunction('__value__writeString'), $entryA, $strB);
+        $this->context->builder->call($this->context->lookupFunction('__value__writeString'), $entryB, $strA);
+        $this->context->builder->store(
+            $this->context->builder->subNoSignedWrap($iAtSwap, $one),
+            $iSlot
+        );
+        $this->context->builder->branch($head);
+
+        $this->context->builder->positionAtEnd($loopDone);
+    }
+
+    /** Uniform index in [0, $upperExclusive) using 8 CSPRNG bytes. */
+    private function emitRandomIndexMod(
+        PHPLLVM\LLVMAbstract\Value\Function_ $fn,
+        PHPLLVM\Value $upperExclusive
+    ): PHPLLVM\Value {
+        $sizeT = $this->context->getTypeFromString('size_t');
+        $upperSlot = $this->context->builder->alloca($sizeT, 1, 'shuffle_rand_upper');
+        $this->context->builder->store($upperExclusive, $upperSlot);
+        $i64 = $this->context->getTypeFromString('int64');
+        $randStr = $this->context->builder->call(
+            $this->context->lookupFunction('__compiler_random_bytes'),
+            $i64->constInt(8, false)
+        );
+        $randPtr = $this->stringDataPtr($randStr);
+        $accSlot = $this->context->builder->alloca($i64, 1, 'shuffle_rand_acc');
+        $this->context->builder->store($i64->constInt(0, false), $accSlot);
+        $byteSlot = $this->context->builder->alloca($i64, 1, 'shuffle_rand_byte');
+        $this->context->builder->store($i64->constInt(0, false), $byteSlot);
+
+        $byteHead = $fn->appendBasicBlock('shuffle_rand_head');
+        $byteBody = $fn->appendBasicBlock('shuffle_rand_body');
+        $byteDone = $fn->appendBasicBlock('shuffle_rand_done');
+        $this->context->builder->branch($byteHead);
+
+        $this->context->builder->positionAtEnd($byteHead);
+        $bi = $this->context->builder->load($byteSlot);
+        $byteStop = $this->context->builder->icmp(
+            Builder::INT_SGE,
+            $bi,
+            $i64->constInt(8, false)
+        );
+        $this->context->builder->branchIf($byteStop, $byteDone, $byteBody);
+
+        $this->context->builder->positionAtEnd($byteBody);
+        $acc = $this->context->builder->load($accSlot);
+        $byte = $this->context->builder->zext(
+            $this->context->builder->load($this->context->builder->gep($randPtr, $bi)),
+            $i64
+        );
+        $shifted = $this->context->builder->shl($acc, $i64->constInt(8, false));
+        $this->context->builder->store($this->context->builder->or($shifted, $byte), $accSlot);
+        $this->context->builder->store(
+            $this->context->builder->addNoSignedWrap($bi, $i64->constInt(1, false)),
+            $byteSlot
+        );
+        $this->context->builder->branch($byteHead);
+
+        $this->context->builder->positionAtEnd($byteDone);
+        $accVal = $this->context->builder->load($accSlot);
+        $upperI64 = $this->context->builder->zext($this->context->builder->load($upperSlot), $i64);
+        $jI64 = $this->context->builder->unsigendRem($accVal, $upperI64);
+
+        return $this->context->builder->trunc($jI64, $sizeT);
     }
 
     /**

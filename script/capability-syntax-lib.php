@@ -1256,6 +1256,14 @@ function stdlibArrayBuiltinNorthStarDefinitions(): array
             'notes' => ['Packed homogeneous string/int lists; `__hashtable__sortPackedReverse`'],
         ],
         [
+            'construct' => '`shuffle()` (packed list Fisher–Yates)',
+            'vm' => 'yes',
+            'jit' => 'yes',
+            'aot' => 'yes',
+            'issue' => 2310,
+            'notes' => ['Homogeneous string/int packed lists; `__hashtable__shufflePacked` + CSPRNG'],
+        ],
+        [
             'construct' => '`array_merge()` on string-key associative arrays',
             'vm' => 'yes',
             'jit' => 'yes',
