@@ -594,9 +594,9 @@ ci_run_bootstrap_vm_unit_probe() {
   "$_CI_SCRIPT_DIR/bootstrap-selfhost-vm-unit-probe.sh"
 }
 
-# M3 PHPTypes unit probe: lib/JIT.php Type constants bundle native link + run (issue #2430); opt-in (#2433).
+# M3 PHPTypes unit probe: lib/JIT.php Type constants bundle native link + run (issue #2430); default-on (#2433, #2436).
 ci_run_bootstrap_phptypes_unit_probe() {
-  if [[ "${BOOTSTRAP_PHPTYPES_UNIT_PROBE_GATE:-0}" != "1" ]]; then
+  if [[ "${BOOTSTRAP_PHPTYPES_UNIT_PROBE_GATE:-1}" != "1" ]]; then
     return 0
   fi
   if ! ci_llvm_ready; then
