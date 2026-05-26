@@ -263,4 +263,41 @@ final class VmArray
 
         return $sorted;
     }
+
+    /**
+     * shuffle() — Fisher–Yates on packed list values (CSPRNG via {@see VmString::randomBytes()}).
+     */
+    public static function shufflePacked(HashTable $ht): void
+    {
+        $n = $ht->getNumElements();
+        if ($n < 2) {
+            return;
+        }
+        if (!self::isList($ht)) {
+            throw new \LogicException(
+                'shuffle() only supports packed list arrays in this compiler build'
+            );
+        }
+        $values = [];
+        foreach ($ht->iterate(true) as $value) {
+            $copy = new Variable();
+            $copy->copyFrom($value);
+            $values[] = $copy;
+        }
+        for ($i = $n - 1; $i > 0; --$i) {
+            $rand = VmString::randomBytes(8);
+            $pick = 0;
+            for ($b = 0; $b < 8; ++$b) {
+                $pick = ($pick << 8) | \ord($rand[$b]);
+            }
+            $j = $pick % ($i + 1);
+            if ($j < 0) {
+                $j += $i + 1;
+            }
+            $tmp = $values[$i];
+            $values[$i] = $values[$j];
+            $values[$j] = $tmp;
+        }
+        $ht->replacePackedValues($values);
+    }
 }

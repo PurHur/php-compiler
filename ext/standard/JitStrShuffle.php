@@ -90,7 +90,7 @@ final class JitStrShuffle
         $context->builder->branchIf($stop, $loopDone, $loopBody);
 
         $context->builder->positionAtEnd($loopBody);
-        $jVal = self::randomIndex($context, $context->builder->add($iVal, $one));
+        $jVal = self::randomIndexBelow($context, $context->builder->add($iVal, $one));
         $iAt = $context->builder->gep($destPtr, $iVal);
         $jAt = $context->builder->gep($destPtr, $jVal);
         $iCh = $context->builder->load($iAt);
@@ -115,7 +115,7 @@ final class JitStrShuffle
     }
 
     /** Uniform index in [0, $upperExclusive) using 8 CSPRNG bytes. */
-    private static function randomIndex(Context $context, Value $upperExclusive): Value
+    public static function randomIndexBelow(Context $context, Value $upperExclusive): Value
     {
         $i64 = $context->getTypeFromString('int64');
         $randStr = JitRandomBytes::generate($context, $i64->constInt(8, false));

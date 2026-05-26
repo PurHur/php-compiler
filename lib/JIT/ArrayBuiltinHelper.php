@@ -5041,6 +5041,18 @@ final class ArrayBuiltinHelper
         );
     }
 
+    public static function shufflePacked(Context $context, Variable $array): void
+    {
+        if (self::isNativeArray($array->type)) {
+            throw new \LogicException(
+                'shuffle() cannot compile fixed-size literal arrays in JIT/AOT yet; use bin/vm.php or bin/serve.php, or build the list with [] append'
+            );
+        }
+        $ht = self::loadHashTable($context, $array);
+        $context->builder->call($context->lookupFunction('__hashtable__shufflePacked'), $ht);
+        HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
+    }
+
     public static function sortPacked(Context $context, Variable $array): void
     {
         if (self::isNativeArray($array->type)) {
