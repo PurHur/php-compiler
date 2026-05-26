@@ -20,6 +20,28 @@ final class RuntimeInitVmContext {
         $stackSlot = $object->propertyFetch($ctx, 'PHPCompiler\\VM\\Context', 'scriptStack');
         $object->propertyStore($stackSlot->objectPropertySlot, $stackVar, Variable::TYPE_OBJECT);
 
+        // VM\Context constructor initializes these as []; native init must materialize hashtable objects.
+        foreach ([
+            'functions',
+            'classes',
+            'enums',
+            'classAutoloaders',
+            'splAutoloadCallbacks',
+            'constants',
+            'foreachIterators',
+            // Private storage used by core runtime paths.
+            'loadedCompileUnits',
+            'superglobalVars',
+            'globalVars',
+            'functionStaticVars',
+            'functionStaticInitialized',
+        ] as $prop) {
+            $ht = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+            $htVar = new Variable($context, Variable::TYPE_HASHTABLE, Variable::KIND_VALUE, $ht);
+            $slot = $object->propertyFetch($ctx, 'PHPCompiler\\VM\\Context', $prop);
+            $object->propertyStore($slot->objectPropertySlot, $htVar, Variable::TYPE_HASHTABLE);
+        }
+
         $runtimeVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $runtimeThis);
         $runtimeSlot = $object->propertyFetch($ctx, 'PHPCompiler\\VM\\Context', 'runtime');
         $object->propertyStore($runtimeSlot->objectPropertySlot, $runtimeVar, Variable::TYPE_OBJECT);
