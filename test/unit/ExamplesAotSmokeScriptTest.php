@@ -63,6 +63,10 @@ final class ExamplesAotSmokeScriptTest extends TestCase
         $this->assertStringContainsString('THROWSWEB_AOT_SMOKE_GATE', $body);
         $this->assertStringContainsString('smoke_007_throwsweb', $body);
         $this->assertStringContainsString('EXAMPLES_AOT_SMOKE_ONLY=007', $body);
+        $this->assertStringContainsString('009-FastCGIWeb', $body);
+        $this->assertStringContainsString('FASTCGI_WEB_AOT_SMOKE_GATE', $body);
+        $this->assertStringContainsString('smoke_009_fastcgiweb', $body);
+        $this->assertStringContainsString('EXAMPLES_AOT_SMOKE_ONLY=009', $body);
         $this->assertStringNotContainsString('#568', $body);
     }
 

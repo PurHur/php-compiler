@@ -96,6 +96,7 @@ if ci_llvm_ready; then
     ci_run_sessions_web_aot_execute "$@"
     ci_run_file_upload_web_aot_execute "$@"
     ci_run_throws_web_aot_execute "$@"
+    ci_run_fastcgi_web_aot_execute "$@"
     ci_run_miniwebapp_serve_aot "$@"
     ci_run_miniwebapp_jit_project "$@"
   else
@@ -115,6 +116,7 @@ if ci_llvm_ready; then
     ci_run_sessions_web_aot_execute "$@"
     ci_run_file_upload_web_aot_execute "$@"
     ci_run_throws_web_aot_execute "$@"
+    ci_run_fastcgi_web_aot_execute "$@"
     ci_run_miniwebapp_serve_aot "$@"
     ci_run_miniwebapp_jit_project "$@"
     ci_run_jit_server_superglobal "$@"

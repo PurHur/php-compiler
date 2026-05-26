@@ -11,6 +11,8 @@
 #   EXAMPLES_AOT_SMOKE_ONLY=006 ./script/examples-aot-smoke.sh   # 006 slice only (#2013)
 #   EXAMPLES_AOT_SMOKE_ONLY=007 ./script/examples-aot-smoke.sh   # 007 slice only (#2104)
 #   THROWSWEB_AOT_SMOKE_GATE=1 EXAMPLES_AOT_SMOKE_ONLY=007 ./script/examples-aot-smoke.sh
+#   EXAMPLES_AOT_SMOKE_ONLY=009 ./script/examples-aot-smoke.sh   # 009 slice only (#2352)
+#   FASTCGI_WEB_AOT_SMOKE_GATE=1 EXAMPLES_AOT_SMOKE_ONLY=009 ./script/examples-aot-smoke.sh
 #
 # Docker:
 #   ./script/docker-exec.sh -- make examples-aot-smoke
@@ -26,6 +28,7 @@ MINIWEBAPP="${ROOT}/examples/003-MiniWebApp"
 SESSIONSWEB="${ROOT}/examples/005-SessionsWeb"
 FILEUPLOADWEB="${ROOT}/examples/006-FileUploadWeb"
 THROWSWEB="${ROOT}/examples/007-ThrowsWeb"
+FASTCGIWEB="${ROOT}/examples/009-FastCGIWeb"
 SMOKE_ONLY="${EXAMPLES_AOT_SMOKE_ONLY:-}"
 
 resolve_llvm_dir() {
@@ -378,6 +381,84 @@ smoke_007_throwsweb() {
 
   echo "examples-aot-smoke: 007-ThrowsWeb: ok"
 }
+
+# 009-FastCGIWeb project AOT + CGI health + PATH_INFO diagnostics (#2331, #2352).
+smoke_009_fastcgiweb() {
+  if [[ "${FASTCGI_WEB_AOT_SMOKE_GATE:-0}" != "1" ]]; then
+    echo "examples-aot-smoke: 009-FastCGIWeb: skip (FASTCGI_WEB_AOT_SMOKE_GATE=0)"
+    return 0
+  fi
+  if [[ ! -f "${FASTCGIWEB}/example.php" ]]; then
+    echo "examples-aot-smoke: 009-FastCGIWeb: skip (tree missing #2331)" >&2
+    return 0
+  fi
+
+  local binary="${FASTCGIWEB}/.phpc/bin/app"
+  echo "examples-aot-smoke: 009-FastCGIWeb: phpc build --project -> ${binary}"
+  if ! "$PHPC" build --project "${FASTCGIWEB}"; then
+    echo "examples-aot-smoke: 009-FastCGIWeb: link failed" >&2
+    return 1
+  fi
+  if [[ ! -x "$binary" ]]; then
+    echo "examples-aot-smoke: 009-FastCGIWeb: expected executable ${binary}" >&2
+    return 1
+  fi
+
+  local out stderr_file run_code stderr
+  stderr_file="$(mktemp "${SMOKE_ROOT}/009.XXXXXX")"
+  set +e
+  out="$(
+    QUERY_STRING='' \
+      REQUEST_URI='/example.php' \
+      SCRIPT_NAME='/example.php' \
+      "$binary" 2>"$stderr_file"
+  )"
+  run_code=$?
+  set -e
+  stderr="$(cat "$stderr_file" 2>/dev/null || true)"
+  rm -f "$stderr_file"
+  if [[ "$run_code" -ne 0 ]]; then
+    echo "examples-aot-smoke: 009-FastCGIWeb: health exited ${run_code}" >&2
+    [[ -n "$stderr" ]] && echo "$stderr" >&2
+    return 1
+  fi
+  if [[ "$out" != *'ok'* ]]; then
+    echo "examples-aot-smoke: 009-FastCGIWeb: health missing ok needle" >&2
+    [[ -n "$out" ]] && echo "--- stdout ---" >&2 && echo "$out" >&2 && echo "--- end ---" >&2
+    return 1
+  fi
+
+  stderr_file="$(mktemp "${SMOKE_ROOT}/009.XXXXXX")"
+  set +e
+  out="$(
+    PATH_INFO='/ping' \
+      REQUEST_URI='/example.php/ping' \
+      SCRIPT_NAME='/example.php' \
+      "$binary" 2>"$stderr_file"
+  )"
+  run_code=$?
+  set -e
+  stderr="$(cat "$stderr_file" 2>/dev/null || true)"
+  rm -f "$stderr_file"
+  if [[ "$run_code" -ne 0 ]]; then
+    echo "examples-aot-smoke: 009-FastCGIWeb: PATH_INFO exited ${run_code}" >&2
+    [[ -n "$stderr" ]] && echo "$stderr" >&2
+    return 1
+  fi
+  if [[ "$out" != *'PATH_INFO='* ]]; then
+    echo "examples-aot-smoke: 009-FastCGIWeb: missing PATH_INFO diagnostic" >&2
+    [[ -n "$out" ]] && echo "--- stdout ---" >&2 && echo "$out" >&2 && echo "--- end ---" >&2
+    return 1
+  fi
+
+  echo "examples-aot-smoke: 009-FastCGIWeb: ok"
+}
+
+if [[ "${SMOKE_ONLY}" == "009" ]]; then
+  echo "examples-aot-smoke: 009 slice (LLVM at ${LLVM_DIR})"
+  smoke_009_fastcgiweb
+  exit $?
+fi
 
 if [[ "${SMOKE_ONLY}" == "007" ]]; then
   echo "examples-aot-smoke: 007 slice (LLVM at ${LLVM_DIR})"
