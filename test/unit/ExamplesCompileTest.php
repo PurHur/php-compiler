@@ -195,6 +195,7 @@ final class ExamplesCompileTest extends TestCase
             '006-FileUploadWeb' => [$root.'/006-FileUploadWeb'],
             '007-ThrowsWeb' => [$root.'/007-ThrowsWeb'],
             '008-SelfHostProbe' => [$root.'/008-SelfHostProbe'],
+            '009-FastCGIWeb' => [$root.'/009-FastCGIWeb'],
         ];
     }
 
@@ -1332,6 +1333,7 @@ PHP];
             '006-FileUploadWeb' => ['FileUploadWeb', 'No upload yet'],
             '007-ThrowsWeb' => ['ThrowsWeb', 'Submit an email'],
             '008-SelfHostProbe' => ['SelfHostProbe', 'north-star2-verify'],
+            '009-FastCGIWeb' => ['ok'],
             default => ['Hello'],
         };
     }
