@@ -62,7 +62,7 @@ final class JitCompilerSelfHostStubTest extends TestCase
     ];
 
     /** @var list<string> */
-    private const M3_COMPILER_PHP_LOWERING_SUFFIXES = [
+    private const M3_COMPILER_NATIVE_LOWERING_SUFFIXES = [
         'operandschainequal',
         'unwrapoperandchain',
     ];
@@ -131,9 +131,9 @@ final class JitCompilerSelfHostStubTest extends TestCase
     }
 
     /**
-     * @dataProvider m3CompilerPhpLoweringSuffixProvider
+     * @dataProvider m3CompilerNativeLoweringSuffixProvider
      */
-    public function testM3CompileDriverCompilerPhpLoweringIsNotStubbed(string $suffix): void
+    public function testM3CompileDriverCompilerNativeLoweringIsNotStubbed(string $suffix): void
     {
         $prevSelfHost = getenv('PHP_COMPILER_SELFHOST_AOT');
         $prevM3 = getenv('PHP_COMPILER_M3_COMPILE_DRIVER');
@@ -162,15 +162,15 @@ final class JitCompilerSelfHostStubTest extends TestCase
     }
 
     /** @return iterable<string, array{0: string}> */
-    public static function m3CompilerPhpLoweringSuffixProvider(): iterable
+    public static function m3CompilerNativeLoweringSuffixProvider(): iterable
     {
-        foreach (self::M3_COMPILER_PHP_LOWERING_SUFFIXES as $suffix) {
+        foreach (self::M3_COMPILER_NATIVE_LOWERING_SUFFIXES as $suffix) {
             yield $suffix => [$suffix];
         }
     }
 
     /**
-     * @dataProvider m3CompilerPhpLoweringSuffixProvider
+     * @dataProvider m3CompilerNativeLoweringSuffixProvider
      */
     public function testCompilerOperandChainHelpersRemainStubbedWithoutM3Driver(string $suffix): void
     {

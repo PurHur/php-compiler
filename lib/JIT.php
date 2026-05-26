@@ -375,6 +375,14 @@ class JIT {
         }
         if ($this->shouldUseM3CompileDriverRealLowering() && null !== $logicalName) {
             $m3Spine = strtolower($logicalName);
+            if ($this->isM3CompileDriverCompilerNativeLoweringName($m3Spine)) {
+                return JIT\CompilerOperandChainNative::compile(
+                    $this->context,
+                    $this->llvmInternalName($internalName),
+                    $block,
+                    $logicalName
+                );
+            }
             if (str_ends_with($m3Spine, '\\runtime::loadjit')) {
                 return $this->compileRuntimeLoadJitM3Native($internalName, $block, $logicalName);
             }
@@ -1128,16 +1136,41 @@ class JIT {
     }
 
     /**
-     * Compiler helpers safe for PHP CFG lowering on M3 compile spine (#1520).
+     * Compiler helpers for native lowering on M3 compile_driver link (#1768).
+     *
+     * PHP CFG lowering of these hits LLVM 9 dominance verify failures; use
+     * {@see CompilerOperandChainNative} instead.
      *
      * @return list<string> method suffixes after \\compiler::
      */
-    private function m3CompileDriverCompilerPhpLoweringSuffixes(): array
+    private function m3CompileDriverCompilerNativeLoweringSuffixes(): array
     {
         return [
             'operandschainequal',
             'unwrapoperandchain',
         ];
+    }
+
+    /**
+     * @return list<string> method suffixes after \\compiler::
+     */
+    private function m3CompileDriverCompilerPhpLoweringSuffixes(): array
+    {
+        return [];
+    }
+
+    private function isM3CompileDriverCompilerNativeLoweringName(string $lower): bool
+    {
+        if (!$this->shouldUseM3CompileDriverRealLowering()) {
+            return false;
+        }
+        foreach ($this->m3CompileDriverCompilerNativeLoweringSuffixes() as $suffix) {
+            if (str_ends_with($lower, '\\compiler::'.$suffix)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function isM3CompileDriverCompilerPhpLoweringName(string $lower): bool
@@ -1288,6 +1321,14 @@ class JIT {
 
             return null;
         }
+        if ($this->isM3CompileDriverCompilerNativeLoweringName($emitLc)) {
+            return JIT\CompilerOperandChainNative::compile(
+                $this->context,
+                $this->llvmInternalName($internalName),
+                $block,
+                $logicalName
+            );
+        }
         if ($this->isM3CompileDriverCompilerPhpLoweringName($emitLc)) {
             return $this->compileRuntimeSpinePhpLowering($internalName, $block, $logicalName);
         }
@@ -1347,6 +1388,9 @@ class JIT {
             return false;
         }
         if ($this->isM3CompileDriverCompilerPhpLoweringName($lower)) {
+            return false;
+        }
+        if ($this->isM3CompileDriverCompilerNativeLoweringName($lower)) {
             return false;
         }
         if ($this->shouldUseM3EmitTuNativeBridge() && str_contains($lower, '\\compiler::compileemitsmoke')) {
@@ -2600,6 +2644,14 @@ class JIT {
         }
         if ($this->shouldUseM3EmitTuNativeBridge() && $this->isBootstrapM3RuntimeEmitBridgeName($lcname)) {
             return $this->compileBootstrapCompileSmokeM3EmitNative($internalName, $block, $logicalName);
+        }
+        if ($this->isM3CompileDriverCompilerNativeLoweringName($lcname)) {
+            return JIT\CompilerOperandChainNative::compile(
+                $this->context,
+                $this->llvmInternalName($internalName),
+                $block,
+                $logicalName
+            );
         }
         if ($this->isM3CompileDriverCompilerPhpLoweringName($lcname)) {
             return $this->compileRuntimeSpinePhpLowering($internalName, $block, $logicalName);
