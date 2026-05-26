@@ -584,15 +584,15 @@ class JIT {
         Block $block,
         string $logicalName
     ): PHPLLVM\Value {
-        if (!$this->shouldUseM3EmitTuNativeBridge()) {
-            return $this->compileRuntimeSpinePhpLowering($internalName, $block, $logicalName);
+        if ($this->shouldUseM3EmitTuNativeBridge()) {
+            return $this->emitM3EmitTuRuntimeConstructNativeFunction($internalName, $logicalName, $block);
         }
 
-        return $this->emitM3EmitTuRuntimeConstructNativeFunction($internalName, $logicalName, $block);
+        return $this->compileRuntimeSpinePhpLowering($internalName, $block, $logicalName);
     }
 
     /**
-     * Native Runtime::__construct for emit TU — call init* spine symbols without PHP CFG (#2442, #1402).
+     * Native Runtime::__construct for emit TU — no-op until init* spine is safe (#2540).
      */
     private function emitM3EmitTuRuntimeConstructNativeFunction(
         string $internalName,
@@ -658,10 +658,7 @@ class JIT {
         Block $block,
         string $logicalName
     ): PHPLLVM\Value {
-        // Emit TU uses void init stubs at link — C-floor only on compile_driver spine (#2442, #2513).
-        if ($this->shouldUseM3EmitTuNativeBridge()) {
-            return $this->emitM3EmitTuRuntimeInitVoidStub($internalName, $logicalName, $block);
-        }
+        // Emit TU and compile_driver share C-floor initVmContext (#2513, #2540).
         $lcname = strtolower($logicalName);
         if (isset($this->context->functions[$lcname])) {
             return $this->context->functions[$lcname];

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+require_once __DIR__.'/RuntimeEmitTuAlloc.php';
+
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -104,8 +106,8 @@ final class BootstrapCompileSmokeM3Emit
         $context->builder->returnValue($retFail);
 
         $context->builder->positionAtEnd($readOk);
-        // LLVM 9 crashes lowering Object_::allocate(Runtime) in emit-helper TU (#2442).
-        $runtime = $objPtr->constNull();
+        // Minimal Runtime shell — full Object_::allocate() LLVM 9 link crash (#2540).
+        $runtime = RuntimeEmitTuAlloc::emit($context);
         $context->builder->call(
             self::runtimeSpine($context, '__construct', 'void', ['__object__*', 'int64']),
             $runtime,
