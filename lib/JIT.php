@@ -345,6 +345,15 @@ class JIT {
             if (str_ends_with($m3Spine, '\\runtime::loadcoremodules')) {
                 return $this->compileRuntimeLoadCoreModulesM3Native($internalName, $block, $logicalName);
             }
+            if (
+                $this->shouldUseM3EmitTuNativeBridge()
+                && (
+                    str_ends_with($m3Spine, '\\runtime::parseandcompile')
+                    || str_ends_with($m3Spine, '\\runtime::parseandcompileemitsmoke')
+                )
+            ) {
+                return $this->compileRuntimeParseAndCompileM3Native($internalName, $block, $logicalName);
+            }
             if (str_ends_with($m3Spine, '\\runtime::parse')
                 || str_ends_with($m3Spine, '\\runtime::compile')
                 || str_ends_with($m3Spine, '\\runtime::compileemitsmoke')
@@ -628,6 +637,29 @@ class JIT {
         return $func;
     }
 
+    /**
+     * Native parseAndCompile for M3 emit TU — avoids LLVM 9 crash lowering full Runtime::compile (#2516).
+     */
+    private function compileRuntimeParseAndCompileM3Native(
+        string $internalName,
+        Block $block,
+        string $logicalName
+    ): PHPLLVM\Value {
+        if (!$this->shouldUseM3EmitTuNativeBridge()) {
+            return $this->compileRuntimeSpinePhpLowering($internalName, $block, $logicalName);
+        }
+        $lcname = strtolower($logicalName);
+        if (isset($this->context->functions[$lcname])) {
+            return $this->context->functions[$lcname];
+        }
+
+        return \PHPCompiler\JIT\BootstrapCompileSmokeM3Emit::declareRuntimeParseAndCompileNative(
+            $this->context,
+            $this->llvmInternalName($internalName),
+            $logicalName
+        );
+    }
+
     private function compileRuntimeLoadCoreModulesM3Native(
         string $internalName,
         Block $block,
@@ -901,6 +933,7 @@ class JIT {
         if ($this->shouldUseEmitHelperLinkStubs()) {
             if (
                 str_ends_with($lower, '\\runtime::parseandcompileemitsmoke')
+                || str_ends_with($lower, '\\runtime::parseandcompile')
                 || str_ends_with($lower, '\\runtime::compileemitsmoke')
                 || str_ends_with($lower, '\\runtime::parse')
                 || str_ends_with($lower, '\\runtime::compile')
@@ -1304,9 +1337,6 @@ class JIT {
             'initvmcontext' => true,
             'loadcoremodules' => true,
             'parse' => true,
-            'compile' => true,
-            'parseandcompile' => true,
-            'parseandcompileemitsmoke' => true,
             'compileemitsmoke' => true,
             'loadjit' => true,
             'loadjitcontext' => true,
@@ -1314,6 +1344,17 @@ class JIT {
             'jitemitinplace' => true,
             'standalone' => true,
         ];
+        $runtimeNativeParseMethods = [];
+        if ($this->shouldUseM3EmitTuNativeBridge()) {
+            $runtimeNativeParseMethods = [
+                'parseandcompile' => true,
+                'parseandcompileemitsmoke' => true,
+            ];
+        } else {
+            $runtimeMethods['compile'] = true;
+            $runtimeMethods['parseandcompile'] = true;
+            $runtimeMethods['parseandcompileemitsmoke'] = true;
+        }
         foreach ($this->m3EmitTuMainBlock->opCodes as $op) {
             if (OpCode::TYPE_DECLARE_CLASS !== $op->type) {
                 continue;
@@ -1353,9 +1394,38 @@ class JIT {
             }
             $this->context->popScope();
         }
+        $this->compileM3EmitTuRuntimeParseAndCompileNativeDecl($runtimeNativeParseMethods);
         $this->compileM3EmitTuCompilerCompileDecl();
         $this->compileM3EmitTuCompilerEmitSmokeNativeDecl();
         $this->runQueue();
+    }
+
+    /**
+     * Register native Runtime parseAndCompile* for emit TU (#2516).
+     *
+     * @param array<string, true> $methods lowercase method names
+     */
+    private function compileM3EmitTuRuntimeParseAndCompileNativeDecl(array $methods): void
+    {
+        if ([] === $methods || !$this->shouldUseM3EmitTuNativeBridge()) {
+            return;
+        }
+        $this->context->pushScope();
+        $this->context->scope->classId = $this->context->type->object->lookup('PHPCompiler\\Runtime');
+        $this->context->scope->className = 'phpcompiler\\runtime';
+        foreach (array_keys($methods) as $methodLc) {
+            $logical = 'PHPCompiler\\Runtime::'.$methodLc;
+            $lc = strtolower($logical);
+            if (isset($this->context->functions[$lc])) {
+                continue;
+            }
+            \PHPCompiler\JIT\BootstrapCompileSmokeM3Emit::declareRuntimeParseAndCompileNative(
+                $this->context,
+                $this->llvmInternalName($logical),
+                $logical
+            );
+        }
+        $this->context->popScope();
     }
 
     /** Register native compileEmitSmoke with Compiler object metadata (#1937). */

@@ -64,6 +64,10 @@ final class BootstrapRuntimeCompileSmokeTest extends TestCase
         $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
         $this->assertStringContainsString('isBootstrapM3RuntimeEmitBridgeName', $jit);
         $this->assertStringContainsString('runtime_compile_smoke_m3_emit', $jit);
+        $this->assertStringContainsString('compileRuntimeParseAndCompileM3Native', $jit);
+        $emit = (string) file_get_contents(self::$root.'/lib/JIT/BootstrapCompileSmokeM3Emit.php');
+        $this->assertStringContainsString('declareRuntimeParseAndCompileNative', $emit);
+        $this->assertStringContainsString("'parseandcompile'", $emit);
     }
 
     public function testCompilePhpPreservesSelfhostAotForRuntimeM3NativeEmitEntry(): void
