@@ -8,6 +8,30 @@ final class RuntimeInitVmContext {
         $ctxId = $object->lookup('PHPCompiler\\VM\\Context');
         $ctx = $object->allocate($ctxId);
 
+        foreach ([
+            'functions',
+            'classes',
+            'enums',
+            'classAutoloaders',
+            'splAutoloadCallbacks',
+            'loadedCompileUnits',
+            'constants',
+            'superglobalVars',
+            'globalVars',
+            'functionStaticVars',
+            'functionStaticInitialized',
+            'foreachIterators',
+        ] as $prop) {
+            $slot = $object->propertyFetch($ctx, 'PHPCompiler\\VM\\Context', $prop);
+            $emptyHt = new Variable(
+                $context,
+                Variable::TYPE_HASHTABLE,
+                Variable::KIND_VALUE,
+                HashTableHelper::alloc($context)
+            );
+            $object->propertyStore($slot->objectPropertySlot, $emptyHt, Variable::TYPE_HASHTABLE);
+        }
+
         $errorsId = $object->lookup('PHPCompiler\\VM\\ErrorReporter');
         $errors = $object->allocate($errorsId);
         $errorsVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $errors);
