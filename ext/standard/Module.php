@@ -56,6 +56,7 @@ class Module extends ModuleAbstract
             new pack(),
             new chr(),
             new strcmp(),
+            new levenshtein(),
             new strnatcmp(),
             new strnatcasecmp(),
             new strcasecmp(),
