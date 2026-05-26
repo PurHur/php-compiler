@@ -9,6 +9,8 @@ allow:\runtime::loadjit
 allow:\runtime::loadjitcontext
 allow:\runtime::parse
 allow:\runtime::parseandcompile
+allow:\runtime::parseandcompileemitsmoke
+allow:\runtime::compileemitsmoke
 allow:\runtime::standalone
 deny:\bootstrapaot\helloworld_compile_smoke
 deny:\runtime::__destruct
