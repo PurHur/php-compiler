@@ -34,4 +34,21 @@ final class GettingStartedDocTest extends TestCase
         $this->assertStringContainsString('make examples-throws-smoke', self::$doc);
         $this->assertStringContainsString('#2157', self::$doc);
     }
+
+    public function testNorthStar4SectionHasPresenterCommands(): void
+    {
+        $this->assertStringContainsString('### 7. (Optional) North Star 4', self::$doc);
+        $this->assertStringContainsString('./phpc lint --bootstrap-inventory --check', self::$doc);
+        $this->assertStringContainsString('make north-star4-verify', self::$doc);
+        $this->assertStringContainsString(
+            './script/north-star4-verify.sh --dry-run-only',
+            self::$doc
+        );
+        $this->assertStringContainsString(
+            './script/north-star4-verify.sh --strict --require-llvm',
+            self::$doc
+        );
+        $this->assertStringContainsString('./script/docker-exec.sh', self::$doc);
+        $this->assertStringContainsString('#2464', self::$doc);
+    }
 }
