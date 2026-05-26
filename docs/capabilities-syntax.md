@@ -36,7 +36,7 @@ Tracking issues: [#58](https://github.com/PurHur/php-compiler/issues/58), [#145]
 | foreach by-reference (`&$v`) | yes | yes | yes | [#1222](https://github.com/PurHur/php-compiler/issues/1222) | Packed and string-keyed arrays; VM + JIT lowering |
 | By-reference parameters (`function f(&$x)`) | yes | no | no | [#140](https://github.com/PurHur/php-compiler/issues/140) | VM aliases caller slots via TYPE_INDIRECT; JIT pointer args deferred; VM-only lowering |
 | Static property `Class::$prop` | yes | yes | yes | [#1225](https://github.com/PurHur/php-compiler/issues/1225) | Class-scoped storage; `self::` / `static::`; literal property names in JIT |
-| `unset()` on variables and array offsets | yes | yes | yes | [#1224](https://github.com/PurHur/php-compiler/issues/1224) | VM + JIT assign null to lvalue slots |
+| `unset()` on variables, array offsets, and object properties | yes | yes | yes | [#2273](https://github.com/PurHur/php-compiler/issues/2273) | Locals, `$this->prop`, public properties, string/int keys (#1224); Static properties via TYPE_STATIC_PROPERTY_UNSET (#2256) |
 | Function-local `static $var = <literal>` | yes | yes | yes | [#2286](https://github.com/PurHur/php-compiler/issues/2286) | Literal int/string init only in v1; VM + JIT + AOT |
 | Keyed array destructuring (`["a" => $x]`) | yes | yes | yes | [#1234](https://github.com/PurHur/php-compiler/issues/1234) | Skip string-key CFG split for fetch+assign destructuring pairs (#1234) |
 | `goto` / labels (function scope) | yes | yes | yes | [#1228](https://github.com/PurHur/php-compiler/issues/1228) | php-cfg lowers labels to CFG Jump; VM avoids frame nesting on same-block back-edges; compliance PHPT |

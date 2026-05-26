@@ -247,11 +247,14 @@ function syntaxRowDefinitions(): array
         ],
         [
             'id' => 'unset',
-            'construct' => '`unset()` on variables and array offsets',
-            'opcodes' => ['TYPE_UNSET'],
-            'issue' => 1224,
-            'notes' => ['VM + JIT assign null to lvalue slots'],
-            'probe' => '$x = 1; unset($x); echo isset($x) ? "set" : "unset";',
+            'construct' => '`unset()` on variables, array offsets, and object properties',
+            'opcodes' => ['TYPE_UNSET', 'TYPE_STATIC_PROPERTY_UNSET'],
+            'issue' => 2273,
+            'notes' => [
+                'Locals, `$this->prop`, public properties, string/int keys (#1224)',
+                'Static properties via TYPE_STATIC_PROPERTY_UNSET (#2256)',
+            ],
+            'probe' => 'class C { public $p = 1; } $o = new C(); unset($o->p); echo isset($o->p) ? "y" : "n";',
         ],
         [
             'id' => 'function_static_local',
