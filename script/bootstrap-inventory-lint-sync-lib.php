@@ -247,6 +247,93 @@ function bootstrap_inventory_lint_triage_render_json(array $rows, int $scanned, 
     )."\n";
 }
 
+/** Committed triage snapshot row count (#2265). */
+const BOOTSTRAP_INVENTORY_TRIAGE_SYNC_TOP = 50;
+
+/**
+ * Live triage payload for drift guard (#2265); matches bootstrap-inventory-triage.php --json.
+ *
+ * @return array{scanned: int, top: int, rows: list<array{rank: int, message: string, file_count: int, examples: list<string>, issue: ?int}>}
+ */
+function bootstrap_inventory_triage_live_payload(string $root, int $top = BOOTSTRAP_INVENTORY_TRIAGE_SYNC_TOP): array
+{
+    $bundle = bootstrap_inventory_lint_report_for_triage($root);
+    $report = ['files' => $bundle['files']];
+    $scanned = count(bootstrapVmPathPhpFiles($root));
+    $rows = bootstrap_inventory_lint_triage_rows($report, $top);
+
+    return [
+        'scanned' => $scanned,
+        'top' => $top,
+        'rows' => $rows,
+    ];
+}
+
+/**
+ * @param array{scanned?: mixed, top?: mixed, rows?: mixed, source?: mixed} $payload
+ *
+ * @return array{scanned: int, top: int, rows: list<array<string, mixed>>}
+ */
+function bootstrap_inventory_triage_normalize_payload(array $payload): array
+{
+    if (!isset($payload['rows']) || !is_array($payload['rows'])) {
+        throw new RuntimeException('triage payload: missing rows');
+    }
+    if (!isset($payload['scanned']) || !is_numeric($payload['scanned'])) {
+        throw new RuntimeException('triage payload: missing scanned');
+    }
+    if (!isset($payload['top']) || !is_numeric($payload['top'])) {
+        throw new RuntimeException('triage payload: missing top');
+    }
+
+    return [
+        'scanned' => (int) $payload['scanned'],
+        'top' => (int) $payload['top'],
+        'rows' => $payload['rows'],
+    ];
+}
+
+/**
+ * @param array{scanned: int, top: int, rows: list<array<string, mixed>>} $live
+ * @param array{scanned: int, top: int, rows: list<array<string, mixed>>} $snapshot
+ *
+ * @return list<string>
+ */
+function bootstrap_inventory_triage_diff_errors(array $live, array $snapshot): array
+{
+    $errors = [];
+    if ($live['scanned'] !== $snapshot['scanned']) {
+        $errors[] = "scanned {$live['scanned']} != snapshot {$snapshot['scanned']}";
+    }
+    if ($live['top'] !== $snapshot['top']) {
+        $errors[] = "top {$live['top']} != snapshot {$snapshot['top']}";
+    }
+    $liveJson = json_encode($live['rows'], JSON_UNESCAPED_SLASHES);
+    $snapJson = json_encode($snapshot['rows'], JSON_UNESCAPED_SLASHES);
+    if ($liveJson !== $snapJson) {
+        $errors[] = 'top CFG gap rows differ from docs/bootstrap-inventory-triage-top50.json';
+    }
+
+    return $errors;
+}
+
+/**
+ * @return array{scanned: int, top: int, rows: list<array<string, mixed>>}
+ */
+function bootstrap_inventory_triage_read_snapshot(string $path): array
+{
+    if (!is_readable($path)) {
+        throw new RuntimeException("missing triage snapshot: {$path}");
+    }
+    $decoded = json_decode((string) file_get_contents($path), true);
+    if (!is_array($decoded)) {
+        throw new RuntimeException("invalid triage snapshot JSON: {$path}");
+    }
+    unset($decoded['source']);
+
+    return bootstrap_inventory_triage_normalize_payload($decoded);
+}
+
 function bootstrap_inventory_lint_diff_errors(array $live, array $snapshot): array
 {
     $errors = [];
