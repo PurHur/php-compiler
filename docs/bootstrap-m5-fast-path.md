@@ -31,6 +31,7 @@ Supporting fixes from #1402:
 
 | Allowlist / native spine | Gate |
 |--------------------------|------|
+| `Compiler::unwrapOperandChain` / `operandsChainEqual` | Native via `JIT\CompilerOperandChainNative` (PHP CFG hits LLVM 9 dominance verify — #1768); `make bootstrap-selfhost-compile-driver-link` |
 | `Runtime::parseAndCompile` | On M3 allowlist when `PHP_COMPILER_M3_COMPILE_DRIVER=1` |
 | `Runtime::parse` / `Runtime::compile` | On M3 allowlist; compile-driver link OK (#1496) |
 | `Runtime::loadJitContext` | Deny-listed (LLVM 9 link crash; same fragment as JIT deny list) |

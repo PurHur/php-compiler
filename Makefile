@@ -282,6 +282,8 @@ bootstrap-m3-emit-tu-execute:
 	./script/bootstrap-m3-emit-tu-execute.sh
 bootstrap-selfhost-compiler-driver-smoke:
 	./script/bootstrap-selfhost-compiler-driver-smoke-link.sh
+bootstrap-selfhost-compile-driver-link:
+	./script/bootstrap-selfhost-compile-driver-link-probe.sh
 bootstrap-selfhost-compiler-unit-probe:
 	./script/bootstrap-selfhost-compiler-unit-probe.sh
 bootstrap-selfhost-jit-unit-probe:
