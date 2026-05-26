@@ -1319,6 +1319,29 @@ final class VmString
         return $out;
     }
 
+    /** Case-insensitive str_replace() for two strings (ASCII fold; subset of PHP). */
+    public static function strIreplace(string $search, string $replace, string $subject): string
+    {
+        if ('' === $search) {
+            throw new \LogicException('str_ireplace(): Argument #1 ($search) cannot be empty');
+        }
+        $searchLen = self::byteLength($search);
+        $out = '';
+        $offset = 0;
+        $len = self::byteLength($subject);
+        while ($offset < $len) {
+            $pos = self::findSubstringCaseInsensitive($subject, $search, $offset);
+            if (false === $pos) {
+                $out .= self::byteSlice($subject, $offset);
+                break;
+            }
+            $out .= self::byteSlice($subject, $offset, $pos - $offset).$replace;
+            $offset = $pos + $searchLen;
+        }
+
+        return $out;
+    }
+
     /**
      * strtr() two-string form — byte translation table (subset of PHP).
      */

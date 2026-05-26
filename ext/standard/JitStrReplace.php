@@ -15,8 +15,13 @@ use PHPLLVM\Value;
 
 final class JitStrReplace
 {
-    public static function replace(Context $context, Value $search, Value $replace, Value $subject): Value
-    {
+    public static function replace(
+        Context $context,
+        Value $search,
+        Value $replace,
+        Value $subject,
+        bool $caseInsensitive = false
+    ): Value {
         $map = $context->structFieldMap['__string__'];
         $searchLen = $context->builder->load(
             $context->builder->structGep($search, $map['length'])
@@ -30,20 +35,21 @@ final class JitStrReplace
         $i64 = $context->getTypeFromString('int64');
         $zero = $i64->constInt(0, false);
 
+        $tag = $caseInsensitive ? 'ireplace' : 'replace';
         $resultSlot = $context->builder->alloca(
             $context->getTypeFromString('__string__*'),
             1,
-            'str_replace_result'
+            'str_'.$tag.'_result'
         );
-        $offsetSlot = $context->builder->alloca($i64, 1, 'str_replace_offset');
+        $offsetSlot = $context->builder->alloca($i64, 1, 'str_'.$tag.'_offset');
         $emptyResult = $context->builder->call($context->lookupFunction('__string__alloc'), $zero);
         $context->builder->store($emptyResult, $resultSlot);
         $context->builder->store($zero, $offsetSlot);
 
-        $loopHead = BasicBlockHelper::append($context, 'str_replace_head');
-        $loopBody = BasicBlockHelper::append($context, 'str_replace_body');
-        $tailBlock = BasicBlockHelper::append($context, 'str_replace_tail');
-        $doneBlock = BasicBlockHelper::append($context, 'str_replace_done');
+        $loopHead = BasicBlockHelper::append($context, 'str_'.$tag.'_head');
+        $loopBody = BasicBlockHelper::append($context, 'str_'.$tag.'_body');
+        $tailBlock = BasicBlockHelper::append($context, 'str_'.$tag.'_tail');
+        $doneBlock = BasicBlockHelper::append($context, 'str_'.$tag.'_done');
         $context->builder->branch($loopHead);
 
         $context->builder->positionAtEnd($loopHead);
@@ -53,14 +59,15 @@ final class JitStrReplace
 
         $context->builder->positionAtEnd($loopBody);
         $searchFrom = $context->builder->gep($subjectPtr, $offset);
+        $searchFn = $caseInsensitive ? 'strcasestr' : 'strstr';
         $found = $context->builder->call(
-            $context->lookupFunction('strstr'),
+            $context->lookupFunction($searchFn),
             $searchFrom,
             $searchPtr
         );
         $null = $context->getTypeFromString('int8*')->constNull();
         $notFound = $context->builder->icmp(Builder::INT_EQ, $found, $null);
-        $matchBlock = BasicBlockHelper::append($context, 'str_replace_match');
+        $matchBlock = BasicBlockHelper::append($context, 'str_'.$tag.'_match');
         $context->builder->branchIf($notFound, $tailBlock, $matchBlock);
 
         $context->builder->positionAtEnd($matchBlock);
