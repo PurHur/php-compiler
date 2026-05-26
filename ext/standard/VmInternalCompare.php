@@ -101,6 +101,25 @@ final class VmInternalCompare
         }
     }
 
+    /**
+     * Sort [key, value] Variable pairs in place by key descending (krsort).
+     *
+     * @param list<array{0: Variable, 1: Variable}> $pairs
+     */
+    public static function sortKeyedPairsByKeyDesc(array &$pairs): void
+    {
+        $n = \count($pairs);
+        for ($i = 1; $i < $n; ++$i) {
+            $j = $i;
+            while ($j > 0 && self::compareKeys($pairs[$j - 1][0], $pairs[$j][0]) < 0) {
+                $tmp = $pairs[$j - 1];
+                $pairs[$j - 1] = $pairs[$j];
+                $pairs[$j] = $tmp;
+                --$j;
+            }
+        }
+    }
+
     public static function compareKeys(Variable $a, Variable $b): int
     {
         $a = $a->resolveIndirect();

@@ -116,4 +116,38 @@ final class VmArray
 
         return $sorted;
     }
+
+    /** krsort() — return array sorted by key descending; packed lists are unchanged. */
+    public static function krsortCopy(HashTable $ht): HashTable
+    {
+        if ($ht->getNumElements() < 2 || self::isList($ht)) {
+            return $ht;
+        }
+        $pairs = [];
+        foreach ($ht->iterateKeyed(true) as [$key, $value]) {
+            $keyCopy = new Variable();
+            $keyCopy->copyFrom($key);
+            $valCopy = new Variable();
+            $valCopy->copyFrom($value);
+            $pairs[] = [$keyCopy, $valCopy];
+        }
+        VmInternalCompare::sortKeyedPairsByKeyDesc($pairs);
+        $sorted = new HashTable();
+        foreach ($pairs as [$key, $value]) {
+            $resolvedKey = $key->resolveIndirect();
+            $copy = new Variable();
+            $copy->copyFrom($value);
+            if (Variable::TYPE_INTEGER === $resolvedKey->type) {
+                $sorted->addIndex($resolvedKey->toInt(), $copy);
+            } elseif (Variable::TYPE_STRING === $resolvedKey->type) {
+                $sorted->add($resolvedKey->toString(), $copy);
+            } else {
+                throw new \LogicException(
+                    'krsort() only supports homogeneous string or integer keys in this compiler build'
+                );
+            }
+        }
+
+        return $sorted;
+    }
 }
