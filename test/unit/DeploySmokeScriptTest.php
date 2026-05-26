@@ -71,6 +71,10 @@ final class DeploySmokeScriptTest extends TestCase
         $this->assertStringContainsString('FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE', $body);
         $this->assertStringContainsString('smoke_006_file_upload_web', $body);
         $this->assertStringContainsString('#2028', $body);
+        $this->assertStringContainsString('007-ThrowsWeb', $body);
+        $this->assertStringContainsString('THROWSWEB_DEPLOY_SMOKE_GATE', $body);
+        $this->assertStringContainsString('smoke_007_throws_web', $body);
+        $this->assertStringContainsString('#2124', $body);
     }
 
     public function testDeploySmokeExample006SkipsWhenGateOff(): void
@@ -146,6 +150,82 @@ final class DeploySmokeScriptTest extends TestCase
         $this->assertSame(0, $exit, $combined);
         $this->assertStringContainsString('deploy-smoke: 006-FileUploadWeb: multipart upload ok', $combined);
         $this->assertStringContainsString('deploy-smoke: 006-FileUploadWeb: ok', $combined);
+        $this->assertStringContainsString('deploy-smoke: ok', $combined);
+    }
+
+    public function testDeploySmokeExample007SkipsWhenGateOff(): void
+    {
+        $repoRoot = dirname(__DIR__, 2);
+        $script = $repoRoot.'/script/deploy-smoke.sh';
+
+        $env = $this->baseEnv();
+        $env['THROWSWEB_DEPLOY_SMOKE_GATE'] = '0';
+
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open(['bash', $script, '--example', '007'], $descriptorSpec, $pipes, $repoRoot, $env);
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+
+        $combined = trim(($stdout !== false ? $stdout : '')."\n".($stderr !== false ? $stderr : ''));
+        $this->assertSame(0, $exit, $combined);
+        $this->assertStringContainsString('007-ThrowsWeb: skip', $combined);
+        $this->assertStringContainsString('THROWSWEB_DEPLOY_SMOKE_GATE=0', $combined);
+    }
+
+    /**
+     * Requires 007 AOT link green (#2101); opt-in gate THROWSWEB_DEPLOY_SMOKE_GATE=1 (#2124).
+     *
+     * @group llvm
+     * @group throwsweb-deploy
+     */
+    public function testDeploySmokeExample007ExecuteWhenGateOn(): void
+    {
+        if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
+            $this->markTestSkipped(
+                'LLVM 9 toolchain not available. Run script/install-llvm9.sh from the repository root.'
+            );
+        }
+
+        $repoRoot = dirname(__DIR__, 2);
+        $phpc = $repoRoot.'/phpc';
+        if (!is_executable($phpc)) {
+            $this->markTestSkipped('phpc wrapper not executable');
+        }
+        if (!is_dir($repoRoot.'/examples/007-ThrowsWeb')) {
+            $this->markTestSkipped('examples/007-ThrowsWeb missing (#2076)');
+        }
+
+        $script = $repoRoot.'/script/deploy-smoke.sh';
+        $env = $this->baseEnv();
+        $env['THROWSWEB_DEPLOY_SMOKE_GATE'] = '1';
+
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open(['bash', $script, '--example', '007'], $descriptorSpec, $pipes, $repoRoot, $env);
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+
+        $combined = trim(($stdout !== false ? $stdout : '')."\n".($stderr !== false ? $stderr : ''));
+        $this->assertSame(0, $exit, $combined);
+        $this->assertStringContainsString('deploy-smoke: 007-ThrowsWeb: caught invalid POST ok', $combined);
+        $this->assertStringContainsString('deploy-smoke: 007-ThrowsWeb: ok', $combined);
         $this->assertStringContainsString('deploy-smoke: ok', $combined);
     }
 

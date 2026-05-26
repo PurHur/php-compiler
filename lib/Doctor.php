@@ -800,11 +800,13 @@ final class Doctor
         $uncaughtDefault = $defaults['THROWSWEB_UNCAUGHT_500_GATE'] ?? '0';
         $linkDefault = $defaults['THROWSWEB_AOT_LINK_GATE'] ?? '1';
         $aotDefault = $defaults['THROWSWEB_AOT_SMOKE_GATE'] ?? '1';
+        $deployDefault = $defaults['THROWSWEB_DEPLOY_SMOKE_GATE'] ?? '0';
 
         $smokeOn = self::gateEnabled('THROWS_WEB_SMOKE_GATE', $smokeDefault);
         $uncaughtOn = self::gateEnabled('THROWSWEB_UNCAUGHT_500_GATE', $uncaughtDefault);
         $linkOn = self::gateEnabled('THROWSWEB_AOT_LINK_GATE', $linkDefault);
         $aotOn = self::gateEnabled('THROWSWEB_AOT_SMOKE_GATE', $aotDefault);
+        $deployOn = self::gateEnabled('THROWSWEB_DEPLOY_SMOKE_GATE', $deployDefault);
 
         $llvmInfo = self::resolveLlvmInfo($repoRoot);
         $llvmReady = null !== $llvmInfo['dir'];
@@ -864,6 +866,14 @@ final class Doctor
         fwrite(STDOUT, "  [{$aotStatus}] Stage 4 AOT execute — THROWSWEB_AOT_SMOKE_GATE default {$aotDefault} ({$aotExecuteNote})\n");
         fwrite(STDOUT, "      PHPUnit: ./script/ci-local.sh --filter ThrowsWebAotExecuteTest\n");
         fwrite(STDOUT, "      Shell:   THROWSWEB_AOT_SMOKE_GATE=1 EXAMPLES_AOT_SMOKE_ONLY=007 ./script/examples-aot-smoke.sh (#2104)\n");
+        $deployStatus = $deployOn && $llvmReady ? '✅' : '📋';
+        $deployNote = $deployOn
+            ? '#2124 ✅ · ci-local when THROWSWEB_DEPLOY_SMOKE_GATE=1 (#2264)'
+            : 'opt-in default 0 — #2124 · #2264';
+        fwrite(STDOUT, "  [{$deployStatus}] Stage 5 Deploy CGI — THROWSWEB_DEPLOY_SMOKE_GATE default {$deployDefault} ({$deployNote})\n");
+        fwrite(STDOUT, "      Run:     THROWSWEB_DEPLOY_SMOKE_GATE=1 make deploy-smoke-all\n");
+        fwrite(STDOUT, "      Or:      make examples-throwsweb-deploy-smoke\n");
+        fwrite(STDOUT, "      Ladder:  make deploy-smoke-all (skips 007 with hint when gate=0; #2077)\n");
 
         $initProfileLive = \PHPCompiler\Cli\PhpcInit::isKnownProfile('throwsweb');
         $initTemplate = is_file($repoRoot.'/templates/init-throwsweb/example.php');

@@ -440,6 +440,20 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('deploy-smoke.sh --example 006', $body);
     }
 
+    public function testMakefileHasExamplesThrowsWebDeploySmokeTarget(): void
+    {
+        $makefile = (string) file_get_contents(dirname(__DIR__, 2).'/Makefile');
+        $this->assertStringContainsString('examples-throwsweb-deploy-smoke:', $makefile);
+        $this->assertStringContainsString('examples-throwsweb-deploy-smoke.sh', $makefile);
+
+        $script = dirname(__DIR__, 2).'/script/examples-throwsweb-deploy-smoke.sh';
+        $this->assertFileExists($script);
+        $this->assertTrue(is_executable($script));
+        $body = (string) file_get_contents($script);
+        $this->assertStringContainsString('THROWSWEB_DEPLOY_SMOKE_GATE=1', $body);
+        $this->assertStringContainsString('deploy-smoke.sh --example 007', $body);
+    }
+
     public function testMakefileHasDeploySmokeAllTarget(): void
     {
         $makefile = (string) file_get_contents(dirname(__DIR__, 2).'/Makefile');
@@ -455,10 +469,13 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('run_example 001', $body);
         $this->assertStringContainsString('run_example 005', $body);
         $this->assertStringContainsString('run_example 006', $body);
+        $this->assertStringContainsString('run_example 007', $body);
         $this->assertStringContainsString('SESSIONS_WEB_DEPLOY_SMOKE_GATE', $body);
         $this->assertStringContainsString('FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE', $body);
+        $this->assertStringContainsString('THROWSWEB_DEPLOY_SMOKE_GATE', $body);
         $this->assertStringContainsString('skip (SESSIONS_WEB_DEPLOY_SMOKE_GATE=0', $body);
         $this->assertStringContainsString('skip (FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE=0', $body);
+        $this->assertStringContainsString('skip (THROWSWEB_DEPLOY_SMOKE_GATE=0', $body);
         $this->assertStringContainsString('deploy-smoke-all: ok', $body);
     }
 
@@ -492,6 +509,8 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('--example 005', $common);
         $this->assertStringContainsString('FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE', $common);
         $this->assertStringContainsString('--example 006', $common);
+        $this->assertStringContainsString('THROWSWEB_DEPLOY_SMOKE_GATE', $common);
+        $this->assertStringContainsString('--example 007', $common);
     }
 
     public function testCiDefaultsEnvDefinesSessionsWebDeploySmokeGateOff(): void
@@ -508,6 +527,15 @@ final class CiScriptsTest extends TestCase
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
         $this->assertStringContainsString(
             'FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE="${FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE:-0}"',
+            $defaults
+        );
+    }
+
+    public function testCiDefaultsEnvDefinesThrowsWebDeploySmokeGateOff(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString(
+            'THROWSWEB_DEPLOY_SMOKE_GATE="${THROWSWEB_DEPLOY_SMOKE_GATE:-0}"',
             $defaults
         );
     }

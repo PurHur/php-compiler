@@ -16,6 +16,7 @@
 #   DEPLOY_SMOKE_ONLY=003 make deploy-smoke
 #   SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 ./script/deploy-smoke.sh --example 005
 #   FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE=1 ./script/deploy-smoke.sh --example 006
+#   THROWSWEB_DEPLOY_SMOKE_GATE=1 ./script/deploy-smoke.sh --example 007
 #
 # Docker (harness-safe):
 #   ./script/docker-exec.sh -- make deploy-smoke
@@ -28,12 +29,13 @@ SMOKE_ROOT="${ROOT}/.phpc/smoke/deploy"
 MINIWEBAPP="${ROOT}/examples/003-MiniWebApp"
 SESSIONS_WEB="${ROOT}/examples/005-SessionsWeb"
 FILE_UPLOAD_WEB="${ROOT}/examples/006-FileUploadWeb"
+THROWS_WEB="${ROOT}/examples/007-ThrowsWeb"
 EXAMPLE="002"
 DEPLOY_SMOKE_ONLY="${DEPLOY_SMOKE_ONLY:-}"
 
 usage() {
   cat <<'EOF' >&2
-Usage: script/deploy-smoke.sh [--example 001|002|003|005|006]
+Usage: script/deploy-smoke.sh [--example 001|002|003|005|006|007]
 
   001  examples/001-SimpleWeb (QUERY_STRING=name=…)
   002  examples/002-StaticWeb (default; static HTML)
@@ -42,10 +44,12 @@ Usage: script/deploy-smoke.sh [--example 001|002|003|005|006]
                                or MINIWEBAPP_AOT_EXECUTE_GATE=1 #745)
   005  examples/005-SessionsWeb (SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 #1893; cookie + POST redirect flash)
   006  examples/006-FileUploadWeb (FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE=1 #2028; multipart POST upload)
+  007  examples/007-ThrowsWeb (THROWSWEB_DEPLOY_SMOKE_GATE=1 #2124; POST invalid email → caught HTML)
 
 003 execute smoke is default on (DEPLOY_SMOKE_003_EXECUTE=1); set DEPLOY_SMOKE_003_EXECUTE=0 to skip (#1530, #745).
 005 requires SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 (default 0 until stable — #1893).
 006 requires FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE=1 (default 0 until stable — #2028).
+007 requires THROWSWEB_DEPLOY_SMOKE_GATE=1 (default 0 until stable — #2124).
 EOF
   exit 1
 }
@@ -146,6 +150,10 @@ deploy_smoke_005_enabled() {
 
 deploy_smoke_006_enabled() {
   [[ "${FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE:-0}" == "1" ]]
+}
+
+deploy_smoke_007_enabled() {
+  [[ "${THROWSWEB_DEPLOY_SMOKE_GATE:-0}" == "1" ]]
 }
 
 # Write multipart/form-data body for field doc=@file (issue #2028).
@@ -596,6 +604,61 @@ smoke_006_file_upload_web() {
   echo "deploy-smoke: ${label}: ok"
 }
 
+smoke_007_throws_web() {
+  local label="007-ThrowsWeb"
+  local dist="${SMOKE_ROOT}/007-ThrowsWeb"
+  local readme="${dist}/README.deploy"
+  local body_file out
+
+  if ! deploy_smoke_007_enabled; then
+    echo "deploy-smoke: ${label}: skip (THROWSWEB_DEPLOY_SMOKE_GATE=0 #2124)" >&2
+    return 0
+  fi
+
+  if [[ ! -d "${THROWS_WEB}" ]]; then
+    echo "deploy-smoke: ${label}: skip (tree missing #2076)" >&2
+    return 0
+  fi
+
+  rm -rf "$dist"
+  mkdir -p "$SMOKE_ROOT"
+
+  echo "deploy-smoke: ${label}: phpc build --project"
+  "$PHPC" build --project "${THROWS_WEB}"
+
+  echo "deploy-smoke: ${label}: phpc deploy -> ${dist}"
+  "$PHPC" deploy "${THROWS_WEB}" -o "$dist"
+
+  if [[ ! -x "${dist}/bin/app" ]]; then
+    echo "deploy-smoke: ${label}: expected executable ${dist}/bin/app" >&2
+    exit 1
+  fi
+  if [[ ! -f "$readme" ]]; then
+    echo "deploy-smoke: ${label}: expected ${readme}" >&2
+    exit 1
+  fi
+  if ! grep -q 'PHPC_DEPLOY_ROOT' "$readme"; then
+    echo "deploy-smoke: ${label}: README.deploy missing PHPC_DEPLOY_ROOT" >&2
+    exit 1
+  fi
+
+  out="$(run_deployed_app "${label} GET empty" "$dist" \
+    REQUEST_METHOD=GET SCRIPT_NAME=/example.php REQUEST_URI=/example.php QUERY_STRING=)"
+  assert_needle "${label} GET empty" "$out" 'Submit an email'
+  echo "deploy-smoke: ${label}: GET empty ok"
+
+  body_file="$(mktemp "${SMOKE_ROOT}/post.XXXXXX")"
+  printf 'email=bad' >"$body_file"
+  out="$(run_deployed_cgi "${label} POST invalid" "$dist" "$body_file" \
+    REQUEST_METHOD=POST SCRIPT_NAME=/example.php REQUEST_URI=/example.php \
+    'CONTENT_TYPE=application/x-www-form-urlencoded')"
+  rm -f "$body_file"
+  assert_needle "${label} POST invalid" "$out" 'invalid'
+  echo "deploy-smoke: ${label}: caught invalid POST ok"
+
+  echo "deploy-smoke: ${label}: ok"
+}
+
 run_deploy_smoke_example() {
   case "$1" in
     001) smoke_deploy_example '001-SimpleWeb' 'examples/001-SimpleWeb' '001-SimpleWeb' ;;
@@ -603,8 +666,9 @@ run_deploy_smoke_example() {
     003) smoke_003_miniwebapp ;;
     005) smoke_005_sessions_web ;;
     006) smoke_006_file_upload_web ;;
+    007) smoke_007_throws_web ;;
     *)
-      echo "deploy-smoke: unknown example ${1} (use 001, 002, 003, 005, or 006)" >&2
+      echo "deploy-smoke: unknown example ${1} (use 001, 002, 003, 005, 006, or 007)" >&2
       exit 1
       ;;
   esac
