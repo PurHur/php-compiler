@@ -107,7 +107,7 @@ Unified wrapper (`./phpc` → `bin/phpc.php`); legacy `bin/vm.php`, `bin/jit.php
 
 Also: `phpc doctor` (env probe), `phpc validate-manifest`, `phpc cgi`. See `./phpc help`.
 
-### Shipped examples (000–007)
+### Shipped examples (000–009)
 
 | Example | VM | AOT link | AOT execute | Deploy smoke |
 |---------|----|----------|-------------|--------------|
@@ -116,6 +116,8 @@ Also: `phpc doctor` (env probe), `phpc validate-manifest`, `phpc cgi`. See `./ph
 | [005-SessionsWeb](examples/005-SessionsWeb/) | ✅ `phpc serve` + session smoke ([#1881](https://github.com/PurHur/php-compiler/issues/1881), [#1887](https://github.com/PurHur/php-compiler/issues/1887)) | ✅ `phpc build` ([#1946](https://github.com/PurHur/php-compiler/issues/1946)) | ✅ AOT execute (`SESSIONS_WEB_AOT_SMOKE_GATE=1`, [#1891](https://github.com/PurHur/php-compiler/issues/1891)) | ✅ deploy smoke opt-in ([#1893](https://github.com/PurHur/php-compiler/issues/1893)) |
 | [006-FileUploadWeb](examples/006-FileUploadWeb/) | ✅ `phpc serve` + multipart smoke ([#1999](https://github.com/PurHur/php-compiler/issues/1999), [#2009](https://github.com/PurHur/php-compiler/issues/2009)) | ✅ `phpc build` ([#2011](https://github.com/PurHur/php-compiler/issues/2011)) | ✅ AOT execute (`FILE_UPLOAD_WEB_AOT_SMOKE_GATE=1` default, [#2012](https://github.com/PurHur/php-compiler/issues/2012)) | — |
 | [007-ThrowsWeb](examples/007-ThrowsWeb/) | ✅ `phpc serve` + caught invalid POST ([#2076](https://github.com/PurHur/php-compiler/issues/2076); VM smoke `THROWS_WEB_SMOKE_GATE=1` default, [#2093](https://github.com/PurHur/php-compiler/issues/2093), [#2125](https://github.com/PurHur/php-compiler/issues/2125)) | ✅ `THROWSWEB_AOT_LINK_GATE=1` ([#2101](https://github.com/PurHur/php-compiler/issues/2101), [#2135](https://github.com/PurHur/php-compiler/issues/2135)) | ✅ `THROWSWEB_AOT_SMOKE_GATE=1` ([#2101](https://github.com/PurHur/php-compiler/issues/2101), [#2135](https://github.com/PurHur/php-compiler/issues/2135)) | — |
+| [008-SelfHostProbe](examples/008-SelfHostProbe/) | ✅ `./phpc run` ([#2207](https://github.com/PurHur/php-compiler/issues/2207)) | — | 📋 optional | — |
+| [009-FastCGIWeb](examples/009-FastCGIWeb/) | ✅ `./phpc run` / `phpc serve` ([#2331](https://github.com/PurHur/php-compiler/issues/2331)) | ✅ `phpc build --project` | 📋 FastCGI adapter ([#173](https://github.com/PurHur/php-compiler/issues/173)) | 📋 `phpc deploy` ([#635](https://github.com/PurHur/php-compiler/issues/635)) |
 
 `make examples-aot-smoke` links and executes 000–004 when LLVM is ready (003 execute green — [#764](https://github.com/PurHur/php-compiler/issues/764)); **006-FileUploadWeb** multipart execute when `FILE_UPLOAD_WEB_AOT_SMOKE_GATE=1` (default — [#2012](https://github.com/PurHur/php-compiler/issues/2012), [#2013](https://github.com/PurHur/php-compiler/issues/2013)). **007-ThrowsWeb** AOT link/execute when `THROWSWEB_AOT_*_GATE=1` (default — [#2135](https://github.com/PurHur/php-compiler/issues/2135), [#2101](https://github.com/PurHur/php-compiler/issues/2101)). **005-SessionsWeb** VM/session curls: `make examples-web-smoke` ([#1887](https://github.com/PurHur/php-compiler/issues/1887)). **007-ThrowsWeb** five-minute presenter curls: [docs/GETTING-STARTED.md §5b](docs/GETTING-STARTED.md) ([#2158](https://github.com/PurHur/php-compiler/issues/2158)). Per-example commands: [examples/README.md](examples/README.md).
 

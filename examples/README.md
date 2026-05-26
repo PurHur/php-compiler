@@ -29,6 +29,9 @@ Shipped demos live under `examples/00x-*/` with an `example.php` entry script. U
 
 ./phpc lint examples/008-SelfHostProbe/example.php
 ./phpc run examples/008-SelfHostProbe/example.php
+
+./phpc lint examples/009-FastCGIWeb/example.php
+./phpc run examples/009-FastCGIWeb/example.php
 ```
 
 AOT (needs LLVM 9 — see `script/install-llvm9.sh` or the `php-compiler:22.04-dev` Docker image):
@@ -54,6 +57,7 @@ Legacy entrypoints still work: `php bin/vm.php`, `php bin/jit.php`, `php bin/com
 | [006-FileUploadWeb](006-FileUploadWeb/) | ✅ `./phpc run` / `phpc serve` | ✅ nested `$_FILES` JIT ([#87](https://github.com/PurHur/php-compiler/issues/87)) | ✅ `phpc build` link ([#2011](https://github.com/PurHur/php-compiler/issues/2011)); execute default-on ([#2012](https://github.com/PurHur/php-compiler/issues/2012)) | `multipart/form-data` + `$_FILES['doc']` — [#1999](https://github.com/PurHur/php-compiler/issues/1999) |
 | [007-ThrowsWeb](007-ThrowsWeb/) | ✅ `./phpc run` / `phpc serve` | 📋 deferred | ✅ `phpc build` + CGI execute | `throw` / `catch` on invalid POST — [#2076](https://github.com/PurHur/php-compiler/issues/2076); VM smoke `THROWS_WEB_SMOKE_GATE=1` default ([#2093](https://github.com/PurHur/php-compiler/issues/2093), [#2125](https://github.com/PurHur/php-compiler/issues/2125)); AOT `THROWSWEB_AOT_*_GATE=1` default ([#2135](https://github.com/PurHur/php-compiler/issues/2135)) |
 | [008-SelfHostProbe](008-SelfHostProbe/) | ✅ `./phpc run` | — | 📋 optional | North Star 2 presenter — [#2207](https://github.com/PurHur/php-compiler/issues/2207); `make north-star2-verify` / spine smoke copy-paste; epic [#1492](https://github.com/PurHur/php-compiler/issues/1492) |
+| [009-FastCGIWeb](009-FastCGIWeb/) | ✅ `./phpc run` / `phpc serve` | 📋 deferred | ✅ `phpc build --project` | Health + CGI diagnostics — [#2331](https://github.com/PurHur/php-compiler/issues/2331); FastCGI execute [#173](https://github.com/PurHur/php-compiler/issues/173); deploy [#635](https://github.com/PurHur/php-compiler/issues/635) |
 | [003-MiniWebApp](003-MiniWebApp/) | ✅ `phpc serve` | partial | ✅ `phpc build --project` | PATH_INFO — [#489](https://github.com/PurHur/php-compiler/issues/489), runtime [#539](https://github.com/PurHur/php-compiler/issues/539); AOT link ✅ ([#752](https://github.com/PurHur/php-compiler/issues/752)); native execute ✅ ([#764](https://github.com/PurHur/php-compiler/issues/764) closed) |
 
 ### 000-HelloWorld
@@ -166,6 +170,20 @@ BOOTSTRAP_LIB_SPINE_SMOKE=1 make bootstrap-selfhost-lib-spine-smoke
 
 See [008-SelfHostProbe/README.md](008-SelfHostProbe/README.md) and [docs/bootstrap-selfhost.md](../docs/bootstrap-selfhost.md). Init scaffold: `./phpc init --profile selfhostprobe my-probe` ([#2220](https://github.com/PurHur/php-compiler/issues/2220)); template parity: `INIT_SELFHOSTPROBE_PARITY_GATE=1` in `ci-fast`. Spine slices: [#2201](https://github.com/PurHur/php-compiler/issues/2201), [#2134](https://github.com/PurHur/php-compiler/issues/2134); unit probe: [#2216](https://github.com/PurHur/php-compiler/issues/2216).
 
+### 009-FastCGIWeb
+
+Health check (`ok`) plus plain-text CGI diagnostics for non-root paths ([#2331](https://github.com/PurHur/php-compiler/issues/2331)). Use `phpc serve` until the FastCGI adapter ([#173](https://github.com/PurHur/php-compiler/issues/173)) lands; package with `phpc deploy` per [deploy-web-aot.md](../docs/deploy-web-aot.md).
+
+```console
+./phpc lint examples/009-FastCGIWeb/example.php
+./phpc run examples/009-FastCGIWeb/example.php
+./phpc serve 127.0.0.1:8080 examples/009-FastCGIWeb
+curl -s http://127.0.0.1:8080/example.php
+curl -s http://127.0.0.1:8080/example.php/ping
+```
+
+AOT: `phpc build --project examples/009-FastCGIWeb` when LLVM is ready. CI serve smoke: opt-in `FASTCGI_WEB_SMOKE_GATE=0` ([#1899](https://github.com/PurHur/php-compiler/issues/1899)).
+
 ### 002-StaticWeb
 
 Static page (no superglobals); good default for first AOT compile.
@@ -183,7 +201,7 @@ cd examples/002-StaticWeb
 
 Full field reference: [docs/phpc-json.md](../docs/phpc-json.md) ([#727](https://github.com/PurHur/php-compiler/issues/727)).
 
-**001-SimpleWeb**, **002-StaticWeb**, **004-ApiJson**, **005-SessionsWeb**, **006-FileUploadWeb**, **007-ThrowsWeb**, and **008-SelfHostProbe** ship a minimal manifest beside `example.php` ([#274](https://github.com/PurHur/php-compiler/issues/274), [#2207](https://github.com/PurHur/php-compiler/issues/2207)):
+**001-SimpleWeb**, **002-StaticWeb**, **004-ApiJson**, **005-SessionsWeb**, **006-FileUploadWeb**, **007-ThrowsWeb**, **008-SelfHostProbe**, and **009-FastCGIWeb** ship a minimal manifest beside `example.php` ([#274](https://github.com/PurHur/php-compiler/issues/274), [#2207](https://github.com/PurHur/php-compiler/issues/2207), [#2331](https://github.com/PurHur/php-compiler/issues/2331)):
 
 ```json
 {
