@@ -182,7 +182,7 @@ curl -s http://127.0.0.1:8080/example.php
 curl -s http://127.0.0.1:8080/example.php/ping
 ```
 
-AOT: `phpc build --project examples/009-FastCGIWeb` when LLVM is ready. CI serve smoke: opt-in `FASTCGI_WEB_SMOKE_GATE=1` · `make examples-fastcgiweb-smoke` ([#2351](https://github.com/PurHur/php-compiler/issues/2351)).
+AOT: `phpc build --project examples/009-FastCGIWeb` when LLVM is ready. Init scaffold: `./phpc init --profile fastcgiweb my-app` ([#2342](https://github.com/PurHur/php-compiler/issues/2342)); template parity: `INIT_FASTCGIWEB_PARITY_GATE=1` in `ci-fast`. CI serve smoke: opt-in `FASTCGI_WEB_SMOKE_GATE=1` · `make examples-fastcgiweb-smoke` ([#2351](https://github.com/PurHur/php-compiler/issues/2351)).
 
 ### 002-StaticWeb
 

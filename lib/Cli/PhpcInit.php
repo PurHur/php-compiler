@@ -23,6 +23,8 @@ final class PhpcInit
 
     public const PROFILE_SELFHOSTPROBE = 'selfhostprobe';
 
+    public const PROFILE_FASTCGIWEB = 'fastcgiweb';
+
     /** @var array<string, list<string>> */
     private const PROFILE_TEMPLATES = [
         self::PROFILE_DEFAULT => [
@@ -51,6 +53,11 @@ final class PhpcInit
             'README.md',
         ],
         self::PROFILE_SELFHOSTPROBE => [
+            'phpc.json',
+            'example.php',
+            'README.md',
+        ],
+        self::PROFILE_FASTCGIWEB => [
             'phpc.json',
             'example.php',
             'README.md',
@@ -180,6 +187,12 @@ final class PhpcInit
             fwrite(STDOUT, "  phpc lint example.php\n");
             fwrite(STDOUT, "  phpc run example.php\n");
             fwrite(STDOUT, "  make north-star2-verify\n");
+        } elseif (self::PROFILE_FASTCGIWEB === $profile) {
+            fwrite(STDOUT, "  phpc lint example.php\n");
+            fwrite(STDOUT, "  phpc run example.php\n");
+            fwrite(STDOUT, "  phpc serve 127.0.0.1:8080 .\n");
+            fwrite(STDOUT, "  curl -s http://127.0.0.1:8080/example.php\n");
+            fwrite(STDOUT, "  curl -s http://127.0.0.1:8080/example.php/ping\n");
         } else {
             fwrite(STDOUT, "  phpc lint public/index.php\n");
             fwrite(STDOUT, "  phpc run public/index.php\n");

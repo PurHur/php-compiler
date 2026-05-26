@@ -954,8 +954,20 @@ final class Doctor
         fwrite(STDOUT, "      Run:     FASTCGI_WEB_DEPLOY_SMOKE_GATE=1 make deploy-smoke-all\n");
         fwrite(STDOUT, "      Or:      make examples-fastcgiweb-deploy-smoke\n");
         fwrite(STDOUT, "      Ladder:  make deploy-smoke-all (skips 009 with hint when gate=0; #2077)\n");
+
+        $initProfileLive = \PHPCompiler\Cli\PhpcInit::isKnownProfile('fastcgiweb');
+        $initTemplate = is_file($exampleDir.'/example.php')
+            && is_file($repoRoot.'/templates/init-fastcgiweb/example.php');
+        if ($initProfileLive && $initTemplate) {
+            fwrite(STDOUT, "  [✅] phpc init --profile fastcgiweb (#2342)\n");
+        } elseif ($initTemplate) {
+            fwrite(STDOUT, "  [📋] phpc init --profile fastcgiweb — template ready; CLI profile pending #2342\n");
+        } else {
+            fwrite(STDOUT, "  [📋] phpc init --profile fastcgiweb — #2342\n");
+        }
+        fwrite(STDOUT, "      Parity:  ./script/check-init-fastcgiweb-parity.sh (INIT_FASTCGIWEB_PARITY_GATE=1 in ci-fast)\n");
+
         fwrite(STDOUT, "\n  Related:\n");
-        fwrite(STDOUT, "  [📋] phpc init --profile fastcgiweb — #2342\n");
         fwrite(STDOUT, "  [📋] FastCGI adapter loop — #173\n");
         fwrite(STDOUT, "  Docs: examples/009-FastCGIWeb/README.md · docs/local-ci-matrix.md\n");
     }
