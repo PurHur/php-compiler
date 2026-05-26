@@ -59,7 +59,9 @@ if [[ "${BOOTSTRAP_M4_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
   m4_link_env=()
   m4_link_mode="stub"
   m4_emit_entry="${EMIT_ENTRY}"
-  if [[ "${BOOTSTRAP_M4_COMPILE_DRIVER_REAL_LOWERING:-${BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING:-0}}" == "1" ]]; then
+  # Default REAL_LOWERING on when LINK_COMPILE_DRIVER=1 so emit helper links with
+  # PHP_COMPILER_M3_COMPILE_DRIVER (stub-only path always fails link — #2571).
+  if [[ "${BOOTSTRAP_M4_COMPILE_DRIVER_REAL_LOWERING:-${BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING:-1}}" == "1" ]]; then
     m4_link_env=(env PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_M3_COMPILE_DRIVER=1 PHP_COMPILER_EMIT_HELPER_LINK=1)
     m4_link_mode="selfhost M3 emit TU (compile_smoke_m3_emit_native_entry.php)"
     # bin/compile.php bootstrap-aot gate matches /test/bootstrap-aot/ in normalized paths (#1983).
