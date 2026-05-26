@@ -120,7 +120,9 @@ Defaults are exported from [`script/ci-defaults.env`](../script/ci-defaults.env)
 | `JIT_SERVER_SUPERGLOBAL_GATE` | `1` | `ci-local.sh` (LLVM tail) | PHPUnit `JitServerSuperglobal` — `bin/jit.php` `$_SERVER` / `PATH_INFO` refresh without recompile ([#2257](https://github.com/PurHur/php-compiler/issues/2257), [#2275](https://github.com/PurHur/php-compiler/issues/2275), [#2292](https://github.com/PurHur/php-compiler/issues/2292)); skipped when LLVM missing or MCJIT probe fails; set `0` to skip |
 | `MINIWEBAPP_SERVE_GATE` | `1` | `ci-local.sh`, `ci-fast.sh` | `ServeTest` `@group miniwebapp` ([#641](https://github.com/PurHur/php-compiler/issues/641)) |
 | `SESSIONS_WEB_SMOKE_GATE` | `1` | `ci-fast.sh`, `ci-local.sh` | `examples-web-smoke.sh --sessions-only` / 005 cookie flash curls ([#1887](https://github.com/PurHur/php-compiler/issues/1887)) |
+| `SESSIONS_WEB_SERVE_AOT_SMOKE_GATE` | `0` | `ci-local.sh` (`ci_run_sessions_web_serve_aot_smoke`) | `examples-web-smoke.sh --sessions-only --aot` — 005 `phpc serve --aot` session flash ([#2333](https://github.com/PurHur/php-compiler/issues/2333)) |
 | `FILE_UPLOAD_WEB_SMOKE_GATE` | `1` | `ci-fast.sh`, `ci-local.sh` | `examples-web-smoke.sh --fileupload-only` / 006 multipart upload curls ([#2009](https://github.com/PurHur/php-compiler/issues/2009), [#1999](https://github.com/PurHur/php-compiler/issues/1999)) |
+| `FILE_UPLOAD_WEB_SERVE_AOT_SMOKE_GATE` | `0` | `ci-local.sh` (`ci_run_file_upload_web_serve_aot_smoke`) | `examples-web-smoke.sh --fileupload-only --aot` — 006 `phpc serve --aot` multipart POST ([#2333](https://github.com/PurHur/php-compiler/issues/2333)) |
 | `SESSIONS_WEB_AOT_LINK_GATE` | `1` | `ci-local.sh` (PHPUnit `@group aot-link`) | `ExamplesCompileTest::test005SessionsWebAotLink` — 005 native link ([#1946](https://github.com/PurHur/php-compiler/issues/1946)); set `0` to skip during iteration |
 | `SESSIONS_WEB_AOT_SMOKE_GATE` | `0` | `ci-local.sh` (`ci_run_sessions_web_aot_execute`) | `SessionsWebAotExecuteTest` two-request execute ([#1891](https://github.com/PurHur/php-compiler/issues/1891), [#1923](https://github.com/PurHur/php-compiler/issues/1923)) |
 | `MINIWEBAPP_WEB_SMOKE_GATE` | `1` | `ci-local.sh` | `examples-web-smoke.sh --miniwebapp-only` ([#664](https://github.com/PurHur/php-compiler/issues/664)) |
@@ -214,6 +216,7 @@ Progressive ladder (VM → AOT link → AOT execute → deploy CGI). Probe with 
 | Stage | Variable | Default | When `=1` |
 |-------|----------|---------|-----------|
 | VM session flash | `SESSIONS_WEB_SMOKE_GATE` | `1` | `make examples-sessions-smoke` / `ci-fast` ([#1887](https://github.com/PurHur/php-compiler/issues/1887)) |
+| AOT serve | `SESSIONS_WEB_SERVE_AOT_SMOKE_GATE` | `0` | `SESSIONS_WEB_SERVE_AOT_SMOKE_GATE=1 ./script/examples-web-smoke.sh --sessions-only --aot` ([#2333](https://github.com/PurHur/php-compiler/issues/2333)) |
 | AOT link | `SESSIONS_WEB_AOT_LINK_GATE` | `1` | `./script/ci-local.sh --filter test005SessionsWebAotLink` ([#1946](https://github.com/PurHur/php-compiler/issues/1946)) |
 | AOT execute | `SESSIONS_WEB_AOT_SMOKE_GATE` | `0` | `SessionsWebAotExecuteTest` or `EXAMPLES_AOT_SMOKE_ONLY=005 ./script/examples-aot-smoke.sh` ([#1891](https://github.com/PurHur/php-compiler/issues/1891) ✅) |
 | Deploy CGI | `SESSIONS_WEB_DEPLOY_SMOKE_GATE` | `0` | `SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 make deploy-smoke-all` ([#1893](https://github.com/PurHur/php-compiler/issues/1893), [#1962](https://github.com/PurHur/php-compiler/issues/1962), [#2077](https://github.com/PurHur/php-compiler/issues/2077)) |
@@ -234,6 +237,7 @@ Progressive ladder (VM multipart → AOT link → AOT execute → deploy CGI). V
 | Stage | Variable | Default | When enabled |
 |-------|----------|---------|--------------|
 | VM multipart | `FILE_UPLOAD_WEB_SMOKE_GATE` | `1` | `ci-fast` / `ci-local` / `examples-web-smoke.sh --fileupload-only` ([#2009](https://github.com/PurHur/php-compiler/issues/2009)) |
+| AOT serve | `FILE_UPLOAD_WEB_SERVE_AOT_SMOKE_GATE` | `0` | `FILE_UPLOAD_WEB_SERVE_AOT_SMOKE_GATE=1 ./script/examples-web-smoke.sh --fileupload-only --aot` ([#2333](https://github.com/PurHur/php-compiler/issues/2333)) |
 | AOT link | `FILE_UPLOAD_WEB_AOT_LINK_GATE` | `1` | `./script/ci-local.sh --filter test006FileUploadWebAotLink` ([#2011](https://github.com/PurHur/php-compiler/issues/2011)); set `0` to skip during iteration |
 | AOT execute | `FILE_UPLOAD_WEB_AOT_SMOKE_GATE` | `1` | `FileUploadWebAotExecuteTest` or `EXAMPLES_AOT_SMOKE_ONLY=006 ./script/examples-aot-smoke.sh` ([#2012](https://github.com/PurHur/php-compiler/issues/2012)) |
 | Deploy CGI | `FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE` | `0` | `FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE=1 make deploy-smoke-all` ([#2044](https://github.com/PurHur/php-compiler/issues/2044), [#2077](https://github.com/PurHur/php-compiler/issues/2077)); `make examples-fileupload-deploy-smoke` (006 only); `ci-local` opt-in ([#2038](https://github.com/PurHur/php-compiler/issues/2038), [#2042](https://github.com/PurHur/php-compiler/issues/2042)) |

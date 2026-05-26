@@ -45,6 +45,7 @@ Defaults from `script/ci-defaults.env` (VM smoke + AOT link + AOT execute defaul
 | Stage | Gate | Default | Command when enabled |
 |-------|------|---------|----------------------|
 | VM multipart | `FILE_UPLOAD_WEB_SMOKE_GATE` | `1` | `./script/examples-web-smoke.sh --fileupload-only` or `ci-fast` ([#2009](https://github.com/PurHur/php-compiler/issues/2009)) |
+| AOT serve | `FILE_UPLOAD_WEB_SERVE_AOT_SMOKE_GATE` | `0` | `FILE_UPLOAD_WEB_SERVE_AOT_SMOKE_GATE=1 ./script/examples-web-smoke.sh --fileupload-only --aot` ([#2333](https://github.com/PurHur/php-compiler/issues/2333)) |
 | AOT link | `FILE_UPLOAD_WEB_AOT_LINK_GATE` | `1` | `./script/ci-local.sh --filter test006FileUploadWebAotLink` ([#2011](https://github.com/PurHur/php-compiler/issues/2011)) |
 | AOT execute | `FILE_UPLOAD_WEB_AOT_SMOKE_GATE` | `1` | `./script/ci-local.sh --filter FileUploadWebAotExecuteTest` or `EXAMPLES_AOT_SMOKE_ONLY=006 ./script/examples-aot-smoke.sh` ([#2012](https://github.com/PurHur/php-compiler/issues/2012), [#2013](https://github.com/PurHur/php-compiler/issues/2013)) |
 | Deploy CGI | `FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE` | `0` | `make examples-fileupload-deploy-smoke` ([#2044](https://github.com/PurHur/php-compiler/issues/2044)); `ci-local` opt-in ([#2038](https://github.com/PurHur/php-compiler/issues/2038)) |

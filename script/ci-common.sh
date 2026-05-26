@@ -866,6 +866,48 @@ ci_run_miniwebapp_web_smoke() {
   "$_CI_SCRIPT_DIR/examples-web-smoke.sh" --miniwebapp-only
 }
 
+# 005-SessionsWeb phpc serve --aot session flash (issue #2333); opt-in SESSIONS_WEB_SERVE_AOT_SMOKE_GATE=1.
+ci_run_sessions_web_serve_aot_smoke() {
+  if [[ "${SESSIONS_WEB_SERVE_AOT_SMOKE_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  if [[ -n "${PHP_COMPILER_SKIP_SERVE_TESTS:-}" ]]; then
+    echo "examples-web-smoke (005 AOT serve): skipped (PHP_COMPILER_SKIP_SERVE_TESTS is set)"
+    return 0
+  fi
+  if ! ci_can_bind_loopback; then
+    echo "examples-web-smoke (005 AOT serve): skipped (cannot bind loopback TCP)"
+    return 0
+  fi
+  if ! ci_llvm_ready; then
+    echo "examples-web-smoke (005 AOT serve): skipped (LLVM 9 not available)"
+    return 0
+  fi
+  echo "examples-web-smoke (005 AOT serve): SessionsWeb phpc serve --aot session flash (SESSIONS_WEB_SERVE_AOT_SMOKE_GATE=1, #2333)..."
+  "$_CI_SCRIPT_DIR/examples-web-smoke.sh" --sessions-only --aot
+}
+
+# 006-FileUploadWeb phpc serve --aot multipart POST (issue #2333); opt-in FILE_UPLOAD_WEB_SERVE_AOT_SMOKE_GATE=1.
+ci_run_file_upload_web_serve_aot_smoke() {
+  if [[ "${FILE_UPLOAD_WEB_SERVE_AOT_SMOKE_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  if [[ -n "${PHP_COMPILER_SKIP_SERVE_TESTS:-}" ]]; then
+    echo "examples-web-smoke (006 AOT serve): skipped (PHP_COMPILER_SKIP_SERVE_TESTS is set)"
+    return 0
+  fi
+  if ! ci_can_bind_loopback; then
+    echo "examples-web-smoke (006 AOT serve): skipped (cannot bind loopback TCP)"
+    return 0
+  fi
+  if ! ci_llvm_ready; then
+    echo "examples-web-smoke (006 AOT serve): skipped (LLVM 9 not available)"
+    return 0
+  fi
+  echo "examples-web-smoke (006 AOT serve): FileUploadWeb phpc serve --aot multipart POST (FILE_UPLOAD_WEB_SERVE_AOT_SMOKE_GATE=1, #2333)..."
+  "$_CI_SCRIPT_DIR/examples-web-smoke.sh" --fileupload-only --aot
+}
+
 # 003-MiniWebApp AOT HTTP curls via phpc serve --aot (issues #833, #1523); default MINIWEBAPP_WEB_SMOKE_AOT_GATE=1.
 ci_run_miniwebapp_web_smoke_aot() {
   if [[ "${MINIWEBAPP_WEB_SMOKE_AOT_GATE:-1}" != "1" ]]; then

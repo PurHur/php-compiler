@@ -102,8 +102,21 @@ final class ExamplesWebSmokeScriptTest extends TestCase
         $this->assertStringContainsString('005-SessionsWeb', $body);
         $this->assertStringContainsString('run_sessions_web_smoke', $body);
         $this->assertStringContainsString('SESSIONS_WEB_SMOKE_GATE', $body);
+        $this->assertStringContainsString('SESSIONS_WEB_SERVE_AOT_SMOKE_GATE', $body);
+        $this->assertStringContainsString('ensure_project_aot_binary', $body);
         $this->assertStringContainsString('curl_expect_303_post_cookies', $body);
         $this->assertStringContainsString('Flash: Saved', $body);
+    }
+
+    public function testExamplesWebSmokeScriptSupportsFileUploadServeAotSlice(): void
+    {
+        $script = dirname(__DIR__, 2).'/script/examples-web-smoke.sh';
+        $body = (string) file_get_contents($script);
+        $this->assertStringContainsString('--fileupload-only', $body);
+        $this->assertStringContainsString('006-FileUploadWeb', $body);
+        $this->assertStringContainsString('FILE_UPLOAD_WEB_SERVE_AOT_SMOKE_GATE', $body);
+        $this->assertStringContainsString('serve --aot --binary', $body);
+        $this->assertStringContainsString('Uploaded: README.md', $body);
     }
 
     public function testExamplesWebSmokeScriptSupportsFastcgiWebSlice(): void

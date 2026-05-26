@@ -30,6 +30,8 @@ WEB_EXAMPLES=(
   002-StaticWeb
   003-MiniWebApp
   004-ApiJson
+  005-SessionsWeb
+  006-FileUploadWeb
 )
 
 echo "examples-web-smoke-prebuild: building AOT binaries (phpc build --project)..."

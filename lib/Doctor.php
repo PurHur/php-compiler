@@ -610,11 +610,13 @@ final class Doctor
 
         $defaults = self::readCiDefaultsEnv($repoRoot);
         $smokeDefault = $defaults['SESSIONS_WEB_SMOKE_GATE'] ?? '1';
+        $serveAotDefault = $defaults['SESSIONS_WEB_SERVE_AOT_SMOKE_GATE'] ?? '0';
         $linkDefault = $defaults['SESSIONS_WEB_AOT_LINK_GATE'] ?? '1';
         $aotDefault = $defaults['SESSIONS_WEB_AOT_SMOKE_GATE'] ?? '0';
         $deployDefault = $defaults['SESSIONS_WEB_DEPLOY_SMOKE_GATE'] ?? '0';
 
         $smokeOn = self::gateEnabled('SESSIONS_WEB_SMOKE_GATE', $smokeDefault);
+        $serveAotOn = self::gateEnabled('SESSIONS_WEB_SERVE_AOT_SMOKE_GATE', $serveAotDefault);
         $linkOn = self::gateEnabled('SESSIONS_WEB_AOT_LINK_GATE', $linkDefault);
         $aotOn = self::gateEnabled('SESSIONS_WEB_AOT_SMOKE_GATE', $aotDefault);
         $deployOn = self::gateEnabled('SESSIONS_WEB_DEPLOY_SMOKE_GATE', $deployDefault);
@@ -650,6 +652,12 @@ final class Doctor
             'make examples-sessions-smoke · ci-fast (#1887)',
             '#1887'
         );
+        $serveAotStatus = $serveAotOn && $llvmReady ? '✅' : '📋';
+        $serveAotNote = $llvmReady
+            ? ($serveAotOn ? '#2333 ✅' : 'opt-in — phpc serve --aot session flash (#2333)')
+            : 'LLVM required; #2333 when gate=1';
+        fwrite(STDOUT, "  [{$serveAotStatus}] Stage 2b AOT serve — SESSIONS_WEB_SERVE_AOT_SMOKE_GATE default {$serveAotDefault} ({$serveAotNote})\n");
+        fwrite(STDOUT, "      Run:     SESSIONS_WEB_SERVE_AOT_SMOKE_GATE=1 ./script/examples-web-smoke.sh --sessions-only --aot\n");
         self::printSessionsWebGateRow(
             2,
             'AOT link',
@@ -708,11 +716,13 @@ final class Doctor
 
         $defaults = self::readCiDefaultsEnv($repoRoot);
         $smokeDefault = $defaults['FILE_UPLOAD_WEB_SMOKE_GATE'] ?? '1';
+        $serveAotDefault = $defaults['FILE_UPLOAD_WEB_SERVE_AOT_SMOKE_GATE'] ?? '0';
         $linkDefault = $defaults['FILE_UPLOAD_WEB_AOT_LINK_GATE'] ?? '1';
         $aotDefault = $defaults['FILE_UPLOAD_WEB_AOT_SMOKE_GATE'] ?? '1';
         $deployDefault = $defaults['FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE'] ?? '0';
 
         $smokeOn = self::gateEnabled('FILE_UPLOAD_WEB_SMOKE_GATE', $smokeDefault);
+        $serveAotOn = self::gateEnabled('FILE_UPLOAD_WEB_SERVE_AOT_SMOKE_GATE', $serveAotDefault);
         $linkOn = self::gateEnabled('FILE_UPLOAD_WEB_AOT_LINK_GATE', $linkDefault);
         $aotOn = self::gateEnabled('FILE_UPLOAD_WEB_AOT_SMOKE_GATE', $aotDefault);
         $deployOn = self::gateEnabled('FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE', $deployDefault);
@@ -748,6 +758,12 @@ final class Doctor
             './script/examples-web-smoke.sh --fileupload-only · ci-fast (#2009)',
             '#2009'
         );
+        $serveAotStatus = $serveAotOn && $llvmReady ? '✅' : '📋';
+        $serveAotNote = $llvmReady
+            ? ($serveAotOn ? '#2333 ✅' : 'opt-in — phpc serve --aot multipart POST (#2333)')
+            : 'LLVM required; #2333 when gate=1';
+        fwrite(STDOUT, "  [{$serveAotStatus}] Stage 2b AOT serve — FILE_UPLOAD_WEB_SERVE_AOT_SMOKE_GATE default {$serveAotDefault} ({$serveAotNote})\n");
+        fwrite(STDOUT, "      Run:     FILE_UPLOAD_WEB_SERVE_AOT_SMOKE_GATE=1 ./script/examples-web-smoke.sh --fileupload-only --aot\n");
         self::printSessionsWebGateRow(
             2,
             'AOT link',

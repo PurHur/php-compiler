@@ -38,7 +38,9 @@ Environment:
   MINIWEBAPP_AOT_EXECUTE_GATE=1    fail instead of skip when 003 AOT probe empty (#747, #676)
   MINIWEBAPP_WEB_SMOKE_AOT_GATE=1  require 003 --aot curls to pass (#833)
   SESSIONS_WEB_SMOKE_GATE=1        include 005 session flash curls in default run (#1887)
+  SESSIONS_WEB_SERVE_AOT_SMOKE_GATE=1  require 005 phpc serve --aot session flash (#2333)
   FILE_UPLOAD_WEB_SMOKE_GATE=1     include 006 multipart upload curls (#1999)
+  FILE_UPLOAD_WEB_SERVE_AOT_SMOKE_GATE=1  require 006 phpc serve --aot multipart POST (#2333)
   THROWS_WEB_SMOKE_GATE=1          include 007 throw/catch POST curls (#2076)
   THROWSWEB_UNCAUGHT_500_GATE=1    include 007 uncaught.php HTTP 500 curl (#2200)
   FASTCGI_WEB_SMOKE_GATE=1         include 009 health + PATH_INFO curls (#2351)
@@ -310,6 +312,37 @@ miniwebapp_aot_require_pass() {
     || [[ "${MINIWEBAPP_WEB_SMOKE_AOT_GATE:-1}" == "1" ]]
 }
 
+sessions_serve_aot_require_pass() {
+  [[ "${SESSIONS_WEB_SERVE_AOT_SMOKE_GATE:-0}" == "1" ]]
+}
+
+file_upload_serve_aot_require_pass() {
+  [[ "${FILE_UPLOAD_WEB_SERVE_AOT_SMOKE_GATE:-0}" == "1" ]]
+}
+
+ensure_project_aot_binary() {
+  local project_dir="$1"
+  local binary="${project_dir}/.phpc/bin/app"
+  if [[ -x "$binary" ]]; then
+    printf '%s' "$binary"
+    return 0
+  fi
+
+  local llvm_dir=""
+  if ! llvm_dir="$(resolve_llvm_dir)"; then
+    return 1
+  fi
+  export PHP_COMPILER_LLVM_PATH="$llvm_dir"
+  echo "examples-web-smoke: $(basename "$project_dir"): phpc build --project -> ${binary}" >&2
+  if ! "$PHPC" build --project "$project_dir"; then
+    return 1
+  fi
+  if [[ ! -x "$binary" ]]; then
+    return 1
+  fi
+  printf '%s' "$binary"
+}
+
 # CLI byte probe aligned with MiniWebAppCgiEnv::shellQueryRouteHome (#773, #809).
 miniwebapp_aot_stdout_ready() {
   local binary="$1"
@@ -486,8 +519,8 @@ run_file_upload_web_smoke() {
     echo "examples-web-smoke: 006-FileUploadWeb: skip (missing docroot)"
     return 0
   fi
-  if [[ "$AOT" -eq 1 ]]; then
-    echo "examples-web-smoke: 006-FileUploadWeb: skip --aot (VM only until FILE_UPLOAD_WEB_AOT_SMOKE_GATE)"
+  if [[ "$AOT" -eq 1 && "${FILE_UPLOAD_WEB_SERVE_AOT_SMOKE_GATE:-0}" != "1" ]]; then
+    echo "examples-web-smoke: 006-FileUploadWeb: skip --aot (FILE_UPLOAD_WEB_SERVE_AOT_SMOKE_GATE=0; #2333)"
     return 0
   fi
 
@@ -497,10 +530,25 @@ run_file_upload_web_smoke() {
     return 1
   fi
 
-  local port pid
+  local port pid serve_cmd=("$PHPC" serve)
+  local mode_label="VM multipart POST"
+  if [[ "$AOT" -eq 1 ]]; then
+    local binary=""
+    if ! binary="$(ensure_project_aot_binary "$docroot")"; then
+      if file_upload_serve_aot_require_pass; then
+        echo "examples-web-smoke: 006-FileUploadWeb: FAILED (no executable .phpc/bin/app; #2333)" >&2
+        return 1
+      fi
+      echo "examples-web-smoke: 006-FileUploadWeb: skip --aot (no executable .phpc/bin/app)"
+      return 0
+    fi
+    serve_cmd=("$PHPC" serve --aot --binary "$binary")
+    mode_label="AOT multipart POST"
+  fi
+
   port="$(find_free_port)"
-  echo "examples-web-smoke: 006-FileUploadWeb on 127.0.0.1:${port} (VM multipart POST)"
-  "${PHPC}" serve "127.0.0.1:${port}" "$docroot" >/dev/null 2>&1 &
+  echo "examples-web-smoke: 006-FileUploadWeb on 127.0.0.1:${port} (${mode_label})"
+  "${serve_cmd[@]}" "127.0.0.1:${port}" "$docroot" >/dev/null 2>&1 &
   pid=$!
 
   stop_serve() {
@@ -536,16 +584,31 @@ run_sessions_web_smoke() {
     echo "examples-web-smoke: 005-SessionsWeb: skip (missing docroot)"
     return 0
   fi
-  if [[ "$AOT" -eq 1 ]]; then
-    echo "examples-web-smoke: 005-SessionsWeb: skip --aot (VM only until #1891)"
+  if [[ "$AOT" -eq 1 && "${SESSIONS_WEB_SERVE_AOT_SMOKE_GATE:-0}" != "1" ]]; then
+    echo "examples-web-smoke: 005-SessionsWeb: skip --aot (SESSIONS_WEB_SERVE_AOT_SMOKE_GATE=0; #2333)"
     return 0
   fi
 
-  local port pid jar
+  local port pid jar serve_cmd=("$PHPC" serve)
+  local mode_label="VM session flash"
+  if [[ "$AOT" -eq 1 ]]; then
+    local binary=""
+    if ! binary="$(ensure_project_aot_binary "$docroot")"; then
+      if sessions_serve_aot_require_pass; then
+        echo "examples-web-smoke: 005-SessionsWeb: FAILED (no executable .phpc/bin/app; #2333)" >&2
+        return 1
+      fi
+      echo "examples-web-smoke: 005-SessionsWeb: skip --aot (no executable .phpc/bin/app)"
+      return 0
+    fi
+    serve_cmd=("$PHPC" serve --aot --binary "$binary")
+    mode_label="AOT session flash"
+  fi
+
   jar="$(mktemp)"
   port="$(find_free_port)"
-  echo "examples-web-smoke: 005-SessionsWeb on 127.0.0.1:${port} (VM session flash)"
-  "${PHPC}" serve "127.0.0.1:${port}" "$docroot" >/dev/null 2>&1 &
+  echo "examples-web-smoke: 005-SessionsWeb on 127.0.0.1:${port} (${mode_label})"
+  "${serve_cmd[@]}" "127.0.0.1:${port}" "$docroot" >/dev/null 2>&1 &
   pid=$!
 
   stop_serve() {

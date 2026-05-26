@@ -159,6 +159,7 @@ final class PhpcDoctorTest extends TestCase
         $this->assertStringContainsString('005-SessionsWeb CI gates', $result['stdout']);
         $this->assertStringContainsString('005-SessionsWeb', $result['stdout']);
         $this->assertStringContainsString('SESSIONS_WEB_SMOKE_GATE', $result['stdout']);
+        $this->assertStringContainsString('SESSIONS_WEB_SERVE_AOT_SMOKE_GATE', $result['stdout']);
         $this->assertStringContainsString('SESSIONS_WEB_AOT_LINK_GATE', $result['stdout']);
         $this->assertStringContainsString('SESSIONS_WEB_AOT_SMOKE_GATE', $result['stdout']);
         $this->assertStringContainsString('SESSIONS_WEB_DEPLOY_SMOKE_GATE', $result['stdout']);
@@ -176,6 +177,7 @@ final class PhpcDoctorTest extends TestCase
         $this->assertStringContainsString('006-FileUploadWeb CI gates', $result['stdout']);
         $this->assertStringContainsString('006-FileUploadWeb', $result['stdout']);
         $this->assertStringContainsString('FILE_UPLOAD_WEB_SMOKE_GATE', $result['stdout']);
+        $this->assertStringContainsString('FILE_UPLOAD_WEB_SERVE_AOT_SMOKE_GATE', $result['stdout']);
         $this->assertStringContainsString('FILE_UPLOAD_WEB_AOT_LINK_GATE', $result['stdout']);
         $this->assertStringContainsString('FILE_UPLOAD_WEB_AOT_SMOKE_GATE', $result['stdout']);
         $this->assertStringContainsString('--fileupload-only', $result['stdout']);
