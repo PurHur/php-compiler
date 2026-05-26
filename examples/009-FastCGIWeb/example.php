@@ -21,8 +21,7 @@ $pathInfo = $_SERVER['PATH_INFO'] ?? '';
 
 header('Content-Type: text/plain; charset=UTF-8');
 
-// strlen guard: VM mis-lowers chained !== on coalesced $_SERVER fetches (#2351 smoke).
-if (strlen($pathInfo) > 1) {
+if ($pathInfo !== '') {
     $requestUri = $_SERVER['REQUEST_URI'] ?? '/';
     $scriptName = $_SERVER['SCRIPT_NAME'] ?? '/example.php';
     echo 'REQUEST_URI=', $requestUri, "\n";
