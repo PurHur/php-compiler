@@ -1,5 +1,5 @@
 --TEST--
-stdlib spl_autoload_register() JIT invokes callback on unknown class (issue #1776)
+stdlib spl_autoload_register() JIT invokes callback on unknown class (issue #1776, #2441)
 --FILE--
 <?php
 function autoload_demo(string $class): void

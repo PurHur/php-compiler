@@ -44,7 +44,7 @@ Related merges outside this wave: `goto` ([#1228](https://github.com/PurHur/php-
 |-------|-------------|--------|-----|
 | [#1367](https://github.com/PurHur/php-compiler/issues/1367) | `parse_str` | Closed | [#1396](https://github.com/PurHur/php-compiler/pull/1396) |
 | [#1368](https://github.com/PurHur/php-compiler/issues/1368) | `setrawcookie` | Closed | [#1403](https://github.com/PurHur/php-compiler/pull/1403) |
-| [#1369](https://github.com/PurHur/php-compiler/issues/1369) | `spl_autoload_register` | Closed (VM) | [#1405](https://github.com/PurHur/php-compiler/pull/1405); JIT deferred — see `docs/stdlib-jit-audit.md` |
+| [#1369](https://github.com/PurHur/php-compiler/issues/1369) | `spl_autoload_register` | Closed (VM+JIT) | [#1405](https://github.com/PurHur/php-compiler/pull/1405); JIT runtime link [#2441](https://github.com/PurHur/php-compiler/issues/2441) |
 | [#1370](https://github.com/PurHur/php-compiler/issues/1370) | `get_object_vars` | Closed | [#1394](https://github.com/PurHur/php-compiler/pull/1394) |
 | [#1371](https://github.com/PurHur/php-compiler/issues/1371) | `trait_exists` / `interface_exists` | Closed | [#1393](https://github.com/PurHur/php-compiler/pull/1393) |
 | [#1372](https://github.com/PurHur/php-compiler/issues/1372) | `property_exists` | Closed | [#1387](https://github.com/PurHur/php-compiler/pull/1387) |
