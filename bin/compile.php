@@ -18,24 +18,29 @@ use PHPCompiler\Web\Superglobals;
 function run(string $filename, string $code, array $options): void
 {
     $normalized = '-' !== $filename ? str_replace('\\', '/', $filename) : '';
-    if ('' !== $normalized && str_contains($normalized, '/test/bootstrap-aot/')) {
+    if ('' !== $normalized && str_contains($normalized, 'bootstrap-aot/')) {
         // M3 native emit TU: self-host M3 allowlist (not full bootstrap JIT) (#1937, #1983).
-        $m3Driver = getenv('PHP_COMPILER_M3_COMPILE_DRIVER');
-        $m3EmitNative = (str_contains($normalized, 'compile_smoke_m3_emit_native_entry.php')
-                || str_contains($normalized, 'runtime_m3_emit_native_entry.php')
-                || str_contains($normalized, 'helloworld_m3_emit_native_entry.php'))
-            && ('1' === $m3Driver || 'true' === strtolower((string) $m3Driver));
-        if ($m3EmitNative) {
+        $m3EmitEntry = str_contains($normalized, 'compile_smoke_m3_emit_native_entry.php')
+            || str_contains($normalized, 'runtime_m3_emit_native_entry.php')
+            || str_contains($normalized, 'helloworld_m3_emit_native_entry.php');
+        if ($m3EmitEntry) {
             putenv('PHP_COMPILER_SELFHOST_AOT=1');
-            // Class-body relaxations + native emit bridge gated on M3_EMIT_TU (#1937, #1983).
+            putenv('PHP_COMPILER_M3_COMPILE_DRIVER=1');
             putenv('PHP_COMPILER_EMIT_HELPER_LINK=1');
             putenv('PHP_COMPILER_M3_EMIT_TU=1');
+            if (str_contains($normalized, 'runtime_m3_emit_native_entry.php')) {
+                putenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX=runtime_compile_smoke_m3_emit');
+            } elseif (str_contains($normalized, 'helloworld_m3_emit_native_entry.php')) {
+                putenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX=helloworld_compile_smoke');
+            } else {
+                putenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX=compile_smoke_m3_emit');
+            }
         } else {
             // Bootstrap AOT fixtures require real JIT lowering; ignore inherited self-host stub env (#1086).
             putenv('PHP_COMPILER_SELFHOST_AOT=0');
         }
     }
-    if ('-' !== $filename && str_contains($normalized, '/test/selfhost/')) {
+    if ('-' !== $filename && str_contains($normalized, 'test/selfhost/')) {
         $selfhostAot = getenv('PHP_COMPILER_SELFHOST_AOT');
         if (false === $selfhostAot || '' === $selfhostAot) {
             putenv('PHP_COMPILER_SELFHOST_AOT=1');

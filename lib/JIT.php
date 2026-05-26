@@ -41,6 +41,8 @@ class JIT {
 
     private array $queue = [];
 
+    private ?Block $m3EmitTuMainBlock = null;
+
     public Context $context;
 
     public function __construct(Context $context) {
@@ -48,6 +50,9 @@ class JIT {
     }
 
     public function compile(Block $block): PHPLLVM\Value {
+        if ($this->shouldUseM3EmitTuNativeBridge() && $this->isM3EmitTuScriptMain($block)) {
+            $this->m3EmitTuMainBlock = $block;
+        }
         $return = $this->compileBlock($block);
         $this->runQueue();
         return $return;
@@ -163,9 +168,6 @@ class JIT {
     /** Emit native entry TU only — not compile_driver bundles that include compile_smoke_m3_emit (#1937). */
     private function shouldUseM3EmitTuNativeBridge(): bool
     {
-        if (!$this->shouldUseM3CompileDriverRealLowering()) {
-            return false;
-        }
         $flag = getenv('PHP_COMPILER_M3_EMIT_TU');
 
         return '1' === $flag || 'true' === strtolower((string) $flag);
@@ -302,6 +304,16 @@ class JIT {
         if (str_contains($internalName, 'opcode_type_name')) {
             return $this->compileSkippedOpcodeNameStub($internalName, $block);
         }
+        if ($this->shouldUseM3EmitTuNativeBridge() && $this->isM3EmitTuScriptMain($block)) {
+            return $this->compileM3EmitTuMainNative($internalName, $block, $logicalName);
+        }
+        if (
+            null !== $logicalName
+            && $this->shouldUseM3EmitTuNativeBridge()
+            && $this->isBootstrapM3RuntimeEmitBridgeName(strtolower($logicalName))
+        ) {
+            return $this->compileBootstrapCompileSmokeM3EmitNative($internalName, $block, $logicalName);
+        }
         if ($this->shouldUseM3CompileDriverRealLowering() && null !== $logicalName) {
             $m3Spine = strtolower($logicalName);
             if (str_ends_with($m3Spine, '\\runtime::loadjit')) {
@@ -321,6 +333,13 @@ class JIT {
             }
             if (str_ends_with($m3Spine, '\\runtime::loadcoremodules')) {
                 return $this->compileRuntimeLoadCoreModulesM3Native($internalName, $block, $logicalName);
+            }
+            if (str_ends_with($m3Spine, '\\runtime::parse')
+                || str_ends_with($m3Spine, '\\runtime::compile')
+                || str_ends_with($m3Spine, '\\runtime::parseandcompile')
+                || str_ends_with($m3Spine, '\\runtime::standalone')
+            ) {
+                return $this->compileRuntimeSpinePhpLowering($internalName, $block, $logicalName);
             }
             if ($this->isM3EmitHelperCompilerPhpLoweringName($m3Spine)) {
                 return $this->compileRuntimeSpinePhpLowering($internalName, $block, $logicalName);
@@ -724,6 +743,13 @@ class JIT {
             || str_ends_with($lower, '\\compiler::compilefunc');
     }
 
+    private function isM3EmitTuScriptMain(Block $block): bool
+    {
+        return null !== $block->func
+            && null === $block->func->class
+            && '{main}' === $block->func->name;
+    }
+
     private function isSkippedCompilerHotPathName(string $name): bool
     {
         $lower = strtolower($name);
@@ -1103,6 +1129,7 @@ class JIT {
         Block $block,
         string $logicalName
     ): PHPLLVM\Value {
+        $this->compileM3EmitTuRuntimeSpineDecls();
         $lcname = strtolower($logicalName);
         if (isset($this->context->functions[$lcname])) {
             return $this->context->functions[$lcname];
@@ -1138,6 +1165,97 @@ class JIT {
         );
 
         return $func;
+    }
+
+    /** Native {main} for M3 emit TU — getenv + bridge only (#1937). */
+    private function compileM3EmitTuMainNative(string $internalName, Block $block, ?string $logicalName): PHPLLVM\Value
+    {
+        $this->compileM3EmitTuRuntimeSpineDecls();
+        $lcname = strtolower($logicalName ?? '{main}');
+        if (isset($this->context->functions[$lcname])) {
+            return $this->context->functions[$lcname];
+        }
+        $i64 = $this->context->getTypeFromString('int64');
+        $func = $this->context->module->addFunction(
+            $this->llvmInternalName($internalName),
+            $this->context->context->functionType($i64, false)
+        );
+        $bb = $func->appendBasicBlock('entry');
+        $saved = $this->context->builder;
+        $this->context->builder = $this->context->context->builderCreate();
+        $this->context->builder->positionAtEnd($bb);
+        $logPrefix = getenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX');
+        if (!is_string($logPrefix) || '' === $logPrefix) {
+            $logPrefix = 'compile_smoke_m3_emit';
+        }
+        \PHPCompiler\JIT\BootstrapCompileSmokeM3Emit::emitMainEntry($this->context, $logPrefix);
+        $this->context->builder->clearInsertionPosition();
+        $this->context->builder = $saved;
+        $this->context->functions[$lcname] = $func;
+        $this->context->functionReturnType[$lcname] = 'int64';
+        $this->context->functionProxies[$lcname] = new JIT\Call\Native($func, $logicalName ?? '{main}', [], []);
+
+        return $func;
+    }
+
+    /** Lower Runtime::__construct/parseandcompile/standalone before native emit bridge (#1937). */
+    private function compileM3EmitTuRuntimeSpineDecls(): void
+    {
+        if (!$this->shouldUseM3EmitTuNativeBridge() || null === $this->m3EmitTuMainBlock) {
+            return;
+        }
+        $allowed = [
+            '__construct' => true,
+            'initparsepipeline' => true,
+            'initcompiler' => true,
+            'initvmcontext' => true,
+            'loadcoremodules' => true,
+            'parse' => true,
+            'compile' => true,
+            'parseandcompile' => true,
+            'loadjit' => true,
+            'loadjitcontext' => true,
+            'standalone' => true,
+        ];
+        foreach ($this->m3EmitTuMainBlock->opCodes as $op) {
+            if (OpCode::TYPE_DECLARE_CLASS !== $op->type) {
+                continue;
+            }
+            $nameOp = $this->m3EmitTuMainBlock->getOperand($op->arg1);
+            if (!$nameOp instanceof Operand\Literal) {
+                continue;
+            }
+            $lc = strtolower(str_replace('/', '\\', ltrim($nameOp->value, '\\')));
+            if ('phpcompiler\\runtime' !== $lc) {
+                continue;
+            }
+            $classBlock = $op->block1;
+            if (null === $classBlock) {
+                continue;
+            }
+            $this->context->pushScope();
+            $this->context->scope->classId = $this->context->type->object->declareClass($nameOp);
+            $this->context->scope->className = $lc;
+            foreach ($classBlock->opCodes as $methodOp) {
+                if (OpCode::TYPE_DECLARE_METHOD !== $methodOp->type) {
+                    continue;
+                }
+                $methodOpName = $classBlock->getOperand($methodOp->arg1);
+                if (!$methodOpName instanceof Operand\Literal) {
+                    continue;
+                }
+                $methodLc = strtolower($methodOpName->value);
+                if (!isset($allowed[$methodLc])) {
+                    continue;
+                }
+                $logical = $lc.'::'.$methodLc;
+                if (!isset($this->context->functions[strtolower($logical)])) {
+                    $this->compileBlock($methodOp->block1, $logical);
+                }
+            }
+            $this->context->popScope();
+        }
+        $this->runQueue();
     }
 
     /** Stub Compiler CFG helpers that crash LLVM 9 during self-host AOT (#816). */
@@ -3226,6 +3344,7 @@ class JIT {
                 default:
                     if ($this->shouldUseSelfHostJitStubs()
                         || $this->shouldUseEmitHelperLinkStubs()
+                        || $this->shouldUseM3EmitTuNativeBridge()
                         || $this->isBundledSuperglobalsClass($classId)
                     ) {
                         break;

@@ -18,6 +18,64 @@ final class BootstrapCompileSmokeM3Emit
 
     private static int $seq = 0;
 
+    /** M3 emit TU {main}: read PHP_COMPILER_M3_* env and run native bridge (#1937). */
+    public static function emitMainEntry(Context $context, string $logPrefix): void
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $retFail = $i64->constInt(1, false);
+        $sourceFile = self::getenvAsPhpcString($context, 'PHP_COMPILER_M3_SOURCE');
+        $outFile = self::getenvAsPhpcString($context, 'PHP_COMPILER_M3_OUT');
+        $srcNull = $context->builder->icmp(Builder::INT_EQ, $sourceFile, $strPtr->constNull());
+        $outNull = $context->builder->icmp(Builder::INT_EQ, $outFile, $strPtr->constNull());
+        $envBad = $context->builder->or($srcNull, $outNull);
+        $envOk = BasicBlockHelper::append($context, 'csm3_env_ok');
+        $envFail = BasicBlockHelper::append($context, 'csm3_env_fail');
+        $context->builder->branchIf($envBad, $envFail, $envOk);
+        $context->builder->positionAtEnd($envFail);
+        self::echoPhaseError($context, $logPrefix, $logPrefix.': set PHP_COMPILER_M3_SOURCE and PHP_COMPILER_M3_OUT', 'env');
+        $i32 = $context->getTypeFromString('int32');
+        $context->builder->call(
+            $context->lookupFunction('exit'),
+            $context->builder->trunc($retFail, $i32)
+        );
+        $context->builder->positionAtEnd($envOk);
+        self::emit($context, $sourceFile, $outFile, $logPrefix);
+    }
+
+    private static function getenvAsPhpcString(Context $context, string $envKey): Value
+    {
+        $tag = 'g'.substr(md5($envKey), 0, 6);
+        $i8p = $context->getTypeFromString('int8*');
+        $i64 = $context->getTypeFromString('int64');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $charPtr = $context->getTypeFromString('char*');
+        $cstr = $context->builder->pointerCast($context->constantFromString($envKey), $charPtr);
+        $env = $context->builder->call($context->lookupFunction('getenv'), $cstr);
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $env, $i8p->constNull());
+        $fail = BasicBlockHelper::append($context, 'csm3_genv_fail_'.$tag);
+        $ok = BasicBlockHelper::append($context, 'csm3_genv_ok_'.$tag);
+        $merge = BasicBlockHelper::append($context, 'csm3_genv_done_'.$tag);
+        $context->builder->branchIf($isNull, $fail, $ok);
+        $context->builder->positionAtEnd($fail);
+        $nullStr = $strPtr->constNull();
+        $context->builder->branch($merge);
+        $context->builder->positionAtEnd($ok);
+        $len = $context->builder->call($context->lookupFunction('strlen'), $env);
+        $phpcStr = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $len,
+            $env
+        );
+        $context->builder->branch($merge);
+        $context->builder->positionAtEnd($merge);
+        $phi = $context->builder->phi($strPtr);
+        $phi->addIncoming($nullStr, $fail);
+        $phi->addIncoming($phpcStr, $ok);
+
+        return $phi;
+    }
+
     public static function emit(Context $context, Value $sourceFile, Value $outFile, string $logPrefix = 'compile_smoke_m3_emit'): void
     {
         $tag = 'csm3'.(string) ++self::$seq;
@@ -113,13 +171,13 @@ final class BootstrapCompileSmokeM3Emit
     ): Value {
         $logical = 'PHPCompiler\\Runtime::'.$methodLc;
         $lc = strtolower($logical);
-        if (isset($context->functions[$lc])) {
-            return $context->functions[$lc];
-        }
-        $mangled = preg_replace('/[^a-zA-Z0-9_]/', '_', $logical) ?? $logical;
+        $mangled = strtolower(preg_replace('/[^a-zA-Z0-9_]/', '_', $logical) ?? $logical);
         $existing = $context->module->getNamedFunction($mangled);
         if (null !== $existing) {
             return $existing;
+        }
+        if (isset($context->functions[$lc])) {
+            return $context->functions[$lc];
         }
         $params = [];
         foreach ($paramTypeNames as $typeName) {
