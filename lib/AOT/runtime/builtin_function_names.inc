@@ -240,6 +240,7 @@ static const char *phpc_builtin_functions[] = {
     "stat",
     "str_contains",
     "str_ends_with",
+    "str_getcsv",
     "str_ireplace",
     "str_pad",
     "str_repeat",
