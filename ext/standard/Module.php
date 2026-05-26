@@ -95,6 +95,7 @@ class Module extends ModuleAbstract
             new str_starts_with(),
             new str_ends_with(),
             new strncmp(),
+            new substr_compare(),
             new array_count(),
             new array_count('sizeof'),
             new array_key_exists(),
@@ -352,6 +353,16 @@ class Module extends ModuleAbstract
             $ft = $context->context->functionType($i32, false, $i8p, $i8p, $sizeT);
             $fn = $context->module->addFunction('strncasecmp', $ft);
             $context->registerFunction('strncasecmp', $fn);
+        }
+        try {
+            $context->lookupFunction('substr_compare');
+        } catch (\Throwable $e) {
+            $i8p = $context->getTypeFromString('int8*');
+            $i64 = $context->getTypeFromString('int64');
+            $i32 = $context->getTypeFromString('int32');
+            $ft = $context->context->functionType($i32, false, $i8p, $i8p, $i64, $i64, $i32);
+            $fn = $context->module->addFunction('substr_compare', $ft);
+            $context->registerFunction('substr_compare', $fn);
         }
         foreach (['strspn', 'strcspn'] as $name) {
             try {
