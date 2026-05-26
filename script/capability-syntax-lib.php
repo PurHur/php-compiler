@@ -1264,6 +1264,14 @@ function stdlibArrayBuiltinNorthStarDefinitions(): array
             'notes' => ['Packed lists without holes; CSPRNG via random_bytes lowering'],
         ],
         [
+            'construct' => '`array_rand()` (packed list keys)',
+            'vm' => 'yes',
+            'jit' => 'yes',
+            'aot' => 'yes',
+            'issue' => 2321,
+            'notes' => ['Packed lists; num=1 JIT/AOT; num>1 VM-only; CSPRNG via random_bytes'],
+        ],
+        [
             'construct' => '`array_merge()` on string-key associative arrays',
             'vm' => 'yes',
             'jit' => 'yes',
