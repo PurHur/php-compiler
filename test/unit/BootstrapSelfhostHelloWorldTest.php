@@ -168,9 +168,12 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
         $this->assertStringContainsString('PHP_COMPILER_M3_COMPILE_DRIVER', $jit);
         $this->assertStringContainsString('isM3CompileDriverRealLoweringName', $jit);
+        $this->assertStringContainsString('shouldUseM3EmitTuRuntimeMethodStub', $jit);
+        $this->assertStringContainsString('m3EmitTuRuntimeSpineLowered', $jit);
         $this->assertStringContainsString('helloworld_compile_smoke', $jit);
         $this->assertStringContainsString('runtime::parseandcompile', $jit);
         $this->assertStringContainsString('runtime::parse', $jit);
+        $this->assertStringContainsString('runtime::compileemitsmoke', $jit);
         $this->assertStringContainsString('runtime::compile', $jit);
         $this->assertStringContainsString('jitFunctionSkipName', $jit);
         $this->assertStringContainsString('m3CompileDriverSpineDenyNames', $jit);

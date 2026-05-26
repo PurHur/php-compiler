@@ -7,7 +7,9 @@ namespace PHPCompiler\JIT;
 use PHPLLVM\Value;
 
 /**
- * Allocate Runtime in M3 emit-helper TU without PHP CFG `new Runtime` (#2540, #2442).
+ * Allocate Runtime shell in M3 emit-helper TU without PHP CFG `new Runtime` (#2540, #2442).
+ *
+ * Caller must run initParsePipeline / initCompiler / initVmContext / loadCoreModules (#2550).
  */
 final class RuntimeEmitTuAlloc
 {
