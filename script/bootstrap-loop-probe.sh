@@ -172,7 +172,18 @@ grep -E 'bootstrap-loop-gen1-link: OK' "${GEN1_LOG}" || tail -n 5 "${GEN1_LOG}"
 if grep -q 'emit_path=native' "${GEN1_LOG}"; then
   echo "bootstrap-loop-probe: gen-2 native emit OK (incremental M4 slice)"
 elif grep -q 'emit_path=zend partial' "${GEN1_LOG}"; then
-  echo "bootstrap-loop-probe: gen-2 emit_path=zend partial (gen-1 native compile blocked on M3 — #1402)"
+  if grep -q 'gen-1 native emit blocked —' "${GEN1_LOG}"; then
+    m4_block="$(grep -m1 'gen-1 native emit blocked —' "${GEN1_LOG}" | sed 's/^.*gen-1 native emit blocked — //')"
+    echo "bootstrap-loop-probe: gen-2 emit_path=zend partial (gen-1 native emit blocked — ${m4_block})"
+  elif grep -q 'emit helper link failed' "${GEN1_LOG}"; then
+    m4_block="$(grep -m1 'emit helper link failed' "${GEN1_LOG}" | sed 's/^bootstrap-loop-gen1-link: //')"
+    echo "bootstrap-loop-probe: gen-2 emit_path=zend partial (${m4_block})"
+  elif grep -q 'runtime gate:' "${GEN1_LOG}"; then
+    m4_block="$(grep -m1 'runtime gate:' "${GEN1_LOG}" | sed 's/^bootstrap-loop-gen1-link: gen-2 emit_path=zend (bin\/compile.php) — //')"
+    echo "bootstrap-loop-probe: gen-2 emit_path=zend partial (${m4_block})"
+  else
+    echo "bootstrap-loop-probe: gen-2 emit_path=zend partial (gen-1 native emit blocked — see gen1-link log)"
+  fi
 fi
 echo ""
 
