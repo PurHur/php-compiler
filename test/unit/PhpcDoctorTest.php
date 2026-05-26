@@ -193,6 +193,18 @@ final class PhpcDoctorTest extends TestCase
         $this->assertStringContainsString('examples/007-ThrowsWeb/README.md', $result['stdout']);
         $this->assertStringContainsString('#2157', $result['stdout']);
         $this->assertStringContainsString('#2135', $result['stdout']);
+        $this->assertStringContainsString('Bootstrap inventory lint', $result['stdout']);
+        $this->assertStringContainsString('bootstrap-inventory', $result['stdout']);
+        $this->assertStringContainsString('BOOTSTRAP_INVENTORY_LINT_SYNC_GATE', $result['stdout']);
+        $this->assertStringContainsString('check-bootstrap-inventory-lint-sync.php', $result['stdout']);
+        $this->assertStringContainsString('bootstrap-inventory-lint-snapshot', $result['stdout']);
+    }
+
+    public function testDoctorSelfhostMentionsBootstrapInventoryGatesProbe(): void
+    {
+        $result = $this->runPhpc(['doctor', '--selfhost']);
+        $this->assertSame(0, $result['exit'], $result['stdout']."\n".$result['stderr']);
+        $this->assertStringContainsString('doctor --gates | grep -i bootstrap_inventory', $result['stdout']);
     }
 
     /**
