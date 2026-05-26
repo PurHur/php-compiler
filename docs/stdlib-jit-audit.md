@@ -137,6 +137,7 @@ _None — all JIT `call()` builtins are lowered or deferred._
 - `hex2bin` — `ext/standard/hex2bin.php`
 - `hexdec` — `ext/standard/hexdec.php`
 - `htmlspecialchars` — `ext/standard/htmlspecialchars.php`
+- `htmlspecialchars_decode` — `ext/standard/htmlspecialchars_decode.php`
 - `http_build_query` — `ext/standard/http_build_query.php`
 - `http_response_code` — `ext/standard/http_response_code.php`
 - `hypot` — `ext/standard/hypot.php`

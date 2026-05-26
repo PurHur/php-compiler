@@ -1311,6 +1311,56 @@ final class VmString
         return $out;
     }
 
+    public static function htmlspecialchars_decode(
+        string $string,
+        int $flags = ENT_COMPAT,
+        string $encoding = 'UTF-8'
+    ): string {
+        if ('UTF-8' !== $encoding) {
+            throw new \LogicException('htmlspecialchars_decode() only supports UTF-8 in this compiler build');
+        }
+        $quoteBoth = 0 !== ($flags & ENT_QUOTES);
+        $quoteDouble = !$quoteBoth && (0 !== ($flags & ENT_COMPAT));
+        $out = '';
+        $len = self::byteLength($string);
+        for ($i = 0; $i < $len;) {
+            if ('&' !== $string[$i]) {
+                $out .= $string[$i];
+                ++$i;
+                continue;
+            }
+            if ($i + 5 <= $len && '&amp;' === self::byteSlice($string, $i, 5)) {
+                $out .= '&';
+                $i += 5;
+                continue;
+            }
+            if ($i + 4 <= $len && '&lt;' === self::byteSlice($string, $i, 4)) {
+                $out .= '<';
+                $i += 4;
+                continue;
+            }
+            if ($i + 4 <= $len && '&gt;' === self::byteSlice($string, $i, 4)) {
+                $out .= '>';
+                $i += 4;
+                continue;
+            }
+            if (($quoteBoth || $quoteDouble) && $i + 6 <= $len && '&quot;' === self::byteSlice($string, $i, 6)) {
+                $out .= '"';
+                $i += 6;
+                continue;
+            }
+            if ($quoteBoth && $i + 6 <= $len && '&#039;' === self::byteSlice($string, $i, 6)) {
+                $out .= "'";
+                $i += 6;
+                continue;
+            }
+            $out .= $string[$i];
+            ++$i;
+        }
+
+        return $out;
+    }
+
     /**
      * strip_tags() subset: removes HTML/PHP tags; optional allow-list like "<b><p>".
      * HTML comments and PHP tags remove their inner content; other tags keep inner text.

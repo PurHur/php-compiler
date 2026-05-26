@@ -122,6 +122,7 @@ static const char *phpc_builtin_functions[] = {
     "hex2bin",
     "hexdec",
     "htmlspecialchars",
+    "htmlspecialchars_decode",
     "http_build_query",
     "http_response_code",
     "hypot",
