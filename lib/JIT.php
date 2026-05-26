@@ -2351,16 +2351,7 @@ class JIT {
                     $this->context->scope->args = [];
                     break;
                 case OpCode::TYPE_STATICCALL_INIT:
-                    $classOp = $block->getOperand($op->arg1);
-                    $nameOp = $block->getOperand($op->arg2);
-                    assert($nameOp instanceof Operand\Literal);
-                    if (!$classOp instanceof Operand\Literal) {
-                        throw new \LogicException('Static call class must be a literal');
-                    }
-                    $className = $this->resolveJitStaticScopeClass($block, $classOp);
-                    $proxyName = strtolower($className).'::'.strtolower($nameOp->value);
-                    $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
-                    $this->context->scope->args = [];
+                    $this->initJitStaticCall($block, $op->arg1, $op->arg2);
                     break;
                 case OpCode::TYPE_ARG_SEND:
                     if ($this->context->inlineIncludeDepth > 0) {
@@ -2483,14 +2474,6 @@ class JIT {
                     break;
                 case OpCode::TYPE_NEW:
                     $classOp = $block->getOperand($op->arg2);
-                    if ($classOp instanceof Operand\Literal
-                        && !$this->context->type->object->hasUserDeclaredClass($classOp->value)
-                    ) {
-                        \PHPCompiler\ext\standard\JitSplAutoload::dispatchLiteral(
-                            $this->context,
-                            $classOp->value
-                        );
-                    }
                     if ($classOp instanceof Operand\Literal && 0 === strcasecmp($classOp->value, 'SplObjectStorage')) {
                         $classId = $this->context->type->object->lookup('SplObjectStorage');
                         $obj = new Variable(
@@ -2504,20 +2487,24 @@ class JIT {
                         $this->context->scope->toCall = null;
                         $this->context->scope->args = [];
                     } else {
-                        $class = $this->context->type->object->lookupOperand($classOp);
+                        $classId = $this->context->type->object->resolveClassId($classOp);
+                        $resolvedName = $this->context->type->object->classNameForId($classId);
+                        if (!$this->context->type->object->hasUserDeclaredClass($resolvedName)) {
+                            \PHPCompiler\ext\standard\JitSplAutoload::dispatchLiteral(
+                                $this->context,
+                                $resolvedName
+                            );
+                        }
                         $obj = new Variable(
                             $this->context,
                             Variable::TYPE_OBJECT,
                             Variable::KIND_VALUE,
-                            $this->context->type->object->allocate($class)
+                            $this->context->type->object->allocate($classId)
                         );
                         $resultOp = $block->getOperand($op->arg1);
                         $this->assignOperand($resultOp, $obj, true);
-                        if ($this->context->type->object->hasConstructor($class)) {
-                            $className = $classOp instanceof Operand\Literal
-                                ? $classOp->value
-                                : $this->context->scope->className;
-                            $proxyName = strtolower($className).'::'.'__construct';
+                        if ($this->context->type->object->hasConstructor($classId)) {
+                            $proxyName = strtolower($resolvedName).'::'.'__construct';
                             $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
                             $this->context->scope->args = [$this->context->getVariableFromOp($resultOp)];
                         } else {
@@ -4263,6 +4250,40 @@ class JIT {
         $proxyName = $declaringClassLc.'::'.$methodLc;
         $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
         $this->context->scope->args = [$this->context->getVariableFromOp($receiverOp)];
+    }
+
+    private function initJitStaticCall(Block $block, int $classOpIdx, int $nameOpIdx): void
+    {
+        $classOp = $block->getOperand($classOpIdx);
+        $nameOp = $block->getOperand($nameOpIdx);
+        assert($nameOp instanceof Operand\Literal);
+        if (!$classOp instanceof Operand\Literal) {
+            throw new \LogicException('Static call class must be a literal');
+        }
+        $className = $this->resolveJitStaticScopeClass($block, $classOp);
+        $declaringClassLc = strtolower($className);
+        $methodLc = strtolower($nameOp->value);
+        $declaringClassId = $this->context->type->object->lookup($className);
+        $visFlags = $this->context->type->object->methodVisibility($declaringClassId, $methodLc);
+        $callerClassLc = null;
+        if (null !== $block->func && null !== $block->func->class) {
+            $callerClassLc = strtolower($block->func->class->value);
+        } elseif ($this->context->scope->className !== '') {
+            $callerClassLc = $this->context->scope->className;
+        }
+        MethodVisibility::assertCallable(
+            $visFlags,
+            $callerClassLc,
+            $declaringClassLc,
+            $className,
+            $nameOp->value
+        );
+        $proxyName = $declaringClassLc.'::'.$methodLc;
+        if (!$this->context->functionIsRegistered($proxyName)) {
+            throw new \LogicException("Call to undefined static method {$className}::{$nameOp->value}()");
+        }
+        $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
+        $this->context->scope->args = [];
     }
 
     /**
