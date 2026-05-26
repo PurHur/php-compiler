@@ -871,6 +871,9 @@ ci_run_deploy_smoke() {
   if [[ "${FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE:-0}" == "1" ]]; then
     "$_CI_SCRIPT_DIR/deploy-smoke.sh" --example 006
   fi
+  if [[ "${THROWSWEB_DEPLOY_SMOKE_GATE:-0}" == "1" ]]; then
+    "$_CI_SCRIPT_DIR/deploy-smoke.sh" --example 007
+  fi
 }
 
 # @group aot-link PHPUnit (link-only; execute is ci_run_miniwebapp_aot_execute — #775).
