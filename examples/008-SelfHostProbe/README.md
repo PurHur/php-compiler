@@ -45,5 +45,5 @@ On Runforge / harness hosts (do **not** use raw `docker run -v "$(pwd):/compiler
 - **#2201** — `bin/vm.php` native link + execute smoke
 - **#2134** — deferred spine paths (`lib/AOT/Linker.php`, …)
 - **#2216** — `lib/Compiler.php` unit compile-driver probe
-- **#2220** — `phpc init --profile selfhostprobe` scaffold
+- **#2220** ✅ — `phpc init --profile selfhostprobe` scaffold (`./script/check-init-selfhostprobe-parity.sh`)
 - **#2222** — [docs/GETTING-STARTED.md](../../docs/GETTING-STARTED.md) §6 walkthrough

@@ -905,6 +905,16 @@ final class Doctor
             'make examples-selfhostprobe-smoke · EXAMPLES_SELFHOSTPROBE_SMOKE_GATE=1 ./script/ci-fast.sh',
             '#2302'
         );
+        $initProfileLive = \PHPCompiler\Cli\PhpcInit::isKnownProfile('selfhostprobe');
+        $initTemplate = is_file($repoRoot.'/templates/init-selfhostprobe/example.php');
+        fwrite(STDOUT, "\n  Related:\n");
+        if ($initProfileLive) {
+            fwrite(STDOUT, "  [✅] phpc init --profile selfhostprobe (#2220)\n");
+        } elseif ($initTemplate) {
+            fwrite(STDOUT, "  [📋] phpc init --profile selfhostprobe — template ready; CLI profile pending #2220\n");
+        } else {
+            fwrite(STDOUT, "  [📋] phpc init --profile selfhostprobe — #2220\n");
+        }
         fwrite(STDOUT, "  Docs: examples/008-SelfHostProbe/README.md\n");
     }
 

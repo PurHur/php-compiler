@@ -2267,6 +2267,45 @@ final class CiScriptsTest extends TestCase
         $this->assertMatchesRegularExpression('/\| `INIT_THROWSWEB_PARITY_GATE` \| `1` \|/', $doc);
     }
 
+    public function testCheckInitSelfhostprobeParityScriptExists(): void
+    {
+        $check = dirname(__DIR__, 2).'/script/check-init-selfhostprobe-parity.sh';
+        $this->assertFileExists($check);
+        $this->assertTrue(is_executable($check));
+        $body = (string) file_get_contents($check);
+        $this->assertStringContainsString('examples/008-SelfHostProbe', $body);
+        $this->assertStringContainsString('templates/init-selfhostprobe', $body);
+    }
+
+    public function testCheckInitSelfhostprobeParityPassesInRepo(): void
+    {
+        $check = dirname(__DIR__, 2).'/script/check-init-selfhostprobe-parity.sh';
+        exec('bash '.escapeshellarg($check).' 2>&1', $out, $code);
+        $this->assertSame(0, $code, implode("\n", $out));
+    }
+
+    public function testCiInventoryRunsInitSelfhostprobeParityCheck(): void
+    {
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('ci_run_init_selfhostprobe_parity_check', $common);
+        $this->assertStringContainsString('check-init-selfhostprobe-parity.sh', $common);
+        $this->assertStringContainsString('INIT_SELFHOSTPROBE_PARITY_GATE:-1', $common);
+    }
+
+    public function testCiDefaultsEnvDefinesSelfhostprobeInitParityGateOn(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString('INIT_SELFHOSTPROBE_PARITY_GATE="${INIT_SELFHOSTPROBE_PARITY_GATE:-1}"', $defaults);
+    }
+
+    public function testLocalCiMatrixDocumentsSelfhostprobeInitParityGate(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('INIT_SELFHOSTPROBE_PARITY_GATE', $doc);
+        $this->assertStringContainsString('check-init-selfhostprobe-parity.sh', $doc);
+        $this->assertMatchesRegularExpression('/\| `INIT_SELFHOSTPROBE_PARITY_GATE` \| `1` \|/', $doc);
+    }
+
     public function testCheckInitApiJsonParityScriptExists(): void
     {
         $check = dirname(__DIR__, 2).'/script/check-init-apijson-parity.sh';

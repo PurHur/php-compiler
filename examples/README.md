@@ -164,7 +164,7 @@ make north-star2-verify
 BOOTSTRAP_LIB_SPINE_SMOKE=1 make bootstrap-selfhost-lib-spine-smoke
 ```
 
-See [008-SelfHostProbe/README.md](008-SelfHostProbe/README.md) and [docs/bootstrap-selfhost.md](../docs/bootstrap-selfhost.md). Spine slices: [#2201](https://github.com/PurHur/php-compiler/issues/2201), [#2134](https://github.com/PurHur/php-compiler/issues/2134); unit probe: [#2216](https://github.com/PurHur/php-compiler/issues/2216).
+See [008-SelfHostProbe/README.md](008-SelfHostProbe/README.md) and [docs/bootstrap-selfhost.md](../docs/bootstrap-selfhost.md). Init scaffold: `./phpc init --profile selfhostprobe my-probe` ([#2220](https://github.com/PurHur/php-compiler/issues/2220)); template parity: `INIT_SELFHOSTPROBE_PARITY_GATE=1` in `ci-fast`. Spine slices: [#2201](https://github.com/PurHur/php-compiler/issues/2201), [#2134](https://github.com/PurHur/php-compiler/issues/2134); unit probe: [#2216](https://github.com/PurHur/php-compiler/issues/2216).
 
 ### 002-StaticWeb
 
