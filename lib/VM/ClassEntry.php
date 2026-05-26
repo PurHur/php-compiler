@@ -25,6 +25,8 @@ class ClassEntry {
     public ?string $parentLc = null;
     /** True for `interface` declarations (#1357). */
     public bool $isInterface = false;
+    /** True for `trait` declarations (#2312). */
+    public bool $isTrait = false;
     /** @var list<string> */
     public array $interfaces = [];
     /** User method or VM builtin handler (issues #1360, #1366). */

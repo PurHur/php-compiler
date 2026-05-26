@@ -2453,6 +2453,15 @@ class JIT {
                     assert($nameOp instanceof Operand\Literal);
                     $this->context->type->object->declareClass($nameOp);
                     break;
+                case OpCode::TYPE_DECLARE_TRAIT:
+                    $nameOp = $block->getOperand($op->arg1);
+                    assert($nameOp instanceof Operand\Literal);
+                    $this->context->pushScope();
+                    $this->context->scope->classId = $this->context->type->object->declareClass($nameOp);
+                    $this->context->scope->className = strtolower($nameOp->value);
+                    $this->compileClass($op->block1, $this->context->scope->classId);
+                    $this->context->popScope();
+                    break;
                 case OpCode::TYPE_DECLARE_ENUM:
                     $nameOp = $block->getOperand($op->arg1);
                     assert($nameOp instanceof Operand\Literal);

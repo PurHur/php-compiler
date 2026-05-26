@@ -126,6 +126,8 @@ class OpCode {
      * Function-local static: arg1 local slot, arg2 storage key constant slot, arg3 default constant slot (#2286).
      */
     const TYPE_DECLARE_FUNCTION_STATIC = 105;
+    /** User trait declaration with method bodies (#2312). */
+    const TYPE_DECLARE_TRAIT = 106;
 
     public int $type;
     public ?int $arg1;

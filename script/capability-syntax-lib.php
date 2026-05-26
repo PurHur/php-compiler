@@ -337,6 +337,17 @@ function syntaxRowDefinitions(): array
             'probe' => 'interface A {} interface B {} class C implements A, B {} function f(A&B $x): int { return 1; } f(new C());',
         ],
         [
+            'id' => 'trait_decl',
+            'construct' => '`trait` declarations with method bodies',
+            'opcodes' => ['TYPE_DECLARE_TRAIT', 'TYPE_DECLARE_METHOD'],
+            'issue' => 2312,
+            'notes' => [
+                'VM registers traits in class table with isTrait; trait use in classes is #144',
+                'interface_exists/trait_exists distinguish from class_exists',
+            ],
+            'probe' => 'trait T { public function m(): int { return 1; } } echo trait_exists(T::class) ? 1 : 0;',
+        ],
+        [
             'id' => 'array_argument_unpack',
             'construct' => 'Array/argument unpack `...$x`',
             'opcodes' => ['TYPE_ARRAY_SPREAD', 'TYPE_ARG_SEND', 'TYPE_INIT_ARRAY', 'TYPE_ADD_ARRAY_ELEMENT'],
