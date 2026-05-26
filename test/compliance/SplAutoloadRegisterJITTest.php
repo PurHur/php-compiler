@@ -7,7 +7,7 @@ namespace PHPCompiler;
 require_once __DIR__.'/../BaseTest.php';
 
 /**
- * JIT compliance for spl_autoload_register() (#1776, #1492).
+ * JIT compliance for spl_autoload_register() (#1776, #2441).
  *
  * @group llvm
  * @group jit

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\Builtin\SplAutoloadOutput;
 use PHPCompiler\JIT\Call\ExternalMethod;
 use PHPCompiler\JIT\Call\Native;
 use PHPCompiler\JIT\Context;
@@ -13,7 +14,7 @@ use PHPCompiler\JIT\SplAutoloadCallbackPolicy;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** LLVM lowering helpers for spl_autoload_register() (#1776, #1492). */
+/** LLVM lowering helpers for spl_autoload_register() (#1776, #2441). */
 final class JitSplAutoload
 {
     /** @var array<string, Value> per-module autoload shims */
@@ -24,6 +25,8 @@ final class JitSplAutoload
         JITVariable $callback,
         ?JITVariable $prependArg
     ): Value {
+        SplAutoloadOutput::ensureLinked($context);
+
         $name = $callback->compileTimeString ?? null;
         if (null === $name) {
             throw new \LogicException(SplAutoloadCallbackPolicy::jitRejectionMessage());
@@ -67,6 +70,8 @@ final class JitSplAutoload
 
     public static function dispatchLiteral(Context $context, string $className): void
     {
+        SplAutoloadOutput::ensureLinked($context);
+
         $sizeT = $context->getTypeFromString('size_t');
         $i8p = $context->getTypeFromString('int8*');
         $namePtr = $context->builder->pointerCast($context->constantFromString($className), $i8p);

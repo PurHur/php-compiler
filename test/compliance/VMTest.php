@@ -16,6 +16,9 @@ class VMTest extends BaseTest {
             if (str_contains(strtolower($case[0]), 'splobjectstorage')) {
                 continue;
             }
+            if (str_contains(strtolower($case[0]), 'spl_autoload_register_jit')) {
+                continue;
+            }
             yield $case;
         }
     }
