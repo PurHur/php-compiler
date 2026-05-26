@@ -169,6 +169,7 @@ final class Doctor
         $spineDeferredDefault = $defaults['SELFHOST_SPINE_DEFERRED_SYNC_GATE'] ?? '1';
         $loopProbeDefault = $defaults['BOOTSTRAP_LOOP_PROBE_GATE'] ?? '0';
         $m4LoopProbeDefault = $defaults['BOOTSTRAP_M4_LOOP_PROBE'] ?? '0';
+        $m4Gen2SyncDefault = $defaults['SELFHOST_M4_GEN2_SYNC_GATE'] ?? '1';
         $testSubsetDefault = $defaults['BOOTSTRAP_TEST_SUBSET_GATE'] ?? '0';
         $testSubsetStrictDefault = $defaults['BOOTSTRAP_TEST_SUBSET_STRICT'] ?? '0';
 
@@ -213,7 +214,8 @@ final class Doctor
 
         fwrite(STDOUT, "5. M4 loop\n");
         fwrite(STDOUT, "   BOOTSTRAP_LOOP_PROBE_GATE=".(self::gateEnabled('BOOTSTRAP_LOOP_PROBE_GATE', $loopProbeDefault) ? '1' : '0')." (default {$loopProbeDefault}) — ci-fast ./script/bootstrap-loop-probe.sh --dry-run\n");
-        fwrite(STDOUT, "   BOOTSTRAP_M4_LOOP_PROBE=".(self::gateEnabled('BOOTSTRAP_M4_LOOP_PROBE', $m4LoopProbeDefault) ? '1' : '0')." (default {$m4LoopProbeDefault}) — ci-local LLVM tail after M3 strict (#2058)\n\n");
+        fwrite(STDOUT, "   BOOTSTRAP_M4_LOOP_PROBE=".(self::gateEnabled('BOOTSTRAP_M4_LOOP_PROBE', $m4LoopProbeDefault) ? '1' : '0')." (default {$m4LoopProbeDefault}) — ci-local LLVM tail after M3 strict (#2058)\n");
+        fwrite(STDOUT, "   SELFHOST_M4_GEN2_SYNC_GATE=".(self::gateEnabled('SELFHOST_M4_GEN2_SYNC_GATE', $m4Gen2SyncDefault) ? '1' : '0')." (default {$m4Gen2SyncDefault}) — ci-fast check-selfhost-m4-gen2-sync.php (#2115, #2175)\n\n");
 
         fwrite(STDOUT, "6. LLVM\n");
         fwrite(STDOUT, "   {$llvmDetail}\n");
