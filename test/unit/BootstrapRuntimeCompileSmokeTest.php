@@ -104,4 +104,17 @@ final class BootstrapRuntimeCompileSmokeTest extends TestCase
         $this->assertStringContainsString('BootstrapCompileSmokeM3Emit::emitMainEntry', $jit);
         $this->assertStringContainsString('compileM3EmitTuRuntimeMethodFromQueue', $jit);
     }
+
+    public function testM3EmitTuRealLoweringSkipsEarlyParseStubDecl(): void
+    {
+        $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
+        $this->assertStringContainsString('shouldUseM3CompileDriverRealLowering()', $jit);
+        $this->assertStringContainsString('compileM3EmitTuRuntimeSpineMethodsForRealLowering', $jit);
+        $this->assertStringContainsString('emitMainEntry', $jit);
+        $this->assertStringContainsString("dirname(__DIR__).'/Runtime.php'", $jit);
+        $this->assertMatchesRegularExpression(
+            '/compileM3EmitTuRuntimeSpineDecls\(\): void[\s\S]*?compileM3EmitTuRuntimeSpineMethodsForRealLowering/',
+            $jit
+        );
+    }
 }
