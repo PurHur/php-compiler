@@ -123,4 +123,24 @@ final class RebuildExamplesTest extends TestCase
         $this->assertStringContainsString('BENCH_THROWSWEB_AOT', $readme);
         $this->assertStringContainsString('007-ThrowsWeb', $readme);
     }
+
+    public function testRebuildExamplesDocumentsFastCGIWebBenchmarkGate(): void
+    {
+        $script = file_get_contents(dirname(__DIR__, 2).'/script/rebuild-examples.php');
+        $this->assertNotFalse($script);
+        $this->assertStringContainsString('shouldBenchFastCGIWeb', $script);
+        $this->assertStringContainsString('BENCH_FASTCGIWEB', $script);
+        $this->assertStringContainsString('FASTCGIWEB_LINT_GATE', $script);
+        $this->assertStringContainsString('examples/009-FastCGIWeb', $script);
+        $this->assertStringContainsString('fastcgiWebPathInfoCgiEnv', $script);
+        $this->assertStringContainsString("'fastcgi_web_project_aot' => true", $script);
+        $this->assertStringContainsString('tryBenchmarkFastCGIWebProjectAot', $script);
+        $this->assertStringContainsString('BENCH_FASTCGIWEB_AOT', $script);
+        $this->assertStringContainsString('#2370', $script);
+
+        $readme = file_get_contents(dirname(__DIR__, 2).'/examples/README.md');
+        $this->assertNotFalse($readme);
+        $this->assertStringContainsString('BENCH_FASTCGIWEB', $readme);
+        $this->assertStringContainsString('009-FastCGIWeb', $readme);
+    }
 }
