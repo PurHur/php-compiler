@@ -55,6 +55,13 @@ Regenerate: `make bootstrap-profile` (inventory + profile + optional `bootstrap-
 
 CI enforces freshness via `php script/bootstrap-inventory.php --check` in `script/ci-common.sh` ([#765](https://github.com/PurHur/php-compiler/issues/765)). Do not hand-edit inventory tables.
 
+**Static compile lint sweep** (same file list as inventory; [#2208](https://github.com/PurHur/php-compiler/issues/2208)):
+
+```bash
+./phpc lint --bootstrap-inventory          # file → unsupported kinds (human report)
+./phpc lint --bootstrap-inventory --check  # exit 1 if any inventory file fails lint
+```
+
 ### When to regenerate `docs/bootstrap-vendor-inventory.md` ([#2030](https://github.com/PurHur/php-compiler/issues/2030))
 
 | Change | Command |

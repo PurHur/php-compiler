@@ -123,6 +123,31 @@ final class Linter
     }
 
     /**
+     * Lint a single file without following include/require (bootstrap inventory sweep).
+     *
+     * @return list<Issue>
+     */
+    public function lintFileStandalone(string $filename): array
+    {
+        if (!is_file($filename)) {
+            throw new \InvalidArgumentException("Could not open file {$filename}");
+        }
+        $this->dynamicIncludeWarnings = [];
+
+        return $this->lintSourceStandalone((string) file_get_contents($filename), $filename);
+    }
+
+    /**
+     * @return list<Issue>
+     */
+    private function lintSourceStandalone(string $code, string $filename): array
+    {
+        $script = $this->parseForLint($code, $filename);
+
+        return $this->lintScript($script);
+    }
+
+    /**
      * @return list<Issue>
      */
     public function lintSource(string $code, string $filename): array

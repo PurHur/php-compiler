@@ -21,6 +21,7 @@ declare(strict_types=1);
  *   phpc lint [-r 'code'] [--json] entry.php
  *   phpc lint --project <entry.php> [--json]
  *   phpc lint --all <dir-or-file> [--json]
+ *   phpc lint --bootstrap-inventory [--check] [--json]
  *   phpc init [--profile default|miniwebapp|sessionsweb|apijson|fileupload|throwsweb] [--force] [target-dir]
  *   phpc test [--fast] [--bootstrap] [--bootstrap-strict] [-- phpunit/ci-local args...]
  *   phpc doctor [--gates] [--selfhost] [--no-lint] [--jit-probe] [--aot-project-probe [dir]]  Env probes; --gates MiniWebApp; --selfhost NS2 (#2053)
@@ -64,6 +65,8 @@ php-compiler CLI
   phpc lint [-r 'code'] [--json] <entry.php>    Report unsupported syntax (line-accurate)
   phpc lint --project <entry.php> [--json]    Entry + literal include/require chain
   phpc lint --all <dir-or-file> [--json]      All .php under a tree (aggregated)
+  phpc lint --bootstrap-inventory [--check]   Lint all bin/vm.php-path files (#2208)
+      --check                                   Exit 1 when any file has unsupported syntax
       --json fields: file, line, kind, message, issue, issue_url (when tracked)
   phpc init [--profile default|miniwebapp|sessionsweb|apijson|fileupload|throwsweb] [--force] [target-dir]
                                               Scaffold web project (default, miniwebapp, sessionsweb, apijson, fileupload, or throwsweb)
