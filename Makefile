@@ -77,6 +77,11 @@ phan:
 test: docker-build-22
 	./script/docker-ci-local.sh
 
+# Harness/dev convenience: install vendor/ without host PHP/composer.
+.PHONY: vendor-docker
+vendor-docker: docker-build-22
+	./script/docker-composer-install.sh
+
 # Deprecated: PHP 7.4 on Ubuntu 16.04 (ircmaxell/php-compiler:16.04-dev image often unavailable).
 .PHONY: test-legacy-16
 test-legacy-16: rebuild-changed
