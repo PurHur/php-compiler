@@ -172,6 +172,7 @@ class Compiler {
                     $block->addOpCode($this->compileInterface($child, $block));
                     break;
                 case Op\Stmt\Trait_::class:
+                    $block->addOpCode($this->compileTrait($child, $block));
                     break;
             }
         }
@@ -784,6 +785,18 @@ class Compiler {
         return $return;
     }
 
+    protected function compileTrait(Op\Stmt\Trait_ $trait, Block $block): OpCode
+    {
+        $return = new OpCode(
+            OpCode::TYPE_DECLARE_TRAIT,
+            $this->compileOperand($trait->name, $block, true)
+        );
+        $return->attributeNames = AttributeNames::fromOp($trait);
+        $return->block1 = $this->compileClassBody($trait->stmts, OpCode::TYPE_DECLARE_TRAIT);
+
+        return $return;
+    }
+
     protected function compileEnum(Op\Stmt\Enum_ $enum, Block $block): OpCode
     {
         $return = new OpCode(
@@ -960,7 +973,7 @@ class Compiler {
         foreach ($block->children as $child) {
             switch (get_class($child)) {
                 case Op\Stmt\Property::class:
-                    if ($type !== OpCode::TYPE_DECLARE_CLASS) {
+                    if (OpCode::TYPE_DECLARE_CLASS !== $type) {
                         throw new \LogicException('Properties are only supported on classes for now');
                     }
                     if (!is_null($child->defaultBlock)) {
@@ -1008,7 +1021,7 @@ class Compiler {
                     $result->addOpCode($declare);
                     break;
                 case Op\Terminal\Const_::class:
-                    if ($type !== OpCode::TYPE_DECLARE_CLASS) {
+                    if (OpCode::TYPE_DECLARE_CLASS !== $type) {
                         throw new \LogicException('Class constants are only supported on classes for now');
                     }
                     $this->compileOps($child->valueBlock->children, $result);

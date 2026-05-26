@@ -689,6 +689,18 @@ restart:
                     $ifaceEntry->interfaces = $op->classImplements;
                     $this->context->classes[$lcname] = $ifaceEntry;
                     break;
+                case OpCode::TYPE_DECLARE_TRAIT:
+                    $name = $frame->scope[$op->arg1]->toString();
+                    $lcname = strtolower($name);
+                    if (isset($this->context->classes[$lcname])) {
+                        throw new \LogicException("Duplicate trait definition for $name");
+                    }
+                    $traitEntry = new ClassEntry($name);
+                    $traitEntry->isTrait = true;
+                    $traitEntry->attributeNames = $op->attributeNames;
+                    self::defineClass($traitEntry, $op->block1);
+                    $this->context->classes[$lcname] = $traitEntry;
+                    break;
                 case OpCode::TYPE_DECLARE_GLOBAL_CONST:
                     $name = $frame->scope[$op->arg1]->toString();
                     if (!isset($frame->block->constants[$op->arg2])) {

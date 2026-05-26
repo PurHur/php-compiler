@@ -44,7 +44,7 @@ final class VmReflection
     {
         $entry = self::resolveClassEntry($ctx, $className);
 
-        return null !== $entry && !$entry->isEnum;
+        return null !== $entry && !$entry->isEnum && !$entry->isInterface && !$entry->isTrait;
     }
 
     public static function enumExists(Context $ctx, string $enumName): bool
@@ -54,12 +54,16 @@ final class VmReflection
 
     public static function interfaceExists(Context $ctx, string $interfaceName): bool
     {
-        return null !== self::resolveClassEntry($ctx, $interfaceName);
+        $entry = self::resolveClassEntry($ctx, $interfaceName);
+
+        return null !== $entry && $entry->isInterface;
     }
 
     public static function traitExists(Context $ctx, string $traitName): bool
     {
-        return null !== self::resolveClassEntry($ctx, $traitName);
+        $entry = self::resolveClassEntry($ctx, $traitName);
+
+        return null !== $entry && $entry->isTrait;
     }
 
     public static function functionExists(Context $ctx, string $functionName): bool
