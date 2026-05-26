@@ -19,7 +19,35 @@ All submissions, including submissions by project members, require review. We us
 - `php script/bootstrap-selfhost-compile-probe.php --update-inventory` when the live self-host probe section changes, then `php script/bootstrap-inventory.php` if needed
 - `php script/capability-matrix.php` / `php script/capability-syntax.php` when builtins or unsupported-syntax registry change
 
-Verify: `php script/bootstrap-inventory.php --check` and `./script/ci-local.sh` (or `./script/ci-fast.sh` while iterating).
+Also run `php script/bootstrap-inventory.php --check` before push when bootstrap paths change.
+
+## Verifying your change
+
+Merge gates are **local/Docker only** — GitHub Actions and CircleCI are disabled ([#394](https://github.com/PurHur/php-compiler/issues/394)); optional mirrors live under [`.github/workflows-disabled/`](.github/workflows-disabled/). See the full matrix in [docs/local-ci-matrix.md](docs/local-ci-matrix.md).
+
+### Host PHP available
+
+From the repo root (after `composer install` and `script/apply-patches.sh`):
+
+- **Iteration:** `./script/ci-fast.sh`
+- **Pre-merge:** `./script/ci-local.sh`
+- **Targeted:** `vendor/bin/phpunit --filter VMTest` (or append `--filter` to `ci-fast.sh` / `ci-local.sh`)
+
+The first `ci-local.sh` run downloads LLVM 9 into `.llvm/` (`script/install-llvm9.sh`). See [README.md](README.md) Quick start (host PHP).
+
+### Docker-only / harness (Runforge)
+
+On hosts **without** system PHP/LLVM, or on Runforge/harness sandboxes where `docker run -v "$(pwd):/compiler"` often mounts an **empty** tree:
+
+- **Full gate:** `make test-harness` or `./script/docker-ci-local.sh`
+- **Fast iteration inside Docker:** `./script/docker-exec.sh -- bash -lc 'source script/php-env.sh && ./script/ci-fast.sh'`
+- **Targeted:** `./script/docker-exec.sh -- bash -lc 'source script/php-env.sh && vendor/bin/phpunit --filter VMTest'`
+
+Do **not** use raw `docker run -v "$(pwd):/compiler"` — use the wrappers above ([#245](https://github.com/PurHur/php-compiler/issues/245), [#2245](https://github.com/PurHur/php-compiler/issues/2245)).
+
+On Runforge harness agents, `$HARNESS_DOCKER_RUN_OPTS` is set by the environment (passed through by `script/ci-docker-run.sh`); no manual export needed.
+
+More: [README.md § Quick start (Docker)](README.md#quick-start-docker-only) · [docs/GETTING-STARTED.md § Troubleshooting](docs/GETTING-STARTED.md#troubleshooting)
 
 **Public documentation** (when a user-visible milestone lands):
 
