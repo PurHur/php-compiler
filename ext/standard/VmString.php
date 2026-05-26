@@ -599,6 +599,14 @@ final class VmString
     }
 
     /**
+     * metaphone() — PHP-compatible Metaphone on ASCII letters (issue #2423).
+     */
+    public static function metaphone(string $string, int $maxPhonemes = 0): string
+    {
+        return VmMetaphone::encode($string, $maxPhonemes);
+    }
+
+    /**
      * soundex() — PHP-compatible Soundex on ASCII letters (issue #2416).
      */
     public static function soundex(string $string): string
