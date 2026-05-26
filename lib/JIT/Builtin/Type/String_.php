@@ -146,6 +146,22 @@ class String_ extends Type {
             $fn___htmlspecialchars->addAttributeAtIndex(\PHPLLVM\Attribute::INDEX_FUNCTION, $this->context->attributes['alwaysinline']);
             $this->context->registerFunction('__string__htmlspecialchars', $fn___htmlspecialchars);
 
+        $fntype___htmlspecialchars_decode = $this->context->context->functionType(
+                $this->context->getTypeFromString('__string__*'),
+                false,
+                $this->context->getTypeFromString('__string__*'),
+                $this->context->getTypeFromString('int64')
+            );
+            $fn___htmlspecialchars_decode = $this->context->module->addFunction(
+                '__string__htmlspecialchars_decode',
+                $fntype___htmlspecialchars_decode
+            );
+            $fn___htmlspecialchars_decode->addAttributeAtIndex(
+                \PHPLLVM\Attribute::INDEX_FUNCTION,
+                $this->context->attributes['alwaysinline']
+            );
+            $this->context->registerFunction('__string__htmlspecialchars_decode', $fn___htmlspecialchars_decode);
+
         $fntype___preg_quote = $this->context->context->functionType(
                 $this->context->getTypeFromString('__string__*'),
                 false,
@@ -261,6 +277,7 @@ class String_ extends Type {
         $this->implementSeparate();
         $this->implementStrlen();
         \PHPCompiler\JIT\Builtin\StringHtmlspecialchars::implement($this->context);
+        \PHPCompiler\JIT\Builtin\StringHtmlspecialcharsDecode::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringPregQuote::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringQuotemeta::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringAddslashes::implement($this->context);

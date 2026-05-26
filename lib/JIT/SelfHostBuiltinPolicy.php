@@ -98,7 +98,7 @@ final class SelfHostBuiltinPolicy
         'strip_tags' => 'string', 'sprintf' => 'string', 'chr' => 'string', 'number_format' => 'string',
         'soundex' => 'string',
         'base64_encode' => 'string', 'base64_decode' => 'string',
-        'htmlspecialchars' => 'string', 'header' => 'string', 'http_response_code' => 'string',
+        'htmlspecialchars' => 'string', 'htmlspecialchars_decode' => 'string', 'header' => 'string', 'http_response_code' => 'string',
         'substr' => 'string', 'trim' => 'string', 'ltrim' => 'string', 'rtrim' => 'string',
         'urlencode' => 'string', 'rawurlencode' => 'string', 'http_build_query' => 'string',
         'parse_str' => 'string',
