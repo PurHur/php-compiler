@@ -845,7 +845,7 @@ function miniWebAppOopNorthStarDefinitions(): array
             'jit' => 'partial',
             'aot' => 'yes',
             'issue' => 58,
-            'notes' => ['#58 ClassMethod + method dispatch; compliance PHPT; AOT execute #764'],
+            'notes' => ['#58 ClassMethod + method dispatch; compliance PHPT; native execute ✅ (#764 closed)'],
         ],
         [
             'construct' => 'Static methods (`Expr_StaticCall`)',
@@ -1193,6 +1193,111 @@ function renderThrowsWebNorthStarMarkdown(array $rows): string
         . '195); `try`/`catch` [#57](' . CAPABILITY_ISSUE_URL_BASE . '57); overlay [#2084](' . CAPABILITY_ISSUE_URL_BASE
         . '2084). ci-local gates: `THROWS_WEB_SMOKE_GATE` (VM serve default-on #2125), '
         . '`THROWSWEB_AOT_LINK_GATE` / `THROWSWEB_AOT_SMOKE_GATE` (AOT default-on #2135; set `0` to skip)._';
+    $lines[] = '';
+
+    return implode("\n", $lines);
+}
+
+/**
+ * Stdlib array sort/merge builtins (issue #2298).
+ *
+ * Curated from closed stdlib issues; full matrix in capabilities.md.
+ *
+ * @return list<array{
+ *   construct: string,
+ *   vm: string,
+ *   jit: string,
+ *   aot: string,
+ *   issue: int,
+ *   notes: list<string>
+ * }>
+ */
+function stdlibArrayBuiltinNorthStarDefinitions(): array
+{
+    return [
+        [
+            'construct' => '`ksort()` (string/int keys, preserve values)',
+            'vm' => 'yes',
+            'jit' => 'yes',
+            'aot' => 'yes',
+            'issue' => 2271,
+            'notes' => ['String-key hashtable + packed list no-op; assoc subset (#66)'],
+        ],
+        [
+            'construct' => '`krsort()` (keys descending)',
+            'vm' => 'yes',
+            'jit' => 'yes',
+            'aot' => 'yes',
+            'issue' => 2282,
+            'notes' => ['String-key hashtable; packed list no-op'],
+        ],
+        [
+            'construct' => '`asort()` (values ascending, preserve keys)',
+            'vm' => 'yes',
+            'jit' => 'yes',
+            'aot' => 'yes',
+            'issue' => 2290,
+            'notes' => ['Homogeneous string/int values; packed + string-key assoc'],
+        ],
+        [
+            'construct' => '`arsort()` (values descending, preserve keys)',
+            'vm' => 'yes',
+            'jit' => 'yes',
+            'aot' => 'yes',
+            'issue' => 2296,
+            'notes' => ['Homogeneous string/int values; packed + string-key assoc'],
+        ],
+        [
+            'construct' => '`rsort()` (values descending, reindex)',
+            'vm' => 'yes',
+            'jit' => 'yes',
+            'aot' => 'yes',
+            'issue' => 2300,
+            'notes' => ['Packed homogeneous string/int lists; `__hashtable__sortPackedReverse`'],
+        ],
+        [
+            'construct' => '`array_merge()` on string-key associative arrays',
+            'vm' => 'yes',
+            'jit' => 'yes',
+            'aot' => 'yes',
+            'issue' => 2287,
+            'notes' => ['String-key maps; packed list append unchanged'],
+        ],
+    ];
+}
+
+/**
+ * @param list<array{construct: string, vm: string, jit: string, aot: string, issue: int, notes: list<string>}> $rows
+ */
+function renderStdlibArrayBuiltinNorthStarMarkdown(array $rows): string
+{
+    $lines = [
+        '## Stdlib array builtins (sort / merge)',
+        '',
+        'Recent stdlib coverage for associative arrays and packed lists.',
+        'ROADMAP Phase 2/4: [#78](' . CAPABILITY_ISSUE_URL_BASE . '78), assoc arrays [#66]('
+        . CAPABILITY_ISSUE_URL_BASE . '66). Full builtin matrix: [capabilities.md](capabilities.md).',
+        '',
+        '| Builtin | VM | JIT | AOT | Issue | Notes |',
+        '|---------|:--:|:---:|:---:|-------|-------|',
+    ];
+
+    foreach ($rows as $row) {
+        $lines[] = sprintf(
+            '| %s | %s | %s | %s | [#%d](%s%d) | %s |',
+            $row['construct'],
+            capabilityStatusLabel($row['vm']),
+            capabilityStatusLabel($row['jit']),
+            capabilityStatusLabel($row['aot']),
+            $row['issue'],
+            CAPABILITY_ISSUE_URL_BASE,
+            $row['issue'],
+            $row['notes'] === [] ? '' : implode('; ', $row['notes'])
+        );
+    }
+
+    $lines[] = '';
+    $lines[] = '_Rows curated from closed stdlib issues (#2271, #2282, #2290, #2296, #2300, #2287); regenerate via `php script/capability-syntax.php`._';
     $lines[] = '';
 
     return implode("\n", $lines);
