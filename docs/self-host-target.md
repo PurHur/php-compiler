@@ -50,8 +50,8 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | M3 Runtime compile smoke (partial) | ✅ `bootstrap-selfhost-runtime-compile-smoke.sh` (Zend emit; strict opt-in #2294) |
 | M2 `BOOTSTRAP_LIB_SPINE_SMOKE=1` spine link | ✅ `compiler_lib_spine_smoke bundle OK` |
 | M3 `make bootstrap-selfhost-helloworld` | 🚧 partial — HelloWorld runs natively; emit uses Zend |
-| M4 `make bootstrap-loop-gen1-link` | 🚧 partial — gen-1 link + gen-2 **Zend** emit (`emit_path=zend partial`); `BOOTSTRAP_M4_LINK_COMPILE_DRIVER=1` for `emit_path=native`; `BOOTSTRAP_M4_GEN2_STRICT=1` refuses Zend fallback ([#1498](https://github.com/PurHur/php-compiler/issues/1498), [#2115](https://github.com/PurHur/php-compiler/issues/2115)) |
-| M4 `make bootstrap-loop-probe` | 🚧 ladder — `--dry-run` validates lint+M2+M3 partial+gen-1; full exits **2** until M3 strict ([#1498](https://github.com/PurHur/php-compiler/issues/1498)) |
+| M4 `make bootstrap-loop-gen1-link` | 🚧 partial — gen-1 link + gen-2 **Zend** emit (`emit_path=zend partial`); `BOOTSTRAP_M4_LINK_COMPILE_DRIVER=1` for `emit_path=native`; `BOOTSTRAP_M4_GEN2_STRICT=1` refuses Zend fallback ([#1498](https://github.com/PurHur/php-compiler/issues/1498), [#2115](https://github.com/PurHur/php-compiler/issues/2115)); five-minute presenter: [GETTING-STARTED §7](GETTING-STARTED.md) ([#2464](https://github.com/PurHur/php-compiler/issues/2464)) |
+| M4 `make bootstrap-loop-probe` | 🚧 ladder — `--dry-run` validates lint+M2+M3 partial+gen-1; full exits **2** until M3 strict ([#1498](https://github.com/PurHur/php-compiler/issues/1498)); bundled in `make north-star4-verify` — [GETTING-STARTED §7](GETTING-STARTED.md) |
 | `make bootstrap-aot-link` | ✅ **71/71** |
 | `php script/bootstrap-inventory.php --check` | ✅ **657** files, **0** source blockers |
 
@@ -197,7 +197,7 @@ make bootstrap-loop-probe
 # Exit codes: 0=strict green | 1=hard failure | 2=LLVM skip or M3 strict blocks M4
 ```
 
-M4 strict loop presenter ([#2379](https://github.com/PurHur/php-compiler/issues/2379)):
+M4 strict loop presenter ([#2379](https://github.com/PurHur/php-compiler/issues/2379); copy-paste walkthrough: [GETTING-STARTED §7](GETTING-STARTED.md) ([#2464](https://github.com/PurHur/php-compiler/issues/2464))):
 
 ```bash
 make north-star4-verify

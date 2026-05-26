@@ -102,7 +102,33 @@ make bootstrap-selfhost-link
 
 Expect stdout: `compiler_minimal bundle OK`. **Talking point:** experimental path toward the compiler compiling its own `lib/` tree ([#1492](https://github.com/PurHur/php-compiler/issues/1492)).
 
-### 7. (Optional) Full local CI
+### 7. (Optional) North Star 4 — M4 strict bootstrap loop
+
+M4 presenter ladder: inventory clean → M3 strict probes → gen-1 link → loop probe ([#2379](https://github.com/PurHur/php-compiler/issues/2379), [#2464](https://github.com/PurHur/php-compiler/issues/2464)). Sibling: [008-SelfHostProbe](../examples/008-SelfHostProbe/README.md) (North Star 2/3); detail: [docs/bootstrap-selfhost.md](bootstrap-selfhost.md) · [docs/self-host-target.md](self-host-target.md).
+
+```bash
+./phpc lint --bootstrap-inventory --check
+make north-star4-verify
+# partial M4 (probe --dry-run; exits 0 when M3 strict still blocks):
+./script/north-star4-verify.sh --dry-run-only
+# when LLVM 9 is present — fail on partial M4:
+./script/north-star4-verify.sh --strict --require-llvm
+./phpc doctor --selfhost
+```
+
+**Talking point:** Default `north-star4-verify` exits **0** on partial M4 (documented M3 strict / gen-2 blockers) so presenters can show the ladder without a red demo; `--strict` is for contributors chasing green M4.
+
+On Runforge / harness hosts (do **not** use raw `docker run -v "$(pwd):/compiler"`):
+
+```bash
+./script/docker-exec.sh -- bash -lc 'source script/php-env.sh && ./phpc lint --bootstrap-inventory --check'
+./script/docker-exec.sh -- bash -lc 'make north-star4-verify'
+./script/docker-exec.sh -- bash -lc './script/north-star4-verify.sh --dry-run-only'
+```
+
+**Next steps:** `BOOTSTRAP_M4_GEN2_STRICT_GATE=1` in `ci-local.sh` ([#2112](https://github.com/PurHur/php-compiler/issues/2112)); opt-in `NORTH_STAR4_VERIFY_GATE=1` ([#2429](https://github.com/PurHur/php-compiler/issues/2429)); native gen-2 emit ([#2075](https://github.com/PurHur/php-compiler/issues/2075), `BOOTSTRAP_M4_GEN2_STRICT=1`); compiled driver ([#1521](https://github.com/PurHur/php-compiler/issues/1521)).
+
+### 8. (Optional) Full local CI
 
 ```bash
 ./script/ci-local.sh

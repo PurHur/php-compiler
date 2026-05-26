@@ -35,6 +35,8 @@ On Runforge / harness hosts (do **not** use raw `docker run -v "$(pwd):/compiler
 
 M3 native unit probes (LLVM; skips when absent): `make north-star3-verify` ([#2360](https://github.com/PurHur/php-compiler/issues/2360); parser [#2418](https://github.com/PurHur/php-compiler/issues/2418), PHPTypes [#2434](https://github.com/PurHur/php-compiler/issues/2434)).
 
+M4 strict bootstrap loop (LLVM; partial M4 OK by default): `make north-star4-verify` ([#2379](https://github.com/PurHur/php-compiler/issues/2379)); five-minute presenter: [docs/GETTING-STARTED.md §7](../../docs/GETTING-STARTED.md) ([#2464](https://github.com/PurHur/php-compiler/issues/2464)).
+
 AOT (LLVM required):
 
 ```console
