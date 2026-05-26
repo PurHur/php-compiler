@@ -541,6 +541,24 @@ final class Doctor
         if (is_readable($snapshotScript)) {
             fwrite(STDOUT, "      Regen: php script/bootstrap-inventory-lint-snapshot.php --write\n");
         }
+        $triageSyncScript = $repoRoot.'/script/check-bootstrap-inventory-triage-sync.php';
+        $triageSnapshotPath = $repoRoot.'/docs/bootstrap-inventory-triage-top50.json';
+        $triageSyncDefault = $defaults['BOOTSTRAP_INVENTORY_TRIAGE_SYNC_GATE'] ?? '0';
+        $triageSyncOn = self::gateEnabled('BOOTSTRAP_INVENTORY_TRIAGE_SYNC_GATE', $triageSyncDefault);
+        $triageIcon = $triageSyncOn ? '✅' : '⬜';
+        $triageNote = $triageSyncOn
+            ? 'ci-fast inventory checks when gate=1 (#2265)'
+            : 'opt-in default 0 — set BOOTSTRAP_INVENTORY_TRIAGE_SYNC_GATE=1 in ci-fast';
+        fwrite(STDOUT, "\n  Triage top-50 ([#2254](https://github.com/PurHur/php-compiler/issues/2254), [#2265](https://github.com/PurHur/php-compiler/issues/2265)):\n");
+        fwrite(STDOUT, "  [{$triageIcon}] BOOTSTRAP_INVENTORY_TRIAGE_SYNC_GATE default {$triageSyncDefault} ({$triageNote})\n");
+        if (is_readable($triageSyncScript)) {
+            fwrite(STDOUT, "      Run: php script/check-bootstrap-inventory-triage-sync.php\n");
+        }
+        if (is_readable($triageSnapshotPath)) {
+            fwrite(STDOUT, "      Snapshot: docs/bootstrap-inventory-triage-top50.json\n");
+        }
+        fwrite(STDOUT, "      Regen: php script/bootstrap-inventory-triage.php --json --top 50 > docs/bootstrap-inventory-triage-top50.json\n");
+
         fwrite(STDOUT, "  Probe: ./phpc doctor --gates | grep -i bootstrap_inventory\n");
         fwrite(STDOUT, "  Docs: docs/bootstrap-selfhost.md · docs/local-ci-matrix.md\n");
     }

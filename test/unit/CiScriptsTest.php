@@ -1022,6 +1022,35 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('#2210', $doc);
     }
 
+    public function testCiDefaultsEnvDefinesBootstrapInventoryTriageSyncGateOptIn(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString('BOOTSTRAP_INVENTORY_TRIAGE_SYNC_GATE="${BOOTSTRAP_INVENTORY_TRIAGE_SYNC_GATE:-0}"', $defaults);
+    }
+
+    public function testCiFastRunsBootstrapInventoryTriageSyncViaInventoryChecks(): void
+    {
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('ci_run_bootstrap_inventory_triage_sync_check', $common);
+        $this->assertStringContainsString('check-bootstrap-inventory-triage-sync.php', $common);
+        $this->assertStringContainsString('BOOTSTRAP_INVENTORY_TRIAGE_SYNC_GATE:-0', $common);
+    }
+
+    public function testCiDockerRunPassesBootstrapInventoryTriageSyncGateOptIn(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');
+        $this->assertStringContainsString('BOOTSTRAP_INVENTORY_TRIAGE_SYNC_GATE=${BOOTSTRAP_INVENTORY_TRIAGE_SYNC_GATE:-0}', $body);
+    }
+
+    public function testLocalCiMatrixDocumentsBootstrapInventoryTriageSyncGate(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('BOOTSTRAP_INVENTORY_TRIAGE_SYNC_GATE', $doc);
+        $this->assertStringContainsString('check-bootstrap-inventory-triage-sync.php', $doc);
+        $this->assertMatchesRegularExpression('/\| `BOOTSTRAP_INVENTORY_TRIAGE_SYNC_GATE` \| `0` \|/', $doc);
+        $this->assertStringContainsString('#2265', $doc);
+    }
+
     public function testCiDefaultsEnvDefinesSelfhostM4Gen2SyncGateOn(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');

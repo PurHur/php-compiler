@@ -81,6 +81,20 @@ BOOTSTRAP_INVENTORY_LINT_SYNC_GATE=1 ./script/ci-fast.sh
 
 Rows include `BOOTSTRAP_INVENTORY_LINT_SYNC_GATE` (default from `script/ci-defaults.env`), committed snapshot summary (`docs/bootstrap-inventory-lint-snapshot.json`), and copy-paste commands for `phpc lint --bootstrap-inventory` and `php script/check-bootstrap-inventory-lint-sync.php`.
 
+**CFG gap triage** ([#2254](https://github.com/PurHur/php-compiler/issues/2254)): rank unsupported kinds across inventory files:
+
+```bash
+php script/bootstrap-inventory-triage.php
+php script/bootstrap-inventory-triage.php --json --top 50
+```
+
+Drift guard (opt-in CI, [#2265](https://github.com/PurHur/php-compiler/issues/2265)): committed top-50 at `docs/bootstrap-inventory-triage-top50.json`. After inventory lint or triage ranking changes:
+
+```bash
+php script/bootstrap-inventory-triage.php --json --top 50 > docs/bootstrap-inventory-triage-top50.json
+BOOTSTRAP_INVENTORY_TRIAGE_SYNC_GATE=1 ./script/ci-fast.sh
+```
+
 ### When to regenerate `docs/bootstrap-vendor-inventory.md` ([#2030](https://github.com/PurHur/php-compiler/issues/2030))
 
 | Change | Command |
