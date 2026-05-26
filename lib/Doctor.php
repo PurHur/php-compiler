@@ -135,6 +135,7 @@ final class Doctor
 
         self::printExampleWebGatesSection($repoRoot);
         self::printSelfHostPresenterSection($repoRoot);
+        self::printBootstrapInventoryLintSection($repoRoot);
         self::printSessionsWebSection($repoRoot);
         self::printFileUploadWebSection($repoRoot);
         self::printThrowsWebSection($repoRoot);
@@ -212,7 +213,8 @@ final class Doctor
             fwrite(STDOUT, "   NORTH_STAR2_THROWSWEB_GATE=".(self::gateEnabled('NORTH_STAR2_THROWSWEB_GATE', $ns2ThrowswebDefault) ? '1' : '0')." (default {$ns2ThrowswebDefault}) — 007 init parity + VM smoke in presenter (#2177)\n");
         }
         fwrite(STDOUT, "   phpc test --bootstrap [--strict]\n");
-        fwrite(STDOUT, "   make bootstrap-wave-check  (opt-in --with-helloworld)\n\n");
+        fwrite(STDOUT, "   make bootstrap-wave-check  (opt-in --with-helloworld)\n");
+        fwrite(STDOUT, "   ./phpc doctor --gates | grep -i bootstrap_inventory  (#2228)\n\n");
 
         fwrite(STDOUT, "5. M4 loop\n");
         fwrite(STDOUT, "   BOOTSTRAP_LOOP_PROBE_GATE=".(self::gateEnabled('BOOTSTRAP_LOOP_PROBE_GATE', $loopProbeDefault) ? '1' : '0')." (default {$loopProbeDefault}) — ci-fast ./script/bootstrap-loop-probe.sh --dry-run\n");
@@ -373,6 +375,101 @@ final class Doctor
         fwrite(STDOUT, "  Fast CI hook     {$ns2CiDetail}\n");
         fwrite(STDOUT, "  Bootstrap subset {$subsetDetail}\n");
         fwrite(STDOUT, "  Docs             docs/bootstrap-selfhost.md · docs/self-host-target.md (#1492)\n");
+    }
+
+    /**
+     * Bootstrap inventory static lint + snapshot sync (issues #2208, #2210, #2228).
+     */
+    private static function printBootstrapInventoryLintSection(string $repoRoot): void
+    {
+        $lintBin = $repoRoot.'/bin/lint.php';
+        if (!is_readable($lintBin)) {
+            return;
+        }
+
+        $syncScript = $repoRoot.'/script/check-bootstrap-inventory-lint-sync.php';
+        $snapshotScript = $repoRoot.'/script/bootstrap-inventory-lint-snapshot.php';
+        $snapshotPath = $repoRoot.'/docs/bootstrap-inventory-lint-snapshot.json';
+        $hasSync = is_readable($syncScript);
+        $hasSnapshot = is_readable($snapshotPath);
+
+        $defaults = self::readCiDefaultsEnv($repoRoot);
+        $syncDefault = $defaults['BOOTSTRAP_INVENTORY_LINT_SYNC_GATE'] ?? '0';
+        $syncOn = self::gateEnabled('BOOTSTRAP_INVENTORY_LINT_SYNC_GATE', $syncDefault);
+
+        require_once $repoRoot.'/script/bootstrap-spine-count.php';
+        $counts = bootstrap_spine_counts($repoRoot);
+        $inventoryTotal = $counts['inventory'];
+
+        $snapshotSummary = self::bootstrapInventoryLintSnapshotSummary($repoRoot);
+
+        fwrite(STDOUT, "\nBootstrap inventory lint (#2228, #2208, #2210):\n");
+        fwrite(STDOUT, "  Scope: {$inventoryTotal} file(s) on bin/vm.php path (same as inventory --check)\n");
+        fwrite(STDOUT, "  Defaults: script/ci-defaults.env\n\n");
+
+        fwrite(STDOUT, "  Sweep: ./phpc lint --bootstrap-inventory\n");
+        fwrite(STDOUT, "         ./phpc lint --bootstrap-inventory --check  (exit 1 on unsupported syntax)\n");
+        fwrite(STDOUT, "         ./phpc lint --bootstrap-inventory --json   (machine report)\n\n");
+
+        if ('' !== $snapshotSummary) {
+            fwrite(STDOUT, "  Snapshot: {$snapshotSummary}\n");
+            fwrite(STDOUT, "            docs/bootstrap-inventory-lint-snapshot.json\n\n");
+        } elseif ($hasSnapshot) {
+            fwrite(STDOUT, "  Snapshot: docs/bootstrap-inventory-lint-snapshot.json present (unreadable summary)\n\n");
+        }
+
+        $syncIcon = $syncOn ? '✅' : '⬜';
+        $syncNote = $syncOn
+            ? 'ci-fast inventory checks when gate=1 (#2210)'
+            : 'opt-in default 0 — set BOOTSTRAP_INVENTORY_LINT_SYNC_GATE=1 in ci-fast';
+        fwrite(STDOUT, "  [{$syncIcon}] BOOTSTRAP_INVENTORY_LINT_SYNC_GATE default {$syncDefault} ({$syncNote})\n");
+        if ($hasSync) {
+            fwrite(STDOUT, "      Run: php script/check-bootstrap-inventory-lint-sync.php\n");
+        } else {
+            fwrite(STDOUT, "      Run: script/check-bootstrap-inventory-lint-sync.php missing\n");
+        }
+        if (is_readable($snapshotScript)) {
+            fwrite(STDOUT, "      Regen: php script/bootstrap-inventory-lint-snapshot.php --write\n");
+        }
+        fwrite(STDOUT, "  Probe: ./phpc doctor --gates | grep -i bootstrap_inventory\n");
+        fwrite(STDOUT, "  Docs: docs/bootstrap-selfhost.md · docs/local-ci-matrix.md\n");
+    }
+
+    /**
+     * @return non-empty-string Human-readable snapshot summary, or '' when unavailable.
+     */
+    private static function bootstrapInventoryLintSnapshotSummary(string $repoRoot): string
+    {
+        $snapshotPath = $repoRoot.'/docs/bootstrap-inventory-lint-snapshot.json';
+        if (!is_readable($snapshotPath)) {
+            return '';
+        }
+
+        $lib = $repoRoot.'/script/bootstrap-inventory-lint-sync-lib.php';
+        if (!is_readable($lib)) {
+            return '';
+        }
+
+        require_once $lib;
+
+        try {
+            $snapshot = bootstrap_inventory_lint_read_snapshot($snapshotPath);
+        } catch (\Throwable $e) {
+            return '';
+        }
+
+        $files = $snapshot['files'];
+        $fileCount = count($files);
+        $kindCount = 0;
+        foreach ($files as $kinds) {
+            $kindCount += count($kinds);
+        }
+
+        if (0 === $fileCount) {
+            return '0 file(s) with unsupported syntax in committed snapshot';
+        }
+
+        return "{$fileCount} file(s), {$kindCount} unsupported kind(s) in committed snapshot";
     }
 
     /**

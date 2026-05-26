@@ -69,6 +69,15 @@ php script/bootstrap-inventory-lint-snapshot.php --write
 BOOTSTRAP_INVENTORY_LINT_SYNC_GATE=1 ./script/ci-fast.sh
 ```
 
+**Presenter ladder** ([#2228](https://github.com/PurHur/php-compiler/issues/2228)): one-screen status without running the full sweep:
+
+```bash
+./phpc doctor --gates | grep -i bootstrap_inventory
+./phpc doctor --selfhost   # also lists doctor --gates probe (#2228)
+```
+
+Rows include `BOOTSTRAP_INVENTORY_LINT_SYNC_GATE` (default from `script/ci-defaults.env`), committed snapshot summary (`docs/bootstrap-inventory-lint-snapshot.json`), and copy-paste commands for `phpc lint --bootstrap-inventory` and `php script/check-bootstrap-inventory-lint-sync.php`.
+
 ### When to regenerate `docs/bootstrap-vendor-inventory.md` ([#2030](https://github.com/PurHur/php-compiler/issues/2030))
 
 | Change | Command |
