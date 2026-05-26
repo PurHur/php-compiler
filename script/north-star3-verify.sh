@@ -36,6 +36,8 @@ Use --require-llvm to fail if LLVM is missing (default: skip LLVM probes, exit 0
 
 Environment: script/ci-defaults.env. See docs/bootstrap-selfhost.md · docs/self-host-target.md.
 
+CI: NORTH_STAR3_VERIFY_GATE=1 ./script/ci-fast.sh runs this bundle in fast CI (#2396).
+
 Docker:
   ./script/docker-exec.sh -- bash -lc 'make north-star3-verify'
 EOF

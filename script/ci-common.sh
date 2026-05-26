@@ -661,6 +661,21 @@ ci_run_north_star2_verify() {
   "$ns2_script" "${ns2_args[@]}"
 }
 
+# M3 unit-probe presenter in fast CI (issue #2396, #2360); default off — opt-in with NORTH_STAR3_VERIFY_GATE=1.
+ci_run_north_star3_verify() {
+  if [[ "${NORTH_STAR3_VERIFY_GATE:-0}" != "1" ]]; then
+    echo "north-star3-verify: skipped (NORTH_STAR3_VERIFY_GATE=0 default; set 1 to opt in, issue #2396)"
+    return 0
+  fi
+  local ns3_script="$_CI_SCRIPT_DIR/north-star3-verify.sh"
+  if [[ ! -x "$ns3_script" ]]; then
+    echo "north-star3-verify: skipped (script missing — run from repo root)"
+    return 0
+  fi
+  echo "north-star3-verify (NORTH_STAR3_VERIFY_GATE=1, issue #2396)..."
+  make -C "$_CI_REPO_ROOT" north-star3-verify
+}
+
 # M4 bootstrap-loop dry-run probe (issue #1777, #1498); default off until M3 strict is stable.
 ci_run_bootstrap_loop_probe() {
   if [[ "${BOOTSTRAP_LOOP_PROBE_GATE:-0}" != "1" ]]; then

@@ -51,6 +51,8 @@ final class NorthStar3VerifyScriptTest extends TestCase
         $this->assertStringContainsString('#2360', $combined);
         $this->assertStringContainsString('#1492', $combined);
         $this->assertStringContainsString('--require-llvm', $combined);
+        $this->assertStringContainsString('NORTH_STAR3_VERIFY_GATE', $combined);
+        $this->assertStringContainsString('#2396', $combined);
     }
 
     public function testNorthStar3VerifyScriptDocumentsSteps(): void
