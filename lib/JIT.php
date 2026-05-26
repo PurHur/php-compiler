@@ -53,10 +53,6 @@ class JIT {
     public function compile(Block $block): PHPLLVM\Value {
         if ($this->shouldUseM3EmitTuNativeBridge() && $this->isM3EmitTuScriptMain($block)) {
             $this->m3EmitTuMainBlock = $block;
-            if (!$this->m3EmitTuRuntimeSpineLowered) {
-                $this->m3EmitTuRuntimeSpineLowered = true;
-                $this->compileM3EmitTuRuntimeSpineDecls();
-            }
         }
         $return = $this->compileBlock($block);
         $this->runQueue();
@@ -328,12 +324,15 @@ class JIT {
         if ($this->shouldUseM3EmitTuNativeBridge() && null !== $logicalName) {
             $m3EmitRuntime = strtolower($logicalName);
             if ($this->isM3EmitTuRuntimeSpineLoweringName($m3EmitRuntime)) {
-                return $this->compileM3EmitTuRuntimeSpineStub(
-                    $internalName,
-                    $block,
-                    $logicalName,
-                    $m3EmitRuntime
-                );
+                $methodLc = substr($m3EmitRuntime, (int) strrpos($m3EmitRuntime, '::') + 2);
+                if ($this->shouldUseM3EmitTuRuntimeMethodStub($methodLc)) {
+                    return $this->compileM3EmitTuRuntimeSpineStub(
+                        $internalName,
+                        $block,
+                        $logicalName,
+                        $m3EmitRuntime
+                    );
+                }
             }
             if ($this->isM3EmitTuCompilerSpineLoweringName($m3EmitRuntime)) {
                 if ('phpcompiler\\compiler::compileemitsmoke' === $m3EmitRuntime) {
@@ -1609,12 +1608,42 @@ class JIT {
         return $func;
     }
 
-    /** Native {main} for M3 emit TU — thin PHP in entry; bridge on BootstrapAot\\*_m3_emit (#1937, #2540). */
+    /** Native {main} for M3 emit TU — libc getenv + emit bridge after spine pre-lower (#1937, #2550). */
     private function compileM3EmitTuMainNative(string $internalName, Block $block, ?string $logicalName): PHPLLVM\Value
     {
-        $this->compileM3EmitTuRuntimeSpineDecls();
+        $lcname = strtolower($logicalName ?? '{main}');
+        if (isset($this->context->functions[$lcname])) {
+            return $this->context->functions[$lcname];
+        }
+        if (!$this->m3EmitTuRuntimeSpineLowered) {
+            $this->m3EmitTuRuntimeSpineLowered = true;
+            foreach (['parse', 'compileemitsmoke', 'standalone'] as $methodLc) {
+                $this->compileM3EmitTuRuntimeMethodFromQueue($methodLc);
+            }
+            $this->runQueue();
+            $this->compileM3EmitTuRuntimeSpineDecls();
+        }
+        $i64 = $this->context->getTypeFromString('int64');
+        $func = $this->context->module->addFunction(
+            $this->llvmInternalName($internalName),
+            $this->context->context->functionType($i64, false)
+        );
+        $bb = $func->appendBasicBlock('entry');
+        $saved = $this->context->builder;
+        $this->context->builder = $this->context->context->builderCreate();
+        $this->context->builder->positionAtEnd($bb);
+        $logPrefix = getenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX');
+        if (!is_string($logPrefix) || '' === $logPrefix) {
+            $logPrefix = 'compile_smoke_m3_emit';
+        }
+        \PHPCompiler\JIT\BootstrapCompileSmokeM3Emit::emitMainEntry($this->context, $logPrefix);
+        $this->context->builder->clearInsertionPosition();
+        $this->context->builder = $saved;
+        $this->context->functions[$lcname] = $func;
+        $this->context->functionReturnType[$lcname] = 'int64';
+        $this->context->functionProxies[$lcname] = new JIT\Call\Native($func, $logicalName ?? '{main}', [], []);
 
-        return $this->compileBlockPhpLowering($internalName, $block, $logicalName, $logicalName);
+        return $func;
     }
 
     /** Lower Runtime/Compiler spine before native emit bridge (#1937, #2512). */
@@ -1669,6 +1698,10 @@ class JIT {
                 'PHPCompiler\\Runtime::__construct',
                 $stubBlock
             );
+            $this->compileM3EmitTuRuntimeParseAndCompileNativeDecl([
+                'parseandcompile' => true,
+                'parseandcompileemitsmoke' => true,
+            ]);
         } else {
             $this->emitM3EmitTuRuntimeParseStubNative(
                 $this->llvmInternalName('PHPCompiler\\Runtime::parse'),
@@ -2020,6 +2053,28 @@ class JIT {
 
                 return;
             }
+        }
+    }
+
+    /** Pre-lower Runtime spine from JIT queue before emit bridge binds symbols (#2512, #2550). */
+    private function compileM3EmitTuRuntimeMethodFromQueue(string $methodLc): void
+    {
+        $logical = 'PHPCompiler\\Runtime::'.$methodLc;
+        $lc = strtolower($logical);
+        if (isset($this->context->functions[$lc])) {
+            return;
+        }
+        foreach ($this->queue as $item) {
+            $func = $item[0];
+            if (!$func instanceof CoreFunc\PHP) {
+                continue;
+            }
+            if (strtolower($func->getName()) !== $lc) {
+                continue;
+            }
+            $this->compileBlock($func->block, $logical);
+
+            return;
         }
     }
 

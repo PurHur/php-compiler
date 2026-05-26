@@ -92,5 +92,8 @@ final class BootstrapRuntimeCompileSmokeTest extends TestCase
         $this->assertStringContainsString('RuntimeEmitTuAlloc::emit', $emit);
         $object = (string) file_get_contents(self::$root.'/lib/JIT/Builtin/Type/Object_.php');
         $this->assertStringContainsString('allocateEmitTuShell', $object);
+        $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
+        $this->assertStringContainsString('emitMainEntry', $jit);
+        $this->assertStringContainsString('compileM3EmitTuRuntimeMethodFromQueue', $jit);
     }
 }
