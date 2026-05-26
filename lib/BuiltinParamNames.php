@@ -13,6 +13,7 @@ final class BuiltinParamNames
     private const MAP = [
         'strlen' => ['string'],
         'parse_str' => ['string', 'array'],
+        'similar_text' => ['string1', 'string2', 'percent'],
     ];
 
     /**
