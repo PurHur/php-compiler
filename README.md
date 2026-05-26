@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| **Status site** | [Overview](https://purhur.github.io/php-compiler/docs/pages/index.html) · [status](https://purhur.github.io/php-compiler/development-status.html) · [gaps](https://purhur.github.io/php-compiler/missing-implementation.html) |
+| **Status site** | [Overview](https://purhur.github.io/php-compiler/docs/pages/index.html) · [status](https://purhur.github.io/php-compiler/development-status.html) · [gaps](https://purhur.github.io/php-compiler/missing-implementation.html) · [PHP compare](https://purhur.github.io/php-compiler/capability-comparison.html) |
 | **North star** | [Self-host #1492](https://github.com/PurHur/php-compiler/issues/1492) · [Example gates #1044](https://github.com/PurHur/php-compiler/issues/1044) (closed, regression only) |
 | **Docs index** | [`docs/README.md`](docs/README.md) · [`docs/GETTING-STARTED.md`](docs/GETTING-STARTED.md) |
 | **CI** | `./script/ci-local.sh` or `make test` ([#436](https://github.com/PurHur/php-compiler/issues/436) — remote GHA/Circle temporarily disabled) |

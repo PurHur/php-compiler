@@ -9,6 +9,7 @@ Only **`docs/pages/`** is published. Contributor docs stay in the repo root `doc
 | **Overview** | https://purhur.github.io/php-compiler/docs/pages/index.html |
 | **Status** (short) | https://purhur.github.io/php-compiler/development-status.html |
 | **Missing implementation** (gap tables) | https://purhur.github.io/php-compiler/missing-implementation.html |
+| **PHP capability comparison** | https://purhur.github.io/php-compiler/capability-comparison.html |
 | **Repository** | https://github.com/PurHur/php-compiler |
 
 ## Site map
@@ -18,6 +19,7 @@ Only **`docs/pages/`** is published. Contributor docs stay in the repo root `doc
 | `index.html` | Landing — demo, progress, north star summary |
 | `development-status.md` | Short status narrative (Jekyll) |
 | `missing-implementation.html` | Tables of real open implementation gaps |
+| `capability-comparison.html` | PHP language/stdlib vs VM / JIT / AOT (generated) |
 | `css/style.css`, `js/main.js` | Theme |
 | `_layouts/status.html` | Jekyll layout for status markdown |
 
@@ -28,9 +30,10 @@ Capability matrices, bootstrap inventory tables, CI gate matrices, and long cont
 ## Update checklist
 
 1. **`missing-implementation.html`** — when a gap closes or a new blocker is user-visible
-2. **`development-status.md`** — milestone / ladder changes
-3. **`index.html`** — badges and progress % if the story changed
-4. **`README.md`** — link to status site
+2. **`capability-comparison.html`** — after matrix regen: `php script/generate-pages-capability-comparison.php`
+3. **`development-status.md`** — milestone / ladder changes
+4. **`index.html`** — badges and progress % if the story changed
+5. **`README.md`** — link to status site
 
 Trackers: [#78](https://github.com/PurHur/php-compiler/issues/78), [#1492](https://github.com/PurHur/php-compiler/issues/1492).
 

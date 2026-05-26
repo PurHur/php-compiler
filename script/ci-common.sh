@@ -410,6 +410,7 @@ ci_run_inventory_checks() {
   ci_run_init_apijson_parity_check
   "$PHP_BIN" "${PHP_OPTS[@]}" script/capability-matrix.php --check
   ci_run_capability_syntax_check
+  ci_ensure_generated_doc script/generate-pages-capability-comparison.php capability-comparison.html
   ci_ensure_generated_doc script/bootstrap-inventory.php docs/bootstrap-inventory.md
   ci_ensure_generated_doc script/bootstrap-profile.php docs/bootstrap-profile.json
   ci_run_wave3_roadmap_sync_check

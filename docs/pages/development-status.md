@@ -17,7 +17,7 @@ permalink: /development-status.html
 | **Examples 000–009** | VM + AOT regression fixtures (not a product north star) |
 | **Try it** | [`docs/GETTING-STARTED.md`](https://github.com/PurHur/php-compiler/blob/master/docs/GETTING-STARTED.md) |
 
-[← Overview](index.html) · [**Missing implementation tables**](missing-implementation.html) · [GitHub](https://github.com/PurHur/php-compiler)
+[← Overview](index.html) · [**Missing implementation tables**](missing-implementation.html) · [**PHP capability comparison**](capability-comparison.html) · [GitHub](https://github.com/PurHur/php-compiler)
 
 ---
 
@@ -52,6 +52,8 @@ Contributor detail: [`docs/self-host-target.md`](https://github.com/PurHur/php-c
 ## What is still missing
 
 For tables of real implementation gaps (emit spine, LLVM deny list, deferred spine paths, language subset), see **[missing-implementation.html](missing-implementation.html)**.
+
+For tracked PHP language/stdlib features vs VM / JIT / AOT (from the capability matrices), see **[capability-comparison.html](capability-comparison.html)**.
 
 ---
 

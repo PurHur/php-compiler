@@ -11,9 +11,10 @@ Technical documentation for **php-compiler** contributors and operators. End-use
 | **Overview** | [purhur.github.io/php-compiler/docs/pages/index.html](https://purhur.github.io/php-compiler/docs/pages/index.html) |
 | **Development status** (short) | [purhur.github.io/php-compiler/development-status.html](https://purhur.github.io/php-compiler/development-status.html) |
 | **Missing implementation** (gap tables) | [purhur.github.io/php-compiler/missing-implementation.html](https://purhur.github.io/php-compiler/missing-implementation.html) |
+| **PHP capability comparison** | [purhur.github.io/php-compiler/capability-comparison.html](https://purhur.github.io/php-compiler/capability-comparison.html) |
 | **Repository** | [github.com/PurHur/php-compiler](https://github.com/PurHur/php-compiler) |
 
-**Edit sources:** [`pages/index.html`](pages/index.html) · [`pages/development-status.md`](pages/development-status.md) · [`pages/missing-implementation.html`](pages/missing-implementation.html) · [`pages/PAGES.md`](pages/PAGES.md).
+**Edit sources:** [`pages/index.html`](pages/index.html) · [`pages/development-status.md`](pages/development-status.md) · [`pages/missing-implementation.html`](pages/missing-implementation.html) · [`pages/capability-comparison.html`](pages/capability-comparison.html) (generated) · [`pages/PAGES.md`](pages/PAGES.md).
 
 ## Start here
 

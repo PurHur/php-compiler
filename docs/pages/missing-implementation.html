@@ -24,6 +24,7 @@
         <a href="index.html">Overview</a>
         <a href="development-status.html">Status</a>
         <a href="missing-implementation.html" aria-current="page">Gaps</a>
+        <a href="capability-comparison.html">PHP compare</a>
         <a href="https://github.com/PurHur/php-compiler">GitHub</a>
       </nav>
     </div>
@@ -156,11 +157,11 @@
             <tbody>
               <tr>
                 <td><code>bin/vm.php</code></td>
-                <td>Full driver entry; M5 / inventory closure</td>
+                <td>Full driver entry; M5 / inventory closure ([#2201](https://github.com/PurHur/php-compiler/issues/2201))</td>
               </tr>
               <tr>
                 <td><code>lib/AOT/Linker.php</code></td>
-                <td>Uses <code>shell_exec</code> / external <code>clang</code> — not in self-host bundle</td>
+                <td>Uses external <code>clang</code> via <code>shell_exec</code> — excluded from self-host bundle (expected M5 floor)</td>
               </tr>
             </tbody>
           </table>
