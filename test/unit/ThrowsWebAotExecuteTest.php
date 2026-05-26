@@ -89,7 +89,7 @@ final class ThrowsWebAotExecuteTest extends TestCase
         $env['REQUEST_URI'] = '/example.php';
 
         $out = $this->runBinary($env);
-        $this->assertMatchesRegularExpression('/invalid/i', $out);
+        $this->assertStringContainsString('Invalid email address', $out);
     }
 
     public function testGetShowsSubmitPrompt(): void

@@ -42,6 +42,7 @@ Environment:
   FILE_UPLOAD_WEB_SMOKE_GATE=1     include 006 multipart upload curls (#1999)
   FILE_UPLOAD_WEB_SERVE_AOT_SMOKE_GATE=1  require 006 phpc serve --aot multipart POST (#2333)
   THROWS_WEB_SMOKE_GATE=1          include 007 throw/catch POST curls (#2076)
+  THROWSWEB_SERVE_AOT_SMOKE_GATE=1 require 007 phpc serve --aot caught invalid POST (#2387)
   THROWSWEB_UNCAUGHT_500_GATE=1    include 007 uncaught.php HTTP 500 curl (#2200)
   FASTCGI_WEB_SMOKE_GATE=1         include 009 health + PATH_INFO curls (#2351)
 EOF
@@ -320,6 +321,10 @@ file_upload_serve_aot_require_pass() {
   [[ "${FILE_UPLOAD_WEB_SERVE_AOT_SMOKE_GATE:-0}" == "1" ]]
 }
 
+throws_web_serve_aot_require_pass() {
+  [[ "${THROWSWEB_SERVE_AOT_SMOKE_GATE:-0}" == "1" ]]
+}
+
 ensure_project_aot_binary() {
   local project_dir="$1"
   local binary="${project_dir}/.phpc/bin/app"
@@ -467,15 +472,30 @@ run_throws_web_smoke() {
     echo "examples-web-smoke: 007-ThrowsWeb: skip (missing docroot)"
     return 0
   fi
-  if [[ "$AOT" -eq 1 ]]; then
-    echo "examples-web-smoke: 007-ThrowsWeb: skip --aot (VM only until #2101)"
+  if [[ "$AOT" -eq 1 && "${THROWSWEB_SERVE_AOT_SMOKE_GATE:-0}" != "1" ]]; then
+    echo "examples-web-smoke: 007-ThrowsWeb: skip --aot (THROWSWEB_SERVE_AOT_SMOKE_GATE=0; #2387)"
     return 0
   fi
 
-  local port pid
+  local port pid serve_cmd=("$PHPC" serve)
+  local mode_label="VM throw/catch POST"
+  if [[ "$AOT" -eq 1 ]]; then
+    local binary=""
+    if ! binary="$(ensure_project_aot_binary "$docroot")"; then
+      if throws_web_serve_aot_require_pass; then
+        echo "examples-web-smoke: 007-ThrowsWeb: FAILED (no executable .phpc/bin/app; #2387)" >&2
+        return 1
+      fi
+      echo "examples-web-smoke: 007-ThrowsWeb: skip --aot (no executable .phpc/bin/app)"
+      return 0
+    fi
+    serve_cmd=("$PHPC" serve --aot --binary "$binary")
+    mode_label="AOT throw/catch POST"
+  fi
+
   port="$(find_free_port)"
-  echo "examples-web-smoke: 007-ThrowsWeb on 127.0.0.1:${port} (VM throw/catch POST)"
-  "${PHPC}" serve "127.0.0.1:${port}" "$docroot" >/dev/null 2>&1 &
+  echo "examples-web-smoke: 007-ThrowsWeb on 127.0.0.1:${port} (${mode_label})"
+  "${serve_cmd[@]}" "127.0.0.1:${port}" "$docroot" >/dev/null 2>&1 &
   pid=$!
 
   stop_serve() {

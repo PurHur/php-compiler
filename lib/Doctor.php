@@ -843,12 +843,14 @@ final class Doctor
 
         $defaults = self::readCiDefaultsEnv($repoRoot);
         $smokeDefault = $defaults['THROWS_WEB_SMOKE_GATE'] ?? '0';
+        $serveAotDefault = $defaults['THROWSWEB_SERVE_AOT_SMOKE_GATE'] ?? '0';
         $uncaughtDefault = $defaults['THROWSWEB_UNCAUGHT_500_GATE'] ?? '0';
         $linkDefault = $defaults['THROWSWEB_AOT_LINK_GATE'] ?? '1';
         $aotDefault = $defaults['THROWSWEB_AOT_SMOKE_GATE'] ?? '1';
         $deployDefault = $defaults['THROWSWEB_DEPLOY_SMOKE_GATE'] ?? '0';
 
         $smokeOn = self::gateEnabled('THROWS_WEB_SMOKE_GATE', $smokeDefault);
+        $serveAotOn = self::gateEnabled('THROWSWEB_SERVE_AOT_SMOKE_GATE', $serveAotDefault);
         $uncaughtOn = self::gateEnabled('THROWSWEB_UNCAUGHT_500_GATE', $uncaughtDefault);
         $linkOn = self::gateEnabled('THROWSWEB_AOT_LINK_GATE', $linkDefault);
         $aotOn = self::gateEnabled('THROWSWEB_AOT_SMOKE_GATE', $aotDefault);
@@ -895,6 +897,12 @@ final class Doctor
             'THROWSWEB_UNCAUGHT_500_GATE=1 ./script/examples-web-smoke.sh --throws-only · ci-fast (#2200)',
             '#2200'
         );
+        $serveAotStatus = $serveAotOn && $llvmReady ? '✅' : '📋';
+        $serveAotNote = $llvmReady
+            ? ($serveAotOn ? '#2387 ✅' : 'opt-in — phpc serve --aot caught invalid POST (#2387)')
+            : 'LLVM required; #2387 when gate=1';
+        fwrite(STDOUT, "  [{$serveAotStatus}] Stage 2b AOT serve — THROWSWEB_SERVE_AOT_SMOKE_GATE default {$serveAotDefault} ({$serveAotNote})\n");
+        fwrite(STDOUT, "      Run:     THROWSWEB_SERVE_AOT_SMOKE_GATE=1 ./script/examples-web-smoke.sh --throws-only --aot\n");
         self::printSessionsWebGateRow(
             3,
             'AOT link',

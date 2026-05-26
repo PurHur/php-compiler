@@ -188,6 +188,7 @@ final class PhpcDoctorTest extends TestCase
         $this->assertStringContainsString('007-ThrowsWeb CI gates', $result['stdout']);
         $this->assertStringContainsString('007-ThrowsWeb', $result['stdout']);
         $this->assertStringContainsString('THROWS_WEB_SMOKE_GATE', $result['stdout']);
+        $this->assertStringContainsString('THROWSWEB_SERVE_AOT_SMOKE_GATE', $result['stdout']);
         $this->assertStringContainsString('THROWSWEB_UNCAUGHT_500_GATE', $result['stdout']);
         $this->assertStringContainsString('#2200', $result['stdout']);
         $this->assertStringContainsString('THROWSWEB_AOT_LINK_GATE', $result['stdout']);

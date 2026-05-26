@@ -32,6 +32,7 @@ WEB_EXAMPLES=(
   004-ApiJson
   005-SessionsWeb
   006-FileUploadWeb
+  007-ThrowsWeb
 )
 
 echo "examples-web-smoke-prebuild: building AOT binaries (phpc build --project)..."

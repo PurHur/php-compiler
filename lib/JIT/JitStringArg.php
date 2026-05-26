@@ -24,6 +24,9 @@ final class JitStringArg
                 JitValueBox::valuePtrFromVariable($context, $arg)
             );
         }
+        if (Variable::TYPE_STRING === $arg->type && Variable::KIND_VARIABLE === $arg->kind) {
+            return $context->helper->loadValue($arg);
+        }
         $literal = self::compileTimeLiteral($arg);
         if (null !== $literal) {
             if (Variable::TYPE_STRING === $arg->type && Variable::KIND_VALUE === $arg->kind) {
