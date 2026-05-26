@@ -17,6 +17,7 @@
 #   SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 ./script/deploy-smoke.sh --example 005
 #   FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE=1 ./script/deploy-smoke.sh --example 006
 #   THROWSWEB_DEPLOY_SMOKE_GATE=1 ./script/deploy-smoke.sh --example 007
+#   FASTCGI_WEB_DEPLOY_SMOKE_GATE=1 ./script/deploy-smoke.sh --example 009
 #
 # Docker (harness-safe):
 #   ./script/docker-exec.sh -- make deploy-smoke
@@ -30,12 +31,13 @@ MINIWEBAPP="${ROOT}/examples/003-MiniWebApp"
 SESSIONS_WEB="${ROOT}/examples/005-SessionsWeb"
 FILE_UPLOAD_WEB="${ROOT}/examples/006-FileUploadWeb"
 THROWS_WEB="${ROOT}/examples/007-ThrowsWeb"
+FASTCGI_WEB="${ROOT}/examples/009-FastCGIWeb"
 EXAMPLE="002"
 DEPLOY_SMOKE_ONLY="${DEPLOY_SMOKE_ONLY:-}"
 
 usage() {
   cat <<'EOF' >&2
-Usage: script/deploy-smoke.sh [--example 001|002|003|005|006|007]
+Usage: script/deploy-smoke.sh [--example 001|002|003|005|006|007|009]
 
   001  examples/001-SimpleWeb (QUERY_STRING=name=…)
   002  examples/002-StaticWeb (default; static HTML)
@@ -45,11 +47,13 @@ Usage: script/deploy-smoke.sh [--example 001|002|003|005|006|007]
   005  examples/005-SessionsWeb (SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 #1893; cookie + POST redirect flash)
   006  examples/006-FileUploadWeb (FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE=1 #2028; multipart POST upload)
   007  examples/007-ThrowsWeb (THROWSWEB_DEPLOY_SMOKE_GATE=1 #2124; POST invalid email → caught HTML)
+  009  examples/009-FastCGIWeb (FASTCGI_WEB_DEPLOY_SMOKE_GATE=1 #2359; health ok + PATH_INFO /ping diagnostics)
 
 003 execute smoke is default on (DEPLOY_SMOKE_003_EXECUTE=1); set DEPLOY_SMOKE_003_EXECUTE=0 to skip (#1530, #745).
 005 requires SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 (default 0 until stable — #1893).
 006 requires FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE=1 (default 0 until stable — #2028).
 007 requires THROWSWEB_DEPLOY_SMOKE_GATE=1 (default 0 until stable — #2124).
+009 requires FASTCGI_WEB_DEPLOY_SMOKE_GATE=1 (default 0 until stable — #2359).
 EOF
   exit 1
 }
@@ -154,6 +158,10 @@ deploy_smoke_006_enabled() {
 
 deploy_smoke_007_enabled() {
   [[ "${THROWSWEB_DEPLOY_SMOKE_GATE:-0}" == "1" ]]
+}
+
+deploy_smoke_009_enabled() {
+  [[ "${FASTCGI_WEB_DEPLOY_SMOKE_GATE:-0}" == "1" ]]
 }
 
 # Write multipart/form-data body for field doc=@file (issue #2028).
@@ -659,6 +667,61 @@ smoke_007_throws_web() {
   echo "deploy-smoke: ${label}: ok"
 }
 
+smoke_009_fastcgi_web() {
+  local label="009-FastCGIWeb"
+  local dist="${SMOKE_ROOT}/009-FastCGIWeb"
+  local readme="${dist}/README.deploy"
+  local out
+
+  if ! deploy_smoke_009_enabled; then
+    echo "deploy-smoke: ${label}: skip (FASTCGI_WEB_DEPLOY_SMOKE_GATE=0 #2359)" >&2
+    return 0
+  fi
+
+  if [[ ! -d "${FASTCGI_WEB}" ]]; then
+    echo "deploy-smoke: ${label}: skip (tree missing #2331)" >&2
+    return 0
+  fi
+  if [[ ! -f "${FASTCGI_WEB}/example.php" ]]; then
+    echo "deploy-smoke: ${label}: skip (example.php missing #2331)" >&2
+    return 0
+  fi
+
+  rm -rf "$dist"
+  mkdir -p "$SMOKE_ROOT"
+
+  echo "deploy-smoke: ${label}: phpc build --project"
+  "$PHPC" build --project "${FASTCGI_WEB}"
+
+  echo "deploy-smoke: ${label}: phpc deploy -> ${dist}"
+  "$PHPC" deploy "${FASTCGI_WEB}" -o "$dist"
+
+  if [[ ! -x "${dist}/bin/app" ]]; then
+    echo "deploy-smoke: ${label}: expected executable ${dist}/bin/app" >&2
+    exit 1
+  fi
+  if [[ ! -f "$readme" ]]; then
+    echo "deploy-smoke: ${label}: expected ${readme}" >&2
+    exit 1
+  fi
+  if ! grep -q 'PHPC_DEPLOY_ROOT' "$readme"; then
+    echo "deploy-smoke: ${label}: README.deploy missing PHPC_DEPLOY_ROOT" >&2
+    exit 1
+  fi
+
+  out="$(run_deployed_app "${label} GET health" "$dist" \
+    REQUEST_METHOD=GET SCRIPT_NAME=/example.php REQUEST_URI=/example.php QUERY_STRING=)"
+  assert_needle "${label} GET health" "$out" 'ok'
+  echo "deploy-smoke: ${label}: health ok"
+
+  out="$(run_deployed_app "${label} GET PATH_INFO ping" "$dist" \
+    REQUEST_METHOD=GET SCRIPT_NAME=/example.php REQUEST_URI=/example.php/ping PATH_INFO=/ping)"
+  assert_needle "${label} GET PATH_INFO ping" "$out" 'PATH_INFO='
+  echo "deploy-smoke: ${label}: PATH_INFO diagnostics ok"
+
+  echo "deploy-smoke: ${label}: ok"
+}
+
 run_deploy_smoke_example() {
   case "$1" in
     001) smoke_deploy_example '001-SimpleWeb' 'examples/001-SimpleWeb' '001-SimpleWeb' ;;
@@ -667,8 +730,9 @@ run_deploy_smoke_example() {
     005) smoke_005_sessions_web ;;
     006) smoke_006_file_upload_web ;;
     007) smoke_007_throws_web ;;
+    009) smoke_009_fastcgi_web ;;
     *)
-      echo "deploy-smoke: unknown example ${1} (use 001, 002, 003, 005, 006, or 007)" >&2
+      echo "deploy-smoke: unknown example ${1} (use 001, 002, 003, 005, 006, 007, or 009)" >&2
       exit 1
       ;;
   esac

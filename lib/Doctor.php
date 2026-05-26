@@ -902,9 +902,11 @@ final class Doctor
         $defaults = self::readCiDefaultsEnv($repoRoot);
         $smokeDefault = $defaults['FASTCGI_WEB_SMOKE_GATE'] ?? '0';
         $aotDefault = $defaults['FASTCGI_WEB_AOT_SMOKE_GATE'] ?? '0';
+        $deployDefault = $defaults['FASTCGI_WEB_DEPLOY_SMOKE_GATE'] ?? '0';
 
         $smokeOn = self::gateEnabled('FASTCGI_WEB_SMOKE_GATE', $smokeDefault);
         $aotOn = self::gateEnabled('FASTCGI_WEB_AOT_SMOKE_GATE', $aotDefault);
+        $deployOn = self::gateEnabled('FASTCGI_WEB_DEPLOY_SMOKE_GATE', $deployDefault);
 
         $llvmInfo = self::resolveLlvmInfo($repoRoot);
         $llvmReady = null !== $llvmInfo['dir'];
@@ -944,9 +946,17 @@ final class Doctor
         fwrite(STDOUT, "  [{$aotStatus}] Stage 2 AOT execute — FASTCGI_WEB_AOT_SMOKE_GATE default {$aotDefault} ({$aotExecuteNote})\n");
         fwrite(STDOUT, "      Shell:   FASTCGI_WEB_AOT_SMOKE_GATE=1 EXAMPLES_AOT_SMOKE_ONLY=009 ./script/examples-aot-smoke.sh\n");
         fwrite(STDOUT, "      PHPUnit: ./script/ci-local.sh --filter FastCGIWebAotExecuteTest (when present)\n");
+        $deployStatus = $deployOn && $llvmReady ? '✅' : '📋';
+        $deployNote = $deployOn
+            ? '#2359 ✅ · ci-local when FASTCGI_WEB_DEPLOY_SMOKE_GATE=1'
+            : 'opt-in default 0 — #2359';
+        fwrite(STDOUT, "  [{$deployStatus}] Stage 3 Deploy CGI — FASTCGI_WEB_DEPLOY_SMOKE_GATE default {$deployDefault} ({$deployNote})\n");
+        fwrite(STDOUT, "      Run:     FASTCGI_WEB_DEPLOY_SMOKE_GATE=1 make deploy-smoke-all\n");
+        fwrite(STDOUT, "      Or:      make examples-fastcgiweb-deploy-smoke\n");
+        fwrite(STDOUT, "      Ladder:  make deploy-smoke-all (skips 009 with hint when gate=0; #2077)\n");
         fwrite(STDOUT, "\n  Related:\n");
         fwrite(STDOUT, "  [📋] phpc init --profile fastcgiweb — #2342\n");
-        fwrite(STDOUT, "  [📋] FastCGI adapter loop — #173 · deploy smoke #2359\n");
+        fwrite(STDOUT, "  [📋] FastCGI adapter loop — #173\n");
         fwrite(STDOUT, "  Docs: examples/009-FastCGIWeb/README.md · docs/local-ci-matrix.md\n");
     }
 
