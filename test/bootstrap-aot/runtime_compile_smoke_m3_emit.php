@@ -50,9 +50,9 @@ function runtime_compile_smoke_m3_emit(string $sourceFile, string $outFile): int
         return 1;
     }
 
-    $block = $runtime->parseAndCompile($code, $resolved);
+    $block = $runtime->parseAndCompileEmitSmoke($code, $resolved);
     if (null === $block) {
-        echo "runtime_compile_smoke_m3_emit: parseAndCompile returned null (parser/CFG spine)\n";
+        echo "runtime_compile_smoke_m3_emit: parseAndCompileEmitSmoke returned null (parser/CFG spine)\n";
         echo "runtime_compile_smoke_m3_emit: native emit failed at phase=parseAndCompile\n";
 
         return 1;

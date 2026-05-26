@@ -52,6 +52,24 @@ class Context {
 
     /** Call-site file strict_types while lowering FUNCCALL (issues #156, #1229). */
     public bool $callerStrictTypes = false;
+
+    /** Link-time source bytes for runtime_trivial_echo.php (M3 emit-helper #2559). */
+    public ?string $m3EmitTuTrivialEchoSource = null;
+
+    /** Absolute path to runtime_trivial_echo.php cached at emit-helper link (#2559). */
+    public ?string $m3EmitTuTrivialEchoPath = null;
+
+    /** Compiled Block for runtime_trivial_echo.php (host compile at link time). */
+    public ?\PHPCompiler\Block $m3EmitTuTrivialEchoCompiledBlock = null;
+
+    /** Host-linked AOT bytes for runtime_trivial_echo.php (#2559). */
+    public ?string $m3EmitTuTrivialEchoAotBytes = null;
+
+    public ?string $m3EmitTuTrivialEchoSidecarPath = null;
+
+    public ?\PHPLLVM\Value $m3EmitTuTrivialEchoSourceGlobal = null;
+
+    public ?\PHPLLVM\Value $m3EmitTuTrivialEchoSidecarPathGlobal = null;
     private array $typeMap = [];
     public array $structFieldMap = [];
     private array $intConstant = [];

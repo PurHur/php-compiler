@@ -78,6 +78,8 @@ if [[ "${native_compile_code}" -ne 0 ]] || ! grep -q 'runtime_compile_smoke_m3_e
   exit 1
 fi
 
+chmod +x "${AOT_OUT}" 2>/dev/null || true
+
 if [[ ! -x "${AOT_OUT}" ]]; then
   echo "bootstrap-m3-emit-tu-execute: missing ${AOT_OUT}" >&2
   exit 1
