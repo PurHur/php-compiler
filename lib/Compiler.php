@@ -158,25 +158,30 @@ class Compiler {
     }
 
     protected function compileOps(array $ops, Block $block): void {
-        // First hoist functions and class definitions
+        // Hoist class-like definitions before functions so JIT/AOT see member
+        // constants when compiling FUNCDEF bodies (issue #2215, MiniWebApp Router::CONST).
         foreach ($ops as $child) {
             switch (get_class($child)) {
-                case Op\Stmt\Function_::class:
-                    $block->addOpCode($this->compileFunction($child, $block));
-                    break;
                 case Op\Stmt\Class_::class:
                     $block->addOpCode($this->compileClassLike($child, $block));
                     break;
                 case Op\Stmt\Enum_::class:
                     $block->addOpCode($this->compileEnum($child, $block));
                     break;
-                case Op\Terminal\Const_::class:
-                    $block->addOpCode($this->compileGlobalConst($child, $block));
-                    break;
                 case Op\Stmt\Interface_::class:
                     $block->addOpCode($this->compileInterface($child, $block));
                     break;
                 case Op\Stmt\Trait_::class:
+                    break;
+            }
+        }
+        foreach ($ops as $child) {
+            switch (get_class($child)) {
+                case Op\Stmt\Function_::class:
+                    $block->addOpCode($this->compileFunction($child, $block));
+                    break;
+                case Op\Terminal\Const_::class:
+                    $block->addOpCode($this->compileGlobalConst($child, $block));
                     break;
             }
         }
