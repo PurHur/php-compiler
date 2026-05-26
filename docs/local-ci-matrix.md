@@ -43,7 +43,16 @@ On **Runforge harness** hosts (and similar agent sandboxes), `docker run -v "$(p
 | Targeted PHPUnit | `./script/docker-exec.sh -- bash -lc 'source script/php-env.sh && vendor/bin/phpunit …'` |
 | Never on harness | Raw `docker run -v "$(pwd):/compiler"` (empty tree) |
 
-Agent environments may set `HARNESS_DOCKER_RUN_OPTS` (or `PHP_COMPILER_DOCKER_RUN_OPTS`); `script/docker-exec.sh` and `script/ci-docker-run.sh` pass those through to `docker run`.
+**Harness Docker resource limits** ([#2249](https://github.com/PurHur/php-compiler/issues/2249)): Runforge/agent-harness hosts export `HARNESS_DOCKER_RUN_OPTS` (e.g. `--memory=8g --cpus=2`). All wrapper scripts source `script/ci-docker-run.sh`, which passes those flags (or `PHP_COMPILER_DOCKER_RUN_OPTS`) on every `docker run` / `docker create`, together with the repo memory cap from `ci-defaults.env`.
+
+| Variable / entrypoint | Behavior |
+|-----------------------|----------|
+| `HARNESS_DOCKER_RUN_OPTS` | Injected by harness; preferred on Runforge |
+| `PHP_COMPILER_DOCKER_RUN_OPTS` | Explicit override (wins over harness var when set) |
+| `PHP_COMPILER_REQUIRE_DOCKER_RUN_OPTS=1` | Fail fast if neither var is set (`make test-harness`, `make test-docker-exec`) |
+| `ci_docker_harness_context` | Detects `HARNESS_HOST` / `HARNESS_PORT` / `HARNESS_DATA_DIR` and prints a high-signal warning when opts are missing |
+
+Do **not** call raw `docker run` in harness docs or issues — use `./script/docker-exec.sh`, `./script/docker-ci-local.sh`, or `make test-harness` so limits and tar-fallback stay consistent ([#2245](https://github.com/PurHur/php-compiler/issues/2245)).
 
 **Docker preflight** ([#2246](https://github.com/PurHur/php-compiler/issues/2246)): harness entrypoints (`make test-harness`, `./script/docker-ci-local.sh`, `./script/docker-exec.sh`, `./script/ci-docker-safe.sh`) call `script/ci-docker-preflight.sh` before any container work:
 

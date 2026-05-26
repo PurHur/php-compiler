@@ -3,16 +3,14 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 IMAGE="${PHP_COMPILER_DOCKER_IMAGE:-php:8.2-cli-bookworm}"
-DOCKER_EXTRA=()
-if [[ -n "${PHP_COMPILER_DOCKER_RUN_OPTS:-${HARNESS_DOCKER_RUN_OPTS:-}}" ]]; then
-  # shellcheck disable=SC2206
-  DOCKER_EXTRA=(${PHP_COMPILER_DOCKER_RUN_OPTS:-${HARNESS_DOCKER_RUN_OPTS}})
-fi
 
-CID=$(docker create "${DOCKER_EXTRA[@]}" "$IMAGE" bash -lc 'mkdir -p /compiler; exec sleep 600')
+# shellcheck source=ci-docker-run.sh
+source "$(dirname "$0")/ci-docker-run.sh"
+
+CID=$(ci_docker_create "$IMAGE" bash -lc 'mkdir -p /compiler; exec sleep 600')
+docker start "$CID" >/dev/null
 cleanup() { docker rm -f "$CID" >/dev/null 2>&1 || true; }
 trap cleanup EXIT
-docker start "$CID" >/dev/null
 
 tar -C "$ROOT" -cf - --exclude='.git' --exclude='.phpunit.result.cache' . | docker exec -i "$CID" bash -lc 'tar xf - -C /compiler'
 
