@@ -1574,6 +1574,40 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('#2168', $docSelfhost);
     }
 
+    public function testCiDefaultsEnvDefinesJitUnitProbeGateDefaultOff(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString(
+            'BOOTSTRAP_JIT_UNIT_PROBE_GATE="${BOOTSTRAP_JIT_UNIT_PROBE_GATE:-0}"',
+            $defaults
+        );
+        $this->assertStringContainsString('#2332', $defaults);
+        $this->assertStringContainsString('#2361', $defaults);
+    }
+
+    public function testCiLocalHonorsJitUnitProbeGate(): void
+    {
+        $local = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-local.sh');
+        $this->assertStringContainsString('ci_run_bootstrap_jit_unit_probe', $local);
+
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('BOOTSTRAP_JIT_UNIT_PROBE_GATE', $common);
+        $this->assertStringContainsString('BOOTSTRAP_JIT_UNIT_PROBE_GATE:-0', $common);
+        $this->assertStringContainsString('bootstrap-selfhost-jit-unit-probe.sh', $common);
+    }
+
+    public function testLocalCiMatrixDocumentsJitUnitProbeGate(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('BOOTSTRAP_JIT_UNIT_PROBE_GATE', $doc);
+        $this->assertStringContainsString('bootstrap-selfhost-jit-unit-probe.sh', $doc);
+        $this->assertStringContainsString('#2361', $doc);
+
+        $docSelfhost = (string) file_get_contents(dirname(__DIR__, 2).'/docs/bootstrap-selfhost.md');
+        $this->assertStringContainsString('jit_unit_probe bundle OK', $docSelfhost);
+        $this->assertStringContainsString('#2361', $docSelfhost);
+    }
+
     public function testCiDefaultsEnvDefinesBootstrapSelfhostProbeUpdateOff(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
