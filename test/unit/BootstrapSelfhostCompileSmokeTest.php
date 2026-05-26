@@ -90,6 +90,16 @@ final class BootstrapSelfhostCompileSmokeTest extends TestCase
         $this->assertTrue(is_executable(self::$root.'/build/compile-smoke-aot'));
     }
 
+    public function testCompileSmokeProbeCachesCompilerSmokeStandaloneSidecar(): void
+    {
+        $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
+        $this->assertStringContainsString('compile_smoke_m3_emit', $jit);
+        $this->assertStringContainsString('compiler_smoke_standalone.php', $jit);
+        $this->assertStringContainsString('COMPILE_SMOKE_SIDECAR_REL', $jit);
+        $aot = (string) file_get_contents(self::$root.'/lib/JIT/M3EmitTuTrivialEchoAot.php');
+        $this->assertStringContainsString('compileSmokeSentinelBlock', $aot);
+    }
+
     public function testCompileSmokeProbeDefaultsRealLoweringWhenLinkCompileDriver(): void
     {
         $source = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-compile-smoke-probe.sh');
