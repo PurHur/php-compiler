@@ -167,6 +167,8 @@ final class Doctor
         $m3HelloStrictDefault = $defaults['BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE'] ?? '0';
         $m3SmokeStrictDefault = $defaults['BOOTSTRAP_M3_COMPILE_SMOKE_STRICT_GATE'] ?? '0';
         $m3SmokeProbeDefault = $defaults['BOOTSTRAP_M3_COMPILE_SMOKE_PROBE_GATE'] ?? '1';
+        $runtimeSmokeProbeDefault = $defaults['BOOTSTRAP_RUNTIME_COMPILE_SMOKE_PROBE_GATE'] ?? '1';
+        $runtimeSmokeStrictDefault = $defaults['BOOTSTRAP_RUNTIME_COMPILE_SMOKE_STRICT_GATE'] ?? '0';
         $spineCountSyncDefault = $defaults['SELFHOST_SPINE_COUNT_SYNC_GATE'] ?? '1';
         $spineCoverageDefault = $defaults['SELFHOST_SPINE_COVERAGE_SYNC_GATE'] ?? '1';
         $spineDeferredDefault = $defaults['SELFHOST_SPINE_DEFERRED_SYNC_GATE'] ?? '1';
@@ -204,6 +206,8 @@ final class Doctor
         fwrite(STDOUT, "   BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE=".(self::gateEnabled('BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE', $m3HelloStrictDefault) ? '1' : '0')." (default {$m3HelloStrictDefault}) — ci-local LLVM tail\n");
         fwrite(STDOUT, "   BOOTSTRAP_M3_COMPILE_SMOKE_PROBE_GATE=".(self::gateEnabled('BOOTSTRAP_M3_COMPILE_SMOKE_PROBE_GATE', $m3SmokeProbeDefault) ? '1' : '0')." (default {$m3SmokeProbeDefault})\n");
         fwrite(STDOUT, "   BOOTSTRAP_M3_COMPILE_SMOKE_STRICT_GATE=".(self::gateEnabled('BOOTSTRAP_M3_COMPILE_SMOKE_STRICT_GATE', $m3SmokeStrictDefault) ? '1' : '0')." (default {$m3SmokeStrictDefault})\n");
+        fwrite(STDOUT, "   BOOTSTRAP_RUNTIME_COMPILE_SMOKE_PROBE_GATE=".(self::gateEnabled('BOOTSTRAP_RUNTIME_COMPILE_SMOKE_PROBE_GATE', $runtimeSmokeProbeDefault) ? '1' : '0')." (default {$runtimeSmokeProbeDefault}) — ci-local lib/Runtime.php probe ([#2294](https://github.com/PurHur/php-compiler/issues/2294))\n");
+        fwrite(STDOUT, "   BOOTSTRAP_RUNTIME_COMPILE_SMOKE_STRICT_GATE=".(self::gateEnabled('BOOTSTRAP_RUNTIME_COMPILE_SMOKE_STRICT_GATE', $runtimeSmokeStrictDefault) ? '1' : '0')." (default {$runtimeSmokeStrictDefault}) — opt-in strict runtime emit ([#2294](https://github.com/PurHur/php-compiler/issues/2294))\n");
         fwrite(STDOUT, "   BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1 BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING=1 BOOTSTRAP_M3_RUNTIME_COMPILE=1 ./script/bootstrap-selfhost-helloworld-probe.sh\n");
         fwrite(STDOUT, "   BOOTSTRAP_M3_HELLOWORLD_STRICT=1 … helloworld-probe.sh  (no Zend fallback; #1493)\n");
         fwrite(STDOUT, "   Emit TU: test/bootstrap-aot/helloworld_m3_emit_native_entry.php (#1768)\n\n");
@@ -391,6 +395,13 @@ final class Doctor
         fwrite(STDOUT, "  Null coalescing  {$coalesceDetail}\n");
         fwrite(STDOUT, "  JIT \$fn() calls  {$jitVarFnDetail}\n");
         fwrite(STDOUT, "  JIT \$_SERVER     {$jitServerDetail}\n");
+        $defaultsWeb = self::readCiDefaultsEnv($repoRoot);
+        $jitProjectDefault = $defaultsWeb['MINIWEBAPP_JIT_PROJECT_GATE'] ?? '0';
+        $jitProjectOn = self::gateEnabled('MINIWEBAPP_JIT_PROJECT_GATE', $jitProjectDefault);
+        $jitProjectDetail = $jitProjectOn
+            ? 'default on when gate=1 — ci-local MiniWebAppJitProjectTest (#587, #2183)'
+            : 'opt-in default 0 — MINIWEBAPP_JIT_PROJECT_GATE=1 for project JIT (#587)';
+        fwrite(STDOUT, '  003 project JIT  MINIWEBAPP_JIT_PROJECT_GATE='.($jitProjectOn ? '1' : '0')." (default {$jitProjectDefault}) — {$jitProjectDetail}\n");
         fwrite(STDOUT, "  Full AOT tail    ./script/ci-local.sh --filter MiniWebAppAotExecuteTest   LLVM required\n");
         fwrite(STDOUT, "  Presenter bundle make north-star1-verify            --require-llvm / --skip-llvm-tail\n");
         fwrite(STDOUT, "  Script           ./script/north-star1-verify.sh    same as make target\n");

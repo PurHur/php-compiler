@@ -1122,6 +1122,34 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('#2265', $doc);
     }
 
+    public function testCiDefaultsEnvDefinesDoctorGatesMatrixSyncGateOn(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString('DOCTOR_GATES_MATRIX_SYNC_GATE="${DOCTOR_GATES_MATRIX_SYNC_GATE:-1}"', $defaults);
+    }
+
+    public function testCiFastRunsDoctorGatesMatrixSyncViaInventoryChecks(): void
+    {
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('ci_run_doctor_gates_matrix_sync_check', $common);
+        $this->assertStringContainsString('check-doctor-gates-sync.php', $common);
+        $this->assertStringContainsString('DOCTOR_GATES_MATRIX_SYNC_GATE:-1', $common);
+    }
+
+    public function testCiDockerRunPassesDoctorGatesMatrixSyncGateDefaultOn(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');
+        $this->assertStringContainsString('DOCTOR_GATES_MATRIX_SYNC_GATE=${DOCTOR_GATES_MATRIX_SYNC_GATE:-1}', $body);
+    }
+
+    public function testLocalCiMatrixDocumentsDoctorGatesMatrixSyncGate(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('DOCTOR_GATES_MATRIX_SYNC_GATE', $doc);
+        $this->assertStringContainsString('check-doctor-gates-sync.php', $doc);
+        $this->assertMatchesRegularExpression('/\| `DOCTOR_GATES_MATRIX_SYNC_GATE` \| `1` \|/', $doc);
+    }
+
     public function testCiDefaultsEnvDefinesSelfhostM4Gen2SyncGateOn(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
