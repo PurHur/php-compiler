@@ -24,6 +24,7 @@ Usage: script/north-star3-verify.sh [--require-llvm]
 Runs North Star 3 M3 unit-probe bundle (issue #2360, epic #1492):
 
   1. ./phpc run examples/008-SelfHostProbe/example.php (north-star2 presenter smoke)
+     Optional when SELFHOSTPROBE_AOT_SMOKE_GATE=1: 008 AOT via examples-aot-smoke (#2407)
   2. BOOTSTRAP_COMPILER_UNIT_PROBE_GATE=1 bootstrap-selfhost-compiler-unit-probe.sh (#2216)
   3. BOOTSTRAP_JIT_UNIT_PROBE_GATE=1 bootstrap-selfhost-jit-unit-probe.sh (#2332)
   4. BOOTSTRAP_VM_UNIT_PROBE_GATE=1 bootstrap-selfhost-vm-unit-probe.sh (#2354)
@@ -106,6 +107,16 @@ if [[ ! -f "${EXAMPLE}" ]]; then
 fi
 
 ns3_run 1 "008-SelfHostProbe VM run" "${_CI_REPO_ROOT}/phpc" run "${EXAMPLE}"
+
+if [[ "${SELFHOSTPROBE_AOT_SMOKE_GATE:-1}" == "1" ]] && ci_llvm_ready; then
+  ci_apply_llvm_memory_env
+  ns3_run 1 "008-SelfHostProbe AOT execute (#2407)" env \
+    SELFHOSTPROBE_AOT_SMOKE_GATE=1 EXAMPLES_AOT_SMOKE_ONLY=008 \
+    "${_CI_SCRIPT_DIR}/examples-aot-smoke.sh"
+elif [[ "${SELFHOSTPROBE_AOT_SMOKE_GATE:-1}" == "1" ]]; then
+  echo
+  echo "=== north-star3-verify: 008-SelfHostProbe AOT skipped (LLVM 9 not available; SELFHOSTPROBE_AOT_SMOKE_GATE=1) ==="
+fi
 
 if ! ci_llvm_ready; then
   if [[ "${REQUIRE_LLVM}" -eq 1 ]]; then

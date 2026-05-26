@@ -1052,7 +1052,7 @@ ci_run_deploy_smoke() {
 # @group aot-link PHPUnit (link-only; execute is ci_run_miniwebapp_aot_execute — #775).
 # 005 link: ExamplesCompileTest::test005SessionsWebAotLink when SESSIONS_WEB_AOT_LINK_GATE=1 (#1946).
 ci_run_aot_link_phpunit() {
-  local -a aot_link_args=(--group aot-link --exclude-group serve --exclude-group miniwebapp-aot-execute --exclude-group miniwebapp-aot-serve --exclude-group sessionsweb-aot-execute --exclude-group fileuploadweb-aot-execute --exclude-group throwsweb-aot-execute --exclude-group fastcgiweb-aot-execute)
+  local -a aot_link_args=(--group aot-link --exclude-group serve --exclude-group miniwebapp-aot-execute --exclude-group miniwebapp-aot-serve --exclude-group sessionsweb-aot-execute --exclude-group fileuploadweb-aot-execute --exclude-group throwsweb-aot-execute --exclude-group fastcgiweb-aot-execute --exclude-group selfhostprobe-aot-execute)
   echo "PHPUnit: AOT link (@group aot-link; SESSIONS_WEB_AOT_LINK_GATE=${SESSIONS_WEB_AOT_LINK_GATE:-0}, FILE_UPLOAD_WEB_AOT_LINK_GATE=${FILE_UPLOAD_WEB_AOT_LINK_GATE:-0}, THROWSWEB_AOT_LINK_GATE=${THROWSWEB_AOT_LINK_GATE:-1})..."
   ci_run_phpunit "${aot_link_args[@]}" "$@"
 }
@@ -1081,6 +1081,19 @@ ci_run_throws_web_aot_execute() {
   fi
   echo "PHPUnit: ThrowsWeb AOT execute (@group throwsweb-aot-execute; THROWSWEB_AOT_SMOKE_GATE=1, #2101)..."
   ci_run_phpunit --group throwsweb-aot-execute "$@"
+}
+
+# 008-SelfHostProbe AOT binary CLI execute (issue #2407); default SELFHOSTPROBE_AOT_SMOKE_GATE=1.
+ci_run_selfhostprobe_aot_smoke() {
+  if [[ "${SELFHOSTPROBE_AOT_SMOKE_GATE:-1}" != "1" ]]; then
+    return 0
+  fi
+  if ! ci_llvm_ready; then
+    echo "PHPUnit: SelfHostProbe AOT execute skipped (LLVM 9 not available)"
+    return 0
+  fi
+  echo "PHPUnit: SelfHostProbe AOT execute (@group selfhostprobe-aot-execute; SELFHOSTPROBE_AOT_SMOKE_GATE=1, #2407)..."
+  ci_run_phpunit --group selfhostprobe-aot-execute "$@"
 }
 
 # 009-FastCGIWeb AOT binary CLI execute (issue #2331); opt-in FASTCGI_WEB_AOT_SMOKE_GATE=1 (#2352).
