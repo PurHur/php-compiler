@@ -1,0 +1,19 @@
+--- vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
+@@ -278,6 +278,16 @@
+                 return [(new Type(Type::TYPE_UNION, array_merge($methodTypes, [Type::null()])))->simplify()];
+             case 'Expr_MethodCall':
+                 return $this->resolveMethodCall($op->var, $op->name, $op, $resolved);
++            case 'Terminal_StaticVar':
++                if (null !== $op->defaultVar) {
++                    if (!isset($resolved[$op->defaultVar])) {
++                        return false;
++                    }
++
++                    return $resolved[$op->defaultVar]->subTypes ?? [$resolved[$op->defaultVar]];
++                }
++
++                return [Type::null()];
+             case 'Expr_Yield':
+             case 'Expr_Include':
+                 // TODO: we may be able to determine these...

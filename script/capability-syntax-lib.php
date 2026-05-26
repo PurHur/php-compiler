@@ -254,6 +254,14 @@ function syntaxRowDefinitions(): array
             'probe' => '$x = 1; unset($x); echo isset($x) ? "set" : "unset";',
         ],
         [
+            'id' => 'function_static_local',
+            'construct' => 'Function-local `static $var = <literal>`',
+            'opcodes' => ['TYPE_DECLARE_FUNCTION_STATIC'],
+            'issue' => 2286,
+            'notes' => ['Literal int/string init only in v1; VM + JIT + AOT'],
+            'probe' => 'function f(){static $n=0; $n++; return $n;} echo f().f().f();',
+        ],
+        [
             'id' => 'keyed_list_destruct',
             'construct' => 'Keyed array destructuring (`["a" => $x]`)',
             'opcodes' => ['TYPE_INIT_ARRAY', 'TYPE_ADD_ARRAY_ELEMENT', 'TYPE_ARRAY_DIM_FETCH', 'TYPE_ASSIGN'],

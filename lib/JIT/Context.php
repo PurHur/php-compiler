@@ -122,6 +122,9 @@ class Context {
     /** @var array<string, Variable> */
     public array $jitGlobalVariables = [];
 
+    /** @var array<string, Variable> function-local static storage (#2286) */
+    public array $jitFunctionStaticVariables = [];
+
     /** @var array<string, string> */
     public array $refAliasNames = [];
 

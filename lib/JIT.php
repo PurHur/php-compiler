@@ -1406,6 +1406,26 @@ class JIT {
                         $this->ensureJitGlobal($globalName)
                     );
                     break;
+                case OpCode::TYPE_DECLARE_FUNCTION_STATIC:
+                    if (!isset($block->constants[$op->arg2])) {
+                        throw new \LogicException('Function static key must be a compile-time constant');
+                    }
+                    $storageKey = $block->constants[$op->arg2]->toString();
+                    $destOp = $block->getOperand($op->arg1);
+                    if (!$this->context->hasVariableOp($destOp)) {
+                        $this->context->makeVariableFromOp($func, $basicBlock, $block, $destOp);
+                    }
+                    $staticVar = $this->ensureJitFunctionStatic($storageKey);
+                    if (null !== $op->arg3 && isset($block->constants[$op->arg3])) {
+                        JIT\FunctionStaticHelper::emitLazyInit(
+                            $this->context,
+                            $storageKey,
+                            $staticVar,
+                            $this->jitVariableFromVmConstant($block->constants[$op->arg3])
+                        );
+                    }
+                    $this->context->setVariableOp($destOp, $staticVar);
+                    break;
                 case OpCode::TYPE_VAR_FETCH:
                     $destOp = $block->getOperand($op->arg1);
                     if (!$this->context->hasVariableOp($destOp)) {
@@ -4684,6 +4704,21 @@ class JIT {
         }
 
         return $this->context->jitGlobalVariables[$name];
+    }
+
+    private function ensureJitFunctionStatic(string $storageKey): Variable
+    {
+        if (!isset($this->context->jitFunctionStaticVariables[$storageKey])) {
+            $slot = JIT\JitValueBox::alloc($this->context);
+            $this->context->jitFunctionStaticVariables[$storageKey] = new Variable(
+                $this->context,
+                Variable::TYPE_VALUE,
+                Variable::KIND_VARIABLE,
+                $slot
+            );
+        }
+
+        return $this->context->jitFunctionStaticVariables[$storageKey];
     }
 
     private static function operandSlotRank(\PHPCfg\Operand $op): int

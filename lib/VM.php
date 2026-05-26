@@ -177,6 +177,20 @@ restart:
                     $globalName = $frame->block->constants[$op->arg2]->toString();
                     $frame->scope[$op->arg1]->indirect($this->context->ensureGlobal($globalName));
                     break;
+                case OpCode::TYPE_DECLARE_FUNCTION_STATIC:
+                    if (!isset($frame->block->constants[$op->arg2])) {
+                        throw new \LogicException('Function static key must be a compile-time constant');
+                    }
+                    $storageKey = $frame->block->constants[$op->arg2]->toString();
+                    $storage = $this->context->ensureFunctionStatic($storageKey);
+                    if (!$this->context->isFunctionStaticInitialized($storageKey)) {
+                        if (null !== $op->arg3 && isset($frame->block->constants[$op->arg3])) {
+                            $storage->copyFrom($frame->block->constants[$op->arg3]);
+                        }
+                        $this->context->markFunctionStaticInitialized($storageKey);
+                    }
+                    $frame->scope[$op->arg1]->indirect($storage);
+                    break;
                 case OpCode::TYPE_ARRAY_DIM_FETCH:
                 case OpCode::TYPE_ARRAY_DIM_FETCH_WRITE:
                     $arg1 = $frame->scope[$op->arg1];
