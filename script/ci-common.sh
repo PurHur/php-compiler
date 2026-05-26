@@ -926,6 +926,27 @@ ci_run_file_upload_web_serve_aot_smoke() {
   "$_CI_SCRIPT_DIR/examples-web-smoke.sh" --fileupload-only --aot
 }
 
+# 007-ThrowsWeb phpc serve --aot caught invalid POST (issue #2387); opt-in THROWSWEB_SERVE_AOT_SMOKE_GATE=1.
+ci_run_throws_web_serve_aot_smoke() {
+  if [[ "${THROWSWEB_SERVE_AOT_SMOKE_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  if [[ -n "${PHP_COMPILER_SKIP_SERVE_TESTS:-}" ]]; then
+    echo "examples-web-smoke (007 AOT serve): skipped (PHP_COMPILER_SKIP_SERVE_TESTS is set)"
+    return 0
+  fi
+  if ! ci_can_bind_loopback; then
+    echo "examples-web-smoke (007 AOT serve): skipped (cannot bind loopback TCP)"
+    return 0
+  fi
+  if ! ci_llvm_ready; then
+    echo "examples-web-smoke (007 AOT serve): skipped (LLVM 9 not available)"
+    return 0
+  fi
+  echo "examples-web-smoke (007 AOT serve): ThrowsWeb phpc serve --aot caught invalid POST (THROWSWEB_SERVE_AOT_SMOKE_GATE=1, #2387)..."
+  "$_CI_SCRIPT_DIR/examples-web-smoke.sh" --throws-only --aot
+}
+
 # 003-MiniWebApp AOT HTTP curls via phpc serve --aot (issues #833, #1523); default MINIWEBAPP_WEB_SMOKE_AOT_GATE=1.
 ci_run_miniwebapp_web_smoke_aot() {
   if [[ "${MINIWEBAPP_WEB_SMOKE_AOT_GATE:-1}" != "1" ]]; then

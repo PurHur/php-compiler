@@ -137,6 +137,7 @@ Defaults are exported from [`script/ci-defaults.env`](../script/ci-defaults.env)
 | `DEPLOY_SMOKE_003_EXECUTE` | `1` | `deploy-smoke.sh`, `ci-local.sh` | Default-on 003 deploy execute E2E ([#1530](https://github.com/PurHur/php-compiler/issues/1530)); also runs when `MINIWEBAPP_AOT_EXECUTE_GATE=1` ([#745](https://github.com/PurHur/php-compiler/issues/745)) |
 | `SESSIONS_WEB_DEPLOY_SMOKE_GATE` | `0` | `deploy-smoke.sh`, `ci-local.sh` | Opt-in 005 deploy + `PHPC_DEPLOY_ROOT` session flash CGI ([#1893](https://github.com/PurHur/php-compiler/issues/1893)); VM curls stay on `SESSIONS_WEB_SMOKE_GATE=1` ([#1887](https://github.com/PurHur/php-compiler/issues/1887)) |
 | `FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE` | `0` | `deploy-smoke.sh`, `ci-local.sh` | Opt-in 006 deploy + `PHPC_DEPLOY_ROOT` multipart upload CGI ([#2028](https://github.com/PurHur/php-compiler/issues/2028)); VM curls stay on `FILE_UPLOAD_WEB_SMOKE_GATE=1` ([#2009](https://github.com/PurHur/php-compiler/issues/2009)) |
+| `THROWSWEB_SERVE_AOT_SMOKE_GATE` | `0` | `ci-local.sh` (`ci_run_throws_web_serve_aot_smoke`) | `examples-web-smoke.sh --throws-only --aot` — 007 `phpc serve --aot` caught invalid POST ([#2387](https://github.com/PurHur/php-compiler/issues/2387)) |
 | `THROWSWEB_DEPLOY_SMOKE_GATE` | `0` | `deploy-smoke.sh`, `ci-local.sh` | Opt-in 007 deploy + `PHPC_DEPLOY_ROOT` caught invalid POST CGI ([#2124](https://github.com/PurHur/php-compiler/issues/2124), [#2264](https://github.com/PurHur/php-compiler/issues/2264)); VM curls stay on `THROWS_WEB_SMOKE_GATE=1` ([#2125](https://github.com/PurHur/php-compiler/issues/2125)) |
 | `DEPLOY_SMOKE_ALL` | `0` | `Makefile` `deploy-smoke` | When `1`, `make deploy-smoke` delegates to `deploy-smoke-all.sh` (same as `make deploy-smoke-all`) ([#2077](https://github.com/PurHur/php-compiler/issues/2077)) |
 | `FASTCGI_WEB_DEPLOY_SMOKE_GATE` | `0` | `deploy-smoke.sh`, `ci-local.sh` | Opt-in 009 deploy + `PHPC_DEPLOY_ROOT` health + PATH_INFO CGI ([#2359](https://github.com/PurHur/php-compiler/issues/2359)); VM curls stay on `FASTCGI_WEB_SMOKE_GATE=1` ([#2351](https://github.com/PurHur/php-compiler/issues/2351)) |
@@ -269,6 +270,7 @@ Progressive ladder (VM throw/catch → AOT link → AOT execute → deploy CGI).
 |-------|----------|---------|--------------|
 | VM throw/catch | `THROWS_WEB_SMOKE_GATE` | `1` | `make examples-throws-smoke` · `ci-fast.sh` ([#2125](https://github.com/PurHur/php-compiler/issues/2125), [#2093](https://github.com/PurHur/php-compiler/issues/2093)) |
 | VM uncaught 500 | `THROWSWEB_UNCAUGHT_500_GATE` | `0` | `THROWSWEB_UNCAUGHT_500_GATE=1 ./script/examples-web-smoke.sh --throws-only` · `ci-fast.sh` ([#2200](https://github.com/PurHur/php-compiler/issues/2200)) |
+| AOT serve | `THROWSWEB_SERVE_AOT_SMOKE_GATE` | `0` | `THROWSWEB_SERVE_AOT_SMOKE_GATE=1 ./script/examples-web-smoke.sh --throws-only --aot` ([#2387](https://github.com/PurHur/php-compiler/issues/2387)) |
 | AOT link | `THROWSWEB_AOT_LINK_GATE` | `1` | `./script/ci-local.sh --filter test007ThrowsWebAotLink` ([#2101](https://github.com/PurHur/php-compiler/issues/2101), [#2135](https://github.com/PurHur/php-compiler/issues/2135)); set `0` to skip during iteration |
 | AOT execute | `THROWSWEB_AOT_SMOKE_GATE` | `1` | `ThrowsWebAotExecuteTest` or `EXAMPLES_AOT_SMOKE_ONLY=007 ./script/examples-aot-smoke.sh` ([#2101](https://github.com/PurHur/php-compiler/issues/2101), [#2135](https://github.com/PurHur/php-compiler/issues/2135)) |
 | Deploy CGI | `THROWSWEB_DEPLOY_SMOKE_GATE` | `0` | `THROWSWEB_DEPLOY_SMOKE_GATE=1 make deploy-smoke-all` ([#2124](https://github.com/PurHur/php-compiler/issues/2124), [#2077](https://github.com/PurHur/php-compiler/issues/2077)); `make examples-throwsweb-deploy-smoke` (007 only); `ci-local` opt-in ([#2264](https://github.com/PurHur/php-compiler/issues/2264)) |
@@ -277,6 +279,7 @@ Progressive ladder (VM throw/catch → AOT link → AOT execute → deploy CGI).
 ./phpc doctor --gates | grep -E 'THROWS|007-ThrowsWeb'
 THROWS_WEB_SMOKE_GATE=1 ./script/examples-web-smoke.sh --throws-only
 THROWSWEB_UNCAUGHT_500_GATE=1 ./script/examples-web-smoke.sh --throws-only
+THROWSWEB_SERVE_AOT_SMOKE_GATE=1 ./script/examples-web-smoke.sh --throws-only --aot
 THROWSWEB_AOT_LINK_GATE=1 THROWSWEB_AOT_SMOKE_GATE=1 ./script/ci-local.sh --filter ThrowsWebAot
 make examples-throwsweb-deploy-smoke
 THROWSWEB_DEPLOY_SMOKE_GATE=1 ./script/deploy-smoke.sh --example 007

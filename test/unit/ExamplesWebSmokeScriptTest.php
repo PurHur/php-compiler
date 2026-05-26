@@ -119,6 +119,17 @@ final class ExamplesWebSmokeScriptTest extends TestCase
         $this->assertStringContainsString('Uploaded: README.md', $body);
     }
 
+    public function testExamplesWebSmokeScriptSupportsThrowsWebServeAotSlice(): void
+    {
+        $script = dirname(__DIR__, 2).'/script/examples-web-smoke.sh';
+        $body = (string) file_get_contents($script);
+        $this->assertStringContainsString('--throws-only', $body);
+        $this->assertStringContainsString('007-ThrowsWeb', $body);
+        $this->assertStringContainsString('THROWSWEB_SERVE_AOT_SMOKE_GATE', $body);
+        $this->assertStringContainsString('throws_web_serve_aot_require_pass', $body);
+        $this->assertStringContainsString('Invalid email', $body);
+    }
+
     public function testExamplesWebSmokeScriptSupportsFastcgiWebSlice(): void
     {
         $script = dirname(__DIR__, 2).'/script/examples-web-smoke.sh';

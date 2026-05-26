@@ -67,12 +67,15 @@ final class CiScriptsTest extends TestCase
         $local = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-local.sh');
         $this->assertStringContainsString('ci_run_sessions_web_serve_aot_smoke', $local);
         $this->assertStringContainsString('ci_run_file_upload_web_serve_aot_smoke', $local);
+        $this->assertStringContainsString('ci_run_throws_web_serve_aot_smoke', $local);
 
         $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
         $this->assertStringContainsString('SESSIONS_WEB_SERVE_AOT_SMOKE_GATE', $common);
         $this->assertStringContainsString('FILE_UPLOAD_WEB_SERVE_AOT_SMOKE_GATE', $common);
+        $this->assertStringContainsString('THROWSWEB_SERVE_AOT_SMOKE_GATE', $common);
         $this->assertStringContainsString('--sessions-only --aot', $common);
         $this->assertStringContainsString('--fileupload-only --aot', $common);
+        $this->assertStringContainsString('--throws-only --aot', $common);
 
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
         $this->assertStringContainsString(
@@ -81,6 +84,10 @@ final class CiScriptsTest extends TestCase
         );
         $this->assertStringContainsString(
             'FILE_UPLOAD_WEB_SERVE_AOT_SMOKE_GATE="${FILE_UPLOAD_WEB_SERVE_AOT_SMOKE_GATE:-0}"',
+            $defaults
+        );
+        $this->assertStringContainsString(
+            'THROWSWEB_SERVE_AOT_SMOKE_GATE="${THROWSWEB_SERVE_AOT_SMOKE_GATE:-0}"',
             $defaults
         );
     }
@@ -416,6 +423,7 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('003-MiniWebApp', $body);
         $this->assertStringContainsString('005-SessionsWeb', $body);
         $this->assertStringContainsString('006-FileUploadWeb', $body);
+        $this->assertStringContainsString('007-ThrowsWeb', $body);
         $this->assertStringContainsString('phpc build --project', $body);
     }
 
@@ -1983,6 +1991,7 @@ final class CiScriptsTest extends TestCase
         $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
         $this->assertStringContainsString('## 007-ThrowsWeb gates', $doc);
         $this->assertStringContainsString('THROWS_WEB_SMOKE_GATE', $doc);
+        $this->assertStringContainsString('THROWSWEB_SERVE_AOT_SMOKE_GATE', $doc);
         $this->assertStringContainsString('THROWSWEB_AOT_LINK_GATE', $doc);
         $this->assertStringContainsString('THROWSWEB_AOT_SMOKE_GATE', $doc);
         $this->assertStringContainsString('test007ThrowsWebAotLink', $doc);
@@ -1997,6 +2006,7 @@ final class CiScriptsTest extends TestCase
     public function testCiDefaultsEnvDefinesThrowsWebAotGatesOn(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString('THROWSWEB_SERVE_AOT_SMOKE_GATE="${THROWSWEB_SERVE_AOT_SMOKE_GATE:-0}"', $defaults);
         $this->assertStringContainsString('THROWSWEB_AOT_LINK_GATE="${THROWSWEB_AOT_LINK_GATE:-1}"', $defaults);
         $this->assertStringContainsString('THROWSWEB_AOT_SMOKE_GATE="${THROWSWEB_AOT_SMOKE_GATE:-1}"', $defaults);
     }
