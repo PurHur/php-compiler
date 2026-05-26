@@ -3758,13 +3758,14 @@ class JIT {
                         $this->context->type->object->setClassParentName($nameOp->value, $parentOp->value);
                     }
                     if ([] !== $op->attributeNames) {
+                        $attrNames = [];
+                        foreach ($op->attributeNames as $n) {
+                            $attrNames[] = ltrim($n, '\\');
+                        }
                         AttributeRegistry::emitRegisterClass(
                             $this->context,
                             strtolower(ltrim($nameOp->value, '\\')),
-                            array_map(
-                                static fn (string $n): string => ltrim($n, '\\'),
-                                $op->attributeNames
-                            )
+                            $attrNames
                         );
                     }
                     $this->compileClass($op->block1, $this->context->scope->classId);
@@ -4506,14 +4507,15 @@ class JIT {
                     assert($name instanceof Operand\Literal);
                     $methodLc = strtolower($name->value);
                     if ([] !== $op->attributeNames && '' !== $this->context->scope->className) {
+                        $attrNames = [];
+                        foreach ($op->attributeNames as $n) {
+                            $attrNames[] = ltrim($n, '\\');
+                        }
                         AttributeRegistry::emitRegisterMethod(
                             $this->context,
                             strtolower(ltrim($this->context->scope->className, '\\')),
                             $methodLc,
-                            array_map(
-                                static fn (string $n): string => ltrim($n, '\\'),
-                                $op->attributeNames
-                            )
+                            $attrNames
                         );
                     }
                     if ($this->isBundledSuperglobalsClass($classId) && 'issuperglobalname' !== $methodLc) {
