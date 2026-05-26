@@ -19,9 +19,13 @@ final class M3EmitTuTrivialEchoAot
 
     private const HELLOWORLD_SENTINEL_LOGICAL = 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::helloworldSentinelBlock';
 
+    private const COMPILE_SMOKE_SENTINEL_LOGICAL = 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compileSmokeSentinelBlock';
+
     public const TRIVIAL_ECHO_SIDECAR_REL = 'build/.m3_trivial_echo_aot_blob';
 
     public const HELLOWORLD_SIDECAR_REL = 'build/.m3_helloworld_aot_blob';
+
+    public const COMPILE_SMOKE_SIDECAR_REL = 'build/.m3_compile_smoke_aot_blob';
 
     /** @var list<string> */
     private static array $registeredSidecarRels = [];
