@@ -237,10 +237,11 @@ ci_run_bootstrap_m5_doc_sync_check() {
 }
 
 ci_run_selfhost_m4_gen2_sync_check() {
-  if [[ "${SELFHOST_M4_GEN2_SYNC_GATE:-0}" != "1" ]]; then
+  if [[ "${SELFHOST_M4_GEN2_SYNC_GATE:-1}" != "1" ]]; then
+    echo "Self-host M4 gen-2 doc sync: skipped (SELFHOST_M4_GEN2_SYNC_GATE=0 opt-out)"
     return 0
   fi
-  echo "Self-host M4 gen-2 doc sync (SELFHOST_M4_GEN2_SYNC_GATE=1, issue #2115)..."
+  echo "Self-host M4 gen-2 doc sync (SELFHOST_M4_GEN2_SYNC_GATE=1, issues #2115, #2175)..."
   "$PHP_BIN" "${PHP_OPTS[@]}" script/check-selfhost-m4-gen2-sync.php
 }
 

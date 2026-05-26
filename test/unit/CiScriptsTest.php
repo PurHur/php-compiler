@@ -847,10 +847,10 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('BOOTSTRAP_M5_DOC_SYNC_GATE=${BOOTSTRAP_M5_DOC_SYNC_GATE:-1}', $body);
     }
 
-    public function testCiDefaultsEnvDefinesSelfhostM4Gen2SyncGateOff(): void
+    public function testCiDefaultsEnvDefinesSelfhostM4Gen2SyncGateOn(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
-        $this->assertStringContainsString('SELFHOST_M4_GEN2_SYNC_GATE="${SELFHOST_M4_GEN2_SYNC_GATE:-0}"', $defaults);
+        $this->assertStringContainsString('SELFHOST_M4_GEN2_SYNC_GATE="${SELFHOST_M4_GEN2_SYNC_GATE:-1}"', $defaults);
     }
 
     public function testCiFastRunsSelfhostM4Gen2SyncViaInventoryChecks(): void
@@ -858,13 +858,13 @@ final class CiScriptsTest extends TestCase
         $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
         $this->assertStringContainsString('ci_run_selfhost_m4_gen2_sync_check', $common);
         $this->assertStringContainsString('check-selfhost-m4-gen2-sync.php', $common);
-        $this->assertStringContainsString('SELFHOST_M4_GEN2_SYNC_GATE:-0', $common);
+        $this->assertStringContainsString('SELFHOST_M4_GEN2_SYNC_GATE:-1', $common);
     }
 
-    public function testCiDockerRunPassesSelfhostM4Gen2SyncGateDefaultOff(): void
+    public function testCiDockerRunPassesSelfhostM4Gen2SyncGateDefaultOn(): void
     {
         $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');
-        $this->assertStringContainsString('SELFHOST_M4_GEN2_SYNC_GATE=${SELFHOST_M4_GEN2_SYNC_GATE:-0}', $body);
+        $this->assertStringContainsString('SELFHOST_M4_GEN2_SYNC_GATE=${SELFHOST_M4_GEN2_SYNC_GATE:-1}', $body);
     }
 
     public function testLocalCiMatrixDocumentsSelfhostM4Gen2SyncGate(): void
@@ -872,8 +872,9 @@ final class CiScriptsTest extends TestCase
         $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
         $this->assertStringContainsString('SELFHOST_M4_GEN2_SYNC_GATE', $doc);
         $this->assertStringContainsString('check-selfhost-m4-gen2-sync.php', $doc);
-        $this->assertMatchesRegularExpression('/\| `SELFHOST_M4_GEN2_SYNC_GATE` \| `0` \|/', $doc);
+        $this->assertMatchesRegularExpression('/\| `SELFHOST_M4_GEN2_SYNC_GATE` \| `1` \|/', $doc);
         $this->assertStringContainsString('#2115', $doc);
+        $this->assertStringContainsString('#2175', $doc);
     }
 
     public function testCiDefaultsEnvDefinesBootstrapM3StrictSyncGateOff(): void
