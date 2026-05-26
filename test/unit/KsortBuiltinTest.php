@@ -31,6 +31,24 @@ final class KsortBuiltinTest extends TestCase
         $this->assertSame(['a', 'b', 'c'], $keys);
     }
 
+    public function testSortsIntegerKeys(): void
+    {
+        $runtime = new Runtime();
+        $fn = new ksort_();
+        $ht = new HashTable();
+        foreach ([30 => 'c', 10 => 'a', 20 => 'b'] as $k => $v) {
+            $val = new VMVariable();
+            $val->string($v);
+            $ht->addIndex($k, $val);
+        }
+        $sorted = $this->runKsort($fn, $runtime, $ht);
+        $keys = [];
+        foreach ($sorted->iterateKeyed(true) as [$key]) {
+            $keys[] = $key->toInt();
+        }
+        $this->assertSame([10, 20, 30], $keys);
+    }
+
     public function testPackedListUnchanged(): void
     {
         $runtime = new Runtime();
