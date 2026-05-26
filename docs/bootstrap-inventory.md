@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 712 |
-| Phase A inventory files (M2 ratio SSOT) | 711 |
+| PHP files on vm.php path | 713 |
+| Phase A inventory files (M2 ratio SSOT) | 712 |
 | Phase A ratio-deferred paths | 1 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 1837 |
+| Source constructs flagged (warnings) | 1840 |
 
 Phase A ratio-deferred (still inventoried; excluded from M2 spine ratio denominator only — [#2543](https://github.com/PurHur/php-compiler/issues/2543)):
 
@@ -646,7 +646,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/FunctionStaticHelper.php` | 0 | 1 |
 | `lib/JIT/HashTableHelper.php` | 0 | 26 |
 | `lib/JIT/Helper.php` | 0 | 7 |
-| `lib/JIT/IncludeHelper.php` | 0 | 7 |
+| `lib/JIT/IncludeHelper.php` | 0 | 8 |
 | `lib/JIT/IssetHelper.php` | 0 | 4 |
 | `lib/JIT/IteratorHelper.php` | 0 | 13 |
 | `lib/JIT/JitBoolArg.php` | 0 | 1 |
@@ -682,6 +682,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/VarFetchHelper.php` | 0 | 1 |
 | `lib/JIT/Variable.php` | 0 | 24 |
 | `lib/JIT/VariableFunctionCallHelper.php` | 0 | 1 |
+| `lib/JIT/VmSpineSmokeNative.php` | 0 | 2 |
 | `lib/Lint/Issue.php` | 0 | 2 |
 | `lib/Lint/LintCompiler.php` | 0 | 11 |
 | `lib/Lint/Linter.php` | 0 | 6 |
@@ -3937,56 +3938,56 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT\Call\ExternalMethod (line 99)
-- new JIT\Scope (line 116)
-- new Variable (line 529)
-- new JIT\Call\Vararg (line 539)
-- new JIT\Call\Native (line 549)
-- new JIT\Call\Native (line 618)
-- new JIT\Call\Native (line 747)
-- new JIT\Call\Native (line 805)
-- new JIT\Call\Native (line 847)
-- new JIT\Call\Native (line 893)
-- new JIT\Call\Native (line 1649)
-- new JIT\Call\Native (line 1680)
-- new JIT\Call\Native (line 1724)
-- new JIT\Call\Native (line 1771)
-- new JIT\Call\Native (line 2084)
-- new JIT\Call\Native (line 2122)
-- new JIT\Call\Native (line 2156)
-- new JIT\Call\Native (line 2200)
-- new JIT\Call\Native (line 2552)
-- new JIT\Call\Native (line 2594)
-- new ext\standard\boolval (line 2951)
-- new Operand\Literal (line 3031)
-- new JIT\Variable (line 3065)
-- new JIT\Variable (line 3135)
-- new Operand\Literal (line 3154)
-- new ext\standard\intval (line 3253)
-- new Variable (line 3282)
-- new Variable (line 3393)
-- new OpCode (line 3476)
-- new JIT\Call\RuntimeVariableFunction (line 3749)
-- new Variable (line 3913)
-- new Variable (line 3932)
-- new Variable (line 4718)
-- new Variable (line 4758)
-- new Variable (line 5291)
-- new Variable (line 5311)
-- new Variable (line 5381)
-- new Variable (line 5587)
-- new Variable (line 5626)
-- new Operand\Literal (line 5635)
-- new Variable (line 5650)
-- new Operand\Literal (line 5941)
-- new Operand\Literal (line 5945)
-- new Operand\Literal (line 5949)
-- new Variable (line 5953)
-- new Variable (line 5977)
-- new Variable (line 5989)
-- new Variable (line 6199)
-- new Variable (line 6214)
-- 155 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new JIT\Call\ExternalMethod (line 100)
+- new JIT\Scope (line 117)
+- new Variable (line 540)
+- new JIT\Call\Vararg (line 550)
+- new JIT\Call\Native (line 560)
+- new JIT\Call\Native (line 650)
+- new JIT\Call\Native (line 779)
+- new JIT\Call\Native (line 837)
+- new JIT\Call\Native (line 879)
+- new JIT\Call\Native (line 925)
+- new JIT\Call\Native (line 1681)
+- new JIT\Call\Native (line 1712)
+- new JIT\Call\Native (line 1756)
+- new JIT\Call\Native (line 1803)
+- new JIT\Call\Native (line 2116)
+- new JIT\Call\Native (line 2154)
+- new JIT\Call\Native (line 2188)
+- new JIT\Call\Native (line 2232)
+- new JIT\Call\Native (line 2584)
+- new JIT\Call\Native (line 2626)
+- new ext\standard\boolval (line 2983)
+- new Operand\Literal (line 3063)
+- new JIT\Variable (line 3097)
+- new JIT\Variable (line 3167)
+- new Operand\Literal (line 3186)
+- new ext\standard\intval (line 3285)
+- new Variable (line 3314)
+- new Variable (line 3425)
+- new OpCode (line 3508)
+- new JIT\Call\RuntimeVariableFunction (line 3781)
+- new Variable (line 3945)
+- new Variable (line 3964)
+- new Variable (line 4750)
+- new Variable (line 4790)
+- new Variable (line 5323)
+- new Variable (line 5343)
+- new Variable (line 5413)
+- new Variable (line 5619)
+- new Variable (line 5658)
+- new Operand\Literal (line 5667)
+- new Variable (line 5682)
+- new Operand\Literal (line 5973)
+- new Operand\Literal (line 5977)
+- new Operand\Literal (line 5981)
+- new Variable (line 5985)
+- new Variable (line 6009)
+- new Variable (line 6021)
+- new Variable (line 6231)
+- new Variable (line 6246)
+- 156 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Analyzer.php`
 
@@ -4642,13 +4643,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/IncludeHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Temporary (line 91)
-- new Variable (line 95)
-- new Variable (line 126)
-- new Variable (line 280)
-- new Variable (line 307)
-- new Literal (line 468)
-- 18 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new Temporary (line 96)
+- new Variable (line 100)
+- new Variable (line 131)
+- new Variable (line 285)
+- new Variable (line 312)
+- new Literal (line 473)
+- new Variable (line 699)
+- 20 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/IssetHelper.php`
 
@@ -4884,6 +4886,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 12 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/JIT/VmSpineSmokeNative.php`
+
+**Warnings** (review for bootstrap subset):
+- new Call\Native (line 59)
+- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/Lint/Issue.php`
 

@@ -60,6 +60,7 @@ final class NorthStar4VerifyScriptTest extends TestCase
         $this->assertStringContainsString('bootstrap-loop-gen1-link.sh', $body);
         $this->assertStringContainsString('bootstrap-loop-probe.sh', $body);
         $this->assertStringContainsString('BOOTSTRAP_M4_LINK_COMPILE_DRIVER=1', $body);
+        $this->assertStringContainsString('BOOTSTRAP_M4_RUNTIME_COMPILE=1', $body);
         $this->assertStringContainsString('BOOTSTRAP_M4_GEN2_STRICT', $body);
         $this->assertStringContainsString('ci_llvm_ready', $body);
         $this->assertStringContainsString('north-star4-verify: OK', $body);
