@@ -56,6 +56,8 @@ if [[ ! -f "${EMIT_ENTRY}" ]]; then
 fi
 
 if [[ "${BOOTSTRAP_M4_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
+  # Native emit execute defaults on with compile-driver link (#2599); set =0 to bisect Zend fallback.
+  : "${BOOTSTRAP_M4_RUNTIME_COMPILE:=1}"
   m4_link_env=()
   m4_link_mode="stub"
   m4_emit_entry="${EMIT_ENTRY}"
