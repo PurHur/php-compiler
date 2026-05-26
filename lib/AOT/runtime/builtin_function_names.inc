@@ -231,6 +231,7 @@ static const char *phpc_builtin_functions[] = {
     "str_pad",
     "str_repeat",
     "str_replace",
+    "str_ireplace",
     "str_rot13",
     "str_shuffle",
     "str_split",
@@ -284,4 +285,4 @@ static const char *phpc_builtin_functions[] = {
     "web_string",
     "wordwrap",
 };
-static const size_t phpc_builtin_functions_count = 280;
+static const size_t phpc_builtin_functions_count = 281;
