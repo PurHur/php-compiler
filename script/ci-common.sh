@@ -293,7 +293,7 @@ ci_run_bootstrap_inventory_triage_sync_check() {
 }
 
 ci_run_stdlib_jit_deferred_sync_check() {
-  if [[ "${STDLIB_JIT_DEFERRED_SYNC_GATE:-0}" != "1" ]]; then
+  if [[ "${STDLIB_JIT_DEFERRED_SYNC_GATE:-1}" != "1" ]]; then
     return 0
   fi
   echo "Stdlib JIT deferred sync (STDLIB_JIT_DEFERRED_SYNC_GATE=1, issue #2465)..."

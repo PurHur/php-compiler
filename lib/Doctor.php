@@ -646,7 +646,7 @@ final class Doctor
         $stdlibJitIcon = $stdlibJitSyncOn ? '✅' : '⬜';
         $stdlibJitNote = $stdlibJitSyncOn
             ? 'ci-fast inventory checks when gate=1 (#2465)'
-            : 'opt-in default 0 — set STDLIB_JIT_DEFERRED_SYNC_GATE=1 in ci-fast';
+            : 'default 1 — set STDLIB_JIT_DEFERRED_SYNC_GATE=0 to opt out (#2476)';
         fwrite(STDOUT, "\n  Stdlib JIT deferrals ([#2441](https://github.com/PurHur/php-compiler/issues/2441), [#2465](https://github.com/PurHur/php-compiler/issues/2465)):\n");
         fwrite(STDOUT, "  [{$stdlibJitIcon}] STDLIB_JIT_DEFERRED_SYNC_GATE default {$stdlibJitSyncDefault} ({$stdlibJitNote})\n");
         if (is_readable($stdlibJitSyncScript)) {
