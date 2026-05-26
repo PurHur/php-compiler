@@ -548,6 +548,52 @@ final class VmString
         return 0;
     }
 
+    /**
+     * levenshtein() — byte-oriented edit distance (subset of PHP; issue #2406).
+     */
+    public static function levenshtein(
+        string $s1,
+        string $s2,
+        int $insertionCost = 1,
+        int $replacementCost = 1,
+        int $deletionCost = 1
+    ): int {
+        $l1 = self::byteLength($s1);
+        $l2 = self::byteLength($s2);
+        if ($l1 > 255 || $l2 > 255) {
+            return -1;
+        }
+        if ($insertionCost <= 0 || $replacementCost <= 0 || $deletionCost <= 0) {
+            throw new \ValueError('levenshtein(): All costs must be greater than zero');
+        }
+        if (0 === $l1) {
+            return $l2 * $insertionCost;
+        }
+        if (0 === $l2) {
+            return $l1 * $deletionCost;
+        }
+
+        $row0 = [];
+        $row1 = [];
+        for ($j = 0; $j <= $l2; ++$j) {
+            $row0[$j] = $j * $insertionCost;
+        }
+        for ($i = 1; $i <= $l1; ++$i) {
+            $row1[0] = $i * $deletionCost;
+            for ($j = 1; $j <= $l2; ++$j) {
+                $cost = $s1[$i - 1] === $s2[$j - 1] ? 0 : $replacementCost;
+                $del = $row0[$j] + $deletionCost;
+                $ins = $row1[$j - 1] + $insertionCost;
+                $rep = $row0[$j - 1] + $cost;
+                $row1[$j] = min($del, $ins, $rep);
+            }
+            $row0 = $row1;
+            $row1 = [];
+        }
+
+        return $row0[$l2];
+    }
+
     private static function strncmpCase(string $a, string $b, int $length): int
     {
         if ($length <= 0) {
