@@ -64,6 +64,25 @@ final class VmInternalCompare
     }
 
     /**
+     * Sort packed Variable list in place descending (arsort packed lists).
+     *
+     * @param list<Variable> $values
+     */
+    public static function sortVariableValuesDesc(array &$values, Internal $compare): void
+    {
+        $n = \count($values);
+        for ($i = 1; $i < $n; ++$i) {
+            $j = $i;
+            while ($j > 0 && self::invoke($compare, $values[$j - 1], $values[$j]) < 0) {
+                $tmp = $values[$j - 1];
+                $values[$j - 1] = $values[$j];
+                $values[$j] = $tmp;
+                --$j;
+            }
+        }
+    }
+
+    /**
      * Sort [key, value] Variable pairs in place by value (no PHP closures — AOT self-host spine safe).
      *
      * @param list<array{0: Variable, 1: Variable}> $pairs
@@ -74,6 +93,54 @@ final class VmInternalCompare
         for ($i = 1; $i < $n; ++$i) {
             $j = $i;
             while ($j > 0 && self::invoke($compare, $pairs[$j - 1][1], $pairs[$j][1]) > 0) {
+                $tmp = $pairs[$j - 1];
+                $pairs[$j - 1] = $pairs[$j];
+                $pairs[$j] = $tmp;
+                --$j;
+            }
+        }
+    }
+
+    /**
+     * Sort [key, value] Variable pairs in place by value descending (arsort).
+     *
+     * @param list<array{0: Variable, 1: Variable}> $pairs
+     */
+    public static function sortKeyedPairsByValueDesc(array &$pairs, Internal $compare): void
+    {
+        $n = \count($pairs);
+        for ($i = 1; $i < $n; ++$i) {
+            $j = $i;
+            while ($j > 0 && self::invoke($compare, $pairs[$j - 1][1], $pairs[$j][1]) < 0) {
+                $tmp = $pairs[$j - 1];
+                $pairs[$j - 1] = $pairs[$j];
+                $pairs[$j] = $tmp;
+                --$j;
+            }
+        }
+    }
+
+    /**
+     * Sort [key, value] pairs in place by integer value descending (arsort subset).
+     *
+     * @param list<array{0: Variable, 1: Variable}> $pairs
+     */
+    public static function sortKeyedPairsByValueIntDesc(array &$pairs): void
+    {
+        $n = \count($pairs);
+        for ($i = 1; $i < $n; ++$i) {
+            $j = $i;
+            while ($j > 0) {
+                $a = $pairs[$j - 1][1]->resolveIndirect();
+                $b = $pairs[$j][1]->resolveIndirect();
+                if (Variable::TYPE_INTEGER !== $a->type || Variable::TYPE_INTEGER !== $b->type) {
+                    throw new \LogicException(
+                        'arsort() only supports homogeneous string or integer values in this compiler build'
+                    );
+                }
+                if ($a->toInt() >= $b->toInt()) {
+                    break;
+                }
                 $tmp = $pairs[$j - 1];
                 $pairs[$j - 1] = $pairs[$j];
                 $pairs[$j] = $tmp;
