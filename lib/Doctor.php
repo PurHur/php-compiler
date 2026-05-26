@@ -624,6 +624,21 @@ final class Doctor
         }
         fwrite(STDOUT, "      Regen: php script/bootstrap-inventory-triage.php --json --top 50 > docs/bootstrap-inventory-triage-top50.json\n");
 
+        $stdlibJitSyncScript = $repoRoot.'/script/check-stdlib-jit-deferred-sync.php';
+        $stdlibJitSyncDefault = $defaults['STDLIB_JIT_DEFERRED_SYNC_GATE'] ?? '0';
+        $stdlibJitSyncOn = self::gateEnabled('STDLIB_JIT_DEFERRED_SYNC_GATE', $stdlibJitSyncDefault);
+        $stdlibJitIcon = $stdlibJitSyncOn ? '✅' : '⬜';
+        $stdlibJitNote = $stdlibJitSyncOn
+            ? 'ci-fast inventory checks when gate=1 (#2465)'
+            : 'opt-in default 0 — set STDLIB_JIT_DEFERRED_SYNC_GATE=1 in ci-fast';
+        fwrite(STDOUT, "\n  Stdlib JIT deferrals ([#2441](https://github.com/PurHur/php-compiler/issues/2441), [#2465](https://github.com/PurHur/php-compiler/issues/2465)):\n");
+        fwrite(STDOUT, "  [{$stdlibJitIcon}] STDLIB_JIT_DEFERRED_SYNC_GATE default {$stdlibJitSyncDefault} ({$stdlibJitNote})\n");
+        if (is_readable($stdlibJitSyncScript)) {
+            fwrite(STDOUT, "      Run: php script/check-stdlib-jit-deferred-sync.php\n");
+        }
+        fwrite(STDOUT, "      Audit: php script/audit-stdlib-jit.php → docs/stdlib-jit-audit.md\n");
+        fwrite(STDOUT, "      Allowlist: script/stdlib-jit-deferred-lib.php\n");
+
         fwrite(STDOUT, "  Probe: ./phpc doctor --gates | grep -i bootstrap_inventory\n");
         fwrite(STDOUT, "  Docs: docs/bootstrap-selfhost.md · docs/local-ci-matrix.md\n");
     }
