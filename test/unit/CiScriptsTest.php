@@ -1174,10 +1174,10 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('#2210', $doc);
     }
 
-    public function testCiDefaultsEnvDefinesBootstrapInventoryTriageSyncGateOptIn(): void
+    public function testCiDefaultsEnvDefinesBootstrapInventoryTriageSyncGateDefaultOn(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
-        $this->assertStringContainsString('BOOTSTRAP_INVENTORY_TRIAGE_SYNC_GATE="${BOOTSTRAP_INVENTORY_TRIAGE_SYNC_GATE:-0}"', $defaults);
+        $this->assertStringContainsString('BOOTSTRAP_INVENTORY_TRIAGE_SYNC_GATE="${BOOTSTRAP_INVENTORY_TRIAGE_SYNC_GATE:-1}"', $defaults);
     }
 
     public function testCiFastRunsBootstrapInventoryTriageSyncViaInventoryChecks(): void
@@ -1185,13 +1185,13 @@ final class CiScriptsTest extends TestCase
         $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
         $this->assertStringContainsString('ci_run_bootstrap_inventory_triage_sync_check', $common);
         $this->assertStringContainsString('check-bootstrap-inventory-triage-sync.php', $common);
-        $this->assertStringContainsString('BOOTSTRAP_INVENTORY_TRIAGE_SYNC_GATE:-0', $common);
+        $this->assertStringContainsString('BOOTSTRAP_INVENTORY_TRIAGE_SYNC_GATE:-1', $common);
     }
 
-    public function testCiDockerRunPassesBootstrapInventoryTriageSyncGateOptIn(): void
+    public function testCiDockerRunPassesBootstrapInventoryTriageSyncGateDefaultOn(): void
     {
         $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');
-        $this->assertStringContainsString('BOOTSTRAP_INVENTORY_TRIAGE_SYNC_GATE=${BOOTSTRAP_INVENTORY_TRIAGE_SYNC_GATE:-0}', $body);
+        $this->assertStringContainsString('BOOTSTRAP_INVENTORY_TRIAGE_SYNC_GATE=${BOOTSTRAP_INVENTORY_TRIAGE_SYNC_GATE:-1}', $body);
     }
 
     public function testLocalCiMatrixDocumentsBootstrapInventoryTriageSyncGate(): void
@@ -1199,8 +1199,9 @@ final class CiScriptsTest extends TestCase
         $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
         $this->assertStringContainsString('BOOTSTRAP_INVENTORY_TRIAGE_SYNC_GATE', $doc);
         $this->assertStringContainsString('check-bootstrap-inventory-triage-sync.php', $doc);
-        $this->assertMatchesRegularExpression('/\| `BOOTSTRAP_INVENTORY_TRIAGE_SYNC_GATE` \| `0` \|/', $doc);
+        $this->assertMatchesRegularExpression('/\| `BOOTSTRAP_INVENTORY_TRIAGE_SYNC_GATE` \| `1` \|/', $doc);
         $this->assertStringContainsString('#2265', $doc);
+        $this->assertStringContainsString('#2389', $doc);
     }
 
     public function testCiDefaultsEnvDefinesStdlibJitDeferredSyncGateDefaultOn(): void
