@@ -847,6 +847,35 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('BOOTSTRAP_M5_DOC_SYNC_GATE=${BOOTSTRAP_M5_DOC_SYNC_GATE:-1}', $body);
     }
 
+    public function testCiDefaultsEnvDefinesBootstrapInventoryLintSyncGateOptIn(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString('BOOTSTRAP_INVENTORY_LINT_SYNC_GATE="${BOOTSTRAP_INVENTORY_LINT_SYNC_GATE:-0}"', $defaults);
+    }
+
+    public function testCiFastRunsBootstrapInventoryLintSyncViaInventoryChecks(): void
+    {
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('ci_run_bootstrap_inventory_lint_sync_check', $common);
+        $this->assertStringContainsString('check-bootstrap-inventory-lint-sync.php', $common);
+        $this->assertStringContainsString('BOOTSTRAP_INVENTORY_LINT_SYNC_GATE:-0', $common);
+    }
+
+    public function testCiDockerRunPassesBootstrapInventoryLintSyncGateOptIn(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');
+        $this->assertStringContainsString('BOOTSTRAP_INVENTORY_LINT_SYNC_GATE=${BOOTSTRAP_INVENTORY_LINT_SYNC_GATE:-0}', $body);
+    }
+
+    public function testLocalCiMatrixDocumentsBootstrapInventoryLintSyncGate(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('BOOTSTRAP_INVENTORY_LINT_SYNC_GATE', $doc);
+        $this->assertStringContainsString('check-bootstrap-inventory-lint-sync.php', $doc);
+        $this->assertMatchesRegularExpression('/\| `BOOTSTRAP_INVENTORY_LINT_SYNC_GATE` \| `0` \|/', $doc);
+        $this->assertStringContainsString('#2210', $doc);
+    }
+
     public function testCiDefaultsEnvDefinesSelfhostM4Gen2SyncGateOn(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');

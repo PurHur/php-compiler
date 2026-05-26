@@ -62,6 +62,13 @@ CI enforces freshness via `php script/bootstrap-inventory.php --check` in `scrip
 ./phpc lint --bootstrap-inventory --check  # exit 1 if any inventory file fails lint
 ```
 
+Drift guard (opt-in CI, [#2210](https://github.com/PurHur/php-compiler/issues/2210)): committed snapshot at `docs/bootstrap-inventory-lint-snapshot.json`. After inventory or linter changes affecting the report:
+
+```bash
+php script/bootstrap-inventory-lint-snapshot.php --write
+BOOTSTRAP_INVENTORY_LINT_SYNC_GATE=1 ./script/ci-fast.sh
+```
+
 ### When to regenerate `docs/bootstrap-vendor-inventory.md` ([#2030](https://github.com/PurHur/php-compiler/issues/2030))
 
 | Change | Command |
