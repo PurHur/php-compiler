@@ -43,11 +43,14 @@ mkdir -p "${ROOT}/build"
 export PHP_COMPILER_JIT_PROGRESS_FILE="${ROOT}/build/.last-jit-func-m3-emit-tu-phpunit"
 rm -f "${EMIT_HELPER}" "${AOT_OUT}" "${PHP_COMPILER_JIT_PROGRESS_FILE}"
 
+# Real Runtime::parse lowering required for native emit-TU execute (#2442, #2552).
+m3_link_env=(env PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_EMIT_HELPER_LINK=1 PHP_COMPILER_M3_COMPILE_DRIVER=1)
+
 set +e
 m3_link_code=1
 for _try in 1 2 3 4 5 6 7 8; do
   rm -f "${EMIT_HELPER}"
-  php "${ROOT}/bin/compile.php" -o "${EMIT_HELPER}" "${EMIT_ENTRY}" >/dev/null 2>&1
+  "${m3_link_env[@]}" php "${ROOT}/bin/compile.php" -o "${EMIT_HELPER}" "${EMIT_ENTRY}" >/dev/null 2>&1
   m3_link_code=$?
   if [[ "${m3_link_code}" -eq 0 && -x "${EMIT_HELPER}" ]]; then
     break
@@ -64,7 +67,8 @@ fi
 rm -f "${AOT_OUT}"
 set +e
 compile_out="$(
-  env PHP_COMPILER_M3_EMIT_MINIMAL=1 \
+  env PHP_COMPILER_M3_COMPILE_DRIVER=1 \
+    PHP_COMPILER_M3_EMIT_MINIMAL=1 \
     PHP_COMPILER_M3_SOURCE="${SOURCE}" \
     PHP_COMPILER_M3_OUT="${AOT_OUT}" \
     "${EMIT_HELPER}" 2>&1

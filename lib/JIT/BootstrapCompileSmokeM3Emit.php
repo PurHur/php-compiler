@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 require_once __DIR__.'/RuntimeEmitTuAlloc.php';
+require_once __DIR__.'/RuntimeEmitTuInit.php';
 
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -106,13 +107,17 @@ final class BootstrapCompileSmokeM3Emit
         $context->builder->returnValue($retFail);
 
         $context->builder->positionAtEnd($readOk);
-        // Minimal Runtime shell — full Object_::allocate() LLVM 9 link crash (#2540).
         $runtime = RuntimeEmitTuAlloc::emit($context);
-        $context->builder->call(
-            self::runtimeSpine($context, '__construct', 'void', ['__object__*', 'int64']),
-            $runtime,
-            $i64->constInt(self::MODE_AOT, false)
-        );
+        $mode = $i64->constInt(self::MODE_AOT, false);
+        if (self::shouldUseEmitTuRealLowering($context)) {
+            RuntimeEmitTuInit::emitInitSequence($context, $runtime, $mode);
+        } else {
+            $context->builder->call(
+                self::runtimeSpine($context, '__construct', 'void', ['__object__*', 'int64']),
+                $runtime,
+                $mode
+            );
+        }
         $block = $context->builder->call(
             self::runtimeSpine($context, 'parseandcompileemitsmoke', '__object__*', ['__object__*', '__string__*', '__string__*']),
             $runtime,
@@ -152,6 +157,13 @@ final class BootstrapCompileSmokeM3Emit
         );
         ValueEchoHelper::echoLiteral($context, "\n");
         $context->builder->returnValue($retOk);
+    }
+
+    private static function shouldUseEmitTuRealLowering(Context $context): bool
+    {
+        $minimal = getenv('PHP_COMPILER_M3_EMIT_MINIMAL');
+
+        return '1' === $minimal || 'true' === strtolower((string) $minimal);
     }
 
     private static function echoPhaseError(Context $context, string $logPrefix, string $line1, string $phase): void
@@ -273,13 +285,23 @@ final class BootstrapCompileSmokeM3Emit
         );
     }
 
+  /** @param list<string> $paramTypeNames */
+    public static function runtimeSpineFn(
+        Context $context,
+        string $methodLc,
+        string $returnTypeName,
+        array $paramTypeNames
+    ): Value {
+        return self::runtimeSpine($context, $methodLc, $returnTypeName, $paramTypeNames);
+    }
+
     private static function runtimeSpine(
         Context $context,
         string $methodLc,
         string $returnTypeName,
         array $paramTypeNames
     ): Value {
-        $logical = 'PHPCompiler\\Runtime::'.$methodLc;
+        $logical = 'phpcompiler\\runtime::'.$methodLc;
         $lc = strtolower($logical);
         if (isset($context->functions[$lc])) {
             return $context->functions[$lc];

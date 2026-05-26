@@ -59,6 +59,7 @@ class JIT {
         }
         $return = $this->compileBlock($block);
         $this->runQueue();
+        $this->finalizeM3EmitTuRuntimeSpineAfterQueue();
 
         return $return;
     }
@@ -1682,50 +1683,12 @@ class JIT {
         }
         $stubBlock = $this->m3EmitTuMainBlock;
         if ($this->shouldUseM3CompileDriverRealLowering()) {
-            $runtimeMethods = [
-                'parse' => true,
-                'compileemitsmoke' => true,
-                'standalone' => true,
-            ];
-            foreach ($this->m3EmitTuMainBlock->opCodes as $op) {
-                if (OpCode::TYPE_DECLARE_CLASS !== $op->type) {
-                    continue;
-                }
-                $nameOp = $this->m3EmitTuMainBlock->getOperand($op->arg1);
-                if (!$nameOp instanceof Operand\Literal) {
-                    continue;
-                }
-                $lc = strtolower(str_replace('/', '\\', ltrim($nameOp->value, '\\')));
-                if ('phpcompiler\\runtime' !== $lc || null === $op->block1) {
-                    continue;
-                }
-                $this->context->pushScope();
-                $this->context->scope->classId = $this->context->type->object->declareClass($nameOp);
-                $this->context->scope->className = $lc;
-                foreach ($op->block1->opCodes as $methodOp) {
-                    if (OpCode::TYPE_DECLARE_METHOD !== $methodOp->type) {
-                        continue;
-                    }
-                    $methodOpName = $op->block1->getOperand($methodOp->arg1);
-                    if (!$methodOpName instanceof Operand\Literal) {
-                        continue;
-                    }
-                    $methodLc = strtolower($methodOpName->value);
-                    if (!isset($runtimeMethods[$methodLc])) {
-                        continue;
-                    }
-                    $logical = $lc.'::'.$methodLc;
-                    if (!isset($this->context->functions[strtolower($logical)])) {
-                        $this->compileBlock($methodOp->block1, $logical);
-                    }
-                }
-                $this->context->popScope();
+            $this->compileM3EmitTuRuntimeSpineMethodsForRealLowering();
+            foreach (['initparsepipeline', 'initcompiler', 'initvmcontext', 'loadcoremodules', 'standalone'] as $methodLc) {
+                $this->compileM3EmitTuRuntimeMethodFromQueue($methodLc);
             }
-            $this->emitM3EmitTuRuntimeConstructNativeFunction(
-                $this->llvmInternalName('PHPCompiler\\Runtime::__construct'),
-                'PHPCompiler\\Runtime::__construct',
-                $stubBlock
-            );
+            $this->compileM3EmitTuCompilerSpineMethodsFromMainBlock(['compileemitsmoke']);
+            $this->runQueue();
             $this->compileM3EmitTuRuntimeParseAndCompileNativeDecl([
                 'parseandcompile' => true,
                 'parseandcompileemitsmoke' => true,
@@ -1742,11 +1705,6 @@ class JIT {
                 'PHPCompiler\\Runtime::compileEmitSmoke',
                 $stubBlock
             );
-            $this->emitM3EmitTuRuntimeStandaloneStubNative(
-                $this->llvmInternalName('PHPCompiler\\Runtime::standalone'),
-                'PHPCompiler\\Runtime::standalone',
-                $stubBlock
-            );
             $this->emitM3EmitTuRuntimeConstructNativeFunction(
                 $this->llvmInternalName('PHPCompiler\\Runtime::__construct'),
                 'PHPCompiler\\Runtime::__construct',
@@ -1761,9 +1719,32 @@ class JIT {
                 'PHPCompiler\\Runtime::compile',
                 $stubBlock
             );
+            $this->emitM3EmitTuRuntimeStandaloneStubNative(
+                $this->llvmInternalName('PHPCompiler\\Runtime::standalone'),
+                'PHPCompiler\\Runtime::standalone',
+                $stubBlock
+            );
+            $this->compileM3EmitTuCompilerEmitSmokeNativeDecl();
+            $this->runQueue();
         }
+    }
+
+    /**
+     * After spine pre-lower, register emit-bridge decls that call real Runtime::parse (#2512, #2550).
+     */
+    private function finalizeM3EmitTuRuntimeSpineAfterQueue(): void
+    {
+        if (!$this->shouldUseM3EmitTuNativeBridge()
+            || !$this->shouldUseM3CompileDriverRealLowering()
+            || null === $this->m3EmitTuMainBlock
+        ) {
+            return;
+        }
+        $this->compileM3EmitTuRuntimeParseAndCompileNativeDecl([
+            'parseandcompile' => true,
+            'parseandcompileemitsmoke' => true,
+        ]);
         $this->compileM3EmitTuCompilerEmitSmokeNativeDecl();
-        $this->runQueue();
     }
 
     /**
@@ -1780,7 +1761,7 @@ class JIT {
         $this->context->scope->classId = $this->context->type->object->lookup('PHPCompiler\\Runtime');
         $this->context->scope->className = 'phpcompiler\\runtime';
         foreach (array_keys($methods) as $methodLc) {
-            $logical = 'PHPCompiler\\Runtime::'.$methodLc;
+            $logical = 'phpcompiler\\runtime::'.$methodLc;
             $lc = strtolower($logical);
             if (isset($this->context->functions[$lc])) {
                 continue;
@@ -2181,6 +2162,156 @@ class JIT {
             $this->compileBlock($func->block, $logical);
 
             return;
+        }
+        $this->compileM3EmitTuRuntimeMethodFromDeclareClassBlocks([$methodLc]);
+        $this->compileM3EmitTuRuntimeMethodFromModules($methodLc);
+    }
+
+    /** Pre-lower Runtime spine callees before native emit {main} bridge (#2550). */
+    private function compileM3EmitTuRuntimeSpineMethodsForRealLowering(): void
+    {
+        if (!$this->shouldUseM3EmitTuNativeBridge() || !$this->shouldUseM3CompileDriverRealLowering()) {
+            return;
+        }
+        foreach (['__construct', 'parse', 'compileemitsmoke'] as $methodLc) {
+            $this->compileM3EmitTuRuntimeMethodFromModules($methodLc);
+        }
+        $this->runQueue();
+    }
+
+    private function compileM3EmitTuRuntimeMethodFromModules(string $methodLc): void
+    {
+        $logical = 'PHPCompiler\\Runtime::'.$methodLc;
+        $lc = strtolower($logical);
+        if (isset($this->context->functions[$lc])) {
+            return;
+        }
+        foreach ($this->context->runtime->modules as $module) {
+            foreach ($module->getFunctions() as $func) {
+                if (!$func instanceof CoreFunc\PHP) {
+                    continue;
+                }
+                if (strtolower($func->getName()) !== $lc) {
+                    continue;
+                }
+                $this->compileBlock($func->block, $logical);
+
+                return;
+            }
+        }
+        if (null === $this->m3EmitTuMainBlock) {
+            return;
+        }
+        foreach ($this->m3EmitTuMainBlock->opCodes as $op) {
+            if (OpCode::TYPE_DECLARE_CLASS !== $op->type) {
+                continue;
+            }
+            $nameOp = $this->m3EmitTuMainBlock->getOperand($op->arg1);
+            if (!$nameOp instanceof Operand\Literal) {
+                continue;
+            }
+            $classLc = strtolower(str_replace('/', '\\', ltrim($nameOp->value, '\\')));
+            if ('phpcompiler\\runtime' !== $classLc || null === $op->block1) {
+                continue;
+            }
+            $this->context->pushScope();
+            $this->context->scope->classId = $this->context->type->object->lookup('PHPCompiler\\Runtime');
+            $this->context->scope->className = $classLc;
+            foreach ($op->block1->opCodes as $methodOp) {
+                if (OpCode::TYPE_DECLARE_METHOD !== $methodOp->type) {
+                    continue;
+                }
+                $methodOpName = $op->block1->getOperand($methodOp->arg1);
+                if (!$methodOpName instanceof Operand\Literal || strtolower($methodOpName->value) !== $methodLc) {
+                    continue;
+                }
+                if (null !== $methodOp->block1) {
+                    $this->compileBlock($methodOp->block1, $logical);
+                }
+            }
+            $this->context->popScope();
+
+            return;
+        }
+        $runtimePath = dirname(__DIR__).'/Runtime.php';
+        if (!is_file($runtimePath)) {
+            return;
+        }
+        try {
+            $script = $this->context->runtime->parse((string) file_get_contents($runtimePath), $runtimePath);
+        } catch (\Throwable $e) {
+            return;
+        }
+        foreach ($script->functions as $cfgFunc) {
+            $funcLc = strtolower($cfgFunc->name);
+            if ($funcLc !== $lc && !str_ends_with($funcLc, '\\'.$methodLc)) {
+                continue;
+            }
+            $compiled = $this->context->runtime->compileFunc($logical, $cfgFunc);
+            if ($compiled instanceof CoreFunc\PHP) {
+                $this->compileBlock($compiled->block, $logical);
+            }
+
+            return;
+        }
+    }
+
+    /**
+     * Find Runtime methods on bundled declare_class blocks (private init* may be absent from queue).
+     *
+     * @param list<string> $methodLcs lowercase method names without class prefix
+     */
+    private function compileM3EmitTuRuntimeMethodFromDeclareClassBlocks(array $methodLcs): void
+    {
+        if (!$this->shouldUseM3EmitTuNativeBridge()) {
+            return;
+        }
+        $allowed = array_fill_keys($methodLcs, true);
+        $blocks = [];
+        if (null !== $this->m3EmitTuMainBlock) {
+            $blocks[] = $this->m3EmitTuMainBlock;
+        }
+        foreach ($this->queue as $item) {
+            $blocks[] = $item[1];
+        }
+        foreach ($blocks as $block) {
+            if (null === $block) {
+                continue;
+            }
+            foreach ($block->opCodes as $op) {
+                if (OpCode::TYPE_DECLARE_CLASS !== $op->type) {
+                    continue;
+                }
+                $nameOp = $block->getOperand($op->arg1);
+                if (!$nameOp instanceof Operand\Literal) {
+                    continue;
+                }
+                $classLc = strtolower(str_replace('/', '\\', ltrim($nameOp->value, '\\')));
+                if ('phpcompiler\\runtime' !== $classLc || null === $op->block1) {
+                    continue;
+                }
+                $this->context->pushScope();
+                $this->context->scope->classId = $this->context->type->object->declareClass($nameOp);
+                $this->context->scope->className = $classLc;
+                foreach ($op->block1->opCodes as $methodOp) {
+                    if (OpCode::TYPE_DECLARE_METHOD !== $methodOp->type) {
+                        continue;
+                    }
+                    $methodOpName = $op->block1->getOperand($methodOp->arg1);
+                    if (!$methodOpName instanceof Operand\Literal) {
+                        continue;
+                    }
+                    $methodLc = strtolower($methodOpName->value);
+                    if (!isset($allowed[$methodLc])) {
+                        continue;
+                    }
+                    $logical = $classLc.'::'.$methodLc;
+                    if (!isset($this->context->functions[strtolower($logical)])) {
+                        $this->compileBlock($methodOp->block1, $logical);
+                    }
+                }
+                $this->context->popScope();
+            }
         }
     }
 
