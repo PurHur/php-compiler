@@ -7,6 +7,7 @@
 # Local:
 #   ./script/examples-web-smoke.sh
 #   ./script/examples-web-smoke.sh --aot    # when .phpc/bin/app exists per example
+#   ./script/examples-web-smoke.sh --jit    # phpc serve --jit (LLVM + MCJIT probe)
 #
 # Docker (harness-safe; same image as make test-harness):
 #   ./script/docker-exec.sh -- ./script/examples-web-smoke.sh
@@ -21,11 +22,12 @@ PHPC="${ROOT}/phpc"
 
 usage() {
   cat <<'EOF'
-Usage: script/examples-web-smoke.sh [--aot] [--miniwebapp-only] [--sessions-only]
+Usage: script/examples-web-smoke.sh [--aot] [--jit] [--miniwebapp-only] [--sessions-only]
 
   VM mode (default): phpc serve per example docroot.
   --aot: use phpc serve --aot when <docroot>/.phpc/bin/app exists; skip otherwise.
          003-MiniWebApp: home + hello PATH_INFO + contact POST when stdout has MiniWebApp (#833, #676).
+  --jit: use phpc serve --jit (007-ThrowsWeb: THROWSWEB_SERVE_JIT_SMOKE_GATE — #2408).
   --miniwebapp-only: curl only examples/003-MiniWebApp (MINIWEBAPP_WEB_SMOKE_GATE — #633).
   --sessions-only: curl only examples/005-SessionsWeb (SESSIONS_WEB_SMOKE_GATE — #1887).
   --fileupload-only: curl only examples/006-FileUploadWeb (FILE_UPLOAD_WEB_SMOKE_GATE — #1999).
@@ -43,12 +45,14 @@ Environment:
   FILE_UPLOAD_WEB_SERVE_AOT_SMOKE_GATE=1  require 006 phpc serve --aot multipart POST (#2333)
   THROWS_WEB_SMOKE_GATE=1          include 007 throw/catch POST curls (#2076)
   THROWSWEB_SERVE_AOT_SMOKE_GATE=1 require 007 phpc serve --aot caught invalid POST (#2387)
+  THROWSWEB_SERVE_JIT_SMOKE_GATE=1 require 007 phpc serve --jit caught invalid POST (#2408)
   THROWSWEB_UNCAUGHT_500_GATE=1    include 007 uncaught.php HTTP 500 curl (#2200)
   FASTCGI_WEB_SMOKE_GATE=1         include 009 health + PATH_INFO curls (#2351)
 EOF
 }
 
 AOT=0
+JIT=0
 MINIWEBAPP_ONLY=0
 SESSIONS_ONLY=0
 FILEUPLOAD_ONLY=0
@@ -57,6 +61,7 @@ FASTCGI_ONLY=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --aot) AOT=1; shift ;;
+    --jit) JIT=1; shift ;;
     --miniwebapp-only) MINIWEBAPP_ONLY=1; shift ;;
     --sessions-only) SESSIONS_ONLY=1; shift ;;
     --fileupload-only) FILEUPLOAD_ONLY=1; shift ;;
@@ -325,6 +330,23 @@ throws_web_serve_aot_require_pass() {
   [[ "${THROWSWEB_SERVE_AOT_SMOKE_GATE:-0}" == "1" ]]
 }
 
+throws_web_serve_jit_require_pass() {
+  [[ "${THROWSWEB_SERVE_JIT_SMOKE_GATE:-0}" == "1" ]]
+}
+
+ensure_jit_serve_ready() {
+  local llvm_dir=""
+  if ! llvm_dir="$(resolve_llvm_dir)"; then
+    return 1
+  fi
+  export PHP_COMPILER_LLVM_PATH="$llvm_dir"
+  unset PHP_COMPILER_SKIP_LLVM_PRELOAD
+  if ! "${ROOT}/script/php-local.sh" "${ROOT}/script/jit-runtime-probe.php" >/dev/null 2>&1; then
+    return 2
+  fi
+  return 0
+}
+
 ensure_project_aot_binary() {
   local project_dir="$1"
   local binary="${project_dir}/.phpc/bin/app"
@@ -472,6 +494,14 @@ run_throws_web_smoke() {
     echo "examples-web-smoke: 007-ThrowsWeb: skip (missing docroot)"
     return 0
   fi
+  if [[ "$AOT" -eq 1 && "$JIT" -eq 1 ]]; then
+    echo "examples-web-smoke: 007-ThrowsWeb: --aot and --jit are mutually exclusive" >&2
+    return 1
+  fi
+  if [[ "$JIT" -eq 1 && "${THROWSWEB_SERVE_JIT_SMOKE_GATE:-0}" != "1" ]]; then
+    echo "examples-web-smoke: 007-ThrowsWeb: skip --jit (THROWSWEB_SERVE_JIT_SMOKE_GATE=0; #2408)"
+    return 0
+  fi
   if [[ "$AOT" -eq 1 && "${THROWSWEB_SERVE_AOT_SMOKE_GATE:-0}" != "1" ]]; then
     echo "examples-web-smoke: 007-ThrowsWeb: skip --aot (THROWSWEB_SERVE_AOT_SMOKE_GATE=0; #2387)"
     return 0
@@ -479,7 +509,28 @@ run_throws_web_smoke() {
 
   local port pid serve_cmd=("$PHPC" serve)
   local mode_label="VM throw/catch POST"
-  if [[ "$AOT" -eq 1 ]]; then
+  if [[ "$JIT" -eq 1 ]]; then
+    local jit_ready=0
+    ensure_jit_serve_ready || jit_ready=$?
+    if [[ "$jit_ready" -eq 1 ]]; then
+      if throws_web_serve_jit_require_pass; then
+        echo "examples-web-smoke: 007-ThrowsWeb: FAILED (LLVM 9 not available; #2408)" >&2
+        return 1
+      fi
+      echo "examples-web-smoke: 007-ThrowsWeb: skip --jit (LLVM 9 not available)"
+      return 0
+    fi
+    if [[ "$jit_ready" -eq 2 ]]; then
+      if throws_web_serve_jit_require_pass; then
+        echo "examples-web-smoke: 007-ThrowsWeb: FAILED (JIT MCJIT probe failed; #2408)" >&2
+        return 1
+      fi
+      echo "examples-web-smoke: 007-ThrowsWeb: skip --jit (JIT MCJIT probe failed)"
+      return 0
+    fi
+    serve_cmd=("$PHPC" serve --jit)
+    mode_label="JIT throw/catch POST"
+  elif [[ "$AOT" -eq 1 ]]; then
     local binary=""
     if ! binary="$(ensure_project_aot_binary "$docroot")"; then
       if throws_web_serve_aot_require_pass; then
@@ -784,6 +835,7 @@ run_docroot_smoke() {
 
 mode_label="VM"
 [[ "$AOT" -eq 1 ]] && mode_label="--aot"
+[[ "$JIT" -eq 1 ]] && mode_label="--jit"
 [[ "$MINIWEBAPP_ONLY" -eq 1 ]] && mode_label="${mode_label}; --miniwebapp-only"
 [[ "$SESSIONS_ONLY" -eq 1 ]] && mode_label="${mode_label}; --sessions-only"
 [[ "$FILEUPLOAD_ONLY" -eq 1 ]] && mode_label="${mode_label}; --fileupload-only"

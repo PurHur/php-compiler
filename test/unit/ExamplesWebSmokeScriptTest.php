@@ -130,6 +130,18 @@ final class ExamplesWebSmokeScriptTest extends TestCase
         $this->assertStringContainsString('Invalid email', $body);
     }
 
+    public function testExamplesWebSmokeScriptSupportsThrowsWebServeJitSlice(): void
+    {
+        $script = dirname(__DIR__, 2).'/script/examples-web-smoke.sh';
+        $body = (string) file_get_contents($script);
+        $this->assertStringContainsString('--jit', $body);
+        $this->assertStringContainsString('THROWSWEB_SERVE_JIT_SMOKE_GATE', $body);
+        $this->assertStringContainsString('throws_web_serve_jit_require_pass', $body);
+        $this->assertStringContainsString('serve --jit', $body);
+        $this->assertStringContainsString('JIT throw/catch POST', $body);
+        $this->assertStringContainsString('#2408', $body);
+    }
+
     public function testExamplesWebSmokeScriptSupportsFastcgiWebSlice(): void
     {
         $script = dirname(__DIR__, 2).'/script/examples-web-smoke.sh';
