@@ -37,7 +37,7 @@ Tracking issues: [#58](https://github.com/PurHur/php-compiler/issues/58), [#145]
 | By-reference parameters (`function f(&$x)`) | yes | no | no | [#140](https://github.com/PurHur/php-compiler/issues/140) | VM aliases caller slots via TYPE_INDIRECT; JIT pointer args deferred; VM-only lowering |
 | Static property `Class::$prop` | yes | yes | yes | [#1225](https://github.com/PurHur/php-compiler/issues/1225) | Class-scoped storage; `self::` / `static::`; literal property names in JIT |
 | `unset()` on variables and array offsets | yes | yes | yes | [#1224](https://github.com/PurHur/php-compiler/issues/1224) | VM + JIT assign null to lvalue slots |
-| Function-local `static $var = <literal>` | yes | yes | yes | [#2286](https://github.com/PurHur/php-compiler/issues/2286) | Literal int/string init only in v1; VM + JIT + AOT |
+| Function-local `static $var = <literal>` | yes | yes | no | [#2286](https://github.com/PurHur/php-compiler/issues/2286) | Literal int/string init only in v1; VM + JIT + AOT |
 | Keyed array destructuring (`["a" => $x]`) | yes | yes | yes | [#1234](https://github.com/PurHur/php-compiler/issues/1234) | Skip string-key CFG split for fetch+assign destructuring pairs (#1234) |
 | `goto` / labels (function scope) | yes | yes | yes | [#1228](https://github.com/PurHur/php-compiler/issues/1228) | php-cfg lowers labels to CFG Jump; VM avoids frame nesting on same-block back-edges; compliance PHPT |
 | `declare(strict_types=1)` scalar parameter checks | yes | yes | yes | [#1229](https://github.com/PurHur/php-compiler/issues/1229) | VM #156; JIT enforces at user call sites via JIT\TypeCheck + Native::compileArg weak casts |
@@ -69,9 +69,10 @@ ROADMAP Phase 2/4: [#78](https://github.com/PurHur/php-compiler/issues/78), asso
 | `arsort()` (values descending, preserve keys) | yes | yes | yes | [#2296](https://github.com/PurHur/php-compiler/issues/2296) | Homogeneous string/int values; packed + string-key assoc |
 | `rsort()` (values descending, reindex) | yes | yes | yes | [#2300](https://github.com/PurHur/php-compiler/issues/2300) | Packed homogeneous string/int lists; `__hashtable__sortPackedReverse` |
 | `shuffle()` (packed list, Fisher–Yates) | yes | yes | yes | [#2310](https://github.com/PurHur/php-compiler/issues/2310) | Packed lists without holes; CSPRNG via random_bytes lowering |
+| `array_rand()` (packed list, CSPRNG keys) | yes | partial | partial | [#2321](https://github.com/PurHur/php-compiler/issues/2321) | Packed lists; num=1 JIT/AOT; num>1 VM-only; compliance PHPT |
 | `array_merge()` on string-key associative arrays | yes | yes | yes | [#2287](https://github.com/PurHur/php-compiler/issues/2287) | String-key maps; packed list append unchanged |
 
-_Rows curated from closed stdlib issues (#2271, #2282, #2290, #2296, #2300, #2310, #2287); regenerate via `php script/capability-syntax.php`._
+_Rows curated from closed stdlib issues (#2271, #2282, #2290, #2296, #2300, #2310, #2321, #2287); regenerate via `php script/capability-syntax.php`._
 ## Web north-star (`examples/003-MiniWebApp`)
 
 PATH_INFO routing, deploy-root includes, and CGI drivers for the reference web app.

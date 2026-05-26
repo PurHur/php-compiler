@@ -1264,6 +1264,14 @@ function stdlibArrayBuiltinNorthStarDefinitions(): array
             'notes' => ['Packed lists without holes; CSPRNG via random_bytes lowering'],
         ],
         [
+            'construct' => '`array_rand()` (packed list, CSPRNG keys)',
+            'vm' => 'yes',
+            'jit' => 'partial',
+            'aot' => 'partial',
+            'issue' => 2321,
+            'notes' => ['Packed lists; num=1 JIT/AOT; num>1 VM-only; compliance PHPT'],
+        ],
+        [
             'construct' => '`array_merge()` on string-key associative arrays',
             'vm' => 'yes',
             'jit' => 'yes',
@@ -1305,7 +1313,7 @@ function renderStdlibArrayBuiltinNorthStarMarkdown(array $rows): string
     }
 
     $lines[] = '';
-    $lines[] = '_Rows curated from closed stdlib issues (#2271, #2282, #2290, #2296, #2300, #2287); regenerate via `php script/capability-syntax.php`._';
+    $lines[] = '_Rows curated from closed stdlib issues (#2271, #2282, #2290, #2296, #2300, #2310, #2321, #2287); regenerate via `php script/capability-syntax.php`._';
     $lines[] = '';
 
     return implode("\n", $lines);
