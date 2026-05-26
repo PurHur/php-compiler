@@ -21,6 +21,7 @@ $outFile = $root . '/docs/capabilities-syntax.md';
 $handlers = collectOpcodeHandlers($root);
 $syntax = collectSyntaxCapabilities($root, syntaxRowDefinitions(), $handlers);
 $markdown = renderSyntaxMarkdown($syntax)
+    . renderStdlibArrayBuiltinNorthStarMarkdown(stdlibArrayBuiltinNorthStarDefinitions())
     . renderWebNorthStarMarkdown(webNorthStarDefinitions())
     . renderMiniWebAppOopNorthStarMarkdown(miniWebAppOopNorthStarDefinitions())
     . renderSessionsWebNorthStarMarkdown(sessionsWebNorthStarDefinitions())

@@ -56,6 +56,21 @@ Tracking issues: [#58](https://github.com/PurHur/php-compiler/issues/58), [#145]
 | WeakReference / WeakMap | yes | no | yes | [#1366](https://github.com/PurHur/php-compiler/issues/1366) | VM stub: WeakReference::create/get via indirect target slot (unset clears get); not cycle-collecting GC weak refs; WeakMap uses object-id string keys; JIT may compile references but method bodies are VM-only; VM-only lowering |
 
 _Syntax AOT column reflects `Runtime::MODE_AOT` compile probes unless a row pins AOT (e.g. native user-class link)._
+## Stdlib array builtins (sort / merge)
+
+Recent stdlib coverage for associative arrays and packed lists.
+ROADMAP Phase 2/4: [#78](https://github.com/PurHur/php-compiler/issues/78), assoc arrays [#66](https://github.com/PurHur/php-compiler/issues/66). Full builtin matrix: [capabilities.md](capabilities.md).
+
+| Builtin | VM | JIT | AOT | Issue | Notes |
+|---------|:--:|:---:|:---:|-------|-------|
+| `ksort()` (string/int keys, preserve values) | yes | yes | yes | [#2271](https://github.com/PurHur/php-compiler/issues/2271) | String-key hashtable + packed list no-op; assoc subset (#66) |
+| `krsort()` (keys descending) | yes | yes | yes | [#2282](https://github.com/PurHur/php-compiler/issues/2282) | String-key hashtable; packed list no-op |
+| `asort()` (values ascending, preserve keys) | yes | yes | yes | [#2290](https://github.com/PurHur/php-compiler/issues/2290) | Homogeneous string/int values; packed + string-key assoc |
+| `arsort()` (values descending, preserve keys) | yes | yes | yes | [#2296](https://github.com/PurHur/php-compiler/issues/2296) | Homogeneous string/int values; packed + string-key assoc |
+| `rsort()` (values descending, reindex) | yes | yes | yes | [#2300](https://github.com/PurHur/php-compiler/issues/2300) | Packed homogeneous string/int lists; `__hashtable__sortPackedReverse` |
+| `array_merge()` on string-key associative arrays | yes | yes | yes | [#2287](https://github.com/PurHur/php-compiler/issues/2287) | String-key maps; packed list append unchanged |
+
+_Rows curated from closed stdlib issues (#2271, #2282, #2290, #2296, #2300, #2287); regenerate via `php script/capability-syntax.php`._
 ## Web north-star (`examples/003-MiniWebApp`)
 
 PATH_INFO routing, deploy-root includes, and CGI drivers for the reference web app.
@@ -79,7 +94,7 @@ ROADMAP Phase 1/4: [#78](https://github.com/PurHur/php-compiler/issues/78), acce
 | Construct | VM | JIT | AOT | Issue | Notes |
 |-----------|:--:|:---:|:---:|-------|-------|
 | `003-MiniWebApp` Router OOP (VM serve) | yes | partial | yes | [#2059](https://github.com/PurHur/php-compiler/issues/2059) | #2059 VM OOP e2e; lint zero (#2078); serve smoke default-on; JIT project opt-in (#587) |
-| Public instance methods (`Expr_MethodCall`) | yes | partial | yes | [#58](https://github.com/PurHur/php-compiler/issues/58) | #58 ClassMethod + method dispatch; compliance PHPT; AOT execute #764 |
+| Public instance methods (`Expr_MethodCall`) | yes | partial | yes | [#58](https://github.com/PurHur/php-compiler/issues/58) | #58 ClassMethod + method dispatch; compliance PHPT; native execute ✅ (#764 closed) |
 | Static methods (`Expr_StaticCall`) | yes | partial | yes | [#2209](https://github.com/PurHur/php-compiler/issues/2209) | #2209 user static methods; factory `Class::method()` + instance chain |
 | Private methods + `__construct` | yes | partial | yes | [#145](https://github.com/PurHur/php-compiler/issues/145) | #145 visibility + ctor; Router private render paths |
 | Method return types (`: string` / `: void`) | yes | no | partial | [#55](https://github.com/PurHur/php-compiler/issues/55) | #55 JIT non-void return types; VM `: void` on Router::dispatch |

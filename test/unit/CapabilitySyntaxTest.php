@@ -34,6 +34,12 @@ final class CapabilitySyntaxTest extends TestCase
         $this->assertStringContainsString('Native user-class link', $body);
         $this->assertStringContainsString('Magic constants', $body);
         $this->assertStringContainsString('| Construct | VM | JIT | AOT | Issue | Notes |', $body);
+        $this->assertStringContainsString('## Stdlib array builtins (sort / merge)', $body);
+        $this->assertStringContainsString('`ksort()`', $body);
+        $this->assertStringContainsString('`array_merge()` on string-key associative arrays', $body);
+        $this->assertStringContainsString('`rsort()`', $body);
+        $this->assertStringContainsString('#2271', $body);
+        $this->assertStringContainsString('#2287', $body);
         $this->assertStringContainsString('## Web north-star', $body);
         $this->assertStringContainsString('PATH_INFO / `?route=` fallback', $body);
         $this->assertStringContainsString('`phpc_deploy_path()` + `PHPC_DEPLOY_ROOT`', $body);
