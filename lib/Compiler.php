@@ -991,7 +991,7 @@ class Compiler {
                     }
                     $declared = $child->declaredType instanceof Op\Type\Literal
                         ? Type::fromDecl($child->declaredType->name)
-                        : $child->type;
+                        : ($child->type ?? Type::mixed());
                     $declareType = $child->static
                         ? OpCode::TYPE_DECLARE_STATIC_PROPERTY
                         : OpCode::TYPE_DECLARE_PROPERTY;

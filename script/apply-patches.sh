@@ -100,6 +100,13 @@ patch_already_applied() {
     php-cfg-switch-cond-property.patch)
       grep -q 'public \$cond;' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Switch_.php" 2>/dev/null
       ;;
+    php-cfg-property-type.patch)
+      grep -q 'public \\$type;' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php" 2>/dev/null \
+        && grep -q 'function __construct(Operand \\$name, int \\$visibility' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php" 2>/dev/null
+      ;;
+    php-cfg-assertion-expr-property.patch)
+      grep -q 'public \\$expr;' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Assertion.php" 2>/dev/null
+      ;;
     php-cfg-match.patch)
       grep -q 'function parseExpr_Match' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
       ;;
@@ -296,6 +303,8 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-magic-script-const.patch"
   apply_patch "$PATCH_DIR/php-cfg-magic-line.patch"
   apply_patch "$PATCH_DIR/php-cfg-switch-cond-property.patch"
+  apply_patch "$PATCH_DIR/php-cfg-property-type.patch"
+  apply_patch "$PATCH_DIR/php-cfg-assertion-expr-property.patch"
   apply_patch "$PATCH_DIR/php-cfg-match.patch"
   apply_patch "$PATCH_DIR/php-cfg-assignop-coalesce.patch"
   apply_patch "$PATCH_DIR/php-cfg-first-class-callable.patch"
