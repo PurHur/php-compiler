@@ -72,6 +72,7 @@ if ci_llvm_ready; then
   ci_run_bootstrap_compiler_driver_smoke
   ci_run_bootstrap_jit_unit_probe
   ci_run_bootstrap_vm_unit_probe
+  ci_run_bootstrap_parser_unit_probe
   ci_run_bootstrap_phptypes_unit_probe
   ci_run_bootstrap_m3_emit_tu_execute
 

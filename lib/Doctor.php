@@ -179,6 +179,7 @@ final class Doctor
         $compilerDriverSmokeDefault = $defaults['COMPILER_DRIVER_SMOKE_GATE'] ?? '1';
         $jitUnitProbeDefault = $defaults['BOOTSTRAP_JIT_UNIT_PROBE_GATE'] ?? '0';
         $vmUnitProbeDefault = $defaults['BOOTSTRAP_VM_UNIT_PROBE_GATE'] ?? '0';
+        $parserUnitProbeDefault = $defaults['BOOTSTRAP_PARSER_UNIT_PROBE_GATE'] ?? '0';
         $phptypesUnitProbeDefault = $defaults['BOOTSTRAP_PHPTYPES_UNIT_PROBE_GATE'] ?? '1';
         $testSubsetDefault = $defaults['BOOTSTRAP_TEST_SUBSET_GATE'] ?? '0';
         $testSubsetStrictDefault = $defaults['BOOTSTRAP_TEST_SUBSET_STRICT'] ?? '0';
@@ -209,7 +210,8 @@ final class Doctor
         fwrite(STDOUT, '   BOOTSTRAP_JIT_UNIT_PROBE_GATE='.(self::gateEnabled('BOOTSTRAP_JIT_UNIT_PROBE_GATE', $jitUnitProbeDefault) ? '1' : '0')." (default {$jitUnitProbeDefault}) — ci-local LLVM tail ([#2332](https://github.com/PurHur/php-compiler/issues/2332), [#2361](https://github.com/PurHur/php-compiler/issues/2361))\n");
         fwrite(STDOUT, "   make bootstrap-selfhost-vm-unit-probe\n");
         fwrite(STDOUT, '   BOOTSTRAP_VM_UNIT_PROBE_GATE='.(self::gateEnabled('BOOTSTRAP_VM_UNIT_PROBE_GATE', $vmUnitProbeDefault) ? '1' : '0')." (default {$vmUnitProbeDefault}) — ci-local LLVM tail ([#2354](https://github.com/PurHur/php-compiler/issues/2354), [#2368](https://github.com/PurHur/php-compiler/issues/2368))\n");
-        fwrite(STDOUT, "   make bootstrap-selfhost-parser-unit-probe  (#2409 CFG parse front-end)\n");
+        fwrite(STDOUT, "   make bootstrap-selfhost-parser-unit-probe\n");
+        fwrite(STDOUT, '   BOOTSTRAP_PARSER_UNIT_PROBE_GATE='.(self::gateEnabled('BOOTSTRAP_PARSER_UNIT_PROBE_GATE', $parserUnitProbeDefault) ? '1' : '0')." (default {$parserUnitProbeDefault}) — ci-local LLVM tail ([#2409](https://github.com/PurHur/php-compiler/issues/2409), [#2417](https://github.com/PurHur/php-compiler/issues/2417))\n");
         fwrite(STDOUT, "   make bootstrap-selfhost-types-unit-probe\n");
         fwrite(STDOUT, '   BOOTSTRAP_PHPTYPES_UNIT_PROBE_GATE='.(self::gateEnabled('BOOTSTRAP_PHPTYPES_UNIT_PROBE_GATE', $phptypesUnitProbeDefault) ? '1' : '0')." (default {$phptypesUnitProbeDefault}) — ci-local LLVM tail ([#2430](https://github.com/PurHur/php-compiler/issues/2430), [#2433](https://github.com/PurHur/php-compiler/issues/2433), [#2436](https://github.com/PurHur/php-compiler/issues/2436))\n\n");
 
@@ -492,7 +494,13 @@ final class Doctor
             : 'opt-in BOOTSTRAP_VM_UNIT_PROBE_GATE=1 for lib/VM.php native link (#2354, #2368)';
         fwrite(STDOUT, "  M3 VM probe      make bootstrap-selfhost-vm-unit-probe\n");
         fwrite(STDOUT, "                   {$vmUnitProbeDetail}\n");
-        fwrite(STDOUT, "  M3 parser probe  make bootstrap-selfhost-parser-unit-probe  (#2409)\n");
+        $parserUnitProbeDefaultPresenter = $defaultsPresenter['BOOTSTRAP_PARSER_UNIT_PROBE_GATE'] ?? '0';
+        $parserUnitProbeOn = self::gateEnabled('BOOTSTRAP_PARSER_UNIT_PROBE_GATE', $parserUnitProbeDefaultPresenter);
+        $parserUnitProbeDetail = $parserUnitProbeOn
+            ? 'BOOTSTRAP_PARSER_UNIT_PROBE_GATE=1 — ci-local LLVM tail M3 parser unit probe (#2409, #2417)'
+            : 'opt-in BOOTSTRAP_PARSER_UNIT_PROBE_GATE=1 for CFG parse front-end native link (#2409, #2417)';
+        fwrite(STDOUT, "  M3 parser probe  make bootstrap-selfhost-parser-unit-probe\n");
+        fwrite(STDOUT, "                   {$parserUnitProbeDetail}\n");
         $phptypesUnitProbeDefaultPresenter = $defaultsPresenter['BOOTSTRAP_PHPTYPES_UNIT_PROBE_GATE'] ?? '1';
         $phptypesUnitProbeOn = self::gateEnabled('BOOTSTRAP_PHPTYPES_UNIT_PROBE_GATE', $phptypesUnitProbeDefaultPresenter);
         $phptypesUnitProbeDetail = $phptypesUnitProbeOn

@@ -84,4 +84,26 @@ final class BootstrapParserUnitProbeTest extends TestCase
         $this->assertStringContainsString('bootstrap-selfhost-parser-unit-probe:', $makefile);
         $this->assertStringContainsString('bootstrap-selfhost-parser-unit-probe.sh', $makefile);
     }
+
+    public function testCiDefaultsEnvDefinesParserUnitProbeGateDefaultOff(): void
+    {
+        $defaults = (string) file_get_contents(self::$root.'/script/ci-defaults.env');
+        $this->assertStringContainsString(
+            'BOOTSTRAP_PARSER_UNIT_PROBE_GATE="${BOOTSTRAP_PARSER_UNIT_PROBE_GATE:-0}"',
+            $defaults
+        );
+        $this->assertStringContainsString('#2409', $defaults);
+        $this->assertStringContainsString('#2417', $defaults);
+    }
+
+    public function testCiLocalHonorsParserUnitProbeGate(): void
+    {
+        $local = (string) file_get_contents(self::$root.'/script/ci-local.sh');
+        $this->assertStringContainsString('ci_run_bootstrap_parser_unit_probe', $local);
+
+        $common = (string) file_get_contents(self::$root.'/script/ci-common.sh');
+        $this->assertStringContainsString('BOOTSTRAP_PARSER_UNIT_PROBE_GATE', $common);
+        $this->assertStringContainsString('BOOTSTRAP_PARSER_UNIT_PROBE_GATE:-0', $common);
+        $this->assertStringContainsString('bootstrap-selfhost-parser-unit-probe.sh', $common);
+    }
 }
