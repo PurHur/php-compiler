@@ -598,6 +598,61 @@ final class VmString
         return $prev[$len2];
     }
 
+    /**
+     * soundex() — ASCII Soundex encoding (subset of PHP; issue #2416).
+     */
+    public static function soundex(string $string): string
+    {
+        $len = self::byteLength($string);
+        if (0 === $len) {
+            return '0000';
+        }
+
+        $out = self::asciiUpperByte($string[0]);
+        $lastCode = self::soundexEncodeByte($out);
+        for ($i = 1; $i < $len; ++$i) {
+            $ch = self::asciiUpperByte($string[$i]);
+            $code = self::soundexEncodeByte($ch);
+            if (0 === $code || $code === $lastCode) {
+                continue;
+            }
+            $out .= (string) $code;
+            $lastCode = $code;
+            if (4 === self::byteLength($out)) {
+                break;
+            }
+        }
+
+        while (self::byteLength($out) < 4) {
+            $out .= '0';
+        }
+
+        return $out;
+    }
+
+    private static function soundexEncodeByte(string $ch): int
+    {
+        return match ($ch) {
+            'B', 'F', 'P', 'V' => 1,
+            'C', 'G', 'J', 'K', 'Q', 'S', 'X', 'Z' => 2,
+            'D', 'T' => 3,
+            'L' => 4,
+            'M', 'N' => 5,
+            'R' => 6,
+            default => 0,
+        };
+    }
+
+    private static function asciiUpperByte(string $ch): string
+    {
+        $ord = self::byteOrd($ch);
+        if ($ord >= 97 && $ord <= 122) {
+            return self::byteChr($ord - 32);
+        }
+
+        return $ch;
+    }
+
     private static function strncmpCase(string $a, string $b, int $length): int
     {
         if ($length <= 0) {
