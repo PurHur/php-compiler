@@ -301,7 +301,7 @@ final class BootstrapCompileSmokeM3Emit
         string $returnTypeName,
         array $paramTypeNames
     ): Value {
-        $logical = 'phpcompiler\\runtime::'.$methodLc;
+        $logical = 'PHPCompiler\\Runtime::'.$methodLc;
         $lc = strtolower($logical);
         if (isset($context->functions[$lc])) {
             return $context->functions[$lc];
