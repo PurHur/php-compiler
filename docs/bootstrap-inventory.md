@@ -9,14 +9,13 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Metric | Count |
 |--------|------:|
 | PHP files on vm.php path | 712 |
-| Phase A inventory files (M2 ratio SSOT) | 710 |
-| Phase A ratio-deferred paths | 2 |
+| Phase A inventory files (M2 ratio SSOT) | 711 |
+| Phase A ratio-deferred paths | 1 |
 | Source constructs flagged (blockers) | 0 |
 | Source constructs flagged (warnings) | 1837 |
 
 Phase A ratio-deferred (still inventoried; excluded from M2 spine ratio denominator only — [#2543](https://github.com/PurHur/php-compiler/issues/2543)):
 
-- `bin/vm.php` — spine substitute: test/bootstrap-aot/vm_run_smoke.php
 - `lib/VM/HashTable.php` — spine bundles lib/JIT/Builtin/Type/HashTable.php via ArrayIterator
 
 Included on Phase A path and in `compiler_lib_spine_smoke` (not ratio-deferred): `lib/JIT/Builtin/StringPregMatch.php`, `lib/AOT/Linker.php` (external `clang` / `shell_exec` native floor).
