@@ -220,6 +220,14 @@ ci_run_root_readme_008_sync_check() {
   ROOT_README_008_SYNC_GATE=1 "$PHP_BIN" "${PHP_OPTS[@]}" script/check-root-readme-sync.php
 }
 
+ci_run_getting_started_selfhostprobe_sync_check() {
+  if [[ "${GETTING_STARTED_SELFHOSTPROBE_SYNC_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  echo "GETTING-STARTED 008 §6 sync (GETTING_STARTED_SELFHOSTPROBE_SYNC_GATE=1, issue #2230)..."
+  "$PHP_BIN" "${PHP_OPTS[@]}" script/check-getting-started-selfhostprobe-sync.php
+}
+
 ci_run_root_readme_009_sync_check() {
   if [[ "${ROOT_README_009_SYNC_GATE:-1}" != "1" ]]; then
     return 0
@@ -429,6 +437,7 @@ ci_run_inventory_checks() {
   ci_run_root_readme_006_sync_check
   ci_run_root_readme_007_sync_check
   ci_run_root_readme_008_sync_check
+  ci_run_getting_started_selfhostprobe_sync_check
   ci_run_root_readme_009_sync_check
   ci_run_development_status_sync_check
   ci_run_development_status_007_sync_check
