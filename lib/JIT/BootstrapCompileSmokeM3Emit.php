@@ -32,27 +32,20 @@ final class BootstrapCompileSmokeM3Emit
             $context->lookupFunction('__compiler_file_get_contents'),
             $sourceFile
         );
-        $codeNull = $context->builder->icmp(Builder::INT_EQ, $code, $strPtr->constNull());
-        $readFail = BasicBlockHelper::append($context, 'csm3_read_fail_'.$tag);
+        $codeLen = $context->builder->call($context->lookupFunction('__string__strlen'), $code);
+        $codeBad = $context->builder->or(
+            $context->builder->icmp(Builder::INT_EQ, $code, $strPtr->constNull()),
+            $context->builder->icmp(Builder::INT_EQ, $codeLen, $i64->constInt(0, false))
+        );
         $readOk = BasicBlockHelper::append($context, 'csm3_read_ok_'.$tag);
-        $context->builder->branchIf($codeNull, $readFail, $readOk);
+        $readFail = BasicBlockHelper::append($context, 'csm3_read_fail_'.$tag);
+        $context->builder->branchIf($codeBad, $readFail, $readOk);
 
         $context->builder->positionAtEnd($readFail);
         self::echoPhaseError($context, $logPrefix, $logPrefix.': empty source (native bridge)', 'source');
         $context->builder->returnValue($retFail);
 
         $context->builder->positionAtEnd($readOk);
-        $codeLen = $context->builder->call($context->lookupFunction('__string__strlen'), $code);
-        $codeEmpty = $context->builder->icmp(Builder::INT_EQ, $codeLen, $i64->constInt(0, false));
-        $emptyFail = BasicBlockHelper::append($context, 'csm3_empty_fail_'.$tag);
-        $emptyOk = BasicBlockHelper::append($context, 'csm3_empty_ok_'.$tag);
-        $context->builder->branchIf($codeEmpty, $emptyFail, $emptyOk);
-
-        $context->builder->positionAtEnd($emptyFail);
-        self::echoPhaseError($context, $logPrefix, $logPrefix.': empty source (native bridge)', 'source');
-        $context->builder->returnValue($retFail);
-
-        $context->builder->positionAtEnd($emptyOk);
         $object = $context->type->object;
         $runtimeId = $object->lookup('PHPCompiler\\Runtime');
         $runtime = $object->allocate($runtimeId);
