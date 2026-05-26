@@ -578,7 +578,7 @@ attributes_gate="${ATTRIBUTES_COMPLIANCE_GATE:-1}"
 rehash_gate="${REHASH_COMPLIANCE_GATE:-1}"
 coalesce_gate="${COALESCE_COMPLIANCE_GATE:-1}"
 jit_var_fn_gate="${JIT_VARIABLE_FUNCTION_COMPLIANCE_GATE:-1}"
-jit_server_gate="${JIT_SERVER_SUPERGLOBAL_GATE:-0}"
+jit_server_gate="${JIT_SERVER_SUPERGLOBAL_GATE:-1}"
 echo "  ROOT_README_SYNC_GATE=${root_readme_gate}  script/check-root-readme-sync.php (#1832, #1525)"
 echo "  EXAMPLES_README_SYNC_GATE=${examples_readme_gate}  script/check-examples-readme-sync.php (#1822)"
 echo "  WAVE3_ROADMAP_SYNC_GATE=${wave3_gate}  script/check-wave3-roadmap-sync.php (#1802)"
@@ -605,7 +605,7 @@ echo "  Opt out: ATTRIBUTES_COMPLIANCE_GATE=0 ./script/ci-fast.sh"
 echo "  Opt out: REHASH_COMPLIANCE_GATE=0 ./script/ci-fast.sh"
 echo "  Opt out: COALESCE_COMPLIANCE_GATE=0 ./script/ci-fast.sh"
 echo "  Opt out: JIT_VARIABLE_FUNCTION_COMPLIANCE_GATE=0 ./script/ci-fast.sh"
-echo "  Opt in:  JIT_SERVER_SUPERGLOBAL_GATE=1 ./script/ci-local.sh --filter JitServerSuperglobal"
+echo "  Opt out: JIT_SERVER_SUPERGLOBAL_GATE=0 ./script/ci-local.sh"
 
 # Current focus
 if [[ "${lint_exit}" -ne 0 && "${lint_gate}" != "0" ]]; then
