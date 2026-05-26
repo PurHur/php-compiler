@@ -1050,10 +1050,10 @@ final class Doctor
         }
 
         $defaults = self::readCiDefaultsEnv($repoRoot);
-        $smokeDefault = $defaults['EXAMPLES_SELFHOSTPROBE_SMOKE_GATE'] ?? '0';
+        $smokeDefault = $defaults['EXAMPLES_SELFHOSTPROBE_SMOKE_GATE'] ?? '1';
         $smokeOn = self::gateEnabled('EXAMPLES_SELFHOSTPROBE_SMOKE_GATE', $smokeDefault);
 
-        fwrite(STDOUT, "\n008-SelfHostProbe CI gates (#2302, #2240):\n");
+        fwrite(STDOUT, "\n008-SelfHostProbe CI gates (#2343, #2240):\n");
         fwrite(STDOUT, "  Tree: examples/008-SelfHostProbe\n");
         fwrite(STDOUT, "  Defaults: script/ci-defaults.env\n\n");
         self::printSessionsWebGateRow(
@@ -1063,8 +1063,8 @@ final class Doctor
             $smokeDefault,
             $smokeOn,
             false,
-            'make examples-selfhostprobe-smoke · EXAMPLES_SELFHOSTPROBE_SMOKE_GATE=1 ./script/ci-fast.sh',
-            '#2302'
+            'make examples-selfhostprobe-smoke · ci-fast default-on (#2343); opt-out EXAMPLES_SELFHOSTPROBE_SMOKE_GATE=0',
+            '#2343'
         );
         $initProfileLive = \PHPCompiler\Cli\PhpcInit::isKnownProfile('selfhostprobe');
         $initTemplate = is_file($repoRoot.'/templates/init-selfhostprobe/example.php');

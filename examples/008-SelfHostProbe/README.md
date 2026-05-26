@@ -38,7 +38,7 @@ On Runforge / harness hosts (do **not** use raw `docker run -v "$(pwd):/compiler
 | VM `phpc run` | ✅ presenter text only — no superglobals required |
 | VM `phpc serve` | 📋 not used (CLI presenter) |
 | AOT | 📋 optional later — out of scope for v1 ([#2207](https://github.com/PurHur/php-compiler/issues/2207)) |
-| CI | ✅ `ExamplesCompileTest::test008SelfHostProbeVmLint` + `provideExamples` lint/smoke ([#2239](https://github.com/PurHur/php-compiler/issues/2239)) |
+| CI | ✅ `ExamplesCompileTest::test008SelfHostProbeVmLint` + `provideExamples` lint/smoke ([#2239](https://github.com/PurHur/php-compiler/issues/2239)); `EXAMPLES_SELFHOSTPROBE_SMOKE_GATE=1` default in `ci-fast` ([#2343](https://github.com/PurHur/php-compiler/issues/2343)) |
 
 ## Next slices
 
