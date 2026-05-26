@@ -152,6 +152,12 @@ int __compiler_copy(__string__ *from, __string__ *to)
     if (fclose(in) != 0) {
         ok = 0;
     }
+    if (ok) {
+        struct stat st;
+        if (stat(src, &st) == 0) {
+            chmod(dst, st.st_mode);
+        }
+    }
 
     return ok;
 }

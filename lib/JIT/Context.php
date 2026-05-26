@@ -70,6 +70,9 @@ class Context {
     public ?\PHPLLVM\Value $m3EmitTuTrivialEchoSourceGlobal = null;
 
     public ?\PHPLLVM\Value $m3EmitTuTrivialEchoSidecarPathGlobal = null;
+
+    /** @var list<array{sourceGlobal: \PHPLLVM\Value, sidecarGlobal: \PHPLLVM\Value, sentinelLc: string}> */
+    public array $m3EmitTuLinktimeSidecarEntries = [];
     private array $typeMap = [];
     public array $structFieldMap = [];
     private array $intConstant = [];
