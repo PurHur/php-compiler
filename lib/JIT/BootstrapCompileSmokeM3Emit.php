@@ -104,9 +104,8 @@ final class BootstrapCompileSmokeM3Emit
         $context->builder->returnValue($retFail);
 
         $context->builder->positionAtEnd($readOk);
-        $object = $context->type->object;
-        $runtimeId = $object->lookup('PHPCompiler\\Runtime');
-        $runtime = $object->allocate($runtimeId);
+        // LLVM 9 crashes lowering Object_::allocate(Runtime) in emit-helper TU (#2442).
+        $runtime = $objPtr->constNull();
         $context->builder->call(
             self::runtimeSpine($context, '__construct', 'void', ['__object__*', 'int64']),
             $runtime,
@@ -182,6 +181,11 @@ final class BootstrapCompileSmokeM3Emit
     /**
      * @param list<string> $paramTypeNames
      */
+    private static function mangleLogicalFunction(string $logical): string
+    {
+        return preg_replace('/[^a-zA-Z0-9_]/', '_', $logical) ?? $logical;
+    }
+
     private static function compilerSpine(
         Context $context,
         string $methodLc,
@@ -190,13 +194,13 @@ final class BootstrapCompileSmokeM3Emit
     ): Value {
         $logical = 'PHPCompiler\\Compiler::'.$methodLc;
         $lc = strtolower($logical);
-        $mangled = strtolower(preg_replace('/[^a-zA-Z0-9_]/', '_', $logical) ?? $logical);
+        if (isset($context->functions[$lc])) {
+            return $context->functions[$lc];
+        }
+        $mangled = self::mangleLogicalFunction($logical);
         $existing = $context->module->getNamedFunction($mangled);
         if (null !== $existing) {
             return $existing;
-        }
-        if (isset($context->functions[$lc])) {
-            return $context->functions[$lc];
         }
         $params = [];
         foreach ($paramTypeNames as $typeName) {
@@ -221,13 +225,13 @@ final class BootstrapCompileSmokeM3Emit
     ): Value {
         $logical = 'PHPCompiler\\Runtime::'.$methodLc;
         $lc = strtolower($logical);
-        $mangled = strtolower(preg_replace('/[^a-zA-Z0-9_]/', '_', $logical) ?? $logical);
+        if (isset($context->functions[$lc])) {
+            return $context->functions[$lc];
+        }
+        $mangled = self::mangleLogicalFunction($logical);
         $existing = $context->module->getNamedFunction($mangled);
         if (null !== $existing) {
             return $existing;
-        }
-        if (isset($context->functions[$lc])) {
-            return $context->functions[$lc];
         }
         $params = [];
         foreach ($paramTypeNames as $typeName) {

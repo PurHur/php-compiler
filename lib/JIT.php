@@ -315,6 +315,14 @@ class JIT {
         ) {
             return $this->compileBootstrapCompileSmokeM3EmitNative($internalName, $block, $logicalName);
         }
+        $emitTuSpine = $this->tryCompileM3EmitTuRuntimeSpineNative($internalName, $block, $logicalName);
+        if (null !== $emitTuSpine) {
+            return $emitTuSpine;
+        }
+        $emitTuCompiler = $this->tryCompileM3EmitTuCompilerSpineNative($internalName, $block, $logicalName);
+        if (null !== $emitTuCompiler) {
+            return $emitTuCompiler;
+        }
         if ($this->shouldUseM3CompileDriverRealLowering() && null !== $logicalName) {
             $m3Spine = strtolower($logicalName);
             if (str_ends_with($m3Spine, '\\runtime::loadjit')) {
@@ -381,6 +389,9 @@ class JIT {
         }
         if ($this->isSkippedVmHotPathName($skipName)) {
             return $this->compileSkippedVmHotPathStub($internalName, $block, $logicalName ?? $internalName);
+        }
+        if ($this->isSkippedM3EmitTuBundledHelperName($skipName)) {
+            return $this->compileSkippedCompilerSplitCfgStub($internalName, $block, $logicalName ?? $internalName);
         }
         if ($this->isSkippedCompilerHotPathName($skipName)
             || $this->isSkippedWebBootstrapHotPathName($skipName)
@@ -647,6 +658,10 @@ class JIT {
         Block $block,
         string $logicalName
     ): PHPLLVM\Value {
+        // Emit TU uses void init stubs at link — C-floor only on compile_driver spine (#2442, #2513).
+        if ($this->shouldUseM3EmitTuNativeBridge()) {
+            return $this->emitM3EmitTuRuntimeInitVoidStub($internalName, $logicalName, $block);
+        }
         $lcname = strtolower($logicalName);
         if (isset($this->context->functions[$lcname])) {
             return $this->context->functions[$lcname];
@@ -782,6 +797,33 @@ class JIT {
             || str_ends_with($lower, '::getframe');
     }
 
+    /**
+     * M3 emit TU bundles Compiler/Runtime for link only — stub JIT/VM/Lint bodies (#2442).
+     */
+    private function isSkippedM3EmitTuBundledHelperName(string $name): bool
+    {
+        if (!$this->shouldUseM3EmitTuNativeBridge()) {
+            return false;
+        }
+        $lower = strtolower($name);
+        if ($this->isM3EmitTuRuntimeSpineLoweringName($lower)) {
+            return false;
+        }
+        if ($this->isM3EmitTuCompilerSpineLoweringName($lower)) {
+            return false;
+        }
+        if ($this->isBootstrapM3RuntimeEmitBridgeName($lower)) {
+            return false;
+        }
+
+        return str_contains($lower, '\\jit\\')
+            || str_contains($lower, '\\lint\\')
+            || str_contains($lower, '\\vm\\')
+            || str_contains($lower, '\\printer::')
+            || str_contains($lower, '\\handler::')
+            || str_contains($lower, '\\optimizer::');
+    }
+
     /** Stub bundled lib/ interpreter helpers for self-host AOT (#557, #816). */
     private function isSkippedBootstrapInterpreterHotPathName(string $name): bool
     {
@@ -856,6 +898,10 @@ class JIT {
         if (!$this->shouldUseEmitHelperLinkStubs()) {
             return false;
         }
+        // Emit TU uses native/stub Compiler spine — not full CFG lowering (#2442).
+        if ($this->shouldUseM3EmitTuNativeBridge() && $this->isM3EmitTuCompilerSpineLoweringName($lower)) {
+            return false;
+        }
         if ($this->isM3EmitTuCompilerSpineLoweringName($lower)) {
             return true;
         }
@@ -902,6 +948,83 @@ class JIT {
         }
 
         return false;
+    }
+
+    /**
+     * Lightweight native stubs for Runtime spine in M3 emit TU — never full PHP CFG (#2442).
+     *
+     * LLVM 9 crashes lowering initVmContext / parseAndCompile bodies in the emit-helper bundle.
+     */
+    private function tryCompileM3EmitTuRuntimeSpineNative(
+        string $internalName,
+        Block $block,
+        ?string $logicalName
+    ): ?PHPLLVM\Value {
+        if (!$this->shouldUseM3EmitTuNativeBridge() || null === $logicalName) {
+            return null;
+        }
+        $emitLc = strtolower($logicalName);
+        if (!$this->isM3EmitTuRuntimeSpineLoweringName($emitLc)) {
+            return null;
+        }
+        if (str_ends_with($emitLc, '\\runtime::__construct')) {
+            return $this->emitM3EmitTuRuntimeConstructNativeFunction($internalName, $logicalName, $block);
+        }
+        if (str_ends_with($emitLc, '\\runtime::initvmcontext')
+            || str_ends_with($emitLc, '\\runtime::initparsepipeline')
+            || str_ends_with($emitLc, '\\runtime::initcompiler')
+            || str_ends_with($emitLc, '\\runtime::loadcoremodules')
+            || str_ends_with($emitLc, '\\runtime::loadjit')
+            || str_ends_with($emitLc, '\\runtime::loadjitcontext')
+            || str_ends_with($emitLc, '\\runtime::createjit')
+            || str_ends_with($emitLc, '\\runtime::jitcontextforloadjit')
+            || str_ends_with($emitLc, '\\runtime::loadjitcompilemodulefuncs')
+            || str_ends_with($emitLc, '\\runtime::jitemitinplace')
+        ) {
+            return $this->emitM3EmitTuRuntimeInitVoidStub($internalName, $logicalName, $block);
+        }
+        if (str_ends_with($emitLc, '\\runtime::parse')) {
+            return $this->emitM3EmitTuRuntimeParseStubNative($internalName, $logicalName, $block);
+        }
+        if (str_ends_with($emitLc, '\\runtime::compileemitsmoke')) {
+            return $this->emitM3EmitTuRuntimeCompileEmitSmokeNative($internalName, $logicalName, $block);
+        }
+        if (str_ends_with($emitLc, '\\runtime::standalone')) {
+            return $this->emitM3EmitTuRuntimeStandaloneStubNative($internalName, $logicalName, $block);
+        }
+        if (str_ends_with($emitLc, '\\runtime::compile')
+            || str_ends_with($emitLc, '\\runtime::parseandcompile')
+            || str_ends_with($emitLc, '\\runtime::parseandcompileemitsmoke')
+            || str_ends_with($emitLc, '\\runtime::jitcompileblock')
+        ) {
+            return $this->emitM3EmitTuRuntimeParseStubNative($internalName, $logicalName, $block);
+        }
+
+        return null;
+    }
+
+    /** Stub Compiler CFG spine in M3 emit TU — LLVM 9 cannot lower full compile() chain (#2442). */
+    private function tryCompileM3EmitTuCompilerSpineNative(
+        string $internalName,
+        Block $block,
+        ?string $logicalName
+    ): ?PHPLLVM\Value {
+        if (!$this->shouldUseM3EmitTuNativeBridge() || null === $logicalName) {
+            return null;
+        }
+        $emitLc = strtolower($logicalName);
+        if (!$this->isM3EmitTuCompilerSpineLoweringName($emitLc)) {
+            return null;
+        }
+        if ('phpcompiler\\compiler::compileemitsmoke' === $emitLc) {
+            return $this->emitM3EmitTuCompilerCompileEmitSmokeNativeFunction($internalName, $logicalName);
+        }
+
+        return $this->compileSkippedCompilerSplitCfgStub(
+            $internalName,
+            $block,
+            $logicalName
+        );
     }
 
     /** Runtime methods the M3 emit native bridge calls — never self-host stub (#2442). */
