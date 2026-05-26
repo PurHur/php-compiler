@@ -205,11 +205,11 @@ test-docker-fast-safe: docker-build-22
 # Optional: make test-harness ARGS='--filter VMTest'
 .PHONY: test-harness test-docker-exec
 test-harness:
-	./script/docker-ci-local.sh $(ARGS)
+	PHP_COMPILER_REQUIRE_DOCKER_RUN_OPTS=1 ./script/docker-ci-local.sh $(ARGS)
 
 # Ad-hoc commands in the dev image (tar fallback when bind-mount is incomplete).
 test-docker-exec:
-	./script/docker-exec.sh $(ARGS)
+	PHP_COMPILER_REQUIRE_DOCKER_RUN_OPTS=1 ./script/docker-exec.sh $(ARGS)
 
 # Quick PHPUnit in 22.04 dev image (deprecated: prefer test-docker-fast / ci-fast.sh)
 .PHONY: test-docker-quick
