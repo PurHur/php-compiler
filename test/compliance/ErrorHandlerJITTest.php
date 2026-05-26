@@ -7,7 +7,7 @@ namespace PHPCompiler;
 require_once __DIR__.'/../BaseTest.php';
 
 /**
- * JIT compliance for set_error_handler() / restore_error_handler() (#1379, #1492).
+ * JIT compliance for set_error_handler() / restore_error_handler() (#1379, #2456, #1492).
  *
  * @group llvm
  * @group jit

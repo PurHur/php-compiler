@@ -13,7 +13,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** LLVM lowering helpers for set_error_handler() / restore_error_handler() (#1379, #1492). */
+/** LLVM lowering helpers for set_error_handler() / restore_error_handler() (#1379, #2456, #1492). */
 final class JitErrorHandler
 {
     /** @var array<string, Value> per-module error-handler shims */
@@ -130,16 +130,19 @@ final class JitErrorHandler
         $lineSlot = JitValueBox::alloc($context);
         JitValueBox::writeLong($context, $lineSlot, $context->builder->sext($line, $i64));
 
-        $handled = $context->builder->call(
-            $userFn->function,
-            JitValueBox::pointer($context, $errnoSlot),
-            JitValueBox::pointer($context, $errstrSlot),
-            JitValueBox::pointer($context, $fileSlot),
-            JitValueBox::pointer($context, $lineSlot)
-        );
+        $callArgs = [];
+        foreach ([$errnoSlot, $errstrSlot, $fileSlot, $lineSlot] as $index => $slot) {
+            $callArgs[] = self::valueArgForNativeParam(
+                $context,
+                $slot,
+                $userFn->function->getParam($index)->typeOf()
+            );
+        }
+        $handled = $context->builder->call($userFn->function, ...$callArgs);
+        $handledPtr = self::valuePtrFromNativeReturn($context, $handled);
         $asLong = $context->builder->call(
             $context->lookupFunction('__value__readLong'),
-            $handled
+            $handledPtr
         );
         $truthy = $context->builder->icmp(
             \PHPLLVM\Builder::INT_NE,
@@ -154,5 +157,41 @@ final class JitErrorHandler
         self::$handlerShims[$cacheKey] = $shimFn;
 
         return $shimFn;
+    }
+
+    private static function valueArgForNativeParam(
+        Context $context,
+        Value $slot,
+        \PHPLLVM\Type $paramTy
+    ): Value {
+        $paramTyName = $context->getStringFromType($paramTy);
+        if ('__value__' === $paramTyName) {
+            return $context->builder->load($slot);
+        }
+        if ('__value__*' === $paramTyName) {
+            return JitValueBox::pointer($context, $slot);
+        }
+
+        throw new \LogicException(
+            'error handler callback parameter type '.$paramTyName.' is not supported for JIT'
+        );
+    }
+
+    private static function valuePtrFromNativeReturn(Context $context, Value $handled): Value
+    {
+        $retTyName = $context->getStringFromType($handled->typeOf());
+        if ('__value__*' === $retTyName) {
+            return $handled;
+        }
+        if ('__value__' === $retTyName) {
+            $retSlot = JitValueBox::alloc($context);
+            $context->builder->store($handled, $retSlot);
+
+            return JitValueBox::pointer($context, $retSlot);
+        }
+
+        throw new \LogicException(
+            'error handler callback return type '.$retTyName.' is not supported for JIT'
+        );
     }
 }
