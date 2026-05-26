@@ -43,7 +43,17 @@ On **Runforge harness** hosts (and similar agent sandboxes), `docker run -v "$(p
 | Targeted PHPUnit | `./script/docker-exec.sh -- bash -lc 'source script/php-env.sh && vendor/bin/phpunit …'` |
 | Never on harness | Raw `docker run -v "$(pwd):/compiler"` (empty tree) |
 
-Agent environments may set `HARNESS_DOCKER_RUN_OPTS` (or `PHP_COMPILER_DOCKER_RUN_OPTS`); `script/docker-exec.sh` and `script/ci-docker-run.sh` pass those through to `docker run`. Run `docker info` before heavy Docker work.
+Agent environments may set `HARNESS_DOCKER_RUN_OPTS` (or `PHP_COMPILER_DOCKER_RUN_OPTS`); `script/docker-exec.sh` and `script/ci-docker-run.sh` pass those through to `docker run`.
+
+**Docker preflight** ([#2246](https://github.com/PurHur/php-compiler/issues/2246)): harness entrypoints (`make test-harness`, `./script/docker-ci-local.sh`, `./script/docker-exec.sh`, `./script/ci-docker-safe.sh`) call `script/ci-docker-preflight.sh` before any container work:
+
+| Check | Behavior |
+|-------|----------|
+| `docker info` | Fail fast with an actionable error when the daemon is unreachable |
+| Single CI container | `flock` on `.php-compiler-ci.lock` (workspace); blocks a second concurrent wrapper run |
+| Opt-out | `PHP_COMPILER_CI_SINGLE_CONTAINER=0` skips the lock; `PHP_COMPILER_CI_VERBOSE=1` prints one-line OK |
+
+Do **not** run several full CI containers in parallel — each `vm.php` child can grow large; wait for the other run or stop its container.
 
 ## GitHub Actions: bootstrap self-host (disabled mirror)
 

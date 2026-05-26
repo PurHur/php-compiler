@@ -1264,6 +1264,34 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('ci-defaults.env', $body);
     }
 
+    public function testDockerWrappersSourceCiDockerPreflight(): void
+    {
+        $root = dirname(__DIR__, 2);
+        foreach (['docker-ci-local.sh', 'docker-exec.sh', 'ci-docker-safe.sh'] as $script) {
+            $body = (string) file_get_contents($root.'/script/'.$script);
+            $this->assertStringContainsString('ci-docker-preflight.sh', $body, $script);
+            $this->assertStringContainsString('ci_docker_preflight', $body, $script);
+            $this->assertStringContainsString('ci_docker_acquire_single_ci_lock', $body, $script);
+        }
+    }
+
+    public function testCiDockerPreflightDefinesDockerInfoAndLock(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-preflight.sh');
+        $this->assertStringContainsString('docker info', $body);
+        $this->assertStringContainsString('flock -n 200', $body);
+        $this->assertStringContainsString('.php-compiler-ci.lock', $body);
+        $this->assertStringContainsString('PHP_COMPILER_CI_SINGLE_CONTAINER', $body);
+    }
+
+    public function testLocalCiMatrixDocumentsDockerPreflight(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('ci-docker-preflight.sh', $doc);
+        $this->assertStringContainsString('#2246', $doc);
+        $this->assertStringContainsString('.php-compiler-ci.lock', $doc);
+    }
+
     public function testCiDockerRunPassesJitPreflightGateEnv(): void
     {
         $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');

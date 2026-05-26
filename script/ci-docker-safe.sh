@@ -10,6 +10,11 @@ shift || true
 
 IMAGE="${PHP_COMPILER_DEV_IMAGE:-php-compiler:22.04-dev}"
 
+# shellcheck source=ci-docker-preflight.sh
+source "$(dirname "$0")/ci-docker-preflight.sh"
+ci_docker_preflight
+ci_docker_acquire_single_ci_lock
+
 # shellcheck source=ci-docker-run.sh
 source "$(dirname "$0")/ci-docker-run.sh"
 

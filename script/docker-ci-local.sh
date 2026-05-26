@@ -7,7 +7,13 @@
 # Always applies repository memory defaults (script/ci-defaults.env) and Docker -m cap.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+REPO_ROOT="$(pwd)"
 IMAGE="${PHP_COMPILER_DEV_IMAGE:-php-compiler:22.04-dev}"
+
+# shellcheck source=ci-docker-preflight.sh
+source "$(dirname "$0")/ci-docker-preflight.sh"
+ci_docker_preflight
+ci_docker_acquire_single_ci_lock
 
 # shellcheck source=ci-docker-run.sh
 source "$(dirname "$0")/ci-docker-run.sh"

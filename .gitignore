@@ -8,3 +8,4 @@ demo
 .phpunit.result.cache
 .php_cs.cache
 .env
+.php-compiler-ci.lock
