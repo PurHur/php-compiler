@@ -58,8 +58,13 @@ final class JitCompilerSelfHostStubTest extends TestCase
         'findcoalesce',
         'resolvecoalesce',
         'resolveisset',
-        'operandschainequal',
         'isredundantcoalescetailassign',
+    ];
+
+    /** @var list<string> */
+    private const M3_COMPILER_PHP_LOWERING_SUFFIXES = [
+        'operandschainequal',
+        'unwrapoperandchain',
     ];
 
     /** @var list<string> */
@@ -118,8 +123,81 @@ final class JitCompilerSelfHostStubTest extends TestCase
 
     public function testCompilerSkipPatternCount(): void
     {
-        $this->assertSame(self::COMPILER_SKIP_PATTERNS, $this->compilerSkipPatternsFromJit());
-        $this->assertCount(48, self::COMPILER_SKIP_PATTERNS);
+        $parsed = $this->compilerSkipPatternsFromJit();
+        $this->assertCount(47, self::COMPILER_SKIP_PATTERNS);
+        foreach (self::COMPILER_SKIP_PATTERNS as $pattern) {
+            $this->assertContains($pattern, $parsed, "Missing skip pattern {$pattern} in isSkippedCompilerHotPathName");
+        }
+    }
+
+    /**
+     * @dataProvider m3CompilerPhpLoweringSuffixProvider
+     */
+    public function testM3CompileDriverCompilerPhpLoweringIsNotStubbed(string $suffix): void
+    {
+        $prevSelfHost = getenv('PHP_COMPILER_SELFHOST_AOT');
+        $prevM3 = getenv('PHP_COMPILER_M3_COMPILE_DRIVER');
+        putenv('PHP_COMPILER_SELFHOST_AOT=1');
+        putenv('PHP_COMPILER_M3_COMPILE_DRIVER=1');
+        try {
+            $this->assertFalse(
+                $this->invokeSkipCheck(
+                    'isSkippedCompilerHotPathName',
+                    'phpcompiler\\compiler::'.$suffix
+                ),
+                "Expected real lowering for Compiler::{$suffix} when M3 compile driver is on"
+            );
+        } finally {
+            if (false === $prevSelfHost) {
+                putenv('PHP_COMPILER_SELFHOST_AOT');
+            } else {
+                putenv('PHP_COMPILER_SELFHOST_AOT='.$prevSelfHost);
+            }
+            if (false === $prevM3) {
+                putenv('PHP_COMPILER_M3_COMPILE_DRIVER');
+            } else {
+                putenv('PHP_COMPILER_M3_COMPILE_DRIVER='.$prevM3);
+            }
+        }
+    }
+
+    /** @return iterable<string, array{0: string}> */
+    public static function m3CompilerPhpLoweringSuffixProvider(): iterable
+    {
+        foreach (self::M3_COMPILER_PHP_LOWERING_SUFFIXES as $suffix) {
+            yield $suffix => [$suffix];
+        }
+    }
+
+    /**
+     * @dataProvider m3CompilerPhpLoweringSuffixProvider
+     */
+    public function testCompilerOperandChainHelpersRemainStubbedWithoutM3Driver(string $suffix): void
+    {
+        $prevSelfHost = getenv('PHP_COMPILER_SELFHOST_AOT');
+        $prevM3 = getenv('PHP_COMPILER_M3_COMPILE_DRIVER');
+        putenv('PHP_COMPILER_SELFHOST_AOT=1');
+        putenv('PHP_COMPILER_M3_COMPILE_DRIVER=0');
+        try {
+            $this->assertTrue(
+                $this->invokeSkipCheck(
+                    'isSkippedCompilerHotPathName',
+                    'phpcompiler\\compiler::'.$suffix
+                ),
+                "Expected stub for Compiler::{$suffix} without M3 compile driver"
+            );
+        } finally {
+            if (false === $prevSelfHost) {
+                putenv('PHP_COMPILER_SELFHOST_AOT');
+            } else {
+                putenv('PHP_COMPILER_SELFHOST_AOT='.$prevSelfHost);
+            }
+            if (false === $prevM3) {
+                putenv('PHP_COMPILER_M3_COMPILE_DRIVER');
+            } else {
+                putenv('PHP_COMPILER_M3_COMPILE_DRIVER='.$prevM3);
+            }
+        }
     }
 
     /**

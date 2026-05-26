@@ -1095,6 +1095,33 @@ class JIT {
         ];
     }
 
+    /**
+     * Compiler helpers safe for PHP CFG lowering on M3 compile spine (#1520).
+     *
+     * @return list<string> method suffixes after \\compiler::
+     */
+    private function m3CompileDriverCompilerPhpLoweringSuffixes(): array
+    {
+        return [
+            'operandschainequal',
+            'unwrapoperandchain',
+        ];
+    }
+
+    private function isM3CompileDriverCompilerPhpLoweringName(string $lower): bool
+    {
+        if (!$this->shouldUseM3CompileDriverRealLowering()) {
+            return false;
+        }
+        foreach ($this->m3CompileDriverCompilerPhpLoweringSuffixes() as $suffix) {
+            if (str_ends_with($lower, '\\compiler::'.$suffix)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private function isM3EmitTuCompilerSpineLoweringName(string $lower): bool
     {
         if (!$this->shouldUseM3EmitTuNativeBridge()) {
@@ -1229,6 +1256,9 @@ class JIT {
 
             return null;
         }
+        if ($this->isM3CompileDriverCompilerPhpLoweringName($emitLc)) {
+            return $this->compileRuntimeSpinePhpLowering($internalName, $block, $logicalName);
+        }
 
         return $this->compileSkippedCompilerSplitCfgStub(
             $internalName,
@@ -1282,6 +1312,9 @@ class JIT {
             return false;
         }
         if ($this->isM3EmitHelperCompilerPhpLoweringName($lower)) {
+            return false;
+        }
+        if ($this->isM3CompileDriverCompilerPhpLoweringName($lower)) {
             return false;
         }
         if ($this->shouldUseM3EmitTuNativeBridge() && str_contains($lower, '\\compiler::compileemitsmoke')) {
@@ -1338,7 +1371,6 @@ class JIT {
             || str_contains($lower, 'findcoalesce')
             || str_contains($lower, 'resolvecoalesce')
             || str_contains($lower, 'resolveisset')
-            || str_contains($lower, 'operandschainequal')
             || str_contains($lower, 'isredundantcoalescetailassign');
     }
 
@@ -2537,54 +2569,8 @@ class JIT {
         if ($this->shouldUseM3EmitTuNativeBridge() && $this->isBootstrapM3RuntimeEmitBridgeName($lcname)) {
             return $this->compileBootstrapCompileSmokeM3EmitNative($internalName, $block, $logicalName);
         }
-        if ($this->shouldUseSelfHostJitStubs() && str_contains($lcname, 'operandschainequal')) {
-            $objectPtr = $this->context->getTypeFromString('__object__*');
-            $boolTy = $this->context->getTypeFromString('bool');
-            $func = $this->context->module->addFunction(
-                $this->llvmInternalName($internalName),
-                $this->context->context->functionType($boolTy, false, $objectPtr, $objectPtr, $objectPtr)
-            );
-            $bb = $func->appendBasicBlock('stub');
-            $saved = $this->context->builder;
-            $this->context->builder = $this->context->context->builderCreate();
-            $this->context->builder->positionAtEnd($bb);
-            $this->context->builder->returnValue($boolTy->constInt(0, false));
-            $this->context->builder->clearInsertionPosition();
-            $this->context->builder = $saved;
-            $this->context->functions[$lcname] = $func;
-            $this->context->functionReturnType[$lcname] = 'bool';
-            $this->context->functionProxies[$lcname] = new JIT\Call\Native(
-                $func,
-                $logicalName,
-                [$objectPtr, $objectPtr, $objectPtr],
-                []
-            );
-
-            return $func;
-        }
-        if ($this->shouldUseSelfHostJitStubs() && str_contains($lcname, 'unwrapoperandchain')) {
-            $objectPtr = $this->context->getTypeFromString('__object__*');
-            $func = $this->context->module->addFunction(
-                $this->llvmInternalName($internalName),
-                $this->context->context->functionType($objectPtr, false, $objectPtr, $objectPtr)
-            );
-            $bb = $func->appendBasicBlock('stub');
-            $saved = $this->context->builder;
-            $this->context->builder = $this->context->context->builderCreate();
-            $this->context->builder->positionAtEnd($bb);
-            $this->context->builder->returnValue($objectPtr->constNull());
-            $this->context->builder->clearInsertionPosition();
-            $this->context->builder = $saved;
-            $this->context->functions[$lcname] = $func;
-            $this->context->functionReturnType[$lcname] = '__object__*';
-            $this->context->functionProxies[$lcname] = new JIT\Call\Native(
-                $func,
-                $logicalName,
-                [$objectPtr, $objectPtr],
-                []
-            );
-
-            return $func;
+        if ($this->isM3CompileDriverCompilerPhpLoweringName($lcname)) {
+            return $this->compileRuntimeSpinePhpLowering($internalName, $block, $logicalName);
         }
         $args = $this->normalizeSelfHostNativeCallArgTypes(
             $this->collectStubFunctionArgTypes($block),
