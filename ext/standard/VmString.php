@@ -499,6 +499,80 @@ final class VmString
         return 0;
     }
 
+    /**
+     * substr_compare() — byte-oriented haystack slice vs needle (subset of PHP; issue #2400).
+     */
+    public static function substr_compare(
+        string $haystack,
+        string $needle,
+        int $offset,
+        ?int $length = null,
+        bool $caseInsensitive = false
+    ): int {
+        $hayLen = self::byteLength($haystack);
+        if ($offset < 0) {
+            $offset += $hayLen;
+            if ($offset < 0) {
+                $offset = 0;
+            }
+        }
+        if ($offset > $hayLen) {
+            throw new \ValueError('substr_compare(): Argument #3 ($offset) must be contained in argument #1 ($haystack)');
+        }
+        $needleLen = self::byteLength($needle);
+        $hayRemain = $hayLen - $offset;
+        $compareLen = $hayRemain;
+        $lengthOmitted = null === $length;
+        if (!$lengthOmitted) {
+            if ($length < 0) {
+                throw new \ValueError('substr_compare(): Argument #4 ($length) must be greater than or equal to 0');
+            }
+            if ($length > $hayRemain) {
+                $length = $hayRemain;
+            }
+            $compareLen = $length;
+        } else {
+            $length = $needleLen > $hayRemain ? $hayRemain : $needleLen;
+        }
+        $s1 = self::byteSlice($haystack, $offset, $length);
+        $cmp = $caseInsensitive
+            ? self::strncmpCase($s1, $needle, $length)
+            : self::strncmp($s1, $needle, $length);
+        if (0 !== $cmp) {
+            return $cmp;
+        }
+        if ($lengthOmitted && $compareLen !== $needleLen) {
+            return $compareLen < $needleLen ? -1 : 1;
+        }
+
+        return 0;
+    }
+
+    private static function strncmpCase(string $a, string $b, int $length): int
+    {
+        if ($length <= 0) {
+            return 0;
+        }
+        $lenA = self::byteLength($a);
+        $lenB = self::byteLength($b);
+        $compare = $length;
+        if ($compare > $lenA) {
+            $compare = $lenA;
+        }
+        if ($compare > $lenB) {
+            $compare = $lenB;
+        }
+        for ($i = 0; $i < $compare; ++$i) {
+            $ordA = self::byteOrd(self::asciiLowerByte($a[$i]));
+            $ordB = self::byteOrd(self::asciiLowerByte($b[$i]));
+            if ($ordA !== $ordB) {
+                return $ordA <=> $ordB;
+            }
+        }
+
+        return 0;
+    }
+
     public static function strspn(string $str, string $mask): int
     {
         if ('' === $mask) {

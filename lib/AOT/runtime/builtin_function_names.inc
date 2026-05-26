@@ -276,6 +276,7 @@ static const char *phpc_builtin_functions[] = {
     "strtr",
     "strval",
     "substr",
+    "substr_compare",
     "substr_count",
     "sys_get_temp_dir",
     "tan",
