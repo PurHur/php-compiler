@@ -42,6 +42,7 @@ class JIT {
     private array $queue = [];
 
     private ?Block $m3EmitTuMainBlock = null;
+    private bool $m3EmitTuRuntimeSpineLowered = false;
 
     public Context $context;
 
@@ -52,6 +53,10 @@ class JIT {
     public function compile(Block $block): PHPLLVM\Value {
         if ($this->shouldUseM3EmitTuNativeBridge() && $this->isM3EmitTuScriptMain($block)) {
             $this->m3EmitTuMainBlock = $block;
+            if (!$this->m3EmitTuRuntimeSpineLowered) {
+                $this->m3EmitTuRuntimeSpineLowered = true;
+                $this->compileM3EmitTuRuntimeSpineDecls();
+            }
         }
         $return = $this->compileBlock($block);
         $this->runQueue();
@@ -249,6 +254,9 @@ class JIT {
         if (str_ends_with($lower, '\\runtime::loadcoremodules')) {
             return true;
         }
+        if (str_ends_with($lower, '\\runtime::compileemitsmoke')) {
+            return true;
+        }
 
         return false;
     }
@@ -387,21 +395,21 @@ class JIT {
                 return $this->compileRuntimeParseAndCompileM3Native($internalName, $block, $logicalName);
             }
             if (str_ends_with($m3Spine, '\\runtime::parse')) {
-                if ($this->shouldUseM3EmitTuNativeBridge() && !$this->shouldUseM3CompileDriverRealLowering()) {
+                if ($this->shouldUseM3EmitTuRuntimeMethodStub('parse')) {
                     return $this->emitM3EmitTuRuntimeParseStubNative($internalName, $logicalName, $block);
                 }
 
                 return $this->compileRuntimeSpinePhpLowering($internalName, $block, $logicalName);
             }
             if (str_ends_with($m3Spine, '\\runtime::compileemitsmoke')) {
-                if ($this->shouldUseM3EmitTuNativeBridge() && !$this->shouldUseM3CompileDriverRealLowering()) {
+                if ($this->shouldUseM3EmitTuRuntimeMethodStub('compileemitsmoke')) {
                     return $this->emitM3EmitTuRuntimeCompileEmitSmokeNative($internalName, $logicalName, $block);
                 }
 
                 return $this->compileRuntimeSpinePhpLowering($internalName, $block, $logicalName);
             }
             if (str_ends_with($m3Spine, '\\runtime::standalone')) {
-                if ($this->shouldUseM3EmitTuNativeBridge() && !$this->shouldUseM3CompileDriverRealLowering()) {
+                if ($this->shouldUseM3EmitTuRuntimeMethodStub('standalone')) {
                     return $this->emitM3EmitTuRuntimeStandaloneStubNative($internalName, $logicalName, $block);
                 }
 
@@ -631,11 +639,24 @@ class JIT {
         Block $block,
         string $logicalName
     ): PHPLLVM\Value {
-        if ($this->shouldUseM3EmitTuNativeBridge()) {
+        if ($this->shouldUseM3EmitTuRuntimeMethodStub('__construct')) {
             return $this->emitM3EmitTuRuntimeConstructNativeFunction($internalName, $logicalName, $block);
         }
 
         return $this->compileRuntimeSpinePhpLowering($internalName, $block, $logicalName);
+    }
+
+    /** Emit TU null-returning stubs unless M3 real-lowering is enabled (#2512, #2542). */
+    private function shouldUseM3EmitTuRuntimeMethodStub(string $methodLc): bool
+    {
+        if (!$this->shouldUseM3EmitTuNativeBridge()) {
+            return false;
+        }
+        if (!$this->shouldUseM3CompileDriverRealLowering()) {
+            return true;
+        }
+
+        return !$this->isM3CompileDriverRealLoweringName('phpcompiler\\runtime::'.$methodLc);
     }
 
     /**
@@ -704,7 +725,7 @@ class JIT {
         Block $block,
         string $logicalName
     ): PHPLLVM\Value {
-        if ($this->shouldUseM3EmitTuNativeBridge() && !$this->shouldUseM3CompileDriverRealLowering()) {
+        if ($this->shouldUseM3EmitTuRuntimeMethodStub('initparsepipeline')) {
             return $this->emitM3EmitTuRuntimeInitVoidStub($internalName, $logicalName, $block);
         }
 
@@ -716,7 +737,7 @@ class JIT {
         Block $block,
         string $logicalName
     ): PHPLLVM\Value {
-        if ($this->shouldUseM3EmitTuNativeBridge() && !$this->shouldUseM3CompileDriverRealLowering()) {
+        if ($this->shouldUseM3EmitTuRuntimeMethodStub('initcompiler')) {
             return $this->emitM3EmitTuRuntimeInitVoidStub($internalName, $logicalName, $block);
         }
 
@@ -766,7 +787,7 @@ class JIT {
         Block $block,
         string $logicalName
     ): PHPLLVM\Value {
-        if ($this->shouldUseM3EmitTuNativeBridge() && !$this->shouldUseM3CompileDriverRealLowering()) {
+        if ($this->shouldUseM3EmitTuRuntimeMethodStub('loadcoremodules')) {
             return $this->emitM3EmitTuRuntimeInitVoidStub($internalName, $logicalName, $block);
         }
 
@@ -1041,7 +1062,16 @@ class JIT {
             || str_ends_with($emitLc, '\\runtime::initparsepipeline')
             || str_ends_with($emitLc, '\\runtime::initcompiler')
             || str_ends_with($emitLc, '\\runtime::loadcoremodules')
-            || str_ends_with($emitLc, '\\runtime::loadjit')
+        ) {
+            if ($this->shouldUseM3EmitTuRuntimeMethodStub(
+                substr($emitLc, (int) strrpos($emitLc, '::') + 2)
+            )) {
+                return $this->emitM3EmitTuRuntimeInitVoidStub($internalName, $logicalName, $block);
+            }
+
+            return null;
+        }
+        if (str_ends_with($emitLc, '\\runtime::loadjit')
             || str_ends_with($emitLc, '\\runtime::loadjitcontext')
             || str_ends_with($emitLc, '\\runtime::createjit')
             || str_ends_with($emitLc, '\\runtime::jitcontextforloadjit')
@@ -1062,13 +1092,25 @@ class JIT {
             }
         }
         if (str_ends_with($emitLc, '\\runtime::parse')) {
-            return $this->emitM3EmitTuRuntimeParseStubNative($internalName, $logicalName, $block);
+            if ($this->shouldUseM3EmitTuRuntimeMethodStub('parse')) {
+                return $this->emitM3EmitTuRuntimeParseStubNative($internalName, $logicalName, $block);
+            }
+
+            return null;
         }
         if (str_ends_with($emitLc, '\\runtime::compileemitsmoke')) {
-            return $this->emitM3EmitTuRuntimeCompileEmitSmokeNative($internalName, $logicalName, $block);
+            if ($this->shouldUseM3EmitTuRuntimeMethodStub('compileemitsmoke')) {
+                return $this->emitM3EmitTuRuntimeCompileEmitSmokeNative($internalName, $logicalName, $block);
+            }
+
+            return null;
         }
         if (str_ends_with($emitLc, '\\runtime::standalone')) {
-            return $this->emitM3EmitTuRuntimeStandaloneStubNative($internalName, $logicalName, $block);
+            if ($this->shouldUseM3EmitTuRuntimeMethodStub('standalone')) {
+                return $this->emitM3EmitTuRuntimeStandaloneStubNative($internalName, $logicalName, $block);
+            }
+
+            return null;
         }
         if (str_ends_with($emitLc, '\\runtime::compile')
             || str_ends_with($emitLc, '\\runtime::parseandcompile')
@@ -1575,42 +1617,89 @@ class JIT {
         return $this->compileBlockPhpLowering($internalName, $block, $logicalName, $logicalName);
     }
 
-    /** Lower Runtime/Compiler spine before native emit bridge (#1937). */
+    /** Lower Runtime/Compiler spine before native emit bridge (#1937, #2512). */
     private function compileM3EmitTuRuntimeSpineDecls(): void
     {
         if (!$this->shouldUseM3EmitTuNativeBridge() || null === $this->m3EmitTuMainBlock) {
             return;
         }
         $stubBlock = $this->m3EmitTuMainBlock;
-        $this->emitM3EmitTuRuntimeParseStubNative(
-            $this->llvmInternalName('PHPCompiler\\Runtime::parse'),
-            'PHPCompiler\\Runtime::parse',
-            $stubBlock
-        );
-        $this->emitM3EmitTuRuntimeCompileEmitSmokeNative(
-            $this->llvmInternalName('PHPCompiler\\Runtime::compileEmitSmoke'),
-            'PHPCompiler\\Runtime::compileEmitSmoke',
-            $stubBlock
-        );
-        $this->emitM3EmitTuRuntimeStandaloneStubNative(
-            $this->llvmInternalName('PHPCompiler\\Runtime::standalone'),
-            'PHPCompiler\\Runtime::standalone',
-            $stubBlock
-        );
-        $this->emitM3EmitTuRuntimeConstructNativeFunction(
-            $this->llvmInternalName('PHPCompiler\\Runtime::__construct'),
-            'PHPCompiler\\Runtime::__construct',
-            $stubBlock
-        );
-        $this->compileM3EmitTuRuntimeParseAndCompileNativeDecl([
-            'parseandcompile' => true,
-            'parseandcompileemitsmoke' => true,
-        ]);
-        $this->emitM3EmitTuRuntimeBlockPtrStubNative(
-            $this->llvmInternalName('PHPCompiler\\Runtime::compile'),
-            'PHPCompiler\\Runtime::compile',
-            $stubBlock
-        );
+        if ($this->shouldUseM3CompileDriverRealLowering()) {
+            $runtimeMethods = [
+                'parse' => true,
+                'compileemitsmoke' => true,
+                'standalone' => true,
+            ];
+            foreach ($this->m3EmitTuMainBlock->opCodes as $op) {
+                if (OpCode::TYPE_DECLARE_CLASS !== $op->type) {
+                    continue;
+                }
+                $nameOp = $this->m3EmitTuMainBlock->getOperand($op->arg1);
+                if (!$nameOp instanceof Operand\Literal) {
+                    continue;
+                }
+                $lc = strtolower(str_replace('/', '\\', ltrim($nameOp->value, '\\')));
+                if ('phpcompiler\\runtime' !== $lc || null === $op->block1) {
+                    continue;
+                }
+                $this->context->pushScope();
+                $this->context->scope->classId = $this->context->type->object->declareClass($nameOp);
+                $this->context->scope->className = $lc;
+                foreach ($op->block1->opCodes as $methodOp) {
+                    if (OpCode::TYPE_DECLARE_METHOD !== $methodOp->type) {
+                        continue;
+                    }
+                    $methodOpName = $op->block1->getOperand($methodOp->arg1);
+                    if (!$methodOpName instanceof Operand\Literal) {
+                        continue;
+                    }
+                    $methodLc = strtolower($methodOpName->value);
+                    if (!isset($runtimeMethods[$methodLc])) {
+                        continue;
+                    }
+                    $logical = $lc.'::'.$methodLc;
+                    if (!isset($this->context->functions[strtolower($logical)])) {
+                        $this->compileBlock($methodOp->block1, $logical);
+                    }
+                }
+                $this->context->popScope();
+            }
+            $this->emitM3EmitTuRuntimeConstructNativeFunction(
+                $this->llvmInternalName('PHPCompiler\\Runtime::__construct'),
+                'PHPCompiler\\Runtime::__construct',
+                $stubBlock
+            );
+        } else {
+            $this->emitM3EmitTuRuntimeParseStubNative(
+                $this->llvmInternalName('PHPCompiler\\Runtime::parse'),
+                'PHPCompiler\\Runtime::parse',
+                $stubBlock
+            );
+            $this->emitM3EmitTuRuntimeCompileEmitSmokeNative(
+                $this->llvmInternalName('PHPCompiler\\Runtime::compileEmitSmoke'),
+                'PHPCompiler\\Runtime::compileEmitSmoke',
+                $stubBlock
+            );
+            $this->emitM3EmitTuRuntimeStandaloneStubNative(
+                $this->llvmInternalName('PHPCompiler\\Runtime::standalone'),
+                'PHPCompiler\\Runtime::standalone',
+                $stubBlock
+            );
+            $this->emitM3EmitTuRuntimeConstructNativeFunction(
+                $this->llvmInternalName('PHPCompiler\\Runtime::__construct'),
+                'PHPCompiler\\Runtime::__construct',
+                $stubBlock
+            );
+            $this->compileM3EmitTuRuntimeParseAndCompileNativeDecl([
+                'parseandcompile' => true,
+                'parseandcompileemitsmoke' => true,
+            ]);
+            $this->emitM3EmitTuRuntimeBlockPtrStubNative(
+                $this->llvmInternalName('PHPCompiler\\Runtime::compile'),
+                'PHPCompiler\\Runtime::compile',
+                $stubBlock
+            );
+        }
         $this->compileM3EmitTuCompilerEmitSmokeNativeDecl();
         $this->runQueue();
     }
