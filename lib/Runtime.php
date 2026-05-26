@@ -183,6 +183,24 @@ class Runtime {
         return $block;
     }
 
+    /** M3 native emit: compile trivial scripts via compileEmitSmoke (#1937). */
+    public function compileEmitSmoke(Script $script): ?Block {
+        $block = $this->compiler->compileEmitSmoke($script);
+        $this->assignOpResolver->optimize($block);
+
+        return $block;
+    }
+
+    public function parseAndCompileEmitSmoke(string $code, string $filename): ?Block
+    {
+        $block = $this->compileEmitSmoke($this->parse($code, $filename));
+        if (null !== $block) {
+            $block->setScriptPath($filename);
+        }
+
+        return $block;
+    }
+
     public function compileFunc(string $name, CfgFunc $func): Func {
         $compiled = $this->compiler->compileFunc($name, $func);
         $this->assignOpResolver->optimize($compiled->block);

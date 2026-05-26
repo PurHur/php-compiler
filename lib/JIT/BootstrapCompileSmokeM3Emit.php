@@ -112,9 +112,8 @@ final class BootstrapCompileSmokeM3Emit
             $runtime,
             $i64->constInt(self::MODE_AOT, false)
         );
-
         $block = $context->builder->call(
-            self::runtimeSpine($context, 'parseandcompile', '__object__*', ['__object__*', '__string__*', '__string__*']),
+            self::runtimeSpine($context, 'parseandcompileemitsmoke', '__object__*', ['__object__*', '__string__*', '__string__*']),
             $runtime,
             $code,
             $sourceFile
@@ -163,6 +162,37 @@ final class BootstrapCompileSmokeM3Emit
     /**
      * @param list<string> $paramTypeNames
      */
+    private static function compilerSpine(
+        Context $context,
+        string $methodLc,
+        string $returnTypeName,
+        array $paramTypeNames
+    ): Value {
+        $logical = 'PHPCompiler\\Compiler::'.$methodLc;
+        $lc = strtolower($logical);
+        $mangled = strtolower(preg_replace('/[^a-zA-Z0-9_]/', '_', $logical) ?? $logical);
+        $existing = $context->module->getNamedFunction($mangled);
+        if (null !== $existing) {
+            return $existing;
+        }
+        if (isset($context->functions[$lc])) {
+            return $context->functions[$lc];
+        }
+        $params = [];
+        foreach ($paramTypeNames as $typeName) {
+            $params[] = $context->getTypeFromString($typeName);
+        }
+
+        return $context->module->addFunction(
+            $mangled,
+            $context->context->functionType(
+                $context->getTypeFromString($returnTypeName),
+                false,
+                ...$params
+            )
+        );
+    }
+
     private static function runtimeSpine(
         Context $context,
         string $methodLc,

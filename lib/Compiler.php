@@ -29,8 +29,8 @@ use PHPCompiler\Web\Superglobals;
 
 class Compiler {
 
-    protected ?SplObjectStorage $seen;
-    protected ?SplObjectStorage $funcs;
+    protected ?SplObjectStorage $seen = null;
+    protected ?SplObjectStorage $funcs = null;
 
     public function compile(Script $script): ?Block {
         $this->seen = new SplObjectStorage;
@@ -39,6 +39,12 @@ class Compiler {
 
         $this->seen = null;
         return $main;
+    }
+
+    /** M3 emit TU: trivial single-block sources without full seen-map compile (#1937). */
+    public function compileEmitSmoke(Script $script): ?Block
+    {
+        return $this->compileCfgBlock($script->main->cfg, $script->main->params, $script->main);
     }
 
     public function compileFunc(string $name, CfgFunc $func): Func {
@@ -105,6 +111,9 @@ class Compiler {
     }
 
     protected function compileCfgBlock(CfgBlock $block, array $params = [], ?CfgFunc $func = null): Block {
+        if (null === $this->seen) {
+            $this->seen = new SplObjectStorage;
+        }
         if (!$this->seen->contains($block)) {
             $this->seen[$block] = $new = new Block($block);
             if (null !== $func) {

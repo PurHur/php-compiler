@@ -3,9 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="php-compiler — compile PHP to native binaries with VM, LLVM JIT, and AOT. Demo-ready web deployment and self-host bootstrap.">
-  <meta property="og:title" content="php-compiler — PHP to native binaries">
-  <meta property="og:description" content="VM, JIT, and AOT deployment for a web-capable PHP subset. See live progress and try it in five minutes.">
+  <meta name="description" content="php-compiler — compile PHP to native binaries with VM, LLVM JIT, and AOT.">
   <title>php-compiler — PHP to native binaries</title>
   <link rel="stylesheet" href="css/style.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><ellipse cx='50' cy='55' rx='42' ry='32' fill='%23777BB4'/><ellipse cx='50' cy='48' rx='38' ry='28' fill='%234F5B93'/><circle cx='35' cy='42' r='4' fill='%231a1a2e'/><circle cx='65' cy='42' r='4' fill='%231a1a2e'/></svg>">
@@ -19,18 +17,14 @@
           <ellipse cx="24" cy="24" rx="18" ry="12" fill="#4F5B93"/>
           <circle cx="16" cy="22" r="2.5" fill="#0f0f1a"/>
           <circle cx="32" cy="22" r="2.5" fill="#0f0f1a"/>
-          <path d="M18 32 Q24 36 30 32" stroke="#8892BF" stroke-width="1.5" fill="none" stroke-linecap="round"/>
         </svg>
         php-compiler
       </a>
       <nav class="nav" aria-label="Primary">
         <a href="#demo">Try it</a>
         <a href="#overview">Overview</a>
-        <a href="#progress">Progress</a>
-        <a href="#wave3">Wave 3</a>
-        <a href="#self-host">North star</a>
-        <a href="/php-compiler/development-status.html#example-integration-tests">Examples</a>
-        <a href="/php-compiler/development-status.html">Full status</a>
+        <a href="missing-implementation.html">Gaps</a>
+        <a href="development-status.html">Status</a>
         <a href="https://github.com/PurHur/php-compiler">GitHub</a>
       </nav>
     </div>
@@ -39,26 +33,23 @@
   <div id="top" class="hero">
     <div>
       <span class="badge badge--live">Demo-ready</span>
-      <span class="badge">Updated 24 May 2026</span>
+      <span class="badge">May 2026</span>
       <h1>Compile PHP to native binaries</h1>
       <p class="lead">
-        <strong>php-compiler</strong> lowers PHP to a CFG, executes on a VM, JIT-compiles with LLVM&nbsp;9,
-        and links <strong>AOT native executables</strong> for CLI and web — deployed apps run
-        <strong>without Zend PHP at runtime</strong>. Active work: <strong>self-host bootstrap</strong>
-        (compiler compiling its own <code>lib/</code>). Web examples under
-        <code>examples/</code> stay as integration test fixtures.
+        <strong>php-compiler</strong> parses PHP to a CFG, runs a VM, JIT-compiles with LLVM&nbsp;9,
+        and links <strong>AOT executables</strong> for CLI and web — deployed apps need no Zend at runtime.
+        Active work: <strong>self-host</strong> — the compiler compiling its own <code>lib/</code>
+        ([#1492](https://github.com/PurHur/php-compiler/issues/1492)).
       </p>
       <div class="hero-badges">
         <span class="badge badge--live">VM + JIT + AOT</span>
-        <span class="badge badge--live">Wave 3 language 12/12</span>
-        <span class="badge badge--live">Wave 3 stdlib 13/13</span>
-        <span class="badge badge--wip">North star — self-host (#1492)</span>
-        <span class="badge badge--live">Example gates — regression only</span>
+        <span class="badge badge--live">Wave 3 · 12 + 13 closed</span>
+        <span class="badge badge--wip">M3 emit in progress</span>
       </div>
       <div class="hero-actions">
         <a class="btn btn--primary" href="#demo">Try in 5 minutes</a>
-        <a class="btn btn--ghost" href="/php-compiler/development-status.html">Full status report</a>
-        <a class="btn btn--ghost" href="https://github.com/PurHur/php-compiler">Clone on GitHub</a>
+        <a class="btn btn--ghost" href="missing-implementation.html">What’s missing</a>
+        <a class="btn btn--ghost" href="https://github.com/PurHur/php-compiler">GitHub</a>
       </div>
     </div>
     <div class="code-window" aria-label="Example usage">
@@ -68,18 +59,10 @@
         <span class="code-window__dot"></span>
         <span class="code-window__title">quick-start.sh</span>
       </div>
-      <pre><code><span class="php-cmt"># Host PHP builds; deployed app runs natively</span>
-<span class="php-tag">&lt;?php</span>
-<span class="php-fn">composer</span> install
-./phpc <span class="php-str">test</span> --fast          <span class="php-cmt"># VM compliance (local CI)</span>
-./script/ci-local.sh       <span class="php-cmt"># full gate (GHA/Circle disabled)</span>
-./phpc <span class="php-str">build</span> --project my-app
-./phpc <span class="php-str">serve</span> examples/003-MiniWebApp
-
-<span class="php-cmt"># Self-host (experimental): native lib/ bundles</span>
-make bootstrap-selfhost-link   <span class="php-cmt"># M0 → compiler_minimal bundle OK</span>
-BOOTSTRAP_LIB_SPINE_SMOKE=1 make bootstrap-selfhost-lib-spine-smoke
-<span class="php-cmt"># M2 → compiler_lib_spine_smoke bundle OK (655/657)</span></code></pre>
+      <pre><code>composer install
+./phpc test --fast
+./phpc build -o /tmp/hello examples/000-HelloWorld/example.php
+./phpc serve examples/003-MiniWebApp</code></pre>
     </div>
   </div>
 
@@ -87,16 +70,15 @@ BOOTSTRAP_LIB_SPINE_SMOKE=1 make bootstrap-selfhost-lib-spine-smoke
     <section id="demo" class="reveal">
       <h2>Try it in five minutes</h2>
       <p class="section-intro">
-        Clone the repo on a Linux host with PHP&nbsp;8.1+ and Composer. Full presenter script:
-        <a href="https://github.com/PurHur/php-compiler/blob/master/docs/GETTING-STARTED.md"><code>docs/GETTING-STARTED.md</code></a>.
+        Linux, PHP&nbsp;8.1+, Composer. Full script:
+        <a href="https://github.com/PurHur/php-compiler/blob/master/docs/GETTING-STARTED.md">GETTING-STARTED.md</a>.
       </p>
       <div class="demo-grid">
         <article class="demo-card">
           <span class="demo-card__step">1</span>
-          <h3>Fast CI smoke</h3>
+          <h3>Fast smoke</h3>
           <pre><code>composer install
 ./phpc test --fast</code></pre>
-          <p>VM/compliance gate — no LLVM link required.</p>
         </article>
         <article class="demo-card">
           <span class="demo-card__step">2</span>
@@ -104,235 +86,80 @@ BOOTSTRAP_LIB_SPINE_SMOKE=1 make bootstrap-selfhost-lib-spine-smoke
           <pre><code>./phpc build -o /tmp/hello \
   examples/000-HelloWorld/example.php
 /tmp/hello</code></pre>
-          <p>PHP source → standalone executable.</p>
         </article>
         <article class="demo-card">
           <span class="demo-card__step">3</span>
-          <h3>Web app (VM)</h3>
-          <pre><code>./phpc serve examples/003-MiniWebApp
-# → http://127.0.0.1:8080/</code></pre>
-          <p>Router, templates, forms, JSON API — stable today.</p>
-        </article>
-        <article class="demo-card demo-card--optional">
-          <span class="demo-card__step">+</span>
-          <h3>Self-host smoke</h3>
-          <pre><code>script/apply-patches.sh
-make bootstrap-selfhost-link
-BOOTSTRAP_LIB_SPINE_SMOKE=1 \
-  make bootstrap-selfhost-lib-spine-smoke</code></pre>
-          <p>M0 + M2 native link smoke (LLVM 9). Zend still drives <code>bin/compile.php</code> today.</p>
+          <h3>Web app</h3>
+          <pre><code>./phpc serve examples/003-MiniWebApp</code></pre>
         </article>
       </div>
       <p class="demo-disclaimer">
-        <strong>Honest scope:</strong> not full Zend PHP — subset compiler (detailed capability matrices are
-        contributor-only in the repo, not on this site).
-        <strong>North star:</strong> self-host bootstrap ([#1492](https://github.com/PurHur/php-compiler/issues/1492)).
-        <code>examples/003-MiniWebApp</code> and siblings are CI regression fixtures, not a product north star.
+        Subset compiler, not full Zend PHP. Examples are CI fixtures; north star is self-host.
       </p>
     </section>
 
     <section id="overview" class="reveal">
       <h2>Overview</h2>
-      <p class="section-intro">
-        Visual snapshot for visitors. The authoritative written report is
-        <a href="/php-compiler/development-status.html"><strong>development-status.md</strong></a>
-        (maintained for this site only). Repo technical docs stay on
-        <a href="https://github.com/PurHur/php-compiler/tree/master/docs">GitHub</a>.
-      </p>
       <div class="dual-track">
         <article class="track-panel track-panel--selfhost">
-          <h3>🎯 Project north star — Self-host</h3>
-          <p>
-            <strong>Compiler fully compiles itself:</strong> native binary from <code>lib/</code> (no <code>vendor/</code>),
-            compiles PHP, then rebuilds the next compiler revision without Zend.
-          </p>
-          <p><strong>Status:</strong> M0 ✅ · M1 ✅ · M2 ✅ native link <strong>655/657</strong> · M3 🚧 native <strong>run</strong> ✅, native <strong>emit</strong> blocked ([#1937](https://github.com/PurHur/php-compiler/issues/1937)) · M4–M5 ⬜.</p>
-          <p><strong>To “compile itself”:</strong> close M3 emit → M4 bootstrap loop → M5 (no Zend, no <code>vendor/</code> at cold boot).</p>
-          <p><a href="/php-compiler/development-status.html#north-star-self-host">Full north-star doc →</a> · <a href="https://github.com/PurHur/php-compiler/blob/master/docs/self-host-target.md">Target doc</a> · <a href="https://github.com/PurHur/php-compiler/issues/1492">#1492</a></p>
+          <h3>North star — Self-host</h3>
+          <p>Native binary from <code>lib/</code> compiles PHP and rebuilds the next compiler without Zend.</p>
+          <p><strong>Now:</strong> M0–M2 ✅ · M3 partial (native <strong>run</strong> ✅, <strong>emit</strong> 🚧) · M4–M5 ⬜</p>
+          <p><a href="development-status.html">Status</a> · <a href="missing-implementation.html">Gap tables</a> · <a href="https://github.com/PurHur/php-compiler/issues/1492">#1492</a></p>
         </article>
         <article class="track-panel track-panel--web">
-          <h3>🧪 Example integration tests</h3>
-          <p>
-            <a href="https://github.com/PurHur/php-compiler/tree/master/examples/003-MiniWebApp">003-MiniWebApp</a>,
-            <a href="https://github.com/PurHur/php-compiler/tree/master/examples/005-SessionsWeb">005-SessionsWeb</a>,
-            <a href="https://github.com/PurHur/php-compiler/tree/master/examples/006-FileUploadWeb">006-FileUploadWeb</a>
-            — VM + AOT regression harness (not a north star).
-          </p>
-          <p><strong>Status:</strong> VM ✅ · AOT link/execute ✅ · default-on CI gates for 003.</p>
-          <p><a href="/php-compiler/development-status.html#example-integration-tests">Fixture doc →</a> · <code>make north-star1-verify</code> (legacy name)</p>
-        </article>
-      </div>
-    </section>
-
-    <section id="wave3" class="reveal">
-      <h2>Roadmap wave 3</h2>
-      <p class="section-intro">
-        May 2026 gap batch toward full PHP — umbrella
-        <a href="https://github.com/PurHur/php-compiler/issues/1380">#1380</a>.
-        Detailed PR/status table:
-        <a href="https://github.com/PurHur/php-compiler/blob/master/docs/roadmap-wave3.md">roadmap-wave3.md</a>
-        (repo only).
-      </p>
-      <div class="dual-track">
-        <article class="track-panel track-panel--web">
-          <h3>Stdlib (#1367–#1379)</h3>
-          <p><strong>13 / 13 closed on master.</strong> Landed: <code>parse_str</code>, reflection helpers, <code>pack</code>, <code>sleep</code>, cookies, autoload (VM), <code>debug_backtrace</code>, error handlers (VM), and more.</p>
-          <p>Some stdlib items remain VM-only or JIT-deferred — see <a href="https://github.com/PurHur/php-compiler/blob/master/docs/stdlib-jit-audit.md">stdlib-jit-audit.md</a> ([#1776](https://github.com/PurHur/php-compiler/issues/1776)).</p>
-        </article>
-        <article class="track-panel track-panel--selfhost">
-          <h3>Language (#1354–#1366)</h3>
-          <p><strong>12 / 12 closed on master.</strong> Includes attributes VM v1 ([#1354](https://github.com/PurHur/php-compiler/issues/1354)), readonly classes ([#1360](https://github.com/PurHur/php-compiler/issues/1360) / [#1473](https://github.com/PurHur/php-compiler/pull/1473)), <code>never</code>, enums, ctor promotion, intersection types, unpack, multi-catch, <code>__serialize</code>, first-class callable JIT, variable-variables JIT, WeakReference/WeakMap ([#1478](https://github.com/PurHur/php-compiler/pull/1478)).</p>
-          <p>Attributes phase-2 (JIT/AOT reflection) tracked separately in <a href="https://github.com/PurHur/php-compiler/issues/1936">#1936</a>; wave-3 umbrella <a href="https://github.com/PurHur/php-compiler/issues/1380">#1380</a> is language <strong>12/12</strong> + stdlib <strong>13/13</strong> on master.</p>
+          <h3>Example tests</h3>
+          <p>MiniWebApp, SessionsWeb, FileUploadWeb, ThrowsWeb — VM + AOT regression in CI.</p>
+          <p><strong>Now:</strong> VM ✅ · AOT link/execute ✅ for the curated web subset.</p>
         </article>
       </div>
     </section>
 
     <section id="progress" class="reveal">
-      <h2>Overall progress</h2>
-      <p class="section-intro">
-        Indicative composite — tables and blockers in
-        <a href="/php-compiler/development-status.html">development-status.md</a>.
-      </p>
+      <h2>Progress</h2>
       <div class="overall-progress">
         <div class="overall-progress__label">
-          <span>Toward a self-hosting compiler</span>
-          <span class="overall-progress__pct" id="overall-pct">~52%</span>
+          <span>Toward self-hosting</span>
+          <span class="overall-progress__pct">~52%</span>
         </div>
-        <div class="progress-track" role="progressbar" aria-valuenow="52" aria-valuemin="0" aria-valuemax="100" aria-label="Overall project progress">
-          <div class="progress-fill" id="overall-progress-fill" data-width="52" style="width: 0"></div>
+        <div class="progress-track" role="progressbar" aria-valuenow="52" aria-valuemin="0" aria-valuemax="100">
+          <div class="progress-fill" data-width="52" style="width: 0"></div>
         </div>
         <p class="overall-progress__note">
-          Strong on VM and AOT linking; wave-3 language <strong>12/12</strong> and stdlib <strong>13/13</strong> on master.
-          <strong>Self-host:</strong> we can <strong>link</strong> a large native <code>lib/</code> bundle (<strong>655</strong> spine units / <strong>626</strong> vm.php-path files, [#1960](https://github.com/PurHur/php-compiler/issues/1960));
-          we cannot yet <strong>compile the next compiler</strong> without Zend (<strong>M3 emit</strong> + <strong>M4 loop</strong> + <strong>M5</strong> vendor prelink — [#1492](https://github.com/PurHur/php-compiler/issues/1492), [#1416](https://github.com/PurHur/php-compiler/issues/1416)).
-          Example web gates stay regression-only.
+          Strong VM/AOT and wave-3 batches. Spine link <strong>655/657</strong>.
+          Next: native emit (M3) → bootstrap loop (M4) → no Zend cold boot (M5).
         </p>
       </div>
     </section>
 
-    <section id="phases" class="reveal">
-      <h2>Development phases</h2>
-      <p class="section-intro">
-        Phases follow <a href="https://github.com/PurHur/php-compiler/issues/78">issue #78</a>.
-        Phase breakdown: <a href="/php-compiler/development-status.html#development-phases-roadmap-78">full status</a>.
-      </p>
-      <div class="phase-grid phase-grid--phases">
-        <article class="card">
-          <span class="phase-num">Phase 0</span>
-          <h3><span class="status-dot status-dot--done"></span> Foundation</h3>
-          <p>CI via <code>./script/ci-local.sh</code>; GHA/Circle disabled; <code>phpc</code> CLI + Docker.</p>
-          <div class="mini-progress"><div class="progress-track"><div class="progress-fill" data-width="88"></div></div></div>
-        </article>
-        <article class="card">
-          <span class="phase-num">Phase 1</span>
-          <h3><span class="status-dot status-dot--wip"></span> Language</h3>
-          <p>OOP VM/JIT; wave-3 language <strong>12/12</strong> on master ([#1380](https://github.com/PurHur/php-compiler/issues/1380)).</p>
-          <div class="mini-progress"><div class="progress-track"><div class="progress-fill" data-width="72"></div></div></div>
-        </article>
-        <article class="card">
-          <span class="phase-num">Phase 2</span>
-          <h3><span class="status-dot status-dot--wip"></span> Stdlib</h3>
-          <p>Wave 3: <strong>13/13</strong> closed on master; JIT audit in repo.</p>
-          <div class="mini-progress"><div class="progress-track"><div class="progress-fill" data-width="58"></div></div></div>
-        </article>
-        <article class="card">
-          <span class="phase-num">Phase 3</span>
-          <h3><span class="status-dot status-dot--wip"></span> Web AOT</h3>
-          <p>Project link ✅; execute ✅ (example fixtures 003–006).</p>
-          <div class="mini-progress"><div class="progress-track"><div class="progress-fill" data-width="58"></div></div></div>
-        </article>
-        <article class="card">
-          <span class="phase-num">Phase 4</span>
-          <h3><span class="status-dot status-dot--wip"></span> Example polish</h3>
-          <p>Regression maintenance only — optional bisect [#1750](https://github.com/PurHur/php-compiler/issues/1750).</p>
-          <div class="mini-progress"><div class="progress-track"><div class="progress-fill" data-width="48"></div></div></div>
-        </article>
-        <article class="card">
-          <span class="phase-num">Self-host</span>
-          <h3><span class="status-dot status-dot--wip"></span> Compile-itself</h3>
-          <p>M0–M1 ✅; M2 spine <strong>655/657</strong> link ✅; M3 partial (native run ✅, emit 🚧); M5 = full self-host.</p>
-          <div class="mini-progress"><div class="progress-track"><div class="progress-fill" data-width="58"></div></div></div>
-        </article>
-      </div>
-    </section>
-
     <section id="self-host" class="reveal">
-      <h2>Self-host bootstrap</h2>
-      <p class="section-intro">
-        Stretch goal: the compiler <strong>fully compiles itself</strong> (M5). Zend still runs
-        <code>bin/compile.php</code> today; native output is a growing <code>lib/</code> bundle (~109 minimal → <strong>655</strong> spine <code>require_once</code> units toward <strong>626</strong> vm.php-path inventory files).
-        Full ladder: <a href="/php-compiler/development-status.html#north-star-self-host">development-status.md</a>
-        · <a href="https://github.com/PurHur/php-compiler/blob/master/docs/self-host-target.md">self-host-target.md</a>
-        · tracker <a href="https://github.com/PurHur/php-compiler/issues/1492">#1492</a>.
-      </p>
+      <h2>Self-host milestones</h2>
       <ol class="ladder" aria-label="Self-host milestones">
-        <li class="is-done">
-          <span class="ladder__marker" aria-hidden="true">✓</span>
-          <h4>M0 — Bundled subset runs</h4>
-          <p><code>compiler_minimal bundle OK</code> ([#557](https://github.com/PurHur/php-compiler/issues/557)).</p>
-        </li>
-        <li class="is-done">
-          <span class="ladder__marker" aria-hidden="true">✓</span>
-          <h4>M1 — Compiler-shaped bundle</h4>
-          <p>Compile-smoke native link + AOT echo; driver smoke ([#1025](https://github.com/PurHur/php-compiler/issues/1025)).</p>
-        </li>
-        <li class="is-done">
-          <span class="ladder__marker" aria-hidden="true">✓</span>
-          <h4>M2 — Full top-level <code>lib/</code></h4>
-          <p>14/14 lint ✅; <strong>655/657</strong> spine units native link ✅ ([#1960](https://github.com/PurHur/php-compiler/issues/1960)); a few inventory paths still deferred ([#2126](https://github.com/PurHur/php-compiler/issues/2126)).</p>
-        </li>
-        <li class="is-wip">
-          <span class="ladder__marker" aria-hidden="true">3</span>
-          <h4>M3 — Native compiles PHP</h4>
-          <p>HelloWorld AOT <strong>runs</strong> natively ✅; <strong>emit</strong> still uses Zend fallback (strict gate fails until emit TU stable — [#1937](https://github.com/PurHur/php-compiler/issues/1937), [#1768](https://github.com/PurHur/php-compiler/issues/1768), [#1402](https://github.com/PurHur/php-compiler/issues/1402)).</p>
-        </li>
-        <li class="is-todo">
-          <span class="ladder__marker" aria-hidden="true">4</span>
-          <h4>M4 — Bootstrap loop</h4>
-          <p>Native binary rebuilds the <strong>next</strong> compiler tree (gen-1 link 🚧; gen-2 emit still Zend partial — [#1498](https://github.com/PurHur/php-compiler/issues/1498)).</p>
-        </li>
-        <li class="is-todo">
-          <span class="ladder__marker" aria-hidden="true">★</span>
-          <h4>M5 — Full self-host (north star)</h4>
-          <p>Real <code>bin/vm.php</code> / <code>bin/compile.php</code>; no Zend bootstrap; no <code>vendor/</code> at cold boot ([#1492](https://github.com/PurHur/php-compiler/issues/1492), [#1416](https://github.com/PurHur/php-compiler/issues/1416)).</p>
-        </li>
+        <li class="is-done"><span class="ladder__marker" aria-hidden="true">✓</span><h4>M0–M1</h4><p>Minimal + compiler-shaped bundles.</p></li>
+        <li class="is-done"><span class="ladder__marker" aria-hidden="true">✓</span><h4>M2</h4><p>Spine <strong>655/657</strong> native link.</p></li>
+        <li class="is-wip"><span class="ladder__marker" aria-hidden="true">3</span><h4>M3</h4><p>Native compile PHP — emit TU in progress ([#1937](https://github.com/PurHur/php-compiler/issues/1937)).</p></li>
+        <li class="is-todo"><span class="ladder__marker" aria-hidden="true">4</span><h4>M4–M5</h4><p>Bootstrap loop; full self-host.</p></li>
       </ol>
-      <div class="dual-track" style="margin-top: 1.5rem">
-        <article class="track-panel track-panel--selfhost">
-          <h3>Distance to “compiler compiles itself”</h3>
-          <p><strong>Done:</strong> parse → CFG → VM/JIT → AOT link for a curated <code>lib/</code> closure; spine bundle runs natively.</p>
-          <p><strong>Not done:</strong> self-hosted <code>bin/compile.php</code>; native emit of HelloWorld / compile-smoke without Zend; bootstrap loop; vendor prelink.</p>
-          <p>Count: <code>php script/bootstrap-spine-count.php</code> · probe: <code>make bootstrap-selfhost-helloworld</code></p>
-        </article>
-      </div>
+      <p style="margin-top: 1rem">
+        <a class="btn btn--ghost" href="missing-implementation.html">See missing implementation tables →</a>
+      </p>
     </section>
 
     <section id="contribute" class="reveal">
       <h2>Get involved</h2>
-      <p class="section-intro">
-        Pick work by phase label, north-star tracker, or bootstrap gate. Update
-        <code>docs/pages/development-status.md</code> when a milestone is user-visible.
-      </p>
       <div class="hero-actions">
         <a class="btn btn--primary" href="https://github.com/PurHur/php-compiler/issues">Open issues</a>
-        <a class="btn btn--ghost" href="https://github.com/PurHur/php-compiler/blob/master/CONTRIBUTING.md">Contributing guide</a>
-        <a class="btn btn--ghost" href="/php-compiler/development-status.html">Full status document</a>
+        <a class="btn btn--ghost" href="https://github.com/PurHur/php-compiler/blob/master/CONTRIBUTING.md">Contributing</a>
       </div>
     </section>
   </main>
 
   <footer class="site-footer">
+    <p><a href="https://github.com/PurHur/php-compiler">PurHur/php-compiler</a> · MIT</p>
     <p>
-      <a href="https://github.com/PurHur/php-compiler">PurHur/php-compiler</a>
-      · MIT · GitHub Pages (<code>docs/pages/</code>)
-    </p>
-    <p>
-      <a href="#demo">Demo</a> ·
-      <a href="/php-compiler/development-status.html">Status</a> ·
-      <a href="https://github.com/PurHur/php-compiler/blob/master/docs/GETTING-STARTED.md">Getting started</a> ·
-      <a href="https://github.com/PurHur/php-compiler/issues/78">#78</a> ·
-      <a href="https://github.com/PurHur/php-compiler/issues/1044">#1044</a> ·
-      <a href="https://github.com/PurHur/php-compiler/issues/1492">#1492</a>
+      <a href="development-status.html">Status</a> ·
+      <a href="missing-implementation.html">Gaps</a> ·
+      <a href="https://github.com/PurHur/php-compiler/blob/master/docs/GETTING-STARTED.md">Getting started</a>
     </p>
   </footer>
 

@@ -802,7 +802,25 @@ class Object_ extends Type {
             $this->defineProperty($id, 'scriptStack', Variable::TYPE_OBJECT);
         }
         if ('phpcompiler\runtime' === $lcname) {
-            $this->defineProperty($id, 'vmContext', Variable::TYPE_OBJECT);
+            foreach (
+                [
+                    'compiler',
+                    'parser',
+                    'preprocessor',
+                    'postprocessor',
+                    'detector',
+                    'assignOpResolver',
+                    'vmContext',
+                    'vm',
+                    'jitContext',
+                    'jit',
+                    'typeReconstructor',
+                ] as $prop
+            ) {
+                $this->defineProperty($id, $prop, Variable::TYPE_OBJECT);
+            }
+            $this->defineProperty($id, 'modules', Variable::TYPE_HASHTABLE);
+            $this->defineProperty($id, 'mode', Variable::TYPE_NATIVE_LONG);
         }
         if ('splobjectstorage' === $lcname) {
             $this->splObjectStorageClassId = $id;
@@ -859,7 +877,11 @@ class Object_ extends Type {
                 ];
             }
         }
+        if ('phpcfg\\script' === $lcname) {
+            $this->defineProperty($id, 'main', Variable::TYPE_OBJECT);
+        }
         if ('phpcfg\\func' === $lcname) {
+            $this->defineProperty($id, 'cfg', Variable::TYPE_OBJECT);
             foreach ([
                 'flag_public' => \PHPCfg\Func::FLAG_PUBLIC,
                 'flag_protected' => \PHPCfg\Func::FLAG_PROTECTED,
@@ -970,6 +992,46 @@ class Object_ extends Type {
 
         if (isset($arrayProps[$lcClass][$lcName])) {
             return Variable::TYPE_HASHTABLE;
+        }
+
+        if (str_starts_with($lcClass, 'phpcfg\\script')) {
+            if ('main' === $lcName) {
+                return Variable::TYPE_OBJECT;
+            }
+            if ('functions' === $lcName) {
+                return Variable::TYPE_HASHTABLE;
+            }
+        }
+        if (str_starts_with($lcClass, 'phpcfg\\func')) {
+            if ('cfg' === $lcName) {
+                return Variable::TYPE_OBJECT;
+            }
+            if ('params' === $lcName) {
+                return Variable::TYPE_HASHTABLE;
+            }
+        }
+        if (str_starts_with($lcClass, 'phpcompiler\\runtime')) {
+            if (in_array($lcName, [
+                'compiler',
+                'parser',
+                'preprocessor',
+                'postprocessor',
+                'detector',
+                'assignopresolver',
+                'vmcontext',
+                'vm',
+                'jitcontext',
+                'jit',
+                'typereconstructor',
+            ], true)) {
+                return Variable::TYPE_OBJECT;
+            }
+            if ('modules' === $lcName) {
+                return Variable::TYPE_HASHTABLE;
+            }
+            if ('mode' === $lcName) {
+                return Variable::TYPE_NATIVE_LONG;
+            }
         }
 
         if (
@@ -1775,6 +1837,17 @@ class Object_ extends Type {
             }
         }
 
+        if (Variable::TYPE_OBJECT === $propertyType && Variable::TYPE_OBJECT === $value->type) {
+            $stored = $this->context->builder->pointerCast(
+                $this->context->helper->loadValue($value),
+                $voidPtr
+            );
+            $this->context->builder->store($stored, $slot);
+            $value->addref();
+
+            return;
+        }
+
         $valueType = $this->context->getTypeFromString('__value__');
         $heapVal = $this->context->memory->malloc($valueType);
         $heapPtr = $this->context->builder->pointerCast(
@@ -1822,7 +1895,7 @@ class Object_ extends Type {
             return;
         }
 
-        if (Variable::TYPE_OBJECT === $value->type) {
+        if (Variable::TYPE_VALUE === $propertyType && Variable::TYPE_OBJECT === $value->type) {
             $this->context->builder->call(
                 $this->context->lookupFunction('__value__writeObject'),
                 $heapPtr,

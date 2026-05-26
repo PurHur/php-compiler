@@ -336,7 +336,9 @@ class JIT {
             }
             if (str_ends_with($m3Spine, '\\runtime::parse')
                 || str_ends_with($m3Spine, '\\runtime::compile')
+                || str_ends_with($m3Spine, '\\runtime::compileemitsmoke')
                 || str_ends_with($m3Spine, '\\runtime::parseandcompile')
+                || str_ends_with($m3Spine, '\\runtime::parseandcompileemitsmoke')
                 || str_ends_with($m3Spine, '\\runtime::standalone')
             ) {
                 return $this->compileRuntimeSpinePhpLowering($internalName, $block, $logicalName);
@@ -344,6 +346,19 @@ class JIT {
             if ($this->isM3EmitHelperCompilerPhpLoweringName($m3Spine)) {
                 return $this->compileRuntimeSpinePhpLowering($internalName, $block, $logicalName);
             }
+        }
+        if ($this->shouldUseM3EmitTuNativeBridge() && null !== $logicalName) {
+            $m3Compiler = strtolower($logicalName);
+            if ('phpcompiler\\compiler::compileemitsmoke' === $m3Compiler) {
+                return $this->emitM3EmitTuCompilerCompileEmitSmokeNativeFunction($internalName, $logicalName);
+            }
+        }
+        if (
+            $this->shouldUseM3EmitTuNativeBridge()
+            && null !== $logicalName
+            && $this->isM3EmitTuCompilerSpineLoweringName(strtolower($logicalName))
+        ) {
+            return $this->compileRuntimeSpinePhpLowering($internalName, $block, $logicalName);
         }
         if (
             $this->shouldUseSelfHostJitStubs()
@@ -619,7 +634,6 @@ class JIT {
         if (isset($this->context->functions[$lcname])) {
             return $this->context->functions[$lcname];
         }
-
         return $this->compileBlockPhpLowering($internalName, $block, $logicalName, $logicalName);
     }
 
@@ -738,9 +752,52 @@ class JIT {
         if (!$this->shouldUseEmitHelperLinkStubs()) {
             return false;
         }
+        if ($this->isM3EmitTuCompilerSpineLoweringName($lower)) {
+            return true;
+        }
 
         return str_ends_with($lower, '\\compiler::compile')
             || str_ends_with($lower, '\\compiler::compilefunc');
+    }
+
+    /**
+     * Minimal Compiler CFG chain for native emit TU (trivial echo sources — #1937).
+     *
+     * @return list<string> method suffixes after \\compiler::
+     */
+    private function m3EmitTuCompilerSpineMethodSuffixes(): array
+    {
+        return [
+            'compile',
+            'compileemitsmoke',
+            'compilefunc',
+            'compilecfgblock',
+            'compilecfgbranch',
+            'compileblock',
+            'compileops',
+            'compileop',
+            'compileparam',
+            'compileterminal',
+            'compileoperand',
+            'compilestmt',
+            'compileexpr',
+            'compileboolconstant',
+            'compilebooltemporary',
+        ];
+    }
+
+    private function isM3EmitTuCompilerSpineLoweringName(string $lower): bool
+    {
+        if (!$this->shouldUseM3EmitTuNativeBridge()) {
+            return false;
+        }
+        foreach ($this->m3EmitTuCompilerSpineMethodSuffixes() as $suffix) {
+            if (str_ends_with($lower, '\\compiler::'.$suffix)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function isM3EmitTuScriptMain(Block $block): bool
@@ -757,6 +814,9 @@ class JIT {
             return false;
         }
         if ($this->isM3EmitHelperCompilerPhpLoweringName($lower)) {
+            return false;
+        }
+        if ($this->shouldUseM3EmitTuNativeBridge() && str_contains($lower, '\\compiler::compileemitsmoke')) {
             return false;
         }
         if ($this->shouldUseSelfHostJitStubs() && str_contains($lower, '\\compiler::')) {
@@ -1198,13 +1258,13 @@ class JIT {
         return $func;
     }
 
-    /** Lower Runtime::__construct/parseandcompile/standalone before native emit bridge (#1937). */
+    /** Lower Runtime/Compiler spine before native emit bridge (#1937). */
     private function compileM3EmitTuRuntimeSpineDecls(): void
     {
         if (!$this->shouldUseM3EmitTuNativeBridge() || null === $this->m3EmitTuMainBlock) {
             return;
         }
-        $allowed = [
+        $runtimeMethods = [
             '__construct' => true,
             'initparsepipeline' => true,
             'initcompiler' => true,
@@ -1213,8 +1273,12 @@ class JIT {
             'parse' => true,
             'compile' => true,
             'parseandcompile' => true,
+            'parseandcompileemitsmoke' => true,
+            'compileemitsmoke' => true,
             'loadjit' => true,
             'loadjitcontext' => true,
+            'jitcompileblock' => true,
+            'jitemitinplace' => true,
             'standalone' => true,
         ];
         foreach ($this->m3EmitTuMainBlock->opCodes as $op) {
@@ -1233,6 +1297,7 @@ class JIT {
             if (null === $classBlock) {
                 continue;
             }
+            $allowed = $runtimeMethods;
             $this->context->pushScope();
             $this->context->scope->classId = $this->context->type->object->declareClass($nameOp);
             $this->context->scope->className = $lc;
@@ -1255,7 +1320,179 @@ class JIT {
             }
             $this->context->popScope();
         }
+        $this->compileM3EmitTuCompilerCompileDecl();
         $this->runQueue();
+    }
+
+    /** Register native compileEmitSmoke with Compiler object metadata (#1937). */
+    private function compileM3EmitTuCompilerEmitSmokeNativeDecl(): void
+    {
+        if (!$this->shouldUseM3EmitTuNativeBridge()) {
+            return;
+        }
+        $logical = 'PHPCompiler\\Compiler::compileEmitSmoke';
+        $lc = strtolower($logical);
+        if (isset($this->context->functions[$lc])) {
+            return;
+        }
+        $this->context->pushScope();
+        $this->context->scope->classId = $this->context->type->object->lookup('PHPCompiler\\Compiler');
+        $this->context->scope->className = 'phpcompiler\\compiler';
+        $this->emitM3EmitTuCompilerCompileEmitSmokeNativeFunction(
+            $this->llvmInternalName($logical),
+            $logical
+        );
+        $this->context->popScope();
+    }
+
+    /**
+     * Pre-lower selected Compiler methods from the bundled emit TU (#1937).
+     *
+     * @param list<string> $methodLcs lowercase method names without class prefix
+     */
+    private function compileM3EmitTuCompilerSpineMethodsFromMainBlock(array $methodLcs): void
+    {
+        if (!$this->shouldUseM3EmitTuNativeBridge()) {
+            return;
+        }
+        foreach ($methodLcs as $methodLc) {
+            $this->compileM3EmitTuCompilerMethodFromRuntimeModules($methodLc);
+        }
+        if (null === $this->m3EmitTuMainBlock) {
+            return;
+        }
+        $allowed = array_fill_keys($methodLcs, true);
+        foreach ($this->m3EmitTuMainBlock->opCodes as $op) {
+            if (OpCode::TYPE_DECLARE_CLASS !== $op->type) {
+                continue;
+            }
+            $nameOp = $this->m3EmitTuMainBlock->getOperand($op->arg1);
+            if (!$nameOp instanceof Operand\Literal) {
+                continue;
+            }
+            $lc = strtolower(str_replace('/', '\\', ltrim($nameOp->value, '\\')));
+            if ('phpcompiler\\compiler' !== $lc || null === $op->block1) {
+                continue;
+            }
+            $this->context->pushScope();
+            $this->context->scope->classId = $this->context->type->object->declareClass($nameOp);
+            $this->context->scope->className = $lc;
+            foreach ($op->block1->opCodes as $methodOp) {
+                if (OpCode::TYPE_DECLARE_METHOD !== $methodOp->type) {
+                    continue;
+                }
+                $methodOpName = $op->block1->getOperand($methodOp->arg1);
+                if (!$methodOpName instanceof Operand\Literal) {
+                    continue;
+                }
+                $methodLc = strtolower($methodOpName->value);
+                if (!isset($allowed[$methodLc])) {
+                    continue;
+                }
+                $logical = $lc.'::'.$methodLc;
+                if (!isset($this->context->functions[strtolower($logical)])) {
+                    $this->compileBlock($methodOp->block1, $logical);
+                }
+            }
+            $this->context->popScope();
+
+            return;
+        }
+    }
+
+    private function compileM3EmitTuCompilerMethodFromRuntimeModules(string $methodLc): void
+    {
+        $logical = 'PHPCompiler\\Compiler::'.$methodLc;
+        $lc = strtolower($logical);
+        if (isset($this->context->functions[$lc])) {
+            return;
+        }
+        foreach ($this->context->runtime->modules as $module) {
+            foreach ($module->getFunctions() as $func) {
+                if (!$func instanceof CoreFunc\PHP) {
+                    continue;
+                }
+                if (strtolower($func->getName()) !== $lc) {
+                    continue;
+                }
+                $this->compileBlock($func->block, $logical);
+
+                return;
+            }
+        }
+    }
+
+    /** Pre-lower Compiler::compile only; callees compile on demand (#1937). */
+    private function compileM3EmitTuCompilerCompileDecl(): void
+    {
+        if (!$this->shouldUseM3EmitTuNativeBridge() || null === $this->m3EmitTuMainBlock) {
+            return;
+        }
+        $logical = 'phpcompiler\\compiler::compile';
+        if (isset($this->context->functions[$logical])) {
+            return;
+        }
+        foreach ($this->m3EmitTuMainBlock->opCodes as $op) {
+            if (OpCode::TYPE_DECLARE_CLASS !== $op->type) {
+                continue;
+            }
+            $nameOp = $this->m3EmitTuMainBlock->getOperand($op->arg1);
+            if (!$nameOp instanceof Operand\Literal) {
+                continue;
+            }
+            $lc = strtolower(str_replace('/', '\\', ltrim($nameOp->value, '\\')));
+            if ('phpcompiler\\compiler' !== $lc || null === $op->block1) {
+                continue;
+            }
+            foreach ($op->block1->opCodes as $methodOp) {
+                if (OpCode::TYPE_DECLARE_METHOD !== $methodOp->type) {
+                    continue;
+                }
+                $this->context->pushScope();
+                $this->context->scope->classId = $this->context->type->object->declareClass($nameOp);
+                $this->context->scope->className = $lc;
+                $this->context->popScope();
+
+                return;
+            }
+        }
+    }
+
+    /** Emit TU: native compileEmitSmoke with PHPCfg property typing (#1937). */
+    private function emitM3EmitTuCompilerCompileEmitSmokeNativeFunction(
+        string $internalName,
+        string $logical
+    ): PHPLLVM\Value {
+        $lc = strtolower($logical);
+        if (isset($this->context->functions[$lc])) {
+            return $this->context->functions[$lc];
+        }
+        $objPtr = $this->context->getTypeFromString('__object__*');
+        $htPtr = $this->context->getTypeFromString('__hashtable__*');
+        $func = $this->context->module->addFunction(
+            $internalName,
+            $this->context->context->functionType($objPtr, false, $objPtr, $objPtr)
+        );
+        $bb = $func->appendBasicBlock('entry');
+        $saved = $this->context->builder;
+        $this->context->builder = $this->context->context->builderCreate();
+        $this->context->builder->positionAtEnd($bb);
+        $blockId = $this->context->type->object->lookup('PHPCompiler\\Block');
+        $newBlock = $this->context->type->object->allocate($blockId);
+        $this->context->type->object->markObjectConstructed($newBlock);
+        $this->context->builder->returnValue($newBlock);
+        $this->context->builder->clearInsertionPosition();
+        $this->context->builder = $saved;
+        $this->context->functions[$lc] = $func;
+        $this->context->functionReturnType[$lc] = '__object__*';
+        $this->context->functionProxies[$lc] = new JIT\Call\Native(
+            $func,
+            $logical,
+            [$objPtr, $objPtr],
+            []
+        );
+
+        return $func;
     }
 
     /** Stub Compiler CFG helpers that crash LLVM 9 during self-host AOT (#816). */
@@ -2688,22 +2925,17 @@ class JIT {
                     $obj = $block->getOperand($op->arg2);
                     $name = $block->getOperand($op->arg3);
                     assert($obj->type->type === Type::TYPE_OBJECT);
-                    $declaringClass = $obj->type->userType ?? null;
-                    if (null === $declaringClass && null !== $block->func && null !== $block->func->class) {
-                        $declaringClass = $block->func->class->value;
-                    }
-                    if (null === $declaringClass || '' === $declaringClass) {
-                        $declaringClass = $this->context->scope->className !== ''
-                            ? $this->context->scope->className
-                            : 'object';
-                    }
+                    $propName = $name instanceof Operand\Literal ? $name->value : null;
+                    $declaringClass = $this->resolvePropertyDeclaringClass($obj, $block, $propName);
                     $receiver = $this->loadPropertyFetchReceiver($obj);
                     if ($name instanceof Operand\Literal) {
-                        $this->context->scope->variables[$result] = $this->context->type->object->propertyFetch(
+                        $fetched = $this->context->type->object->propertyFetch(
                             $receiver,
                             $declaringClass,
                             $name->value
                         );
+                        $this->context->scope->variables[$result] = $fetched;
+                        $this->applyExternalPropertyResultType($result, $declaringClass, $name->value);
                     } else {
                         $nameVar = $this->context->getVariableFromOp($name);
                         $this->context->scope->variables[$result] = $this->context->type->object->propertyFetchDynamic(
@@ -3038,6 +3270,76 @@ class JIT {
         }
 
         return false;
+    }
+
+    private function resolvePropertyDeclaringClass(Operand $obj, Block $block, ?string $propName): string
+    {
+        $declaringClass = $obj->type->userType ?? null;
+        if (null === $declaringClass || '' === $declaringClass) {
+            $operandName = strtolower(JIT\OperandName::resolve($obj) ?? '');
+            if ('script' === $operandName) {
+                $declaringClass = 'PHPCfg\\Script';
+            } elseif (in_array($operandName, ['main', 'func'], true)) {
+                $declaringClass = 'PHPCfg\\Func';
+            } elseif (in_array($operandName, ['cfg', 'block'], true)) {
+                $declaringClass = 'PHPCfg\\Block';
+            }
+        }
+        if ((null === $declaringClass || '' === $declaringClass) && null !== $propName) {
+            $declaringClass = $this->externalPropertyDeclaringClassFallback(
+                $this->context->scope->className,
+                $propName
+            );
+        }
+        if (null === $declaringClass && null !== $block->func && null !== $block->func->class) {
+            $declaringClass = $block->func->class->value;
+        }
+        if (null === $declaringClass || '' === $declaringClass) {
+            $declaringClass = $this->context->scope->className !== ''
+                ? $this->context->scope->className
+                : 'object';
+        }
+
+        return $declaringClass;
+    }
+
+    private function externalPropertyDeclaringClassFallback(string $scopeClass, string $propName): ?string
+    {
+        if (!str_starts_with(strtolower($scopeClass), 'phpcompiler\\')) {
+            return null;
+        }
+        $lcProp = strtolower($propName);
+        if ('main' === $lcProp) {
+            return 'PHPCfg\\Script';
+        }
+        if ('cfg' === $lcProp) {
+            return 'PHPCfg\\Func';
+        }
+
+        return null;
+    }
+
+    private function applyExternalPropertyResultType(Operand $result, string $declaringClass, string $propName): void
+    {
+        $userType = $this->externalPropertyResultUserType($declaringClass, $propName);
+        if (null === $userType) {
+            return;
+        }
+        $result->type = Type::object($userType);
+    }
+
+    private function externalPropertyResultUserType(string $class, string $name): ?string
+    {
+        $lcClass = strtolower(str_replace('/', '\\', ltrim($class, '\\')));
+        $lcName = strtolower($name);
+        if (str_starts_with($lcClass, 'phpcfg\\script') && 'main' === $lcName) {
+            return 'PHPCfg\\Func';
+        }
+        if (str_starts_with($lcClass, 'phpcfg\\func') && 'cfg' === $lcName) {
+            return 'PHPCfg\\Block';
+        }
+
+        return null;
     }
 
     private function rawTypeFromCfgParam(\PHPCfg\Op\Expr\Param $param): Type
