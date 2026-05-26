@@ -9,6 +9,7 @@ static const char *phpc_builtin_functions[] = {
     "array_diff",
     "array_fill",
     "array_fill_keys",
+    "array_pad",
     "array_filter",
     "array_flip",
     "array_intersect",

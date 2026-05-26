@@ -484,6 +484,61 @@ final class HashTable {
     }
 
     /**
+     * Pad a packed list to {@param $length} elements with {@param $value} (array_pad subset).
+     */
+    public function padCopy(int $length, Variable $value): HashTable
+    {
+        if (!$this->isWithoutHoles()) {
+            throw new \LogicException('padCopy() only supports packed list arrays without holes');
+        }
+        $count = $this->numElements;
+        $target = abs($length);
+        if ($target <= $count) {
+            $out = new self();
+            foreach ($this->iterate(true) as $element) {
+                $copy = new Variable();
+                $copy->copyFrom($element);
+                $out->append($copy);
+            }
+
+            return $out;
+        }
+        $padCount = $target - $count;
+        $pad = new Variable();
+        $pad->copyFrom($value);
+        if ($length > 0) {
+            $out = new self();
+            foreach ($this->iterate(true) as $element) {
+                $copy = new Variable();
+                $copy->copyFrom($element);
+                $out->append($copy);
+            }
+            for ($i = 0; $i < $padCount; ++$i) {
+                $copy = new Variable();
+                $copy->copyFrom($pad);
+                $out->append($copy);
+            }
+
+            return $out;
+        }
+        $prepend = [];
+        for ($i = 0; $i < $padCount; ++$i) {
+            $copy = new Variable();
+            $copy->copyFrom($pad);
+            $prepend[] = $copy;
+        }
+        $out = new self();
+        $out->unshiftPrepend(...$prepend);
+        foreach ($this->iterate(true) as $element) {
+            $copy = new Variable();
+            $copy->copyFrom($element);
+            $out->append($copy);
+        }
+
+        return $out;
+    }
+
+    /**
      * Copy a sub-range of a packed list array into a new list (non-negative offset).
      */
     public function sliceCopy(int $offset, ?int $length = null): HashTable

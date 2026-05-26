@@ -53,6 +53,14 @@ final class VmArray
     }
 
     /**
+     * array_pad() — pad packed list {@param $array} to abs({@param $length}) with {@param $value}.
+     */
+    public static function pad(HashTable $array, int $length, Variable $value): HashTable
+    {
+        return $array->padCopy($length, $value);
+    }
+
+    /**
      * array_fill_keys() — keys from values of {@param $keys}, uniform {@param $value}.
      */
     public static function fillKeys(HashTable $keys, Variable $value): HashTable

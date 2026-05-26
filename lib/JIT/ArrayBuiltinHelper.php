@@ -3363,6 +3363,190 @@ final class ArrayBuiltinHelper
         return self::fillKeysHashTable($context, $keysHt, $value);
     }
 
+    /**
+     * array_pad() — pad a packed list hashtable to abs({@param $length}) with {@param $value}.
+     */
+    public static function pad(Context $context, Variable $array, Value $length, Variable $value): Value
+    {
+        $src = self::isNativeArray($array->type)
+            ? HashTableHelper::materializeNativeArrayForCall($context, $array)
+            : self::loadHashTable($context, $array);
+
+        return self::padHashTable($context, $src, $length, $value);
+    }
+
+    private static function padHashTable(Context $context, Value $src, Value $length, Variable $value): Value
+    {
+        $sizeT = $context->getTypeFromString('size_t');
+        $i64 = $context->getTypeFromString('int64');
+        $zero64 = $i64->constInt(0, false);
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $negLen = $context->builder->icmp(Builder::INT_SLT, $length, $zero64);
+        $negBlock = BasicBlockHelper::append($context, 'array_pad_abs_neg');
+        $posBlock = BasicBlockHelper::append($context, 'array_pad_abs_pos');
+        $absDone = BasicBlockHelper::append($context, 'array_pad_abs_done');
+        $context->builder->branchIf($negLen, $negBlock, $posBlock);
+        $context->builder->positionAtEnd($negBlock);
+        $negated = $context->builder->sub($zero64, $length);
+        $context->builder->branch($absDone);
+        $context->builder->positionAtEnd($posBlock);
+        $context->builder->branch($absDone);
+        $context->builder->positionAtEnd($absDone);
+        $absPhi = $context->builder->phi($i64);
+        $absPhi->addIncoming($negated, $negBlock);
+        $absPhi->addIncoming($length, $posBlock);
+        $target = $context->builder->truncOrBitCast($absPhi, $sizeT);
+
+        $count = $context->builder->call(
+            $context->lookupFunction('__hashtable__getNumElements'),
+            $src
+        );
+        $needsPad = $context->builder->icmp(Builder::INT_SGT, $target, $count);
+        $noPadBlock = BasicBlockHelper::append($context, 'array_pad_no_pad');
+        $padBlock = BasicBlockHelper::append($context, 'array_pad_pad');
+        $doneBlock = BasicBlockHelper::append($context, 'array_pad_done');
+        $context->builder->branchIf($needsPad, $padBlock, $noPadBlock);
+
+        $context->builder->positionAtEnd($noPadBlock);
+        $copied = self::copyPackedListHashTable($context, $src, $zero);
+        $noPadExit = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($padBlock);
+        $padCount = $context->builder->sub($target, $count);
+        $posLen = $context->builder->icmp(Builder::INT_SGT, $length, $zero64);
+        $rightBlock = BasicBlockHelper::append($context, 'array_pad_right');
+        $leftBlock = BasicBlockHelper::append($context, 'array_pad_left');
+        $padDone = BasicBlockHelper::append($context, 'array_pad_pad_done');
+        $context->builder->branchIf($posLen, $rightBlock, $leftBlock);
+
+        $context->builder->positionAtEnd($rightBlock);
+        $rightHt = self::copyPackedListHashTable($context, $src, $zero);
+        $padIdxSlot = $context->builder->alloca($sizeT, 1, 'array_pad_right_idx');
+        $context->builder->store($count, $padIdxSlot);
+        $rightHead = BasicBlockHelper::append($context, 'array_pad_right_head');
+        $rightBody = BasicBlockHelper::append($context, 'array_pad_right_body');
+        $rightAdvance = BasicBlockHelper::append($context, 'array_pad_right_advance');
+        $rightDone = BasicBlockHelper::append($context, 'array_pad_right_done');
+        $context->builder->branch($rightHead);
+        $context->builder->positionAtEnd($rightHead);
+        $padIdx = $context->builder->load($padIdxSlot);
+        $rightAtEnd = $context->builder->icmp(Builder::INT_SGE, $padIdx, $target);
+        $context->builder->branchIf($rightAtEnd, $rightDone, $rightBody);
+        $context->builder->positionAtEnd($rightBody);
+        self::appendElement($context, $rightHt, $value);
+        $context->builder->branch($rightAdvance);
+        $context->builder->positionAtEnd($rightAdvance);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($padIdx, $one),
+            $padIdxSlot
+        );
+        $context->builder->branch($rightHead);
+        $context->builder->positionAtEnd($rightDone);
+        $context->builder->branch($padDone);
+
+        $context->builder->positionAtEnd($leftBlock);
+        $leftHt = HashTableHelper::alloc($context);
+        $leftIdxSlot = $context->builder->alloca($sizeT, 1, 'array_pad_left_pad_idx');
+        $context->builder->store($zero, $leftIdxSlot);
+        $leftPadHead = BasicBlockHelper::append($context, 'array_pad_left_pad_head');
+        $leftPadBody = BasicBlockHelper::append($context, 'array_pad_left_pad_body');
+        $leftPadAdvance = BasicBlockHelper::append($context, 'array_pad_left_pad_advance');
+        $leftCopyBlock = BasicBlockHelper::append($context, 'array_pad_left_copy');
+        $context->builder->branch($leftPadHead);
+        $context->builder->positionAtEnd($leftPadHead);
+        $leftPadIdx = $context->builder->load($leftIdxSlot);
+        $leftPadAtEnd = $context->builder->icmp(Builder::INT_SGE, $leftPadIdx, $padCount);
+        $context->builder->branchIf($leftPadAtEnd, $leftCopyBlock, $leftPadBody);
+        $context->builder->positionAtEnd($leftPadBody);
+        HashTableHelper::setAtIndex($context, $leftHt, $leftPadIdx, $value);
+        $context->builder->branch($leftPadAdvance);
+        $context->builder->positionAtEnd($leftPadAdvance);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($leftPadIdx, $one),
+            $leftIdxSlot
+        );
+        $context->builder->branch($leftPadHead);
+        $context->builder->positionAtEnd($leftCopyBlock);
+        $leftPadded = self::copyPackedListHashTable($context, $src, $padCount, $leftHt);
+        $leftPadExit = $context->builder->getInsertBlock();
+        $context->builder->branch($padDone);
+
+        $context->builder->positionAtEnd($padDone);
+        $padPhi = $context->builder->phi($rightHt->typeOf());
+        $padPhi->addIncoming($rightHt, $rightDone);
+        $padPhi->addIncoming($leftPadded, $leftPadExit);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $resultPhi = $context->builder->phi($copied->typeOf());
+        $resultPhi->addIncoming($copied, $noPadExit);
+        $resultPhi->addIncoming($padPhi, $padDone);
+
+        return $resultPhi;
+    }
+
+    /**
+     * Copy packed list {@param $src} into a new hashtable starting at {@param $destOffset}.
+     */
+    private static function copyPackedListHashTable(
+        Context $context,
+        Value $src,
+        Value $destOffset,
+        ?Value $destIn = null
+    ): Value {
+        $map = $context->structFieldMap['__hashtable__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $nextFree = $context->builder->load(
+            $context->builder->structGep($src, $map['nextFreeElement'])
+        );
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $nextFree, $zero);
+        $emptyBlock = BasicBlockHelper::append($context, 'array_pad_copy_empty');
+        $workBlock = BasicBlockHelper::append($context, 'array_pad_copy_work');
+        $doneBlock = BasicBlockHelper::append($context, 'array_pad_copy_done');
+        $context->builder->branchIf($isEmpty, $emptyBlock, $workBlock);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        $emptyHt = null !== $destIn ? $destIn : HashTableHelper::alloc($context);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($workBlock);
+        $dest = null !== $destIn ? $destIn : HashTableHelper::alloc($context);
+        $srcIdxSlot = $context->builder->alloca($sizeT, 1, 'array_pad_copy_src');
+        $context->builder->store($zero, $srcIdxSlot);
+        $head = BasicBlockHelper::append($context, 'array_pad_copy_head');
+        $body = BasicBlockHelper::append($context, 'array_pad_copy_body');
+        $advance = BasicBlockHelper::append($context, 'array_pad_copy_advance');
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $srcIdx = $context->builder->load($srcIdxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $srcIdx, $nextFree);
+        $context->builder->branchIf($atEnd, $doneBlock, $body);
+
+        $context->builder->positionAtEnd($body);
+        $destIdx = $context->builder->addNoSignedWrap($destOffset, $srcIdx);
+        self::copyPackedListEntry($context, $src, $srcIdx, $dest, $destIdx);
+        $context->builder->branch($advance);
+
+        $context->builder->positionAtEnd($advance);
+        $context->builder->store(
+            $context->builder->addNoSignedWrap($srcIdx, $one),
+            $srcIdxSlot
+        );
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($emptyHt->typeOf());
+        $phi->addIncoming($emptyHt, $emptyBlock);
+        $phi->addIncoming($dest, $head);
+
+        return $phi;
+    }
+
     private static function fillKeysHashTable(Context $context, Value $keysHt, Variable $value): Value
     {
         $sizeT = $context->getTypeFromString('size_t');
