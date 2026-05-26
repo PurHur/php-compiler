@@ -474,6 +474,11 @@ class Type extends Builtin {
             $this->context->context->functionType($htPtr, false, $i64, $i64, $strPtr, $strPtr, $strPtr)
         );
         $this->context->registerFunction('__compiler_fgetcsv', $fnFgetcsv);
+        $fnStrGetcsv = $this->context->module->addFunction(
+            '__compiler_str_getcsv',
+            $this->context->context->functionType($htPtr, false, $strPtr, $strPtr, $strPtr, $strPtr)
+        );
+        $this->context->registerFunction('__compiler_str_getcsv', $fnStrGetcsv);
         $valuePtr = $this->context->getTypeFromString('__value__*');
         $i64 = $this->context->getTypeFromString('int64');
         $fnParseUrl = $this->context->module->addFunction(
