@@ -88,12 +88,12 @@ final class M3EmitTuTrivialEchoAot
         callable $defaultEmit
     ): Value {
         if (!self::isRegistered($context)) {
-            return $defaultEmit($runtimeThis, $code, $filename);
+            return $defaultEmit($context, $runtimeThis, $code, $filename);
         }
         $objPtr = $context->getTypeFromString('__object__*');
         $sourceGlobal = $context->m3EmitTuTrivialEchoSourceGlobal;
         if (null === $sourceGlobal) {
-            return $defaultEmit($runtimeThis, $code, $filename);
+            return $defaultEmit($context, $runtimeThis, $code, $filename);
         }
         $cached = $context->builder->load($sourceGlobal);
         $matches = JitStringCompare::identical($context, $code, $cached);
@@ -102,7 +102,7 @@ final class M3EmitTuTrivialEchoAot
         $merge = BasicBlockHelper::append($context, 'm3te_pac_done');
         $context->builder->branchIf($matches, $ok, $fail);
         $context->builder->positionAtEnd($fail);
-        $defaultBlock = $defaultEmit($runtimeThis, $code, $filename);
+        $defaultBlock = $defaultEmit($context, $runtimeThis, $code, $filename);
         $context->builder->branch($merge);
         $context->builder->positionAtEnd($ok);
         $lc = strtolower(self::SENTINEL_LOGICAL);

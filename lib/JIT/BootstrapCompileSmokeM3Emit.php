@@ -196,20 +196,27 @@ final class BootstrapCompileSmokeM3Emit
             $runtimeThis,
             $code,
             $filename,
-            static function (Value $runtimeThis, Value $code, Value $filename) use ($context): Value {
-                $script = $context->builder->call(
-                    self::runtimeSpine($context, 'parse', '__object__*', ['__object__*', '__string__*', '__string__*']),
-                    $runtimeThis,
-                    $code,
-                    $filename
-                );
+            [self::class, 'emitRuntimeParseAndCompileDefault']
+        );
+    }
 
-                return $context->builder->call(
-                    self::runtimeSpine($context, 'compileemitsmoke', '__object__*', ['__object__*', '__object__*']),
-                    $runtimeThis,
-                    $script
-                );
-            }
+    public static function emitRuntimeParseAndCompileDefault(
+        Context $context,
+        Value $runtimeThis,
+        Value $code,
+        Value $filename
+    ): Value {
+        $script = $context->builder->call(
+            self::runtimeSpine($context, 'parse', '__object__*', ['__object__*', '__string__*', '__string__*']),
+            $runtimeThis,
+            $code,
+            $filename
+        );
+
+        return $context->builder->call(
+            self::runtimeSpine($context, 'compileemitsmoke', '__object__*', ['__object__*', '__object__*']),
+            $runtimeThis,
+            $script
         );
     }
 
