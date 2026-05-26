@@ -109,7 +109,7 @@ final class BootstrapCompileSmokeM3Emit
         $context->builder->positionAtEnd($readOk);
         $runtime = RuntimeEmitTuAlloc::emit($context);
         $mode = $i64->constInt(self::MODE_AOT, false);
-        if (self::shouldUseEmitTuRealLowering($context)) {
+        if (self::shouldUseEmitTuMinimalShellInit($context)) {
             RuntimeEmitTuInit::emitInitSequence($context, $runtime, $mode);
         } else {
             $context->builder->call(
@@ -118,12 +118,31 @@ final class BootstrapCompileSmokeM3Emit
                 $mode
             );
         }
-        $parseAndCompileMethod = 'parseandcompileemitsmoke';
-        $block = $context->builder->call(
-            self::runtimeSpine($context, $parseAndCompileMethod, '__object__*', ['__object__*', '__string__*', '__string__*']),
+        $script = $context->builder->call(
+            self::runtimeSpine($context, 'parse', '__object__*', ['__object__*', '__string__*', '__string__*']),
             $runtime,
             $code,
             $sourceFile
+        );
+        $scriptNull = $context->builder->icmp(Builder::INT_EQ, $script, $objPtr->constNull());
+        $parseFail = BasicBlockHelper::append($context, 'csm3_parse_fail_'.$tag);
+        $parseOk = BasicBlockHelper::append($context, 'csm3_parse_ok_'.$tag);
+        $context->builder->branchIf($scriptNull, $parseFail, $parseOk);
+
+        $context->builder->positionAtEnd($parseFail);
+        self::echoPhaseError(
+            $context,
+            $logPrefix,
+            $logPrefix.': Runtime::parse returned null (parser spine)',
+            'parse'
+        );
+        $context->builder->returnValue($retFail);
+
+        $context->builder->positionAtEnd($parseOk);
+        $block = $context->builder->call(
+            self::runtimeSpine($context, 'compileemitsmoke', '__object__*', ['__object__*', '__object__*']),
+            $runtime,
+            $script
         );
         $blockNull = $context->builder->icmp(Builder::INT_EQ, $block, $objPtr->constNull());
         $pacFail = BasicBlockHelper::append($context, 'csm3_pac_fail_'.$tag);
@@ -134,8 +153,8 @@ final class BootstrapCompileSmokeM3Emit
         self::echoPhaseError(
             $context,
             $logPrefix,
-            $logPrefix.': parseAndCompile returned null (parser/CFG spine)',
-            'parseAndCompile'
+            $logPrefix.': Runtime::compileEmitSmoke returned null (CFG spine)',
+            'compileEmitSmoke'
         );
         $context->builder->returnValue($retFail);
 
@@ -160,7 +179,8 @@ final class BootstrapCompileSmokeM3Emit
         $context->builder->returnValue($retOk);
     }
 
-    private static function shouldUseEmitTuRealLowering(Context $context): bool
+    /** C-floor init spine after allocate/allocateEmitTuShell (#2550, #2566). */
+    private static function shouldUseEmitTuMinimalShellInit(Context $context): bool
     {
         $minimal = getenv('PHP_COMPILER_M3_EMIT_MINIMAL');
 
@@ -192,18 +212,28 @@ final class BootstrapCompileSmokeM3Emit
         Value $code,
         Value $filename
     ): Value {
+        $objPtr = $context->getTypeFromString('__object__*');
+        $tag = 'pac'.(string) ++self::$seq;
         $script = $context->builder->call(
             self::runtimeSpine($context, 'parse', '__object__*', ['__object__*', '__string__*', '__string__*']),
             $runtimeThis,
             $code,
             $filename
         );
-
-        return $context->builder->call(
+        $scriptNull = $context->builder->icmp(Builder::INT_EQ, $script, $objPtr->constNull());
+        $parseFail = BasicBlockHelper::append($context, 'csm3_parse_fail_'.$tag);
+        $parseOk = BasicBlockHelper::append($context, 'csm3_parse_ok_'.$tag);
+        $context->builder->branchIf($scriptNull, $parseFail, $parseOk);
+        $context->builder->positionAtEnd($parseFail);
+        $context->builder->returnValue($objPtr->constNull());
+        $context->builder->positionAtEnd($parseOk);
+        $block = $context->builder->call(
             self::runtimeSpine($context, 'compileemitsmoke', '__object__*', ['__object__*', '__object__*']),
             $runtimeThis,
             $script
         );
+
+        return $block;
     }
 
     /** Register native LLVM for Runtime::parseandcompile / parseandcompileemitsmoke (#2516). */
@@ -294,7 +324,7 @@ final class BootstrapCompileSmokeM3Emit
         string $returnTypeName,
         array $paramTypeNames
     ): Value {
-        $logical = 'phpcompiler\\runtime::'.$methodLc;
+        $logical = 'PHPCompiler\\Runtime::'.$methodLc;
         $lc = strtolower($logical);
         if (isset($context->functions[$lc])) {
             return $context->functions[$lc];
