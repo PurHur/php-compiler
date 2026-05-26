@@ -1118,6 +1118,12 @@ final class Doctor
             'SELFHOSTPROBE_AOT_SMOKE_GATE=1 EXAMPLES_AOT_SMOKE_ONLY=008 ./script/examples-aot-smoke.sh · north-star3-verify (#2407)',
             '#2407'
         );
+        $rootReadme008Default = $defaults['ROOT_README_008_SYNC_GATE'] ?? '0';
+        $rootReadme008On = self::gateEnabled('ROOT_README_008_SYNC_GATE', $rootReadme008Default);
+        $rootReadme008Icon = $rootReadme008On ? '✅' : '⬜';
+        fwrite(STDOUT, "\n  Doc sync (ci-fast inventory):\n");
+        fwrite(STDOUT, "  [{$rootReadme008Icon}] README 008 stale phrases — ROOT_README_008_SYNC_GATE default {$rootReadme008Default} (#2229)\n");
+        fwrite(STDOUT, "      Run: ROOT_README_008_SYNC_GATE=1 php script/check-root-readme-sync.php · ci-fast when gate=1\n");
         $initProfileLive = \PHPCompiler\Cli\PhpcInit::isKnownProfile('selfhostprobe');
         $initTemplate = is_file($repoRoot.'/templates/init-selfhostprobe/example.php');
         fwrite(STDOUT, "\n  Related:\n");

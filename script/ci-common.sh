@@ -212,6 +212,14 @@ ci_run_root_readme_007_sync_check() {
   ROOT_README_007_SYNC_GATE=1 "$PHP_BIN" "${PHP_OPTS[@]}" script/check-root-readme-sync.php
 }
 
+ci_run_root_readme_008_sync_check() {
+  if [[ "${ROOT_README_008_SYNC_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  echo "Root README 008 sync (ROOT_README_008_SYNC_GATE=1, issue #2229)..."
+  ROOT_README_008_SYNC_GATE=1 "$PHP_BIN" "${PHP_OPTS[@]}" script/check-root-readme-sync.php
+}
+
 ci_run_root_readme_009_sync_check() {
   if [[ "${ROOT_README_009_SYNC_GATE:-1}" != "1" ]]; then
     return 0
@@ -411,6 +419,7 @@ ci_run_inventory_checks() {
   ci_run_root_readme_sync_check
   ci_run_root_readme_006_sync_check
   ci_run_root_readme_007_sync_check
+  ci_run_root_readme_008_sync_check
   ci_run_root_readme_009_sync_check
   ci_run_development_status_sync_check
   ci_run_development_status_007_sync_check
