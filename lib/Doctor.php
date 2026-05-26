@@ -177,6 +177,7 @@ final class Doctor
         $m4LoopProbeDefault = $defaults['BOOTSTRAP_M4_LOOP_PROBE'] ?? '0';
         $m4Gen2SyncDefault = $defaults['SELFHOST_M4_GEN2_SYNC_GATE'] ?? '1';
         $compilerDriverSmokeDefault = $defaults['COMPILER_DRIVER_SMOKE_GATE'] ?? '1';
+        $compilerUnitProbeDefault = $defaults['BOOTSTRAP_COMPILER_UNIT_PROBE_GATE'] ?? '1';
         $jitUnitProbeDefault = $defaults['BOOTSTRAP_JIT_UNIT_PROBE_GATE'] ?? '0';
         $vmUnitProbeDefault = $defaults['BOOTSTRAP_VM_UNIT_PROBE_GATE'] ?? '0';
         $parserUnitProbeDefault = $defaults['BOOTSTRAP_PARSER_UNIT_PROBE_GATE'] ?? '1';
@@ -206,6 +207,8 @@ final class Doctor
         fwrite(STDOUT, "   BOOTSTRAP_LIB_SPINE_VM_SMOKE=1 make bootstrap-selfhost-lib-spine-vm-smoke\n");
         fwrite(STDOUT, "   BOOTSTRAP_COMPILER_DRIVER_SMOKE=1 make bootstrap-selfhost-compiler-driver-smoke\n");
         fwrite(STDOUT, '   COMPILER_DRIVER_SMOKE_GATE='.(self::gateEnabled('COMPILER_DRIVER_SMOKE_GATE', $compilerDriverSmokeDefault) ? '1' : '0')." (default {$compilerDriverSmokeDefault}) — ci-local LLVM tail ([#2137](https://github.com/PurHur/php-compiler/issues/2137), [#2168](https://github.com/PurHur/php-compiler/issues/2168))\n");
+        fwrite(STDOUT, "   make bootstrap-selfhost-compiler-unit-probe\n");
+        fwrite(STDOUT, '   BOOTSTRAP_COMPILER_UNIT_PROBE_GATE='.(self::gateEnabled('BOOTSTRAP_COMPILER_UNIT_PROBE_GATE', $compilerUnitProbeDefault) ? '1' : '0')." (default {$compilerUnitProbeDefault}) — ci-local LLVM tail ([#2216](https://github.com/PurHur/php-compiler/issues/2216), [#2221](https://github.com/PurHur/php-compiler/issues/2221))\n");
         fwrite(STDOUT, "   make bootstrap-selfhost-jit-unit-probe\n");
         fwrite(STDOUT, '   BOOTSTRAP_JIT_UNIT_PROBE_GATE='.(self::gateEnabled('BOOTSTRAP_JIT_UNIT_PROBE_GATE', $jitUnitProbeDefault) ? '1' : '0')." (default {$jitUnitProbeDefault}) — ci-local LLVM tail ([#2332](https://github.com/PurHur/php-compiler/issues/2332), [#2361](https://github.com/PurHur/php-compiler/issues/2361))\n");
         fwrite(STDOUT, "   make bootstrap-selfhost-vm-unit-probe\n");
@@ -480,6 +483,13 @@ final class Doctor
             : 'skipped (COMPILER_DRIVER_SMOKE_GATE=0 opt-out)';
         fwrite(STDOUT, "  M3 driver smoke  BOOTSTRAP_COMPILER_DRIVER_SMOKE=1 make bootstrap-selfhost-compiler-driver-smoke\n");
         fwrite(STDOUT, "                   {$compilerDriverSmokeDetail}\n");
+        $compilerUnitProbeDefaultPresenter = $defaultsPresenter['BOOTSTRAP_COMPILER_UNIT_PROBE_GATE'] ?? '1';
+        $compilerUnitProbeOn = self::gateEnabled('BOOTSTRAP_COMPILER_UNIT_PROBE_GATE', $compilerUnitProbeDefaultPresenter);
+        $compilerUnitProbeDetail = $compilerUnitProbeOn
+            ? 'BOOTSTRAP_COMPILER_UNIT_PROBE_GATE=1 — ci-local LLVM tail M3 Compiler unit probe (#2216, #2221)'
+            : 'opt-out BOOTSTRAP_COMPILER_UNIT_PROBE_GATE=0 to skip lib/Compiler.php native link (#2216)';
+        fwrite(STDOUT, "  M3 compiler probe make bootstrap-selfhost-compiler-unit-probe\n");
+        fwrite(STDOUT, "                   {$compilerUnitProbeDetail}\n");
         $jitUnitProbeDefaultPresenter = $defaultsPresenter['BOOTSTRAP_JIT_UNIT_PROBE_GATE'] ?? '0';
         $jitUnitProbeOn = self::gateEnabled('BOOTSTRAP_JIT_UNIT_PROBE_GATE', $jitUnitProbeDefaultPresenter);
         $jitUnitProbeDetail = $jitUnitProbeOn
