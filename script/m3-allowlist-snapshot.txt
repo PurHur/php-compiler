@@ -1,4 +1,5 @@
 # M3 compile-driver allowlist/denylist — regenerate: php script/bootstrap-m3-allowlist-snapshot.php --write
+allow:\compiler::compileemitsmoke
 allow:\runtime::__construct
 allow:\runtime::compile
 allow:\runtime::initcompiler
