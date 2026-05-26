@@ -15,11 +15,11 @@ usage() {
 Usage: script/bootstrap-loop-probe.sh [--dry-run]
 
 M4 bootstrap-loop probe (#1498). Runs M2 spine + M3 partial + gen-1 link/gen-2 attempt,
-then (unless --dry-run) M3 strict native emit. Full gen-2 without Zend remains blocked on M3.
+then (unless --dry-run) M3 strict native emit and gen-1→gen-2 native slice.
 
 Exit codes:
   0  --dry-run: lint + M2 spine + M3 partial + gen-1 link (gen-2 Zend partial OK) green
-     full:      same + M3 strict green; gen-2 native still blocked until M3/M4 close
+     full:      same + M3 strict + gen-1→gen-2 native emit (BOOTSTRAP_M4_RUNTIME_COMPILE=1)
   1  hard failure (missing entry/scripts, lint, M2 spine, M3 partial, or gen-1 link)
   2  LLVM 9 not found (skip), or full mode: M3 strict / gen-2 native emit not ready
   3  reserved
@@ -191,17 +191,10 @@ echo ""
 if [[ "${DRY_RUN}" -eq 1 ]]; then
   echo "bootstrap-loop-probe: --dry-run OK (exit 0)"
   echo ""
-  echo "Current blockers for full M4 loop (not run in --dry-run):"
-  echo "  1. M3 strict native emit:"
-  echo "       BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1 \\"
-  echo "       BOOTSTRAP_M3_RUNTIME_COMPILE=1 \\"
-  echo "       BOOTSTRAP_M3_HELLOWORLD_STRICT=1 make bootstrap-selfhost-helloworld"
-  echo "     Tracker: #1402, docs/bootstrap-m5-fast-path.md"
-  echo "  2. M4 gen-2 native emit (gen-1 link OK; native gen-2 blocked on M3 — #1498):"
-  echo "       BOOTSTRAP_M4_LINK_COMPILE_DRIVER=1 BOOTSTRAP_M4_RUNTIME_COMPILE=1 \\"
-  echo "         ./script/bootstrap-loop-gen1-link.sh"
-  echo "       Then: gen-1 compiles bin/compile.php (or src/cli.php) → full gen-2 (#1467)"
-  echo "       gen-2 rebuilds compiler tree without Zend; gen-1/gen-2 artifacts must match"
+  echo "Full M4 loop (without --dry-run): M3 strict + gen-1→gen-2 native emit."
+  echo "  make bootstrap-loop-probe"
+  echo "  make bootstrap-selfhost-helloworld  # default native emit (strict; #2522)"
+  echo "Next: gen-1 compiles bin/compile.php (or src/cli.php) → full gen-2 tree (#1467, #1521)"
   exit 0
 fi
 
@@ -221,7 +214,7 @@ set -e
 if [[ "${M3_CODE}" -ne 0 ]]; then
   echo "bootstrap-loop-probe: M3 strict native emit not ready — M4 blocked (exit 2)" >&2
   echo "bootstrap-loop-probe: close M3 first (#1402, docs/bootstrap-m5-fast-path.md)" >&2
-  echo "bootstrap-loop-probe: hint: BOOTSTRAP_M3_HELLOWORLD_STRICT=1 make bootstrap-selfhost-helloworld" >&2
+  echo "bootstrap-loop-probe: hint: make bootstrap-selfhost-helloworld" >&2
   echo "bootstrap-loop-probe: use --dry-run to validate lint + spine + M3 partial without strict" >&2
   m4_probe_tail "${M3_STRICT_OUT}"
   exit 2
@@ -237,7 +230,7 @@ if grep -q 'emit_path=native' "${GEN1_LOG}" 2>/dev/null; then
 fi
 
 echo "bootstrap-loop-probe: M3 strict OK; M4 gen-2 native emit still blocked (exit 2)" >&2
-echo "bootstrap-loop-probe: gen-1 link + Zend gen-2 partial OK — close M3 runtime compile (#1402)" >&2
-echo "bootstrap-loop-probe: NEXT: BOOTSTRAP_M4_RUNTIME_COMPILE=1 ./script/bootstrap-loop-gen1-link.sh" >&2
+echo "bootstrap-loop-probe: gen-1 link log lacked emit_path=native — check gen-1 native emit output" >&2
+echo "bootstrap-loop-probe: NEXT: make bootstrap-loop-gen1-link" >&2
 m4_probe_tail "${GEN1_LOG}" 5
 exit 2
