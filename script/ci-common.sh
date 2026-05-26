@@ -585,6 +585,19 @@ ci_run_bootstrap_vm_unit_probe() {
   "$_CI_SCRIPT_DIR/bootstrap-selfhost-vm-unit-probe.sh"
 }
 
+# M3 PHPTypes unit probe: lib/JIT.php Type constants bundle native link + run (issue #2430); opt-in (#2433).
+ci_run_bootstrap_phptypes_unit_probe() {
+  if [[ "${BOOTSTRAP_PHPTYPES_UNIT_PROBE_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  if ! ci_llvm_ready; then
+    echo "bootstrap-selfhost-types-unit-probe: skipped (LLVM 9 not available)"
+    return 0
+  fi
+  echo "bootstrap-selfhost-types-unit-probe (BOOTSTRAP_PHPTYPES_UNIT_PROBE_GATE=1, issue #2430, #2433)..."
+  "$_CI_SCRIPT_DIR/bootstrap-selfhost-types-unit-probe.sh"
+}
+
 # Bootstrap test subset in fast CI (issue #2069); default off — opt-in BOOTSTRAP_TEST_SUBSET_GATE=1.
 ci_run_bootstrap_test_subset() {
   if [[ "${BOOTSTRAP_TEST_SUBSET_GATE:-0}" != "1" ]]; then

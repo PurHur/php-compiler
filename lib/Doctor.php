@@ -178,6 +178,7 @@ final class Doctor
         $compilerDriverSmokeDefault = $defaults['COMPILER_DRIVER_SMOKE_GATE'] ?? '1';
         $jitUnitProbeDefault = $defaults['BOOTSTRAP_JIT_UNIT_PROBE_GATE'] ?? '0';
         $vmUnitProbeDefault = $defaults['BOOTSTRAP_VM_UNIT_PROBE_GATE'] ?? '0';
+        $phptypesUnitProbeDefault = $defaults['BOOTSTRAP_PHPTYPES_UNIT_PROBE_GATE'] ?? '0';
         $testSubsetDefault = $defaults['BOOTSTRAP_TEST_SUBSET_GATE'] ?? '0';
         $testSubsetStrictDefault = $defaults['BOOTSTRAP_TEST_SUBSET_STRICT'] ?? '0';
 
@@ -208,7 +209,8 @@ final class Doctor
         fwrite(STDOUT, "   make bootstrap-selfhost-vm-unit-probe\n");
         fwrite(STDOUT, '   BOOTSTRAP_VM_UNIT_PROBE_GATE='.(self::gateEnabled('BOOTSTRAP_VM_UNIT_PROBE_GATE', $vmUnitProbeDefault) ? '1' : '0')." (default {$vmUnitProbeDefault}) — ci-local LLVM tail ([#2354](https://github.com/PurHur/php-compiler/issues/2354), [#2368](https://github.com/PurHur/php-compiler/issues/2368))\n");
         fwrite(STDOUT, "   make bootstrap-selfhost-parser-unit-probe  (#2409 CFG parse front-end)\n");
-        fwrite(STDOUT, "   make bootstrap-selfhost-types-unit-probe  (#2430 PHPTypes constants)\n\n");
+        fwrite(STDOUT, "   make bootstrap-selfhost-types-unit-probe\n");
+        fwrite(STDOUT, '   BOOTSTRAP_PHPTYPES_UNIT_PROBE_GATE='.(self::gateEnabled('BOOTSTRAP_PHPTYPES_UNIT_PROBE_GATE', $phptypesUnitProbeDefault) ? '1' : '0')." (default {$phptypesUnitProbeDefault}) — ci-local LLVM tail ([#2430](https://github.com/PurHur/php-compiler/issues/2430), [#2433](https://github.com/PurHur/php-compiler/issues/2433))\n\n");
 
         fwrite(STDOUT, "3. M3 emit (partial vs strict)\n");
         fwrite(STDOUT, "   BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE=".(self::gateEnabled('BOOTSTRAP_M3_HELLOWORLD_STRICT_GATE', $m3HelloStrictDefault) ? '1' : '0')." (default {$m3HelloStrictDefault}) — ci-local LLVM tail\n");
@@ -486,7 +488,13 @@ final class Doctor
         fwrite(STDOUT, "  M3 VM probe      make bootstrap-selfhost-vm-unit-probe\n");
         fwrite(STDOUT, "                   {$vmUnitProbeDetail}\n");
         fwrite(STDOUT, "  M3 parser probe  make bootstrap-selfhost-parser-unit-probe  (#2409)\n");
-        fwrite(STDOUT, "  M3 types probe   make bootstrap-selfhost-types-unit-probe  (#2430)\n");
+        $phptypesUnitProbeDefaultPresenter = $defaultsPresenter['BOOTSTRAP_PHPTYPES_UNIT_PROBE_GATE'] ?? '0';
+        $phptypesUnitProbeOn = self::gateEnabled('BOOTSTRAP_PHPTYPES_UNIT_PROBE_GATE', $phptypesUnitProbeDefaultPresenter);
+        $phptypesUnitProbeDetail = $phptypesUnitProbeOn
+            ? 'BOOTSTRAP_PHPTYPES_UNIT_PROBE_GATE=1 — ci-local LLVM tail M3 PHPTypes unit probe (#2430, #2433)'
+            : 'opt-in BOOTSTRAP_PHPTYPES_UNIT_PROBE_GATE=1 for PHPTypes Type constants native link (#2430, #2433)';
+        fwrite(STDOUT, "  M3 types probe   make bootstrap-selfhost-types-unit-probe\n");
+        fwrite(STDOUT, "                   {$phptypesUnitProbeDetail}\n");
         $loopProbeGate = getenv('BOOTSTRAP_LOOP_PROBE_GATE');
         $loopProbeOn = false !== $loopProbeGate && '1' === $loopProbeGate;
         $m4LoopProbeGate = getenv('BOOTSTRAP_M4_LOOP_PROBE');
