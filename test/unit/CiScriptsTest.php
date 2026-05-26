@@ -1868,21 +1868,21 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('JIT_VARIABLE_FUNCTION_COMPLIANCE_GATE', $body);
     }
 
-    public function testCiDefaultsEnvDefinesJitServerSuperglobalGateOff(): void
+    public function testCiDefaultsEnvDefinesJitServerSuperglobalGateOn(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
         $this->assertStringContainsString(
-            'JIT_SERVER_SUPERGLOBAL_GATE="${JIT_SERVER_SUPERGLOBAL_GATE:-0}"',
+            'JIT_SERVER_SUPERGLOBAL_GATE="${JIT_SERVER_SUPERGLOBAL_GATE:-1}"',
             $defaults
         );
-        $this->assertStringContainsString('#2275', $defaults);
+        $this->assertStringContainsString('#2292', $defaults);
     }
 
     public function testCiCommonDefinesJitServerSuperglobalRunner(): void
     {
         $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
         $this->assertStringContainsString('ci_run_jit_server_superglobal()', $common);
-        $this->assertStringContainsString('JIT_SERVER_SUPERGLOBAL_GATE:-0', $common);
+        $this->assertStringContainsString('JIT_SERVER_SUPERGLOBAL_GATE:-1', $common);
         $this->assertStringContainsString('--filter JitServerSuperglobal', $common);
     }
 
@@ -1897,7 +1897,7 @@ final class CiScriptsTest extends TestCase
         $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
         $this->assertStringContainsString('JIT_SERVER_SUPERGLOBAL_GATE', $doc);
         $this->assertStringContainsString('JitServerSuperglobal', $doc);
-        $this->assertMatchesRegularExpression('/\| `JIT_SERVER_SUPERGLOBAL_GATE` \| `0` \|/', $doc);
+        $this->assertMatchesRegularExpression('/\| `JIT_SERVER_SUPERGLOBAL_GATE` \| `1` \|/', $doc);
     }
 
     public function testCiDockerRunPassesJitServerSuperglobalGateEnv(): void

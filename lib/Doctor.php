@@ -377,10 +377,10 @@ final class Doctor
             ? 'default on — ci-fast/ci-local VariableFunction* JIT (#2060)'
             : 'skipped (JIT_VARIABLE_FUNCTION_COMPLIANCE_GATE=0)';
         $jitServerGate = getenv('JIT_SERVER_SUPERGLOBAL_GATE');
-        $jitServerOn = '1' === $jitServerGate;
+        $jitServerOn = false === $jitServerGate || '' === $jitServerGate || '1' === $jitServerGate;
         $jitServerDetail = $jitServerOn
-            ? 'opt-in on — ci-local JitServerSuperglobal (#2257, #2275)'
-            : 'skipped (JIT_SERVER_SUPERGLOBAL_GATE=0 — set 1 for bin/jit.php $_SERVER refresh)';
+            ? 'default on — ci-local JitServerSuperglobal (#2257, #2275, #2292)'
+            : 'skipped (JIT_SERVER_SUPERGLOBAL_GATE=0)';
 
         fwrite(STDOUT, "  Gates ladder     make miniwebapp-gates              stages 0–4d (#472)\n");
         fwrite(STDOUT, "  Fast CI          ./script/ci-fast.sh               VM/compliance\n");

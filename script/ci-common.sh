@@ -691,9 +691,9 @@ ci_run_jit_variable_function_compliance() {
   ci_run_phpunit --filter VariableFunction --group jit --fail-on-skipped "$@"
 }
 
-# bin/jit.php $_SERVER / PATH_INFO refresh without recompile (issues #2257, #2275); opt-in JIT_SERVER_SUPERGLOBAL_GATE=1.
+# bin/jit.php $_SERVER / PATH_INFO refresh without recompile (issues #2257, #2275, #2292); default on — set JIT_SERVER_SUPERGLOBAL_GATE=0 to skip.
 ci_run_jit_server_superglobal() {
-  if [[ "${JIT_SERVER_SUPERGLOBAL_GATE:-0}" != "1" ]]; then
+  if [[ "${JIT_SERVER_SUPERGLOBAL_GATE:-1}" != "1" ]]; then
     return 0
   fi
   if ! ci_llvm_ready; then
