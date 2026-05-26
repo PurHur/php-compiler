@@ -300,6 +300,14 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString('MODE_AOT', $source);
     }
 
+    public function testHelloWorldProbeDefaultsRealLoweringWhenLinkCompileDriver(): void
+    {
+        $script = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-helloworld-probe.sh');
+        $this->assertStringContainsString('BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING:-1', $script);
+        $this->assertStringContainsString('#2571', $script);
+        $this->assertStringContainsString('#2582', $script);
+    }
+
     public function testHelloWorldProbeDocumentsEmitPathAndStrict(): void
     {
         $script = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-helloworld-probe.sh');

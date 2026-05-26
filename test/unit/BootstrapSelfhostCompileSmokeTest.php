@@ -90,6 +90,12 @@ final class BootstrapSelfhostCompileSmokeTest extends TestCase
         $this->assertTrue(is_executable(self::$root.'/build/compile-smoke-aot'));
     }
 
+    public function testCompileSmokeProbeDefaultsRealLoweringWhenLinkCompileDriver(): void
+    {
+        $source = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-compile-smoke-probe.sh');
+        $this->assertStringContainsString('BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING:-1', $source);
+    }
+
     public function testCompileSmokeProbeScriptWiresNativeCompileDriver(): void
     {
         $script = self::$root.'/script/bootstrap-selfhost-compile-smoke-probe.sh';
