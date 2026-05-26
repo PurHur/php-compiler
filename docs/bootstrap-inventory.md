@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 710 |
 | Phase A ratio-deferred paths | 2 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 1839 |
+| Source constructs flagged (warnings) | 1837 |
 
 Phase A ratio-deferred (still inventoried; excluded from M2 spine ratio denominator only — [#2543](https://github.com/PurHur/php-compiler/issues/2543)):
 
@@ -545,7 +545,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Func/JIT.php` | 0 | 2 |
 | `lib/Func/PHP.php` | 0 | 1 |
 | `lib/Handler.php` | 0 | 1 |
-| `lib/JIT.php` | 0 | 52 |
+| `lib/JIT.php` | 0 | 50 |
 | `lib/JIT/Analyzer.php` | 0 | 1 |
 | `lib/JIT/ArrayBuiltinHelper.php` | 0 | 47 |
 | `lib/JIT/ArrayMapCallbackPolicy.php` | 0 | 1 |
@@ -3948,48 +3948,46 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JIT\Call\Native (line 805)
 - new JIT\Call\Native (line 847)
 - new JIT\Call\Native (line 893)
-- new JIT\Call\Native (line 1617)
-- new JIT\Call\Native (line 1648)
-- new JIT\Call\Native (line 1692)
-- new JIT\Call\Native (line 1739)
-- new JIT\Call\Native (line 2052)
-- new JIT\Call\Native (line 2090)
-- new JIT\Call\Native (line 2124)
-- new JIT\Call\Native (line 2168)
-- new JIT\Call\Native (line 2520)
-- new JIT\Call\Native (line 2556)
-- new JIT\Call\Native (line 2580)
-- new JIT\Call\Native (line 2608)
-- new ext\standard\boolval (line 2965)
-- new Operand\Literal (line 3045)
-- new JIT\Variable (line 3079)
-- new JIT\Variable (line 3149)
-- new Operand\Literal (line 3168)
-- new ext\standard\intval (line 3267)
-- new Variable (line 3296)
-- new Variable (line 3407)
-- new OpCode (line 3490)
-- new JIT\Call\RuntimeVariableFunction (line 3763)
-- new Variable (line 3927)
-- new Variable (line 3946)
-- new Variable (line 4732)
-- new Variable (line 4772)
-- new Variable (line 5305)
-- new Variable (line 5325)
-- new Variable (line 5395)
-- new Variable (line 5601)
-- new Variable (line 5640)
-- new Operand\Literal (line 5649)
-- new Variable (line 5664)
-- new Operand\Literal (line 5955)
-- new Operand\Literal (line 5959)
-- new Operand\Literal (line 5963)
-- new Variable (line 5967)
-- new Variable (line 5991)
-- new Variable (line 6003)
-- new Variable (line 6213)
-- new Variable (line 6228)
-- 153 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new JIT\Call\Native (line 1649)
+- new JIT\Call\Native (line 1680)
+- new JIT\Call\Native (line 1724)
+- new JIT\Call\Native (line 1771)
+- new JIT\Call\Native (line 2084)
+- new JIT\Call\Native (line 2122)
+- new JIT\Call\Native (line 2156)
+- new JIT\Call\Native (line 2200)
+- new JIT\Call\Native (line 2552)
+- new JIT\Call\Native (line 2594)
+- new ext\standard\boolval (line 2951)
+- new Operand\Literal (line 3031)
+- new JIT\Variable (line 3065)
+- new JIT\Variable (line 3135)
+- new Operand\Literal (line 3154)
+- new ext\standard\intval (line 3253)
+- new Variable (line 3282)
+- new Variable (line 3393)
+- new OpCode (line 3476)
+- new JIT\Call\RuntimeVariableFunction (line 3749)
+- new Variable (line 3913)
+- new Variable (line 3932)
+- new Variable (line 4718)
+- new Variable (line 4758)
+- new Variable (line 5291)
+- new Variable (line 5311)
+- new Variable (line 5381)
+- new Variable (line 5587)
+- new Variable (line 5626)
+- new Operand\Literal (line 5635)
+- new Variable (line 5650)
+- new Operand\Literal (line 5941)
+- new Operand\Literal (line 5945)
+- new Operand\Literal (line 5949)
+- new Variable (line 5953)
+- new Variable (line 5977)
+- new Variable (line 5989)
+- new Variable (line 6199)
+- new Variable (line 6214)
+- 155 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Analyzer.php`
 
