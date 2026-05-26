@@ -14,7 +14,7 @@ use PHPLLVM\Value;
 /**
  * stream_context_create() — VM returns array stream-context representation (#1377).
  *
- * JIT: {@see JitStreamContextCreate} (zero-arg empty context; options deferred, #1377).
+ * JIT: {@see JitStreamContextCreate} (options array subset; params deferred, #1377, #2457).
  */
 final class stream_context_create extends Internal
 {

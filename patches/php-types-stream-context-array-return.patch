@@ -1,0 +1,11 @@
+--- vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php
+@@ -7476,7 +7476,7 @@
+         'stream_bucket_make_writeable' => ['object', 'brigade' => ''],
+         'stream_bucket_new' => ['resource', 'stream' => '', 'buffer' => 'string'],
+         'stream_bucket_prepend' => ['', 'brigade' => '', 'bucket' => ''],
+-        'stream_context_create' => ['resource', 'options=' => 'array', 'params=' => 'array'],
++        'stream_context_create' => ['array', 'options=' => 'array', 'params=' => 'array'],
+         'stream_context_get_default' => ['resource', 'options=' => 'array'],
+         'stream_context_get_options' => ['array', 'context' => ''],
+         'stream_context_get_params' => ['array', 'context' => ''],

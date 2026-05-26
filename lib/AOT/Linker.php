@@ -50,6 +50,7 @@ final class Linker
         __DIR__.'/runtime/phpc_ini_set.c',
         __DIR__.'/runtime/phpc_error_handler.c',
         __DIR__.'/runtime/phpc_spl_autoload.c',
+        __DIR__.'/runtime/phpc_stream_context.c',
         __DIR__.'/runtime/phpc_debug_backtrace.c',
         __DIR__.'/runtime/phpc_readonly_raise.c',
         __DIR__.'/runtime/phpc_jit_throw.c',
