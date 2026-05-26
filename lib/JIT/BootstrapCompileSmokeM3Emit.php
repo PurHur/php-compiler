@@ -18,7 +18,7 @@ final class BootstrapCompileSmokeM3Emit
 
     private static int $seq = 0;
 
-    public static function emit(Context $context, Value $sourceFile, Value $outFile): void
+    public static function emit(Context $context, Value $sourceFile, Value $outFile, string $logPrefix = 'compile_smoke_m3_emit'): void
     {
         $tag = 'csm3'.(string) ++self::$seq;
         $i64 = $context->getTypeFromString('int64');
@@ -38,7 +38,7 @@ final class BootstrapCompileSmokeM3Emit
         $context->builder->branchIf($codeNull, $readFail, $readOk);
 
         $context->builder->positionAtEnd($readFail);
-        self::echoPhaseError($context, 'compile_smoke_m3_emit: empty source (native bridge)', 'source');
+        self::echoPhaseError($context, $logPrefix, $logPrefix.': empty source (native bridge)', 'source');
         $context->builder->returnValue($retFail);
 
         $context->builder->positionAtEnd($readOk);
@@ -49,7 +49,7 @@ final class BootstrapCompileSmokeM3Emit
         $context->builder->branchIf($codeEmpty, $emptyFail, $emptyOk);
 
         $context->builder->positionAtEnd($emptyFail);
-        self::echoPhaseError($context, 'compile_smoke_m3_emit: empty source (native bridge)', 'source');
+        self::echoPhaseError($context, $logPrefix, $logPrefix.': empty source (native bridge)', 'source');
         $context->builder->returnValue($retFail);
 
         $context->builder->positionAtEnd($emptyOk);
@@ -76,7 +76,8 @@ final class BootstrapCompileSmokeM3Emit
         $context->builder->positionAtEnd($pacFail);
         self::echoPhaseError(
             $context,
-            'compile_smoke_m3_emit: parseAndCompile returned null (CFG/compile spine)',
+            $logPrefix,
+            $logPrefix.': parseAndCompile returned null (CFG/compile spine)',
             'parseAndCompile'
         );
         $context->builder->returnValue($retFail);
@@ -89,7 +90,7 @@ final class BootstrapCompileSmokeM3Emit
             $outFile
         );
 
-        ValueEchoHelper::echoLiteral($context, 'compile_smoke_m3_emit: compile OK -> ');
+        ValueEchoHelper::echoLiteral($context, $logPrefix.': compile OK -> ');
         $outLen = $context->builder->load($context->builder->structGep($outFile, $strMap['length']));
         $outChars = $context->builder->structGep($outFile, $strMap['value']);
         $sizeT = $context->getTypeFromString('size_t');
@@ -102,10 +103,10 @@ final class BootstrapCompileSmokeM3Emit
         $context->builder->returnValue($retOk);
     }
 
-    private static function echoPhaseError(Context $context, string $line1, string $phase): void
+    private static function echoPhaseError(Context $context, string $logPrefix, string $line1, string $phase): void
     {
         ValueEchoHelper::echoLiteral($context, $line1."\n");
-        ValueEchoHelper::echoLiteral($context, 'compile_smoke_m3_emit: native emit failed at phase='.$phase."\n");
+        ValueEchoHelper::echoLiteral($context, $logPrefix.': native emit failed at phase='.$phase."\n");
     }
 
     /**
