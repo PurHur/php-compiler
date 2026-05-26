@@ -293,9 +293,16 @@ bootstrap-selfhost-lib-spine-smoke:
 bootstrap-selfhost-lib-spine-vm-smoke:
 	./script/bootstrap-selfhost-lib-spine-vm-smoke.sh
 bootstrap-selfhost-helloworld:
+	BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1 \
+	BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING=1 \
+	BOOTSTRAP_M3_RUNTIME_COMPILE=1 \
+	BOOTSTRAP_M3_HELLOWORLD_STRICT=1 \
 	./script/bootstrap-selfhost-helloworld-probe.sh
 bootstrap-loop-gen1-link:
-	BOOTSTRAP_M4_LINK_COMPILE_DRIVER=1 ./script/bootstrap-loop-gen1-link.sh
+	BOOTSTRAP_M4_LINK_COMPILE_DRIVER=1 \
+	BOOTSTRAP_M4_COMPILE_DRIVER_REAL_LOWERING=1 \
+	BOOTSTRAP_M4_RUNTIME_COMPILE=1 \
+	./script/bootstrap-loop-gen1-link.sh
 bootstrap-loop-probe:
 	./script/bootstrap-loop-probe.sh
 bootstrap-loop-probe-dry:

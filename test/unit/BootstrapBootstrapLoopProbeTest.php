@@ -47,6 +47,7 @@ final class BootstrapBootstrapLoopProbeTest extends TestCase
         $this->assertStringContainsString('BOOTSTRAP_M3_HELLOWORLD_STRICT=1', $script);
         $this->assertStringContainsString('BOOTSTRAP_M4_LINK_COMPILE_DRIVER=1', $script);
         $this->assertStringContainsString('BOOTSTRAP_M4_COMPILE_DRIVER_REAL_LOWERING', $script);
+        $this->assertStringContainsString('M4_RUNTIME_DEFAULT', $script);
         $this->assertStringContainsString('gen-1 link', $script);
     }
 
@@ -190,7 +191,7 @@ final class BootstrapBootstrapLoopProbeTest extends TestCase
         $this->assertTrue(is_executable(self::$root.'/build/bootstrap-loop-gen2'));
     }
 
-    public function testFullProbeExitsTwoWhenM3StrictBlocked(): void
+    public function testFullProbeGreenWhenM3StrictAndM4NativeEmitReady(): void
     {
         if (!LlvmToolchain::isReady(self::$root)) {
             $this->markTestSkipped('LLVM 9 not available for M4 bootstrap-loop full probe test.');
@@ -213,6 +214,7 @@ final class BootstrapBootstrapLoopProbeTest extends TestCase
         }
         if (str_contains($out, 'M4 gen-1→gen-2 native slice OK')) {
             $this->assertSame(0, $exitCode, $out);
+            $this->assertStringContainsString('M3 strict prerequisite OK', $out);
 
             return;
         }
