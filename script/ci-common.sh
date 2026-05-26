@@ -773,6 +773,23 @@ ci_run_throws_web_uncaught_smoke() {
   THROWSWEB_UNCAUGHT_500_GATE=1 "$_CI_SCRIPT_DIR/examples-web-smoke.sh" --throws-only
 }
 
+# Shell curl harness for 009-FastCGIWeb health + PATH_INFO (issue #2351).
+ci_run_fastcgi_web_smoke() {
+  if [[ "${FASTCGI_WEB_SMOKE_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  if [[ -n "${PHP_COMPILER_SKIP_SERVE_TESTS:-}" ]]; then
+    echo "examples-web-smoke (009): skipped (PHP_COMPILER_SKIP_SERVE_TESTS is set)"
+    return 0
+  fi
+  if ! ci_can_bind_loopback; then
+    echo "examples-web-smoke (009): skipped (cannot bind loopback TCP)"
+    return 0
+  fi
+  echo "examples-web-smoke (009): FastCGIWeb health + PATH_INFO curls (FASTCGI_WEB_SMOKE_GATE=1, #2351)..."
+  "$_CI_SCRIPT_DIR/examples-web-smoke.sh" --fastcgi-only
+}
+
 # Shell curl harness for 005-SessionsWeb session flash (issue #1887).
 ci_run_sessions_web_smoke() {
   if [[ "${SESSIONS_WEB_SMOKE_GATE:-1}" != "1" ]]; then

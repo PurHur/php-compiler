@@ -200,6 +200,13 @@ final class PhpcDoctorTest extends TestCase
         $this->assertStringContainsString('examples/007-ThrowsWeb/README.md', $result['stdout']);
         $this->assertStringContainsString('#2157', $result['stdout']);
         $this->assertStringContainsString('#2135', $result['stdout']);
+        $this->assertStringContainsString('009-FastCGIWeb CI gates', $result['stdout']);
+        $this->assertStringContainsString('009-FastCGIWeb', $result['stdout']);
+        $this->assertStringContainsString('FASTCGI_WEB_SMOKE_GATE', $result['stdout']);
+        $this->assertStringContainsString('FASTCGI_WEB_AOT_SMOKE_GATE', $result['stdout']);
+        $this->assertStringContainsString('examples-fastcgiweb-smoke', $result['stdout']);
+        $this->assertStringContainsString('--fastcgi-only', $result['stdout']);
+        $this->assertStringContainsString('#2351', $result['stdout']);
         $this->assertStringContainsString('Bootstrap inventory lint', $result['stdout']);
         $this->assertStringContainsString('bootstrap-inventory', $result['stdout']);
         $this->assertStringContainsString('BOOTSTRAP_INVENTORY_LINT_SYNC_GATE', $result['stdout']);

@@ -277,6 +277,26 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('THROWSWEB_AOT_SMOKE_GATE:-1}', $body);
     }
 
+    public function testCiFastRunsFastcgiWebSmokeWhenGateOn(): void
+    {
+        $fast = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-fast.sh');
+        $this->assertStringContainsString('ci_run_fastcgi_web_smoke', $fast);
+
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('FASTCGI_WEB_SMOKE_GATE', $common);
+        $this->assertStringContainsString('--fastcgi-only', $common);
+        $this->assertStringContainsString('009-FastCGIWeb', $common);
+    }
+
+    public function testCiDefaultsEnvDefinesFastcgiWebSmokeGateOff(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString(
+            'FASTCGI_WEB_SMOKE_GATE="${FASTCGI_WEB_SMOKE_GATE:-0}"',
+            $defaults
+        );
+    }
+
     public function testCiDefaultsEnvDefinesFastcgiWebAotSmokeGateOff(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
@@ -407,6 +427,14 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('THROWS_WEB_SMOKE_GATE=1', $makefile);
         $this->assertStringContainsString('examples-web-smoke.sh --throws-only', $makefile);
         $this->assertStringContainsString('examples-throws-smoke', $makefile);
+    }
+
+    public function testMakefileHasExamplesFastcgiwebSmokeTarget(): void
+    {
+        $makefile = (string) file_get_contents(dirname(__DIR__, 2).'/Makefile');
+        $this->assertStringContainsString('examples-fastcgiweb-smoke:', $makefile);
+        $this->assertStringContainsString('FASTCGI_WEB_SMOKE_GATE=1', $makefile);
+        $this->assertStringContainsString('examples-web-smoke.sh --fastcgi-only', $makefile);
     }
 
     public function testMakefileHasExamplesSelfhostprobeSmokeTarget(): void

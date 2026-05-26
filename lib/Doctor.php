@@ -139,6 +139,7 @@ final class Doctor
         self::printSessionsWebSection($repoRoot);
         self::printFileUploadWebSection($repoRoot);
         self::printThrowsWebSection($repoRoot);
+        self::printFastCGIWebSection($repoRoot);
         self::printSelfHostProbeSection($repoRoot);
 
         return is_int($exit) ? $exit : 1;
@@ -886,6 +887,67 @@ final class Doctor
             fwrite(STDOUT, "  [📋] phpc init --profile throwsweb — #2092\n");
         }
         fwrite(STDOUT, "  Docs: examples/007-ThrowsWeb/README.md · docs/local-ci-matrix.md (#2102)\n");
+    }
+
+    /**
+     * 009-FastCGIWeb gate ladder (issues #2331, #2351, #2352).
+     */
+    private static function printFastCGIWebSection(string $repoRoot): void
+    {
+        $exampleDir = $repoRoot.'/examples/009-FastCGIWeb';
+        if (!is_dir($exampleDir)) {
+            return;
+        }
+
+        $defaults = self::readCiDefaultsEnv($repoRoot);
+        $smokeDefault = $defaults['FASTCGI_WEB_SMOKE_GATE'] ?? '0';
+        $aotDefault = $defaults['FASTCGI_WEB_AOT_SMOKE_GATE'] ?? '0';
+
+        $smokeOn = self::gateEnabled('FASTCGI_WEB_SMOKE_GATE', $smokeDefault);
+        $aotOn = self::gateEnabled('FASTCGI_WEB_AOT_SMOKE_GATE', $aotDefault);
+
+        $llvmInfo = self::resolveLlvmInfo($repoRoot);
+        $llvmReady = null !== $llvmInfo['dir'];
+        $llvmDetail = $llvmReady
+            ? 'LLVM ready at '.$llvmInfo['dir']
+            : 'LLVM missing — AOT execute row needs libLLVM-9.so.1';
+
+        $hasExample = is_file($exampleDir.'/example.php');
+        $hasManifest = is_file($exampleDir.'/phpc.json');
+
+        fwrite(STDOUT, "\n009-FastCGIWeb CI gates (#2331, #2351, #2352):\n");
+        fwrite(STDOUT, "  Tree: examples/009-FastCGIWeb\n");
+        fwrite(STDOUT, "  {$llvmDetail}\n");
+        fwrite(STDOUT, "  Defaults: script/ci-defaults.env\n\n");
+
+        if ($hasExample && $hasManifest) {
+            fwrite(STDOUT, "  [✅] example.php + phpc.json present\n");
+        } else {
+            fwrite(STDOUT, "  [⬜] example tree incomplete (expected example.php + phpc.json)\n");
+        }
+        fwrite(STDOUT, "  Lint: ./phpc lint examples/009-FastCGIWeb/example.php\n\n");
+
+        self::printSessionsWebGateRow(
+            1,
+            'VM serve health + PATH_INFO',
+            'FASTCGI_WEB_SMOKE_GATE',
+            $smokeDefault,
+            $smokeOn,
+            false,
+            'make examples-fastcgiweb-smoke · examples-web-smoke.sh --fastcgi-only · ci-fast when gate=1 (#2351)',
+            '#2351'
+        );
+        $aotStatus = $aotOn && $llvmReady ? '✅' : '📋';
+        $aotExecuteNote = $llvmReady
+            ? ($aotOn ? '#2352 · FASTCGI_WEB_AOT_SMOKE_GATE=1' : '#2352 · opt-in default 0')
+            : 'LLVM required; #2352 when gate=1';
+        fwrite(STDOUT, "  [{$aotStatus}] Stage 2 AOT execute — FASTCGI_WEB_AOT_SMOKE_GATE default {$aotDefault} ({$aotExecuteNote})\n");
+        fwrite(STDOUT, "      Shell:   FASTCGI_WEB_AOT_SMOKE_GATE=1 EXAMPLES_AOT_SMOKE_ONLY=009 ./script/examples-aot-smoke.sh\n");
+        fwrite(STDOUT, "      PHPUnit: ./script/ci-local.sh --filter FastCGIWebAotExecuteTest (when present)\n");
+        fwrite(STDOUT, "\n  Related:\n");
+        fwrite(STDOUT, "  [📋] phpc init --profile fastcgiweb — #2342\n");
+        fwrite(STDOUT, "  [📋] FastCGI adapter loop — #173 · deploy smoke #2359\n");
+        fwrite(STDOUT, "  Docs: examples/009-FastCGIWeb/README.md · docs/local-ci-matrix.md\n");
     }
 
     /**

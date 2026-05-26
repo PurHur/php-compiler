@@ -106,6 +106,18 @@ final class ExamplesWebSmokeScriptTest extends TestCase
         $this->assertStringContainsString('Flash: Saved', $body);
     }
 
+    public function testExamplesWebSmokeScriptSupportsFastcgiWebSlice(): void
+    {
+        $script = dirname(__DIR__, 2).'/script/examples-web-smoke.sh';
+        $body = (string) file_get_contents($script);
+        $this->assertStringContainsString('--fastcgi-only', $body);
+        $this->assertStringContainsString('009-FastCGIWeb', $body);
+        $this->assertStringContainsString('run_fastcgi_web_smoke', $body);
+        $this->assertStringContainsString('FASTCGI_WEB_SMOKE_GATE', $body);
+        $this->assertStringContainsString('example.php/ping', $body);
+        $this->assertStringContainsString('PATH_INFO', $body);
+    }
+
     public function testExamplesWebSmokeScriptSupportsAot003MiniWebAppSlice(): void
     {
         $script = dirname(__DIR__, 2).'/script/examples-web-smoke.sh';

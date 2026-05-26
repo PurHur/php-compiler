@@ -37,7 +37,7 @@ Production nginx + `PHPC_DEPLOY_ROOT`: [docs/deploy-web-aot.md](../../docs/deplo
 | AOT `phpc build --project` | ✅ when LLVM ready (`ExamplesCompileTest`) |
 | AOT CGI execute | ✅ opt-in `FASTCGI_WEB_AOT_SMOKE_GATE=1` ([#2352](https://github.com/PurHur/php-compiler/issues/2352)); `EXAMPLES_AOT_SMOKE_ONLY=009 ./script/examples-aot-smoke.sh` |
 | FastCGI adapter execute | 📋 blocked on [#173](https://github.com/PurHur/php-compiler/issues/173) |
-| CI serve smoke | 📋 opt-in `FASTCGI_WEB_SMOKE_GATE=0` until [#1899](https://github.com/PurHur/php-compiler/issues/1899) |
+| CI serve smoke | ✅ opt-in `FASTCGI_WEB_SMOKE_GATE=1` ([#2351](https://github.com/PurHur/php-compiler/issues/2351)); `make examples-fastcgiweb-smoke` |
 
 ## Related
 
