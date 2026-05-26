@@ -89,4 +89,26 @@ final class BootstrapTypesUnitProbeTest extends TestCase
         $this->assertStringContainsString('bootstrap-selfhost-types-unit-probe:', $makefile);
         $this->assertStringContainsString('bootstrap-selfhost-types-unit-probe.sh', $makefile);
     }
+
+    public function testCiDefaultsEnvDefinesPhptypesUnitProbeGateDefaultOff(): void
+    {
+        $defaults = (string) file_get_contents(self::$root.'/script/ci-defaults.env');
+        $this->assertStringContainsString(
+            'BOOTSTRAP_PHPTYPES_UNIT_PROBE_GATE="${BOOTSTRAP_PHPTYPES_UNIT_PROBE_GATE:-0}"',
+            $defaults
+        );
+        $this->assertStringContainsString('#2430', $defaults);
+        $this->assertStringContainsString('#2433', $defaults);
+    }
+
+    public function testCiLocalHonorsPhptypesUnitProbeGate(): void
+    {
+        $local = (string) file_get_contents(self::$root.'/script/ci-local.sh');
+        $this->assertStringContainsString('ci_run_bootstrap_phptypes_unit_probe', $local);
+
+        $common = (string) file_get_contents(self::$root.'/script/ci-common.sh');
+        $this->assertStringContainsString('BOOTSTRAP_PHPTYPES_UNIT_PROBE_GATE', $common);
+        $this->assertStringContainsString('BOOTSTRAP_PHPTYPES_UNIT_PROBE_GATE:-0', $common);
+        $this->assertStringContainsString('bootstrap-selfhost-types-unit-probe.sh', $common);
+    }
 }
