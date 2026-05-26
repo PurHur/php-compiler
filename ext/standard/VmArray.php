@@ -30,4 +30,25 @@ final class VmArray
 
         return $expected === $n;
     }
+
+    public static function keyFirst(HashTable $ht): ?Variable
+    {
+        $ht->iterReset();
+        if (!$ht->iterValid()) {
+            return null;
+        }
+
+        return $ht->iterCurrentKey();
+    }
+
+    public static function keyLast(HashTable $ht): ?Variable
+    {
+        $ht->iterReset();
+        $last = null;
+        while ($ht->iterValid()) {
+            $last = $ht->iterCurrentKey();
+        }
+
+        return $last;
+    }
 }

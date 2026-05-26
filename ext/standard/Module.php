@@ -95,6 +95,8 @@ class Module extends ModuleAbstract
             new array_count(),
             new array_count('sizeof'),
             new array_key_exists(),
+            new array_key_first(),
+            new array_key_last(),
             new array_is_list(),
             new in_array(),
             new array_push(),
