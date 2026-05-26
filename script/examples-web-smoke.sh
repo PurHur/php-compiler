@@ -30,6 +30,7 @@ Usage: script/examples-web-smoke.sh [--aot] [--miniwebapp-only] [--sessions-only
   --sessions-only: curl only examples/005-SessionsWeb (SESSIONS_WEB_SMOKE_GATE — #1887).
   --fileupload-only: curl only examples/006-FileUploadWeb (FILE_UPLOAD_WEB_SMOKE_GATE — #1999).
   --throws-only: curl only examples/007-ThrowsWeb (THROWS_WEB_SMOKE_GATE — #2076).
+  --fastcgi-only: curl only examples/009-FastCGIWeb (FASTCGI_WEB_SMOKE_GATE — #2351).
 
 Environment:
   PHP_COMPILER_SKIP_SERVE_TESTS=1  exit 0 without running HTTP checks
@@ -40,6 +41,7 @@ Environment:
   FILE_UPLOAD_WEB_SMOKE_GATE=1     include 006 multipart upload curls (#1999)
   THROWS_WEB_SMOKE_GATE=1          include 007 throw/catch POST curls (#2076)
   THROWSWEB_UNCAUGHT_500_GATE=1    include 007 uncaught.php HTTP 500 curl (#2200)
+  FASTCGI_WEB_SMOKE_GATE=1         include 009 health + PATH_INFO curls (#2351)
 EOF
 }
 
@@ -48,6 +50,7 @@ MINIWEBAPP_ONLY=0
 SESSIONS_ONLY=0
 FILEUPLOAD_ONLY=0
 THROWS_ONLY=0
+FASTCGI_ONLY=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --aot) AOT=1; shift ;;
@@ -55,6 +58,7 @@ while [[ $# -gt 0 ]]; do
     --sessions-only) SESSIONS_ONLY=1; shift ;;
     --fileupload-only) FILEUPLOAD_ONLY=1; shift ;;
     --throws-only) THROWS_ONLY=1; shift ;;
+    --fastcgi-only) FASTCGI_ONLY=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "examples-web-smoke: unknown argument: $1" >&2; usage >&2; exit 1 ;;
   esac
@@ -575,6 +579,51 @@ run_sessions_web_smoke() {
   trap - RETURN
 }
 
+run_fastcgi_web_smoke() {
+  local docroot="${ROOT}/examples/009-FastCGIWeb"
+  if [[ ! -d "$docroot" ]]; then
+    echo "examples-web-smoke: 009-FastCGIWeb: skip (missing docroot)"
+    return 0
+  fi
+  if [[ ! -f "${docroot}/example.php" ]]; then
+    echo "examples-web-smoke: 009-FastCGIWeb: skip (example.php missing #2331)"
+    return 0
+  fi
+  if [[ "$AOT" -eq 1 ]]; then
+    echo "examples-web-smoke: 009-FastCGIWeb: skip --aot (VM serve smoke only; AOT via FASTCGI_WEB_AOT_SMOKE_GATE #2352)"
+    return 0
+  fi
+
+  local port pid
+  port="$(find_free_port)"
+  echo "examples-web-smoke: 009-FastCGIWeb on 127.0.0.1:${port} (VM health + PATH_INFO)"
+  "${PHPC}" serve "127.0.0.1:${port}" "$docroot" >/dev/null 2>&1 &
+  pid=$!
+
+  stop_serve() {
+    kill "$pid" 2>/dev/null || true
+    local waited=0
+    while kill -0 "$pid" 2>/dev/null && ((waited < 40)); do
+      sleep 0.05
+      waited=$((waited + 1))
+    done
+    if kill -0 "$pid" 2>/dev/null; then
+      kill -9 "$pid" 2>/dev/null || true
+    fi
+    wait "$pid" 2>/dev/null || true
+  }
+  trap stop_serve RETURN
+
+  wait_for_serve "$port"
+
+  local base="http://127.0.0.1:${port}"
+  curl_expect_200 "009-FastCGIWeb / GET health" "${base}/example.php" "ok"
+  curl_expect_200 "009-FastCGIWeb / GET PATH_INFO ping" "${base}/example.php/ping" "PATH_INFO"
+
+  stop_serve
+  trap - RETURN
+}
+
 run_docroot_smoke() {
   local name="$1"
   local docroot="${ROOT}/${2}"
@@ -656,7 +705,14 @@ mode_label="VM"
 [[ "$SESSIONS_ONLY" -eq 1 ]] && mode_label="${mode_label}; --sessions-only"
 [[ "$FILEUPLOAD_ONLY" -eq 1 ]] && mode_label="${mode_label}; --fileupload-only"
 [[ "$THROWS_ONLY" -eq 1 ]] && mode_label="${mode_label}; --throws-only"
+[[ "$FASTCGI_ONLY" -eq 1 ]] && mode_label="${mode_label}; --fastcgi-only"
 echo "examples-web-smoke: starting (${mode_label})"
+
+if [[ "${FASTCGI_ONLY}" -eq 1 ]]; then
+  run_fastcgi_web_smoke
+  echo "examples-web-smoke: ok"
+  exit 0
+fi
 
 if [[ "${THROWS_ONLY}" -eq 1 ]]; then
   run_throws_web_smoke
@@ -699,6 +755,10 @@ if [[ "${MINIWEBAPP_ONLY}" -eq 0 ]]; then
 
   if [[ "${THROWS_WEB_SMOKE_GATE:-1}" == "1" ]]; then
     run_throws_web_smoke
+  fi
+
+  if [[ "${FASTCGI_WEB_SMOKE_GATE:-0}" == "1" ]]; then
+    run_fastcgi_web_smoke
   fi
 fi
 
