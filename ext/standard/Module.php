@@ -143,6 +143,7 @@ class Module extends ModuleAbstract
             new array_intersect(),
             new array_replace(),
             new array_fill(),
+            new array_fill_keys(),
             new array_combine(),
             new array_map(),
             new array_filter(),

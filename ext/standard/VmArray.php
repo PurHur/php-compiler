@@ -51,4 +51,27 @@ final class VmArray
 
         return $last;
     }
+
+    /**
+     * array_fill_keys() — keys from values of {@param $keys}, uniform {@param $value}.
+     */
+    public static function fillKeys(HashTable $keys, Variable $value): HashTable
+    {
+        $dest = new HashTable();
+        foreach ($keys->iterateKeyed(true) as [, $keyValue]) {
+            $stored = new Variable();
+            $stored->copyFrom($value);
+            if (Variable::TYPE_INTEGER === $keyValue->type) {
+                $dest->addIndex($keyValue->toInt(), $stored);
+            } elseif (Variable::TYPE_STRING === $keyValue->type) {
+                $dest->add($keyValue->toString(), $stored);
+            } else {
+                throw new \ValueError(
+                    'array_fill_keys(): Argument #1 ($keys) must contain only integer and string keys'
+                );
+            }
+        }
+
+        return $dest;
+    }
 }
