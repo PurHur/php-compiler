@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+require_once __DIR__.'/EmitTuMode.php';
 require_once __DIR__.'/RuntimeEmitTuAlloc.php';
 require_once __DIR__.'/RuntimeEmitTuInit.php';
 
@@ -161,9 +162,9 @@ final class BootstrapCompileSmokeM3Emit
 
     private static function shouldUseEmitTuRealLowering(Context $context): bool
     {
-        $minimal = getenv('PHP_COMPILER_M3_EMIT_MINIMAL');
+        unset($context);
 
-        return '1' === $minimal || 'true' === strtolower((string) $minimal);
+        return EmitTuMode::isMinimalRuntime();
     }
 
     private static function echoPhaseError(Context $context, string $logPrefix, string $line1, string $phase): void
