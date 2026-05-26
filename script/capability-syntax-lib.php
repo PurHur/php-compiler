@@ -320,8 +320,20 @@ function syntaxRowDefinitions(): array
             'notes' => [
                 'php-cfg Expr_FirstClassCallable (#1230); VM stores string or [obj, method] array',
                 'JIT folds strlen(...) / Class::m(...) via compileTimeString assign chains (#1363)',
+                'php-types TypeReconstructor patch for Expr_FirstClassCallable (#2315)',
             ],
             'probe' => '$fn = strlen(...); echo $fn("x");',
+        ],
+        [
+            'id' => 'use_function_const_import',
+            'construct' => '`use function` / `use const` imports',
+            'opcodes' => ['TYPE_FUNCCALL_INIT', 'TYPE_CONST_FETCH'],
+            'issue' => 2325,
+            'notes' => [
+                'php-cfg resolves imported names at parse time; no Stmt_Use lowering required',
+                'Grouped `use Foo\\Bar` unchanged',
+            ],
+            'probe' => 'namespace N { function f() { return 1; } } namespace U { use function N\\f; echo f(); }',
         ],
         [
             'id' => 'never_return',
