@@ -61,14 +61,16 @@ final class BootstrapCompilerDriverSmokeTest extends TestCase
         $this->assertStringContainsString('bootstrap-selfhost-compiler-driver-smoke-link.sh', $makefile);
     }
 
-    public function testCiDefaultsEnvDefinesCompilerDriverSmokeGateOff(): void
+    public function testCiDefaultsEnvDefinesCompilerDriverSmokeGateDefaultOn(): void
     {
         $defaults = (string) file_get_contents(self::$root.'/script/ci-defaults.env');
         $this->assertStringContainsString(
-            'COMPILER_DRIVER_SMOKE_GATE="${COMPILER_DRIVER_SMOKE_GATE:-0}"',
+            'COMPILER_DRIVER_SMOKE_GATE="${COMPILER_DRIVER_SMOKE_GATE:-1}"',
             $defaults
         );
         $this->assertStringContainsString('#2136', $defaults);
+        $this->assertStringContainsString('#2137', $defaults);
+        $this->assertStringContainsString('#2168', $defaults);
     }
 
     public function testCiLocalHonorsCompilerDriverSmokeGate(): void
@@ -78,7 +80,7 @@ final class BootstrapCompilerDriverSmokeTest extends TestCase
 
         $common = (string) file_get_contents(self::$root.'/script/ci-common.sh');
         $this->assertStringContainsString('COMPILER_DRIVER_SMOKE_GATE', $common);
-        $this->assertStringContainsString('COMPILER_DRIVER_SMOKE_GATE:-0', $common);
+        $this->assertStringContainsString('COMPILER_DRIVER_SMOKE_GATE:-1', $common);
         $this->assertStringContainsString('bootstrap-selfhost-compiler-driver-smoke-link.sh', $common);
     }
 }

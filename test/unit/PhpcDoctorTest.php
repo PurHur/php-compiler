@@ -70,6 +70,7 @@ final class PhpcDoctorTest extends TestCase
         $this->assertStringContainsString('helloworld_m3_emit_native_entry.php', $result['stdout']);
         $this->assertStringContainsString('2. M2 spine', $result['stdout']);
         $this->assertStringContainsString('bootstrap-spine-count.php', $result['stdout']);
+        $this->assertStringContainsString('COMPILER_DRIVER_SMOKE_GATE', $result['stdout']);
     }
 
     public function testDoctorJitProbeWhenLlvmPresent(): void
@@ -131,6 +132,7 @@ final class PhpcDoctorTest extends TestCase
         $this->assertStringContainsString('bootstrap-selfhost-lib-spine-smoke', $result['stdout']);
         $this->assertStringContainsString('bootstrap-selfhost-lib-spine-vm-smoke', $result['stdout']);
         $this->assertStringContainsString('bootstrap-selfhost-compiler-driver-smoke', $result['stdout']);
+        $this->assertStringContainsString('COMPILER_DRIVER_SMOKE_GATE', $result['stdout']);
         $this->assertStringContainsString('M2 spine:', $result['stdout']);
         $this->assertStringContainsString('M3 strict:', $result['stdout']);
         $this->assertStringContainsString('M4 loop dry-run', $result['stdout']);

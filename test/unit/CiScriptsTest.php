@@ -1177,14 +1177,16 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('BOOTSTRAP_LIB_SPINE_VM_SMOKE_GATE=1', $docSelfhost);
     }
 
-    public function testCiDefaultsEnvDefinesCompilerDriverSmokeGateOff(): void
+    public function testCiDefaultsEnvDefinesCompilerDriverSmokeGateDefaultOn(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
         $this->assertStringContainsString(
-            'COMPILER_DRIVER_SMOKE_GATE="${COMPILER_DRIVER_SMOKE_GATE:-0}"',
+            'COMPILER_DRIVER_SMOKE_GATE="${COMPILER_DRIVER_SMOKE_GATE:-1}"',
             $defaults
         );
         $this->assertStringContainsString('#2136', $defaults);
+        $this->assertStringContainsString('#2137', $defaults);
+        $this->assertStringContainsString('#2168', $defaults);
     }
 
     public function testCiLocalHonorsCompilerDriverSmokeGate(): void
@@ -1194,6 +1196,7 @@ final class CiScriptsTest extends TestCase
 
         $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
         $this->assertStringContainsString('COMPILER_DRIVER_SMOKE_GATE', $common);
+        $this->assertStringContainsString('COMPILER_DRIVER_SMOKE_GATE:-1', $common);
         $this->assertStringContainsString('bootstrap-selfhost-compiler-driver-smoke-link.sh', $common);
     }
 
@@ -1202,9 +1205,11 @@ final class CiScriptsTest extends TestCase
         $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
         $this->assertStringContainsString('COMPILER_DRIVER_SMOKE_GATE', $doc);
         $this->assertStringContainsString('bootstrap-selfhost-compiler-driver-smoke-link.sh', $doc);
+        $this->assertStringContainsString('#2168', $doc);
 
         $docSelfhost = (string) file_get_contents(dirname(__DIR__, 2).'/docs/bootstrap-selfhost.md');
         $this->assertStringContainsString('compiler_driver_smoke bundle OK', $docSelfhost);
+        $this->assertStringContainsString('#2168', $docSelfhost);
     }
 
     public function testCiDefaultsEnvDefinesBootstrapSelfhostProbeUpdateOff(): void

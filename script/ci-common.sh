@@ -464,9 +464,10 @@ ci_run_bootstrap_lib_spine_vm_smoke() {
   "$_CI_SCRIPT_DIR/bootstrap-selfhost-lib-spine-vm-smoke.sh"
 }
 
-# M3 compiler driver smoke: Compiler.php bundle native link + run (issue #2136); default off until stable.
+# M3 compiler driver smoke: Compiler.php bundle native link + run (issue #2136); default on (#2137, #2168).
 ci_run_bootstrap_compiler_driver_smoke() {
-  if [[ "${COMPILER_DRIVER_SMOKE_GATE:-0}" != "1" ]]; then
+  if [[ "${COMPILER_DRIVER_SMOKE_GATE:-1}" != "1" ]]; then
+    echo "bootstrap-compiler-driver-smoke: skipped (COMPILER_DRIVER_SMOKE_GATE=0 opt-out)"
     return 0
   fi
   if ! ci_llvm_ready; then
