@@ -10,9 +10,10 @@ Tracking issues: [#58](https://github.com/PurHur/php-compiler/issues/58), [#145]
 | Construct | VM | JIT | AOT | Issue | Notes |
 |-----------|:--:|:---:|:---:|-------|-------|
 | `class` / `new` | yes | yes | yes | [#58](https://github.com/PurHur/php-compiler/issues/58) | compliance PHPT; bootstrap AOT |
-| Anonymous class `new class { }` | yes | yes | no | [#1233](https://github.com/PurHur/php-compiler/issues/1233) | php-cfg inline Stmt\Class_ in parseExpr_New; synthetic AnonymousClass@line name |
+| Anonymous class `new class { }` | yes | yes | yes | [#1233](https://github.com/PurHur/php-compiler/issues/1233) | php-cfg inline Stmt\Class_ in parseExpr_New; synthetic AnonymousClass@line name |
 | Enum declarations `enum Foo: string { case Bar = 'x'; }` | yes | yes | no | [#1356](https://github.com/PurHur/php-compiler/issues/1356) | Backed enum cases as class constants; `Foo::Bar` const-like fetch; `enum_exists` registry |
 | Instance methods (`ClassMethod` / `Expr_MethodCall`) | yes | yes | yes | [#58](https://github.com/PurHur/php-compiler/issues/58) | MiniWebApp `$router->dispatch()` (#2059); compliance PHPT; bootstrap AOT |
+| Static methods on user classes (`Expr_StaticCall`) | yes | yes | yes | [#2209](https://github.com/PurHur/php-compiler/issues/2209) | Public static methods without $this; `Router::fromConfig()` factory (#2059); Late static `static::method()` tracked separately (#1231) |
 | Constructors (`__construct`) | yes | yes | yes | [#145](https://github.com/PurHur/php-compiler/issues/145) | Router `__construct(array $config)` (#2059); compliance PHPT; bootstrap AOT |
 | Private methods | yes | yes | yes | [#145](https://github.com/PurHur/php-compiler/issues/145) | Router private `render*` paths (#2059); compliance PHPT; bootstrap AOT |
 | Property fetch `$this->x` | yes | yes | yes | [#58](https://github.com/PurHur/php-compiler/issues/58) | compliance PHPT; bootstrap AOT |
@@ -42,7 +43,7 @@ Tracking issues: [#58](https://github.com/PurHur/php-compiler/issues/58), [#145]
 | Variable variables (`$$name`) | yes | yes | yes | [#1226](https://github.com/PurHur/php-compiler/issues/1226) | php-cfg nests Operand\Variable name; VM resolves runtime local by name; JIT compile-time name fold (#1226); compliance PHPT |
 | Variable function calls (`$fn()`) | yes | yes | yes | [#56](https://github.com/PurHur/php-compiler/issues/56) | VM resolves callee at runtime; compiler folds literal assignment; JIT uses compile-time string |
 | Invokable objects (`$obj()` / `__invoke`) | yes | yes | yes | [#1232](https://github.com/PurHur/php-compiler/issues/1232) | Object-typed FuncCall lowered to __invoke method dispatch; VM runtime fallback |
-| First-class callable syntax (`foo(...)`, `Class::m(...)`) | yes | yes | no | [#1363](https://github.com/PurHur/php-compiler/issues/1363) | php-cfg Expr_FirstClassCallable (#1230); VM stores string or [obj, method] array; JIT folds strlen(...) / Class::m(...) via compileTimeString assign chains (#1363) |
+| First-class callable syntax (`foo(...)`, `Class::m(...)`) | yes | yes | yes | [#1363](https://github.com/PurHur/php-compiler/issues/1363) | php-cfg Expr_FirstClassCallable (#1230); VM stores string or [obj, method] array; JIT folds strlen(...) / Class::m(...) via compileTimeString assign chains (#1363) |
 | `never` return type | yes | yes | yes | [#1358](https://github.com/PurHur/php-compiler/issues/1358) | php-cfg Op\Type\Never_; any `return` in body is a compile error; normal completion via throw/exit |
 | Intersection types (`A&B`) | yes | yes | no | [#1357](https://github.com/PurHur/php-compiler/issues/1357) | php-cfg Op\Type\Intersection; VM checks object implements each interface at call |
 | Array/argument unpack `...$x` | yes | yes | yes | [#1361](https://github.com/PurHur/php-compiler/issues/1361) | php-cfg spread.patch (#141); VM HashTable::spreadFrom; JIT HashTableHelper::spreadInto + mergeCallArgEntries; compliance PHPT |
@@ -78,6 +79,7 @@ ROADMAP Phase 1/4: [#78](https://github.com/PurHur/php-compiler/issues/78), acce
 |-----------|:--:|:---:|:---:|-------|-------|
 | `003-MiniWebApp` Router OOP (VM serve) | yes | partial | yes | [#2059](https://github.com/PurHur/php-compiler/issues/2059) | #2059 VM OOP e2e; lint zero (#2078); serve smoke default-on; JIT project opt-in (#587) |
 | Public instance methods (`Expr_MethodCall`) | yes | partial | yes | [#58](https://github.com/PurHur/php-compiler/issues/58) | #58 ClassMethod + method dispatch; compliance PHPT; AOT execute #764 |
+| Static methods (`Expr_StaticCall`) | yes | partial | yes | [#2209](https://github.com/PurHur/php-compiler/issues/2209) | #2209 user static methods; factory `Class::method()` + instance chain |
 | Private methods + `__construct` | yes | partial | yes | [#145](https://github.com/PurHur/php-compiler/issues/145) | #145 visibility + ctor; Router private render paths |
 | Method return types (`: string` / `: void`) | yes | no | partial | [#55](https://github.com/PurHur/php-compiler/issues/55) | #55 JIT non-void return types; VM `: void` on Router::dispatch |
 

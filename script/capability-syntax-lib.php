@@ -55,6 +55,17 @@ function syntaxRowDefinitions(): array
             'probe' => 'class C { public function f(): string { return "ok"; } } echo (new C())->f();',
         ],
         [
+            'id' => 'static_methods',
+            'construct' => 'Static methods on user classes (`Expr_StaticCall`)',
+            'opcodes' => ['TYPE_DECLARE_METHOD', 'TYPE_STATICCALL_INIT', 'TYPE_FUNCCALL_EXEC_RETURN'],
+            'issue' => 2209,
+            'notes' => [
+                'Public static methods without $this; `Router::fromConfig()` factory (#2059)',
+                'Late static `static::method()` tracked separately (#1231)',
+            ],
+            'probe' => 'class C { public static function id(): string { return "ok"; } } echo C::id();',
+        ],
+        [
             'id' => 'construct_method',
             'construct' => 'Constructors (`__construct`)',
             'opcodes' => ['TYPE_DECLARE_METHOD', 'TYPE_NEW', 'TYPE_METHODCALL_INIT', 'TYPE_ARG_RECV'],
@@ -827,6 +838,14 @@ function miniWebAppOopNorthStarDefinitions(): array
             'aot' => 'yes',
             'issue' => 58,
             'notes' => ['#58 ClassMethod + method dispatch; compliance PHPT; AOT execute #764'],
+        ],
+        [
+            'construct' => 'Static methods (`Expr_StaticCall`)',
+            'vm' => 'yes',
+            'jit' => 'partial',
+            'aot' => 'yes',
+            'issue' => 2209,
+            'notes' => ['#2209 user static methods; factory `Class::method()` + instance chain'],
         ],
         [
             'construct' => 'Private methods + `__construct`',
