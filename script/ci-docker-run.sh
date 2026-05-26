@@ -6,9 +6,30 @@ _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=ci-defaults.env
 source "$_SCRIPT_DIR/ci-defaults.env"
 
+# Extra docker run flags injected by CI/harness environments (issue #2244).
+# Prefer explicit PHP_COMPILER_DOCKER_RUN_OPTS but fall back to HARNESS_DOCKER_RUN_OPTS.
+_ci_docker_extra_opts=()
+if [[ -n "${PHP_COMPILER_DOCKER_RUN_OPTS:-${HARNESS_DOCKER_RUN_OPTS:-}}" ]]; then
+  # shellcheck disable=SC2206
+  _ci_docker_extra_opts=(${PHP_COMPILER_DOCKER_RUN_OPTS:-${HARNESS_DOCKER_RUN_OPTS}})
+fi
+
+if [[ "${PHP_COMPILER_REQUIRE_DOCKER_RUN_OPTS:-0}" = "1" ]] && [[ ${#_ci_docker_extra_opts[@]} -eq 0 ]]; then
+  echo "ci-docker-run: missing required \$PHP_COMPILER_DOCKER_RUN_OPTS / \$HARNESS_DOCKER_RUN_OPTS" >&2
+  echo "ci-docker-run: set HARNESS_DOCKER_RUN_OPTS (recommended on harness) or override with PHP_COMPILER_DOCKER_RUN_OPTS" >&2
+  exit 2
+fi
+
+# Best-effort nudge in non-strict mode (avoid spamming by printing once per process).
+if [[ ${#_ci_docker_extra_opts[@]} -eq 0 ]] && [[ -z "${_CI_DOCKER_RUN_OPTS_WARNED:-}" ]]; then
+  export _CI_DOCKER_RUN_OPTS_WARNED=1
+  echo "ci-docker-run: warning: no \$HARNESS_DOCKER_RUN_OPTS / \$PHP_COMPILER_DOCKER_RUN_OPTS set (possible OOM/flakiness on harness)" >&2
+fi
+
 # Usage: ci_docker_run [docker run flags and image...] -- command...
 ci_docker_run() {
   docker run --rm \
+    "${_ci_docker_extra_opts[@]}" \
     -m "${PHP_COMPILER_DOCKER_MEM}" \
     --memory-swap "${PHP_COMPILER_DOCKER_MEM_SWAP}" \
     -e "PHP_COMPILER_CI_RAM_GB=${PHP_COMPILER_CI_RAM_GB}" \

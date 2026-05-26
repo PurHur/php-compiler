@@ -3,9 +3,19 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 IMAGE="${PHP_COMPILER_DOCKER_IMAGE:-php:8.2-cli-bookworm}"
-CID=$(tar -C "$ROOT" -cf - --exclude='.git' --exclude='.phpunit.result.cache' . | docker run -i -d "$IMAGE" bash -c 'mkdir -p /compiler && tar xf - -C /compiler && exec sleep 600')
+DOCKER_EXTRA=()
+if [[ -n "${PHP_COMPILER_DOCKER_RUN_OPTS:-${HARNESS_DOCKER_RUN_OPTS:-}}" ]]; then
+  # shellcheck disable=SC2206
+  DOCKER_EXTRA=(${PHP_COMPILER_DOCKER_RUN_OPTS:-${HARNESS_DOCKER_RUN_OPTS}})
+fi
+
+CID=$(docker create "${DOCKER_EXTRA[@]}" "$IMAGE" bash -lc 'mkdir -p /compiler; exec sleep 600')
 cleanup() { docker rm -f "$CID" >/dev/null 2>&1 || true; }
 trap cleanup EXIT
+docker start "$CID" >/dev/null
+
+tar -C "$ROOT" -cf - --exclude='.git' --exclude='.phpunit.result.cache' . | docker exec -i "$CID" bash -lc 'tar xf - -C /compiler'
+
 docker exec "$CID" bash -lc '
 set -e
 cd /compiler

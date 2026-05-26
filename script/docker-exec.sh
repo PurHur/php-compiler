@@ -19,16 +19,10 @@ if [[ "${1:-}" == "--" ]]; then
   shift
 fi
 
-DOCKER_EXTRA=()
-if [[ -n "${PHP_COMPILER_DOCKER_RUN_OPTS:-${HARNESS_DOCKER_RUN_OPTS:-}}" ]]; then
-  # shellcheck disable=SC2206
-  DOCKER_EXTRA=(${PHP_COMPILER_DOCKER_RUN_OPTS:-${HARNESS_DOCKER_RUN_OPTS}})
-fi
-
 _run_in_container() {
   local inner="$1"
   # shellcheck disable=SC2086
-  ci_docker_run "${DOCKER_EXTRA[@]}" -v "$(pwd):/compiler" -w /compiler "$IMAGE" bash -lc "$inner"
+  ci_docker_run -v "$(pwd):/compiler" -w /compiler "$IMAGE" bash -lc "$inner"
 }
 
 _llvm_exports='export PHP_COMPILER_LLVM_PATH=/opt/llvm9; export LD_LIBRARY_PATH=/opt/llvm9${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}; unset PHP_COMPILER_SKIP_LLVM_PRELOAD;'
@@ -41,14 +35,14 @@ fi
 quoted=$(printf '%q ' "$@")
 inner="source script/php-env.sh; ${_llvm_exports} ${quoted}"
 
-if [[ -f vendor/bin/phpunit ]] && ci_docker_run "${DOCKER_EXTRA[@]}" -v "$(pwd):/compiler" -w /compiler "$IMAGE" test -f vendor/bin/phpunit 2>/dev/null; then
+if [[ -f vendor/bin/phpunit ]] && ci_docker_run -v "$(pwd):/compiler" -w /compiler "$IMAGE" test -f vendor/bin/phpunit 2>/dev/null; then
   _run_in_container "$inner"
   exit $?
 fi
 
 echo "docker-exec: bind-mount incomplete; copying repo via tar..." >&2
 # shellcheck disable=SC2086
-tar -cf - --exclude='.git' --exclude='.llvm' . | ci_docker_run "${DOCKER_EXTRA[@]}" -i -w /compiler "$IMAGE" bash -c "
+tar -cf - --exclude='.git' --exclude='.llvm' . | ci_docker_run -i -w /compiler "$IMAGE" bash -c "
   tar -xf -
   chmod +x bin/*.php script/*.sh 2>/dev/null || true
   ${_llvm_exports}
