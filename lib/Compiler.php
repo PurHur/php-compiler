@@ -2034,9 +2034,27 @@ class Compiler {
 
     protected function functionStaticStorageKey(\PHPCfg\Func $func, string $varName): string
     {
-        $funcName = null !== $func->class ? $func->class.'::'.$func->name : $func->name;
+        return $this->resolveFuncDisplayName($func)."\0".$varName;
+    }
 
-        return $funcName."\0".$varName;
+    protected function resolveFuncDisplayName(\PHPCfg\Func $func): string
+    {
+        $name = $func->name;
+        if ($name instanceof Operand\Literal && is_string($name->value)) {
+            $name = $name->value;
+        }
+        if (!is_string($name)) {
+            throw new \LogicException('Function name must be a string literal for static storage key (#2286)');
+        }
+        $class = $func->class;
+        if ($class instanceof Operand\Literal && is_string($class->value)) {
+            $class = $class->value;
+        }
+        if (null !== $class && !is_string($class)) {
+            throw new \LogicException('Function class must be a string literal for static storage key (#2286)');
+        }
+
+        return null !== $class ? $class.'::'.$name : $name;
     }
 
     /**

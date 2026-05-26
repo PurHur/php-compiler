@@ -18,9 +18,7 @@ final class VariableFunctionCallHelper
 {
     private static int $blockSeq = 0;
 
-    /**
-     * @return list<string> lowercase names that may flow into a dynamic $fn() callee.
-     */
+    /** Lowercase names that may flow into a dynamic $fn() callee. */
     public static function hintedCalleeNames(Block $block, ?int $nameSlot): array
     {
         $hints = [];
