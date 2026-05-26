@@ -10,6 +10,9 @@ declare(strict_types=1);
  * Compile mode (maps M4 env → M3 helloworld driver; avoid top-level __DIR__ concat):
  *   PHP_COMPILER_M4_COMPILE_MODE=compile PHP_COMPILER_M4_RUNTIME_COMPILE=1
  *   PHP_COMPILER_M4_SOURCE=… PHP_COMPILER_M4_OUT=… ./build/bootstrap-loop-gen1-compile
+ *
+ * Native link: bootstrap-loop-gen1-link.sh links compile_smoke_m3_emit_native_entry.php
+ * (compile_driver.php bundle segfaults on LLVM 9 — #1768); this file stays lint-only for M4 env dispatch.
  */
 
 if ('compile' === (string) getenv('PHP_COMPILER_M4_COMPILE_MODE')) {

@@ -83,6 +83,25 @@ final class BootstrapBootstrapLoopProbeTest extends TestCase
         $this->assertStringContainsString('compiler_helloworld_smoke/compile_driver.php', $driver);
     }
 
+    public function testBootstrapLoopGen1LinkUsesM3EmitTu(): void
+    {
+        $script = (string) file_get_contents(self::$root.'/script/bootstrap-loop-gen1-link.sh');
+        $this->assertStringContainsString('cd "${ROOT}"', $script);
+        $this->assertStringContainsString('compile_smoke_m3_emit_native_entry.php', $script);
+        $this->assertStringContainsString('compile_smoke_m3_emit: compile OK', $script);
+        $this->assertStringContainsString('PHP_COMPILER_M3_EMIT_MINIMAL=1', $script);
+        $this->assertStringContainsString('php bin/compile.php -o "${EMIT_HELPER}"', $script);
+        $this->assertStringContainsString('m4_emit_entry="${EMIT_ENTRY}"', $script);
+        $this->assertStringNotContainsString('bootstrap_loop_smoke/compile_driver.php" 2>&1', $script);
+        $this->assertStringContainsString('==> link gen-1 emit helper', $script);
+        $this->assertStringContainsString('==> link gen-1 (bootstrap_loop_smoke bundle)', $script);
+        $emitPos = strpos($script, '==> link gen-1 emit helper');
+        $gen1Pos = strpos($script, '==> link gen-1 (bootstrap_loop_smoke bundle)');
+        $this->assertNotFalse($emitPos);
+        $this->assertNotFalse($gen1Pos);
+        $this->assertLessThan($gen1Pos, $emitPos, 'emit helper should link before gen-1 bundle (M3 probe order)');
+    }
+
     public function testSelfHostTargetDocMentionsBootstrapLoopProbe(): void
     {
         $doc = (string) file_get_contents(self::$root.'/docs/self-host-target.md');
@@ -97,6 +116,7 @@ final class BootstrapBootstrapLoopProbeTest extends TestCase
         $this->assertStringContainsString('bootstrap-loop-probe:', $makefile);
         $this->assertStringContainsString('./script/bootstrap-loop-probe.sh', $makefile);
         $this->assertStringContainsString('bootstrap-loop-gen1-link:', $makefile);
+        $this->assertStringContainsString('bootstrap-loop-probe-dry-run:', $makefile);
     }
 
     public function testBootstrapLoopSmokeEntryDocumentsProbe(): void
