@@ -961,8 +961,8 @@ final class Doctor
         fwrite(STDOUT, "      Run:     THROWSWEB_SERVE_AOT_SMOKE_GATE=1 ./script/examples-web-smoke.sh --throws-only --aot\n");
         $serveJitStatus = $serveJitOn && $llvmReady ? '✅' : '📋';
         $serveJitNote = $llvmReady
-            ? ($serveJitOn ? '#2408 ✅' : 'opt-in — phpc serve --jit caught invalid POST (#2408)')
-            : 'LLVM required; #2408 when gate=1';
+            ? ($serveJitOn ? '#2435 ✅' : 'opt-out — phpc serve --jit caught invalid POST (#2435, #2408)')
+            : 'LLVM required; #2435 when gate=1';
         fwrite(STDOUT, "  [{$serveJitStatus}] Stage 2c JIT serve — THROWSWEB_SERVE_JIT_SMOKE_GATE default {$serveJitDefault} ({$serveJitNote})\n");
         fwrite(STDOUT, "      Run:     THROWSWEB_SERVE_JIT_SMOKE_GATE=1 ./script/examples-web-smoke.sh --throws-only --jit\n");
         self::printSessionsWebGateRow(

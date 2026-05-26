@@ -1035,9 +1035,9 @@ ci_run_throws_web_serve_aot_smoke() {
   "$_CI_SCRIPT_DIR/examples-web-smoke.sh" --throws-only --aot
 }
 
-# 007-ThrowsWeb phpc serve --jit caught invalid POST (issue #2408); opt-in THROWSWEB_SERVE_JIT_SMOKE_GATE=1.
+# 007-ThrowsWeb phpc serve --jit caught invalid POST (issue #2408, default-on #2435).
 ci_run_throws_web_serve_jit_smoke() {
-  if [[ "${THROWSWEB_SERVE_JIT_SMOKE_GATE:-0}" != "1" ]]; then
+  if [[ "${THROWSWEB_SERVE_JIT_SMOKE_GATE:-1}" != "1" ]]; then
     return 0
   fi
   if [[ -n "${PHP_COMPILER_SKIP_SERVE_TESTS:-}" ]]; then
@@ -1057,7 +1057,7 @@ ci_run_throws_web_serve_jit_smoke() {
     return 0
   fi
   ci_apply_llvm_memory_env
-  echo "examples-web-smoke (007 JIT serve): ThrowsWeb phpc serve --jit caught invalid POST (THROWSWEB_SERVE_JIT_SMOKE_GATE=1, #2408)..."
+  echo "examples-web-smoke (007 JIT serve): ThrowsWeb phpc serve --jit caught invalid POST (THROWSWEB_SERVE_JIT_SMOKE_GATE=1, #2408, #2435)..."
   "$_CI_SCRIPT_DIR/examples-web-smoke.sh" --throws-only --jit
 }
 

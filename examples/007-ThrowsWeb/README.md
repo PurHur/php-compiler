@@ -20,7 +20,7 @@ curl -sf -X POST -d 'email=bad' http://127.0.0.1:8080/example.php | grep -i inva
 | VM uncaught → HTTP 500 | ✅ `uncaught.php` + opt-in `THROWSWEB_UNCAUGHT_500_GATE=1` ([#2200](https://github.com/PurHur/php-compiler/issues/2200), [#152](https://github.com/PurHur/php-compiler/issues/152)) |
 | AOT `phpc serve` | 📋 opt-in `THROWSWEB_SERVE_AOT_SMOKE_GATE=1` ([#2387](https://github.com/PurHur/php-compiler/issues/2387)) |
 | AOT `phpc build` + execute | ✅ caught invalid POST ([#2157](https://github.com/PurHur/php-compiler/issues/2157), [#2135](https://github.com/PurHur/php-compiler/issues/2135)) |
-| JIT `phpc serve` | 📋 opt-in `THROWSWEB_SERVE_JIT_SMOKE_GATE=1` ([#2408](https://github.com/PurHur/php-compiler/issues/2408), [#2167](https://github.com/PurHur/php-compiler/issues/2167)) |
+| JIT `phpc serve` | ✅ caught invalid POST ([#2435](https://github.com/PurHur/php-compiler/issues/2435), [#2408](https://github.com/PurHur/php-compiler/issues/2408), [#2167](https://github.com/PurHur/php-compiler/issues/2167)) |
 
 ## CI gates
 
@@ -35,7 +35,7 @@ Defaults from `script/ci-defaults.env`:
 | VM serve | `THROWS_WEB_SMOKE_GATE` | `1` | `make examples-throws-smoke` · `ci-fast.sh` ([#2125](https://github.com/PurHur/php-compiler/issues/2125)) |
 | VM uncaught 500 | `THROWSWEB_UNCAUGHT_500_GATE` | `0` | `THROWSWEB_UNCAUGHT_500_GATE=1 ./script/examples-web-smoke.sh --throws-only` ([#2200](https://github.com/PurHur/php-compiler/issues/2200)) |
 | AOT serve | `THROWSWEB_SERVE_AOT_SMOKE_GATE` | `0` | `THROWSWEB_SERVE_AOT_SMOKE_GATE=1 ./script/examples-web-smoke.sh --throws-only --aot` ([#2387](https://github.com/PurHur/php-compiler/issues/2387)) |
-| JIT serve | `THROWSWEB_SERVE_JIT_SMOKE_GATE` | `0` | `make examples-throws-jit-smoke` · `THROWSWEB_SERVE_JIT_SMOKE_GATE=1 ./script/examples-web-smoke.sh --throws-only --jit` ([#2408](https://github.com/PurHur/php-compiler/issues/2408)) |
+| JIT serve | `THROWSWEB_SERVE_JIT_SMOKE_GATE` | `1` | `make examples-throws-jit-smoke` · `ci-fast.sh` ([#2435](https://github.com/PurHur/php-compiler/issues/2435), [#2408](https://github.com/PurHur/php-compiler/issues/2408)); set `0` to skip |
 | AOT link | `THROWSWEB_AOT_LINK_GATE` | `1` | `./script/ci-local.sh --filter test007ThrowsWebAotLink` ([#2135](https://github.com/PurHur/php-compiler/issues/2135)) |
 | AOT execute | `THROWSWEB_AOT_SMOKE_GATE` | `1` | `ThrowsWebAotExecuteTest` · `EXAMPLES_AOT_SMOKE_ONLY=007 make examples-aot-smoke` ([#2135](https://github.com/PurHur/php-compiler/issues/2135)) |
 

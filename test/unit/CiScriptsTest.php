@@ -94,7 +94,7 @@ final class CiScriptsTest extends TestCase
             $defaults
         );
         $this->assertStringContainsString(
-            'THROWSWEB_SERVE_JIT_SMOKE_GATE="${THROWSWEB_SERVE_JIT_SMOKE_GATE:-0}"',
+            'THROWSWEB_SERVE_JIT_SMOKE_GATE="${THROWSWEB_SERVE_JIT_SMOKE_GATE:-1}"',
             $defaults
         );
     }
@@ -2176,6 +2176,32 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('THROWSWEB_SERVE_AOT_SMOKE_GATE="${THROWSWEB_SERVE_AOT_SMOKE_GATE:-0}"', $defaults);
         $this->assertStringContainsString('THROWSWEB_AOT_LINK_GATE="${THROWSWEB_AOT_LINK_GATE:-1}"', $defaults);
         $this->assertStringContainsString('THROWSWEB_AOT_SMOKE_GATE="${THROWSWEB_AOT_SMOKE_GATE:-1}"', $defaults);
+    }
+
+    public function testCiDefaultsEnvDefinesThrowsWebServeJitGateOn(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString(
+            'THROWSWEB_SERVE_JIT_SMOKE_GATE="${THROWSWEB_SERVE_JIT_SMOKE_GATE:-1}"',
+            $defaults
+        );
+        $this->assertStringContainsString('#2435', $defaults);
+    }
+
+    public function testCiCommonThrowsWebServeJitGateDefaultOn(): void
+    {
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('THROWSWEB_SERVE_JIT_SMOKE_GATE:-1', $common);
+    }
+
+    public function testLocalCiMatrixDocumentsThrowsWebServeJitGateDefaultOn(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertMatchesRegularExpression(
+            '/\| `THROWSWEB_SERVE_JIT_SMOKE_GATE` \| `1` \|/',
+            $doc
+        );
+        $this->assertStringContainsString('#2435', $doc);
     }
 
     public function testCiFastRunsMiniWebAppVmCliGateByDefault(): void
