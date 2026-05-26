@@ -26,6 +26,9 @@ Shipped demos live under `examples/00x-*/` with an `example.php` entry script. U
 
 ./phpc lint examples/007-ThrowsWeb/example.php
 ./phpc run examples/007-ThrowsWeb/example.php
+
+./phpc lint examples/008-SelfHostProbe/example.php
+./phpc run examples/008-SelfHostProbe/example.php
 ```
 
 AOT (needs LLVM 9 — see `script/install-llvm9.sh` or the `php-compiler:22.04-dev` Docker image):
@@ -50,6 +53,7 @@ Legacy entrypoints still work: `php bin/vm.php`, `php bin/jit.php`, `php bin/com
 | [005-SessionsWeb](005-SessionsWeb/) | ✅ `./phpc run` / `phpc serve` | ✅ `session_start` JIT ([#1882](https://github.com/PurHur/php-compiler/issues/1882)) | ✅ `phpc build` link ([#1946](https://github.com/PurHur/php-compiler/issues/1946)); execute [#1891](https://github.com/PurHur/php-compiler/issues/1891); deploy smoke opt-in ([#1893](https://github.com/PurHur/php-compiler/issues/1893)) | `$_SESSION` flash across requests — [#1881](https://github.com/PurHur/php-compiler/issues/1881) |
 | [006-FileUploadWeb](006-FileUploadWeb/) | ✅ `./phpc run` / `phpc serve` | ✅ nested `$_FILES` JIT ([#87](https://github.com/PurHur/php-compiler/issues/87)) | ✅ `phpc build` link ([#2011](https://github.com/PurHur/php-compiler/issues/2011)); execute default-on ([#2012](https://github.com/PurHur/php-compiler/issues/2012)) | `multipart/form-data` + `$_FILES['doc']` — [#1999](https://github.com/PurHur/php-compiler/issues/1999) |
 | [007-ThrowsWeb](007-ThrowsWeb/) | ✅ `./phpc run` / `phpc serve` | 📋 deferred | ✅ `phpc build` + CGI execute | `throw` / `catch` on invalid POST — [#2076](https://github.com/PurHur/php-compiler/issues/2076); VM smoke `THROWS_WEB_SMOKE_GATE=1` default ([#2093](https://github.com/PurHur/php-compiler/issues/2093), [#2125](https://github.com/PurHur/php-compiler/issues/2125)); AOT `THROWSWEB_AOT_*_GATE=1` default ([#2135](https://github.com/PurHur/php-compiler/issues/2135)) |
+| [008-SelfHostProbe](008-SelfHostProbe/) | ✅ `./phpc run` | — | 📋 optional | North Star 2 presenter — [#2207](https://github.com/PurHur/php-compiler/issues/2207); `make north-star2-verify` / spine smoke copy-paste; epic [#1492](https://github.com/PurHur/php-compiler/issues/1492) |
 | [003-MiniWebApp](003-MiniWebApp/) | ✅ `phpc serve` | partial | ✅ `phpc build --project` | PATH_INFO — [#489](https://github.com/PurHur/php-compiler/issues/489), runtime [#539](https://github.com/PurHur/php-compiler/issues/539); AOT link ✅ ([#752](https://github.com/PurHur/php-compiler/issues/752)); native execute ✅ ([#764](https://github.com/PurHur/php-compiler/issues/764) closed) |
 
 ### 000-HelloWorld
@@ -150,6 +154,19 @@ curl -sf -X POST -d 'email=bad' http://127.0.0.1:8080/example.php | grep -i inva
 
 VM serve curls: `make examples-throws-smoke` or `make examples-web-smoke` (`THROWS_WEB_SMOKE_GATE=1` default — [#2125](https://github.com/PurHur/php-compiler/issues/2125), [#2093](https://github.com/PurHur/php-compiler/issues/2093)). Presenter copy-paste: [docs/GETTING-STARTED.md](../docs/GETTING-STARTED.md) § 5b ([#2158](https://github.com/PurHur/php-compiler/issues/2158)). AOT link/execute: default `THROWSWEB_AOT_*_GATE=1` ([#2135](https://github.com/PurHur/php-compiler/issues/2135), [#2157](https://github.com/PurHur/php-compiler/issues/2157)); JIT deferred ([#2167](https://github.com/PurHur/php-compiler/issues/2167)). Init scaffold: `./phpc init --profile throwsweb my-app` ([#2092](https://github.com/PurHur/php-compiler/issues/2092)); template parity: [#2086](https://github.com/PurHur/php-compiler/issues/2086) (`INIT_THROWSWEB_PARITY_GATE=1` default in `ci-fast`, [#2127](https://github.com/PurHur/php-compiler/issues/2127)).
 
+### 008-SelfHostProbe
+
+North Star 2 self-host **presenter** — prints M0–M4 copy-paste commands ([#2207](https://github.com/PurHur/php-compiler/issues/2207)). Does not run bootstrap from PHP; use `make` targets. GETTING-STARTED §6: [#2222](https://github.com/PurHur/php-compiler/issues/2222).
+
+```console
+./phpc lint examples/008-SelfHostProbe/example.php
+./phpc run examples/008-SelfHostProbe/example.php
+make north-star2-verify
+BOOTSTRAP_LIB_SPINE_SMOKE=1 make bootstrap-selfhost-lib-spine-smoke
+```
+
+See [008-SelfHostProbe/README.md](008-SelfHostProbe/README.md) and [docs/bootstrap-selfhost.md](../docs/bootstrap-selfhost.md). Spine slices: [#2201](https://github.com/PurHur/php-compiler/issues/2201), [#2134](https://github.com/PurHur/php-compiler/issues/2134); unit probe: [#2216](https://github.com/PurHur/php-compiler/issues/2216).
+
 ### 002-StaticWeb
 
 Static page (no superglobals); good default for first AOT compile.
@@ -167,7 +184,7 @@ cd examples/002-StaticWeb
 
 Full field reference: [docs/phpc-json.md](../docs/phpc-json.md) ([#727](https://github.com/PurHur/php-compiler/issues/727)).
 
-**001-SimpleWeb**, **002-StaticWeb**, **004-ApiJson**, **005-SessionsWeb**, **006-FileUploadWeb**, and **007-ThrowsWeb** ship a minimal manifest beside `example.php` ([#274](https://github.com/PurHur/php-compiler/issues/274)):
+**001-SimpleWeb**, **002-StaticWeb**, **004-ApiJson**, **005-SessionsWeb**, **006-FileUploadWeb**, **007-ThrowsWeb**, and **008-SelfHostProbe** ship a minimal manifest beside `example.php` ([#274](https://github.com/PurHur/php-compiler/issues/274), [#2207](https://github.com/PurHur/php-compiler/issues/2207)):
 
 ```json
 {

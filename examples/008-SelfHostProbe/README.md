@@ -1,0 +1,47 @@
+# 008-SelfHostProbe
+
+North Star 2 **presenter** for self-host bootstrap M0–M4 ([#2207](https://github.com/PurHur/php-compiler/issues/2207)). Prints a copy-paste ladder; it does **not** invoke `make` or compile `lib/` from PHP (use the Makefile targets below).
+
+Epic: [#1492](https://github.com/PurHur/php-compiler/issues/1492) · Presenter script: `script/north-star2-verify.sh` ([#1865](https://github.com/PurHur/php-compiler/issues/1865)) · Detail: [docs/bootstrap-selfhost.md](../../docs/bootstrap-selfhost.md)
+
+## Run
+
+```console
+./phpc lint examples/008-SelfHostProbe/example.php
+./phpc run examples/008-SelfHostProbe/example.php
+```
+
+Output includes `SelfHostProbe` and `north-star2-verify` (VM smoke in `ExamplesCompileTest`).
+
+## Presenter ladder
+
+```console
+make north-star2-verify
+BOOTSTRAP_LIB_SPINE_SMOKE=1 make bootstrap-selfhost-lib-spine-smoke
+php script/bootstrap-inventory.php --check
+./phpc doctor --selfhost
+```
+
+On Runforge / harness hosts (do **not** use raw `docker run -v "$(pwd):/compiler"`):
+
+```console
+./script/docker-exec.sh -- bash -lc 'source script/php-env.sh && ./phpc run examples/008-SelfHostProbe/example.php'
+./script/docker-exec.sh -- bash -lc 'make north-star2-verify'
+```
+
+## Status
+
+| Layer | Notes |
+|-------|-------|
+| VM `phpc run` | ✅ presenter text only — no superglobals required |
+| VM `phpc serve` | 📋 not used (CLI presenter) |
+| AOT | 📋 optional later — out of scope for v1 ([#2207](https://github.com/PurHur/php-compiler/issues/2207)) |
+| CI | ✅ `ExamplesCompileTest::test008SelfHostProbeVmLint` + `provideExamples` lint/smoke ([#2239](https://github.com/PurHur/php-compiler/issues/2239)) |
+
+## Next slices
+
+- **#2201** — `bin/vm.php` native link + execute smoke
+- **#2134** — deferred spine paths (`lib/AOT/Linker.php`, …)
+- **#2216** — `lib/Compiler.php` unit compile-driver probe
+- **#2220** — `phpc init --profile selfhostprobe` scaffold
+- **#2222** — [docs/GETTING-STARTED.md](../../docs/GETTING-STARTED.md) §6 walkthrough
