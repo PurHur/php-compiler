@@ -13,9 +13,7 @@ declare(strict_types=1);
  */
 function stdlib_jit_deferred_tracked(): array
 {
-    return [
-        'spl_autoload_register' => ['issue' => 2441, 'category' => 'autoload'],
-    ];
+    return [];
 }
 
 /**
