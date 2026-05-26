@@ -7,6 +7,8 @@ Epic: [#1492](https://github.com/PurHur/php-compiler/issues/1492) · Presenter s
 ## Run
 
 ```console
+make examples-selfhostprobe-smoke
+# or:
 ./phpc lint examples/008-SelfHostProbe/example.php
 ./phpc run examples/008-SelfHostProbe/example.php
 ```

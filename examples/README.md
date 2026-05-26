@@ -159,8 +159,7 @@ VM serve curls: `make examples-throws-smoke` or `make examples-web-smoke` (`THRO
 North Star 2 self-host **presenter** — prints M0–M4 copy-paste commands ([#2207](https://github.com/PurHur/php-compiler/issues/2207)). Does not run bootstrap from PHP; use `make` targets. GETTING-STARTED §6: [#2222](https://github.com/PurHur/php-compiler/issues/2222).
 
 ```console
-./phpc lint examples/008-SelfHostProbe/example.php
-./phpc run examples/008-SelfHostProbe/example.php
+make examples-selfhostprobe-smoke
 make north-star2-verify
 BOOTSTRAP_LIB_SPINE_SMOKE=1 make bootstrap-selfhost-lib-spine-smoke
 ```

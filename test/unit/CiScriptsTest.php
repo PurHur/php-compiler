@@ -388,6 +388,17 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('examples-throws-smoke', $makefile);
     }
 
+    public function testMakefileHasExamplesSelfhostprobeSmokeTarget(): void
+    {
+        $makefile = (string) file_get_contents(dirname(__DIR__, 2).'/Makefile');
+        $this->assertStringContainsString('examples-selfhostprobe-smoke:', $makefile);
+        $this->assertStringContainsString('examples-selfhostprobe-smoke.sh', $makefile);
+
+        $script = dirname(__DIR__, 2).'/script/examples-selfhostprobe-smoke.sh';
+        $this->assertFileExists($script);
+        $this->assertTrue(is_executable($script));
+    }
+
     public function testMakefileHasExamplesFileuploadDeploySmokeTarget(): void
     {
         $makefile = (string) file_get_contents(dirname(__DIR__, 2).'/Makefile');
