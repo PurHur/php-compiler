@@ -441,9 +441,7 @@ final class Doctor
         fwrite(STDOUT, "  Docs: docs/bootstrap-selfhost.md · docs/local-ci-matrix.md\n");
     }
 
-    /**
-     * @return non-empty-string Human-readable snapshot summary, or '' when unavailable.
-     */
+    /** Human-readable snapshot summary, or empty string when unavailable. */
     private static function bootstrapInventoryLintSnapshotSummary(string $repoRoot): string
     {
         $snapshotPath = $repoRoot.'/docs/bootstrap-inventory-lint-snapshot.json';
