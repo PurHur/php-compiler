@@ -300,4 +300,63 @@ final class VmArray
         }
         $ht->replacePackedValues($values);
     }
+
+    /**
+     * array_rand() — pick {@param $num} unique packed list keys (CSPRNG; issue #2321).
+     */
+    public static function arrayRandPacked(HashTable $ht, int $num): Variable
+    {
+        if (!self::isList($ht)) {
+            throw new \LogicException(
+                'array_rand() only supports packed list arrays in this compiler build'
+            );
+        }
+        $n = $ht->getNumElements();
+        if (0 === $n) {
+            throw new \ValueError('array_rand(): Argument #1 ($array) cannot be empty');
+        }
+        if ($num < 1) {
+            throw new \ValueError('array_rand(): Argument #2 ($num) must be greater than 0');
+        }
+        if ($num > $n) {
+            throw new \ValueError(
+                'array_rand(): Argument #2 ($num) must be between 1 and the number of elements in Argument #1 ($array)'
+            );
+        }
+        $indices = [];
+        for ($i = 0; $i < $n; ++$i) {
+            $indices[] = $i;
+        }
+        for ($i = 0; $i < $num; ++$i) {
+            $rand = VmString::randomBytes(8);
+            $pick = 0;
+            for ($b = 0; $b < 8; ++$b) {
+                $pick = ($pick << 8) | \ord($rand[$b]);
+            }
+            $upper = $n - $i;
+            $j = $i + ($pick % $upper);
+            if ($j < 0) {
+                $j = $i;
+            }
+            $tmp = $indices[$i];
+            $indices[$i] = $indices[$j];
+            $indices[$j] = $tmp;
+        }
+        $picked = \array_slice($indices, 0, $num);
+        $result = new Variable();
+        if (1 === $num) {
+            $result->int($picked[0]);
+
+            return $result;
+        }
+        $arr = new HashTable();
+        foreach ($picked as $pos => $key) {
+            $v = new Variable();
+            $v->int($key);
+            $arr->addIndex($pos, $v);
+        }
+        $result->array($arr);
+
+        return $result;
+    }
 }

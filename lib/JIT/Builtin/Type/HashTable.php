@@ -109,6 +109,7 @@ class HashTable extends Type
         $this->registerFn('__hashtable__sortPacked', 'void', ['__hashtable__*']);
         $this->registerFn('__hashtable__sortPackedReverse', 'void', ['__hashtable__*']);
         $this->registerFn('__hashtable__shufflePacked', 'void', ['__hashtable__*']);
+        $this->registerFn('__hashtable__arrayRandPacked', 'void', ['__hashtable__*', 'size_t', '__value__*']);
         $this->registerFn('__hashtable__sortStringKeys', 'void', ['__hashtable__*']);
         $this->registerFn('__hashtable__sortStringKeysReverse', 'void', ['__hashtable__*']);
         $this->registerFn('__hashtable__sortStringKeyValues', 'void', ['__hashtable__*']);
@@ -171,6 +172,7 @@ class HashTable extends Type
         $this->implementSortPacked();
         $this->implementSortPackedReverse();
         $this->implementShufflePacked();
+        $this->implementArrayRandPacked();
         $this->implementSortStringKeys();
         $this->implementSortStringKeysReverse();
         $this->implementSortStringKeyValues();
@@ -2630,6 +2632,27 @@ class HashTable extends Type
         $this->context->builder->branch($loopHead);
 
         $this->context->builder->positionAtEnd($done);
+        $this->context->builder->returnVoid();
+    }
+
+    private function implementArrayRandPacked(): void
+    {
+        $fn = $this->context->lookupFunction('__hashtable__arrayRandPacked');
+        $main = $fn->appendBasicBlock('main');
+        $this->context->builder->positionAtEnd($main);
+        $ht = $fn->getParam(0);
+        $out = $fn->getParam(2);
+        $map = $this->context->structFieldMap['__hashtable__'];
+        $i64 = $this->context->getTypeFromString('int64');
+        $n = $this->context->builder->load(
+            $this->context->builder->structGep($ht, $map['nextFreeElement'])
+        );
+        $idx = $this->emitRandomIndexBelow($fn, $n);
+        $this->context->builder->call(
+            $this->context->lookupFunction('__value__writeLong'),
+            $out,
+            $this->context->builder->truncOrBitCast($idx, $i64)
+        );
         $this->context->builder->returnVoid();
     }
 
