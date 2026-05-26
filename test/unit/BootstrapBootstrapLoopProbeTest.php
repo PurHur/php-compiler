@@ -118,6 +118,8 @@ final class BootstrapBootstrapLoopProbeTest extends TestCase
         $this->assertStringContainsString('./script/bootstrap-loop-probe.sh', $makefile);
         $this->assertStringContainsString('bootstrap-loop-gen1-link:', $makefile);
         $this->assertStringContainsString('bootstrap-loop-probe-dry-run:', $makefile);
+        $this->assertStringContainsString('BOOTSTRAP_M3_HELLOWORLD_STRICT=1', $makefile);
+        $this->assertStringContainsString('BOOTSTRAP_M4_RUNTIME_COMPILE=1', $makefile);
     }
 
     public function testBootstrapLoopSmokeEntryDocumentsProbe(): void
