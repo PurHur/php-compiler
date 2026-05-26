@@ -2032,6 +2032,55 @@ class Compiler {
         return $endBlock;
     }
 
+    protected function functionStaticStorageKey(\PHPCfg\Func $func, string $varName): string
+    {
+        $funcName = null !== $func->class ? $func->class.'::'.$func->name : $func->name;
+
+        return $funcName."\0".$varName;
+    }
+
+    /**
+     * @param Op\Terminal\StaticVar $terminal
+     */
+    protected function compileFunctionStaticVar(Op\Terminal $terminal, Block $block): OpCode
+    {
+        if (null === $block->func) {
+            throw new \LogicException('Function-local static requires a function context');
+        }
+        $varName = $this->resolveSimpleVariableName($terminal->var);
+        $storageKey = $this->functionStaticStorageKey($block->func, $varName);
+        $keyVar = new Variable(Variable::TYPE_STRING);
+        $keyVar->string($storageKey);
+        $keyOperand = new Operand\Literal($storageKey);
+        $keyOperand->type = Type::string();
+        $keySlot = $block->registerConstant($keyOperand, $keyVar);
+        $defaultSlot = null;
+        if (null !== $terminal->defaultVar) {
+            $defaultSlot = $this->compileOperand($terminal->defaultVar, $block, true);
+            if (!isset($block->constants[$defaultSlot])) {
+                throw new \LogicException(
+                    'Function-local static initializer must be a literal int or string in v1 (#2286)'
+                );
+            }
+            $defaultVm = $block->constants[$defaultSlot];
+            if (
+                Variable::TYPE_INTEGER !== $defaultVm->type
+                && Variable::TYPE_STRING !== $defaultVm->type
+            ) {
+                throw new \LogicException(
+                    'Function-local static initializer must be a literal int or string in v1 (#2286)'
+                );
+            }
+        }
+
+        return new OpCode(
+            OpCode::TYPE_DECLARE_FUNCTION_STATIC,
+            $this->compileOperand($terminal->var, $block, false),
+            $keySlot,
+            $defaultSlot
+        );
+    }
+
     protected function resolveSimpleVariableName(Operand $var): string
     {
         while ($var instanceof Temporary) {
@@ -2561,6 +2610,8 @@ class Compiler {
                     $this->compileOperand($terminal->var, $block, false),
                     $nameSlot
                 )];
+            case 'Terminal_StaticVar':
+                return [$this->compileFunctionStaticVar($terminal, $block)];
             default:
                 throw new \LogicException("Unknown Terminal Type: " . $terminal->getType());
         }
