@@ -399,6 +399,33 @@ final class CiScriptsTest extends TestCase
         $this->assertTrue(is_executable($script));
     }
 
+    public function testCiDefaultsEnvDefinesExamplesSelfhostprobeSmokeGateOff(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString(
+            'EXAMPLES_SELFHOSTPROBE_SMOKE_GATE="${EXAMPLES_SELFHOSTPROBE_SMOKE_GATE:-0}"',
+            $defaults
+        );
+    }
+
+    public function testCiFastRunsExamplesSelfhostprobeSmokeGate(): void
+    {
+        $fast = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-fast.sh');
+        $this->assertStringContainsString('ci_run_examples_selfhostprobe_smoke', $fast);
+
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('EXAMPLES_SELFHOSTPROBE_SMOKE_GATE', $common);
+        $this->assertStringContainsString('examples-selfhostprobe-smoke.sh', $common);
+    }
+
+    public function testLocalCiMatrixDocumentsExamplesSelfhostprobeSmokeGate(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('EXAMPLES_SELFHOSTPROBE_SMOKE_GATE', $doc);
+        $this->assertStringContainsString('examples-selfhostprobe-smoke.sh', $doc);
+        $this->assertStringContainsString('#2302', $doc);
+    }
+
     public function testMakefileHasExamplesFileuploadDeploySmokeTarget(): void
     {
         $makefile = (string) file_get_contents(dirname(__DIR__, 2).'/Makefile');
