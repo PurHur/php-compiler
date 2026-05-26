@@ -798,16 +798,17 @@ ci_run_examples_serve_jit_smoke() {
   "$_CI_SCRIPT_DIR/examples-serve-jit-smoke.sh"
 }
 
-# 008-SelfHostProbe VM lint + run (issue #2240, opt-in ci-fast #2302).
+# 008-SelfHostProbe VM lint + run (issue #2240; default-on ci-fast #2343).
 ci_run_examples_selfhostprobe_smoke() {
-  if [[ "${EXAMPLES_SELFHOSTPROBE_SMOKE_GATE:-0}" != "1" ]]; then
+  if [[ "${EXAMPLES_SELFHOSTPROBE_SMOKE_GATE:-1}" != "1" ]]; then
+    echo "examples-selfhostprobe-smoke: skipped (EXAMPLES_SELFHOSTPROBE_SMOKE_GATE=0)"
     return 0
   fi
   if [[ ! -f "${_CI_REPO_ROOT}/examples/008-SelfHostProbe/example.php" ]]; then
     echo "examples-selfhostprobe-smoke: skipped (008-SelfHostProbe tree missing #2207)"
     return 0
   fi
-  echo "examples-selfhostprobe-smoke (EXAMPLES_SELFHOSTPROBE_SMOKE_GATE=1, #2302)..."
+  echo "examples-selfhostprobe-smoke (EXAMPLES_SELFHOSTPROBE_SMOKE_GATE=1 default, #2343)..."
   "$_CI_SCRIPT_DIR/examples-selfhostprobe-smoke.sh"
 }
 
