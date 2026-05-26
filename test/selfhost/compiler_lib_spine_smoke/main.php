@@ -651,7 +651,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/ReadonlyRaise.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringFsDir.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringHashCrypto.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringMicrotime.php';
-// lib/JIT/Builtin/StringPasswordCrypto.php: static initializer lint (#2286)
+require_once __DIR__.'/../../../lib/JIT/Builtin/StringPasswordCrypto.php';
 require_once __DIR__.'/../../../lib/JIT/Call/RuntimeVariableFunction.php';
 require_once __DIR__.'/../../../lib/JIT/FunctionStaticHelper.php';
 require_once __DIR__.'/../../../lib/JIT/ReadonlyClassGuard.php';

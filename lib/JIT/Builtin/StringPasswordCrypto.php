@@ -25,7 +25,7 @@ final class StringPasswordCrypto
     /** MCJIT resolves libcrypt symbols from the host process (#172). */
     public static function preloadLibcrypt(): void
     {
-        static $loaded = false;
+        static $loaded = 0;
         if ($loaded) {
             return;
         }
@@ -38,7 +38,7 @@ final class StringPasswordCrypto
         } catch (\Throwable $e) {
             // Best-effort: AOT links -lcrypt explicitly.
         }
-        $loaded = true;
+        $loaded = 1;
     }
 
     public static function implement(Context $context): void

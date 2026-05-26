@@ -1,7 +1,3 @@
 {
-    "files": {
-        "lib/JIT/Builtin/StringPasswordCrypto.php": [
-            "Terminal_StaticVar"
-        ]
-    }
+    "files": []
 }
