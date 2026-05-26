@@ -41,7 +41,7 @@ Presenter script and troubleshooting: [`docs/GETTING-STARTED.md`](docs/GETTING-S
 | **003-MiniWebApp** VM + AOT link | ✅ |
 | **003** AOT execute (home, hello, PATH_INFO, contact) | ✅ native execute ([#764](https://github.com/PurHur/php-compiler/issues/764) closed; close tracker [#1044](https://github.com/PurHur/php-compiler/issues/1044)) |
 | Self-host **M0–M1** | ✅ |
-| Self-host **M2** spine | 🚧 **654** / 657 units ([#1492](https://github.com/PurHur/php-compiler/issues/1492), [#2126](https://github.com/PurHur/php-compiler/issues/2126)) |
+| Self-host **M2** spine | 🚧 **661** / 657 units ([#1492](https://github.com/PurHur/php-compiler/issues/1492), [#2126](https://github.com/PurHur/php-compiler/issues/2126)) |
 | Full Zend PHP compatibility | ❌ — subset only (matrices in `docs/`, not on status site) |
 
 MiniWebApp gates: [docs/miniwebapp-gates.md](docs/miniwebapp-gates.md) ([#472](https://github.com/PurHur/php-compiler/issues/472)). Presenter verify: `make north-star1-verify` ([#1845](https://github.com/PurHur/php-compiler/issues/1845)). Docker image: `php-compiler:22.04-dev`.

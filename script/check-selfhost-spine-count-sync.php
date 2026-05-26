@@ -100,8 +100,15 @@ function validate_spine_footnotes(string $rel, string $doc, int $spineCount, int
         $errors[] = "{$rel}: missing inventory total {$inventoryTotal}";
     }
 
-    // Reject stale M2 ratio footnotes (e.g. 358/586, 584/588) when they disagree with canonical.
-    if (preg_match_all('/\b(\d{2,4})\s*\/\s*'.$inventoryTotal.'\b/', $doc, $ratioMatches, PREG_SET_ORDER)) {
+    // Reject stale M2 ratio footnotes (e.g. 358/586, 584/588, **654** / 657) when they disagree with canonical.
+    $ratioPatterns = [
+        '/\b(\d{2,4})\s*\/\s*'.$inventoryTotal.'\b/',
+        '/\*\*(\d{2,4})\*\*\s*\/\s*'.$inventoryTotal.'\b/',
+    ];
+    foreach ($ratioPatterns as $ratioPattern) {
+        if (!preg_match_all($ratioPattern, $doc, $ratioMatches, PREG_SET_ORDER)) {
+            continue;
+        }
         foreach ($ratioMatches as $ratioMatch) {
             $found = (int) $ratioMatch[1];
             if ($found !== $spineCount && $found !== $inventoryTotal) {
