@@ -128,4 +128,23 @@ final class BootstrapRuntimeCompileSmokeTest extends TestCase
         $aot = (string) file_get_contents(self::$root.'/lib/JIT/M3EmitTuTrivialEchoAot.php');
         $this->assertStringContainsString('emitParseAndCompileWithTrivialFallback', $aot);
     }
+
+    /** Runtime.php CFG uses bare init* names; emit TU must match them (#2568). */
+    public function testM3EmitTuRuntimeMethodFromModulesMatchesBareCfgFuncNames(): void
+    {
+        $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
+        $this->assertStringContainsString('$funcLc !== $methodLc', $jit);
+        $this->assertStringContainsString("'initparsepipeline'", $jit);
+        $this->assertStringContainsString('compileM3EmitTuRuntimeSpineMethodsForRealLowering', $jit);
+    }
+
+    public function testM3EmitTuUsesRuntimeInitCompilerFloor(): void
+    {
+        $init = (string) file_get_contents(self::$root.'/lib/JIT/RuntimeEmitTuInit.php');
+        $this->assertStringContainsString('RuntimeInitCompiler::emit', $init);
+        $compiler = (string) file_get_contents(self::$root.'/lib/JIT/RuntimeInitCompiler.php');
+        $this->assertStringContainsString("'PHPCompiler\\\\Compiler'", $compiler);
+        $emit = (string) file_get_contents(self::$root.'/lib/JIT/BootstrapCompileSmokeM3Emit.php');
+        $this->assertStringContainsString("'PHPCompiler\\\\Runtime::'", $emit);
+    }
 }

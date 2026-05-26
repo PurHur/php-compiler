@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+require_once __DIR__.'/RuntimeInitCompiler.php';
+require_once __DIR__.'/RuntimeInitVmContext.php';
+
 use PHPLLVM\Value;
 
 /**
@@ -20,9 +23,16 @@ final class RuntimeEmitTuInit
         $modeVar = new Variable($context, Variable::TYPE_NATIVE_LONG, Variable::KIND_VALUE, $mode);
         $object->propertyStore($modeSlot->objectPropertySlot, $modeVar, Variable::TYPE_NATIVE_LONG);
 
+        foreach (['initparsepipeline'] as $methodLc) {
+            $context->builder->call(
+                BootstrapCompileSmokeM3Emit::runtimeSpineFn($context, $methodLc, 'void', ['__object__*']),
+                $runtime
+            );
+        }
+        RuntimeInitCompiler::emit($context, $object, $runtime);
         RuntimeInitVmContext::emit($context, $object, $runtime);
 
-        foreach (['initparsepipeline', 'initcompiler', 'loadcoremodules'] as $methodLc) {
+        foreach (['loadcoremodules'] as $methodLc) {
             $context->builder->call(
                 BootstrapCompileSmokeM3Emit::runtimeSpineFn($context, $methodLc, 'void', ['__object__*']),
                 $runtime
