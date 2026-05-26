@@ -18,8 +18,8 @@ M4 bootstrap-loop probe (#1498). Runs M2 spine + M3 partial + gen-1 link/gen-2 a
 then (unless --dry-run) M3 strict native emit and gen-1→gen-2 native slice.
 
 Exit codes:
-  0  --dry-run: lint + M2 spine + M3 partial + gen-1 link (gen-2 Zend partial OK) green
-     full:      same + M3 strict + gen-1→gen-2 native emit (BOOTSTRAP_M4_RUNTIME_COMPILE=1)
+  0  --dry-run: lint + M2 spine + M3 partial + gen-1 link + gen-2 native slice green
+     full:      same + M3 strict + gen-1→gen-2 native emit (default when link driver on — #2599)
   1  hard failure (missing entry/scripts, lint, M2 spine, M3 partial, or gen-1 link)
   2  LLVM 9 not found (skip), or full mode: M3 strict / gen-2 native emit not ready
   3  reserved
@@ -157,7 +157,7 @@ set +e
   cd "${ROOT}"
   BOOTSTRAP_M4_LINK_COMPILE_DRIVER=1 \
   BOOTSTRAP_M4_COMPILE_DRIVER_REAL_LOWERING="${BOOTSTRAP_M4_COMPILE_DRIVER_REAL_LOWERING:-1}" \
-  BOOTSTRAP_M4_RUNTIME_COMPILE="${BOOTSTRAP_M4_RUNTIME_COMPILE:-$([[ "${DRY_RUN}" -eq 1 ]] && echo 0 || echo 1)}" \
+  BOOTSTRAP_M4_RUNTIME_COMPILE="${BOOTSTRAP_M4_RUNTIME_COMPILE:-1}" \
   bash "${GEN1_LINK}"
 ) >"${GEN1_LOG}" 2>&1
 GEN1_CODE=$?

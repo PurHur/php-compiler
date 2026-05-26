@@ -23,8 +23,9 @@ helloworld_m3_emit_next_lower() {
     echo "bootstrap-selfhost-helloworld-probe: NEXT_LOWER_CMD: ./script/docker-exec.sh -- bash -lc 'source script/php-env.sh && BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1 BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING=1 BOOTSTRAP_M3_RUNTIME_COMPILE=1 BOOTSTRAP_M3_HELLOWORLD_STRICT=1 ./script/bootstrap-selfhost-helloworld-probe.sh'" >&2
     return
   fi
-  if [[ "${BOOTSTRAP_M3_RUNTIME_COMPILE:-0}" != "1" ]]; then
-    echo "bootstrap-selfhost-helloworld-probe: NEXT_LOWER: set BOOTSTRAP_M3_RUNTIME_COMPILE=1 to execute native emit helper (#2572)" >&2
+  m3_runtime_compile="${BOOTSTRAP_M3_RUNTIME_COMPILE:-${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-0}}"
+  if [[ "${m3_runtime_compile}" != "1" ]]; then
+    echo "bootstrap-selfhost-helloworld-probe: NEXT_LOWER: set BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1 (or BOOTSTRAP_M3_RUNTIME_COMPILE=1) to execute native emit helper (#2599)" >&2
     return
   fi
   if grep -qE 'segfault|SIGKILL|exit 139' <<< "${M3_BLOCK_REASON}"; then
@@ -105,7 +106,8 @@ if [[ "${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
   if [[ -x "${EMIT_HELPER}" ]]; then
     M3_EMIT_HELPER_LINKED=1
     echo "bootstrap-selfhost-helloworld-probe: native emit helper link OK (${EMIT_HELPER}, ${m3_link_mode})"
-    if [[ "${BOOTSTRAP_M3_RUNTIME_COMPILE:-0}" == "1" ]]; then
+    m3_runtime_compile="${BOOTSTRAP_M3_RUNTIME_COMPILE:-${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-0}}"
+    if [[ "${m3_runtime_compile}" == "1" ]]; then
       set +e
       compile_out="$(
         env PHP_COMPILER_M3_EMIT_MINIMAL=1 \
@@ -130,7 +132,7 @@ if [[ "${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
         printf '%s\n' "${compile_out}" >&2
       fi
     else
-      M3_BLOCK_REASON="runtime gate: BOOTSTRAP_M3_RUNTIME_COMPILE=1 not set"
+      M3_BLOCK_REASON="runtime gate: native emit execute disabled (BOOTSTRAP_M3_RUNTIME_COMPILE=0 with link driver — #2599)"
     fi
   else
     M3_BLOCK_REASON="emit helper link failed ($(m3_exit_label "${m3_link_code}"), mode=${m3_link_mode})"

@@ -159,11 +159,17 @@ final class BootstrapCompileSmokeM3Emit
         $context->builder->returnValue($retOk);
     }
 
+    /** Real Runtime init when emit helper is linked (not stub __construct only; #2599). */
     private static function shouldUseEmitTuRealLowering(Context $context): bool
     {
-        $minimal = getenv('PHP_COMPILER_M3_EMIT_MINIMAL');
+        foreach (['PHP_COMPILER_M3_EMIT_MINIMAL', 'PHP_COMPILER_EMIT_HELPER_LINK', 'PHP_COMPILER_M3_EMIT_TU'] as $key) {
+            $flag = getenv($key);
+            if ('1' === $flag || 'true' === strtolower((string) $flag)) {
+                return true;
+            }
+        }
 
-        return '1' === $minimal || 'true' === strtolower((string) $minimal);
+        return false;
     }
 
     private static function echoPhaseError(Context $context, string $logPrefix, string $line1, string $phase): void

@@ -162,6 +162,11 @@ final class BootstrapBootstrapLoopProbeTest extends TestCase
             $out,
             'M4 probe must link emit helper with PHP_COMPILER_M3_COMPILE_DRIVER (#2571)'
         );
+        $this->assertStringNotContainsString(
+            'runtime gate: BOOTSTRAP_M4_RUNTIME_COMPILE=1 not set',
+            $out,
+            'dry-run should default native gen-2 when link driver on (#2599)'
+        );
     }
 
     public function testGen1LinkPartialGreenWhenLlvmPresent(): void
@@ -188,6 +193,7 @@ final class BootstrapBootstrapLoopProbeTest extends TestCase
             'emit helper link failed (exit 255, mode=selfhost stubs (no PHP_COMPILER_M3_COMPILE_DRIVER))',
             $out
         );
+        $this->assertStringContainsString('emit_path=native', $out);
         $this->assertTrue(is_executable(self::$root.'/build/bootstrap-loop-gen1'));
         $this->assertTrue(is_executable(self::$root.'/build/bootstrap-loop-gen2'));
     }

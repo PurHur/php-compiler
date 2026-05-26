@@ -78,7 +78,8 @@ if [[ "${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
   set -e
   if [[ -x "${EMIT_HELPER}" ]]; then
     echo "bootstrap-selfhost-runtime-compile-smoke: native emit helper link OK (${EMIT_HELPER}, ${m3_link_mode})"
-    if [[ "${BOOTSTRAP_M3_RUNTIME_COMPILE:-0}" == "1" ]]; then
+    m3_runtime_compile="${BOOTSTRAP_M3_RUNTIME_COMPILE:-${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-0}}"
+    if [[ "${m3_runtime_compile}" == "1" ]]; then
       set +e
       compile_out="$(
         env PHP_COMPILER_M3_EMIT_MINIMAL=1 \
@@ -106,7 +107,7 @@ if [[ "${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
         printf '%s\n' "${compile_out}" >&2
       fi
     else
-      M3_BLOCK_REASON="runtime gate: BOOTSTRAP_M3_RUNTIME_COMPILE=1 not set"
+      M3_BLOCK_REASON="runtime gate: native emit execute disabled (BOOTSTRAP_M3_RUNTIME_COMPILE=0 with link driver — #2599)"
     fi
   else
     M3_BLOCK_REASON="emit helper link failed ($(m3_exit_label "${m3_link_code}"), mode=${m3_link_mode})"

@@ -89,7 +89,7 @@ ns4_print_m4_next_steps() {
     echo "north-star4-verify: M4 ladder green"
   fi
   echo "north-star4-verify: Next strict CI — BOOTSTRAP_M4_GEN2_STRICT_GATE=1 in ci-local.sh (#2112)"
-  echo "north-star4-verify: Next compiled driver — BOOTSTRAP_M4_RUNTIME_COMPILE=1 gen-1 link (#1521)"
+  echo "north-star4-verify: Next compiled driver — gen-1 compiles bin/compile.php spine (#1521, #2600)"
   echo "north-star4-verify: Native gen-2 emit — BOOTSTRAP_M4_GEN2_STRICT=1 BOOTSTRAP_M4_LINK_COMPILE_DRIVER=1 ./script/bootstrap-loop-gen1-link.sh (#2115, #2075)"
   echo "north-star4-verify: Opt-in ci-local — NORTH_STAR4_VERIFY_GATE=1 ./script/ci-local.sh (#2429)"
 }
@@ -151,7 +151,7 @@ ns4_run_m3_strict_optional 2 "M3 HelloWorld strict probe" \
 ns4_run_m3_strict_optional 3 "M3 compile-smoke strict probe" \
   ci_run_bootstrap_m3_compile_smoke_strict
 
-GEN1_ENV=(BOOTSTRAP_M4_LINK_COMPILE_DRIVER=1)
+GEN1_ENV=(BOOTSTRAP_M4_LINK_COMPILE_DRIVER=1 BOOTSTRAP_M4_RUNTIME_COMPILE=1)
 if [[ "${STRICT_M4}" -eq 1 ]]; then
   GEN1_ENV+=(BOOTSTRAP_M4_GEN2_STRICT=1)
 fi
