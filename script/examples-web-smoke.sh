@@ -331,7 +331,7 @@ throws_web_serve_aot_require_pass() {
 }
 
 throws_web_serve_jit_require_pass() {
-  [[ "${THROWSWEB_SERVE_JIT_SMOKE_GATE:-0}" == "1" ]]
+  [[ "${THROWSWEB_SERVE_JIT_SMOKE_GATE:-1}" == "1" ]]
 }
 
 ensure_jit_serve_ready() {
@@ -498,8 +498,8 @@ run_throws_web_smoke() {
     echo "examples-web-smoke: 007-ThrowsWeb: --aot and --jit are mutually exclusive" >&2
     return 1
   fi
-  if [[ "$JIT" -eq 1 && "${THROWSWEB_SERVE_JIT_SMOKE_GATE:-0}" != "1" ]]; then
-    echo "examples-web-smoke: 007-ThrowsWeb: skip --jit (THROWSWEB_SERVE_JIT_SMOKE_GATE=0; #2408)"
+  if [[ "$JIT" -eq 1 && "${THROWSWEB_SERVE_JIT_SMOKE_GATE:-1}" != "1" ]]; then
+    echo "examples-web-smoke: 007-ThrowsWeb: skip --jit (THROWSWEB_SERVE_JIT_SMOKE_GATE=0; #2408, #2435)"
     return 0
   fi
   if [[ "$AOT" -eq 1 && "${THROWSWEB_SERVE_AOT_SMOKE_GATE:-0}" != "1" ]]; then
