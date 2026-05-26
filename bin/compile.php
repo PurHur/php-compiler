@@ -25,7 +25,6 @@ function run(string $filename, string $code, array $options): void
             || str_contains($normalized, 'helloworld_m3_emit_native_entry.php');
         if ($m3EmitEntry) {
             putenv('PHP_COMPILER_SELFHOST_AOT=1');
-            putenv('PHP_COMPILER_M3_COMPILE_DRIVER=1');
             putenv('PHP_COMPILER_EMIT_HELPER_LINK=1');
             putenv('PHP_COMPILER_M3_EMIT_TU=1');
             putenv('PHP_COMPILER_M3_EMIT_MINIMAL=1');
