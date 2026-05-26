@@ -1311,6 +1311,16 @@ final class VmString
         return $out;
     }
 
+    /** htmlentities() — same subset as htmlspecialchars(); PHP default flags ENT_COMPAT (#2472). */
+    public static function htmlentities(
+        string $string,
+        int $flags = ENT_COMPAT,
+        string $encoding = 'UTF-8',
+        bool $doubleEncode = true
+    ): string {
+        return self::htmlspecialchars($string, $flags, $encoding, $doubleEncode);
+    }
+
     /**
      * htmlspecialchars_decode() — inverse of {@see htmlspecialchars()} for our entity subset.
      */
@@ -1353,6 +1363,14 @@ final class VmString
         }
 
         return $out;
+    }
+
+    /** html_entity_decode() — same subset as htmlspecialchars_decode(); default ENT_COMPAT (#2472). */
+    public static function html_entity_decode(
+        string $string,
+        int $flags = ENT_COMPAT
+    ): string {
+        return self::htmlspecialchars_decode($string, $flags);
     }
 
     private static function entityAt(string $string, int $pos, int $len, string $entity, int $entityLen): bool
