@@ -1235,11 +1235,18 @@ class JIT {
     /** Native {main} for M3 emit TU — getenv + bridge only (#1937). */
     private function compileM3EmitTuMainNative(string $internalName, Block $block, ?string $logicalName): PHPLLVM\Value
     {
-        $this->compileM3EmitTuRuntimeSpineDecls();
+        // The emit-TU bridge must be built only after the Runtime/Compiler spine is
+        // actually lowered (runQueue), otherwise bridge calls can bind to stubs.
+        if (!$this->m3EmitTuRuntimeSpineLowered) {
+            $this->m3EmitTuRuntimeSpineLowered = true;
+            $this->m3EmitTuMainBlock = $block;
+            $this->compileM3EmitTuRuntimeSpineDecls();
+        }
         $lcname = strtolower($logicalName ?? '{main}');
         if (isset($this->context->functions[$lcname])) {
             return $this->context->functions[$lcname];
         }
+        $this->runQueue();
         $i64 = $this->context->getTypeFromString('int64');
         $func = $this->context->module->addFunction(
             $this->llvmInternalName($internalName),
@@ -1326,6 +1333,7 @@ class JIT {
             $this->context->popScope();
         }
         $this->compileM3EmitTuCompilerCompileDecl();
+        $this->compileM3EmitTuCompilerEmitSmokeNativeDecl();
         $this->runQueue();
     }
 
