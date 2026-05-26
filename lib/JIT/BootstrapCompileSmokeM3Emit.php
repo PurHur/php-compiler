@@ -229,9 +229,18 @@ final class BootstrapCompileSmokeM3Emit
         if (isset($context->functions[$lc])) {
             return $context->functions[$lc];
         }
+        $params = [];
+        foreach ($paramTypeNames as $typeName) {
+            $params[] = $context->getTypeFromString($typeName);
+        }
 
-        throw new \LogicException(
-            'M3 emit bridge missing lowered runtime spine: '.$logical.' (#2442)'
+        return $context->module->addFunction(
+            $mangled,
+            $context->context->functionType(
+                $context->getTypeFromString($returnTypeName),
+                false,
+                ...$params
+            )
         );
     }
 }
