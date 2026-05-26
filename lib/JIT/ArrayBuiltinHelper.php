@@ -5374,6 +5374,49 @@ final class ArrayBuiltinHelper
         HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
     }
 
+    public static function natcasesortByValue(Context $context, Variable $array): void
+    {
+        if (self::isNativeArray($array->type)) {
+            throw new \LogicException(
+                'natcasesort() cannot compile fixed-size literal arrays in JIT/AOT yet; use bin/vm.php or bin/serve.php'
+            );
+        }
+        $isList = \PHPCompiler\ext\standard\JitArrayIsList::invoke($context, $array);
+        $done = BasicBlockHelper::append($context, 'natcasesort_done');
+        $sortList = BasicBlockHelper::append($context, 'natcasesort_sort_list');
+        $sortAssoc = BasicBlockHelper::append($context, 'natcasesort_sort_assoc');
+        $context->builder->branchIf($isList, $sortList, $sortAssoc);
+
+        $context->builder->positionAtEnd($sortList);
+        self::sortPackedNaturalCase($context, $array);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($sortAssoc);
+        self::sortStringKeyValuesNaturalCase($context, $array);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+    }
+
+    public static function sortPackedNaturalCase(Context $context, Variable $array): void
+    {
+        if (self::isNativeArray($array->type)) {
+            throw new \LogicException(
+                'natcasesort() cannot compile fixed-size literal arrays in JIT/AOT yet; use bin/vm.php or bin/serve.php'
+            );
+        }
+        $ht = self::loadHashTable($context, $array);
+        $context->builder->call($context->lookupFunction('__hashtable__sortPackedNaturalCase'), $ht);
+        HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
+    }
+
+    public static function sortStringKeyValuesNaturalCase(Context $context, Variable $array): void
+    {
+        $ht = self::loadHashTable($context, $array);
+        $context->builder->call($context->lookupFunction('__hashtable__sortStringKeyValuesNaturalCase'), $ht);
+        HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
+    }
+
     public static function sortStringKeyValues(Context $context, Variable $array): void
     {
         $ht = self::loadHashTable($context, $array);
