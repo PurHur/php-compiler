@@ -1,5 +1,5 @@
 --TEST--
-AOT: match selects literal arms (string and int) (#2398, #2428)
+match selects literal arms (string and int) with default present (#2398, #2428)
 --FILE--
 <?php
 echo match ('x') {

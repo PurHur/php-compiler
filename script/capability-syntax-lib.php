@@ -144,7 +144,10 @@ function syntaxRowDefinitions(): array
             'construct' => '`match` expression',
             'opcodes' => ['TYPE_IDENTICAL', 'TYPE_JUMPIF', 'TYPE_ASSIGN'],
             'issue' => 143,
-            'notes' => ['Lowered in php-cfg to === / jump-if / assign (#143)'],
+            'notes' => [
+                'Lowered in php-cfg to === / jump-if / assign (#143)',
+                'Wave-3 literal-arm subset (#2398); acceptance PHPT (#2428)',
+            ],
             'probe' => 'echo match (2) { 1 => "a", 2 => "b", default => "c" };',
         ],
         [
