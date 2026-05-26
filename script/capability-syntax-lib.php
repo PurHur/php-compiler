@@ -334,9 +334,18 @@ function syntaxRowDefinitions(): array
             'issue' => 2325,
             'notes' => [
                 'php-cfg resolves imported names at parse time; no Stmt_Use lowering required',
-                'Grouped `use Foo\\Bar` unchanged',
             ],
             'probe' => 'namespace N { function f() { return 1; } } namespace U { use function N\\f; echo f(); }',
+        ],
+        [
+            'id' => 'use_group_import',
+            'construct' => 'Namespace group use (`use Foo\\{Bar, Baz}`)',
+            'opcodes' => ['TYPE_FUNCCALL_INIT', 'TYPE_CONST_FETCH', 'TYPE_CLASS_CONST_FETCH'],
+            'issue' => 2443,
+            'notes' => [
+                'PhpParser Stmt_GroupUse; NameResolver registers aliases; GroupUseStripper before PHPCfg',
+            ],
+            'probe' => 'namespace N { class A {} } namespace U { use N\\{A}; echo (new A()) ? 1 : 0; }',
         ],
         [
             'id' => 'never_return',
