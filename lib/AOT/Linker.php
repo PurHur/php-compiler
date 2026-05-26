@@ -54,6 +54,8 @@ final class Linker
         __DIR__.'/runtime/phpc_debug_backtrace.c',
         __DIR__.'/runtime/phpc_readonly_raise.c',
         __DIR__.'/runtime/phpc_jit_throw.c',
+        __DIR__.'/runtime/phpc_attr_registry.c',
+        __DIR__.'/runtime/phpc_reflection_attr.c',
     ];
 
     private const RUNTIME_LINK_LIBS = '-lpcre2-8 -lcrypt';

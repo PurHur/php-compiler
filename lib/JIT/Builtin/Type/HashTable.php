@@ -257,6 +257,11 @@ class HashTable extends Type
             $typeinfo,
             $ref
         );
+        $this->context->builder->call(
+            $this->context->lookupFunction('__hashtable__grow'),
+            $ht,
+            $sizeT->constInt(1, false)
+        );
         $this->context->builder->returnValue($ht);
     }
 

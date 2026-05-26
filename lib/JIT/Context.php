@@ -347,6 +347,9 @@ class Context {
             SuperglobalInit::implementRefresh($this);
         }
 
+        Builtin\ReflectionNative::registerDeclarations($this);
+        Builtin\AttributeRegistry::registerDeclarations($this);
+
         $this->functionProxies['is_null'] = new Builtin\IsNullFn();
         $this->functionProxies['phpcompiler\\is_null'] = new Builtin\IsNullFn();
         $this->functionProxies['splobjectstorage::attach'] = new Call\SplObjectStorageMethod('attach');
@@ -355,6 +358,13 @@ class Context {
         $this->functionProxies['splobjectstorage::offsetexists'] = new Call\SplObjectStorageMethod('offsetexists');
         $this->functionProxies['splobjectstorage::offsetget'] = new Call\SplObjectStorageMethod('offsetget');
         $this->functionProxies['splobjectstorage::offsetset'] = new Call\SplObjectStorageMethod('offsetset');
+
+        $this->functionProxies['reflectionclass::__construct'] = new Call\ReflectionClassConstruct();
+        $this->functionProxies['reflectionclass::getname'] = new Call\ReflectionClassGetName();
+        $this->functionProxies['reflectionclass::getattributes'] = new Call\ReflectionClassGetAttributes();
+        $this->functionProxies['reflectionclass::getmethod'] = new Call\ReflectionClassGetMethod();
+        $this->functionProxies['reflectionmethod::getattributes'] = new Call\ReflectionMethodGetAttributes();
+        $this->functionProxies['reflectionattribute::getname'] = new Call\ReflectionAttributeGetName();
     }
 
     public function compileToFile(string $file) {
@@ -718,6 +728,23 @@ class Context {
             $this->stringConstantMap[$string] = $global;
         }
         return $this->stringConstantMap[$string];
+    }
+
+    /**
+     * Temporarily position the builder at __init__ (for native registry calls).
+     *
+     * @param callable(self): void $emit
+     */
+    public function emitInInit(callable $emit): void
+    {
+        $oldBuilder = $this->builder;
+        $this->builder = $this->context->builderCreate();
+        $this->builder->positionAtEnd($this->initBlock);
+        try {
+            $emit($this);
+        } finally {
+            $this->builder = $oldBuilder;
+        }
     }
 
     public function makeVariableFromOp(

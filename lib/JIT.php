@@ -18,6 +18,7 @@ require_once __DIR__.'/JIT/RuntimeInitVmContext.php';
 use PHPCfg\Operand;
 use PHPCfg\Op;
 use PHPTypes\Type;
+use PHPCompiler\JIT\Builtin\AttributeRegistry;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\IssetHelper;
 use PHPCompiler\JIT\SelfHostBuiltinPolicy;
@@ -3655,6 +3656,16 @@ class JIT {
                         assert($parentOp instanceof Operand\Literal);
                         $this->context->type->object->setClassParentName($nameOp->value, $parentOp->value);
                     }
+                    if ([] !== $op->attributeNames) {
+                        AttributeRegistry::emitRegisterClass(
+                            $this->context,
+                            strtolower(ltrim($nameOp->value, '\\')),
+                            array_map(
+                                static fn (string $n): string => ltrim($n, '\\'),
+                                $op->attributeNames
+                            )
+                        );
+                    }
                     $this->compileClass($op->block1, $this->context->scope->classId);
                     if ($parentOp instanceof Operand\Literal) {
                         $this->context->type->object->inheritReadonlyFromParent(
@@ -3695,7 +3706,12 @@ class JIT {
                         );
                         $resultOp = $block->getOperand($op->arg1);
                         $this->assignOperand($resultOp, $obj, true);
-                        if ($this->context->type->object->hasConstructor($classId)) {
+                        if ($classOp instanceof Operand\Literal
+                            && 0 === strcasecmp(ltrim($classOp->value, '\\'), 'ReflectionClass')
+                        ) {
+                            $this->context->scope->toCall = $this->context->resolveFunctionProxy('reflectionclass::__construct');
+                            $this->context->scope->args = [$this->context->getVariableFromOp($resultOp)];
+                        } elseif ($this->context->type->object->hasConstructor($classId)) {
                             $proxyName = strtolower($resolvedName).'::'.'__construct';
                             $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
                             $this->context->scope->args = [$this->context->getVariableFromOp($resultOp)];
@@ -4388,12 +4404,16 @@ class JIT {
                     $name = $block->getOperand($op->arg1);
                     assert($name instanceof Operand\Literal);
                     $methodLc = strtolower($name->value);
-                    if ([] !== $op->attributeNames
-                        && null !== $this->context->runtime->vmContext
-                        && isset($this->context->runtime->vmContext->classes[$this->context->scope->className])
-                    ) {
-                        $this->context->runtime->vmContext->classes[$this->context->scope->className]
-                            ->methodAttributeNames[$methodLc] = $op->attributeNames;
+                    if ([] !== $op->attributeNames && '' !== $this->context->scope->className) {
+                        AttributeRegistry::emitRegisterMethod(
+                            $this->context,
+                            strtolower(ltrim($this->context->scope->className, '\\')),
+                            $methodLc,
+                            array_map(
+                                static fn (string $n): string => ltrim($n, '\\'),
+                                $op->attributeNames
+                            )
+                        );
                     }
                     if ($this->isBundledSuperglobalsClass($classId) && 'issuperglobalname' !== $methodLc) {
                         break;
@@ -5490,6 +5510,17 @@ class JIT {
             ?? ($this->context->scope->className !== '' ? $this->context->scope->className : 'object');
         $declaringClassLc = strtolower($className);
         $methodLc = strtolower($methodName);
+
+        if ('object' === $declaringClassLc) {
+            if ('getname' === $methodLc && $this->context->functionIsRegistered('reflectionattribute::getname')) {
+                $className = 'ReflectionAttribute';
+                $declaringClassLc = 'reflectionattribute';
+            } elseif ('getattributes' === $methodLc && $this->context->functionIsRegistered('reflectionmethod::getattributes')) {
+                $className = 'ReflectionMethod';
+                $declaringClassLc = 'reflectionmethod';
+            }
+        }
+
         $declaringClassId = $this->context->type->object->lookup($className);
         $visFlags = $this->context->type->object->methodVisibility($declaringClassId, $methodLc);
         $callerClassLc = null;
