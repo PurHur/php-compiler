@@ -264,6 +264,53 @@ class Object_ extends Type {
         return $obj;
     }
 
+    /**
+     * Object shell for M3 emit-helper TU — property slots only, no defaults/ht init (#2540).
+     */
+    public function allocateEmitTuShell(int $classId): PHPLLVM\Value
+    {
+        $objType = $this->context->getTypeFromString('__object__');
+        $propCount = count($this->properties[$classId] ?? []);
+        if (0 === $propCount) {
+            $obj = $this->context->memory->malloc($objType);
+        } else {
+            $obj = $this->context->memory->mallocWithExtra(
+                $objType,
+                $this->context->constantFromInteger(8 * $propCount, 'size_t')
+            );
+        }
+
+        $map = $this->context->structFieldMap['__object__'];
+        $this->context->builder->store(
+            $this->context->constantFromInteger($classId, 'int64'),
+            $this->context->builder->structGep($obj, $map['class_id'])
+        );
+        $this->context->builder->store(
+            $this->context->getTypeFromString('int8')->constInt(1, false),
+            $this->context->builder->structGep($obj, $map['constructed'])
+        );
+
+        $typeinfo = $this->context->getTypeFromString('int32')->constInt(
+            Refcount::TYPE_INFO_TYPE_OBJECT | Refcount::TYPE_INFO_REFCOUNTED,
+            false
+        );
+        $ref = $this->context->builder->pointerCast(
+            $obj,
+            $this->context->getTypeFromString('__ref__virtual*')
+        );
+        $this->context->builder->call(
+            $this->context->lookupFunction('__ref__init'),
+            $typeinfo,
+            $ref
+        );
+
+        if ($propCount > 0) {
+            $this->initPropertySlots($obj, $propCount);
+        }
+
+        return $obj;
+    }
+
     public function splObjectStorageClassId(): ?int
     {
         return $this->splObjectStorageClassId;

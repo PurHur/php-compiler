@@ -85,4 +85,12 @@ final class BootstrapRuntimeCompileSmokeTest extends TestCase
         $source = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-runtime-compile-smoke.sh');
         $this->assertStringContainsString('PHP_COMPILER_EMIT_HELPER_LINK=1', $source);
     }
+
+    public function testM3EmitTuUsesMinimalRuntimeShellAlloc(): void
+    {
+        $emit = (string) file_get_contents(self::$root.'/lib/JIT/BootstrapCompileSmokeM3Emit.php');
+        $this->assertStringContainsString('RuntimeEmitTuAlloc::emit', $emit);
+        $object = (string) file_get_contents(self::$root.'/lib/JIT/Builtin/Type/Object_.php');
+        $this->assertStringContainsString('allocateEmitTuShell', $object);
+    }
 }
