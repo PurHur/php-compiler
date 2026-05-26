@@ -169,6 +169,7 @@ deploy-smoke:
 		if [ "$${SESSIONS_WEB_DEPLOY_SMOKE_GATE:-0}" = "1" ]; then ./script/deploy-smoke.sh --example 005; fi; \
 		if [ "$${FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE:-0}" = "1" ]; then ./script/deploy-smoke.sh --example 006; fi; \
 		if [ "$${THROWSWEB_DEPLOY_SMOKE_GATE:-0}" = "1" ]; then ./script/deploy-smoke.sh --example 007; fi; \
+		if [ "$${FASTCGI_WEB_DEPLOY_SMOKE_GATE:-0}" = "1" ]; then ./script/deploy-smoke.sh --example 009; fi; \
 	fi
 
 # Full deploy ladder 001–007 with explicit skip messages when gates=0 (#2077)

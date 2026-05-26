@@ -207,6 +207,9 @@ final class PhpcDoctorTest extends TestCase
         $this->assertStringContainsString('examples-fastcgiweb-smoke', $result['stdout']);
         $this->assertStringContainsString('--fastcgi-only', $result['stdout']);
         $this->assertStringContainsString('#2351', $result['stdout']);
+        $this->assertStringContainsString('FASTCGI_WEB_DEPLOY_SMOKE_GATE', $result['stdout']);
+        $this->assertStringContainsString('deploy-smoke.sh --example 009', $result['stdout']);
+        $this->assertStringContainsString('#2359', $result['stdout']);
         $this->assertStringContainsString('Bootstrap inventory lint', $result['stdout']);
         $this->assertStringContainsString('bootstrap-inventory', $result['stdout']);
         $this->assertStringContainsString('BOOTSTRAP_INVENTORY_LINT_SYNC_GATE', $result['stdout']);

@@ -522,9 +522,12 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('SESSIONS_WEB_DEPLOY_SMOKE_GATE', $body);
         $this->assertStringContainsString('FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE', $body);
         $this->assertStringContainsString('THROWSWEB_DEPLOY_SMOKE_GATE', $body);
+        $this->assertStringContainsString('FASTCGI_WEB_DEPLOY_SMOKE_GATE', $body);
+        $this->assertStringContainsString('run_example 009', $body);
         $this->assertStringContainsString('skip (SESSIONS_WEB_DEPLOY_SMOKE_GATE=0', $body);
         $this->assertStringContainsString('skip (FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE=0', $body);
         $this->assertStringContainsString('skip (THROWSWEB_DEPLOY_SMOKE_GATE=0', $body);
+        $this->assertStringContainsString('skip (FASTCGI_WEB_DEPLOY_SMOKE_GATE=0', $body);
         $this->assertStringContainsString('deploy-smoke-all: ok', $body);
     }
 
@@ -587,6 +590,24 @@ final class CiScriptsTest extends TestCase
             'THROWSWEB_DEPLOY_SMOKE_GATE="${THROWSWEB_DEPLOY_SMOKE_GATE:-0}"',
             $defaults
         );
+    }
+
+    public function testCiDefaultsEnvDefinesFastcgiWebDeploySmokeGateOff(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString(
+            'FASTCGI_WEB_DEPLOY_SMOKE_GATE="${FASTCGI_WEB_DEPLOY_SMOKE_GATE:-0}"',
+            $defaults
+        );
+    }
+
+    public function testDeploySmokeScriptDocumentsExample009(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/deploy-smoke.sh');
+        $this->assertStringContainsString('FASTCGI_WEB_DEPLOY_SMOKE_GATE', $body);
+        $this->assertStringContainsString('--example 009', $body);
+        $this->assertStringContainsString('009-FastCGIWeb', $body);
+        $this->assertStringContainsString('PATH_INFO=', $body);
     }
 
     public function testCiDefaultsEnvDefinesDeploySmokeGateOn(): void

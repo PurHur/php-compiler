@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Full PHPC_DEPLOY_ROOT deploy ladder 001–003 + opt-in 005/006/007 (issue #2077).
+# Full PHPC_DEPLOY_ROOT deploy ladder 001–003 + opt-in 005/006/007/009 (issue #2077, #2359).
 #
 # Same as: make deploy-smoke-all
 #          DEPLOY_SMOKE_ALL=1 make deploy-smoke
@@ -8,6 +8,7 @@
 #   ./script/deploy-smoke-all.sh
 #   make deploy-smoke-all
 #   FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE=1 SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 THROWSWEB_DEPLOY_SMOKE_GATE=1 make deploy-smoke-all
+#   FASTCGI_WEB_DEPLOY_SMOKE_GATE=1 make deploy-smoke-all
 #
 # Docker:
 #   ./script/docker-exec.sh -- \
@@ -39,7 +40,11 @@ skip_007() {
   echo "deploy-smoke-all: 007-ThrowsWeb: skip (THROWSWEB_DEPLOY_SMOKE_GATE=0 — set THROWSWEB_DEPLOY_SMOKE_GATE=1 or make examples-throwsweb-deploy-smoke #2124)" >&2
 }
 
-echo "deploy-smoke-all: ladder 001–003 (+ 005/006/007 when deploy gates=1; probe: ./phpc doctor --gates)"
+skip_009() {
+  echo "deploy-smoke-all: 009-FastCGIWeb: skip (FASTCGI_WEB_DEPLOY_SMOKE_GATE=0 — set FASTCGI_WEB_DEPLOY_SMOKE_GATE=1; see phpc doctor --gates #2359)" >&2
+}
+
+echo "deploy-smoke-all: ladder 001–003 (+ 005/006/007/009 when deploy gates=1; probe: ./phpc doctor --gates)"
 
 run_example 001
 run_example 002
@@ -66,6 +71,12 @@ if [ "${THROWSWEB_DEPLOY_SMOKE_GATE:-0}" = "1" ]; then
   run_example 007
 else
   skip_007
+fi
+
+if [ "${FASTCGI_WEB_DEPLOY_SMOKE_GATE:-0}" = "1" ]; then
+  run_example 009
+else
+  skip_009
 fi
 
 echo "deploy-smoke-all: ok"

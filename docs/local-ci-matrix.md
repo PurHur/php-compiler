@@ -274,12 +274,14 @@ Progressive ladder (VM serve → AOT execute). VM serve smoke is opt-in until de
 |-------|----------|---------|--------------|
 | VM health + PATH_INFO | `FASTCGI_WEB_SMOKE_GATE` | `0` | `make examples-fastcgiweb-smoke` · `ci-fast` when `=1` ([#2351](https://github.com/PurHur/php-compiler/issues/2351)) |
 | AOT execute | `FASTCGI_WEB_AOT_SMOKE_GATE` | `0` | `EXAMPLES_AOT_SMOKE_ONLY=009 ./script/examples-aot-smoke.sh` ([#2352](https://github.com/PurHur/php-compiler/issues/2352)) |
+| Deploy CGI | `FASTCGI_WEB_DEPLOY_SMOKE_GATE` | `0` | `FASTCGI_WEB_DEPLOY_SMOKE_GATE=1 make deploy-smoke-all` ([#2359](https://github.com/PurHur/php-compiler/issues/2359)) |
 
 ```bash
 ./phpc doctor --gates | grep -E 'FASTCGI|009-FastCGIWeb'
 FASTCGI_WEB_SMOKE_GATE=1 make examples-fastcgiweb-smoke
 FASTCGI_WEB_SMOKE_GATE=1 ./script/examples-web-smoke.sh --fastcgi-only
 FASTCGI_WEB_AOT_SMOKE_GATE=1 EXAMPLES_AOT_SMOKE_ONLY=009 ./script/examples-aot-smoke.sh
+FASTCGI_WEB_DEPLOY_SMOKE_GATE=1 ./script/deploy-smoke.sh --example 009
 ```
 
 **003 AOT execute** (`MINIWEBAPP_AOT_EXECUTE_GATE=1` default; set `0` to skip during iteration):
