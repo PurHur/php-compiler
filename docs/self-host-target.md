@@ -34,9 +34,9 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | Layer | Today | Target |
 |-------|-------|--------|
 | **Bootstrap driver** | Zend runs `php bin/compile.php` | Compiled `bin/compile.php` |
-| **Bundle size** | **609** curated `require_once` in spine smoke (108 minimal overlap + **498** M2-only) | **611** inventory files |
-| **Inventory coverage** | **100%** of vm.php path in spine smoke (**609/611**; 2 deferred) | **100%*
-| **HelloWorld** | Native **run** ✅; **emit** still Zend fallback | Native compile + emit |
+| **Bundle size** | **609** curated `require_once` in spine smoke (108 minimal overlap + **498** M2-only) | **657** inventory files |
+| **Inventory coverage** | **609/657** in spine smoke (~93%; some paths deferred [#2126](https://github.com/PurHur/php-compiler/issues/2126)) | **100%**
+| **HelloWorld** | Native **run** ✅; **emit** still Zend fallback (strict gate 🚧) | Native compile + emit |
 | **Bootstrap loop (M4)** | Gen-1 link + gen-2 Zend partial | Native gen-2 emit + full tree rebuild |
 | **Vendor** | `composer install` + patches on host | Prelinked artifacts only |
 
@@ -52,7 +52,7 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | M4 `make bootstrap-loop-gen1-link` | 🚧 partial — gen-1 link + gen-2 **Zend** emit (`emit_path=zend partial`); `BOOTSTRAP_M4_LINK_COMPILE_DRIVER=1` for `emit_path=native`; `BOOTSTRAP_M4_GEN2_STRICT=1` refuses Zend fallback ([#1498](https://github.com/PurHur/php-compiler/issues/1498), [#2115](https://github.com/PurHur/php-compiler/issues/2115)) |
 | M4 `make bootstrap-loop-probe` | 🚧 ladder — `--dry-run` validates lint+M2+M3 partial+gen-1; full exits **2** until M3 strict ([#1498](https://github.com/PurHur/php-compiler/issues/1498)) |
 | `make bootstrap-aot-link` | ✅ **71/71** |
-| `php script/bootstrap-inventory.php --check` | ✅ **611** files, **0** source blockers |
+| `php script/bootstrap-inventory.php --check` | ✅ **657** files, **0** source blockers |
 
 ---
 
@@ -62,8 +62,8 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 |-----------|----------------|--------|-----|
 | **M0** | AOT can link a **small** honest `lib/` subset | ✅ | 100% |
 | **M1** | Bundle is **compiler-shaped** (lint + compile-smoke) | ✅ | 100% |
-| **M2** | Spine grows toward full `bin/vm.php` inventory | 🚧 **609/611** units | **100%*
-| **M3** | Self-host binary **compiles external PHP** (HelloWorld) without Zend emit | 🚧 partial | **~45%** |
+| **M2** | Spine grows toward full `bin/vm.php` inventory | ✅ **609/657** units (link) | **~93%** |
+| **M3** | Self-host binary **compiles external PHP** (HelloWorld) without Zend emit | 🚧 partial (run ✅, emit 🚧) | **~35%** |
 | **M4** | Self-host binary **rebuilds** the next compiler tree | ⬜ | 0% |
 | **M5** | Full self-host; Zend retired from loop | ⬜ north star | 0% |
 
@@ -73,9 +73,9 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 
 | Indicator | Formula | May 2026 |
 |-----------|---------|----------|
-| **M2 spine progress** | `require_once` units in `compiler_lib_spine_smoke` ÷ Phase A inventory file count | **609 / 611** (2 deferred [#2126](https://github.com/PurHur/php-compiler/issues/2126))
-| **Public “Self-host” row** | Same M2 ratio until M3–M5 gates add weight ([`development-status.md`](pages/development-status.md)) | **~61%** |
-| **Composite (internal)** | Milestone weights in table above (M0–M1 = 100%, M2 = spine %, M3–M5 = gate %) | **~54%** |
+| **M2 spine progress** | `require_once` units in `compiler_lib_spine_smoke` ÷ Phase A inventory file count | **609 / 657** (deferred [#2126](https://github.com/PurHur/php-compiler/issues/2126)) |
+| **Public “Self-host” row** | Same M2 ratio until M3–M5 gates add weight ([`development-status.md`](pages/development-status.md)) | **~58%** |
+| **Composite (internal)** | Milestone weights in table above (M0–M1 = 100%, M2 = spine %, M3–M5 = gate %) | **~52%** |
 
 Regenerate inventory: `php script/bootstrap-inventory.php` · spine count: `php script/bootstrap-spine-count.php` (or `grep -c '^require_once' test/selfhost/compiler_lib_spine_smoke/main.php`)
 

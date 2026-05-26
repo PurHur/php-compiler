@@ -39,7 +39,7 @@
   <div id="top" class="hero">
     <div>
       <span class="badge badge--live">Demo-ready</span>
-      <span class="badge">Updated May 2026</span>
+      <span class="badge">Updated 24 May 2026</span>
       <h1>Compile PHP to native binaries</h1>
       <p class="lead">
         <strong>php-compiler</strong> lowers PHP to a CFG, executes on a VM, JIT-compiles with LLVM&nbsp;9,
@@ -76,8 +76,10 @@
 ./phpc <span class="php-str">build</span> --project my-app
 ./phpc <span class="php-str">serve</span> examples/003-MiniWebApp
 
-<span class="php-cmt"># Self-host (experimental): compile a lib/ bundle with itself</span>
-make bootstrap-selfhost-link   <span class="php-cmt"># → compiler_minimal bundle OK</span></code></pre>
+<span class="php-cmt"># Self-host (experimental): native lib/ bundles</span>
+make bootstrap-selfhost-link   <span class="php-cmt"># M0 → compiler_minimal bundle OK</span>
+BOOTSTRAP_LIB_SPINE_SMOKE=1 make bootstrap-selfhost-lib-spine-smoke
+<span class="php-cmt"># M2 → compiler_lib_spine_smoke bundle OK (609/657)</span></code></pre>
     </div>
   </div>
 
@@ -115,8 +117,10 @@ make bootstrap-selfhost-link   <span class="php-cmt"># → compiler_minimal bund
           <span class="demo-card__step">+</span>
           <h3>Self-host smoke</h3>
           <pre><code>script/apply-patches.sh
-make bootstrap-selfhost-link</code></pre>
-          <p>Expect <code>compiler_minimal bundle OK</code> (experimental).</p>
+make bootstrap-selfhost-link
+BOOTSTRAP_LIB_SPINE_SMOKE=1 \
+  make bootstrap-selfhost-lib-spine-smoke</code></pre>
+          <p>M0 + M2 native link smoke (LLVM 9). Zend still drives <code>bin/compile.php</code> today.</p>
         </article>
       </div>
       <p class="demo-disclaimer">
@@ -142,7 +146,8 @@ make bootstrap-selfhost-link</code></pre>
             <strong>Compiler fully compiles itself:</strong> native binary from <code>lib/</code> (no <code>vendor/</code>),
             compiles PHP, then rebuilds the next compiler revision without Zend.
           </p>
-          <p><strong>Status:</strong> M0 ✅ · M1 ✅ · M2 ✅ link (609/611) · M3 HelloWorld strict ✅ · compile-smoke 🚧 · M5 ⬜.</p>
+          <p><strong>Status:</strong> M0 ✅ · M1 ✅ · M2 ✅ native link <strong>609/657</strong> · M3 🚧 native <strong>run</strong> ✅, native <strong>emit</strong> blocked ([#1937](https://github.com/PurHur/php-compiler/issues/1937)) · M4–M5 ⬜.</p>
+          <p><strong>To “compile itself”:</strong> close M3 emit → M4 bootstrap loop → M5 (no Zend, no <code>vendor/</code> at cold boot).</p>
           <p><a href="/php-compiler/development-status.html#north-star-self-host">Full north-star doc →</a> · <a href="https://github.com/PurHur/php-compiler/blob/master/docs/self-host-target.md">Target doc</a> · <a href="https://github.com/PurHur/php-compiler/issues/1492">#1492</a></p>
         </article>
         <article class="track-panel track-panel--web">
@@ -191,15 +196,16 @@ make bootstrap-selfhost-link</code></pre>
       <div class="overall-progress">
         <div class="overall-progress__label">
           <span>Toward a self-hosting compiler</span>
-          <span class="overall-progress__pct" id="overall-pct">~50%</span>
+          <span class="overall-progress__pct" id="overall-pct">~52%</span>
         </div>
-        <div class="progress-track" role="progressbar" aria-valuenow="50" aria-valuemin="0" aria-valuemax="100" aria-label="Overall project progress">
-          <div class="progress-fill" id="overall-progress-fill" data-width="50" style="width: 0"></div>
+        <div class="progress-track" role="progressbar" aria-valuenow="52" aria-valuemin="0" aria-valuemax="100" aria-label="Overall project progress">
+          <div class="progress-fill" id="overall-progress-fill" data-width="52" style="width: 0"></div>
         </div>
         <p class="overall-progress__note">
-          Strong on VM and AOT linking; wave-3 language **12/12** and stdlib **13/13** on master; local/Docker CI while remote GHA/Circle are disabled.
-          <strong>North star</strong> M0–M1 done, M2 spine link (609/611, #1960), M3 HelloWorld strict (#1493); M5 full self-compile is the stretch goal ([#1492](https://github.com/PurHur/php-compiler/issues/1492)).
-          Example web gates (<code>make north-star1-verify</code>, <strong>005-SessionsWeb</strong> opt-in #1891/#1893) stay in CI as regression only.
+          Strong on VM and AOT linking; wave-3 language <strong>12/12</strong> and stdlib <strong>13/13</strong> on master.
+          <strong>Self-host:</strong> we can <strong>link</strong> a large native <code>lib/</code> bundle (<strong>609</strong> spine units / <strong>626</strong> vm.php-path files, [#1960](https://github.com/PurHur/php-compiler/issues/1960));
+          we cannot yet <strong>compile the next compiler</strong> without Zend (<strong>M3 emit</strong> + <strong>M4 loop</strong> + <strong>M5</strong> vendor prelink — [#1492](https://github.com/PurHur/php-compiler/issues/1492), [#1416](https://github.com/PurHur/php-compiler/issues/1416)).
+          Example web gates stay regression-only.
         </p>
       </div>
     </section>
@@ -244,8 +250,8 @@ make bootstrap-selfhost-link</code></pre>
         <article class="card">
           <span class="phase-num">Self-host</span>
           <h3><span class="status-dot status-dot--wip"></span> Compile-itself</h3>
-          <p>M0–M1 ✅; M2 spine 609/611 link ✅; M3 HelloWorld strict ✅; compile-smoke 🚧; M5 = full self-host.</p>
-          <div class="mini-progress"><div class="progress-track"><div class="progress-fill" data-width="54"></div></div></div>
+          <p>M0–M1 ✅; M2 spine <strong>609/657</strong> link ✅; M3 partial (native run ✅, emit 🚧); M5 = full self-host.</p>
+          <div class="mini-progress"><div class="progress-track"><div class="progress-fill" data-width="58"></div></div></div>
         </article>
       </div>
     </section>
@@ -254,7 +260,7 @@ make bootstrap-selfhost-link</code></pre>
       <h2>Self-host bootstrap</h2>
       <p class="section-intro">
         Stretch goal: the compiler <strong>fully compiles itself</strong> (M5). Zend still runs
-        <code>bin/compile.php</code> today; native output is a growing <code>lib/</code> bundle (~109 minimal → <strong>609</strong> spine units toward <strong>611</strong> vm.php-path files).
+        <code>bin/compile.php</code> today; native output is a growing <code>lib/</code> bundle (~109 minimal → <strong>609</strong> spine <code>require_once</code> units toward <strong>626</strong> vm.php-path inventory files).
         Full ladder: <a href="/php-compiler/development-status.html#north-star-self-host">development-status.md</a>
         · <a href="https://github.com/PurHur/php-compiler/blob/master/docs/self-host-target.md">self-host-target.md</a>
         · tracker <a href="https://github.com/PurHur/php-compiler/issues/1492">#1492</a>.
@@ -273,24 +279,32 @@ make bootstrap-selfhost-link</code></pre>
         <li class="is-done">
           <span class="ladder__marker" aria-hidden="true">✓</span>
           <h4>M2 — Full top-level <code>lib/</code></h4>
-          <p>14/14 lint ✅; <strong>609/611</strong> spine units native link ✅ ([#1960](https://github.com/PurHur/php-compiler/issues/1960), [#1419](https://github.com/PurHur/php-compiler/issues/1419)).</p>
+          <p>14/14 lint ✅; <strong>609/657</strong> spine units native link ✅ ([#1960](https://github.com/PurHur/php-compiler/issues/1960)); a few inventory paths still deferred ([#2126](https://github.com/PurHur/php-compiler/issues/2126)).</p>
         </li>
         <li class="is-wip">
           <span class="ladder__marker" aria-hidden="true">3</span>
           <h4>M3 — Native compiles PHP</h4>
-          <p>HelloWorld strict native emit ✅ ([#1493](https://github.com/PurHur/php-compiler/issues/1493)); compile-smoke fixture 🚧 ([#1937](https://github.com/PurHur/php-compiler/issues/1937)).</p>
+          <p>HelloWorld AOT <strong>runs</strong> natively ✅; <strong>emit</strong> still uses Zend fallback (strict gate fails until emit TU stable — [#1937](https://github.com/PurHur/php-compiler/issues/1937), [#1768](https://github.com/PurHur/php-compiler/issues/1768), [#1402](https://github.com/PurHur/php-compiler/issues/1402)).</p>
         </li>
         <li class="is-todo">
           <span class="ladder__marker" aria-hidden="true">4</span>
           <h4>M4 — Bootstrap loop</h4>
-          <p>Native toolchain rebuilds the next compiler revision.</p>
+          <p>Native binary rebuilds the <strong>next</strong> compiler tree (gen-1 link 🚧; gen-2 emit still Zend partial — [#1498](https://github.com/PurHur/php-compiler/issues/1498)).</p>
         </li>
         <li class="is-todo">
           <span class="ladder__marker" aria-hidden="true">★</span>
           <h4>M5 — Full self-host (north star)</h4>
-          <p>Real <code>bin/vm.php</code> / <code>bin/compile.php</code>; no Zend bootstrap ([#1492](https://github.com/PurHur/php-compiler/issues/1492)).</p>
+          <p>Real <code>bin/vm.php</code> / <code>bin/compile.php</code>; no Zend bootstrap; no <code>vendor/</code> at cold boot ([#1492](https://github.com/PurHur/php-compiler/issues/1492), [#1416](https://github.com/PurHur/php-compiler/issues/1416)).</p>
         </li>
       </ol>
+      <div class="dual-track" style="margin-top: 1.5rem">
+        <article class="track-panel track-panel--selfhost">
+          <h3>Distance to “compiler compiles itself”</h3>
+          <p><strong>Done:</strong> parse → CFG → VM/JIT → AOT link for a curated <code>lib/</code> closure; spine bundle runs natively.</p>
+          <p><strong>Not done:</strong> self-hosted <code>bin/compile.php</code>; native emit of HelloWorld / compile-smoke without Zend; bootstrap loop; vendor prelink.</p>
+          <p>Count: <code>php script/bootstrap-spine-count.php</code> · probe: <code>make bootstrap-selfhost-helloworld</code></p>
+        </article>
+      </div>
     </section>
 
     <section id="contribute" class="reveal">
