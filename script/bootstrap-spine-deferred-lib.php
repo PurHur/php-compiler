@@ -15,6 +15,5 @@ function bootstrap_spine_native_link_deferred(): array
 {
     return [
         'bin/vm.php',
-        'lib/AOT/Linker.php',
     ];
 }

@@ -23,7 +23,7 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | **No Zend bootstrap** | `bin/compile.php` / `bin/vm.php` run as **compiled** code, not `php bin/compile.php` |
 | **Full inventory** | Honest bundle covers the `bin/vm.php` path (~**611** files; [`bootstrap-inventory.md`](bootstrap-inventory.md)) |
 | **Stub surface minimal** | `PHP_COMPILER_SELFHOST_AOT` stubs shrink; compiler behavior is real, not link-only |
-| **Small native floor OK** | `lib/AOT/runtime/*.c` + external `clang` via `lib/AOT/Linker.php` — **not** required to disappear |
+| **Small native floor OK** | `lib/AOT/runtime/*.c` + external `clang` via `lib/AOT/Linker.php` (in spine smoke native link since [#2267](https://github.com/PurHur/php-compiler/issues/2267)) — **not** required to disappear |
 
 **Not required for M5:** 100% Zend parity · in-process linker · production web-app polish (examples stay as regression fixtures).
 
@@ -35,7 +35,7 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 |-------|-------|--------|
 | **Bootstrap driver** | Zend runs `php bin/compile.php` | Compiled `bin/compile.php` |
 | **Bundle size** | **654** curated `require_once` in spine smoke (108 minimal overlap + **498** M2-only) | **657** inventory files |
-| **Inventory coverage** | **655/657** in spine smoke (~93%; some paths deferred [#2126](https://github.com/PurHur/php-compiler/issues/2126)) | **100%**
+| **Inventory coverage** | **661/657** in spine smoke (~93%; some paths deferred [#2126](https://github.com/PurHur/php-compiler/issues/2126)) | **100%**
 | **HelloWorld** | Native **run** ✅; **emit** still Zend fallback (strict gate 🚧) | Native compile + emit |
 | **Bootstrap loop (M4)** | Gen-1 link + gen-2 Zend partial | Native gen-2 emit + full tree rebuild |
 | **Vendor** | `composer install` + patches on host | Prelinked artifacts only |
@@ -63,7 +63,7 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 |-----------|----------------|--------|-----|
 | **M0** | AOT can link a **small** honest `lib/` subset | ✅ | 100% |
 | **M1** | Bundle is **compiler-shaped** (lint + compile-smoke) | ✅ | 100% |
-| **M2** | Spine grows toward full `bin/vm.php` inventory | ✅ **655/657** units (link) | **~93%** |
+| **M2** | Spine grows toward full `bin/vm.php` inventory | ✅ **661/657** units (link) | **~93%** |
 | **M3** | Self-host binary **compiles external PHP** (HelloWorld) without Zend emit | 🚧 partial (run ✅, emit 🚧) | **~35%** |
 
 **M3 unit probe presenter** ([#2360](https://github.com/PurHur/php-compiler/issues/2360)): `make north-star3-verify` runs `008-SelfHostProbe` plus optional `bootstrap-selfhost-{compiler,jit,vm}-unit-probe.sh` when LLVM 9 and probe scripts are present. **Parser unit probe** ([#2409](https://github.com/PurHur/php-compiler/issues/2409)): `make bootstrap-selfhost-parser-unit-probe` — CFG front-end (`Runtime` + `lib/Compiler.php` bundle); `north-star3-verify` step ([#2418](https://github.com/PurHur/php-compiler/issues/2418)) and CI gate ([#2417](https://github.com/PurHur/php-compiler/issues/2417)) follow. **VM unit probe** ([#2354](https://github.com/PurHur/php-compiler/issues/2354)): `make bootstrap-selfhost-vm-unit-probe` / `BOOTSTRAP_VM_UNIT_PROBE_GATE=1` in `ci-local.sh` llvm tail. Compiler/JIT unit probes: [#2216](https://github.com/PurHur/php-compiler/issues/2216), [#2332](https://github.com/PurHur/php-compiler/issues/2332).
@@ -76,7 +76,7 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 
 | Indicator | Formula | May 2026 |
 |-----------|---------|----------|
-| **M2 spine progress** | `require_once` units in `compiler_lib_spine_smoke` ÷ Phase A inventory file count | **655 / 657** (2 deferred [#2126](https://github.com/PurHur/php-compiler/issues/2126)) |
+| **M2 spine progress** | `require_once` units in `compiler_lib_spine_smoke` ÷ Phase A inventory file count | **661 / 657** (1 deferred [#2126](https://github.com/PurHur/php-compiler/issues/2126)) |
 | **Public “Self-host” row** | Same M2 ratio until M3–M5 gates add weight ([`development-status.md`](pages/development-status.md)) | **~58%** |
 | **Composite (internal)** | Milestone weights in table above (M0–M1 = 100%, M2 = spine %, M3–M5 = gate %) | **~52%** |
 
