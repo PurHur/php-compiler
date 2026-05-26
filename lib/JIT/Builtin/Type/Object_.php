@@ -1189,6 +1189,59 @@ class Object_ extends Type {
         $this->context->builder->positionAtEnd($restore);
     }
 
+    public function staticPropertyUnset(int $classId, string $name): void
+    {
+        $key = strtolower($name);
+        if (!isset($this->staticPropertyGlobals[$classId][$key])) {
+            throw new \LogicException("Undefined static property: {$name}");
+        }
+        $entry = $this->staticPropertyGlobals[$classId][$key];
+        $global = $entry['global'];
+        if (Variable::TYPE_VALUE === $entry['type']) {
+            $valueType = $this->context->getTypeFromString('__value__');
+            $heapVal = $this->context->memory->malloc($valueType);
+            $heapPtr = $this->context->builder->pointerCast(
+                $heapVal,
+                $this->context->getTypeFromString('__value__*')
+            );
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeNull'),
+                $heapPtr
+            );
+            $this->context->builder->store($heapPtr, $global);
+
+            return;
+        }
+        if (Variable::TYPE_STRING === $entry['type']) {
+            $this->context->builder->store(
+                $this->context->getTypeFromString('__string__*')->constNull(),
+                $global
+            );
+
+            return;
+        }
+        if (Variable::TYPE_NATIVE_BOOL === $entry['type']) {
+            $this->context->builder->store(
+                $this->context->getTypeFromString('int1')->constInt(0, false),
+                $global
+            );
+
+            return;
+        }
+        if (Variable::TYPE_NATIVE_DOUBLE === $entry['type']) {
+            $this->context->builder->store(
+                $this->context->getTypeFromString('double')->constReal(0.0, false),
+                $global
+            );
+
+            return;
+        }
+        $this->context->builder->store(
+            $this->context->getTypeFromString('int64')->constInt(0, false),
+            $global
+        );
+    }
+
     public function staticPropertyFetch(int $classId, string $name): Variable
     {
         $key = strtolower($name);

@@ -120,6 +120,8 @@ class OpCode {
     const TYPE_DECLARE_INTERFACE = 102;
     /** User enum declaration with case constants (#1356). */
     const TYPE_DECLARE_ENUM = 103;
+    /** unset(Class::$prop) — arg2 class, arg3 property name (#2256). */
+    const TYPE_STATIC_PROPERTY_UNSET = 104;
 
     public int $type;
     public ?int $arg1;

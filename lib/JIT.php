@@ -1787,6 +1787,15 @@ class JIT {
                         $this->context->type->object->staticPropertyFetch($classId, $nameOp->value)
                     );
                     break;
+                case OpCode::TYPE_STATIC_PROPERTY_UNSET:
+                    $classOp = $block->getOperand($op->arg2);
+                    $nameOp = $block->getOperand($op->arg3);
+                    if (!$nameOp instanceof Operand\Literal) {
+                        throw new \LogicException('JIT static property unset requires a literal property name');
+                    }
+                    $classId = $this->context->type->object->resolveClassId($classOp);
+                    $this->context->type->object->staticPropertyUnset($classId, $nameOp->value);
+                    break;
                 case OpCode::TYPE_UNSET:
                     if (null === $op->arg3) {
                         $targetOp = $block->getOperand($op->arg2);

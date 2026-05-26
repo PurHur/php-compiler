@@ -436,6 +436,34 @@ restart:
                     }
                     $frame->scope[$op->arg1]->indirect($classEntry->staticProperties[$propName]);
                     break;
+                case OpCode::TYPE_STATIC_PROPERTY_UNSET:
+                    $rawClass = $frame->scope[$op->arg2]->toString();
+                    if ('parent' === strtolower($rawClass)) {
+                        return $this->raise('parent::$property is not supported (issue #1858)', $frame);
+                    }
+                    $lcClass = $this->resolveStaticClassName($rawClass, $frame);
+                    if (!isset($this->context->classes[$lcClass])) {
+                        if ('self' !== strtolower($rawClass) && 'static' !== strtolower($rawClass)) {
+                            $this->context->autoloadClass($rawClass);
+                        }
+                    }
+                    if (!isset($this->context->classes[$lcClass])) {
+                        return $this->raise("Unknown class for static property unset: {$rawClass}", $frame);
+                    }
+                    $propName = strtolower($frame->scope[$op->arg3]->toString());
+                    $classEntry = $this->context->classes[$lcClass];
+                    if (!isset($classEntry->staticProperties[$propName])) {
+                        $classLabel = $classEntry->name;
+
+                        return $this->raise(
+                            "Undefined static property {$classLabel}::{$propName}",
+                            $frame
+                        );
+                    }
+                    $storage = $classEntry->staticProperties[$propName];
+                    $storage->reset();
+                    $storage->type = Variable::TYPE_UNDEFINED;
+                    break;
                 case OpCode::TYPE_UNSET:
                     if (null === $op->arg3) {
                         if (null !== $op->arg2 && isset($frame->scope[$op->arg2])) {
