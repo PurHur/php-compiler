@@ -985,6 +985,50 @@ restart:
                 goto return_bool;
             }
         }
+        if (Variable::TYPE_STRING === $leftType && Variable::TYPE_NATIVE_LONG === $rightType) {
+            $falseVal = $this->context->getTypeFromString('int1')->constInt(0, false);
+            if (OpCode::TYPE_IDENTICAL === $opcode->type || OpCode::TYPE_EQUAL === $opcode->type) {
+                $result = $falseVal;
+                goto return_bool;
+            }
+            if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                $result = $this->context->getTypeFromString('int1')->constInt(1, false);
+                goto return_bool;
+            }
+        }
+        if (Variable::TYPE_NATIVE_LONG === $leftType && Variable::TYPE_STRING === $rightType) {
+            $falseVal = $this->context->getTypeFromString('int1')->constInt(0, false);
+            if (OpCode::TYPE_IDENTICAL === $opcode->type || OpCode::TYPE_EQUAL === $opcode->type) {
+                $result = $falseVal;
+                goto return_bool;
+            }
+            if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                $result = $this->context->getTypeFromString('int1')->constInt(1, false);
+                goto return_bool;
+            }
+        }
+        if (Variable::TYPE_STRING === $leftType && Variable::TYPE_NATIVE_DOUBLE === $rightType) {
+            $falseVal = $this->context->getTypeFromString('int1')->constInt(0, false);
+            if (OpCode::TYPE_IDENTICAL === $opcode->type || OpCode::TYPE_EQUAL === $opcode->type) {
+                $result = $falseVal;
+                goto return_bool;
+            }
+            if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                $result = $this->context->getTypeFromString('int1')->constInt(1, false);
+                goto return_bool;
+            }
+        }
+        if (Variable::TYPE_NATIVE_DOUBLE === $leftType && Variable::TYPE_STRING === $rightType) {
+            $falseVal = $this->context->getTypeFromString('int1')->constInt(0, false);
+            if (OpCode::TYPE_IDENTICAL === $opcode->type || OpCode::TYPE_EQUAL === $opcode->type) {
+                $result = $falseVal;
+                goto return_bool;
+            }
+            if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type || OpCode::TYPE_NOT_EQUAL === $opcode->type) {
+                $result = $this->context->getTypeFromString('int1')->constInt(1, false);
+                goto return_bool;
+            }
+        }
         if (Variable::TYPE_NATIVE_BOOL === $leftType && Variable::TYPE_STRING === $rightType) {
             $falseVal = $this->context->getTypeFromString('int1')->constInt(0, false);
             if (OpCode::TYPE_IDENTICAL === $opcode->type || OpCode::TYPE_EQUAL === $opcode->type) {
