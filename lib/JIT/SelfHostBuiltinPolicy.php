@@ -115,6 +115,7 @@ final class SelfHostBuiltinPolicy
         'array_chunk' => 'array', 'array_column' => 'array',
         'array_product' => 'array', 'array_unique' => 'array', 'array_diff' => 'array', 'array_intersect' => 'array',
         'array_replace' => 'array', 'array_sum' => 'array', 'sort' => 'array', 'ksort' => 'array',
+        'krsort' => 'array',
         'array_multisort' => 'array',
         'usort' => 'array', 'uasort' => 'array',
         'compact' => 'array', 'extract' => 'array', 'defined' => 'array', 'define' => 'array',

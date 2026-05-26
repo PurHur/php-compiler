@@ -105,6 +105,7 @@ class Module extends ModuleAbstract
             new array_unshift(),
             new sort_(),
             new ksort_(),
+            new krsort_(),
             new array_multisort(),
             new usort_(),
             new uasort_(),
