@@ -548,6 +548,56 @@ final class VmString
         return 0;
     }
 
+    /**
+     * levenshtein() — byte-oriented edit distance (subset of PHP; issue #2406).
+     */
+    public static function levenshtein(
+        string $string1,
+        string $string2,
+        int $insertionCost = 1,
+        int $replacementCost = 1,
+        int $deletionCost = 1
+    ): int {
+        $len1 = self::byteLength($string1);
+        $len2 = self::byteLength($string2);
+        if ($len1 > 255 || $len2 > 255) {
+            throw new \ValueError(
+                'levenshtein(): Argument #1 ($string1) or #2 ($string2) must be less than 256 characters'
+            );
+        }
+        if ($insertionCost < 1 || $replacementCost < 1 || $deletionCost < 1) {
+            throw new \ValueError(
+                'levenshtein(): insertion, replacement, and deletion costs must be larger than zero'
+            );
+        }
+        if (0 === $len1) {
+            return $len2 * $insertionCost;
+        }
+        if (0 === $len2) {
+            return $len1 * $deletionCost;
+        }
+
+        $prev = [];
+        for ($j = 0; $j <= $len2; ++$j) {
+            $prev[$j] = $j * $insertionCost;
+        }
+        for ($i = 1; $i <= $len1; ++$i) {
+            $cur = [];
+            $cur[0] = $i * $deletionCost;
+            for ($j = 1; $j <= $len2; ++$j) {
+                $subst = $string1[$i - 1] === $string2[$j - 1] ? 0 : $replacementCost;
+                $cur[$j] = min(
+                    $cur[$j - 1] + $insertionCost,
+                    $prev[$j] + $deletionCost,
+                    $prev[$j - 1] + $subst
+                );
+            }
+            $prev = $cur;
+        }
+
+        return $prev[$len2];
+    }
+
     private static function strncmpCase(string $a, string $b, int $length): int
     {
         if ($length <= 0) {
