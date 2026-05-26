@@ -1685,7 +1685,7 @@ class JIT {
         $saved = $this->context->builder;
         $this->context->builder = $this->context->context->builderCreate();
         $this->context->builder->positionAtEnd($bb);
-        $this->context->builder->returnValue($objectPtr->constNull());
+        $this->context->builder->returnValue($objPtr->constNull());
         $this->context->builder->clearInsertionPosition();
         $this->context->builder = $saved;
         $this->context->functions[$lc] = $func;
