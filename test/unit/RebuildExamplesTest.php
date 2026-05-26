@@ -98,11 +98,17 @@ final class RebuildExamplesTest extends TestCase
         $this->assertStringContainsString('examples/007-ThrowsWeb', $script);
         $this->assertStringContainsString('throwsWebPostCgiEnv', $script);
         $this->assertStringContainsString("'skip_aot' => true", $script);
+        $this->assertStringContainsString("'throws_web_project_aot' => true", $script);
+        $this->assertStringContainsString('tryBenchmarkThrowsWebProjectAot', $script);
+        $this->assertStringContainsString('BENCH_THROWSWEB_AOT', $script);
+        $this->assertStringContainsString('throwsWebAotInvalidPostProbe', $script);
         $this->assertStringContainsString('#2113', $script);
+        $this->assertStringContainsString('#2166', $script);
 
         $readme = file_get_contents(dirname(__DIR__, 2).'/examples/README.md');
         $this->assertNotFalse($readme);
         $this->assertStringContainsString('BENCH_THROWSWEB', $readme);
+        $this->assertStringContainsString('BENCH_THROWSWEB_AOT', $readme);
         $this->assertStringContainsString('007-ThrowsWeb', $readme);
     }
 }
