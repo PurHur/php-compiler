@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 713 |
-| Phase A inventory files (M2 ratio SSOT) | 712 |
+| PHP files on vm.php path | 714 |
+| Phase A inventory files (M2 ratio SSOT) | 713 |
 | Phase A ratio-deferred paths | 1 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 1840 |
+| Source constructs flagged (warnings) | 1841 |
 
 Phase A ratio-deferred (still inventoried; excluded from M2 spine ratio denominator only — [#2543](https://github.com/PurHur/php-compiler/issues/2543)):
 
@@ -642,6 +642,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/Vararg.php` | 0 | 1 |
 | `lib/JIT/CoalesceHelper.php` | 0 | 1 |
 | `lib/JIT/Context.php` | 0 | 39 |
+| `lib/JIT/EmitTuMode.php` | 0 | 1 |
 | `lib/JIT/ErrorHandlerCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/FunctionStaticHelper.php` | 0 | 1 |
 | `lib/JIT/HashTableHelper.php` | 0 | 26 |
@@ -4063,7 +4064,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/BootstrapCompileSmokeM3Emit.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\Native (line 254)
+- new Call\Native (line 255)
 - 12 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Builtin.php`
@@ -4589,6 +4590,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 1052)
 - 51 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
+### `lib/JIT/EmitTuMode.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
 ### `lib/JIT/ErrorHandlerCallbackPolicy.php`
 
 **Warnings** (review for bootstrap subset):
@@ -4984,9 +4990,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new VM (line 92)
 - new ext\types\Module (line 107)
 - new ext\standard\Module (line 108)
-- new JIT (line 136)
-- new JITContext (line 150)
-- new State (line 175)
+- new JIT (line 134)
+- new JITContext (line 148)
+- new State (line 173)
 - 27 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/VM.php`
