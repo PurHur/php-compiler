@@ -1031,6 +1031,20 @@ class Compiler {
                         $this->compileOperand($child->value, $result, true)
                     ));
                     break;
+                case Op\Stmt\TraitUse::class:
+                    if (OpCode::TYPE_DECLARE_CLASS !== $type) {
+                        throw new \LogicException('Trait use is only supported on classes for now');
+                    }
+                    if ([] !== $child->adaptations) {
+                        throw new \LogicException('TraitUseAdaptation is not supported yet');
+                    }
+                    foreach ($child->traits as $traitOperand) {
+                        $result->addOpCode(new OpCode(
+                            OpCode::TYPE_USE_TRAIT,
+                            $this->compileOperand($traitOperand, $result, true)
+                        ));
+                    }
+                    break;
                 default:
                     throw new \LogicException('Unsupported class body element: ' . get_class($child));
             }

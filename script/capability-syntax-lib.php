@@ -363,6 +363,19 @@ function syntaxRowDefinitions(): array
             'probe' => 'trait T { public function m(): int { return 1; } } echo trait_exists(T::class) ? 1 : 0;',
         ],
         [
+            'id' => 'trait_use_simple',
+            'construct' => 'Simple `use Trait;` in class body',
+            'opcodes' => ['TYPE_DECLARE_CLASS', 'TYPE_USE_TRAIT', 'TYPE_DECLARE_METHOD'],
+            'issue' => 2314,
+            'jit' => false,
+            'aot' => false,
+            'notes' => [
+                'php-cfg-trait-use.patch; VM merges trait methods into class',
+                'TraitUseAdaptation (alias/insteadof) is #144',
+            ],
+            'probe' => 'trait T { public function m(): int { return 1; } } class C { use T; } echo (new C())->m();',
+        ],
+        [
             'id' => 'array_argument_unpack',
             'construct' => 'Array/argument unpack `...$x`',
             'opcodes' => ['TYPE_ARRAY_SPREAD', 'TYPE_ARG_SEND', 'TYPE_INIT_ARRAY', 'TYPE_ADD_ARRAY_ELEMENT'],

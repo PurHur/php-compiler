@@ -128,6 +128,8 @@ class OpCode {
     const TYPE_DECLARE_FUNCTION_STATIC = 105;
     /** User trait declaration with method bodies (#2312). */
     const TYPE_DECLARE_TRAIT = 106;
+    /** Import trait methods into a class body (`use SomeTrait;`, issue #2314). */
+    const TYPE_USE_TRAIT = 107;
 
     public int $type;
     public ?int $arg1;
