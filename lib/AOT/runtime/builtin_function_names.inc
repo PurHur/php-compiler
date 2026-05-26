@@ -230,6 +230,7 @@ static const char *phpc_builtin_functions[] = {
     "setrawcookie",
     "sha1",
     "shell_exec",
+    "similar_text",
     "shuffle",
     "sin",
     "sizeof",

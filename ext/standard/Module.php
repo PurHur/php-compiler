@@ -57,6 +57,7 @@ class Module extends ModuleAbstract
             new chr(),
             new strcmp(),
             new levenshtein(),
+            new similar_text(),
             new soundex(),
             new metaphone(),
             new strnatcmp(),
