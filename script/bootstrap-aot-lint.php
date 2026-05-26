@@ -49,6 +49,63 @@ $env = bootstrapLlvmProcessEnv($llvmDir);
 $phpBin = PHP_BINARY;
 $failures = [];
 
+/**
+ * Read stdout/stderr concurrently to avoid pipe deadlocks when one fills up.
+ *
+ * @param array{0: resource, 1: resource, 2: resource} $pipes
+ * @return array{0: string, 1: string} [stdout, stderr]
+ */
+function bootstrapProcReadAll(array $pipes): array
+{
+    stream_set_blocking($pipes[1], false);
+    stream_set_blocking($pipes[2], false);
+    $out = '';
+    $err = '';
+    $open = [1 => true, 2 => true];
+    while ($open !== []) {
+        $read = [];
+        if (isset($open[1])) {
+            $read[] = $pipes[1];
+        }
+        if (isset($open[2])) {
+            $read[] = $pipes[2];
+        }
+        if ([] === $read) {
+            break;
+        }
+        $write = null;
+        $except = null;
+        $n = stream_select($read, $write, $except, 2);
+        if (false === $n) {
+            break;
+        }
+        if (0 === $n) {
+            continue;
+        }
+        foreach ($read as $r) {
+            if ($r === $pipes[1]) {
+                $chunk = fread($pipes[1], 1 << 20);
+                if (false !== $chunk && '' !== $chunk) {
+                    $out .= $chunk;
+                }
+                if (feof($pipes[1])) {
+                    unset($open[1]);
+                }
+            } elseif ($r === $pipes[2]) {
+                $chunk = fread($pipes[2], 1 << 20);
+                if (false !== $chunk && '' !== $chunk) {
+                    $err .= $chunk;
+                }
+                if (feof($pipes[2])) {
+                    unset($open[2]);
+                }
+            }
+        }
+    }
+
+    return [$out, $err];
+}
+
 foreach ($profile['aot_lint_targets'] as $rel) {
     if (!is_string($rel)) {
         continue;
@@ -70,8 +127,7 @@ foreach ($profile['aot_lint_targets'] as $rel) {
         continue;
     }
     fclose($pipes[0]);
-    $stdout = stream_get_contents($pipes[1]);
-    $stderr = stream_get_contents($pipes[2]);
+    [$stdout, $stderr] = bootstrapProcReadAll($pipes);
     fclose($pipes[1]);
     fclose($pipes[2]);
     $code = proc_close($proc);
