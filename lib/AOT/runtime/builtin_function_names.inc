@@ -32,6 +32,7 @@ static const char *phpc_builtin_functions[] = {
     "array_slice",
     "array_splice",
     "array_sum",
+    "asort",
     "array_unique",
     "array_unshift",
     "array_values",

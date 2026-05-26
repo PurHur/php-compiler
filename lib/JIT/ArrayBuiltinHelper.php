@@ -5105,6 +5105,37 @@ final class ArrayBuiltinHelper
         HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
     }
 
+    public static function asortByValue(Context $context, Variable $array): void
+    {
+        if (self::isNativeArray($array->type)) {
+            throw new \LogicException(
+                'asort() cannot compile fixed-size literal arrays in JIT/AOT yet; use bin/vm.php or bin/serve.php'
+            );
+        }
+        $isList = \PHPCompiler\ext\standard\JitArrayIsList::invoke($context, $array);
+        $done = BasicBlockHelper::append($context, 'asort_done');
+        $sortList = BasicBlockHelper::append($context, 'asort_sort_list');
+        $sortAssoc = BasicBlockHelper::append($context, 'asort_sort_assoc');
+        $context->builder->branchIf($isList, $sortList, $sortAssoc);
+
+        $context->builder->positionAtEnd($sortList);
+        self::sortPacked($context, $array);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($sortAssoc);
+        self::sortStringKeyValues($context, $array);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+    }
+
+    public static function sortStringKeyValues(Context $context, Variable $array): void
+    {
+        $ht = self::loadHashTable($context, $array);
+        $context->builder->call($context->lookupFunction('__hashtable__sortStringKeyValues'), $ht);
+        HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
+    }
+
     private static function sameTypeEqual(Context $context, Variable $left, Variable $right): Value
     {
         switch ($left->type) {

@@ -83,6 +83,35 @@ final class VmInternalCompare
     }
 
     /**
+     * Sort [key, value] pairs in place by integer value ascending (asort subset).
+     *
+     * @param list<array{0: Variable, 1: Variable}> $pairs
+     */
+    public static function sortKeyedPairsByValueInt(array &$pairs): void
+    {
+        $n = \count($pairs);
+        for ($i = 1; $i < $n; ++$i) {
+            $j = $i;
+            while ($j > 0) {
+                $a = $pairs[$j - 1][1]->resolveIndirect();
+                $b = $pairs[$j][1]->resolveIndirect();
+                if (Variable::TYPE_INTEGER !== $a->type || Variable::TYPE_INTEGER !== $b->type) {
+                    throw new \LogicException(
+                        'asort() only supports homogeneous string or integer values in this compiler build'
+                    );
+                }
+                if ($a->toInt() <= $b->toInt()) {
+                    break;
+                }
+                $tmp = $pairs[$j - 1];
+                $pairs[$j - 1] = $pairs[$j];
+                $pairs[$j] = $tmp;
+                --$j;
+            }
+        }
+    }
+
+    /**
      * Sort [key, value] Variable pairs in place by key (no PHP closures — AOT self-host spine safe).
      *
      * @param list<array{0: Variable, 1: Variable}> $pairs
