@@ -269,6 +269,7 @@ static const char *phpc_builtin_functions[] = {
     "uasort",
     "ucfirst",
     "ucwords",
+    "uniqid",
     "unlink",
     "unserialize",
     "urldecode",

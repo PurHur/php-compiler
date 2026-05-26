@@ -35,4 +35,9 @@ final class VmDate
     {
         return \microtime($asFloat);
     }
+
+    public static function uniqid(string $prefix = '', bool $moreEntropy = false): string
+    {
+        return \uniqid($prefix, $moreEntropy);
+    }
 }

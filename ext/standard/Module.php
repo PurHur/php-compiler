@@ -284,6 +284,7 @@ class Module extends ModuleAbstract
             new time(),
             new getmypid(),
             new microtime(),
+            new uniqid(),
             new date(),
             new gmdate(),
             new sleep(),

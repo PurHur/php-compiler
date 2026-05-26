@@ -302,6 +302,10 @@ class Type extends Builtin {
         $fntypeMicrotimeFloat = $this->context->context->functionType($double, false);
         $fnMicrotimeFloat = $this->context->module->addFunction('__compiler_microtime_float', $fntypeMicrotimeFloat);
         $this->context->registerFunction('__compiler_microtime_float', $fnMicrotimeFloat);
+        $i8 = $this->context->getTypeFromString('int8');
+        $fntypeUniqid = $this->context->context->functionType($strPtr, false, $strPtr, $i8);
+        $fnUniqid = $this->context->module->addFunction('__compiler_uniqid', $fntypeUniqid);
+        $this->context->registerFunction('__compiler_uniqid', $fnUniqid);
         $i64 = $this->context->getTypeFromString('int64');
         $fntypePasswordHash = $this->context->context->functionType($strPtr, false, $strPtr, $i64);
         $fnPasswordHash = $this->context->module->addFunction('__compiler_password_hash', $fntypePasswordHash);
