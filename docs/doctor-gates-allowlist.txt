@@ -1,0 +1,8 @@
+# Gates exported from script/ci-defaults.env that are intentionally omitted from
+# phpc doctor --gates presenter output. Each line must still be documented in
+# docs/local-ci-matrix.md unless noted below.
+#
+# Regenerate / debug: php script/check-doctor-gates-sync.php
+
+# Harness-only (not a *_GATE export; listed for doc cross-ref)
+# PHP_COMPILER_SKIP_SERVE_TESTS
