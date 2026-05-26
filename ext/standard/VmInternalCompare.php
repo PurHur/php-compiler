@@ -81,4 +81,39 @@ final class VmInternalCompare
             }
         }
     }
+
+    /**
+     * Sort [key, value] Variable pairs in place by key (no PHP closures — AOT self-host spine safe).
+     *
+     * @param list<array{0: Variable, 1: Variable}> $pairs
+     */
+    public static function sortKeyedPairsByKey(array &$pairs): void
+    {
+        $n = \count($pairs);
+        for ($i = 1; $i < $n; ++$i) {
+            $j = $i;
+            while ($j > 0 && self::compareKeys($pairs[$j - 1][0], $pairs[$j][0]) > 0) {
+                $tmp = $pairs[$j - 1];
+                $pairs[$j - 1] = $pairs[$j];
+                $pairs[$j] = $tmp;
+                --$j;
+            }
+        }
+    }
+
+    public static function compareKeys(Variable $a, Variable $b): int
+    {
+        $a = $a->resolveIndirect();
+        $b = $b->resolveIndirect();
+        if (Variable::TYPE_STRING === $a->type && Variable::TYPE_STRING === $b->type) {
+            return self::invoke(self::resolveStringCallback('strcmp'), $a, $b);
+        }
+        if (Variable::TYPE_INTEGER === $a->type && Variable::TYPE_INTEGER === $b->type) {
+            return $a->toInt() <=> $b->toInt();
+        }
+
+        throw new \LogicException(
+            'ksort() only supports homogeneous string or integer keys in this compiler build'
+        );
+    }
 }
