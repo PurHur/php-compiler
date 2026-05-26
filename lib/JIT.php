@@ -682,7 +682,7 @@ class JIT {
     }
 
     /**
-     * Native Runtime::__construct for emit TU — no-op until init* spine is safe (#2540).
+     * Native Runtime::__construct for emit TU — C-floor vmContext when real-lowering (#2513, #2550).
      */
     private function emitM3EmitTuRuntimeConstructNativeFunction(
         string $internalName,
@@ -704,6 +704,13 @@ class JIT {
         $saved = $this->context->builder;
         $this->context->builder = $this->context->context->builderCreate();
         $this->context->builder->positionAtEnd($bb);
+        if ($this->shouldUseM3CompileDriverRealLowering()) {
+            \PHPCompiler\JIT\RuntimeInitVmContext::emit(
+                $this->context,
+                $this->context->type->object,
+                $func->getParam(0)
+            );
+        }
         $this->context->builder->returnVoid();
         $this->context->builder->clearInsertionPosition();
         $this->context->builder = $saved;
