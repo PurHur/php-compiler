@@ -167,6 +167,7 @@ _None — all JIT `call()` builtins are lowered or deferred._
 - `krsort` — `ext/standard/krsort_.php`
 - `lcfirst` — `ext/standard/lcfirst.php`
 - `levenshtein` — `ext/standard/levenshtein.php`
+- `soundex` — `ext/standard/soundex.php`
 - `log` — `ext/standard/log.php`
 - `lstat` — `ext/standard/lstat_.php`
 - `ltrim` — `ext/standard/string_ltrim.php`
