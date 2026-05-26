@@ -173,6 +173,7 @@ _None — all JIT `call()` builtins are lowered or deferred._
 - `ltrim` — `ext/standard/string_ltrim.php`
 - `max` — `ext/standard/int_max.php`
 - `md5` — `ext/standard/md5.php`
+- `metaphone` — `ext/standard/metaphone.php`
 - `method_exists` — `ext/standard/method_exists_.php`
 - `min` — `ext/standard/int_min.php`
 - `mkdir` — `ext/standard/mkdir_.php`

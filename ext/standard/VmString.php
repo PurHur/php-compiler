@@ -639,6 +639,20 @@ final class VmString
         return str_pad($code, 4, '0');
     }
 
+    /**
+     * metaphone() — PHP-compatible Metaphone (issue #2423).
+     */
+    public static function metaphone(string $string, int $maxPhonemes = 0): string
+    {
+        if ($maxPhonemes < 0) {
+            throw new \InvalidArgumentException(
+                'metaphone(): Argument #2 ($max_phonemes) must be greater than or equal to 0'
+            );
+        }
+
+        return \metaphone($string, $maxPhonemes);
+    }
+
     private static function strncmpCase(string $a, string $b, int $length): int
     {
         if ($length <= 0) {

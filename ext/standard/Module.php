@@ -58,6 +58,7 @@ class Module extends ModuleAbstract
             new strcmp(),
             new levenshtein(),
             new soundex(),
+            new metaphone(),
             new strnatcmp(),
             new strnatcasecmp(),
             new strcasecmp(),
