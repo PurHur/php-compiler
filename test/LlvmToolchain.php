@@ -26,14 +26,16 @@ final class LlvmToolchain
         }
 
         $candidates = [];
-        if (null !== $repoRoot) {
-            $candidates[] = $repoRoot.'/.llvm';
+        if (is_file('/opt/llvm9/libLLVM-9.so.1')) {
+            $candidates[] = '/opt/llvm9';
         }
         $fromEnv = getenv('PHP_COMPILER_LLVM_PATH');
         if (false !== $fromEnv && '' !== $fromEnv) {
             $candidates[] = $fromEnv;
         }
-        $candidates[] = '/opt/llvm9';
+        if (null !== $repoRoot) {
+            $candidates[] = $repoRoot.'/.llvm';
+        }
 
         foreach ($candidates as $dir) {
             if (is_file($dir.'/libLLVM-9.so.1')) {

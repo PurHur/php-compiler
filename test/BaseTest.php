@@ -150,6 +150,9 @@ abstract class BaseTest extends TestCase {
         $skipExtensionPreload = '' !== $this->BIN && str_contains($this->BIN, 'jit.php');
         if (is_dir($extDir) && !$skipExtensionPreload) {
             foreach (['tokenizer', 'mbstring', 'dom', 'xml', 'xmlwriter', 'ffi', 'posix', 'phar'] as $ext) {
+                if (extension_loaded($ext)) {
+                    continue;
+                }
                 $so = $extDir.'/'.$ext.'.so';
                 if (is_file($so)) {
                     $cmd[] = '-d';
