@@ -66,7 +66,7 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | **M2** | Spine grows toward full `bin/vm.php` inventory | ✅ **655/657** units (link) | **~93%** |
 | **M3** | Self-host binary **compiles external PHP** (HelloWorld) without Zend emit | 🚧 partial (run ✅, emit 🚧) | **~35%** |
 
-**M3 unit probe presenter** ([#2360](https://github.com/PurHur/php-compiler/issues/2360)): `make north-star3-verify` runs `008-SelfHostProbe` plus optional `bootstrap-selfhost-{compiler,jit,vm}-unit-probe.sh` when LLVM 9 and probe scripts are present (issues [#2216](https://github.com/PurHur/php-compiler/issues/2216), [#2332](https://github.com/PurHur/php-compiler/issues/2332), [#2354](https://github.com/PurHur/php-compiler/issues/2354)).
+**M3 unit probe presenter** ([#2360](https://github.com/PurHur/php-compiler/issues/2360)): `make north-star3-verify` runs `008-SelfHostProbe` plus optional `bootstrap-selfhost-{compiler,jit,vm}-unit-probe.sh` when LLVM 9 and probe scripts are present. **VM unit probe** ([#2354](https://github.com/PurHur/php-compiler/issues/2354)): `make bootstrap-selfhost-vm-unit-probe` / `BOOTSTRAP_VM_UNIT_PROBE_GATE=1` in `ci-local.sh` llvm tail. Compiler/JIT unit probes: [#2216](https://github.com/PurHur/php-compiler/issues/2216), [#2332](https://github.com/PurHur/php-compiler/issues/2332).
 | **M4** | Self-host binary **rebuilds** the next compiler tree | ⬜ | 0% |
 | **M5** | Full self-host; Zend retired from loop | ⬜ north star | 0% |
 

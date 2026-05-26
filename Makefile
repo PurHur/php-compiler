@@ -238,7 +238,7 @@ test-docker-exec:
 .PHONY: test-docker-quick
 test-docker-quick: test-docker-fast
 
-.PHONY: bootstrap-inventory bootstrap-profile bootstrap-aot-lint bootstrap-aot-link bootstrap-aot-link-lib bootstrap-selfhost-probe bootstrap-selfhost-link bootstrap-selfhost-compile-smoke bootstrap-selfhost-runtime-compile-smoke bootstrap-selfhost-compiler-driver-smoke bootstrap-selfhost-lib-spine-smoke bootstrap-selfhost-lib-spine-vm-smoke bootstrap-selfhost-helloworld bootstrap-loop-gen1-link bootstrap-loop-probe bootstrap-loop-probe-dry bootstrap-loop-probe-dry-run bootstrap-wave-check
+.PHONY: bootstrap-inventory bootstrap-profile bootstrap-aot-lint bootstrap-aot-link bootstrap-aot-link-lib bootstrap-selfhost-probe bootstrap-selfhost-link bootstrap-selfhost-compile-smoke bootstrap-selfhost-runtime-compile-smoke bootstrap-selfhost-compiler-driver-smoke bootstrap-selfhost-vm-unit-probe bootstrap-selfhost-lib-spine-smoke bootstrap-selfhost-lib-spine-vm-smoke bootstrap-selfhost-helloworld bootstrap-loop-gen1-link bootstrap-loop-probe bootstrap-loop-probe-dry bootstrap-loop-probe-dry-run bootstrap-wave-check
 bootstrap-inventory:
 	php script/bootstrap-inventory.php
 bootstrap-profile: bootstrap-inventory
@@ -261,6 +261,8 @@ bootstrap-selfhost-runtime-compile-smoke:
 	./script/bootstrap-selfhost-runtime-compile-smoke.sh
 bootstrap-selfhost-compiler-driver-smoke:
 	./script/bootstrap-selfhost-compiler-driver-smoke-link.sh
+bootstrap-selfhost-vm-unit-probe:
+	./script/bootstrap-selfhost-vm-unit-probe.sh
 bootstrap-selfhost-lib-spine-smoke:
 	./script/bootstrap-selfhost-lib-spine-smoke-link.sh
 bootstrap-selfhost-lib-spine-vm-smoke:

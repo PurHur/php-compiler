@@ -559,6 +559,19 @@ ci_run_bootstrap_compiler_driver_smoke() {
   "$_CI_SCRIPT_DIR/bootstrap-selfhost-compiler-driver-smoke-link.sh"
 }
 
+# M3 VM unit probe: lib/VM.php bundle native link (+ optional run) (issue #2354); opt-in (#2368).
+ci_run_bootstrap_vm_unit_probe() {
+  if [[ "${BOOTSTRAP_VM_UNIT_PROBE_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  if ! ci_llvm_ready; then
+    echo "bootstrap-selfhost-vm-unit-probe: skipped (LLVM 9 not available)"
+    return 0
+  fi
+  echo "bootstrap-selfhost-vm-unit-probe (BOOTSTRAP_VM_UNIT_PROBE_GATE=1, issue #2354)..."
+  "$_CI_SCRIPT_DIR/bootstrap-selfhost-vm-unit-probe.sh"
+}
+
 # Bootstrap test subset in fast CI (issue #2069); default off — opt-in BOOTSTRAP_TEST_SUBSET_GATE=1.
 ci_run_bootstrap_test_subset() {
   if [[ "${BOOTSTRAP_TEST_SUBSET_GATE:-0}" != "1" ]]; then
