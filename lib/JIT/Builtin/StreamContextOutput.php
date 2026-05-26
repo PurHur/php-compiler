@@ -13,8 +13,8 @@ final class StreamContextOutput
     {
         $htPtr = $context->getTypeFromString('__hashtable__*');
 
-        $ft = $context->context->functionType($htPtr, false, $htPtr);
-        $fn = $context->module->addFunction('__phpc_stream_context_attach_marker', $ft);
-        $context->registerFunction('__phpc_stream_context_attach_marker', $fn);
+        $ft = $context->context->functionType($htPtr, false, $htPtr, $htPtr);
+        $fn = $context->module->addFunction('__phpc_stream_context_create', $ft);
+        $context->registerFunction('__phpc_stream_context_create', $fn);
     }
 }

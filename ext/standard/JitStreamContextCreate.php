@@ -22,32 +22,36 @@ final class JitStreamContextCreate
                 'stream_context_create() accepts at most two arguments in this compiler build'
             );
         }
+
+        $htPtrTy = $context->getTypeFromString('__hashtable__*');
+        $nullHt = $htPtrTy->constNull();
+        $optionsHt = $nullHt;
+        if ($argc >= 1) {
+            $optionsHt = self::loadArrayArg($context, $args[0], 1);
+        }
+        $paramsHt = $nullHt;
         if (2 === $argc) {
-            throw new \LogicException(
-                'stream_context_create() second argument is not supported for JIT in this compiler build (issue #1377)'
-            );
+            $paramsHt = self::loadArrayArg($context, $args[1], 2);
         }
 
-        $sizeT = $context->getTypeFromString('size_t');
-        $zero = $sizeT->constInt(0, false);
-        $placeholder = new JITVariable(
-            $context,
-            JITVariable::TYPE_NATIVE_LONG,
-            JITVariable::KIND_VALUE,
-            $context->getTypeFromString('int64')->constInt(0, false)
+        $ht = $context->builder->call(
+            $context->lookupFunction('__phpc_stream_context_create'),
+            $optionsHt,
+            $paramsHt
         );
 
-        $ht = 0 === $argc
-            ? HashTableHelper::buildArrayFill($context, $zero, $zero, $placeholder)
-            : self::loadArray($context, $args[0]);
-
-        return $context->builder->call(
-            $context->lookupFunction('__phpc_stream_context_attach_marker'),
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            $ptr,
             $ht
         );
+
+        return $ptr;
     }
 
-    private static function loadArray(Context $context, JITVariable $arg): Value
+    private static function loadArrayArg(Context $context, JITVariable $arg, int $position): Value
     {
         if (JITVariable::TYPE_HASHTABLE === $arg->type) {
             return $context->helper->loadValue($arg);
@@ -63,7 +67,7 @@ final class JitStreamContextCreate
         }
 
         throw new \LogicException(
-            'stream_context_create() argument #1 must be an array in this compiler build'
+            "stream_context_create() argument #{$position} must be an array in this compiler build"
         );
     }
 }
