@@ -5331,6 +5331,49 @@ final class ArrayBuiltinHelper
         $context->builder->positionAtEnd($done);
     }
 
+    public static function natsortByValue(Context $context, Variable $array): void
+    {
+        if (self::isNativeArray($array->type)) {
+            throw new \LogicException(
+                'natsort() cannot compile fixed-size literal arrays in JIT/AOT yet; use bin/vm.php or bin/serve.php'
+            );
+        }
+        $isList = \PHPCompiler\ext\standard\JitArrayIsList::invoke($context, $array);
+        $done = BasicBlockHelper::append($context, 'natsort_done');
+        $sortList = BasicBlockHelper::append($context, 'natsort_sort_list');
+        $sortAssoc = BasicBlockHelper::append($context, 'natsort_sort_assoc');
+        $context->builder->branchIf($isList, $sortList, $sortAssoc);
+
+        $context->builder->positionAtEnd($sortList);
+        self::sortPackedNatural($context, $array);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($sortAssoc);
+        self::sortStringKeyValuesNatural($context, $array);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+    }
+
+    public static function sortPackedNatural(Context $context, Variable $array): void
+    {
+        if (self::isNativeArray($array->type)) {
+            throw new \LogicException(
+                'natsort() cannot compile fixed-size literal arrays in JIT/AOT yet; use bin/vm.php or bin/serve.php'
+            );
+        }
+        $ht = self::loadHashTable($context, $array);
+        $context->builder->call($context->lookupFunction('__hashtable__sortPackedNatural'), $ht);
+        HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
+    }
+
+    public static function sortStringKeyValuesNatural(Context $context, Variable $array): void
+    {
+        $ht = self::loadHashTable($context, $array);
+        $context->builder->call($context->lookupFunction('__hashtable__sortStringKeyValuesNatural'), $ht);
+        HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
+    }
+
     public static function sortStringKeyValues(Context $context, Variable $array): void
     {
         $ht = self::loadHashTable($context, $array);

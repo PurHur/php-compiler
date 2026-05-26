@@ -17,6 +17,7 @@ final class VmInternalCompare
     private const STRING_CALLBACKS = [
         'strcmp' => strcmp::class,
         'strcasecmp' => strcasecmp::class,
+        'strnatcmp' => strnatcmp::class,
     ];
 
     public static function resolveStringCallback(string $name): Internal
