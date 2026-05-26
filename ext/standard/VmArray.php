@@ -218,6 +218,52 @@ final class VmArray
         return $sorted;
     }
 
+    /** natsort() — return array sorted by value using natural order; packed lists unchanged (in-place). */
+    public static function natsortCopy(HashTable $ht): HashTable
+    {
+        if ($ht->getNumElements() < 2 || self::isList($ht)) {
+            return $ht;
+        }
+        $pairs = [];
+        foreach ($ht->iterateKeyed(true) as [$key, $value]) {
+            $keyCopy = new Variable();
+            $keyCopy->copyFrom($key);
+            $valCopy = new Variable();
+            $valCopy->copyFrom($value);
+            $pairs[] = [$keyCopy, $valCopy];
+        }
+        $first = $pairs[0][1]->resolveIndirect();
+        if (Variable::TYPE_STRING === $first->type) {
+            VmInternalCompare::sortKeyedPairsByValue(
+                $pairs,
+                VmInternalCompare::resolveStringCallback('strnatcmp')
+            );
+        } elseif (Variable::TYPE_INTEGER === $first->type) {
+            VmInternalCompare::sortKeyedPairsByValueInt($pairs);
+        } else {
+            throw new \LogicException(
+                'natsort() only supports homogeneous string or integer values in this compiler build'
+            );
+        }
+        $sorted = new HashTable();
+        foreach ($pairs as [$key, $value]) {
+            $resolvedKey = $key->resolveIndirect();
+            $copy = new Variable();
+            $copy->copyFrom($value);
+            if (Variable::TYPE_INTEGER === $resolvedKey->type) {
+                $sorted->addIndex($resolvedKey->toInt(), $copy);
+            } elseif (Variable::TYPE_STRING === $resolvedKey->type) {
+                $sorted->add($resolvedKey->toString(), $copy);
+            } else {
+                throw new \LogicException(
+                    'natsort() only supports homogeneous string or integer keys in this compiler build'
+                );
+            }
+        }
+
+        return $sorted;
+    }
+
     /** arsort() — return array sorted by value descending; packed lists are unchanged (handled in-place). */
     public static function arsortCopy(HashTable $ht): HashTable
     {
