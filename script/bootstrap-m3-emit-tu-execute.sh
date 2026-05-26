@@ -47,7 +47,11 @@ set +e
 m3_link_code=1
 for _try in 1 2 3 4 5 6 7 8; do
   rm -f "${EMIT_HELPER}"
-  php "${ROOT}/bin/compile.php" -o "${EMIT_HELPER}" "${EMIT_ENTRY}" >/dev/null 2>&1
+  m3_link_env=(php)
+  if [[ "${BOOTSTRAP_M3_EMIT_SPINE_REAL:-0}" == "1" ]]; then
+    m3_link_env=(env PHP_COMPILER_M3_EMIT_SPINE_REAL=1 php)
+  fi
+  "${m3_link_env[@]}" "${ROOT}/bin/compile.php" -o "${EMIT_HELPER}" "${EMIT_ENTRY}" >/dev/null 2>&1
   m3_link_code=$?
   if [[ "${m3_link_code}" -eq 0 && -x "${EMIT_HELPER}" ]]; then
     break

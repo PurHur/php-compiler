@@ -27,6 +27,11 @@ function run(string $filename, string $code, array $options): void
             putenv('PHP_COMPILER_SELFHOST_AOT=1');
             putenv('PHP_COMPILER_EMIT_HELPER_LINK=1');
             putenv('PHP_COMPILER_M3_EMIT_TU=1');
+            // Opt-in at link: BOOTSTRAP_M3_EMIT_SPINE_REAL=1 / PHP_COMPILER_M3_EMIT_SPINE_REAL=1 (#2552).
+            $spineReal = getenv('PHP_COMPILER_M3_EMIT_SPINE_REAL');
+            if ('1' === $spineReal || 'true' === strtolower((string) $spineReal)) {
+                putenv('PHP_COMPILER_M3_EMIT_SPINE_REAL=1');
+            }
             putenv('PHP_COMPILER_M3_EMIT_MINIMAL=1');
             if (str_contains($normalized, 'runtime_m3_emit_native_entry.php')) {
                 putenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX=runtime_compile_smoke_m3_emit');

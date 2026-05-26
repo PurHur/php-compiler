@@ -113,11 +113,13 @@ final class BootstrapCompileSmokeM3Emit
             $runtime,
             $i64->constInt(self::MODE_AOT, false)
         );
-        $parseAndCompileMethod = str_starts_with($logPrefix, 'runtime_compile_smoke_m3_emit')
-            ? 'parseandcompile'
-            : 'parseandcompileemitsmoke';
         $block = $context->builder->call(
-            self::runtimeSpine($context, $parseAndCompileMethod, '__object__*', ['__object__*', '__string__*', '__string__*']),
+            self::runtimeSpine(
+                $context,
+                'parseandcompileemitsmoke',
+                '__object__*',
+                ['__object__*', '__string__*', '__string__*']
+            ),
             $runtime,
             $code,
             $sourceFile
