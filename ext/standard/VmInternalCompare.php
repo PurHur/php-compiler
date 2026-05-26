@@ -81,4 +81,58 @@ final class VmInternalCompare
             }
         }
     }
+
+    /**
+     * Sort [key, value] Variable pairs in place by key (string strcmp or integer order).
+     *
+     * @param list<array{0: Variable, 1: Variable}> $pairs
+     */
+    public static function sortKeyedPairsByKey(array &$pairs): void
+    {
+        $n = \count($pairs);
+        if ($n < 2) {
+            return;
+        }
+        $first = $pairs[0][0]->resolveIndirect();
+        if (Variable::TYPE_STRING === $first->type) {
+            $compare = self::resolveStringCallback('strcmp');
+            for ($i = 1; $i < $n; ++$i) {
+                $j = $i;
+                while ($j > 0 && self::invoke($compare, $pairs[$j - 1][0], $pairs[$j][0]) > 0) {
+                    $tmp = $pairs[$j - 1];
+                    $pairs[$j - 1] = $pairs[$j];
+                    $pairs[$j] = $tmp;
+                    --$j;
+                }
+            }
+
+            return;
+        }
+        if (Variable::TYPE_INTEGER === $first->type) {
+            for ($i = 1; $i < $n; ++$i) {
+                $j = $i;
+                while ($j > 0) {
+                    $a = $pairs[$j - 1][0]->resolveIndirect();
+                    $b = $pairs[$j][0]->resolveIndirect();
+                    if (Variable::TYPE_INTEGER !== $a->type || Variable::TYPE_INTEGER !== $b->type) {
+                        throw new \LogicException(
+                            'ksort() only supports homogeneous string or integer keys in this compiler build'
+                        );
+                    }
+                    if ($a->toInt() <= $b->toInt()) {
+                        break;
+                    }
+                    $tmp = $pairs[$j - 1];
+                    $pairs[$j - 1] = $pairs[$j];
+                    $pairs[$j] = $tmp;
+                    --$j;
+                }
+            }
+
+            return;
+        }
+        throw new \LogicException(
+            'ksort() only supports homogeneous string or integer keys in this compiler build'
+        );
+    }
 }

@@ -161,6 +161,7 @@ _None — all JIT `call()` builtins are lowered or deferred._
 - `json_decode` — `ext/standard/json_decode.php`
 - `json_encode` — `ext/standard/json_encode.php`
 - `json_last_error` — `ext/standard/json_last_error_.php`
+- `ksort` — `ext/standard/ksort_.php`
 - `lcfirst` — `ext/standard/lcfirst.php`
 - `log` — `ext/standard/log.php`
 - `lstat` — `ext/standard/lstat_.php`
