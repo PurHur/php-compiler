@@ -310,6 +310,9 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString('compile_smoke_m3_emit: compile OK', $script);
         $this->assertStringContainsString('helloworld_m3_emit_native_entry.php', $script);
         $this->assertStringContainsString('PHP_COMPILER_EMIT_HELPER_LINK=1', $script);
+        $this->assertStringContainsString('helloworld_m3_emit_next_lower', $script);
+        $this->assertStringContainsString('NEXT_LOWER_CMD:', $script);
+        $this->assertStringContainsString('BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1', $script);
         $this->assertStringContainsString('missing executable', $script);
     }
 
