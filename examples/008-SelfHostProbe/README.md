@@ -30,7 +30,10 @@ On Runforge / harness hosts (do **not** use raw `docker run -v "$(pwd):/compiler
 ./script/docker-exec.sh -- bash -lc 'source script/php-env.sh && ./phpc run examples/008-SelfHostProbe/example.php'
 ./script/docker-exec.sh -- bash -lc 'source script/php-env.sh && ./phpc build -o /tmp/probe examples/008-SelfHostProbe/example.php && /tmp/probe'
 ./script/docker-exec.sh -- bash -lc 'make north-star2-verify'
+./script/docker-exec.sh -- bash -lc 'make north-star3-verify'
 ```
+
+M3 native unit probes (LLVM; skips when absent): `make north-star3-verify` ([#2360](https://github.com/PurHur/php-compiler/issues/2360); parser [#2418](https://github.com/PurHur/php-compiler/issues/2418), PHPTypes [#2434](https://github.com/PurHur/php-compiler/issues/2434)).
 
 AOT (LLVM required):
 
