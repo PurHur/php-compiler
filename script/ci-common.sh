@@ -1052,9 +1052,9 @@ ci_run_file_upload_web_serve_aot_smoke() {
   "$_CI_SCRIPT_DIR/examples-web-smoke.sh" --fileupload-only --aot
 }
 
-# 007-ThrowsWeb phpc serve --aot caught invalid POST (issue #2387); opt-in THROWSWEB_SERVE_AOT_SMOKE_GATE=1.
+# 007-ThrowsWeb phpc serve --aot caught invalid POST (issue #2387, default-on #2390).
 ci_run_throws_web_serve_aot_smoke() {
-  if [[ "${THROWSWEB_SERVE_AOT_SMOKE_GATE:-0}" != "1" ]]; then
+  if [[ "${THROWSWEB_SERVE_AOT_SMOKE_GATE:-1}" != "1" ]]; then
     return 0
   fi
   if [[ -n "${PHP_COMPILER_SKIP_SERVE_TESTS:-}" ]]; then
@@ -1069,7 +1069,7 @@ ci_run_throws_web_serve_aot_smoke() {
     echo "examples-web-smoke (007 AOT serve): skipped (LLVM 9 not available)"
     return 0
   fi
-  echo "examples-web-smoke (007 AOT serve): ThrowsWeb phpc serve --aot caught invalid POST (THROWSWEB_SERVE_AOT_SMOKE_GATE=1, #2387)..."
+  echo "examples-web-smoke (007 AOT serve): ThrowsWeb phpc serve --aot caught invalid POST (THROWSWEB_SERVE_AOT_SMOKE_GATE=1, #2387, #2390)..."
   "$_CI_SCRIPT_DIR/examples-web-smoke.sh" --throws-only --aot
 }
 
