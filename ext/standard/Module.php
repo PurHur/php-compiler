@@ -160,6 +160,7 @@ class Module extends ModuleAbstract
             new password_hash(),
             new password_verify(),
             new random_bytes(),
+            new uniqid(),
             new str_pad(),
             new str_split(),
             new chunk_split(),

@@ -269,6 +269,7 @@ static const char *phpc_builtin_functions[] = {
     "uasort",
     "ucfirst",
     "ucwords",
+    "uniqid",
     "unlink",
     "unserialize",
     "urldecode",
@@ -281,4 +282,4 @@ static const char *phpc_builtin_functions[] = {
     "web_string",
     "wordwrap",
 };
-static const size_t phpc_builtin_functions_count = 279;
+static const size_t phpc_builtin_functions_count = 280;

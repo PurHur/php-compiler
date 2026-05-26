@@ -146,7 +146,9 @@ abstract class BaseTest extends TestCase {
             $cmd = [PHP_BINARY];
         }
         $extDir = getenv('PHP_COMPILER_EXT_DIR') ?: '/usr/lib/php/20220829';
-        if (is_dir($extDir)) {
+        // MCJIT child must not preload duplicate extensions (segfault with libLLVM, #98, #2219).
+        $skipExtensionPreload = '' !== $this->BIN && str_contains($this->BIN, 'jit.php');
+        if (is_dir($extDir) && !$skipExtensionPreload) {
             foreach (['tokenizer', 'mbstring', 'dom', 'xml', 'xmlwriter', 'ffi', 'posix', 'phar'] as $ext) {
                 $so = $extDir.'/'.$ext.'.so';
                 if (is_file($so)) {
@@ -324,6 +326,7 @@ abstract class BaseTest extends TestCase {
         $maxMb = (int) (getenv('PHP_COMPILER_VM_PEAK_RSS_MB') ?: '2048');
         $maxKb = $maxMb * 1024;
         $peakKb = 0;
+        $lastExitCode = 0;
 
         while (true) {
             $status = proc_get_status($proc);
@@ -343,6 +346,7 @@ abstract class BaseTest extends TestCase {
                 }
             }
             if (!$status['running']) {
+                $lastExitCode = (int) ($status['exitcode'] ?? 0);
                 break;
             }
             usleep(150000);
@@ -352,7 +356,8 @@ abstract class BaseTest extends TestCase {
         $stderr = stream_get_contents($pipes[2]);
         fclose($pipes[1]);
         fclose($pipes[2]);
-        $exitCode = proc_close($proc);
+        proc_close($proc);
+        $exitCode = $lastExitCode;
 
         if ($guard && $peakKb > 0) {
             fwrite(STDERR, sprintf(
