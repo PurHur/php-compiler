@@ -586,6 +586,27 @@ final class VmString
      * @throws \ValueError when length is less than 1
      * @throws \Exception when the operating system cannot supply random data
      */
+    /**
+     * uniqid() subset: gettimeofday-based id + optional 8 hex entropy chars (#2219).
+     */
+    public static function uniqid(string $prefix = '', bool $moreEntropy = false): string
+    {
+        $tv = \gettimeofday();
+        $usec = $tv['usec'] % 0x100000;
+        $core = \sprintf('%08x%05x', $tv['sec'], $usec);
+        if ($moreEntropy) {
+            try {
+                $rnd = self::randomBytes(4);
+                $dec = \unpack('N', $rnd)[1] % 100000000;
+            } catch (\Throwable $e) {
+                $dec = ($tv['usec'] ^ $tv['sec']) % 100000000;
+            }
+            $core .= \sprintf('.%08u', $dec);
+        }
+
+        return $prefix.$core;
+    }
+
     public static function randomBytes(int $length): string
     {
         if ($length < 1) {

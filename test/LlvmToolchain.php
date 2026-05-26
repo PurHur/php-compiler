@@ -20,6 +20,11 @@ final class LlvmToolchain
      */
     public static function resolveDir(?string $repoRoot = null): ?string
     {
+        // php-compiler:22.04-dev: image LLVM is reliable; tar-copied .llvm can break MCJIT (#2055).
+        if (is_file('/.dockerenv') && is_file('/opt/llvm9/libLLVM-9.so.1')) {
+            return '/opt/llvm9';
+        }
+
         $candidates = [];
         if (null !== $repoRoot) {
             $candidates[] = $repoRoot.'/.llvm';
