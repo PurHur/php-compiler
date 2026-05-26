@@ -9,6 +9,7 @@ declare(strict_types=1);
  * VM -r: ./script/bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846)
  */
 
+require_once __DIR__.'/../../../lib/AOT/Linker.php';
 require_once __DIR__.'/../../../lib/AOT/ProjectGraph.php';
 require_once __DIR__.'/../../../lib/Block.php';
 require_once __DIR__.'/../../../lib/BuiltinParamNames.php';
@@ -669,7 +670,6 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassGetMethod.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodGetAttributes.php';
 require_once __DIR__.'/../../../lib/VM/ReflectionSupport.php';
 require_once __DIR__.'/../../../test/bootstrap-aot/macro_functions_spine_shim.php';
-// lib/AOT/Linker.php: shell_exec external link — M5 deferred (#1960).
 // VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh when vm_run_smoke links under LLVM 9.
 
 echo "compiler_lib_spine_smoke bundle OK\n";

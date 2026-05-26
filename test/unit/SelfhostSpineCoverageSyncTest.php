@@ -61,7 +61,7 @@ final class SelfhostSpineCoverageSyncTest extends TestCase
         $inventoryList = $tmp.'/inventory.txt';
         file_put_contents(
             $inventoryList,
-            "lib/Block.php\nlib/AOT/Linker.php\nbin/vm.php\n"
+            "lib/Block.php\nbin/vm.php\n"
         );
 
         $cmd = 'PHP_COMPILER_SPINE_COVERAGE_TEST_SPINE='.escapeshellarg($spine)
