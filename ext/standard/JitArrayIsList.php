@@ -31,7 +31,7 @@ final class JitArrayIsList
         throw new \LogicException('array_is_list() requires an array in this compiler build');
     }
 
-    private static function hashTableIsList(Context $context, Value $ht): Value
+    public static function hashTableIsList(Context $context, Value $ht): Value
     {
         $sizeT = $context->getTypeFromString('size_t');
         $i64 = $context->getTypeFromString('int64');

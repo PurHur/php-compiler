@@ -4956,6 +4956,52 @@ final class ArrayBuiltinHelper
         HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
     }
 
+    /**
+     * ksort() — packed list no-op; string-key assoc arrays sorted in place (issue #2271).
+     */
+    public static function ksort(Context $context, Variable $array): void
+    {
+        if (self::isNativeArray($array->type)) {
+            throw new \LogicException(
+                'ksort() cannot compile fixed-size literal arrays in JIT/AOT yet; use bin/vm.php or bin/serve.php, or build the array with [] append'
+            );
+        }
+        $ht = self::loadHashTable($context, $array);
+        $sizeT = $context->getTypeFromString('size_t');
+        $two = $sizeT->constInt(2, false);
+        $num = $context->builder->call(
+            $context->lookupFunction('__hashtable__getNumElements'),
+            $ht
+        );
+        $tooSmall = $context->builder->icmp(Builder::INT_ULT, $num, $two);
+        $done = BasicBlockHelper::append($context, 'ksort_done');
+        $work = BasicBlockHelper::append($context, 'ksort_work');
+        $context->builder->branchIf($tooSmall, $done, $work);
+
+        $context->builder->positionAtEnd($work);
+        $htMap = $context->structFieldMap['__hashtable__'];
+        $nodePtrType = $context->getTypeFromString('__strkey_node__*');
+        $head = $context->builder->load($context->builder->structGep($ht, $htMap['strKeys']));
+        $hasStringKeys = $context->builder->icmp(
+            Builder::INT_NE,
+            $head,
+            $nodePtrType->constNull()
+        );
+        $listDone = BasicBlockHelper::append($context, 'ksort_list_done');
+        $sortKeys = BasicBlockHelper::append($context, 'ksort_sort_keys');
+        $context->builder->branchIf($hasStringKeys, $sortKeys, $listDone);
+
+        $context->builder->positionAtEnd($sortKeys);
+        $context->builder->call($context->lookupFunction('__hashtable__sortStringKeys'), $ht);
+        HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($listDone);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+    }
+
     private static function sameTypeEqual(Context $context, Variable $left, Variable $right): Value
     {
         switch ($left->type) {

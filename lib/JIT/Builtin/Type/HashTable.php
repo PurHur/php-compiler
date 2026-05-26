@@ -107,6 +107,7 @@ class HashTable extends Type
         $this->registerFn('__value__readHashtable', '__hashtable__*', ['__value__*']);
         $this->registerFn('__value__writeHashtable', 'void', ['__value__*', '__hashtable__*']);
         $this->registerFn('__hashtable__sortPacked', 'void', ['__hashtable__*']);
+        $this->registerFn('__hashtable__sortStringKeys', 'void', ['__hashtable__*']);
 
         $this->pointer = $this->context->getTypeFromString('__hashtable__*');
     }
@@ -163,6 +164,7 @@ class HashTable extends Type
         $this->implementValueReadHashtable();
         $this->implementValueWriteHashtable();
         $this->implementSortPacked();
+        $this->implementSortStringKeys();
     }
 
     private function ensureLibcStringCompare(): void
@@ -1619,6 +1621,223 @@ class HashTable extends Type
 
         $this->context->builder->positionAtEnd($done);
         $this->context->builder->returnVoid();
+    }
+
+    private function implementSortStringKeys(): void
+    {
+        $fn = $this->context->lookupFunction('__hashtable__sortStringKeys');
+        $main = $fn->appendBasicBlock('main');
+        $this->context->builder->positionAtEnd($main);
+        $ht = $fn->getParam(0);
+        $htMap = $this->context->structFieldMap['__hashtable__'];
+        $nodeMap = $this->context->structFieldMap['__strkey_node__'];
+        $headSlot = $this->context->builder->structGep($ht, $htMap['strKeys']);
+        $nodePtrType = $this->context->getTypeFromString('__strkey_node__*');
+        $nullNode = $nodePtrType->constNull();
+        $sizeT = $this->context->getTypeFromString('size_t');
+        $one = $sizeT->constInt(1, false);
+        $zero = $sizeT->constInt(0, false);
+        $two = $sizeT->constInt(2, false);
+
+        $countSlot = $this->context->builder->alloca($sizeT, 1, 'ksort_str_count');
+        $walkSlot = $this->context->builder->alloca($nodePtrType, 1, 'ksort_str_walk');
+        $this->context->builder->store($zero, $countSlot);
+        $this->context->builder->store($this->loadStrKeysHead($headSlot), $walkSlot);
+
+        $countHead = $fn->appendBasicBlock('ksort_str_count_head');
+        $countBody = $fn->appendBasicBlock('ksort_str_count_body');
+        $countDone = $fn->appendBasicBlock('ksort_str_count_done');
+        $done = $fn->appendBasicBlock('ksort_str_done');
+        $work = $fn->appendBasicBlock('ksort_str_work');
+        $this->context->builder->branch($countHead);
+
+        $this->context->builder->positionAtEnd($countHead);
+        $walkNode = $this->context->builder->load($walkSlot);
+        $walkEnd = $this->context->builder->icmp(Builder::INT_EQ, $walkNode, $nullNode);
+        $this->context->builder->branchIf($walkEnd, $countDone, $countBody);
+
+        $this->context->builder->positionAtEnd($countBody);
+        $count = $this->context->builder->load($countSlot);
+        $this->context->builder->store(
+            $this->context->builder->addNoSignedWrap($count, $one),
+            $countSlot
+        );
+        $nextWalk = $this->context->builder->load($this->context->builder->structGep($walkNode, $nodeMap['next']));
+        $this->context->builder->store($nextWalk, $walkSlot);
+        $this->context->builder->branch($countHead);
+
+        $this->context->builder->positionAtEnd($countDone);
+        $num = $this->context->builder->load($countSlot);
+        $tooSmall = $this->context->builder->icmp(Builder::INT_ULT, $num, $two);
+        $this->context->builder->branchIf($tooSmall, $done, $work);
+
+        $this->context->builder->positionAtEnd($work);
+        $this->emitBubbleSortStringKeys($fn, $ht, $htMap, $num, $headSlot);
+        $this->context->builder->branch($done);
+
+        $this->context->builder->positionAtEnd($done);
+        $this->context->builder->returnVoid();
+    }
+
+    /**
+     * Collect strkey nodes, bubble-sort by key, rebuild the linked list (issue #2271).
+     *
+     * @param array<string, int> $htMap
+     */
+    private function emitBubbleSortStringKeys(
+        PHPLLVM\LLVMAbstract\Value\Function_ $fn,
+        PHPLLVM\Value $ht,
+        array $htMap,
+        PHPLLVM\Value $num,
+        PHPLLVM\Value $headSlot
+    ): void {
+        $nodeMap = $this->context->structFieldMap['__strkey_node__'];
+        $nodePtrType = $this->context->getTypeFromString('__strkey_node__*');
+        $nodeArrayType = $nodePtrType->pointerType(0);
+        $nullNode = $nodePtrType->constNull();
+        $sizeT = $this->context->getTypeFromString('size_t');
+        $one = $sizeT->constInt(1, false);
+        $zero = $sizeT->constInt(0, false);
+        $ptrSize = $sizeT->constInt(8, false);
+        $i32 = $this->context->getTypeFromString('int32');
+
+        $nodesSlot = $this->context->builder->alloca($nodeArrayType, 1, 'ksort_str_nodes');
+        $idxSlot = $this->context->builder->alloca($sizeT, 1, 'ksort_str_idx');
+        $walkSlot = $this->context->builder->alloca($nodePtrType, 1, 'ksort_str_walk');
+        $outerSlot = $this->context->builder->alloca($sizeT, 1, 'ksort_str_outer');
+        $innerSlot = $this->context->builder->alloca($sizeT, 1, 'ksort_str_inner');
+
+        $bytes = $this->context->builder->mulNoSignedWrap($num, $ptrSize);
+        $nodesRaw = $this->context->builder->call($this->context->lookupFunction('__mm__malloc'), $bytes);
+        $nodesArray = $this->context->builder->pointerCast($nodesRaw, $nodeArrayType);
+        $this->context->builder->store($nodesArray, $nodesSlot);
+
+        $head = $this->loadStrKeysHead($headSlot);
+        $this->context->builder->store($zero, $idxSlot);
+        $this->context->builder->store($head, $walkSlot);
+        $fillHead = $fn->appendBasicBlock('ksort_str_fill_head');
+        $fillBody = $fn->appendBasicBlock('ksort_str_fill_body');
+        $fillDone = $fn->appendBasicBlock('ksort_str_fill_done');
+        $outerHead = $fn->appendBasicBlock('ksort_str_outer_head');
+        $outerBody = $fn->appendBasicBlock('ksort_str_outer_body');
+        $outerDone = $fn->appendBasicBlock('ksort_str_outer_done');
+        $innerHead = $fn->appendBasicBlock('ksort_str_inner_head');
+        $innerBody = $fn->appendBasicBlock('ksort_str_inner_body');
+        $innerDone = $fn->appendBasicBlock('ksort_str_inner_done');
+        $linkHead = $fn->appendBasicBlock('ksort_str_link_head');
+        $linkBody = $fn->appendBasicBlock('ksort_str_link_body');
+        $linkDone = $fn->appendBasicBlock('ksort_str_link_done');
+        $this->context->builder->branch($fillHead);
+
+        $this->context->builder->positionAtEnd($fillHead);
+        $walkNode = $this->context->builder->load($walkSlot);
+        $walkEnd = $this->context->builder->icmp(Builder::INT_EQ, $walkNode, $nullNode);
+        $this->context->builder->branchIf($walkEnd, $fillDone, $fillBody);
+
+        $this->context->builder->positionAtEnd($fillBody);
+        $walkNode = $this->context->builder->load($walkSlot);
+        $idx = $this->context->builder->load($idxSlot);
+        $nodes = $this->context->builder->load($nodesSlot);
+        $this->context->builder->store($walkNode, $this->context->builder->inBoundsGep($nodes, $idx));
+        $this->context->builder->store($this->context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+        $nextWalk = $this->context->builder->load($this->context->builder->structGep($walkNode, $nodeMap['next']));
+        $this->context->builder->store($nextWalk, $walkSlot);
+        $this->context->builder->branch($fillHead);
+
+        $this->context->builder->positionAtEnd($fillDone);
+        $this->context->builder->store($zero, $outerSlot);
+        $this->context->builder->branch($outerHead);
+
+        $this->context->builder->positionAtEnd($outerHead);
+        $outer = $this->context->builder->load($outerSlot);
+        $outerEnd = $this->context->builder->sub($num, $one);
+        $outerAtEnd = $this->context->builder->icmp(Builder::INT_SGE, $outer, $outerEnd);
+        $this->context->builder->branchIf($outerAtEnd, $outerDone, $outerBody);
+
+        $this->context->builder->positionAtEnd($outerBody);
+        $this->context->builder->store($zero, $innerSlot);
+        $limit = $this->context->builder->sub($num, $outer);
+        $limit = $this->context->builder->sub($limit, $one);
+        $this->context->builder->branch($innerHead);
+
+        $this->context->builder->positionAtEnd($innerHead);
+        $inner = $this->context->builder->load($innerSlot);
+        $innerAtEnd = $this->context->builder->icmp(Builder::INT_SGE, $inner, $limit);
+        $this->context->builder->branchIf($innerAtEnd, $innerDone, $innerBody);
+
+        $this->context->builder->positionAtEnd($innerBody);
+        $nextInner = $this->context->builder->addNoSignedWrap($inner, $one);
+        $nodes = $this->context->builder->load($nodesSlot);
+        $nodeA = $this->context->builder->load($this->context->builder->inBoundsGep($nodes, $inner));
+        $nodeB = $this->context->builder->load($this->context->builder->inBoundsGep($nodes, $nextInner));
+        $keyA = $this->context->builder->load($this->context->builder->structGep($nodeA, $nodeMap['key']));
+        $keyB = $this->context->builder->load($this->context->builder->structGep($nodeB, $nodeMap['key']));
+        $cmp = $this->context->builder->call(
+            $this->context->lookupFunction('strcmp'),
+            $this->stringDataPtr($keyA),
+            $this->stringDataPtr($keyB)
+        );
+        $needsSwap = $this->context->builder->icmp(Builder::INT_SGT, $cmp, $i32->constInt(0, false));
+        $swapBlock = $fn->appendBasicBlock('ksort_str_swap_ptr');
+        $noSwap = $fn->appendBasicBlock('ksort_str_no_swap_ptr');
+        $afterSwap = $fn->appendBasicBlock('ksort_str_after_swap_ptr');
+        $this->context->builder->branchIf($needsSwap, $swapBlock, $noSwap);
+
+        $this->context->builder->positionAtEnd($swapBlock);
+        $this->context->builder->store($nodeB, $this->context->builder->inBoundsGep($nodes, $inner));
+        $this->context->builder->store($nodeA, $this->context->builder->inBoundsGep($nodes, $nextInner));
+        $this->context->builder->branch($afterSwap);
+
+        $this->context->builder->positionAtEnd($noSwap);
+        $this->context->builder->branch($afterSwap);
+
+        $this->context->builder->positionAtEnd($afterSwap);
+        $this->context->builder->store($nextInner, $innerSlot);
+        $this->context->builder->branch($innerHead);
+
+        $this->context->builder->positionAtEnd($innerDone);
+        $this->context->builder->store(
+            $this->context->builder->addNoSignedWrap($outer, $one),
+            $outerSlot
+        );
+        $this->context->builder->branch($outerHead);
+
+        $this->context->builder->positionAtEnd($outerDone);
+        $this->context->builder->store($zero, $idxSlot);
+        $this->context->builder->branch($linkHead);
+
+        $this->context->builder->positionAtEnd($linkHead);
+        $idx = $this->context->builder->load($idxSlot);
+        $atEnd = $this->context->builder->icmp(Builder::INT_SGE, $idx, $num);
+        $this->context->builder->branchIf($atEnd, $linkDone, $linkBody);
+
+        $this->context->builder->positionAtEnd($linkBody);
+        $nodes = $this->context->builder->load($nodesSlot);
+        $node = $this->context->builder->load($this->context->builder->inBoundsGep($nodes, $idx));
+        $nextIdx = $this->context->builder->addNoSignedWrap($idx, $one);
+        $hasNext = $this->context->builder->icmp(Builder::INT_ULT, $nextIdx, $num);
+        $setNext = $fn->appendBasicBlock('ksort_str_set_next');
+        $setNull = $fn->appendBasicBlock('ksort_str_set_null');
+        $afterLink = $fn->appendBasicBlock('ksort_str_after_link');
+        $this->context->builder->branchIf($hasNext, $setNext, $setNull);
+
+        $this->context->builder->positionAtEnd($setNext);
+        $nextNode = $this->context->builder->load($this->context->builder->inBoundsGep($nodes, $nextIdx));
+        $this->context->builder->store($nextNode, $this->context->builder->structGep($node, $nodeMap['next']));
+        $this->context->builder->branch($afterLink);
+
+        $this->context->builder->positionAtEnd($setNull);
+        $this->context->builder->store($nullNode, $this->context->builder->structGep($node, $nodeMap['next']));
+        $this->context->builder->branch($afterLink);
+
+        $this->context->builder->positionAtEnd($afterLink);
+        $this->context->builder->store($nextIdx, $idxSlot);
+        $this->context->builder->branch($linkHead);
+
+        $this->context->builder->positionAtEnd($linkDone);
+        $nodes = $this->context->builder->load($nodesSlot);
+        $newHead = $this->context->builder->load($this->context->builder->inBoundsGep($nodes, $zero));
+        $this->context->builder->store($newHead, $headSlot);
     }
 
     private function emitBubbleSortStrings(

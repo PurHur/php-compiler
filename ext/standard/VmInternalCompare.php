@@ -81,4 +81,66 @@ final class VmInternalCompare
             }
         }
     }
+
+    /**
+     * Sort [key, value] Variable pairs in place by key (string strcmp or integer order).
+     *
+     * @param list<array{0: Variable, 1: Variable}> $pairs
+     */
+    public static function sortKeyedPairsByKey(array &$pairs): void
+    {
+        $n = \count($pairs);
+        if ($n < 2) {
+            return;
+        }
+        $firstKey = $pairs[0][0]->resolveIndirect();
+        if (Variable::TYPE_STRING === $firstKey->type) {
+            $compare = self::resolveStringCallback('strcmp');
+            for ($i = 1; $i < $n; ++$i) {
+                $j = $i;
+                while ($j > 0) {
+                    $a = $pairs[$j - 1][0]->resolveIndirect();
+                    $b = $pairs[$j][0]->resolveIndirect();
+                    if (Variable::TYPE_STRING !== $a->type || Variable::TYPE_STRING !== $b->type) {
+                        throw new \LogicException(
+                            'ksort() only supports homogeneous string or integer keys in this compiler build'
+                        );
+                    }
+                    if (self::invoke($compare, $a, $b) <= 0) {
+                        break;
+                    }
+                    $tmp = $pairs[$j - 1];
+                    $pairs[$j - 1] = $pairs[$j];
+                    $pairs[$j] = $tmp;
+                    --$j;
+                }
+            }
+
+            return;
+        }
+        if (Variable::TYPE_INTEGER !== $firstKey->type) {
+            throw new \LogicException(
+                'ksort() only supports homogeneous string or integer keys in this compiler build'
+            );
+        }
+        for ($i = 1; $i < $n; ++$i) {
+            $j = $i;
+            while ($j > 0) {
+                $a = $pairs[$j - 1][0]->resolveIndirect();
+                $b = $pairs[$j][0]->resolveIndirect();
+                if (Variable::TYPE_INTEGER !== $a->type || Variable::TYPE_INTEGER !== $b->type) {
+                    throw new \LogicException(
+                        'ksort() only supports homogeneous string or integer keys in this compiler build'
+                    );
+                }
+                if ($a->toInt() <= $b->toInt()) {
+                    break;
+                }
+                $tmp = $pairs[$j - 1];
+                $pairs[$j - 1] = $pairs[$j];
+                $pairs[$j] = $tmp;
+                --$j;
+            }
+        }
+    }
 }
