@@ -1452,6 +1452,40 @@ restart:
         return [$thisVar];
     }
 
+    protected function applyTraitUse(ClassEntry $entry, string $traitName): void
+    {
+        $traitLc = strtolower(ltrim($traitName, '\\'));
+        if (!isset($this->context->classes[$traitLc])) {
+            $this->context->autoloadClass($traitName);
+        }
+        if (!isset($this->context->classes[$traitLc])) {
+            throw new \LogicException("Trait {$traitName} not found");
+        }
+        $trait = $this->context->classes[$traitLc];
+        if (!$trait->isTrait) {
+            throw new \LogicException("{$traitName} is not a trait");
+        }
+        foreach ($trait->methods as $name => $method) {
+            if (!isset($entry->methods[$name])) {
+                $entry->methods[$name] = $method;
+                $entry->methodVisibility[$name] = $trait->methodVisibility[$name] ?? \PHPCfg\Func::FLAG_PUBLIC;
+                if (isset($trait->methodAttributeNames[$name])) {
+                    $entry->methodAttributeNames[$name] = $trait->methodAttributeNames[$name];
+                }
+            }
+        }
+        foreach ($trait->staticProperties as $name => $storage) {
+            if (!isset($entry->staticProperties[$name])) {
+                $entry->staticProperties[$name] = $storage;
+            }
+        }
+        foreach ($trait->constants as $name => $value) {
+            if (!isset($entry->constants[$name])) {
+                $entry->constants[$name] = $value;
+            }
+        }
+    }
+
     protected function inheritFromParent(ClassEntry $entry): void
     {
         if (null === $entry->parentLc || !isset($this->context->classes[$entry->parentLc])) {
@@ -1587,6 +1621,9 @@ restart:
                         throw new \LogicException('Class constant value must be a compile-time constant');
                     }
                     $entry->constants[$name] = $block->constants[$op->arg2];
+                    break;
+                case OpCode::TYPE_USE_TRAIT:
+                    $this->applyTraitUse($entry, $frame->scope[$op->arg1]->toString());
                     break;
                 default:
                     var_dump($op);
