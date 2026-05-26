@@ -168,12 +168,15 @@ class JIT {
             || str_ends_with($lower, '\\helloworld_compile_smoke');
     }
 
-    /** M3 compile-smoke native emit (smaller than helloworld_compile_smoke — #1977). */
-    private function isBootstrapCompileSmokeM3EmitName(string $lower): bool
+    /** M3 native emit bridge entrypoints (Runtime parseAndCompile + standalone — #1983, #2294). */
+    private function isBootstrapM3RuntimeEmitBridgeName(string $lower): bool
     {
         return str_ends_with($lower, '\\bootstrapaot\\compile_smoke_m3_emit')
             || 'compile_smoke_m3_emit' === $lower
-            || str_ends_with($lower, '\\compile_smoke_m3_emit');
+            || str_ends_with($lower, '\\compile_smoke_m3_emit')
+            || str_ends_with($lower, '\\bootstrapaot\\runtime_compile_smoke_m3_emit')
+            || 'runtime_compile_smoke_m3_emit' === $lower
+            || str_ends_with($lower, '\\runtime_compile_smoke_m3_emit');
     }
 
     private function isBootstrapRuntimeCtorSmokeName(string $lower): bool
@@ -784,7 +787,7 @@ class JIT {
             return false;
         }
         // M3 compile-smoke wrapper: native bridge in emit TU (#1983 approach 3).
-        if ($this->shouldUseM3CompileDriverRealLowering() && $this->isBootstrapCompileSmokeM3EmitName($lower)) {
+        if ($this->shouldUseM3CompileDriverRealLowering() && $this->isBootstrapM3RuntimeEmitBridgeName($lower)) {
             if ($this->shouldUseEmitHelperLinkStubs()) {
                 return true;
             }
@@ -806,7 +809,7 @@ class JIT {
             || 'type_pair' === $lower
             || $this->isBootstrapRuntimeCtorSmokeName($lower)
             || ($this->isBootstrapHelloWorldSmokeName($lower) && !$this->shouldUseM3CompileDriverRealLowering())
-            || ($this->isBootstrapCompileSmokeM3EmitName($lower) && !$this->shouldUseM3CompileDriverRealLowering());
+            || ($this->isBootstrapM3RuntimeEmitBridgeName($lower) && !$this->shouldUseM3CompileDriverRealLowering());
     }
 
     private function isSkippedWebBootstrapHotPathName(string $name): bool
@@ -1107,10 +1110,14 @@ class JIT {
         $saved = $this->context->builder;
         $this->context->builder = $this->context->context->builderCreate();
         $this->context->builder->positionAtEnd($bb);
+        $logPrefix = str_contains($lcname, 'runtime_compile_smoke_m3_emit')
+            ? 'runtime_compile_smoke_m3_emit'
+            : 'compile_smoke_m3_emit';
         \PHPCompiler\JIT\BootstrapCompileSmokeM3Emit::emit(
             $this->context,
             $func->getParam(0),
-            $func->getParam(1)
+            $func->getParam(1),
+            $logPrefix
         );
         $this->context->builder->clearInsertionPosition();
         $this->context->builder = $saved;
@@ -1133,7 +1140,7 @@ class JIT {
         if (isset($this->context->functions[$lcname])) {
             return $this->context->functions[$lcname];
         }
-        if ($this->shouldUseEmitHelperLinkStubs() && $this->isBootstrapCompileSmokeM3EmitName($lcname)) {
+        if ($this->shouldUseEmitHelperLinkStubs() && $this->isBootstrapM3RuntimeEmitBridgeName($lcname)) {
             return $this->compileBootstrapCompileSmokeM3EmitNative($internalName, $block, $logicalName);
         }
         if ($this->shouldUseSelfHostJitStubs() && str_contains($lcname, 'operandschainequal')) {
