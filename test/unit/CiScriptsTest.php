@@ -1199,6 +1199,35 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('#2265', $doc);
     }
 
+    public function testCiDefaultsEnvDefinesStdlibJitDeferredSyncGateOptIn(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString('STDLIB_JIT_DEFERRED_SYNC_GATE="${STDLIB_JIT_DEFERRED_SYNC_GATE:-0}"', $defaults);
+    }
+
+    public function testCiFastRunsStdlibJitDeferredSyncViaInventoryChecks(): void
+    {
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('ci_run_stdlib_jit_deferred_sync_check', $common);
+        $this->assertStringContainsString('check-stdlib-jit-deferred-sync.php', $common);
+        $this->assertStringContainsString('STDLIB_JIT_DEFERRED_SYNC_GATE:-0', $common);
+    }
+
+    public function testCiDockerRunPassesStdlibJitDeferredSyncGateOptIn(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');
+        $this->assertStringContainsString('STDLIB_JIT_DEFERRED_SYNC_GATE=${STDLIB_JIT_DEFERRED_SYNC_GATE:-0}', $body);
+    }
+
+    public function testLocalCiMatrixDocumentsStdlibJitDeferredSyncGate(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('STDLIB_JIT_DEFERRED_SYNC_GATE', $doc);
+        $this->assertStringContainsString('check-stdlib-jit-deferred-sync.php', $doc);
+        $this->assertMatchesRegularExpression('/\| `STDLIB_JIT_DEFERRED_SYNC_GATE` \| `0` \|/', $doc);
+        $this->assertStringContainsString('#2465', $doc);
+    }
+
     public function testCiDefaultsEnvDefinesDoctorGatesMatrixSyncGateOn(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');

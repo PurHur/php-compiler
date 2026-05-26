@@ -45,8 +45,8 @@ final class SelfHostBuiltinPolicy
         + self::CATEGORY_NUMERIC
         + self::CATEGORY_PASSWORD;
 
-    /** @var array<string, string> */
-    private const VM_ONLY_DEFERRED = [];
+    /** @var array<string, string>|null */
+    private static ?array $vmOnlyDeferredCache = null;
 
     /** @var array<string, string> */
     private const CATEGORY_OUTPUT = [
@@ -192,13 +192,23 @@ final class SelfHostBuiltinPolicy
 
     public static function isVmOnlyDeferred(string $name): bool
     {
-        return isset(self::VM_ONLY_DEFERRED[self::normalizeName($name)]);
+        return isset(self::vmOnlyDeferredByCategory()[self::normalizeName($name)]);
     }
 
     /** @return array<string, string> */
     public static function vmOnlyDeferredByCategory(): array
     {
-        return self::VM_ONLY_DEFERRED;
+        if (null === self::$vmOnlyDeferredCache) {
+            $lib = dirname(__DIR__, 2).'/script/stdlib-jit-deferred-lib.php';
+            if (is_readable($lib)) {
+                require_once $lib;
+                self::$vmOnlyDeferredCache = stdlib_jit_deferred_by_category();
+            } else {
+                self::$vmOnlyDeferredCache = [];
+            }
+        }
+
+        return self::$vmOnlyDeferredCache;
     }
 
     /** @return array<string, string> */
