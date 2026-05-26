@@ -55,7 +55,8 @@ function compile_smoke_m3_emit(string $sourceFile, string $outFile): int
 
         return 1;
     }
-    $block = $runtime->parseAndCompile($code, $resolved);
+    // M3 emit helper links with self-host stubs; keep compile path on the emit-smoke subset (#1937).
+    $block = $runtime->parseAndCompileEmitSmoke($code, $resolved);
     if (null === $block) {
         echo "compile_smoke_m3_emit: parseAndCompile returned null (CFG/compile spine)\n";
         echo "compile_smoke_m3_emit: native emit failed at phase=parseAndCompile\n";
