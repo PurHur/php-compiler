@@ -196,6 +196,22 @@ ci_run_root_readme_007_sync_check() {
   ROOT_README_007_SYNC_GATE=1 "$PHP_BIN" "${PHP_OPTS[@]}" script/check-root-readme-sync.php
 }
 
+ci_run_root_readme_009_sync_check() {
+  if [[ "${ROOT_README_009_SYNC_GATE:-1}" != "1" ]]; then
+    return 0
+  fi
+  echo "Root README 009 sync (ROOT_README_009_SYNC_GATE=1, issue #2353)..."
+  "$PHP_BIN" "${PHP_OPTS[@]}" script/check-root-readme-009-sync.php
+}
+
+ci_run_development_status_009_sync_check() {
+  if [[ "${DEVELOPMENT_STATUS_009_SYNC_GATE:-1}" != "1" ]]; then
+    return 0
+  fi
+  echo "Development status 009 sync (DEVELOPMENT_STATUS_009_SYNC_GATE=1, issue #2353)..."
+  "$PHP_BIN" "${PHP_OPTS[@]}" script/check-development-status-009-sync.php
+}
+
 ci_run_selfhost_spine_count_sync_check() {
   if [[ "${SELFHOST_SPINE_COUNT_SYNC_GATE:-0}" != "1" ]]; then
     return 0
@@ -369,8 +385,10 @@ ci_run_inventory_checks() {
   ci_run_root_readme_sync_check
   ci_run_root_readme_006_sync_check
   ci_run_root_readme_007_sync_check
+  ci_run_root_readme_009_sync_check
   ci_run_development_status_sync_check
   ci_run_development_status_007_sync_check
+  ci_run_development_status_009_sync_check
   ci_run_selfhost_spine_count_sync_check
   ci_run_selfhost_spine_coverage_sync_check
   ci_run_selfhost_spine_deferred_sync_check

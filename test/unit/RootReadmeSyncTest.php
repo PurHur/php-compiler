@@ -75,4 +75,28 @@ final class RootReadmeSyncTest extends TestCase
         $this->assertSame(0, $code, implode("\n", $out));
         $this->assertStringContainsString('check-root-readme-sync: OK', implode("\n", $out));
     }
+
+    public function testRootReadmeLists009FastCGIWeb(): void
+    {
+        $readme = dirname(__DIR__, 2).'/README.md';
+        $body = (string) file_get_contents($readme);
+        $this->assertStringContainsString('009-FastCGIWeb', $body);
+        $this->assertStringContainsString('examples/009-FastCGIWeb/', $body);
+    }
+
+    public function testRootReadme009SyncScriptExists(): void
+    {
+        $script = dirname(__DIR__, 2).'/script/check-root-readme-009-sync.php';
+        $this->assertFileExists($script);
+    }
+
+    public function testRootReadme009SyncPassesOnMaster(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $cmd = escapeshellarg(PHP_BINARY).' '
+            .escapeshellarg($root.'/script/check-root-readme-009-sync.php').' 2>&1';
+        exec($cmd, $out, $code);
+        $this->assertSame(0, $code, implode("\n", $out));
+        $this->assertStringContainsString('check-root-readme-009-sync: OK', implode("\n", $out));
+    }
 }

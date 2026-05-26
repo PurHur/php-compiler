@@ -32,7 +32,7 @@ final class DevelopmentStatusSyncTest extends TestCase
         $body = (string) file_get_contents($path);
         $this->assertStringContainsString('006-FileUploadWeb', $body);
         $this->assertStringContainsString('FILE_UPLOAD_WEB_SMOKE_GATE=1', $body);
-        $this->assertStringContainsString('Shipped examples (000–007)', $body);
+        $this->assertStringContainsString('Shipped examples (000–009)', $body);
     }
 
     public function testDevelopmentStatusLists007ThrowsWeb(): void
@@ -54,5 +54,31 @@ final class DevelopmentStatusSyncTest extends TestCase
         exec($cmd, $out, $code);
         $this->assertSame(0, $code, implode("\n", $out));
         $this->assertStringContainsString('check-development-status-sync: OK', implode("\n", $out));
+    }
+
+    public function testDevelopmentStatusLists009FastCGIWeb(): void
+    {
+        $path = dirname(__DIR__, 2).'/docs/pages/development-status.md';
+        $body = (string) file_get_contents($path);
+        $this->assertStringContainsString('009-FastCGIWeb', $body);
+        $this->assertStringContainsString('FASTCGI_WEB_SMOKE_GATE', $body);
+        $this->assertStringContainsString('#2331', $body);
+        $this->assertStringContainsString('#173', $body);
+    }
+
+    public function testDevelopmentStatus009SyncScriptExists(): void
+    {
+        $script = dirname(__DIR__, 2).'/script/check-development-status-009-sync.php';
+        $this->assertFileExists($script);
+    }
+
+    public function testDevelopmentStatus009SyncPassesOnMaster(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $cmd = escapeshellarg(PHP_BINARY).' '
+            .escapeshellarg($root.'/script/check-development-status-009-sync.php').' 2>&1';
+        exec($cmd, $out, $code);
+        $this->assertSame(0, $code, implode("\n", $out));
+        $this->assertStringContainsString('check-development-status-009-sync: OK', implode("\n", $out));
     }
 }

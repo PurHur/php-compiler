@@ -74,6 +74,9 @@ if (is_readable($examplesReadme)) {
     if (str_contains($examples, '007-ThrowsWeb') && !str_contains($body, '007-ThrowsWeb')) {
         $errors[] = 'README.md: missing 007-ThrowsWeb row (sync examples/README.md; #2094)';
     }
+    if (str_contains($examples, '009-FastCGIWeb') && !str_contains($body, '009-FastCGIWeb')) {
+        $errors[] = 'README.md: missing 009-FastCGIWeb row (sync examples/README.md; #2353)';
+    }
     if (str_contains($examples, '| [006-FileUploadWeb]')
         && preg_match('/\| \[006-FileUploadWeb\][^\n]*✅/u', $examples)
         && preg_match('/\| \[006-FileUploadWeb\][^\n]*🚧/u', $body)) {

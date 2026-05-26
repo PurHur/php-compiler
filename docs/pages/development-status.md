@@ -15,7 +15,7 @@ permalink: /development-status.html
 | **Overall progress** | ~**50%** toward a self-hosting compiler (indicative) |
 | **Wave 3 (May 2026)** | Language **12/12** · Stdlib **13/13** ([#1380](https://github.com/PurHur/php-compiler/issues/1380)) |
 | **North star (self-host)** | M0–M1 ✅ · M2 spine **655/657** native link ✅ ([#1960](https://github.com/PurHur/php-compiler/issues/1960)) · M3 partial (native run ✅, emit 🚧 [#1937](https://github.com/PurHur/php-compiler/issues/1937)) · M5 ⬜ ([#1492](https://github.com/PurHur/php-compiler/issues/1492)) |
-| **Example tests** | `examples/000–007` — VM + AOT regression fixtures (not a project north star) |
+| **Example tests** | `examples/000–009` — VM + AOT regression fixtures (not a project north star) |
 | **Not Zend parity** | Subset compiler (not full Zend PHP) |
 
 [← Visual overview](index.html) · [Repository](https://github.com/PurHur/php-compiler)
@@ -97,7 +97,7 @@ Zend PHP still runs `bin/compile.php` during bootstrap. The output is a **curate
 
 ## Example integration tests {#example-integration-tests}
 
-The `examples/` tree (**000–007**) is kept for **VM + AOT regression testing** — routing, templates, sessions, uploads, throw/catch, and deploy smoke. It is **not** a project north star; active product work targets [self-host](#north-star-self-host) ([#1492](https://github.com/PurHur/php-compiler/issues/1492)).
+The `examples/` tree (**000–009**) is kept for **VM + AOT regression testing** — routing, templates, sessions, uploads, throw/catch, and deploy smoke. It is **not** a project north star; active product work targets [self-host](#north-star-self-host) ([#1492](https://github.com/PurHur/php-compiler/issues/1492)).
 
 | Fixture | Role | CI |
 |---------|------|-----|
@@ -202,14 +202,14 @@ GitHub issues use labels `phase-0:Foundation` … `phase-5:reference-app`. Deliv
 | **0 — Foundation** | CI, `phpc` CLI, Docker, docs, JIT compliance | Largely ✅ |
 | **1 — Language** | OOP, types, includes, `::class` | VM/JIT strong; native AOT gaps remain |
 | **2 — Stdlib** | Web builtins, filesystem, JSON, regex | Ongoing batches; audit in repo |
-| **3 — Web AOT** | `phpc build --project`, deploy, runtime includes | Link ✅; execute ✅ (example fixtures **003–007**) |
+| **3 — Web AOT** | `phpc build --project`, deploy, runtime includes | Link ✅; execute ✅ (example fixtures **003–009**) |
 | **4 — Polish** | Example regression + language/stdlib batches | Maintenance only — not a north star |
 
 **Current active phase:** Self-host bootstrap (M3–M5) per [#1492](https://github.com/PurHur/php-compiler/issues/1492). Example web gates stay in CI as regression tests.
 
 ---
 
-## Shipped examples (000–007)
+## Shipped examples (000–009)
 
 | Example | VM | AOT link | AOT execute | Deploy / notes |
 |---------|----|----------|-------------|----------------|
@@ -218,6 +218,8 @@ GitHub issues use labels `phase-0:Foundation` … `phase-5:reference-app`. Deliv
 | 005-SessionsWeb | ✅ `phpc serve` + `SESSIONS_WEB_SMOKE_GATE=1` ([#1887](https://github.com/PurHur/php-compiler/issues/1887)) | ✅ `SESSIONS_WEB_AOT_LINK_GATE=1` ([#1946](https://github.com/PurHur/php-compiler/issues/1946)) | ✅ opt-in `SESSIONS_WEB_AOT_SMOKE_GATE=1` ([#1891](https://github.com/PurHur/php-compiler/issues/1891), [#1923](https://github.com/PurHur/php-compiler/issues/1923)) | Deploy smoke opt-in `SESSIONS_WEB_DEPLOY_SMOKE_GATE=1` ([#1893](https://github.com/PurHur/php-compiler/issues/1893)); default-on tracked in [#1954](https://github.com/PurHur/php-compiler/issues/1954) / [#1967](https://github.com/PurHur/php-compiler/issues/1967) |
 | 006-FileUploadWeb | ✅ `phpc serve` + `FILE_UPLOAD_WEB_SMOKE_GATE=1` ([#2009](https://github.com/PurHur/php-compiler/issues/2009)) | ✅ `FILE_UPLOAD_WEB_AOT_LINK_GATE=1` ([#2011](https://github.com/PurHur/php-compiler/issues/2011)) | ✅ `FILE_UPLOAD_WEB_AOT_SMOKE_GATE=1` ([#2012](https://github.com/PurHur/php-compiler/issues/2012)) | Deploy smoke opt-in `FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE=1` ([#2038](https://github.com/PurHur/php-compiler/issues/2038)); default-on tracked in [#2042](https://github.com/PurHur/php-compiler/issues/2042) |
 | 007-ThrowsWeb | ✅ `phpc serve` + `THROWS_WEB_SMOKE_GATE=1` ([#2076](https://github.com/PurHur/php-compiler/issues/2076), [#2093](https://github.com/PurHur/php-compiler/issues/2093)) | ✅ `THROWSWEB_AOT_LINK_GATE=1` ([#2101](https://github.com/PurHur/php-compiler/issues/2101), [#2135](https://github.com/PurHur/php-compiler/issues/2135)) | ✅ `THROWSWEB_AOT_SMOKE_GATE=1` ([#2101](https://github.com/PurHur/php-compiler/issues/2101), [#2135](https://github.com/PurHur/php-compiler/issues/2135)) | `make examples-throws-smoke` ([#2141](https://github.com/PurHur/php-compiler/issues/2141)); deploy smoke opt-in `THROWSWEB_DEPLOY_SMOKE_GATE=1` ([#2124](https://github.com/PurHur/php-compiler/issues/2124), [#2264](https://github.com/PurHur/php-compiler/issues/2264)) |
+| 008-SelfHostProbe | ✅ `./phpc run` ([#2207](https://github.com/PurHur/php-compiler/issues/2207)) | — | 📋 optional | North Star 2 presenter — `make north-star2-verify` |
+| 009-FastCGIWeb | ✅ `phpc run` / `phpc serve` ([#2331](https://github.com/PurHur/php-compiler/issues/2331)); VM smoke opt-in `FASTCGI_WEB_SMOKE_GATE=1` ([#2351](https://github.com/PurHur/php-compiler/issues/2351)) | ✅ `phpc build --project` | 📋 FastCGI adapter execute ([#173](https://github.com/PurHur/php-compiler/issues/173)); AOT CGI opt-in `FASTCGI_WEB_AOT_SMOKE_GATE=1` ([#2352](https://github.com/PurHur/php-compiler/issues/2352)) | Deploy smoke opt-in `FASTCGI_WEB_DEPLOY_SMOKE_GATE=1` ([#2359](https://github.com/PurHur/php-compiler/issues/2359)); `make examples-fastcgiweb-smoke` |
 
 Commands: `./phpc run`, `./phpc build`, `./phpc serve`, `make examples-aot-smoke` (see [README](https://github.com/PurHur/php-compiler/blob/master/README.md) and [examples/README.md](https://github.com/PurHur/php-compiler/blob/master/examples/README.md)).
 
