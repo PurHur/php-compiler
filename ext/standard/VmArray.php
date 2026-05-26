@@ -300,4 +300,61 @@ final class VmArray
         }
         $ht->replacePackedValues($values);
     }
+
+    /**
+     * array_rand() — pick {@param $num} distinct keys from packed list {@param $ht} (CSPRNG).
+     */
+    public static function randPackedKeys(HashTable $ht, int $num = 1): Variable
+    {
+        $n = $ht->getNumElements();
+        if (0 === $n) {
+            throw new \LogicException('array_rand(): Argument #1 ($array) cannot be empty');
+        }
+        if (!self::isList($ht)) {
+            throw new \LogicException(
+                'array_rand() only supports packed list arrays in this compiler build'
+            );
+        }
+        if ($num < 1) {
+            throw new \LogicException('array_rand(): Argument #2 ($num) must be greater than 0');
+        }
+        if ($num > $n) {
+            throw new \LogicException(
+                'array_rand(): Argument #2 ($num) must be between 1 and the number of elements in $array'
+            );
+        }
+        $indices = \range(0, $n - 1);
+        for ($i = 0; $i < $num; ++$i) {
+            $rand = VmString::randomBytes(8);
+            $pick = 0;
+            for ($b = 0; $b < 8; ++$b) {
+                $pick = ($pick << 8) | \ord($rand[$b]);
+            }
+            $upper = $n - $i;
+            $j = $i + ($pick % $upper);
+            if ($pick % $upper < 0) {
+                $j += $upper;
+            }
+            $tmp = $indices[$i];
+            $indices[$i] = $indices[$j];
+            $indices[$j] = $tmp;
+        }
+        $selected = \array_slice($indices, 0, $num);
+        if (1 === $num) {
+            $key = new Variable();
+            $key->int($selected[0]);
+
+            return $key;
+        }
+        $out = new HashTable();
+        foreach ($selected as $keyIndex) {
+            $key = new Variable();
+            $key->int($keyIndex);
+            $out->addIndex($out->getNumElements(), $key);
+        }
+        $result = new Variable();
+        $result->array($out);
+
+        return $result;
+    }
 }

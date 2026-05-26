@@ -43,6 +43,7 @@ _None — all JIT `call()` builtins are lowered or deferred._
 - `array_pop` — `ext/standard/array_pop.php`
 - `array_product` — `ext/standard/array_product.php`
 - `array_push` — `ext/standard/array_push.php`
+- `array_rand` — `ext/standard/array_rand.php`
 - `array_reduce` — `ext/standard/array_reduce.php`
 - `array_replace` — `ext/standard/array_replace.php`
 - `array_reverse` — `ext/standard/array_reverse.php`

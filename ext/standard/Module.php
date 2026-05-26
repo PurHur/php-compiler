@@ -100,6 +100,7 @@ class Module extends ModuleAbstract
             new array_is_list(),
             new in_array(),
             new array_push(),
+            new array_rand(),
             new array_pop(),
             new array_shift(),
             new array_unshift(),

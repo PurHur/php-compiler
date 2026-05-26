@@ -109,6 +109,7 @@ class HashTable extends Type
         $this->registerFn('__hashtable__sortPacked', 'void', ['__hashtable__*']);
         $this->registerFn('__hashtable__sortPackedReverse', 'void', ['__hashtable__*']);
         $this->registerFn('__hashtable__shufflePacked', 'void', ['__hashtable__*']);
+        $this->registerFn('__hashtable__arrayRandKeys', '__hashtable__*', ['__hashtable__*', 'size_t']);
         $this->registerFn('__hashtable__sortStringKeys', 'void', ['__hashtable__*']);
         $this->registerFn('__hashtable__sortStringKeysReverse', 'void', ['__hashtable__*']);
         $this->registerFn('__hashtable__sortStringKeyValues', 'void', ['__hashtable__*']);
@@ -171,6 +172,7 @@ class HashTable extends Type
         $this->implementSortPacked();
         $this->implementSortPackedReverse();
         $this->implementShufflePacked();
+        $this->implementArrayRandKeys();
         $this->implementSortStringKeys();
         $this->implementSortStringKeysReverse();
         $this->implementSortStringKeyValues();
@@ -2636,7 +2638,8 @@ class HashTable extends Type
     /** Uniform index in [0, $upperExclusive) using 8 CSPRNG bytes. */
     private function emitRandomIndexBelow(
         PHPLLVM\LLVMAbstract\Value\Function_ $fn,
-        PHPLLVM\Value $upperExclusive
+        PHPLLVM\Value $upperExclusive,
+        string $tag = 'shuffle'
     ): PHPLLVM\Value {
         $i64 = $this->context->getTypeFromString('int64');
         $randStr = $this->context->builder->call(
@@ -2645,14 +2648,14 @@ class HashTable extends Type
         );
         $randMap = $this->context->structFieldMap['__string__'];
         $randPtr = $this->context->builder->structGep($randStr, $randMap['value']);
-        $accSlot = $this->context->builder->alloca($i64, 1, 'shuffle_rand_acc');
+        $accSlot = $this->context->builder->alloca($i64, 1, $tag.'_acc');
         $this->context->builder->store($i64->constInt(0, false), $accSlot);
-        $byteSlot = $this->context->builder->alloca($i64, 1, 'shuffle_rand_byte');
+        $byteSlot = $this->context->builder->alloca($i64, 1, $tag.'_byte');
         $this->context->builder->store($i64->constInt(0, false), $byteSlot);
 
-        $byteHead = $fn->appendBasicBlock('shuffle_rand_head');
-        $byteBody = $fn->appendBasicBlock('shuffle_rand_body');
-        $byteDone = $fn->appendBasicBlock('shuffle_rand_done');
+        $byteHead = $fn->appendBasicBlock($tag.'_head');
+        $byteBody = $fn->appendBasicBlock($tag.'_body');
+        $byteDone = $fn->appendBasicBlock($tag.'_done');
         $this->context->builder->branch($byteHead);
 
         $this->context->builder->positionAtEnd($byteHead);
@@ -2755,5 +2758,115 @@ class HashTable extends Type
         $this->context->builder->branch($afterSwap);
 
         $this->context->builder->positionAtEnd($afterSwap);
+    }
+
+    /** array_rand() multi-key path: packed list of distinct long keys (#2321). */
+    private function implementArrayRandKeys(): void
+    {
+        $fn = $this->context->lookupFunction('__hashtable__arrayRandKeys');
+        $main = $fn->appendBasicBlock('main');
+        $this->context->builder->positionAtEnd($main);
+        $ht = $fn->getParam(0);
+        $num = $fn->getParam(1);
+        $map = $this->context->structFieldMap['__hashtable__'];
+        $sizeT = $this->context->getTypeFromString('size_t');
+        $i64 = $this->context->getTypeFromString('int64');
+        $one = $sizeT->constInt(1, false);
+        $zero = $sizeT->constInt(0, false);
+        $n = $this->context->builder->load(
+            $this->context->builder->structGep($ht, $map['nextFreeElement'])
+        );
+        $outHt = $this->context->builder->call($this->context->lookupFunction('__hashtable__alloc'));
+
+        $pickedSlot = $this->context->builder->alloca($sizeT, 1, 'array_rand_keys_picked');
+        $candidateSlot = $this->context->builder->alloca($sizeT, 1, 'array_rand_keys_candidate');
+        $scanSlot = $this->context->builder->alloca($sizeT, 1, 'array_rand_keys_scan');
+        $isDupSlot = $this->context->builder->alloca($this->context->getTypeFromString('int1'), 1, 'array_rand_keys_dup');
+        $this->context->builder->store($zero, $pickedSlot);
+
+        $pickHead = $fn->appendBasicBlock('array_rand_keys_head');
+        $pickTry = $fn->appendBasicBlock('array_rand_keys_try');
+        $pickRetry = $fn->appendBasicBlock('array_rand_keys_retry');
+        $scanHead = $fn->appendBasicBlock('array_rand_keys_scan_head');
+        $scanBody = $fn->appendBasicBlock('array_rand_keys_scan_body');
+        $scanDone = $fn->appendBasicBlock('array_rand_keys_scan_done');
+        $accept = $fn->appendBasicBlock('array_rand_keys_accept');
+        $done = $fn->appendBasicBlock('array_rand_keys_done');
+        $this->context->builder->branch($pickHead);
+
+        $this->context->builder->positionAtEnd($pickHead);
+        $picked = $this->context->builder->load($pickedSlot);
+        $finished = $this->context->builder->icmp(Builder::INT_SGE, $picked, $num);
+        $this->context->builder->branchIf($finished, $done, $pickTry);
+
+        $tryTag = 'array_rand_try';
+        $retryTag = 'array_rand_retry';
+        $emitCandidate = function (PHPLLVM\BasicBlock $target, string $tag) use (
+            $fn,
+            $n,
+            $candidateSlot,
+            $scanSlot,
+            $isDupSlot,
+            $zero,
+            $scanHead
+        ): void {
+            $this->context->builder->positionAtEnd($target);
+            $this->context->builder->store(
+                $this->emitRandomIndexBelow($fn, $n, $tag),
+                $candidateSlot
+            );
+            $this->context->builder->store($zero, $scanSlot);
+            $this->context->builder->store($this->context->getTypeFromString('int1')->constInt(0, false), $isDupSlot);
+            $this->context->builder->branch($scanHead);
+        };
+        $emitCandidate($pickTry, $tryTag);
+        $emitCandidate($pickRetry, $retryTag);
+
+        $this->context->builder->positionAtEnd($scanHead);
+        $picked = $this->context->builder->load($pickedSlot);
+        $scanIdx = $this->context->builder->load($scanSlot);
+        $scanEnd = $this->context->builder->icmp(Builder::INT_SGE, $scanIdx, $picked);
+        $this->context->builder->branchIf($scanEnd, $scanDone, $scanBody);
+
+        $this->context->builder->positionAtEnd($scanBody);
+        $candidate = $this->context->builder->load($candidateSlot);
+        $existing = $this->context->builder->call(
+            $this->context->lookupFunction('__hashtable__readLongAt'),
+            $outHt,
+            $scanIdx
+        );
+        $same = $this->context->builder->icmp(
+            Builder::INT_EQ,
+            $this->context->builder->truncOrBitCast($candidate, $i64),
+            $existing
+        );
+        $wasDup = $this->context->builder->load($isDupSlot);
+        $this->context->builder->store($this->context->builder->or($wasDup, $same), $isDupSlot);
+        $this->context->builder->store(
+            $this->context->builder->addNoSignedWrap($scanIdx, $one),
+            $scanSlot
+        );
+        $this->context->builder->branch($scanHead);
+
+        $this->context->builder->positionAtEnd($scanDone);
+        $isDup = $this->context->builder->load($isDupSlot);
+        $this->context->builder->branchIf($isDup, $pickRetry, $accept);
+
+        $this->context->builder->positionAtEnd($accept);
+        $picked = $this->context->builder->load($pickedSlot);
+        $this->context->builder->call(
+            $this->context->lookupFunction('__hashtable__setLongAt'),
+            $outHt,
+            $picked,
+            $this->context->builder->truncOrBitCast($this->context->builder->load($candidateSlot), $i64)
+        );
+        $this->context->builder->store(
+            $this->context->builder->addNoSignedWrap($picked, $one),
+            $pickedSlot
+        );
+        $this->context->builder->branch($pickHead);
+
+        $this->context->builder->positionAtEnd($done);
+        $this->context->builder->returnValue($outHt);
     }
 }
