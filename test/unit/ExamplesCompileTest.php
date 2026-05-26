@@ -194,6 +194,7 @@ final class ExamplesCompileTest extends TestCase
             '005-SessionsWeb' => [$root.'/005-SessionsWeb'],
             '006-FileUploadWeb' => [$root.'/006-FileUploadWeb'],
             '007-ThrowsWeb' => [$root.'/007-ThrowsWeb'],
+            '008-SelfHostProbe' => [$root.'/008-SelfHostProbe'],
         ];
     }
 
