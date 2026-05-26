@@ -112,14 +112,31 @@ final class BootstrapCompileSmokeM3Emit
             $runtime,
             $i64->constInt(self::MODE_AOT, false)
         );
-        $parseAndCompileMethod = str_starts_with($logPrefix, 'runtime_compile_smoke_m3_emit')
-            ? 'parseandcompile'
-            : 'parseandcompileemitsmoke';
-        $block = $context->builder->call(
-            self::runtimeSpine($context, $parseAndCompileMethod, '__object__*', ['__object__*', '__string__*', '__string__*']),
+        $script = $context->builder->call(
+            self::runtimeSpine($context, 'parse', '__object__*', ['__object__*', '__string__*', '__string__*']),
             $runtime,
             $code,
             $sourceFile
+        );
+        $scriptNull = $context->builder->icmp(Builder::INT_EQ, $script, $objPtr->constNull());
+        $parseFail = BasicBlockHelper::append($context, 'csm3_parse_fail_'.$tag);
+        $parseOk = BasicBlockHelper::append($context, 'csm3_parse_ok_'.$tag);
+        $context->builder->branchIf($scriptNull, $parseFail, $parseOk);
+
+        $context->builder->positionAtEnd($parseFail);
+        self::echoPhaseError(
+            $context,
+            $logPrefix,
+            $logPrefix.': parse returned null (parser spine)',
+            'parse'
+        );
+        $context->builder->returnValue($retFail);
+
+        $context->builder->positionAtEnd($parseOk);
+        $block = $context->builder->call(
+            self::runtimeSpine($context, 'compileemitsmoke', '__object__*', ['__object__*', '__object__*']),
+            $runtime,
+            $script
         );
         $blockNull = $context->builder->icmp(Builder::INT_EQ, $block, $objPtr->constNull());
         $pacFail = BasicBlockHelper::append($context, 'csm3_pac_fail_'.$tag);
@@ -130,8 +147,8 @@ final class BootstrapCompileSmokeM3Emit
         self::echoPhaseError(
             $context,
             $logPrefix,
-            $logPrefix.': parseAndCompile returned null (CFG/compile spine)',
-            'parseAndCompile'
+            $logPrefix.': compileEmitSmoke returned null (CFG/compile spine)',
+            'compileEmitSmoke'
         );
         $context->builder->returnValue($retFail);
 
@@ -194,74 +211,6 @@ final class BootstrapCompileSmokeM3Emit
                 ...$params
             )
         );
-    }
-
-    /**
-     * Native Runtime::parseandcompile* for M3 emit TU (#2516).
-     *
-     * Mirrors parseAndCompileEmitSmoke: parse → compileEmitSmoke (no full Compiler::compile).
-     */
-    public static function emitRuntimeParseAndCompileNativeMethod(
-        Context $context,
-        Value $runtimeThis,
-        Value $code,
-        Value $filename
-    ): Value {
-        $objPtr = $context->getTypeFromString('__object__*');
-        $script = $context->builder->call(
-            self::runtimeSpine($context, 'parse', '__object__*', ['__object__*', '__string__*', '__string__*']),
-            $runtimeThis,
-            $code,
-            $filename
-        );
-        $block = $context->builder->call(
-            self::runtimeSpine($context, 'compileemitsmoke', '__object__*', ['__object__*', '__object__*']),
-            $runtimeThis,
-            $script
-        );
-
-        return $block;
-    }
-
-    /** Register native LLVM for Runtime::parseandcompile / parseandcompileemitsmoke (#2516). */
-    public static function declareRuntimeParseAndCompileNative(
-        Context $context,
-        string $internalName,
-        string $logicalName
-    ): Value {
-        $lc = strtolower($logicalName);
-        if (isset($context->functions[$lc])) {
-            return $context->functions[$lc];
-        }
-        $objPtr = $context->getTypeFromString('__object__*');
-        $strPtr = $context->getTypeFromString('__string__*');
-        $func = $context->module->addFunction(
-            $internalName,
-            $context->context->functionType($objPtr, false, $objPtr, $strPtr, $strPtr)
-        );
-        $bb = $func->appendBasicBlock('entry');
-        $saved = $context->builder;
-        $context->builder = $context->context->builderCreate();
-        $context->builder->positionAtEnd($bb);
-        $block = self::emitRuntimeParseAndCompileNativeMethod(
-            $context,
-            $func->getParam(0),
-            $func->getParam(1),
-            $func->getParam(2)
-        );
-        $context->builder->returnValue($block);
-        $context->builder->clearInsertionPosition();
-        $context->builder = $saved;
-        $context->functions[$lc] = $func;
-        $context->functionReturnType[$lc] = '__object__*';
-        $context->functionProxies[$lc] = new Call\Native(
-            $func,
-            $logicalName,
-            [$objPtr, $strPtr, $strPtr],
-            []
-        );
-
-        return $func;
     }
 
     private static function runtimeSpine(

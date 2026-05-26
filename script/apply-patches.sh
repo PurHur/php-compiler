@@ -271,6 +271,14 @@ apply_patch() {
   else
     echo "Skip $(basename "$patch") (already applied or failed)" >&2
     case "$(basename "$patch")" in
+      php-cfg-match.patch)
+        if python3 "$ROOT/script/patch-php-cfg-match.py"; then
+          echo "Applied $(basename "$patch") (python fallback)"
+        else
+          echo "ERROR: php-cfg-match.patch failed (match lowering required for self-host spine)." >&2
+          return 1
+        fi
+        ;;
       php-cfg-strict-types.patch)
         echo "ERROR: php-cfg-strict-types.patch is required for AOT (declare(strict_types))." >&2
         return 1
