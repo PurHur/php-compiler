@@ -1353,6 +1353,27 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('make test-harness', $doc);
     }
 
+    /**
+     * Primary-path docs must not copy-paste raw bind-mount docker run (#2245).
+     */
+    public function testPrimaryDocsDoNotRecommendRawDockerBindMount(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $bad = 'docker run --rm -v "$(pwd):/compiler"';
+        foreach (
+            [
+                'README.md',
+                'docs/bootstrap-selfhost.md',
+                'examples/README.md',
+                'docs/deploy-web-aot.md',
+                'docs/runtime-semantics.md',
+            ] as $rel
+        ) {
+            $doc = (string) file_get_contents($root.'/'.$rel);
+            $this->assertStringNotContainsString($bad, $doc, $rel);
+        }
+    }
+
     public function testMakefileTestHarnessRequiresDockerRunOpts(): void
     {
         $makefile = (string) file_get_contents(dirname(__DIR__, 2).'/Makefile');

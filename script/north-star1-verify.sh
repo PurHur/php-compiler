@@ -40,8 +40,8 @@ Options:
 
 Environment: same as ci-local (script/ci-defaults.env). See docs/miniwebapp-gates.md.
 
-Docker:
-  docker run --rm -v "$(pwd):/compiler" -w /compiler php-compiler:22.04-dev make north-star1-verify
+Docker (harness-safe):
+  ./script/docker-exec.sh -- make north-star1-verify
 EOF
       exit 0
       ;;

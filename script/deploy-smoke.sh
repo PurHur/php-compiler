@@ -17,8 +17,8 @@
 #   SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 ./script/deploy-smoke.sh --example 005
 #   FILE_UPLOAD_WEB_DEPLOY_SMOKE_GATE=1 ./script/deploy-smoke.sh --example 006
 #
-# Docker:
-#   docker run --rm -v "$(pwd):/compiler" -w /compiler php-compiler:22.04-dev make deploy-smoke
+# Docker (harness-safe):
+#   ./script/docker-exec.sh -- make deploy-smoke
 set -euo pipefail
 
 cd "$(dirname "$0")/.."

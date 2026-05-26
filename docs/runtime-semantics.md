@@ -20,10 +20,11 @@ Recommended app pattern: `$name = $_GET['name'] ?? 'Guest';` (no undefined-key w
 ## Verification
 
 ```bash
-docker run --rm -v "$(pwd):/compiler" -w /compiler php-compiler:22.04-dev \
-  ./phpc run examples/001-SimpleWeb/example.php
+./script/docker-exec.sh -- ./phpc run examples/001-SimpleWeb/example.php
 # Without ?name= — VM emits Warning on stderr; page still renders with null coerced in echo.
 
 ./script/ci-local.sh --filter UndefinedArrayKey
 ./script/ci-local.sh --filter undefined_array_key_get
+# Docker:
+./script/docker-exec.sh -- bash -lc 'source script/php-env.sh && ./script/ci-local.sh --filter UndefinedArrayKey'
 ```

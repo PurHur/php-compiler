@@ -276,13 +276,13 @@ Production AOT CGI wrapper for nginx spawn: [#665](https://github.com/PurHur/php
 Docker (preferred on harness hosts):
 
 ```bash
-docker run --rm -v "$(pwd):/compiler" -w /compiler php-compiler:22.04-dev make deploy-smoke
+./script/docker-exec.sh -- make deploy-smoke
 ```
 
-Manual one-liner (bind-mount OK on a normal dev machine):
+Manual build/deploy check (harness-safe):
 
 ```bash
-docker run --rm -v "$(pwd):/compiler" -w /compiler php-compiler:22.04-dev bash -lc '
+./script/docker-exec.sh -- bash -lc '
   ./phpc build --project examples/002-StaticWeb
   ./phpc deploy examples/002-StaticWeb -o /tmp/static-dist
   test -x /tmp/static-dist/bin/app
@@ -290,9 +290,10 @@ docker run --rm -v "$(pwd):/compiler" -w /compiler php-compiler:22.04-dev bash -
 '
 ```
 
-On harness hosts with an empty mount, use:
+Full CI gate or PHPUnit filter:
 
 ```bash
+make test-harness
 ./script/docker-ci-local.sh fast --filter PhpcDeployTest
 ```
 

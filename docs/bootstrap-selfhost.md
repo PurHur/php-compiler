@@ -89,7 +89,7 @@ CI: `./script/ci-fast.sh` runs `--check` by default (`BOOTSTRAP_VENDOR_INVENTORY
 **Docker** (optional; LLVM 9 in `php-compiler:22.04-dev` — see README):
 
 ```console
-docker run --rm -v "$(pwd):/compiler" -w /compiler php-compiler:22.04-dev bash -lc 'make bootstrap-selfhost-probe && ./script/bootstrap-selfhost-link.sh'
+./script/docker-exec.sh -- bash -lc 'make bootstrap-selfhost-probe && ./script/bootstrap-selfhost-link.sh'
 ```
 
 Self-host native link requires `PHP_COMPILER_SELFHOST_AOT=1` (set by `./script/bootstrap-selfhost-link.sh` and `make bootstrap-selfhost-probe`). `PHP_COMPILER_JIT_PROGRESS_FILE` is optional progress logging for segfault triage only — it does not enable JIT stubs.
