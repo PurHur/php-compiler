@@ -129,7 +129,7 @@ miniwebapp-aot-bisect:
 	./script/miniwebapp-aot-bisect.sh
 
 # HTTP smoke: phpc serve + curl for 001-SimpleWeb and 002-StaticWeb (issue #298)
-.PHONY: examples-web-smoke examples-sessions-smoke examples-throws-smoke examples-fastcgiweb-smoke examples-selfhostprobe-smoke examples-serve-jit-smoke examples-fileupload-deploy-smoke examples-throwsweb-deploy-smoke examples-fastcgiweb-deploy-smoke examples-web-smoke-prebuild examples-aot-smoke deploy-smoke deploy-smoke-all
+.PHONY: examples-web-smoke examples-sessions-smoke examples-throws-smoke examples-throws-jit-smoke examples-fastcgiweb-smoke examples-selfhostprobe-smoke examples-serve-jit-smoke examples-fileupload-deploy-smoke examples-throwsweb-deploy-smoke examples-fastcgiweb-deploy-smoke examples-web-smoke-prebuild examples-aot-smoke deploy-smoke deploy-smoke-all
 examples-web-smoke:
 	./script/examples-web-smoke.sh
 
@@ -138,6 +138,10 @@ examples-sessions-smoke:
 
 examples-throws-smoke:
 	THROWS_WEB_SMOKE_GATE=1 ./script/examples-web-smoke.sh --throws-only
+
+# 007-ThrowsWeb phpc serve --jit caught invalid POST (THROWSWEB_SERVE_JIT_SMOKE_GATE=1; issue #2408)
+examples-throws-jit-smoke:
+	THROWSWEB_SERVE_JIT_SMOKE_GATE=1 ./script/examples-web-smoke.sh --throws-only --jit
 
 examples-fastcgiweb-smoke:
 	FASTCGI_WEB_SMOKE_GATE=1 ./script/examples-web-smoke.sh --fastcgi-only

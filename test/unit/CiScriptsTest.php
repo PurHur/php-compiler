@@ -73,9 +73,12 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('SESSIONS_WEB_SERVE_AOT_SMOKE_GATE', $common);
         $this->assertStringContainsString('FILE_UPLOAD_WEB_SERVE_AOT_SMOKE_GATE', $common);
         $this->assertStringContainsString('THROWSWEB_SERVE_AOT_SMOKE_GATE', $common);
+        $this->assertStringContainsString('THROWSWEB_SERVE_JIT_SMOKE_GATE', $common);
+        $this->assertStringContainsString('ci_run_throws_web_serve_jit_smoke', $common);
         $this->assertStringContainsString('--sessions-only --aot', $common);
         $this->assertStringContainsString('--fileupload-only --aot', $common);
         $this->assertStringContainsString('--throws-only --aot', $common);
+        $this->assertStringContainsString('--throws-only --jit', $common);
 
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
         $this->assertStringContainsString(
@@ -88,6 +91,10 @@ final class CiScriptsTest extends TestCase
         );
         $this->assertStringContainsString(
             'THROWSWEB_SERVE_AOT_SMOKE_GATE="${THROWSWEB_SERVE_AOT_SMOKE_GATE:-0}"',
+            $defaults
+        );
+        $this->assertStringContainsString(
+            'THROWSWEB_SERVE_JIT_SMOKE_GATE="${THROWSWEB_SERVE_JIT_SMOKE_GATE:-0}"',
             $defaults
         );
     }
@@ -239,10 +246,12 @@ final class CiScriptsTest extends TestCase
         $body = (string) file_get_contents($fast);
         $this->assertStringContainsString('ci_run_throws_web_smoke', $body);
         $this->assertStringContainsString('ci_run_throws_web_uncaught_smoke', $body);
+        $this->assertStringContainsString('ci_run_throws_web_serve_jit_smoke', $body);
 
         $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
         $this->assertStringContainsString('THROWS_WEB_SMOKE_GATE', $common);
         $this->assertStringContainsString('THROWSWEB_UNCAUGHT_500_GATE', $common);
+        $this->assertStringContainsString('THROWSWEB_SERVE_JIT_SMOKE_GATE', $common);
         $this->assertStringContainsString('--throws-only', $common);
     }
 
@@ -481,6 +490,15 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('THROWS_WEB_SMOKE_GATE=1', $makefile);
         $this->assertStringContainsString('examples-web-smoke.sh --throws-only', $makefile);
         $this->assertStringContainsString('examples-throws-smoke', $makefile);
+    }
+
+    public function testMakefileHasExamplesThrowsJitSmokeTarget(): void
+    {
+        $makefile = (string) file_get_contents(dirname(__DIR__, 2).'/Makefile');
+        $this->assertStringContainsString('examples-throws-jit-smoke:', $makefile);
+        $this->assertStringContainsString('THROWSWEB_SERVE_JIT_SMOKE_GATE=1', $makefile);
+        $this->assertStringContainsString('examples-web-smoke.sh --throws-only --jit', $makefile);
+        $this->assertStringContainsString('#2408', $makefile);
     }
 
     public function testMakefileHasExamplesFastcgiwebSmokeTarget(): void
@@ -2077,6 +2095,7 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('## 007-ThrowsWeb gates', $doc);
         $this->assertStringContainsString('THROWS_WEB_SMOKE_GATE', $doc);
         $this->assertStringContainsString('THROWSWEB_SERVE_AOT_SMOKE_GATE', $doc);
+        $this->assertStringContainsString('THROWSWEB_SERVE_JIT_SMOKE_GATE', $doc);
         $this->assertStringContainsString('THROWSWEB_AOT_LINK_GATE', $doc);
         $this->assertStringContainsString('THROWSWEB_AOT_SMOKE_GATE', $doc);
         $this->assertStringContainsString('test007ThrowsWebAotLink', $doc);

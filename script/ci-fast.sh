@@ -57,6 +57,7 @@ if [[ -z "${PHP_COMPILER_SKIP_SERVE_TESTS:-}" ]]; then
   ci_run_file_upload_web_smoke
   ci_run_throws_web_smoke
   ci_run_throws_web_uncaught_smoke
+  ci_run_throws_web_serve_jit_smoke
   ci_run_fastcgi_web_smoke
 fi
 
