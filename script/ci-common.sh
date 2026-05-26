@@ -268,6 +268,14 @@ ci_run_selfhost_spine_deferred_sync_check() {
   "$PHP_BIN" "${PHP_OPTS[@]}" script/check-selfhost-spine-deferred-sync.php
 }
 
+ci_run_bootstrap_spine_phpcfg_parse_check() {
+  if [[ "${BOOTSTRAP_SPINE_PHPCFG_PARSE_GATE:-1}" != "1" ]]; then
+    return 0
+  fi
+  echo "Bootstrap spine PHPCfg parse check (BOOTSTRAP_SPINE_PHPCFG_PARSE_GATE=1, issue #2575)..."
+  "$PHP_BIN" "${PHP_OPTS[@]}" script/bootstrap-spine-php-cfg-parse-check.php --minimal
+}
+
 ci_run_m3_allowlist_sync_check() {
   if [[ "${M3_ALLOWLIST_SYNC_GATE:-0}" != "1" ]]; then
     return 0
@@ -461,6 +469,7 @@ ci_run_inventory_checks() {
   ci_run_selfhost_spine_count_sync_check
   ci_run_selfhost_spine_coverage_sync_check
   ci_run_selfhost_spine_deferred_sync_check
+  ci_run_bootstrap_spine_phpcfg_parse_check
   ci_run_m3_allowlist_sync_check
   ci_run_bootstrap_m5_doc_sync_check
   ci_run_selfhost_m4_gen2_sync_check

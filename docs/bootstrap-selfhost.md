@@ -7,6 +7,7 @@
 | Gate | Command | Status |
 |------|---------|--------|
 | Phase A inventory | `php script/bootstrap-inventory.php --check` | ✅ vm.php-path inventory; **0** source blockers; M2 ratio SSOT: `Phase A inventory files` row in `docs/bootstrap-inventory.md` (ratio-deferred: `bin/vm.php`, `lib/VM/HashTable.php` only — [#2543](https://github.com/PurHur/php-compiler/issues/2543)); `lib/JIT/Builtin/StringPregMatch.php` and `lib/AOT/Linker.php` **included** in spine |
+| Spine PHPCfg parse | `php script/bootstrap-spine-php-cfg-parse-check.php` (`--minimal` for M0 bundle) | ✅ no unsupported php-cfg expr/stmt on spine ([#2575](https://github.com/PurHur/php-compiler/issues/2575)); `BOOTSTRAP_SPINE_PHPCFG_PARSE_GATE=1` in `ci-fast.sh` |
 | Phase B lib AOT lint | `php bin/compile.php -l lib/*.php` (with `script/php-env.sh`) | ✅ **14/14** top-level `lib/*.php` units ([#534](https://github.com/PurHur/php-compiler/pull/534)) |
 | Phase B fixture lint | `php script/bootstrap-aot-lint.php` | ✅ **13** procedural targets under `test/bootstrap-aot/` + `examples/000-HelloWorld` |
 | Phase C native run | `make bootstrap-aot-link` or `./script/bootstrap-aot-link.sh` | ✅ **71/71** link targets OK |
