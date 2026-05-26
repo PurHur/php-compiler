@@ -1,0 +1,28 @@
+diff --git vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php
+index 1a1a1a1..2b2b2b2 100644
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php
+@@ -22,6 +22,9 @@ class Property extends Stmt
+ 
+     public $visibility;
+ 
++    /** Inferred type from php-types TypeReconstructor (bootstrap native AOT needs declared field). */
++    public $type;
++
+     public $static;
+ 
+     public $defaultVar = null;
+@@ -30,12 +33,12 @@ class Property extends Stmt
+ 
+     public $declaredType;
+ 
+-    public function __construct(Operand $name, int $visiblity, bool $static, Op\Type $declaredType, Operand $defaultVar = null, Block $defaultBlock = null, array $attributes = [])
++    public function __construct(Operand $name, int $visibility, bool $static, Op\Type $declaredType, Operand $defaultVar = null, Block $defaultBlock = null, array $attributes = [])
+     {
+         parent::__construct($attributes);
+         $this->name = $this->addReadRef($name);
+-        $this->visiblity = $visiblity;
++        $this->visibility = $visibility;
+         $this->static = $static;
+         $this->declaredType = $declaredType;
+         if (null !== $defaultVar) {

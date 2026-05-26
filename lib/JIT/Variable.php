@@ -364,6 +364,51 @@ final class Variable {
                     Variable::KIND_VARIABLE,
                     $slot
                 );
+            case self::TYPE_VALUE:
+                $slot = JitValueBox::alloc($context);
+                $ptr = JitValueBox::pointer($context, $slot);
+                if (null === $op->value) {
+                    $context->builder->call($context->lookupFunction('__value__writeNull'), $ptr);
+                } elseif (is_int($op->value)) {
+                    $context->builder->call(
+                        $context->lookupFunction('__value__writeLong'),
+                        $ptr,
+                        $context->constantFromInteger($op->value)
+                    );
+                } elseif (is_bool($op->value)) {
+                    $context->builder->call(
+                        $context->lookupFunction('__value__writeBool'),
+                        $ptr,
+                        $context->getTypeFromString('int32')->constInt($op->value ? 1 : 0, false)
+                    );
+                } elseif (is_float($op->value)) {
+                    $context->builder->call(
+                        $context->lookupFunction('__value__writeDouble'),
+                        $ptr,
+                        $context->constantFromFloat($op->value)
+                    );
+                } elseif (is_string($op->value)) {
+                    $str = $context->builder->load($context->constantStringFromString($op->value));
+                    $context->builder->call(
+                        $context->lookupFunction('__value__writeString'),
+                        $ptr,
+                        $str
+                    );
+                    $literal = $op->value;
+                } else {
+                    $context->builder->call($context->lookupFunction('__value__writeNull'), $ptr);
+                }
+                $var = new Variable(
+                    $context,
+                    self::TYPE_VALUE,
+                    Variable::KIND_VARIABLE,
+                    $slot
+                );
+                if (isset($literal)) {
+                    $var->compileTimeString = $literal;
+                }
+
+                return $var;
             default:
                 throw new \LogicException("Literal type " . self::getStringType($type) . " not yet supported");
         }
