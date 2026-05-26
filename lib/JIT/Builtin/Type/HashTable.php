@@ -2641,19 +2641,143 @@ class HashTable extends Type
         $main = $fn->appendBasicBlock('main');
         $this->context->builder->positionAtEnd($main);
         $ht = $fn->getParam(0);
+        $numArg = $fn->getParam(1);
         $out = $fn->getParam(2);
         $map = $this->context->structFieldMap['__hashtable__'];
         $i64 = $this->context->getTypeFromString('int64');
+        $sizeT = $this->context->getTypeFromString('size_t');
+        $one = $sizeT->constInt(1, false);
+        $zero = $sizeT->constInt(0, false);
         $n = $this->context->builder->load(
             $this->context->builder->structGep($ht, $map['nextFreeElement'])
         );
+        // Variable-length alloca must live in the entry block (LLVM/MCJIT).
+        $indices = $this->context->builder->arrayAlloca($sizeT, $n);
+        $initSlot = $this->context->builder->alloca($sizeT, 1, 'array_rand_init_i');
+        $pickSlot = $this->context->builder->alloca($sizeT, 1, 'array_rand_pick_i');
+        $jSlot = $this->context->builder->alloca($sizeT, 1, 'array_rand_pick_j');
+        $outSlot = $this->context->builder->alloca($sizeT, 1, 'array_rand_out_i');
+
+        $isSingle = $this->context->builder->icmp(Builder::INT_EQ, $numArg, $one);
+        $singlePath = $fn->appendBasicBlock('array_rand_single');
+        $multiPath = $fn->appendBasicBlock('array_rand_multi');
+        $done = $fn->appendBasicBlock('array_rand_done');
+        $this->context->builder->branchIf($isSingle, $singlePath, $multiPath);
+
+        $this->context->builder->positionAtEnd($singlePath);
         $idx = $this->emitRandomIndexBelow($fn, $n);
         $this->context->builder->call(
             $this->context->lookupFunction('__value__writeLong'),
             $out,
             $this->context->builder->truncOrBitCast($idx, $i64)
         );
+        $this->context->builder->branch($done);
+
+        $this->context->builder->positionAtEnd($multiPath);
+        $this->context->builder->store($zero, $initSlot);
+        $initHead = $fn->appendBasicBlock('array_rand_init_head');
+        $initBody = $fn->appendBasicBlock('array_rand_init_body');
+        $initDone = $fn->appendBasicBlock('array_rand_init_done');
+        $this->context->builder->branch($initHead);
+
+        $this->context->builder->positionAtEnd($initHead);
+        $initI = $this->context->builder->load($initSlot);
+        $initStop = $this->context->builder->icmp(Builder::INT_UGE, $initI, $n);
+        $this->context->builder->branchIf($initStop, $initDone, $initBody);
+
+        $this->context->builder->positionAtEnd($initBody);
+        $this->context->builder->store(
+            $initI,
+            $this->context->builder->inBoundsGep($indices, $initI)
+        );
+        $this->context->builder->store(
+            $this->context->builder->addNoSignedWrap($initI, $one),
+            $initSlot
+        );
+        $this->context->builder->branch($initHead);
+
+        $this->context->builder->positionAtEnd($initDone);
+        $this->context->builder->store($zero, $pickSlot);
+        $pickHead = $fn->appendBasicBlock('array_rand_pick_head');
+        $pickRand = $fn->appendBasicBlock('array_rand_pick_rand');
+        $pickBody = $fn->appendBasicBlock('array_rand_pick_body');
+        $pickDone = $fn->appendBasicBlock('array_rand_pick_done');
+        $this->context->builder->branch($pickHead);
+
+        $this->context->builder->positionAtEnd($pickHead);
+        $pickI = $this->context->builder->load($pickSlot);
+        $pickStop = $this->context->builder->icmp(Builder::INT_UGE, $pickI, $numArg);
+        $this->context->builder->branchIf($pickStop, $pickDone, $pickRand);
+
+        $this->context->builder->positionAtEnd($pickRand);
+        $upper = $this->context->builder->sub($n, $pickI);
+        $offset = $this->emitRandomIndexBelow($fn, $upper);
+        $j = $this->context->builder->addNoSignedWrap($pickI, $offset);
+        $this->context->builder->store($j, $jSlot);
+        $this->context->builder->branch($pickBody);
+
+        $this->context->builder->positionAtEnd($pickBody);
+        $pickIVal = $this->context->builder->load($pickSlot);
+        $jVal = $this->context->builder->load($jSlot);
+        $this->emitSwapSizeTSlots($indices, $pickIVal, $jVal);
+        $this->context->builder->store(
+            $this->context->builder->addNoSignedWrap($pickIVal, $one),
+            $pickSlot
+        );
+        $this->context->builder->branch($pickHead);
+
+        $this->context->builder->positionAtEnd($pickDone);
+        $result = $this->context->builder->call($this->context->lookupFunction('__hashtable__alloc'));
+        $this->context->builder->store($zero, $outSlot);
+        $outHead = $fn->appendBasicBlock('array_rand_out_head');
+        $outBody = $fn->appendBasicBlock('array_rand_out_body');
+        $outDone = $fn->appendBasicBlock('array_rand_out_done');
+        $this->context->builder->branch($outHead);
+
+        $this->context->builder->positionAtEnd($outHead);
+        $outI = $this->context->builder->load($outSlot);
+        $outStop = $this->context->builder->icmp(Builder::INT_UGE, $outI, $numArg);
+        $this->context->builder->branchIf($outStop, $outDone, $outBody);
+
+        $this->context->builder->positionAtEnd($outBody);
+        $key = $this->context->builder->load(
+            $this->context->builder->inBoundsGep($indices, $outI)
+        );
+        $this->context->builder->call(
+            $this->context->lookupFunction('__hashtable__setLongAt'),
+            $result,
+            $outI,
+            $this->context->builder->truncOrBitCast($key, $i64)
+        );
+        $this->context->builder->store(
+            $this->context->builder->addNoSignedWrap($outI, $one),
+            $outSlot
+        );
+        $this->context->builder->branch($outHead);
+
+        $this->context->builder->positionAtEnd($outDone);
+        $this->context->builder->call(
+            $this->context->lookupFunction('__value__writeHashtable'),
+            $out,
+            $result
+        );
+        $this->context->builder->branch($done);
+
+        $this->context->builder->positionAtEnd($done);
         $this->context->builder->returnVoid();
+    }
+
+    private function emitSwapSizeTSlots(
+        PHPLLVM\Value $indices,
+        PHPLLVM\Value $indexA,
+        PHPLLVM\Value $indexB
+    ): void {
+        $slotA = $this->context->builder->inBoundsGep($indices, $indexA);
+        $slotB = $this->context->builder->inBoundsGep($indices, $indexB);
+        $a = $this->context->builder->load($slotA);
+        $b = $this->context->builder->load($slotB);
+        $this->context->builder->store($b, $slotA);
+        $this->context->builder->store($a, $slotB);
     }
 
     /** Uniform index in [0, $upperExclusive) using 8 CSPRNG bytes. */

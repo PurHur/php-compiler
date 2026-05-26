@@ -70,7 +70,7 @@ ROADMAP Phase 2/4: [#78](https://github.com/PurHur/php-compiler/issues/78), asso
 | `arsort()` (values descending, preserve keys) | yes | yes | yes | [#2296](https://github.com/PurHur/php-compiler/issues/2296) | Homogeneous string/int values; packed + string-key assoc |
 | `rsort()` (values descending, reindex) | yes | yes | yes | [#2300](https://github.com/PurHur/php-compiler/issues/2300) | Packed homogeneous string/int lists; `__hashtable__sortPackedReverse` |
 | `shuffle()` (packed list, Fisher–Yates) | yes | yes | yes | [#2310](https://github.com/PurHur/php-compiler/issues/2310) | Packed lists without holes; CSPRNG via random_bytes lowering |
-| `array_rand()` (packed list keys) | yes | yes | yes | [#2321](https://github.com/PurHur/php-compiler/issues/2321) | Packed lists; num=1 JIT/AOT; num>1 VM-only; CSPRNG via random_bytes |
+| `array_rand()` (packed list keys) | yes | yes | yes | [#2321](https://github.com/PurHur/php-compiler/issues/2321) | Packed lists; num=1 returns int key; num>1 returns array of keys; CSPRNG via random_bytes |
 | `array_merge()` on string-key associative arrays | yes | yes | yes | [#2287](https://github.com/PurHur/php-compiler/issues/2287) | String-key maps; packed list append unchanged |
 
 _Rows curated from closed stdlib issues (#2271, #2282, #2290, #2296, #2300, #2287); regenerate via `php script/capability-syntax.php`._
