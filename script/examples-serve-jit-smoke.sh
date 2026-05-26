@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# phpc serve --jit e2e for 001-SimpleWeb (+ 003-MiniWebApp when project-ready) (issue #2274).
+# phpc serve --jit e2e for 001-SimpleWeb (+ 003-MiniWebApp when project-ready, + 007-ThrowsWeb when lint green) (#2274, #2478).
 #
 # Usage:
 #   SERVE_JIT_SMOKE_GATE=1 ./script/examples-serve-jit-smoke.sh
@@ -18,8 +18,9 @@ usage() {
 Usage: script/examples-serve-jit-smoke.sh
 
 Environment:
-  SERVE_JIT_SMOKE_GATE=1           required (script exits 0 when unset)
-  PHP_COMPILER_SKIP_SERVE_TESTS=1  exit 0 without HTTP checks
+  SERVE_JIT_SMOKE_GATE=1              required (script exits 0 when unset)
+  THROWSWEB_SERVE_JIT_SMOKE_GATE=1    007 block when lint green (#2478, #2435); set 0 to skip
+  PHP_COMPILER_SKIP_SERVE_TESTS=1     exit 0 without HTTP checks
 EOF
 }
 
@@ -135,6 +136,36 @@ curl_expect_200() {
   echo "examples-serve-jit-smoke: ${label}: ok"
 }
 
+curl_expect_200_post() {
+  local label="$1"
+  local url="$2"
+  local post_body="$3"
+  shift 3
+  local needles=("$@")
+  local body status
+  body="$(mktemp)"
+  status="$(curl -sS -o "$body" -w '%{http_code}' --connect-timeout 5 --max-time 15 \
+    -X POST -d "$post_body" "$url" || echo "000")"
+  if [[ "$status" != "200" ]]; then
+    echo "examples-serve-jit-smoke: ${label}: expected HTTP 200, got ${status}" >&2
+    echo "  url: ${url}" >&2
+    cat "$body" >&2 || true
+    rm -f "$body"
+    return 1
+  fi
+  for needle in "${needles[@]}"; do
+    if ! grep -qF "$needle" "$body"; then
+      echo "examples-serve-jit-smoke: ${label}: response missing needle: ${needle}" >&2
+      echo "  url: ${url}" >&2
+      cat "$body" >&2 || true
+      rm -f "$body"
+      return 1
+    fi
+  done
+  rm -f "$body"
+  echo "examples-serve-jit-smoke: ${label}: ok"
+}
+
 run_serve_jit_smoke() {
   local name="$1"
   local docroot="$2"
@@ -193,6 +224,61 @@ miniwebapp_jit_serve_ready() {
   return 0
 }
 
+throwsweb_jit_serve_ready() {
+  local project="${ROOT}/examples/007-ThrowsWeb"
+  if [[ ! -d "${project}" ]]; then
+    return 1
+  fi
+  if ! "${PHPC}" lint "${project}/example.php" >/dev/null 2>&1; then
+    return 1
+  fi
+  return 0
+}
+
+run_throwsweb_serve_jit_smoke() {
+  local docroot="${ROOT}/examples/007-ThrowsWeb"
+  if [[ ! -d "${docroot}" ]]; then
+    echo "examples-serve-jit-smoke: 007-ThrowsWeb: skip (missing docroot)"
+    return 0
+  fi
+  if [[ "${THROWSWEB_SERVE_JIT_SMOKE_GATE:-1}" != "1" ]]; then
+    echo "examples-serve-jit-smoke: 007-ThrowsWeb: skip (THROWSWEB_SERVE_JIT_SMOKE_GATE=0; #2478, #2435)"
+    return 0
+  fi
+
+  local port pid
+  port="$(find_free_port)"
+  echo "examples-serve-jit-smoke: 007-ThrowsWeb on 127.0.0.1:${port} (phpc serve --jit)"
+  "${PHPC}" serve --jit "127.0.0.1:${port}" "$docroot" >/dev/null 2>&1 &
+  pid=$!
+
+  stop_serve() {
+    kill "$pid" 2>/dev/null || true
+    local waited=0
+    while kill -0 "$pid" 2>/dev/null && ((waited < 40)); do
+      sleep 0.05
+      waited=$((waited + 1))
+    done
+    if kill -0 "$pid" 2>/dev/null; then
+      kill -9 "$pid" 2>/dev/null || true
+    fi
+    wait "$pid" 2>/dev/null || true
+  }
+  trap stop_serve RETURN
+
+  wait_for_serve "$port"
+
+  local base="http://127.0.0.1:${port}"
+  curl_expect_200 "007-ThrowsWeb / GET empty" "${base}/example.php" \
+    "Submit an email"
+  curl_expect_200_post "007-ThrowsWeb / POST invalid" "${base}/example.php" \
+    "email=bad" \
+    "Invalid email"
+
+  stop_serve
+  trap - RETURN
+}
+
 echo "examples-serve-jit-smoke: starting (SERVE_JIT_SMOKE_GATE=1, #2274)"
 
 run_serve_jit_smoke "001-SimpleWeb" "${ROOT}/examples/001-SimpleWeb" \
@@ -205,6 +291,12 @@ if miniwebapp_jit_serve_ready; then
     'GET hello|/index.php/hello?name=Dev|Hello — MiniWebApp;Hello Dev'
 else
   echo "examples-serve-jit-smoke: 003-MiniWebApp: skip (project includes #475 / #1770; lint --all not green)"
+fi
+
+if throwsweb_jit_serve_ready; then
+  run_throwsweb_serve_jit_smoke
+else
+  echo "examples-serve-jit-smoke: 007-ThrowsWeb: skip (phpc lint example.php not green)"
 fi
 
 echo "examples-serve-jit-smoke: ok"

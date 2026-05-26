@@ -36,8 +36,12 @@ final class ExamplesServeJitSmokeTest extends TestCase
         $this->assertStringContainsString('phpc serve --jit', $body);
         $this->assertStringContainsString('001-SimpleWeb', $body);
         $this->assertStringContainsString('003-MiniWebApp', $body);
+        $this->assertStringContainsString('007-ThrowsWeb', $body);
+        $this->assertStringContainsString('THROWSWEB_SERVE_JIT_SMOKE_GATE', $body);
+        $this->assertStringContainsString('#2478', $body);
         $this->assertStringContainsString('#475', $body);
         $this->assertStringContainsString('jit-runtime-probe.php', $body);
+        $this->assertStringContainsString('curl_expect_200_post', $body);
     }
 
     public function testCiDefaultsDefinesServeJitSmokeGateOff(): void
@@ -75,5 +79,7 @@ final class ExamplesServeJitSmokeTest extends TestCase
         $this->assertStringContainsString('SERVE_JIT_SMOKE_GATE', $matrix);
         $this->assertStringContainsString('examples-serve-jit-smoke', $matrix);
         $this->assertStringContainsString('#2274', $matrix);
+        $this->assertStringContainsString('#2478', $matrix);
+        $this->assertStringContainsString('007-ThrowsWeb', $matrix);
     }
 }
