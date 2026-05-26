@@ -133,6 +133,18 @@ Same manifest as **001-SimpleWeb**; docroot is the project root (no `public/`). 
 | `sessionsweb` | `templates/init-sessionsweb/` | Flat `example.php` session flash ([**005-SessionsWeb**](../examples/005-SessionsWeb/)) |
 | `fileupload` | `templates/init-fileupload/` | Flat `example.php` multipart upload ([**006-FileUploadWeb**](../examples/006-FileUploadWeb/)) |
 | `throwsweb` | `templates/init-throwsweb/` | Flat `example.php` throw/catch validation ([**007-ThrowsWeb**](../examples/007-ThrowsWeb/)) |
+| `selfhostprobe` | `templates/init-selfhostprobe/` | Flat `example.php` North Star 2 bootstrap presenter ([**008-SelfHostProbe**](../examples/008-SelfHostProbe/)) |
+
+### Self-host presenter flat project (`examples/008-SelfHostProbe/phpc.json`)
+
+```json
+{
+    "entry": "example.php",
+    "binary": ".phpc/bin/app"
+}
+```
+
+CLI presenter only (no superglobals). Scaffold with `phpc init --profile selfhostprobe` ([#2220](https://github.com/PurHur/php-compiler/issues/2220)); template parity: `script/check-init-selfhostprobe-parity.sh` (default `INIT_SELFHOSTPROBE_PARITY_GATE=1` in `ci-fast`).
 
 ## Commands
 

@@ -22,7 +22,7 @@ declare(strict_types=1);
  *   phpc lint --project <entry.php> [--json]
  *   phpc lint --all <dir-or-file> [--json]
  *   phpc lint --bootstrap-inventory [--check] [--json]
- *   phpc init [--profile default|miniwebapp|sessionsweb|apijson|fileupload|throwsweb] [--force] [target-dir]
+ *   phpc init [--profile default|miniwebapp|sessionsweb|apijson|fileupload|throwsweb|selfhostprobe] [--force] [target-dir]
  *   phpc test [--fast] [--bootstrap] [--bootstrap-strict] [-- phpunit/ci-local args...]
  *   phpc doctor [--gates] [--selfhost] [--no-lint] [--jit-probe] [--aot-project-probe [dir]]  Env probes; --gates MiniWebApp; --selfhost NS2 (#2053)
  *   phpc validate-manifest [dir]                 Validate phpc.json schema and paths (issue #263)
@@ -68,8 +68,8 @@ php-compiler CLI
   phpc lint --bootstrap-inventory [--check]   Lint all bin/vm.php-path files (#2208)
       --check                                   Exit 1 when any file has unsupported syntax
       --json fields: file, line, kind, message, issue, issue_url (when tracked)
-  phpc init [--profile default|miniwebapp|sessionsweb|apijson|fileupload|throwsweb] [--force] [target-dir]
-                                              Scaffold web project (default, miniwebapp, sessionsweb, apijson, fileupload, or throwsweb)
+  phpc init [--profile default|miniwebapp|sessionsweb|apijson|fileupload|throwsweb|selfhostprobe] [--force] [target-dir]
+                                              Scaffold web project (default, miniwebapp, sessionsweb, apijson, fileupload, throwsweb, or selfhostprobe)
   phpc test [--fast] [args...]                  Run ci-local.sh (full) or ci-fast.sh (no LLVM)
   phpc test --bootstrap [--strict]              Bootstrap subset (inventory + spine sync; #1961)
   phpc doctor [--gates] [--selfhost] [--no-lint] [--jit-probe] [--aot-project-probe [dir]]
