@@ -8,6 +8,7 @@ declare(strict_types=1);
  *
  * Usage:
  *   phpc serve [host:port] [docroot]
+ *   phpc serve --jit [host:port] [docroot]
  *   phpc serve --aot [host:port] [docroot] [--binary path]
  *   phpc run [-q 'name=World'] [-p 'field=val'] script.php [args...]
  *   phpc run --project [dir] [--cgi-env KEY=VAL] [--cgi-env-file path] [--deploy-root dist]
@@ -38,6 +39,7 @@ if ([] === $args || in_array($args[0], ['-h', '--help', 'help'], true)) {
 php-compiler CLI
 
   phpc serve [host:port] [docroot]              Start HTTP dev server (VM)
+  phpc serve --jit [host:port] [docroot]        Serve with MCJIT per script (CGI refresh)
   phpc serve --aot [host:port] [docroot]        Serve precompiled AOT binary (CGI env)
       [--binary path]                           Explicit binary or phpc.json "binary"
   phpc run <script.php> [vm.php flags...]      Run a script in the VM
@@ -94,11 +96,16 @@ switch ($command) {
         }
         require $repoRoot.'/vendor/autoload.php';
         $aot = false;
+        $jit = false;
         $serveArgs = [];
         while ([] !== $args) {
             $arg = array_shift($args);
             if ('--aot' === $arg) {
                 $aot = true;
+                continue;
+            }
+            if ('--jit' === $arg) {
+                $jit = true;
                 continue;
             }
             if ('--binary' === $arg && [] !== $args) {
@@ -114,7 +121,16 @@ switch ($command) {
                 $serveArgs[$last] = \PHPCompiler\Cli\InvokeCwd::resolve((string) $serveArgs[$last]);
             }
         }
-        $script = $aot ? $repoRoot.'/bin/serve-aot.php' : $repoRoot.'/bin/serve.php';
+        if ($aot && $jit) {
+            fwrite(STDERR, "phpc serve: use only one of --jit or --aot\n");
+            exit(1);
+        }
+        $script = $repoRoot.'/bin/serve.php';
+        if ($aot) {
+            $script = $repoRoot.'/bin/serve-aot.php';
+        } elseif ($jit) {
+            $script = $repoRoot.'/bin/serve-jit.php';
+        }
         exit(runProcess(array_merge($php, array_merge([$script], $serveArgs)), $repoRoot));
 
     case 'run':

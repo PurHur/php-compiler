@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\Web;
 
 /**
- * Shared HTTP/1.1 dev-server helpers for bin/serve.php and bin/serve-aot.php.
+ * Shared HTTP/1.1 dev-server helpers for bin/serve.php, bin/serve-jit.php, and bin/serve-aot.php.
  */
 final class DevServer
 {
