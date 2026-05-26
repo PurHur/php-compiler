@@ -265,7 +265,7 @@ class Object_ extends Type {
     }
 
     /**
-     * Object shell for M3 emit-helper TU — property slots only, no defaults/ht init (#2540).
+     * Object shell for M3 emit-helper TU — slots + defaults/ht, no vendor ctor (#2540, #2550).
      */
     public function allocateEmitTuShell(int $classId): PHPLLVM\Value
     {
@@ -306,6 +306,8 @@ class Object_ extends Type {
 
         if ($propCount > 0) {
             $this->initPropertySlots($obj, $propCount);
+            $this->initPropertyDefaults($obj, $classId);
+            $this->initEmptyHashtableProperties($obj, $classId);
         }
 
         return $obj;
