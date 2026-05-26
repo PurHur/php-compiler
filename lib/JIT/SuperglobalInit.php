@@ -27,8 +27,9 @@ final class SuperglobalInit
         '_COOKIE',
     ];
 
-    /** $_SERVER keys repopulated by __superglobals__refresh (issue #201, #235, #296, #302, #295, #314, #453). */
+    /** $_SERVER keys repopulated by __superglobals__refresh (issue #201, #235, #296, #302, #295, #314, #453, #2257). */
     private const RUNTIME_SERVER_KEYS = [
+        'REQUEST_METHOD',
         'REQUEST_SCHEME',
         'HTTPS',
         'SERVER_PORT',

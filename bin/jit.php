@@ -12,6 +12,12 @@ declare(strict_types=1);
 use PHPCompiler\Runtime;
 use PHPCompiler\Web\Superglobals;
 
+/**
+ * Run a script via MCJIT. CGI superglobals refresh each execution (issue #642, #2257):
+ * - `-q` / `-p` set QUERY_STRING / REQUEST_BODY (and POST method when body non-empty)
+ * - `REQUEST_METHOD`, `PATH_INFO`, `SCRIPT_NAME`, `HTTPS`, etc. come from the process
+ *   environment (same keys as VM serve / AOT `__superglobals__refresh`)
+ */
 function run(string $filename, string $code, array $options): void
 {
     $runtime = new Runtime();
