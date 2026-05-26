@@ -220,6 +220,9 @@ final class Doctor
             fwrite(STDOUT, "   make north-star2-verify  or  ./script/north-star2-verify.sh\n");
             fwrite(STDOUT, "   NORTH_STAR2_THROWSWEB_GATE=".(self::gateEnabled('NORTH_STAR2_THROWSWEB_GATE', $ns2ThrowswebDefault) ? '1' : '0')." (default {$ns2ThrowswebDefault}) — 007 init parity + VM smoke in presenter (#2177)\n");
         }
+        if (is_executable($repoRoot.'/script/north-star3-verify.sh')) {
+            fwrite(STDOUT, "   make north-star3-verify  or  ./script/north-star3-verify.sh  (#2360 M3 unit probes)\n");
+        }
         fwrite(STDOUT, "   phpc test --bootstrap [--strict]\n");
         fwrite(STDOUT, "   make bootstrap-wave-check  (opt-in --with-helloworld)\n");
         fwrite(STDOUT, "   ./phpc doctor --gates | grep -i bootstrap_inventory  (#2228)\n\n");
@@ -498,6 +501,11 @@ final class Doctor
             fwrite(STDOUT, "  007 ladder       {$ns2ThrowswebDetail}\n");
         } else {
             fwrite(STDOUT, "  Presenter bundle make north-star2-verify            script missing in tree\n");
+        }
+        $ns3Script = $repoRoot.'/script/north-star3-verify.sh';
+        if (is_executable($ns3Script)) {
+            fwrite(STDOUT, "  M3 unit probes   make north-star3-verify            008 + compiler/JIT/VM unit probes (#2360)\n");
+            fwrite(STDOUT, "  Script           ./script/north-star3-verify.sh    --require-llvm when probes must run\n");
         }
         fwrite(STDOUT, "  Fast CI hook     {$ns2CiDetail}\n");
         fwrite(STDOUT, "  Bootstrap subset {$subsetDetail}\n");
