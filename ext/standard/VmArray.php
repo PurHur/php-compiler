@@ -359,4 +359,46 @@ final class VmArray
 
         return $result;
     }
+
+    /**
+     * array_count_values() — count occurrences of string or integer values (#2356).
+     */
+    public static function countValues(HashTable $ht): HashTable
+    {
+        $out = new HashTable();
+        foreach ($ht->iterateKeyed(true) as [, $value]) {
+            $v = $value->resolveIndirect();
+            if (Variable::TYPE_STRING === $v->type) {
+                $key = $v->toString();
+                $existing = $out->find($key);
+                if (null === $existing) {
+                    $count = new Variable();
+                    $count->int(1);
+                    $out->add($key, $count);
+                } else {
+                    $resolved = $existing->resolveIndirect();
+                    $resolved->int($resolved->toInt() + 1);
+                }
+                continue;
+            }
+            if (Variable::TYPE_INTEGER === $v->type) {
+                $idx = $v->toInt();
+                $existing = $out->findIndex($idx);
+                if (null === $existing) {
+                    $count = new Variable();
+                    $count->int(1);
+                    $out->addIndex($idx, $count);
+                } else {
+                    $resolved = $existing->resolveIndirect();
+                    $resolved->int($resolved->toInt() + 1);
+                }
+                continue;
+            }
+            throw new \LogicException(
+                'array_count_values() only supports string and integer values in this compiler build'
+            );
+        }
+
+        return $out;
+    }
 }

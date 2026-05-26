@@ -631,6 +631,7 @@ require_once __DIR__.'/../../../ext/standard/array_is_list.php';
 require_once __DIR__.'/../../../ext/standard/array_key_first.php';
 require_once __DIR__.'/../../../ext/standard/array_key_last.php';
 require_once __DIR__.'/../../../ext/standard/array_pad.php';
+require_once __DIR__.'/../../../ext/standard/array_count_values.php';
 require_once __DIR__.'/../../../ext/standard/arsort_.php';
 require_once __DIR__.'/../../../ext/standard/asort_.php';
 require_once __DIR__.'/../../../ext/standard/getmypid.php';

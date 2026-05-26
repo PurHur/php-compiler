@@ -145,6 +145,7 @@ class Module extends ModuleAbstract
             new array_sum(),
             new array_product(),
             new array_flip(),
+            new array_count_values(),
             new array_unique(),
             new array_diff(),
             new array_intersect(),

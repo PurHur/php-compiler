@@ -6,6 +6,7 @@ static const char *phpc_builtin_functions[] = {
     "array_chunk",
     "array_column",
     "array_combine",
+    "array_count_values",
     "array_diff",
     "array_fill",
     "array_fill_keys",

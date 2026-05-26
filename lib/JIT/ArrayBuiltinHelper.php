@@ -1330,6 +1330,196 @@ final class ArrayBuiltinHelper
     }
 
     /**
+     * array_count_values() for packed lists of string or integer values (subset of PHP; #2356).
+     */
+    public static function arrayCountValues(Context $context, Variable $array): Value
+    {
+        if (self::isNativeArray($array->type)) {
+            return self::countValuesHashTable($context, self::nativeListToHashTable($context, $array));
+        }
+
+        return self::countValuesHashTable($context, self::loadHashTable($context, $array));
+    }
+
+    private static function countValuesHashTable(Context $context, Value $src): Value
+    {
+        $dest = HashTableHelper::alloc($context);
+        $map = $context->structFieldMap['__hashtable__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+
+        $nextFree = $context->builder->load($context->builder->structGep($src, $map['nextFreeElement']));
+        $idxSlot = $context->builder->alloca($sizeT, 1, 'array_count_values_idx');
+        $context->builder->store($zero, $idxSlot);
+
+        $head = BasicBlockHelper::append($context, 'array_count_values_head');
+        $body = BasicBlockHelper::append($context, 'array_count_values_body');
+        $count = BasicBlockHelper::append($context, 'array_count_values_count');
+        $next = BasicBlockHelper::append($context, 'array_count_values_next');
+        $done = BasicBlockHelper::append($context, 'array_count_values_done');
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $nextFree);
+        $context->builder->branchIf($atEnd, $done, $body);
+
+        $context->builder->positionAtEnd($body);
+        $isSet = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $src,
+            $idx
+        );
+        $context->builder->branchIf($isSet, $count, $next);
+
+        $context->builder->positionAtEnd($count);
+        $valEntry = self::listEntryAt($context, $src, $idx);
+        self::countIncrementPackedEntry($context, $dest, $valEntry);
+        $context->builder->branch($next);
+
+        $context->builder->positionAtEnd($next);
+        $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($done);
+        BasicBlockHelper::branchToFreshContinue($context, 'array_count_values_continue');
+
+        return $dest;
+    }
+
+    /**
+     * Increment occurrence count for one packed input value in the result hashtable.
+     */
+    private static function countIncrementPackedEntry(Context $context, Value $dest, Value $valEntry): void
+    {
+        static $serial = 0;
+        $id = (string) (++$serial);
+
+        $valueMap = $context->structFieldMap['__value__'];
+        $valType = $context->builder->load(
+            $context->builder->structGep($valEntry, $valueMap['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $oneLong = $i64->constInt(1, false);
+
+        $stringBlock = BasicBlockHelper::append($context, 'array_count_values_val_string_'.$id);
+        $longBlock = BasicBlockHelper::append($context, 'array_count_values_val_long_'.$id);
+        $done = BasicBlockHelper::append($context, 'array_count_values_val_done_'.$id);
+
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $valType,
+            $i8->constInt(Variable::TYPE_STRING, false)
+        );
+        $isLong = $context->builder->icmp(
+            Builder::INT_EQ,
+            $valType,
+            $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
+        );
+
+        $afterString = BasicBlockHelper::append($context, 'array_count_values_after_string_'.$id);
+        $context->builder->branchIf($isString, $stringBlock, $afterString);
+
+        $context->builder->positionAtEnd($stringBlock);
+        $keyStr = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $valEntry
+        );
+        $ownedKey = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $keyStr
+        );
+        $exists = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSetStringKey'),
+            $dest,
+            $ownedKey
+        );
+        $strNew = BasicBlockHelper::append($context, 'array_count_values_str_new_'.$id);
+        $strInc = BasicBlockHelper::append($context, 'array_count_values_str_inc_'.$id);
+        $strDone = BasicBlockHelper::append($context, 'array_count_values_str_done_'.$id);
+        $context->builder->branchIf($exists, $strInc, $strNew);
+
+        $context->builder->positionAtEnd($strNew);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyLong'),
+            $dest,
+            $ownedKey,
+            $oneLong
+        );
+        $context->builder->branch($strDone);
+
+        $context->builder->positionAtEnd($strInc);
+        $existing = $context->builder->call(
+            $context->lookupFunction('__hashtable__peekStringKeyValue'),
+            $dest,
+            $ownedKey
+        );
+        $oldCount = $context->builder->call(
+            $context->lookupFunction('__value__readLong'),
+            $existing
+        );
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyLong'),
+            $dest,
+            $ownedKey,
+            $context->builder->addNoSignedWrap($oldCount, $oneLong)
+        );
+        $context->builder->branch($strDone);
+
+        $context->builder->positionAtEnd($strDone);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterString);
+        $context->builder->branchIf($isLong, $longBlock, $done);
+
+        $context->builder->positionAtEnd($longBlock);
+        $keyIdx = $context->builder->truncOrBitCast(
+            $context->builder->call($context->lookupFunction('__value__readLong'), $valEntry),
+            $sizeT
+        );
+        $existsIdx = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $dest,
+            $keyIdx
+        );
+        $longNew = BasicBlockHelper::append($context, 'array_count_values_long_new_'.$id);
+        $longInc = BasicBlockHelper::append($context, 'array_count_values_long_inc_'.$id);
+        $longDone = BasicBlockHelper::append($context, 'array_count_values_long_done_'.$id);
+        $context->builder->branchIf($existsIdx, $longInc, $longNew);
+
+        $context->builder->positionAtEnd($longNew);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setLongAt'),
+            $dest,
+            $keyIdx,
+            $oneLong
+        );
+        $context->builder->branch($longDone);
+
+        $context->builder->positionAtEnd($longInc);
+        $oldCountIdx = $context->builder->call(
+            $context->lookupFunction('__hashtable__readLongAt'),
+            $dest,
+            $keyIdx
+        );
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setLongAt'),
+            $dest,
+            $keyIdx,
+            $context->builder->addNoSignedWrap($oldCountIdx, $oneLong)
+        );
+        $context->builder->branch($longDone);
+
+        $context->builder->positionAtEnd($longDone);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+    }
+
+    /**
      * Copy a sub-range of a packed list array (array_slice subset; matches VM HashTable::sliceCopy).
      *
      * @param Value $offset   int64 slice offset (negative offsets normalized against element count)
