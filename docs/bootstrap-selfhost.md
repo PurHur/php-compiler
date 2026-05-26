@@ -1,6 +1,6 @@
 # Self-host bootstrap roadmap
 
-**Project north star:** The **compiler fully compiles itself** — native AOT from `lib/` (no `vendor/` at cold boot), then compiles PHP and rebuilds the next compiler revision without Zend. **M2 spine:** **661** / **657** (`php script/bootstrap-spine-count.php`; 1 deferred native-link [#2126](https://github.com/PurHur/php-compiler/issues/2126)). **Living tracker:** [#1492](https://github.com/PurHur/php-compiler/issues/1492) (was [#1056](https://github.com/PurHur/php-compiler/issues/1056)) · **re-root doc:** [self-host-target.md](self-host-target.md) · public status: [development-status § North star](https://purhur.github.io/php-compiler/development-status.html#north-star-self-host). Parent tracking: [#78](https://github.com/PurHur/php-compiler/issues/78) (roadmap), [#212](https://github.com/PurHur/php-compiler/issues/212) (closed umbrella).
+**Project north star:** The **compiler fully compiles itself** — native AOT from `lib/` (no `vendor/` at cold boot), then compiles PHP and rebuilds the next compiler revision without Zend. **M2 spine:** **661** units with real **`bin/vm.php`** ([#2134](https://github.com/PurHur/php-compiler/issues/2134); `php script/bootstrap-spine-count.php`). **Living tracker:** [#1492](https://github.com/PurHur/php-compiler/issues/1492) (was [#1056](https://github.com/PurHur/php-compiler/issues/1056)) · **re-root doc:** [self-host-target.md](self-host-target.md) · public status: [development-status § North star](https://purhur.github.io/php-compiler/development-status.html#north-star-self-host). Parent tracking: [#78](https://github.com/PurHur/php-compiler/issues/78) (roadmap), [#212](https://github.com/PurHur/php-compiler/issues/212) (closed umbrella).
 
 ## Current gates
 
@@ -31,7 +31,7 @@
 | Wave gate in full CI | `./script/ci-local.sh` (LLVM tail) | ✅ default-on when LLVM 9 present; `BOOTSTRAP_WAVE_CHECK=0` to skip; `./script/bootstrap-wave-check.sh --fail-fast` |
 | Self-host native link | `./script/bootstrap-selfhost-link.sh` | ✅ `build/selfhost` prints `compiler_minimal bundle OK` ([#557](https://github.com/PurHur/php-compiler/issues/557), [#913](https://github.com/PurHur/php-compiler/issues/913)) |
 | M2 lib spine smoke lint | `php bin/compile.php -l test/selfhost/compiler_lib_spine_smoke/main.php` | ✅ **661/657** units ([#1492](https://github.com/PurHur/php-compiler/issues/1492), [#2001](https://github.com/PurHur/php-compiler/issues/2001), [#2126](https://github.com/PurHur/php-compiler/issues/2126))
-| M2 spine coverage drift | `php script/check-selfhost-spine-coverage-sync.php` | ✅ 661/657 in spine; **1** deferred (native-link [#2201](https://github.com/PurHur/php-compiler/issues/2201)); `SELFHOST_SPINE_COVERAGE_SYNC_GATE=1` ([#1945](https://github.com/PurHur/php-compiler/issues/1945))
+| M2 spine coverage drift | `php script/check-selfhost-spine-coverage-sync.php` | ✅ 661 inventory units in spine; `bin/vm.php` promoted (#2134); `SELFHOST_SPINE_COVERAGE_SYNC_GATE=1` ([#1945](https://github.com/PurHur/php-compiler/issues/1945))
 | M2 lib spine smoke native run | `./script/bootstrap-selfhost-lib-spine-smoke-link.sh` or `BOOTSTRAP_LIB_SPINE_SMOKE=1 make bootstrap-selfhost-lib-spine-smoke` | ✅ `build/selfhost-lib-spine-smoke` prints `compiler_lib_spine_smoke bundle OK` |
 | M2 lib spine VM `-r` smoke | `./script/bootstrap-selfhost-lib-spine-vm-smoke.sh` or `BOOTSTRAP_LIB_SPINE_VM_SMOKE=1 make bootstrap-selfhost-lib-spine-vm-smoke` | ✅ same binary + `PHP_COMPILER_VM_SPINE_SMOKE=1` prints `vm-spine-ok` ([#1846](https://github.com/PurHur/php-compiler/issues/1846); `ci-local.sh` default `BOOTSTRAP_LIB_SPINE_VM_SMOKE_GATE=1` ([#1867](https://github.com/PurHur/php-compiler/issues/1867)); set `0` to skip) |
 | M3 HelloWorld self-host probe lint | `php bin/compile.php -l test/selfhost/compiler_helloworld_smoke/main.php` | ✅ `compiler_compile_smoke` spine + `helloworld_compile_smoke` driver (linkable) |
@@ -212,7 +212,7 @@ Extends `compiler_minimal` with remaining vm.php-path `lib/` units that pass bun
 | `lib/JIT/Builtin/Type.php`, `lib/JIT/Builtin/Type/String_.php` | JIT builtin type hierarchy toward full stdlib lowering |
 | `lib/Doctor.php` | compile-time diagnostics helper |
 | `lib/Cli/InvokeCwd.php`, `lib/Cli/PhpcBuild.php`, `lib/Cli/PhpcInit.php`, `lib/Cli/PhpcRun.php` | `phpc` CLI spine toward `bin/compile.php` / `phpc run` |
-| `test/bootstrap-aot/vm_run_smoke.php` | Bundleable `bin/vm.php` run() subset; full entry deferred until M4 (`src/cli.php`) |
+| `bin/vm.php` | Real `require_once` in `compiler_lib_spine_smoke` (#2134); cli argv via `cli_spine_shim.php` |
 | `lib/Web/CgiAotDriver.php`, `lib/Web/CgiDriver.php`, `lib/Web/ProjectDeploy.php` | CGI / deploy drivers on vm.php path |
 | `ext/standard/JitAddslashes.php`, `JitBase64Encode.php`, `JitBin2hex.php`, `JitChunkSplit.php`, `JitCrc32.php`, `JitExplode.php`, `JitChmod.php`, `JitCopy.php`, `JitDate.php`, `JitImplode.php`, `JitNl2br.php`, `JitPregQuote.php`, `JitQuotemeta.php`, `JitStrRot13.php`, `JitSessionId.php`, `JitSessionName.php`, `ext/standard/Module.php` | stdlib JIT leaf modules toward full inventory |
 

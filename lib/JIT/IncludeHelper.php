@@ -53,6 +53,11 @@ final class IncludeHelper
                 'include/require must use a compile-time literal path for JIT/AOT (issue #54)'
             );
         }
+        if (self::shouldSkipSelfHostSpineCliInclude($path)) {
+            self::emitSkippedSelfHostSpineCliInclude($jit, $callerBlock, $resultOperand);
+
+            return;
+        }
         self::compileIncludedFile($jit, $func, $callerBlock, $path, $resultOperand);
     }
 
@@ -661,5 +666,43 @@ final class IncludeHelper
         }
 
         return null;
+    }
+
+    /**
+     * Skip argv/cli driver includes when bundling bin/vm.php in compiler_lib_spine_smoke (#2134).
+     * cli_spine_shim.php provides php_compiler_cli_should_skip_entry_driver() at runtime; this
+     * avoids compiling vendor/autoload Expr_Closure during self-host AOT link.
+     */
+    private static function shouldSkipSelfHostSpineCliInclude(string $path): bool
+    {
+        $flag = getenv('PHP_COMPILER_SELFHOST_AOT');
+        if ('1' !== $flag && 'true' !== strtolower((string) $flag)) {
+            return false;
+        }
+        $normalized = str_replace('\\', '/', $path);
+
+        return str_ends_with($normalized, '/src/cli.php')
+            || str_ends_with($normalized, '/src/cli_driver.php')
+            || str_ends_with($normalized, '/vendor/autoload.php');
+    }
+
+    private static function emitSkippedSelfHostSpineCliInclude(
+        JIT $jit,
+        Block $callerBlock,
+        ?Operand $resultOperand
+    ): void {
+        if (null === $resultOperand) {
+            return;
+        }
+        $jit->assignOperand(
+            $resultOperand,
+            new Variable(
+                $jit->context,
+                Variable::TYPE_NATIVE_LONG,
+                Variable::KIND_VALUE,
+                $jit->context->constantFromInteger(1)
+            ),
+            true
+        );
     }
 }

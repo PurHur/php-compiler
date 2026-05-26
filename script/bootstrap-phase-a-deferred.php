@@ -16,7 +16,6 @@ declare(strict_types=1);
 function bootstrap_phase_a_ratio_deferred(): array
 {
     return [
-        'bin/vm.php' => 'spine substitute: test/bootstrap-aot/vm_run_smoke.php',
         'lib/VM/HashTable.php' => 'spine bundles lib/JIT/Builtin/Type/HashTable.php via ArrayIterator',
     ];
 }
