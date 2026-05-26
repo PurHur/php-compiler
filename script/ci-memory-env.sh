@@ -22,7 +22,18 @@ ci_apply_default_memory_env() {
   php_compiler_apply_memory_php_opt
 }
 
+# php-cfg/php-types vendor patches (union types, etc.) are not in composer packages;
+# bootstrap/AOT gates must apply them before compile.php (issue #2499).
+ci_ensure_vendor_patches() {
+  local root
+  root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+  if [[ -x "${root}/script/apply-patches.sh" && -d "${root}/vendor/ircmaxell/php-cfg" ]]; then
+    "${root}/script/apply-patches.sh" >/dev/null 2>&1 || true
+  fi
+}
+
 ci_apply_llvm_memory_env() {
+  ci_ensure_vendor_patches
   export PHP_COMPILER_MEMORY_LIMIT="${PHP_COMPILER_LLVM_MEMORY_LIMIT}"
   PHP_OPTS+=(-d "memory_limit=${PHP_COMPILER_MEMORY_LIMIT}")
 }

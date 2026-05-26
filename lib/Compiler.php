@@ -20,6 +20,7 @@ use PHPCfg\Operand\Literal;
 use PHPCfg\Operand\Temporary;
 use PHPCfg\Script;
 use PHPTypes\Type;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\JIT\OperandName;
 use PHPCompiler\Compiler\AttributeNames;
@@ -2140,19 +2141,22 @@ class Compiler {
         $keySlot = $block->registerConstant($keyOperand, $keyVar);
         $defaultSlot = null;
         if (null !== $terminal->defaultVar) {
-            $defaultSlot = $this->compileOperand($terminal->defaultVar, $block, true);
-            if (!isset($block->constants[$defaultSlot])) {
-                throw new \LogicException(
-                    'Function-local static initializer must be a literal int or string in v1 (#2286)'
-                );
+            $defaultSlot = $this->tryFoldFunctionStaticDefaultSlot($terminal, $block);
+            if (null === $defaultSlot) {
+                if (null !== $terminal->defaultBlock) {
+                    $this->compileOps($terminal->defaultBlock->children, $block);
+                }
+                $defaultSlot = $this->compileOperand($terminal->defaultVar, $block, true);
+                if (!isset($block->constants[$defaultSlot])) {
+                    throw new \LogicException(
+                        'Function-local static initializer must be a compile-time literal in v1 (#2286)'
+                    );
+                }
             }
             $defaultVm = $block->constants[$defaultSlot];
-            if (
-                Variable::TYPE_INTEGER !== $defaultVm->type
-                && Variable::TYPE_STRING !== $defaultVm->type
-            ) {
+            if (!$this->isAllowedFunctionStaticDefaultType($defaultVm->type)) {
                 throw new \LogicException(
-                    'Function-local static initializer must be a literal int or string in v1 (#2286)'
+                    'Function-local static initializer must be a compile-time literal in v1 (#2286)'
                 );
             }
         }
@@ -2163,6 +2167,135 @@ class Compiler {
             $keySlot,
             $defaultSlot
         );
+    }
+
+    private function isAllowedFunctionStaticDefaultType(int $type): bool
+    {
+        return \in_array(
+            $type,
+            [
+                Variable::TYPE_INTEGER,
+                Variable::TYPE_STRING,
+                Variable::TYPE_ARRAY,
+                Variable::TYPE_BOOLEAN,
+                Variable::TYPE_FLOAT,
+                Variable::TYPE_NULL,
+            ],
+            true
+        );
+    }
+
+    /**
+     * @param Op\Terminal\StaticVar $terminal
+     */
+    protected function tryFoldFunctionStaticDefaultSlot(Op\Terminal $terminal, Block $block): ?int
+    {
+        if (null === $terminal->defaultBlock || null === $terminal->defaultVar) {
+            return null;
+        }
+        $children = $terminal->defaultBlock->children;
+        if (1 !== \count($children) || !$children[0] instanceof Op\Expr\Array_) {
+            return null;
+        }
+        $vm = $this->tryBuildCompileTimeArrayFromExpr($children[0]);
+        if (null === $vm) {
+            return null;
+        }
+        $operand = new Operand\Temporary();
+
+        return $block->registerConstant($operand, $vm);
+    }
+
+    protected function tryBuildCompileTimeArrayFromExpr(Op\Expr\Array_ $expr): ?Variable
+    {
+        $unpackFlags = property_exists($expr, 'unpack') ? $expr->unpack : [];
+        $ht = new HashTable();
+        $n = \count($expr->values);
+        for ($i = 0; $i < $n; ++$i) {
+            if (!empty($unpackFlags[$i])) {
+                return null;
+            }
+            $valueVm = $this->vmVariableFromCfgLiteralOperand($expr->values[$i]);
+            if (null === $valueVm) {
+                return null;
+            }
+            $keyOp = $expr->keys[$i] ?? null;
+            if (
+                null === $keyOp
+                || $keyOp instanceof Operand\NullOperand
+                || ($keyOp instanceof Operand\Literal && null === $keyOp->value)
+            ) {
+                $ht->append($valueVm);
+                continue;
+            }
+            $keyVm = $this->vmVariableFromCfgLiteralOperand($keyOp);
+            if (null === $keyVm) {
+                return null;
+            }
+            if ($keyVm->is(Variable::TYPE_INTEGER)) {
+                $ht->addIndex($keyVm->toInt(), $valueVm);
+            } elseif ($keyVm->is(Variable::TYPE_STRING)) {
+                $ht->add($keyVm->toString(), $valueVm);
+            } else {
+                return null;
+            }
+        }
+        $vmArray = new Variable(Variable::TYPE_ARRAY);
+        $vmArray->array($ht);
+
+        return $vmArray;
+    }
+
+    protected function vmVariableFromCfgLiteralOperand(Operand $operand): ?Variable
+    {
+        $literal = $this->unwrapCfgLiteralOperand($operand);
+        if (null === $literal) {
+            return null;
+        }
+        $mappedType = Variable::mapFromType($literal->type ?? Type::mixed());
+        if (Variable::TYPE_UNDEFINED === $mappedType) {
+            if (\is_int($literal->value)) {
+                $mappedType = Variable::TYPE_INTEGER;
+            } elseif (\is_float($literal->value)) {
+                $mappedType = Variable::TYPE_FLOAT;
+            } elseif (\is_string($literal->value)) {
+                $mappedType = Variable::TYPE_STRING;
+            } elseif (\is_bool($literal->value)) {
+                $mappedType = Variable::TYPE_BOOLEAN;
+            } elseif (null === $literal->value) {
+                $mappedType = Variable::TYPE_NULL;
+            }
+        }
+        $return = new Variable($mappedType);
+        switch ($mappedType) {
+            case Variable::TYPE_STRING:
+                $return->string($literal->value);
+                break;
+            case Variable::TYPE_INTEGER:
+                $return->int($literal->value);
+                break;
+            case Variable::TYPE_FLOAT:
+                $return->float($literal->value);
+                break;
+            case Variable::TYPE_BOOLEAN:
+                $return->bool($literal->value);
+                break;
+            case Variable::TYPE_NULL:
+                break;
+            default:
+                return null;
+        }
+
+        return $return;
+    }
+
+    protected function unwrapCfgLiteralOperand(Operand $operand): ?Operand\Literal
+    {
+        while ($operand instanceof Operand\Temporary && null !== $operand->original) {
+            $operand = $operand->original;
+        }
+
+        return $operand instanceof Operand\Literal ? $operand : null;
     }
 
     protected function resolveSimpleVariableName(Operand $var): string
