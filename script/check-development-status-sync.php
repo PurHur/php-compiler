@@ -28,12 +28,12 @@ if (!str_contains($body, '006-FileUploadWeb')) {
     $errors[] = 'development-status.md: missing 006-FileUploadWeb row (sync examples/README.md; #2039)';
 }
 
-if (preg_match('/Shipped examples \(000–00[0-5]\)/', $body)) {
-    $errors[] = 'development-status.md: section title stale (update to 000–007; #2145)';
+if (preg_match('/Shipped examples \(000–00[0-7]\)/', $body) && !preg_match('/Shipped examples \(000–009\)/', $body)) {
+    $errors[] = 'development-status.md: section title stale (update to 000–009; #2353)';
 }
 
-if (!preg_match('/Shipped examples \(000–007\)/', $body)) {
-    $errors[] = 'development-status.md: missing "Shipped examples (000–007)" section header (#2145)';
+if (!preg_match('/Shipped examples \(000–009\)/', $body)) {
+    $errors[] = 'development-status.md: missing "Shipped examples (000–009)" section header (#2353)';
 }
 
 if (!preg_match('/\| 006-FileUploadWeb \|/', $body)) {
