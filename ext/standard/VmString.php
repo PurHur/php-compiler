@@ -1312,6 +1312,64 @@ final class VmString
     }
 
     /**
+     * htmlspecialchars_decode() — inverse of {@see htmlspecialchars()} for our entity subset.
+     */
+    public static function htmlspecialchars_decode(
+        string $string,
+        int $flags = ENT_QUOTES | ENT_SUBSTITUTE
+    ): string {
+        $quoteBoth = 0 !== ($flags & ENT_QUOTES);
+        $out = '';
+        $len = self::byteLength($string);
+        $i = 0;
+        while ($i < $len) {
+            if ('&' !== $string[$i]) {
+                $out .= $string[$i];
+                ++$i;
+                continue;
+            }
+            if (self::entityAt($string, $i, $len, '&amp;', 5)) {
+                $out .= '&';
+                $i += 5;
+            } elseif (self::entityAt($string, $i, $len, '&lt;', 4)) {
+                $out .= '<';
+                $i += 4;
+            } elseif (self::entityAt($string, $i, $len, '&gt;', 4)) {
+                $out .= '>';
+                $i += 4;
+            } elseif ($quoteBoth && self::entityAt($string, $i, $len, '&quot;', 6)) {
+                $out .= '"';
+                $i += 6;
+            } elseif ($quoteBoth && self::entityAt($string, $i, $len, '&#039;', 6)) {
+                $out .= "'";
+                $i += 6;
+            } elseif ($quoteBoth && self::entityAt($string, $i, $len, '&#39;', 5)) {
+                $out .= "'";
+                $i += 5;
+            } else {
+                $out .= '&';
+                ++$i;
+            }
+        }
+
+        return $out;
+    }
+
+    private static function entityAt(string $string, int $pos, int $len, string $entity, int $entityLen): bool
+    {
+        if ($pos + $entityLen > $len) {
+            return false;
+        }
+        for ($j = 0; $j < $entityLen; ++$j) {
+            if ($string[$pos + $j] !== $entity[$j]) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
      * strip_tags() subset: removes HTML/PHP tags; optional allow-list like "<b><p>".
      * HTML comments and PHP tags remove their inner content; other tags keep inner text.
      */

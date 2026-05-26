@@ -190,6 +190,7 @@ class Module extends ModuleAbstract
             new chunk_split(),
             new wordwrap(),
             new htmlspecialchars(),
+            new htmlspecialchars_decode(),
             new strip_tags(),
             new header_(),
             new setcookie(),
