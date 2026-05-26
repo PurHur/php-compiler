@@ -445,9 +445,9 @@ function syntaxRowDefinitions(): array
             'construct' => 'PHP 8 attributes — `ReflectionClass` / `ReflectionMethod` metadata',
             'opcodes' => ['TYPE_DECLARE_CLASS', 'TYPE_DECLARE_METHOD'],
             'issue' => 1936,
-            'jit' => false,
             'notes' => [
-                'php-cfg preserves `attrGroups`; VM `ClassEntry` stores names; Reflection* builtins are VM-only (no JIT lowering)',
+                'php-cfg preserves `attrGroups`; compiler stores attribute class names on TYPE_DECLARE_CLASS / TYPE_DECLARE_METHOD',
+                'VM reflection reads from VM ClassEntry; JIT/AOT mirror class+method attribute tables into VMContext for reflection',
                 'Read path: `getAttributes()` count + `ReflectionAttribute::getName()`; no `newInstance()` or parameter attributes',
             ],
             'probe' => '#[\AllowDynamicProperties] class B {} $a = (new ReflectionClass(B::class))->getAttributes(); echo count($a).$a[0]->getName();',

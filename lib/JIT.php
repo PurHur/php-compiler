@@ -2864,6 +2864,22 @@ class JIT {
                         assert($parentOp instanceof Operand\Literal);
                         $this->context->type->object->setClassParentName($nameOp->value, $parentOp->value);
                     }
+                    if (null !== $this->context->runtime->vmContext) {
+                        $lc = strtolower(ltrim($nameOp->value, '\\'));
+                        if (!isset($this->context->runtime->vmContext->classes[$lc])) {
+                            $this->context->runtime->vmContext->classes[$lc] = new \PHPCompiler\VM\ClassEntry($nameOp->value);
+                        }
+                        $entry = $this->context->runtime->vmContext->classes[$lc];
+                        if ([] !== $op->attributeNames) {
+                            $entry->attributeNames = $op->attributeNames;
+                        }
+                        if ($parentOp instanceof Operand\Literal) {
+                            $entry->parentLc = strtolower(ltrim($parentOp->value, '\\'));
+                        }
+                        if (null !== $op->arg3 && isset($block->constants[$op->arg3])) {
+                            $entry->readonly = (bool) $block->constants[$op->arg3]->toInt();
+                        }
+                    }
                     $this->compileClass($op->block1, $this->context->scope->classId);
                     if ($parentOp instanceof Operand\Literal) {
                         $this->context->type->object->inheritReadonlyFromParent(
