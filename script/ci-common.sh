@@ -772,6 +772,32 @@ ci_run_jit_server_superglobal() {
   ci_run_phpunit --filter JitServerSuperglobal --fail-on-skipped "$@"
 }
 
+# 001-SimpleWeb (+ 003 when ready) phpc serve --jit superglobal curls (issue #2274); opt-in SERVE_JIT_SMOKE_GATE=1.
+ci_run_examples_serve_jit_smoke() {
+  if [[ "${SERVE_JIT_SMOKE_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  if [[ -n "${PHP_COMPILER_SKIP_SERVE_TESTS:-}" ]]; then
+    echo "examples-serve-jit-smoke: skipped (PHP_COMPILER_SKIP_SERVE_TESTS is set)"
+    return 0
+  fi
+  if ! ci_can_bind_loopback; then
+    echo "examples-serve-jit-smoke: skipped (cannot bind loopback TCP)"
+    return 0
+  fi
+  if ! ci_llvm_ready; then
+    echo "examples-serve-jit-smoke: skipped (LLVM 9 not available)"
+    return 0
+  fi
+  if ! ci_should_run_jit; then
+    echo "examples-serve-jit-smoke: skipped (JIT MCJIT probe failed)"
+    return 0
+  fi
+  ci_apply_llvm_memory_env
+  echo "examples-serve-jit-smoke (SERVE_JIT_SMOKE_GATE=1, #2274)..."
+  "$_CI_SCRIPT_DIR/examples-serve-jit-smoke.sh"
+}
+
 # 008-SelfHostProbe VM lint + run (issue #2240, opt-in ci-fast #2302).
 ci_run_examples_selfhostprobe_smoke() {
   if [[ "${EXAMPLES_SELFHOSTPROBE_SMOKE_GATE:-0}" != "1" ]]; then

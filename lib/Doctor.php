@@ -396,6 +396,12 @@ final class Doctor
         fwrite(STDOUT, "  JIT \$fn() calls  {$jitVarFnDetail}\n");
         fwrite(STDOUT, "  JIT \$_SERVER     {$jitServerDetail}\n");
         $defaultsWeb = self::readCiDefaultsEnv($repoRoot);
+        $serveJitDefault = $defaultsWeb['SERVE_JIT_SMOKE_GATE'] ?? '0';
+        $serveJitOn = self::gateEnabled('SERVE_JIT_SMOKE_GATE', $serveJitDefault);
+        $serveJitDetail = $serveJitOn
+            ? 'opt-in when gate=1 — examples-serve-jit-smoke (#2274)'
+            : 'opt-in default 0 — SERVE_JIT_SMOKE_GATE=1 make examples-serve-jit-smoke (#2274, #1900 ci-local)';
+        fwrite(STDOUT, '  Serve --jit e2e  SERVE_JIT_SMOKE_GATE='.($serveJitOn ? '1' : '0')." (default {$serveJitDefault}) — {$serveJitDetail}\n");
         $jitProjectDefault = $defaultsWeb['MINIWEBAPP_JIT_PROJECT_GATE'] ?? '0';
         $jitProjectOn = self::gateEnabled('MINIWEBAPP_JIT_PROJECT_GATE', $jitProjectDefault);
         $jitProjectDetail = $jitProjectOn

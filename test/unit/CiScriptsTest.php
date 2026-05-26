@@ -465,6 +465,36 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('examples-web-smoke.sh --fastcgi-only', $makefile);
     }
 
+    public function testMakefileHasExamplesServeJitSmokeTarget(): void
+    {
+        $makefile = (string) file_get_contents(dirname(__DIR__, 2).'/Makefile');
+        $this->assertStringContainsString('examples-serve-jit-smoke:', $makefile);
+        $this->assertStringContainsString('examples-serve-jit-smoke.sh', $makefile);
+        $this->assertStringContainsString('SERVE_JIT_SMOKE_GATE=1', $makefile);
+
+        $script = dirname(__DIR__, 2).'/script/examples-serve-jit-smoke.sh';
+        $this->assertFileExists($script);
+        $this->assertTrue(is_executable($script));
+    }
+
+    public function testCiDefaultsEnvDefinesServeJitSmokeGateOff(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString(
+            'SERVE_JIT_SMOKE_GATE="${SERVE_JIT_SMOKE_GATE:-0}"',
+            $defaults
+        );
+        $this->assertStringContainsString('#2274', $defaults);
+    }
+
+    public function testCiCommonDefinesServeJitSmokeRunner(): void
+    {
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('ci_run_examples_serve_jit_smoke()', $common);
+        $this->assertStringContainsString('SERVE_JIT_SMOKE_GATE', $common);
+        $this->assertStringContainsString('examples-serve-jit-smoke.sh', $common);
+    }
+
     public function testMakefileHasExamplesSelfhostprobeSmokeTarget(): void
     {
         $makefile = (string) file_get_contents(dirname(__DIR__, 2).'/Makefile');
