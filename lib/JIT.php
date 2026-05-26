@@ -2141,6 +2141,9 @@ class JIT {
                     break;
                 case OpCode::TYPE_EXIT:
                     if (null === $op->arg2) {
+                        if (JIT\Builtin::LOAD_TYPE_STANDALONE === $this->context->loadType) {
+                            JIT\Builtin\PendingHeaders::emitFlushForStandalone($this->context);
+                        }
                         $i32 = $this->context->getTypeFromString('int32');
                         $this->context->builder->call(
                             $this->context->lookupFunction('exit'),

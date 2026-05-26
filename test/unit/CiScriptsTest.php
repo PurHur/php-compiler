@@ -62,6 +62,29 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('--miniwebapp-only --aot', $common);
     }
 
+    public function testCiLocalWiresSessionsAndFileUploadServeAotSmokes(): void
+    {
+        $local = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-local.sh');
+        $this->assertStringContainsString('ci_run_sessions_web_serve_aot_smoke', $local);
+        $this->assertStringContainsString('ci_run_file_upload_web_serve_aot_smoke', $local);
+
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('SESSIONS_WEB_SERVE_AOT_SMOKE_GATE', $common);
+        $this->assertStringContainsString('FILE_UPLOAD_WEB_SERVE_AOT_SMOKE_GATE', $common);
+        $this->assertStringContainsString('--sessions-only --aot', $common);
+        $this->assertStringContainsString('--fileupload-only --aot', $common);
+
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString(
+            'SESSIONS_WEB_SERVE_AOT_SMOKE_GATE="${SESSIONS_WEB_SERVE_AOT_SMOKE_GATE:-0}"',
+            $defaults
+        );
+        $this->assertStringContainsString(
+            'FILE_UPLOAD_WEB_SERVE_AOT_SMOKE_GATE="${FILE_UPLOAD_WEB_SERVE_AOT_SMOKE_GATE:-0}"',
+            $defaults
+        );
+    }
+
     public function testCiDefaultsEnvDefinesMiniWebAppWebSmokeAotGateOn(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
@@ -391,6 +414,8 @@ final class CiScriptsTest extends TestCase
         $body = (string) file_get_contents($prebuild);
         $this->assertStringContainsString('001-SimpleWeb', $body);
         $this->assertStringContainsString('003-MiniWebApp', $body);
+        $this->assertStringContainsString('005-SessionsWeb', $body);
+        $this->assertStringContainsString('006-FileUploadWeb', $body);
         $this->assertStringContainsString('phpc build --project', $body);
     }
 

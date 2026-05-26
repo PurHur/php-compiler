@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\Builder;
@@ -104,6 +105,9 @@ final class ScriptExit
 
     private static function callLibcExit(Context $context, Value $status): void
     {
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            PendingHeaders::emitFlushForStandalone($context);
+        }
         $i32 = $context->getTypeFromString('int32');
         $trunc = $context->builder->trunc($status, $i32);
         $context->builder->call($context->lookupFunction('exit'), $trunc);

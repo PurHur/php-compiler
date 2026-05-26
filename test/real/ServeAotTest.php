@@ -141,6 +141,27 @@ PHP,
         @rmdir($binaryDir);
     }
 
+    public function testServeAotHeaderLocation303WithBareExit(): void
+    {
+        $docroot = $this->makeDocroot([
+            'redirect.php' => <<<'PHP'
+<?php
+declare(strict_types=1);
+header('Location: /done', true, 303);
+exit;
+PHP,
+        ]);
+        $binaryDir = sys_get_temp_dir().'/phpc_serve_aot_redir_'.bin2hex(random_bytes(4));
+        $this->assertTrue(mkdir($binaryDir));
+        $binary = $binaryDir.'/app';
+        $this->compileExample($docroot.'/redirect.php', $binary);
+        $response = $this->httpGetAot($docroot, $binary, '/redirect.php');
+        $this->assertStringContainsString('HTTP/1.1 303', $response);
+        $this->assertStringContainsString('Location: /done', $response);
+        @unlink($binary);
+        @rmdir($binaryDir);
+    }
+
     public function testServeAotPopulatesContentLengthOnPost(): void
     {
         $body = 'abcdefghijkl';

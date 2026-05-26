@@ -74,6 +74,7 @@ Probe all four stages (defaults from `script/ci-defaults.env`):
 | Stage | Gate | Command when `=1` |
 |-------|------|-------------------|
 | VM flash | `SESSIONS_WEB_SMOKE_GATE` | `make examples-sessions-smoke` |
+| AOT serve | `SESSIONS_WEB_SERVE_AOT_SMOKE_GATE` | `SESSIONS_WEB_SERVE_AOT_SMOKE_GATE=1 ./script/examples-web-smoke.sh --sessions-only --aot` ([#2333](https://github.com/PurHur/php-compiler/issues/2333)) |
 | AOT link | `SESSIONS_WEB_AOT_LINK_GATE` | `./script/ci-local.sh --filter test005SessionsWebAotLink` |
 | AOT execute | `SESSIONS_WEB_AOT_SMOKE_GATE` | `EXAMPLES_AOT_SMOKE_ONLY=005 ./script/examples-aot-smoke.sh` |
 | Deploy CGI | `SESSIONS_WEB_DEPLOY_SMOKE_GATE` | `SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 make deploy-smoke` |
