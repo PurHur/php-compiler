@@ -79,7 +79,7 @@ if [[ "${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
       )"
       native_compile_code=$?
       set -e
-      if [[ "${native_compile_code}" -eq 0 ]] && grep -q 'compile_smoke_m3_emit: compile OK' <<< "${compile_out}"; then
+      if [[ "${native_compile_code}" -eq 0 ]] && grep -qE 'compile_smoke_m3_emit: compile OK|helloworld_compile_smoke: compile OK' <<< "${compile_out}"; then
         M3_NATIVE_COMPILE=1
         M3_EMIT_PATH="native"
         M3_BLOCK_REASON=""
