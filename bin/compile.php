@@ -27,8 +27,9 @@ function run(string $filename, string $code, array $options): void
             && ('1' === $m3Driver || 'true' === strtolower((string) $m3Driver));
         if ($m3EmitNative) {
             putenv('PHP_COMPILER_SELFHOST_AOT=1');
-            // Real Compiler/JIT lowering for emit TU; keep VM/ext class-body stubs (#1937, #1983).
+            // Class-body relaxations + native emit bridge gated on M3_EMIT_TU (#1937, #1983).
             putenv('PHP_COMPILER_EMIT_HELPER_LINK=1');
+            putenv('PHP_COMPILER_M3_EMIT_TU=1');
         } else {
             // Bootstrap AOT fixtures require real JIT lowering; ignore inherited self-host stub env (#1086).
             putenv('PHP_COMPILER_SELFHOST_AOT=0');

@@ -160,6 +160,17 @@ class JIT {
         return '1' === $flag || 'true' === strtolower((string) $flag);
     }
 
+    /** Emit native entry TU only — not compile_driver bundles that include compile_smoke_m3_emit (#1937). */
+    private function shouldUseM3EmitTuNativeBridge(): bool
+    {
+        if (!$this->shouldUseM3CompileDriverRealLowering()) {
+            return false;
+        }
+        $flag = getenv('PHP_COMPILER_M3_EMIT_TU');
+
+        return '1' === $flag || 'true' === strtolower((string) $flag);
+    }
+
     /** Bundled bootstrap-aot smoke FUNCDEF names (BootstrapAot / legacy Lint bundle) (#1515). */
     private function isBootstrapHelloWorldSmokeName(string $lower): bool
     {
@@ -786,13 +797,9 @@ class JIT {
         if ($this->isM3CompileDriverRealLoweringName($lower)) {
             return false;
         }
-        // M3 compile-smoke wrapper: native bridge in emit TU (#1983 approach 3).
-        if ($this->shouldUseM3CompileDriverRealLowering() && $this->isBootstrapM3RuntimeEmitBridgeName($lower)) {
-            if ($this->shouldUseEmitHelperLinkStubs()) {
-                return true;
-            }
-
-            return false;
+        // M3 compile-smoke wrapper: native bridge in emit TU only (#1983 approach 3, #1937).
+        if ($this->shouldUseM3EmitTuNativeBridge() && $this->isBootstrapM3RuntimeEmitBridgeName($lower)) {
+            return true;
         }
         // Self-host bundle includes Runtime/VM/Func for closure only; stub non-Compiler bodies (#913).
         if (str_contains($lower, '\\runtime::')
@@ -1140,7 +1147,7 @@ class JIT {
         if (isset($this->context->functions[$lcname])) {
             return $this->context->functions[$lcname];
         }
-        if ($this->shouldUseEmitHelperLinkStubs() && $this->isBootstrapM3RuntimeEmitBridgeName($lcname)) {
+        if ($this->shouldUseM3EmitTuNativeBridge() && $this->isBootstrapM3RuntimeEmitBridgeName($lcname)) {
             return $this->compileBootstrapCompileSmokeM3EmitNative($internalName, $block, $logicalName);
         }
         if ($this->shouldUseSelfHostJitStubs() && str_contains($lcname, 'operandschainequal')) {

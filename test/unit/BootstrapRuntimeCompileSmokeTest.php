@@ -72,6 +72,7 @@ final class BootstrapRuntimeCompileSmokeTest extends TestCase
         $this->assertStringContainsString('runtime_m3_emit_native_entry.php', $compile);
         $this->assertStringContainsString('PHP_COMPILER_M3_COMPILE_DRIVER', $compile);
         $this->assertStringContainsString('PHP_COMPILER_EMIT_HELPER_LINK=1', $compile);
+        $this->assertStringContainsString('PHP_COMPILER_M3_EMIT_TU=1', $compile);
     }
 
     public function testRuntimeCompileSmokeProbeSetsEmitHelperLinkEnv(): void
