@@ -197,6 +197,15 @@ make bootstrap-loop-probe
 # Exit codes: 0=strict green | 1=hard failure | 2=LLVM skip or M3 strict blocks M4
 ```
 
+M4 strict loop presenter ([#2379](https://github.com/PurHur/php-compiler/issues/2379)):
+
+```bash
+make north-star4-verify
+./script/north-star4-verify.sh --dry-run-only   # partial M4 (probe --dry-run)
+./script/north-star4-verify.sh --strict           # fail on M3 strict / probe exit 2
+# Docker: ./script/docker-exec.sh -- bash -lc './script/north-star4-verify.sh --dry-run-only'
+```
+
 ---
 
 ## Related docs
