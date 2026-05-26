@@ -15,7 +15,7 @@ use PHPLLVM\Value;
  * array_rand() — random key(s) from a packed list (subset of PHP; issue #2321).
  *
  * VM: packed lists without holes; CSPRNG via {@see VmString::randomBytes()}.
- * JIT/AOT: {@see JitArrayRand} (single-key only; num>1 is VM-only).
+ * JIT/AOT: {@see JitArrayRand} (packed lists; num>1 returns array of keys).
  */
 final class array_rand extends Internal
 {

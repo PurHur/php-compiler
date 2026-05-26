@@ -25,23 +25,18 @@ final class JitArrayRand
                 'array_rand() cannot compile fixed-size literal arrays in JIT/AOT yet; use bin/vm.php or bin/serve.php, or build the list with [] append'
             );
         }
-        if (isset($args[1])) {
-            if (JITVariable::TYPE_NATIVE_LONG !== $args[1]->type || 1 !== (int) $args[1]->value) {
-                throw new \LogicException(
-                    'array_rand() with num != 1 is not supported in JIT/AOT yet; use bin/vm.php or omit the second argument'
-                );
-            }
-        }
+        $sizeT = $context->getTypeFromString('size_t');
+        $num = isset($args[1])
+            ? JitLongArg::lower($context, $args[1], 'array_rand() num')
+            : $sizeT->constInt(1, false);
 
         $resultSlot = JitValueBox::alloc($context);
         $resultPtr = JitValueBox::pointer($context, $resultSlot);
         $ht = ArrayBuiltinHelper::loadHashTable($context, $args[0]);
-        $sizeT = $context->getTypeFromString('size_t');
-        $one = $sizeT->constInt(1, false);
         $context->builder->call(
             $context->lookupFunction('__hashtable__arrayRandPacked'),
             $ht,
-            $one,
+            $num,
             $resultPtr
         );
 
