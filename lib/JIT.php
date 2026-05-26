@@ -1708,7 +1708,11 @@ class JIT {
         }
         if (!$this->m3EmitTuRuntimeSpineLowered) {
             $this->m3EmitTuRuntimeSpineLowered = true;
+            $sidecar = $this->isM3EmitTuTrivialEchoSidecarActive();
             foreach (['parse', 'compileemitsmoke', 'standalone'] as $methodLc) {
+                if ('standalone' === $methodLc && $sidecar) {
+                    continue;
+                }
                 $this->compileM3EmitTuRuntimeMethodFromQueue($methodLc);
             }
             $this->runQueue();
@@ -1745,8 +1749,19 @@ class JIT {
         }
         $stubBlock = $this->m3EmitTuMainBlock;
         if ($this->shouldUseM3CompileDriverRealLowering()) {
+            $sidecar = $this->isM3EmitTuTrivialEchoSidecarActive();
             $this->compileM3EmitTuRuntimeSpineMethodsForRealLowering();
             foreach (['initparsepipeline', 'initcompiler', 'initvmcontext', 'loadcoremodules', 'standalone'] as $methodLc) {
+                if ('standalone' === $methodLc && $sidecar) {
+                    if (null !== $stubBlock) {
+                        $this->emitM3EmitTuRuntimeStandaloneStubNative(
+                            $this->llvmInternalName('PHPCompiler\\Runtime::standalone'),
+                            'PHPCompiler\\Runtime::standalone',
+                            $stubBlock
+                        );
+                    }
+                    continue;
+                }
                 $this->compileM3EmitTuRuntimeMethodFromQueue($methodLc);
             }
             $this->compileM3EmitTuCompilerSpineMethodsFromMainBlock(['compileemitsmoke']);
@@ -1855,9 +1870,7 @@ class JIT {
      */
     private function compileM3EmitTuRuntimeSpineMethodsForRealLowering(): void
     {
-        if ($this->shouldUseM3EmitTuEmitHelperSpineRealLowering()) {
-            $this->cacheM3EmitTuTrivialEchoAtLinkTime();
-        }
+        $sidecar = $this->isM3EmitTuTrivialEchoSidecarActive();
         if (!$this->shouldUseM3EmitTuNativeBridge() || !$this->shouldUseM3CompileDriverRealLowering()) {
             return;
         }
@@ -1871,7 +1884,25 @@ class JIT {
         ] as $methodLc) {
             $this->compileM3EmitTuRuntimeMethodFromModules($methodLc);
         }
+        if ($sidecar && null !== $this->m3EmitTuMainBlock) {
+            $this->emitM3EmitTuRuntimeStandaloneStubNative(
+                $this->llvmInternalName('PHPCompiler\\Runtime::standalone'),
+                'PHPCompiler\\Runtime::standalone',
+                $this->m3EmitTuMainBlock
+            );
+        }
         $this->runQueue();
+    }
+
+    /** Link-time trivial-echo AOT sidecar for emit-helper TU (#2559, #2566). */
+    private function isM3EmitTuTrivialEchoSidecarActive(): bool
+    {
+        if (!$this->shouldUseM3EmitTuNativeBridge() || !$this->shouldUseEmitHelperLinkStubs()) {
+            return false;
+        }
+        $this->cacheM3EmitTuTrivialEchoAtLinkTime();
+
+        return \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::isRegistered($this->context);
     }
 
     /** Host-parse trivial echo and cache linked AOT bytes at emit-helper link (#2559). */
@@ -2101,9 +2132,7 @@ class JIT {
         $saved = $this->context->builder;
         $this->context->builder = $this->context->context->builderCreate();
         $this->context->builder->positionAtEnd($bb);
-        if ($this->shouldUseM3EmitTuEmitHelperSpineRealLowering()
-            && \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::isRegistered($this->context)
-        ) {
+        if (\PHPCompiler\JIT\M3EmitTuTrivialEchoAot::isRegistered($this->context)) {
             \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::emitStandaloneWriteCachedAot(
                 $this->context,
                 $func->getParam(2)
