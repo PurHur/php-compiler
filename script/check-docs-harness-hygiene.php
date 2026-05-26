@@ -41,6 +41,7 @@ $negationPatterns = [
     '/warning/i',
     '/empty.*tree/i',
     '/Never on harness/i',
+    '/guard.*against/i',
 ];
 
 $rawBindMountPattern = '/docker run.*-v.*["\']?\$\(pwd\)["\']?:\/compiler/';
