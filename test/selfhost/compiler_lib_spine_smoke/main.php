@@ -670,6 +670,11 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassGetMethod.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodGetAttributes.php';
 require_once __DIR__.'/../../../lib/VM/ReflectionSupport.php';
 require_once __DIR__.'/../../../test/bootstrap-aot/macro_functions_spine_shim.php';
-// VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh when vm_run_smoke links under LLVM 9.
+// VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
 
-echo "compiler_lib_spine_smoke bundle OK\n";
+$vmSpineSmoke = getenv('PHP_COMPILER_VM_SPINE_SMOKE');
+if (is_string($vmSpineSmoke) && ('1' === $vmSpineSmoke || 'true' === strtolower($vmSpineSmoke))) {
+    echo "vm-spine-ok\n";
+} else {
+    echo "compiler_lib_spine_smoke bundle OK\n";
+}

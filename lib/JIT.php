@@ -16,6 +16,7 @@ require_once __DIR__.'/OpCodeNames.php';
 require_once __DIR__.'/JIT/RuntimeInitVmContext.php';
 require_once __DIR__.'/JIT/RuntimeInitCompiler.php';
 require_once __DIR__.'/JIT/M3EmitTuTrivialEchoAot.php';
+require_once __DIR__.'/JIT/VmSpineSmokeNative.php';
 
 use PHPCfg\Operand;
 use PHPCfg\Op;
@@ -440,6 +441,16 @@ class JIT {
                 return $this->emitM3EmitTuCompilerCompileEmitSmokeNativeFunction($internalName, $logicalName);
             }
         }
+        if ($this->shouldUseSelfHostJitStubs() && null !== $logicalName) {
+            $vmSpineLc = strtolower($logicalName);
+            if (JIT\VmSpineSmokeNative::isVmRunSmokeName($vmSpineLc)) {
+                return $this->compileVmRunSmokeNative(
+                    $this->llvmInternalName($internalName),
+                    $block,
+                    $logicalName
+                );
+            }
+        }
         if (
             $this->shouldUseSelfHostJitStubs()
             && null !== $logicalName
@@ -574,6 +585,27 @@ class JIT {
         $lower = strtolower($name);
 
         return str_ends_with($lower, '::issuperglobalname') || 'issuperglobalname' === $lower;
+    }
+
+    /** Native vm_run_smoke for M2 lib spine VM -r gate (#1846). */
+    private function compileVmRunSmokeNative(
+        string $internalName,
+        Block $block,
+        string $logicalName
+    ): PHPLLVM\Value {
+        $paramTypes = [];
+        if (null !== $block->func) {
+            foreach ($block->func->params as $param) {
+                $paramTypes[] = $this->llvmTypeForCfgParam($param);
+            }
+        }
+
+        return JIT\VmSpineSmokeNative::compileVmRunSmokeNative(
+            $this->context,
+            $internalName,
+            $logicalName,
+            $paramTypes
+        );
     }
 
     /** Native __compiler_is_superglobal_name for self-host AOT (issue #1056). */
