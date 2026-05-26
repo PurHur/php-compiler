@@ -327,6 +327,24 @@ final class CiScriptsTest extends TestCase
         );
     }
 
+    public function testCiDefaultsEnvDefinesSelfhostprobeAotSmokeGateOn(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString(
+            'SELFHOSTPROBE_AOT_SMOKE_GATE="${SELFHOSTPROBE_AOT_SMOKE_GATE:-1}"',
+            $defaults
+        );
+    }
+
+    public function testCiLocalRunsSelfhostprobeAotSmoke(): void
+    {
+        $local = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-local.sh');
+        $this->assertStringContainsString('ci_run_selfhostprobe_aot_smoke', $local);
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('--group selfhostprobe-aot-execute', $common);
+        $this->assertStringContainsString('--exclude-group selfhostprobe-aot-execute', $common);
+    }
+
     public function testCiDefaultsEnvDefinesFastcgiWebAotSmokeGateOff(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');

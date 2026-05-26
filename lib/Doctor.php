@@ -1052,8 +1052,10 @@ final class Doctor
         $defaults = self::readCiDefaultsEnv($repoRoot);
         $smokeDefault = $defaults['EXAMPLES_SELFHOSTPROBE_SMOKE_GATE'] ?? '1';
         $smokeOn = self::gateEnabled('EXAMPLES_SELFHOSTPROBE_SMOKE_GATE', $smokeDefault);
+        $aotDefault = $defaults['SELFHOSTPROBE_AOT_SMOKE_GATE'] ?? '1';
+        $aotOn = self::gateEnabled('SELFHOSTPROBE_AOT_SMOKE_GATE', $aotDefault);
 
-        fwrite(STDOUT, "\n008-SelfHostProbe CI gates (#2343, #2240):\n");
+        fwrite(STDOUT, "\n008-SelfHostProbe CI gates (#2343, #2240, #2407):\n");
         fwrite(STDOUT, "  Tree: examples/008-SelfHostProbe\n");
         fwrite(STDOUT, "  Defaults: script/ci-defaults.env\n\n");
         self::printSessionsWebGateRow(
@@ -1065,6 +1067,16 @@ final class Doctor
             false,
             'make examples-selfhostprobe-smoke · ci-fast default-on (#2343); opt-out EXAMPLES_SELFHOSTPROBE_SMOKE_GATE=0',
             '#2343'
+        );
+        self::printSessionsWebGateRow(
+            2,
+            'AOT build + execute',
+            'SELFHOSTPROBE_AOT_SMOKE_GATE',
+            $aotDefault,
+            $aotOn,
+            false,
+            'SELFHOSTPROBE_AOT_SMOKE_GATE=1 EXAMPLES_AOT_SMOKE_ONLY=008 ./script/examples-aot-smoke.sh · north-star3-verify (#2407)',
+            '#2407'
         );
         $initProfileLive = \PHPCompiler\Cli\PhpcInit::isKnownProfile('selfhostprobe');
         $initTemplate = is_file($repoRoot.'/templates/init-selfhostprobe/example.php');

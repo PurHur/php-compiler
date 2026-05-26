@@ -28,7 +28,17 @@ On Runforge / harness hosts (do **not** use raw `docker run -v "$(pwd):/compiler
 
 ```console
 ./script/docker-exec.sh -- bash -lc 'source script/php-env.sh && ./phpc run examples/008-SelfHostProbe/example.php'
+./script/docker-exec.sh -- bash -lc 'source script/php-env.sh && ./phpc build -o /tmp/probe examples/008-SelfHostProbe/example.php && /tmp/probe'
 ./script/docker-exec.sh -- bash -lc 'make north-star2-verify'
+```
+
+AOT (LLVM required):
+
+```console
+./phpc build -o .phpc/bin/probe example.php
+./.phpc/bin/probe
+# or:
+SELFHOSTPROBE_AOT_SMOKE_GATE=1 EXAMPLES_AOT_SMOKE_ONLY=008 ./script/examples-aot-smoke.sh
 ```
 
 ## Status
@@ -37,8 +47,8 @@ On Runforge / harness hosts (do **not** use raw `docker run -v "$(pwd):/compiler
 |-------|-------|
 | VM `phpc run` | ✅ presenter text only — no superglobals required |
 | VM `phpc serve` | 📋 not used (CLI presenter) |
-| AOT | 📋 optional later — out of scope for v1 ([#2207](https://github.com/PurHur/php-compiler/issues/2207)) |
-| CI | ✅ `ExamplesCompileTest::test008SelfHostProbeVmLint` + `provideExamples` lint/smoke ([#2239](https://github.com/PurHur/php-compiler/issues/2239)); `EXAMPLES_SELFHOSTPROBE_SMOKE_GATE=1` default in `ci-fast` ([#2343](https://github.com/PurHur/php-compiler/issues/2343)) |
+| AOT | ✅ `phpc build` + native execute ([#2407](https://github.com/PurHur/php-compiler/issues/2407)); `SELFHOSTPROBE_AOT_SMOKE_GATE=1 EXAMPLES_AOT_SMOKE_ONLY=008 ./script/examples-aot-smoke.sh` |
+| CI | ✅ VM: `ExamplesCompileTest` ([#2239](https://github.com/PurHur/php-compiler/issues/2239)); `EXAMPLES_SELFHOSTPROBE_SMOKE_GATE=1` in `ci-fast` ([#2343](https://github.com/PurHur/php-compiler/issues/2343)); AOT: `SELFHOSTPROBE_AOT_SMOKE_GATE=1` ([#2407](https://github.com/PurHur/php-compiler/issues/2407)) |
 
 ## Next slices
 

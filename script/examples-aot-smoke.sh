@@ -11,6 +11,8 @@
 #   EXAMPLES_AOT_SMOKE_ONLY=006 ./script/examples-aot-smoke.sh   # 006 slice only (#2013)
 #   EXAMPLES_AOT_SMOKE_ONLY=007 ./script/examples-aot-smoke.sh   # 007 slice only (#2104)
 #   THROWSWEB_AOT_SMOKE_GATE=1 EXAMPLES_AOT_SMOKE_ONLY=007 ./script/examples-aot-smoke.sh
+#   EXAMPLES_AOT_SMOKE_ONLY=008 ./script/examples-aot-smoke.sh   # 008 slice only (#2407)
+#   SELFHOSTPROBE_AOT_SMOKE_GATE=1 EXAMPLES_AOT_SMOKE_ONLY=008 ./script/examples-aot-smoke.sh
 #   EXAMPLES_AOT_SMOKE_ONLY=009 ./script/examples-aot-smoke.sh   # 009 slice only (#2352)
 #   FASTCGI_WEB_AOT_SMOKE_GATE=1 EXAMPLES_AOT_SMOKE_ONLY=009 ./script/examples-aot-smoke.sh
 #
@@ -28,6 +30,7 @@ MINIWEBAPP="${ROOT}/examples/003-MiniWebApp"
 SESSIONSWEB="${ROOT}/examples/005-SessionsWeb"
 FILEUPLOADWEB="${ROOT}/examples/006-FileUploadWeb"
 THROWSWEB="${ROOT}/examples/007-ThrowsWeb"
+SELFHOSTPROBE="${ROOT}/examples/008-SelfHostProbe"
 FASTCGIWEB="${ROOT}/examples/009-FastCGIWeb"
 SMOKE_ONLY="${EXAMPLES_AOT_SMOKE_ONLY:-}"
 
@@ -382,6 +385,26 @@ smoke_007_throwsweb() {
   echo "examples-aot-smoke: 007-ThrowsWeb: ok"
 }
 
+# 008-SelfHostProbe single-file AOT + CLI execute (#2407).
+smoke_008_selfhostprobe() {
+  if [[ "${SELFHOSTPROBE_AOT_SMOKE_GATE:-0}" != "1" ]]; then
+    echo "examples-aot-smoke: 008-SelfHostProbe: skip (SELFHOSTPROBE_AOT_SMOKE_GATE=0)"
+    return 0
+  fi
+  if [[ ! -f "${SELFHOSTPROBE}/example.php" ]]; then
+    echo "examples-aot-smoke: 008-SelfHostProbe: skip (tree missing #2207)" >&2
+    return 0
+  fi
+
+  local binary="${SMOKE_ROOT}/008-SelfHostProbe/app"
+  echo "examples-aot-smoke: 008-SelfHostProbe: phpc build -> ${binary}"
+  build_binary '008-SelfHostProbe' "${SELFHOSTPROBE}/example.php" "${binary}"
+  local out
+  out="$(run_binary '008-SelfHostProbe' "${binary}")"
+  assert_needles '008-SelfHostProbe' "$out" 'SelfHostProbe'
+  echo "examples-aot-smoke: 008-SelfHostProbe: ok"
+}
+
 # 009-FastCGIWeb project AOT + CGI health + PATH_INFO diagnostics (#2331, #2352).
 smoke_009_fastcgiweb() {
   if [[ "${FASTCGI_WEB_AOT_SMOKE_GATE:-0}" != "1" ]]; then
@@ -457,6 +480,12 @@ smoke_009_fastcgiweb() {
 if [[ "${SMOKE_ONLY}" == "009" ]]; then
   echo "examples-aot-smoke: 009 slice (LLVM at ${LLVM_DIR})"
   smoke_009_fastcgiweb
+  exit $?
+fi
+
+if [[ "${SMOKE_ONLY}" == "008" ]]; then
+  echo "examples-aot-smoke: 008 slice (LLVM at ${LLVM_DIR})"
+  smoke_008_selfhostprobe
   exit $?
 fi
 
