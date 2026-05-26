@@ -565,14 +565,14 @@ final class Superglobals
             $scriptName = '/index.php';
         }
 
-        self::setStringEntry($server, 'REQUEST_METHOD', $method);
-        self::setStringEntry($server, 'QUERY_STRING', $queryString);
-        self::setStringEntry($server, 'SCRIPT_NAME', $scriptName);
-        self::setStringEntry($server, 'PHP_SELF', $scriptName);
+        self::setOrUpdateStringEntry($server, 'REQUEST_METHOD', $method);
+        self::setOrUpdateStringEntry($server, 'QUERY_STRING', $queryString);
+        self::setOrUpdateStringEntry($server, 'SCRIPT_NAME', $scriptName);
+        self::setOrUpdateStringEntry($server, 'PHP_SELF', $scriptName);
 
         $scriptFilename = self::resolveScriptFilename($scriptName);
         if ('' !== $scriptFilename) {
-            self::setStringEntry($server, 'SCRIPT_FILENAME', $scriptFilename);
+            self::setOrUpdateStringEntry($server, 'SCRIPT_FILENAME', $scriptFilename);
         }
 
         $requestUri = getenv('REQUEST_URI');
@@ -582,36 +582,34 @@ final class Superglobals
                 $requestUri .= '?'.$queryString;
             }
         }
-        self::setStringEntry($server, 'REQUEST_URI', $requestUri);
+        self::setOrUpdateStringEntry($server, 'REQUEST_URI', $requestUri);
 
         $pathInfo = getenv('PATH_INFO');
         if (false === $pathInfo || '' === $pathInfo) {
             $pathInfo = self::derivePathInfo($scriptName, $requestUri);
         }
-        if ('' !== $pathInfo) {
-            self::setStringEntry($server, 'PATH_INFO', $pathInfo);
-        }
+        self::setOrUpdateStringEntry($server, 'PATH_INFO', $pathInfo);
 
-        self::setStringEntry($server, 'GATEWAY_INTERFACE', 'CGI/1.1');
+        self::setOrUpdateStringEntry($server, 'GATEWAY_INTERFACE', 'CGI/1.1');
         $serverProtocol = getenv('SERVER_PROTOCOL');
         if (false === $serverProtocol || '' === $serverProtocol) {
             $serverProtocol = 'HTTP/1.1';
         }
-        self::setStringEntry($server, 'SERVER_PROTOCOL', $serverProtocol);
-        self::setStringEntry($server, 'SERVER_SOFTWARE', 'PHP-Compiler-VM');
+        self::setOrUpdateStringEntry($server, 'SERVER_PROTOCOL', $serverProtocol);
+        self::setOrUpdateStringEntry($server, 'SERVER_SOFTWARE', 'PHP-Compiler-VM');
 
         $documentRoot = getenv('DOCUMENT_ROOT');
         if (false !== $documentRoot && '' !== $documentRoot) {
-            self::setStringEntry($server, 'DOCUMENT_ROOT', $documentRoot);
+            self::setOrUpdateStringEntry($server, 'DOCUMENT_ROOT', $documentRoot);
         }
 
         $remoteAddr = getenv('REMOTE_ADDR');
         if (false !== $remoteAddr && '' !== $remoteAddr) {
-            self::setStringEntry($server, 'REMOTE_ADDR', $remoteAddr);
+            self::setOrUpdateStringEntry($server, 'REMOTE_ADDR', $remoteAddr);
         }
         $remotePort = getenv('REMOTE_PORT');
         if (false !== $remotePort && '' !== $remotePort) {
-            self::setStringEntry($server, 'REMOTE_PORT', $remotePort);
+            self::setOrUpdateStringEntry($server, 'REMOTE_PORT', $remotePort);
         }
 
         foreach (array_merge($_ENV, $_SERVER) as $key => $value) {
@@ -619,7 +617,7 @@ final class Superglobals
                 continue;
             }
             if (str_starts_with($key, 'HTTP_') || str_starts_with($key, 'CONTENT_')) {
-                self::setStringEntry($server, $key, $value);
+                self::setOrUpdateStringEntry($server, $key, $value);
             }
         }
 
@@ -636,25 +634,31 @@ final class Superglobals
             $fromEnv = getenv('HTTP_HOST');
             $host = false === $fromEnv ? '' : $fromEnv;
             if ('' !== $host) {
-                self::setStringEntry($server, 'HTTP_HOST', $host);
+                self::setOrUpdateStringEntry($server, 'HTTP_HOST', $host);
             }
         }
 
         $https = self::detectHttps($server);
         $scheme = $https ? 'https' : 'http';
-        self::setStringEntry($server, 'REQUEST_SCHEME', $scheme);
+        self::setOrUpdateStringEntry($server, 'REQUEST_SCHEME', $scheme);
         if ($https) {
-            self::setStringEntry($server, 'HTTPS', 'on');
+            self::setOrUpdateStringEntry($server, 'HTTPS', 'on');
+        } else {
+            $httpsKey = new Variable(Variable::TYPE_STRING);
+            $httpsKey->string('HTTPS');
+            if ($server->offsetIsSet($httpsKey)) {
+                $server->offsetUnset($httpsKey);
+            }
         }
 
         [$serverName, $portFromHost] = self::parseHostAndPort($host);
         $port = self::resolveServerPort($https, $portFromHost);
-        self::setStringEntry($server, 'SERVER_PORT', (string) $port);
+        self::setOrUpdateStringEntry($server, 'SERVER_PORT', (string) $port);
 
         if ('' !== $serverName) {
-            self::setStringEntry($server, 'SERVER_NAME', $serverName);
+            self::setOrUpdateStringEntry($server, 'SERVER_NAME', $serverName);
         } elseif ('' !== $host) {
-            self::setStringEntry($server, 'SERVER_NAME', $host);
+            self::setOrUpdateStringEntry($server, 'SERVER_NAME', $host);
         }
     }
 

@@ -136,6 +136,20 @@ final class MiniWebAppCgiEnv
     }
 
     /**
+     * Front-controller home route via PATH_INFO (rebuild-examples / issue #2257).
+     *
+     * @return array<string, string>
+     */
+    public static function pathInfoHome(): array
+    {
+        return [
+            'SCRIPT_NAME' => '/index.php',
+            'PATH_INFO' => '/home',
+            'REQUEST_METHOD' => 'GET',
+        ];
+    }
+
+    /**
      * AOT execute: PATH_INFO hello without SCRIPT_NAME in the scenario overlay.
      *
      * @return array<string, string>
@@ -239,6 +253,7 @@ final class MiniWebAppCgiEnv
             'postQueryRouteContact',
             'queryRouteApiStatus',
             'pathInfoHello',
+            'pathInfoHome',
             'aotPathInfoHello',
             'pathInfoContact',
             'pathInfoApiStatus',
@@ -265,6 +280,8 @@ final class MiniWebAppCgiEnv
                 return self::queryRouteApiStatus();
             case 'pathInfoHello':
                 return self::pathInfoHello();
+            case 'pathInfoHome':
+                return self::pathInfoHome();
             case 'aotPathInfoHello':
                 return self::aotPathInfoHello();
             case 'pathInfoContact':
