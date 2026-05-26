@@ -13,16 +13,16 @@ INSERT = r'''    /**
     protected function parseExpr_Match(Expr\Match_ $expr)
     {
         $attrs = $this->mapAttributes($expr);
-        $cond = $this->readVariable($this->parseExprNode($expr->cond));
         $endBlock = $this->block->create();
         $result = new Temporary();
         $entryBlock = $this->block;
-        // Seed $result in entry scope so every arm block inherits the same compile slot (#143).
+        // Seed $result so arm blocks share one compile slot (#143).
         $entryBlock->children[] = new Op\Expr\Assign(
             $result,
             $this->readVariable(new Literal('')),
             $attrs
         );
+        $cond = $this->matchPatternOperand($expr->cond, $attrs);
         $chainBlock = $entryBlock;
         $defaultArm = null;
 
@@ -37,10 +37,10 @@ INSERT = r'''    /**
             $conds = $arm->conds;
             $lastCondIdx = count($conds) - 1;
             foreach ($conds as $idx => $condNode) {
-                $caseExpr = $this->parseExprNode($condNode);
+                $caseOperand = $this->matchPatternOperand($condNode, $attrs);
                 $cmp = new Op\Expr\BinaryOp\Identical(
                     $cond,
-                    $this->readVariable($caseExpr),
+                    $caseOperand,
                     $attrs
                 );
                 $testBlock->children[] = $cmp;
@@ -75,6 +75,30 @@ INSERT = r'''    /**
         $this->block = $endBlock;
 
         return $result;
+    }
+
+    /**
+     * Match subject / pattern: use Literal for true/false/null (issue #2428).
+     *
+     * NameResolver marks bare true/false/null as qualified; avoid ConstFetch ops that break VM compares.
+     *
+     * @return Operand
+     */
+    private function matchPatternOperand($exprNode, array $attrs): Operand
+    {
+        if ($exprNode instanceof Expr\ConstFetch) {
+            $lc = strtolower($exprNode->name->getLast());
+            switch ($lc) {
+                case 'true':
+                    return $this->readVariable(new Literal(true));
+                case 'false':
+                    return $this->readVariable(new Literal(false));
+                case 'null':
+                    return $this->readVariable(new Literal(null));
+            }
+        }
+
+        return $this->readVariable($this->parseExprNode($exprNode));
     }
 
 '''
