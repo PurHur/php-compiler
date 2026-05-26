@@ -173,6 +173,12 @@ class JIT {
     /** Emit native entry TU only — not compile_driver bundles that include compile_smoke_m3_emit (#1937). */
     private function shouldUseM3EmitTuNativeBridge(): bool
     {
+        // M3 emit helpers are linked with PHP_COMPILER_EMIT_HELPER_LINK=1; treat that as opt-in
+        // for the emit TU native bridge so compile_smoke_m3_emit can progress without adding extra
+        // bootstrap env plumbing (#1983, #1937).
+        if ($this->shouldUseEmitHelperLinkStubs()) {
+            return true;
+        }
         $flag = getenv('PHP_COMPILER_M3_EMIT_TU');
 
         return '1' === $flag || 'true' === strtolower((string) $flag);
@@ -786,6 +792,8 @@ class JIT {
             'compileoperand',
             'compilestmt',
             'compileexpr',
+            'operandschainequal',
+            'unwrapoperandchain',
             'compileboolconstant',
             'compilebooltemporary',
         ];
@@ -887,6 +895,19 @@ class JIT {
         $lower = strtolower($name);
         if ($this->isM3CompileDriverRealLoweringName($lower)) {
             return false;
+        }
+        // Emit-helper link uses self-host AOT but must still be able to run the Runtime parse+compile
+        // spine for the M3 emit bridge (#1983/#1937). Keep these Runtime entries real-lowered.
+        if ($this->shouldUseEmitHelperLinkStubs()) {
+            if (
+                str_ends_with($lower, '\\runtime::parseandcompileemitsmoke')
+                || str_ends_with($lower, '\\runtime::compileemitsmoke')
+                || str_ends_with($lower, '\\runtime::parse')
+                || str_ends_with($lower, '\\runtime::compile')
+                || str_ends_with($lower, '\\runtime::__construct')
+            ) {
+                return false;
+            }
         }
         // M3 compile-smoke wrapper: native bridge in emit TU only (#1983 approach 3, #1937).
         if ($this->shouldUseM3EmitTuNativeBridge() && $this->isBootstrapM3RuntimeEmitBridgeName($lower)) {
