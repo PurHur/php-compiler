@@ -196,6 +196,8 @@ function opcode_type_name(int $type): string
             return 'TYPE_DECLARE_INTERFACE';
         case 103:
             return 'TYPE_DECLARE_ENUM';
+        case 104:
+            return 'TYPE_STATIC_PROPERTY_UNSET';
         default:
             return 'unknown opcode';
     }

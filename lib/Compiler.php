@@ -748,6 +748,11 @@ class Compiler {
                 $this->compileOperand($expr->name, $block, true),
             ];
         }
+        if ($expr instanceof Op\Expr\StaticPropertyFetch) {
+            throw new \LogicException(
+                'StaticPropertyFetch unset must be lowered via TYPE_STATIC_PROPERTY_UNSET (#2256)'
+            );
+        }
         if ($expr instanceof Operand) {
             $dimFetch = $this->findCoalesceArrayDimFetch($expr, $block);
             if (null !== $dimFetch) {
@@ -2525,6 +2530,15 @@ class Compiler {
             case 'Terminal_Unset':
                 $ops = [];
                 foreach ($terminal->exprs as $unsetExpr) {
+                    if ($unsetExpr instanceof Op\Expr\StaticPropertyFetch) {
+                        $ops[] = new OpCode(
+                            OpCode::TYPE_STATIC_PROPERTY_UNSET,
+                            null,
+                            $this->compileOperand($unsetExpr->class, $block, true),
+                            $this->compileOperand($unsetExpr->name, $block, true)
+                        );
+                        continue;
+                    }
                     [$containerSlot, $dimSlot] = $this->resolveUnsetTarget($unsetExpr, $block);
                     $ops[] = new OpCode(
                         OpCode::TYPE_UNSET,
