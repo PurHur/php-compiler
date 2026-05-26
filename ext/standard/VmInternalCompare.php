@@ -18,6 +18,7 @@ final class VmInternalCompare
         'strcmp' => strcmp::class,
         'strcasecmp' => strcasecmp::class,
         'strnatcmp' => strnatcmp::class,
+        'strnatcasecmp' => strnatcasecmp::class,
     ];
 
     public static function resolveStringCallback(string $name): Internal

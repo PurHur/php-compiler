@@ -366,6 +366,73 @@ final class VmString
         return ($lenA - $ia) <=> ($lenB - $ib);
     }
 
+    /**
+     * strnatcasecmp() — byte-oriented natural order, ASCII case-insensitive (#2372).
+     */
+    public static function strnatcasecmp(string $a, string $b): int
+    {
+        $lenA = self::byteLength($a);
+        $lenB = self::byteLength($b);
+        $ia = 0;
+        $ib = 0;
+        while ($ia < $lenA && $ib < $lenB) {
+            $ordA = self::byteOrd($a[$ia]);
+            $ordB = self::byteOrd($b[$ib]);
+            $digA = $ordA >= 48 && $ordA <= 57;
+            $digB = $ordB >= 48 && $ordB <= 57;
+            if ($digA && $digB) {
+                while ($ia < $lenA && 48 === self::byteOrd($a[$ia])) {
+                    ++$ia;
+                }
+                while ($ib < $lenB && 48 === self::byteOrd($b[$ib])) {
+                    ++$ib;
+                }
+                $startA = $ia;
+                $startB = $ib;
+                while ($ia < $lenA) {
+                    $o = self::byteOrd($a[$ia]);
+                    if ($o < 48 || $o > 57) {
+                        break;
+                    }
+                    ++$ia;
+                }
+                while ($ib < $lenB) {
+                    $o = self::byteOrd($b[$ib]);
+                    if ($o < 48 || $o > 57) {
+                        break;
+                    }
+                    ++$ib;
+                }
+                $numLenA = $ia - $startA;
+                $numLenB = $ib - $startB;
+                if (0 === $numLenA && 0 === $numLenB) {
+                    continue;
+                }
+                if ($numLenA !== $numLenB) {
+                    return $numLenA <=> $numLenB;
+                }
+                for ($k = 0; $k < $numLenA; ++$k) {
+                    $da = self::byteOrd($a[$startA + $k]);
+                    $db = self::byteOrd($b[$startB + $k]);
+                    if ($da !== $db) {
+                        return $da <=> $db;
+                    }
+                }
+
+                continue;
+            }
+            $ordA = self::byteOrd(self::asciiLowerByte($a[$ia]));
+            $ordB = self::byteOrd(self::asciiLowerByte($b[$ib]));
+            if ($ordA !== $ordB) {
+                return $ordA <=> $ordB;
+            }
+            ++$ia;
+            ++$ib;
+        }
+
+        return ($lenA - $ia) <=> ($lenB - $ib);
+    }
+
     public static function strncmp(string $a, string $b, int $length): int
     {
         if ($length <= 0) {
