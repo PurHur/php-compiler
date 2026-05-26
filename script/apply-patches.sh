@@ -116,6 +116,9 @@ patch_already_applied() {
     php-cfg-first-class-callable.patch)
       grep -q 'isFirstClassCallable' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
       ;;
+    php-cfg-arrow-function.patch)
+      grep -q 'function parseExpr_ArrowFunction' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
+      ;;
     php-cfg-anonymous-class.patch)
       grep -q 'parseStmt_Class($expr->class)' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
       ;;
@@ -210,6 +213,39 @@ PY
   echo "Applied php-cfg-match.patch (overlay)"
 }
 
+apply_php_cfg_arrow_function_overlay() {
+  local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
+  local op="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/ArrowFunction.php"
+  local overlay="$PATCH_DIR/overlays/php-cfg"
+  if grep -q 'function parseExpr_ArrowFunction' "$parser" 2>/dev/null; then
+    echo "Skip php-cfg-arrow-function.patch (already applied)"
+    return 0
+  fi
+  if [[ ! -f "$overlay/Op/Expr/ArrowFunction.php" || ! -f "$overlay/arrow-function-parser-method.php" ]]; then
+    echo "Skip php-cfg-arrow-function.patch (overlay files missing)" >&2
+    return 1
+  fi
+  mkdir -p "$(dirname "$op")"
+  cp "$overlay/Op/Expr/ArrowFunction.php" "$op"
+  python3 - "$parser" "$overlay/arrow-function-parser-method.php" <<'PY'
+import sys
+from pathlib import Path
+
+parser_path = Path(sys.argv[1])
+method_path = Path(sys.argv[2])
+text = parser_path.read_text()
+anchor = """    protected function parseExpr_ClassConstFetch(Expr\\ClassConstFetch $expr)
+    {
+        $c = $this->readVariable($this->parseExprNode($expr->class));"""
+insert = method_path.read_text().rstrip("\n") + "\n\n"
+if anchor not in text:
+    sys.stderr.write("php-cfg-arrow-function: parseExpr_ClassConstFetch anchor not found in Parser.php\n")
+    sys.exit(1)
+parser_path.write_text(text.replace(anchor, insert + anchor, 1))
+PY
+  echo "Applied php-cfg-arrow-function.patch (overlay)"
+}
+
 apply_php_cfg_trycatch_overlay() {
   local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
   local op="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/TryCatch.php"
@@ -251,6 +287,10 @@ apply_patch() {
   fi
   if [[ "$(basename "$patch")" == "php-cfg-match.patch" ]]; then
     apply_php_cfg_match_overlay
+    return $?
+  fi
+  if [[ "$(basename "$patch")" == "php-cfg-arrow-function.patch" ]]; then
+    apply_php_cfg_arrow_function_overlay
     return $?
   fi
   if [[ "$(basename "$patch")" == "php-cfg-trycatch.patch" ]]; then
@@ -321,6 +361,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-match.patch"
   apply_patch "$PATCH_DIR/php-cfg-assignop-coalesce.patch"
   apply_patch "$PATCH_DIR/php-cfg-first-class-callable.patch"
+  apply_patch "$PATCH_DIR/php-cfg-arrow-function.patch"
   apply_patch "$PATCH_DIR/php-cfg-anonymous-class.patch"
   apply_patch "$PATCH_DIR/php-cfg-enum.patch"
   apply_patch "$PATCH_DIR/php-cfg-named-args.patch"

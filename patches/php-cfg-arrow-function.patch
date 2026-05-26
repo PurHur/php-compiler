@@ -1,0 +1,2 @@
+# Applied via overlay in script/apply-patches.sh (issue #2574).
+# Adds PHPCfg\Op\Expr\ArrowFunction and parseExpr_ArrowFunction for bootstrap spine parse.
