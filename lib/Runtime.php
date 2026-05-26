@@ -23,6 +23,7 @@ use PHPTypes\State;
 use PHPCompiler\VM\Optimizer;
 use PHPCompiler\VM\Context as VMContext;
 use PHPCompiler\JIT\Context as JITContext;
+use PHPCompiler\Ast\GroupUseStripper;
 use PHPCompiler\Web\Superglobals;
 
 class Runtime {
@@ -59,6 +60,7 @@ class Runtime {
         $astTraverser->addVisitor(
             new NodeVisitor\NameResolver
         );
+        $astTraverser->addVisitor(new GroupUseStripper());
         $this->parser = new Parser(
             (new ParserFactory)->create(ParserFactory::ONLY_PHP7),
             $astTraverser
