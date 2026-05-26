@@ -10,7 +10,41 @@ EMIT_HELPER="${ROOT}/build/selfhost-helloworld-emit"
 EMIT_ENTRY="${ROOT}/test/bootstrap-aot/helloworld_m3_emit_native_entry.php"
 M3_NATIVE_COMPILE=0
 M3_EMIT_PATH="none"
+M3_EMIT_HELPER_LINKED=0
 M3_BLOCK_REASON="native emit helper not linked (set BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1)"
+
+helloworld_m3_emit_next_lower() {
+  if [[ "${M3_EMIT_HELPER_LINKED}" -eq 0 ]]; then
+    if [[ "${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-0}" != "1" ]]; then
+      echo "bootstrap-selfhost-helloworld-probe: NEXT_LOWER: set BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1 (+ real lowering + runtime compile) before emit-TU execute (#2572)" >&2
+    else
+      echo "bootstrap-selfhost-helloworld-probe: NEXT_LOWER: M3 emit helper link — ${M3_BLOCK_REASON} (#1768)" >&2
+    fi
+    echo "bootstrap-selfhost-helloworld-probe: NEXT_LOWER_CMD: ./script/docker-exec.sh -- bash -lc 'source script/php-env.sh && BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1 BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING=1 BOOTSTRAP_M3_RUNTIME_COMPILE=1 BOOTSTRAP_M3_HELLOWORLD_STRICT=1 ./script/bootstrap-selfhost-helloworld-probe.sh'" >&2
+    return
+  fi
+  if [[ "${BOOTSTRAP_M3_RUNTIME_COMPILE:-0}" != "1" ]]; then
+    echo "bootstrap-selfhost-helloworld-probe: NEXT_LOWER: set BOOTSTRAP_M3_RUNTIME_COMPILE=1 to execute native emit helper (#2572)" >&2
+    return
+  fi
+  if grep -qE 'segfault|SIGKILL|exit 139' <<< "${M3_BLOCK_REASON}"; then
+    echo "bootstrap-selfhost-helloworld-probe: NEXT_LOWER: M3 emit TU LLVM 9 link/execute (global ctor / OOM; #2540)" >&2
+    return
+  fi
+  if grep -qE 'phase=parseAndCompile|parseAndCompile returned null' <<< "${M3_BLOCK_REASON}"; then
+    echo "bootstrap-selfhost-helloworld-probe: NEXT_LOWER: HelloWorld emit TU parseAndCompile spine (#2567)" >&2
+    return
+  fi
+  if grep -qE 'phase=parse|Runtime::parse returned null' <<< "${M3_BLOCK_REASON}"; then
+    echo "bootstrap-selfhost-helloworld-probe: NEXT_LOWER: Runtime::parse / initParsePipeline spine (#2568)" >&2
+    return
+  fi
+  if grep -q 'phase=compileEmitSmoke' <<< "${M3_BLOCK_REASON}"; then
+    echo "bootstrap-selfhost-helloworld-probe: NEXT_LOWER: Runtime::compileEmitSmoke / Compiler spine (#2566)" >&2
+    return
+  fi
+  echo "bootstrap-selfhost-helloworld-probe: NEXT_LOWER: M3 emit TU runtime init (global ctor / type reconstructor; #1937)" >&2
+}
 # shellcheck source=php-env.sh
 source "$(dirname "$0")/php-env.sh"
 ci_apply_llvm_memory_env
@@ -68,6 +102,7 @@ if [[ "${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
   m3_link_code=$?
   set -e
   if [[ -x "${EMIT_HELPER}" ]]; then
+    M3_EMIT_HELPER_LINKED=1
     echo "bootstrap-selfhost-helloworld-probe: native emit helper link OK (${EMIT_HELPER}, ${m3_link_mode})"
     if [[ "${BOOTSTRAP_M3_RUNTIME_COMPILE:-0}" == "1" ]]; then
       set +e
@@ -117,7 +152,7 @@ fi
 
 if [[ "${M3_NATIVE_COMPILE}" -eq 0 ]]; then
   echo "bootstrap-selfhost-helloworld-probe: native emit unavailable (M3 partial) — ${M3_BLOCK_REASON}" >&2
-  echo "bootstrap-selfhost-helloworld-probe: NEXT_LOWER: M3 emit TU runtime init (global ctor / type reconstructor; #1937)" >&2
+  helloworld_m3_emit_next_lower
   if [[ "${BOOTSTRAP_M3_HELLOWORLD_STRICT:-0}" == "1" ]]; then
     echo "bootstrap-selfhost-helloworld-probe: BOOTSTRAP_M3_HELLOWORLD_STRICT=1 — require native emit; refusing Zend compile.php fallback" >&2
     echo "bootstrap-selfhost-helloworld-probe: emit_path=zend_fallback_would_be_used block_reason=${M3_BLOCK_REASON}" >&2
