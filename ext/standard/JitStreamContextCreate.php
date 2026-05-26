@@ -6,31 +6,68 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** LLVM lowering for stream_context_create() (#1377). */
+/** LLVM lowering for stream_context_create() (#1377, #2457). */
 final class JitStreamContextCreate
 {
     /** @return Value */
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
         $argc = \count($args);
-        if ($argc > 0) {
+        if ($argc > 2) {
             throw new \LogicException(
-                'stream_context_create() options are not supported for JIT in this compiler build (issue #1377)'
+                'stream_context_create() accepts at most two arguments in this compiler build'
             );
         }
 
-        $sizeT = $context->getTypeFromString('size_t');
-        $zero = $sizeT->constInt(0, false);
-        $placeholder = new JITVariable(
-            $context,
-            JITVariable::TYPE_NATIVE_LONG,
-            JITVariable::KIND_VALUE,
-            $context->getTypeFromString('int64')->constInt(0, false)
+        $htPtrTy = $context->getTypeFromString('__hashtable__*');
+        $nullHt = $htPtrTy->constNull();
+        $optionsHt = $nullHt;
+        if ($argc >= 1) {
+            $optionsHt = self::loadArrayArg($context, $args[0], 1);
+        }
+        $paramsHt = $nullHt;
+        if (2 === $argc) {
+            $paramsHt = self::loadArrayArg($context, $args[1], 2);
+        }
+
+        $ht = $context->builder->call(
+            $context->lookupFunction('__phpc_stream_context_create'),
+            $optionsHt,
+            $paramsHt
         );
 
-        return HashTableHelper::buildArrayFill($context, $zero, $zero, $placeholder);
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            $ptr,
+            $ht
+        );
+
+        return $ptr;
+    }
+
+    private static function loadArrayArg(Context $context, JITVariable $arg, int $position): Value
+    {
+        if (JITVariable::TYPE_HASHTABLE === $arg->type) {
+            return $context->helper->loadValue($arg);
+        }
+        if (0 !== ($arg->type & JITVariable::IS_NATIVE_ARRAY)) {
+            return HashTableHelper::materializeNativeArrayForCall($context, $arg);
+        }
+        if (JITVariable::TYPE_VALUE === $arg->type) {
+            return $context->builder->call(
+                $context->lookupFunction('__value__readHashtable'),
+                JitValueBox::pointer($context, $arg->value)
+            );
+        }
+
+        throw new \LogicException(
+            "stream_context_create() argument #{$position} must be an array in this compiler build"
+        );
     }
 }
