@@ -1454,6 +1454,41 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('#1928', $doc);
     }
 
+    public function testCiFastHonorsNorthStar3VerifyGate(): void
+    {
+        $fast = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-fast.sh');
+        $this->assertStringContainsString('ci_run_north_star3_verify', $fast);
+        $this->assertStringContainsString('NORTH_STAR3_VERIFY_GATE=1', $fast);
+
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('NORTH_STAR3_VERIFY_GATE', $common);
+        $this->assertStringContainsString('NORTH_STAR3_VERIFY_GATE:-0', $common);
+        $this->assertStringContainsString('north-star3-verify', $common);
+        $this->assertStringContainsString('make -C', $common);
+        $this->assertFileExists(dirname(__DIR__, 2).'/script/north-star3-verify.sh');
+
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString(
+            'NORTH_STAR3_VERIFY_GATE="${NORTH_STAR3_VERIFY_GATE:-0}"',
+            $defaults
+        );
+
+        $docker = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-docker-run.sh');
+        $this->assertStringContainsString(
+            'NORTH_STAR3_VERIFY_GATE=${NORTH_STAR3_VERIFY_GATE:-0}',
+            $docker
+        );
+    }
+
+    public function testLocalCiMatrixDocumentsNorthStar3VerifyGate(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('NORTH_STAR3_VERIFY_GATE', $doc);
+        $this->assertStringContainsString('north-star3-verify', $doc);
+        $this->assertMatchesRegularExpression('/\| `NORTH_STAR3_VERIFY_GATE` \| `0` \|/', $doc);
+        $this->assertStringContainsString('#2396', $doc);
+    }
+
     public function testCiFastHonorsBootstrapTestSubsetGate(): void
     {
         $fast = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-fast.sh');
