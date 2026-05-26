@@ -105,6 +105,9 @@ ci_run_jit_variable_function_compliance "$@"
 # M4 bootstrap-loop dry-run when opt-in (issue #1929; default off in ci-defaults).
 ci_run_bootstrap_loop_probe
 
+# 008-SelfHostProbe VM smoke when opt-in (issue #2302; default off in ci-defaults).
+ci_run_examples_selfhostprobe_smoke
+
 # Self-host presenter when opt-in (issue #1928; script pending #1865).
 ci_run_north_star2_verify
 

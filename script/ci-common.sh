@@ -700,6 +700,19 @@ ci_run_jit_server_superglobal() {
   ci_run_phpunit --filter JitServerSuperglobal --fail-on-skipped "$@"
 }
 
+# 008-SelfHostProbe VM lint + run (issue #2240, opt-in ci-fast #2302).
+ci_run_examples_selfhostprobe_smoke() {
+  if [[ "${EXAMPLES_SELFHOSTPROBE_SMOKE_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  if [[ ! -f "${_CI_REPO_ROOT}/examples/008-SelfHostProbe/example.php" ]]; then
+    echo "examples-selfhostprobe-smoke: skipped (008-SelfHostProbe tree missing #2207)"
+    return 0
+  fi
+  echo "examples-selfhostprobe-smoke (EXAMPLES_SELFHOSTPROBE_SMOKE_GATE=1, #2302)..."
+  "$_CI_SCRIPT_DIR/examples-selfhostprobe-smoke.sh"
+}
+
 # Shell curl harness for 006-FileUploadWeb multipart upload (issue #1999).
 ci_run_file_upload_web_smoke() {
   if [[ "${FILE_UPLOAD_WEB_SMOKE_GATE:-1}" != "1" ]]; then

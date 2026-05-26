@@ -139,6 +139,7 @@ final class Doctor
         self::printSessionsWebSection($repoRoot);
         self::printFileUploadWebSection($repoRoot);
         self::printThrowsWebSection($repoRoot);
+        self::printSelfHostProbeSection($repoRoot);
 
         return is_int($exit) ? $exit : 1;
     }
@@ -777,6 +778,36 @@ final class Doctor
             fwrite(STDOUT, "  [📋] phpc init --profile throwsweb — #2092\n");
         }
         fwrite(STDOUT, "  Docs: examples/007-ThrowsWeb/README.md · docs/local-ci-matrix.md (#2102)\n");
+    }
+
+    /**
+     * 008-SelfHostProbe VM smoke gate (issues #2207, #2240, #2302).
+     */
+    private static function printSelfHostProbeSection(string $repoRoot): void
+    {
+        $example = $repoRoot.'/examples/008-SelfHostProbe/example.php';
+        if (!is_file($example)) {
+            return;
+        }
+
+        $defaults = self::readCiDefaultsEnv($repoRoot);
+        $smokeDefault = $defaults['EXAMPLES_SELFHOSTPROBE_SMOKE_GATE'] ?? '0';
+        $smokeOn = self::gateEnabled('EXAMPLES_SELFHOSTPROBE_SMOKE_GATE', $smokeDefault);
+
+        fwrite(STDOUT, "\n008-SelfHostProbe CI gates (#2302, #2240):\n");
+        fwrite(STDOUT, "  Tree: examples/008-SelfHostProbe\n");
+        fwrite(STDOUT, "  Defaults: script/ci-defaults.env\n\n");
+        self::printSessionsWebGateRow(
+            1,
+            'VM lint + run',
+            'EXAMPLES_SELFHOSTPROBE_SMOKE_GATE',
+            $smokeDefault,
+            $smokeOn,
+            false,
+            'make examples-selfhostprobe-smoke · EXAMPLES_SELFHOSTPROBE_SMOKE_GATE=1 ./script/ci-fast.sh',
+            '#2302'
+        );
+        fwrite(STDOUT, "  Docs: examples/008-SelfHostProbe/README.md\n");
     }
 
     /**
