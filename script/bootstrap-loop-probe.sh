@@ -19,7 +19,7 @@ then (unless --dry-run) M3 strict native emit and gen-1→gen-2 native slice.
 
 Exit codes:
   0  --dry-run: lint + M2 spine + M3 partial + gen-1 link (gen-2 Zend partial OK) green
-     full:      same + M3 strict + gen-1→gen-2 native emit (default on; opt-out BOOTSTRAP_M4_RUNTIME_COMPILE=0)
+     full:      same + M3 strict + gen-1→gen-2 native emit (default on; opt-out BOOTSTRAP_M4_RUNTIME_COMPILE=0; #2599)
   1  hard failure (missing entry/scripts, lint, M2 spine, M3 partial, or gen-1 link)
   2  LLVM 9 not found (skip), or full mode: M3 strict / gen-2 native emit not ready
   3  reserved

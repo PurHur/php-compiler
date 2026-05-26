@@ -119,7 +119,9 @@ final class BootstrapBootstrapLoopProbeTest extends TestCase
         $this->assertStringContainsString('bootstrap-loop-gen1-link:', $makefile);
         $this->assertStringContainsString('bootstrap-loop-probe-dry-run:', $makefile);
         $this->assertStringContainsString('BOOTSTRAP_M3_HELLOWORLD_STRICT=1', $makefile);
-        $this->assertStringContainsString('BOOTSTRAP_M4_RUNTIME_COMPILE=1', $makefile);
+        $this->assertStringContainsString('BOOTSTRAP_M4_RUNTIME_COMPILE', $makefile);
+        $gen1 = (string) file_get_contents(self::$root.'/script/bootstrap-loop-gen1-link.sh');
+        $this->assertStringContainsString('BOOTSTRAP_M4_RUNTIME_COMPILE:=1', $gen1);
     }
 
     public function testBootstrapLoopSmokeEntryDocumentsProbe(): void
@@ -189,6 +191,11 @@ final class BootstrapBootstrapLoopProbeTest extends TestCase
             'emit helper link failed (exit 255, mode=selfhost stubs (no PHP_COMPILER_M3_COMPILE_DRIVER))',
             $out
         );
+        if (str_contains($out, 'emit_path=native')) {
+            $this->assertStringContainsString('OK emit_path=native', $out);
+        } else {
+            $this->assertStringContainsString('runtime gate:', $out);
+        }
         $this->assertTrue(is_executable(self::$root.'/build/bootstrap-loop-gen1'));
         $this->assertTrue(is_executable(self::$root.'/build/bootstrap-loop-gen2'));
     }
