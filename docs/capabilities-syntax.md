@@ -10,7 +10,7 @@ Tracking issues: [#58](https://github.com/PurHur/php-compiler/issues/58), [#145]
 | Construct | VM | JIT | AOT | Issue | Notes |
 |-----------|:--:|:---:|:---:|-------|-------|
 | `class` / `new` | yes | yes | yes | [#58](https://github.com/PurHur/php-compiler/issues/58) | compliance PHPT; bootstrap AOT |
-| Anonymous class `new class { }` | yes | yes | yes | [#1233](https://github.com/PurHur/php-compiler/issues/1233) | php-cfg inline Stmt\Class_ in parseExpr_New; synthetic AnonymousClass@line name |
+| Anonymous class `new class { }` | yes | yes | no | [#1233](https://github.com/PurHur/php-compiler/issues/1233) | php-cfg inline Stmt\Class_ in parseExpr_New; synthetic AnonymousClass@line name |
 | Enum declarations `enum Foo: string { case Bar = 'x'; }` | yes | yes | no | [#1356](https://github.com/PurHur/php-compiler/issues/1356) | Backed enum cases as class constants; `Foo::Bar` const-like fetch; `enum_exists` registry |
 | Instance methods (`ClassMethod` / `Expr_MethodCall`) | yes | yes | yes | [#58](https://github.com/PurHur/php-compiler/issues/58) | MiniWebApp `$router->dispatch()` (#2059); compliance PHPT; bootstrap AOT |
 | Static methods on user classes (`Expr_StaticCall`) | yes | yes | yes | [#2209](https://github.com/PurHur/php-compiler/issues/2209) | Public static methods without $this; `Router::fromConfig()` factory (#2059); Late static `static::method()` tracked separately (#1231) |
@@ -44,7 +44,8 @@ Tracking issues: [#58](https://github.com/PurHur/php-compiler/issues/58), [#145]
 | Variable variables (`$$name`) | yes | yes | yes | [#1226](https://github.com/PurHur/php-compiler/issues/1226) | php-cfg nests Operand\Variable name; VM resolves runtime local by name; JIT compile-time name fold (#1226); compliance PHPT |
 | Variable function calls (`$fn()`) | yes | yes | yes | [#56](https://github.com/PurHur/php-compiler/issues/56) | VM resolves callee at runtime; compiler folds literal assignment; JIT uses compile-time string |
 | Invokable objects (`$obj()` / `__invoke`) | yes | yes | yes | [#1232](https://github.com/PurHur/php-compiler/issues/1232) | Object-typed FuncCall lowered to __invoke method dispatch; VM runtime fallback |
-| First-class callable syntax (`foo(...)`, `Class::m(...)`) | yes | yes | yes | [#1363](https://github.com/PurHur/php-compiler/issues/1363) | php-cfg Expr_FirstClassCallable (#1230); VM stores string or [obj, method] array; JIT folds strlen(...) / Class::m(...) via compileTimeString assign chains (#1363) |
+| First-class callable syntax (`foo(...)`, `Class::m(...)`) | yes | yes | yes | [#1363](https://github.com/PurHur/php-compiler/issues/1363) | php-cfg Expr_FirstClassCallable (#1230); VM stores string or [obj, method] array; JIT folds strlen(...) / Class::m(...) via compileTimeString assign chains (#1363); php-types TypeReconstructor patch for Expr_FirstClassCallable (#2315) |
+| `use function` / `use const` imports | yes | yes | yes | [#2325](https://github.com/PurHur/php-compiler/issues/2325) | php-cfg resolves imported names at parse time; no Stmt_Use lowering required; Grouped `use Foo\Bar` unchanged |
 | `never` return type | yes | yes | yes | [#1358](https://github.com/PurHur/php-compiler/issues/1358) | php-cfg Op\Type\Never_; any `return` in body is a compile error; normal completion via throw/exit |
 | Intersection types (`A&B`) | yes | yes | no | [#1357](https://github.com/PurHur/php-compiler/issues/1357) | php-cfg Op\Type\Intersection; VM checks object implements each interface at call |
 | `trait` declarations with method bodies | yes | yes | yes | [#2312](https://github.com/PurHur/php-compiler/issues/2312) | VM registers traits in class table with isTrait; trait use in classes is #144; interface_exists/trait_exists distinguish from class_exists |
@@ -70,7 +71,7 @@ ROADMAP Phase 2/4: [#78](https://github.com/PurHur/php-compiler/issues/78), asso
 | `arsort()` (values descending, preserve keys) | yes | yes | yes | [#2296](https://github.com/PurHur/php-compiler/issues/2296) | Homogeneous string/int values; packed + string-key assoc |
 | `rsort()` (values descending, reindex) | yes | yes | yes | [#2300](https://github.com/PurHur/php-compiler/issues/2300) | Packed homogeneous string/int lists; `__hashtable__sortPackedReverse` |
 | `shuffle()` (packed list, Fisher–Yates) | yes | yes | yes | [#2310](https://github.com/PurHur/php-compiler/issues/2310) | Packed lists without holes; CSPRNG via random_bytes lowering |
-| `array_rand()` (packed list keys) | yes | yes | yes | [#2321](https://github.com/PurHur/php-compiler/issues/2321) | Packed lists; num=1 returns int key; num>1 returns array of keys; CSPRNG via random_bytes |
+| `array_rand()` (packed list keys) | yes | yes | yes | [#2321](https://github.com/PurHur/php-compiler/issues/2321) | Packed lists; num=1 JIT/AOT; num>1 VM-only; CSPRNG via random_bytes |
 | `array_merge()` on string-key associative arrays | yes | yes | yes | [#2287](https://github.com/PurHur/php-compiler/issues/2287) | String-key maps; packed list append unchanged |
 
 _Rows curated from closed stdlib issues (#2271, #2282, #2290, #2296, #2300, #2287); regenerate via `php script/capability-syntax.php`._

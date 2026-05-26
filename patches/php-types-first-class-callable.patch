@@ -1,7 +1,6 @@
 --- vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
 +++ vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
-@@ -253,6 +253,12 @@ class TypeReconstructor
-             case 'Expr_Yield':
+@@ -292,6 +292,12 @@ class TypeReconstructor
              case 'Expr_Include':
                  // TODO: we may be able to determine these...
                  return false;
@@ -11,6 +10,6 @@
 +                }
 +
 +                return [Type::string()];
-         }
- 
-         throw new \LogicException('Unknown variable op found: '.$op->getType());
+             case 'Expr_MagicScriptConst':
+                 if ($op->kind === \PHPCfg\Op\Expr\MagicScriptConst::KIND_LINE) {
+                     return [Type::int()];
