@@ -28,9 +28,6 @@ final class ini_get_ extends Internal
             return;
         }
         $optionVar = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $optionVar->type) {
-            throw new \LogicException('ini_get() requires a string option in this compiler build');
-        }
         $result = VmIni::get($frame->vmContext, $optionVar->toString());
         if (false === $result) {
             $frame->returnVar->bool(false);
@@ -44,11 +41,8 @@ final class ini_get_ extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('ini_get() requires exactly one argument');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type) {
-            throw new \LogicException('ini_get() requires a string option in this compiler build');
-        }
-        $this->jitString($context, $args[0], 'ini_get() option');
+        $optionStr = $this->jitString($context, $args[0], 'ini_get() option');
 
-        return JitIni::get($context, $context->helper->loadValue($args[0]));
+        return JitIni::get($context, $optionStr);
     }
 }

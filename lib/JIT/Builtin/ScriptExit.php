@@ -19,7 +19,7 @@ final class ScriptExit
         switch ($arg->type) {
             case Variable::TYPE_STRING:
                 self::echoString($context, $context->helper->loadValue($arg));
-                self::callLibcExit($context, 0);
+                self::callLibcExit($context, $context->getTypeFromString('int64')->constInt(0, false));
                 break;
             case Variable::TYPE_NATIVE_LONG:
                 self::callLibcExit($context, $context->helper->loadValue($arg));
@@ -66,7 +66,7 @@ final class ScriptExit
             $boxedPtr
         );
         self::echoString($context, $strPtr);
-        self::callLibcExit($context, 0);
+        self::callLibcExit($context, $context->getTypeFromString('int64')->constInt(0, false));
 
         $context->builder->positionAtEnd($afterStringProbe);
         $context->builder->branchIf($isLong, $longBlock, $badBlock);
