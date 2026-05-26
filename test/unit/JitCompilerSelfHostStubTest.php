@@ -406,6 +406,19 @@ final class JitCompilerSelfHostStubTest extends TestCase
         );
     }
 
+    public function testSelfHostStubsTolerateDuplicateGlobalConstDeclare(): void
+    {
+        $source = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT.php');
+        $this->assertStringContainsString(
+            'Spine may require bin/vm.php after tokenizer-compat shims (#2134)',
+            $source
+        );
+        $this->assertMatchesRegularExpression(
+            '/defineConstant\([^)]+\)\)\) \{\s*\/\/ Spine may require bin\/vm\.php/s',
+            $source
+        );
+    }
+
     /** @return list<string> */
     private function compilerSkipPatternsFromJit(): array
     {
