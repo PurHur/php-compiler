@@ -124,6 +124,12 @@ if [[ "${WITH_HELLOWORLD}" -eq 1 ]]; then
   print_summary
 fi
 
+if [[ "${BOOTSTRAP_VENDOR_PRELINK_GATE:-0}" == "1" ]]; then
+  run_step "vendor-prelink-bundles" php script/bootstrap-vendor-objects.php --check
+  run_step "vendor-prelink-compile" make bootstrap-vendor-objects
+  print_summary
+fi
+
 for code in "${STEP_CODES[@]}"; do
   if [[ "${code}" -ne 0 && "${code}" -ne 2 ]]; then
     exit "${code}"

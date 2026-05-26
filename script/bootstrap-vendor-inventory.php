@@ -74,6 +74,28 @@ function bootstrapVendorRenderMarkdown(array $report): string
         $lines[] = '| `'.$name.'` | '.$info['php_files'].' | '.$info['role'].' |';
     }
     $lines[] = '';
+    $lines[] = '## Prelink targets (issue #1416)';
+    $lines[] = '';
+    $lines[] = '| Package | Bundle | Prelinked object |';
+    $lines[] = '|---------|--------|------------------|';
+    $manifestPath = dirname(__DIR__).'/prelinked/bootstrap-vendor/manifest.json';
+    $manifest = is_file($manifestPath)
+        ? json_decode((string) file_get_contents($manifestPath), true)
+        : null;
+    require_once __DIR__.'/bootstrap-vendor-prelink-lib.php';
+    foreach (BOOTSTRAP_VENDOR_PRELINK_PACKAGES as $package => $role) {
+        $slug = bootstrapVendorPrelinkSlug($package);
+        $bundle = 'test/bootstrap-vendor-prelink/generated/'.$slug.'_bundle.php';
+        $object = 'prelinked/bootstrap-vendor/'.$slug.'.o';
+        $status = 'pending';
+        if (is_array($manifest) && isset($manifest['packages'][$package]['status'])) {
+            $status = (string) $manifest['packages'][$package]['status'];
+        }
+        $lines[] = '| `'.$package.'` | `'.$bundle.'` | `'.$object.'` ('.$status.') |';
+    }
+    $lines[] = '';
+    $lines[] = 'Regenerate bundles: `php script/bootstrap-vendor-objects.php` · compile: `make bootstrap-vendor-objects`';
+    $lines[] = '';
     $lines[] = '## Non-goals (v1)';
     $lines[] = '';
     $lines[] = '- Compiling vendor from source inside the self-host bundle';

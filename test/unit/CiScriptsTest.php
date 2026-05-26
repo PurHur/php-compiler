@@ -1369,7 +1369,9 @@ final class CiScriptsTest extends TestCase
         $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
         $this->assertStringContainsString('ci_run_bootstrap_vendor_inventory_sync_check', $common);
         $this->assertStringContainsString('bootstrap-vendor-inventory.php', $common);
+        $this->assertStringContainsString('bootstrap-vendor-objects.php', $common);
         $this->assertStringContainsString('BOOTSTRAP_VENDOR_INVENTORY_SYNC_GATE:-0', $common);
+        $this->assertStringContainsString('BOOTSTRAP_VENDOR_PRELINK_SYNC_GATE:-0', $common);
     }
 
     public function testCiDockerRunPassesBootstrapVendorInventorySyncGateDefaultOn(): void
@@ -1447,7 +1449,7 @@ final class CiScriptsTest extends TestCase
     {
         $fast = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-fast.sh');
         $this->assertStringContainsString('ci_run_north_star2_verify', $fast);
-        $this->assertStringContainsString('NORTH_STAR2_VERIFY_GATE=1', $fast);
+        $this->assertStringContainsString('NORTH_STAR2_VERIFY_GATE=0', $fast);
 
         $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
         $this->assertStringContainsString('NORTH_STAR2_VERIFY_GATE', $common);

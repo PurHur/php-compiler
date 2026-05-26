@@ -246,7 +246,7 @@ test-docker-exec:
 .PHONY: test-docker-quick
 test-docker-quick: test-docker-fast
 
-.PHONY: bootstrap-inventory bootstrap-profile bootstrap-aot-lint bootstrap-aot-link bootstrap-aot-link-lib bootstrap-selfhost-probe bootstrap-selfhost-link bootstrap-selfhost-compile-smoke bootstrap-selfhost-runtime-compile-smoke bootstrap-selfhost-compiler-driver-smoke bootstrap-selfhost-jit-unit-probe bootstrap-selfhost-vm-unit-probe bootstrap-selfhost-parser-unit-probe bootstrap-selfhost-types-unit-probe bootstrap-selfhost-lib-spine-smoke bootstrap-selfhost-lib-spine-vm-smoke bootstrap-selfhost-helloworld bootstrap-loop-gen1-link bootstrap-loop-probe bootstrap-loop-probe-dry bootstrap-loop-probe-dry-run bootstrap-wave-check
+.PHONY: bootstrap-inventory bootstrap-profile bootstrap-aot-lint bootstrap-aot-link bootstrap-aot-link-lib bootstrap-vendor-prelink-bundles bootstrap-vendor-objects bootstrap-selfhost-probe bootstrap-selfhost-link bootstrap-selfhost-compile-smoke bootstrap-selfhost-runtime-compile-smoke bootstrap-selfhost-compiler-driver-smoke bootstrap-selfhost-jit-unit-probe bootstrap-selfhost-vm-unit-probe bootstrap-selfhost-parser-unit-probe bootstrap-selfhost-types-unit-probe bootstrap-selfhost-lib-spine-smoke bootstrap-selfhost-lib-spine-vm-smoke bootstrap-selfhost-helloworld bootstrap-loop-gen1-link bootstrap-loop-probe bootstrap-loop-probe-dry bootstrap-loop-probe-dry-run bootstrap-wave-check
 bootstrap-inventory:
 	php script/bootstrap-inventory.php
 bootstrap-profile: bootstrap-inventory
@@ -257,6 +257,10 @@ bootstrap-aot-link: bootstrap-profile
 	./script/bootstrap-aot-link.sh
 bootstrap-aot-link-lib: bootstrap-profile
 	./script/bootstrap-aot-link-lib.sh
+bootstrap-vendor-prelink-bundles:
+	php script/bootstrap-vendor-objects.php
+bootstrap-vendor-objects: bootstrap-vendor-prelink-bundles
+	./script/bootstrap-vendor-objects.sh --compile
 bootstrap-selfhost-probe:
 	./script/bootstrap-selfhost-compile-probe.sh
 bootstrap-selfhost-link:

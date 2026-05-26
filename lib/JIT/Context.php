@@ -391,6 +391,10 @@ class Context {
         }
         $objectFile = $file . '.o';
         $machine->emitToFile($this->module, $objectFile, $machine::CODEGEN_FILE_TYPE_OBJECT);
+        $keepObject = getenv('PHP_COMPILER_KEEP_OBJECT_FILE');
+        if ('1' === $keepObject || 'true' === strtolower((string) $keepObject)) {
+            return;
+        }
         Linker::link($objectFile, $file);
         unlink($objectFile);
     }

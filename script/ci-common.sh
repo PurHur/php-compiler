@@ -349,6 +349,14 @@ ci_run_bootstrap_vendor_inventory_sync_check() {
   ci_ensure_generated_doc script/bootstrap-vendor-inventory.php docs/bootstrap-vendor-inventory.md
 }
 
+ci_run_bootstrap_vendor_prelink_sync_check() {
+  if [[ "${BOOTSTRAP_VENDOR_PRELINK_SYNC_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  echo "Bootstrap vendor prelink bundle sync (BOOTSTRAP_VENDOR_PRELINK_SYNC_GATE=1, issue #1416)..."
+  "$PHP_BIN" "${PHP_OPTS[@]}" script/bootstrap-vendor-objects.php --check
+}
+
 ci_run_init_miniwebapp_parity_check() {
   if [[ "${INIT_MINIWEBAPP_PARITY_GATE:-1}" != "1" ]]; then
     return 0
@@ -458,6 +466,7 @@ ci_run_inventory_checks() {
   ci_run_selfhost_m4_gen2_sync_check
   ci_run_bootstrap_m3_strict_sync_check
   ci_run_bootstrap_vendor_inventory_sync_check
+  ci_run_bootstrap_vendor_prelink_sync_check
   ci_run_bootstrap_inventory_lint_sync_check
   ci_run_bootstrap_inventory_triage_sync_check
   ci_run_stdlib_jit_deferred_sync_check
