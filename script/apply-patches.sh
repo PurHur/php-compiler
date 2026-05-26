@@ -139,6 +139,9 @@ patch_already_applied() {
     php-types-first-class-callable.patch)
       grep -q 'Expr_FirstClassCallable' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
       ;;
+    php-types-terminal-static-var.patch)
+      grep -q "case 'Terminal_StaticVar':" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
+      ;;
     *)
       return 1
       ;;
@@ -285,6 +288,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-ns-func-call.patch"
   apply_patch "$PATCH_DIR/php-types-magic-script-const.patch"
   apply_patch "$PATCH_DIR/php-types-first-class-callable.patch"
+  apply_patch "$PATCH_DIR/php-types-terminal-static-var.patch"
   apply_patch "$PATCH_DIR/php-types-never-type.patch"
   apply_patch "$PATCH_DIR/php-types-intersection-type.patch"
 fi

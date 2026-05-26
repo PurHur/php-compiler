@@ -1406,6 +1406,20 @@ class JIT {
                         $this->ensureJitGlobal($globalName)
                     );
                     break;
+                case OpCode::TYPE_DECLARE_STATIC_LOCAL:
+                    if (!isset($block->constants[$op->arg2])) {
+                        throw new \LogicException('Static local storage key must be a compile-time constant');
+                    }
+                    $storageKey = $block->constants[$op->arg2]->toString();
+                    $default = (null !== $op->arg3 && isset($block->constants[$op->arg3]))
+                        ? $block->constants[$op->arg3]
+                        : null;
+                    $storage = JIT\StaticLocalInit::loadVariable($this->context, $storageKey, $default);
+                    $this->context->setVariableOp(
+                        $block->getOperand($op->arg1),
+                        $storage
+                    );
+                    break;
                 case OpCode::TYPE_VAR_FETCH:
                     $destOp = $block->getOperand($op->arg1);
                     if (!$this->context->hasVariableOp($destOp)) {
@@ -4037,16 +4051,59 @@ class JIT {
 
     private function compileBinaryOp(OpCode $op, Variable $left, Variable $right): Variable
     {
-        if (Variable::TYPE_VALUE === $left->type && Variable::TYPE_VALUE === $right->type) {
+        if (Variable::TYPE_VALUE === $left->type) {
             switch ($op->type) {
                 case OpCode::TYPE_BITWISE_AND:
                 case OpCode::TYPE_BITWISE_OR:
                 case OpCode::TYPE_BITWISE_XOR:
-                    return $this->compileValueBoxedBitwiseOp($op->type, $left, $right);
+                    if (Variable::TYPE_VALUE === $right->type) {
+                        return $this->compileValueBoxedBitwiseOp($op->type, $left, $right);
+                    }
+                    break;
+                case OpCode::TYPE_PLUS:
+                case OpCode::TYPE_MINUS:
+                case OpCode::TYPE_MUL:
+                case OpCode::TYPE_DIV:
+                case OpCode::TYPE_MODULO:
+                    return $this->compileValueBoxedNumericOp($op->type, $left, $right);
             }
         }
 
         return $this->context->helper->binaryOp($op, $left, $right);
+    }
+
+    private function compileValueBoxedNumericOp(int $opcodeType, Variable $left, Variable $right): Variable
+    {
+        $leftPtr = JIT\JitValueBox::normalizeValuePtr(
+            $this->context,
+            Variable::KIND_VARIABLE === $left->kind ? $left->value : $this->context->helper->loadValue($left)
+        );
+        $readLong = $this->context->lookupFunction('__value__readLong');
+        $writeLong = $this->context->lookupFunction('__value__writeLong');
+        $leftLong = $this->context->builder->call($readLong, $leftPtr);
+        $rightLong = $this->context->helper->loadValue($right);
+        switch ($opcodeType) {
+            case OpCode::TYPE_PLUS:
+                $resultLong = $this->context->builder->add($leftLong, $rightLong);
+                break;
+            case OpCode::TYPE_MINUS:
+                $resultLong = $this->context->builder->sub($leftLong, $rightLong);
+                break;
+            case OpCode::TYPE_MUL:
+                $resultLong = $this->context->builder->mul($leftLong, $rightLong);
+                break;
+            case OpCode::TYPE_DIV:
+                $resultLong = $this->context->builder->sdiv($leftLong, $rightLong);
+                break;
+            case OpCode::TYPE_MODULO:
+                $resultLong = $this->context->builder->srem($leftLong, $rightLong);
+                break;
+            default:
+                throw new \LogicException('Unsupported boxed numeric opcode: '.opcode_type_name($opcodeType));
+        }
+        $this->context->builder->call($writeLong, $leftPtr, $resultLong);
+
+        return new Variable($this->context, Variable::TYPE_NATIVE_LONG, Variable::KIND_VALUE, $resultLong);
     }
 
     private function compileValueBoxedBitwiseOp(int $opcodeType, Variable $left, Variable $right): Variable

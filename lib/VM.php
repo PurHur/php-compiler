@@ -142,7 +142,7 @@ restart:
                     if (null !== ($err = $this->enforceReadonlyPropertyWrite($arg2, $frame))) {
                         return $err;
                     }
-                    $arg2->copyFrom($arg3);
+                    $arg2->resolveIndirect()->copyFrom($arg3);
                     $arg1->copyFrom($arg3);
                     $strict = null !== $frame->parent
                         ? $frame->parent->block->strictTypes
@@ -176,6 +176,19 @@ restart:
                     }
                     $globalName = $frame->block->constants[$op->arg2]->toString();
                     $frame->scope[$op->arg1]->indirect($this->context->ensureGlobal($globalName));
+                    break;
+                case OpCode::TYPE_DECLARE_STATIC_LOCAL:
+                    if (!isset($frame->block->constants[$op->arg2])) {
+                        throw new \LogicException('Static local storage key must be a compile-time constant');
+                    }
+                    $storageKey = $frame->block->constants[$op->arg2]->toString();
+                    $default = null;
+                    if (null !== $op->arg3 && isset($frame->block->constants[$op->arg3])) {
+                        $default = $frame->block->constants[$op->arg3];
+                    }
+                    $frame->scope[$op->arg1]->indirect(
+                        $this->context->ensureFunctionStatic($storageKey, $default)
+                    );
                     break;
                 case OpCode::TYPE_ARRAY_DIM_FETCH:
                 case OpCode::TYPE_ARRAY_DIM_FETCH_WRITE:
@@ -263,7 +276,7 @@ restart:
                 case OpCode::TYPE_DIV:
                 case OpCode::TYPE_MODULO:
                 case OpCode::TYPE_POW:
-                    $arg1 = $frame->scope[$op->arg1];
+                    $arg1 = $frame->scope[$op->arg1]->resolveIndirect();
                     $arg2 = $frame->scope[$op->arg2];
                     $arg3 = $frame->scope[$op->arg3];
                     $arg1->numericOp($op->type, $arg2, $arg3);
@@ -286,7 +299,7 @@ restart:
                     $arg1->unaryOp($op->type, $arg2);
                     break;
                 case OpCode::TYPE_CONCAT:
-                    $arg1 = $frame->scope[$op->arg1];
+                    $arg1 = $frame->scope[$op->arg1]->resolveIndirect();
                     $arg2 = $frame->scope[$op->arg2]->toString();
                     $arg3 = $frame->scope[$op->arg3]->toString();
                     $arg1->string($arg2 . $arg3);

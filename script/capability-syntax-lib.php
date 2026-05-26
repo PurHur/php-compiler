@@ -246,6 +246,15 @@ function syntaxRowDefinitions(): array
             'probe' => 'class C { public static int $n = 1; } echo C::$n;',
         ],
         [
+            'id' => 'static_local',
+            'construct' => 'Function-local `static $var = literal`',
+            'opcodes' => ['TYPE_DECLARE_STATIC_LOCAL'],
+            'issue' => 2286,
+            'notes' => ['Literal initializer only; persists across calls in the same function'],
+            'probe' => 'function f(){static $n=0; $n++; return $n;} echo f().f().f();',
+            'aot' => true,
+        ],
+        [
             'id' => 'unset',
             'construct' => '`unset()` on variables and array offsets',
             'opcodes' => ['TYPE_UNSET'],

@@ -34,6 +34,9 @@ class Context {
     /** @var array<string, Variable> */
     private array $globalVars = [];
 
+    /** @var array<string, Variable> function static storage keyed by func\\0var (#2286) */
+    private array $functionStaticVars = [];
+
     public Runtime $runtime;
 
     /** Pending thrown value while dispatching catch handlers (issue #1362). */
@@ -176,6 +179,21 @@ class Context {
             $this->globalVars[$name] = new Variable(Variable::TYPE_NULL);
         }
         return $this->globalVars[$name];
+    }
+
+    public function ensureFunctionStatic(string $storageKey, ?Variable $default): Variable
+    {
+        if (!isset($this->functionStaticVars[$storageKey])) {
+            if (null !== $default) {
+                $storage = new Variable();
+                $storage->copyFrom($default);
+                $this->functionStaticVars[$storageKey] = $storage;
+            } else {
+                $this->functionStaticVars[$storageKey] = new Variable(Variable::TYPE_NULL);
+            }
+        }
+
+        return $this->functionStaticVars[$storageKey];
     }
 
     public function save(Frame $frame): RunStackEntry {

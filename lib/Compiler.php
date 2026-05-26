@@ -2561,6 +2561,37 @@ class Compiler {
                     $this->compileOperand($terminal->var, $block, false),
                     $nameSlot
                 )];
+            case 'Terminal_StaticVar':
+                if (null === $block->func) {
+                    throw new \LogicException('static variables are only allowed inside functions');
+                }
+                if (null !== $terminal->defaultBlock) {
+                    $this->compileOps($terminal->defaultBlock->children, $block);
+                }
+                if (null !== $terminal->defaultVar && !$terminal->defaultVar instanceof Operand\Literal) {
+                    throw new \CompileError(
+                        'function static variables only support literal initializers in this build (#2286)'
+                    );
+                }
+                $varName = $this->resolveSimpleVariableName($terminal->var);
+                $funcName = $block->func->name;
+                $storageKey = $funcName."\0".$varName;
+                $keyVar = new Variable(Variable::TYPE_STRING);
+                $keyVar->string($storageKey);
+                $keyOperand = new Operand\Literal($storageKey);
+                $keyOperand->type = Type::string();
+                $keySlot = $block->registerConstant($keyOperand, $keyVar);
+                $defaultSlot = null;
+                if (null !== $terminal->defaultVar) {
+                    $defaultSlot = $this->compileOperand($terminal->defaultVar, $block, true);
+                }
+
+                return [new OpCode(
+                    OpCode::TYPE_DECLARE_STATIC_LOCAL,
+                    $this->compileOperand($terminal->var, $block, false),
+                    $keySlot,
+                    $defaultSlot
+                )];
             default:
                 throw new \LogicException("Unknown Terminal Type: " . $terminal->getType());
         }

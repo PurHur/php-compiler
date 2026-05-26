@@ -1,0 +1,17 @@
+--- vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
+@@ -288,6 +288,14 @@ class TypeReconstructor
+                 }
+
+                 return [Type::string()];
++            case 'Terminal_StaticVar':
++                if (null !== $op->defaultVar) {
++                    if (!isset($resolved[$op->defaultVar])) {
++                        return false;
++                    }
++                    return [$resolved[$op->defaultVar]];
++                }
++                return [Type::null()];
+         }
+
+         throw new \LogicException('Unknown variable op found: '.$op->getType());

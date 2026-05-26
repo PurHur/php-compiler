@@ -122,6 +122,11 @@ class OpCode {
     const TYPE_DECLARE_ENUM = 103;
     /** unset(Class::$prop) — arg2 class, arg3 property name (#2256). */
     const TYPE_STATIC_PROPERTY_UNSET = 104;
+    /**
+     * Function-local static: `static $n = …` — arg1 local slot, arg2 storage key constant,
+     * arg3 optional default constant slot (#2286).
+     */
+    const TYPE_DECLARE_STATIC_LOCAL = 105;
 
     public int $type;
     public ?int $arg1;
