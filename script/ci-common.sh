@@ -308,6 +308,14 @@ ci_run_doctor_gates_matrix_sync_check() {
   "$PHP_BIN" "${PHP_OPTS[@]}" script/check-doctor-gates-sync.php
 }
 
+ci_run_docs_harness_hygiene_check() {
+  if [[ "${DOCS_HARNESS_HYGIENE_GATE:-1}" != "1" ]]; then
+    return 0
+  fi
+  echo "Docs harness hygiene (DOCS_HARNESS_HYGIENE_GATE=1, issue #2485)..."
+  "$PHP_BIN" "${PHP_OPTS[@]}" script/check-docs-harness-hygiene.php
+}
+
 ci_run_selfhost_m4_gen2_sync_check() {
   if [[ "${SELFHOST_M4_GEN2_SYNC_GATE:-1}" != "1" ]]; then
     echo "Self-host M4 gen-2 doc sync: skipped (SELFHOST_M4_GEN2_SYNC_GATE=0 opt-out)"
@@ -445,6 +453,7 @@ ci_run_inventory_checks() {
   ci_run_bootstrap_inventory_triage_sync_check
   ci_run_stdlib_jit_deferred_sync_check
   ci_run_doctor_gates_matrix_sync_check
+  ci_run_docs_harness_hygiene_check
 }
 
 ci_llvm_dir() {
