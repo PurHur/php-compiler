@@ -19,7 +19,7 @@ Regenerate capability truth: `php script/capability-matrix.php`, `php script/cap
 
 Related merges outside this wave: `goto` ([#1228](https://github.com/PurHur/php-compiler/issues/1228) / [#1333](https://github.com/PurHur/php-compiler/pull/1333)), anonymous classes ([#1233](https://github.com/PurHur/php-compiler/issues/1233) / [#1386](https://github.com/PurHur/php-compiler/pull/1386)).
 
-**M2 spine:** **654/657** inventory (`compiler_lib_spine_smoke` native link ✅; 3 deferred native-link [#2126](https://github.com/PurHur/php-compiler/issues/2126); [#1492](https://github.com/PurHur/php-compiler/issues/1492), M2 batches [#1419](https://github.com/PurHur/php-compiler/issues/1419), [#1497](https://github.com/PurHur/php-compiler/issues/1497)). Target doc: [self-host-target.md](self-host-target.md)
+**M2 spine:** **661** / **664** inventory (`compiler_lib_spine_smoke` native link ✅; 3 deferred native-link [#2126](https://github.com/PurHur/php-compiler/issues/2126); [#1492](https://github.com/PurHur/php-compiler/issues/1492), M2 batches [#1419](https://github.com/PurHur/php-compiler/issues/1419), [#1497](https://github.com/PurHur/php-compiler/issues/1497)). Target doc: [self-host-target.md](self-host-target.md)
 
 ## Language (#1354–#1366)
 

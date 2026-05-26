@@ -35,7 +35,7 @@ Supporting fixes from #1402:
 | `Runtime::parse` / `Runtime::compile` | On M3 allowlist; compile-driver link OK (#1496) |
 | `Runtime::loadJitContext` | Deny-listed (LLVM 9 link crash; same fragment as JIT deny list) |
 | `Runtime::__construct` | Slim ctor via `compileRuntimeConstructM3Native` → `compileBlockPhpLowering` (#1494) |
-| `Runtime::initParsePipeline` / `Runtime::initCompiler` / `Runtime::loadCoreModules` | On deny list; `compileRuntime*M3Native` → PHP CFG lowering (#1494) |
+| `Runtime::initParsePipeline` / `Runtime::initCompiler` / `Runtime::loadCoreModules` | On M3 allowlist; `compileRuntime*M3Native` → PHP CFG lowering (#1494) |
 | `Runtime::initVmContext` | **Native** via `RuntimeInitVmContext::emit` (allocate `VM\Context` + `ErrorReporter` + `ScriptStack`, wire `runtime` + `vmContext`); wired in `compileBlock()`; off deny list (#1494, #2126). PHP CFG `new VMContext` still LLVM 9 link crash when combined with ctor spine. |
 | `Runtime::loadJit` | `compileRuntimeLoadJitM3Native` + nested `createJit` helpers (#1495) |
 | `Runtime::standalone` | Compile-driver link OK (#1402, #1056) |
@@ -86,7 +86,6 @@ BOOTSTRAP_M3_RUNTIME_COMPILE=1 \
 |--------|-------|
 | `Block::slotIndexForVariableName` | Also in compiler hot-path skip |
 | `Runtime::__destruct` | Deny-listed (LLVM 9; not on compile spine) |
-| `Runtime::initParsePipeline` / `initCompiler` / `loadCoreModules` | PHP CFG spine; deny while expanding (#1494) |
 | `Runtime::loadJitContext` | Deny-listed (LLVM 9 link crash #1402) |
 | `Runtime::createJit` / `jitContextForLoadJit` / `loadJitCompileModuleFuncs` | Split from `loadJit`; stay on deny list (stubbed) while outer `loadJit` is real-lowered (#1495) |
 

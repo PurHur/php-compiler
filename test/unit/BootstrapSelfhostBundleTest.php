@@ -374,7 +374,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         $this->assertFileExists($entry);
         $contents = (string) file_get_contents($entry);
         $count = substr_count($contents, 'require_once __DIR__');
-        $this->assertSame(654, $count, 'M2 spine 609/611 inventory (2 deferred native-link #2126)');
+        $this->assertSame(661, $count, 'M2 spine 661/664 inventory (3 deferred native-link #2126)');
         foreach (self::LIB_SPINE_SMOKE_NEW_UNITS as $unit) {
             $this->assertStringContainsString(
                 "require_once __DIR__.'/../../../{$unit}';",

@@ -79,7 +79,7 @@
 <span class="php-cmt"># Self-host (experimental): native lib/ bundles</span>
 make bootstrap-selfhost-link   <span class="php-cmt"># M0 → compiler_minimal bundle OK</span>
 BOOTSTRAP_LIB_SPINE_SMOKE=1 make bootstrap-selfhost-lib-spine-smoke
-<span class="php-cmt"># M2 → compiler_lib_spine_smoke bundle OK (654/657)</span></code></pre>
+<span class="php-cmt"># M2 → compiler_lib_spine_smoke bundle OK (661/664)</span></code></pre>
     </div>
   </div>
 
@@ -146,7 +146,7 @@ BOOTSTRAP_LIB_SPINE_SMOKE=1 \
             <strong>Compiler fully compiles itself:</strong> native binary from <code>lib/</code> (no <code>vendor/</code>),
             compiles PHP, then rebuilds the next compiler revision without Zend.
           </p>
-          <p><strong>Status:</strong> M0 ✅ · M1 ✅ · M2 ✅ native link <strong>654/657</strong> · M3 🚧 native <strong>run</strong> ✅, native <strong>emit</strong> blocked ([#1937](https://github.com/PurHur/php-compiler/issues/1937)) · M4–M5 ⬜.</p>
+          <p><strong>Status:</strong> M0 ✅ · M1 ✅ · M2 ✅ native link <strong>661/664</strong> · M3 🚧 native <strong>run</strong> ✅, native <strong>emit</strong> blocked ([#1937](https://github.com/PurHur/php-compiler/issues/1937)) · M4–M5 ⬜.</p>
           <p><strong>To “compile itself”:</strong> close M3 emit → M4 bootstrap loop → M5 (no Zend, no <code>vendor/</code> at cold boot).</p>
           <p><a href="/php-compiler/development-status.html#north-star-self-host">Full north-star doc →</a> · <a href="https://github.com/PurHur/php-compiler/blob/master/docs/self-host-target.md">Target doc</a> · <a href="https://github.com/PurHur/php-compiler/issues/1492">#1492</a></p>
         </article>
@@ -250,7 +250,7 @@ BOOTSTRAP_LIB_SPINE_SMOKE=1 \
         <article class="card">
           <span class="phase-num">Self-host</span>
           <h3><span class="status-dot status-dot--wip"></span> Compile-itself</h3>
-          <p>M0–M1 ✅; M2 spine <strong>654/657</strong> link ✅; M3 partial (native run ✅, emit 🚧); M5 = full self-host.</p>
+          <p>M0–M1 ✅; M2 spine <strong>661/664</strong> link ✅; M3 partial (native run ✅, emit 🚧); M5 = full self-host.</p>
           <div class="mini-progress"><div class="progress-track"><div class="progress-fill" data-width="58"></div></div></div>
         </article>
       </div>
@@ -279,7 +279,7 @@ BOOTSTRAP_LIB_SPINE_SMOKE=1 \
         <li class="is-done">
           <span class="ladder__marker" aria-hidden="true">✓</span>
           <h4>M2 — Full top-level <code>lib/</code></h4>
-          <p>14/14 lint ✅; <strong>654/657</strong> spine units native link ✅ ([#1960](https://github.com/PurHur/php-compiler/issues/1960)); a few inventory paths still deferred ([#2126](https://github.com/PurHur/php-compiler/issues/2126)).</p>
+          <p>14/14 lint ✅; <strong>661/664</strong> spine units native link ✅ ([#1960](https://github.com/PurHur/php-compiler/issues/1960)); a few inventory paths still deferred ([#2126](https://github.com/PurHur/php-compiler/issues/2126)).</p>
         </li>
         <li class="is-wip">
           <span class="ladder__marker" aria-hidden="true">3</span>
