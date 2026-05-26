@@ -160,4 +160,19 @@ final class BootstrapRuntimeCompileSmokeTest extends TestCase
         $emit = (string) file_get_contents(self::$root.'/lib/JIT/BootstrapCompileSmokeM3Emit.php');
         $this->assertStringContainsString("'PHPCompiler\\\\Runtime::'", $emit);
     }
+
+    public function testEmitTuModeDetectsHelperLinkEnv(): void
+    {
+        $source = (string) file_get_contents(self::$root.'/lib/JIT/EmitTuMode.php');
+        $this->assertStringContainsString('PHP_COMPILER_EMIT_HELPER_LINK', $source);
+        $this->assertStringContainsString('PHP_COMPILER_M3_EMIT_TU', $source);
+        $emit = (string) file_get_contents(self::$root.'/lib/JIT/BootstrapCompileSmokeM3Emit.php');
+        $this->assertStringContainsString('EmitTuMode::isMinimalRuntime', $emit);
+        $runtime = (string) file_get_contents(self::$root.'/lib/Runtime.php');
+        $this->assertStringContainsString('EmitTuMode::isMinimalRuntime', $runtime);
+        $gen1 = (string) file_get_contents(self::$root.'/script/bootstrap-loop-gen1-link.sh');
+        $this->assertStringContainsString('BOOTSTRAP_M4_RUNTIME_COMPILE:-1', $gen1);
+        $probe = (string) file_get_contents(self::$root.'/script/bootstrap-loop-probe.sh');
+        $this->assertStringContainsString('BOOTSTRAP_M4_RUNTIME_COMPILE:-1', $probe);
+    }
 }

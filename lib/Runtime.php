@@ -118,12 +118,10 @@ class Runtime {
         return $this->jit;
     }
 
-    /** M3 emit smoke: compile main block only; skip eager ext/ JIT (#1983). */
+    /** M3 emit smoke: compile main block only; skip eager ext/ JIT (#1983, #2599). */
     private function shouldSkipLoadJitCompileModuleFuncs(): bool
     {
-        $flag = getenv('PHP_COMPILER_M3_EMIT_MINIMAL');
-
-        return '1' === $flag || 'true' === strtolower((string) $flag);
+        return JIT\EmitTuMode::isMinimalRuntime();
     }
 
     /** Avoid inlining loadJitContext into loadJit (LLVM 9 crash when both are real-lowered #1402). */

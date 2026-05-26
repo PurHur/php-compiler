@@ -184,6 +184,7 @@ final class BootstrapBootstrapLoopProbeTest extends TestCase
         $this->assertStringContainsString('bootstrap-loop-gen1-link: OK', $out);
         $this->assertStringContainsString('compiler smoke', $out);
         $this->assertStringContainsString('emit helper link OK', $out);
+        $this->assertStringContainsString('emit_path=native', $out);
         $this->assertStringNotContainsString(
             'emit helper link failed (exit 255, mode=selfhost stubs (no PHP_COMPILER_M3_COMPILE_DRIVER))',
             $out

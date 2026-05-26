@@ -79,7 +79,7 @@ if [[ "${BOOTSTRAP_M4_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
   set -e
   if [[ -x "${EMIT_HELPER}" ]]; then
     echo "bootstrap-loop-gen1-link: emit helper link OK (${ROOT}/${EMIT_HELPER}, ${m4_link_mode})"
-    if [[ "${BOOTSTRAP_M4_RUNTIME_COMPILE:-0}" == "1" ]]; then
+    if [[ "${BOOTSTRAP_M4_RUNTIME_COMPILE:-1}" == "1" ]]; then
       set +e
       compile_out="$(
         env PHP_COMPILER_M3_EMIT_MINIMAL=1 \
@@ -104,7 +104,7 @@ if [[ "${BOOTSTRAP_M4_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
         printf '%s\n' "${compile_out}" >&2
       fi
     else
-      M4_BLOCK_REASON="runtime gate: BOOTSTRAP_M4_RUNTIME_COMPILE=1 not set (M3 emit TU runtime init — #1937)"
+      M4_BLOCK_REASON="runtime compile skipped (BOOTSTRAP_M4_RUNTIME_COMPILE=0)"
     fi
   else
     M4_BLOCK_REASON="emit helper link failed ($(m4_gen_exit_label "${emit_link_code}"), mode=${m4_link_mode})"
