@@ -5136,6 +5136,49 @@ final class ArrayBuiltinHelper
         HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
     }
 
+    public static function sortPackedReverse(Context $context, Variable $array): void
+    {
+        if (self::isNativeArray($array->type)) {
+            throw new \LogicException(
+                'arsort() cannot compile fixed-size literal arrays in JIT/AOT yet; use bin/vm.php or bin/serve.php, or build the list with [] append'
+            );
+        }
+        $ht = self::loadHashTable($context, $array);
+        $context->builder->call($context->lookupFunction('__hashtable__sortPackedReverse'), $ht);
+        HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
+    }
+
+    public static function sortStringKeyValuesReverse(Context $context, Variable $array): void
+    {
+        $ht = self::loadHashTable($context, $array);
+        $context->builder->call($context->lookupFunction('__hashtable__sortStringKeyValuesReverse'), $ht);
+        HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
+    }
+
+    public static function arsortByValue(Context $context, Variable $array): void
+    {
+        if (self::isNativeArray($array->type)) {
+            throw new \LogicException(
+                'arsort() cannot compile fixed-size literal arrays in JIT/AOT yet; use bin/vm.php or bin/serve.php'
+            );
+        }
+        $isList = \PHPCompiler\ext\standard\JitArrayIsList::invoke($context, $array);
+        $done = BasicBlockHelper::append($context, 'arsort_done');
+        $sortList = BasicBlockHelper::append($context, 'arsort_sort_list');
+        $sortAssoc = BasicBlockHelper::append($context, 'arsort_sort_assoc');
+        $context->builder->branchIf($isList, $sortList, $sortAssoc);
+
+        $context->builder->positionAtEnd($sortList);
+        self::sortPackedReverse($context, $array);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($sortAssoc);
+        self::sortStringKeyValuesReverse($context, $array);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+    }
+
     private static function sameTypeEqual(Context $context, Variable $left, Variable $right): Value
     {
         switch ($left->type) {
