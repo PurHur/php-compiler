@@ -130,6 +130,8 @@ class OpCode {
     const TYPE_DECLARE_TRAIT = 106;
     /** Import trait methods into a class body (`use SomeTrait;`, issue #2314). */
     const TYPE_USE_TRAIT = 107;
+    /** Suspend generator and expose value/key to foreach (issue #167). arg2=value slot, arg3=key slot. */
+    const TYPE_YIELD = 108;
 
     public int $type;
     public ?int $arg1;

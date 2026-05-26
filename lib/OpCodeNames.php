@@ -202,6 +202,10 @@ function opcode_type_name(int $type): string
             return 'TYPE_DECLARE_FUNCTION_STATIC';
         case 106:
             return 'TYPE_DECLARE_TRAIT';
+        case 107:
+            return 'TYPE_USE_TRAIT';
+        case 108:
+            return 'TYPE_YIELD';
         default:
             return 'unknown opcode';
     }

@@ -49,6 +49,9 @@ class Context {
 
     public ScriptStack $scriptStack;
 
+    /** @var array<int, Variable> foreach iterator container cache (issue #167, #1885). */
+    public array $foreachIterators = [];
+
     public function __construct(Runtime $runtime) {
         $this->runtime = $runtime;
         $this->errors = new ErrorReporter();

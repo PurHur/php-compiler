@@ -44,6 +44,20 @@ class Frame {
     /** Class used for the pending static call (set by STATICCALL_INIT / initStaticCallable). */
     public ?string $staticCallClass = null;
 
+    /** Active generator while executing a generator function body (issue #167). */
+    public ?VM\GeneratorState $generatorState = null;
+
+    /** Set when TYPE_YIELD suspends; runFrames returns GENERATOR_YIELD. */
+    public bool $generatorYield = false;
+
+    /**
+     * Foreach iterator container cache keyed by scope slot.
+     * php-cfg SSA temps may alias (issue #1885); ITER_* must not rely on rereading the slot.
+     *
+     * @var array<int, Variable>
+     */
+    public array $iterators = [];
+
     public function __construct(?Handler $handler, ?Block $block, ?Frame $parent, Variable ...$scope) {
         $this->handler = $handler;
         $this->block = $block;

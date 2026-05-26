@@ -21,7 +21,6 @@ final class UnsupportedRegistry
         'Stmt_TryCatch' => 57,
         'Stmt_Catch' => 57,
         'Stmt_Finally' => 57,
-        'Expr_Yield' => 167,
         'Expr_YieldFrom' => 167,
         'Expr_ArrowFunction' => 142,
         'Expr_Closure' => 72,

@@ -85,6 +85,9 @@ class Block {
     /** Parameter indices declared with `&$param` (issue #140). */
     public array $paramByRef = [];
 
+    /** Function body contains `yield` (issue #167). */
+    public bool $isGenerator = false;
+
     /** Resolved absolute paths for TYPE_INCLUDE opcodes (arg3 index, issue #54). */
     public array $literalIncludePaths = [];
 

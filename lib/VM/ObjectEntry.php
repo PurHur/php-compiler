@@ -25,6 +25,9 @@ class ObjectEntry {
     /** True after `__construct` returns (or immediately when none is defined). */
     public bool $constructed = false;
 
+    /** User generator instance state (issue #167). */
+    public ?GeneratorState $generatorState = null;
+
     public function __construct(ClassEntry $class) {
         $this->class = $class;
         $this->id = ++self::$counter;

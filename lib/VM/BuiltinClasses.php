@@ -30,6 +30,7 @@ final class BuiltinClasses
         self::registerWeakReference($ctx);
         self::registerWeakMap($ctx);
         self::registerReflection($ctx);
+        GeneratorState::register($ctx);
     }
 
     private static function registerWeakReference(Context $ctx): void

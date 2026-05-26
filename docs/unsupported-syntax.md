@@ -31,7 +31,7 @@ Some constructs (for example `break`/`continue`, `goto`/`label`, `list()` / shor
 |----------|----------|
 | `Expr_Throw` | [#195](https://github.com/PurHur/php-compiler/issues/195) |
 | `Stmt_Try`, `Stmt_TryCatch`, `Stmt_Catch`, `Stmt_Finally` | [#57](https://github.com/PurHur/php-compiler/issues/57) (AOT lint lowering; VM unwind follow-up) |
-| `Expr_Yield`, `Expr_YieldFrom` | [#167](https://github.com/PurHur/php-compiler/issues/167) |
+| `Expr_YieldFrom` | [#167](https://github.com/PurHur/php-compiler/issues/167) |
 | `Expr_Closure` | [#72](https://github.com/PurHur/php-compiler/issues/72) |
 | `Expr_ArrowFunction` | [#142](https://github.com/PurHur/php-compiler/issues/142) |
 | `Expr_New` (non-trivial) | [#136](https://github.com/PurHur/php-compiler/issues/136) |

@@ -14,6 +14,7 @@ require_once __DIR__.'/OpCodeNames.php';
 use PHPCompiler\Func;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ClassEntry;
+use PHPCompiler\VM\GeneratorState;
 use PHPCompiler\VM\NamedArgs;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\TypeCheck;
@@ -23,6 +24,9 @@ use PHPCompiler\Web\Superglobals;
 class VM {
     const SUCCESS = 1;
     const FAILURE = 2;
+
+    /** Generator body suspended at `yield` (issue #167). */
+    const GENERATOR_YIELD = 3;
 
     public Context $context;
 
@@ -507,6 +511,13 @@ restart:
                     $this->enforceReturnType($frame, null);
                     // Do not null returnVar: it may alias the caller result slot (#1885).
                     $this->markObjectConstructedIfLeavingConstruct($frame);
+                    $gen = $this->findGeneratorState($frame);
+                    if (null !== $gen) {
+                        $gen->done = true;
+                        $gen->frame = null;
+                        $gen->hasCurrent = false;
+                        goto nextframe;
+                    }
                     if ($frame->ephemeral && null !== $frame->parent) {
                         $frame = $frame->parent;
                         goto restart;
@@ -610,6 +621,21 @@ restart:
                     if (is_null($frame->call)) {
                         // Used for null constructors, etc
                         $this->markPendingNewObjectConstructed($frame);
+                        break;
+                    }
+                    if ($frame->call instanceof Func\PHP && $frame->call->block->isGenerator) {
+                        try {
+                            $calledArgs = $this->resolveOutgoingCallArgs($frame);
+                        } catch (\LogicException $e) {
+                            return $this->raise($e->getMessage(), $frame);
+                        }
+                        $state = new GeneratorState($this, $frame->call, $calledArgs);
+                        if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                            $this->scopeSlot($frame, (int) $op->arg1)->object($state->wrapObject());
+                        }
+                        $frame->call = null;
+                        $frame->callArgs = [];
+                        $frame->callArgEntries = [];
                         break;
                     }
                     $new = $frame->call->getFrame($this->context, $frame);
@@ -900,29 +926,72 @@ restart:
                     }
                     $frame = $new;
                     goto restart;
+                case OpCode::TYPE_YIELD:
+                    $gen = $this->findGeneratorState($frame);
+                    if (null === $gen) {
+                        throw new \LogicException('yield outside generator function');
+                    }
+                    if (null !== $op->arg2 && isset($frame->scope[$op->arg2])) {
+                        $gen->currentValue->copyFrom($frame->scope[$op->arg2]->resolveIndirect());
+                    } else {
+                        $gen->currentValue->null();
+                    }
+                    if (null !== $op->arg3 && isset($frame->scope[$op->arg3])) {
+                        $gen->currentKey->copyFrom($frame->scope[$op->arg3]->resolveIndirect());
+                    } else {
+                        $gen->currentKey->int($gen->autoKey++);
+                    }
+                    $gen->hasCurrent = true;
+                    $gen->frame = $frame;
+                    $frame->generatorYield = true;
+                    break;
                 case OpCode::TYPE_ITER_RESET:
                     $container = $frame->scope[$op->arg1]->resolveIndirect();
+                    $frame->iterators[$op->arg1] = $container;
+                    $this->context->foreachIterators[$op->arg1] = $container;
+                    if ($this->variableIsGenerator($container)) {
+                        $container->toObject()->generatorState->rewind();
+                        break;
+                    }
                     if (Variable::TYPE_ARRAY !== $container->type) {
                         throw new \LogicException('Iterator reset requires an array');
                     }
                     $container->toArray()->iterReset();
                     break;
                 case OpCode::TYPE_ITER_VALID:
-                    $container = $frame->scope[$op->arg2]->resolveIndirect();
+                    $container = ($this->context->foreachIterators[$op->arg2] ?? ($frame->iterators[$op->arg2] ?? $frame->scope[$op->arg2]))->resolveIndirect();
+                    if ($this->variableIsGenerator($container)) {
+                        $frame->scope[$op->arg1]->bool(
+                            $this->advanceGeneratorIteration($container->toObject()->generatorState)
+                        );
+                        break;
+                    }
                     if (Variable::TYPE_ARRAY !== $container->type) {
                         throw new \LogicException('Iterator valid requires an array');
                     }
                     $frame->scope[$op->arg1]->bool($container->toArray()->iterValid());
                     break;
                 case OpCode::TYPE_ITER_KEY:
-                    $container = $frame->scope[$op->arg2]->resolveIndirect();
+                    $container = ($this->context->foreachIterators[$op->arg2] ?? ($frame->iterators[$op->arg2] ?? $frame->scope[$op->arg2]))->resolveIndirect();
+                    if ($this->variableIsGenerator($container)) {
+                        $frame->scope[$op->arg1]->copyFrom(
+                            $container->toObject()->generatorState->currentKey
+                        );
+                        break;
+                    }
                     if (Variable::TYPE_ARRAY !== $container->type) {
                         throw new \LogicException('Iterator key requires an array');
                     }
                     $frame->scope[$op->arg1]->copyFrom($container->toArray()->iterCurrentKey());
                     break;
                 case OpCode::TYPE_ITER_VALUE:
-                    $container = $frame->scope[$op->arg2]->resolveIndirect();
+                    $container = ($this->context->foreachIterators[$op->arg2] ?? ($frame->iterators[$op->arg2] ?? $frame->scope[$op->arg2]))->resolveIndirect();
+                    if ($this->variableIsGenerator($container)) {
+                        $frame->scope[$op->arg1]->copyFrom(
+                            $container->toObject()->generatorState->currentValue
+                        );
+                        break;
+                    }
                     if (Variable::TYPE_ARRAY !== $container->type) {
                         throw new \LogicException('Iterator value requires an array');
                     }
@@ -986,6 +1055,11 @@ restart:
                     throw new \Exception($thrown->toString());
                 default:
                     throw new \LogicException("VM OpCode Not Implemented: " . opcode_type_name($op->type));
+            }
+            if ($frame->generatorYield) {
+                $frame->generatorYield = false;
+
+                return self::GENERATOR_YIELD;
             }
         }
         if ($frame->ephemeral) {
@@ -1206,6 +1280,55 @@ restart:
         $name = strtolower($func->name);
 
         return '__construct' === $name || str_ends_with($name, '::__construct');
+    }
+
+    private function variableIsGenerator(Variable $container): bool
+    {
+        $container = $container->resolveIndirect();
+
+        return Variable::TYPE_OBJECT === $container->type
+            && null !== $container->toObject()->generatorState;
+    }
+
+    private function findGeneratorState(Frame $frame): ?GeneratorState
+    {
+        while (null !== $frame) {
+            if (null !== $frame->generatorState) {
+                return $frame->generatorState;
+            }
+            $frame = $frame->parent;
+        }
+
+        return null;
+    }
+
+    private function advanceGeneratorIteration(GeneratorState $gen): bool
+    {
+        if ($gen->done) {
+            return false;
+        }
+        if (null === $gen->frame) {
+            $gen->frame = $gen->func->getFrame($this->context, null);
+            $gen->frame->calledArgs = $gen->calledArgs;
+            $gen->frame->generatorState = $gen;
+            $gen->frame->pos = 0;
+        }
+        $savedStack = $this->context->swapRunStack(null);
+        try {
+            $this->context->push($gen->frame);
+            $result = $this->runFrames();
+        } finally {
+            $this->context->swapRunStack($savedStack);
+        }
+        if (self::GENERATOR_YIELD === $result) {
+            return $gen->hasCurrent;
+        }
+        $gen->frame = null;
+        if (self::SUCCESS === $result) {
+            $gen->done = true;
+        }
+
+        return false;
     }
 
     /**

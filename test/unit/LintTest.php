@@ -67,9 +67,8 @@ PHP;
     {
         $code = '<?php function f() { yield 1; }';
         $exit = $this->runLint(['-r', $code]);
-        $this->assertSame(1, $exit['code']);
-        $this->assertStringContainsString('#167', $exit['stdout']);
-        $this->assertStringNotContainsString('#114', $exit['stdout']);
+        $this->assertSame(0, $exit['code']);
+        $this->assertStringNotContainsString('#167', $exit['stdout']);
     }
 
     public function testLintPreIncExitsZero(): void
@@ -127,16 +126,10 @@ PHP;
     {
         $code = '<?php function f() { yield 1; }';
         $exit = $this->runLint(['--json', '-r', $code]);
-        $this->assertSame(1, $exit['code']);
+        $this->assertSame(0, $exit['code']);
         $decoded = json_decode($exit['stdout'], true);
         $this->assertIsArray($decoded);
-        $this->assertNotEmpty($decoded['issues']);
-        $this->assertArrayHasKey('line', $decoded['issues'][0]);
-        $this->assertSame(167, $decoded['issues'][0]['issue']);
-        $this->assertSame(
-            'https://github.com/PurHur/php-compiler/issues/167',
-            $decoded['issues'][0]['issue_url']
-        );
+        $this->assertSame([], $decoded['issues'] ?? null);
     }
 
     public function testPhpcLintDelegatesToLintScript(): void
@@ -144,8 +137,8 @@ PHP;
         $repoRoot = dirname(__DIR__, 2);
         $cmd = array_merge(self::phpCommand(), [$repoRoot.'/bin/phpc.php', 'lint', '-r', '<?php function f() { yield 1; }']);
         $exit = $this->runCommand($cmd, $repoRoot);
-        $this->assertSame(1, $exit['code']);
-        $this->assertStringContainsString('#167', $exit['stdout']);
+        $this->assertSame(0, $exit['code']);
+        $this->assertStringNotContainsString('#167', $exit['stdout']);
     }
 
     /**

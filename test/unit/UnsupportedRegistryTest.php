@@ -20,7 +20,6 @@ final class UnsupportedRegistryTest extends TestCase
     public static function kindToIssueProvider(): array
     {
         return [
-            'yield' => ['Expr_Yield', 167],
             'yield from' => ['Expr_YieldFrom', 167],
             'closure' => ['Expr_Closure', 72],
             'arrow function' => ['Expr_ArrowFunction', 142],

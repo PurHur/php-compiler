@@ -10,7 +10,7 @@ Tracking issues: [#58](https://github.com/PurHur/php-compiler/issues/58), [#145]
 | Construct | VM | JIT | AOT | Issue | Notes |
 |-----------|:--:|:---:|:---:|-------|-------|
 | `class` / `new` | yes | yes | yes | [#58](https://github.com/PurHur/php-compiler/issues/58) | compliance PHPT; bootstrap AOT |
-| Anonymous class `new class { }` | yes | yes | no | [#1233](https://github.com/PurHur/php-compiler/issues/1233) | php-cfg inline Stmt\Class_ in parseExpr_New; synthetic AnonymousClass@line name |
+| Anonymous class `new class { }` | yes | yes | yes | [#1233](https://github.com/PurHur/php-compiler/issues/1233) | php-cfg inline Stmt\Class_ in parseExpr_New; synthetic AnonymousClass@line name |
 | Enum declarations `enum Foo: string { case Bar = 'x'; }` | yes | yes | no | [#1356](https://github.com/PurHur/php-compiler/issues/1356) | Backed enum cases as class constants; `Foo::Bar` const-like fetch; `enum_exists` registry |
 | Instance methods (`ClassMethod` / `Expr_MethodCall`) | yes | yes | yes | [#58](https://github.com/PurHur/php-compiler/issues/58) | MiniWebApp `$router->dispatch()` (#2059); compliance PHPT; bootstrap AOT |
 | Static methods on user classes (`Expr_StaticCall`) | yes | yes | yes | [#2209](https://github.com/PurHur/php-compiler/issues/2209) | Public static methods without $this; `Router::fromConfig()` factory (#2059); Late static `static::method()` tracked separately (#1231) |
@@ -25,6 +25,7 @@ Tracking issues: [#58](https://github.com/PurHur/php-compiler/issues/58), [#145]
 | `instanceof` | yes | yes | yes | [#138](https://github.com/PurHur/php-compiler/issues/138) | compliance PHPT; bootstrap AOT |
 | `match` expression | yes | yes | yes | [#143](https://github.com/PurHur/php-compiler/issues/143) | Lowered in php-cfg to === / jump-if / assign (#143); Wave-3 literal-arm subset (#2398); acceptance PHPT (#2428); compliance PHPT; bootstrap AOT |
 | Arrow functions `fn () =>` | no | no | no | [#142](https://github.com/PurHur/php-compiler/issues/142) | compliance PHPT |
+| Generators (`yield` / `foreach`) | yes | no | no | [#167](https://github.com/PurHur/php-compiler/issues/167) | VM-only; `yield from` deferred (#167); compliance PHPT; VM-only lowering |
 | `ClassName::class` / `static::class` | yes | yes | yes | [#740](https://github.com/PurHur/php-compiler/issues/740) | Compile-time class name string; related to __CLASS__ (#199); compliance PHPT; bootstrap AOT |
 | Class member constants `public` / `private` / `protected const` | yes | yes | yes | [#2199](https://github.com/PurHur/php-compiler/issues/2199) | MiniWebApp `Router::DEFAULT_CONTACT_NAME_MAX` (#2059); compliance PHPT; bootstrap AOT |
 | Late static binding `static::method()` / `static::class` | yes | yes | yes | [#1231](https://github.com/PurHur/php-compiler/issues/1231) | VM/JIT called-class propagation; parent::method() and static:: LSB (#1858) |
