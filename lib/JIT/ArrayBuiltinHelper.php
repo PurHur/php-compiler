@@ -4956,9 +4956,30 @@ final class ArrayBuiltinHelper
         HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
     }
 
-    /** ksort() — JIT no-op (packed lists sorted; string/int assoc use VM — #2271). */
     public static function ksortByKey(Context $context, Variable $array): void
     {
+        if (self::isNativeArray($array->type)) {
+            throw new \LogicException(
+                'ksort() cannot compile fixed-size literal arrays in JIT/AOT yet; use bin/vm.php or bin/serve.php'
+            );
+        }
+        $isList = \PHPCompiler\ext\standard\JitArrayIsList::invoke($context, $array);
+        $done = BasicBlockHelper::append($context, 'ksort_done');
+        $sort = BasicBlockHelper::append($context, 'ksort_sort');
+        $context->builder->branchIf($isList, $done, $sort);
+
+        $context->builder->positionAtEnd($sort);
+        self::sortStringKeys($context, $array);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+    }
+
+    public static function sortStringKeys(Context $context, Variable $array): void
+    {
+        $ht = self::loadHashTable($context, $array);
+        $context->builder->call($context->lookupFunction('__hashtable__sortStringKeys'), $ht);
+        HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
     }
 
     private static function sameTypeEqual(Context $context, Variable $left, Variable $right): Value

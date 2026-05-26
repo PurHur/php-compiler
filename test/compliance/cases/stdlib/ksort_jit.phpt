@@ -1,9 +1,13 @@
 --TEST--
-stdlib ksort() JIT (packed lists; string keys: VM)
+stdlib ksort() JIT string-key hashtable (issue #2271)
 --FILE--
 <?php
-$b = array(1, 2, 3);
-ksort($b);
-echo $b[0], ',', $b[1], ',', $b[2], "\n";
+$data = ['b' => 'zebra', 'a' => 'apple', 'c' => 'mango'];
+ksort($data);
+foreach ($data as $key => $value) {
+    echo $key, ':', $value, "\n";
+}
 --EXPECT--
-1,2,3
+a:apple
+b:zebra
+c:mango

@@ -100,7 +100,18 @@ final class VmArray
         VmInternalCompare::sortKeyedPairsByKey($pairs);
         $sorted = new HashTable();
         foreach ($pairs as [$key, $value]) {
-            array_map::appendKeyedCopy($sorted, $key, $value);
+            $resolvedKey = $key->resolveIndirect();
+            $copy = new Variable();
+            $copy->copyFrom($value);
+            if (Variable::TYPE_INTEGER === $resolvedKey->type) {
+                $sorted->addIndex($resolvedKey->toInt(), $copy);
+            } elseif (Variable::TYPE_STRING === $resolvedKey->type) {
+                $sorted->add($resolvedKey->toString(), $copy);
+            } else {
+                throw new \LogicException(
+                    'ksort() only supports homogeneous string or integer keys in this compiler build'
+                );
+            }
         }
 
         return $sorted;
