@@ -50,14 +50,11 @@ helloworld_m3_emit_next_lower() {
 }
 # shellcheck source=php-env.sh
 source "$(dirname "$0")/php-env.sh"
+# shellcheck source=selfhost-preflight.sh
+source "$(dirname "$0")/selfhost-preflight.sh"
 ci_apply_llvm_memory_env
 
-if ! command -v php >/dev/null 2>&1; then
-  echo "bootstrap-selfhost-helloworld-probe: missing 'php' on host." >&2
-  echo "bootstrap-selfhost-helloworld-probe: run via Docker instead:" >&2
-  echo "  ./script/docker-exec.sh -- bash -lc 'make bootstrap-selfhost-helloworld'" >&2
-  exit 1
-fi
+selfhost_preflight bootstrap-selfhost-helloworld-probe php-or-docker
 
 # Strict mode requires native emit — auto-enable compile-driver link env (mirror compile-smoke; #2610).
 if [[ "${BOOTSTRAP_M3_HELLOWORLD_STRICT:-0}" == "1" ]]; then

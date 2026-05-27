@@ -1925,6 +1925,34 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('PHP_COMPILER_CI_SINGLE_CONTAINER', $body);
     }
 
+    public function testSelfhostPreflightScriptDefinesModesAndDockerPath(): void
+    {
+        $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/selfhost-preflight.sh');
+        $this->assertStringContainsString('selfhost_preflight', $body);
+        $this->assertStringContainsString('php-or-docker', $body);
+        $this->assertStringContainsString('docker-only', $body);
+        $this->assertStringContainsString('environment prerequisites missing', $body);
+        $this->assertStringContainsString('./script/docker-exec.sh', $body);
+        $this->assertStringContainsString('do not nest', $body);
+    }
+
+    public function testBootstrapScriptsSourceSelfhostPreflight(): void
+    {
+        $root = dirname(__DIR__, 2);
+        foreach (
+            [
+                'bootstrap-selfhost-link.sh',
+                'bootstrap-selfhost-helloworld-probe.sh',
+                'bootstrap-loop-probe.sh',
+                'docker-exec.sh',
+            ] as $script
+        ) {
+            $body = (string) file_get_contents($root.'/script/'.$script);
+            $this->assertStringContainsString('selfhost-preflight.sh', $body, $script);
+            $this->assertStringContainsString('selfhost_preflight', $body, $script);
+        }
+    }
+
     public function testLocalCiMatrixDocumentsDockerPreflight(): void
     {
         $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
