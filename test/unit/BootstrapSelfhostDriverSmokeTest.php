@@ -23,6 +23,18 @@ final class BootstrapSelfhostDriverSmokeTest extends TestCase
         $this->assertStringContainsString('PHP_COMPILER_M3_COMPILE_MODE=compile', $script);
         $this->assertStringContainsString('emit_path=native', $script);
         $this->assertStringContainsString('compiler smoke', $script);
+        $this->assertStringContainsString('compiler_smoke_standalone.php', $script);
+        $this->assertStringContainsString('PHP_COMPILER_M3_SOURCE="${EMIT_PROBE}"', $script);
+        $this->assertStringNotContainsString(' -l ', $script);
+    }
+
+    public function testCompileSmokeM3EmitRegistersLinkerPolyfillBeforeStandalone(): void
+    {
+        $source = (string) file_get_contents(self::$root.'/test/bootstrap-aot/compile_smoke_m3_emit.php');
+        $this->assertStringContainsString('bootstrap_m3_emit_ensure_phpc_run_command', $source);
+        $this->assertStringContainsString('phpc_run_command_polyfill.php', $source);
+        $this->assertStringContainsString('bootstrap_m3_emit_ensure_phpc_run_command();', $source);
+        $this->assertStringContainsString('$runtime->standalone', $source);
     }
 
     public function testMakefileExposesDriverSmokeTarget(): void

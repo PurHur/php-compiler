@@ -91,14 +91,29 @@ if ! grep -qx "${EXPECTED_STDOUT}" <<< "${run_out}"; then
 fi
 
 if [[ -x "${COMPILED_COMPILE}" ]]; then
-  echo "bootstrap-selfhost-driver-smoke: stage 3 — compiled bin/compile.php lint (no Zend)"
+  echo "bootstrap-selfhost-driver-smoke: stage 3 — compiled driver native emit (no Zend)"
+  EMIT_PROBE="${ROOT}/test/bootstrap-aot/compiler_smoke_standalone.php"
+  EMIT_OUT="${ROOT}/build/selfhost-driver-smoke-emit-aot"
+  rm -f "${EMIT_OUT}"
   set +e
-  lint_out="$("${COMPILED_COMPILE}" -l "${ROOT}/test/bootstrap-aot/echo_hello.php" 2>&1)"
-  lint_code=$?
+  emit_out="$(
+    env PHP_COMPILER_M3_SOURCE="${EMIT_PROBE}" \
+      PHP_COMPILER_M3_OUT="${EMIT_OUT}" \
+      "${COMPILED_COMPILE}" 2>&1
+  )"
+  emit_code=$?
   set -e
-  if [[ "${lint_code}" -ne 0 ]]; then
-    printf '%s\n' "${lint_out}" >&2
-    echo "bootstrap-selfhost-driver-smoke: compiled driver lint failed (exit ${lint_code})" >&2
+  printf '%s\n' "${emit_out}"
+  if [[ "${emit_code}" -ne 0 ]]; then
+    echo "bootstrap-selfhost-driver-smoke: compiled driver emit failed (exit ${emit_code})" >&2
+    exit 1
+  fi
+  if ! grep -qE 'helloworld_compile_smoke: compile OK|compile_smoke_m3_emit: compile OK' <<< "${emit_out}"; then
+    echo "bootstrap-selfhost-driver-smoke: expected compile OK line from compiled driver" >&2
+    exit 1
+  fi
+  if [[ ! -x "${EMIT_OUT}" ]]; then
+    echo "bootstrap-selfhost-driver-smoke: missing ${EMIT_OUT}" >&2
     exit 1
   fi
 fi

@@ -58,6 +58,8 @@ function runtime_compile_smoke_m3_emit(string $sourceFile, string $outFile): int
         return 1;
     }
 
+    require_once __DIR__.'/compile_smoke_m3_emit.php';
+    bootstrap_m3_emit_ensure_phpc_run_command();
     $runtime->standalone($block, $outFile);
 
     echo 'runtime_compile_smoke_m3_emit: compile OK -> '.$outFile."\n";
