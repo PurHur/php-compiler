@@ -2484,14 +2484,16 @@ class JIT {
                 \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILE_SMOKE_SIDECAR_REL,
                 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compileSmokeSentinelBlock'
             );
-            $cuEmit = getenv('PHP_COMPILER_M3_COMPILER_UNIT_PROBE_EMIT');
-            if ('1' === $cuEmit || 'true' === strtolower((string) $cuEmit)) {
-                $this->registerM3EmitTuSidecarFromPath(
-                    __DIR__.'/../test/selfhost/compiler_unit_probe/compiler_unit_probe_compile.php',
-                    \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_UNIT_PROBE_SIDECAR_REL,
-                    'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerUnitProbeSentinelBlock'
-                );
-            }
+            $this->registerM3EmitTuSidecarFromPath(
+                __DIR__.'/../test/selfhost/compiler_unit_probe/compiler_unit_probe_compile.php',
+                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_UNIT_PROBE_SIDECAR_REL,
+                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerUnitProbeSentinelBlock'
+            );
+            $this->registerM3EmitTuSidecarFromPath(
+                __DIR__.'/../test/selfhost/compiler_helloworld_smoke/compile_driver.php',
+                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILE_DRIVER_SIDECAR_REL,
+                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compileDriverSentinelBlock'
+            );
         } else {
             $this->registerM3EmitTuSidecarFromPath(
                 __DIR__.'/../test/bootstrap-aot/runtime_trivial_echo.php',
