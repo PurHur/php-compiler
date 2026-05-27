@@ -406,6 +406,15 @@ class JIT {
         if (str_ends_with($lower, '\\runtime::loadjitcontext')) {
             return true;
         }
+        if (str_ends_with($lower, '\\runtime::createjit')) {
+            return true;
+        }
+        if (str_ends_with($lower, '\\runtime::jitcontextforloadjit')) {
+            return true;
+        }
+        if (str_ends_with($lower, '\\runtime::loadjitcompilemodulefuncs')) {
+            return true;
+        }
         if (str_ends_with($lower, '\\runtime::standalone')) {
             return true;
         }
@@ -465,9 +474,6 @@ class JIT {
             '\\bootstrapaot\\helloworld_compile_smoke',
             // compile_smoke_m3_emit real-lowers only in native emit TU (#1983), not compile_driver.
             '\\runtime::__destruct',
-            '\\runtime::createjit',
-            '\\runtime::jitcontextforloadjit',
-            '\\runtime::loadjitcompilemodulefuncs',
         ];
     }
 
@@ -617,6 +623,15 @@ class JIT {
             }
             if (str_ends_with($m3Spine, '\\runtime::loadjitcontext')) {
                 return $this->compileRuntimeLoadJitContextM3Native($internalName, $block, $logicalName);
+            }
+            if (str_ends_with($m3Spine, '\\runtime::createjit')) {
+                return $this->compileRuntimeCreateJitM3Native($internalName, $block, $logicalName);
+            }
+            if (str_ends_with($m3Spine, '\\runtime::jitcontextforloadjit')) {
+                return $this->compileRuntimeJitContextForLoadJitM3Native($internalName, $block, $logicalName);
+            }
+            if (str_ends_with($m3Spine, '\\runtime::loadjitcompilemodulefuncs')) {
+                return $this->compileRuntimeLoadJitCompileModuleFuncsM3Native($internalName, $block, $logicalName);
             }
             if (str_ends_with($m3Spine, '\\runtime::__construct')) {
                 return $this->compileRuntimeConstructM3Native($internalName, $block, $logicalName);
@@ -1004,7 +1019,7 @@ class JIT {
     }
 
     /**
-     * M3 compile-driver loadJit (#1402): outer orchestration; inner createJit/helpers stay deny-listed (#1495).
+     * M3 compile-driver loadJit (#1402, #2847): outer orchestration; inner helpers are separate FUNCDEFs.
      * Calls loadJitContext via jitContextForLoadJit — keep loadJitContext as its own LLVM function (#2846).
      */
     private function compileRuntimeLoadJitM3Native(
@@ -1019,6 +1034,33 @@ class JIT {
      * M3 compile-driver loadJitContext (#1402, #2846): separate FUNCDEF from loadJit to avoid LLVM 9 inlining crash.
      */
     private function compileRuntimeLoadJitContextM3Native(
+        string $internalName,
+        Block $block,
+        string $logicalName
+    ): PHPLLVM\Value {
+        return $this->compileRuntimeSpinePhpLowering($internalName, $block, $logicalName);
+    }
+
+    /** M3 compile-driver createJit (#1402, #2847): separate FUNCDEF from loadJit (LLVM 9 inlining). */
+    private function compileRuntimeCreateJitM3Native(
+        string $internalName,
+        Block $block,
+        string $logicalName
+    ): PHPLLVM\Value {
+        return $this->compileRuntimeSpinePhpLowering($internalName, $block, $logicalName);
+    }
+
+    /** M3 compile-driver jitContextForLoadJit (#1402, #2847): thin wrapper; own FUNCDEF from loadJit. */
+    private function compileRuntimeJitContextForLoadJitM3Native(
+        string $internalName,
+        Block $block,
+        string $logicalName
+    ): PHPLLVM\Value {
+        return $this->compileRuntimeSpinePhpLowering($internalName, $block, $logicalName);
+    }
+
+    /** M3 compile-driver loadJitCompileModuleFuncs (#1402, #2847): module foreach; separate FUNCDEF. */
+    private function compileRuntimeLoadJitCompileModuleFuncsM3Native(
         string $internalName,
         Block $block,
         string $logicalName
@@ -1736,7 +1778,11 @@ class JIT {
 
             return $this->compileRuntimeLoadCoreModulesM3Native($internalName, $block, $logicalName);
         }
-        if (str_ends_with($emitLc, '\\runtime::loadjitcontext')) {
+        if (str_ends_with($emitLc, '\\runtime::loadjitcontext')
+            || str_ends_with($emitLc, '\\runtime::createjit')
+            || str_ends_with($emitLc, '\\runtime::jitcontextforloadjit')
+            || str_ends_with($emitLc, '\\runtime::loadjitcompilemodulefuncs')
+        ) {
             if ($this->shouldUseM3CompileDriverRealLowering()) {
                 return null;
             }
@@ -1744,9 +1790,6 @@ class JIT {
             return $this->emitM3EmitTuRuntimeInitVoidStub($internalName, $logicalName, $block);
         }
         if (str_ends_with($emitLc, '\\runtime::loadjit')
-            || str_ends_with($emitLc, '\\runtime::createjit')
-            || str_ends_with($emitLc, '\\runtime::jitcontextforloadjit')
-            || str_ends_with($emitLc, '\\runtime::loadjitcompilemodulefuncs')
             || str_ends_with($emitLc, '\\runtime::jitemitinplace')
         ) {
             return $this->emitM3EmitTuRuntimeInitVoidStub($internalName, $logicalName, $block);

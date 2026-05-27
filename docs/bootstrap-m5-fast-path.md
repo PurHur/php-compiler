@@ -30,14 +30,17 @@ Supporting fixes from #1402:
 
 | Allowlist / native spine | Gate |
 |--------------------------|------|
-| `Compiler::unwrapOperandChain` / `operandsChainEqual` | Native via `JIT\CompilerOperandChainNative` (PHP CFG hits LLVM 9 dominance verify — #1768); `make bootstrap-selfhost-compile-driver-link` |
+| `php_compiler_cli_dispatch` / `php_compiler_cli_should_run_entry_driver` | M5 driver host compile (#2794) |
 | `Runtime::parseAndCompile` | On M3 allowlist when `PHP_COMPILER_M3_COMPILE_DRIVER=1` |
+| `Runtime::parseAndCompileEmitSmoke` | On M3 allowlist; emit-helper spine (#1983) |
 | `Runtime::parse` / `Runtime::compile` | On M3 allowlist; compile-driver link OK (#1496) |
+| `Runtime::compileEmitSmoke` | On M3 allowlist; M3 emit TU (#1983) |
 | `Runtime::loadJitContext` | PHP CFG via `compileRuntimeLoadJitContextM3Native` (separate FUNCDEF from `loadJit` — #2846) |
 | `Runtime::__construct` | Slim ctor via `compileRuntimeConstructM3Native` → `compileBlockPhpLowering` (#1494) |
-| `Runtime::initParsePipeline` / `Runtime::initCompiler` / `Runtime::loadCoreModules` | On deny list; `compileRuntime*M3Native` → PHP CFG lowering (#1494) |
+| `Runtime::initParsePipeline` / `Runtime::initCompiler` / `Runtime::loadCoreModules` | On M3 allowlist; `compileRuntime*M3Native` → PHP CFG lowering (#1494) |
 | `Runtime::initVmContext` | **Native** via `RuntimeInitVmContext::emit` (allocate `VM\Context` + `ErrorReporter` + `ScriptStack`, wire `runtime` + `vmContext`); wired in `compileBlock()`; off deny list (#1494, #2126). PHP CFG `new VMContext` still LLVM 9 link crash when combined with ctor spine. |
-| `Runtime::loadJit` | `compileRuntimeLoadJitM3Native` + nested `createJit` helpers (#1495) |
+| `Runtime::loadJit` | `compileRuntimeLoadJitM3Native` (#1495, #2847) |
+| `Runtime::createJit` / `jitContextForLoadJit` / `loadJitCompileModuleFuncs` | PHP CFG via separate FUNCDEFs (`compileRuntime*M3Native`) — off deny list (#2847) |
 | `Block::slotIndexForVariableName` | PHP CFG via `isM3CompileDriverBlockPhpLoweringName` (#2848) |
 | `Runtime::standalone` | Compile-driver link OK (#1402, #1056) |
 | `helloworld_compile_smoke` | Deny-listed for link (LLVM 9); compile_driver bundle keeps stub; runtime emit via `helloworld_m3_emit_native_entry.php` / `compile_smoke_m3_emit_native_entry.php` + `PHP_COMPILER_EMIT_HELPER_LINK=1` (#1768, #1983) |
@@ -97,8 +100,7 @@ PHP_COMPILER_M3_SOURCE=bin/compile.php PHP_COMPILER_M3_OUT=/tmp/bin-compile-aot 
 | Symbol | Notes |
 |--------|-------|
 | `Runtime::__destruct` | Deny-listed (LLVM 9; not on compile spine) |
-| `Runtime::initParsePipeline` / `initCompiler` / `loadCoreModules` | PHP CFG spine; deny while expanding (#1494) |
-| `Runtime::createJit` / `jitContextForLoadJit` / `loadJitCompileModuleFuncs` | Split from `loadJit`; stay on deny list (stubbed) while outer `loadJit` / `loadJitContext` are real-lowered (#1495, #2846) |
+| `helloworld_compile_smoke` | Deny-listed for compile-driver link (LLVM 9 #1514) |
 
 **Next:** complete native `VM\Context` (hashtable props + sub-objects) without LLVM 9 link regression, or small `lib/AOT/runtime/` C floor (#1494).
 

@@ -65,6 +65,9 @@ function bootstrap_m5_doc_fixture_only_keys(): array
 function bootstrap_m5_doc_symbol_to_key(string $symbol): string
 {
     $symbol = trim($symbol);
+    if (str_starts_with($symbol, 'php_compiler_cli_')) {
+        return '\\'.strtolower($symbol);
+    }
     if (str_contains($symbol, '::')) {
         [$class, $method] = explode('::', $symbol, 2);
         $classLower = strtolower($class);

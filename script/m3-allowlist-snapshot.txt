@@ -4,11 +4,14 @@ allow:\php_compiler_cli_should_run_entry_driver
 allow:\runtime::__construct
 allow:\runtime::compile
 allow:\runtime::compileemitsmoke
+allow:\runtime::createjit
 allow:\runtime::initcompiler
 allow:\runtime::initparsepipeline
 allow:\runtime::initvmcontext
+allow:\runtime::jitcontextforloadjit
 allow:\runtime::loadcoremodules
 allow:\runtime::loadjit
+allow:\runtime::loadjitcompilemodulefuncs
 allow:\runtime::loadjitcontext
 allow:\runtime::parse
 allow:\runtime::parseandcompile
@@ -17,6 +20,3 @@ allow:\runtime::standalone
 allow:slotindexforvariablename
 deny:\bootstrapaot\helloworld_compile_smoke
 deny:\runtime::__destruct
-deny:\runtime::createjit
-deny:\runtime::jitcontextforloadjit
-deny:\runtime::loadjitcompilemodulefuncs
