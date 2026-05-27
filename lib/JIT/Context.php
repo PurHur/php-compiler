@@ -394,6 +394,30 @@ class Context {
     }
 
     public function compileToFile(string $file) {
+        // `-o` is a file path, not a directory. When a directory slips through, LLVM/ld
+        // errors are confusing and (in some environments) can be misinterpreted as success.
+        if (is_dir($file)) {
+            throw new \InvalidArgumentException(sprintf(
+                'Output path is a directory: %s (expected file path)',
+                $file
+            ));
+        }
+        $outDir = dirname($file);
+        if ('' !== $outDir && '.' !== $outDir && !is_dir($outDir)) {
+            throw new \InvalidArgumentException(sprintf(
+                'Output directory does not exist: %s (from -o %s)',
+                $outDir,
+                $file
+            ));
+        }
+        if ('' !== $outDir && '.' !== $outDir && !is_writable($outDir)) {
+            throw new \InvalidArgumentException(sprintf(
+                'Output directory is not writable: %s (from -o %s)',
+                $outDir,
+                $file
+            ));
+        }
+
         // add main function
         if (!is_null($this->main)) {
             $i32 = $this->context->int32Type();
@@ -439,6 +463,12 @@ class Context {
         Progress::noteFunction('jit_context_link_begin');
         Linker::link($objectFile, $file);
         Progress::noteFunction('jit_context_link_done');
+        if (!is_file($file)) {
+            throw new \LogicException(sprintf(
+                'Link succeeded but output file is missing: %s',
+                $file
+            ));
+        }
         unlink($objectFile);
     }
 
