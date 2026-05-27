@@ -1340,7 +1340,27 @@ class JIT {
      */
     private function m3CompileDriverCompilerPhpLoweringSuffixes(): array
     {
-        return [];
+        // M5 (#2666): allow the M3 emit helper to compile inventory-scale sources (lib/Compiler.php,
+        // bin/compile.php) by lowering a minimal Compiler compile chain (avoid LLVM 9 emit-TU link
+        // crashes when lowering the full Compiler into the helper module; #2540).
+        return [
+            'compile',
+            'compilecfgblock',
+            'compilecfgbranch',
+            'compileblock',
+            'compileops',
+            'compileop',
+            'compilestmt',
+            'compileexpr',
+            'compileoperand',
+            'compileterminal',
+            'compileparam',
+            'compilefunction',
+            'compilefunccall',
+            // class-heavy sources (lib/*.php) need class lowering
+            'compileclasslike',
+            'compileclassbody',
+        ];
     }
 
     private function isM3CompileDriverCompilerNativeLoweringName(string $lower): bool
