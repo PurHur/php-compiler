@@ -25,6 +25,27 @@ if [[ "${1:-}" == "--" ]]; then
   shift
 fi
 
+FORCE_BIND_MOUNT=0
+if [[ "${1:-}" == "--bind" ]]; then
+  FORCE_BIND_MOUNT=1
+  shift
+  if [[ "${1:-}" == "--" ]]; then
+    shift
+  fi
+fi
+
+SYNC_BACK_PATHS=()
+if [[ "${1:-}" == "--sync-back" ]]; then
+  shift
+  while [[ $# -gt 0 ]] && [[ "${1:-}" != "--" ]]; do
+    SYNC_BACK_PATHS+=("$1")
+    shift
+  done
+  if [[ "${1:-}" == "--" ]]; then
+    shift
+  fi
+fi
+
 _run_in_container() {
   local inner="$1"
   # shellcheck disable=SC2086
@@ -41,6 +62,11 @@ fi
 quoted=$(printf '%q ' "$@")
 inner="source script/php-env.sh; ${_llvm_exports} ${quoted}"
 
+if [[ "$FORCE_BIND_MOUNT" -eq 1 ]]; then
+  _run_in_container "$inner"
+  exit $?
+fi
+
 if [[ -f vendor/bin/phpunit ]] && ci_docker_run -v "$(pwd):/compiler" -w /compiler "$IMAGE" test -f vendor/bin/phpunit 2>/dev/null; then
   _run_in_container "$inner"
   exit $?
@@ -48,10 +74,24 @@ fi
 
 echo "docker-exec: bind-mount incomplete; copying repo via tar..." >&2
 # shellcheck disable=SC2086
-tar -cf - --exclude='.git' --exclude='.llvm' . | ci_docker_run -i -w /compiler "$IMAGE" bash -c "
-  tar -xf -
-  chmod +x bin/*.php script/*.sh 2>/dev/null || true
-  ${_llvm_exports}
-  source script/php-env.sh
-  ${quoted}
-"
+if [[ "${#SYNC_BACK_PATHS[@]}" -gt 0 ]]; then
+  sync_quoted=$(printf '%q ' "${SYNC_BACK_PATHS[@]}")
+  # Stream the repo into the container, run the command, then stream selected paths back.
+  tar -cf - --exclude='.git' --exclude='.llvm' . | ci_docker_run -i -w /compiler "$IMAGE" bash -c "
+    set -euo pipefail
+    tar -xf -
+    chmod +x bin/*.php script/*.sh 2>/dev/null || true
+    ${_llvm_exports}
+    source script/php-env.sh
+    ${quoted} 1>&2
+    tar -cf - ${sync_quoted}
+  " | tar -xf -
+else
+  tar -cf - --exclude='.git' --exclude='.llvm' . | ci_docker_run -i -w /compiler "$IMAGE" bash -c "
+    tar -xf -
+    chmod +x bin/*.php script/*.sh 2>/dev/null || true
+    ${_llvm_exports}
+    source script/php-env.sh
+    ${quoted}
+  "
+fi
