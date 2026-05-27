@@ -19,7 +19,7 @@ Regenerate capability truth: `php script/capability-matrix.php`, `php script/cap
 
 Related merges outside this wave: `goto` ([#1228](https://github.com/PurHur/php-compiler/issues/1228) / [#1333](https://github.com/PurHur/php-compiler/pull/1333)), anonymous classes ([#1233](https://github.com/PurHur/php-compiler/issues/1233) / [#1386](https://github.com/PurHur/php-compiler/pull/1386)).
 
-**M2 spine:** **662/717** (`compiler_lib_spine_smoke` native link ✅ with **`bin/vm.php`** [#2134](https://github.com/PurHur/php-compiler/issues/2134); [#1492](https://github.com/PurHur/php-compiler/issues/1492), M2 batches [#1419](https://github.com/PurHur/php-compiler/issues/1419), [#1497](https://github.com/PurHur/php-compiler/issues/1497)). Target doc: [self-host-target.md](self-host-target.md)
+**M2 spine:** **662/717** spine vs Phase A inventory (`662` `require_once` units in `compiler_lib_spine_smoke`; **717** SSOT Phase A files in `bootstrap-inventory.md`). Native link ✅ with **`bin/vm.php`** [#2134](https://github.com/PurHur/php-compiler/issues/2134); **`Ast/GroupUseStripper` [#2634](https://github.com/PurHur/php-compiler/issues/2634)**; [#1492](https://github.com/PurHur/php-compiler/issues/1492), M2 batches [#1419](https://github.com/PurHur/php-compiler/issues/1419), [#1497](https://github.com/PurHur/php-compiler/issues/1497). Target doc: [self-host-target.md](self-host-target.md)
 
 ## Language (#1354–#1366)
 

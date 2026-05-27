@@ -14,7 +14,7 @@ use PhpParser\NodeVisitor;
  * PHPCfg ignores Stmt_Use but does not know GroupUse (#2443).
  *
  * Implements {@see NodeVisitor} instead of extending {@see NodeVisitorAbstract}
- * so self-host lint/AOT lowering does not need vendor parent class wiring (#2634).
+ * so self-host lint/AOT lowering does not need vendor-only parent wiring (#2634).
  */
 final class GroupUseStripper implements NodeVisitor
 {
@@ -28,6 +28,7 @@ final class GroupUseStripper implements NodeVisitor
         return null;
     }
 
+    /** Drop group-use declarations once NameResolver owns the aliases (#2443). */
     public function leaveNode(Node $node)
     {
         if ($node instanceof GroupUse) {

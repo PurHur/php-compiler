@@ -34,8 +34,8 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | Layer | Today | Target |
 |-------|-------|--------|
 | **Bootstrap driver** | Zend runs `php bin/compile.php` | Compiled `bin/compile.php` |
-| **Bundle size** | **662** curated `require_once` in spine smoke (108 minimal overlap + **554** M2-only) | **717** Phase A inventory files (SSOT) |
-| **Inventory coverage** | **662/717** in spine smoke with real **`bin/vm.php`** ([#2134](https://github.com/PurHur/php-compiler/issues/2134)) | **100%**
+| **Bundle size** | **662** curated `require_once` in spine smoke (108 minimal overlap + **554** M2-only) | **717** Phase A inventory files (SSOT) |
+| **Inventory coverage** | **662/717** in spine smoke with real **`bin/vm.php`** ([#2134](https://github.com/PurHur/php-compiler/issues/2134); **#2634** `Ast/GroupUseStripper`) | **100%**
 | **HelloWorld** | Native **run** ✅; **emit** still Zend fallback (strict gate 🚧) | Native compile + emit |
 | **Bootstrap loop (M4)** | Gen-1 link + gen-2 Zend partial | Native gen-2 emit + full tree rebuild |
 | **Vendor** | `composer install` + patches on host | Prelinked artifacts only |
@@ -53,7 +53,7 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | M4 `make bootstrap-loop-gen1-link` | 🚧 partial — gen-1 link + gen-2 **Zend** emit (`emit_path=zend partial`); `BOOTSTRAP_M4_LINK_COMPILE_DRIVER=1` for `emit_path=native`; `BOOTSTRAP_M4_GEN2_STRICT=1` refuses Zend fallback ([#1498](https://github.com/PurHur/php-compiler/issues/1498), [#2115](https://github.com/PurHur/php-compiler/issues/2115)); five-minute presenter: [GETTING-STARTED §7](GETTING-STARTED.md) ([#2464](https://github.com/PurHur/php-compiler/issues/2464)) |
 | M4 `make bootstrap-loop-probe` | 🚧 ladder — `--dry-run` validates lint+M2+M3 partial+gen-1; full exits **2** until M3 strict ([#1498](https://github.com/PurHur/php-compiler/issues/1498)); bundled in `make north-star4-verify` — [GETTING-STARTED §7](GETTING-STARTED.md) |
 | `make bootstrap-aot-link` | ✅ **71/71** |
-| `php script/bootstrap-inventory.php --check` | ✅ **717** Phase A inventory files; **0** source blockers |
+| `php script/bootstrap-inventory.php --check` | ✅ **717** Phase A files, **718** vm.php-path files, **0** source blockers |
 
 ---
 
@@ -76,9 +76,9 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 
 | Indicator | Formula | May 2026 |
 |-----------|---------|----------|
-| **M2 spine progress** | `require_once` units in `compiler_lib_spine_smoke` ÷ Phase A inventory file count | **662 / 717** (`bin/vm.php` promoted [#2134](https://github.com/PurHur/php-compiler/issues/2134)) |
-| **Public “Self-host” row** | Same M2 ratio until M3–M5 gates add weight ([`development-status.md`](pages/development-status.md)) | **~58%** |
-| **Composite (internal)** | Milestone weights in table above (M0–M1 = 100%, M2 = spine %, M3–M5 = gate %) | **~51%** |
+| **M2 spine progress** | `require_once` units in `compiler_lib_spine_smoke` ÷ Phase A inventory file count | **662 / 717** (`bin/vm.php` promoted [#2134](https://github.com/PurHur/php-compiler/issues/2134); **#2634** `Ast/GroupUseStripper`) |
+| **Public “Self-host” row** | Same M2 ratio until M3–M5 gates add weight ([`development-status.md`](pages/development-status.md)) | **~92%** |
+| **Composite (internal)** | Milestone weights in table above (M0–M1 = 100%, M2 = spine %, M3–M5 = gate %) | **~53%** |
 
 Regenerate inventory: `php script/bootstrap-inventory.php` · spine count: `php script/bootstrap-spine-count.php` (or `grep -c '^require_once' test/selfhost/compiler_lib_spine_smoke/main.php`)
 
@@ -127,7 +127,7 @@ Parallel batches ([#1419](https://github.com/PurHur/php-compiler/issues/1419), [
 
 | Entry | Units | Role |
 |-------|------:|------|
-| `test/selfhost/compiler_minimal/main.php` | **109** | M0 core |
+| `test/selfhost/compiler_minimal/main.php` | **108** | M0 core |
 | `test/selfhost/compiler_lib_spine_smoke/main.php` | **662** | M2 growth (ext/standard + Vm* spine batch) |
 | `test/selfhost/compiler_helloworld_smoke/` | — | M3 probe + compile driver |
 | `test/selfhost/bootstrap_loop_smoke/` | — | M4 scaffold (gen-1→gen-2 loop probe; [#1498](https://github.com/PurHur/php-compiler/issues/1498)) |

@@ -41,7 +41,7 @@ Presenter script and troubleshooting: [`docs/GETTING-STARTED.md`](docs/GETTING-S
 | **003-MiniWebApp** VM + AOT link | ✅ |
 | **003** AOT execute (home, hello, PATH_INFO, contact) | ✅ native execute ([#764](https://github.com/PurHur/php-compiler/issues/764) closed; close tracker [#1044](https://github.com/PurHur/php-compiler/issues/1044)) |
 | Self-host **M0–M1** | ✅ |
-| Self-host **M2** spine | ✅ **662/717** link ([#1492](https://github.com/PurHur/php-compiler/issues/1492), [#2201](https://github.com/PurHur/php-compiler/issues/2201)) |
+| Self-host **M2** spine | ✅ **662/717** link ([#1492](https://github.com/PurHur/php-compiler/issues/1492), [#2201](https://github.com/PurHur/php-compiler/issues/2201), [#2634](https://github.com/PurHur/php-compiler/issues/2634)) |
 | Self-host **M3** emit | 🚧 Zend partial ([#1937](https://github.com/PurHur/php-compiler/issues/1937)) |
 | Full Zend PHP compatibility | ❌ — subset only (matrices in `docs/`, not on status site) |
 

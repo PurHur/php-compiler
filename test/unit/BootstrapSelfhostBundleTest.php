@@ -46,6 +46,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'lib/Web/CgiDriver.php',
         'lib/Web/ProjectDeploy.php',
         'lib/AOT/ProjectGraph.php',
+        'lib/Ast/GroupUseStripper.php',
         'lib/Web/DevServer.php',
         'lib/Web/ManifestValidator.php',
         'lib/Web/Params.php',
@@ -249,7 +250,6 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/array_diff.php',
         'ext/standard/array_fill.php',
         'ext/standard/array_flip.php',
-        'ext/standard/array_change_key_case.php',
         'ext/standard/array_key_exists.php',
         'ext/standard/array_keys.php',
         'ext/standard/array_intersect.php',
@@ -375,7 +375,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         $this->assertFileExists($entry);
         $contents = (string) file_get_contents($entry);
         $count = substr_count($contents, 'require_once __DIR__');
-        $this->assertSame(662, $count, 'M2 spine 662 require_once units (bin/vm.php promoted #2134)');
+        $this->assertSame(662, $count, 'M2 spine 662 require_once units (#2134; #2634 GroupUseStripper)');
         foreach (self::LIB_SPINE_SMOKE_NEW_UNITS as $unit) {
             $this->assertStringContainsString(
                 "require_once __DIR__.'/../../../{$unit}';",
