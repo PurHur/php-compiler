@@ -887,6 +887,7 @@ ci_run_bootstrap_m4_loop_probe() {
   fi
 }
 
+# M4 inventory-scale gen-1 emit (issue #2770); after M4 loop probe in ci-local LLVM tail.
 ci_run_bootstrap_m4_full_spine_probe() {
   if [[ "${BOOTSTRAP_M4_FULL_SPINE_PROBE_GATE:-0}" != "1" ]]; then
     return 0

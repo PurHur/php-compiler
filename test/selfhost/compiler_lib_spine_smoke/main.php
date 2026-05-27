@@ -112,6 +112,7 @@ require_once __DIR__.'/../../../lib/JIT/JitValueCompare.php';
 require_once __DIR__.'/../../../lib/JIT/M3EmitTuTrivialEchoAot.php';
 require_once __DIR__.'/../../../lib/JIT/NullsafeHelper.php';
 require_once __DIR__.'/../../../lib/JIT/OperandName.php';
+require_once __DIR__.'/../../../lib/JIT/OperandNameNative.php';
 require_once __DIR__.'/../../../lib/JIT/PregReplaceCallbackPolicy.php';
 require_once __DIR__.'/../../../lib/JIT/Progress.php';
 require_once __DIR__.'/../../../lib/JIT/ReflectionBuiltinHelper.php';
