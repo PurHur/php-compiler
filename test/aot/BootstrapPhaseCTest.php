@@ -221,6 +221,91 @@ final class BootstrapPhaseCTest extends TestCase
         $this->assertStringContainsString('target(s) OK', implode("\n", $out));
     }
 
+    public function testLinkerShellExecMethodSmokeAotExitCode(): void
+    {
+        $this->assertBootstrapFixtureExitCode('linker_shell_exec_method_smoke.php', 0);
+    }
+
+    /** User function `main` must not collide with the LLVM/C entry symbol (#2779). */
+    public function testShellExecMethodMainEntryAotExitCode(): void
+    {
+        $this->assertBootstrapFixtureExitCode('shell_exec_method_main_entry.php', 0);
+    }
+
+    private function assertBootstrapFixtureExitCode(string $fixture, int $expectedExit): void
+    {
+        if (!self::isLlvmReady()) {
+            $this->markTestSkipped(
+                'LLVM 9 toolchain not available. Run script/install-llvm9.sh from the repository root.'
+            );
+        }
+        $root = dirname(__DIR__, 2);
+        $source = $root.'/test/bootstrap-aot/'.$fixture;
+        $this->assertFileExists($source);
+
+        $env = [];
+        foreach (array_merge($_ENV, $_SERVER) as $key => $value) {
+            if (is_string($value)) {
+                $env[$key] = $value;
+            }
+        }
+        LlvmToolchain::applyProcessEnv($env, $root);
+        $outDir = $root.'/build/bootstrap-aot';
+        if (!is_dir($outDir) && !mkdir($outDir, 0777, true) && !is_dir($outDir)) {
+            $this->fail('Cannot create '.$outDir);
+        }
+        $base = pathinfo($fixture, PATHINFO_FILENAME);
+        $binary = $outDir.'/'.$base;
+        @unlink($binary);
+
+        $compile = [PHP_BINARY, $root.'/bin/compile.php', '-o', $binary, $source];
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open($compile, $descriptorSpec, $pipes, $root, $env);
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $this->assertSame(0, proc_close($proc), trim($stderr !== false ? $stderr : ''));
+        $this->assertFileExists($binary);
+        $this->assertTrue(is_executable($binary));
+
+        $zendProc = proc_open(
+            [PHP_BINARY, $source],
+            [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+            $zendPipes,
+            $root,
+            $env
+        );
+        $this->assertIsResource($zendProc);
+        fclose($zendPipes[0]);
+        fclose($zendPipes[1]);
+        fclose($zendPipes[2]);
+        $zendExit = proc_close($zendProc);
+
+        $nativeProc = proc_open(
+            [$binary],
+            [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+            $nativePipes,
+            $root,
+            $env
+        );
+        $this->assertIsResource($nativeProc);
+        fclose($nativePipes[0]);
+        fclose($nativePipes[1]);
+        fclose($nativePipes[2]);
+        $nativeExit = proc_close($nativeProc);
+
+        $this->assertSame($expectedExit, $zendExit);
+        $this->assertSame($expectedExit, $nativeExit);
+
+        @unlink($binary);
+    }
+
     private function assertBootstrapFixtureLinkAndExecute(string $fixture, string $contains): void
     {
         if (!self::isLlvmReady()) {
