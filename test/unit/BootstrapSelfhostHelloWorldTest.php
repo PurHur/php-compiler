@@ -517,6 +517,26 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertSame(0, $exitCode, implode("\n", $lines));
         $this->assertFileExists($out);
         $this->assertTrue(is_executable($out));
+
+        $hw = self::$root.'/examples/000-HelloWorld/example.php';
+        $aotOut = self::$root.'/build/selfhost-inventory-emit-hw-aot';
+        @unlink($aotOut);
+        $runCmd = implode(' ', array_map('escapeshellarg', [
+            ...$prefix,
+            'env',
+            'PHP_COMPILER_M3_EMIT_MINIMAL=1',
+            'PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1',
+            'PHP_COMPILER_M3_SOURCE='.$hw,
+            'PHP_COMPILER_M3_OUT='.$aotOut,
+            $out,
+        ])).' 2>&1';
+        exec($runCmd, $runLines, $runExit);
+        if (139 === $runExit) {
+            $this->markTestSkipped('LLVM 9 segfault during inventory compile_driver emit run (#2843).');
+        }
+        $this->assertSame(0, $runExit, implode("\n", $runLines));
+        $this->assertStringContainsString('helloworld_compile_smoke: compile OK', implode("\n", $runLines));
+        $this->assertFileExists($aotOut);
     }
 
     /** Issue #2681: M3 emit TU sidecar for lib/Compiler.php on compile_smoke_m3_emit link (#2666). */

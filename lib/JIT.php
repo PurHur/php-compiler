@@ -298,6 +298,16 @@ class JIT {
         return false;
     }
 
+    /** Inventory emit TU is compile_driver.php — do not host-compile it again as a link sidecar (#2843). */
+    private function shouldSkipM3InventoryEmitDriverSelfSidecar(string $path): bool
+    {
+        if (!$this->shouldUseM3InventoryEmitDriver()) {
+            return false;
+        }
+
+        return str_contains(str_replace('\\', '/', $path), 'compiler_helloworld_smoke/compile_driver.php');
+    }
+
     private function isM3CompileDriverScriptMain(Block $block): bool
     {
         return null !== $block->func
@@ -356,6 +366,10 @@ class JIT {
     /** Emit native entry TU only — not compile_driver bundles that include compile_smoke_m3_emit (#1937). */
     private function shouldUseM3EmitTuNativeBridge(): bool
     {
+        // Inventory emit links compile_driver.php {main} via the same bridge as helloworld_m3_emit (#2843).
+        if ($this->shouldUseM3InventoryEmitDriver() && $this->shouldUseEmitHelperLinkStubs()) {
+            return true;
+        }
         $flag = getenv('PHP_COMPILER_M3_EMIT_TU');
 
         return '1' === $flag || 'true' === strtolower((string) $flag);
@@ -541,7 +555,11 @@ class JIT {
         ) {
             return $this->compileSkippedCompilerSplitCfgStub($internalName, $block, '{main}');
         }
-        if ($this->shouldUseM3CompileDriverMainNative() && $this->isM3CompileDriverBundleScriptMain($block)) {
+        if (
+            $this->shouldUseM3CompileDriverMainNative()
+            && $this->isM3CompileDriverBundleScriptMain($block)
+            && !$this->shouldUseM3InventoryEmitDriver()
+        ) {
             return $this->compileM3CompileDriverMainNative($internalName, $block, $logicalName);
         }
         if ($this->shouldUseM3EmitTuNativeBridge() && $this->isM3EmitTuScriptMain($block)) {
@@ -2796,7 +2814,7 @@ class JIT {
         }
         $this->m3EmitTuSidecarsCached = true;
         $logPrefix = getenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX');
-        if ('helloworld_compile_smoke' === $logPrefix || $this->shouldUseM3InventoryEmitDriver()) {
+        if ('helloworld_compile_smoke' === $logPrefix) {
             $this->registerM3EmitTuSidecarFromPath(
                 __DIR__.'/../examples/000-HelloWorld/example.php',
                 \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::HELLOWORLD_SIDECAR_REL,
@@ -2833,7 +2851,7 @@ class JIT {
                 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::cliDriverSentinelBlock',
                 true
             );
-        } elseif ('compile_smoke_m3_emit' === $logPrefix) {
+        } elseif ('compile_smoke_m3_emit' === $logPrefix || $this->shouldUseM3InventoryEmitDriver()) {
             $this->registerM3EmitTuSidecarFromPath(
                 __DIR__.'/../examples/000-HelloWorld/example.php',
                 \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::HELLOWORLD_SIDECAR_REL,
@@ -2902,6 +2920,9 @@ class JIT {
         string $sentinelLogical,
         bool $sidecarHostStubNonLiteralIncludes = false
     ): void {
+        if ($this->shouldSkipM3InventoryEmitDriverSelfSidecar($path)) {
+            return;
+        }
         if (!is_readable($path)) {
             return;
         }
