@@ -32,6 +32,11 @@ ci_docker_acquire_single_ci_lock() {
   local lockfile="${PHP_COMPILER_CI_LOCK_FILE:-${root}/.php-compiler-ci.lock}"
   mkdir -p "$(dirname "$lockfile")"
 
+  # Stale-lock guard (issue #2688): if a previous wrapper crashed, the lockfile may remain
+  # but no process should still hold the flock. In that case, remove and retry once.
+  local stale_after="${PHP_COMPILER_CI_LOCK_STALE_AFTER_SEC:-1800}"
+  local did_retry="${_CI_DOCKER_LOCK_STALE_RETRY:-0}"
+
   _ci_docker_lock_fd=200
   exec 200>"$lockfile"
   if flock -n 200; then
@@ -50,8 +55,12 @@ ci_docker_acquire_single_ci_lock() {
   fi
 
   local holder=""
+  local holder_pid=""
+  local holder_ts=""
   if [[ -r "$lockfile" ]]; then
     holder=$(head -n 1 "$lockfile" 2>/dev/null || true)
+    holder_pid=$(awk '{print $1}' <<< "$holder" 2>/dev/null || true)
+    holder_ts=$(awk '{print $2}' <<< "$holder" 2>/dev/null || true)
   fi
   echo "ci-docker-preflight: another CI/Docker wrapper run is active (lock: ${lockfile})" >&2
   if [[ -n "$holder" ]]; then
@@ -68,6 +77,19 @@ ci_docker_acquire_single_ci_lock() {
         local age=$(( now - mtime ))
         if (( age >= 0 )); then
           echo "ci-docker-preflight: lock age: ${age}s" >&2
+          if [[ "$did_retry" != "1" ]] \
+            && [[ -n "$stale_after" ]] && [[ "$stale_after" =~ ^[0-9]+$ ]] \
+            && (( age >= stale_after ))
+          then
+            if [[ -n "$holder_pid" ]] && [[ "$holder_pid" =~ ^[0-9]+$ ]] && ! kill -0 "$holder_pid" 2>/dev/null; then
+              echo "ci-docker-preflight: lock appears stale (pid ${holder_pid} not running; age ${age}s >= ${stale_after}s)" >&2
+              echo "ci-docker-preflight: attempting one-time stale cleanup + retry" >&2
+              rm -f "$lockfile" 2>/dev/null || true
+              export _CI_DOCKER_LOCK_STALE_RETRY=1
+              ci_docker_acquire_single_ci_lock
+              return $?
+            fi
+          fi
         fi
       fi
     fi
