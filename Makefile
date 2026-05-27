@@ -263,8 +263,7 @@ bootstrap-inventory-check:
 # Regenerate docs/bootstrap-inventory.md into the host working tree (harness-safe; issue #2527, #2537).
 bootstrap-inventory-regenerate:
 	@bash -lc 'if command -v php >/dev/null 2>&1; then php script/bootstrap-inventory.php; else \
-	  ./script/docker-exec.sh -- bash -lc "php script/bootstrap-inventory.php >/dev/null"; \
-	  ./script/docker-exec.sh -- bash -lc "php -r \"readfile(\\\"docs/bootstrap-inventory.md\\\");\"" > docs/bootstrap-inventory.md; \
+	  ./script/docker-exec.sh -- bash -lc "php script/bootstrap-inventory.php >/dev/null; php -r \"readfile(\\\"docs/bootstrap-inventory.md\\\");\"" > docs/bootstrap-inventory.md; \
 	fi'
 bootstrap-spine-phpcfg-parse-check:
 	php script/bootstrap-spine-php-cfg-parse-check.php --minimal
