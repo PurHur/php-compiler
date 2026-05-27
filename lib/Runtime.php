@@ -25,6 +25,7 @@ use PHPCompiler\VM\Context as VMContext;
 use PHPCompiler\JIT\Context as JITContext;
 use PHPCompiler\Ast\GroupUseStripper;
 use PHPCompiler\Web\Superglobals;
+use PHPCompiler\Lint\LintCompiler;
 
 class Runtime {
     const MODE_NORMAL   = 0b0001;
@@ -193,9 +194,12 @@ class Runtime {
 
     public function parseAndCompileEmitSmoke(string $code, string $filename): ?Block
     {
-        $block = $this->compileEmitSmoke($this->parse($code, $filename));
+        $script = $this->parse($code, $filename);
+        $block = $this->compileEmitSmoke($script);
         if (null !== $block) {
             $block->setScriptPath($filename);
+        } else {
+            $this->emitParseAndCompileNullDiagnostic($script);
         }
 
         return $block;
@@ -229,9 +233,12 @@ class Runtime {
     }
 
     public function parseAndCompile(string $code, string $filename): ?Block {
-        $block = $this->compile($this->parse($code, $filename));
+        $script = $this->parse($code, $filename);
+        $block = $this->compile($script);
         if (null !== $block) {
             $block->setScriptPath($filename);
+        } else {
+            $this->emitParseAndCompileNullDiagnostic($script);
         }
 
         return $block;
@@ -243,12 +250,45 @@ class Runtime {
             $filename = $normalized;
         }
 
-        $block = $this->compile($this->parse(file_get_contents($filename), $filename));
+        $script = $this->parse(file_get_contents($filename), $filename);
+        $block = $this->compile($script);
         if (null !== $block) {
             $block->setScriptPath($filename);
+        } else {
+            $this->emitParseAndCompileNullDiagnostic($script);
         }
 
         return $block;
+    }
+
+    /**
+     * `parseAndCompile()` returning null is a common self-host bootstrap failure mode (#2642).
+     * Best-effort: re-run compile under the lint compiler and print the first unsupported kind.
+     */
+    private function emitParseAndCompileNullDiagnostic(Script $script): void
+    {
+        if (
+            false === getenv('PHP_COMPILER_SELFHOST_AOT')
+            && false === getenv('PHP_COMPILER_M3_COMPILE_MODE')
+        ) {
+            return;
+        }
+
+        $lint = new LintCompiler();
+        $prev = $this->compiler;
+        $this->compiler = $lint;
+        try {
+            $this->compile($script);
+        } catch (\Throwable $e) {
+            // When parse/type fails, callers already emit a higher-level error.
+        } finally {
+            $this->compiler = $prev;
+        }
+
+        $issue = $lint->issues[0] ?? null;
+        if (null !== $issue) {
+            echo "parseAndCompile: {$issue->formatHuman()}\n";
+        }
     }
 
     /**

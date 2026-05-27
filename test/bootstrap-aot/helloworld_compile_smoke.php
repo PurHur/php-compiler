@@ -51,6 +51,18 @@ function helloworld_compile_smoke(string $sourceFile, string $outFile): int
     $runtime = new \PHPCompiler\Runtime(\PHPCompiler\Runtime::MODE_AOT);
     $block = $runtime->parseAndCompile($code, $resolved);
     if (null === $block) {
+        try {
+            $linter = new \PHPCompiler\Lint\Linter($runtime);
+            $issues = $linter->lintFileStandalone($resolved);
+            $first = $issues[0] ?? null;
+            if (null !== $first) {
+                echo "helloworld_compile_smoke: unsupported {$first->kind} at {$first->file}:{$first->line}\n";
+            } else {
+                echo "helloworld_compile_smoke: parseAndCompile failed (no lint issues)\n";
+            }
+        } catch (\Throwable $e) {
+            echo "helloworld_compile_smoke: parseAndCompile failed (lint exception)\n";
+        }
         echo "helloworld_compile_smoke: parseAndCompile returned null (CFG/compile spine)\n";
         echo "helloworld_compile_smoke: native emit failed at phase=parseAndCompile\n";
 
