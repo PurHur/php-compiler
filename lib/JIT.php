@@ -721,7 +721,7 @@ class JIT {
                 && (
                     $this->isM3EmitTuCompilerCompileChainLoweringName($emitLc)
                     || $this->isLiteralIncludeDiscoveryRealLoweringMethod($emitLc)
-                    || $this->isSuperglobalsM3CompileDriverLoweringMethod($emitLc)
+                    || $this->isSuperglobalsRealLoweringMethod($emitLc)
                     || $this->isM3EmitTuRuntimeCompileDriverSpineLoweringName($emitLc)
                 )
             ) {
