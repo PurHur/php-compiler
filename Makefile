@@ -356,6 +356,7 @@ bootstrap-loop-full-spine-probe:
 bootstrap-loop-gen2-recompile-spine:
 	./script/bootstrap-loop-gen2-recompile-spine.sh
 bootstrap-loop-gen2-recompile-minimal: bootstrap-loop-gen2-recompile-spine
+# Script dry-run ladder: make bootstrap-loop-probe-dry (not `make bootstrap-loop-probe --dry-run`, which is GNU make recipe print only — #2828).
 bootstrap-loop-probe:
 	./script/bootstrap-loop-probe.sh
 bootstrap-loop-probe-dry:

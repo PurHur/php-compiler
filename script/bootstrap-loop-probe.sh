@@ -6,6 +6,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ENTRY="${ROOT}/test/selfhost/bootstrap_loop_smoke/main.php"
 COMPILE_DRIVER="${ROOT}/test/selfhost/bootstrap_loop_smoke/compile_driver.php"
 M3_PROBE="${ROOT}/script/bootstrap-selfhost-helloworld-probe.sh"
+SELFHOST_LINK="${ROOT}/script/bootstrap-selfhost-link.sh"
 SPINE_LINK="${ROOT}/script/bootstrap-selfhost-lib-spine-smoke-link.sh"
 GEN1_LINK="${ROOT}/script/bootstrap-loop-gen1-link.sh"
 FULL_SPINE_EMIT="${ROOT}/script/bootstrap-loop-gen1-full-spine-emit.sh"
@@ -16,13 +17,13 @@ usage() {
   cat <<'EOF'
 Usage: script/bootstrap-loop-probe.sh [--dry-run]
 
-M4 bootstrap-loop probe (#1498). Runs M2 spine + M3 HelloWorld with the same strict env as
+M4 bootstrap-loop probe (#1498). Runs M0 link + M2 spine + M3 HelloWorld with the same strict env as
 `make bootstrap-selfhost-helloworld` (#2612), then gen-1 link / gen-2 attempt, then gen-2→gen-3 spine recompile.
 
 Exit codes:
-  0  --dry-run: lint + M2 spine + M3 HelloWorld strict + gen-1 link (gen-2 Zend partial OK)
+  0  --dry-run: lint + M0 link + M2 spine + M3 HelloWorld strict + gen-1 link (gen-2 Zend partial OK)
      full:      same + gen-1→gen-2 native + gen-2→gen-3 spine (717/717)
-  1  hard failure (missing entry/scripts, lint, M2 spine, M3 HelloWorld, or gen-1 link)
+  1  hard failure (missing entry/scripts, lint, M0 link, M2 spine, M3 HelloWorld, or gen-1 link)
   2  LLVM 9 not found (skip), or full mode: gen-2 native emit or gen-3 spine recompile blocked
   3  reserved
 
@@ -85,7 +86,7 @@ m4_run_subprobe() {
 
 echo "=== M4 bootstrap-loop probe (#1498) ==="
 if [[ "${DRY_RUN}" -eq 1 ]]; then
-  echo "mode: --dry-run (lint + M2 spine + M3 HelloWorld Makefile parity — strict native emit; no gen-2 strict slice)"
+  echo "mode: --dry-run (lint + M0 link + M2 spine + M3 HelloWorld Makefile parity — strict native emit; no gen-2 strict slice)"
 else
   echo "mode: full (M3 HelloWorld strict before gen-1; gen-1→gen-2 + gen-2→gen-3 spine per #2611/#2697)"
 fi
@@ -100,6 +101,11 @@ fi
 
 if [[ ! -f "${M3_PROBE}" ]]; then
   echo "bootstrap-loop-probe: missing ${M3_PROBE}" >&2
+  exit 1
+fi
+
+if [[ ! -f "${SELFHOST_LINK}" ]]; then
+  echo "bootstrap-loop-probe: missing ${SELFHOST_LINK}" >&2
   exit 1
 fi
 
@@ -143,6 +149,12 @@ fi
 echo "==> lint bootstrap_loop_smoke compile driver"
 if ! php "${ROOT}/bin/compile.php" -l "${COMPILE_DRIVER}" 2>&1; then
   echo "bootstrap-loop-probe: compile driver lint failed (exit 1)" >&2
+  exit 1
+fi
+
+if ! m4_run_subprobe "M0 self-host native link (compiler_minimal bundle)" bash "${SELFHOST_LINK}"; then
+  echo "bootstrap-loop-probe: M0 prerequisite failed (exit 1)" >&2
+  echo "bootstrap-loop-probe: hint: make bootstrap-selfhost-link" >&2
   exit 1
 fi
 
