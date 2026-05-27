@@ -54,7 +54,7 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | M4 `make bootstrap-loop-gen1-link` | ✅ gen-1 link + gen-2 smoke **`emit_path=native`** (defaults compile-driver env, #2611); full tree rebuild still open ([#1498](https://github.com/PurHur/php-compiler/issues/1498)); presenter: [GETTING-STARTED §7](GETTING-STARTED.md) ([#2464](https://github.com/PurHur/php-compiler/issues/2464)) |
 | M4 `make bootstrap-loop-probe` | 🚧 ladder — dry-run + strict slices pass; **full** may exit **2** until full gen-2 tree ([#1498](https://github.com/PurHur/php-compiler/issues/1498)); `make north-star4-verify` — [GETTING-STARTED §7](GETTING-STARTED.md) |
 | `make bootstrap-aot-link` | ✅ **71/71** |
-| `php script/bootstrap-inventory.php --check` | ✅ **717** Phase A files, **717** vm.php-path files, **0** source blockers |
+| `make bootstrap-inventory-check` | ✅ **717** Phase A files, **717** vm.php-path files, **0** source blockers |
 | `make north-star5-verify` | ✅ inventory + spine + selfhost link; vendor **1/3** `object_ok` (partial; `--strict` for 3/3) |
 
 ---
@@ -83,7 +83,7 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | **M5 vendor prelink** | `object_ok` packages ÷ 3 | **1 / 3** (`php-types`) |
 | **Composite (internal)** | Milestone weights in table above (M0–M1 = 100%, M2 = spine %, M3–M5 = gate %) | **~62%** |
 
-Regenerate inventory: `php script/bootstrap-inventory.php` · spine count: `php script/bootstrap-spine-count.php` (or `grep -c '^require_once' test/selfhost/compiler_lib_spine_smoke/main.php`)
+Regenerate inventory: `make bootstrap-inventory-regenerate` (or `php script/bootstrap-inventory.php`) · spine count: `php script/bootstrap-spine-count.php` (or `grep -c '^require_once' test/selfhost/compiler_lib_spine_smoke/main.php`)
 
 ---
 
@@ -172,7 +172,7 @@ make bootstrap-wave-check
 make bootstrap-selfhost-compile-smoke-run
 BOOTSTRAP_LIB_SPINE_SMOKE=1 make bootstrap-selfhost-lib-spine-smoke
 make bootstrap-selfhost-helloworld
-php script/bootstrap-inventory.php --check
+make bootstrap-inventory-check
 php script/bootstrap-vendor-inventory.php
 ```
 

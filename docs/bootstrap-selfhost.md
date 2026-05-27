@@ -6,7 +6,7 @@
 
 | Gate | Command | Status |
 |------|---------|--------|
-| Phase A inventory | `php script/bootstrap-inventory.php --check` | ✅ vm.php-path inventory; **0** source blockers; M2 ratio SSOT: `Phase A inventory files` row in `docs/bootstrap-inventory.md` (no ratio-deferred paths — [#2543](https://github.com/PurHur/php-compiler/issues/2543)); `lib/JIT/Builtin/StringPregMatch.php` and `lib/AOT/Linker.php` **included** in spine |
+| Phase A inventory | `make bootstrap-inventory-check` | ✅ vm.php-path inventory; **0** source blockers; M2 ratio SSOT: `Phase A inventory files` row in `docs/bootstrap-inventory.md` (no ratio-deferred paths — [#2543](https://github.com/PurHur/php-compiler/issues/2543)); `lib/JIT/Builtin/StringPregMatch.php` and `lib/AOT/Linker.php` **included** in spine |
 | Spine PHPCfg parse | `php script/bootstrap-spine-php-cfg-parse-check.php` (`--minimal` for M0 bundle) | ✅ no unsupported php-cfg expr/stmt on spine ([#2575](https://github.com/PurHur/php-compiler/issues/2575)); `BOOTSTRAP_SPINE_PHPCFG_PARSE_GATE=1` in `ci-fast.sh` |
 | Phase B lib AOT lint | `php bin/compile.php -l lib/*.php` (with `script/php-env.sh`) | ✅ **14/14** top-level `lib/*.php` units ([#534](https://github.com/PurHur/php-compiler/pull/534)) |
 | Phase B fixture lint | `php script/bootstrap-aot-lint.php` | ✅ **13** procedural targets under `test/bootstrap-aot/` + `examples/000-HelloWorld` |
@@ -69,11 +69,11 @@ Regenerate: `make bootstrap-profile` (inventory + profile + optional `bootstrap-
 
 | Change | Command |
 |--------|---------|
-| New file on `bin/vm.php` path | `php script/bootstrap-inventory.php` |
-| Self-host probe finds new blocker (`NEXT_LOWER`) | `php script/bootstrap-selfhost-compile-probe.php --update-inventory` then `php script/bootstrap-inventory.php` if headers drift |
+| New file on `bin/vm.php` path | `make bootstrap-inventory-regenerate` (or `php script/bootstrap-inventory.php`) |
+| Self-host probe finds new blocker (`NEXT_LOWER`) | `php script/bootstrap-selfhost-compile-probe.php --update-inventory` then `make bootstrap-inventory-regenerate` if headers drift |
 | Capability / bootstrap cross-links | `make bootstrap-profile` |
 
-CI enforces freshness via `php script/bootstrap-inventory.php --check` in `script/ci-common.sh` ([#765](https://github.com/PurHur/php-compiler/issues/765)). Do not hand-edit inventory tables.
+CI enforces freshness via `make bootstrap-inventory-check` (or `php script/bootstrap-inventory.php --check`) in `script/ci-common.sh` ([#765](https://github.com/PurHur/php-compiler/issues/765)). Do not hand-edit inventory tables.
 
 **Static compile lint sweep** (same file list as inventory; [#2208](https://github.com/PurHur/php-compiler/issues/2208)):
 
@@ -186,7 +186,7 @@ Per-file `php bin/compile.php -l lib/*.php` passes for all 14 top-level units af
 
 ### `compiler_minimal` bundle (literal `require_once`)
 
-Incremental growth toward `bin/vm.php` inventory path ([#559](https://github.com/PurHur/php-compiler/issues/559)). Regenerate inventory: `php script/bootstrap-inventory.php`.
+Incremental growth toward `bin/vm.php` inventory path ([#559](https://github.com/PurHur/php-compiler/issues/559)). Regenerate inventory: `make bootstrap-inventory-regenerate` (or `php script/bootstrap-inventory.php`).
 
 | File | Role |
 |------|------|
@@ -258,7 +258,7 @@ Parallel bootstrap waves use **four agents** with disjoint ownership. Each wave 
 2. `php script/bootstrap-aot-lint.php` — quick procedural ladder (exit 2 = LLVM skip)
 3. `./script/bootstrap-selfhost-compile-probe.sh` — prints `NEXT_LOWER` for the next native blocker
 
-Inventory between waves: `php script/bootstrap-inventory.php`. Stdlib JIT audit: `php script/audit-stdlib-jit.php` → `docs/stdlib-jit-audit.md`.
+Inventory between waves: `make bootstrap-inventory-regenerate` (or `php script/bootstrap-inventory.php`). Stdlib JIT audit: `php script/audit-stdlib-jit.php` → `docs/stdlib-jit-audit.md`.
 
 ## Non-goals (initial bootstrap)
 
