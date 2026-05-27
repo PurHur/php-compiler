@@ -50,18 +50,41 @@ final class JitStringCompare
             $context->builder->structGep($rightStr, $map['length'])
         );
         $lenEq = $context->builder->icmp(Builder::INT_EQ, $leftLen, $rightLen);
+        $i1 = $context->getTypeFromString('int1');
+        $falseVal = $i1->constInt(0, false);
+
+        // __string__ is length-tracked and not guaranteed to be null-terminated; use memcmp
+        // guarded by length equality (strcmp can read past the buffer and/or mismatch).
+        $lenOk = BasicBlockHelper::append($context, 'jit_strcmp_len_ok');
+        $lenBad = BasicBlockHelper::append($context, 'jit_strcmp_len_bad');
+        $merge = BasicBlockHelper::append($context, 'jit_strcmp_done');
+        $context->builder->branchIf($lenEq, $lenOk, $lenBad);
+
+        $context->builder->positionAtEnd($lenBad);
+        $context->builder->branch($merge);
+
+        $context->builder->positionAtEnd($lenOk);
+        $sizeT = $context->getTypeFromString('size_t');
+        $len = $context->builder->zExt($leftLen, $sizeT);
         $cmp = $context->builder->call(
-            $context->lookupFunction('strcmp'),
+            $context->lookupFunction('memcmp'),
             $context->builder->structGep($leftStr, $map['value']),
-            $context->builder->structGep($rightStr, $map['value'])
+            $context->builder->structGep($rightStr, $map['value']),
+            $len
         );
         $strEq = $context->builder->icmp(
             Builder::INT_EQ,
             $cmp,
             $cmp->typeOf()->constInt(0, false)
         );
+        $context->builder->branch($merge);
 
-        return $context->builder->and($lenEq, $strEq);
+        $context->builder->positionAtEnd($merge);
+        $phi = $context->builder->phi($i1);
+        $phi->addIncoming($falseVal, $lenBad);
+        $phi->addIncoming($strEq, $lenOk);
+
+        return $phi;
     }
 
     /**

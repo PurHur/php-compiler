@@ -334,6 +334,16 @@ class Module extends ModuleAbstract
             $context->registerFunction('strcmp', $fn);
         }
         try {
+            $context->lookupFunction('memcmp');
+        } catch (\Throwable $e) {
+            $i8p = $context->getTypeFromString('int8*');
+            $sizeT = $context->getTypeFromString('size_t');
+            $i32 = $context->getTypeFromString('int32');
+            $ft = $context->context->functionType($i32, false, $i8p, $i8p, $sizeT);
+            $fn = $context->module->addFunction('memcmp', $ft);
+            $context->registerFunction('memcmp', $fn);
+        }
+        try {
             $context->lookupFunction('strncmp');
         } catch (\Throwable $e) {
             $i8p = $context->getTypeFromString('int8*');
