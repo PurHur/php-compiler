@@ -398,9 +398,6 @@ final class BootstrapCompileSmokeM3Emit
         if (null !== $existing) {
             return $existing;
         }
-        if (self::isRuntimeVoidInitSpine($methodLc)) {
-            return self::emitRuntimeVoidInitSpine($context, $logical, $mangled);
-        }
         $params = [];
         foreach ($paramTypeNames as $typeName) {
             $params[] = $context->getTypeFromString($typeName);
@@ -414,35 +411,5 @@ final class BootstrapCompileSmokeM3Emit
                 ...$params
             )
         );
-    }
-
-    private static function isRuntimeVoidInitSpine(string $methodLc): bool
-    {
-        // initparsepipeline/initcompiler are real spine symbols (RuntimeEmitTuInit uses
-        // RuntimeInitCompiler for initcompiler; initparsepipeline is pre-lowered).
-        return 'loadcoremodules' === $methodLc;
-    }
-
-    private static function emitRuntimeVoidInitSpine(Context $context, string $logical, string $mangled): Value
-    {
-        $lc = strtolower($logical);
-        $objectPtr = $context->getTypeFromString('__object__*');
-        $voidTy = $context->getTypeFromString('void');
-        $func = $context->module->addFunction(
-            $mangled,
-            $context->context->functionType($voidTy, false, $objectPtr)
-        );
-        $bb = $func->appendBasicBlock('entry');
-        $saved = $context->builder;
-        $context->builder = $context->context->builderCreate();
-        $context->builder->positionAtEnd($bb);
-        $context->builder->returnVoid();
-        $context->builder->clearInsertionPosition();
-        $context->builder = $saved;
-        $context->functions[$lc] = $func;
-        $context->functionReturnType[$lc] = 'void';
-        $context->functionProxies[$lc] = new Call\Native($func, $logical, [$objectPtr], []);
-
-        return $func;
     }
 }
