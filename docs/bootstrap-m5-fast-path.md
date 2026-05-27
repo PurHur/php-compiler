@@ -124,6 +124,10 @@ make bootstrap-vendor-prelink-bundles   # test/bootstrap-vendor-prelink/generate
 make bootstrap-vendor-objects           # also AOT → prelinked/bootstrap-vendor/*.o (PHP_COMPILER_KEEP_OBJECT_FILE=1)
 ```
 
+`bootstrap-vendor-objects.php --compile` sets `PHP_COMPILER_VENDOR_PRELINK=1` so `lib/JIT.php` skips non-jittable vendor class bodies during link-only AOT. **May 2026:** `ircmaxell/php-types` → `object_ok`; `php-cfg` / `php-llvm` still blocked on parse/type reconstruction in bundled compile.
+
+Presenter: `make north-star5-verify` / `./script/north-star5-verify.sh` ([#1416](https://github.com/PurHur/php-compiler/issues/1416)).
+
 `lib/AOT/Linker.php::prelinkedVendorObjectPaths()` reads `object_ok` entries from the manifest. CI: `BOOTSTRAP_VENDOR_PRELINK_SYNC_GATE=1` (bundles); `BOOTSTRAP_VENDOR_PRELINK_GATE=1` for compile probe in wave-check (opt-in).
 
 **Stub policy:** shrink `PHP_COMPILER_SELFHOST_AOT` stubs on the **compile spine first** (`parseAndCompile` → `standalone` → `Compiler::compile`), not whole-tree at once.

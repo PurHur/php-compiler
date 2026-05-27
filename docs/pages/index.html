@@ -105,7 +105,7 @@
         <article class="track-panel track-panel--selfhost">
           <h3>North star — Self-host</h3>
           <p>Native binary from <code>lib/</code> compiles PHP and rebuilds the next compiler without Zend.</p>
-          <p><strong>Now:</strong> M0–M2 ✅ · spine <strong>717/718</strong> · M3 smoke emit <strong>native</strong> ✅ (strict probes) · M4 gen-2 smoke 🚧 · M5 ⬜</p>
+          <p><strong>Now:</strong> M0–M2 ✅ · spine <strong>717/718</strong> · M3 smoke emit <strong>native</strong> ✅ (strict probes) · M4 gen-2 smoke 🚧 · M5 vendor prelink 🚧 (<code>php-types</code>)</p>
           <p><a href="development-status.html">Status</a> · <a href="missing-implementation.html">Gap tables</a> · <a href="capability-comparison.html">PHP vs us</a> · <a href="https://github.com/PurHur/php-compiler/issues/1492">#1492</a></p>
         </article>
         <article class="track-panel track-panel--web">
@@ -121,10 +121,10 @@
       <div class="overall-progress">
         <div class="overall-progress__label">
           <span>Toward self-hosting</span>
-          <span class="overall-progress__pct">~58%</span>
+          <span class="overall-progress__pct">~62%</span>
         </div>
-        <div class="progress-track" role="progressbar" aria-valuenow="58" aria-valuemin="0" aria-valuemax="100">
-          <div class="progress-fill" data-width="58" style="width: 0"></div>
+        <div class="progress-track" role="progressbar" aria-valuenow="62" aria-valuemin="0" aria-valuemax="100">
+          <div class="progress-fill" data-width="62" style="width: 0"></div>
         </div>
         <p class="overall-progress__note">
           Verified 27 May 2026 on <code>master</code> (LLVM 9): minimal + spine bundles link;
@@ -141,7 +141,7 @@
         <li class="is-done"><span class="ladder__marker" aria-hidden="true">✓</span><h4>M2</h4><p>Spine <strong>717/718</strong> native link.</p></li>
         <li class="is-wip"><span class="ladder__marker" aria-hidden="true">3</span><h4>M3</h4><p>Smoke fixtures compile with <strong>native emit</strong> (strict gates ✅); full <code>Compiler</code> CFG still open ([#1937](https://github.com/PurHur/php-compiler/issues/1937)).</p></li>
         <li class="is-wip"><span class="ladder__marker" aria-hidden="true">4</span><h4>M4</h4><p>Gen-2 smoke <strong>native</strong> ✅; full tree rebuild ⬜ ([#1498](https://github.com/PurHur/php-compiler/issues/1498)).</p></li>
-        <li class="is-todo"><span class="ladder__marker" aria-hidden="true">5</span><h4>M5</h4><p>Compiled <code>bin/compile.php</code>; no <code>vendor/</code> cold boot.</p></li>
+        <li class="is-wip"><span class="ladder__marker" aria-hidden="true">5</span><h4>M5</h4><p>Vendor <code>php-types</code> prelinked; compiled cold boot ⬜ ([#1416](https://github.com/PurHur/php-compiler/issues/1416)).</p></li>
       </ol>
       <p style="margin-top: 1rem">
         <a class="btn btn--ghost" href="missing-implementation.html">See missing implementation tables →</a>

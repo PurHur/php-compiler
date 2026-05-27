@@ -112,6 +112,7 @@ if ('' === $llvm || !is_file($llvm.'/libLLVM-9.so.1')) {
 }
 
 putenv('PHP_COMPILER_SELFHOST_AOT=0');
+putenv('PHP_COMPILER_VENDOR_PRELINK=1');
 putenv('PHP_COMPILER_KEEP_OBJECT_FILE=1');
 
 $phpBin = PHP_BINARY;

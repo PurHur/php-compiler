@@ -215,6 +215,38 @@ class JIT {
         return '1' === $flag || 'true' === strtolower((string) $flag);
     }
 
+    /**
+     * M5 vendor prelink: AOT-compile literal-require vendor bundles without full class lowering (#1416).
+     * Set by script/bootstrap-vendor-objects.php during --compile only.
+     */
+    private function shouldUseVendorPrelinkJitStubs(): bool
+    {
+        $flag = getenv('PHP_COMPILER_VENDOR_PRELINK');
+
+        return '1' === $flag || 'true' === strtolower((string) $flag);
+    }
+
+    private function shouldSkipExternalClassBodyLowering(int $classId): bool
+    {
+        if ($this->shouldUseSelfHostJitStubs()
+            || $this->shouldUseEmitHelperLinkStubs()
+            || $this->shouldUseM3EmitTuNativeBridge()
+            || $this->shouldUseVendorPrelinkJitStubs()
+            || $this->isBundledSuperglobalsClass($classId)
+        ) {
+            return true;
+        }
+        $className = strtolower($this->context->type->object->classNameForId($classId));
+        if ('' === $className) {
+            return false;
+        }
+
+        return str_starts_with($className, 'phpcfg\\')
+            || str_starts_with($className, 'phptypes\\')
+            || str_starts_with($className, 'phpllvm\\')
+            || str_starts_with($className, 'nikic\\');
+    }
+
     /** Opt-in when linking test/selfhost compile_driver.php bundles (#1056, #1768). */
     private function shouldUseM3CompileDriverMainNative(): bool
     {
@@ -576,8 +608,20 @@ class JIT {
         ) {
             return $this->compileSkippedCompilerSplitCfgStub($internalName, $block, $logicalName ?? $internalName);
         }
-        // Emit TU: never PHP-lowering bundled lib/ (LLVM 9 global ctor; #2540).
+        // Emit TU: stub bundled lib/ except M3 compile-driver Compiler/Web CFG (#2540, #2633).
         if ($this->shouldUseM3EmitTuNativeBridge() && null !== $logicalName) {
+            $emitLc = strtolower($logicalName);
+            if ($this->shouldUseM3CompileDriverRealLowering()
+                && (
+                    $this->isM3EmitTuCompilerCompileChainLoweringName($emitLc)
+                    || $this->isLiteralIncludeDiscoveryRealLoweringMethod($emitLc)
+                    || $this->isSuperglobalsM3CompileDriverLoweringMethod($emitLc)
+                    || $this->isM3EmitTuRuntimeCompileDriverSpineLoweringName($emitLc)
+                )
+            ) {
+                return $this->compileBlockPhpLowering($internalName, $block, $logicalName, $funcName);
+            }
+
             return $this->compileSkippedCompilerSplitCfgStub($internalName, $block, $logicalName ?? $internalName);
         }
 
@@ -1342,6 +1386,104 @@ class JIT {
     }
 
     /**
+     * Compiler CFG helpers allowed through emit-TU stub gate for M3 compile-driver (#2633).
+     *
+     * Kept smaller than {@see m3EmitTuCompilerSpineMethodSuffixes()} to avoid LLVM 9 link crash
+     * when lowering the full Compiler into the emit-helper module (#2540).
+     */
+    private function isM3EmitTuCompilerCompileChainLoweringName(string $lower): bool
+    {
+        if (!$this->shouldUseM3CompileDriverRealLowering()) {
+            return false;
+        }
+        foreach ($this->m3EmitTuCompilerCompileChainLoweringSuffixes() as $suffix) {
+            if (str_ends_with($lower, '\\compiler::'.$suffix)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function isM3EmitTuRuntimeCompileDriverSpineLoweringName(string $lower): bool
+    {
+        if (!$this->shouldUseM3CompileDriverRealLowering()) {
+            return false;
+        }
+        foreach ([
+            'parse',
+            'compileemitsmoke',
+            'initparsepipeline',
+            'initcompiler',
+            'loadcoremodules',
+        ] as $suffix) {
+            if (str_ends_with($lower, '\\runtime::'.$suffix)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** @return list<string> */
+    private function m3EmitTuCompilerCompileChainLoweringSuffixes(): array
+    {
+        return [
+            'compilecfgblock',
+            'compilecfgbranch',
+            'compileblock',
+            'compileops',
+            'compileop',
+            'compilestmt',
+            'compileexpr',
+            'compileoperand',
+            'compileterminal',
+            'compileparam',
+            'compilefunction',
+            'compilefunccall',
+            'compileboolconstant',
+            'compilebooltemporary',
+            'compilecoalesce',
+            'compilenullsafe',
+            'compileisset',
+            'compileissetmulti',
+            'compilearrayliteral',
+            'compilearraydimfetchread',
+            'compileincludeop',
+            'compileclasslike',
+            'compileclassbody',
+            'compileglobalconst',
+            'compileclassconstfetch',
+            'compileinstanceof',
+            'compileswitchasjumpifchain',
+            'getopcodetype',
+            'compiletypeconstrainedvariable',
+            'trycompiledefineasglobalconst',
+            'tryfoldvariablefunctionname',
+            'compilecallargsends',
+            'callargunpack',
+            'markcallerlocalsusedbyliteralinclude',
+            'requireoperandslot',
+            'resolvesimplevariablename',
+            'operandschainequal',
+            'unwrapoperandchain',
+            'slotindexforvariablename',
+            'splitcfgblockafterstringkeyedarray',
+            'inheritfuncfromparent',
+            'needscfg',
+            'unwrap',
+            'isarraydim',
+            'findcoalesce',
+            'resolvecoalesce',
+            'resolveisset',
+            'isredundantcoalescetailassign',
+            'compilefirstclasscallable',
+            'compilefirstclassfunctionnameslot',
+            'compilefirstclassstaticnameslot',
+        ];
+    }
+
+    /**
      * Lightweight native stubs for Runtime spine in M3 emit TU — never full PHP CFG (#2442).
      *
      * LLVM 9 crashes lowering initVmContext / parseAndCompile bodies in the emit-helper bundle.
@@ -1635,7 +1777,9 @@ class JIT {
             || str_contains($lower, 'deployroot')
             || str_contains($lower, 'sourcebundler')
             || (str_contains($lower, '\\web\\conststringfolder::') && !$this->isConstStringFolderRealLoweringMethod($lower))
-            || (str_contains($lower, '\\web\\superglobals::') && !str_ends_with($lower, '::issuperglobalname'));
+            || (str_contains($lower, '\\web\\superglobals::')
+                && !$this->isSuperglobalsM3CompileDriverLoweringMethod($lower)
+                && !str_ends_with($lower, '::issuperglobalname'));
     }
 
 
@@ -1689,7 +1833,22 @@ class JIT {
     /** LiteralIncludeDiscovery methods with safe LLVM 9 lowering during self-host AOT (#816). */
     private function isLiteralIncludeDiscoveryRealLoweringMethod(string $lower): bool
     {
-        return false;
+        if (!$this->shouldUseM3CompileDriverRealLowering()) {
+            return false;
+        }
+
+        return str_contains($lower, '\\web\\literalincludediscovery::')
+            || str_contains($lower, 'deployroot')
+            || str_contains($lower, 'sourcebundler');
+    }
+
+    private function isSuperglobalsM3CompileDriverLoweringMethod(string $lower): bool
+    {
+        if (!$this->shouldUseM3CompileDriverRealLowering()) {
+            return false;
+        }
+
+        return str_contains($lower, '\\web\\superglobals::');
     }
 
     /**
@@ -2243,6 +2402,11 @@ class JIT {
                 __DIR__.'/../test/bootstrap-aot/compiler_smoke_standalone.php',
                 \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILE_SMOKE_SIDECAR_REL,
                 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compileSmokeSentinelBlock'
+            );
+            $this->registerM3EmitTuSidecarFromPath(
+                __DIR__.'/../test/selfhost/compiler_helloworld_smoke/compile_driver.php',
+                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILE_DRIVER_SIDECAR_REL,
+                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compileDriverSentinelBlock'
             );
         } elseif ('compile_smoke_m3_emit' === $logPrefix) {
             $this->registerM3EmitTuSidecarFromPath(
@@ -4969,7 +5133,9 @@ class JIT {
                             $attrNames
                         );
                     }
-                    if ($this->isBundledSuperglobalsClass($classId) && 'issuperglobalname' !== $methodLc) {
+                    if (($this->isBundledSuperglobalsClass($classId) || $this->shouldSkipExternalClassBodyLowering($classId))
+                        && 'issuperglobalname' !== $methodLc
+                    ) {
                         break;
                     }
                     $visFlags = \PHPCfg\Func::FLAG_PUBLIC;
@@ -4997,10 +5163,7 @@ class JIT {
                     $name = $block->getOperand($op->arg1);
                     assert($name instanceof Operand\Literal);
                     if (!isset($block->constants[$op->arg2])) {
-                        if ($this->shouldUseSelfHostJitStubs()
-                            || $this->shouldUseEmitHelperLinkStubs()
-                            || $this->isBundledSuperglobalsClass($classId)
-                        ) {
+                        if ($this->shouldSkipExternalClassBodyLowering($classId)) {
                             break;
                         }
                         throw new \LogicException('Class constant value must be a compile-time constant');
@@ -5012,11 +5175,7 @@ class JIT {
                     );
                     break;
                 default:
-                    if ($this->shouldUseSelfHostJitStubs()
-                        || $this->shouldUseEmitHelperLinkStubs()
-                        || $this->shouldUseM3EmitTuNativeBridge()
-                        || $this->isBundledSuperglobalsClass($classId)
-                    ) {
+                    if ($this->shouldSkipExternalClassBodyLowering($classId)) {
                         break;
                     }
                     throw new \LogicException('Other class body types are not jittable for now');

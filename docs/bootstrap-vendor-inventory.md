@@ -28,7 +28,7 @@ Regenerate: `php script/bootstrap-vendor-inventory.php`
 | Package | Bundle | Prelinked object |
 |---------|--------|------------------|
 | `ircmaxell/php-cfg` | `test/bootstrap-vendor-prelink/generated/ircmaxell-php-cfg_bundle.php` | `prelinked/bootstrap-vendor/ircmaxell-php-cfg.o` (bundle_ok) |
-| `ircmaxell/php-types` | `test/bootstrap-vendor-prelink/generated/ircmaxell-php-types_bundle.php` | `prelinked/bootstrap-vendor/ircmaxell-php-types.o` (bundle_ok) |
+| `ircmaxell/php-types` | `test/bootstrap-vendor-prelink/generated/ircmaxell-php-types_bundle.php` | `prelinked/bootstrap-vendor/ircmaxell-php-types.o` (**object_ok**) |
 | `ircmaxell/php-llvm` | `test/bootstrap-vendor-prelink/generated/ircmaxell-php-llvm_bundle.php` | `prelinked/bootstrap-vendor/ircmaxell-php-llvm.o` (bundle_ok) |
 
 Regenerate bundles: `php script/bootstrap-vendor-objects.php` · compile: `make bootstrap-vendor-objects`

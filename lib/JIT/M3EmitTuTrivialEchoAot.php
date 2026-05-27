@@ -24,6 +24,8 @@ final class M3EmitTuTrivialEchoAot
 
     private const COMPILER_UNIT_PROBE_SENTINEL_LOGICAL = 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerUnitProbeSentinelBlock';
 
+    private const COMPILE_DRIVER_SENTINEL_LOGICAL = 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compileDriverSentinelBlock';
+
     public const TRIVIAL_ECHO_SIDECAR_REL = 'build/.m3_trivial_echo_aot_blob';
 
     public const HELLOWORLD_SIDECAR_REL = 'build/.m3_helloworld_aot_blob';
@@ -31,6 +33,8 @@ final class M3EmitTuTrivialEchoAot
     public const COMPILE_SMOKE_SIDECAR_REL = 'build/.m3_compile_smoke_aot_blob';
 
     public const COMPILER_UNIT_PROBE_SIDECAR_REL = 'build/.m3_compiler_unit_probe_aot_blob';
+
+    public const COMPILE_DRIVER_SIDECAR_REL = 'build/.m3_compile_driver_aot_blob';
 
     /** @var list<string> */
     private static array $registeredSidecarRels = [];
@@ -63,6 +67,7 @@ final class M3EmitTuTrivialEchoAot
                 self::TRIVIAL_ECHO_SIDECAR_REL => self::SENTINEL_LOGICAL,
                 self::COMPILE_SMOKE_SIDECAR_REL => self::COMPILE_SMOKE_SENTINEL_LOGICAL,
                 self::COMPILER_UNIT_PROBE_SIDECAR_REL => self::COMPILER_UNIT_PROBE_SENTINEL_LOGICAL,
+                self::COMPILE_DRIVER_SIDECAR_REL => self::COMPILE_DRIVER_SENTINEL_LOGICAL,
                 default => self::HELLOWORLD_SENTINEL_LOGICAL,
             };
         }

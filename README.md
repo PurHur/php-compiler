@@ -44,6 +44,7 @@ Presenter script and troubleshooting: [`docs/GETTING-STARTED.md`](docs/GETTING-S
 | Self-host **M2** spine | ✅ **717/718** link (`cli_driver` via `cli_spine_shim`) ([#1492](https://github.com/PurHur/php-compiler/issues/1492), [#2201](https://github.com/PurHur/php-compiler/issues/2201), [#2543](https://github.com/PurHur/php-compiler/issues/2543), [#2652](https://github.com/PurHur/php-compiler/issues/2652)) |
 | Self-host **M3** emit | 🚧 smoke strict **native** ✅ ([#2610](https://github.com/PurHur/php-compiler/issues/2610)); full `Compiler` CFG 🚧 ([#1937](https://github.com/PurHur/php-compiler/issues/1937)) |
 | Self-host **M4** loop | 🚧 gen-2 smoke **native** ✅ ([#2611](https://github.com/PurHur/php-compiler/issues/2611)); full tree ⬜ ([#1498](https://github.com/PurHur/php-compiler/issues/1498)) |
+| Self-host **M5** vendor prelink | 🚧 `php-types` **object_ok** ([#1416](https://github.com/PurHur/php-compiler/issues/1416)); `make north-star5-verify` |
 | Full Zend PHP compatibility | ❌ — subset only (matrices in `docs/`, not on status site) |
 
 MiniWebApp gates: [docs/miniwebapp-gates.md](docs/miniwebapp-gates.md) ([#472](https://github.com/PurHur/php-compiler/issues/472)). Presenter verify: `make north-star1-verify` ([#1845](https://github.com/PurHur/php-compiler/issues/1845)). Docker image: `php-compiler:22.04-dev`.
