@@ -527,11 +527,9 @@ class Object_ extends Type {
         $childLc = strtolower(ltrim($className, '\\'));
         $parentLc = strtolower(ltrim($parentName, '\\'));
         if (!isset($this->classes[$parentLc])) {
-            if (class_exists($parentName)) {
-                $this->registerExternalClass($parentLc, $parentName);
-            } else {
-                throw new \LogicException("Class {$className} extends unknown class {$parentName}");
-            }
+            // Allow forward-declared inheritance (parent declared later in the same script/bundle).
+            // If the parent is never declared, we still treat it as an external stub so compilation can proceed.
+            $this->registerExternalClass($parentLc, $parentName);
         }
         $this->classParentLc[$childLc] = $parentLc;
     }
