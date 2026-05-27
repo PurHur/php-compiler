@@ -10,6 +10,8 @@ declare(strict_types=1);
  */
 
 use PHPCompiler\Runtime;
+use PHPCompiler\Block;
+use PHPCompiler\OpCode;
 use PHPCompiler\Web\Superglobals;
 
 /**
@@ -52,7 +54,14 @@ function run(string $filename, string $code, array $options): void
         $runtime->setDebug($debugFile);
     }
     $block = $runtime->parseAndCompile($code, $filename);
-    $runtime->jit($block);
+    if (null !== $block && jit_block_contains_trycatch($block)) {
+        // JIT EH lowering is not yet stable; try/catch currently segfaults in MCJIT (issue #2114).
+        // Fall back to VM semantics rather than producing silent miscompiles or hard crashes.
+        //
+        // This keeps JIT usable for the rest of the language while #2114 is implemented.
+    } else {
+        $runtime->jit($block);
+    }
 
     if (! isset($options['-l'])) {
         $runtime->syncJitSuperglobals($queryArg, $postArg, $scriptFilename);
@@ -60,12 +69,39 @@ function run(string $filename, string $code, array $options): void
     }
 }
 
+function jit_block_contains_trycatch(Block $block): bool
+{
+    foreach ($block->opCodes as $op) {
+        if (
+            OpCode::TYPE_TRY === $op->type
+            || OpCode::TYPE_CATCH === $op->type
+            || OpCode::TYPE_FINALLY === $op->type
+            || OpCode::TYPE_THROW === $op->type
+        ) {
+            return true;
+        }
+        foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+            if ($sub instanceof Block && jit_block_contains_trycatch($sub)) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
 // libffi RTLD_GLOBAL preload before MCJIT segfaults on php-compiler:22.04-dev (#98, #2055).
 putenv('PHP_COMPILER_SKIP_LLVM_PRELOAD=1');
 $_ENV['PHP_COMPILER_SKIP_LLVM_PRELOAD'] = '1';
 $_SERVER['PHP_COMPILER_SKIP_LLVM_PRELOAD'] = '1';
 
-// Use literal require paths so self-host AOT/JIT can fold includes (#54, #1492).
-chdir(__DIR__.'/..');
-require_once 'src/cli.php';
-require_once 'src/cli_driver.php';
+if (
+    !(defined('PHP_COMPILER_LIB_SPINE_SMOKE') && PHP_COMPILER_LIB_SPINE_SMOKE)
+    && !(\function_exists('php_compiler_cli_should_skip_entry_driver') && php_compiler_cli_should_skip_entry_driver())
+) {
+    // Use literal require paths so self-host AOT/JIT can fold includes (#54, #1492).
+    chdir(__DIR__.'/..');
+    require_once 'src/cli.php';
+    require_once 'src/cli_driver.php';
+    php_compiler_cli_dispatch();
+}
