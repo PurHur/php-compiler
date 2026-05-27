@@ -62,16 +62,24 @@ class JIT {
     }
 
     public function compile(Block $block): PHPLLVM\Value {
+        JIT\Progress::noteFunction('jit_compile_begin');
         if ($this->shouldUseM3EmitTuNativeBridge() && $this->isM3EmitTuScriptMain($block)) {
             $this->m3EmitTuMainBlock = $block;
         }
         if ($this->shouldUseM3CompileDriverMainNative() && $this->isM3CompileDriverScriptMain($block)) {
             $this->m3CompileDriverMainBlock = $block;
         }
+        JIT\Progress::noteFunction('jit_compile_compile_block_begin');
         $return = $this->compileBlock($block);
+        JIT\Progress::noteFunction('jit_compile_compile_block_done');
+        JIT\Progress::noteFunction('jit_compile_run_queue_begin');
         $this->runQueue();
+        JIT\Progress::noteFunction('jit_compile_run_queue_done');
+        JIT\Progress::noteFunction('jit_compile_finalize_m3_emit_tu_spine_begin');
         $this->finalizeM3EmitTuRuntimeSpineAfterQueue();
+        JIT\Progress::noteFunction('jit_compile_finalize_m3_emit_tu_spine_done');
 
+        JIT\Progress::noteFunction('jit_compile_done');
         return $return;
     }
 
@@ -211,15 +219,10 @@ class JIT {
         ) {
             return null;
         }
-        $i1 = $this->context->getTypeFromString('int1');
-        $truth = $this->shouldUseSelfHostJitStubs() ? 1 : 0;
+        $lit = new Operand\Literal($this->shouldUseSelfHostJitStubs());
+        $lit->type = Type::bool();
 
-        return new JIT\Variable(
-            $this->context,
-            JIT\Variable::TYPE_NATIVE_BOOL,
-            JIT\Variable::KIND_VALUE,
-            $i1->constInt($truth, false)
-        );
+        return JIT\Variable::fromLiteral($this->context, $lit);
     }
 
     /**
@@ -444,6 +447,18 @@ class JIT {
         }
         if (str_contains($internalName, 'opcode_type_name')) {
             return $this->compileSkippedOpcodeNameStub($internalName, $block);
+        }
+        // M5 bootstrap sidecar: compiling `bin/compile.php` under `PHP_COMPILER_SELFHOST_AOT=1`
+        // only needs a linkable bundle; stub script main to avoid LLVM 9 crashing while lowering
+        // the argv driver call chain (issue #2697).
+        if (
+            $this->shouldUseSelfHostJitStubs()
+            && null === $logicalName
+            && null !== $block->func
+            && '{main}' === $block->func->name
+            && str_ends_with($block->scriptPath(), '/bin/compile.php')
+        ) {
+            return $this->compileSkippedCompilerSplitCfgStub($internalName, $block, '{main}');
         }
         if ($this->shouldUseM3CompileDriverMainNative() && $this->isM3CompileDriverScriptMain($block)) {
             return $this->compileM3CompileDriverMainNative($internalName, $block, $logicalName);
@@ -3278,7 +3293,7 @@ class JIT {
         if ($this->context->scope->blockStorage->contains($block)) {
             return $this->context->scope->blockStorage[$block];
         }
-        if (null !== $block->func && $block->orig === $block->func->cfg) {
+        if (null !== $block->func) {
             JIT\Progress::noteFunction($block->func->getScopedName());
         }
         if (null !== $entryBlock) {
@@ -3352,6 +3367,12 @@ class JIT {
 
         for ($i = 0, $length = null !== $limit ? $limit : count($block->opCodes); $i < $length; $i++) {
             $op = $block->opCodes[$i];
+            if (
+                null !== $block->func
+                && '{main}' === $block->func->name
+            ) {
+                JIT\Progress::noteFunction('{main}:op='.$i.':type='.$op->type);
+            }
             switch ($op->type) {
                 case OpCode::TYPE_ARG_RECV:
                     $recvSlot = $op->arg2 + $thisParamOffset;
@@ -4407,6 +4428,16 @@ class JIT {
                         $this->context->scope->toCall,
                         $this->finalizeJitCallArgs($this->context->scope->args)
                     );
+                    if (null !== $block->func && '{main}' === $block->func->name) {
+                        $toCall = $this->context->scope->toCall;
+                        $label = get_class($toCall);
+                        if ($toCall instanceof CoreFunc\Internal) {
+                            $label .= ':'.$toCall->getName();
+                        } elseif ($toCall instanceof JIT\Call\Native) {
+                            $label .= ':'.$toCall->name;
+                        }
+                        JIT\Progress::noteFunction('{main}:call='.$label);
+                    }
                     $prevStrict = $this->context->callerStrictTypes;
                     $this->context->callerStrictTypes = $block->strictTypes;
                     $this->context->scope->toCall->call($this->context, ...$callArgs);

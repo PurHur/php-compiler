@@ -418,20 +418,27 @@ class Context {
             $this->builder->call($this->shutdownFunc);
             $this->builder->returnValue($i32->constInt(0, false));
         }
+        Progress::noteFunction('jit_context_compile_common_begin');
         $this->compileCommon();
+        Progress::noteFunction('jit_context_compile_common_done');
 
+        Progress::noteFunction('jit_context_create_execution_engine');
         $engine = $this->module->createExecutionEngine();
         $machine = $engine->getTargetMachine();
         if (!is_null($this->debugFile)) {
             $machine->emitToFile($this->module, $this->debugFile . '.s', $machine::CODEGEN_FILE_TYPE_ASM);
         }
         $objectFile = $file . '.o';
+        Progress::noteFunction('jit_context_emit_object_begin');
         $machine->emitToFile($this->module, $objectFile, $machine::CODEGEN_FILE_TYPE_OBJECT);
+        Progress::noteFunction('jit_context_emit_object_done');
         $keepObject = getenv('PHP_COMPILER_KEEP_OBJECT_FILE');
         if ('1' === $keepObject || 'true' === strtolower((string) $keepObject)) {
             return;
         }
+        Progress::noteFunction('jit_context_link_begin');
         Linker::link($objectFile, $file);
+        Progress::noteFunction('jit_context_link_done');
         unlink($objectFile);
     }
 
@@ -466,9 +473,11 @@ class Context {
     }
 
     private function compileCommon() {
+        Progress::noteFunction('jit_context_compile_common_phase_modules_shutdown');
         foreach ($this->modules as $module) {
             $module->jitShutdown($this);
         }
+        Progress::noteFunction('jit_context_compile_common_phase_builtins_shutdown');
         foreach ($this->builtins as $builtin) {
             $builtin->shutdown();
         }
@@ -480,6 +489,7 @@ class Context {
         if (!is_null($this->debugFile)) {
             $this->module->printToFile($this->debugFile . '.bc');
         }
+        Progress::noteFunction('jit_context_compile_common_phase_seal_functions');
         $function = $this->module->getFirstFunction();
         while (null !== $function) {
             if ($function instanceof PHPLLVM\Value\Function_) {
@@ -491,7 +501,9 @@ class Context {
             }
             $function = $next;
         }
+        Progress::noteFunction('jit_context_verify_begin');
         $this->module->verify($this->module::VERIFY_ACTION_THROW, $message);   
+        Progress::noteFunction('jit_context_verify_done');
     }
 
     public function setDebugFile(string $file): void {

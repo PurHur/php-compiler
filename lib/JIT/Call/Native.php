@@ -59,7 +59,12 @@ class Native implements Call {
         if (null !== $this->variadicArgIndex) {
             $args = $this->packVariadicCallArgs($context, $args);
         }
-        CallArgv::emitStore($context, HashTableHelper::packVariables($context, $sentArgs));
+        // Self-host AOT paths do not support func_get_args/func_num_args; avoid emitting call argv global
+        // for bootstrap-sidecar compilation (issue #2697).
+        $selfHostAot = getenv('PHP_COMPILER_SELFHOST_AOT');
+        if ('1' !== $selfHostAot && 'true' !== strtolower((string) $selfHostAot)) {
+            CallArgv::emitStore($context, HashTableHelper::packVariables($context, $sentArgs));
+        }
         $argValues = [];
         $total = count($this->argTypes);
         for ($index = 0; $index < $total; $index++) {
