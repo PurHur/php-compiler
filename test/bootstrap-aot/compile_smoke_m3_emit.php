@@ -15,6 +15,12 @@ namespace PHPCompiler\BootstrapAot;
  * Lint: php bin/compile.php -l test/bootstrap-aot/compile_smoke_m3_emit.php
  */
 
+/** Zend + native M3 emit: Linker::link needs global phpc_run_command before standalone (#2769). */
+function bootstrap_m3_emit_ensure_phpc_run_command(): void
+{
+    require_once __DIR__.'/../../lib/AOT/phpc_run_command_polyfill.php';
+}
+
 function compile_smoke_m3_emit(string $sourceFile, string $outFile): int
 {
     if (!is_file($sourceFile)) {
@@ -85,6 +91,7 @@ function compile_smoke_m3_emit(string $sourceFile, string $outFile): int
         return 1;
     }
 
+    bootstrap_m3_emit_ensure_phpc_run_command();
     $runtime->standalone($block, $outFile);
 
     echo 'compile_smoke_m3_emit: compile OK -> '.$outFile."\n";
