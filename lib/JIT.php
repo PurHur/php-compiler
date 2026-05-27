@@ -53,6 +53,7 @@ class JIT {
     private bool $m3CompileDriverRuntimeSpineLowered = false;
     private ?Block $m3EmitTuTrivialEchoBlock = null;
     private ?string $m3EmitTuTrivialEchoSource = null;
+    private bool $m3EmitTuSidecarsCached = false;
 
     public Context $context;
 
@@ -2170,12 +2171,13 @@ class JIT {
         return \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::isRegistered($this->context);
     }
 
-    /** Host-compile emit-helper probe source and cache linked AOT bytes at link time (#2559, #2567). */
+    /** Host-compile emit-helper probe source and cache linked AOT bytes at link time (#2559, #2567, #2618). */
     private function cacheM3EmitTuTrivialEchoAtLinkTime(): void
     {
-        if (null !== $this->m3EmitTuTrivialEchoSource) {
+        if ($this->m3EmitTuSidecarsCached) {
             return;
         }
+        $this->m3EmitTuSidecarsCached = true;
         $logPrefix = getenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX');
         if ('helloworld_compile_smoke' === $logPrefix) {
             $this->registerM3EmitTuSidecarFromPath(
@@ -2189,12 +2191,14 @@ class JIT {
                 \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILE_SMOKE_SIDECAR_REL,
                 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compileSmokeSentinelBlock'
             );
-            // M3 compiler unit probe fixture shares compile_smoke emit helper (#2618).
-            $this->registerM3EmitTuSidecarFromPath(
-                __DIR__.'/../test/selfhost/compiler_unit_probe/compiler_unit_probe_compile.php',
-                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_UNIT_PROBE_SIDECAR_REL,
-                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerUnitProbeSentinelBlock'
-            );
+            $cuEmit = getenv('PHP_COMPILER_M3_COMPILER_UNIT_PROBE_EMIT');
+            if ('1' === $cuEmit || 'true' === strtolower((string) $cuEmit)) {
+                $this->registerM3EmitTuSidecarFromPath(
+                    __DIR__.'/../test/selfhost/compiler_unit_probe/compiler_unit_probe_compile.php',
+                    \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_UNIT_PROBE_SIDECAR_REL,
+                    'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerUnitProbeSentinelBlock'
+                );
+            }
         } else {
             $this->registerM3EmitTuSidecarFromPath(
                 __DIR__.'/../test/bootstrap-aot/runtime_trivial_echo.php',
