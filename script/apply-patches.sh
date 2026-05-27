@@ -415,4 +415,5 @@ fi
 
 if [[ -d "$ROOT/vendor/pre/plugin" ]]; then
   apply_patch "$PATCH_DIR/pre-plugin-parser-macros.patch"
+  apply_patch "$PATCH_DIR/pre-plugin-autoload-prepend.patch"
 fi
