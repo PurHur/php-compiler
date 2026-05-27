@@ -14,8 +14,18 @@ final class BootstrapPhaseADeferredTest extends TestCase
         require_once dirname(__DIR__, 2).'/script/bootstrap-phase-a-deferred.php';
 
         $deferred = bootstrap_phase_a_ratio_deferred_paths();
+        $this->assertSame([], $deferred, 'no ratio-deferred paths after #2543');
         $this->assertNotContains('lib/JIT/Builtin/StringPregMatch.php', $deferred);
         $this->assertNotContains('lib/AOT/Linker.php', $deferred);
+        $this->assertNotContains('lib/VM/HashTable.php', $deferred);
+    }
+
+    public function testVmHashTableInSpineSmokeBundle(): void
+    {
+        $spineMain = dirname(__DIR__, 2).'/test/selfhost/compiler_lib_spine_smoke/main.php';
+        $contents = (string) file_get_contents($spineMain);
+        $this->assertStringContainsString('lib/VM/HashTable.php', $contents);
+        $this->assertStringContainsString('lib/JIT/TryCatchState.php', $contents);
     }
 
     public function testStringPregMatchInSpineSmokeBundle(): void

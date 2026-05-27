@@ -9,15 +9,12 @@ declare(strict_types=1);
  * They are not omitted from the inventory scan — only from the Phase A file count used in
  * spine progress ratios (see bootstrap_phase_a_inventory_counts()).
  *
- * `lib/JIT/Builtin/StringPregMatch.php` is intentionally **not** deferred: it is bundled in
- * compiler_lib_spine_smoke and native-links today (external clang for preg_match bitcode is
- * permitted native floor per docs/self-host-target.md).
+ * `lib/VM/HashTable.php` promoted in spine smoke (#2543): native link includes the real VM
+ * unit; ratio uses spine require_once count + shim substitute adjustment (#2543).
  */
 function bootstrap_phase_a_ratio_deferred(): array
 {
-    return [
-        'lib/VM/HashTable.php' => 'spine bundles lib/JIT/Builtin/Type/HashTable.php via ArrayIterator',
-    ];
+    return [];
 }
 
 /**

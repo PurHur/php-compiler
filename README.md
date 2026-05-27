@@ -41,7 +41,7 @@ Presenter script and troubleshooting: [`docs/GETTING-STARTED.md`](docs/GETTING-S
 | **003-MiniWebApp** VM + AOT link | ✅ |
 | **003** AOT execute (home, hello, PATH_INFO, contact) | ✅ native execute ([#764](https://github.com/PurHur/php-compiler/issues/764) closed; close tracker [#1044](https://github.com/PurHur/php-compiler/issues/1044)) |
 | Self-host **M0–M1** | ✅ |
-| Self-host **M2** spine | ✅ **716/717** link (1 deferred `lib/VM/HashTable.php`) ([#1492](https://github.com/PurHur/php-compiler/issues/1492), [#2201](https://github.com/PurHur/php-compiler/issues/2201), [#2652](https://github.com/PurHur/php-compiler/issues/2652)) |
+| Self-host **M2** spine | ✅ **717/718** link (`cli_driver` via `cli_spine_shim`) ([#1492](https://github.com/PurHur/php-compiler/issues/1492), [#2201](https://github.com/PurHur/php-compiler/issues/2201), [#2543](https://github.com/PurHur/php-compiler/issues/2543), [#2652](https://github.com/PurHur/php-compiler/issues/2652)) |
 | Self-host **M3** emit | 🚧 smoke strict **native** ✅ ([#2610](https://github.com/PurHur/php-compiler/issues/2610)); full `Compiler` CFG 🚧 ([#1937](https://github.com/PurHur/php-compiler/issues/1937)) |
 | Self-host **M4** loop | 🚧 gen-2 smoke **native** ✅ ([#2611](https://github.com/PurHur/php-compiler/issues/2611)); full tree ⬜ ([#1498](https://github.com/PurHur/php-compiler/issues/1498)) |
 | Self-host **M5** vendor prelink | 🚧 `php-types` **object_ok** ([#1416](https://github.com/PurHur/php-compiler/issues/1416)); `make north-star5-verify` |
@@ -152,7 +152,7 @@ Matrix details: [docs/local-ci-matrix.md](docs/local-ci-matrix.md).
 |-----------|----------------|--------|
 | **M0 — Bundled subset runs** | ~**109** literal `require_once` units in `test/selfhost/compiler_minimal/main.php` compile+link under AOT; native binary prints `compiler_minimal bundle OK` | ✅ ([#557](https://github.com/PurHur/php-compiler/issues/557), [#913](https://github.com/PurHur/php-compiler/issues/913)) |
 | **M1 — Compiler-shaped bundle** | Same bundle **lints** as one translation unit; **compile-smoke** links a tiny fixture and runs AOT echo (`compiler smoke`); driver smoke bundles `bin/compile.php`-adjacent units | ✅ ([#1025](https://github.com/PurHur/php-compiler/issues/1025)) |
-| **M2 — Full top-level `lib/` + spine** | All **14** top-level `lib/*.php` lint ✅; **`compiler_lib_spine_smoke`** native link ✅ with real **`bin/vm.php`** (#2134); grow toward full inventory | 🚧 HashTable ratio-deferred |
+| **M2 — Full top-level `lib/` + spine** | All **14** top-level `lib/*.php` lint ✅; **`compiler_lib_spine_smoke`** native link ✅ with real **`bin/vm.php`** (#2134); **717/718** spine units (#2543) | ✅ |
 | **M3 — Native compiles PHP** | Self-host bundle links; HelloWorld AOT **runs** natively; **compile emit still Zend fallback** | 🚧 partial |
 | **M4 — Bootstrap loop** | Native toolchain rebuilds the **next** compiler sources | ⬜ |
 | **M5 — Full self-host** | Real `bin/vm.php` / `bin/compile.php` on full inventory; **no Zend bootstrap** | ⬜ **north star** ([#1492](https://github.com/PurHur/php-compiler/issues/1492)) |
