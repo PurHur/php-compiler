@@ -82,6 +82,18 @@ patch_already_applied() {
       grep -q '\\$paramTypes = \\[\\];' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Context.php" 2>/dev/null \
         && grep -q '\\$valueRefs = \\[\\];' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php" 2>/dev/null
       ;;
+    php-llvm-pass-registry-interface.patch)
+      grep -q "class PassRegistry implements CorePassRegistry" "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/PassRegistry.php" 2>/dev/null
+      ;;
+    php-llvm-pass-manager-builder-semicolon.patch)
+      grep -q 'PassManagerBuilder as CorePassManagerBuilder;' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/PassManagerBuilder.php" 2>/dev/null
+      ;;
+    php-llvm-pass-manager-builder-typed-prop.patch)
+      grep -q 'LLVMPassManagerBuilderRef \\$passManagerBuilder' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/PassManagerBuilder.php" 2>/dev/null
+      ;;
+    php-llvm-pass-manager-builder-populate.patch)
+      grep -q 'PopulateFunctionPassManager(\\$this->passManagerBuilder, \\$passManager->passManager' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/PassManagerBuilder.php" 2>/dev/null
+      ;;
     php-llvm-memory-buffer-bitcode.patch)
       grep -q 'use llvm\\string_ptr;' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/MemoryBuffer.php" 2>/dev/null \
         && grep -q '\$this->llvm->lib->getFFI()' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/MemoryBuffer.php" 2>/dev/null
@@ -366,6 +378,10 @@ apply_patch "$PATCH_DIR/php-llvm-llvmabstract-value-addincoming.patch"
 apply_patch "$PATCH_DIR/php-llvm-builder-and-or.patch"
 apply_patch "$PATCH_DIR/php-llvm-builder-xor.patch"
 apply_patch "$PATCH_DIR/php-llvm-no-closures-array-map.patch"
+apply_patch "$PATCH_DIR/php-llvm-pass-registry-interface.patch"
+apply_patch "$PATCH_DIR/php-llvm-pass-manager-builder-semicolon.patch"
+apply_patch "$PATCH_DIR/php-llvm-pass-manager-builder-typed-prop.patch"
+apply_patch "$PATCH_DIR/php-llvm-pass-manager-builder-populate.patch"
 apply_patch "$PATCH_DIR/php-llvm-memory-buffer-bitcode.patch"
 apply_patch "$PATCH_DIR/php-llvm-x86-posix-fallback.patch"
 

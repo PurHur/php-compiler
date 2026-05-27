@@ -1,0 +1,11 @@
+--- vendor/ircmaxell/php-llvm/lib/LLVMAbstract/PassManagerBuilder.php
++++ vendor/ircmaxell/php-llvm/lib/LLVMAbstract/PassManagerBuilder.php
+@@ -20,7 +20,7 @@
+ class PassManagerBuilder implements CorePassManagerBuilder {
+ 
+     public LLVM $llvm;
+-    public LLVMPassManagerRef $passManagerBuilder;
++    public LLVMPassManagerBuilderRef $passManagerBuilder;
+ 
+     public function __construct(LLVM $llvm, LLVMPassManagerBuilderRef $passManagerBuilder) {
+         $this->llvm = $llvm;

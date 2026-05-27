@@ -1,0 +1,17 @@
+--- vendor/ircmaxell/php-llvm/lib/LLVMAbstract/PassManagerBuilder.php
++++ vendor/ircmaxell/php-llvm/lib/LLVMAbstract/PassManagerBuilder.php
+@@ -58,3 +58,3 @@
+     public function populateFunctionPassManager(PassManager $passManager): void {
+-        $this->llvm->lib->LLVMPassManagerBuilderPopulateFunctionPassManager($this->passManagerBuilder, $passManagerBuilder);
++        $this->llvm->lib->LLVMPassManagerBuilderPopulateFunctionPassManager($this->passManagerBuilder, $passManager->passManager);
+     }
+@@ -62,3 +62,3 @@
+     public function populateModulePassManager(PassManager $passManager): void {
+-        $this->llvm->lib->LLVMPassManagerBuilderPopulateModulePassManager($this->passManagerBuilder, $passManagerBuilder);
++        $this->llvm->lib->LLVMPassManagerBuilderPopulateModulePassManager($this->passManagerBuilder, $passManager->passManager);
+     }
+@@ -66,3 +66,3 @@
+     public function populateLTOPassManager(PassManager $passManager, bool $internalize, bool $runInliner): void {
+-        $this->llvm->lib->LLVMPassManagerBuilderPopulateLTOPassManager($this->passManagerBuilder, $passManagerBuilder, $this->llvm->toBool($internalize), $this->llvm->toBool($runInliner));
++        $this->llvm->lib->LLVMPassManagerBuilderPopulateLTOPassManager($this->passManagerBuilder, $passManager->passManager, $this->llvm->toBool($internalize), $this->llvm->toBool($runInliner));
+     }
