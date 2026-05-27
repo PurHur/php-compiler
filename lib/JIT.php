@@ -626,6 +626,14 @@ class JIT {
         ) {
             return $this->compileSkippedCompilerSplitCfgStub($internalName, $block, $logicalName ?? $internalName);
         }
+        if (
+            $this->shouldUseSelfHostJitStubs()
+            && null !== $logicalName
+            && str_ends_with(strtolower($logicalName), '\\runtime::__construct')
+            && !$this->shouldUseM3CompileDriverRealLowering()
+        ) {
+            return $this->emitM3EmitTuRuntimeConstructNativeFunction($internalName, $logicalName, $block);
+        }
         // Emit TU: stub bundled lib/ except M3 compile-driver Compiler/Web CFG (#2540, #2633).
         if ($this->shouldUseM3EmitTuNativeBridge() && null !== $logicalName) {
             $emitLc = strtolower($logicalName);
@@ -881,13 +889,15 @@ class JIT {
         return $this->compileBlockPhpLowering($internalName, $block, $logicalName, $logicalName);
     }
 
-    /** M3 compile-driver Runtime::__construct (#1494): slim ctor + init* helpers via PHP CFG lowering. */
+    /** M3 compile-driver Runtime::__construct (#1494): C-floor vmContext — not full PHP CFG (LLVM 9; #2600). */
     private function compileRuntimeConstructM3Native(
         string $internalName,
         Block $block,
         string $logicalName
     ): PHPLLVM\Value {
-        if ($this->shouldUseM3EmitTuRuntimeMethodStub('__construct')) {
+        if ($this->shouldUseM3CompileDriverRealLowering()
+            || $this->shouldUseM3EmitTuRuntimeMethodStub('__construct')
+        ) {
             return $this->emitM3EmitTuRuntimeConstructNativeFunction($internalName, $logicalName, $block);
         }
 
@@ -971,11 +981,27 @@ class JIT {
         $saved = $this->context->builder;
         $this->context->builder = $this->context->context->builderCreate();
         $this->context->builder->positionAtEnd($bb);
-        if ($this->shouldUseM3CompileDriverRealLowering()) {
+        if ($this->shouldUseM3CompileDriverRealLowering() || $this->shouldUseSelfHostJitStubs()) {
             \PHPCompiler\JIT\RuntimeInitVmContext::emit(
                 $this->context,
                 $this->context->type->object,
                 $func->getParam(0)
+            );
+            $modeSlot = $this->context->type->object->propertyFetch(
+                $func->getParam(0),
+                'PHPCompiler\\Runtime',
+                'mode'
+            );
+            $modeVar = new JIT\Variable(
+                $this->context,
+                JIT\Variable::TYPE_NATIVE_LONG,
+                JIT\Variable::KIND_VALUE,
+                $func->getParam(1)
+            );
+            $this->context->type->object->propertyStore(
+                $modeSlot->objectPropertySlot,
+                $modeVar,
+                JIT\Variable::TYPE_NATIVE_LONG
             );
         }
         $this->context->builder->returnVoid();
@@ -2526,8 +2552,9 @@ class JIT {
             .' -o '.escapeshellarg($tmpOut)
             .' '.escapeshellarg($path);
         $compileEnv = $_ENV;
-        // Self-host skips cli/vendor includes during link; required for bin/compile.php sidecar (#2633).
+        // Self-host skips cli/vendor includes during link; M3 compile-driver Runtime ctor native (#2600, #2633).
         $compileEnv['PHP_COMPILER_SELFHOST_AOT'] = '1';
+        $compileEnv['PHP_COMPILER_M3_COMPILE_DRIVER'] = '1';
         unset($compileEnv['PHP_COMPILER_EMIT_HELPER_LINK'], $compileEnv['PHP_COMPILER_M3_EMIT_TU']);
         $descriptor = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
         $proc = proc_open($compileCmd, $descriptor, $pipes, $repoRoot, $compileEnv);

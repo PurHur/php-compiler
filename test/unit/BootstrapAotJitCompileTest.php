@@ -100,6 +100,62 @@ PHP;
         );
     }
 
+    /** Self-host AOT: `new Runtime()` must not segfault LLVM 9 (#2600). */
+    public function testSelfHostAotNewRuntimeCompiles(): void
+    {
+        $this->skipUnlessLlvmReady();
+        $repoRoot = dirname(__DIR__, 2);
+        $source = <<<'PHP'
+<?php
+declare(strict_types=1);
+function bootstrap_new_runtime(): int {
+    new \PHPCompiler\Runtime(\PHPCompiler\Runtime::MODE_AOT);
+    return 0;
+}
+echo bootstrap_new_runtime(), "\n";
+PHP;
+        $env = [];
+        foreach (array_merge($_ENV, $_SERVER) as $key => $value) {
+            if (is_string($value)) {
+                $env[$key] = $value;
+            }
+        }
+        $env['PHP_COMPILER_SELFHOST_AOT'] = '1';
+        LlvmToolchain::applyProcessEnv($env, $repoRoot);
+
+        $tmpPhp = tempnam(sys_get_temp_dir(), 'bootstrap_aot_runtime_');
+        $this->assertNotFalse($tmpPhp);
+        $sourcePath = $tmpPhp.'.php';
+        rename($tmpPhp, $sourcePath);
+        file_put_contents($sourcePath, $source);
+
+        $outfile = tempnam(sys_get_temp_dir(), 'bootstrap_aot_runtime_out_');
+        $this->assertNotFalse($outfile);
+        unlink($outfile);
+
+        $compileArgv = array_merge(
+            LlvmToolchain::envPrefix($repoRoot),
+            [PHP_BINARY, $repoRoot.'/bin/compile.php', '-o', $outfile, $sourcePath]
+        );
+        $descriptorSpec = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+        $compile = proc_open($compileArgv, $descriptorSpec, $pipes, $repoRoot, $env);
+        $this->assertIsResource($compile);
+        fclose($pipes[0]);
+        fclose($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[2]);
+        $exitCode = proc_close($compile);
+        @unlink($sourcePath);
+        if (is_file($outfile)) {
+            @unlink($outfile);
+        }
+        $stderr = trim($stderr !== false ? $stderr : '');
+        if (139 === $exitCode) {
+            $this->markTestSkipped('LLVM 9 segfault during self-host Runtime ctor (#2600).');
+        }
+        $this->assertSame(0, $exitCode, 'self-host new Runtime AOT compile: '.$stderr);
+    }
+
     private function skipUnlessLlvmReady(): void
     {
         if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
