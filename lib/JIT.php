@@ -1914,12 +1914,11 @@ class JIT {
     /** IncludePathResolver methods with safe LLVM 9 lowering during self-host AOT (#816). */
     private function isIncludePathResolverRealLoweringMethod(string $lower): bool
     {
-        // resolve() nullable return still hits ICmp type mismatch in full self-host probe (#1097).
-        if ($this->shouldUseSelfHostJitStubs()) {
+        if (!$this->shouldUseM3CompileDriverRealLowering()) {
             return false;
         }
 
-        return str_ends_with($lower, '::resolve');
+        return str_ends_with($lower, '\\web\\includepathresolver::resolve');
     }
 
     /** LiteralIncludeDiscovery methods with safe LLVM 9 lowering during self-host AOT (#816). */

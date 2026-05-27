@@ -76,6 +76,11 @@ final class JitCompilerSelfHostStubTest extends TestCase
     ];
 
     /** @var list<string> */
+    private const M3_WEB_INCLUDEPATHRESOLVER_REAL_LOWERING_METHODS = [
+        'resolve',
+    ];
+
+    /** @var list<string> */
     private const WEB_BOOTSTRAP_SKIP_PATTERNS = [
         'deployroot',
         'sourcebundler',
@@ -204,6 +209,45 @@ final class JitCompilerSelfHostStubTest extends TestCase
     public static function m3WebConstStringFolderRealLoweringProvider(): iterable
     {
         foreach (self::M3_WEB_CONSTSTRINGFOLDER_REAL_LOWERING_METHODS as $method) {
+            yield $method => [$method];
+        }
+    }
+
+    /**
+     * @dataProvider m3WebIncludePathResolverRealLoweringProvider
+     */
+    public function testM3CompileDriverIncludePathResolverLoweringIsNotStubbed(string $method): void
+    {
+        $prevSelfHost = getenv('PHP_COMPILER_SELFHOST_AOT');
+        $prevM3 = getenv('PHP_COMPILER_M3_COMPILE_DRIVER');
+        putenv('PHP_COMPILER_SELFHOST_AOT=1');
+        putenv('PHP_COMPILER_M3_COMPILE_DRIVER=1');
+        try {
+            $this->assertFalse(
+                $this->invokeSkipCheck(
+                    'isSkippedWebBootstrapHotPathName',
+                    'phpcompiler\\web\\includepathresolver::'.$method
+                ),
+                "Expected real lowering for IncludePathResolver::{$method} when M3 compile driver is on"
+            );
+        } finally {
+            if (false === $prevSelfHost) {
+                putenv('PHP_COMPILER_SELFHOST_AOT');
+            } else {
+                putenv('PHP_COMPILER_SELFHOST_AOT='.$prevSelfHost);
+            }
+            if (false === $prevM3) {
+                putenv('PHP_COMPILER_M3_COMPILE_DRIVER');
+            } else {
+                putenv('PHP_COMPILER_M3_COMPILE_DRIVER='.$prevM3);
+            }
+        }
+    }
+
+    /** @return iterable<string, array{0: string}> */
+    public static function m3WebIncludePathResolverRealLoweringProvider(): iterable
+    {
+        foreach (self::M3_WEB_INCLUDEPATHRESOLVER_REAL_LOWERING_METHODS as $method) {
             yield $method => [$method];
         }
     }
