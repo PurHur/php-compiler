@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 718 |
-| Phase A inventory files (M2 ratio SSOT) | 718 |
+| PHP files on vm.php path | 717 |
+| Phase A inventory files (M2 ratio SSOT) | 717 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 1848 |
+| Source constructs flagged (warnings) | 1847 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -731,7 +731,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Web/ResponseContext.php` | 0 | 1 |
 | `lib/Web/SourceBundler.php` | 0 | 1 |
 | `lib/Web/Superglobals.php` | 0 | 5 |
-| `src/macro_functions.php` | 0 | 1 |
 
 ## Per-file construct flags
 
@@ -5405,9 +5404,4 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 882)
 - new Variable (line 884)
 - 42 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
-
-### `src/macro_functions.php`
-
-**Warnings** (review for bootstrap subset):
-- new Token (line 59)
 
