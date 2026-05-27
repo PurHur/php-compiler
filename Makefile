@@ -351,8 +351,6 @@ bootstrap-loop-gen2-recompile-minimal:
 	./script/bootstrap-loop-gen2-recompile-minimal.sh
 bootstrap-loop-probe:
 	./script/bootstrap-loop-probe.sh
-bootstrap-loop-full-spine-probe:
-	./script/bootstrap-loop-full-spine-probe.sh
 bootstrap-loop-probe-dry:
 	./script/bootstrap-loop-probe.sh --dry-run
 bootstrap-loop-probe-dry-run: bootstrap-loop-probe-dry
