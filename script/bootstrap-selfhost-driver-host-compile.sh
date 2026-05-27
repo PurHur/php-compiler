@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # M5: Zend host-compile bin/compile.php into a native driver (#1521).
 #
-# Full cli_driver bundle + real argv lowering still segfaults LLVM 9 at link (exit 139).
-# Sidecar stub link (default without PHP_COMPILER_M5_DRIVER_HOST bundle growth) is link-only.
+# BOOTSTRAP_M5_DRIVER_HOST_FULL_CLI=1 enables full cli_driver + native $argv bridge (#2794).
+# Default (without FULL_CLI) is link-only sidecar bytes for faster M5 iteration.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

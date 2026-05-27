@@ -3554,9 +3554,11 @@ class JIT {
                         throw new \LogicException('Global name must be a compile-time constant');
                     }
                     $globalName = $block->constants[$op->arg2]->toString();
+                    $globalVar = $this->ensureJitGlobal($globalName);
+                    $this->context->bindVariableByName($globalName, $globalVar);
                     $this->context->setVariableOp(
                         $block->getOperand($op->arg1),
-                        $this->ensureJitGlobal($globalName)
+                        $globalVar
                     );
                     break;
                 case OpCode::TYPE_DECLARE_FUNCTION_STATIC:
@@ -7018,13 +7020,17 @@ class JIT {
     private function ensureJitGlobal(string $name): Variable
     {
         if (!isset($this->context->jitGlobalVariables[$name])) {
-            $slot = JIT\JitValueBox::alloc($this->context);
-            $this->context->jitGlobalVariables[$name] = new Variable(
-                $this->context,
-                Variable::TYPE_VALUE,
-                Variable::KIND_VARIABLE,
-                $slot
-            );
+            if ('argv' === $name && null !== JIT\CliArgvGlobalInit::$global) {
+                $this->context->jitGlobalVariables[$name] = JIT\CliArgvGlobalInit::load($this->context);
+            } else {
+                $slot = JIT\JitValueBox::alloc($this->context);
+                $this->context->jitGlobalVariables[$name] = new Variable(
+                    $this->context,
+                    Variable::TYPE_VALUE,
+                    Variable::KIND_VARIABLE,
+                    $slot
+                );
+            }
         }
 
         return $this->context->jitGlobalVariables[$name];

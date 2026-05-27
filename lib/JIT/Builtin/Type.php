@@ -154,6 +154,12 @@ class Type extends Builtin {
             $this->context->context->functionType($i32, false, $i8p, $i8p)
         );
         $this->context->registerFunction('__phpc_cli_str_eq', $fnCliStrEq);
+        $valuePtr = $this->context->getTypeFromString('__value__*');
+        $fnRefreshArgv = $this->context->module->addFunction(
+            '__phpc_cli_refresh_argv_global',
+            $this->context->context->functionType($voidTy, false, $valuePtr)
+        );
+        $this->context->registerFunction('__phpc_cli_refresh_argv_global', $fnRefreshArgv);
         $ftOpen = $this->context->context->functionType($i32, false, $i8p, $i32);
         $fnOpen = $this->context->module->addFunction('open', $ftOpen);
         $this->context->registerFunction('open', $fnOpen);
