@@ -358,6 +358,13 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString('compile_smoke_m3_emit', $source);
     }
 
+    public function testCompilePhpSetsUnifiedEmitLogPrefixForHelloWorldEmitEntry(): void
+    {
+        $compile = (string) file_get_contents(self::$root.'/bin/compile.php');
+        $this->assertStringContainsString('helloworld_m3_emit_native_entry.php', $compile);
+        $this->assertStringContainsString("putenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX=compile_smoke_m3_emit')", $compile);
+    }
+
     public function testHelloWorldM3EmitNativeEntryLinksWithRealLowering(): void
     {
         if (!LlvmToolchain::isReady(self::$root)) {

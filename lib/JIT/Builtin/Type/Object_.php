@@ -37,6 +37,8 @@ class Object_ extends Type {
     private array $methodVisibility = [];
     /** @var array<int, true> class ids with a compiled __construct body */
     private array $hasConstructor = [];
+    /** @var array<int, true> vendor/external classes without lowered methods (#2666) */
+    private array $externalOnlyClassIds = [];
     /** @var array<int, array<string, array{type: int, value: int|float|bool|string|null}>> */
     private array $classConstants = [];
     /** @var array<int, array<int, array{propertyType: int, type: int, value: int|float|bool|string|null}>> */
@@ -458,6 +460,8 @@ class Object_ extends Type {
         }
         $lc = strtolower($name->value);
         if (isset($this->classes[$lc])) {
+            unset($this->externalOnlyClassIds[$this->classes[$lc]]);
+
             return $this->classes[$lc];
         }
         $id = count($this->classes);
@@ -834,9 +838,15 @@ class Object_ extends Type {
         }
     }
 
+    public function isExternalOnlyClass(int $classId): bool
+    {
+        return isset($this->externalOnlyClassIds[$classId]);
+    }
+
     private function registerExternalClass(string $lcname, string $displayName): void
     {
         $id = count($this->classes);
+        $this->externalOnlyClassIds[$id] = true;
         $this->properties[$id] = [];
         $this->classConstants[$id] = [];
         $this->classIdToName[$id] = $displayName;
