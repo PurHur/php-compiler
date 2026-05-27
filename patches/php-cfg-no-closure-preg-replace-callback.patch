@@ -1,0 +1,64 @@
+diff --git vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/MagicStringResolver.php vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/MagicStringResolver.php
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/MagicStringResolver.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/MagicStringResolver.php
+@@ -119,6 +119,13 @@
+         return 'AnonymousClass@' . $start;
+     }
+ 
++    private function repairCommentsCallback($match)
++    {
++        $type = $match[2];
++        $type = preg_replace('((?<=^|\|)((?i:self)|\$this)(?=\[|$|\|))', end($this->classStack), $type);
++        return '@'.$match[1].' '.$type;
++    }
++
+     private function repairComments(Node $node)
+     {
+         $comment = $node->getDocComment();
+@@ -128,14 +135,9 @@
+             $comment = new Doc(
+                 preg_replace_callback(
+                     $regex,
+-                    function ($match) {
+-                        $type = $match[2];
+-                        $type = preg_replace('((?<=^|\|)((?i:self)|\$this)(?=\[|$|\|))', end($this->classStack), $type);
+-
+-                        return '@'.$match[1].' '.$type;
+-                    },
++                    [$this, 'repairCommentsCallback'],
+                     $comment->getText()
+                 ),
+                 $comment->getLine(),
+                 $comment->getFilePos()
+             );
+diff --git vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/NameResolver.php vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/NameResolver.php
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/NameResolver.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/NameResolver.php
+@@ -43,6 +43,12 @@
+         'callable',
+     ];
+ 
++    private function docCommentTypeCallback($match)
++    {
++        $type = $this->parseTypeDecl($match[2]);
++        return "@{$match[1]} {$type}";
++    }
++
+     public function enterNode(Node $node)
+     {
+         parent::enterNode($node);
+@@ -53,13 +59,9 @@
+             $comment = new Doc(
+                 preg_replace_callback(
+                     $regex,
+-                    function ($match) {
+-                        $type = $this->parseTypeDecl($match[2]);
+-
+-                        return "@{$match[1]} {$type}";
+-                    },
++                    [$this, 'docCommentTypeCallback'],
+                     $comment->getText()
+                 ),
+                 $comment->getLine(),
+                 $comment->getFilePos()
+             );
