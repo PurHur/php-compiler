@@ -20,7 +20,9 @@
              );
          }
          return $this->llvm->factory->type(
-@@ -121,14 +120,19 @@
+@@ -119,14 +118,13 @@
+     }
+ 
      public function structType(bool $packed, CoreType ... $elements): CoreType {
 +        $elementTypes = [];
 +        foreach ($elements as $type) {
@@ -37,6 +39,7 @@
 +            $elementTypes
          );
          return $this->llvm->factory->type(
+             $this,
 --- vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php
 +++ vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php
 @@ -84,14 +84,13 @@
@@ -59,7 +62,7 @@
          );
          return $this->llvm->factory->value($this->context, $this->llvm->lib->LLVMBuildAggregateRet($this->builder, $valueWrapper, count($values)));
      }
-@@ -277,27 +276,25 @@
+@@ -277,14 +276,13 @@
      }
  
      public function gep(CoreValue $pointer, CoreValue ... $indices): CoreValue {
@@ -79,25 +82,7 @@
          );
          return $this->llvm->factory->value($this->context, $this->llvm->lib->LLVMBuildGEP($this->builder, $pointer->value, $valueWrapper, count($indices), ''));
      }
- 
-     public function inBoundsGep(CoreValue $pointer, CoreValue ... $indices): CoreValue {
-+        $indexRefs = [];
-+        foreach ($indices as $value) {
-+            $indexRefs[] = $value->value;
-+        }
-         $valueWrapper = $this->llvm->lib->makeArray(
-             LLVMValueRef_ptr::class,
--            array_map(
--                function(Value $value) {
--                    return $value->value;
--                }, 
--                $indices
--            )
-+            $indexRefs
-         );
-         return $this->llvm->factory->value($this->context, $this->llvm->lib->LLVMBuildInBoundsGEP($this->builder, $pointer->value, $valueWrapper, count($indices), ''));
-     }
-@@ -483,14 +480,13 @@
+@@ -482,14 +480,13 @@
      }
  
      public function call(CoreValue\Function_ $function, CoreValue ... $args): CoreValue {
@@ -139,4 +124,3 @@
          );
          $this->llvm->lib->LLVMStructSetBody(
              $this->type,
-
