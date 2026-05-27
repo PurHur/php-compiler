@@ -23,8 +23,9 @@ final class BootstrapSelfhostDriverSmokeTest extends TestCase
         $this->assertStringContainsString('PHP_COMPILER_M3_COMPILE_MODE=compile', $script);
         $this->assertStringContainsString('emit_path=native', $script);
         $this->assertStringContainsString('compiler smoke', $script);
-        $this->assertStringContainsString('compiler_smoke_standalone.php', $script);
-        $this->assertStringContainsString('PHP_COMPILER_M3_SOURCE="${EMIT_PROBE}"', $script);
+        $this->assertStringContainsString('selfhost-helloworld-compile', $script);
+        $this->assertStringContainsString('bin-compile-aot', $script);
+        $this->assertStringContainsString('"${BIN_COMPILE_DRIVER}" -o "${EMIT_OUT}"', $script);
         $this->assertStringNotContainsString(' -l ', $script);
     }
 
