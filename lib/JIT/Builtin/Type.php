@@ -577,6 +577,16 @@ class Type extends Builtin {
         $fntypeShellExec = $this->context->context->functionType($strPtr, false, $strPtr);
         $fnShellExec = $this->context->module->addFunction('__compiler_shell_exec', $fntypeShellExec);
         $this->context->registerFunction('__compiler_shell_exec', $fnShellExec);
+        $fnEscapeshellarg = $this->context->module->addFunction('__compiler_escapeshellarg', $fntypeShellExec);
+        $this->context->registerFunction('__compiler_escapeshellarg', $fnEscapeshellarg);
+        $fntypePhpcRunCommand = $this->context->context->functionType(
+            $this->context->getTypeFromString('__hashtable__*'),
+            false,
+            $strPtr,
+            $this->context->getTypeFromString('__hashtable__*')
+        );
+        $fnPhpcRunCommand = $this->context->module->addFunction('__compiler_phpc_run_command', $fntypePhpcRunCommand);
+        $this->context->registerFunction('__compiler_phpc_run_command', $fnPhpcRunCommand);
         $fntypeSysGetTempDir = $this->context->context->functionType($strPtr, false);
         $fnSysGetTempDir = $this->context->module->addFunction('__compiler_sys_get_temp_dir', $fntypeSysGetTempDir);
         $this->context->registerFunction('__compiler_sys_get_temp_dir', $fnSysGetTempDir);
