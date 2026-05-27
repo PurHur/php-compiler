@@ -2522,6 +2522,17 @@ class JIT {
                 \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::BIN_COMPILE_SIDECAR_REL,
                 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::binCompileSentinelBlock'
             );
+            $this->registerM3EmitTuSidecarFromPath(
+                __DIR__.'/../bin/vm.php',
+                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::BIN_VM_SIDECAR_REL,
+                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::binVmSentinelBlock'
+            );
+            $this->registerM3EmitTuSidecarFromPath(
+                __DIR__.'/../src/cli_driver.php',
+                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::CLI_DRIVER_SIDECAR_REL,
+                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::cliDriverSentinelBlock',
+                true
+            );
         } elseif ('compile_smoke_m3_emit' === $logPrefix) {
             $this->registerM3EmitTuSidecarFromPath(
                 __DIR__.'/../examples/000-HelloWorld/example.php',
@@ -2554,6 +2565,17 @@ class JIT {
                 \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::BIN_COMPILE_SIDECAR_REL,
                 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::binCompileSentinelBlock'
             );
+            $this->registerM3EmitTuSidecarFromPath(
+                __DIR__.'/../bin/vm.php',
+                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::BIN_VM_SIDECAR_REL,
+                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::binVmSentinelBlock'
+            );
+            $this->registerM3EmitTuSidecarFromPath(
+                __DIR__.'/../src/cli_driver.php',
+                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::CLI_DRIVER_SIDECAR_REL,
+                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::cliDriverSentinelBlock',
+                true
+            );
         } else {
             $this->registerM3EmitTuSidecarFromPath(
                 __DIR__.'/../test/bootstrap-aot/runtime_trivial_echo.php',
@@ -2564,8 +2586,12 @@ class JIT {
     }
 
     /** Host-compile one probe source and register link-time AOT sidecar bytes (#2559, #2618). */
-    private function registerM3EmitTuSidecarFromPath(string $path, string $sidecarRel, string $sentinelLogical): void
-    {
+    private function registerM3EmitTuSidecarFromPath(
+        string $path,
+        string $sidecarRel,
+        string $sentinelLogical,
+        bool $sidecarHostStubNonLiteralIncludes = false
+    ): void {
         if (!is_readable($path)) {
             return;
         }
@@ -2589,6 +2615,9 @@ class JIT {
         // Self-host skips cli/vendor includes during link; M3 compile-driver Runtime ctor native (#2600, #2633).
         $compileEnv['PHP_COMPILER_SELFHOST_AOT'] = '1';
         $compileEnv['PHP_COMPILER_M3_COMPILE_DRIVER'] = '1';
+        if ($sidecarHostStubNonLiteralIncludes) {
+            $compileEnv['PHP_COMPILER_M3_SIDECAR_HOST'] = '1';
+        }
         unset($compileEnv['PHP_COMPILER_EMIT_HELPER_LINK'], $compileEnv['PHP_COMPILER_M3_EMIT_TU']);
         $descriptor = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
         $proc = proc_open($compileCmd, $descriptor, $pipes, $repoRoot, $compileEnv);

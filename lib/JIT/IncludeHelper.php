@@ -49,6 +49,11 @@ final class IncludeHelper
             $path = self::resolveLiteralPath($callerBlock, $op->arg1, $pathOperand, $context);
         }
         if (null === $path || '' === $path) {
+            if (self::shouldStubM3SidecarHostNonLiteralInclude($callerBlock)) {
+                self::emitSkippedSelfHostSpineCliInclude($jit, $callerBlock, $resultOperand);
+
+                return;
+            }
             $caller = $callerBlock->scriptPath();
             $operandDesc = get_debug_type($pathOperand);
             $name = OperandName::resolve($pathOperand);
@@ -683,6 +688,18 @@ final class IncludeHelper
      * cli_spine_shim.php provides php_compiler_cli_should_skip_entry_driver() at runtime; this
      * avoids compiling vendor/autoload Expr_Closure during self-host AOT link.
      */
+    /** Stub dynamic requires while host-compiling M3 emit sidecars (issue #2699). */
+    private static function shouldStubM3SidecarHostNonLiteralInclude(Block $callerBlock): bool
+    {
+        $flag = getenv('PHP_COMPILER_M3_SIDECAR_HOST');
+        if ('1' !== $flag && 'true' !== strtolower((string) $flag)) {
+            return false;
+        }
+        $caller = str_replace('\\', '/', $callerBlock->scriptPath());
+
+        return str_ends_with($caller, '/src/cli_driver.php');
+    }
+
     private static function shouldSkipSelfHostSpineCliInclude(string $path): bool
     {
         // This helper exists primarily to keep argv-driver and vendor autoload out of
