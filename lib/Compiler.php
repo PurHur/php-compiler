@@ -1555,6 +1555,23 @@ class Compiler {
             )];
         }
         switch (get_class($expr)) {
+            case Op\Expr\Closure::class:
+                // Vendor-prelink bundles (M5 cold-boot) include php-llvm which still contains closures.
+                // For the vendor-prelink compile-only path, lower closures to a null placeholder so we
+                // can produce the .o artifact without needing full closure/runtime support yet.
+                if ('1' !== (string) getenv('PHP_COMPILER_VENDOR_PRELINK')) {
+                    $this->throwCompileLogic("Unsupported expression: " . $expr->getType());
+                }
+
+                $resultSlot = $this->compileOperand($expr->result, $block, false);
+                $nullSlot = $this->compileOperand(new Operand\Literal(null), $block, true);
+
+                return [new OpCode(
+                    OpCode::TYPE_ASSIGN,
+                    $resultSlot,
+                    $resultSlot,
+                    $nullSlot
+                )];
             case Op\Expr\Assertion::class:
                 if ($expr->result instanceof Operand\Literal) {
                     //short circuit
