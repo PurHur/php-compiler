@@ -2,6 +2,7 @@
 allow:\php_compiler_cli_dispatch
 allow:\php_compiler_cli_should_run_entry_driver
 allow:\runtime::__construct
+allow:\runtime::__destruct
 allow:\runtime::compile
 allow:\runtime::compileemitsmoke
 allow:\runtime::createjit
@@ -19,4 +20,3 @@ allow:\runtime::parseandcompileemitsmoke
 allow:\runtime::standalone
 allow:slotindexforvariablename
 deny:\bootstrapaot\helloworld_compile_smoke
-deny:\runtime::__destruct

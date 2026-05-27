@@ -459,6 +459,9 @@ class JIT {
         if (str_ends_with($lower, '\\runtime::loadcoremodules')) {
             return true;
         }
+        if (str_ends_with($lower, '\\runtime::__destruct')) {
+            return true;
+        }
         if (str_ends_with($lower, '\\runtime::compileemitsmoke')) {
             return true;
         }
@@ -486,8 +489,6 @@ class JIT {
         return [
             // Full emit FUNCDEF LLVM 9 link crash (#1514); inline emit in compile_driver compile mode (#1983).
             '\\bootstrapaot\\helloworld_compile_smoke',
-            // compile_smoke_m3_emit real-lowers only in native emit TU (#1983), not compile_driver.
-            '\\runtime::__destruct',
         ];
     }
 
@@ -665,6 +666,9 @@ class JIT {
             }
             if (str_ends_with($m3Spine, '\\runtime::loadcoremodules')) {
                 return $this->compileRuntimeLoadCoreModulesM3Native($internalName, $block, $logicalName);
+            }
+            if (str_ends_with($m3Spine, '\\runtime::__destruct')) {
+                return $this->compileRuntimeDestructM3Native($internalName, $block, $logicalName);
             }
             if (
                 $this->shouldUseM3EmitTuNativeBridge()
@@ -1099,6 +1103,18 @@ class JIT {
         }
 
         return $this->compileRuntimeSpinePhpLowering($internalName, $block, $logicalName);
+    }
+
+    /**
+     * M3 compile-driver Runtime::__destruct (#2867): void no-op — module shutdown not required at AOT link.
+     * PHP CFG foreach over $this->modules LLVM 9-crashed when deny-listed (#1402).
+     */
+    private function compileRuntimeDestructM3Native(
+        string $internalName,
+        Block $block,
+        string $logicalName
+    ): PHPLLVM\Value {
+        return $this->emitM3EmitTuRuntimeInitVoidStub($internalName, $logicalName, $block);
     }
 
     /**
