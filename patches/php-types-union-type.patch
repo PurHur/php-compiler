@@ -16,3 +16,21 @@
          throw new \LogicException('Unsupported declaration type: '.get_class($decl));
      }
  
+--- vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
+@@ -779,6 +779,13 @@
+         } elseif ($type instanceof Op\Type\Literal) {
+             return Type::fromDecl($type->name);
+         } elseif ($type instanceof Op\Type\Never_) {
+             return Type::never();
++        } elseif ($type instanceof Op\Type\Union_) {
++            $subs = [];
++            foreach ($type->types as $sub) {
++                $subs[] = $this->resolveOpType($sub);
++            }
++
++            return (new Type(Type::TYPE_UNION, $subs))->simplify();
+         }
+ 
+         throw new \LogicException('Unknown Op\\Type provided: '.get_class($type));
+

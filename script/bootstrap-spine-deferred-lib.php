@@ -13,5 +13,7 @@ declare(strict_types=1);
  */
 function bootstrap_spine_native_link_deferred(): array
 {
-    return [];
+    return [
+        'lib/VM/HashTable.php',
+    ];
 }
