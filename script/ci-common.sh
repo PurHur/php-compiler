@@ -887,6 +887,21 @@ ci_run_bootstrap_m4_loop_probe() {
   fi
 }
 
+ci_run_bootstrap_m4_full_spine_probe() {
+  if [[ "${BOOTSTRAP_M4_FULL_SPINE_PROBE_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  if ! ci_llvm_ready; then
+    echo "bootstrap-m4-full-spine-probe: skipped (LLVM 9 not available)"
+    return 0
+  fi
+  echo "bootstrap-m4-full-spine-probe (BOOTSTRAP_M4_FULL_SPINE_PROBE_GATE=1, issue #2770, #2664)..."
+  if ! "$_CI_SCRIPT_DIR/bootstrap-loop-full-spine-probe.sh"; then
+    echo "bootstrap-m4-full-spine-probe: failed — see docs/bootstrap-selfhost.md (#2770)" >&2
+    return 1
+  fi
+}
+
 ci_should_run_jit() {
   if [[ -n "${PHP_COMPILER_FORCE_JIT_TESTS:-}" ]]; then
     echo "JIT compliance forced (PHP_COMPILER_FORCE_JIT_TESTS=1)."

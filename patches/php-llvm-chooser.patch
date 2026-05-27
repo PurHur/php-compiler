@@ -1,7 +1,6 @@
 --- vendor/ircmaxell/php-llvm/lib/Chooser.php
 +++ vendor/ircmaxell/php-llvm/lib/Chooser.php
-@@ -46,10 +46,15 @@ class Chooser {
-     protected static function findFile(string $file): ?string {
+@@ -48,8 +48,12 @@
          $searchPaths = [
              '/usr/lib',
              '/usr/local/lib',

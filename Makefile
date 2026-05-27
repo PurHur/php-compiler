@@ -342,6 +342,9 @@ bootstrap-loop-gen1-link:
 	./script/bootstrap-loop-gen1-link.sh
 bootstrap-loop-gen1-full-spine-emit:
 	./script/bootstrap-loop-gen1-full-spine-emit.sh
+.PHONY: bootstrap-loop-full-spine-probe
+bootstrap-loop-full-spine-probe:
+	./script/bootstrap-loop-full-spine-probe.sh
 bootstrap-loop-probe:
 	./script/bootstrap-loop-probe.sh
 bootstrap-loop-probe-dry:

@@ -10,6 +10,7 @@ WITH_COMPILE_SMOKE=0
 WITH_LIB_SPINE_SMOKE=0
 WITH_LIB_SPINE_VM_SMOKE=0
 WITH_HELLOWORLD=0
+WITH_DRIVER_SMOKE=0
 if [[ "${BOOTSTRAP_LIB_SPINE_SMOKE:-0}" == "1" ]]; then
   WITH_LIB_SPINE_SMOKE=1
 fi
@@ -18,6 +19,9 @@ if [[ "${BOOTSTRAP_LIB_SPINE_VM_SMOKE:-0}" == "1" ]]; then
 fi
 if [[ "${BOOTSTRAP_M3_HELLOWORLD:-0}" == "1" ]]; then
   WITH_HELLOWORLD=1
+fi
+if [[ "${BOOTSTRAP_M5_DRIVER_SMOKE:-0}" == "1" ]]; then
+  WITH_DRIVER_SMOKE=1
 fi
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -35,6 +39,9 @@ while [[ $# -gt 0 ]]; do
       ;;
     --with-helloworld)
       WITH_HELLOWORLD=1
+      ;;
+    --with-driver-smoke)
+      WITH_DRIVER_SMOKE=1
       ;;
     *)
       echo "bootstrap-wave-check: unknown argument: $1" >&2
@@ -121,6 +128,11 @@ fi
 
 if [[ "${WITH_HELLOWORLD}" -eq 1 ]]; then
   run_step "selfhost-helloworld-probe" ./script/bootstrap-selfhost-helloworld-probe.sh
+  print_summary
+fi
+
+if [[ "${WITH_DRIVER_SMOKE}" -eq 1 ]]; then
+  run_step "selfhost-driver-smoke" ./script/bootstrap-selfhost-driver-smoke.sh
   print_summary
 fi
 
