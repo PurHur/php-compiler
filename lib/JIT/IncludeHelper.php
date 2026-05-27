@@ -75,7 +75,9 @@ final class IncludeHelper
 
         $included = $context->runtime->parseAndCompileFile($path);
         if (null === $included) {
-            throw new \LogicException('failed to compile include: '.$path);
+            $diag = $context->runtime->compiler->getCompileAbortDetail();
+            $suffix = null !== $diag && '' !== $diag ? ' — '.$diag : ' — (no compiler abort detail; parser/CFG returned null)';
+            throw new \LogicException('failed to compile include: '.$path.$suffix);
         }
 
         $included->inheritScopeFrom($callerBlock);

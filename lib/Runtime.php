@@ -178,6 +178,22 @@ class Runtime {
         return $script;
     }
 
+    /**
+     * Log the first CFG-level abort before rethrowing (issue #2642, self-host triage).
+     */
+    private function emitParseCompileFailureStderr(string $sourcePath, \Throwable $e): void
+    {
+        $detail = $this->compiler->getCompileAbortDetail();
+        $primary = null !== $detail && '' !== $detail ? $detail : $e->getMessage();
+        $line = sprintf("parseAndCompile failure: target=%s: %s\n", $sourcePath, $primary);
+        if (\defined('STDERR') && \is_resource(STDERR)) {
+            fwrite(STDERR, $line);
+
+            return;
+        }
+        error_log(rtrim($line));
+    }
+
     public function compile(Script $script): ?Block {
         $block = $this->compiler->compile($script);
         $this->assignOpResolver->optimize($block);
@@ -194,15 +210,21 @@ class Runtime {
 
     public function parseAndCompileEmitSmoke(string $code, string $filename): ?Block
     {
-        $script = $this->parse($code, $filename);
-        $block = $this->compileEmitSmoke($script);
-        if (null !== $block) {
-            $block->setScriptPath($filename);
-        } else {
-            $this->emitParseAndCompileNullDiagnostic($script);
-        }
+        $this->compiler->resetCompileAbortDetail();
+        try {
+            $script = $this->parse($code, $filename);
+            $block = $this->compileEmitSmoke($script);
+            if (null !== $block) {
+                $block->setScriptPath($filename);
+            } else {
+                $this->emitParseAndCompileNullDiagnostic($script);
+            }
 
-        return $block;
+            return $block;
+        } catch (\Throwable $e) {
+            $this->emitParseCompileFailureStderr($filename, $e);
+            throw $e;
+        }
     }
 
     public function compileFunc(string $name, CfgFunc $func): Func {
@@ -233,32 +255,44 @@ class Runtime {
     }
 
     public function parseAndCompile(string $code, string $filename): ?Block {
-        $script = $this->parse($code, $filename);
-        $block = $this->compile($script);
-        if (null !== $block) {
-            $block->setScriptPath($filename);
-        } else {
-            $this->emitParseAndCompileNullDiagnostic($script);
-        }
+        $this->compiler->resetCompileAbortDetail();
+        try {
+            $script = $this->parse($code, $filename);
+            $block = $this->compile($script);
+            if (null !== $block) {
+                $block->setScriptPath($filename);
+            } else {
+                $this->emitParseAndCompileNullDiagnostic($script);
+            }
 
-        return $block;
+            return $block;
+        } catch (\Throwable $e) {
+            $this->emitParseCompileFailureStderr($filename, $e);
+            throw $e;
+        }
     }
 
     public function parseAndCompileFile(string $filename): ?Block {
-        $normalized = VM\ScriptStack::normalize($filename);
-        if ('' !== $normalized) {
-            $filename = $normalized;
-        }
+        $this->compiler->resetCompileAbortDetail();
+        try {
+            $normalized = VM\ScriptStack::normalize($filename);
+            if ('' !== $normalized) {
+                $filename = $normalized;
+            }
 
-        $script = $this->parse(file_get_contents($filename), $filename);
-        $block = $this->compile($script);
-        if (null !== $block) {
-            $block->setScriptPath($filename);
-        } else {
-            $this->emitParseAndCompileNullDiagnostic($script);
-        }
+            $script = $this->parse(file_get_contents($filename), $filename);
+            $block = $this->compile($script);
+            if (null !== $block) {
+                $block->setScriptPath($filename);
+            } else {
+                $this->emitParseAndCompileNullDiagnostic($script);
+            }
 
-        return $block;
+            return $block;
+        } catch (\Throwable $e) {
+            $this->emitParseCompileFailureStderr($filename, $e);
+            throw $e;
+        }
     }
 
     /**
