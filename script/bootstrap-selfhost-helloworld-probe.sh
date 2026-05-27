@@ -12,6 +12,8 @@ PROBE="${ROOT}/build/selfhost-helloworld"
 SOURCE="${ROOT}/examples/000-HelloWorld/example.php"
 AOT_OUT="${ROOT}/build/helloworld-aot"
 EMIT_HELPER="${ROOT}/build/selfhost-helloworld-emit"
+COMPILE_DRIVER_BIN="${ROOT}/build/selfhost-helloworld-compile"
+COMPILE_ENTRY="${ROOT}/test/bootstrap-aot/helloworld_compile_m3_emit_native_entry.php"
 EMIT_ENTRY="${ROOT}/test/bootstrap-aot/helloworld_m3_emit_native_entry.php"
 M3_NATIVE_COMPILE=0
 M3_EMIT_PATH="none"
@@ -98,7 +100,22 @@ fi
 mkdir -p "${ROOT}/build"
 export PHP_COMPILER_SELFHOST_AOT=1
 export PHP_COMPILER_JIT_PROGRESS_FILE="${ROOT}/build/.last-jit-func-helloworld-probe"
-rm -f "${PROBE}" "${EMIT_HELPER}" "${AOT_OUT}" "${PHP_COMPILER_JIT_PROGRESS_FILE}"
+rm -f "${PROBE}" "${EMIT_HELPER}" "${COMPILE_DRIVER_BIN}" "${AOT_OUT}" "${PHP_COMPILER_JIT_PROGRESS_FILE}"
+
+if [[ "${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-0}" == "1" && -f "${COMPILE_ENTRY}" ]]; then
+  set +e
+  env PHP_COMPILER_SELFHOST_AOT=1 \
+    PHP_COMPILER_M3_COMPILE_DRIVER=1 \
+    PHP_COMPILER_EMIT_HELPER_LINK=1 \
+    php "${ROOT}/bin/compile.php" -o "${COMPILE_DRIVER_BIN}" "${COMPILE_ENTRY}" >/dev/null 2>&1
+  cd_link_code=$?
+  set -e
+  if [[ -x "${COMPILE_DRIVER_BIN}" ]]; then
+    echo "bootstrap-selfhost-helloworld-probe: helloworld compile binary link OK (${COMPILE_DRIVER_BIN}, #2681)"
+  else
+    echo "bootstrap-selfhost-helloworld-probe: helloworld compile binary link failed (exit ${cd_link_code})" >&2
+  fi
+fi
 
 if [[ "${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
   : "${BOOTSTRAP_M3_RUNTIME_COMPILE:=1}"

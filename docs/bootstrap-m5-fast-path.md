@@ -81,6 +81,17 @@ BOOTSTRAP_M3_RUNTIME_COMPILE=1 \
 ./script/bootstrap-selfhost-helloworld-probe.sh
 ```
 
+**M5 driver surface (#2681):** use the linked **helloworld compile driver** (`build/selfhost-helloworld-compile`), not `build/selfhost-helloworld-emit` (emit-TU logs `compile_smoke_m3_emit:` and mis-triages `bin/compile.php` failures).
+
+```bash
+make bootstrap-selfhost-helloworld   # also links build/selfhost-helloworld-compile
+# HelloWorld:
+make bootstrap-selfhost-helloworld-compile-bin
+# bin/compile.php (honest helloworld_compile_smoke: prefix; may still fail at parseAndCompile until #2633):
+PHP_COMPILER_M3_SOURCE=bin/compile.php PHP_COMPILER_M3_OUT=/tmp/bin-compile-aot \
+  make bootstrap-selfhost-helloworld-compile-bin
+```
+
 ### Known LLVM 9 link crashers (deny list)
 
 | Symbol | Notes |

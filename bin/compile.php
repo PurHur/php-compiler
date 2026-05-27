@@ -23,7 +23,8 @@ function run(string $filename, string $code, array $options): void
         $m3EmitEntry = str_contains($normalized, 'compile_smoke_m3_emit_native_entry.php')
             || str_contains($normalized, 'compiler_unit_probe_m3_emit_native_entry.php')
             || str_contains($normalized, 'runtime_m3_emit_native_entry.php')
-            || str_contains($normalized, 'helloworld_m3_emit_native_entry.php');
+            || str_contains($normalized, 'helloworld_m3_emit_native_entry.php')
+            || str_contains($normalized, 'helloworld_compile_m3_emit_native_entry.php');
         if ($m3EmitEntry) {
             putenv('PHP_COMPILER_SELFHOST_AOT=1');
             putenv('PHP_COMPILER_EMIT_HELPER_LINK=1');
@@ -35,8 +36,10 @@ function run(string $filename, string $code, array $options): void
             if (str_contains($normalized, 'runtime_m3_emit_native_entry.php')) {
                 putenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX=runtime_compile_smoke_m3_emit');
                 putenv('PHP_COMPILER_M3_EMIT_HELPER_SPINE=1');
+            } elseif (str_contains($normalized, 'helloworld_compile_m3_emit_native_entry.php')) {
+                putenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX=helloworld_compile_smoke');
             } elseif (str_contains($normalized, 'helloworld_m3_emit_native_entry.php')) {
-                // Same native bridge + compileEmitSmoke spine as unit-probe emit (#2666).
+                // HelloWorld strict probe emit TU (#2610); M5 bin/compile.php uses helloworld_compile_m3_emit_native_entry (#2681).
                 putenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX=compile_smoke_m3_emit');
             } else {
                 putenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX=compile_smoke_m3_emit');
@@ -56,6 +59,9 @@ function run(string $filename, string $code, array $options): void
         putenv('PHP_COMPILER_SELFHOST_AOT=1');
         putenv('PHP_COMPILER_M3_COMPILE_DRIVER=1');
         putenv('PHP_COMPILER_M3_COMPILE_DRIVER_MAIN=1');
+        if (str_contains($normalized, 'compiler_helloworld_smoke/compile_driver.php')) {
+            putenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX=helloworld_compile_smoke');
+        }
     }
     if ('' !== $normalized && str_contains($normalized, 'jit_result_stub.php')) {
         putenv('PHP_COMPILER_SELFHOST_AOT=1');
