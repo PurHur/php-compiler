@@ -52,7 +52,11 @@ done
 
 # shellcheck source=php-env.sh
 source "$(dirname "$0")/php-env.sh"
+# shellcheck source=selfhost-preflight.sh
+source "$(dirname "$0")/selfhost-preflight.sh"
 ci_apply_llvm_memory_env
+
+selfhost_preflight bootstrap-loop-probe php-or-docker
 
 m4_probe_tail() {
   local file=$1
