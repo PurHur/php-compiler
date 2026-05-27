@@ -49,8 +49,16 @@ final class IncludeHelper
             $path = self::resolveLiteralPath($callerBlock, $op->arg1, $pathOperand, $context);
         }
         if (null === $path || '' === $path) {
+            $caller = $callerBlock->scriptPath();
+            $operandDesc = get_debug_type($pathOperand);
+            $name = OperandName::resolve($pathOperand);
+            if (null !== $name && '' !== $name) {
+                $operandDesc .= ' '.$name;
+            }
             throw new \LogicException(
                 'include/require must use a compile-time literal path for JIT/AOT (issue #54)'
+                .' — caller='.$caller
+                .' operand='.$operandDesc
             );
         }
         if (self::shouldSkipSelfHostSpineCliInclude($path)) {
@@ -677,8 +685,17 @@ final class IncludeHelper
      */
     private static function shouldSkipSelfHostSpineCliInclude(string $path): bool
     {
-        $flag = getenv('PHP_COMPILER_SELFHOST_AOT');
-        if ('1' !== $flag && 'true' !== strtolower((string) $flag)) {
+        // This helper exists primarily to keep argv-driver and vendor autoload out of
+        // spine smoke bundles. Historically it was gated on SELFHOST_AOT, but bootstrap
+        // probes also bundle CLI entrypoints under other flags (issue #1492, #1467).
+        $selfhost = getenv('PHP_COMPILER_SELFHOST_AOT');
+        $cliSpine = getenv('PHP_COMPILER_CLI_SPINE_BUNDLE');
+        $vmSpine = getenv('PHP_COMPILER_VM_SPINE_SMOKE');
+        if (
+            ('1' !== $selfhost && 'true' !== strtolower((string) $selfhost))
+            && ('1' !== $cliSpine && 'true' !== strtolower((string) $cliSpine))
+            && ('1' !== $vmSpine && 'true' !== strtolower((string) $vmSpine))
+        ) {
             return false;
         }
         $normalized = str_replace('\\', '/', $path);

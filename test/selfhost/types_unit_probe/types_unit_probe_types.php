@@ -9,14 +9,27 @@ declare(strict_types=1);
 function types_unit_probe_vendor_autoload(): ?string
 {
     $root = dirname(__DIR__, 3);
-    $autoload = $root.'/vendor/autoload.php';
-    if (!is_file($autoload)) {
+    if (!is_dir($root)) {
         return null;
     }
+    $cwd = getcwd();
+    if (false === $cwd) {
+        $cwd = null;
+    }
+    chdir($root);
+    if (!is_file('vendor/autoload.php')) {
+        if (null !== $cwd) {
+            chdir($cwd);
+        }
 
-    require_once $autoload;
+        return null;
+    }
+    require_once 'vendor/autoload.php';
+    if (null !== $cwd) {
+        chdir($cwd);
+    }
 
-    return $autoload;
+    return $root.'/vendor/autoload.php';
 }
 
 function types_unit_probe_types_smoke(): string
