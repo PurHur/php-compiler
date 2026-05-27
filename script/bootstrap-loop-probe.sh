@@ -203,6 +203,14 @@ fi
 echo "==> M4 exit status (M3 HelloWorld strict already verified above)"
 if grep -q 'emit_path=native' "${GEN1_LOG}" 2>/dev/null; then
   echo "bootstrap-loop-probe: M4 gen-1→gen-2 native slice OK (exit 0)"
+  if [[ "${BOOTSTRAP_M4_FULL_SPINE_PROBE:-0}" == "1" ]]; then
+    echo ""
+    echo "==> M4 opt-in: gen-1 native emit full compiler_lib_spine_smoke bundle (#2664)"
+    if ! m4_run_subprobe "M4 gen-1 full spine native emit (opt-in; may fail today)" bash "${ROOT}/script/bootstrap-loop-gen1-full-spine-emit.sh"; then
+      echo "bootstrap-loop-probe: opt-in full-spine probe failed (non-gating unless you set BOOTSTRAP_M4_FULL_SPINE_PROBE=1 intentionally)" >&2
+      exit 1
+    fi
+  fi
   exit 0
 fi
 
