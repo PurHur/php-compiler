@@ -389,6 +389,16 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString('#2582', $script);
     }
 
+    public function testHelloWorldProbeDocumentsInventoryEmitDriverOptIn(): void
+    {
+        $script = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-helloworld-probe.sh');
+        $this->assertStringContainsString('BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER', $script);
+        $this->assertStringContainsString('inventory compile_driver', $script);
+        $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
+        $this->assertStringContainsString('shouldUseM3InventoryEmitDriver', $jit);
+        $this->assertStringContainsString('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER', $jit);
+    }
+
     public function testHelloWorldProbeDocumentsEmitPathAndStrict(): void
     {
         $script = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-helloworld-probe.sh');
@@ -464,6 +474,44 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
 
         if (139 === $exitCode) {
             $this->markTestSkipped('LLVM 9 segfault during M3 emit-helper link (#2442).');
+        }
+
+        $this->assertSame(0, $exitCode, implode("\n", $lines));
+        $this->assertFileExists($out);
+        $this->assertTrue(is_executable($out));
+    }
+
+    /** Issue #2843: inventory compile_driver links without *_m3_emit_native_entry.php. */
+    public function testInventoryCompileDriverLinksWithRealLowering(): void
+    {
+        if (!LlvmToolchain::isReady(self::$root)) {
+            $this->markTestSkipped('LLVM 9 not available for inventory compile_driver link test.');
+        }
+
+        $entry = self::$root.'/test/selfhost/compiler_helloworld_smoke/compile_driver.php';
+        $out = self::$root.'/build/selfhost-inventory-emit-test';
+        @unlink($out);
+
+        $prefix = LlvmToolchain::envPrefix(self::$root);
+        $cmd = implode(' ', array_map('escapeshellarg', [
+            ...$prefix,
+            'env',
+            'PHP_COMPILER_SELFHOST_AOT=1',
+            'PHP_COMPILER_M3_COMPILE_DRIVER=1',
+            'PHP_COMPILER_EMIT_HELPER_LINK=1',
+            'PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1',
+            'BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER=1',
+            'PHP_COMPILER_M3_EMIT_LOG_PREFIX=helloworld_compile_smoke',
+            'php',
+            self::$root.'/bin/compile.php',
+            '-o',
+            $out,
+            $entry,
+        ])).' 2>&1';
+        exec($cmd, $lines, $exitCode);
+
+        if (139 === $exitCode) {
+            $this->markTestSkipped('LLVM 9 segfault during inventory compile_driver link (#2843).');
         }
 
         $this->assertSame(0, $exitCode, implode("\n", $lines));

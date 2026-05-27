@@ -66,6 +66,11 @@ function run(string $filename, string $code, array $options): void
         if (str_contains($normalized, 'compiler_helloworld_smoke/compile_driver.php')) {
             putenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX=helloworld_compile_smoke');
         }
+        $inventoryEmit = getenv('BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER') ?: getenv('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER');
+        if ('1' === $inventoryEmit || 'true' === strtolower((string) $inventoryEmit)) {
+            putenv('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1');
+            putenv('PHP_COMPILER_EMIT_HELPER_LINK=1');
+        }
     }
     if ('' !== $normalized && str_contains($normalized, 'jit_result_stub.php')) {
         putenv('PHP_COMPILER_SELFHOST_AOT=1');
