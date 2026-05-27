@@ -1,0 +1,84 @@
+--- vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
+@@ -371,6 +371,7 @@
+             return (new self(self::TYPE_UNION, [
+                 $type,
+                 new self(self::TYPE_NULL),
+             ]))->simplify();
+         }
++        $decl = self::stripTrailingDocText($decl);
+         if (preg_match('/^array\{/i', $decl)) {
+             return new self(self::TYPE_ARRAY);
+         }
+@@ -597,4 +598,61 @@
+ 
+         throw new \RuntimeException("Unknown combinator {$combinator}");
+     }
++
++    /**
++     * Vendor phpdoc sometimes appends English description to the type token in
++     * @var / @return declarations (e.g. "list<bool> parallel to values; ...").
++     * Keep the leading type expression and strip trailing prose.
++     */
++    private static function stripTrailingDocText(string $decl): string
++    {
++        $decl = trim($decl);
++        if ('' === $decl) {
++            return $decl;
++        }
++        if (false === strpos($decl, ' ')) {
++            return $decl;
++        }
++
++        $depthAngle = 0;
++        $depthParen = 0;
++        $depthSquare = 0;
++        $depthCurly = 0;
++
++        $len = strlen($decl);
++        for ($i = 0; $i < $len; $i++) {
++            $ch = $decl[$i];
++            switch ($ch) {
++                case '<':
++                    $depthAngle++;
++                    break;
++                case '>':
++                    if ($depthAngle > 0) {
++                        $depthAngle--;
++                    }
++                    break;
++                case '(':
++                    $depthParen++;
++                    break;
++                case ')':
++                    if ($depthParen > 0) {
++                        $depthParen--;
++                    }
++                    break;
++                case '[':
++                    $depthSquare++;
++                    break;
++                case ']':
++                    if ($depthSquare > 0) {
++                        $depthSquare--;
++                    }
++                    break;
++                case '{':
++                    $depthCurly++;
++                    break;
++                case '}':
++                    if ($depthCurly > 0) {
++                        $depthCurly--;
++                    }
++                    break;
++                default:
++                    if ($ch <= ' ' && 0 === $depthAngle && 0 === $depthParen && 0 === $depthSquare && 0 === $depthCurly) {
++                        return trim(substr($decl, 0, $i));
++                    }
++                    break;
++            }
++        }
++
++        return $decl;
++    }
+ }
