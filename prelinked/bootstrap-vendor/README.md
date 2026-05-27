@@ -5,7 +5,7 @@ This directory holds the **manifest** and, when AOT succeeds, native `.o` / `.a`
 
 ```bash
 php script/bootstrap-vendor-objects.php              # refresh bundles + manifest
-make bootstrap-vendor-objects                        # AOT compile (LLVM 9; may fail until #1402/#1493)
+make bootstrap-vendor-objects                        # AOT compile (LLVM 9; PHP_COMPILER_VENDOR_PRELINK=1, no composer autoload — #2849)
 ```
 
 `manifest.json` records per-package `status` (`bundle_ok`, `compile_failed`, `object_ok`, …).

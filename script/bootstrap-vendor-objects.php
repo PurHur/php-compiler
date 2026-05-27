@@ -8,7 +8,7 @@ declare(strict_types=1);
  *
  * Usage:
  *   php script/bootstrap-vendor-objects.php              # generate bundles + manifest
- *   php script/bootstrap-vendor-objects.php --compile    # also run bin/compile.php (needs LLVM 9)
+ *   php script/bootstrap-vendor-objects.php --compile    # AOT via gen-0 driver resolver (needs LLVM 9; #2849)
  *   php script/bootstrap-vendor-objects.php --check        # manifest + bundles fresh
  */
 
@@ -188,12 +188,17 @@ foreach (BOOTSTRAP_VENDOR_PRELINK_PACKAGES as $package => $role) {
     }
 
     $blocker = 0 !== $code
-        ? 'compile exit '.$code.' (vendor bundle AOT; blocked on M3 emit / Zend parse of vendor — #1416, #1402)'
+        ? 'compile exit '.$code.' (vendor bundle AOT — #1416, #2849)'
         : 'missing object file after compile';
 
     $firstActionable = null;
     foreach ($output as $line) {
         $line = (string) $line;
+        if (str_contains($line, 'Missing vendor autoload')) {
+            $firstActionable = $line;
+            $blocker = 'vendor prelink must not require composer autoload (#2849)';
+            break;
+        }
         if (str_contains($line, 'PHP Fatal error:') || str_contains($line, 'Fatal error:') || str_contains($line, 'Uncaught ')) {
             $firstActionable = $line;
             break;
