@@ -344,6 +344,8 @@ bootstrap-loop-gen1-link:
 	./script/bootstrap-loop-gen1-link.sh
 bootstrap-loop-gen1-full-spine-emit:
 	./script/bootstrap-loop-gen1-full-spine-emit.sh
+bootstrap-loop-gen2-recompile-minimal:
+	./script/bootstrap-loop-gen2-recompile-minimal.sh
 bootstrap-loop-probe:
 	./script/bootstrap-loop-probe.sh
 bootstrap-loop-probe-dry:

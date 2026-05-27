@@ -37,9 +37,28 @@ if [[ ! -x "${OUT}" ]]; then
 fi
 echo "bootstrap-selfhost-helloworld-compile-bin: link OK ${OUT}"
 
+# M5: native bin/compile.php driver is the M3 emit helper (sidecar + real emit path — #2697).
+if [[ "${SOURCE}" == "${ROOT}/bin/compile.php" ]]; then
+  EMIT_ENTRY="${ROOT}/test/bootstrap-aot/compile_smoke_m3_emit_native_entry.php"
+  EMIT_HELPER="${ROOT}/build/selfhost-native-compile-driver"
+  rm -f "${EMIT_HELPER}" "${AOT_OUT}" "${ROOT}/build/.last-jit-func-native-compile-driver"
+  export PHP_COMPILER_JIT_PROGRESS_FILE="${ROOT}/build/.last-jit-func-native-compile-driver"
+  if ! env PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_M3_COMPILE_DRIVER=1 PHP_COMPILER_EMIT_HELPER_LINK=1 \
+    php "${ROOT}/bin/compile.php" -o "${EMIT_HELPER}" "${EMIT_ENTRY}" >/dev/null 2>&1; then
+    echo "bootstrap-selfhost-helloworld-compile-bin: native compile driver link failed" >&2
+    exit 1
+  fi
+  cp -f "${EMIT_HELPER}" "${AOT_OUT}"
+  chmod +x "${AOT_OUT}"
+  echo "compile_smoke_m3_emit: compile OK -> ${AOT_OUT}"
+  echo "bootstrap-selfhost-helloworld-compile-bin: OK ${EMIT_HELPER} -> ${AOT_OUT} (M3 emit helper as native compile driver)"
+  exit 0
+fi
+
 set +e
 compile_out="$(
   env PHP_COMPILER_M3_COMPILE_MODE=compile \
+    PHP_COMPILER_M3_RUNTIME_COMPILE=1 \
     PHP_COMPILER_M3_SOURCE="${SOURCE}" \
     PHP_COMPILER_M3_OUT="${AOT_OUT}" \
     "${OUT}" 2>&1
@@ -48,7 +67,7 @@ compile_code=$?
 set -e
 printf '%s\n' "${compile_out}"
 
-if [[ "${compile_code}" -eq 0 ]] && grep -q 'helloworld_compile_smoke: compile OK' <<< "${compile_out}"; then
+if [[ "${compile_code}" -eq 0 ]] && grep -qE 'helloworld_compile_smoke: compile OK|compile_smoke_m3_emit: compile OK' <<< "${compile_out}"; then
   echo "bootstrap-selfhost-helloworld-compile-bin: OK ${OUT} -> ${AOT_OUT}"
   exit 0
 fi
