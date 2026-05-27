@@ -139,14 +139,18 @@ if ! m4_run_subprobe "M2 lib spine smoke (native link + run)" bash "${SPINE_LINK
   exit 1
 fi
 
-if ! m4_run_subprobe "M3 HelloWorld probe (partial — Zend emit allowed)" bash "${M3_PROBE}"; then
+if ! m4_run_subprobe "M3 HelloWorld probe (partial — native emit when LLVM present)" \
+  env BOOTSTRAP_M3_LINK_COMPILE_DRIVER="${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-1}" \
+  BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING="${BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING:-1}" \
+  BOOTSTRAP_M3_RUNTIME_COMPILE="${BOOTSTRAP_M3_RUNTIME_COMPILE:-1}" \
+  bash "${M3_PROBE}"; then
   echo "bootstrap-loop-probe: M3 partial prerequisite failed (exit 1)" >&2
   echo "bootstrap-loop-probe: hint: make bootstrap-selfhost-helloworld" >&2
   exit 1
 fi
 
 echo ""
-echo "Prerequisites OK through M3 partial (native HelloWorld run; emit may be Zend)."
+echo "Prerequisites OK through M3 partial (native HelloWorld run; emit_path=native when helper links)."
 echo ""
 
 GEN1_LOG="$(mktemp)"

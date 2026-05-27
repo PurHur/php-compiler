@@ -43,6 +43,8 @@ final class BootstrapBootstrapLoopProbeTest extends TestCase
         $this->assertStringContainsString('exit 2', $script);
         $this->assertStringContainsString('bootstrap-selfhost-lib-spine-smoke-link.sh', $script);
         $this->assertStringContainsString('bootstrap-selfhost-helloworld-probe.sh', $script);
+        $this->assertStringContainsString('BOOTSTRAP_M3_LINK_COMPILE_DRIVER', $script);
+        $this->assertStringContainsString('native emit when LLVM present', $script);
         $this->assertStringContainsString('bootstrap-loop-gen1-link.sh', $script);
         $this->assertStringContainsString('BOOTSTRAP_M3_HELLOWORLD_STRICT=1', $script);
         $this->assertStringContainsString('BOOTSTRAP_M4_LINK_COMPILE_DRIVER=1', $script);
