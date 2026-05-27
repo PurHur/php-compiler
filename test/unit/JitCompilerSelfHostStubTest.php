@@ -73,6 +73,14 @@ final class JitCompilerSelfHostStubTest extends TestCase
         'foldconcat',
         'foldforinclude',
         'tryparsedeployinclude',
+        'literalstringvalue',
+        'magicscriptconstvalue',
+        'sourcedir',
+        'findmagicscriptconstforoperand',
+        'findmagicscriptconstinblocktree',
+        'findconcatforoperand',
+        'findconcatinblocktree',
+        'folddeploypathconcat',
     ];
 
     /** @var list<string> */
@@ -234,6 +242,37 @@ final class JitCompilerSelfHostStubTest extends TestCase
     {
         foreach (self::M3_WEB_CONSTSTRINGFOLDER_REAL_LOWERING_METHODS as $method) {
             yield $method => [$method];
+        }
+    }
+
+    /**
+     * @dataProvider m3WebConstStringFolderRealLoweringProvider
+     */
+    public function testM3CompileDriverConstStringFolderHelpersAreNotWebBootstrapStubbed(string $method): void
+    {
+        $prevSelfHost = getenv('PHP_COMPILER_SELFHOST_AOT');
+        $prevM3 = getenv('PHP_COMPILER_M3_COMPILE_DRIVER');
+        putenv('PHP_COMPILER_SELFHOST_AOT=1');
+        putenv('PHP_COMPILER_M3_COMPILE_DRIVER=1');
+        try {
+            $this->assertFalse(
+                $this->invokeSkipCheck(
+                    'isSkippedWebBootstrapHotPathName',
+                    'phpcompiler\\web\\conststringfolder::'.$method
+                ),
+                "Expected web-bootstrap real lowering for ConstStringFolder::{$method} when M3 compile driver is on"
+            );
+        } finally {
+            if (false === $prevSelfHost) {
+                putenv('PHP_COMPILER_SELFHOST_AOT');
+            } else {
+                putenv('PHP_COMPILER_SELFHOST_AOT='.$prevSelfHost);
+            }
+            if (false === $prevM3) {
+                putenv('PHP_COMPILER_M3_COMPILE_DRIVER');
+            } else {
+                putenv('PHP_COMPILER_M3_COMPILE_DRIVER='.$prevM3);
+            }
         }
     }
 

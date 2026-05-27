@@ -723,6 +723,7 @@ class JIT {
                     || $this->isLiteralIncludeDiscoveryRealLoweringMethod($emitLc)
                     || $this->isDeployRootRealLoweringMethod($emitLc)
                     || $this->isSourceBundlerRealLoweringMethod($emitLc)
+                    || $this->isConstStringFolderRealLoweringMethod($emitLc)
                     || $this->isSuperglobalsRealLoweringMethod($emitLc)
                     || $this->isM3EmitTuRuntimeCompileDriverSpineLoweringName($emitLc)
                 )
@@ -2035,21 +2036,36 @@ class JIT {
     }
 
     /**
-     * ConstStringFolder real LLVM lowering during self-host AOT (#816, #1056).
+     * ConstStringFolder real LLVM lowering during M3 compile-driver link (#816, #2827).
      *
-     * Disabled until string/boxed compare ICmp verify is fixed; web-bootstrap stubs link the bundle.
+     * Entry points plus private helpers they call must be real-lowered together; stubbed callees
+     * return null and break __DIR__/__FILE__ include-path folding in bin/compile.php bundles.
      */
     private function isConstStringFolderRealLoweringMethod(string $lower): bool
     {
         if (!$this->shouldUseM3CompileDriverRealLowering()) {
             return false;
         }
+        foreach ([
+            'fold',
+            'foldconcat',
+            'foldforinclude',
+            'tryparsedeployinclude',
+            'literalstringvalue',
+            'magicscriptconstvalue',
+            'sourcedir',
+            'findmagicscriptconstforoperand',
+            'findmagicscriptconstinblocktree',
+            'findconcatforoperand',
+            'findconcatinblocktree',
+            'folddeploypathconcat',
+        ] as $suffix) {
+            if (str_ends_with($lower, '\\web\\conststringfolder::'.$suffix)) {
+                return true;
+            }
+        }
 
-        // Keep this narrow: only the compile-driver needs const-folding for include discovery/bundling.
-        return str_ends_with($lower, '\\web\\conststringfolder::fold')
-            || str_ends_with($lower, '\\web\\conststringfolder::foldconcat')
-            || str_ends_with($lower, '\\web\\conststringfolder::foldforinclude')
-            || str_ends_with($lower, '\\web\\conststringfolder::tryparsedeployinclude');
+        return false;
     }
 
     private function collectStubFunctionArgTypes(Block $block): array
