@@ -42,8 +42,9 @@ final class SelfhostM4Gen2SyncTest extends TestCase
             'runtime_compile_env' => false,
             'emit_path_tokens' => ['emit_path=zend partial'],
         ];
+        $gen3Profile = ['gen3_spine_script' => false, 'gen3_spine_success_line' => false];
         $errors = [];
-        bootstrap_m4_gen2_validate_doc('fake.md', 'M4 bootstrap-loop-gen1-link only', $profile, $errors);
+        bootstrap_m4_gen2_validate_doc('fake.md', 'M4 bootstrap-loop-gen1-link only', $profile, $gen3Profile, $errors);
         $this->assertNotEmpty($errors);
         $this->assertStringContainsString('Zend', implode(' ', $errors));
     }

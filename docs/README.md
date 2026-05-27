@@ -62,6 +62,7 @@ Generated maps and large tables — **repo only**; exclude from `docs/pages/` co
 | Doc | Content |
 |-----|---------|
 | [bootstrap-selfhost.md](bootstrap-selfhost.md) | Gates, waves, stub policy |
+| [bootstrap-generations.md](bootstrap-generations.md) | Gen-0…gen-3 ladder, artifacts, presenter commands |
 | [bootstrap-inventory.md](bootstrap-inventory.md) | `lib/` inventory (`php script/bootstrap-inventory.php`) |
 | [bootstrap-vendor-inventory.md](bootstrap-vendor-inventory.md) | Vendor / parser strategy |
 | [bootstrap-m5-fast-path.md](bootstrap-m5-fast-path.md) | M5 planning notes |

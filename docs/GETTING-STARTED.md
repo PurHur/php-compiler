@@ -104,7 +104,7 @@ Expect stdout: `compiler_minimal bundle OK`. **Talking point:** experimental pat
 
 ### 7. (Optional) North Star 4 — M4 strict bootstrap loop
 
-M4 presenter ladder: inventory clean → M3 strict probes → gen-1 link → loop probe ([#2379](https://github.com/PurHur/php-compiler/issues/2379), [#2464](https://github.com/PurHur/php-compiler/issues/2464)). Sibling: [008-SelfHostProbe](../examples/008-SelfHostProbe/README.md) (North Star 2/3); detail: [docs/bootstrap-selfhost.md](bootstrap-selfhost.md) · [docs/self-host-target.md](self-host-target.md).
+M4 presenter ladder: inventory clean → M3 strict probes → gen-1 link → loop probe (gen-1→gen-2 + gen-2→gen-3 spine) ([#2379](https://github.com/PurHur/php-compiler/issues/2379), [#2464](https://github.com/PurHur/php-compiler/issues/2464)). Generation ladder: [docs/bootstrap-generations.md](bootstrap-generations.md). Sibling: [008-SelfHostProbe](../examples/008-SelfHostProbe/README.md) (North Star 2/3); detail: [docs/bootstrap-selfhost.md](bootstrap-selfhost.md) · [docs/self-host-target.md](self-host-target.md).
 
 ```bash
 ./phpc lint --bootstrap-inventory --check
@@ -116,7 +116,7 @@ make north-star4-verify
 ./phpc doctor --selfhost
 ```
 
-**Talking point:** Default `north-star4-verify` exits **0** on partial M4 (documented M3 strict / gen-2 blockers) so presenters can show the ladder without a red demo; `--strict` is for contributors chasing green M4.
+**Talking point:** Default `north-star4-verify` exits **0** on partial M4 (documented M3 strict / gen-2 / gen-3 blockers) so presenters can show the ladder without a red demo; `--strict` is for contributors chasing green M4. When LLVM is present and gen-1 link is green, step 6 runs `bootstrap-loop-gen2-recompile-spine` unless the full probe already passed gen-3.
 
 On Runforge / harness hosts (do **not** use raw `docker run -v "$(pwd):/compiler"`):
 
@@ -126,7 +126,7 @@ On Runforge / harness hosts (do **not** use raw `docker run -v "$(pwd):/compiler
 ./script/docker-exec.sh -- bash -lc './script/north-star4-verify.sh --dry-run-only'
 ```
 
-**Next steps:** `BOOTSTRAP_M4_GEN2_STRICT_GATE=1` in `ci-local.sh` ([#2112](https://github.com/PurHur/php-compiler/issues/2112)); opt-in `NORTH_STAR4_VERIFY_GATE=1` ([#2429](https://github.com/PurHur/php-compiler/issues/2429)); native gen-2 emit ([#2075](https://github.com/PurHur/php-compiler/issues/2075), `BOOTSTRAP_M4_GEN2_STRICT=1`); compiled driver ([#1521](https://github.com/PurHur/php-compiler/issues/1521)).
+**Next steps:** `BOOTSTRAP_M4_GEN2_STRICT_GATE=1` in `ci-local.sh` ([#2112](https://github.com/PurHur/php-compiler/issues/2112)); opt-in `NORTH_STAR4_VERIFY_GATE=1` ([#2429](https://github.com/PurHur/php-compiler/issues/2429)); argv `bin/compile.php -o` on compiled driver ([#1937](https://github.com/PurHur/php-compiler/issues/1937), [#1521](https://github.com/PurHur/php-compiler/issues/1521)); full revision rebuild ([#1498](https://github.com/PurHur/php-compiler/issues/1498)).
 
 ### 8. (Optional) Full local CI
 
@@ -159,7 +159,8 @@ Needs LLVM + ~8 GiB RAM; includes JIT/AOT lint/link and example smokes.
 | `make north-star1-verify` | Example web regression bundle (legacy name; [#1044](https://github.com/PurHur/php-compiler/issues/1044) closed) ([#1845](https://github.com/PurHur/php-compiler/issues/1845)) |
 | `make north-star2-verify` | Self-host M0–M4 presenter bundle ([#1865](https://github.com/PurHur/php-compiler/issues/1865); listed in `phpc doctor --gates` when script exists) |
 | `make north-star3-verify` | M3 native unit probe bundle — 008 + compiler/JIT/VM/parser/PHPTypes probes ([#2360](https://github.com/PurHur/php-compiler/issues/2360); [#2216](https://github.com/PurHur/php-compiler/issues/2216) / [#2332](https://github.com/PurHur/php-compiler/issues/2332) / [#2354](https://github.com/PurHur/php-compiler/issues/2354) / [#2418](https://github.com/PurHur/php-compiler/issues/2418) / [#2434](https://github.com/PurHur/php-compiler/issues/2434)) |
-| `make north-star4-verify` | M4 strict bootstrap-loop presenter — inventory + M3 strict + gen-1 link + loop probe ([#2379](https://github.com/PurHur/php-compiler/issues/2379)); `--dry-run-only` on partial M4; opt-in CI [#2429](https://github.com/PurHur/php-compiler/issues/2429) |
+| `make north-star4-verify` | M4 strict bootstrap-loop presenter — inventory + M3 strict + gen-1 link + loop probe + gen-2→gen-3 ([#2379](https://github.com/PurHur/php-compiler/issues/2379)); `--dry-run-only` on partial M4; opt-in CI [#2429](https://github.com/PurHur/php-compiler/issues/2429) |
+| `make bootstrap-loop-gen2-recompile-spine` | Gen-2 native driver recompiles **717/717** spine → gen-3 ([#2697](https://github.com/PurHur/php-compiler/pull/2697)) |
 | `make deploy-smoke-all` | Full `PHPC_DEPLOY_ROOT` deploy ladder 001–003 + opt-in 005/006; skip hints when gates `0` — see `./phpc doctor --gates` ([#2077](https://github.com/PurHur/php-compiler/issues/2077)) |
 
 Legacy entrypoints (`bin/vm.php`, `bin/jit.php`, `bin/compile.php`) still work.

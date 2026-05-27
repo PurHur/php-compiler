@@ -37,7 +37,7 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | **Bundle size** | **717** curated `require_once` in spine smoke (108 minimal overlap + **609** M2-only) | **717** Phase A inventory files (SSOT) |
 | **Inventory coverage** | **717/717** in spine smoke with real **`bin/vm.php`** ([#2134](https://github.com/PurHur/php-compiler/issues/2134); **#2652** emit-TU JIT batch; **`lib/VM/HashTable.php`** promoted [#2543](https://github.com/PurHur/php-compiler/issues/2543)); `src/cli_driver.php` via `cli_spine_shim` | **~100%** |
 | **HelloWorld** | Native **run** ✅; strict probe **emit_path=native** ✅ (27 May 2026) | Native compile for arbitrary PHP |
-| **Bootstrap loop (M4)** | Gen-1 link + gen-2 smoke **native** ✅; full tree rebuild ⬜ | Native full revision rebuild |
+| **Bootstrap loop (M4)** | Gen-1→gen-2 smoke/spine **native** ✅; gen-2→gen-3 spine **717/717** ✅; full revision / argv CLI ⬜ | Native full revision rebuild |
 | **Vendor** | `ircmaxell/php-types` **object_ok** ([#1416](https://github.com/PurHur/php-compiler/issues/1416)); cfg/llvm parse blockers | Prelinked artifacts only (no `vendor/autoload.php`) |
 
 ### Gates (run after `script/apply-patches.sh`)
@@ -51,8 +51,10 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | M3 compiler-unit strict | ✅ `make bootstrap-selfhost-compiler-unit-probe-strict` → `emit_path=native` (#2618) |
 | M2 `BOOTSTRAP_LIB_SPINE_SMOKE=1` spine link | ✅ `compiler_lib_spine_smoke bundle OK` |
 | M3 `make bootstrap-selfhost-helloworld` | ✅ strict default — HelloWorld `emit_path=native` (verified 27 May 2026) |
-| M4 `make bootstrap-loop-gen1-link` | ✅ gen-1 link + gen-2 smoke **`emit_path=native`** (defaults compile-driver env, #2611); full tree rebuild still open ([#1498](https://github.com/PurHur/php-compiler/issues/1498)); presenter: [GETTING-STARTED §7](GETTING-STARTED.md) ([#2464](https://github.com/PurHur/php-compiler/issues/2464)) |
-| M4 `make bootstrap-loop-probe` | 🚧 ladder — dry-run + strict slices pass; **full** may exit **2** until full gen-2 tree ([#1498](https://github.com/PurHur/php-compiler/issues/1498)); `make north-star4-verify` — [GETTING-STARTED §7](GETTING-STARTED.md) |
+| M4 `make bootstrap-loop-gen1-link` | ✅ gen-1 link + gen-2 smoke **`emit_path=native`** (`BOOTSTRAP_M4_LINK_COMPILE_DRIVER=1`, #2611); **Zend fallback** (`emit_path=zend partial`) when native blocked; strict: `BOOTSTRAP_M4_GEN2_STRICT=1`; presenter: [GETTING-STARTED §7](GETTING-STARTED.md) ([#2464](https://github.com/PurHur/php-compiler/issues/2464)) |
+| M4 `make bootstrap-loop-gen1-full-spine-emit` | ✅ gen-1→gen-2 **717/717** spine (`bootstrap-loop-gen2-full-spine`) |
+| M4 `make bootstrap-loop-gen2-recompile-spine` | ✅ gen-2→gen-3 **717/717** spine (`bootstrap-loop-gen3-full-spine`) — native driver recompiles spine ([#2697](https://github.com/PurHur/php-compiler/pull/2697)) |
+| M4 `make bootstrap-loop-probe` | ✅ full ladder — M2 + M3 HelloWorld strict + gen-1→gen-2 + gen-2→gen-3; `--dry-run` skips gen-3 ([#1498](https://github.com/PurHur/php-compiler/issues/1498)); `make north-star4-verify` — [GETTING-STARTED §7](GETTING-STARTED.md) |
 | `make bootstrap-aot-link` | ✅ **71/71** |
 | `make bootstrap-inventory-check` | ✅ **717** Phase A files, **717** vm.php-path files, **0** source blockers |
 | `make north-star5-verify` | ✅ inventory + spine + selfhost link; vendor **1/3** `object_ok` (partial; `--strict` for 3/3) |
@@ -69,10 +71,10 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | **M3** | Self-host binary **compiles external PHP** (HelloWorld) without Zend emit | 🚧 smoke strict **native** ✅; full `Compiler` CFG 🚧 | **~65%** |
 
 **M3 unit probe presenter** ([#2360](https://github.com/PurHur/php-compiler/issues/2360)): `make north-star3-verify` runs `008-SelfHostProbe` plus optional `bootstrap-selfhost-{compiler,jit,vm,parser,types}-unit-probe.sh` when LLVM 9 and probe scripts are present (parser step [#2418](https://github.com/PurHur/php-compiler/issues/2418), PHPTypes step [#2434](https://github.com/PurHur/php-compiler/issues/2434)). **Parser unit probe** ([#2409](https://github.com/PurHur/php-compiler/issues/2409)): `make bootstrap-selfhost-parser-unit-probe` — CFG front-end (`Runtime` + `lib/Compiler.php` bundle); CI gate ([#2417](https://github.com/PurHur/php-compiler/issues/2417)) opt-in in `ci-local.sh`. **PHPTypes unit probe** ([#2430](https://github.com/PurHur/php-compiler/issues/2430)): `make bootstrap-selfhost-types-unit-probe` — `lib/JIT.php` / `JIT\Builtin\Type` external-class constant seeds; Zend smoke for `Type::TYPE_*` + union/intersection `fromTypeDecl`; `BOOTSTRAP_PHPTYPES_UNIT_PROBE_GATE=1` default-on in `ci-local.sh` ([#2433](https://github.com/PurHur/php-compiler/issues/2433), [#2436](https://github.com/PurHur/php-compiler/issues/2436)). **VM unit probe** ([#2354](https://github.com/PurHur/php-compiler/issues/2354)): `make bootstrap-selfhost-vm-unit-probe` / `BOOTSTRAP_VM_UNIT_PROBE_GATE=1` in `ci-local.sh` llvm tail. Compiler/JIT unit probes: [#2216](https://github.com/PurHur/php-compiler/issues/2216), [#2332](https://github.com/PurHur/php-compiler/issues/2332).
-| **M4** | Self-host binary **rebuilds** the next compiler tree | 🚧 gen-2 smoke **native** ✅; full tree ⬜ | **~40%** |
+| **M4** | Self-host binary **rebuilds** the next compiler tree | 🚧 gen-2→gen-3 spine **717/717** ✅; full revision / argv CLI ⬜ | **~75%** |
 | **M5** | Full self-host; Zend retired from loop | 🚧 `php-types` prelinked **object_ok**; cold boot open | **~15%** |
 
-**Indicative north star composite:** **~62%** (weighted across M0–M5; see formula below).
+**Indicative north star composite:** **~70%** (weighted across M0–M5; see formula below).
 
 ### North star % (single formula)
 
@@ -81,7 +83,7 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | **M2 spine progress** | `require_once` units in `compiler_lib_spine_smoke` ÷ Phase A inventory file count | **717 / 717** (`bin/vm.php` [#2134](https://github.com/PurHur/php-compiler/issues/2134); `lib/VM/HashTable.php` [#2543](https://github.com/PurHur/php-compiler/issues/2543); **#2652** emit-TU JIT batch) |
 | **Public “Self-host” row** | Same M2 ratio until M3–M5 gates add weight ([`development-status.md`](pages/development-status.md)) | **~99%** |
 | **M5 vendor prelink** | `object_ok` packages ÷ 3 | **1 / 3** (`php-types`) |
-| **Composite (internal)** | Milestone weights in table above (M0–M1 = 100%, M2 = spine %, M3–M5 = gate %) | **~62%** |
+| **Composite (internal)** | Milestone weights in table above (M0–M1 = 100%, M2 = spine %, M3–M5 = gate %) | **~70%** |
 
 Regenerate inventory: `make bootstrap-inventory-regenerate` (or `php script/bootstrap-inventory.php`) · spine count: `php script/bootstrap-spine-count.php` (or `grep -c '^require_once' test/selfhost/compiler_lib_spine_smoke/main.php`)
 
@@ -103,8 +105,9 @@ Work that moves “more compiler logic into compiled PHP” fastest:
    └─ Gate: BOOTSTRAP_LIB_SPINE_SMOKE=1 stays green
 
 3. M4 — bootstrap loop
-   └─ Native binary compiles same tree → second-generation binary
+   └─ Native binary compiles same tree → second-generation binary → gen-3 spine
    └─ Scaffold: `test/selfhost/bootstrap_loop_smoke/` + `make bootstrap-loop-probe` ([#1498](https://github.com/PurHur/php-compiler/issues/1498))
+   └─ Generation ladder: [`bootstrap-generations.md`](bootstrap-generations.md)
 
 4. M5 — vendor prelink + stub retirement
    └─ #1416: no composer at cold boot
@@ -133,7 +136,7 @@ Parallel batches ([#1419](https://github.com/PurHur/php-compiler/issues/1419), [
 | `test/selfhost/compiler_minimal/main.php` | **108** | M0 core |
 | `test/selfhost/compiler_lib_spine_smoke/main.php` | **717** | M2 complete (#2543 VM HashTable + #2652 emit-TU JIT batch) |
 | `test/selfhost/compiler_helloworld_smoke/` | — | M3 probe + compile driver |
-| `test/selfhost/bootstrap_loop_smoke/` | — | M4 scaffold (gen-1→gen-2 loop probe; [#1498](https://github.com/PurHur/php-compiler/issues/1498)) |
+| `test/selfhost/bootstrap_loop_smoke/` | — | M4 scaffold (gen-1→gen-2→gen-3 loop; [#1498](https://github.com/PurHur/php-compiler/issues/1498)) |
 
 ---
 
@@ -192,13 +195,16 @@ make north-star3-verify
 M4 bootstrap-loop probe ([#1498](https://github.com/PurHur/php-compiler/issues/1498)):
 
 ```bash
-# Prerequisites only (no M3 strict native emit):
+# Prerequisites only (no gen-2→gen-3):
 ./script/bootstrap-loop-probe.sh --dry-run   # exit 0 when lint + M2 spine + M3 HelloWorld strict + gen-1 green (#2612)
 
-# Full gate (exit 2 until M3 strict native emit):
+# Full gate (gen-1→gen-2 native + gen-2→gen-3 spine):
 make bootstrap-loop-probe
-# Exit codes: 0=strict green | 1=hard failure | 2=LLVM skip or M3 strict blocks M4
+make bootstrap-loop-gen2-recompile-spine   # gen-2→gen-3 only
+# Exit codes: 0=strict green | 1=hard failure | 2=LLVM skip or M4 gen-2/gen-3 blocked
 ```
+
+See [`bootstrap-generations.md`](bootstrap-generations.md) for artifact names and env vars.
 
 M4 strict loop presenter ([#2379](https://github.com/PurHur/php-compiler/issues/2379); copy-paste walkthrough: [GETTING-STARTED §7](GETTING-STARTED.md) ([#2464](https://github.com/PurHur/php-compiler/issues/2464))):
 
@@ -213,6 +219,7 @@ make north-star4-verify
 
 ## Related docs
 
+- [`bootstrap-generations.md`](bootstrap-generations.md) — gen-0…gen-3 ladder and artifacts
 - [`bootstrap-selfhost.md`](bootstrap-selfhost.md) — gates, waves, stub policy
 - [`bootstrap-m5-fast-path.md`](bootstrap-m5-fast-path.md) — M3 incremental lowering playbook
 - [`bootstrap-inventory.md`](bootstrap-inventory.md) — per-file inventory

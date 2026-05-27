@@ -63,8 +63,8 @@ if [[ "${compile_code}" -ne 0 ]]; then
   exit 1
 fi
 
-if ! grep -q 'helloworld_compile_smoke: compile OK' <<< "${compile_out}"; then
-  echo "bootstrap-selfhost-driver-smoke: expected helloworld_compile_smoke: compile OK" >&2
+if ! grep -qE 'helloworld_compile_smoke: compile OK|compile_smoke_m3_emit: compile OK' <<< "${compile_out}"; then
+  echo "bootstrap-selfhost-driver-smoke: expected compile OK line (helloworld_compile_smoke or compile_smoke_m3_emit)" >&2
   exit 1
 fi
 

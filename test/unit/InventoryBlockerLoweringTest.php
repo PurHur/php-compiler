@@ -8,6 +8,7 @@ final class InventoryBlockerLoweringTest extends TestCase {
     public function testValueBitwiseShiftLint(): void { $this->assertSame(0, $this->lint('test/bootstrap-aot/value_bitwise_shift.php')); }
     public function testShellExecLint(): void { $this->assertSame(0, $this->lint('test/bootstrap-aot/shell_exec_echo.php')); }
     public function testLinkerShellExecMethodLint(): void { $this->assertSame(0, $this->lint('test/bootstrap-aot/linker_shell_exec_method_smoke.php')); }
+    public function testLinkerProcessLint(): void { $this->assertSame(0, $this->lint('test/bootstrap-aot/linker_process_smoke.php')); }
     public function testShiftRightLint(): void { $this->assertSame(0, $this->lint('test/bootstrap-aot/shift_right.php')); }
     public function testTryCatchLint(): void { $this->assertSame(0, $this->lint('test/bootstrap-aot/try_catch.php')); }
     private function lint(string $rel): int {

@@ -278,6 +278,8 @@ class Module extends ModuleAbstract
             new fclose(),
             new getenv_(),
             new shell_exec(),
+            new escapeshellarg(),
+            new phpc_run_command(),
             new sys_get_temp_dir(),
             new tempnam(),
             new getcwd_(),

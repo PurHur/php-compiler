@@ -9,6 +9,7 @@ M3_PROBE="${ROOT}/script/bootstrap-selfhost-helloworld-probe.sh"
 SPINE_LINK="${ROOT}/script/bootstrap-selfhost-lib-spine-smoke-link.sh"
 GEN1_LINK="${ROOT}/script/bootstrap-loop-gen1-link.sh"
 FULL_SPINE_EMIT="${ROOT}/script/bootstrap-loop-gen1-full-spine-emit.sh"
+GEN2_RECOMPILE="${ROOT}/script/bootstrap-loop-gen2-recompile-spine.sh"
 DRY_RUN=0
 
 usage() {
@@ -16,13 +17,13 @@ usage() {
 Usage: script/bootstrap-loop-probe.sh [--dry-run]
 
 M4 bootstrap-loop probe (#1498). Runs M2 spine + M3 HelloWorld with the same strict env as
-`make bootstrap-selfhost-helloworld` (#2612), then gen-1 link / gen-2 attempt.
+`make bootstrap-selfhost-helloworld` (#2612), then gen-1 link / gen-2 attempt, then gen-2→gen-3 spine recompile.
 
 Exit codes:
   0  --dry-run: lint + M2 spine + M3 HelloWorld strict + gen-1 link (gen-2 Zend partial OK)
-     full:      same, then require emit_path=native in gen-1 log for exit 0
+     full:      same + gen-1→gen-2 native + gen-2→gen-3 spine (717/717)
   1  hard failure (missing entry/scripts, lint, M2 spine, M3 HelloWorld, or gen-1 link)
-  2  LLVM 9 not found (skip), or full mode: gen-2 native emit not ready (exit 2 after M3 green)
+  2  LLVM 9 not found (skip), or full mode: gen-2 native emit or gen-3 spine recompile blocked
   3  reserved
 
 Examples:
@@ -86,10 +87,10 @@ echo "=== M4 bootstrap-loop probe (#1498) ==="
 if [[ "${DRY_RUN}" -eq 1 ]]; then
   echo "mode: --dry-run (lint + M2 spine + M3 HelloWorld Makefile parity — strict native emit; no gen-2 strict slice)"
 else
-  echo "mode: full (M3 HelloWorld strict before gen-1; then gen-1→gen-2 slice per #2611/#2612)"
+  echo "mode: full (M3 HelloWorld strict before gen-1; gen-1→gen-2 + gen-2→gen-3 spine per #2611/#2697)"
 fi
 echo ""
-echo "Exit codes: 0=green gate | 1=hard failure | 2=LLVM skip or M4 gen-2 native blocked | 3=reserved"
+echo "Exit codes: 0=green gate | 1=hard failure | 2=LLVM skip or M4 gen-2/gen-3 blocked | 3=reserved"
 echo ""
 
 if [[ ! -f "${ENTRY}" ]]; then
@@ -114,6 +115,11 @@ fi
 
 if [[ ! -f "${FULL_SPINE_EMIT}" ]]; then
   echo "bootstrap-loop-probe: missing ${FULL_SPINE_EMIT}" >&2
+  exit 1
+fi
+
+if [[ ! -f "${GEN2_RECOMPILE}" ]]; then
+  echo "bootstrap-loop-probe: missing ${GEN2_RECOMPILE}" >&2
   exit 1
 fi
 
@@ -200,16 +206,17 @@ echo ""
 if [[ "${DRY_RUN}" -eq 1 ]]; then
   echo "bootstrap-loop-probe: --dry-run OK (exit 0)"
   echo ""
-  echo "Full M4 loop (without --dry-run): same M3 HelloWorld strict as above + gen-1→gen-2 native slice."
+  echo "Full M4 loop (without --dry-run): same M3 HelloWorld strict + gen-1→gen-2 native + gen-2→gen-3 spine."
   echo "  make bootstrap-loop-probe"
+  echo "  make bootstrap-loop-gen2-recompile-spine   # gen-2→gen-3 only (after gen-1→gen-2 spine)"
   echo "  make bootstrap-selfhost-helloworld  # same strict env as the M3 step here (#2612)"
-  echo "Next: gen-1 compiles bin/compile.php (or src/cli.php) → full gen-2 tree (#1467, #1521)"
+  echo "See docs/bootstrap-generations.md for generation ladder."
   exit 0
 fi
 
 echo "==> M4 exit status (M3 HelloWorld strict already verified above)"
 if grep -q 'emit_path=native' "${GEN1_LOG}" 2>/dev/null; then
-  echo "bootstrap-loop-probe: M4 gen-1→gen-2 native slice OK (exit 0)"
+  echo "bootstrap-loop-probe: M4 gen-1→gen-2 native slice OK"
   if [[ "${BOOTSTRAP_M4_GEN1_COMPILE_FULL_SPINE:-0}" == "1" ]]; then
     echo ""
     if ! m4_run_subprobe "M4 gen-1 full-spine native emit (compiler_lib_spine_smoke, #2664)" \
@@ -221,6 +228,12 @@ if grep -q 'emit_path=native' "${GEN1_LOG}" 2>/dev/null; then
       exit 2
     fi
   fi
+  echo ""
+  if ! m4_run_subprobe "M4 gen-2→gen-3 spine recompile (717/717, #2697)" bash "${GEN2_RECOMPILE}"; then
+    echo "bootstrap-loop-probe: M4 gen-2→gen-3 spine recompile blocked (exit 2)" >&2
+    exit 2
+  fi
+  echo "bootstrap-loop-probe: M4 full ladder OK — gen-1→gen-2 native + gen-2→gen-3 spine (exit 0)"
   exit 0
 fi
 

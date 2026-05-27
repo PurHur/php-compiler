@@ -10,6 +10,7 @@ declare(strict_types=1);
  */
 
 require_once __DIR__.'/../../../lib/AOT/Linker.php';
+require_once __DIR__.'/../../../lib/AOT/LinkerProcessPolyfill.php';
 require_once __DIR__.'/../../../lib/AOT/ProjectGraph.php';
 require_once __DIR__.'/../../../lib/Ast/GroupUseStripper.php';
 require_once __DIR__.'/../../../lib/Block.php';
@@ -553,6 +554,10 @@ require_once __DIR__.'/../../../ext/standard/set_error_handler_.php';
 require_once __DIR__.'/../../../ext/standard/setcookie.php';
 require_once __DIR__.'/../../../ext/standard/setrawcookie.php';
 require_once __DIR__.'/../../../ext/standard/shell_exec.php';
+require_once __DIR__.'/../../../ext/standard/escapeshellarg.php';
+require_once __DIR__.'/../../../ext/standard/phpc_run_command.php';
+require_once __DIR__.'/../../../ext/standard/JitEscapeshellarg.php';
+require_once __DIR__.'/../../../ext/standard/JitPhpcRunCommand.php';
 require_once __DIR__.'/../../../ext/standard/sin.php';
 require_once __DIR__.'/../../../ext/standard/sleep.php';
 require_once __DIR__.'/../../../ext/standard/sort_.php';
