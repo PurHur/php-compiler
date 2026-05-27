@@ -25,8 +25,8 @@ permalink: /development-status.html
 
 - **`phpc` CLI** — `run`, `serve`, `build`, `deploy`, `lint`, `test`, `init`
 - **Examples 000–009** — VM and AOT link/execute for the curated web subset
-- **Self-host M0–M2** — minimal bundle ✅; spine native link **661/657** ✅ ([#1960](https://github.com/PurHur/php-compiler/issues/1960))
-- **Self-host M3 (partial)** — HelloWorld / compile-smoke AOT **runs** natively ✅; **emit** still Zend fallback 🚧 ([#1937](https://github.com/PurHur/php-compiler/issues/1937))
+- **Self-host M0–M2** — minimal bundle ✅; spine native link **662/717** ✅ ([#1960](https://github.com/PurHur/php-compiler/issues/1960), [#2634](https://github.com/PurHur/php-compiler/issues/2634))
+- **Self-host M3 (partial)** — compile-smoke AOT runs natively ✅; emit Zend fallback 🚧 ([#1937](https://github.com/PurHur/php-compiler/issues/1937)); HelloWorld / M3 probes ([#1493](https://github.com/PurHur/php-compiler/issues/1493)).
 
 **Not claimed:** full Zend PHP compatibility (subset compiler only).
 
@@ -38,7 +38,7 @@ permalink: /development-status.html
 |-----------|--------|
 | **M0** — Small `lib/` bundle runs | ✅ |
 | **M1** — Compiler-shaped bundle + compile-smoke | ✅ |
-| **M2** — Spine toward full inventory | ✅ **661/657** link |
+| **M2** — Spine toward full inventory | ✅ **662/717** link |
 | **M3** — Native compiles PHP (no Zend emit) | 🚧 run ✅ · emit 🚧 |
 | **M4** — Bootstrap loop (next revision) | ⬜ |
 | **M5** — Full self-host, no `vendor/` cold boot | ⬜ |
@@ -60,6 +60,17 @@ For tracked PHP language/stdlib features vs VM / JIT / AOT (from the capability 
 ## Example integration tests
 
 `examples/003-MiniWebApp` through **009-FastCGIWeb** exercise routing, templates, sessions, uploads, throws, and deploy smoke in CI. They are **regression harnesses**, not the project north star ([#1044](https://github.com/PurHur/php-compiler/issues/1044) closed).
+
+---
+
+## Shipped examples (000–009)
+
+Representative gates (defaults from `script/ci-defaults.env`): **`BOOTSTRAP_M3_COMPILE_SMOKE_PROBE_GATE`** (M3 compile-smoke probe), **`FILE_UPLOAD_WEB_SMOKE_GATE=1`**, **`FILE_UPLOAD_WEB_AOT_LINK_GATE=1`**, **`FILE_UPLOAD_WEB_AOT_SMOKE_GATE=1`**, **`THROWS_WEB_SMOKE_GATE=1`**.
+
+| Example | Highlights |
+|---------|-------------|
+| 006-FileUploadWeb | Multipart uploads + presenters ([#1999](https://github.com/PurHur/php-compiler/issues/1999), [#2039](https://github.com/PurHur/php-compiler/issues/2039)); `FILE_UPLOAD_WEB_SMOKE_GATE` / `FILE_UPLOAD_WEB_AOT_LINK_GATE` / `FILE_UPLOAD_WEB_AOT_SMOKE_GATE`. |
+| 007-ThrowsWeb | Invalid POST + `catch` ([#2076](https://github.com/PurHur/php-compiler/issues/2076)); `THROWS_WEB_SMOKE_GATE` smoke ([#2093](https://github.com/PurHur/php-compiler/issues/2093), [#2101](https://github.com/PurHur/php-compiler/issues/2101), [#2125](https://github.com/PurHur/php-compiler/issues/2125)); **007-ThrowsWeb** presenters ([#2145](https://github.com/PurHur/php-compiler/issues/2145)). |
 
 ---
 

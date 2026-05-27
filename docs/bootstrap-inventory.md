@@ -3667,7 +3667,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Ast/GroupUseStripper.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/Block.php`
 
