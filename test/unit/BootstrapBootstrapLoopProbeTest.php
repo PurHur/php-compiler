@@ -120,12 +120,22 @@ final class BootstrapBootstrapLoopProbeTest extends TestCase
         $makefile = (string) file_get_contents(self::$root.'/Makefile');
         $this->assertStringContainsString('bootstrap-loop-probe:', $makefile);
         $this->assertStringContainsString('./script/bootstrap-loop-probe.sh', $makefile);
+        $this->assertStringContainsString('bootstrap-loop-full-spine-probe:', $makefile);
+        $this->assertStringContainsString('./script/bootstrap-loop-full-spine-probe.sh', $makefile);
         $this->assertStringContainsString('bootstrap-loop-gen1-link:', $makefile);
         $this->assertStringContainsString('bootstrap-loop-probe-dry-run:', $makefile);
         $this->assertStringContainsString('BOOTSTRAP_M3_HELLOWORLD_STRICT=1', $makefile);
         $this->assertStringContainsString('BOOTSTRAP_M4_RUNTIME_COMPILE', $makefile);
         $gen1 = (string) file_get_contents(self::$root.'/script/bootstrap-loop-gen1-link.sh');
         $this->assertStringContainsString('BOOTSTRAP_M4_RUNTIME_COMPILE:=1', $gen1);
+    }
+
+    public function testBootstrapLoopFullSpineProbeScriptWiresEnv(): void
+    {
+        $script = (string) file_get_contents(self::$root.'/script/bootstrap-loop-full-spine-probe.sh');
+        $this->assertStringContainsString('BOOTSTRAP_M4_GEN1_COMPILE_FULL_SPINE=1', $script);
+        $this->assertStringContainsString('bootstrap-loop-probe.sh', $script);
+        $this->assertStringContainsString('#2770', $script);
     }
 
     public function testBootstrapLoopSmokeEntryDocumentsProbe(): void

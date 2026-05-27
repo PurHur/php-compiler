@@ -27,6 +27,7 @@ Exit codes:
 
 Examples:
   make bootstrap-loop-probe
+  make bootstrap-loop-full-spine-probe
   ./script/bootstrap-loop-probe.sh --dry-run
   make bootstrap-selfhost-helloworld
 EOF

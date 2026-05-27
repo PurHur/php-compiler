@@ -31,7 +31,7 @@ Usage: script/north-star5-verify.sh [--require-llvm] [--strict] [--with-ns4]
 M5 ladder presenter (#1416, #1492):
 
   1. php script/bootstrap-inventory.php --check
-  2. php script/bootstrap-spine-count.php (expect 717/717)
+  2. php script/bootstrap-spine-count.php + check-selfhost-spine-coverage-sync.php (718/718)
   3. php script/bootstrap-vendor-objects.php --check
   4. make bootstrap-selfhost-probe + bootstrap-selfhost-lib-spine-smoke (LLVM)
   5. php script/bootstrap-vendor-objects.php --compile (partial OK unless --strict)
@@ -55,7 +55,7 @@ ns5_hint() {
   local step="$1"
   case "${step}" in
     1) echo "Next: php script/bootstrap-inventory.php" ;;
-    2) echo "Next: grow compiler_lib_spine_smoke toward 717/717 (#2652)" ;;
+    2) echo "Next: php script/check-selfhost-spine-coverage-sync.php (#2543 cli_spine_shim)" ;;
     3) echo "Next: php script/bootstrap-vendor-objects.php" ;;
     4) echo "Next: make bootstrap-selfhost-probe (LLVM 9)" ;;
     5) echo "Next: PHP_COMPILER_VENDOR_PRELINK=1 vendor AOT; fix php-cfg/php-llvm parse (#1416)" ;;
@@ -82,7 +82,7 @@ ns5_print_summary() {
   local vendor_ok="${1:-0}"
   echo
   echo "north-star5-verify: M5 status"
-  echo "  Spine: 717/717 (Phase A inventory SSOT)"
+  echo "  Spine: 718/718 (Phase A inventory SSOT)"
   echo "  Vendor prelink: ${vendor_ok}/3 object_ok (php-types first; cfg/llvm parse blockers)"
   echo "  Cold boot: Zend still drives bin/compile.php — target is compiled driver + prelinked vendor"
   echo "north-star5-verify: Next — shrink self-host stubs; link spine + prelinked .o; retire vendor/autoload (#1416)"
@@ -100,11 +100,11 @@ ns5_run 1 "bootstrap inventory --check" \
   ci_ensure_generated_doc "${_CI_REPO_ROOT}/script/bootstrap-inventory.php" "${_CI_REPO_ROOT}/docs/bootstrap-inventory.md"
 
 echo
-echo "=== north-star5-verify step 2: spine count (717/717) ==="
+echo "=== north-star5-verify step 2: spine coverage (718/718) ==="
 SPINE_LINE="$("${PHP_BIN}" "${PHP_OPTS[@]}" "${_CI_REPO_ROOT}/script/bootstrap-spine-count.php" 2>/dev/null | tail -n 1 || true)"
 echo "${SPINE_LINE}"
-if [[ "${SPINE_LINE}" != *"717/717"* ]]; then
-  echo "north-star5-verify: step 2 FAILED (expected bootstrap-spine-count: 717/717)" >&2
+if ! "${PHP_BIN}" "${PHP_OPTS[@]}" "${_CI_REPO_ROOT}/script/check-selfhost-spine-coverage-sync.php"; then
+  echo "north-star5-verify: step 2 FAILED (spine must cover all Phase A inventory files)" >&2
   ns5_hint 2 >&2
   exit 1
 fi
