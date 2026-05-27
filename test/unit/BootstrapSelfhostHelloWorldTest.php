@@ -139,6 +139,43 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $compile = (string) file_get_contents(self::$root.'/bin/compile.php');
         $this->assertStringContainsString('PHP_COMPILER_M3_COMPILE_DRIVER_MAIN=1', $compile);
         $this->assertStringContainsString('compile_driver.php', $compile);
+        $this->assertStringContainsString('PHP_COMPILER_M3_EMIT_LOG_PREFIX=helloworld_compile_smoke', $compile);
+    }
+
+    public function testHelloWorldCompileBinScriptExists(): void
+    {
+        $script = self::$root.'/script/bootstrap-selfhost-helloworld-compile-bin.sh';
+        $this->assertFileExists($script);
+        $source = (string) file_get_contents($script);
+        $this->assertStringContainsString('selfhost-helloworld-compile', $source);
+        $this->assertStringContainsString('helloworld_compile_smoke:', $source);
+        $this->assertStringContainsString('PHP_COMPILER_M3_COMPILE_MODE=compile', $source);
+    }
+
+    public function testHelloWorldProbeLinksCompileDriverBinary(): void
+    {
+        $script = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-helloworld-probe.sh');
+        $this->assertStringContainsString('selfhost-helloworld-compile', $script);
+        $this->assertStringContainsString('helloworld compile binary link OK', $script);
+    }
+
+    public function testHelloWorldCompileM3EmitNativeEntryExists(): void
+    {
+        $entry = self::$root.'/test/bootstrap-aot/helloworld_compile_m3_emit_native_entry.php';
+        $this->assertFileExists($entry);
+        $source = (string) file_get_contents($entry);
+        $this->assertStringContainsString('helloworld_compile_smoke:', $source);
+        $this->assertStringContainsString('selfhost-helloworld-compile', $source);
+    }
+
+    public function testCompilePhpSetsHelloWorldCompileEmitLogPrefix(): void
+    {
+        $compile = (string) file_get_contents(self::$root.'/bin/compile.php');
+        $this->assertStringContainsString('helloworld_compile_m3_emit_native_entry.php', $compile);
+        $this->assertStringContainsString(
+            "putenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX=helloworld_compile_smoke')",
+            $compile
+        );
     }
 
     public function testNativeCompileDriverMainNativePrintsReadyWhenLlvmPresent(): void
