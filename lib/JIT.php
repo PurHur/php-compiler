@@ -2582,9 +2582,22 @@ class JIT {
         }
         fclose($pipes[0]);
         fclose($pipes[1]);
-        stream_get_contents($pipes[2]);
+        $stderr = stream_get_contents($pipes[2]);
         fclose($pipes[2]);
-        if (0 !== proc_close($proc) || !is_readable($tmpOut)) {
+        $exit = proc_close($proc);
+        if (0 !== $exit || !is_readable($tmpOut)) {
+            if (is_string($stderr) && '' !== $stderr) {
+                $tail = strlen($stderr) > 8000 ? substr($stderr, -8000) : $stderr;
+                fwrite(
+                    STDERR,
+                    "m3-emit-tu sidecar host-compile failed: exit={$exit} source={$path} sidecar={$sidecarRel}\n".$tail."\n"
+                );
+            } else {
+                fwrite(
+                    STDERR,
+                    "m3-emit-tu sidecar host-compile failed: exit={$exit} source={$path} sidecar={$sidecarRel}\n"
+                );
+            }
             @unlink($tmpOut);
 
             return;

@@ -65,5 +65,7 @@ putenv('PHP_COMPILER_SKIP_LLVM_PRELOAD=1');
 $_ENV['PHP_COMPILER_SKIP_LLVM_PRELOAD'] = '1';
 $_SERVER['PHP_COMPILER_SKIP_LLVM_PRELOAD'] = '1';
 
-require_once __DIR__.'/../src/cli.php';
-require_once __DIR__.'/../src/cli_driver.php';
+// Use literal require paths so self-host AOT/JIT can fold includes (#54, #1492).
+chdir(__DIR__.'/..');
+require_once 'src/cli.php';
+require_once 'src/cli_driver.php';

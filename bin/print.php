@@ -24,5 +24,7 @@ function run(string $filename, string $code, array $options): void
     echo (new OpCodePrinter())->print($block);
 }
 
-require_once __DIR__.'/../src/cli.php';
-require_once __DIR__.'/../src/cli_driver.php';
+// Use literal require paths so self-host AOT/JIT can fold includes (#54, #1492).
+chdir(__DIR__.'/..');
+require_once 'src/cli.php';
+require_once 'src/cli_driver.php';
