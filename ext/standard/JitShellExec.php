@@ -32,8 +32,10 @@ final class JitShellExec
         $context->builder->branchIf($failed, $failBlock, $okBlock);
 
         $context->builder->positionAtEnd($failBlock);
-        $i1 = $context->getTypeFromString('int1');
-        JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            $ptr
+        );
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($okBlock);

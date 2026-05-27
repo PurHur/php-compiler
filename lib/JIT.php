@@ -828,9 +828,21 @@ class JIT {
         return $func;
     }
 
+  /** LLVM/C symbols reserved for the AOT entry wrapper and runtime init (#2779). */
+    private const LLVM_RESERVED_FUNCTION_NAMES = [
+        'main' => true,
+        '__init__' => true,
+        '__shutdown__' => true,
+    ];
+
     private function llvmInternalName(string $name): string
     {
-        return preg_replace('/[^a-zA-Z0-9_]/', '_', $name) ?? $name;
+        $sanitized = preg_replace('/[^a-zA-Z0-9_]/', '_', $name) ?? $name;
+        if (isset(self::LLVM_RESERVED_FUNCTION_NAMES[$sanitized])) {
+            return 'php_user_'.$sanitized;
+        }
+
+        return $sanitized;
     }
 
     private function isSuperglobalNameJitFunction(string $name): bool
