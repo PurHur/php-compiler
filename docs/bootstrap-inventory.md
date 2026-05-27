@@ -4427,19 +4427,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 343)
-- new Variable (line 1381)
-- new Variable (line 1392)
-- new Variable (line 1524)
-- new Variable (line 1554)
-- new Variable (line 1562)
-- new Literal (line 1579)
-- new Literal (line 1584)
-- new Literal (line 1589)
-- new Variable (line 1600)
-- new Variable (line 1667)
-- new Variable (line 1687)
-- new Variable (line 1707)
-- new Variable (line 1775)
+- new Variable (line 1379)
+- new Variable (line 1390)
+- new Variable (line 1522)
+- new Variable (line 1552)
+- new Variable (line 1560)
+- new Literal (line 1577)
+- new Literal (line 1582)
+- new Literal (line 1587)
+- new Variable (line 1598)
+- new Variable (line 1665)
+- new Variable (line 1685)
+- new Variable (line 1705)
+- new Variable (line 1773)
 - 73 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Builtin/Type/String_.php`

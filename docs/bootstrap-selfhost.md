@@ -74,6 +74,12 @@ Regenerate: `make bootstrap-profile` (inventory + profile + optional `bootstrap-
 | Self-host probe finds new blocker (`NEXT_LOWER`) | `php script/bootstrap-selfhost-compile-probe.php --update-inventory` then `make bootstrap-inventory-regenerate` if headers drift |
 | Capability / bootstrap cross-links | `make bootstrap-profile` |
 
+On harness/Docker-only hosts without `php`, use:
+
+```bash
+./script/bootstrap-inventory-regenerate-docker.sh
+```
+
 CI enforces freshness via `make bootstrap-inventory-check` (or `php script/bootstrap-inventory.php --check`) in `script/ci-common.sh` ([#765](https://github.com/PurHur/php-compiler/issues/765)). Do not hand-edit inventory tables.
 
 **Static compile lint sweep** (same file list as inventory; [#2208](https://github.com/PurHur/php-compiler/issues/2208)):
