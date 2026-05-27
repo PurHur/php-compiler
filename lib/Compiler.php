@@ -87,6 +87,10 @@ class Compiler {
     /** M3 emit TU: trivial single-block sources without full seen-map compile (#1937). */
     public function compileEmitSmoke(Script $script): ?Block
     {
+        // Production drivers (e.g. bin/compile.php) declare user functions; use full compile (#2633).
+        if ([] !== $script->functions) {
+            return $this->compile($script);
+        }
         $this->resetCompileAbortDetail();
 
         return $this->compileCfgBlock($script->main->cfg, $script->main->params, $script->main);
