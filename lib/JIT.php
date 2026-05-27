@@ -2163,6 +2163,7 @@ class JIT {
         foreach ([
             '__construct',
             'parse',
+            'compile',
             'compileemitsmoke',
             'initparsepipeline',
             'initcompiler',
@@ -2204,6 +2205,11 @@ class JIT {
                 __DIR__.'/../examples/000-HelloWorld/example.php',
                 \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::HELLOWORLD_SIDECAR_REL,
                 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::helloworldSentinelBlock'
+            );
+            $this->registerM3EmitTuSidecarFromPath(
+                __DIR__.'/../test/bootstrap-aot/compiler_smoke_standalone.php',
+                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILE_SMOKE_SIDECAR_REL,
+                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compileSmokeSentinelBlock'
             );
         } elseif ('compile_smoke_m3_emit' === $logPrefix) {
             $this->registerM3EmitTuSidecarFromPath(
@@ -2486,7 +2492,12 @@ class JIT {
     /** Register native compileEmitSmoke with Compiler object metadata (#1937). */
     private function compileM3EmitTuCompilerEmitSmokeNativeDecl(): void
     {
-        if (!$this->shouldUseM3EmitTuNativeBridge() || $this->shouldUseM3CompileDriverRealLowering()) {
+        if (!$this->shouldUseM3EmitTuNativeBridge()) {
+            return;
+        }
+        if ($this->shouldUseM3CompileDriverRealLowering()) {
+            $this->compileM3EmitTuCompilerMethodFromRuntimeModules('compileemitsmoke');
+
             return;
         }
         $logical = 'PHPCompiler\\Compiler::compileEmitSmoke';
