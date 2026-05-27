@@ -26,7 +26,7 @@ permalink: /development-status.html
 - **`phpc` CLI** — `run`, `serve`, `build`, `deploy`, `lint`, `test`, `init`
 - **Examples 000–009** — VM and AOT link/execute for the curated web subset
 - **Self-host M0–M2** — minimal bundle ✅; spine native link **662/717** ✅ ([#1960](https://github.com/PurHur/php-compiler/issues/1960), [#2634](https://github.com/PurHur/php-compiler/issues/2634))
-- **Self-host M3 (partial)** — compile-smoke AOT runs natively ✅; emit Zend fallback 🚧 ([#1937](https://github.com/PurHur/php-compiler/issues/1937)); HelloWorld / M3 probes ([#1493](https://github.com/PurHur/php-compiler/issues/1493)).
+- **Self-host M3 (partial)** — HelloWorld / compile-smoke AOT **runs** natively ✅; **emit** still Zend fallback 🚧 ([#1937](https://github.com/PurHur/php-compiler/issues/1937); probes ([#1493](https://github.com/PurHur/php-compiler/issues/1493)).
 
 **Not claimed:** full Zend PHP compatibility (subset compiler only).
 

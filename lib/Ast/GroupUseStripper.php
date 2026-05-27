@@ -13,8 +13,8 @@ use PhpParser\NodeVisitor;
  *
  * PHPCfg ignores Stmt_Use but does not know GroupUse (#2443).
  *
- * Implements NodeVisitor inline so static compile lint does not need the vendor-only
- * NodeVisitorAbstract baseline class from nikic/php-parser (#2634).
+ * Implements {@see NodeVisitor} instead of extending {@see NodeVisitorAbstract}
+ * so self-host lint/AOT lowering does not need vendor-only parent wiring (#2634).
  */
 final class GroupUseStripper implements NodeVisitor
 {
