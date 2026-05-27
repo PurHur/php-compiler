@@ -2121,6 +2121,10 @@ class JIT {
             $path = __DIR__.'/../test/bootstrap-aot/compiler_smoke_standalone.php';
             $sidecarRel = \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILE_SMOKE_SIDECAR_REL;
             $sentinelLogical = 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compileSmokeSentinelBlock';
+        } elseif ('compiler_unit_probe_m3_emit' === $logPrefix) {
+            $path = __DIR__.'/../test/selfhost/compiler_unit_probe/compiler_unit_probe_compile.php';
+            $sidecarRel = \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_UNIT_PROBE_SIDECAR_REL;
+            $sentinelLogical = 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerUnitProbeSentinelBlock';
         } else {
             $path = __DIR__.'/../test/bootstrap-aot/runtime_trivial_echo.php';
             $sidecarRel = \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::TRIVIAL_ECHO_SIDECAR_REL;
