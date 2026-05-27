@@ -2178,18 +2178,35 @@ class JIT {
         }
         $logPrefix = getenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX');
         if ('helloworld_compile_smoke' === $logPrefix) {
-            $path = __DIR__.'/../examples/000-HelloWorld/example.php';
-            $sidecarRel = \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::HELLOWORLD_SIDECAR_REL;
-            $sentinelLogical = 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::helloworldSentinelBlock';
+            $this->registerM3EmitTuSidecarFromPath(
+                __DIR__.'/../examples/000-HelloWorld/example.php',
+                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::HELLOWORLD_SIDECAR_REL,
+                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::helloworldSentinelBlock'
+            );
         } elseif ('compile_smoke_m3_emit' === $logPrefix) {
-            $path = __DIR__.'/../test/bootstrap-aot/compiler_smoke_standalone.php';
-            $sidecarRel = \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILE_SMOKE_SIDECAR_REL;
-            $sentinelLogical = 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compileSmokeSentinelBlock';
+            $this->registerM3EmitTuSidecarFromPath(
+                __DIR__.'/../test/bootstrap-aot/compiler_smoke_standalone.php',
+                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILE_SMOKE_SIDECAR_REL,
+                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compileSmokeSentinelBlock'
+            );
+            // M3 compiler unit probe fixture shares compile_smoke emit helper (#2618).
+            $this->registerM3EmitTuSidecarFromPath(
+                __DIR__.'/../test/selfhost/compiler_unit_probe/compiler_unit_probe_compile.php',
+                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_UNIT_PROBE_SIDECAR_REL,
+                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerUnitProbeSentinelBlock'
+            );
         } else {
-            $path = __DIR__.'/../test/bootstrap-aot/runtime_trivial_echo.php';
-            $sidecarRel = \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::TRIVIAL_ECHO_SIDECAR_REL;
-            $sentinelLogical = 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::sentinelBlock';
+            $this->registerM3EmitTuSidecarFromPath(
+                __DIR__.'/../test/bootstrap-aot/runtime_trivial_echo.php',
+                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::TRIVIAL_ECHO_SIDECAR_REL,
+                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::sentinelBlock'
+            );
         }
+    }
+
+    /** Host-compile one probe source and register link-time AOT sidecar bytes (#2559, #2618). */
+    private function registerM3EmitTuSidecarFromPath(string $path, string $sidecarRel, string $sentinelLogical): void
+    {
         if (!is_readable($path)) {
             return;
         }
@@ -2197,11 +2214,13 @@ class JIT {
         if (!is_string($code) || '' === $code) {
             return;
         }
-        $this->m3EmitTuTrivialEchoSource = $code;
-        $this->context->m3EmitTuTrivialEchoSource = $code;
-        $this->context->m3EmitTuTrivialEchoPath = $path;
+        if (null === $this->m3EmitTuTrivialEchoSource) {
+            $this->m3EmitTuTrivialEchoSource = $code;
+            $this->context->m3EmitTuTrivialEchoSource = $code;
+            $this->context->m3EmitTuTrivialEchoPath = $path;
+        }
         // Sidecar-only: avoid host compileEmitSmoke in emit TU LLVM module (#2540).
-        $tmpOut = sys_get_temp_dir().'/m3_emit_sidecar_aot_'.getmypid();
+        $tmpOut = sys_get_temp_dir().'/m3_emit_sidecar_aot_'.getmypid().'_'.substr(md5($sidecarRel), 0, 8);
         @unlink($tmpOut);
         $repoRoot = dirname(__DIR__);
         $compileCmd = 'php '.escapeshellarg($repoRoot.'/bin/compile.php')

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
@@ -21,11 +22,15 @@ final class M3EmitTuTrivialEchoAot
 
     private const COMPILE_SMOKE_SENTINEL_LOGICAL = 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compileSmokeSentinelBlock';
 
+    private const COMPILER_UNIT_PROBE_SENTINEL_LOGICAL = 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerUnitProbeSentinelBlock';
+
     public const TRIVIAL_ECHO_SIDECAR_REL = 'build/.m3_trivial_echo_aot_blob';
 
     public const HELLOWORLD_SIDECAR_REL = 'build/.m3_helloworld_aot_blob';
 
     public const COMPILE_SMOKE_SIDECAR_REL = 'build/.m3_compile_smoke_aot_blob';
+
+    public const COMPILER_UNIT_PROBE_SIDECAR_REL = 'build/.m3_compiler_unit_probe_aot_blob';
 
     /** @var list<string> */
     private static array $registeredSidecarRels = [];
@@ -57,6 +62,7 @@ final class M3EmitTuTrivialEchoAot
             $sentinelLogical = match ($sidecarRel) {
                 self::TRIVIAL_ECHO_SIDECAR_REL => self::SENTINEL_LOGICAL,
                 self::COMPILE_SMOKE_SIDECAR_REL => self::COMPILE_SMOKE_SENTINEL_LOGICAL,
+                self::COMPILER_UNIT_PROBE_SIDECAR_REL => self::COMPILER_UNIT_PROBE_SENTINEL_LOGICAL,
                 default => self::HELLOWORLD_SENTINEL_LOGICAL,
             };
         }
@@ -147,17 +153,43 @@ final class M3EmitTuTrivialEchoAot
     /** Runtime::standalone native for emit-helper SPINE — copy matched sidecar to outfile. */
     public static function emitStandaloneWriteCachedAot(Context $context, Value $block, Value $outFile): void
     {
-        unset($block);
         if (!self::isRegistered($context)) {
             $context->builder->returnVoid();
 
             return;
         }
-        $entry = $context->m3EmitTuLinktimeSidecarEntries[array_key_last($context->m3EmitTuLinktimeSidecarEntries)];
-        $sidecarPath = $context->builder->load($entry['sidecarGlobal']);
+        $objPtr = $context->getTypeFromString('__object__*');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i64 = $context->getTypeFromString('int64');
+        $lastEntry = $context->m3EmitTuLinktimeSidecarEntries[array_key_last($context->m3EmitTuLinktimeSidecarEntries)];
+        $currentSidecarPath = $context->builder->load($lastEntry['sidecarGlobal']);
+        foreach (array_reverse($context->m3EmitTuLinktimeSidecarEntries) as $index => $entry) {
+            $tag = 's'.(string) $index;
+            $sidecarPath = $context->builder->load($entry['sidecarGlobal']);
+            $sentinelBlock = $context->builder->pointerCast($sidecarPath, $objPtr);
+            $matches = $context->builder->icmp(
+                Builder::INT_EQ,
+                $context->builder->ptrtoint($block, $i64),
+                $context->builder->ptrtoint($sentinelBlock, $i64)
+            );
+            $fail = BasicBlockHelper::append($context, 'm3te_std_prev_'.$tag);
+            $ok = BasicBlockHelper::append($context, 'm3te_std_sidecar_'.$tag);
+            $merge = BasicBlockHelper::append($context, 'm3te_std_done_'.$tag);
+            $context->builder->branchIf($matches, $ok, $fail);
+            $context->builder->positionAtEnd($fail);
+            $context->builder->branch($merge);
+            $context->builder->positionAtEnd($ok);
+            $matchedSidecarPath = $sidecarPath;
+            $context->builder->branch($merge);
+            $context->builder->positionAtEnd($merge);
+            $phi = $context->builder->phi($strPtr);
+            $phi->addIncoming($currentSidecarPath, $fail);
+            $phi->addIncoming($matchedSidecarPath, $ok);
+            $currentSidecarPath = $phi;
+        }
         $context->builder->call(
             $context->lookupFunction('__compiler_copy'),
-            $sidecarPath,
+            $currentSidecarPath,
             $outFile
         );
         $context->builder->returnVoid();
