@@ -21,6 +21,7 @@ function run(string $filename, string $code, array $options): void
     if ('' !== $normalized && str_contains($normalized, 'bootstrap-aot/')) {
         // M3 native emit TU: self-host M3 allowlist (not full bootstrap JIT) (#1937, #1983).
         $m3EmitEntry = str_contains($normalized, 'compile_smoke_m3_emit_native_entry.php')
+            || str_contains($normalized, 'compiler_unit_probe_m3_emit_native_entry.php')
             || str_contains($normalized, 'runtime_m3_emit_native_entry.php')
             || str_contains($normalized, 'helloworld_m3_emit_native_entry.php');
         if ($m3EmitEntry) {
@@ -28,6 +29,9 @@ function run(string $filename, string $code, array $options): void
             putenv('PHP_COMPILER_EMIT_HELPER_LINK=1');
             putenv('PHP_COMPILER_M3_EMIT_TU=1');
             putenv('PHP_COMPILER_M3_EMIT_MINIMAL=1');
+            if (str_contains($normalized, 'compiler_unit_probe_m3_emit_native_entry.php')) {
+                putenv('PHP_COMPILER_M3_COMPILER_UNIT_PROBE_EMIT=1');
+            }
             if (str_contains($normalized, 'runtime_m3_emit_native_entry.php')) {
                 putenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX=runtime_compile_smoke_m3_emit');
                 putenv('PHP_COMPILER_M3_EMIT_HELPER_SPINE=1');
