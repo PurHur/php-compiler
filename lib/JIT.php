@@ -721,6 +721,8 @@ class JIT {
                 && (
                     $this->isM3EmitTuCompilerCompileChainLoweringName($emitLc)
                     || $this->isLiteralIncludeDiscoveryRealLoweringMethod($emitLc)
+                    || $this->isDeployRootRealLoweringMethod($emitLc)
+                    || $this->isSourceBundlerRealLoweringMethod($emitLc)
                     || $this->isSuperglobalsRealLoweringMethod($emitLc)
                     || $this->isM3EmitTuRuntimeCompileDriverSpineLoweringName($emitLc)
                 )
@@ -1920,8 +1922,8 @@ class JIT {
         $lower = strtolower($name);
         return (str_contains($lower, '\\web\\includepathresolver::') && !$this->isIncludePathResolverRealLoweringMethod($lower))
             || (str_contains($lower, '\\web\\literalincludediscovery::') && !$this->isLiteralIncludeDiscoveryRealLoweringMethod($lower))
-            || str_contains($lower, 'deployroot')
-            || str_contains($lower, 'sourcebundler')
+            || (str_contains($lower, '\\web\\deployroot::') && !$this->isDeployRootRealLoweringMethod($lower))
+            || (str_contains($lower, '\\web\\sourcebundler::') && !$this->isSourceBundlerRealLoweringMethod($lower))
             || (str_contains($lower, '\\web\\conststringfolder::') && !$this->isConstStringFolderRealLoweringMethod($lower))
             || (str_contains($lower, '\\web\\superglobals::')
                 && !$this->isSuperglobalsRealLoweringMethod($lower)
@@ -1975,16 +1977,45 @@ class JIT {
         return str_ends_with($lower, '\\web\\includepathresolver::resolve');
     }
 
-    /** LiteralIncludeDiscovery methods with safe LLVM 9 lowering during self-host AOT (#816). */
+    /** LiteralIncludeDiscovery methods with safe LLVM 9 lowering during self-host AOT (#816, #1521). */
     private function isLiteralIncludeDiscoveryRealLoweringMethod(string $lower): bool
     {
         if (!$this->shouldUseM3CompileDriverRealLowering()) {
             return false;
         }
+        foreach ([
+            'discoverdirectabsolutepaths',
+            'discoverabsolutepaths',
+            'pathsfrommainscopeforbundle',
+            'pathsfromscript',
+        ] as $suffix) {
+            if (str_ends_with($lower, '\\web\\literalincludediscovery::'.$suffix)) {
+                return true;
+            }
+        }
 
-        return str_contains($lower, '\\web\\literalincludediscovery::')
-            || str_contains($lower, 'deployroot')
-            || str_contains($lower, 'sourcebundler');
+        return false;
+    }
+
+    /** DeployRoot helpers needed by bin/compile.php include bundling (#1521). */
+    private function isDeployRootRealLoweringMethod(string $lower): bool
+    {
+        if (!$this->shouldUseM3CompileDriverRealLowering()) {
+            return false;
+        }
+
+        return str_ends_with($lower, '\\web\\deployroot::findprojectrootforpath')
+            || str_ends_with($lower, '\\web\\deployroot::relativedirfromproject');
+    }
+
+    /** SourceBundler entry used when literal includes are folded into one TU (#1521). */
+    private function isSourceBundlerRealLoweringMethod(string $lower): bool
+    {
+        if (!$this->shouldUseM3CompileDriverRealLowering()) {
+            return false;
+        }
+
+        return str_ends_with($lower, '\\web\\sourcebundler::bundleforaot');
     }
 
     private function isSuperglobalsRealLoweringMethod(string $lower): bool

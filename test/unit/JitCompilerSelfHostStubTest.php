@@ -81,9 +81,28 @@ final class JitCompilerSelfHostStubTest extends TestCase
     ];
 
     /** @var list<string> */
-    private const WEB_BOOTSTRAP_SKIP_PATTERNS = [
-        'deployroot',
-        'sourcebundler',
+    private const M3_WEB_LITERALINCLUDEDISCOVERY_REAL_LOWERING_METHODS = [
+        'discoverdirectabsolutepaths',
+        'discoverabsolutepaths',
+        'pathsfrommainscopeforbundle',
+        'pathsfromscript',
+    ];
+
+    /** @var list<string> */
+    private const M3_WEB_DEPLOYROOT_REAL_LOWERING_METHODS = [
+        'findprojectrootforpath',
+        'relativedirfromproject',
+    ];
+
+    /** @var list<string> */
+    private const M3_WEB_SOURCEBUNDLER_REAL_LOWERING_METHODS = [
+        'bundleforaot',
+    ];
+
+    /** @var list<array{0: string, 1: string}> */
+    private const WEB_BOOTSTRAP_SKIP_SAMPLES = [
+        ['deployroot::resolvepath', 'PHPCompiler\\Web\\DeployRoot::resolvePath'],
+        ['sourcebundler::isbundlefilemarker', 'PHPCompiler\\Web\\SourceBundler::isBundleFileMarker'],
     ];
 
     /** @var list<string> */
@@ -96,6 +115,12 @@ final class JitCompilerSelfHostStubTest extends TestCase
         'walkcfgblockforbundle',
         'isbundlescopeboundary',
         'walkcfgblockinternal',
+    ];
+
+    /** @var list<string> */
+    private const WEB_BOOTSTRAP_STUBBED_DEPLOYROOT_METHODS = [
+        'findprojectrootforpath',
+        'relativedirfromproject',
     ];
 
     /** @var list<string> */
@@ -251,6 +276,123 @@ final class JitCompilerSelfHostStubTest extends TestCase
         }
     }
 
+    /**
+     * @dataProvider m3WebLiteralIncludeDiscoveryRealLoweringProvider
+     */
+    public function testM3CompileDriverLiteralIncludeDiscoveryLoweringIsNotStubbed(string $method): void
+    {
+        $prevSelfHost = getenv('PHP_COMPILER_SELFHOST_AOT');
+        $prevM3 = getenv('PHP_COMPILER_M3_COMPILE_DRIVER');
+        putenv('PHP_COMPILER_SELFHOST_AOT=1');
+        putenv('PHP_COMPILER_M3_COMPILE_DRIVER=1');
+        try {
+            $this->assertFalse(
+                $this->invokeSkipCheck(
+                    'isSkippedWebBootstrapHotPathName',
+                    'phpcompiler\\web\\literalincludediscovery::'.$method
+                ),
+                "Expected real lowering for LiteralIncludeDiscovery::{$method} when M3 compile driver is on"
+            );
+        } finally {
+            if (false === $prevSelfHost) {
+                putenv('PHP_COMPILER_SELFHOST_AOT');
+            } else {
+                putenv('PHP_COMPILER_SELFHOST_AOT='.$prevSelfHost);
+            }
+            if (false === $prevM3) {
+                putenv('PHP_COMPILER_M3_COMPILE_DRIVER');
+            } else {
+                putenv('PHP_COMPILER_M3_COMPILE_DRIVER='.$prevM3);
+            }
+        }
+    }
+
+    /** @return iterable<string, array{0: string}> */
+    public static function m3WebLiteralIncludeDiscoveryRealLoweringProvider(): iterable
+    {
+        foreach (self::M3_WEB_LITERALINCLUDEDISCOVERY_REAL_LOWERING_METHODS as $method) {
+            yield $method => [$method];
+        }
+    }
+
+    /**
+     * @dataProvider m3WebDeployRootRealLoweringProvider
+     */
+    public function testM3CompileDriverDeployRootLoweringIsNotStubbed(string $method): void
+    {
+        $prevSelfHost = getenv('PHP_COMPILER_SELFHOST_AOT');
+        $prevM3 = getenv('PHP_COMPILER_M3_COMPILE_DRIVER');
+        putenv('PHP_COMPILER_SELFHOST_AOT=1');
+        putenv('PHP_COMPILER_M3_COMPILE_DRIVER=1');
+        try {
+            $this->assertFalse(
+                $this->invokeSkipCheck(
+                    'isSkippedWebBootstrapHotPathName',
+                    'phpcompiler\\web\\deployroot::'.$method
+                ),
+                "Expected real lowering for DeployRoot::{$method} when M3 compile driver is on"
+            );
+        } finally {
+            if (false === $prevSelfHost) {
+                putenv('PHP_COMPILER_SELFHOST_AOT');
+            } else {
+                putenv('PHP_COMPILER_SELFHOST_AOT='.$prevSelfHost);
+            }
+            if (false === $prevM3) {
+                putenv('PHP_COMPILER_M3_COMPILE_DRIVER');
+            } else {
+                putenv('PHP_COMPILER_M3_COMPILE_DRIVER='.$prevM3);
+            }
+        }
+    }
+
+    /** @return iterable<string, array{0: string}> */
+    public static function m3WebDeployRootRealLoweringProvider(): iterable
+    {
+        foreach (self::M3_WEB_DEPLOYROOT_REAL_LOWERING_METHODS as $method) {
+            yield $method => [$method];
+        }
+    }
+
+    /**
+     * @dataProvider m3WebSourceBundlerRealLoweringProvider
+     */
+    public function testM3CompileDriverSourceBundlerLoweringIsNotStubbed(string $method): void
+    {
+        $prevSelfHost = getenv('PHP_COMPILER_SELFHOST_AOT');
+        $prevM3 = getenv('PHP_COMPILER_M3_COMPILE_DRIVER');
+        putenv('PHP_COMPILER_SELFHOST_AOT=1');
+        putenv('PHP_COMPILER_M3_COMPILE_DRIVER=1');
+        try {
+            $this->assertFalse(
+                $this->invokeSkipCheck(
+                    'isSkippedWebBootstrapHotPathName',
+                    'phpcompiler\\web\\sourcebundler::'.$method
+                ),
+                "Expected real lowering for SourceBundler::{$method} when M3 compile driver is on"
+            );
+        } finally {
+            if (false === $prevSelfHost) {
+                putenv('PHP_COMPILER_SELFHOST_AOT');
+            } else {
+                putenv('PHP_COMPILER_SELFHOST_AOT='.$prevSelfHost);
+            }
+            if (false === $prevM3) {
+                putenv('PHP_COMPILER_M3_COMPILE_DRIVER');
+            } else {
+                putenv('PHP_COMPILER_M3_COMPILE_DRIVER='.$prevM3);
+            }
+        }
+    }
+
+    /** @return iterable<string, array{0: string}> */
+    public static function m3WebSourceBundlerRealLoweringProvider(): iterable
+    {
+        foreach (self::M3_WEB_SOURCEBUNDLER_REAL_LOWERING_METHODS as $method) {
+            yield $method => [$method];
+        }
+    }
+
     /** @return iterable<string, array{0: string}> */
     public static function m3CompilerNativeLoweringSuffixProvider(): iterable
     {
@@ -350,9 +492,25 @@ final class JitCompilerSelfHostStubTest extends TestCase
     /** @return iterable<string, array{0: string, 1: string}> */
     public static function webBootstrapSkipPatternProvider(): iterable
     {
-        foreach (self::WEB_BOOTSTRAP_SKIP_PATTERNS as $pattern) {
-            yield $pattern => [$pattern, 'PHPCompiler\\Web\\'.$pattern];
+        foreach (self::WEB_BOOTSTRAP_SKIP_SAMPLES as [$pattern, $sample]) {
+            yield $pattern => [$pattern, $sample];
         }
+        foreach (self::WEB_BOOTSTRAP_STUBBED_LITERALINCLUDEDISCOVERY_METHODS as $method) {
+            yield 'literalincludediscovery::'.$method => [
+                'literalincludediscovery::'.$method,
+                'PHPCompiler\\Web\\LiteralIncludeDiscovery::'.$method,
+            ];
+        }
+        foreach (self::WEB_BOOTSTRAP_STUBBED_DEPLOYROOT_METHODS as $method) {
+            yield 'deployroot::'.$method => [
+                'deployroot::'.$method,
+                'PHPCompiler\\Web\\DeployRoot::'.$method,
+            ];
+        }
+        yield 'sourcebundler::bundleforaot' => [
+            'sourcebundler::bundleforaot',
+            'PHPCompiler\\Web\\SourceBundler::bundleForAot',
+        ];
         foreach (self::WEB_BOOTSTRAP_STUBBED_SUPERGLOBALS_METHODS as $method) {
             yield 'superglobals::'.$method => [
                 'superglobals::'.$method,
@@ -363,12 +521,6 @@ final class JitCompilerSelfHostStubTest extends TestCase
             yield 'conststringfolder::'.$method => [
                 'conststringfolder::'.$method,
                 'PHPCompiler\\Web\\ConstStringFolder::'.$method,
-            ];
-        }
-        foreach (self::WEB_BOOTSTRAP_STUBBED_LITERALINCLUDEDISCOVERY_METHODS as $method) {
-            yield 'literalincludediscovery::'.$method => [
-                'literalincludediscovery::'.$method,
-                'PHPCompiler\\Web\\LiteralIncludeDiscovery::'.$method,
             ];
         }
     }
