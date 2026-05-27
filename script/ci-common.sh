@@ -893,12 +893,12 @@ ci_run_bootstrap_m4_full_spine_probe() {
     return 0
   fi
   if ! ci_llvm_ready; then
-    echo "bootstrap-loop-full-spine-probe: skipped (LLVM 9 not available)"
+    echo "bootstrap-m4-full-spine-probe: skipped (LLVM 9 not available)"
     return 0
   fi
-  echo "bootstrap-loop-full-spine-probe (BOOTSTRAP_M4_FULL_SPINE_PROBE_GATE=1, issue #2770, #2664)..."
+  echo "bootstrap-m4-full-spine-probe (BOOTSTRAP_M4_FULL_SPINE_PROBE_GATE=1, issue #2770, #2664)..."
   if ! "$_CI_SCRIPT_DIR/bootstrap-loop-full-spine-probe.sh"; then
-    echo "bootstrap-loop-full-spine-probe: failed — see docs/bootstrap-selfhost.md (#2770)" >&2
+    echo "bootstrap-m4-full-spine-probe: failed — see docs/bootstrap-selfhost.md (#2770)" >&2
     return 1
   fi
 }

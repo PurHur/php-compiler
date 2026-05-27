@@ -66,7 +66,7 @@ class JIT {
         if ($this->shouldUseM3EmitTuNativeBridge() && $this->isM3EmitTuScriptMain($block)) {
             $this->m3EmitTuMainBlock = $block;
         }
-        if ($this->shouldUseM3CompileDriverMainNative() && $this->isM3CompileDriverScriptMain($block)) {
+        if ($this->shouldUseM3CompileDriverMainNative() && $this->isM3CompileDriverBundleScriptMain($block)) {
             $this->m3CompileDriverMainBlock = $block;
         }
         JIT\Progress::noteFunction('jit_compile_compile_block_begin');
@@ -218,7 +218,9 @@ class JIT {
         ) {
             return null;
         }
-        $lit = new Operand\Literal($this->shouldUseSelfHostJitStubs());
+        // Only compiler_lib_spine_smoke/main.php defines this constant; references from
+        // bin/compile.php cli_driver must fold false at AOT link (#2600, #2697).
+        $lit = new Operand\Literal(false);
         $lit->type = Type::bool();
 
         return JIT\Variable::fromLiteral($this->context, $lit);
@@ -308,9 +310,18 @@ class JIT {
         }
         $path = $block->scriptPath();
 
-        return str_ends_with($path, '/bin/compile.php')
-            || str_ends_with($path, '/bin/vm.php')
+        // bin/compile.php needs real {main} for native CLI driver sidecars (#2697).
+        return str_ends_with($path, '/bin/vm.php')
             || str_ends_with($path, '/src/cli_driver.php');
+    }
+
+    private function isM3CompileDriverBundleScriptMain(Block $block): bool
+    {
+        if (!$this->isM3CompileDriverScriptMain($block)) {
+            return false;
+        }
+
+        return str_contains($block->scriptPath(), 'compile_driver.php');
     }
 
     /** Opt-in when linking test/selfhost/compiler_helloworld_smoke/compile_driver.php (#1056). */
@@ -495,7 +506,7 @@ class JIT {
         ) {
             return $this->compileSkippedCompilerSplitCfgStub($internalName, $block, '{main}');
         }
-        if ($this->shouldUseM3CompileDriverMainNative() && $this->isM3CompileDriverScriptMain($block)) {
+        if ($this->shouldUseM3CompileDriverMainNative() && $this->isM3CompileDriverBundleScriptMain($block)) {
             return $this->compileM3CompileDriverMainNative($internalName, $block, $logicalName);
         }
         if ($this->shouldUseM3EmitTuNativeBridge() && $this->isM3EmitTuScriptMain($block)) {

@@ -50,6 +50,7 @@ final class NorthStar5VerifyScriptTest extends TestCase
         $this->assertStringContainsString('bootstrap-selfhost-probe', $body);
         $this->assertStringContainsString('PHP_COMPILER_VENDOR_PRELINK', $body);
         $this->assertStringContainsString('north-star5-verify: OK', $body);
+        $this->assertStringNotContainsString('cfg/llvm parse blockers', $body);
     }
 
     public function testMakefileDeclaresNorthStar5VerifyTarget(): void

@@ -83,7 +83,7 @@ ns5_print_summary() {
   echo
   echo "north-star5-verify: M5 status"
   echo "  Spine: 718/718 (Phase A inventory SSOT)"
-  echo "  Vendor prelink: ${vendor_ok}/3 object_ok (php-types first; cfg/llvm parse blockers)"
+  echo "  Vendor prelink: ${vendor_ok}/3 object_ok (php-cfg, php-types, php-llvm prelinked .o)"
   echo "  Cold boot: Zend still drives bin/compile.php — target is compiled driver + prelinked vendor"
   echo "north-star5-verify: Next — shrink self-host stubs; link spine + prelinked .o; retire vendor/autoload (#1416)"
 }

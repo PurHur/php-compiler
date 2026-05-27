@@ -60,6 +60,12 @@ set -e
 
 if [[ "${compile_code}" -ne 0 ]]; then
   echo "bootstrap-loop-gen1-full-spine-emit: gen-1 native emit failed (exit ${compile_code})" >&2
+  if [[ -n "${PHP_COMPILER_JIT_PROGRESS_FILE:-}" && -f "${ROOT}/${PHP_COMPILER_JIT_PROGRESS_FILE}" ]]; then
+    echo "bootstrap-loop-gen1-full-spine-emit: last JIT func: $(tail -1 "${ROOT}/${PHP_COMPILER_JIT_PROGRESS_FILE}")" >&2
+  fi
+  if grep -qE 'LogicException|Unsupported ' <<< "${compile_out}"; then
+    grep -m1 -E 'LogicException|Unsupported ' <<< "${compile_out}" >&2 || true
+  fi
   printf '%s\n' "${compile_out}" >&2
   exit 1
 fi
