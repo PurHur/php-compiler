@@ -32,4 +32,20 @@ final class ApplyPatchesTest extends TestCase
             'patch failures must not be reported as ambiguous skips (#2724)'
         );
     }
+
+    public function testPhpTypesUnionTypeReconstructorOverlayApplied(): void
+    {
+        $recon = self::$root.'/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php';
+        if (!is_readable($recon)) {
+            self::markTestSkipped('vendor/ircmaxell/php-types not installed');
+        }
+
+        $body = file_get_contents($recon);
+        self::assertIsString($body);
+        self::assertStringContainsString(
+            'instanceof Op\\Type\\Union_',
+            $body,
+            'php-types-union-type must lower Op\\Type\\Union_ in resolveOpType (M2 spine compile)'
+        );
+    }
 }
