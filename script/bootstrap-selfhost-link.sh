@@ -18,6 +18,10 @@ if [[ -z "${PHP_COMPILER_LLVM_PATH:-}" || ! -f "${PHP_COMPILER_LLVM_PATH}/libLLV
   exit 2
 fi
 
+if [[ -d "${ROOT}/vendor" ]]; then
+  "${ROOT}/script/apply-patches.sh" >/dev/null
+fi
+
 mkdir -p "${ROOT}/build"
 export PHP_COMPILER_SELFHOST_AOT=1
 export PHP_COMPILER_JIT_PROGRESS_FILE="${ROOT}/build/.last-jit-func"

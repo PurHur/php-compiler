@@ -1,0 +1,6 @@
+--- vendor/ircmaxell/php-types/lib/PHPTypes/State.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/State.php
+@@ -224,2 +224,2 @@
+-                echo "Could not find parent {$extends}\n";
++                // Unknown parents may exist outside the analyzed set; don't emit to stdout.
+             }
