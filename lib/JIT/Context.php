@@ -85,6 +85,8 @@ class Context {
     public Builtin\MemoryManager $memory;
     public Builtin\Output $output;
     public Builtin\Type $type;
+    public Builtin\Internal $internal;
+    public Builtin\VarArg $vararg;
     public Builtin\Refcount $refcount;
     public Builtin\ErrorHandler $error;
     public int $loadType;
@@ -94,6 +96,9 @@ class Context {
     public Helper $helper;
 
     public Scope $scope;
+
+    /** @var list<Scope> */
+    public array $scopeStack = [];
 
     public TryCatchState $tryCatch;
 
