@@ -159,7 +159,8 @@ foreach (BOOTSTRAP_VENDOR_PRELINK_PACKAGES as $package => $role) {
     @unlink($buildBase.'.o');
     @unlink($objectAbs);
 
-    $cmd = escapeshellarg($phpBin).' '.escapeshellarg($compileBin)
+    $cmd = 'PHP_COMPILER_VENDOR_PRELINK=1 PHP_COMPILER_SELFHOST_AOT=0 PHP_COMPILER_KEEP_OBJECT_FILE=1 '
+        .escapeshellarg($phpBin).' '.escapeshellarg($compileBin)
         .' -o '.escapeshellarg($buildBase).' '.escapeshellarg($bundleAbs).' 2>&1';
     $output = [];
     exec($cmd, $output, $code);

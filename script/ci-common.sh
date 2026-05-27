@@ -859,6 +859,19 @@ ci_run_bootstrap_m3_strict() {
 }
 
 # M4 bootstrap-loop dry-run probe in ci-local LLVM tail (issue #2058); after M3 strict gates.
+# M5 bootstrap driver: native helloworld compile driver emits + runs gen-2 without Zend on compile (#1521).
+ci_run_bootstrap_m5_driver_smoke() {
+  if [[ "${BOOTSTRAP_M5_DRIVER_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  if ! ci_llvm_ready; then
+    echo "bootstrap-selfhost-driver-smoke: skipped (LLVM 9 not available)"
+    return 0
+  fi
+  echo "bootstrap-selfhost-driver-smoke (BOOTSTRAP_M5_DRIVER_GATE=1, issue #1521)..."
+  "$_CI_SCRIPT_DIR/bootstrap-selfhost-driver-smoke.sh"
+}
+
 ci_run_bootstrap_m4_loop_probe() {
   if [[ "${BOOTSTRAP_M4_LOOP_PROBE:-0}" != "1" ]]; then
     return 0

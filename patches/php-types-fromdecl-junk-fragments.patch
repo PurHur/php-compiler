@@ -1,0 +1,17 @@
+diff --git vendor/ircmaxell/php-types/lib/PHPTypes/Type.php vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
+index 1111111..2222222 100644
+--- vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
+@@ -371,6 +371,12 @@ class Type
+             ]))->simplify();
+         }
+         $decl = self::stripTrailingDocText($decl);
++        $trimmedDecl = trim($decl);
++        // Malformed phpdoc fragments in vendor trees (north-star5 prelink; #2743, #2745).
++        if ('' === $trimmedDecl || '*' === $trimmedDecl || '*/' === $trimmedDecl
++            || str_starts_with($trimmedDecl, '*/')) {
++            return self::mixed();
++        }
+         if (preg_match('/^array\{/i', $decl)) {
+             return new self(self::TYPE_ARRAY);
+         }
