@@ -47,6 +47,7 @@ final class BootstrapSelfhostDriverSmokeTest extends TestCase
     public function testCiDefaultsDefinesM5DriverGate(): void
     {
         $defaults = (string) file_get_contents(self::$root.'/script/ci-defaults.env');
+        $this->assertStringContainsString('BOOTSTRAP_M5_DRIVER_SMOKE_GATE', $defaults);
         $this->assertStringContainsString('BOOTSTRAP_M5_DRIVER_GATE', $defaults);
     }
 
