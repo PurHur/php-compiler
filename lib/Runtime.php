@@ -296,16 +296,18 @@ class Runtime {
     }
 
     /**
-     * `parseAndCompile()` returning null is a common self-host bootstrap failure mode (#2642).
-     * Best-effort: re-run compile under the lint compiler and print the first unsupported kind.
+     * Human detail for `parseAndCompile()` / emit-smoke returning null (#2642, #2633).
+     *
+     * Prefer compile abort detail from the real compiler; otherwise lint the parsed script.
      */
-    private function emitParseAndCompileNullDiagnostic(Script $script): void
+    public function formatParseAndCompileNullDetail(?Script $script): ?string
     {
-        if (
-            false === getenv('PHP_COMPILER_SELFHOST_AOT')
-            && false === getenv('PHP_COMPILER_M3_COMPILE_MODE')
-        ) {
-            return;
+        $detail = $this->compiler->getCompileAbortDetail();
+        if (null !== $detail && '' !== $detail) {
+            return $detail;
+        }
+        if (null === $script) {
+            return 'parse returned null';
         }
 
         $lint = new LintCompiler();
@@ -314,14 +316,33 @@ class Runtime {
         try {
             $this->compile($script);
         } catch (\Throwable $e) {
-            // When parse/type fails, callers already emit a higher-level error.
+            // parse/type failure — lint may still have recorded an issue.
         } finally {
             $this->compiler = $prev;
         }
 
         $issue = $lint->issues[0] ?? null;
-        if (null !== $issue) {
-            echo "parseAndCompile: {$issue->formatHuman()}\n";
+
+        return null !== $issue ? $issue->formatHuman() : null;
+    }
+
+    /**
+     * `parseAndCompile()` returning null is a common self-host bootstrap failure mode (#2642).
+     * Best-effort: re-run compile under the lint compiler and print the first unsupported kind.
+     */
+    private function emitParseAndCompileNullDiagnostic(Script $script): void
+    {
+        if (
+            false === getenv('PHP_COMPILER_SELFHOST_AOT')
+            && false === getenv('PHP_COMPILER_M3_COMPILE_MODE')
+            && !JIT\EmitTuMode::isMinimalRuntime()
+        ) {
+            return;
+        }
+
+        $detail = $this->formatParseAndCompileNullDetail($script);
+        if (null !== $detail && '' !== $detail) {
+            echo "parseAndCompile: {$detail}\n";
         }
     }
 

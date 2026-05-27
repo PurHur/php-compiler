@@ -56,9 +56,21 @@ function compile_smoke_m3_emit(string $sourceFile, string $outFile): int
         return 1;
     }
     // M3 emit helper links with self-host stubs; keep compile path on the emit-smoke subset (#1937).
-    $block = $runtime->parseAndCompileEmitSmoke($code, $resolved);
+    try {
+        $script = $runtime->parse($code, $resolved);
+    } catch (\Throwable $e) {
+        $diag = $runtime->formatParseAndCompileNullDetail(null);
+        $extra = null !== $diag && '' !== $diag ? ' — '.$diag : ' — '.$e->getMessage();
+        echo 'compile_smoke_m3_emit: parse failed'.$extra."\n";
+        echo "compile_smoke_m3_emit: native emit failed at phase=parse\n";
+
+        return 1;
+    }
+    $block = $runtime->compileEmitSmoke($script);
     if (null === $block) {
-        echo "compile_smoke_m3_emit: parseAndCompile returned null (CFG/compile spine)\n";
+        $diag = $runtime->formatParseAndCompileNullDetail($script);
+        $extra = null !== $diag && '' !== $diag ? ' — '.$diag : '';
+        echo "compile_smoke_m3_emit: parseAndCompile returned null (CFG/compile spine)".$extra."\n";
         echo "compile_smoke_m3_emit: native emit failed at phase=parseAndCompile\n";
 
         return 1;
