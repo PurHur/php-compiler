@@ -3667,7 +3667,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/AOT/Linker.php`
 
 **Warnings** (review for bootstrap subset):
-- 16 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 18 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/AOT/LinkerProcessPolyfill.php`
 
