@@ -43,11 +43,13 @@ patch_already_applied() {
       grep -q 'instanceof \\PhpParser\\Comment' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
       ;;
     php-types-docblock-first-token.patch)
-      grep -qF '(@var\s+(.+?)(?:\s*\*\/|\s*$))m' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null \
-        && grep -qF '(@return\s+(.+?)(?:\s*\*\/|\s*$))m' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
+      # Upstream php-types has had a few variants of this regex; we only care that
+      # it captures the first token and does not include trailing docblock '*' text.
+      grep -qF "(@var\\s+([^\\s*][^\\s]*))" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null \
+        && grep -qF "(@return\\s+([^\\s*][^\\s]*))" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
       ;;
     php-types-array-shape.patch)
-      grep -q "preg_match('/^array\\{/'" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
+      grep -qF "preg_match('/^array\\\\{" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
       ;;
     php-types-generics-fallback.patch)
       grep -q "non-empty-string" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
