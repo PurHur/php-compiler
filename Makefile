@@ -217,7 +217,7 @@ test-legacy-18: rebuild-changed
 test-18: test-legacy-18
 
 # Ubuntu 22.04 + PHP 8.2 dev image (issues #73, #202). Build once: make docker-build-22
-PHP_COMPILER_DEV_IMAGE ?= ghcr.io/PurHur/php-compiler:dev
+PHP_COMPILER_DEV_IMAGE ?= ghcr.io/purhur/php-compiler:dev
 LOCAL_DEV_IMAGE ?= php-compiler:22.04-dev
 
 .PHONY: docker-build-22 docker-publish-dev
