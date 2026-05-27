@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # M4 inventory-scale gen-1→gen-2 probe (#2770): same ladder as bootstrap-loop-probe plus
-# compiler_lib_spine_smoke native emit (717 units, #2664).
+# compiler_lib_spine_smoke native emit (718 units, #2664).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 exec env \

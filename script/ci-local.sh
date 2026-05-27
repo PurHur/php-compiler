@@ -120,6 +120,7 @@ if ci_llvm_ready; then
     ci_run_bootstrap_m3_compile_smoke_strict
     ci_run_bootstrap_runtime_compile_smoke_strict
     ci_run_bootstrap_m4_loop_probe
+    ci_run_bootstrap_m4_full_spine_probe
 
     ci_run_aot_link_phpunit "$@"
     ci_run_miniwebapp_aot_execute "$@"
