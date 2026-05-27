@@ -439,6 +439,9 @@ class JIT {
         if (str_ends_with($lower, '\\runtime::compileemitsmoke')) {
             return true;
         }
+        if (str_ends_with($lower, 'slotindexforvariablename')) {
+            return true;
+        }
         if ($this->shouldUseM5DriverHostCompile()) {
             if ('run' === $lower || str_ends_with($lower, '\\php_compiler_cli_dispatch')
                 || str_ends_with($lower, '\\php_compiler_cli_should_run_entry_driver')
@@ -458,7 +461,6 @@ class JIT {
     private function m3CompileDriverSpineDenyNames(): array
     {
         return [
-            'slotindexforvariablename',
             // Full emit FUNCDEF LLVM 9 link crash (#1514); inline emit in compile_driver compile mode (#1983).
             '\\bootstrapaot\\helloworld_compile_smoke',
             // compile_smoke_m3_emit real-lowers only in native emit TU (#1983), not compile_driver.
@@ -479,6 +481,16 @@ class JIT {
         }
 
         return false;
+    }
+
+    /** Block helpers real-lowered on M3 compile-driver spine (#2848). */
+    private function isM3CompileDriverBlockPhpLoweringName(string $lower): bool
+    {
+        if (!$this->shouldUseM3CompileDriverRealLowering()) {
+            return false;
+        }
+
+        return str_ends_with($lower, '\\block::slotindexforvariablename');
     }
 
     /**
@@ -658,6 +670,9 @@ class JIT {
             if ($this->isM3EmitHelperCompilerPhpLoweringName($m3Spine)) {
                 return $this->compileRuntimeSpinePhpLowering($internalName, $block, $logicalName);
             }
+            if ($this->isM3CompileDriverBlockPhpLoweringName($m3Spine)) {
+                return $this->compileBlockPhpLowering($internalName, $block, $logicalName, $funcName);
+            }
         }
         if ($this->shouldUseM3EmitTuNativeBridge() && null !== $logicalName) {
             $m3Compiler = strtolower($logicalName);
@@ -744,6 +759,7 @@ class JIT {
                     || $this->isConstStringFolderRealLoweringMethod($emitLc)
                     || $this->isSuperglobalsRealLoweringMethod($emitLc)
                     || $this->isM3EmitTuRuntimeCompileDriverSpineLoweringName($emitLc)
+                    || $this->isM3CompileDriverBlockPhpLoweringName($emitLc)
                 )
             ) {
                 return $this->compileBlockPhpLowering($internalName, $block, $logicalName, $funcName);
@@ -1649,7 +1665,6 @@ class JIT {
             'resolvesimplevariablename',
             'operandschainequal',
             'unwrapoperandchain',
-            'slotindexforvariablename',
             'splitcfgblockafterstringkeyedarray',
             'inheritfuncfromparent',
             'needscfg',
@@ -1864,8 +1879,7 @@ class JIT {
             return true;
         }
 
-        return str_contains($lower, 'slotindexforvariablename')
-            || str_contains($lower, 'splitcfgblockafterstringkeyedarray')
+        return str_contains($lower, 'splitcfgblockafterstringkeyedarray')
             || str_contains($lower, 'compilecfgbranch')
             || str_contains($lower, 'compilecfgblock')
             || str_contains($lower, 'compileblock')
