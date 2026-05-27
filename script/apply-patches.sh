@@ -54,6 +54,9 @@ patch_already_applied() {
     php-types-docblock-trailing-text.patch)
       grep -q "stripTrailingDocText" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
       ;;
+    php-types-fromdecl-junk-fragments.patch)
+      grep -q "str_starts_with(\$trimmedDecl, '\\*/')" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
+      ;;
     php-types-ns-func-call.patch)
       grep -q 'function resolveOp_Expr_NsFuncCall' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
       ;;
@@ -443,6 +446,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-generics-fallback.patch"
   apply_patch "$PATCH_DIR/php-types-generics-list-array.patch"
   apply_patch "$PATCH_DIR/php-types-docblock-trailing-text.patch"
+  apply_patch "$PATCH_DIR/php-types-fromdecl-junk-fragments.patch"
   apply_patch "$PATCH_DIR/php-types-ns-func-call.patch"
   apply_patch "$PATCH_DIR/php-types-arrow-function.patch"
   apply_patch "$PATCH_DIR/php-types-magic-script-const.patch"
