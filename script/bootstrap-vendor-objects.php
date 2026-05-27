@@ -138,7 +138,13 @@ putenv('PHP_COMPILER_SELFHOST_AOT=0');
 putenv('PHP_COMPILER_VENDOR_PRELINK=1');
 putenv('PHP_COMPILER_KEEP_OBJECT_FILE=1');
 
-$phpBin = PHP_BINARY;
+$compileInvoker = bootstrapVendorPrelinkResolveCompileInvoker($root);
+fwrite(
+    STDERR,
+    'bootstrap-vendor-objects: compile invoker='.$compileInvoker['mode']
+    .' ('.($compileInvoker['argv'][0] ?? 'unknown').") (#2849)\n"
+);
+
 $failures = 0;
 foreach (BOOTSTRAP_VENDOR_PRELINK_PACKAGES as $package => $role) {
     if (null !== $one && $one !== $package && $one !== bootstrapVendorPrelinkSlug($package)) {
@@ -168,9 +174,7 @@ foreach (BOOTSTRAP_VENDOR_PRELINK_PACKAGES as $package => $role) {
     @unlink($buildBase.'.o');
     @unlink($objectAbs);
 
-    $cmd = 'PHP_COMPILER_VENDOR_PRELINK=1 PHP_COMPILER_SELFHOST_AOT=0 PHP_COMPILER_KEEP_OBJECT_FILE=1 '
-        .escapeshellarg($phpBin).' '.escapeshellarg($compileBin)
-        .' -o '.escapeshellarg($buildBase).' '.escapeshellarg($bundleAbs).' 2>&1';
+    $cmd = bootstrapVendorPrelinkBuildCompileCommand($root, $buildBase, $bundleAbs);
     $output = [];
     exec($cmd, $output, $code);
     $objectCandidate = $buildBase.'.o';

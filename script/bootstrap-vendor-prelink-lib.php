@@ -247,3 +247,52 @@ function bootstrapVendorPrelinkColdBootCompileFromCommitted(string $root, string
 
     return 0;
 }
+
+/**
+ * Resolve gen-0 vendor prelink AOT invoker: compiled driver when present, else Zend php bin/compile.php (#2842, #2849).
+ *
+ * @return array{mode: 'native'|'zend', argv: list<string>}
+ */
+function bootstrapVendorPrelinkResolveCompileInvoker(string $root): array
+{
+    if ('1' === (string) getenv('BOOTSTRAP_GEN0_ZEND_ONLY')) {
+        return [
+            'mode' => 'zend',
+            'argv' => [PHP_BINARY, $root.'/bin/compile.php'],
+        ];
+    }
+
+    foreach ([
+        $root.'/build/selfhost-compile-driver',
+        $root.'/build/selfhost-native-compile-driver',
+        $root.'/build/bin-compile-aot',
+    ] as $candidate) {
+        if (is_executable($candidate)) {
+            return [
+                'mode' => 'native',
+                'argv' => [$candidate],
+            ];
+        }
+    }
+
+    return [
+        'mode' => 'zend',
+        'argv' => [PHP_BINARY, $root.'/bin/compile.php'],
+    ];
+}
+
+/** Shell command for vendor bundle AOT → .o (env + driver + -o + entry). */
+function bootstrapVendorPrelinkBuildCompileCommand(
+    string $root,
+    string $buildBase,
+    string $bundleAbs
+): string {
+    $inv = bootstrapVendorPrelinkResolveCompileInvoker($root);
+    $argv = array_map('escapeshellarg', $inv['argv']);
+
+    return 'PHP_COMPILER_VENDOR_PRELINK=1 PHP_COMPILER_SELFHOST_AOT=0 PHP_COMPILER_KEEP_OBJECT_FILE=1 '
+        .implode(' ', $argv)
+        .' -o '.escapeshellarg($buildBase)
+        .' '.escapeshellarg($bundleAbs)
+        .' 2>&1';
+}
