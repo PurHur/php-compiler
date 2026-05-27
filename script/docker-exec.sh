@@ -78,8 +78,9 @@ echo "docker-exec: bind-mount incomplete; copying repo via tar..." >&2
 # shellcheck disable=SC2086
 if [[ "${#SYNC_BACK_PATHS[@]}" -gt 0 ]]; then
   sync_quoted=$(printf '%q ' "${SYNC_BACK_PATHS[@]}")
-  # Stream the repo into the container, run the command, then stream selected paths back.
-  tar -cf - --exclude='.git' --exclude='.llvm' . | ci_docker_run -i -w /compiler "$IMAGE" bash -c "
+  # Stream the repo into a throwaway container, run the command, then stream selected paths back.
+  # Use docker create/start + trap cleanup so tar-fallback never leaks long-lived containers (#2708).
+  container_id="$(ci_docker_create -i -w /compiler "$IMAGE" bash -c "
     set -euo pipefail
     tar -xf -
     chmod +x bin/*.php script/*.sh 2>/dev/null || true
@@ -87,13 +88,28 @@ if [[ "${#SYNC_BACK_PATHS[@]}" -gt 0 ]]; then
     source script/php-env.sh
     ${quoted} 1>&2
     tar -cf - ${sync_quoted}
-  " | tar -xf -
+  ")"
+  trap 'docker rm -f "${container_id}" >/dev/null 2>&1 || true' EXIT INT TERM
+  set +e
+  tar -cf - --exclude='.git' --exclude='.llvm' . | docker start -ai "${container_id}" | tar -xf -
+  status=$?
+  set -e
+  docker rm -f "${container_id}" >/dev/null 2>&1 || true
+  exit "$status"
 else
-  tar -cf - --exclude='.git' --exclude='.llvm' . | ci_docker_run -i -w /compiler "$IMAGE" bash -c "
+  container_id="$(ci_docker_create -i -w /compiler "$IMAGE" bash -c "
+    set -euo pipefail
     tar -xf -
     chmod +x bin/*.php script/*.sh 2>/dev/null || true
     ${_llvm_exports}
     source script/php-env.sh
     ${quoted}
-  "
+  ")"
+  trap 'docker rm -f "${container_id}" >/dev/null 2>&1 || true' EXIT INT TERM
+  set +e
+  tar -cf - --exclude='.git' --exclude='.llvm' . | docker start -ai "${container_id}"
+  status=$?
+  set -e
+  docker rm -f "${container_id}" >/dev/null 2>&1 || true
+  exit "$status"
 fi
