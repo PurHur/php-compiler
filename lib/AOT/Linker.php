@@ -68,6 +68,31 @@ final class Linker
         'password_crypto.c',
     ];
 
+    private static function which(string $binary): ?string
+    {
+        if ('' === $binary) {
+            return null;
+        }
+        if (str_contains($binary, '/')) {
+            return is_file($binary) && is_executable($binary) ? $binary : null;
+        }
+        $path = getenv('PATH');
+        if (false === $path || '' === $path) {
+            return null;
+        }
+        foreach (explode(':', $path) as $dir) {
+            if ('' === $dir) {
+                continue;
+            }
+            $candidate = rtrim($dir, '/').'/'.$binary;
+            if (is_file($candidate) && is_executable($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
     public static function link(string $objectFile, string $executable): void
     {
         $runtimeObjects = self::compileRuntimeObjects($objectFile);
@@ -175,8 +200,8 @@ final class Linker
     private static function resolveRuntimeCompiler(): string
     {
         foreach (['gcc', 'cc', 'clang'] as $name) {
-            $path = trim((string) shell_exec('command -v '.escapeshellarg($name).' 2>/dev/null'));
-            if ('' !== $path) {
+            $path = self::which($name);
+            if (null !== $path) {
                 return $path;
             }
         }
@@ -196,8 +221,8 @@ final class Linker
             }
         }
         foreach (['clang-9', 'clang'] as $name) {
-            $path = trim((string) shell_exec('command -v '.escapeshellarg($name).' 2>/dev/null'));
-            if ('' !== $path) {
+            $path = self::which($name);
+            if (null !== $path) {
                 return $path;
             }
         }
@@ -250,14 +275,16 @@ final class Linker
     {
         $dirs = [];
         foreach (['gcc', 'cc', 'clang'] as $compiler) {
-            $path = trim((string) shell_exec('command -v '.escapeshellarg($compiler).' 2>/dev/null'));
-            if ('' === $path) {
+            $path = self::which($compiler);
+            if (null === $path) {
                 continue;
             }
-            $verbose = shell_exec(
-                escapeshellarg($path).' -E -Wp,-v -xc /dev/null 2>&1'
+            $captured = self::runCaptured(
+                escapeshellarg($path).' -E -Wp,-v -xc /dev/null',
+                null
             );
-            if (!is_string($verbose)) {
+            $verbose = $captured['stderr']."\n".$captured['stdout'];
+            if ('' === trim($verbose)) {
                 continue;
             }
             $capture = false;
@@ -297,8 +324,8 @@ final class Linker
     {
         // Runtime C needs system libc headers; bundled LLVM clang often lacks them.
         foreach (['cc', 'gcc', 'clang'] as $name) {
-            $path = trim((string) shell_exec('command -v '.escapeshellarg($name).' 2>/dev/null'));
-            if ('' !== $path) {
+            $path = self::which($name);
+            if (null !== $path) {
                 return $path;
             }
         }
@@ -307,8 +334,8 @@ final class Linker
         $llvmPrefix = (false !== $llvmDir && '' !== $llvmDir) ? realpath($llvmDir) : false;
         // Prefer the host toolchain for runtime C: bundled LLVM clang often lacks system headers.
         foreach (['clang', 'gcc', 'cc'] as $name) {
-            $path = trim((string) shell_exec('command -v '.escapeshellarg($name).' 2>/dev/null'));
-            if ('' === $path) {
+            $path = self::which($name);
+            if (null === $path) {
                 continue;
             }
             if (false !== $llvmPrefix && str_starts_with($path, $llvmPrefix)) {
@@ -377,8 +404,8 @@ final class Linker
             $objects .= ' '.escapeshellarg($runtimeObject);
         }
         foreach ($linkers as $linker) {
-            $path = trim((string) shell_exec('command -v ' . escapeshellarg($linker) . ' 2>/dev/null'));
-            if ('' === $path) {
+            $path = self::which($linker);
+            if (null === $path) {
                 continue;
             }
             $cmd = escapeshellarg($path) . ' '
