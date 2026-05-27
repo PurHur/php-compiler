@@ -152,6 +152,17 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString('PHP_COMPILER_M3_COMPILE_MODE=compile', $source);
     }
 
+    public function testCliDriverEmitProbeAndVmSidecarConstantsExist(): void
+    {
+        $probe = self::$root.'/script/bootstrap-selfhost-cli-driver-emit.sh';
+        $this->assertFileExists($probe);
+        $jit = (string) file_get_contents(self::$root.'/lib/JIT/M3EmitTuTrivialEchoAot.php');
+        $this->assertStringContainsString('BIN_VM_SIDECAR_REL', $jit);
+        $this->assertStringContainsString('CLI_DRIVER_SIDECAR_REL', $jit);
+        $this->assertStringContainsString('bin/vm.php', (string) file_get_contents(self::$root.'/lib/JIT.php'));
+        $this->assertStringContainsString('src/cli_driver.php', (string) file_get_contents(self::$root.'/lib/JIT.php'));
+    }
+
     public function testHelloWorldProbeLinksCompileDriverBinary(): void
     {
         $script = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-helloworld-probe.sh');
