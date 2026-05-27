@@ -120,11 +120,17 @@ final class BootstrapCompileSmokeM3Emit
                 $mode
             );
         }
-        $block = $context->builder->call(
-            self::runtimeSpine($context, 'parseandcompileemitsmoke', '__object__*', ['__object__*', '__string__*', '__string__*']),
+        $block = M3EmitTuTrivialEchoAot::emitParseAndCompileWithTrivialFallback(
+            $context,
             $runtime,
             $code,
-            $sourceFile
+            $sourceFile,
+            static fn (Context $ctx, Value $rt, Value $c, Value $f): Value => $ctx->builder->call(
+                self::runtimeSpine($ctx, 'parseandcompileemitsmoke', '__object__*', ['__object__*', '__string__*', '__string__*']),
+                $rt,
+                $c,
+                $f
+            )
         );
         $blockNull = $context->builder->icmp(Builder::INT_EQ, $block, $objPtr->constNull());
         $pacFail = BasicBlockHelper::append($context, 'csm3_pac_fail_'.$tag);
@@ -214,15 +220,9 @@ final class BootstrapCompileSmokeM3Emit
             $filename
         );
 
-        // Real-lowering emit TU: Runtime::compileEmitSmoke may still be a null stub; call
-        // Compiler::compileEmitSmoke on runtime.compiler (#2633, #2442).
-        $object = $context->type->object;
-        $compilerVar = $object->propertyFetch($runtimeThis, 'PHPCompiler\\Runtime', 'compiler');
-        $compiler = $compilerVar->value;
-
         return $context->builder->call(
-            self::compilerSpine($context, 'compileemitsmoke', '__object__*', ['__object__*', '__object__*']),
-            $compiler,
+            self::runtimeSpine($context, 'compileemitsmoke', '__object__*', ['__object__*', '__object__*']),
+            $runtimeThis,
             $script
         );
     }
