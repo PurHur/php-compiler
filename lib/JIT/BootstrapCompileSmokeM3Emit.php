@@ -84,6 +84,7 @@ final class BootstrapCompileSmokeM3Emit
     {
         $tag = 'csm3'.(string) ++self::$seq;
         $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
         $strPtr = $context->getTypeFromString('__string__*');
         $objPtr = $context->getTypeFromString('__object__*');
         $strMap = $context->structFieldMap['__string__'];
@@ -150,7 +151,6 @@ final class BootstrapCompileSmokeM3Emit
         ValueEchoHelper::echoLiteral($context, $logPrefix.': compile OK -> ');
         $outLen = $context->builder->load($context->builder->structGep($outFile, $strMap['length']));
         $outChars = $context->builder->structGep($outFile, $strMap['value']);
-        $sizeT = $context->getTypeFromString('size_t');
         $context->builder->call(
             $context->lookupFunction('__phpc_ob_echo_substr'),
             $outChars,
