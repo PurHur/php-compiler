@@ -112,6 +112,7 @@ final class BootstrapSelfhostCompileSmokeTest extends TestCase
     {
         $source = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-compile-smoke-probe.sh');
         $this->assertStringContainsString('BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING:-1', $source);
+        $this->assertStringContainsString('BOOTSTRAP_M3_LINK_COMPILE_DRIVER:=1', $source);
     }
 
     public function testCompileSmokeProbeScriptWiresNativeCompileDriver(): void
