@@ -22,6 +22,7 @@ function run(string $filename, string $code, array $options): void
         // M3 native emit TU: self-host M3 allowlist (not full bootstrap JIT) (#1937, #1983).
         $m3EmitEntry = str_contains($normalized, 'compile_smoke_m3_emit_native_entry.php')
             || str_contains($normalized, 'compiler_unit_probe_m3_emit_native_entry.php')
+            || str_contains($normalized, 'jit_unit_probe_m3_emit_native_entry.php')
             || str_contains($normalized, 'runtime_m3_emit_native_entry.php')
             || str_contains($normalized, 'helloworld_m3_emit_native_entry.php')
             || str_contains($normalized, 'helloworld_compile_m3_emit_native_entry.php');
@@ -32,6 +33,9 @@ function run(string $filename, string $code, array $options): void
             putenv('PHP_COMPILER_M3_EMIT_MINIMAL=1');
             if (str_contains($normalized, 'compiler_unit_probe_m3_emit_native_entry.php')) {
                 putenv('PHP_COMPILER_M3_COMPILER_UNIT_PROBE_EMIT=1');
+            }
+            if (str_contains($normalized, 'jit_unit_probe_m3_emit_native_entry.php')) {
+                putenv('PHP_COMPILER_M3_JIT_UNIT_PROBE_EMIT=1');
             }
             if (str_contains($normalized, 'runtime_m3_emit_native_entry.php')) {
                 putenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX=runtime_compile_smoke_m3_emit');
