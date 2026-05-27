@@ -44,7 +44,11 @@ patch_already_applied() {
       ;;
     php-types-docblock-first-token.patch)
       # Upstream php-types has had a few variants of this regex; we only care that
-      # it captures the first token and does not include trailing docblock '*' text.
+      # @var/@return capture stops before trailing docblock '*' / prose (not \\S+ greed).
+      if grep -qF "(@var\\s+(.+?)(?:\\s*\\*\\/|\\s*$))m" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null \
+        && grep -qF "(@return\\s+(.+?)(?:\\s*\\*\\/|\\s*$))m" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null; then
+        return 0
+      fi
       grep -qF "(@var\\s+([^\\s*][^\\s]*))" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null \
         && grep -qF "(@return\\s+([^\\s*][^\\s]*))" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
       ;;
