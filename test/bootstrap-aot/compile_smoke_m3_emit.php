@@ -69,7 +69,9 @@ function compile_smoke_m3_emit(string $sourceFile, string $outFile): int
     $block = $runtime->compileEmitSmoke($script);
     if (null === $block) {
         $diag = $runtime->formatParseAndCompileNullDetail($script);
-        $extra = null !== $diag && '' !== $diag ? ' — '.$diag : '';
+        $fallback = $runtime->compiler->getCompileAbortDetail();
+        $detail = null !== $diag && '' !== $diag ? $diag : $fallback;
+        $extra = null !== $detail && '' !== $detail ? ' — '.$detail : '';
         echo "compile_smoke_m3_emit: parseAndCompile returned null (CFG/compile spine)".$extra."\n";
         echo "compile_smoke_m3_emit: native emit failed at phase=parseAndCompile\n";
 
