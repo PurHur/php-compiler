@@ -1,8 +1,7 @@
+diff --git vendor/ircmaxell/php-types/lib/PHPTypes/Type.php vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
 --- vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
 +++ vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
-@@ -371,6 +371,7 @@
-             return (new self(self::TYPE_UNION, [
-                 $type,
+@@ -359,6 +359,7 @@
                  new self(self::TYPE_NULL),
              ]))->simplify();
          }
@@ -10,11 +9,10 @@
          if (preg_match('/^array\{/i', $decl)) {
              return new self(self::TYPE_ARRAY);
          }
-@@ -597,4 +598,61 @@
- 
+@@ -582,4 +583,70 @@
          throw new \RuntimeException("Unknown combinator {$combinator}");
      }
-+
+ 
 +    /**
 +     * Vendor phpdoc sometimes appends English description to the type token in
 +     * @var / @return declarations (e.g. "list<bool> parallel to values; ...").
