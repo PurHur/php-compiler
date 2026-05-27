@@ -2048,6 +2048,9 @@ class JIT {
                 $this->compileM3EmitTuCompilerMethodFromRuntimeModules('compileemitsmoke');
             }
             $this->runQueue();
+            if ($emitTu && null !== $stubBlock) {
+                $this->ensureM3EmitTuRuntimeInitSpineSymbols($stubBlock);
+            }
             $this->compileM3EmitTuRuntimeParseAndCompileNativeDecl([
                 'parseandcompile' => true,
                 'parseandcompileemitsmoke' => true,
@@ -2179,6 +2182,36 @@ class JIT {
             );
         }
         $this->runQueue();
+    }
+
+    /**
+     * Emit-helper RuntimeEmitTuInit calls these spine symbols; ensure they are defined (#2633).
+     */
+    private function ensureM3EmitTuRuntimeInitSpineSymbols(Block $stubBlock): void
+    {
+        foreach (['initparsepipeline', 'loadcoremodules'] as $methodLc) {
+            $logical = 'PHPCompiler\\Runtime::'.$methodLc;
+            $lc = strtolower($logical);
+            if (!isset($this->context->functions[$lc])) {
+                $this->compileM3EmitTuRuntimeMethodFromModules($methodLc);
+            }
+            if (isset($this->context->functions[$lc])) {
+                continue;
+            }
+            if ('initparsepipeline' === $methodLc) {
+                $this->compileRuntimeInitParsePipelineM3Native(
+                    $this->llvmInternalName($logical),
+                    $stubBlock,
+                    $logical
+                );
+                continue;
+            }
+            $this->compileRuntimeLoadCoreModulesM3Native(
+                $this->llvmInternalName($logical),
+                $stubBlock,
+                $logical
+            );
+        }
     }
 
     /** Link-time trivial-echo AOT sidecar for emit-helper TU (#2559, #2566). */
