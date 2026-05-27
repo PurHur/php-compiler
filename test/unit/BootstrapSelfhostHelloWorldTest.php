@@ -374,6 +374,8 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString('COMPILER_UNIT_PROBE_SIDECAR_REL', $jit);
         $this->assertStringContainsString('compile_driver.php', $jit);
         $this->assertStringContainsString('COMPILE_DRIVER_SIDECAR_REL', $jit);
+        $this->assertStringContainsString('COMPILER_PHP_SIDECAR_REL', $jit);
+        $this->assertStringContainsString('BIN_COMPILE_SIDECAR_REL', $jit);
         $this->assertStringNotContainsString('PHP_COMPILER_M3_COMPILER_UNIT_PROBE_EMIT', $jit);
     }
 
@@ -409,6 +411,58 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertSame(0, $exitCode, implode("\n", $lines));
         $this->assertFileExists($out);
         $this->assertTrue(is_executable($out));
+    }
+
+    /** Issue #2681: M3 emit TU sidecar for lib/Compiler.php on compile_smoke_m3_emit link (#2666). */
+    public function testM3EmitHelperNativeEmitCompilerPhpViaSidecar(): void
+    {
+        if (!LlvmToolchain::isReady(self::$root)) {
+            $this->markTestSkipped('LLVM 9 not available for M3 Compiler.php sidecar emit test.');
+        }
+
+        $entry = self::$root.'/test/bootstrap-aot/helloworld_m3_emit_native_entry.php';
+        $emitHelper = self::$root.'/build/selfhost-helloworld-emit-compiler-php-test';
+        $aotOut = self::$root.'/build/m3-compiler-php-aot-test';
+        @unlink($emitHelper);
+        @unlink($aotOut);
+
+        $prefix = LlvmToolchain::envPrefix(self::$root);
+        $linkCmd = implode(' ', array_map('escapeshellarg', [
+            ...$prefix,
+            'env',
+            'PHP_COMPILER_SELFHOST_AOT=1',
+            'PHP_COMPILER_M3_COMPILE_DRIVER=1',
+            'PHP_COMPILER_EMIT_HELPER_LINK=1',
+            'php',
+            self::$root.'/bin/compile.php',
+            '-o',
+            $emitHelper,
+            $entry,
+        ])).' 2>&1';
+        exec($linkCmd, $linkLines, $linkCode);
+        if (139 === $linkCode) {
+            $this->markTestSkipped('LLVM 9 segfault during M3 emit-helper link (#2442).');
+        }
+        $this->assertSame(0, $linkCode, implode("\n", $linkLines));
+        $this->assertFileExists($emitHelper);
+
+        $runCmd = implode(' ', array_map('escapeshellarg', [
+            ...$prefix,
+            'env',
+            'PHP_COMPILER_M3_EMIT_MINIMAL=1',
+            'PHP_COMPILER_M3_SOURCE='.self::$root.'/lib/Compiler.php',
+            'PHP_COMPILER_M3_OUT='.$aotOut,
+            $emitHelper,
+        ])).' 2>&1';
+        exec($runCmd, $runLines, $runCode);
+        $runOut = implode("\n", $runLines);
+        if (139 === $runCode) {
+            $this->markTestSkipped('LLVM 9 segfault during M3 Compiler.php sidecar emit (#2540).');
+        }
+        $this->assertSame(0, $runCode, $runOut);
+        $this->assertStringContainsString('compile_smoke_m3_emit: compile OK', $runOut);
+        $this->assertFileExists($aotOut);
+        $this->assertGreaterThan(0, filesize($aotOut));
     }
 
     public function testCompileEmitSmokeInlinesMainCompileForFunctionScripts(): void
