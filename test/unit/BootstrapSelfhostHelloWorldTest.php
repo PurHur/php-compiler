@@ -277,6 +277,7 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
             $denyBlock = $m[1];
             $this->assertStringNotContainsString('runtime::parse', $denyBlock);
             $this->assertStringNotContainsString('runtime::compile', $denyBlock);
+            $this->assertStringNotContainsString('runtime::loadjitcontext', $denyBlock);
         } else {
             $this->fail('Unable to parse m3CompileDriverSpineDenyNames from lib/JIT.php');
         }

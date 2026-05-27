@@ -50,6 +50,15 @@ final class M3AllowlistSnapshotTest extends TestCase
         $this->assertContains('\\bootstrapaot\\helloworld_compile_smoke', $lists['deny']);
     }
 
+    public function testRuntimeLoadJitContextOnAllowlistNotDenylist(): void
+    {
+        require_once self::$root.'/script/bootstrap-m3-allowlist.php';
+
+        $lists = bootstrap_m3_allowlist_from_jit(self::$root.'/lib/JIT.php');
+        $this->assertContains('\\runtime::loadjitcontext', $lists['allow']);
+        $this->assertNotContains('\\runtime::loadjitcontext', $lists['deny']);
+    }
+
     public function testCompileSmokeM3EmitNotOnM3Allowlist(): void
     {
         require_once self::$root.'/script/bootstrap-m3-allowlist.php';
