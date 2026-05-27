@@ -42,4 +42,27 @@ final class BootstrapVendorPrelinkTest extends TestCase
             $this->assertFileExists($root.'/'.$rel);
         }
     }
+
+    public function testPhpLlvmVendorHasNoAnonClosureCallbacksInArrayMap(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $dir = $root.'/vendor/ircmaxell/php-llvm/lib';
+        $this->assertDirectoryExists($dir);
+
+        $it = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($dir, \FilesystemIterator::SKIP_DOTS)
+        );
+
+        foreach ($it as $file) {
+            if (!$file->isFile() || !str_ends_with(strtolower($file->getFilename()), '.php')) {
+                continue;
+            }
+            $contents = (string) file_get_contents((string) $file->getPathname());
+            $this->assertFalse(
+                str_contains($contents, 'array_map('."\n".'                function(')
+                    || str_contains($contents, 'array_map(function('),
+                'Found closure callback in: '.$file->getPathname()
+            );
+        }
+    }
 }
