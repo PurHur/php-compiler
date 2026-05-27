@@ -209,17 +209,13 @@ final class BootstrapCompileSmokeM3Emit
         Value $code,
         Value $filename
     ): Value {
-        $script = $context->builder->call(
-            self::runtimeSpine($context, 'parse', '__object__*', ['__object__*', '__string__*', '__string__*']),
+        // Emit-helper must compile inventory-scale sources (bin/compile.php, lib/Compiler.php) for M5;
+        // the old emit-smoke subset is only valid for trivial fixtures.
+        return $context->builder->call(
+            self::runtimeSpine($context, 'parseandcompile', '__object__*', ['__object__*', '__string__*', '__string__*']),
             $runtimeThis,
             $code,
             $filename
-        );
-
-        return $context->builder->call(
-            self::runtimeSpine($context, 'compileemitsmoke', '__object__*', ['__object__*', '__object__*']),
-            $runtimeThis,
-            $script
         );
     }
 

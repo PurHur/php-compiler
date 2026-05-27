@@ -148,28 +148,45 @@ final class M3EmitTuTrivialEchoAot
             return $defaultEmit($context, $runtimeThis, $code, $filename);
         }
         $objPtr = $context->getTypeFromString('__object__*');
-        $current = $defaultEmit($context, $runtimeThis, $code, $filename);
-        foreach (array_reverse($context->m3EmitTuLinktimeSidecarEntries) as $index => $entry) {
+        $entries = array_reverse($context->m3EmitTuLinktimeSidecarEntries);
+        $merge = BasicBlockHelper::append($context, 'm3te_pac_merge');
+        $defaultBb = BasicBlockHelper::append($context, 'm3te_pac_default');
+
+        /** @var list<array{Value,\PHPLLVM\BasicBlock}> $incoming */
+        $incoming = [];
+
+        // Avoid calling $defaultEmit eagerly: the trivial sources are common and $defaultEmit may
+        // exercise heavy compiler paths (and historically can trip LLVM 9 emit-TU runtime init).
+        foreach ($entries as $index => $entry) {
             $tag = 'e'.(string) $index;
             $cached = $context->builder->load($entry['sourceGlobal']);
             $matches = JitStringCompare::identical($context, $code, $cached);
-            $fail = BasicBlockHelper::append($context, 'm3te_pac_prev_'.$tag);
             $ok = BasicBlockHelper::append($context, 'm3te_pac_sidecar_'.$tag);
-            $merge = BasicBlockHelper::append($context, 'm3te_pac_done_'.$tag);
+            $fail = BasicBlockHelper::append($context, 'm3te_pac_next_'.$tag);
             $context->builder->branchIf($matches, $ok, $fail);
-            $context->builder->positionAtEnd($fail);
-            $context->builder->branch($merge);
+
             $context->builder->positionAtEnd($ok);
             $sidecarBlock = $context->builder->call($context->functions[$entry['sentinelLc']]);
             $context->builder->branch($merge);
-            $context->builder->positionAtEnd($merge);
-            $phi = $context->builder->phi($objPtr);
-            $phi->addIncoming($current, $fail);
-            $phi->addIncoming($sidecarBlock, $ok);
-            $current = $phi;
+            $incoming[] = [$sidecarBlock, $ok];
+
+            $context->builder->positionAtEnd($fail);
         }
 
-        return $current;
+        // No sidecar matched — fall back to the real parse+compile path.
+        $context->builder->branch($defaultBb);
+        $context->builder->positionAtEnd($defaultBb);
+        $default = $defaultEmit($context, $runtimeThis, $code, $filename);
+        $context->builder->branch($merge);
+        $incoming[] = [$default, $defaultBb];
+
+        $context->builder->positionAtEnd($merge);
+        $phi = $context->builder->phi($objPtr);
+        foreach ($incoming as [$val, $bb]) {
+            $phi->addIncoming($val, $bb);
+        }
+
+        return $phi;
     }
 
     /** Runtime::standalone native for emit-helper SPINE — copy matched sidecar to outfile. */
