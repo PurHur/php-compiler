@@ -16,6 +16,13 @@ final class BootstrapSelfhostLinkTest extends TestCase
         self::$root = dirname(__DIR__, 2);
     }
 
+    public function testLinkScriptSurfacesApplyPatchesFailure(): void
+    {
+        $script = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-link.sh');
+        $this->assertStringContainsString('apply-patches failed (#2806)', $script);
+        $this->assertStringNotContainsString('apply-patches.sh" >/dev/null', $script);
+    }
+
     public function testNativeLinkScriptPrintsBundleOkWhenLlvmPresent(): void
     {
         if (!LlvmToolchain::isReady(self::$root)) {
