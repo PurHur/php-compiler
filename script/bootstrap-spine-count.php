@@ -15,6 +15,9 @@ declare(strict_types=1);
  */
 
 $root = dirname(__DIR__);
+require_once $root.'/vendor/autoload.php';
+require_once __DIR__.'/bootstrap-lib.php';
+require_once __DIR__.'/bootstrap-phase-a-deferred.php';
 
 if (PHP_SAPI === 'cli' && realpath($argv[0] ?? '') === realpath(__FILE__)) {
     $json = in_array('--json', $argv, true);
@@ -28,17 +31,27 @@ if (PHP_SAPI === 'cli' && realpath($argv[0] ?? '') === realpath(__FILE__)) {
 }
 
 /**
- * @return array{spine: int, inventory: int}
+ * @return array{spine: int, inventory: int, vm_path_files?: int, phase_a_ratio_deferred?: int}
  */
 function bootstrap_spine_counts(string $root): array
 {
     $spineMain = $root.'/test/selfhost/compiler_lib_spine_smoke/main.php';
-    $inventoryDoc = $root.'/docs/bootstrap-inventory.md';
-
     $spine = bootstrap_count_spine_requires($spineMain);
-    $inventory = bootstrap_read_inventory_total($inventoryDoc);
+    $inventory = bootstrap_spine_phase_a_inventory_files($root);
 
     return ['spine' => $spine, 'inventory' => $inventory];
+}
+
+/** Phase A file count from the inventory generator (M2 ratio SSOT — #2553). */
+function bootstrap_spine_phase_a_inventory_files(string $root): int
+{
+    if (!function_exists('bootstrapCollectInventoryReport')) {
+        return bootstrap_read_inventory_total($root.'/docs/bootstrap-inventory.md');
+    }
+    $report = bootstrapCollectInventoryReport($root);
+    $phaseA = bootstrap_phase_a_inventory_counts($report);
+
+    return (int) $phaseA['phase_a_inventory_files'];
 }
 
 /**

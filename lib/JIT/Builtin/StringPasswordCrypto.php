@@ -32,6 +32,12 @@ final class StringPasswordCrypto
         if (!\extension_loaded('FFI')) {
             return;
         }
+        $selfHost = getenv('PHP_COMPILER_SELFHOST_AOT');
+        if ('1' === $selfHost || 'true' === strtolower((string) $selfHost)) {
+            $loaded = 1;
+
+            return;
+        }
         try {
             $dl = \FFI::cdef('void *dlopen(const char *filename, int flags);', 'libdl.so.2');
             $dl->dlopen('libcrypt.so.1', 0x101);

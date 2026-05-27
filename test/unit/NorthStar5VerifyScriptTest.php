@@ -37,7 +37,7 @@ final class NorthStar5VerifyScriptTest extends TestCase
         $this->assertStringContainsString('north-star5-verify', $combined);
         $this->assertStringContainsString('bootstrap-vendor-objects.php', $combined);
         $this->assertStringContainsString('bootstrap-spine-count.php', $combined);
-        $this->assertStringContainsString('716/717', $combined);
+        $this->assertStringContainsString('717/717', $combined);
         $this->assertStringContainsString('--strict', $combined);
         $this->assertStringContainsString('#1416', $combined);
         $this->assertStringContainsString('#1492', $combined);

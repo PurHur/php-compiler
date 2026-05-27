@@ -31,7 +31,7 @@ Usage: script/north-star5-verify.sh [--require-llvm] [--strict] [--with-ns4]
 M5 ladder presenter (#1416, #1492):
 
   1. php script/bootstrap-inventory.php --check
-  2. php script/bootstrap-spine-count.php (expect 716/717)
+  2. php script/bootstrap-spine-count.php (expect 717/717)
   3. php script/bootstrap-vendor-objects.php --check
   4. make bootstrap-selfhost-probe + bootstrap-selfhost-lib-spine-smoke (LLVM)
   5. php script/bootstrap-vendor-objects.php --compile (partial OK unless --strict)
@@ -82,7 +82,7 @@ ns5_print_summary() {
   local vendor_ok="${1:-0}"
   echo
   echo "north-star5-verify: M5 status"
-  echo "  Spine: 716/717 (ratio-deferred lib/VM/HashTable.php)"
+  echo "  Spine: 717/717 (Phase A inventory SSOT)"
   echo "  Vendor prelink: ${vendor_ok}/3 object_ok (php-types first; cfg/llvm parse blockers)"
   echo "  Cold boot: Zend still drives bin/compile.php — target is compiled driver + prelinked vendor"
   echo "north-star5-verify: Next — shrink self-host stubs; link spine + prelinked .o; retire vendor/autoload (#1416)"
@@ -100,11 +100,11 @@ ns5_run 1 "bootstrap inventory --check" \
   ci_ensure_generated_doc "${_CI_REPO_ROOT}/script/bootstrap-inventory.php" "${_CI_REPO_ROOT}/docs/bootstrap-inventory.md"
 
 echo
-echo "=== north-star5-verify step 2: spine count (716/717) ==="
+echo "=== north-star5-verify step 2: spine count (717/717) ==="
 SPINE_LINE="$("${PHP_BIN}" "${PHP_OPTS[@]}" "${_CI_REPO_ROOT}/script/bootstrap-spine-count.php" 2>/dev/null | tail -n 1 || true)"
 echo "${SPINE_LINE}"
-if [[ "${SPINE_LINE}" != *"716/717"* ]]; then
-  echo "north-star5-verify: step 2 FAILED (expected bootstrap-spine-count: 716/717)" >&2
+if [[ "${SPINE_LINE}" != *"717/717"* ]]; then
+  echo "north-star5-verify: step 2 FAILED (expected bootstrap-spine-count: 717/717)" >&2
   ns5_hint 2 >&2
   exit 1
 fi

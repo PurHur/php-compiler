@@ -25,7 +25,7 @@ permalink: /development-status.html
 
 - **`phpc` CLI** — `run`, `serve`, `build`, `deploy`, `lint`, `test`, `init`
 - **Examples 000–009** — VM and AOT link/execute for the curated web subset
-- **Self-host M0–M2** — minimal bundle ✅; spine native link **717/718** ✅ ([#1960](https://github.com/PurHur/php-compiler/issues/1960), [#2543](https://github.com/PurHur/php-compiler/issues/2543), [#2652](https://github.com/PurHur/php-compiler/issues/2652))
+- **Self-host M0–M2** — minimal bundle ✅; spine native link **717/717** ✅ ([#1960](https://github.com/PurHur/php-compiler/issues/1960), [#2543](https://github.com/PurHur/php-compiler/issues/2543), [#2652](https://github.com/PurHur/php-compiler/issues/2652))
 - **Self-host M3 (smoke native)** — strict probes (`BOOTSTRAP_M3_*_STRICT=1`) emit with **`emit_path=native`** for HelloWorld, compile-smoke, runtime smoke, and compiler-unit fixtures ✅ ([#2610](https://github.com/PurHur/php-compiler/issues/2610), [#2618](https://github.com/PurHur/php-compiler/issues/2618)); full `Compiler::compile()` emit TU still 🚧 ([#1937](https://github.com/PurHur/php-compiler/issues/1937)).
 - **Self-host M4 (partial)** — `make bootstrap-loop-gen1-link` produces gen-2 with **native emit** for the smoke ladder ✅ ([#2611](https://github.com/PurHur/php-compiler/issues/2611)); full revision rebuild still open ([#1498](https://github.com/PurHur/php-compiler/issues/1498)).
 - **Self-host M5 (started)** — `ircmaxell/php-types` vendor prelink **`object_ok`** ([#1416](https://github.com/PurHur/php-compiler/issues/1416)); `php-cfg` / `php-llvm` bundles blocked on parse; presenter `make north-star5-verify`.
@@ -40,7 +40,7 @@ permalink: /development-status.html
 |-----------|--------|
 | **M0** — Small `lib/` bundle runs | ✅ |
 | **M1** — Compiler-shaped bundle + compile-smoke | ✅ |
-| **M2** — Spine toward full inventory | ✅ **717/718** link |
+| **M2** — Spine toward full inventory | ✅ **717/717** link |
 | **M3** — Native compiles PHP (no Zend emit) | 🚧 smoke strict **native emit** ✅ · full `Compiler` CFG 🚧 |
 | **M4** — Bootstrap loop (next revision) | 🚧 gen-2 smoke **native** ✅ · full tree ⬜ |
 | **M5** — Full self-host, no `vendor/` cold boot | 🚧 vendor **1/3** prelinked · cold boot ⬜ |

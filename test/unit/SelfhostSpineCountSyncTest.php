@@ -18,13 +18,19 @@ final class SelfhostSpineCountSyncTest extends TestCase
         $this->assertFileExists($spineMain);
         $expectedSpine = substr_count((string) file_get_contents($spineMain), 'require_once __DIR__');
 
-        $cmd = escapeshellarg(PHP_BINARY).' '.escapeshellarg($root.'/script/bootstrap-spine-count.php').' --json 2>&1';
+        $cmd = escapeshellarg(PHP_BINARY).' '.escapeshellarg($root.'/script/bootstrap-spine-count.php').' --json 2>/dev/null';
         exec($cmd, $out, $code);
         $this->assertSame(0, $code, implode("\n", $out));
         $counts = json_decode(implode("\n", $out), true);
         $this->assertIsArray($counts);
         $this->assertSame($expectedSpine, $counts['spine'] ?? null);
         $this->assertGreaterThan(0, $counts['inventory'] ?? 0);
+        require_once $root.'/vendor/autoload.php';
+        require_once $root.'/script/bootstrap-lib.php';
+        require_once $root.'/script/bootstrap-phase-a-deferred.php';
+        $report = bootstrapCollectInventoryReport($root);
+        $phaseA = bootstrap_phase_a_inventory_counts($report);
+        $this->assertSame((int) $phaseA['phase_a_inventory_files'], $counts['inventory']);
     }
 
     public function testSelfhostSpineCountSyncPassesOnMaster(): void
