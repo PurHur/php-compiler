@@ -1,6 +1,6 @@
---- a/lib/PHPCfg/Parser.php
-+++ b/lib/PHPCfg/Parser.php
-@@ -1678,12 +1678,16 @@ class Parser
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
+@@ -1788,12 +1788,16 @@ class Parser
  
      private function mapAttributes(Node $expr)
      {

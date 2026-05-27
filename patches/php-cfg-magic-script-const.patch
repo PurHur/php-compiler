@@ -35,7 +35,7 @@
 +}
 --- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
 +++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
-@@ -1455,10 +1455,14 @@ class Parser
+@@ -1690,10 +1690,14 @@ class Parser
              case 'Scalar_MagicConst_Class':
                  // TODO
                  return new Literal('__CLASS__');

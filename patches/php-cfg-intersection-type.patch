@@ -26,8 +26,8 @@
 +        $this->types = $types;
 +    }
 +}
---- a/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
-+++ b/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
 @@ -203,6 +203,14 @@
                  $this->mapAttributes($node)
              );
@@ -43,8 +43,8 @@
  
          throw new \LogicException('Unknown type node: '.$node->getType());
      }
---- a/vendor/ircmaxell/php-cfg/lib/PHPCfg/Printer.php
-+++ b/vendor/ircmaxell/php-cfg/lib/PHPCfg/Printer.php
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Printer.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Printer.php
 @@ -264,6 +264,12 @@
          if ($type instanceof Op\Type\Literal) {
              return $type->name;
