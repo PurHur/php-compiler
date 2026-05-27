@@ -161,6 +161,11 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString('CLI_DRIVER_SIDECAR_REL', $jit);
         $this->assertStringContainsString('bin/vm.php', (string) file_get_contents(self::$root.'/lib/JIT.php'));
         $this->assertStringContainsString('src/cli_driver.php', (string) file_get_contents(self::$root.'/lib/JIT.php'));
+
+        // Sidecar matching is content-based; JIT must compare __string__ buffers safely without relying on
+        // null termination (issue #2699).
+        $cmp = (string) file_get_contents(self::$root.'/lib/JIT/JitStringCompare.php');
+        $this->assertStringContainsString("lookupFunction('memcmp')", $cmp);
     }
 
     public function testHelloWorldProbeLinksCompileDriverBinary(): void
