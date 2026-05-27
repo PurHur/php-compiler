@@ -365,6 +365,18 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString("putenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX=compile_smoke_m3_emit')", $compile);
     }
 
+    /** Issue #2666: helloworld emit TU registers unit-probe + compile_driver sidecars without probe-only env. */
+    public function testEmitTuCompileSmokeBranchRegistersUnifiedSidecars(): void
+    {
+        $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
+        $this->assertStringContainsString("'compile_smoke_m3_emit' === \$logPrefix", $jit);
+        $this->assertStringContainsString('compiler_unit_probe_compile.php', $jit);
+        $this->assertStringContainsString('COMPILER_UNIT_PROBE_SIDECAR_REL', $jit);
+        $this->assertStringContainsString('compile_driver.php', $jit);
+        $this->assertStringContainsString('COMPILE_DRIVER_SIDECAR_REL', $jit);
+        $this->assertStringNotContainsString('PHP_COMPILER_M3_COMPILER_UNIT_PROBE_EMIT', $jit);
+    }
+
     public function testHelloWorldM3EmitNativeEntryLinksWithRealLowering(): void
     {
         if (!LlvmToolchain::isReady(self::$root)) {
