@@ -63,19 +63,23 @@ if ('1' !== $skipVendor && 'true' !== strtolower((string) $skipVendor)) {
         function php_compiler_cli_minimal_autoload(string $class): void
         {
             /** @var array<string, string> $prefixMap */
-            static $prefixMap = [
-                // Extension modules (historical lowercase namespace).
-                'PHPCompiler\\ext\\' => __DIR__.'/../ext/',
-                'PHPCompiler\\' => __DIR__.'/../lib/',
-                'PHPCompiler\\Ext\\Standard\\' => __DIR__.'/../ext/standard/',
-                // Legacy global helper namespace used by VM data structures.
-                'php\\' => __DIR__.'/../php/',
-                // Vendor namespaces required by the compiler parse/type/JIT spine.
-                'PhpParser\\' => __DIR__.'/../vendor/nikic/php-parser/lib/PhpParser/',
-                'PHPCfg\\' => __DIR__.'/../vendor/ircmaxell/php-cfg/lib/PHPCfg/',
-                'PHPTypes\\' => __DIR__.'/../vendor/ircmaxell/php-types/lib/PHPTypes/',
-                'PHPLLVM\\' => __DIR__.'/../vendor/ircmaxell/php-llvm/lib/',
-            ];
+            $prefixMap = $GLOBALS['__phpc_cli_prefix_map'] ?? null;
+            if (!is_array($prefixMap)) {
+                $prefixMap = [
+                    // Extension modules (historical lowercase namespace).
+                    'PHPCompiler\\ext\\' => __DIR__.'/../ext/',
+                    'PHPCompiler\\' => __DIR__.'/../lib/',
+                    'PHPCompiler\\Ext\\Standard\\' => __DIR__.'/../ext/standard/',
+                    // Legacy global helper namespace used by VM data structures.
+                    'php\\' => __DIR__.'/../php/',
+                    // Vendor namespaces required by the compiler parse/type/JIT spine.
+                    'PhpParser\\' => __DIR__.'/../vendor/nikic/php-parser/lib/PhpParser/',
+                    'PHPCfg\\' => __DIR__.'/../vendor/ircmaxell/php-cfg/lib/PHPCfg/',
+                    'PHPTypes\\' => __DIR__.'/../vendor/ircmaxell/php-types/lib/PHPTypes/',
+                    'PHPLLVM\\' => __DIR__.'/../vendor/ircmaxell/php-llvm/lib/',
+                ];
+                $GLOBALS['__phpc_cli_prefix_map'] = $prefixMap;
+            }
 
             foreach ($prefixMap as $prefix => $baseDir) {
                 if (!str_starts_with($class, $prefix)) {
