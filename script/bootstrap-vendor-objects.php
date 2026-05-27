@@ -15,6 +15,13 @@ declare(strict_types=1);
 $root = dirname(__DIR__);
 require $root.'/script/bootstrap-vendor-prelink-lib.php';
 
+$applyPatches = $root.'/script/apply-patches.sh';
+if (is_file($applyPatches)) {
+    // Vendor prelink bundles must match patched php-cfg overlays (ArrowFunction, etc.; #2687).
+    passthru('bash '.escapeshellarg($applyPatches).' 2>/dev/null', $patchExit);
+    unset($patchExit);
+}
+
 $compile = in_array('--compile', $argv, true);
 $check = in_array('--check', $argv, true);
 $bundlesDir = $root.'/test/bootstrap-vendor-prelink/generated';

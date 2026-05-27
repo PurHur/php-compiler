@@ -76,7 +76,6 @@ require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Func
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Include_.php';
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/InstanceOf_.php';
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Isset_.php';
-require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/MagicScriptConst.php';
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/MethodCall.php';
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/New_.php';
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/NsFuncCall.php';
