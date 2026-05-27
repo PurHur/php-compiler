@@ -553,13 +553,59 @@ PY
 }
 
 apply_php_types_union_type_overlay() {
-  local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php"
-  if grep -q 'instanceof CfgType\\Union_' "$target" 2>/dev/null; then
+  local type_php="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php"
+  local recon="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+  local need_type=1
+  local need_recon=1
+
+  if grep -q 'instanceof CfgType\\Union_' "$type_php" 2>/dev/null; then
+    need_type=0
+  fi
+  if grep -q 'instanceof Op\\Type\\Union_' "$recon" 2>/dev/null; then
+    need_recon=0
+  fi
+
+  if [[ "$need_type" -eq 0 && "$need_recon" -eq 0 ]]; then
     echo "Skip php-types-union-type.patch (already applied)"
     return 0
   fi
-  # Union support is inserted by php-types-intersection-type overlay now.
-  apply_php_types_intersection_type_overlay
+
+  if [[ "$need_type" -eq 1 ]]; then
+    # Union support in Type.php is inserted by php-types-intersection-type overlay now.
+    apply_php_types_intersection_type_overlay
+  fi
+
+  if [[ "$need_recon" -eq 1 ]]; then
+    python3 - "$recon" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+
+if "instanceof Op\\Type\\Union_" in text:
+    raise SystemExit(0)
+
+anchor = "        throw new \\LogicException('Unknown Op\\\\Type provided: '.get_class($type));"
+if anchor not in text:
+    sys.stderr.write("php-types-union-type: throw anchor not found in TypeReconstructor.php\\n")
+    raise SystemExit(1)
+
+insert = """        } elseif ($type instanceof Op\\Type\\Union_) {
+            $subs = [];
+            foreach ($type->types as $sub) {
+                $subs[] = $this->resolveOpType($sub);
+            }
+
+            return (new Type(Type::TYPE_UNION, $subs))->simplify();
+        }
+
+"""
+
+path.write_text(text.replace(anchor, insert + anchor, 1))
+PY
+    echo "Applied php-types-union-type.patch (overlay)"
+  fi
 }
 
 apply_php_types_first_class_callable_overlay() {
