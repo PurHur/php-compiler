@@ -44,6 +44,40 @@ PHP;
         $this->assertStringNotContainsString('Source type: 196', $stderr);
     }
 
+    /** Self-host lint of production driver must not fail on FFI::cdef (#2633; full AOT link still LLVM 9 flaky). */
+    public function testBinCompilePhpSelfHostLintDoesNotHitFfiCdef(): void
+    {
+        $this->skipUnlessLlvmReady();
+        $repoRoot = dirname(__DIR__, 2);
+        $sourcePath = $repoRoot.'/bin/compile.php';
+
+        $env = [];
+        foreach (array_merge($_ENV, $_SERVER) as $key => $value) {
+            if (is_string($value)) {
+                $env[$key] = $value;
+            }
+        }
+        $env['PHP_COMPILER_SELFHOST_AOT'] = '1';
+        LlvmToolchain::applyProcessEnv($env, $repoRoot);
+
+        $compileArgv = array_merge(
+            LlvmToolchain::envPrefix($repoRoot),
+            [PHP_BINARY, $repoRoot.'/bin/compile.php', '-l', $sourcePath]
+        );
+        $descriptorSpec = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+        $compile = proc_open($compileArgv, $descriptorSpec, $pipes, $repoRoot, $env);
+        $this->assertIsResource($compile);
+        fclose($pipes[0]);
+        fclose($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[2]);
+        $exitCode = proc_close($compile);
+        $stderr = trim($stderr !== false ? $stderr : '');
+        $this->assertSame(0, $exitCode, 'bin/compile.php self-host lint: '.$stderr);
+        $this->assertStringNotContainsString('FFI::cdef', $stderr);
+        $this->assertStringNotContainsString('undefined static method FFI::', $stderr);
+    }
+
     /** bin/compile.php cli_driver guard — fold bundle constant outside spine smoke (#2600). */
     public function testCliDriverLibSpineConstantFoldsForBinCompileDriver(): void
     {

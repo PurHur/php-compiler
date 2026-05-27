@@ -2463,6 +2463,16 @@ class JIT {
                 \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILE_DRIVER_SIDECAR_REL,
                 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compileDriverSentinelBlock'
             );
+            $this->registerM3EmitTuSidecarFromPath(
+                __DIR__.'/../lib/Compiler.php',
+                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_PHP_SIDECAR_REL,
+                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerPhpSentinelBlock'
+            );
+            $this->registerM3EmitTuSidecarFromPath(
+                __DIR__.'/../bin/compile.php',
+                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::BIN_COMPILE_SIDECAR_REL,
+                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::binCompileSentinelBlock'
+            );
         } elseif ('compile_smoke_m3_emit' === $logPrefix) {
             $this->registerM3EmitTuSidecarFromPath(
                 __DIR__.'/../examples/000-HelloWorld/example.php',
@@ -2514,7 +2524,8 @@ class JIT {
             .' -o '.escapeshellarg($tmpOut)
             .' '.escapeshellarg($path);
         $compileEnv = $_ENV;
-        $compileEnv['PHP_COMPILER_SELFHOST_AOT'] = '0';
+        // Self-host skips cli/vendor includes during link; required for bin/compile.php sidecar (#2633).
+        $compileEnv['PHP_COMPILER_SELFHOST_AOT'] = '1';
         unset($compileEnv['PHP_COMPILER_EMIT_HELPER_LINK'], $compileEnv['PHP_COMPILER_M3_EMIT_TU']);
         $descriptor = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
         $proc = proc_open($compileCmd, $descriptor, $pipes, $repoRoot, $compileEnv);
@@ -6349,6 +6360,15 @@ class JIT {
         if (!$this->context->functionIsRegistered($proxyName)) {
             if ($this->context->type->object->isExternalOnlyClass($declaringClassId)) {
                 $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
+                $this->context->scope->args = [];
+
+                return;
+            }
+            // Zend FFI is not lowered in self-host AOT bundles (#2633, StringPasswordCrypto::preloadLibcrypt).
+            if ($this->shouldUseSelfHostJitStubs() && 'ffi' === $declaringClassLc) {
+                $this->context->scope->toCall = $this->context->resolveFunctionProxy(
+                    $className.'::'.$nameOp->value
+                );
                 $this->context->scope->args = [];
 
                 return;

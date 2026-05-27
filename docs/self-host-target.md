@@ -34,8 +34,8 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | Layer | Today | Target |
 |-------|-------|--------|
 | **Bootstrap driver** | Zend runs `php bin/compile.php` | Compiled `bin/compile.php` |
-| **Bundle size** | **717** curated `require_once` in spine smoke (108 minimal overlap + **609** M2-only) | **718** Phase A inventory files (SSOT) |
-| **Inventory coverage** | **717/718** in spine smoke with real **`bin/vm.php`** ([#2134](https://github.com/PurHur/php-compiler/issues/2134); **#2652** emit-TU JIT batch; **`lib/VM/HashTable.php`** promoted [#2543](https://github.com/PurHur/php-compiler/issues/2543)); `src/cli_driver.php` via `cli_spine_shim` | **~100%** |
+| **Bundle size** | **717** curated `require_once` in spine smoke (108 minimal overlap + **609** M2-only) | **717** Phase A inventory files (SSOT) |
+| **Inventory coverage** | **717/717** in spine smoke with real **`bin/vm.php`** ([#2134](https://github.com/PurHur/php-compiler/issues/2134); **#2652** emit-TU JIT batch; **`lib/VM/HashTable.php`** promoted [#2543](https://github.com/PurHur/php-compiler/issues/2543)); `src/cli_driver.php` via `cli_spine_shim` | **~100%** |
 | **HelloWorld** | Native **run** ✅; strict probe **emit_path=native** ✅ (27 May 2026) | Native compile for arbitrary PHP |
 | **Bootstrap loop (M4)** | Gen-1 link + gen-2 smoke **native** ✅; full tree rebuild ⬜ | Native full revision rebuild |
 | **Vendor** | `ircmaxell/php-types` **object_ok** ([#1416](https://github.com/PurHur/php-compiler/issues/1416)); cfg/llvm parse blockers | Prelinked artifacts only (no `vendor/autoload.php`) |
@@ -54,7 +54,7 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | M4 `make bootstrap-loop-gen1-link` | ✅ gen-1 link + gen-2 smoke **`emit_path=native`** (defaults compile-driver env, #2611); full tree rebuild still open ([#1498](https://github.com/PurHur/php-compiler/issues/1498)); presenter: [GETTING-STARTED §7](GETTING-STARTED.md) ([#2464](https://github.com/PurHur/php-compiler/issues/2464)) |
 | M4 `make bootstrap-loop-probe` | 🚧 ladder — dry-run + strict slices pass; **full** may exit **2** until full gen-2 tree ([#1498](https://github.com/PurHur/php-compiler/issues/1498)); `make north-star4-verify` — [GETTING-STARTED §7](GETTING-STARTED.md) |
 | `make bootstrap-aot-link` | ✅ **71/71** |
-| `php script/bootstrap-inventory.php --check` | ✅ **718** Phase A files, **718** vm.php-path files, **0** source blockers |
+| `php script/bootstrap-inventory.php --check` | ✅ **717** Phase A files, **717** vm.php-path files, **0** source blockers |
 | `make north-star5-verify` | ✅ inventory + spine + selfhost link; vendor **1/3** `object_ok` (partial; `--strict` for 3/3) |
 
 ---
@@ -78,7 +78,7 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 
 | Indicator | Formula | May 2026 |
 |-----------|---------|----------|
-| **M2 spine progress** | `require_once` units in `compiler_lib_spine_smoke` ÷ Phase A inventory file count | **717 / 718** (`bin/vm.php` [#2134](https://github.com/PurHur/php-compiler/issues/2134); `lib/VM/HashTable.php` [#2543](https://github.com/PurHur/php-compiler/issues/2543); **#2652** emit-TU JIT batch) |
+| **M2 spine progress** | `require_once` units in `compiler_lib_spine_smoke` ÷ Phase A inventory file count | **717 / 717** (`bin/vm.php` [#2134](https://github.com/PurHur/php-compiler/issues/2134); `lib/VM/HashTable.php` [#2543](https://github.com/PurHur/php-compiler/issues/2543); **#2652** emit-TU JIT batch) |
 | **Public “Self-host” row** | Same M2 ratio until M3–M5 gates add weight ([`development-status.md`](pages/development-status.md)) | **~99%** |
 | **M5 vendor prelink** | `object_ok` packages ÷ 3 | **1 / 3** (`php-types`) |
 | **Composite (internal)** | Milestone weights in table above (M0–M1 = 100%, M2 = spine %, M3–M5 = gate %) | **~62%** |
