@@ -172,7 +172,12 @@ class Runtime {
         $script = $this->parser->parse($code, $filename);
         $this->preprocessor->traverse($script);
         $state = new State($script);
-        $this->typeReconstructor->resolve($state);
+        // M5 vendor prelink compiles literal-require bundles with stubs and without full PHPTypes doc parsing (#1416).
+        // Avoid doc-comment fragments crashing `Type::fromDecl()` while bootstrapping (#2743).
+        $vendorPrelink = getenv('PHP_COMPILER_VENDOR_PRELINK');
+        if (!is_string($vendorPrelink) || ('1' !== $vendorPrelink && 'true' !== strtolower($vendorPrelink))) {
+            $this->typeReconstructor->resolve($state);
+        }
         $this->postprocessor->traverse($script);
         $this->detector->detect($script);
         return $script;
