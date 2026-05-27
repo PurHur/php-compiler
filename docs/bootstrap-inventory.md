@@ -4995,16 +4995,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new NullSafeLivenessDetector (line 75)
 - new Optimizer\AssignOp (line 76)
 - new TypeReconstructor (line 78)
-- new Compiler (line 105)
-- new VMContext (line 110)
-- new VM (line 115)
-- new ext\types\Module (line 130)
-- new ext\standard\Module (line 131)
-- new JIT (line 157)
-- new JITContext (line 171)
-- new State (line 196)
-- new LintCompiler (line 417)
-- 33 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new Compiler (line 96)
+- new VMContext (line 101)
+- new VM (line 106)
+- new ext\types\Module (line 121)
+- new ext\standard\Module (line 122)
+- new JIT (line 148)
+- new JITContext (line 162)
+- new State (line 188)
+- new LintCompiler (line 387)
+- 32 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/VM.php`
 
