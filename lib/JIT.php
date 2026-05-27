@@ -286,6 +286,19 @@ class JIT {
             && '{main}' === $block->func->name;
     }
 
+    /** M5 emit sidecar host-compile targets — stub {main} under self-host AOT (#2697, #2699). */
+    private function isM5BootstrapSidecarScriptMain(Block $block): bool
+    {
+        if (!$this->isM3CompileDriverScriptMain($block)) {
+            return false;
+        }
+        $path = $block->scriptPath();
+
+        return str_ends_with($path, '/bin/compile.php')
+            || str_ends_with($path, '/bin/vm.php')
+            || str_ends_with($path, '/src/cli_driver.php');
+    }
+
     /** Opt-in when linking test/selfhost/compiler_helloworld_smoke/compile_driver.php (#1056). */
     private function shouldUseM3CompileDriverRealLowering(): bool
     {
@@ -448,15 +461,15 @@ class JIT {
         if (str_contains($internalName, 'opcode_type_name')) {
             return $this->compileSkippedOpcodeNameStub($internalName, $block);
         }
-        // M5 bootstrap sidecar: compiling `bin/compile.php` under `PHP_COMPILER_SELFHOST_AOT=1`
-        // only needs a linkable bundle; stub script main to avoid LLVM 9 crashing while lowering
-        // the argv driver call chain (issue #2697).
+        // M5 bootstrap sidecar: CLI entry scripts under `PHP_COMPILER_SELFHOST_AOT=1` only need a
+        // linkable bundle; stub {main} to avoid LLVM 9 crashing while lowering argv driver chains
+        // (#2697, #2699).
         if (
             $this->shouldUseSelfHostJitStubs()
             && null === $logicalName
             && null !== $block->func
             && '{main}' === $block->func->name
-            && str_ends_with($block->scriptPath(), '/bin/compile.php')
+            && $this->isM5BootstrapSidecarScriptMain($block)
         ) {
             return $this->compileSkippedCompilerSplitCfgStub($internalName, $block, '{main}');
         }
@@ -2522,6 +2535,16 @@ class JIT {
                 \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::BIN_COMPILE_SIDECAR_REL,
                 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::binCompileSentinelBlock'
             );
+            $this->registerM3EmitTuSidecarFromPath(
+                __DIR__.'/../bin/vm.php',
+                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::BIN_VM_SIDECAR_REL,
+                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::binVmSentinelBlock'
+            );
+            $this->registerM3EmitTuSidecarFromPath(
+                __DIR__.'/../src/cli_driver.php',
+                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::CLI_DRIVER_SIDECAR_REL,
+                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::cliDriverSentinelBlock'
+            );
         } elseif ('compile_smoke_m3_emit' === $logPrefix) {
             $this->registerM3EmitTuSidecarFromPath(
                 __DIR__.'/../examples/000-HelloWorld/example.php',
@@ -2553,6 +2576,16 @@ class JIT {
                 __DIR__.'/../bin/compile.php',
                 \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::BIN_COMPILE_SIDECAR_REL,
                 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::binCompileSentinelBlock'
+            );
+            $this->registerM3EmitTuSidecarFromPath(
+                __DIR__.'/../bin/vm.php',
+                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::BIN_VM_SIDECAR_REL,
+                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::binVmSentinelBlock'
+            );
+            $this->registerM3EmitTuSidecarFromPath(
+                __DIR__.'/../src/cli_driver.php',
+                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::CLI_DRIVER_SIDECAR_REL,
+                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::cliDriverSentinelBlock'
             );
         } else {
             $this->registerM3EmitTuSidecarFromPath(

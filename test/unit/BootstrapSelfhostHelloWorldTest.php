@@ -414,6 +414,9 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString('COMPILE_DRIVER_SIDECAR_REL', $jit);
         $this->assertStringContainsString('COMPILER_PHP_SIDECAR_REL', $jit);
         $this->assertStringContainsString('BIN_COMPILE_SIDECAR_REL', $jit);
+        $this->assertStringContainsString('BIN_VM_SIDECAR_REL', $jit);
+        $this->assertStringContainsString('CLI_DRIVER_SIDECAR_REL', $jit);
+        $this->assertStringContainsString('isM5BootstrapSidecarScriptMain', $jit);
         $this->assertStringNotContainsString('PHP_COMPILER_M3_COMPILER_UNIT_PROBE_EMIT', $jit);
     }
 
