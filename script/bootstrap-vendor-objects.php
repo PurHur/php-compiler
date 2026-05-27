@@ -24,6 +24,13 @@ if (is_file($applyPatches)) {
 
 $compile = in_array('--compile', $argv, true);
 $check = in_array('--check', $argv, true);
+$one = null;
+foreach ($argv as $arg) {
+    if (str_starts_with((string) $arg, '--one=')) {
+        $one = substr((string) $arg, strlen('--one='));
+        break;
+    }
+}
 $bundlesDir = $root.'/test/bootstrap-vendor-prelink/generated';
 $prelinkDir = $root.'/prelinked/bootstrap-vendor';
 $manifestPath = $prelinkDir.'/manifest.json';
@@ -125,6 +132,9 @@ putenv('PHP_COMPILER_KEEP_OBJECT_FILE=1');
 $phpBin = PHP_BINARY;
 $failures = 0;
 foreach (BOOTSTRAP_VENDOR_PRELINK_PACKAGES as $package => $role) {
+    if (null !== $one && $one !== $package && $one !== bootstrapVendorPrelinkSlug($package)) {
+        continue;
+    }
     $slug = bootstrapVendorPrelinkSlug($package);
     $bundleRel = $manifest['packages'][$package]['bundle'];
     $bundleAbs = $root.'/'.$bundleRel;
@@ -163,18 +173,42 @@ foreach (BOOTSTRAP_VENDOR_PRELINK_PACKAGES as $package => $role) {
         continue;
     }
 
-  $blocker = 0 !== $code
-      ? 'compile exit '.$code.' (vendor bundle AOT; blocked on M3 emit / Zend parse of vendor — #1416, #1402)'
-      : 'missing object file after compile';
-    if ([] !== $output) {
-        $last = (string) end($output);
-        if (preg_match('/:\s*(.+)$/', $last, $m)) {
-            $blocker .= ' — '.$m[1];
+    $blocker = 0 !== $code
+        ? 'compile exit '.$code.' (vendor bundle AOT; blocked on M3 emit / Zend parse of vendor — #1416, #1402)'
+        : 'missing object file after compile';
+
+    $firstActionable = null;
+    foreach ($output as $line) {
+        $line = (string) $line;
+        if (str_contains($line, 'PHP Fatal error:') || str_contains($line, 'Fatal error:') || str_contains($line, 'Uncaught ')) {
+            $firstActionable = $line;
+            break;
         }
     }
+    if (null === $firstActionable && [] !== $output) {
+        $last = (string) end($output);
+        if ('' !== $last) {
+            $firstActionable = $last;
+        }
+    }
+    if (null !== $firstActionable) {
+        $blocker .= ' — '.$firstActionable;
+    }
+
+    $logPath = $buildBase.'.log';
+    file_put_contents($logPath, implode("\n", array_map('strval', $output))."\n");
     $manifest['packages'][$package]['status'] = 139 === $code ? 'compile_segfault' : 'compile_failed';
     $manifest['packages'][$package]['blocker'] = $blocker;
     fwrite(STDERR, "FAIL {$package}: {$blocker}\n");
+    fwrite(STDERR, "  cmd: {$cmd}\n");
+    fwrite(STDERR, "  log: {$logPath}\n");
+    if ([] !== $output) {
+        $tail = array_slice($output, -60);
+        fwrite(STDERR, "  tail:\n");
+        foreach ($tail as $line) {
+            fwrite(STDERR, "    ".(string) $line."\n");
+        }
+    }
     ++$failures;
 }
 
