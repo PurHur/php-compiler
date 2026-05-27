@@ -1016,7 +1016,7 @@ class JIT {
     }
 
     /**
-     * M3 compile-driver loadJitContext (#1402, #2846): separate TU from loadJit to avoid LLVM 9 inlining crash.
+     * M3 compile-driver loadJitContext (#1402, #2846): separate FUNCDEF from loadJit to avoid LLVM 9 inlining crash.
      */
     private function compileRuntimeLoadJitContextM3Native(
         string $internalName,
