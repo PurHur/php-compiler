@@ -184,6 +184,26 @@ class JIT {
         return '1' === $flag || 'true' === strtolower((string) $flag);
     }
 
+    /** Bundle-only PHP constants (spine smoke defines; bin/compile.php AOT folds false — #2600). */
+    private function jitFoldPhpCompilerBundleConstant(string $label): ?JIT\Variable
+    {
+        if (
+            'PHP_COMPILER_LIB_SPINE_SMOKE' !== $label
+            && !str_ends_with($label, '\\PHP_COMPILER_LIB_SPINE_SMOKE')
+        ) {
+            return null;
+        }
+        $i1 = $this->context->getTypeFromString('int1');
+        $truth = $this->shouldUseSelfHostJitStubs() ? 1 : 0;
+
+        return new JIT\Variable(
+            $this->context,
+            JIT\Variable::TYPE_NATIVE_BOOL,
+            JIT\Variable::KIND_VALUE,
+            $i1->constInt($truth, false)
+        );
+    }
+
     /**
      * Link-time only: skip non-jittable ext/ class bodies when building native emit helper (#1983).
      * Does not enable self-host Runtime/Compiler stubs (unlike PHP_COMPILER_SELFHOST_AOT).
@@ -3394,23 +3414,9 @@ class JIT {
                                 $label = (string) $ns->value.'\\'.$label;
                             }
                         }
-                        if (
-                            $this->shouldUseSelfHostJitStubs()
-                            && (
-                                'PHP_COMPILER_LIB_SPINE_SMOKE' === $label
-                                || str_ends_with($label, '\\PHP_COMPILER_LIB_SPINE_SMOKE')
-                            )
-                        ) {
-                            $i1 = $this->context->getTypeFromString('int1');
-                            $this->assignOperand(
-                                $block->getOperand($op->arg1),
-                                new JIT\Variable(
-                                    $this->context,
-                                    JIT\Variable::TYPE_NATIVE_BOOL,
-                                    JIT\Variable::KIND_VALUE,
-                                    $i1->constInt(1, false)
-                                )
-                            );
+                        $bundleConst = $this->jitFoldPhpCompilerBundleConstant($label);
+                        if (null !== $bundleConst) {
+                            $this->assignOperand($block->getOperand($op->arg1), $bundleConst);
                             break;
                         }
                         throw new \RuntimeException('Unknown constant fetch: '.$label);

@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # M3 HelloWorld self-host probe (issue #1056): link selfhost bundle, native or Zend emit, run natively.
 set -euo pipefail
+if [[ "${BOOTSTRAP_M3_HELLOWORLD_STRICT:-0}" == "1" ]]; then
+  export BOOTSTRAP_M3_LINK_COMPILE_DRIVER="${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-1}"
+  export BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING="${BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING:-1}"
+  export BOOTSTRAP_M3_RUNTIME_COMPILE="${BOOTSTRAP_M3_RUNTIME_COMPILE:-1}"
+fi
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ENTRY="${ROOT}/test/selfhost/compiler_helloworld_smoke/main.php"
 PROBE="${ROOT}/build/selfhost-helloworld"
@@ -45,6 +50,13 @@ helloworld_m3_emit_next_lower() {
 source "$(dirname "$0")/php-env.sh"
 ci_apply_llvm_memory_env
 
+# Strict mode requires native emit — auto-enable compile-driver link env (mirror compile-smoke; #2610).
+if [[ "${BOOTSTRAP_M3_HELLOWORLD_STRICT:-0}" == "1" ]]; then
+  export BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1
+  export BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING=1
+  export BOOTSTRAP_M3_RUNTIME_COMPILE=1
+fi
+
 m3_exit_label() {
   local code=$1
   if [[ "${code}" -eq 139 ]]; then
@@ -78,7 +90,7 @@ if [[ -z "${PHP_COMPILER_LLVM_PATH:-}" || ! -f "${PHP_COMPILER_LLVM_PATH}/libLLV
   exit 2
 fi
 
-# Default-on native compile-driver when LLVM present (mirror bootstrap-loop-gen1-link.sh #2611; #2620).
+# Default-on native compile-driver when LLVM present (mirror bootstrap-loop-gen1-link; #2620).
 : "${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:=1}"
 : "${BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING:=1}"
 : "${BOOTSTRAP_M3_RUNTIME_COMPILE:=1}"

@@ -424,7 +424,7 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
             'env',
             'BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1',
             'BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING=1',
-            'BOOTSTRAP_M3_RUNTIME_COMPILE=1',
+            'BOOTSTRAP_M3_RUNTIME_COMPILE=0',
             'BOOTSTRAP_M3_HELLOWORLD_STRICT=1',
             'bash',
             $script,
@@ -440,6 +440,23 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString('block_reason=', $out);
         $this->assertStringNotContainsString('OK emit_path=native', $out);
         $this->assertStringNotContainsString('M3_NATIVE_COMPILE=1 emit_path=native', $out);
+    }
+
+    public function testHelloWorldProbeDefaultNativeEmitWhenLlvmPresent(): void
+    {
+        if (!LlvmToolchain::isReady(self::$root)) {
+            $this->markTestSkipped('LLVM 9 not available for M3 HelloWorld default native emit test.');
+        }
+
+        $script = self::$root.'/script/bootstrap-selfhost-helloworld-probe.sh';
+        $prefix = LlvmToolchain::envPrefix(self::$root);
+        $cmd = implode(' ', array_map('escapeshellarg', [...$prefix, 'bash', $script])).' 2>&1';
+        exec($cmd, $lines, $exitCode);
+
+        $out = implode("\n", $lines);
+        $this->assertSame(0, $exitCode, $out);
+        $this->assertStringContainsString('OK emit_path=native', $out);
+        $this->assertStringNotContainsString('OK emit_path=zend partial', $out);
     }
 
     public function testJitStubsFirstClassCallableForSelfHost(): void

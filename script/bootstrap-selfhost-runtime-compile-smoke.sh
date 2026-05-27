@@ -49,16 +49,10 @@ if [[ -z "${PHP_COMPILER_LLVM_PATH:-}" || ! -f "${PHP_COMPILER_LLVM_PATH}/libLLV
   exit 2
 fi
 
-# Default-on native compile-driver when LLVM present (mirror bootstrap-loop-gen1-link.sh #2611; #2620).
-if [[ "${BOOTSTRAP_M3_RUNTIME_COMPILE_SMOKE_STRICT:-0}" == "1" ]]; then
-  export BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1
-  export BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING=1
-  export BOOTSTRAP_M3_RUNTIME_COMPILE=1
-else
-  : "${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:=1}"
-  : "${BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING:=1}"
-  : "${BOOTSTRAP_M3_RUNTIME_COMPILE:=1}"
-fi
+# Default-on native compile-driver when LLVM present (mirror bootstrap-loop-gen1-link; #2620).
+: "${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:=1}"
+: "${BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING:=1}"
+: "${BOOTSTRAP_M3_RUNTIME_COMPILE:=1}"
 
 mkdir -p "${ROOT}/build"
 export PHP_COMPILER_SELFHOST_AOT=1

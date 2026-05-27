@@ -44,6 +44,28 @@ PHP;
         $this->assertStringNotContainsString('Source type: 196', $stderr);
     }
 
+    /** bin/compile.php cli_driver guard — fold bundle constant outside spine smoke (#2600). */
+    public function testCliDriverLibSpineConstantFoldsForBinCompileDriver(): void
+    {
+        $this->skipUnlessLlvmReady();
+        $source = <<<'PHP'
+<?php
+declare(strict_types=1);
+function bootstrap_lib_spine_branch(): string {
+    if (defined('PHP_COMPILER_LIB_SPINE_SMOKE') && PHP_COMPILER_LIB_SPINE_SMOKE) {
+        return 'spine';
+    }
+    return 'driver';
+}
+echo bootstrap_lib_spine_branch(), "\n";
+PHP;
+        $stderr = $this->compileSource($source, 'PHP_COMPILER_LIB_SPINE_SMOKE cli_driver fold');
+        $this->assertStringNotContainsString(
+            'Unknown constant fetch: PHP_COMPILER_LIB_SPINE_SMOKE',
+            $stderr
+        );
+    }
+
     private function skipUnlessLlvmReady(): void
     {
         if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
