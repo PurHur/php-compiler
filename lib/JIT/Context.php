@@ -367,6 +367,7 @@ class Context {
         }
 
         SuperglobalInit::initialize($this);
+        CliArgvGlobalInit::initialize($this);
         if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType
             || Builtin::LOAD_TYPE_EMBED === $this->loadType) {
             SuperglobalInit::declareRefresh($this);
@@ -431,6 +432,7 @@ class Context {
                 $main->getParam(0),
                 $main->getParam(1)
             );
+            CliArgvGlobalInit::emitRefreshAfterStoreArgv($this);
             $this->builder->call($this->initFunc);
             if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
                 Builtin\HttpResponseCode::emitResetForStandaloneMain($this);
