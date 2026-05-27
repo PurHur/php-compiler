@@ -148,7 +148,7 @@ final class BootstrapBootstrapLoopProbeTest extends TestCase
         if (str_contains($out, 'M2 lib spine smoke') && str_contains($out, 'failed (exit')) {
             $this->markTestSkipped('M2 spine link not green in this environment; dry-run documents spine blocker.');
         }
-        if (str_contains($out, 'M3 HelloWorld probe (partial') && str_contains($out, 'failed (exit')) {
+        if (str_contains($out, 'M3 HelloWorld probe') && str_contains($out, 'failed (exit')) {
             $this->markTestSkipped('M3 partial probe not green in this environment.');
         }
         if (str_contains($out, 'M4 gen-1 link failed')) {
