@@ -1417,7 +1417,13 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('ci_run_bootstrap_m4_loop_probe', $common);
         $this->assertStringContainsString('ci_run_bootstrap_m4_full_spine_probe', $common);
         $this->assertStringContainsString('BOOTSTRAP_M4_LOOP_PROBE', $common);
-        $this->assertStringContainsString('BOOTSTRAP_M4_LOOP_PROBE:-0', $common);
+        $this->assertStringContainsString('full ladder, issue #1498, #2780', $common);
+        $m4Start = strpos($common, 'ci_run_bootstrap_m4_loop_probe()');
+        $m4End = strpos($common, 'ci_run_bootstrap_m4_full_spine_probe()');
+        $this->assertNotFalse($m4Start);
+        $this->assertNotFalse($m4End);
+        $m4Block = substr($common, $m4Start, $m4End - $m4Start);
+        $this->assertStringNotContainsString('--dry-run', $m4Block);
         $this->assertStringContainsString('BOOTSTRAP_M4_FULL_SPINE_PROBE_GATE', $common);
         $this->assertStringContainsString('BOOTSTRAP_M4_FULL_SPINE_PROBE_GATE:-0', $common);
         $this->assertStringContainsString('bootstrap-loop-probe.sh', $common);
@@ -1430,7 +1436,7 @@ final class CiScriptsTest extends TestCase
             $defaults
         );
         $this->assertStringContainsString(
-            'BOOTSTRAP_M4_LOOP_PROBE="${BOOTSTRAP_M4_LOOP_PROBE:-0}"',
+            'BOOTSTRAP_M4_LOOP_PROBE="${BOOTSTRAP_M4_LOOP_PROBE:-1}"',
             $defaults
         );
         $this->assertStringContainsString(
@@ -1444,11 +1450,13 @@ final class CiScriptsTest extends TestCase
         $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
         $this->assertStringContainsString('BOOTSTRAP_LOOP_PROBE_GATE', $doc);
         $this->assertStringContainsString('BOOTSTRAP_M4_LOOP_PROBE', $doc);
-        $this->assertStringContainsString('bootstrap-loop-probe.sh --dry-run', $doc);
+        $this->assertStringContainsString('| `BOOTSTRAP_M4_LOOP_PROBE` | `1` |', $doc);
+        $this->assertStringContainsString('#2780', $doc);
 
         $docSelfhost = (string) file_get_contents(dirname(__DIR__, 2).'/docs/bootstrap-selfhost.md');
         $this->assertStringContainsString('BOOTSTRAP_LOOP_PROBE_GATE=1', $docSelfhost);
-        $this->assertStringContainsString('BOOTSTRAP_M4_LOOP_PROBE=1', $docSelfhost);
+        $this->assertStringContainsString('BOOTSTRAP_M4_LOOP_PROBE=0', $docSelfhost);
+        $this->assertStringContainsString('#2780', $docSelfhost);
         $this->assertStringContainsString('bootstrap-loop-full-spine-probe', $docSelfhost);
         $this->assertStringContainsString('BOOTSTRAP_M4_FULL_SPINE_PROBE_GATE=1', $docSelfhost);
         $this->assertStringContainsString('ci-fast.sh', $doc);
