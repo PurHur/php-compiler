@@ -194,6 +194,15 @@ PHP;
         }
 
         $this->assertSame(0, $exitCode, 'self-host bin/compile.php AOT compile: '.$stderr);
+        $this->assertStringNotContainsString('LinkerProcessPolyfill::run()', $stderr);
+        $this->assertStringNotContainsString('compile-time literal path', $stderr);
+    }
+
+    public function testBinCompilePhpUsesLiteralLinkerProcessPolyfillInclude(): void
+    {
+        $compile = (string) file_get_contents(dirname(__DIR__, 2).'/bin/compile.php');
+        $this->assertStringContainsString("require_once 'lib/AOT/LinkerProcessPolyfill.php'", $compile);
+        $this->assertStringNotContainsString("__DIR__.'/../lib/AOT/LinkerProcessPolyfill.php'", $compile);
     }
 
     private function skipUnlessLlvmReady(): void
