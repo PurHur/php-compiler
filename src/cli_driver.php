@@ -21,45 +21,57 @@ if (
     return;
 }
 
-$autoload = getenv('PHP_COMPILER_VENDOR_AUTOLOAD');
-if (false === $autoload || '' === $autoload) {
-    $autoload = __DIR__.'/../vendor/autoload.php';
-}
+$autoloadEnv = getenv('PHP_COMPILER_VENDOR_AUTOLOAD');
+$skipVendor = getenv('PHP_COMPILER_CLI_SKIP_VENDOR');
 // Keep vendor out of literal include discovery for bootstrap AOT/self-host emit paths (issue #2640).
-if ('1' !== getenv('PHP_COMPILER_CLI_SKIP_VENDOR') && 'true' !== strtolower((string) getenv('PHP_COMPILER_CLI_SKIP_VENDOR'))) {
-    if (!is_file($autoload)) {
-        fwrite(STDERR, "Missing vendor autoload at {$autoload} (did you run composer install?)\n");
+if ('1' !== $skipVendor && 'true' !== strtolower((string) $skipVendor)) {
+    // In JIT/AOT, include/require must use a compile-time literal path. If an override is provided,
+    // fail fast with a clear message instead of producing non-compilable code.
+    if (('1' === getenv('PHP_COMPILER_SELFHOST_AOT') || 'true' === strtolower((string) getenv('PHP_COMPILER_SELFHOST_AOT')))
+        && is_string($autoloadEnv) && '' !== $autoloadEnv
+    ) {
+        fwrite(STDERR, "PHP_COMPILER_VENDOR_AUTOLOAD override is not supported under PHP_COMPILER_SELFHOST_AOT (must be a literal require).\n");
+        exit(1);
+    }
+
+    $autoloadDefault = __DIR__.'/../vendor/autoload.php';
+    if (!is_file($autoloadDefault)) {
+        fwrite(STDERR, "Missing vendor autoload at {$autoloadDefault} (did you run composer install?)\n");
         exit(1);
     }
     /** @psalm-suppress UnresolvableInclude */
-    require $autoload;
+    require __DIR__.'/../vendor/autoload.php';
 } else {
     // Minimal project autoloader for self-host bootstrap paths where composer/vendor is out of scope (issue #2640).
     // Intentionally does not attempt to load vendor namespaces (PHPCfg/PHPTypes/PhpParser/etc).
-    spl_autoload_register(static function (string $class): void {
-        $prefix = 'PHPCompiler\\';
-        if (!str_starts_with($class, $prefix)) {
-            return;
-        }
-        $rel = substr($class, strlen($prefix));
-        $relPath = str_replace('\\', '/', $rel).'.php';
+    if (!function_exists('php_compiler_cli_minimal_autoload')) {
+        function php_compiler_cli_minimal_autoload(string $class): void
+        {
+            $prefix = 'PHPCompiler\\';
+            if (!str_starts_with($class, $prefix)) {
+                return;
+            }
+            $rel = substr($class, strlen($prefix));
+            $relPath = str_replace('\\', '/', $rel).'.php';
 
-        $libPath = __DIR__.'/../lib/'.$relPath;
-        if (is_file($libPath)) {
-            /** @psalm-suppress UnresolvableInclude */
-            require $libPath;
-            return;
-        }
-
-        if (str_starts_with($rel, 'Ext\\Standard\\')) {
-            $extRel = substr($rel, strlen('Ext\\Standard\\'));
-            $extPath = __DIR__.'/../ext/standard/'.str_replace('\\', '/', $extRel).'.php';
-            if (is_file($extPath)) {
+            $libPath = __DIR__.'/../lib/'.$relPath;
+            if (is_file($libPath)) {
                 /** @psalm-suppress UnresolvableInclude */
-                require $extPath;
+                require $libPath;
+                return;
+            }
+
+            if (str_starts_with($rel, 'Ext\\Standard\\')) {
+                $extRel = substr($rel, strlen('Ext\\Standard\\'));
+                $extPath = __DIR__.'/../ext/standard/'.str_replace('\\', '/', $extRel).'.php';
+                if (is_file($extPath)) {
+                    /** @psalm-suppress UnresolvableInclude */
+                    require $extPath;
+                }
             }
         }
-    });
+    }
+    spl_autoload_register('php_compiler_cli_minimal_autoload');
 }
 
 $memoryLimit = getenv('PHP_COMPILER_MEMORY_LIMIT');
