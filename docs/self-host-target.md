@@ -51,7 +51,7 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | M2 `BOOTSTRAP_LIB_SPINE_SMOKE=1` spine link | ✅ `compiler_lib_spine_smoke bundle OK` |
 | M3 `make bootstrap-selfhost-helloworld` | 🚧 partial — HelloWorld runs natively; emit uses Zend |
 | M4 `make bootstrap-loop-gen1-link` | 🚧 partial — gen-1 link + gen-2 **Zend** emit (`emit_path=zend partial`); `BOOTSTRAP_M4_LINK_COMPILE_DRIVER=1` for `emit_path=native`; `BOOTSTRAP_M4_GEN2_STRICT=1` refuses Zend fallback ([#1498](https://github.com/PurHur/php-compiler/issues/1498), [#2115](https://github.com/PurHur/php-compiler/issues/2115)); five-minute presenter: [GETTING-STARTED §7](GETTING-STARTED.md) ([#2464](https://github.com/PurHur/php-compiler/issues/2464)) |
-| M4 `make bootstrap-loop-probe` | 🚧 ladder — `--dry-run` validates lint+M2+M3 partial+gen-1; full exits **2** until M3 strict ([#1498](https://github.com/PurHur/php-compiler/issues/1498)); bundled in `make north-star4-verify` — [GETTING-STARTED §7](GETTING-STARTED.md) |
+| M4 `make bootstrap-loop-probe` | 🚧 ladder — `--dry-run` validates lint+M2+M3 HelloWorld strict (**Makefile parity**, #2612)+gen-1; **full** exits **2** until gen-2 native emit ([#1498](https://github.com/PurHur/php-compiler/issues/1498)); bundled in `make north-star4-verify` — [GETTING-STARTED §7](GETTING-STARTED.md) |
 | `make bootstrap-aot-link` | ✅ **71/71** |
 | `php script/bootstrap-inventory.php --check` | ✅ **717** Phase A files, **718** vm.php-path files, **0** source blockers |
 
@@ -190,7 +190,7 @@ M4 bootstrap-loop probe ([#1498](https://github.com/PurHur/php-compiler/issues/1
 
 ```bash
 # Prerequisites only (no M3 strict native emit):
-./script/bootstrap-loop-probe.sh --dry-run   # exit 0 when lint + M2 spine + M3 partial green
+./script/bootstrap-loop-probe.sh --dry-run   # exit 0 when lint + M2 spine + M3 HelloWorld strict + gen-1 green (#2612)
 
 # Full gate (exit 2 until M3 strict native emit):
 make bootstrap-loop-probe

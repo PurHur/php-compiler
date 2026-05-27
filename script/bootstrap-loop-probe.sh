@@ -14,20 +14,20 @@ usage() {
   cat <<'EOF'
 Usage: script/bootstrap-loop-probe.sh [--dry-run]
 
-M4 bootstrap-loop probe (#1498). Runs M2 spine + M3 partial + gen-1 link/gen-2 attempt,
-then (unless --dry-run) M3 strict native emit and gen-1→gen-2 native slice.
+M4 bootstrap-loop probe (#1498). Runs M2 spine + M3 HelloWorld with the same strict env as
+`make bootstrap-selfhost-helloworld` (#2612), then gen-1 link / gen-2 attempt.
 
 Exit codes:
-  0  --dry-run: lint + M2 spine + M3 partial + gen-1 link (gen-2 Zend partial OK) green
-     full:      same + M3 strict + gen-1→gen-2 native emit (default on; opt-out BOOTSTRAP_M4_RUNTIME_COMPILE=0; #2599)
-  1  hard failure (missing entry/scripts, lint, M2 spine, M3 partial, or gen-1 link)
-  2  LLVM 9 not found (skip), or full mode: M3 strict / gen-2 native emit not ready
+  0  --dry-run: lint + M2 spine + M3 HelloWorld strict + gen-1 link (gen-2 Zend partial OK)
+     full:      same, then require emit_path=native in gen-1 log for exit 0
+  1  hard failure (missing entry/scripts, lint, M2 spine, M3 HelloWorld, or gen-1 link)
+  2  LLVM 9 not found (skip), or full mode: gen-2 native emit not ready (exit 2 after M3 green)
   3  reserved
 
 Examples:
   make bootstrap-loop-probe
   ./script/bootstrap-loop-probe.sh --dry-run
-  BOOTSTRAP_M3_HELLOWORLD_STRICT=1 make bootstrap-selfhost-helloworld
+  make bootstrap-selfhost-helloworld
 EOF
 }
 
@@ -82,12 +82,12 @@ m4_run_subprobe() {
 
 echo "=== M4 bootstrap-loop probe (#1498) ==="
 if [[ "${DRY_RUN}" -eq 1 ]]; then
-  echo "mode: --dry-run (lint + M2 spine + M3 partial; no M3 strict native emit)"
+  echo "mode: --dry-run (lint + M2 spine + M3 HelloWorld Makefile parity — strict native emit; no gen-2 strict slice)"
 else
-  echo "mode: full (requires BOOTSTRAP_M3_HELLOWORLD_STRICT=1 after prerequisite ladder)"
+  echo "mode: full (M3 HelloWorld strict before gen-1; then gen-1→gen-2 slice per #2611/#2612)"
 fi
 echo ""
-echo "Exit codes: 0=green gate | 1=hard failure | 2=LLVM skip or M3 strict blocks M4 | 3=reserved"
+echo "Exit codes: 0=green gate | 1=hard failure | 2=LLVM skip or M4 gen-2 native blocked | 3=reserved"
 echo ""
 
 if [[ ! -f "${ENTRY}" ]]; then
@@ -139,22 +139,23 @@ if ! m4_run_subprobe "M2 lib spine smoke (native link + run)" bash "${SPINE_LINK
   exit 1
 fi
 
-if ! m4_run_subprobe "M3 HelloWorld probe (partial — native emit when LLVM present)" \
+if ! m4_run_subprobe "M3 HelloWorld probe (Makefile parity — strict native emit, #2612)" \
   env BOOTSTRAP_M3_LINK_COMPILE_DRIVER="${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-1}" \
   BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING="${BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING:-1}" \
   BOOTSTRAP_M3_RUNTIME_COMPILE="${BOOTSTRAP_M3_RUNTIME_COMPILE:-1}" \
+  BOOTSTRAP_M3_HELLOWORLD_STRICT=1 \
   bash "${M3_PROBE}"; then
-  echo "bootstrap-loop-probe: M3 partial prerequisite failed (exit 1)" >&2
+  echo "bootstrap-loop-probe: M3 HelloWorld prerequisite failed (exit 1)" >&2
   echo "bootstrap-loop-probe: hint: make bootstrap-selfhost-helloworld" >&2
   exit 1
 fi
 
 echo ""
-echo "Prerequisites OK through M3 partial (native HelloWorld run; emit_path=native when helper links)."
+echo "Prerequisites OK through M3 HelloWorld (strict; same env as Makefile bootstrap-selfhost-helloworld)."
 echo ""
 
 GEN1_LOG="$(mktemp)"
-trap 'rm -f "${GEN1_LOG}" "${M3_STRICT_OUT:-}"' EXIT
+trap 'rm -f "${GEN1_LOG}"' EXIT
 echo "==> M4 gen-1 link + gen-2 compile attempt (script defaults native emit when LLVM present; #2611)"
 set +e
 (
@@ -192,45 +193,20 @@ echo ""
 if [[ "${DRY_RUN}" -eq 1 ]]; then
   echo "bootstrap-loop-probe: --dry-run OK (exit 0)"
   echo ""
-  echo "Full M4 loop (without --dry-run): M3 strict + gen-1→gen-2 native emit."
+  echo "Full M4 loop (without --dry-run): same M3 HelloWorld strict as above + gen-1→gen-2 native slice."
   echo "  make bootstrap-loop-probe"
-  echo "  make bootstrap-selfhost-helloworld  # default native emit (strict; #2522)"
+  echo "  make bootstrap-selfhost-helloworld  # same strict env as the M3 step here (#2612)"
   echo "Next: gen-1 compiles bin/compile.php (or src/cli.php) → full gen-2 tree (#1467, #1521)"
   exit 0
 fi
 
-M3_STRICT_OUT="$(mktemp)"
-echo "==> M3 native-emit prerequisite (strict)"
-set +e
-(
-  cd "${ROOT}"
-  BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1 \
-  BOOTSTRAP_M3_RUNTIME_COMPILE=1 \
-  BOOTSTRAP_M3_HELLOWORLD_STRICT=1 \
-  bash "${M3_PROBE}"
-) >"${M3_STRICT_OUT}" 2>&1
-M3_CODE=$?
-set -e
-
-if [[ "${M3_CODE}" -ne 0 ]]; then
-  echo "bootstrap-loop-probe: M3 strict native emit not ready — M4 blocked (exit 2)" >&2
-  echo "bootstrap-loop-probe: close M3 first (#1402, docs/bootstrap-m5-fast-path.md)" >&2
-  echo "bootstrap-loop-probe: hint: make bootstrap-selfhost-helloworld" >&2
-  echo "bootstrap-loop-probe: use --dry-run to validate lint + spine + M3 partial without strict" >&2
-  m4_probe_tail "${M3_STRICT_OUT}"
-  exit 2
-fi
-
-grep -E 'bootstrap-selfhost-helloworld-probe: OK' "${M3_STRICT_OUT}" || tail -n 5 "${M3_STRICT_OUT}"
-
-echo ""
-echo "bootstrap-loop-probe: M3 strict prerequisite OK"
+echo "==> M4 exit status (M3 HelloWorld strict already verified above)"
 if grep -q 'emit_path=native' "${GEN1_LOG}" 2>/dev/null; then
   echo "bootstrap-loop-probe: M4 gen-1→gen-2 native slice OK (exit 0)"
   exit 0
 fi
 
-echo "bootstrap-loop-probe: M3 strict OK; M4 gen-2 native emit still blocked (exit 2)" >&2
+echo "bootstrap-loop-probe: M3 HelloWorld strict OK; M4 gen-2 native emit still blocked (exit 2)" >&2
 echo "bootstrap-loop-probe: gen-1 link log lacked emit_path=native — check gen-1 native emit output" >&2
 echo "bootstrap-loop-probe: NEXT: make bootstrap-loop-gen1-link" >&2
 m4_probe_tail "${GEN1_LOG}" 5
