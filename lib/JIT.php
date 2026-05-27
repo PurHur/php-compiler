@@ -1998,6 +1998,11 @@ class JIT {
             && str_contains($lower, '\\web\\superglobals::');
     }
 
+    private function isSuperglobalsM3CompileDriverLoweringMethod(string $lower): bool
+    {
+        return $this->isSuperglobalsRealLoweringMethod($lower);
+    }
+
     /**
      * ConstStringFolder real LLVM lowering during self-host AOT (#816, #1056).
      *
