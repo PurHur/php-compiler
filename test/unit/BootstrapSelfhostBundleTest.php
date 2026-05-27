@@ -47,6 +47,14 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'lib/Web/ProjectDeploy.php',
         'lib/AOT/ProjectGraph.php',
         'lib/Ast/GroupUseStripper.php',
+        'lib/JIT/EmitTuMode.php',
+        'lib/JIT/M3EmitTuTrivialEchoAot.php',
+        'lib/JIT/RuntimeEmitTuAlloc.php',
+        'lib/JIT/RuntimeEmitTuInit.php',
+        'lib/JIT/RuntimeInitCompiler.php',
+        'lib/JIT/VmDriverExecuteNative.php',
+        'lib/JIT/VmSpineSmokeNative.php',
+        'lib/JIT/VmUnitProbeExecuteNative.php',
         'lib/Web/DevServer.php',
         'lib/Web/ManifestValidator.php',
         'lib/Web/Params.php',
@@ -375,7 +383,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         $this->assertFileExists($entry);
         $contents = (string) file_get_contents($entry);
         $count = substr_count($contents, 'require_once __DIR__');
-        $this->assertSame(662, $count, 'M2 spine 662 require_once units (#2134; #2634 GroupUseStripper)');
+        $this->assertSame(670, $count, 'M2 spine 670 require_once units (#2652 emit-TU JIT batch)');
         foreach (self::LIB_SPINE_SMOKE_NEW_UNITS as $unit) {
             $this->assertStringContainsString(
                 "require_once __DIR__.'/../../../{$unit}';",
