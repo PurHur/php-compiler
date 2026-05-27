@@ -94,6 +94,10 @@ final class JitCompilerSelfHostStubTest extends TestCase
         'discoverabsolutepaths',
         'pathsfrommainscopeforbundle',
         'pathsfromscript',
+        'walkcfgblock',
+        'walkcfgblockforbundle',
+        'walkcfgblockinternal',
+        'isbundlescopeboundary',
     ];
 
     /** @var list<string> */
@@ -119,10 +123,6 @@ final class JitCompilerSelfHostStubTest extends TestCase
         'discoverabsolutepaths',
         'pathsfrommainscopeforbundle',
         'pathsfromscript',
-        'walkcfgblock',
-        'walkcfgblockforbundle',
-        'isbundlescopeboundary',
-        'walkcfgblockinternal',
     ];
 
     /** @var list<string> */
