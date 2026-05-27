@@ -24,21 +24,20 @@ if [[ ! -x "${PHP_COMPILER_M3_OUT}" ]]; then
   exit 1
 fi
 
-# Stage 2: native driver compiles a fixture via M3 emit helper (#2697).
+# Stage 2: native driver compiles via argv `bin/compile.php -o` shape (#1937, #2697).
 AOT_OUT="${ROOT}/build/bootstrap-native-driver-smoke"
 SMOKE_SOURCE="${ROOT}/test/bootstrap-aot/compiler_smoke_standalone.php"
 rm -f "${AOT_OUT}"
 set +e
 compile_out="$(
-  env PHP_COMPILER_M3_SOURCE="${SMOKE_SOURCE}" \
-    PHP_COMPILER_M3_OUT="${AOT_OUT}" \
-    "${PHP_COMPILER_M3_OUT}" 2>&1
+  env -u PHP_COMPILER_M3_SOURCE -u PHP_COMPILER_M3_OUT \
+    "${PHP_COMPILER_M3_OUT}" -o "${AOT_OUT}" "${SMOKE_SOURCE}" 2>&1
 )"
 compile_code=$?
 set -e
 printf '%s\n' "${compile_out}"
 if [[ "${compile_code}" -ne 0 ]] || [[ ! -x "${AOT_OUT}" ]]; then
-  echo "bootstrap-native-compile-driver-smoke: native driver compile failed (exit ${compile_code})" >&2
+  echo "bootstrap-native-compile-driver-smoke: argv -o compile failed (exit ${compile_code})" >&2
   exit "${compile_code:-1}"
 fi
 if ! grep -qE 'compile_smoke_m3_emit: compile OK|helloworld_compile_smoke: compile OK' <<< "${compile_out}"; then
@@ -52,4 +51,21 @@ if ! grep -q 'compiler smoke' <<< "${run_out}"; then
   exit 1
 fi
 
-echo "bootstrap-native-compile-driver-smoke: OK ${PHP_COMPILER_M3_OUT} -> ${AOT_OUT}"
+# Stage 3: env bridge still works (M3 compat).
+AOT_OUT_ENV="${ROOT}/build/bootstrap-native-driver-smoke-env"
+rm -f "${AOT_OUT_ENV}"
+set +e
+env_out="$(
+  env PHP_COMPILER_M3_SOURCE="${SMOKE_SOURCE}" \
+    PHP_COMPILER_M3_OUT="${AOT_OUT_ENV}" \
+    "${PHP_COMPILER_M3_OUT}" 2>&1
+)"
+env_code=$?
+set -e
+if [[ "${env_code}" -ne 0 ]] || [[ ! -x "${AOT_OUT_ENV}" ]]; then
+  echo "bootstrap-native-compile-driver-smoke: env M3 compile failed (exit ${env_code})" >&2
+  printf '%s\n' "${env_out}" >&2
+  exit 1
+fi
+
+echo "bootstrap-native-compile-driver-smoke: OK argv -o and env (${PHP_COMPILER_M3_OUT})"

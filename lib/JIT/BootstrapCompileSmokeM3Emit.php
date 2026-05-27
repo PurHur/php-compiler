@@ -22,7 +22,7 @@ final class BootstrapCompileSmokeM3Emit
 
     private static int $seq = 0;
 
-    /** M3 emit TU {main}: read PHP_COMPILER_M3_* env and run native bridge (#1937). */
+    /** M3 emit TU {main}: env PHP_COMPILER_M3_* or argv `-o OUT SOURCE` (#1937, #2697). */
     public static function emitMainEntry(Context $context, string $logPrefix): void
     {
         $i64 = $context->getTypeFromString('int64');
@@ -34,17 +34,98 @@ final class BootstrapCompileSmokeM3Emit
         $outNull = $context->builder->icmp(Builder::INT_EQ, $outFile, $strPtr->constNull());
         $envBad = $context->builder->or($srcNull, $outNull);
         $envOk = BasicBlockHelper::append($context, 'csm3_env_ok');
-        $envFail = BasicBlockHelper::append($context, 'csm3_env_fail');
-        $context->builder->branchIf($envBad, $envFail, $envOk);
-        $context->builder->positionAtEnd($envFail);
-        self::echoPhaseError($context, $logPrefix, $logPrefix.': set PHP_COMPILER_M3_SOURCE and PHP_COMPILER_M3_OUT', 'env');
+        $envTryArgv = BasicBlockHelper::append($context, 'csm3_try_argv');
+        $context->builder->branchIf($envBad, $envTryArgv, $envOk);
+        $context->builder->positionAtEnd($envOk);
+        self::emit($context, $sourceFile, $outFile, $logPrefix);
+
+        $context->builder->positionAtEnd($envTryArgv);
+        self::emitArgvOrFail($context, $logPrefix, $retFail);
+    }
+
+    private static function emitArgvOrFail(Context $context, string $logPrefix, Value $retFail): void
+    {
         $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $argc = $context->builder->call($context->lookupFunction('__phpc_cli_argc'));
+        $argcOk = $context->builder->icmp(Builder::INT_SGE, $argc, $i64->constInt(4, false));
+        $argvOk = BasicBlockHelper::append($context, 'csm3_argv_parse');
+        $argvFail = BasicBlockHelper::append($context, 'csm3_argv_fail');
+        $context->builder->branchIf($argcOk, $argvOk, $argvFail);
+
+        $context->builder->positionAtEnd($argvOk);
+        $flagCstr = $context->builder->call($context->lookupFunction('__phpc_cli_argv_cstr'), $i32->constInt(1, false));
+        $isMinusO = self::cstrEqualsLiteral($context, $flagCstr, '-o');
+        $outCstr = $context->builder->call($context->lookupFunction('__phpc_cli_argv_cstr'), $i32->constInt(2, false));
+        $srcCstr = $context->builder->call($context->lookupFunction('__phpc_cli_argv_cstr'), $i32->constInt(3, false));
+        $outFile = self::cstrAsPhpcString($context, $outCstr);
+        $sourceFile = self::cstrAsPhpcString($context, $srcCstr);
+        $i8p = $context->getTypeFromString('int8*');
+        $outNull = $context->builder->icmp(Builder::INT_EQ, $outCstr, $i8p->constNull());
+        $srcNull = $context->builder->icmp(Builder::INT_EQ, $srcCstr, $i8p->constNull());
+        $outPhpcNull = $context->builder->icmp(Builder::INT_EQ, $outFile, $strPtr->constNull());
+        $srcPhpcNull = $context->builder->icmp(Builder::INT_EQ, $sourceFile, $strPtr->constNull());
+        $argvBad = $context->builder->or($context->builder->not($isMinusO), $outNull);
+        $argvBad = $context->builder->or($argvBad, $srcNull);
+        $argvBad = $context->builder->or($argvBad, $outPhpcNull);
+        $argvBad = $context->builder->or($argvBad, $srcPhpcNull);
+        $argvEmit = BasicBlockHelper::append($context, 'csm3_argv_emit');
+        $context->builder->branchIf($argvBad, $argvFail, $argvEmit);
+        $context->builder->positionAtEnd($argvEmit);
+        self::emit($context, $sourceFile, $outFile, $logPrefix);
+
+        $context->builder->positionAtEnd($argvFail);
+        self::echoPhaseError(
+            $context,
+            $logPrefix,
+            $logPrefix.': set PHP_COMPILER_M3_SOURCE and PHP_COMPILER_M3_OUT, or run: DRIVER -o OUT SOURCE.php',
+            'env'
+        );
         $context->builder->call(
             $context->lookupFunction('exit'),
             $context->builder->trunc($retFail, $i32)
         );
-        $context->builder->positionAtEnd($envOk);
-        self::emit($context, $sourceFile, $outFile, $logPrefix);
+    }
+
+    private static function cstrEqualsLiteral(Context $context, Value $cstr, string $literal): Value
+    {
+        $charPtr = $context->getTypeFromString('char*');
+        $i32 = $context->getTypeFromString('int32');
+        $literalCstr = $context->builder->pointerCast($context->constantFromString($literal), $charPtr);
+        $eq = $context->builder->call($context->lookupFunction('__phpc_cli_str_eq'), $cstr, $literalCstr);
+
+        return $context->builder->icmp(Builder::INT_NE, $eq, $i32->constInt(0, false));
+    }
+
+    private static function cstrAsPhpcString(Context $context, Value $cstr): Value
+    {
+        $tag = 'csm3c'.(string) ++self::$seq;
+        $i8p = $context->getTypeFromString('int8*');
+        $i64 = $context->getTypeFromString('int64');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $cstr, $i8p->constNull());
+        $fail = BasicBlockHelper::append($context, 'csm3_cstr_fail_'.$tag);
+        $ok = BasicBlockHelper::append($context, 'csm3_cstr_ok_'.$tag);
+        $merge = BasicBlockHelper::append($context, 'csm3_cstr_done_'.$tag);
+        $context->builder->branchIf($isNull, $fail, $ok);
+        $context->builder->positionAtEnd($fail);
+        $nullStr = $strPtr->constNull();
+        $context->builder->branch($merge);
+        $context->builder->positionAtEnd($ok);
+        $len = $context->builder->call($context->lookupFunction('strlen'), $cstr);
+        $phpcStr = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $len,
+            $cstr
+        );
+        $context->builder->branch($merge);
+        $context->builder->positionAtEnd($merge);
+        $phi = $context->builder->phi($strPtr);
+        $phi->addIncoming($nullStr, $fail);
+        $phi->addIncoming($phpcStr, $ok);
+
+        return $phi;
     }
 
     private static function getenvAsPhpcString(Context $context, string $envKey): Value

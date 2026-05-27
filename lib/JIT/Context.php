@@ -421,10 +421,16 @@ class Context {
         // add main function
         if (!is_null($this->main)) {
             $i32 = $this->context->int32Type();
-            $signature = $this->context->functionType($i32, false);
+            $i8pp = $this->getTypeFromString('int8**');
+            $signature = $this->context->functionType($i32, false, $i32, $i8pp);
             $main = $this->module->addFunction('main', $signature);
             $block = $main->appendBasicBlock('main');
             $this->builder->positionAtEnd($block);
+            $this->builder->call(
+                $this->lookupFunction('__phpc_cli_store_argv'),
+                $main->getParam(0),
+                $main->getParam(1)
+            );
             $this->builder->call($this->initFunc);
             if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
                 Builtin\HttpResponseCode::emitResetForStandaloneMain($this);

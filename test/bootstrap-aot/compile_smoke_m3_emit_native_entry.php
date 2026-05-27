@@ -103,7 +103,7 @@ require_once __DIR__.'/compile_smoke_m3_emit.php';
 $sourceFile = getenv('PHP_COMPILER_M3_SOURCE');
 $outFile = getenv('PHP_COMPILER_M3_OUT');
 if (!is_string($sourceFile) || '' === $sourceFile || !is_string($outFile) || '' === $outFile) {
-    echo "compile_smoke_m3_emit_entry: set PHP_COMPILER_M3_SOURCE and PHP_COMPILER_M3_OUT\n";
+    echo "compile_smoke_m3_emit_entry: set PHP_COMPILER_M3_SOURCE and PHP_COMPILER_M3_OUT, or run: DRIVER -o OUT SOURCE.php\n";
     exit(1);
 }
 
