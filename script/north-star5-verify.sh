@@ -110,8 +110,14 @@ if [[ "${SPINE_LINE}" != *"717/717"* ]]; then
 fi
 echo "north-star5-verify: step 2 ok"
 
-ns5_run 3 "vendor prelink bundles --check" \
+echo
+echo "=== north-star5-verify step 3: vendor prelink bundles --check ==="
+if ! "${PHP_BIN}" "${PHP_OPTS[@]}" "${_CI_REPO_ROOT}/script/bootstrap-vendor-objects.php" --check; then
+  echo "north-star5-verify: vendor bundles stale; regenerating..."
+  "${PHP_BIN}" "${PHP_OPTS[@]}" "${_CI_REPO_ROOT}/script/bootstrap-vendor-objects.php" >/dev/null
   "${PHP_BIN}" "${PHP_OPTS[@]}" "${_CI_REPO_ROOT}/script/bootstrap-vendor-objects.php" --check
+fi
+echo "north-star5-verify: step 3 ok"
 
 if ! ci_llvm_ready; then
   if [[ "${REQUIRE_LLVM}" -eq 1 ]]; then

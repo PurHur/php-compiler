@@ -315,10 +315,10 @@ apply_patch() {
   if git -C "$ROOT" apply --check -p0 "$patch" 2>/dev/null; then
     git -C "$ROOT" apply -p0 "$patch"
     echo "Applied $(basename "$patch")"
-  elif patch -p0 --dry-run -s -f < "$patch" 2>/dev/null; then
-    patch -p0 -s -f < "$patch"
+  elif patch -p0 --dry-run -s -f < "$patch" >/dev/null 2>&1; then
+    patch -p0 -s -f < "$patch" >/dev/null 2>&1
     echo "Applied $(basename "$patch") (patch(1))"
-  elif patch -p0 --reverse --dry-run -s -f < "$patch" 2>/dev/null; then
+  elif patch -p0 --reverse --dry-run -s -f < "$patch" >/dev/null 2>&1; then
     echo "Skip $(basename "$patch") (already applied)"
   else
     echo "Skip $(basename "$patch") (already applied or failed)" >&2
