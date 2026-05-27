@@ -683,7 +683,10 @@ final class IncludeHelper
         }
         $normalized = str_replace('\\', '/', $path);
 
-        return str_ends_with($normalized, '/src/cli.php')
+        return $normalized === 'src/cli.php'
+            || $normalized === 'src/cli_driver.php'
+            || $normalized === 'vendor/autoload.php'
+            || str_ends_with($normalized, '/src/cli.php')
             || str_ends_with($normalized, '/src/cli_driver.php')
             || str_ends_with($normalized, '/vendor/autoload.php');
     }

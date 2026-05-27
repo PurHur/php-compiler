@@ -8,8 +8,9 @@ if (!function_exists('php_compiler_cli_should_skip_entry_driver')) {
     /** Skip argv driver when bundled in compiler_lib_spine_smoke (issue #1467, #1742). */
     function php_compiler_cli_should_skip_entry_driver(): bool
     {
-        $flag = getenv('PHP_COMPILER_CLI_SPINE_BUNDLE');
-        return '1' === $flag || 'true' === strtolower((string) $flag);
+        $lc = strtolower((string) getenv('PHP_COMPILER_CLI_SPINE_BUNDLE'));
+
+        return '1' === $lc || 'true' === $lc;
     }
 }
 
