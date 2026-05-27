@@ -20,4 +20,3 @@ deny:\runtime::__destruct
 deny:\runtime::createjit
 deny:\runtime::jitcontextforloadjit
 deny:\runtime::loadjitcompilemodulefuncs
-deny:\runtime::loadjitcontext

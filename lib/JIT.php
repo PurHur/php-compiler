@@ -465,7 +465,6 @@ class JIT {
             '\\bootstrapaot\\helloworld_compile_smoke',
             // compile_smoke_m3_emit real-lowers only in native emit TU (#1983), not compile_driver.
             '\\runtime::__destruct',
-            '\\runtime::loadjitcontext',
             '\\runtime::createjit',
             '\\runtime::jitcontextforloadjit',
             '\\runtime::loadjitcompilemodulefuncs',
@@ -615,6 +614,9 @@ class JIT {
             }
             if (str_ends_with($m3Spine, '\\runtime::loadjit')) {
                 return $this->compileRuntimeLoadJitM3Native($internalName, $block, $logicalName);
+            }
+            if (str_ends_with($m3Spine, '\\runtime::loadjitcontext')) {
+                return $this->compileRuntimeLoadJitContextM3Native($internalName, $block, $logicalName);
             }
             if (str_ends_with($m3Spine, '\\runtime::__construct')) {
                 return $this->compileRuntimeConstructM3Native($internalName, $block, $logicalName);
@@ -1015,6 +1017,22 @@ class JIT {
         if (isset($this->context->functions[$lcname])) {
             return $this->context->functions[$lcname];
         }
+        return $this->compileBlockPhpLowering($internalName, $block, $logicalName, $logicalName);
+    }
+
+    /**
+     * M3 compile-driver loadJitContext (#2846): separate FUNCDEF from loadJit to avoid LLVM 9 inlining crash (#1402).
+     */
+    private function compileRuntimeLoadJitContextM3Native(
+        string $internalName,
+        Block $block,
+        string $logicalName
+    ): PHPLLVM\Value {
+        $lcname = strtolower($logicalName);
+        if (isset($this->context->functions[$lcname])) {
+            return $this->context->functions[$lcname];
+        }
+
         return $this->compileBlockPhpLowering($internalName, $block, $logicalName, $logicalName);
     }
 
@@ -1729,7 +1747,6 @@ class JIT {
             return $this->compileRuntimeLoadCoreModulesM3Native($internalName, $block, $logicalName);
         }
         if (str_ends_with($emitLc, '\\runtime::loadjit')
-            || str_ends_with($emitLc, '\\runtime::loadjitcontext')
             || str_ends_with($emitLc, '\\runtime::createjit')
             || str_ends_with($emitLc, '\\runtime::jitcontextforloadjit')
             || str_ends_with($emitLc, '\\runtime::loadjitcompilemodulefuncs')
