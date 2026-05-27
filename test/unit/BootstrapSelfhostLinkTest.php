@@ -23,6 +23,24 @@ final class BootstrapSelfhostLinkTest extends TestCase
         $this->assertStringNotContainsString('apply-patches.sh" >/dev/null', $script);
     }
 
+    public function testLinkScriptUsesCompiledDriverResolver(): void
+    {
+        $link = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-link.sh');
+        $this->assertStringContainsString('bootstrap-resolve-compile-invoke.sh', $link);
+        $this->assertStringContainsString('bootstrap_compile_invoke', $link);
+        $resolver = self::$root.'/script/bootstrap-resolve-compile-invoke.sh';
+        $this->assertFileExists($resolver);
+        $body = (string) file_get_contents($resolver);
+        $this->assertStringContainsString('build/selfhost-compile-driver', $body);
+        $this->assertStringContainsString('build/bin-compile-aot', $body);
+        $driverPos = strpos($body, 'build/selfhost-compile-driver');
+        $argvPos = strpos($body, 'build/bin-compile-aot');
+        $this->assertNotFalse($driverPos);
+        $this->assertNotFalse($argvPos);
+        $this->assertLessThan($argvPos, $driverPos, 'prefer selfhost-compile-driver before bin-compile-aot');
+        $this->assertStringContainsString('falling back to Zend gen-0', $body);
+    }
+
     public function testNativeLinkScriptPrintsBundleOkWhenLlvmPresent(): void
     {
         if (!LlvmToolchain::isReady(self::$root)) {

@@ -33,7 +33,7 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 
 | Layer | Today | Target |
 |-------|-------|--------|
-| **Bootstrap driver** | Zend runs `php bin/compile.php` | Compiled `bin/compile.php` |
+| **Bootstrap driver** | Gen-0 Zend `php bin/compile.php` once; routine `bootstrap-selfhost-link` / spine / M4 gen-1 prefer `build/bin-compile-aot` or `build/selfhost-compile-driver` when present ([#2842](https://github.com/PurHur/php-compiler/issues/2842)) | Compiled `bin/compile.php` only |
 | **Bundle size** | **717** curated `require_once` in spine smoke (108 minimal overlap + **609** M2-only) | **717** Phase A inventory files (SSOT) |
 | **Inventory coverage** | **717/717** in spine smoke with real **`bin/vm.php`** ([#2134](https://github.com/PurHur/php-compiler/issues/2134); **#2652** emit-TU JIT batch; **`lib/VM/HashTable.php`** promoted [#2543](https://github.com/PurHur/php-compiler/issues/2543)); `src/cli_driver.php` via `cli_spine_shim` | **~100%** |
 | **HelloWorld** | Native **run** ✅; strict probe **emit_path=native** ✅ (27 May 2026) | Native compile for arbitrary PHP |

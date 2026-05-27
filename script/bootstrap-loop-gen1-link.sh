@@ -16,6 +16,8 @@ M4_EMIT_PATH="none"
 M4_BLOCK_REASON="native compile driver not linked (set BOOTSTRAP_M4_LINK_COMPILE_DRIVER=1)"
 # shellcheck source=php-env.sh
 source "$(dirname "$0")/php-env.sh"
+# shellcheck source=bootstrap-resolve-compile-invoke.sh
+source "$(dirname "$0")/bootstrap-resolve-compile-invoke.sh"
 ci_apply_llvm_memory_env
 
 m4_gen_exit_label() {
@@ -100,7 +102,7 @@ if [[ "${BOOTSTRAP_M4_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
   rm -f "${EMIT_HELPER}" "build/.last-jit-func-bootstrap-loop-gen1-emit"
   export PHP_COMPILER_JIT_PROGRESS_FILE="build/.last-jit-func-bootstrap-loop-gen1-emit"
   set +e
-  "${m4_link_env[@]}" php bin/compile.php -o "${EMIT_HELPER}" "${m4_emit_entry}" >/dev/null 2>&1
+  bootstrap_compile_invoke "${EMIT_HELPER}" "${m4_emit_entry}" "${m4_link_env[@]}" >/dev/null 2>&1
   emit_link_code=$?
   set -e
   if [[ -x "${EMIT_HELPER}" ]]; then
@@ -140,7 +142,7 @@ if [[ "${BOOTSTRAP_M4_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
 fi
 
 echo "==> link gen-1 (bootstrap_loop_smoke bundle)"
-if ! php bin/compile.php -o "${GEN1}" "${ENTRY}" 2>&1; then
+if ! bootstrap_compile_invoke "${GEN1}" "${ROOT}/${ENTRY}" env PHP_COMPILER_SELFHOST_AOT=1 2>&1; then
   echo "bootstrap-loop-gen1-link: gen-1 link failed (see stderr above)" >&2
   exit 1
 fi
@@ -163,8 +165,8 @@ if [[ "${M4_NATIVE_COMPILE}" -eq 0 ]]; then
   M4_EMIT_PATH="zend"
   echo "bootstrap-loop-gen1-link: gen-2 emit_path=zend (bin/compile.php) — ${M4_BLOCK_REASON}" >&2
   rm -f "${GEN2_OUT}"
-  if ! php bin/compile.php -o "${GEN2_OUT}" "${GEN2_SOURCE}" 2>&1; then
-    echo "bootstrap-loop-gen1-link: Zend gen-2 emit failed" >&2
+  if ! bootstrap_compile_invoke "${GEN2_OUT}" "${ROOT}/${GEN2_SOURCE}" env PHP_COMPILER_SELFHOST_AOT=1 2>&1; then
+    echo "bootstrap-loop-gen1-link: gen-2 emit failed (compiled driver or Zend)" >&2
     exit 1
   fi
 fi

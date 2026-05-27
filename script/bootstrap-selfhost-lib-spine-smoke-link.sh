@@ -6,6 +6,8 @@ ENTRY="${ROOT}/test/selfhost/compiler_lib_spine_smoke/main.php"
 OUT="${ROOT}/build/selfhost-lib-spine-smoke"
 # shellcheck source=php-env.sh
 source "$(dirname "$0")/php-env.sh"
+# shellcheck source=bootstrap-resolve-compile-invoke.sh
+source "$(dirname "$0")/bootstrap-resolve-compile-invoke.sh"
 ci_apply_llvm_memory_env
 
 if [[ ! -f "${ENTRY}" ]]; then
@@ -22,7 +24,7 @@ mkdir -p "${ROOT}/build"
 export PHP_COMPILER_SELFHOST_AOT=1
 export PHP_COMPILER_JIT_PROGRESS_FILE="${ROOT}/build/.last-jit-func-lib-spine-smoke"
 rm -f "${OUT}" "${PHP_COMPILER_JIT_PROGRESS_FILE}"
-if ! php "${ROOT}/bin/compile.php" -o "${OUT}" "${ENTRY}" 2>&1; then
+if ! bootstrap_compile_invoke "${OUT}" "${ENTRY}" env PHP_COMPILER_SELFHOST_AOT=1 2>&1; then
   echo "bootstrap-selfhost-lib-spine-smoke-link: compile failed (progress gate; see stderr above)" >&2
   exit 1
 fi
