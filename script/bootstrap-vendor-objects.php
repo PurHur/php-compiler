@@ -37,6 +37,15 @@ $manifestPath = $prelinkDir.'/manifest.json';
 $compileBin = $root.'/bin/compile.php';
 
 $manifest = bootstrapVendorPrelinkReadManifest($manifestPath) ?? bootstrapVendorPrelinkEmptyManifest($root);
+$vendorPresent = bootstrapVendorPrelinkVendorTreePresent($root);
+
+if ($check && !$vendorPresent) {
+    exit(bootstrapVendorPrelinkColdBootCheck($root, $manifestPath, $manifest));
+}
+
+if ($compile && !$vendorPresent) {
+    exit(bootstrapVendorPrelinkColdBootCompileFromCommitted($root, $manifestPath, $manifest));
+}
 
 foreach (BOOTSTRAP_VENDOR_PRELINK_PACKAGES as $package => $role) {
     $slug = bootstrapVendorPrelinkSlug($package);

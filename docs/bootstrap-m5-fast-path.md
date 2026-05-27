@@ -133,7 +133,16 @@ make bootstrap-vendor-prelink-bundles   # test/bootstrap-vendor-prelink/generate
 make bootstrap-vendor-objects           # also AOT → prelinked/bootstrap-vendor/*.o (PHP_COMPILER_KEEP_OBJECT_FILE=1)
 ```
 
-`bootstrap-vendor-objects.php --compile` sets `PHP_COMPILER_VENDOR_PRELINK=1` so `lib/JIT.php` skips non-jittable vendor class bodies during link-only AOT. **May 2026:** `ircmaxell/php-types` → `object_ok`; `php-cfg` / `php-llvm` still blocked on parse/type reconstruction in bundled compile.
+`bootstrap-vendor-objects.php --compile` sets `PHP_COMPILER_VENDOR_PRELINK=1` so `lib/JIT.php` skips non-jittable vendor class bodies during link-only AOT; `bin/compile.php` skips `vendor/autoload.php` via minimal CLI autoload ([#2849](https://github.com/PurHur/php-compiler/issues/2849)). **May 2026:** `ircmaxell/php-types` → `object_ok`; `php-cfg` / `php-llvm` still blocked on parse/type reconstruction in bundled compile.
+
+**Cold boot (no `vendor/`):** committed bundles + `prelinked/bootstrap-vendor/*.o` only ([#2841](https://github.com/PurHur/php-compiler/issues/2841)):
+
+```bash
+php script/bootstrap-vendor-objects.php --check    # validates committed bundles (no composer tree)
+php script/bootstrap-vendor-objects.php --compile  # reuses committed .o when vendor/ absent
+```
+
+Rebuild of vendor `.o` still requires `vendor/` + Zend or native driver ([#2849](https://github.com/PurHur/php-compiler/issues/2849)).
 
 Presenter: `make north-star5-verify` / `./script/north-star5-verify.sh` ([#1416](https://github.com/PurHur/php-compiler/issues/1416)).
 

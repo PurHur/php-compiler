@@ -113,6 +113,11 @@ echo "north-star5-verify: step 2 ok"
 echo
 echo "=== north-star5-verify step 3: vendor prelink bundles --check ==="
 if ! "${PHP_BIN}" "${PHP_OPTS[@]}" "${_CI_REPO_ROOT}/script/bootstrap-vendor-objects.php" --check; then
+  if [[ ! -d "${_CI_REPO_ROOT}/vendor/ircmaxell/php-cfg" ]]; then
+    echo "north-star5-verify: vendor tree absent — cold boot bundle check failed" >&2
+    ns5_hint 3 >&2
+    exit 1
+  fi
   echo "north-star5-verify: vendor bundles stale; regenerating..."
   "${PHP_BIN}" "${PHP_OPTS[@]}" "${_CI_REPO_ROOT}/script/bootstrap-vendor-objects.php" >/dev/null
   "${PHP_BIN}" "${PHP_OPTS[@]}" "${_CI_REPO_ROOT}/script/bootstrap-vendor-objects.php" --check

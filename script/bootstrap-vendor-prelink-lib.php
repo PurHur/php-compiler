@@ -149,3 +149,101 @@ function bootstrapVendorPrelinkExistingObjects(string $root, array $manifest): a
 
     return $found;
 }
+
+function bootstrapVendorPrelinkVendorTreePresent(string $root): bool
+{
+    foreach (array_keys(BOOTSTRAP_VENDOR_PRELINK_PACKAGES) as $package) {
+        if (!is_dir($root.'/vendor/'.$package)) {
+            return false;
+        }
+    }
+
+    return is_file($root.'/vendor/autoload.php');
+}
+
+/**
+ * M5 cold boot: verify committed bundles + manifest without regenerating from vendor/ (#2841).
+ *
+ * @param array{version: int, generated_at: string, packages: array<string, array<string, mixed>>} $manifest
+ */
+function bootstrapVendorPrelinkColdBootCheck(string $root, string $manifestPath, array $manifest): int
+{
+    if (!is_file($manifestPath)) {
+        fwrite(STDERR, "Missing {$manifestPath}; cold boot requires committed manifest\n");
+
+        return 1;
+    }
+
+    foreach (BOOTSTRAP_VENDOR_PRELINK_PACKAGES as $package => $role) {
+        $slug = bootstrapVendorPrelinkSlug($package);
+        $bundleRel = 'test/bootstrap-vendor-prelink/generated/'.$slug.'_bundle.php';
+        $bundleAbs = $root.'/'.$bundleRel;
+        if (!is_file($bundleAbs)) {
+            fwrite(STDERR, "Missing bundle {$bundleRel}; cold boot requires committed vendor prelink bundles\n");
+
+            return 1;
+        }
+        $bundleBody = (string) file_get_contents($bundleAbs);
+        if (!str_contains($bundleBody, "vendor/{$package}/")) {
+            fwrite(STDERR, "Bundle {$bundleRel} does not reference vendor/{$package} sources\n");
+
+            return 1;
+        }
+        $expectedFiles = (int) ($manifest['packages'][$package]['php_files'] ?? 0);
+        if ($expectedFiles <= 0) {
+            fwrite(STDERR, "Manifest php_files for {$package} must be > 0 for cold boot\n");
+
+            return 1;
+        }
+        $requireCount = substr_count($bundleBody, 'require_once');
+        if ($requireCount < $expectedFiles) {
+            fwrite(STDERR, "Bundle {$bundleRel} has {$requireCount} require_once lines; manifest expects {$expectedFiles}\n");
+
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+/**
+ * When vendor/ is absent, reuse committed prelinked .o artifacts instead of Zend rebuild (#2841).
+ *
+ * @param array{version: int, generated_at: string, packages: array<string, array<string, mixed>>} $manifest
+ *
+ * @return int exit code (0 = all packages satisfied from disk)
+ */
+function bootstrapVendorPrelinkColdBootCompileFromCommitted(string $root, string $manifestPath, array &$manifest): int
+{
+    $failures = 0;
+    foreach (BOOTSTRAP_VENDOR_PRELINK_PACKAGES as $package => $role) {
+        $slug = bootstrapVendorPrelinkSlug($package);
+        $objectRel = $manifest['packages'][$package]['object'] ?? '';
+        if (!is_string($objectRel) || '' === $objectRel) {
+            ++$failures;
+            continue;
+        }
+        $objectAbs = $root.'/'.$objectRel;
+        if (!is_file($objectAbs)) {
+            $manifest['packages'][$package]['status'] = 'missing_object';
+            $manifest['packages'][$package]['blocker'] = 'cold boot: committed '.$objectRel.' missing (restore vendor/ for rebuild — #2849)';
+            ++$failures;
+            continue;
+        }
+        $manifest['packages'][$package]['status'] = 'object_ok';
+        $manifest['packages'][$package]['blocker'] = null;
+        fwrite(STDOUT, "OK {$package} → {$objectRel} (cold boot: committed prelink)\n");
+    }
+
+    bootstrapVendorPrelinkWriteManifest($manifestPath, $manifest);
+
+    if ($failures > 0) {
+        fwrite(STDERR, "bootstrap-vendor-objects: {$failures} package(s) missing committed prelink .o (vendor/ absent)\n");
+
+        return 1;
+    }
+
+    fwrite(STDOUT, "bootstrap-vendor-objects: cold boot — all prelink objects from committed artifacts\n");
+
+    return 0;
+}

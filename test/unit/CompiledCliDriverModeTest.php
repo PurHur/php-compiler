@@ -14,6 +14,7 @@ final class CompiledCliDriverModeTest extends TestCase
         putenv('PHP_COMPILER_CLI_SKIP_VENDOR');
         putenv('PHP_COMPILER_CLI_COMPILED');
         putenv('PHP_COMPILER_SELFHOST_AOT');
+        putenv('PHP_COMPILER_VENDOR_PRELINK');
 
         parent::tearDown();
     }
@@ -48,6 +49,14 @@ final class CompiledCliDriverModeTest extends TestCase
         putenv('PHP_COMPILER_CLI_COMPILED=1');
         putenv('PHP_COMPILER_CLI_SKIP_VENDOR=0');
         $this->assertFalse(\php_compiler_cli_should_skip_vendor_autoload());
+    }
+
+    public function testVendorPrelinkSkipsVendorAutoload(): void
+    {
+        require_once dirname(__DIR__, 2).'/src/cli.php';
+
+        putenv('PHP_COMPILER_VENDOR_PRELINK=1');
+        $this->assertTrue(\php_compiler_cli_should_skip_vendor_autoload());
     }
 }
 

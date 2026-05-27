@@ -46,7 +46,13 @@ if (!function_exists('php_compiler_cli_should_skip_vendor_autoload')) {
         }
 
         $selfhostAot = getenv('PHP_COMPILER_SELFHOST_AOT');
+        if ('1' === $selfhostAot || 'true' === strtolower((string) $selfhostAot)) {
+            return true;
+        }
 
-        return '1' === $selfhostAot || 'true' === strtolower((string) $selfhostAot);
+        // Vendor prelink bundles use literal require_once; composer autoload is not available (#2849).
+        $vendorPrelink = getenv('PHP_COMPILER_VENDOR_PRELINK');
+
+        return '1' === $vendorPrelink || 'true' === strtolower((string) $vendorPrelink);
     }
 }
