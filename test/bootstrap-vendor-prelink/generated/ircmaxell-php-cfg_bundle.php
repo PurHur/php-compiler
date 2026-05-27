@@ -76,6 +76,7 @@ require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Func
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Include_.php';
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/InstanceOf_.php';
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Isset_.php';
+require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/MagicScriptConst.php';
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/MethodCall.php';
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/New_.php';
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/NsFuncCall.php';
@@ -99,6 +100,7 @@ require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt.php'
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/ClassLike.php';
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/ClassMethod.php';
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Class_.php';
+require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Enum_.php';
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Function_.php';
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Interface_.php';
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Jump.php';
@@ -117,6 +119,7 @@ require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Terminal/
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Terminal/Throw_.php';
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Terminal/Unset_.php';
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Type.php';
+require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Type/Intersection.php';
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Type/Literal.php';
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Type/Mixed_.php';
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Type/Never_.php';

@@ -127,6 +127,7 @@ require_once __DIR__.'/../../../lib/JIT/ScopeBuiltinHelper.php';
 require_once __DIR__.'/../../../lib/JIT/ScriptMagic.php';
 require_once __DIR__.'/../../../lib/JIT/SelfHostBuiltinPolicy.php';
 require_once __DIR__.'/../../../lib/JIT/StringOffsetHelper.php';
+require_once __DIR__.'/../../../lib/JIT/CliArgvGlobalInit.php';
 require_once __DIR__.'/../../../lib/JIT/SuperglobalInit.php';
 require_once __DIR__.'/../../../lib/JIT/TypeCheck.php';
 require_once __DIR__.'/../../../lib/JIT/UnsetHelper.php';
