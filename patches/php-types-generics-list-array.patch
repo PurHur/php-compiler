@@ -1,6 +1,7 @@
+diff --git vendor/ircmaxell/php-types/lib/PHPTypes/Type.php vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
 --- vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
 +++ vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
-@@ -384,6 +384,9 @@
+@@ -411,6 +411,9 @@
          if (preg_match('/^(positive|negative|non-zero)-int$/', $pseudo)) {
              return new self(self::TYPE_LONG);
          }
@@ -9,4 +10,4 @@
 +        }
          $regex = '(^([a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*\\\\)*[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*$)';
          if (! preg_match($regex, $decl)) {
-             throw new \RuntimeException("Unknown type declaration found: ${decl}");
+             throw new \RuntimeException("Unknown type declaration found: {$decl}");
