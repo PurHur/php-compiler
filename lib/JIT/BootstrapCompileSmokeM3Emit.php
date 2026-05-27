@@ -125,12 +125,7 @@ final class BootstrapCompileSmokeM3Emit
             $runtime,
             $code,
             $sourceFile,
-            static fn (Context $ctx, Value $rt, Value $c, Value $f): Value => $ctx->builder->call(
-                self::runtimeSpine($ctx, 'parseandcompileemitsmoke', '__object__*', ['__object__*', '__string__*', '__string__*']),
-                $rt,
-                $c,
-                $f
-            )
+            [self::class, 'emitRuntimeParseAndCompileDefault']
         );
         $blockNull = $context->builder->icmp(Builder::INT_EQ, $block, $objPtr->constNull());
         $pacFail = BasicBlockHelper::append($context, 'csm3_pac_fail_'.$tag);
