@@ -6585,6 +6585,22 @@ class JIT {
 
                 return;
             }
+            // bin/compile.php Zend polyfill → phpc_run_command AOT builtin (#2779, #2697).
+            if (
+                $this->shouldUseSelfHostJitStubs()
+                && 'phpcompiler\aot\linkerprocesspolyfill' === $declaringClassLc
+                && 'run' === $methodLc
+            ) {
+                if (!$this->context->functionIsRegistered('phpc_run_command')) {
+                    throw new \LogicException(
+                        'phpc_run_command internal missing for LinkerProcessPolyfill::run lowering (#2779)'
+                    );
+                }
+                $this->context->scope->toCall = $this->context->resolveFunctionProxy('phpc_run_command');
+                $this->context->scope->args = [];
+
+                return;
+            }
             throw new \LogicException("Call to undefined static method {$className}::{$nameOp->value}()");
         }
         $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);

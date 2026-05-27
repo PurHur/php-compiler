@@ -131,7 +131,8 @@ function run(string $filename, string $code, array $options): void
             $debugFile = true === $options['-y'] ? $options['-o'] : $options['-y'];
             $runtime->setDebug($debugFile);
         }
-        require_once __DIR__.'/../lib/AOT/LinkerProcessPolyfill.php';
+        // Literal path for self-host AOT/JIT include folding (#54, #1492).
+        require_once 'lib/AOT/LinkerProcessPolyfill.php';
         if (!\function_exists('phpc_run_command')) {
             /**
              * @param array<string, string>|null $env
