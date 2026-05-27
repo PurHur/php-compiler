@@ -1,6 +1,6 @@
 {
     "version": 1,
-    "generated_at": "2026-05-27T07:56:20+00:00",
+    "generated_at": "2026-05-27T10:20:29+00:00",
     "packages": {
         "ircmaxell/php-cfg": {
             "role": "CFG + traversers",
@@ -8,9 +8,9 @@
             "bundle": "test/bootstrap-vendor-prelink/generated/ircmaxell-php-cfg_bundle.php",
             "object": "prelinked/bootstrap-vendor/ircmaxell-php-cfg.o",
             "archive": "prelinked/bootstrap-vendor/ircmaxell-php-cfg.a",
-            "php_files": 135,
-            "status": "compile_failed",
-            "blocker": "compile exit 255 (vendor bundle AOT; blocked on M3 emit / Zend parse of vendor \u2014 #1416, #1402)"
+            "php_files": 137,
+            "status": "bundle_ok",
+            "blocker": null
         },
         "ircmaxell/php-types": {
             "role": "TypeReconstructor",
@@ -19,7 +19,7 @@
             "object": "prelinked/bootstrap-vendor/ircmaxell-php-types.o",
             "archive": "prelinked/bootstrap-vendor/ircmaxell-php-types.a",
             "php_files": 6,
-            "status": "object_ok",
+            "status": "bundle_ok",
             "blocker": null
         },
         "ircmaxell/php-llvm": {
@@ -29,8 +29,8 @@
             "object": "prelinked/bootstrap-vendor/ircmaxell-php-llvm.o",
             "archive": "prelinked/bootstrap-vendor/ircmaxell-php-llvm.a",
             "php_files": 88,
-            "status": "compile_failed",
-            "blocker": "compile exit 255 (vendor bundle AOT; blocked on M3 emit / Zend parse of vendor \u2014 #1416, #1402)"
+            "status": "bundle_ok",
+            "blocker": null
         }
     }
 }
