@@ -68,6 +68,14 @@ final class JitCompilerSelfHostStubTest extends TestCase
     ];
 
     /** @var list<string> */
+    private const M3_WEB_CONSTSTRINGFOLDER_REAL_LOWERING_METHODS = [
+        'fold',
+        'foldconcat',
+        'foldforinclude',
+        'tryparsedeployinclude',
+    ];
+
+    /** @var list<string> */
     private const WEB_BOOTSTRAP_SKIP_PATTERNS = [
         'deployroot',
         'sourcebundler',
@@ -158,6 +166,45 @@ final class JitCompilerSelfHostStubTest extends TestCase
             } else {
                 putenv('PHP_COMPILER_M3_COMPILE_DRIVER='.$prevM3);
             }
+        }
+    }
+
+    /**
+     * @dataProvider m3WebConstStringFolderRealLoweringProvider
+     */
+    public function testM3CompileDriverConstStringFolderLoweringIsNotStubbed(string $method): void
+    {
+        $prevSelfHost = getenv('PHP_COMPILER_SELFHOST_AOT');
+        $prevM3 = getenv('PHP_COMPILER_M3_COMPILE_DRIVER');
+        putenv('PHP_COMPILER_SELFHOST_AOT=1');
+        putenv('PHP_COMPILER_M3_COMPILE_DRIVER=1');
+        try {
+            $this->assertFalse(
+                $this->invokeSkipCheck(
+                    'isSkippedCompilerHotPathName',
+                    'phpcompiler\\web\\conststringfolder::'.$method
+                ),
+                "Expected real lowering for ConstStringFolder::{$method} when M3 compile driver is on"
+            );
+        } finally {
+            if (false === $prevSelfHost) {
+                putenv('PHP_COMPILER_SELFHOST_AOT');
+            } else {
+                putenv('PHP_COMPILER_SELFHOST_AOT='.$prevSelfHost);
+            }
+            if (false === $prevM3) {
+                putenv('PHP_COMPILER_M3_COMPILE_DRIVER');
+            } else {
+                putenv('PHP_COMPILER_M3_COMPILE_DRIVER='.$prevM3);
+            }
+        }
+    }
+
+    /** @return iterable<string, array{0: string}> */
+    public static function m3WebConstStringFolderRealLoweringProvider(): iterable
+    {
+        foreach (self::M3_WEB_CONSTSTRINGFOLDER_REAL_LOWERING_METHODS as $method) {
+            yield $method => [$method];
         }
     }
 
@@ -492,7 +539,7 @@ final class JitCompilerSelfHostStubTest extends TestCase
             $source
         );
         $this->assertMatchesRegularExpression(
-            '/defineConstant\([^)]+\)\)\) \{\s*\/\/ Spine may require bin\/vm\.php/s',
+            '/defineConstant\([\s\S]*?\)\)\s*\{\s*\/\/ Spine may require bin\/vm\.php/s',
             $source
         );
     }

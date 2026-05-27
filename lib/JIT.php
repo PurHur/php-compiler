@@ -1922,7 +1922,15 @@ class JIT {
      */
     private function isConstStringFolderRealLoweringMethod(string $lower): bool
     {
-        return false;
+        if (!$this->shouldUseM3CompileDriverRealLowering()) {
+            return false;
+        }
+
+        // Keep this narrow: only the compile-driver needs const-folding for include discovery/bundling.
+        return str_ends_with($lower, '\\web\\conststringfolder::fold')
+            || str_ends_with($lower, '\\web\\conststringfolder::foldconcat')
+            || str_ends_with($lower, '\\web\\conststringfolder::foldforinclude')
+            || str_ends_with($lower, '\\web\\conststringfolder::tryparsedeployinclude');
     }
 
     private function collectStubFunctionArgTypes(Block $block): array
