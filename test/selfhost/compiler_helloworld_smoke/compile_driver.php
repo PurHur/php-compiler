@@ -102,7 +102,10 @@ require_once __DIR__.'/../../bootstrap-aot/helloworld_compile_smoke.php';
 
 if ('compile' === (string) getenv('PHP_COMPILER_M3_COMPILE_MODE')) {
     if (\function_exists('putenv')) {
-        putenv('PHP_COMPILER_SELFHOST_AOT');
+        // Compile-driver lowering is guarded by env flags at runtime; keep self-host mode enabled
+        // when running inside the native emit helper (issue #2666).
+        putenv('PHP_COMPILER_SELFHOST_AOT=1');
+        putenv('PHP_COMPILER_M3_COMPILE_DRIVER=1');
     }
     if ('1' !== (string) getenv('PHP_COMPILER_M3_RUNTIME_COMPILE')) {
         echo "helloworld_compile_smoke: emit path blocked (gate: set BOOTSTRAP_M3_RUNTIME_COMPILE=1 and PHP_COMPILER_M3_RUNTIME_COMPILE=1 after M3 spine link)\n";
