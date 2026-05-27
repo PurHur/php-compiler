@@ -339,10 +339,10 @@ final class BootstrapCompileSmokeM3Emit
         );
     }
 
-  private static function isRuntimeVoidInitSpine(string $methodLc): bool
+    private static function isRuntimeVoidInitSpine(string $methodLc): bool
     {
         // initparsepipeline/initcompiler are real spine symbols (RuntimeEmitTuInit uses
-        // RuntimeInitCompiler for initcompiler; initparsepipeline is pre-lowered — #2666).
+        // RuntimeInitCompiler for initcompiler; initparsepipeline is pre-lowered).
         return 'loadcoremodules' === $methodLc;
     }
 

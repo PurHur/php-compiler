@@ -10,6 +10,7 @@ EMIT_ENTRY="test/bootstrap-aot/compile_smoke_m3_emit_native_entry.php"
 EMIT_ENTRY_ABS="${ROOT}/test/bootstrap-aot/compile_smoke_m3_emit_native_entry.php"
 GEN2_SOURCE="test/bootstrap-aot/compiler_smoke_standalone.php"
 GEN2_OUT="build/bootstrap-loop-gen2"
+GEN2_EXPECT_STDOUT_RE="compiler smoke"
 M4_NATIVE_COMPILE=0
 M4_EMIT_PATH="none"
 M4_BLOCK_REASON="native compile driver not linked (set BOOTSTRAP_M4_LINK_COMPILE_DRIVER=1)"
@@ -38,6 +39,17 @@ fi
 if [[ ! -f "${GEN2_SOURCE}" ]]; then
   echo "bootstrap-loop-gen1-link: missing ${ROOT}/${GEN2_SOURCE}" >&2
   exit 1
+fi
+
+# Optional: compile inventory-scale spine bundle instead of compile-smoke slice (#2664).
+if [[ "${BOOTSTRAP_M4_GEN1_COMPILE_FULL_SPINE:-0}" == "1" ]]; then
+  GEN2_SOURCE="test/selfhost/compiler_lib_spine_smoke/main.php"
+  GEN2_OUT="build/bootstrap-loop-gen2-full-spine"
+  GEN2_EXPECT_STDOUT_RE="compiler_lib_spine_smoke bundle OK"
+  if [[ ! -f "${GEN2_SOURCE}" ]]; then
+    echo "bootstrap-loop-gen1-link: BOOTSTRAP_M4_GEN1_COMPILE_FULL_SPINE=1 but missing ${ROOT}/${GEN2_SOURCE}" >&2
+    exit 1
+  fi
 fi
 
 if [[ -z "${PHP_COMPILER_LLVM_PATH:-}" || ! -f "${PHP_COMPILER_LLVM_PATH}/libLLVM-9.so.1" ]]; then
@@ -163,8 +175,8 @@ if [[ ! -x "${GEN2_OUT}" ]]; then
 fi
 
 gen2_out="$("./${GEN2_OUT}" 2>&1)"
-if ! grep -q 'compiler smoke' <<< "${gen2_out}"; then
-  echo "bootstrap-loop-gen1-link: unexpected gen-2 stdout (want compiler smoke, emit_path=${M4_EMIT_PATH})" >&2
+if ! grep -qE "${GEN2_EXPECT_STDOUT_RE}" <<< "${gen2_out}"; then
+  echo "bootstrap-loop-gen1-link: unexpected gen-2 stdout (want ${GEN2_EXPECT_STDOUT_RE}, emit_path=${M4_EMIT_PATH})" >&2
   printf '%s\n' "${gen2_out}" >&2
   exit 1
 fi
