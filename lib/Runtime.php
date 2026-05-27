@@ -84,20 +84,11 @@ class Runtime {
      *
      * This is intentionally bootstrap-only: keep normal compilation strict.
      */
-    private function shouldTolerateBootstrapTypeReconstructorErrors(): bool
+    private function isBootstrapVendorPrelinkMode(): bool
     {
         $flag = getenv('PHP_COMPILER_VENDOR_PRELINK');
 
         return '1' === $flag || 'true' === strtolower((string) $flag);
-    }
-
-    private function isBootstrapTolerableTypeReconstructorError(\Throwable $e): bool
-    {
-        if (!$e instanceof \RuntimeException) {
-            return false;
-        }
-
-        return str_starts_with($e->getMessage(), 'Unknown type declaration found:');
     }
 
     /** Compiler instance; split from VMContext for M3 link (#1494). */
@@ -193,30 +184,9 @@ class Runtime {
     public function parse(string $code, string $filename): Script {
         $script = $this->parser->parse($code, $filename);
         $this->preprocessor->traverse($script);
-        $state = new State($script);
-        try {
+        if (!$this->isBootstrapVendorPrelinkMode()) {
+            $state = new State($script);
             $this->typeReconstructor->resolve($state);
-        } catch (\Throwable $e) {
-            if (
-                $this->shouldTolerateBootstrapTypeReconstructorErrors()
-                && $this->isBootstrapTolerableTypeReconstructorError($e)
-            ) {
-                static $warned = false;
-                if (!$warned) {
-                    $warned = true;
-                    $msg = sprintf(
-                        "bootstrap vendor prelink: suppressed PHPTypes type reconstruction error: %s\n",
-                        $e->getMessage()
-                    );
-                    if (\defined('STDERR') && \is_resource(STDERR)) {
-                        fwrite(STDERR, $msg);
-                    } else {
-                        error_log(rtrim($msg));
-                    }
-                }
-            } else {
-                throw $e;
-            }
         }
         $this->postprocessor->traverse($script);
         $this->detector->detect($script);

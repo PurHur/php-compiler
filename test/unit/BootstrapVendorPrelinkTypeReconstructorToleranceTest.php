@@ -10,7 +10,7 @@ use PHPTypes\TypeReconstructor;
 
 final class BootstrapVendorPrelinkTypeReconstructorToleranceTest extends TestCase
 {
-    public function testVendorPrelinkModeSuppressesUnknownTypeDeclFromTypeReconstructor(): void
+    public function testVendorPrelinkModeSkipsTypeReconstructor(): void
     {
         $prev = getenv('PHP_COMPILER_VENDOR_PRELINK');
         putenv('PHP_COMPILER_VENDOR_PRELINK=1');
