@@ -13,14 +13,18 @@ class Enum_ extends ClassLike
     /** @var Type|null Backing scalar type (string|int) when declared as `enum Foo: string` */
     public $backedType = null;
 
-    public function __construct(Operand $name, ?Type $backedType, Block $stmts, array $attributes = [])
+    /** @var Operand[] Implemented interface name operands */
+    public $implements = [];
+
+    public function __construct(Operand $name, ?Type $backedType, array $implements, Block $stmts, array $attributes = [])
     {
         parent::__construct($name, $stmts, $attributes);
         $this->backedType = $backedType;
+        $this->implements = $implements;
     }
 
     public function getVariableNames(): array
     {
-        return ['name'];
+        return ['name', 'implements'];
     }
 }

@@ -22,6 +22,7 @@
         $this->block->children[] = new Op\Stmt\Enum_(
             $name,
             $backedType,
+            $this->parseExprList($node->implements),
             $stmtsBlock,
             $this->mapAttributes($node)
         );
