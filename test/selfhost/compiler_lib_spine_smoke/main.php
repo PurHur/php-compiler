@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 require_once __DIR__.'/../../../lib/AOT/Linker.php';
 require_once __DIR__.'/../../../lib/AOT/ProjectGraph.php';
+require_once __DIR__.'/../../../lib/Ast/GroupUseStripper.php';
 require_once __DIR__.'/../../../lib/Block.php';
 require_once __DIR__.'/../../../lib/BuiltinParamNames.php';
 require_once __DIR__.'/../../../lib/Cli/InvokeCwd.php';

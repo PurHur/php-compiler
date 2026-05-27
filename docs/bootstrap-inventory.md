@@ -3667,7 +3667,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Ast/GroupUseStripper.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/Block.php`
 
@@ -4967,7 +4967,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new SwitchDetectorAstVisitor (line 35)
 - new NodeTraverser (line 36)
 - new Issue (line 43)
-- 2 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 5 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/Lint/UnsupportedRegistry.php`
 

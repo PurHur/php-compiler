@@ -7,7 +7,7 @@ namespace PHPCompiler\Lint;
 use PhpParser\Node;
 use PhpParser\Node\Stmt\Switch_;
 use PhpParser\NodeTraverser;
-use PhpParser\NodeVisitorAbstract;
+use PhpParser\NodeVisitor;
 use PhpParser\ParserFactory;
 
 /**
@@ -55,10 +55,15 @@ final class SwitchDetector
 
 
 /** @internal */
-final class SwitchDetectorAstVisitor extends NodeVisitorAbstract
+final class SwitchDetectorAstVisitor implements NodeVisitor
 {
     /** @var list<array{int, string}> */
     public array $hits = [];
+
+    public function beforeTraverse(array $nodes)
+    {
+        return null;
+    }
 
     public function enterNode(Node $node): ?int
     {
@@ -66,6 +71,16 @@ final class SwitchDetectorAstVisitor extends NodeVisitorAbstract
             $this->hits[] = [$node->getStartLine(), SwitchDetector::KIND];
         }
 
+        return null;
+    }
+
+    public function leaveNode(Node $node)
+    {
+        return null;
+    }
+
+    public function afterTraverse(array $nodes)
+    {
         return null;
     }
 }
