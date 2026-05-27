@@ -129,4 +129,11 @@ final class RuntimeAotLintTest extends TestCase
 
         return false;
     }
+
+    public function testFormatParseAndCompileNullDetailWhenScriptMissing(): void
+    {
+        $runtime = new Runtime(Runtime::MODE_AOT);
+
+        $this->assertSame('parse returned null', $runtime->formatParseAndCompileNullDetail(null));
+    }
 }

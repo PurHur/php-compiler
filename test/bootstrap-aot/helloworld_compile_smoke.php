@@ -49,9 +49,19 @@ function helloworld_compile_smoke(string $sourceFile, string $outFile): int
     }
 
     $runtime = new \PHPCompiler\Runtime(\PHPCompiler\Runtime::MODE_AOT);
-    $block = $runtime->parseAndCompile($code, $resolved);
+    try {
+        $script = $runtime->parse($code, $resolved);
+    } catch (\Throwable $e) {
+        $diag = $runtime->formatParseAndCompileNullDetail(null);
+        $extra = null !== $diag && '' !== $diag ? ' — '.$diag : ' — '.$e->getMessage();
+        echo 'helloworld_compile_smoke: parse failed'.$extra."\n";
+        echo "helloworld_compile_smoke: native emit failed at phase=parse\n";
+
+        return 1;
+    }
+    $block = $runtime->compile($script);
     if (null === $block) {
-        $diag = $runtime->compiler->getCompileAbortDetail();
+        $diag = $runtime->formatParseAndCompileNullDetail($script);
         $extra = null !== $diag && '' !== $diag ? ' — '.$diag : '';
         echo "helloworld_compile_smoke: parseAndCompile returned null (CFG/compile spine)".$extra."\n";
         echo "helloworld_compile_smoke: native emit failed at phase=parseAndCompile\n";
