@@ -171,7 +171,7 @@ final class TryCatchHelper
         $thrown = $context->getVariableFromOp($block->getOperand($op->arg1));
         $obj = $context->helper->loadValue($thrown);
         if (Variable::TYPE_OBJECT !== $thrown->type) {
-            $valuePtr = JIT\JitValueBox::valuePtrFromVariable($context, $thrown);
+            $valuePtr = JitValueBox::valuePtrFromVariable($context, $thrown);
             $obj = $context->builder->call($context->lookupFunction('__value__readObject'), $valuePtr);
         }
 

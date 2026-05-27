@@ -903,6 +903,20 @@ class Context {
                 } else {
                     throw new \LogicException("Unknown variable referenced: " . get_class($op));
                 }
+            } elseif ($op instanceof Operand\Temporary) {
+                // Temporaries can be introduced by CFG transforms after scope variable allocation.
+                // Treat unknown temporaries as boxed __value__ slots to keep self-host emit paths alive.
+                $slot = JitValueBox::alloc($this);
+                $this->builder->call(
+                    $this->lookupFunction('__value__writeNull'),
+                    JitValueBox::pointer($this, $slot)
+                );
+                $this->scope->variables[$op] = new Variable(
+                    $this,
+                    Variable::TYPE_VALUE,
+                    Variable::KIND_VARIABLE,
+                    $slot
+                );
             } else {
                 throw new \LogicException("Unknown variable referenced: " . get_class($op));
             }

@@ -5459,6 +5459,25 @@ class JIT {
             );
             $result = $this->context->getVariableFromOp($resultOp);
         }
+        if (
+            !$force
+            && $resultOp instanceof \PHPCfg\Operand\Temporary
+            && Variable::KIND_VALUE === $result->kind
+            && Variable::TYPE_STRING !== $result->type
+        ) {
+            // Temporaries can start life as rvalues; promote to a boxed stack slot on first assignment.
+            $slot = JIT\JitValueBox::alloc($this->context);
+            $this->context->setVariableOp(
+                $resultOp,
+                new Variable(
+                    $this->context,
+                    Variable::TYPE_VALUE,
+                    Variable::KIND_VARIABLE,
+                    $slot
+                )
+            );
+            $result = $this->context->getVariableFromOp($resultOp);
+        }
         if (null !== $result->objectPropertySlot) {
             if (null === $result->objectPropertyType) {
                 throw new \LogicException('objectPropertySlot requires objectPropertyType');
