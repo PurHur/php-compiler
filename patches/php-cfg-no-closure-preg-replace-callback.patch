@@ -1,8 +1,8 @@
 diff --git vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/MagicStringResolver.php vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/MagicStringResolver.php
 --- vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/MagicStringResolver.php
 +++ vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/MagicStringResolver.php
-@@ -119,6 +119,13 @@
-         return 'AnonymousClass@' . $start;
+@@ -134,6 +134,13 @@
+         return end($parts);
      }
  
 +    private function repairCommentsCallback($match)
@@ -15,7 +15,7 @@ diff --git vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/MagicStringResolver.ph
      private function repairComments(Node $node)
      {
          $comment = $node->getDocComment();
-@@ -128,14 +135,9 @@
+@@ -143,14 +150,9 @@
              $comment = new Doc(
                  preg_replace_callback(
                      $regex,
@@ -34,7 +34,7 @@ diff --git vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/MagicStringResolver.ph
 diff --git vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/NameResolver.php vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/NameResolver.php
 --- vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/NameResolver.php
 +++ vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/NameResolver.php
-@@ -43,6 +43,12 @@
+@@ -42,6 +42,12 @@
          'callable',
      ];
  
@@ -47,7 +47,7 @@ diff --git vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/NameResolver.php vendo
      public function enterNode(Node $node)
      {
          parent::enterNode($node);
-@@ -53,13 +59,9 @@
+@@ -55,13 +61,9 @@
              $comment = new Doc(
                  preg_replace_callback(
                      $regex,

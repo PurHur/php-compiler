@@ -1,8 +1,7 @@
 diff --git vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Assertion.php vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Assertion.php
-index 1111111..2222222 100644
 --- vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Assertion.php
 +++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Assertion.php
-@@ -17,7 +17,7 @@ use PHPCfg\Operand;
+@@ -18,6 +18,6 @@
  
  class Assertion extends Expr
  {

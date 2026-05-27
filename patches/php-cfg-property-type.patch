@@ -1,8 +1,7 @@
 diff --git vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php
-index 1a1a1a1..2b2b2b2 100644
 --- vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php
 +++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php
-@@ -22,6 +22,9 @@ class Property extends Stmt
+@@ -20,6 +20,9 @@ class Property extends Stmt
  
      public $visibility;
  
@@ -26,3 +25,7 @@ index 1a1a1a1..2b2b2b2 100644
          $this->static = $static;
          $this->declaredType = $declaredType;
          if (null !== $defaultVar) {
+             $this->defaultVar = $this->addReadRef($defaultVar);
+         }
+         $this->defaultBlock = $defaultBlock;
+     }

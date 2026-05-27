@@ -1,7 +1,7 @@
 diff --git vendor/ircmaxell/php-types/lib/PHPTypes/Type.php vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
 --- vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
 +++ vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
-@@ -359,6 +359,7 @@
+@@ -359,6 +359,7 @@ public static function fromDecl($decl): self
                  new self(self::TYPE_NULL),
              ]))->simplify();
          }
@@ -9,10 +9,10 @@ diff --git vendor/ircmaxell/php-types/lib/PHPTypes/Type.php vendor/ircmaxell/php
          if (preg_match('/^array\{/i', $decl)) {
              return new self(self::TYPE_ARRAY);
          }
-@@ -582,4 +583,70 @@
+@@ -579,3 +580,70 @@ protected static function parseCompexDecl(string $decl): self
          throw new \RuntimeException("Unknown combinator {$combinator}");
      }
- 
++
 +    /**
 +     * Vendor phpdoc sometimes appends English description to the type token in
 +     * @var / @return declarations (e.g. "list<bool> parallel to values; ...").
