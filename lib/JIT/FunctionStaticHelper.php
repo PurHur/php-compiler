@@ -48,6 +48,16 @@ final class FunctionStaticHelper
             case Variable::TYPE_NATIVE_LONG:
                 JitValueBox::writeLong($context, $destSlot, $default->value);
                 break;
+            case Variable::TYPE_NATIVE_BOOL:
+                JitValueBox::writeBool($context, $destSlot, $default->value);
+                break;
+            case Variable::TYPE_NATIVE_DOUBLE:
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeDouble'),
+                    JitValueBox::pointer($context, $destSlot),
+                    $default->value
+                );
+                break;
             case Variable::TYPE_STRING:
                 $context->builder->call(
                     $context->lookupFunction('__value__writeString'),

@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 717 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 1850 |
+| Source constructs flagged (warnings) | 1852 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -524,7 +524,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Func/JIT.php` | 0 | 2 |
 | `lib/Func/PHP.php` | 0 | 1 |
 | `lib/Handler.php` | 0 | 1 |
-| `lib/JIT.php` | 0 | 53 |
+| `lib/JIT.php` | 0 | 54 |
 | `lib/JIT/Analyzer.php` | 0 | 1 |
 | `lib/JIT/ArrayBuiltinHelper.php` | 0 | 47 |
 | `lib/JIT/ArrayMapCallbackPolicy.php` | 0 | 1 |
@@ -622,7 +622,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/Vararg.php` | 0 | 1 |
 | `lib/JIT/CoalesceHelper.php` | 0 | 1 |
 | `lib/JIT/CompilerOperandChainNative.php` | 0 | 3 |
-| `lib/JIT/Context.php` | 0 | 39 |
+| `lib/JIT/Context.php` | 0 | 40 |
 | `lib/JIT/EmitTuMode.php` | 0 | 1 |
 | `lib/JIT/ErrorHandlerCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/FunctionStaticHelper.php` | 0 | 1 |
@@ -3955,21 +3955,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 4632)
 - new Variable (line 5413)
 - new Variable (line 5453)
-- new Variable (line 5986)
-- new Variable (line 6006)
-- new Variable (line 6076)
-- new Variable (line 6282)
-- new Variable (line 6321)
-- new Operand\Literal (line 6330)
-- new Variable (line 6345)
-- new Operand\Literal (line 6651)
-- new Operand\Literal (line 6655)
-- new Operand\Literal (line 6659)
-- new Variable (line 6663)
-- new Variable (line 6687)
-- new Variable (line 6699)
-- new Variable (line 6909)
-- new Variable (line 6924)
+- new Variable (line 5472)
+- new Variable (line 6005)
+- new Variable (line 6025)
+- new Variable (line 6095)
+- new Variable (line 6301)
+- new Variable (line 6340)
+- new Operand\Literal (line 6349)
+- new Variable (line 6364)
+- new Operand\Literal (line 6670)
+- new Operand\Literal (line 6674)
+- new Operand\Literal (line 6678)
+- new Variable (line 6682)
+- new Variable (line 6706)
+- new Variable (line 6718)
+- new Variable (line 6928)
+- new Variable (line 6943)
 - 175 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Analyzer.php`
@@ -4568,16 +4569,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\ReflectionAttributeGetName (line 393)
 - new Result (line 493)
 - new Variable (line 587)
-- new VMVariable (line 1003)
-- new VMVariable (line 1009)
-- new VMVariable (line 1015)
-- new VMVariable (line 1021)
-- new VMVariable (line 1028)
-- new VMVariable (line 1034)
-- new VMVariable (line 1040)
-- new VMVariable (line 1046)
-- new Variable (line 1071)
-- new Variable (line 1106)
+- new Variable (line 914)
+- new VMVariable (line 1017)
+- new VMVariable (line 1023)
+- new VMVariable (line 1029)
+- new VMVariable (line 1035)
+- new VMVariable (line 1042)
+- new VMVariable (line 1048)
+- new VMVariable (line 1054)
+- new VMVariable (line 1060)
+- new Variable (line 1085)
+- new Variable (line 1120)
 - 51 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/EmitTuMode.php`
@@ -4993,16 +4995,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new NullSafeLivenessDetector (line 75)
 - new Optimizer\AssignOp (line 76)
 - new TypeReconstructor (line 78)
-- new Compiler (line 83)
-- new VMContext (line 88)
-- new VM (line 93)
-- new ext\types\Module (line 108)
-- new ext\standard\Module (line 109)
-- new JIT (line 135)
-- new JITContext (line 149)
-- new State (line 174)
-- new LintCompiler (line 322)
-- 30 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new Compiler (line 105)
+- new VMContext (line 110)
+- new VM (line 115)
+- new ext\types\Module (line 130)
+- new ext\standard\Module (line 131)
+- new JIT (line 157)
+- new JITContext (line 171)
+- new State (line 196)
+- new LintCompiler (line 417)
+- 33 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/VM.php`
 
@@ -5397,7 +5399,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Web/SourceBundler.php`
 
 **Warnings** (review for bootstrap subset):
-- 10 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- 12 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/Web/Superglobals.php`
 

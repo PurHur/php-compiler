@@ -50,7 +50,15 @@ final class BasicBlockHelper
             $context->builder->positionAtEnd($entry);
         }
         $slot = $context->builder->alloca($type);
-        $context->builder->positionAtEnd($restore);
+        if (null !== $restore) {
+            $terminator = $restore->getTerminator();
+            if (null !== $terminator) {
+                // Do not position after a terminator: it creates invalid IR ("terminator in the middle").
+                $context->builder->positionBefore($terminator);
+            } else {
+                $context->builder->positionAtEnd($restore);
+            }
+        }
         return $slot;
     }
 
