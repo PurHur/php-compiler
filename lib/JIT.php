@@ -18,6 +18,7 @@ require_once __DIR__.'/JIT/RuntimeInitCompiler.php';
 require_once __DIR__.'/JIT/M3EmitTuTrivialEchoAot.php';
 require_once __DIR__.'/JIT/VmSpineSmokeNative.php';
 require_once __DIR__.'/JIT/VmDriverExecuteNative.php';
+require_once __DIR__.'/JIT/VmUnitProbeExecuteNative.php';
 
 use PHPCfg\Operand;
 use PHPCfg\Op;
@@ -76,6 +77,18 @@ class JIT {
                 return;
             }
             $skipName = $this->jitFunctionSkipName($name, $func->block);
+            if (
+                $this->shouldUseSelfHostJitStubs()
+                && JIT\VmUnitProbeExecuteNative::isVmUnitProbeRunName($skipName)
+            ) {
+                $this->compileVmUnitProbeRunNative(
+                    $this->llvmInternalName($name),
+                    $func->block,
+                    $name
+                );
+
+                return;
+            }
             if (
                 $this->shouldUseSelfHostJitStubs()
                 && JIT\VmDriverExecuteNative::isBinVmRunName($skipName, $func->block)
@@ -479,6 +492,13 @@ class JIT {
                     $logicalName
                 );
             }
+            if (JIT\VmUnitProbeExecuteNative::isVmUnitProbeRunName($vmSpineLc)) {
+                return $this->compileVmUnitProbeRunNative(
+                    $this->llvmInternalName($internalName),
+                    $block,
+                    $logicalName
+                );
+            }
             if (JIT\VmDriverExecuteNative::isBinVmRunName($vmSpineLc, $block)) {
                 return $this->compileBinVmRunNative(
                     $this->llvmInternalName($internalName),
@@ -637,6 +657,27 @@ class JIT {
         }
 
         return JIT\VmSpineSmokeNative::compileVmRunSmokeNative(
+            $this->context,
+            $internalName,
+            $logicalName,
+            $paramTypes
+        );
+    }
+
+    /** Native vm_unit_probe_run for M3 VM unit probe execute gate (#2619). */
+    private function compileVmUnitProbeRunNative(
+        string $internalName,
+        Block $block,
+        string $logicalName
+    ): PHPLLVM\Value {
+        $paramTypes = [];
+        if (null !== $block->func) {
+            foreach ($block->func->params as $param) {
+                $paramTypes[] = $this->llvmTypeForCfgParam($param);
+            }
+        }
+
+        return JIT\VmUnitProbeExecuteNative::compileVmUnitProbeRunNative(
             $this->context,
             $internalName,
             $logicalName,

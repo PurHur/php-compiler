@@ -35,4 +35,28 @@ if ! grep -q 'vm_unit_probe bundle OK' <<< "${bundle_out}"; then
   exit 1
 fi
 
+vm_unit_probe_execute="${BOOTSTRAP_VM_UNIT_PROBE_EXECUTE:-${PHP_COMPILER_VM_UNIT_PROBE_EXECUTE:-0}}"
+if [[ "${vm_unit_probe_execute}" == "1" || "${vm_unit_probe_execute}" == "true" ]]; then
+  set +e
+  execute_out="$(env PHP_COMPILER_VM_UNIT_PROBE_EXECUTE=1 "${OUT}" 2>&1)"
+  execute_code=$?
+  set -e
+  if [[ "${execute_code}" -ne 0 ]]; then
+    echo "bootstrap-selfhost-vm-unit-probe: native VM execute failed (exit ${execute_code})" >&2
+    printf '%s\n' "${execute_out}" >&2
+    exit 1
+  fi
+  if ! grep -q 'vm_unit_probe_run OK' <<< "${execute_out}"; then
+    echo "bootstrap-selfhost-vm-unit-probe: unexpected execute stdout (want vm_unit_probe_run OK)" >&2
+    printf '%s\n' "${execute_out}" >&2
+    exit 1
+  fi
+  if ! grep -Fxq '1' <<< "${execute_out}"; then
+    echo "bootstrap-selfhost-vm-unit-probe: unexpected execute stdout (want echo 1 from fixture)" >&2
+    printf '%s\n' "${execute_out}" >&2
+    exit 1
+  fi
+  echo "bootstrap-selfhost-vm-unit-probe: execute OK"
+fi
+
 echo "bootstrap-selfhost-vm-unit-probe: OK ${OUT}"

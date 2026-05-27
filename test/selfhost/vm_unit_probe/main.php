@@ -116,5 +116,12 @@ require_once __DIR__.'/../../../lib/Lint/Issue.php';
 require_once __DIR__.'/../../../lib/Lint/UnsupportedRegistry.php';
 require_once __DIR__.'/../../../lib/Lint/LintCompiler.php';
 require_once __DIR__.'/../../../lib/Lint/Linter.php';
-// vm_unit_probe_run.php: optional phase-2 VM echo run (deferred — native bundle init; #2354).
+require_once __DIR__.'/../../../test/bootstrap-aot/vm_unit_probe_run.php';
+
 echo "vm_unit_probe bundle OK\n";
+
+$vmUnitProbeExecute = getenv('PHP_COMPILER_VM_UNIT_PROBE_EXECUTE');
+if (is_string($vmUnitProbeExecute) && ('1' === $vmUnitProbeExecute || 'true' === strtolower($vmUnitProbeExecute))) {
+    $result = vm_unit_probe_run('Command line code', 'echo 1;', []);
+    echo $result."\n";
+}
