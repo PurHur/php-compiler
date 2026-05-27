@@ -16,6 +16,7 @@ class Type extends Builtin {
     public Type\String_ $string;
     public Type\Object_ $object;
     public Type\HashTable $hashtable;
+    public Type\Value $value;
     protected array $fields;
 
     public function register(): void {
