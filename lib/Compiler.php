@@ -33,7 +33,49 @@ class Compiler {
     protected ?SplObjectStorage $seen = null;
     protected ?SplObjectStorage $funcs = null;
 
+    /** Set from the first compile-time abort (#2642, self-host diagnostics). */
+    private ?string $compileAbortDetail = null;
+
+    public function resetCompileAbortDetail(): void
+    {
+        $this->compileAbortDetail = null;
+    }
+
+    public function getCompileAbortDetail(): ?string
+    {
+        return $this->compileAbortDetail;
+    }
+
+    /**
+     * Marks the CFG construct that halted compilation before throwing LogicException (#2642).
+     *
+     * @return never
+     */
+    protected function throwCompileLogic(string $detail): void
+    {
+        if (null === $this->compileAbortDetail) {
+            $this->compileAbortDetail = $detail;
+        }
+
+        throw new \LogicException($detail);
+    }
+
+    /**
+     * Like throwCompileLogic for CompileError paths (#2642).
+     *
+     * @return never
+     */
+    protected function throwCompileError(string $detail): void
+    {
+        if (null === $this->compileAbortDetail) {
+            $this->compileAbortDetail = $detail;
+        }
+
+        throw new \CompileError($detail);
+    }
+
     public function compile(Script $script): ?Block {
+        $this->resetCompileAbortDetail();
         $this->seen = new SplObjectStorage;
 
         $main = $this->compileCfgBlock($script->main->cfg, $script->main->params, $script->main);
@@ -45,10 +87,13 @@ class Compiler {
     /** M3 emit TU: trivial single-block sources without full seen-map compile (#1937). */
     public function compileEmitSmoke(Script $script): ?Block
     {
+        $this->resetCompileAbortDetail();
+
         return $this->compileCfgBlock($script->main->cfg, $script->main->params, $script->main);
     }
 
     public function compileFunc(string $name, CfgFunc $func): Func {
+        $this->resetCompileAbortDetail();
         $this->seen = new SplObjectStorage;
 
         $funcBlock = $this->compileCfgBlock($func->cfg, $func->params, $func);
@@ -760,7 +805,7 @@ class Compiler {
             ];
         }
         if ($expr instanceof Op\Expr\StaticPropertyFetch) {
-            throw new \LogicException(
+            $this->throwCompileLogic(
                 'StaticPropertyFetch unset must be lowered via TYPE_STATIC_PROPERTY_UNSET (#2256)'
             );
         }
@@ -781,7 +826,7 @@ class Compiler {
             return $this->resolveIssetTarget($expr, $block);
         }
 
-        throw new \LogicException('Unsupported unset target: ' . (is_object($expr) ? $expr->getType() : gettype($expr)));
+        $this->throwCompileLogic('Unsupported unset target: ' . (is_object($expr) ? $expr->getType() : gettype($expr)));
     }
 
     protected function compileInterface(Op\Stmt\Interface_ $iface, Block $block): OpCode
@@ -823,7 +868,7 @@ class Compiler {
         $result = new Block($block);
         foreach ($block->children as $child) {
             if (!$child instanceof Op\Terminal\Const_) {
-                throw new \LogicException('Unsupported enum body element: '.get_class($child));
+                $this->throwCompileLogic('Unsupported enum body element: '.get_class($child));
             }
             $this->compileOps($child->valueBlock->children, $result);
             $result->addOpCode(new OpCode(
@@ -841,7 +886,7 @@ class Compiler {
         if ($class instanceof Op\Stmt\Class_) {
             $type = OpCode::TYPE_DECLARE_CLASS;
         } else {
-            throw new \LogicException('Unsupported class type: ' . get_class($class));
+            $this->throwCompileLogic('Unsupported class type: ' . get_class($class));
         }
         $parentSlot = null;
         if ($class instanceof Op\Stmt\Class_ && null !== $class->extends) {
@@ -877,7 +922,7 @@ class Compiler {
         foreach ($operands as $operand) {
             $name = $this->staticNameFromOperand($operand);
             if (null === $name) {
-                throw new \CompileError('Interface name must be a compile-time class reference');
+                $this->throwCompileError('Interface name must be a compile-time class reference');
             }
             $names[] = strtolower(ltrim($name, '\\'));
         }
@@ -902,7 +947,7 @@ class Compiler {
         if (null === $className || 'parent' !== strtolower($className)) {
             return;
         }
-        throw new \CompileError("{$construct} is not supported (issue #1858)");
+        $this->throwCompileError("{$construct} is not supported (issue #1858)");
     }
 
     protected function literalScopeClassName(Operand $class): ?string
@@ -934,7 +979,7 @@ class Compiler {
         foreach ($type->types as $member) {
             $name = $this->staticNameFromCfgType($member);
             if (null === $name) {
-                throw new \CompileError('Intersection type members must be interface names');
+                $this->throwCompileError('Intersection type members must be interface names');
             }
             $names[] = strtolower(ltrim($name, '\\'));
         }
@@ -984,7 +1029,7 @@ class Compiler {
             switch (get_class($child)) {
                 case Op\Stmt\Property::class:
                     if (OpCode::TYPE_DECLARE_CLASS !== $type) {
-                        throw new \LogicException('Properties are only supported on classes for now');
+                        $this->throwCompileLogic('Properties are only supported on classes for now');
                     }
                     if (!is_null($child->defaultBlock)) {
                         $this->compileOps($child->defaultBlock->children, $result);
@@ -1032,7 +1077,7 @@ class Compiler {
                     break;
                 case Op\Terminal\Const_::class:
                     if (OpCode::TYPE_DECLARE_CLASS !== $type) {
-                        throw new \LogicException('Class constants are only supported on classes for now');
+                        $this->throwCompileLogic('Class constants are only supported on classes for now');
                     }
                     $this->compileOps($child->valueBlock->children, $result);
                     $result->addOpCode(new OpCode(
@@ -1043,10 +1088,10 @@ class Compiler {
                     break;
                 case Op\Stmt\TraitUse::class:
                     if (OpCode::TYPE_DECLARE_CLASS !== $type) {
-                        throw new \LogicException('Trait use is only supported on classes for now');
+                        $this->throwCompileLogic('Trait use is only supported on classes for now');
                     }
                     if ([] !== $child->adaptations) {
-                        throw new \LogicException('TraitUseAdaptation is not supported yet');
+                        $this->throwCompileLogic('TraitUseAdaptation is not supported yet');
                     }
                     foreach ($child->traits as $traitOperand) {
                         $result->addOpCode(new OpCode(
@@ -1056,7 +1101,7 @@ class Compiler {
                     }
                     break;
                 default:
-                    throw new \LogicException('Unsupported class body element: ' . get_class($child));
+                    $this->throwCompileLogic('Unsupported class body element: ' . get_class($child));
             }
         }
         return $result;
@@ -1098,7 +1143,7 @@ class Compiler {
                 continue;
             }
             if (!($param->name instanceof Operand\Literal) || !is_string($param->name->value)) {
-                throw new \LogicException('Promoted constructor parameter must have a simple name');
+                $this->throwCompileLogic('Promoted constructor parameter must have a simple name');
             }
             $propName = new Operand\Literal($param->name->value);
             $propName->type = Type::string();
@@ -1145,7 +1190,7 @@ class Compiler {
         if ($param->variadic) {
             assert(null === $param->defaultVar);
             if (null !== $block->variadicParamIndex) {
-                throw new \LogicException('Only one variadic parameter is allowed per function');
+                $this->throwCompileLogic('Only one variadic parameter is allowed per function');
             }
             $block->variadicParamIndex = $paramIdx;
         }
@@ -1229,7 +1274,7 @@ class Compiler {
                 $block->addOpCode($terminalOp);
             }
         } else {
-            throw new \LogicException("Unknown Op Type: " . opcode_type_name($op->type));
+            $this->throwCompileLogic("Unknown Op Type: " . opcode_type_name($op->type));
         }
     }
 
@@ -1275,7 +1320,7 @@ class Compiler {
         } elseif ($stmt instanceof Op\Stmt\Switch_) {
             $this->compileSwitchAsJumpIfChain($stmt, $block);
         } else {
-            throw new \LogicException("Unknown Stmt Type: " . $stmt->getType());
+            $this->throwCompileLogic("Unknown Stmt Type: " . $stmt->getType());
         }
     }
 
@@ -1285,7 +1330,7 @@ class Compiler {
     protected function compileSwitchAsJumpIfChain(Op\Stmt\Switch_ $switch, Block $block): void
     {
         if (!isset($switch->cond)) {
-            throw new \LogicException('Switch missing condition operand');
+            $this->throwCompileLogic('Switch missing condition operand');
         }
         $condSlot = $this->requireOperandSlot(
             $this->compileOperand($switch->cond, $block, true),
@@ -1385,7 +1430,7 @@ class Compiler {
         } elseif ($expr instanceof Op\Expr\BinaryOp\ShiftRight) {
             return OpCode::TYPE_SHIFT_RIGHT;
         }
-        throw new \LogicException("Unknown BinaryOp Type: " . $expr->getType());
+        $this->throwCompileLogic("Unknown BinaryOp Type: " . $expr->getType());
     }
 
     protected function getOpCodeTypeFromCastOp(Op\Expr\Cast $expr): int {
@@ -1404,7 +1449,7 @@ class Compiler {
         } elseif ($expr instanceof Op\Expr\Cast\Unset_) {
             return OpCode::TYPE_CAST_UNSET;
         }
-        throw new \LogicException("Unknown CastOp Type: " . $expr->getType());
+        $this->throwCompileLogic("Unknown CastOp Type: " . $expr->getType());
     }
 
     protected function getOpCodeTypeFromUnaryOp(Op\Expr $expr): int {
@@ -1427,7 +1472,7 @@ class Compiler {
         } elseif ($expr instanceof Op\Expr\Print_) {
             return OpCode::TYPE_PRINT;
         }
-        throw new \LogicException("Unknown UnaryOp Type: " . $expr->getType());
+        $this->throwCompileLogic("Unknown UnaryOp Type: " . $expr->getType());
     }
 
     protected function compileExpr(Op\Expr $expr, Block $block): array {
@@ -1750,7 +1795,7 @@ class Compiler {
                         : null,
                 )];
         }
-        throw new \LogicException("Unsupported expression: " . $expr->getType());
+        $this->throwCompileLogic("Unsupported expression: " . $expr->getType());
     }
 
     protected function markFunctionGenerator(Block $block): void
@@ -2111,14 +2156,14 @@ class Compiler {
             $name = $name->value;
         }
         if (!is_string($name)) {
-            throw new \LogicException('Function name must be a string literal for static storage key (#2286)');
+            $this->throwCompileLogic('Function name must be a string literal for static storage key (#2286)');
         }
         $class = $func->class;
         if ($class instanceof Operand\Literal && is_string($class->value)) {
             $class = $class->value;
         }
         if (null !== $class && !is_string($class)) {
-            throw new \LogicException('Function class must be a string literal for static storage key (#2286)');
+            $this->throwCompileLogic('Function class must be a string literal for static storage key (#2286)');
         }
 
         return null !== $class ? $class.'::'.$name : $name;
@@ -2130,7 +2175,7 @@ class Compiler {
     protected function compileFunctionStaticVar(Op\Terminal $terminal, Block $block): OpCode
     {
         if (null === $block->func) {
-            throw new \LogicException('Function-local static requires a function context');
+            $this->throwCompileLogic('Function-local static requires a function context');
         }
         $varName = $this->resolveSimpleVariableName($terminal->var);
         $storageKey = $this->functionStaticStorageKey($block->func, $varName);
@@ -2148,14 +2193,14 @@ class Compiler {
                 }
                 $defaultSlot = $this->compileOperand($terminal->defaultVar, $block, true);
                 if (!isset($block->constants[$defaultSlot])) {
-                    throw new \LogicException(
+                    $this->throwCompileLogic(
                         'Function-local static initializer must be a compile-time literal in v1 (#2286)'
                     );
                 }
             }
             $defaultVm = $block->constants[$defaultSlot];
             if (!$this->isAllowedFunctionStaticDefaultType($defaultVm->type)) {
-                throw new \LogicException(
+                $this->throwCompileLogic(
                     'Function-local static initializer must be a compile-time literal in v1 (#2286)'
                 );
             }
@@ -2310,7 +2355,7 @@ class Compiler {
             return $var->value;
         }
         if (!$var instanceof Operand\Variable) {
-            throw new \LogicException('Expected a simple variable operand');
+            $this->throwCompileLogic('Expected a simple variable operand');
         }
         $name = $var->name;
         while ($name instanceof Temporary) {
@@ -2323,7 +2368,7 @@ class Compiler {
             return $name->value;
         }
 
-        throw new \LogicException('Expected a simple variable name');
+        $this->throwCompileLogic('Expected a simple variable name');
     }
 
     /**
@@ -2633,7 +2678,7 @@ class Compiler {
     protected function requireOperandSlot(?int $slot, string $context): int
     {
         if (null === $slot) {
-            throw new \LogicException('Missing operand slot for '.$context);
+            $this->throwCompileLogic('Missing operand slot for '.$context);
         }
 
         return $slot;
@@ -2680,7 +2725,7 @@ class Compiler {
                 case Variable::TYPE_NULL:
                     break;
                 default:
-                    throw new \LogicException('Unknown Literal Operand Type: ' . ($operand->type ?? 'untyped'));
+                    $this->throwCompileLogic('Unknown Literal Operand Type: ' . ($operand->type ?? 'untyped'));
             }
             return $block->registerConstant($operand, $return);
         } elseif ($operand instanceof Operand\Variable) {
@@ -2700,7 +2745,7 @@ class Compiler {
         } elseif ($operand instanceof Operand\Temporary) {
             return $block->getVarSlot($operand, $isRead);
         }
-        throw new \LogicException("Unknown Operand Type: " . $operand->getType());
+        $this->throwCompileLogic("Unknown Operand Type: " . $operand->getType());
     }
 
     private function isDynamicVariableOperand(Operand\Variable $operand): bool
@@ -2751,12 +2796,12 @@ class Compiler {
             case 'Terminal_Return':
                 if ($block->returnTypeNever) {
                     if (!is_null($terminal->expr)) {
-                        throw new \CompileError('A never-returning function must not return');
+                        $this->throwCompileError('A never-returning function must not return');
                     }
                     if ($this->neverFunctionHasAbnormalExitBeforeReturn($block->orig, $terminal)) {
                         return [];
                     }
-                    throw new \CompileError('A never-returning function must not return');
+                    $this->throwCompileError('A never-returning function must not return');
                 }
                 if (is_null($terminal->expr)) {
                     return [new OpCode(
@@ -2830,7 +2875,7 @@ class Compiler {
             case 'Terminal_StaticVar':
                 return [$this->compileFunctionStaticVar($terminal, $block)];
             default:
-                throw new \LogicException("Unknown Terminal Type: " . $terminal->getType());
+                $this->throwCompileLogic("Unknown Terminal Type: " . $terminal->getType());
         }
     }
 
@@ -2858,7 +2903,7 @@ class Compiler {
             'parent' === strtolower((string) $this->literalScopeClassName($expr->class))
             && 'class' === strtolower((string) $this->literalScopeClassName($expr->name))
         ) {
-            throw new \CompileError('parent::class is not supported (issue #1858)');
+            $this->throwCompileError('parent::class is not supported (issue #1858)');
         }
 
         return [new OpCode(
@@ -2903,7 +2948,7 @@ class Compiler {
         } elseif (2 === $expr->kind) {
             $callableSlot = $this->compileFirstClassStaticNameSlot($expr->class, $expr->name, $block);
         } else {
-            throw new \LogicException('Unknown first-class callable kind');
+            $this->throwCompileLogic('Unknown first-class callable kind');
         }
 
         return [new OpCode(
@@ -2917,7 +2962,7 @@ class Compiler {
     private function compileFirstClassFunctionNameSlot(Operand $name, Block $block): int
     {
         if (!$name instanceof Operand\Literal) {
-            throw new \LogicException('First-class function callable name must be a literal');
+            $this->throwCompileLogic('First-class function callable name must be a literal');
         }
 
         return $this->compileStringLiteralSlot($name->value, $block);
@@ -2926,7 +2971,7 @@ class Compiler {
     private function compileFirstClassStaticNameSlot(?Operand $class, Operand $method, Block $block): int
     {
         if (!$class instanceof Operand\Literal || !$method instanceof Operand\Literal) {
-            throw new \LogicException('First-class static callable requires literal class and method names');
+            $this->throwCompileLogic('First-class static callable requires literal class and method names');
         }
 
         return $this->compileStringLiteralSlot($class->value.'::'.$method->value, $block);
