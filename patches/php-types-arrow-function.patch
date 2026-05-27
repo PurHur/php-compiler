@@ -1,0 +1,16 @@
+--- vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
+@@ -386,6 +386,11 @@
+     protected function resolveOp_Expr_Closure(Operand $var, Op\Expr\Closure $op, SplObjectStorage $resolved)
+     {
+         return [new Type(Type::TYPE_OBJECT, [], 'Closure')];
+     }
+ 
++    protected function resolveOp_Expr_ArrowFunction(Operand $var, Op\Expr\ArrowFunction $op, SplObjectStorage $resolved)
++    {
++        return [new Type(Type::TYPE_OBJECT, [], 'Closure')];
++    }
++
+     protected function resolveOp_Expr_FuncCall(Operand $var, Op\Expr\FuncCall $op, SplObjectStorage $resolved)
+     {
+         if ($op->name instanceof Operand\Literal) {
