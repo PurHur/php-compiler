@@ -13,6 +13,10 @@ cd "$(dirname "$0")/.."
 REPO_ROOT="$(pwd)"
 IMAGE="${PHP_COMPILER_DEV_IMAGE:-php-compiler:22.04-dev}"
 
+# shellcheck source=selfhost-preflight.sh
+source "$(dirname "$0")/selfhost-preflight.sh"
+selfhost_preflight docker-exec docker-only
+
 # shellcheck source=ci-docker-preflight.sh
 source "$(dirname "$0")/ci-docker-preflight.sh"
 ci_docker_preflight

@@ -1978,7 +1978,12 @@ class JIT {
         return str_ends_with($lower, '\\web\\includepathresolver::resolve');
     }
 
-    /** LiteralIncludeDiscovery methods with safe LLVM 9 lowering during self-host AOT (#816, #1521). */
+    /**
+     * LiteralIncludeDiscovery real LLVM lowering during M3 compile-driver link (#816, #2843).
+     *
+     * Entry points call private CFG walkers and ConstStringFolder::foldForInclude; stubbed callees
+     * return empty paths and break include bundling in bin/compile.php bundles.
+     */
     private function isLiteralIncludeDiscoveryRealLoweringMethod(string $lower): bool
     {
         if (!$this->shouldUseM3CompileDriverRealLowering()) {
@@ -1989,6 +1994,10 @@ class JIT {
             'discoverabsolutepaths',
             'pathsfrommainscopeforbundle',
             'pathsfromscript',
+            'walkcfgblock',
+            'walkcfgblockforbundle',
+            'walkcfgblockinternal',
+            'isbundlescopeboundary',
         ] as $suffix) {
             if (str_ends_with($lower, '\\web\\literalincludediscovery::'.$suffix)) {
                 return true;

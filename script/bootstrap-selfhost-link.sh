@@ -8,7 +8,17 @@ OUT="${ROOT}/build/selfhost"
 source "$(dirname "$0")/php-env.sh"
 # shellcheck source=bootstrap-resolve-compile-invoke.sh
 source "$(dirname "$0")/bootstrap-resolve-compile-invoke.sh"
+# shellcheck source=selfhost-preflight.sh
+source "$(dirname "$0")/selfhost-preflight.sh"
 ci_apply_llvm_memory_env
+
+if bootstrap_resolve_compile_driver; then
+  if [[ "${BOOTSTRAP_COMPILE_DRIVER_MODE}" == "zend" ]]; then
+    selfhost_preflight bootstrap-selfhost-link php-only
+  fi
+else
+  selfhost_preflight bootstrap-selfhost-link php-or-docker
+fi
 
 if [[ ! -f "${ENTRY}" ]]; then
   echo "bootstrap-selfhost-link: missing ${ENTRY}" >&2
@@ -18,13 +28,6 @@ fi
 if [[ -z "${PHP_COMPILER_LLVM_PATH:-}" || ! -f "${PHP_COMPILER_LLVM_PATH}/libLLVM-9.so.1" ]]; then
   echo "bootstrap-selfhost-link: LLVM 9 not found (skip)" >&2
   exit 2
-fi
-
-if ! bootstrap_resolve_compile_driver; then
-  echo "bootstrap-selfhost-link: no compiled driver and php missing on host." >&2
-  echo "bootstrap-selfhost-link: run via Docker instead:" >&2
-  echo "  ./script/docker-exec.sh -- bash -lc 'make bootstrap-selfhost-link'" >&2
-  exit 1
 fi
 
 if [[ "${BOOTSTRAP_COMPILE_DRIVER_MODE}" == "zend" && -d "${ROOT}/vendor" ]]; then
