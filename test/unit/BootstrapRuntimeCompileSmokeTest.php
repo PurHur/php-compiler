@@ -99,6 +99,7 @@ final class BootstrapRuntimeCompileSmokeTest extends TestCase
     public function testM3EmitTuUsesMinimalRuntimeShellAlloc(): void
     {
         $emit = (string) file_get_contents(self::$root.'/lib/JIT/BootstrapCompileSmokeM3Emit.php');
+        $this->assertStringContainsString('emitParseAndCompileWithTrivialFallback', $emit);
         $this->assertStringContainsString('RuntimeEmitTuAlloc::emit', $emit);
         $this->assertStringContainsString('RuntimeEmitTuInit::emitInitSequence', $emit);
         $init = (string) file_get_contents(self::$root.'/lib/JIT/RuntimeEmitTuInit.php');

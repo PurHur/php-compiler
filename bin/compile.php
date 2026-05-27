@@ -36,7 +36,8 @@ function run(string $filename, string $code, array $options): void
                 putenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX=runtime_compile_smoke_m3_emit');
                 putenv('PHP_COMPILER_M3_EMIT_HELPER_SPINE=1');
             } elseif (str_contains($normalized, 'helloworld_m3_emit_native_entry.php')) {
-                putenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX=helloworld_compile_smoke');
+                // Same native bridge + compileEmitSmoke spine as unit-probe emit (#2666).
+                putenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX=compile_smoke_m3_emit');
             } else {
                 putenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX=compile_smoke_m3_emit');
             }
