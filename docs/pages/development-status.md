@@ -25,7 +25,7 @@ permalink: /development-status.html
 
 - **`phpc` CLI** — `run`, `serve`, `build`, `deploy`, `lint`, `test`, `init`
 - **Examples 000–009** — VM and AOT link/execute for the curated web subset
-- **Self-host M0–M2** — minimal bundle ✅; spine native link **670/717** ✅ ([#1960](https://github.com/PurHur/php-compiler/issues/1960), [#2652](https://github.com/PurHur/php-compiler/issues/2652))
+- **Self-host M0–M2** — minimal bundle ✅; spine native link **716/717** ✅ ([#1960](https://github.com/PurHur/php-compiler/issues/1960), [#2652](https://github.com/PurHur/php-compiler/issues/2652))
 - **Self-host M3 (partial)** — HelloWorld / compile-smoke AOT **runs** natively ✅; **emit** still Zend fallback 🚧 ([#1937](https://github.com/PurHur/php-compiler/issues/1937); probes ([#1493](https://github.com/PurHur/php-compiler/issues/1493)).
 
 **Not claimed:** full Zend PHP compatibility (subset compiler only).
@@ -38,7 +38,7 @@ permalink: /development-status.html
 |-----------|--------|
 | **M0** — Small `lib/` bundle runs | ✅ |
 | **M1** — Compiler-shaped bundle + compile-smoke | ✅ |
-| **M2** — Spine toward full inventory | ✅ **670/717** link |
+| **M2** — Spine toward full inventory | ✅ **716/717** link |
 | **M3** — Native compiles PHP (no Zend emit) | 🚧 run ✅ · emit 🚧 |
 | **M4** — Bootstrap loop (next revision) | ⬜ |
 | **M5** — Full self-host, no `vendor/` cold boot | ⬜ |

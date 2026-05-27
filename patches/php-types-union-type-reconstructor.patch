@@ -1,0 +1,17 @@
+--- a/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
++++ b/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
+@@ -779,6 +779,15 @@
+         } elseif ($type instanceof Op\Type\Literal) {
+             return Type::fromDecl($type->name);
+         } elseif ($type instanceof Op\Type\Never_) {
+             return Type::never();
++        } elseif ($type instanceof Op\Type\Union_) {
++            $subs = [];
++            foreach ($type->types as $sub) {
++                $subs[] = $this->resolveOpType($sub);
++            }
++
++            return (new Type(Type::TYPE_UNION, $subs))->simplify();
+         }
+ 
+         throw new \LogicException('Unknown Op\\Type provided: '.get_class($type));

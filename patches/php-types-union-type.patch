@@ -16,3 +16,4 @@
          throw new \LogicException('Unsupported declaration type: '.get_class($decl));
      }
  
+
