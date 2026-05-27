@@ -1555,6 +1555,23 @@ class Compiler {
             )];
         }
         switch (get_class($expr)) {
+            case Op\Expr\ArrowFunction::class:
+                // Vendor-prelink bundles (M5 cold-boot) include php-cfg code containing arrow functions.
+                // Full arrow-function semantics are closure-like and not supported yet; for compile-only
+                // vendor object generation, lower to a null placeholder to produce the .o artifact.
+                if ('1' !== (string) getenv('PHP_COMPILER_VENDOR_PRELINK')) {
+                    $this->throwCompileLogic("Unsupported expression: " . $expr->getType());
+                }
+
+                $resultSlot = $this->compileOperand($expr->result, $block, false);
+                $nullSlot = $this->compileOperand(new Operand\Literal(null), $block, true);
+
+                return [new OpCode(
+                    OpCode::TYPE_ASSIGN,
+                    $resultSlot,
+                    $resultSlot,
+                    $nullSlot
+                )];
             case Op\Expr\Closure::class:
                 // Vendor-prelink bundles (M5 cold-boot) include php-llvm which still contains closures.
                 // For the vendor-prelink compile-only path, lower closures to a null placeholder so we
