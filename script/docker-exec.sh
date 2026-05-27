@@ -67,7 +67,9 @@ if [[ "$FORCE_BIND_MOUNT" -eq 1 ]]; then
   exit $?
 fi
 
-if [[ -f vendor/bin/phpunit ]] && ci_docker_run -v "$(pwd):/compiler" -w /compiler "$IMAGE" test -f vendor/bin/phpunit 2>/dev/null; then
+# Bind-mount completeness probe: some harness hosts report a partial tree where a few files exist
+# but script/ paths are missing (#272). Require a couple of repo-sentinel files before trusting the mount.
+if [[ -f vendor/bin/phpunit ]] && ci_docker_run -v "$(pwd):/compiler" -w /compiler "$IMAGE" bash -lc "test -f vendor/bin/phpunit && test -f script/ci-local.sh && test -f script/bootstrap-selfhost-cli-driver-emit.sh" 2>/dev/null; then
   _run_in_container "$inner"
   exit $?
 fi

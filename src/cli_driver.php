@@ -23,35 +23,16 @@ if (
 }
 
 $autoloadEnv = getenv('PHP_COMPILER_VENDOR_AUTOLOAD');
-$skipVendor = getenv('PHP_COMPILER_CLI_SKIP_VENDOR');
 $selfhostAot = getenv('PHP_COMPILER_SELFHOST_AOT');
 $compiledCli = getenv('PHP_COMPILER_CLI_COMPILED');
-$m3EmitTu = getenv('PHP_COMPILER_M3_EMIT_TU');
-$m3CompileDriver = getenv('PHP_COMPILER_M3_COMPILE_DRIVER');
+$compiledCliLc = strtolower((string) $compiledCli);
+$isCompiledCli = '1' === $compiledCliLc || 'true' === $compiledCliLc;
 
-// "Compiled CLI driver mode" (M5): the entrypoint is running as compiled code, so it must not
-// depend on loading Composer or vendor files from disk. Any required classes are expected to be
-// bundled into the binary already (#2641).
-if ('1' === $compiledCli || 'true' === strtolower((string) $compiledCli)) {
-    $skipVendor = '1';
-}
-
-// Under self-host AOT / native-emit bootstrap modes, vendor autoload is out-of-scope and can drag in
-// unsupported vendor constructs. Default to skipping it unless explicitly overridden (issue #2640).
-if ('1' === $selfhostAot || 'true' === strtolower((string) $selfhostAot)) {
-    $inBootstrapCompilePath = ('1' === $m3EmitTu || 'true' === strtolower((string) $m3EmitTu))
-        || ('1' === $m3CompileDriver || 'true' === strtolower((string) $m3CompileDriver));
-    if ($inBootstrapCompilePath && ('0' !== $skipVendor && 'false' !== strtolower((string) $skipVendor))) {
-        $skipVendor = '1';
-    }
-    // For self-host AOT execution outside the M3 helper path (future M5 compiled driver), default
-    // to skipping vendor unless explicitly forced on.
-    if ('0' !== $skipVendor && 'false' !== strtolower((string) $skipVendor)) {
-        $skipVendor = '1';
-    }
-}
-// Keep vendor out of literal include discovery for bootstrap AOT/self-host emit paths (issue #2640).
-if ('1' !== $skipVendor && 'true' !== strtolower((string) $skipVendor)) {
+// Keep vendor out of literal include discovery for self-host AOT / compiled CLI driver mode (issue #2641, #2640).
+$shouldSkipVendorAutoload = \function_exists('php_compiler_cli_should_skip_vendor_autoload')
+    ? php_compiler_cli_should_skip_vendor_autoload()
+    : ('1' === $selfhostAot || 'true' === strtolower((string) $selfhostAot));
+if (!$shouldSkipVendorAutoload) {
     // In JIT/AOT, include/require must use a compile-time literal path. If an override is provided,
     // fail fast with a clear message instead of producing non-compilable code.
     if (('1' === $selfhostAot || 'true' === strtolower((string) $selfhostAot))
@@ -69,7 +50,7 @@ if ('1' !== $skipVendor && 'true' !== strtolower((string) $skipVendor)) {
     /** @psalm-suppress UnresolvableInclude */
     require __DIR__.'/../vendor/autoload.php';
 } else {
-    if (!('1' === $compiledCli || 'true' === strtolower((string) $compiledCli))) {
+    if (!$isCompiledCli) {
         // Minimal project autoloader for self-host bootstrap paths where composer autoload can pull in
         // unsupported vendor trees. We avoid `vendor/autoload.php` and instead resolve a small PSR-4
         // subset that is required for bootstrap compile paths (issue #2640).
