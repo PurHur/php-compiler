@@ -861,25 +861,31 @@ class Object_ extends Type {
             $this->defineProperty($id, 'scriptStack', Variable::TYPE_OBJECT);
         }
         if ('phpcompiler\runtime' === $lcname) {
-            foreach (
-                [
-                    'compiler',
-                    'parser',
-                    'preprocessor',
-                    'postprocessor',
-                    'detector',
-                    'assignOpResolver',
-                    'vmContext',
-                    'vm',
-                    'jitContext',
-                    'jit',
-                    'typeReconstructor',
-                ] as $prop
-            ) {
-                $this->defineProperty($id, $prop, Variable::TYPE_OBJECT);
+            $selfHostAot = getenv('PHP_COMPILER_SELFHOST_AOT');
+            if ('1' === $selfHostAot || 'true' === strtolower((string) $selfHostAot)) {
+                // Full Runtime property init segfaults LLVM 9 when lowering `new Runtime()` (#2600).
+                $this->defineProperty($id, 'mode', Variable::TYPE_NATIVE_LONG);
+            } else {
+                foreach (
+                    [
+                        'compiler',
+                        'parser',
+                        'preprocessor',
+                        'postprocessor',
+                        'detector',
+                        'assignOpResolver',
+                        'vmContext',
+                        'vm',
+                        'jitContext',
+                        'jit',
+                        'typeReconstructor',
+                    ] as $prop
+                ) {
+                    $this->defineProperty($id, $prop, Variable::TYPE_OBJECT);
+                }
+                $this->defineProperty($id, 'modules', Variable::TYPE_HASHTABLE);
+                $this->defineProperty($id, 'mode', Variable::TYPE_NATIVE_LONG);
             }
-            $this->defineProperty($id, 'modules', Variable::TYPE_HASHTABLE);
-            $this->defineProperty($id, 'mode', Variable::TYPE_NATIVE_LONG);
         }
         if ('splobjectstorage' === $lcname) {
             $this->splObjectStorageClassId = $id;
