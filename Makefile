@@ -256,6 +256,16 @@ test-docker-quick: test-docker-fast
 .PHONY: bootstrap-inventory bootstrap-spine-phpcfg-parse-check bootstrap-profile bootstrap-aot-lint bootstrap-aot-link bootstrap-aot-link-lib bootstrap-vendor-prelink-bundles bootstrap-vendor-objects bootstrap-selfhost-probe bootstrap-selfhost-link bootstrap-selfhost-compile-smoke bootstrap-selfhost-compile-smoke-strict bootstrap-selfhost-runtime-compile-smoke bootstrap-selfhost-runtime-compile-smoke-strict bootstrap-m3-emit-tu-execute bootstrap-selfhost-compiler-driver-smoke bootstrap-selfhost-compiler-unit-probe bootstrap-selfhost-compiler-unit-probe-strict bootstrap-selfhost-jit-unit-probe bootstrap-selfhost-vm-unit-probe bootstrap-selfhost-parser-unit-probe bootstrap-selfhost-types-unit-probe bootstrap-selfhost-lib-spine-smoke bootstrap-selfhost-lib-spine-vm-smoke bootstrap-selfhost-vm-driver-execute-probe bootstrap-selfhost-helloworld bootstrap-loop-gen1-link bootstrap-loop-probe bootstrap-loop-probe-dry bootstrap-loop-probe-dry-run bootstrap-wave-check
 bootstrap-inventory:
 	php script/bootstrap-inventory.php
+.PHONY: bootstrap-inventory-check bootstrap-inventory-regenerate
+# Phase A inventory freshness gate (works with/without host php; issue #2537).
+bootstrap-inventory-check:
+	@bash -lc 'if command -v php >/dev/null 2>&1; then php script/bootstrap-inventory.php --check; else ./script/docker-exec.sh -- bash -lc "php script/bootstrap-inventory.php --check"; fi'
+# Regenerate docs/bootstrap-inventory.md into the host working tree (harness-safe; issue #2527, #2537).
+bootstrap-inventory-regenerate:
+	@bash -lc 'if command -v php >/dev/null 2>&1; then php script/bootstrap-inventory.php; else \
+	  ./script/docker-exec.sh -- bash -lc "php script/bootstrap-inventory.php >/dev/null"; \
+	  ./script/docker-exec.sh -- bash -lc "php -r \"readfile(\\\"docs/bootstrap-inventory.md\\\");\"" > docs/bootstrap-inventory.md; \
+	fi'
 bootstrap-spine-phpcfg-parse-check:
 	php script/bootstrap-spine-php-cfg-parse-check.php --minimal
 bootstrap-profile: bootstrap-inventory
