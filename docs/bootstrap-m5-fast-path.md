@@ -98,7 +98,7 @@ PHP_COMPILER_M3_SOURCE=bin/compile.php PHP_COMPILER_M3_OUT=/tmp/bin-compile-aot 
 
 | Symbol | Notes |
 |--------|-------|
-| `Runtime::__destruct` | Deny-listed (LLVM 9; not on compile spine) |
+| `Runtime::__destruct` | Void no-op via `compileRuntimeDestructM3Native` (#2867) |
 | `helloworld_compile_smoke` | Deny-listed FUNCDEF (#1514); emit via M3 sidecar |
 
 **Next:** complete native `VM\Context` (hashtable props + sub-objects) without LLVM 9 link regression, or small `lib/AOT/runtime/` C floor (#1494).

@@ -42,6 +42,16 @@ final class M3AllowlistSnapshotTest extends TestCase
         $this->assertContains('\\runtime::__construct', $lists['allow']);
     }
 
+    /** Issue #2867: last M3 deny fragment retired — void no-op lowering on compile spine. */
+    public function testRuntimeDestructOnAllowlistNotDenylist(): void
+    {
+        require_once self::$root.'/script/bootstrap-m3-allowlist.php';
+
+        $lists = bootstrap_m3_allowlist_from_jit(self::$root.'/lib/JIT.php');
+        $this->assertContains('\\runtime::__destruct', $lists['allow']);
+        $this->assertNotContains('\\runtime::__destruct', $lists['deny']);
+    }
+
     public function testHelloworldCompileSmokeOnDenylist(): void
     {
         require_once self::$root.'/script/bootstrap-m3-allowlist.php';
