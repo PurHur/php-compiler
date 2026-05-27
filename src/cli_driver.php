@@ -25,8 +25,16 @@ if (
 $autoloadEnv = getenv('PHP_COMPILER_VENDOR_AUTOLOAD');
 $skipVendor = getenv('PHP_COMPILER_CLI_SKIP_VENDOR');
 $selfhostAot = getenv('PHP_COMPILER_SELFHOST_AOT');
+$compiledCli = getenv('PHP_COMPILER_CLI_COMPILED');
 $m3EmitTu = getenv('PHP_COMPILER_M3_EMIT_TU');
 $m3CompileDriver = getenv('PHP_COMPILER_M3_COMPILE_DRIVER');
+
+// "Compiled CLI driver mode" (M5): the entrypoint is running as compiled code, so it must not
+// depend on loading Composer or vendor files from disk. Any required classes are expected to be
+// bundled into the binary already (#2641).
+if ('1' === $compiledCli || 'true' === strtolower((string) $compiledCli)) {
+    $skipVendor = '1';
+}
 
 // Under self-host AOT / native-emit bootstrap modes, vendor autoload is out-of-scope and can drag in
 // unsupported vendor constructs. Default to skipping it unless explicitly overridden (issue #2640).
@@ -34,6 +42,11 @@ if ('1' === $selfhostAot || 'true' === strtolower((string) $selfhostAot)) {
     $inBootstrapCompilePath = ('1' === $m3EmitTu || 'true' === strtolower((string) $m3EmitTu))
         || ('1' === $m3CompileDriver || 'true' === strtolower((string) $m3CompileDriver));
     if ($inBootstrapCompilePath && ('0' !== $skipVendor && 'false' !== strtolower((string) $skipVendor))) {
+        $skipVendor = '1';
+    }
+    // For self-host AOT execution outside the M3 helper path (future M5 compiled driver), default
+    // to skipping vendor unless explicitly forced on.
+    if ('0' !== $skipVendor && 'false' !== strtolower((string) $skipVendor)) {
         $skipVendor = '1';
     }
 }
@@ -56,46 +69,48 @@ if ('1' !== $skipVendor && 'true' !== strtolower((string) $skipVendor)) {
     /** @psalm-suppress UnresolvableInclude */
     require __DIR__.'/../vendor/autoload.php';
 } else {
-    // Minimal project autoloader for self-host bootstrap paths where composer autoload can pull in
-    // unsupported vendor trees. We avoid `vendor/autoload.php` and instead resolve a small PSR-4
-    // subset that is required for bootstrap compile paths (issue #2640).
-    if (!function_exists('php_compiler_cli_minimal_autoload')) {
-        function php_compiler_cli_minimal_autoload(string $class): void
-        {
-            /** @var array<string, string> $prefixMap */
-            $prefixMap = $GLOBALS['__phpc_cli_prefix_map'] ?? null;
-            if (!is_array($prefixMap)) {
-                $prefixMap = [
-                    // Extension modules (historical lowercase namespace).
-                    'PHPCompiler\\ext\\' => __DIR__.'/../ext/',
-                    'PHPCompiler\\' => __DIR__.'/../lib/',
-                    'PHPCompiler\\Ext\\Standard\\' => __DIR__.'/../ext/standard/',
-                    // Legacy global helper namespace used by VM data structures.
-                    'php\\' => __DIR__.'/../php/',
-                    // Vendor namespaces required by the compiler parse/type/JIT spine.
-                    'PhpParser\\' => __DIR__.'/../vendor/nikic/php-parser/lib/PhpParser/',
-                    'PHPCfg\\' => __DIR__.'/../vendor/ircmaxell/php-cfg/lib/PHPCfg/',
-                    'PHPTypes\\' => __DIR__.'/../vendor/ircmaxell/php-types/lib/PHPTypes/',
-                    'PHPLLVM\\' => __DIR__.'/../vendor/ircmaxell/php-llvm/lib/',
-                ];
-                $GLOBALS['__phpc_cli_prefix_map'] = $prefixMap;
-            }
+    if (!('1' === $compiledCli || 'true' === strtolower((string) $compiledCli))) {
+        // Minimal project autoloader for self-host bootstrap paths where composer autoload can pull in
+        // unsupported vendor trees. We avoid `vendor/autoload.php` and instead resolve a small PSR-4
+        // subset that is required for bootstrap compile paths (issue #2640).
+        if (!function_exists('php_compiler_cli_minimal_autoload')) {
+            function php_compiler_cli_minimal_autoload(string $class): void
+            {
+                /** @var array<string, string> $prefixMap */
+                $prefixMap = $GLOBALS['__phpc_cli_prefix_map'] ?? null;
+                if (!is_array($prefixMap)) {
+                    $prefixMap = [
+                        // Extension modules (historical lowercase namespace).
+                        'PHPCompiler\\ext\\' => __DIR__.'/../ext/',
+                        'PHPCompiler\\' => __DIR__.'/../lib/',
+                        'PHPCompiler\\Ext\\Standard\\' => __DIR__.'/../ext/standard/',
+                        // Legacy global helper namespace used by VM data structures.
+                        'php\\' => __DIR__.'/../php/',
+                        // Vendor namespaces required by the compiler parse/type/JIT spine.
+                        'PhpParser\\' => __DIR__.'/../vendor/nikic/php-parser/lib/PhpParser/',
+                        'PHPCfg\\' => __DIR__.'/../vendor/ircmaxell/php-cfg/lib/PHPCfg/',
+                        'PHPTypes\\' => __DIR__.'/../vendor/ircmaxell/php-types/lib/PHPTypes/',
+                        'PHPLLVM\\' => __DIR__.'/../vendor/ircmaxell/php-llvm/lib/',
+                    ];
+                    $GLOBALS['__phpc_cli_prefix_map'] = $prefixMap;
+                }
 
-            foreach ($prefixMap as $prefix => $baseDir) {
-                if (!str_starts_with($class, $prefix)) {
-                    continue;
+                foreach ($prefixMap as $prefix => $baseDir) {
+                    if (!str_starts_with($class, $prefix)) {
+                        continue;
+                    }
+                    $rel = substr($class, strlen($prefix));
+                    $path = $baseDir.str_replace('\\', '/', $rel).'.php';
+                    if (is_file($path)) {
+                        /** @psalm-suppress UnresolvableInclude */
+                        require $path;
+                    }
+                    return;
                 }
-                $rel = substr($class, strlen($prefix));
-                $path = $baseDir.str_replace('\\', '/', $rel).'.php';
-                if (is_file($path)) {
-                    /** @psalm-suppress UnresolvableInclude */
-                    require $path;
-                }
-                return;
             }
         }
+        spl_autoload_register('php_compiler_cli_minimal_autoload');
     }
-    spl_autoload_register('php_compiler_cli_minimal_autoload');
 }
 
 $memoryLimit = getenv('PHP_COMPILER_MEMORY_LIMIT');
