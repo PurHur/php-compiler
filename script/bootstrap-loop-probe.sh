@@ -8,6 +8,7 @@ COMPILE_DRIVER="${ROOT}/test/selfhost/bootstrap_loop_smoke/compile_driver.php"
 M3_PROBE="${ROOT}/script/bootstrap-selfhost-helloworld-probe.sh"
 SPINE_LINK="${ROOT}/script/bootstrap-selfhost-lib-spine-smoke-link.sh"
 GEN1_LINK="${ROOT}/script/bootstrap-loop-gen1-link.sh"
+FULL_SPINE_EMIT="${ROOT}/script/bootstrap-loop-gen1-full-spine-emit.sh"
 DRY_RUN=0
 
 usage() {
@@ -110,6 +111,11 @@ if [[ ! -f "${GEN1_LINK}" ]]; then
   exit 1
 fi
 
+if [[ ! -f "${FULL_SPINE_EMIT}" ]]; then
+  echo "bootstrap-loop-probe: missing ${FULL_SPINE_EMIT}" >&2
+  exit 1
+fi
+
 if [[ ! -f "${COMPILE_DRIVER}" ]]; then
   echo "bootstrap-loop-probe: missing ${COMPILE_DRIVER}" >&2
   exit 1
@@ -203,6 +209,17 @@ fi
 echo "==> M4 exit status (M3 HelloWorld strict already verified above)"
 if grep -q 'emit_path=native' "${GEN1_LOG}" 2>/dev/null; then
   echo "bootstrap-loop-probe: M4 gen-1→gen-2 native slice OK (exit 0)"
+  if [[ "${BOOTSTRAP_M4_GEN1_COMPILE_FULL_SPINE:-0}" == "1" ]]; then
+    echo ""
+    if ! m4_run_subprobe "M4 gen-1 full-spine native emit (compiler_lib_spine_smoke, #2664)" \
+      env BOOTSTRAP_M4_LINK_COMPILE_DRIVER="${BOOTSTRAP_M4_LINK_COMPILE_DRIVER:-1}" \
+      BOOTSTRAP_M4_COMPILE_DRIVER_REAL_LOWERING="${BOOTSTRAP_M4_COMPILE_DRIVER_REAL_LOWERING:-1}" \
+      BOOTSTRAP_M4_RUNTIME_COMPILE="${BOOTSTRAP_M4_RUNTIME_COMPILE:-1}" \
+      bash "${FULL_SPINE_EMIT}"; then
+      echo "bootstrap-loop-probe: M4 full-spine gen-1 emit blocked (exit 2)" >&2
+      exit 2
+    fi
+  fi
   exit 0
 fi
 
