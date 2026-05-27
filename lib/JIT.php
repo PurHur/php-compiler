@@ -18,6 +18,7 @@ require_once __DIR__.'/JIT/RuntimeInitCompiler.php';
 require_once __DIR__.'/JIT/M3EmitTuTrivialEchoAot.php';
 require_once __DIR__.'/JIT/VmSpineSmokeNative.php';
 require_once __DIR__.'/JIT/VmDriverExecuteNative.php';
+require_once __DIR__.'/JIT/VmUnitProbeRunNative.php';
 
 use PHPCfg\Operand;
 use PHPCfg\Op;
@@ -486,6 +487,13 @@ class JIT {
                     $logicalName
                 );
             }
+            if (JIT\VmUnitProbeRunNative::isVmUnitProbeRunName($vmSpineLc)) {
+                return $this->compileVmUnitProbeRunNative(
+                    $this->llvmInternalName($internalName),
+                    $block,
+                    $logicalName
+                );
+            }
         }
         if (
             $this->shouldUseSelfHostJitStubs()
@@ -658,6 +666,27 @@ class JIT {
         }
 
         return JIT\VmDriverExecuteNative::compileBinVmRunNative(
+            $this->context,
+            $internalName,
+            $logicalName,
+            $paramTypes
+        );
+    }
+
+    /** Native vm_unit_probe_run for M3 VM unit probe execute gate (#2619). */
+    private function compileVmUnitProbeRunNative(
+        string $internalName,
+        Block $block,
+        string $logicalName
+    ): PHPLLVM\Value {
+        $paramTypes = [];
+        if (null !== $block->func) {
+            foreach ($block->func->params as $param) {
+                $paramTypes[] = $this->llvmTypeForCfgParam($param);
+            }
+        }
+
+        return JIT\VmUnitProbeRunNative::compileVmUnitProbeRunNative(
             $this->context,
             $internalName,
             $logicalName,

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# M3 VM unit probe: lib/VM.php bundle AOT native link + optional VM run (issue #2354).
+# M3 VM unit probe: lib/VM.php bundle AOT native link + optional VM run (issue #2354, #2619).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ENTRY="${ROOT}/test/selfhost/vm_unit_probe/main.php"
@@ -33,6 +33,18 @@ if ! grep -q 'vm_unit_probe bundle OK' <<< "${bundle_out}"; then
   echo "bootstrap-selfhost-vm-unit-probe: unexpected link stdout (want vm_unit_probe bundle OK)" >&2
   printf '%s\n' "${bundle_out}" >&2
   exit 1
+fi
+
+if [[ "${BOOTSTRAP_VM_UNIT_PROBE_EXECUTE:-0}" == "1" ]]; then
+  execute_out="$(
+    env PHP_COMPILER_VM_UNIT_PROBE_EXECUTE=1 "${OUT}" 2>&1
+  )"
+  if ! grep -q 'vm_unit_probe_run OK' <<< "${execute_out}"; then
+    echo "bootstrap-selfhost-vm-unit-probe: execute phase failed (want vm_unit_probe_run OK)" >&2
+    printf '%s\n' "${execute_out}" >&2
+    exit 1
+  fi
+  echo "bootstrap-selfhost-vm-unit-probe: execute OK (vm_unit_probe_run)"
 fi
 
 echo "bootstrap-selfhost-vm-unit-probe: OK ${OUT}"

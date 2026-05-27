@@ -51,6 +51,32 @@ final class BootstrapVmUnitProbeTest extends TestCase
         $this->assertSame(0, $exitCode, implode("\n", $lines));
     }
 
+    /**
+     * @group llvm
+     */
+    public function testNativeVmUnitProbeExecutePrintsRunOkWhenLlvmPresent(): void
+    {
+        if (!LlvmToolchain::isReady(self::$root)) {
+            $this->markTestSkipped('LLVM 9 not available for VM unit probe execute test.');
+        }
+
+        $script = self::$root.'/script/bootstrap-selfhost-vm-unit-probe.sh';
+        $this->assertFileExists($script);
+
+        $prefix = LlvmToolchain::envPrefix(self::$root);
+        $cmd = implode(' ', array_map('escapeshellarg', [...$prefix, 'env', 'BOOTSTRAP_VM_UNIT_PROBE_EXECUTE=1', 'bash', $script])).' 2>&1';
+        exec($cmd, $lines, $exitCode);
+
+        $out = implode("\n", $lines);
+        $this->assertSame(0, $exitCode, $out);
+        $this->assertStringContainsString('bootstrap-selfhost-vm-unit-probe: execute OK', $out);
+        $binary = self::$root.'/build/selfhost-vm-unit-probe';
+        $this->assertTrue(is_executable($binary), $binary);
+        $runOut = shell_exec('PHP_COMPILER_VM_UNIT_PROBE_EXECUTE=1 '.escapeshellarg($binary));
+        $this->assertIsString($runOut);
+        $this->assertStringContainsString('vm_unit_probe_run OK', $runOut);
+    }
+
     public function testVmUnitProbeEntryDocumentsVmSliceAndProbe(): void
     {
         $entry = (string) file_get_contents(self::$root.'/test/selfhost/vm_unit_probe/main.php');
@@ -59,12 +85,37 @@ final class BootstrapVmUnitProbeTest extends TestCase
         $this->assertStringContainsString('bootstrap-selfhost-vm-unit-probe.sh', $entry);
     }
 
+    public function testVmUnitProbeEntryDocumentsExecuteEnv(): void
+    {
+        $entry = (string) file_get_contents(self::$root.'/test/selfhost/vm_unit_probe/main.php');
+        $this->assertStringContainsString('vm_unit_probe_run.php', $entry);
+        $this->assertStringContainsString('PHP_COMPILER_VM_UNIT_PROBE_EXECUTE', $entry);
+    }
+
+    public function testVmUnitProbeRunNativeLoweringExists(): void
+    {
+        $native = (string) file_get_contents(self::$root.'/lib/JIT/VmUnitProbeRunNative.php');
+        $this->assertStringContainsString('vm_unit_probe_run OK', $native);
+        $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
+        $this->assertStringContainsString('VmUnitProbeRunNative', $jit);
+        $this->assertStringContainsString('compileVmUnitProbeRunNative', $jit);
+    }
+
+    public function testMakefileDefinesVmUnitProbeExecuteTarget(): void
+    {
+        $makefile = (string) file_get_contents(self::$root.'/Makefile');
+        $this->assertStringContainsString('bootstrap-selfhost-vm-unit-probe-execute:', $makefile);
+        $this->assertStringContainsString('BOOTSTRAP_VM_UNIT_PROBE_EXECUTE=1', $makefile);
+    }
+
     public function testProbeScriptDocumentsGateAndArtifact(): void
     {
         $script = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-vm-unit-probe.sh');
         $this->assertStringContainsString('PHP_COMPILER_SELFHOST_AOT=1', $script);
         $this->assertStringContainsString('selfhost-vm-unit-probe', $script);
         $this->assertStringContainsString('vm_unit_probe bundle OK', $script);
+        $this->assertStringContainsString('BOOTSTRAP_VM_UNIT_PROBE_EXECUTE', $script);
+        $this->assertStringContainsString('vm_unit_probe_run OK', $script);
     }
 
     public function testMakefileDefinesVmUnitProbeTarget(): void
