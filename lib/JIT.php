@@ -383,6 +383,14 @@ class JIT {
                     $logicalName
                 );
             }
+            if (JIT\VariableTypeMapNative::isNativeLoweringName($m3Spine)) {
+                return JIT\VariableTypeMapNative::compile(
+                    $this->context,
+                    $this->llvmInternalName($internalName),
+                    $block,
+                    $logicalName
+                );
+            }
             if (str_ends_with($m3Spine, '\\runtime::loadjit')) {
                 return $this->compileRuntimeLoadJitM3Native($internalName, $block, $logicalName);
             }
@@ -1034,6 +1042,9 @@ class JIT {
             return false;
         }
         if ($this->isM3EmitTuRuntimeSpineLoweringName($lower)) {
+            return false;
+        }
+        if ($this->shouldUseM3CompileDriverRealLowering() && JIT\VariableTypeMapNative::isNativeLoweringName($lower)) {
             return false;
         }
         if ($this->isSkippedSelfHostEntryName($name)) {
@@ -2647,6 +2658,14 @@ class JIT {
         }
         if ($this->isM3CompileDriverCompilerNativeLoweringName($lcname)) {
             return JIT\CompilerOperandChainNative::compile(
+                $this->context,
+                $this->llvmInternalName($internalName),
+                $block,
+                $logicalName
+            );
+        }
+        if ($this->shouldUseM3CompileDriverRealLowering() && JIT\VariableTypeMapNative::isNativeLoweringName($lcname)) {
+            return JIT\VariableTypeMapNative::compile(
                 $this->context,
                 $this->llvmInternalName($internalName),
                 $block,
