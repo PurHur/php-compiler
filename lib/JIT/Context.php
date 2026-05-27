@@ -89,6 +89,10 @@ class Context {
     public Builtin\VarArg $vararg;
     public Builtin\Refcount $refcount;
     public Builtin\ErrorHandler $error;
+    public Builtin\Internal $internal;
+    public Builtin\VarArg $vararg;
+    /** @var list<Scope> */
+    public array $scopeStack = [];
     public int $loadType;
     private static int $stringConstantCounter = 0;
     private ?string $debugFile = null;
