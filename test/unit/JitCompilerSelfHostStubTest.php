@@ -454,17 +454,18 @@ final class JitCompilerSelfHostStubTest extends TestCase
         }
     }
 
-    public function testIssetHelperCompileRemainsSelfHostStub(): void
+    public function testIssetHelperUsesRealLoweringUnderSelfHostAot(): void
     {
         $prev = getenv('PHP_COMPILER_SELFHOST_AOT');
         putenv('PHP_COMPILER_SELFHOST_AOT=1');
         try {
             $this->assertTrue(
-                $this->invokeSkipCheck(
-                    'isSkippedIssetHelperHotPathName',
-                    'phpcompiler\\jit\\issethelper::compile'
+                \PHPCompiler\JIT\OperandNameNative::isNativeLoweringName(
+                    'phpcompiler\\jit\\operandname::resolve'
                 )
             );
+            $jit = (string) file_get_contents(__DIR__.'/../../lib/JIT.php');
+            $this->assertStringNotContainsString('isSkippedIssetHelperHotPathName', $jit);
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_SELFHOST_AOT');
