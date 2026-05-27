@@ -43,7 +43,8 @@ final class SelfHostBuiltinPolicy
         + self::CATEGORY_FILTER
         + self::CATEGORY_JSON
         + self::CATEGORY_NUMERIC
-        + self::CATEGORY_PASSWORD;
+        + self::CATEGORY_PASSWORD
+        + self::CATEGORY_PROCESS;
 
     /** @var array<string, string>|null */
     private static ?array $vmOnlyDeferredCache = null;
@@ -83,6 +84,12 @@ final class SelfHostBuiltinPolicy
         'getenv' => 'filesystem', 'putenv' => 'filesystem', 'sys_get_temp_dir' => 'filesystem', 'tempnam' => 'filesystem',
         'getcwd' => 'filesystem', 'chdir' => 'filesystem',
         'stream_context_create' => 'filesystem',
+    ];
+
+    /** @var array<string, string> */
+    private const CATEGORY_PROCESS = [
+        // Required for AOT linker/toolchain discovery (lib/AOT/Linker.php) and bootstrap M5 path.
+        'shell_exec' => 'process',
     ];
 
     /** @var array<string, string> */
