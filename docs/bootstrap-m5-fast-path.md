@@ -33,7 +33,7 @@ Supporting fixes from #1402:
 | `Compiler::unwrapOperandChain` / `operandsChainEqual` | Native via `JIT\CompilerOperandChainNative` (PHP CFG hits LLVM 9 dominance verify — #1768); `make bootstrap-selfhost-compile-driver-link` |
 | `Runtime::parseAndCompile` | On M3 allowlist when `PHP_COMPILER_M3_COMPILE_DRIVER=1` |
 | `Runtime::parse` / `Runtime::compile` | On M3 allowlist; compile-driver link OK (#1496) |
-| `Runtime::loadJitContext` | Deny-listed (LLVM 9 link crash; same fragment as JIT deny list) |
+| `Runtime::loadJitContext` | `compileRuntimeLoadJitContextM3Native` — separate LLVM function from `loadJit` (#2846) |
 | `Runtime::__construct` | Slim ctor via `compileRuntimeConstructM3Native` → `compileBlockPhpLowering` (#1494) |
 | `Runtime::initParsePipeline` / `Runtime::initCompiler` / `Runtime::loadCoreModules` | On deny list; `compileRuntime*M3Native` → PHP CFG lowering (#1494) |
 | `Runtime::initVmContext` | **Native** via `RuntimeInitVmContext::emit` (allocate `VM\Context` + `ErrorReporter` + `ScriptStack`, wire `runtime` + `vmContext`); wired in `compileBlock()`; off deny list (#1494, #2126). PHP CFG `new VMContext` still LLVM 9 link crash when combined with ctor spine. |
@@ -98,7 +98,7 @@ PHP_COMPILER_M3_SOURCE=bin/compile.php PHP_COMPILER_M3_OUT=/tmp/bin-compile-aot 
 |--------|-------|
 | `Runtime::__destruct` | Deny-listed (LLVM 9; not on compile spine) |
 | `Runtime::initParsePipeline` / `initCompiler` / `loadCoreModules` | PHP CFG spine; deny while expanding (#1494) |
-| `Runtime::loadJitContext` | Deny-listed (LLVM 9 link crash #1402) |
+| `Runtime::loadJitContext` | Real-lowered via `compileRuntimeLoadJitContextM3Native` (#2846); not inlined into `loadJit` |
 | `Runtime::createJit` / `jitContextForLoadJit` / `loadJitCompileModuleFuncs` | Split from `loadJit`; stay on deny list (stubbed) while outer `loadJit` is real-lowered (#1495) |
 
 **Next:** complete native `VM\Context` (hashtable props + sub-objects) without LLVM 9 link regression, or small `lib/AOT/runtime/` C floor (#1494).
