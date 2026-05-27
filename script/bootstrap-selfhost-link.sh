@@ -8,6 +8,13 @@ OUT="${ROOT}/build/selfhost"
 source "$(dirname "$0")/php-env.sh"
 ci_apply_llvm_memory_env
 
+if ! command -v php >/dev/null 2>&1; then
+  echo "bootstrap-selfhost-link: missing 'php' on host." >&2
+  echo "bootstrap-selfhost-link: run via Docker instead:" >&2
+  echo "  ./script/docker-exec.sh -- bash -lc 'make bootstrap-selfhost-link'" >&2
+  exit 1
+fi
+
 if [[ ! -f "${ENTRY}" ]]; then
   echo "bootstrap-selfhost-link: missing ${ENTRY}" >&2
   exit 1
