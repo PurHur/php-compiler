@@ -2276,6 +2276,11 @@ class JIT {
                 \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILE_SMOKE_SIDECAR_REL,
                 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compileSmokeSentinelBlock'
             );
+            $this->registerM3EmitTuSidecarFromPath(
+                __DIR__.'/../test/selfhost/compiler_helloworld_smoke/compile_driver.php',
+                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILE_DRIVER_SIDECAR_REL,
+                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compileDriverSentinelBlock'
+            );
         } elseif ('compile_smoke_m3_emit' === $logPrefix) {
             $this->registerM3EmitTuSidecarFromPath(
                 __DIR__.'/../test/bootstrap-aot/compiler_smoke_standalone.php',

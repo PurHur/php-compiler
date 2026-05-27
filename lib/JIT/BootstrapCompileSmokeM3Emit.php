@@ -214,9 +214,15 @@ final class BootstrapCompileSmokeM3Emit
             $filename
         );
 
+        // Real-lowering emit TU: Runtime::compileEmitSmoke may still be a null stub; call
+        // Compiler::compileEmitSmoke on runtime.compiler (#2633, #2442).
+        $object = $context->type->object;
+        $compilerVar = $object->propertyFetch($runtimeThis, 'PHPCompiler\\Runtime', 'compiler');
+        $compiler = $compilerVar->value;
+
         return $context->builder->call(
-            self::runtimeSpine($context, 'compileemitsmoke', '__object__*', ['__object__*', '__object__*']),
-            $runtimeThis,
+            self::compilerSpine($context, 'compileemitsmoke', '__object__*', ['__object__*', '__object__*']),
+            $compiler,
             $script
         );
     }
