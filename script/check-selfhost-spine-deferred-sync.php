@@ -30,8 +30,13 @@ if ($spineCount <= 0 || $inventoryTotal <= 0) {
     $errors[] = 'bootstrap-spine-count: missing spine or inventory totals';
 }
 
-if ($spineCount > 0 && $inventoryTotal > 0 && $spineCount + $deferredCount !== $inventoryTotal) {
-    $errors[] = "spine {$spineCount} + deferred {$deferredCount} != inventory {$inventoryTotal} (update bootstrap-spine-deferred-lib.php or spine bundle)";
+$shimExtra = bootstrap_spine_shim_substitute_extra_inventory();
+if (
+    $spineCount > 0
+    && $inventoryTotal > 0
+    && $spineCount + $deferredCount + $shimExtra !== $inventoryTotal
+) {
+    $errors[] = "spine {$spineCount} + deferred {$deferredCount} + shim {$shimExtra} != inventory {$inventoryTotal} (update bootstrap-spine-deferred-lib.php or spine bundle)";
 }
 
 $coverageScript = $root.'/script/check-selfhost-spine-coverage-sync.php';

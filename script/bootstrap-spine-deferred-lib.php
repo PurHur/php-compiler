@@ -13,7 +13,13 @@ declare(strict_types=1);
  */
 function bootstrap_spine_native_link_deferred(): array
 {
-    return [
-        'lib/VM/HashTable.php',
-    ];
+    return [];
+}
+
+/**
+ * Inventory paths covered by one spine require_once via cli_spine_shim (issue #2543).
+ */
+function bootstrap_spine_shim_substitute_extra_inventory(): int
+{
+    return 1;
 }

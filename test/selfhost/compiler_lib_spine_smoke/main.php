@@ -674,6 +674,7 @@ require_once __DIR__.'/../../../lib/JIT/Call/RuntimeVariableFunction.php';
 require_once __DIR__.'/../../../lib/JIT/FunctionStaticHelper.php';
 require_once __DIR__.'/../../../lib/JIT/ReadonlyClassGuard.php';
 require_once __DIR__.'/../../../lib/JIT/TryCatchHelper.php';
+require_once __DIR__.'/../../../lib/JIT/TryCatchState.php';
 require_once __DIR__.'/../../../lib/JIT/VariableFunctionCallHelper.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionAttributeGetName.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassConstruct.php';
