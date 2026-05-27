@@ -301,7 +301,7 @@ ci_run_bootstrap_inventory_lint_sync_check() {
 }
 
 ci_run_bootstrap_inventory_triage_sync_check() {
-  if [[ "${BOOTSTRAP_INVENTORY_TRIAGE_SYNC_GATE:-0}" != "1" ]]; then
+  if [[ "${BOOTSTRAP_INVENTORY_TRIAGE_SYNC_GATE:-1}" != "1" ]]; then
     return 0
   fi
   echo "Bootstrap inventory triage snapshot sync (BOOTSTRAP_INVENTORY_TRIAGE_SYNC_GATE=1, issue #2265)..."
