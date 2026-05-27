@@ -24,15 +24,32 @@ if [[ ! -x "${PHP_COMPILER_M3_OUT}" ]]; then
   exit 1
 fi
 
-# Stage 2: prove the compiled driver can lint a bootstrap fixture without Zend.
+# Stage 2: native driver compiles a fixture via M3 emit helper (#2697).
+AOT_OUT="${ROOT}/build/bootstrap-native-driver-smoke"
+SMOKE_SOURCE="${ROOT}/test/bootstrap-aot/compiler_smoke_standalone.php"
+rm -f "${AOT_OUT}"
 set +e
-lint_out="$("${PHP_COMPILER_M3_OUT}" -l "${ROOT}/test/bootstrap-aot/echo_hello.php" 2>&1)"
-lint_code=$?
+compile_out="$(
+  env PHP_COMPILER_M3_SOURCE="${SMOKE_SOURCE}" \
+    PHP_COMPILER_M3_OUT="${AOT_OUT}" \
+    "${PHP_COMPILER_M3_OUT}" 2>&1
+)"
+compile_code=$?
 set -e
-printf '%s\n' "${lint_out}"
-if [[ "${lint_code}" -ne 0 ]]; then
-  echo "bootstrap-native-compile-driver-smoke: compiled bin/compile.php lint failed (exit ${lint_code})" >&2
-  exit "${lint_code}"
+printf '%s\n' "${compile_out}"
+if [[ "${compile_code}" -ne 0 ]] || [[ ! -x "${AOT_OUT}" ]]; then
+  echo "bootstrap-native-compile-driver-smoke: native driver compile failed (exit ${compile_code})" >&2
+  exit "${compile_code:-1}"
+fi
+if ! grep -qE 'compile_smoke_m3_emit: compile OK|helloworld_compile_smoke: compile OK' <<< "${compile_out}"; then
+  echo "bootstrap-native-compile-driver-smoke: missing compile OK marker" >&2
+  exit 1
+fi
+run_out="$("${AOT_OUT}" 2>&1)"
+if ! grep -q 'compiler smoke' <<< "${run_out}"; then
+  echo "bootstrap-native-compile-driver-smoke: unexpected AOT stdout (want compiler smoke)" >&2
+  printf '%s\n' "${run_out}" >&2
+  exit 1
 fi
 
-echo "bootstrap-native-compile-driver-smoke: OK ${PHP_COMPILER_M3_OUT} -l test/bootstrap-aot/echo_hello.php"
+echo "bootstrap-native-compile-driver-smoke: OK ${PHP_COMPILER_M3_OUT} -> ${AOT_OUT}"

@@ -66,7 +66,7 @@ class JIT {
         if ($this->shouldUseM3EmitTuNativeBridge() && $this->isM3EmitTuScriptMain($block)) {
             $this->m3EmitTuMainBlock = $block;
         }
-        if ($this->shouldUseM3CompileDriverMainNative() && $this->isM3CompileDriverScriptMain($block)) {
+        if ($this->shouldUseM3CompileDriverMainNative() && $this->isM3CompileDriverBundleScriptMain($block)) {
             $this->m3CompileDriverMainBlock = $block;
         }
         JIT\Progress::noteFunction('jit_compile_compile_block_begin');
@@ -122,7 +122,6 @@ class JIT {
                 || $this->isSkippedLibSpineSmokeHotPathName($skipName)
                 || $this->isSkippedSelfHostEntryName($skipName)
                 || $this->isSkippedBootstrapInterpreterHotPathName($skipName)
-                || $this->isSkippedIssetHelperHotPathName($skipName)
             ) {
                 $this->compileBlock($func->block, $name);
 
@@ -219,7 +218,9 @@ class JIT {
         ) {
             return null;
         }
-        $lit = new Operand\Literal($this->shouldUseSelfHostJitStubs());
+        // Only compiler_lib_spine_smoke/main.php defines this constant; references from
+        // bin/compile.php cli_driver must fold false at AOT link (#2600, #2697).
+        $lit = new Operand\Literal(false);
         $lit->type = Type::bool();
 
         return JIT\Variable::fromLiteral($this->context, $lit);
@@ -286,17 +287,41 @@ class JIT {
             && '{main}' === $block->func->name;
     }
 
+    /**
+     * Host-compile a functional production driver (bin/compile.php) — not link-only sidecar bytes (#1521).
+     *
+     * Sidecar registration keeps {main} stubbed; set this env when emitting a driver that must run argv/compile.
+     */
+    private function shouldUseM5DriverHostCompile(): bool
+    {
+        $flag = getenv('PHP_COMPILER_M5_DRIVER_HOST');
+
+        return '1' === $flag || 'true' === strtolower((string) $flag);
+    }
+
     /** M5 emit sidecar host-compile targets — stub {main} under self-host AOT (#2697, #2699). */
     private function isM5BootstrapSidecarScriptMain(Block $block): bool
     {
+        if ($this->shouldUseM5DriverHostCompile()) {
+            return false;
+        }
         if (!$this->isM3CompileDriverScriptMain($block)) {
             return false;
         }
         $path = $block->scriptPath();
 
-        return str_ends_with($path, '/bin/compile.php')
-            || str_ends_with($path, '/bin/vm.php')
+        // bin/compile.php needs real {main} for native CLI driver sidecars (#2697).
+        return str_ends_with($path, '/bin/vm.php')
             || str_ends_with($path, '/src/cli_driver.php');
+    }
+
+    private function isM3CompileDriverBundleScriptMain(Block $block): bool
+    {
+        if (!$this->isM3CompileDriverScriptMain($block)) {
+            return false;
+        }
+
+        return str_contains($block->scriptPath(), 'compile_driver.php');
     }
 
     /** Opt-in when linking test/selfhost/compiler_helloworld_smoke/compile_driver.php (#1056). */
@@ -396,6 +421,13 @@ class JIT {
         if (str_ends_with($lower, '\\runtime::compileemitsmoke')) {
             return true;
         }
+        if ($this->shouldUseM5DriverHostCompile()) {
+            if ('run' === $lower || str_ends_with($lower, '\\php_compiler_cli_dispatch')
+                || str_ends_with($lower, '\\php_compiler_cli_should_run_entry_driver')
+            ) {
+                return true;
+            }
+        }
 
         return false;
     }
@@ -463,9 +495,10 @@ class JIT {
         }
         // M5 bootstrap sidecar: CLI entry scripts under `PHP_COMPILER_SELFHOST_AOT=1` only need a
         // linkable bundle; stub {main} to avoid LLVM 9 crashing while lowering argv driver chains
-        // (#2697, #2699).
+        // (#2697, #2699). `PHP_COMPILER_M5_DRIVER_HOST=1` opts into real argv lowering (#1521).
         if (
             $this->shouldUseSelfHostJitStubs()
+            && !$this->shouldUseM5DriverHostCompile()
             && null === $logicalName
             && null !== $block->func
             && '{main}' === $block->func->name
@@ -473,7 +506,7 @@ class JIT {
         ) {
             return $this->compileSkippedCompilerSplitCfgStub($internalName, $block, '{main}');
         }
-        if ($this->shouldUseM3CompileDriverMainNative() && $this->isM3CompileDriverScriptMain($block)) {
+        if ($this->shouldUseM3CompileDriverMainNative() && $this->isM3CompileDriverBundleScriptMain($block)) {
             return $this->compileM3CompileDriverMainNative($internalName, $block, $logicalName);
         }
         if ($this->shouldUseM3EmitTuNativeBridge() && $this->isM3EmitTuScriptMain($block)) {
@@ -536,6 +569,14 @@ class JIT {
             }
             if (JIT\VariableTypeMapNative::isNativeLoweringName($m3Spine)) {
                 return JIT\VariableTypeMapNative::compile(
+                    $this->context,
+                    $this->llvmInternalName($internalName),
+                    $block,
+                    $logicalName
+                );
+            }
+            if (JIT\OperandNameNative::isNativeLoweringName($m3Spine)) {
+                return JIT\OperandNameNative::compile(
                     $this->context,
                     $this->llvmInternalName($internalName),
                     $block,
@@ -639,6 +680,18 @@ class JIT {
         ) {
             return $this->compileSuperglobalNameNative($internalName, $block, $logicalName);
         }
+        if (
+            $this->shouldUseSelfHostJitStubs()
+            && null !== $logicalName
+            && JIT\OperandNameNative::isNativeLoweringName(strtolower($logicalName))
+        ) {
+            return JIT\OperandNameNative::compile(
+                $this->context,
+                $this->llvmInternalName($internalName),
+                $block,
+                $logicalName
+            );
+        }
         if ($this->isSkippedVmHotPathName($skipName)) {
             return $this->compileSkippedVmHotPathStub($internalName, $block, $logicalName ?? $internalName);
         }
@@ -650,7 +703,6 @@ class JIT {
             || $this->isSkippedLibSpineSmokeHotPathName($skipName)
             || $this->isSkippedSelfHostEntryName($skipName)
             || $this->isSkippedBootstrapInterpreterHotPathName($skipName)
-            || $this->isSkippedIssetHelperHotPathName($skipName)
         ) {
             return $this->compileSkippedCompilerSplitCfgStub($internalName, $block, $logicalName ?? $internalName);
         }
@@ -1335,16 +1387,6 @@ class JIT {
         }
 
         return str_contains($lowerName, '\\jit\\result::');
-    }
-
-    /** Stub IssetHelper (superglobalName OperandName walk crashes LLVM 9 during self-host AOT). */
-    private function isSkippedIssetHelperHotPathName(string $name): bool
-    {
-        if (!$this->shouldUseSelfHostJitStubs()) {
-            return false;
-        }
-
-        return str_contains(strtolower($name), '\\jit\\issethelper::');
     }
 
     /** M3 emit TU: PHP CFG lowering for compile spine only (#1937, #1983). */
@@ -3256,6 +3298,14 @@ class JIT {
         }
         if ($this->shouldUseM3CompileDriverRealLowering() && JIT\VariableTypeMapNative::isNativeLoweringName($lcname)) {
             return JIT\VariableTypeMapNative::compile(
+                $this->context,
+                $this->llvmInternalName($internalName),
+                $block,
+                $logicalName
+            );
+        }
+        if (JIT\OperandNameNative::isNativeLoweringName($lcname)) {
+            return JIT\OperandNameNative::compile(
                 $this->context,
                 $this->llvmInternalName($internalName),
                 $block,

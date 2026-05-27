@@ -613,4 +613,30 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
         $this->assertStringContainsString('compilefirstclasscallable', $jit);
     }
+
+    public function testCliDriverDispatchEntryForM5CompiledDriver(): void
+    {
+        $cli = (string) file_get_contents(self::$root.'/src/cli_driver.php');
+        $this->assertStringContainsString('function php_compiler_cli_dispatch(): void', $cli);
+        $this->assertStringContainsString('function php_compiler_cli_should_run_entry_driver(): bool', $cli);
+        $this->assertStringContainsString('global $argv', $cli);
+
+        $compile = (string) file_get_contents(self::$root.'/bin/compile.php');
+        $this->assertStringContainsString('php_compiler_cli_dispatch();', $compile);
+
+        $vm = (string) file_get_contents(self::$root.'/bin/vm.php');
+        $this->assertStringContainsString('php_compiler_cli_dispatch();', $vm);
+    }
+
+    public function testJitM5DriverHostCompileEnv(): void
+    {
+        $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
+        $this->assertStringContainsString('shouldUseM5DriverHostCompile', $jit);
+        $this->assertStringContainsString('PHP_COMPILER_M5_DRIVER_HOST', $jit);
+
+        $script = self::$root.'/script/bootstrap-selfhost-driver-host-compile.sh';
+        $this->assertFileExists($script);
+        $body = (string) file_get_contents($script);
+        $this->assertStringContainsString('BOOTSTRAP_M5_DRIVER_HOST_FULL_CLI', $body);
+    }
 }

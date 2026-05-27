@@ -70,7 +70,7 @@ final class IssetHelper
         if (null !== $container->superglobalName) {
             return $container->superglobalName;
         }
-        // Self-host AOT: OperandName::resolve Temporary walk crashes LLVM 9 (#816).
+        // Self-host AOT: OperandName::resolve uses OperandNameNative (LLVM 9 safe; #816).
         if (self::isSelfHostAot()) {
             return null;
         }

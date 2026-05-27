@@ -253,7 +253,7 @@ test-docker-exec:
 .PHONY: test-docker-quick
 test-docker-quick: test-docker-fast
 
-.PHONY: bootstrap-inventory bootstrap-spine-phpcfg-parse-check bootstrap-profile bootstrap-aot-lint bootstrap-aot-link bootstrap-aot-link-lib bootstrap-vendor-prelink-bundles bootstrap-vendor-objects bootstrap-selfhost-probe bootstrap-selfhost-link bootstrap-selfhost-compile-smoke bootstrap-selfhost-compile-smoke-strict bootstrap-selfhost-runtime-compile-smoke bootstrap-selfhost-runtime-compile-smoke-strict bootstrap-m3-emit-tu-execute bootstrap-selfhost-compiler-driver-smoke bootstrap-selfhost-compiler-unit-probe bootstrap-selfhost-compiler-unit-probe-strict bootstrap-selfhost-jit-unit-probe bootstrap-selfhost-vm-unit-probe bootstrap-selfhost-parser-unit-probe bootstrap-selfhost-types-unit-probe bootstrap-selfhost-lib-spine-smoke bootstrap-selfhost-lib-spine-vm-smoke bootstrap-selfhost-vm-driver-execute-probe bootstrap-selfhost-helloworld bootstrap-selfhost-helloworld-compile-bin bootstrap-selfhost-cli-driver-emit bootstrap-native-compile-driver-smoke bootstrap-selfhost-driver-smoke bootstrap-loop-gen1-link bootstrap-loop-gen1-full-spine-emit bootstrap-loop-probe bootstrap-loop-probe-dry bootstrap-loop-probe-dry-run bootstrap-wave-check
+.PHONY: bootstrap-inventory bootstrap-spine-phpcfg-parse-check bootstrap-profile bootstrap-aot-lint bootstrap-aot-link bootstrap-aot-link-lib bootstrap-vendor-prelink-bundles bootstrap-vendor-objects bootstrap-selfhost-probe bootstrap-selfhost-link bootstrap-selfhost-compile-smoke bootstrap-selfhost-compile-smoke-strict bootstrap-selfhost-runtime-compile-smoke bootstrap-selfhost-runtime-compile-smoke-strict bootstrap-m3-emit-tu-execute bootstrap-selfhost-compiler-driver-smoke bootstrap-selfhost-compiler-unit-probe bootstrap-selfhost-compiler-unit-probe-strict bootstrap-selfhost-jit-unit-probe bootstrap-selfhost-vm-unit-probe bootstrap-selfhost-parser-unit-probe bootstrap-selfhost-types-unit-probe bootstrap-selfhost-lib-spine-smoke bootstrap-selfhost-lib-spine-vm-smoke bootstrap-selfhost-vm-driver-execute-probe bootstrap-selfhost-helloworld bootstrap-selfhost-helloworld-compile-bin bootstrap-selfhost-cli-driver-emit bootstrap-selfhost-driver-host-compile bootstrap-selfhost-driver-smoke bootstrap-native-compile-driver-smoke bootstrap-loop-gen1-link bootstrap-loop-gen1-full-spine-emit bootstrap-loop-probe bootstrap-loop-probe-dry bootstrap-loop-probe-dry-run bootstrap-wave-check
 bootstrap-inventory:
 	php script/bootstrap-inventory.php
 .PHONY: bootstrap-inventory-check bootstrap-inventory-regenerate
@@ -331,10 +331,12 @@ bootstrap-selfhost-helloworld-compile-bin:
 	./script/bootstrap-selfhost-helloworld-compile-bin.sh
 bootstrap-selfhost-cli-driver-emit:
 	./script/bootstrap-selfhost-cli-driver-emit.sh
-bootstrap-native-compile-driver-smoke:
-	./script/bootstrap-native-compile-driver-smoke.sh
+bootstrap-selfhost-driver-host-compile:
+	./script/bootstrap-selfhost-driver-host-compile.sh
 bootstrap-selfhost-driver-smoke:
 	./script/bootstrap-selfhost-driver-smoke.sh
+bootstrap-native-compile-driver-smoke:
+	./script/bootstrap-native-compile-driver-smoke.sh
 bootstrap-loop-gen1-link:
 	BOOTSTRAP_M4_LINK_COMPILE_DRIVER=1 \
 	BOOTSTRAP_M4_COMPILE_DRIVER_REAL_LOWERING=1 \
@@ -345,6 +347,8 @@ bootstrap-loop-gen1-full-spine-emit:
 .PHONY: bootstrap-loop-full-spine-probe
 bootstrap-loop-full-spine-probe:
 	./script/bootstrap-loop-full-spine-probe.sh
+bootstrap-loop-gen2-recompile-minimal:
+	./script/bootstrap-loop-gen2-recompile-minimal.sh
 bootstrap-loop-probe:
 	./script/bootstrap-loop-probe.sh
 bootstrap-loop-probe-dry:
