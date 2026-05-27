@@ -102,11 +102,15 @@ function run(string $filename, string $code, array $options): void
         $scriptFilename
     );
     $block = $runtime->parseAndCompile($code, $filename);
-    if (! isset($options['-l']) && null === $block) {
-        $diag = $runtime->compiler->getCompileAbortDetail();
-        $suffix = null !== $diag && '' !== $diag ? ' — '.$diag : '';
-        fwrite(STDERR, 'compile.php: parseAndCompile returned null for '.$filename.$suffix."\n");
-        exit(2);
+    if (null === $block) {
+        if (! isset($options['-l'])) {
+            $diag = $runtime->compiler->getCompileAbortDetail();
+            $suffix = null !== $diag && '' !== $diag ? ' — '.$diag : '';
+            fwrite(STDERR, 'compile.php: parseAndCompile returned null for '.$filename.$suffix."\n");
+            exit(2);
+        }
+        fwrite(STDERR, "phpc lint: failed to compile {$filename}\n");
+        exit(1);
     }
     if (! isset($options['-l'])) {
         if (! isset($options['-o']) || $options['-o'] === true) {
