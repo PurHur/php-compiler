@@ -41,6 +41,9 @@ final class BootstrapBootstrapLoopProbeTest extends TestCase
         $this->assertStringContainsString('--dry-run', $script);
         $this->assertStringContainsString('Exit codes:', $script);
         $this->assertStringContainsString('exit 2', $script);
+        $this->assertStringContainsString('bootstrap-selfhost-link.sh', $script);
+        $this->assertStringContainsString('M0 compiler_minimal link', $script);
+        $this->assertStringContainsString('#2828', $script);
         $this->assertStringContainsString('bootstrap-selfhost-lib-spine-smoke-link.sh', $script);
         $this->assertStringContainsString('bootstrap-selfhost-helloworld-probe.sh', $script);
         $this->assertStringContainsString('BOOTSTRAP_M3_LINK_COMPILE_DRIVER', $script);

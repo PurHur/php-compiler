@@ -26,7 +26,14 @@ if [[ -z "${PHP_COMPILER_LLVM_PATH:-}" || ! -f "${PHP_COMPILER_LLVM_PATH}/libLLV
 fi
 
 if [[ -d "${ROOT}/vendor" ]]; then
-  "${ROOT}/script/apply-patches.sh" >/dev/null
+  patch_log="$(mktemp)"
+  if ! "${ROOT}/script/apply-patches.sh" >"${patch_log}" 2>&1; then
+    echo "bootstrap-selfhost-link: apply-patches failed (#2806)" >&2
+    cat "${patch_log}" >&2
+    rm -f "${patch_log}"
+    exit 1
+  fi
+  rm -f "${patch_log}"
 fi
 
 mkdir -p "${ROOT}/build"

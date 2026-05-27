@@ -5,6 +5,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ENTRY="${ROOT}/test/selfhost/bootstrap_loop_smoke/main.php"
 COMPILE_DRIVER="${ROOT}/test/selfhost/bootstrap_loop_smoke/compile_driver.php"
+M0_LINK="${ROOT}/script/bootstrap-selfhost-link.sh"
 M3_PROBE="${ROOT}/script/bootstrap-selfhost-helloworld-probe.sh"
 SPINE_LINK="${ROOT}/script/bootstrap-selfhost-lib-spine-smoke-link.sh"
 GEN1_LINK="${ROOT}/script/bootstrap-loop-gen1-link.sh"
@@ -98,6 +99,11 @@ if [[ ! -f "${ENTRY}" ]]; then
   exit 1
 fi
 
+if [[ ! -f "${M0_LINK}" ]]; then
+  echo "bootstrap-loop-probe: missing ${M0_LINK}" >&2
+  exit 1
+fi
+
 if [[ ! -f "${M3_PROBE}" ]]; then
   echo "bootstrap-loop-probe: missing ${M3_PROBE}" >&2
   exit 1
@@ -143,6 +149,12 @@ fi
 echo "==> lint bootstrap_loop_smoke compile driver"
 if ! php "${ROOT}/bin/compile.php" -l "${COMPILE_DRIVER}" 2>&1; then
   echo "bootstrap-loop-probe: compile driver lint failed (exit 1)" >&2
+  exit 1
+fi
+
+if ! m4_run_subprobe "M0 compiler_minimal link (#2828)" bash "${M0_LINK}"; then
+  echo "bootstrap-loop-probe: M0 prerequisite failed (exit 1)" >&2
+  echo "bootstrap-loop-probe: hint: make bootstrap-selfhost-link" >&2
   exit 1
 fi
 
