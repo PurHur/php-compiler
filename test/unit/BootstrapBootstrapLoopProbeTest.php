@@ -166,7 +166,7 @@ final class BootstrapBootstrapLoopProbeTest extends TestCase
         );
     }
 
-    public function testGen1LinkPartialGreenWhenLlvmPresent(): void
+    public function testGen1LinkNativeDefaultWhenLlvmPresent(): void
     {
         if (!LlvmToolchain::isReady(self::$root)) {
             $this->markTestSkipped('LLVM 9 not available for M4 gen-1 link test.');
@@ -174,11 +174,7 @@ final class BootstrapBootstrapLoopProbeTest extends TestCase
 
         $script = self::$root.'/script/bootstrap-loop-gen1-link.sh';
         $prefix = LlvmToolchain::envPrefix(self::$root);
-        $cmd = implode(' ', array_map('escapeshellarg', [
-            ...$prefix,
-            'env', 'BOOTSTRAP_M4_LINK_COMPILE_DRIVER=1',
-            'bash', $script,
-        ])).' 2>&1';
+        $cmd = implode(' ', array_map('escapeshellarg', [...$prefix, 'bash', $script])).' 2>&1';
         exec($cmd, $lines, $exitCode);
 
         $out = implode("\n", $lines);
@@ -187,17 +183,39 @@ final class BootstrapBootstrapLoopProbeTest extends TestCase
         $this->assertStringContainsString('compiler smoke', $out);
         $this->assertStringContainsString('emit helper link OK', $out);
         $this->assertStringContainsString('emit_path=native', $out);
+        $this->assertStringContainsString('OK emit_path=native', $out);
         $this->assertStringNotContainsString(
             'emit helper link failed (exit 255, mode=selfhost stubs (no PHP_COMPILER_M3_COMPILE_DRIVER))',
             $out
         );
-        if (str_contains($out, 'emit_path=native')) {
-            $this->assertStringContainsString('OK emit_path=native', $out);
-        } else {
-            $this->assertStringContainsString('runtime gate:', $out);
-        }
         $this->assertTrue(is_executable(self::$root.'/build/bootstrap-loop-gen1'));
         $this->assertTrue(is_executable(self::$root.'/build/bootstrap-loop-gen2'));
+    }
+
+    public function testGen1LinkStrictRefusesZendFallbackWhenNativeBlocked(): void
+    {
+        if (!LlvmToolchain::isReady(self::$root)) {
+            $this->markTestSkipped('LLVM 9 not available for M4 gen-2 strict test.');
+        }
+
+        $script = self::$root.'/script/bootstrap-loop-gen1-link.sh';
+        $prefix = LlvmToolchain::envPrefix(self::$root);
+        $cmd = implode(' ', array_map('escapeshellarg', [
+            ...$prefix,
+            'env', 'BOOTSTRAP_M4_GEN2_STRICT=1', 'BOOTSTRAP_M4_LINK_COMPILE_DRIVER=0',
+            'bash', $script,
+        ])).' 2>&1';
+        exec($cmd, $lines, $exitCode);
+
+        $out = implode("\n", $lines);
+        // Strict forces link driver on; should still pass with native emit when LLVM green.
+        if (str_contains($out, 'OK emit_path=native')) {
+            $this->assertSame(0, $exitCode, $out);
+
+            return;
+        }
+        $this->assertSame(1, $exitCode, $out);
+        $this->assertStringContainsString('emit_path=zend_fallback_would_be_used', $out);
     }
 
     public function testFullProbeExitsTwoWhenM3StrictBlocked(): void

@@ -45,6 +45,18 @@ if [[ -z "${PHP_COMPILER_LLVM_PATH:-}" || ! -f "${PHP_COMPILER_LLVM_PATH}/libLLV
   exit 2
 fi
 
+# Default-on native compile-driver when LLVM present (mirror make bootstrap-loop-gen1-link; #2611).
+# Strict requires native gen-2 emit — force link env even if caller cleared defaults.
+if [[ "${BOOTSTRAP_M4_GEN2_STRICT:-0}" == "1" ]]; then
+  export BOOTSTRAP_M4_LINK_COMPILE_DRIVER=1
+  export BOOTSTRAP_M4_COMPILE_DRIVER_REAL_LOWERING=1
+  export BOOTSTRAP_M4_RUNTIME_COMPILE=1
+else
+  : "${BOOTSTRAP_M4_LINK_COMPILE_DRIVER:=1}"
+  : "${BOOTSTRAP_M4_COMPILE_DRIVER_REAL_LOWERING:=1}"
+  : "${BOOTSTRAP_M4_RUNTIME_COMPILE:=1}"
+fi
+
 mkdir -p build
 export PHP_COMPILER_SELFHOST_AOT=1
 export PHP_COMPILER_JIT_PROGRESS_FILE="build/.last-jit-func-bootstrap-loop-gen1"

@@ -151,13 +151,10 @@ echo ""
 
 GEN1_LOG="$(mktemp)"
 trap 'rm -f "${GEN1_LOG}" "${M3_STRICT_OUT:-}"' EXIT
-echo "==> M4 gen-1 link + gen-2 compile attempt (partial — Zend gen-2 emit allowed)"
+echo "==> M4 gen-1 link + gen-2 compile attempt (script defaults native emit when LLVM present; #2611)"
 set +e
 (
   cd "${ROOT}"
-  BOOTSTRAP_M4_LINK_COMPILE_DRIVER=1 \
-  BOOTSTRAP_M4_COMPILE_DRIVER_REAL_LOWERING="${BOOTSTRAP_M4_COMPILE_DRIVER_REAL_LOWERING:-1}" \
-  BOOTSTRAP_M4_RUNTIME_COMPILE="${BOOTSTRAP_M4_RUNTIME_COMPILE:-1}" \
   bash "${GEN1_LINK}"
 ) >"${GEN1_LOG}" 2>&1
 GEN1_CODE=$?
