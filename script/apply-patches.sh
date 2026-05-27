@@ -164,6 +164,9 @@ patch_already_applied() {
     php-types-first-class-callable.patch)
       grep -q 'Expr_FirstClassCallable' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
       ;;
+    php-types-missing-parent-no-echo.patch)
+      ! grep -q "Could not find parent" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/State.php" 2>/dev/null
+      ;;
     *)
       return 1
       ;;
@@ -385,6 +388,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-strpbrk-string-false.patch"
   apply_patch "$PATCH_DIR/php-types-crc32-int.patch"
   apply_patch "$PATCH_DIR/php-types-dollars-brace.patch"
+  apply_patch "$PATCH_DIR/php-types-missing-parent-no-echo.patch"
   apply_patch "$PATCH_DIR/php-types-mixed-reserved.patch"
   apply_patch "$PATCH_DIR/php-types-nullsafe.patch"
   apply_patch "$PATCH_DIR/php-types-static-var.patch"

@@ -1,52 +1,32 @@
 --- vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
 +++ vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
-@@ -359,7 +359,7 @@
-         }
-         $regex = '(^([a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*\\\\)*[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*$)';
+@@ -418,3 +418,3 @@
          if (! preg_match($regex, $decl)) {
 -            throw new \RuntimeException("Unknown type declaration found: ${decl}");
 +            throw new \RuntimeException("Unknown type declaration found: {$decl}");
          }
- 
-         return new self(self::TYPE_OBJECT, [], $decl);
-@@ -488,7 +488,7 @@
-                 throw new \RuntimeException('Unmatched braces?');
-             }
+@@ -550,3 +550,3 @@
              if (! in_array(substr($decl, 0, 1), ['|', '&'], true)) {
 -                throw new \RuntimeException("Unknown position of combinator: ${decl}");
 +                throw new \RuntimeException("Unknown position of combinator: {$decl}");
              }
-             $right = self::fromDecl(substr($decl, 1));
-             $combinator = substr($decl, 0, 1);
-@@ -503,10 +503,10 @@
-             } elseif ($orPos !== false && $andPos !== false) {
-                 $pos = min($orPos, $andPos);
+@@ -566,3 +566,3 @@
              } else {
 -                throw new \RuntimeException("No combinator found: ${decl}");
 +                throw new \RuntimeException("No combinator found: {$decl}");
              }
+@@ -569,3 +569,3 @@
              if ($pos === 0) {
 -                throw new \RuntimeException("Unknown position of combinator: ${decl}");
 +                throw new \RuntimeException("Unknown position of combinator: {$decl}");
              }
-             $left = self::fromDecl(substr($decl, 0, $pos));
-             $right = self::fromDecl(substr($decl, $pos + 1));
-@@ -519,7 +519,7 @@
-             return new self(self::TYPE_INTERSECTION, [$left, $right]);
-         }
- 
+@@ -582,2 +582,2 @@
 -        throw new \RuntimeException("Unknown combinator ${combinator}");
 +        throw new \RuntimeException("Unknown combinator {$combinator}");
      }
- }
 --- vendor/ircmaxell/php-types/lib/PHPTypes/State.php
 +++ vendor/ircmaxell/php-types/lib/PHPTypes/State.php
-@@ -221,7 +221,7 @@
-                     $map[$mapped][$name] = $class;
-                 }
-             } else {
+@@ -224,2 +224,2 @@
 -                echo "Could not find parent ${extends}\n";
 +                echo "Could not find parent {$extends}\n";
              }
-         }
-         $this->classResolves = $map;
