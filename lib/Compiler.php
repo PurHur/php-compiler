@@ -47,6 +47,17 @@ class Compiler {
     }
 
     /**
+     * Best-effort set of the first compile abort detail without throwing.
+     * Used to surface self-host null-return failure modes (#2666).
+     */
+    public function setCompileAbortDetailIfEmpty(string $detail): void
+    {
+        if (null === $this->compileAbortDetail || '' === $this->compileAbortDetail) {
+            $this->compileAbortDetail = $detail;
+        }
+    }
+
+    /**
      * Marks the CFG construct that halted compilation before throwing LogicException (#2642).
      *
      * @return never
@@ -78,9 +89,20 @@ class Compiler {
         $this->resetCompileAbortDetail();
         $this->seen = new SplObjectStorage;
 
+        /** @var mixed $main */
         $main = $this->compileCfgBlock($script->main->cfg, $script->main->params, $script->main);
+        if (!$main instanceof Block) {
+            // Self-host AOT can surface unexpected stub returns as null; capture a stable diagnostic.
+            if (null === $this->compileAbortDetail) {
+                $this->compileAbortDetail = 'Compiler::compile: compileCfgBlock returned non-Block';
+            }
+            $this->seen = null;
+
+            return null;
+        }
 
         $this->seen = null;
+
         return $main;
     }
 
@@ -88,7 +110,9 @@ class Compiler {
     public function compileEmitSmoke(Script $script): ?Block
     {
         // Production drivers (e.g. bin/compile.php) declare user functions; use full compile (#2633).
-        if ([] !== $script->functions) {
+        // Also treat class-like definitions as non-trivial: emitting method bodies and hoisting
+        // definitions relies on full compile setup on the self-host path (#2666).
+        if ([] !== $script->functions || $this->emitSmokeScriptHasClassLike($script)) {
             return $this->compile($script);
         }
         $this->resetCompileAbortDetail();
@@ -99,6 +123,26 @@ class Compiler {
         }
 
         return $block;
+    }
+
+    /**
+     * Emit-smoke is intended for small scripts; class-like constructs are a strong signal that
+     * we should run the full compile path (self-host M5, #2666).
+     */
+    private function emitSmokeScriptHasClassLike(Script $script): bool
+    {
+        foreach ($script->main->cfg->children as $child) {
+            if (
+                $child instanceof Op\Stmt\Class_
+                || $child instanceof Op\Stmt\Interface_
+                || $child instanceof Op\Stmt\Trait_
+                || $child instanceof Op\Stmt\Enum_
+            ) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function compileFunc(string $name, CfgFunc $func): Func {
@@ -185,7 +229,18 @@ class Compiler {
             }
             $this->compileBlock($new);
         }
-        return $this->seen[$block];
+        /** @var mixed $out */
+        $out = $this->seen[$block] ?? null;
+        if (!$out instanceof Block) {
+            if (null === $this->compileAbortDetail) {
+                $this->compileAbortDetail = 'Compiler::compileCfgBlock: seen map returned non-Block';
+            }
+            // Best effort: keep going with a fresh Block so callers can surface a meaningful abort later.
+            $out = new Block($block);
+            $this->seen[$block] = $out;
+        }
+
+        return $out;
     }
 
     /**

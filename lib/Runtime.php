@@ -195,8 +195,17 @@ class Runtime {
     }
 
     public function compile(Script $script): ?Block {
+        /** @var mixed $block */
         $block = $this->compiler->compile($script);
+        if (!$block instanceof Block) {
+            // Self-host AOT can surface unexpected stub returns as null; preserve a stable abort detail.
+            $this->compiler->setCompileAbortDetailIfEmpty('Runtime::compile: Compiler::compile returned non-Block');
+
+            return null;
+        }
+
         $this->assignOpResolver->optimize($block);
+
         return $block;
     }
 
