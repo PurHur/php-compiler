@@ -242,7 +242,9 @@ final class Doctor
             fwrite(STDOUT, "   make north-star3-verify  or  ./script/north-star3-verify.sh  (#2360 M3 unit probes)\n");
         }
         if (is_executable($repoRoot.'/script/north-star4-verify.sh')) {
-            fwrite(STDOUT, "   make north-star4-verify  or  ./script/north-star4-verify.sh  (#2379 M4 strict loop; --dry-run-only on partial M4)\n");
+            fwrite(STDOUT, "   make north-star4-verify  or  ./script/north-star4-verify.sh  (#2379 M4: gen-1→gen-2 + gen-2→gen-3)\n");
+            fwrite(STDOUT, "   make bootstrap-loop-gen2-recompile-spine  — gen-2→gen-3 spine only (#2697)\n");
+            fwrite(STDOUT, "   docs/bootstrap-generations.md — generation ladder SSOT\n");
         }
         fwrite(STDOUT, "   phpc test --bootstrap [--strict]\n");
         fwrite(STDOUT, "   make bootstrap-wave-check  (opt-in --with-helloworld)\n");
@@ -570,7 +572,8 @@ final class Doctor
         }
         $ns4Script = $repoRoot.'/script/north-star4-verify.sh';
         if (is_executable($ns4Script)) {
-            fwrite(STDOUT, "  M4 strict loop   make north-star4-verify            inventory + M3 strict + gen-1 link + loop probe (#2379)\n");
+            fwrite(STDOUT, "  M4 strict loop   make north-star4-verify            inventory + M3 strict + gen-1→gen-2 + gen-2→gen-3 (#2379)\n");
+            fwrite(STDOUT, "  M4 gen-3 spine   make bootstrap-loop-gen2-recompile-spine   gen-2 driver recompiles 717/717 (#2697)\n");
             fwrite(STDOUT, "  Script           ./script/north-star4-verify.sh    --dry-run-only / --strict / --require-llvm\n");
         }
         fwrite(STDOUT, "  Fast CI hook     {$ns2CiDetail}\n");

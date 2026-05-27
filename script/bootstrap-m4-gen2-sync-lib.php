@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * Shared M4 gen-2 emit_path profile for docs ↔ bootstrap-loop scripts (issue #2115).
+ * Shared M4 gen-2/gen-3 emit_path profile for docs ↔ bootstrap-loop scripts (issue #2115).
  */
 
 /**
@@ -37,6 +37,17 @@ function bootstrap_m4_gen2_script_profile(string $gen1LinkSource, string $probeS
 }
 
 /**
+ * @return array{gen3_spine_script: bool, gen3_spine_success_line: bool}
+ */
+function bootstrap_m4_gen3_script_profile(string $gen2RecompileSource): array
+{
+    return [
+        'gen3_spine_script' => str_contains($gen2RecompileSource, 'bootstrap-loop-gen3-full-spine'),
+        'gen3_spine_success_line' => str_contains($gen2RecompileSource, 'bootstrap-loop-gen2-recompile-spine: OK'),
+    ];
+}
+
+/**
  * @param array{
  *   zend_fallback: bool,
  *   native_success: bool,
@@ -45,9 +56,10 @@ function bootstrap_m4_gen2_script_profile(string $gen1LinkSource, string $probeS
  *   runtime_compile_env: bool,
  *   emit_path_tokens: list<string>
  * } $profile
+ * @param array{gen3_spine_script: bool, gen3_spine_success_line: bool} $gen3Profile
  * @param list<string> $errors
  */
-function bootstrap_m4_gen2_validate_doc(string $rel, string $doc, array $profile, array &$errors): void
+function bootstrap_m4_gen2_validate_doc(string $rel, string $doc, array $profile, array $gen3Profile, array &$errors): void
 {
     if ($profile['gen2_strict_env'] && !str_contains($doc, 'BOOTSTRAP_M4_GEN2_STRICT')) {
         $errors[] = "{$rel}: missing BOOTSTRAP_M4_GEN2_STRICT gate name (see bootstrap-loop-gen1-link.sh)";
@@ -58,10 +70,11 @@ function bootstrap_m4_gen2_validate_doc(string $rel, string $doc, array $profile
     }
 
     if ($profile['zend_fallback']) {
-        if (!preg_match('/gen-2.*Zend|Zend.*gen-2|gen-2 \*\*Zend\*\*/i', $doc)) {
+        if (!preg_match('/gen-2.*Zend|Zend.*gen-2|gen-2 \*\*Zend\*\*|emit_path=zend partial/i', $doc)) {
             $errors[] = "{$rel}: M4 gen-2 must mention Zend partial emit while bootstrap-loop-gen1-link.sh retains Zend fallback";
         }
-        if (preg_match('/native gen-2 emit\s*[✅]|native gen-2 emit\s*\|\s*✅/i', $doc)) {
+        if (preg_match('/native gen-2 emit\s*[✅]|native gen-2 emit\s*\|\s*✅/i', $doc)
+            && !preg_match('/Zend (partial|fallback)|emit_path=zend partial/i', $doc)) {
             $errors[] = "{$rel}: claims native gen-2 emit complete while script still has Zend fallback path";
         }
     }
@@ -74,9 +87,22 @@ function bootstrap_m4_gen2_validate_doc(string $rel, string $doc, array $profile
         $errors[] = "{$rel}: script supports native gen-2 emit_path=native — document opt-in path (BOOTSTRAP_M4_LINK_COMPILE_DRIVER)";
     }
 
+    if ($gen3Profile['gen3_spine_script']) {
+        if (!str_contains($doc, 'bootstrap-loop-gen2-recompile-spine')) {
+            $errors[] = "{$rel}: missing bootstrap-loop-gen2-recompile-spine.sh reference (gen-2→gen-3 spine recompile)";
+        }
+        if (!preg_match('/gen-3|bootstrap-loop-gen3-full-spine/i', $doc)) {
+            $errors[] = "{$rel}: must document gen-3 spine artifact (bootstrap-loop-gen3-full-spine)";
+        }
+    }
+
+    if (preg_match('/gen-2.*compiles itself|gen-2→gen-3|gen-2 recompiles/i', $doc)
+        && !$gen3Profile['gen3_spine_script']) {
+        $errors[] = "{$rel}: claims gen-2 self-compile but bootstrap-loop-gen2-recompile-spine.sh missing gen-3 wiring";
+    }
+
     foreach ($profile['emit_path_tokens'] as $token) {
         if (!str_contains($doc, $token) && 'emit_path=zend_fallback_would_be_used' !== $token) {
-            // Probe stdout cites zend partial; gen1-link is SSOT for success lines.
             if (in_array($token, ['emit_path=zend partial', 'emit_path=native'], true)) {
                 continue;
             }
