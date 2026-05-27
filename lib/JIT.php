@@ -608,8 +608,20 @@ class JIT {
         ) {
             return $this->compileSkippedCompilerSplitCfgStub($internalName, $block, $logicalName ?? $internalName);
         }
-        // Emit TU: never PHP-lowering bundled lib/ (LLVM 9 global ctor; #2540).
+        // Emit TU: stub bundled lib/ except M3 compile-driver Compiler/Web CFG (#2540, #2633).
         if ($this->shouldUseM3EmitTuNativeBridge() && null !== $logicalName) {
+            $emitLc = strtolower($logicalName);
+            if ($this->shouldUseM3CompileDriverRealLowering()
+                && (
+                    $this->isM3EmitTuCompilerCompileChainLoweringName($emitLc)
+                    || $this->isLiteralIncludeDiscoveryRealLoweringMethod($emitLc)
+                    || $this->isSuperglobalsM3CompileDriverLoweringMethod($emitLc)
+                    || $this->isM3EmitTuRuntimeCompileDriverSpineLoweringName($emitLc)
+                )
+            ) {
+                return $this->compileBlockPhpLowering($internalName, $block, $logicalName, $funcName);
+            }
+
             return $this->compileSkippedCompilerSplitCfgStub($internalName, $block, $logicalName ?? $internalName);
         }
 
@@ -1374,6 +1386,104 @@ class JIT {
     }
 
     /**
+     * Compiler CFG helpers allowed through emit-TU stub gate for M3 compile-driver (#2633).
+     *
+     * Kept smaller than {@see m3EmitTuCompilerSpineMethodSuffixes()} to avoid LLVM 9 link crash
+     * when lowering the full Compiler into the emit-helper module (#2540).
+     */
+    private function isM3EmitTuCompilerCompileChainLoweringName(string $lower): bool
+    {
+        if (!$this->shouldUseM3CompileDriverRealLowering()) {
+            return false;
+        }
+        foreach ($this->m3EmitTuCompilerCompileChainLoweringSuffixes() as $suffix) {
+            if (str_ends_with($lower, '\\compiler::'.$suffix)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function isM3EmitTuRuntimeCompileDriverSpineLoweringName(string $lower): bool
+    {
+        if (!$this->shouldUseM3CompileDriverRealLowering()) {
+            return false;
+        }
+        foreach ([
+            'parse',
+            'compileemitsmoke',
+            'initparsepipeline',
+            'initcompiler',
+            'loadcoremodules',
+        ] as $suffix) {
+            if (str_ends_with($lower, '\\runtime::'.$suffix)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** @return list<string> */
+    private function m3EmitTuCompilerCompileChainLoweringSuffixes(): array
+    {
+        return [
+            'compilecfgblock',
+            'compilecfgbranch',
+            'compileblock',
+            'compileops',
+            'compileop',
+            'compilestmt',
+            'compileexpr',
+            'compileoperand',
+            'compileterminal',
+            'compileparam',
+            'compilefunction',
+            'compilefunccall',
+            'compileboolconstant',
+            'compilebooltemporary',
+            'compilecoalesce',
+            'compilenullsafe',
+            'compileisset',
+            'compileissetmulti',
+            'compilearrayliteral',
+            'compilearraydimfetchread',
+            'compileincludeop',
+            'compileclasslike',
+            'compileclassbody',
+            'compileglobalconst',
+            'compileclassconstfetch',
+            'compileinstanceof',
+            'compileswitchasjumpifchain',
+            'getopcodetype',
+            'compiletypeconstrainedvariable',
+            'trycompiledefineasglobalconst',
+            'tryfoldvariablefunctionname',
+            'compilecallargsends',
+            'callargunpack',
+            'markcallerlocalsusedbyliteralinclude',
+            'requireoperandslot',
+            'resolvesimplevariablename',
+            'operandschainequal',
+            'unwrapoperandchain',
+            'slotindexforvariablename',
+            'splitcfgblockafterstringkeyedarray',
+            'inheritfuncfromparent',
+            'needscfg',
+            'unwrap',
+            'isarraydim',
+            'findcoalesce',
+            'resolvecoalesce',
+            'resolveisset',
+            'isredundantcoalescetailassign',
+            'compilefirstclasscallable',
+            'compilefirstclassfunctionnameslot',
+            'compilefirstclassstaticnameslot',
+        ];
+    }
+
+    /**
      * Lightweight native stubs for Runtime spine in M3 emit TU — never full PHP CFG (#2442).
      *
      * LLVM 9 crashes lowering initVmContext / parseAndCompile bodies in the emit-helper bundle.
@@ -1667,7 +1777,9 @@ class JIT {
             || str_contains($lower, 'deployroot')
             || str_contains($lower, 'sourcebundler')
             || (str_contains($lower, '\\web\\conststringfolder::') && !$this->isConstStringFolderRealLoweringMethod($lower))
-            || (str_contains($lower, '\\web\\superglobals::') && !str_ends_with($lower, '::issuperglobalname'));
+            || (str_contains($lower, '\\web\\superglobals::')
+                && !$this->isSuperglobalsM3CompileDriverLoweringMethod($lower)
+                && !str_ends_with($lower, '::issuperglobalname'));
     }
 
 
@@ -1721,7 +1833,22 @@ class JIT {
     /** LiteralIncludeDiscovery methods with safe LLVM 9 lowering during self-host AOT (#816). */
     private function isLiteralIncludeDiscoveryRealLoweringMethod(string $lower): bool
     {
-        return false;
+        if (!$this->shouldUseM3CompileDriverRealLowering()) {
+            return false;
+        }
+
+        return str_contains($lower, '\\web\\literalincludediscovery::')
+            || str_contains($lower, 'deployroot')
+            || str_contains($lower, 'sourcebundler');
+    }
+
+    private function isSuperglobalsM3CompileDriverLoweringMethod(string $lower): bool
+    {
+        if (!$this->shouldUseM3CompileDriverRealLowering()) {
+            return false;
+        }
+
+        return str_contains($lower, '\\web\\superglobals::');
     }
 
     /**
