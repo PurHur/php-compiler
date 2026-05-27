@@ -206,6 +206,8 @@ function opcode_type_name(int $type): string
             return 'TYPE_USE_TRAIT';
         case 108:
             return 'TYPE_YIELD';
+        case 109:
+            return 'TYPE_CLOSURE';
         default:
             return 'unknown opcode';
     }

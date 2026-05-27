@@ -1858,6 +1858,13 @@ class Compiler {
                         ? $this->compileOperand($yieldKey, $block, true)
                         : null,
                 )];
+            case Op\Expr\Closure::class:
+                // Bootstrap-oriented stub: allow compiling vendor code containing closures (e.g. php-llvm prelink).
+                // Full closure runtime semantics are not implemented yet; the VM/JIT lower this opcode to null.
+                return [new OpCode(
+                    OpCode::TYPE_CLOSURE,
+                    $this->compileOperand($expr->result, $block, false),
+                )];
         }
         $this->throwCompileLogic("Unsupported expression: " . $expr->getType());
     }

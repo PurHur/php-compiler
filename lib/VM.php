@@ -507,6 +507,10 @@ restart:
                         break;
                     }
                     break;
+                case OpCode::TYPE_CLOSURE:
+                    // Bootstrap stub: closures are not executable yet; represent as null.
+                    $frame->scope[$op->arg1]->null();
+                    break;
                 case OpCode::TYPE_RETURN_VOID:
                     $this->enforceReturnType($frame, null);
                     // Do not null returnVar: it may alias the caller result slot (#1885).
