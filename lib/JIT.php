@@ -280,6 +280,24 @@ class JIT {
         return '1' === $flag || 'true' === strtolower((string) $flag);
     }
 
+    /**
+     * Inventory-scale M3 emit via compile_driver.php {main} — no separate *_m3_emit_native_entry.php (#2843).
+     */
+    private function shouldUseM3InventoryEmitDriver(): bool
+    {
+        if (!$this->shouldUseM3CompileDriverMainNative()) {
+            return false;
+        }
+        foreach (['PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER', 'BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER'] as $envKey) {
+            $flag = getenv($envKey);
+            if ('1' === $flag || 'true' === strtolower((string) $flag)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private function isM3CompileDriverScriptMain(Block $block): bool
     {
         return null !== $block->func
@@ -1020,7 +1038,22 @@ class JIT {
     /** Emit TU null-returning stubs unless M3 real-lowering is enabled (#2512, #2542). */
     private function shouldUseM3EmitTuRuntimeMethodStub(string $methodLc): bool
     {
-        if (!$this->shouldUseM3EmitTuNativeBridge()) {
+        if ($this->shouldUseM3InventoryEmitDriver()) {
+            static $inventoryEmitSpine = [
+                '__construct',
+                'initparsepipeline',
+                'initcompiler',
+                'initvmcontext',
+                'loadcoremodules',
+                'parse',
+                'compileemitsmoke',
+                'standalone',
+            ];
+            if (in_array($methodLc, $inventoryEmitSpine, true)) {
+                return true;
+            }
+        }
+        if (!$this->shouldUseM3EmitTuNativeBridge() && !$this->shouldUseM3InventoryEmitDriver()) {
             return false;
         }
         if (!$this->shouldUseM3CompileDriverRealLowering()) {
@@ -2380,8 +2413,42 @@ class JIT {
         $saved = $this->context->builder;
         $this->context->builder = $this->context->context->builderCreate();
         $this->context->builder->positionAtEnd($bb);
-        \PHPCompiler\JIT\ValueEchoHelper::echoLiteral($this->context, "compiler_helloworld_compile_driver ready\n");
-        $this->context->builder->returnValue($i64->constInt(0, false));
+        if ($this->shouldUseM3InventoryEmitDriver()) {
+            if (!$this->m3CompileDriverRuntimeSpineLowered) {
+                $this->m3CompileDriverRuntimeSpineLowered = true;
+                $sidecar = $this->isM3EmitTuTrivialEchoSidecarActive();
+                $inventoryEmit = $this->shouldUseM3InventoryEmitDriver();
+                foreach (['parse', 'compileemitsmoke', 'standalone'] as $methodLc) {
+                    if ('standalone' === $methodLc && ($sidecar || $inventoryEmit)) {
+                        continue;
+                    }
+                    $this->compileM3EmitTuRuntimeMethodFromQueue($methodLc);
+                }
+                $this->runQueue();
+                $this->compileM3EmitTuRuntimeSpineDecls($this->m3CompileDriverMainBlock);
+            }
+            $logPrefix = getenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX');
+            if (!is_string($logPrefix) || '' === $logPrefix) {
+                $logPrefix = 'helloworld_compile_smoke';
+            }
+            if (null !== $this->m3CompileDriverMainBlock) {
+                $standaloneLc = strtolower('PHPCompiler\\Runtime::standalone');
+                unset(
+                    $this->context->functions[$standaloneLc],
+                    $this->context->functionReturnType[$standaloneLc],
+                    $this->context->functionProxies[$standaloneLc]
+                );
+                $this->emitM3EmitTuRuntimeStandaloneStubNative(
+                    $this->llvmInternalName('PHPCompiler\\Runtime::standalone'),
+                    'PHPCompiler\\Runtime::standalone',
+                    $this->m3CompileDriverMainBlock
+                );
+            }
+            \PHPCompiler\JIT\BootstrapCompileSmokeM3Emit::emitMainEntry($this->context, $logPrefix);
+        } else {
+            \PHPCompiler\JIT\ValueEchoHelper::echoLiteral($this->context, "compiler_helloworld_compile_driver ready\n");
+            $this->context->builder->returnValue($i64->constInt(0, false));
+        }
 
         $this->context->builder->clearInsertionPosition();
         $this->context->builder = $saved;
@@ -2405,8 +2472,16 @@ class JIT {
             $sidecar = $emitTu && $this->isM3EmitTuTrivialEchoSidecarActive();
             $this->compileM3EmitTuRuntimeSpineMethodsForRealLowering();
             foreach (['initparsepipeline', 'initcompiler', 'initvmcontext', 'loadcoremodules', 'standalone'] as $methodLc) {
-                if ('standalone' === $methodLc && $sidecar) {
+                if ('standalone' === $methodLc && ($sidecar || $this->shouldUseM3InventoryEmitDriver())) {
                     if (null !== $stubBlock) {
+                        if ($this->shouldUseM3InventoryEmitDriver()) {
+                            $standaloneLc = strtolower('PHPCompiler\\Runtime::standalone');
+                            unset(
+                                $this->context->functions[$standaloneLc],
+                                $this->context->functionReturnType[$standaloneLc],
+                                $this->context->functionProxies[$standaloneLc]
+                            );
+                        }
                         $this->emitM3EmitTuRuntimeStandaloneStubNative(
                             $this->llvmInternalName('PHPCompiler\\Runtime::standalone'),
                             'PHPCompiler\\Runtime::standalone',
@@ -2423,7 +2498,7 @@ class JIT {
                 $this->compileM3EmitTuCompilerMethodFromRuntimeModules('compileemitsmoke');
             }
             $this->runQueue();
-            if ($emitTu && null !== $stubBlock) {
+            if (null !== $stubBlock && ($emitTu || $compileDriver)) {
                 $this->ensureM3EmitTuRuntimeInitSpineSymbols($stubBlock);
                 $this->ensureM3EmitTuEmitBridgeSpineSymbols();
             }
@@ -2486,17 +2561,25 @@ class JIT {
      */
     private function finalizeM3EmitTuRuntimeSpineAfterQueue(): void
     {
-        if (!$this->shouldUseM3EmitTuNativeBridge()
-            || !$this->shouldUseM3CompileDriverRealLowering()
-            || null === $this->m3EmitTuMainBlock
-        ) {
+        if (!$this->shouldUseM3CompileDriverRealLowering()) {
             return;
         }
-        $this->compileM3EmitTuRuntimeParseAndCompileNativeDecl([
-            'parseandcompile' => true,
-            'parseandcompileemitsmoke' => true,
-        ]);
-        $this->compileM3EmitTuCompilerEmitSmokeNativeDecl();
+        if ($this->shouldUseM3EmitTuNativeBridge() && null !== $this->m3EmitTuMainBlock) {
+            $this->compileM3EmitTuRuntimeParseAndCompileNativeDecl([
+                'parseandcompile' => true,
+                'parseandcompileemitsmoke' => true,
+            ]);
+            $this->compileM3EmitTuCompilerEmitSmokeNativeDecl();
+
+            return;
+        }
+        if ($this->shouldUseM3InventoryEmitDriver() && null !== $this->m3CompileDriverMainBlock) {
+            $this->compileM3EmitTuRuntimeParseAndCompileNativeDecl([
+                'parseandcompile' => true,
+                'parseandcompileemitsmoke' => true,
+            ]);
+            $this->compileM3EmitTuCompilerEmitSmokeNativeDecl();
+        }
     }
 
     /**
@@ -2506,7 +2589,10 @@ class JIT {
      */
     private function compileM3EmitTuRuntimeParseAndCompileNativeDecl(array $methods): void
     {
-        if ([] === $methods || !$this->shouldUseM3EmitTuNativeBridge()) {
+        if ([] === $methods) {
+            return;
+        }
+        if (!$this->shouldUseM3EmitTuNativeBridge() && !$this->shouldUseM3InventoryEmitDriver()) {
             return;
         }
         $this->context->pushScope();
@@ -2563,7 +2649,10 @@ class JIT {
     /** Ensure parse + Compiler::compileEmitSmoke exist before emit-bridge LLVM (#2666). */
     private function ensureM3EmitTuEmitBridgeSpineSymbols(): void
     {
-        if (!$this->shouldUseM3EmitTuNativeBridge() || !$this->shouldUseM3CompileDriverRealLowering()) {
+        if (!$this->shouldUseM3CompileDriverRealLowering()) {
+            return;
+        }
+        if (!$this->shouldUseM3EmitTuNativeBridge() && !$this->shouldUseM3InventoryEmitDriver()) {
             return;
         }
         $parseLc = strtolower('PHPCompiler\\Runtime::parse');
@@ -2584,10 +2673,12 @@ class JIT {
         foreach (['initparsepipeline', 'loadcoremodules'] as $methodLc) {
             $logical = 'PHPCompiler\\Runtime::'.$methodLc;
             $lc = strtolower($logical);
-            if (!isset($this->context->functions[$lc])) {
+            if ($this->shouldUseM3InventoryEmitDriver()) {
+                unset($this->context->functions[$lc], $this->context->functionReturnType[$lc], $this->context->functionProxies[$lc]);
+            } elseif (!isset($this->context->functions[$lc])) {
                 $this->compileM3EmitTuRuntimeMethodFromModules($methodLc);
             }
-            if (isset($this->context->functions[$lc])) {
+            if (!$this->shouldUseM3InventoryEmitDriver() && isset($this->context->functions[$lc])) {
                 continue;
             }
             if ('initparsepipeline' === $methodLc) {
@@ -2609,7 +2700,10 @@ class JIT {
     /** Link-time trivial-echo AOT sidecar for emit-helper TU (#2559, #2566). */
     private function isM3EmitTuTrivialEchoSidecarActive(): bool
     {
-        if (!$this->shouldUseM3EmitTuNativeBridge() || !$this->shouldUseEmitHelperLinkStubs()) {
+        if (!$this->shouldUseEmitHelperLinkStubs()) {
+            return false;
+        }
+        if (!$this->shouldUseM3EmitTuNativeBridge() && !$this->shouldUseM3InventoryEmitDriver()) {
             return false;
         }
         $this->cacheM3EmitTuTrivialEchoAtLinkTime();
@@ -2625,7 +2719,7 @@ class JIT {
         }
         $this->m3EmitTuSidecarsCached = true;
         $logPrefix = getenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX');
-        if ('helloworld_compile_smoke' === $logPrefix) {
+        if ('helloworld_compile_smoke' === $logPrefix || $this->shouldUseM3InventoryEmitDriver()) {
             $this->registerM3EmitTuSidecarFromPath(
                 __DIR__.'/../examples/000-HelloWorld/example.php',
                 \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::HELLOWORLD_SIDECAR_REL,
@@ -3004,7 +3098,7 @@ class JIT {
     /** Register native compileEmitSmoke with Compiler object metadata (#1937). */
     private function compileM3EmitTuCompilerEmitSmokeNativeDecl(): void
     {
-        if (!$this->shouldUseM3EmitTuNativeBridge()) {
+        if (!$this->shouldUseM3EmitTuNativeBridge() && !$this->shouldUseM3InventoryEmitDriver()) {
             return;
         }
         if ($this->shouldUseM3CompileDriverRealLowering()) {
