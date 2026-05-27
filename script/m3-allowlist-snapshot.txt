@@ -1,6 +1,9 @@
 # M3 compile-driver allowlist/denylist — regenerate: php script/bootstrap-m3-allowlist-snapshot.php --write
+allow:\php_compiler_cli_dispatch
+allow:\php_compiler_cli_should_run_entry_driver
 allow:\runtime::__construct
 allow:\runtime::compile
+allow:\runtime::compileemitsmoke
 allow:\runtime::initcompiler
 allow:\runtime::initparsepipeline
 allow:\runtime::initvmcontext
@@ -10,7 +13,6 @@ allow:\runtime::loadjitcontext
 allow:\runtime::parse
 allow:\runtime::parseandcompile
 allow:\runtime::parseandcompileemitsmoke
-allow:\runtime::compileemitsmoke
 allow:\runtime::standalone
 deny:\bootstrapaot\helloworld_compile_smoke
 deny:\runtime::__destruct
@@ -18,4 +20,3 @@ deny:\runtime::createjit
 deny:\runtime::jitcontextforloadjit
 deny:\runtime::loadjitcompilemodulefuncs
 deny:\runtime::loadjitcontext
-deny:slotindexforvariablename

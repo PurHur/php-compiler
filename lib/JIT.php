@@ -440,7 +440,6 @@ class JIT {
     private function m3CompileDriverSpineDenyNames(): array
     {
         return [
-            'slotindexforvariablename',
             // Full emit FUNCDEF LLVM 9 link crash (#1514); inline emit in compile_driver compile mode (#1983).
             '\\bootstrapaot\\helloworld_compile_smoke',
             // compile_smoke_m3_emit real-lowers only in native emit TU (#1983), not compile_driver.
@@ -724,6 +723,7 @@ class JIT {
                     || $this->isDeployRootRealLoweringMethod($emitLc)
                     || $this->isSourceBundlerRealLoweringMethod($emitLc)
                     || $this->isConstStringFolderRealLoweringMethod($emitLc)
+                    || $this->isBlockRealLoweringMethod($emitLc)
                     || $this->isSuperglobalsRealLoweringMethod($emitLc)
                     || $this->isM3EmitTuRuntimeCompileDriverSpineLoweringName($emitLc)
                 )
@@ -1363,7 +1363,7 @@ class JIT {
             return false;
         }
         if (str_contains($lower, '\\vm::')
-            || str_contains($lower, '\\block::')
+            || (str_contains($lower, '\\block::') && !$this->isBlockRealLoweringMethod($lower))
             || str_contains($lower, '\\frame::')
             || str_contains($lower, '\\module::')
             || str_contains($lower, '\\runtime::')
@@ -1616,7 +1616,6 @@ class JIT {
             'resolvesimplevariablename',
             'operandschainequal',
             'unwrapoperandchain',
-            'slotindexforvariablename',
             'splitcfgblockafterstringkeyedarray',
             'inheritfuncfromparent',
             'needscfg',
@@ -1831,8 +1830,11 @@ class JIT {
             return true;
         }
 
-        return str_contains($lower, 'slotindexforvariablename')
-            || str_contains($lower, 'splitcfgblockafterstringkeyedarray')
+        if ($this->isBlockRealLoweringMethod($lower)) {
+            return false;
+        }
+
+        return str_contains($lower, 'splitcfgblockafterstringkeyedarray')
             || str_contains($lower, 'compilecfgbranch')
             || str_contains($lower, 'compilecfgblock')
             || str_contains($lower, 'compileblock')
@@ -1902,7 +1904,7 @@ class JIT {
             || str_contains($lower, '\\func\\php::')
             || str_contains($lower, '\\func::')
             || str_contains($lower, '\\frame::')
-            || str_contains($lower, '\\block::')
+            || (str_contains($lower, '\\block::') && !$this->isBlockRealLoweringMethod($lower))
         ) {
             return true;
         }
@@ -2075,6 +2077,20 @@ class JIT {
         }
 
         return false;
+    }
+
+    /**
+     * Block helpers real LLVM lowering during M3 compile-driver link (#2848).
+     *
+     * slotIndexForVariableName is on the Compiler compile spine (variable slot resolution).
+     */
+    private function isBlockRealLoweringMethod(string $lower): bool
+    {
+        if (!$this->shouldUseM3CompileDriverRealLowering()) {
+            return false;
+        }
+
+        return str_ends_with($lower, '\\block::slotindexforvariablename');
     }
 
     private function collectStubFunctionArgTypes(Block $block): array

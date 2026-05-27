@@ -17,7 +17,7 @@ Expand `JIT::isM3CompileDriverRealLoweringName()` **one function at a time** whi
 Supporting fixes from #1402:
 
 - `jitFunctionSkipName()` — FUNCDEF short names → scoped names for stub/M3 gates
-- `isSkippedCompilerHotPathName()` — always stub `Block::slotIndexForVariableName`
+- `isSkippedCompilerHotPathName()` — stubs most `Compiler::` CFG; `Block::slotIndexForVariableName` real-lowers under M3 driver ([#2848](https://github.com/PurHur/php-compiler/issues/2848))
 - `m3CompileDriverSpineDenyNames()` — documented LLVM 9 crashers during spine expansion
 - `compileBlockPhpLowering()` + `compileRuntime*M3Native()` — PHP CFG lowering for split `Runtime` ctor spine (#1494)
 
