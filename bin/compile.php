@@ -47,6 +47,11 @@ function run(string $filename, string $code, array $options): void
             putenv('PHP_COMPILER_SELFHOST_AOT=1');
         }
     }
+    if ('' !== $normalized && str_contains($normalized, 'selfhost/') && str_contains($normalized, 'compile_driver.php') && !isset($options['-l'])) {
+        putenv('PHP_COMPILER_SELFHOST_AOT=1');
+        putenv('PHP_COMPILER_M3_COMPILE_DRIVER=1');
+        putenv('PHP_COMPILER_M3_COMPILE_DRIVER_MAIN=1');
+    }
     if ('' !== $normalized && str_contains($normalized, 'jit_result_stub.php')) {
         putenv('PHP_COMPILER_SELFHOST_AOT=1');
     }
