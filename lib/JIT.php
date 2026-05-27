@@ -1924,7 +1924,7 @@ class JIT {
             || str_contains($lower, 'sourcebundler')
             || (str_contains($lower, '\\web\\conststringfolder::') && !$this->isConstStringFolderRealLoweringMethod($lower))
             || (str_contains($lower, '\\web\\superglobals::')
-                && !$this->isSuperglobalsM3CompileDriverLoweringMethod($lower)
+                && !$this->isSuperglobalsRealLoweringMethod($lower)
                 && !str_ends_with($lower, '::issuperglobalname'));
     }
 
@@ -1987,13 +1987,15 @@ class JIT {
             || str_contains($lower, 'sourcebundler');
     }
 
-    private function isSuperglobalsM3CompileDriverLoweringMethod(string $lower): bool
+    private function isSuperglobalsRealLoweringMethod(string $lower): bool
     {
-        if (!$this->shouldUseM3CompileDriverRealLowering()) {
-            return false;
+        if (str_ends_with($lower, '\\web\\superglobals::readrequestbody')
+            || str_ends_with($lower, '\\web\\superglobals::exportcgienvironment')) {
+            return true;
         }
 
-        return str_contains($lower, '\\web\\superglobals::');
+        return $this->shouldUseM3CompileDriverRealLowering()
+            && str_contains($lower, '\\web\\superglobals::');
     }
 
     /**

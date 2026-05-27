@@ -101,7 +101,6 @@ final class JitCompilerSelfHostStubTest extends TestCase
     /** @var list<string> */
     private const WEB_BOOTSTRAP_STUBBED_SUPERGLOBALS_METHODS = [
         'populatefromenvironment',
-        'readrequestbody',
     ];
 
     /** @var list<string> */
