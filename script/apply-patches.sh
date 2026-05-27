@@ -618,7 +618,7 @@ apply_php_types_union_type_overlay() {
 
 apply_php_types_first_class_callable_overlay() {
   local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
-  if grep -q 'Expr_FirstClassCallable' "$target" 2>/dev/null; then
+  if grep -q 'FirstClassCallable::KIND_METHOD' "$target" 2>/dev/null; then
     echo "Skip php-types-first-class-callable.patch (already applied)"
     return 0
   fi
@@ -628,33 +628,56 @@ from pathlib import Path
 
 path = Path(sys.argv[1])
 text = path.read_text()
-old = """            case 'Expr_Yield':
-            case 'Expr_Include':
-                // TODO: we may be able to determine these...
-                return false;
-            case 'Expr_MagicScriptConst':"""
-new = """            case 'Expr_Yield':
-            case 'Expr_Include':
-                // TODO: we may be able to determine these...
-                return false;
-            case 'Expr_FirstClassCallable':
+fcc_case = """            case 'Expr_FirstClassCallable':
                 if (\\PHPCfg\\Op\\Expr\\FirstClassCallable::KIND_METHOD === $op->kind) {
                     return [Type::array()];
                 }
 
                 return [Type::string()];
-            case 'Expr_MagicScriptConst':"""
-if old not in text:
-    sys.stderr.write("php-types-first-class-callable: TypeReconstructor anchor not found\n")
-    raise SystemExit(1)
-path.write_text(text.replace(old, new, 1))
+"""
+anchors = [
+    (
+        """            case 'Expr_Yield':
+            case 'Expr_Include':
+                // TODO: we may be able to determine these...
+                return false;
+            case 'Expr_MagicScriptConst':""",
+        """            case 'Expr_Yield':
+            case 'Expr_Include':
+                // TODO: we may be able to determine these...
+                return false;
+""" + fcc_case + """            case 'Expr_MagicScriptConst':""",
+    ),
+    (
+        """            case 'Expr_Yield':
+            case 'Expr_Include':
+                // TODO: we may be able to determine these...
+                return false;
+        }
+
+        throw new \\LogicException('Unknown variable op found: '.$op->getType());""",
+        """            case 'Expr_Yield':
+            case 'Expr_Include':
+                // TODO: we may be able to determine these...
+                return false;
+""" + fcc_case + """        }
+
+        throw new \\LogicException('Unknown variable op found: '.$op->getType());""",
+    ),
+]
+for old, new in anchors:
+    if old in text:
+        path.write_text(text.replace(old, new, 1))
+        raise SystemExit(0)
+sys.stderr.write("php-types-first-class-callable: TypeReconstructor anchor not found\n")
+raise SystemExit(1)
 PY
   echo "Applied php-types-first-class-callable.patch (overlay)"
 }
 
 apply_php_types_magic_script_const_overlay() {
   local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
-  if grep -q 'Expr_MagicScriptConst' "$target" 2>/dev/null; then
+  if grep -q 'MagicScriptConst::KIND_LINE' "$target" 2>/dev/null; then
     echo "Skip php-types-magic-script-const.patch (already applied)"
     return 0
   fi
@@ -664,30 +687,57 @@ from pathlib import Path
 
 path = Path(sys.argv[1])
 text = path.read_text()
-old = """            case 'Expr_Yield':
-            case 'Expr_Include':
-                // TODO: we may be able to determine these...
-                return false;
-        }
-
-        throw new \\LogicException('Unknown variable op found: '.$op->getType());"""
-new = """            case 'Expr_Yield':
-            case 'Expr_Include':
-                // TODO: we may be able to determine these...
-                return false;
-            case 'Expr_MagicScriptConst':
+msc_case = """            case 'Expr_MagicScriptConst':
                 if (\\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_LINE === $op->kind) {
                     return [Type::int()];
                 }
 
                 return [Type::string()];
+"""
+anchors = [
+    (
+        """            case 'Expr_Yield':
+            case 'Expr_Include':
+                // TODO: we may be able to determine these...
+                return false;
         }
 
-        throw new \\LogicException('Unknown variable op found: '.$op->getType());"""
-if old not in text:
-    sys.stderr.write("php-types-magic-script-const: TypeReconstructor anchor not found\n")
-    raise SystemExit(1)
-path.write_text(text.replace(old, new, 1))
+        throw new \\LogicException('Unknown variable op found: '.$op->getType());""",
+        """            case 'Expr_Yield':
+            case 'Expr_Include':
+                // TODO: we may be able to determine these...
+                return false;
+""" + msc_case + """        }
+
+        throw new \\LogicException('Unknown variable op found: '.$op->getType());""",
+    ),
+    (
+        """            case 'Expr_FirstClassCallable':
+                if (\\PHPCfg\\Op\\Expr\\FirstClassCallable::KIND_METHOD === $op->kind) {
+                    return [Type::array()];
+                }
+
+                return [Type::string()];
+        }
+
+        throw new \\LogicException('Unknown variable op found: '.$op->getType());""",
+        """            case 'Expr_FirstClassCallable':
+                if (\\PHPCfg\\Op\\Expr\\FirstClassCallable::KIND_METHOD === $op->kind) {
+                    return [Type::array()];
+                }
+
+                return [Type::string()];
+""" + msc_case + """        }
+
+        throw new \\LogicException('Unknown variable op found: '.$op->getType());""",
+    ),
+]
+for old, new in anchors:
+    if old in text:
+        path.write_text(text.replace(old, new, 1))
+        raise SystemExit(0)
+sys.stderr.write("php-types-magic-script-const: TypeReconstructor anchor not found\n")
+raise SystemExit(1)
 PY
   echo "Applied php-types-magic-script-const.patch (overlay)"
 }
