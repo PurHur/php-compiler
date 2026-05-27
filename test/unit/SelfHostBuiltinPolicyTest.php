@@ -69,6 +69,8 @@ final class SelfHostBuiltinPolicyTest extends TestCase
             'ini_set',
             'ini_get',
             'shell_exec',
+            'gettype',
+            'var_export',
         ] as $fn) {
             $this->assertTrue(
                 SelfHostBuiltinPolicy::isRequiredForBundle($fn),

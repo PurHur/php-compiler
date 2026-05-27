@@ -122,7 +122,6 @@ class JIT {
                 || $this->isSkippedLibSpineSmokeHotPathName($skipName)
                 || $this->isSkippedSelfHostEntryName($skipName)
                 || $this->isSkippedBootstrapInterpreterHotPathName($skipName)
-                || $this->isSkippedIssetHelperHotPathName($skipName)
             ) {
                 $this->compileBlock($func->block, $name);
 
@@ -542,6 +541,14 @@ class JIT {
                     $logicalName
                 );
             }
+            if (JIT\OperandNameNative::isNativeLoweringName($m3Spine)) {
+                return JIT\OperandNameNative::compile(
+                    $this->context,
+                    $this->llvmInternalName($internalName),
+                    $block,
+                    $logicalName
+                );
+            }
             if (str_ends_with($m3Spine, '\\runtime::loadjit')) {
                 return $this->compileRuntimeLoadJitM3Native($internalName, $block, $logicalName);
             }
@@ -639,6 +646,18 @@ class JIT {
         ) {
             return $this->compileSuperglobalNameNative($internalName, $block, $logicalName);
         }
+        if (
+            $this->shouldUseSelfHostJitStubs()
+            && null !== $logicalName
+            && JIT\OperandNameNative::isNativeLoweringName(strtolower($logicalName))
+        ) {
+            return JIT\OperandNameNative::compile(
+                $this->context,
+                $this->llvmInternalName($internalName),
+                $block,
+                $logicalName
+            );
+        }
         if ($this->isSkippedVmHotPathName($skipName)) {
             return $this->compileSkippedVmHotPathStub($internalName, $block, $logicalName ?? $internalName);
         }
@@ -650,7 +669,6 @@ class JIT {
             || $this->isSkippedLibSpineSmokeHotPathName($skipName)
             || $this->isSkippedSelfHostEntryName($skipName)
             || $this->isSkippedBootstrapInterpreterHotPathName($skipName)
-            || $this->isSkippedIssetHelperHotPathName($skipName)
         ) {
             return $this->compileSkippedCompilerSplitCfgStub($internalName, $block, $logicalName ?? $internalName);
         }
@@ -1335,16 +1353,6 @@ class JIT {
         }
 
         return str_contains($lowerName, '\\jit\\result::');
-    }
-
-    /** Stub IssetHelper (superglobalName OperandName walk crashes LLVM 9 during self-host AOT). */
-    private function isSkippedIssetHelperHotPathName(string $name): bool
-    {
-        if (!$this->shouldUseSelfHostJitStubs()) {
-            return false;
-        }
-
-        return str_contains(strtolower($name), '\\jit\\issethelper::');
     }
 
     /** M3 emit TU: PHP CFG lowering for compile spine only (#1937, #1983). */
@@ -3256,6 +3264,14 @@ class JIT {
         }
         if ($this->shouldUseM3CompileDriverRealLowering() && JIT\VariableTypeMapNative::isNativeLoweringName($lcname)) {
             return JIT\VariableTypeMapNative::compile(
+                $this->context,
+                $this->llvmInternalName($internalName),
+                $block,
+                $logicalName
+            );
+        }
+        if (JIT\OperandNameNative::isNativeLoweringName($lcname)) {
+            return JIT\OperandNameNative::compile(
                 $this->context,
                 $this->llvmInternalName($internalName),
                 $block,
