@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace PHPCompiler\AOT {
+namespace PHPCompiler\AOT;
 
 /**
- * Zend bootstrap polyfill for phpc_run_command() during bin/compile.php link (#2779).
+ * Zend bootstrap polyfill for process capture during bin/compile.php link (#2779).
  *
  * Compiled AOT uses ext/standard/phpc_run_command Internal lowering instead.
  */
@@ -36,22 +36,4 @@ final class LinkerProcessPolyfill
             'stderr' => false === $stderr ? '' : $stderr,
         ];
     }
-}
-
-}
-
-namespace {
-
-    if (!\function_exists('phpc_run_command')) {
-        /**
-         * @param array<string, string>|null $env
-         *
-         * @return array{code:int,stdout:string,stderr:string}|null
-         */
-        function phpc_run_command(string $command, ?array $env = null): ?array
-        {
-            return \PHPCompiler\AOT\LinkerProcessPolyfill::run($command, $env);
-        }
-    }
-
 }
