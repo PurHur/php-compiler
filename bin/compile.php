@@ -135,3 +135,4 @@ function run(string $filename, string $code, array $options): void
 chdir(__DIR__.'/..');
 require_once 'src/cli.php';
 require_once 'src/cli_driver.php';
+php_compiler_cli_dispatch();

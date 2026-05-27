@@ -286,9 +286,24 @@ class JIT {
             && '{main}' === $block->func->name;
     }
 
+    /**
+     * Host-compile a functional production driver (bin/compile.php) — not link-only sidecar bytes (#1521).
+     *
+     * Sidecar registration keeps {main} stubbed; set this env when emitting a driver that must run argv/compile.
+     */
+    private function shouldUseM5DriverHostCompile(): bool
+    {
+        $flag = getenv('PHP_COMPILER_M5_DRIVER_HOST');
+
+        return '1' === $flag || 'true' === strtolower((string) $flag);
+    }
+
     /** M5 emit sidecar host-compile targets — stub {main} under self-host AOT (#2697, #2699). */
     private function isM5BootstrapSidecarScriptMain(Block $block): bool
     {
+        if ($this->shouldUseM5DriverHostCompile()) {
+            return false;
+        }
         if (!$this->isM3CompileDriverScriptMain($block)) {
             return false;
         }
@@ -396,6 +411,13 @@ class JIT {
         if (str_ends_with($lower, '\\runtime::compileemitsmoke')) {
             return true;
         }
+        if ($this->shouldUseM5DriverHostCompile()) {
+            if ('run' === $lower || str_ends_with($lower, '\\php_compiler_cli_dispatch')
+                || str_ends_with($lower, '\\php_compiler_cli_should_run_entry_driver')
+            ) {
+                return true;
+            }
+        }
 
         return false;
     }
@@ -463,9 +485,10 @@ class JIT {
         }
         // M5 bootstrap sidecar: CLI entry scripts under `PHP_COMPILER_SELFHOST_AOT=1` only need a
         // linkable bundle; stub {main} to avoid LLVM 9 crashing while lowering argv driver chains
-        // (#2697, #2699).
+        // (#2697, #2699). `PHP_COMPILER_M5_DRIVER_HOST=1` opts into real argv lowering (#1521).
         if (
             $this->shouldUseSelfHostJitStubs()
+            && !$this->shouldUseM5DriverHostCompile()
             && null === $logicalName
             && null !== $block->func
             && '{main}' === $block->func->name
