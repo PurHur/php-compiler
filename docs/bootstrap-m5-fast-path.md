@@ -17,7 +17,6 @@ Expand `JIT::isM3CompileDriverRealLoweringName()` **one function at a time** whi
 Supporting fixes from #1402:
 
 - `jitFunctionSkipName()` — FUNCDEF short names → scoped names for stub/M3 gates
-- `isSkippedCompilerHotPathName()` — always stub `Block::slotIndexForVariableName`
 - `m3CompileDriverSpineDenyNames()` — documented LLVM 9 crashers during spine expansion
 - `compileBlockPhpLowering()` + `compileRuntime*M3Native()` — PHP CFG lowering for split `Runtime` ctor spine (#1494)
 
@@ -39,6 +38,7 @@ Supporting fixes from #1402:
 | `Runtime::initParsePipeline` / `Runtime::initCompiler` / `Runtime::loadCoreModules` | On deny list; `compileRuntime*M3Native` → PHP CFG lowering (#1494) |
 | `Runtime::initVmContext` | **Native** via `RuntimeInitVmContext::emit` (allocate `VM\Context` + `ErrorReporter` + `ScriptStack`, wire `runtime` + `vmContext`); wired in `compileBlock()`; off deny list (#1494, #2126). PHP CFG `new VMContext` still LLVM 9 link crash when combined with ctor spine. |
 | `Runtime::loadJit` | `compileRuntimeLoadJitM3Native` + nested `createJit` helpers (#1495) |
+| `Block::slotIndexForVariableName` | PHP CFG via `isM3CompileDriverBlockPhpLoweringName` (#2848) |
 | `Runtime::standalone` | Compile-driver link OK (#1402, #1056) |
 | `helloworld_compile_smoke` | Deny-listed for link (LLVM 9); compile_driver bundle keeps stub; runtime emit via `helloworld_m3_emit_native_entry.php` / `compile_smoke_m3_emit_native_entry.php` + `PHP_COMPILER_EMIT_HELPER_LINK=1` (#1768, #1983) |
 | Native emit runtime | `BOOTSTRAP_M3_RUNTIME_COMPILE=1` + `PHP_COMPILER_M3_EMIT_MINIMAL=1` skips eager `loadJitCompileModuleFuncs` during smoke emit |
@@ -96,7 +96,6 @@ PHP_COMPILER_M3_SOURCE=bin/compile.php PHP_COMPILER_M3_OUT=/tmp/bin-compile-aot 
 
 | Symbol | Notes |
 |--------|-------|
-| `Block::slotIndexForVariableName` | Also in compiler hot-path skip |
 | `Runtime::__destruct` | Deny-listed (LLVM 9; not on compile spine) |
 | `Runtime::initParsePipeline` / `initCompiler` / `loadCoreModules` | PHP CFG spine; deny while expanding (#1494) |
 | `Runtime::loadJitContext` | Deny-listed (LLVM 9 link crash #1402) |
