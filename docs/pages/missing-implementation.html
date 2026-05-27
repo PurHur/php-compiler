@@ -37,7 +37,7 @@
         <p class="section-intro" style="margin-top: 0.5rem">
           Real gaps toward the
           <a href="https://github.com/PurHur/php-compiler/issues/1492">self-host north star (#1492)</a>.
-          Updated May 2026.
+          Updated 27 May 2026 (verified on <code>master</code> with LLVM&nbsp;9).
           VM, examples, and wave-3 language/stdlib batches are largely done; this page lists what is
           <strong>not</strong> implemented yet for compiling the compiler without Zend.
         </p>
@@ -57,12 +57,12 @@
             <tbody>
               <tr>
                 <td><strong>M3</strong> native compile</td>
-                <td>Emit TU: <code>parseAndCompile</code> → real <code>Compiler</code> CFG (not Zend / empty stub)</td>
+                <td>Full emit TU: <code>Compiler::compileCfgBlock</code> and friends for arbitrary PHP (smoke strict probes already <code>emit_path=native</code> ✅)</td>
                 <td><a href="https://github.com/PurHur/php-compiler/issues/1937">#1937</a>, <a href="https://github.com/PurHur/php-compiler/issues/1402">#1402</a></td>
               </tr>
               <tr>
                 <td><strong>M4</strong> bootstrap loop</td>
-                <td>Native binary rebuilds next compiler tree; gen-2 emit without Zend</td>
+                <td>Full revision rebuild from native gen-1 (gen-2 smoke ladder links with <code>emit_path=native</code> ✅)</td>
                 <td><a href="https://github.com/PurHur/php-compiler/issues/1498">#1498</a></td>
               </tr>
               <tr>
@@ -77,7 +77,7 @@
 
       <section>
         <h2>M3 native emit spine</h2>
-        <p>Emit helper links; runtime smoke still uses <span class="status-wip">Zend partial</span> until the chain below is real in the emit TU.</p>
+        <p>Smoke ladders use dedicated M3 emit helpers with <span class="status-yes">native strict gates</span> (<code>BOOTSTRAP_M3_*_STRICT=1</code>). Full <code>Compiler::compile()</code> in the emit TU is still open.</p>
         <div class="table-wrap">
           <table>
             <thead>
@@ -110,8 +110,8 @@
               </tr>
               <tr>
                 <td>Strict gates <code>BOOTSTRAP_M3_*_STRICT=1</code></td>
-                <td class="status-no">Fail</td>
-                <td>Require <code>emit_path=native</code> and <code>compile OK</code> stdout</td>
+                <td class="status-yes">Pass (smoke)</td>
+                <td>HelloWorld, compile-smoke, runtime smoke, compiler-unit: <code>emit_path=native</code> (verified 27 May 2026)</td>
               </tr>
             </tbody>
           </table>
@@ -144,24 +144,24 @@
       </section>
 
       <section>
-        <h2>M2 spine — deferred from native link</h2>
-        <p>SSOT: <code>script/bootstrap-spine-deferred-lib.php</code> — <strong>670/717</strong> spine vs Phase&nbsp;A inventory SSOT link; deferred paths stay out of spine smoke (#2632).</p>
+        <h2>M2 spine — ratio-deferred / not yet in spine</h2>
+        <p>SSOT: <code>script/bootstrap-spine-count.php</code> — <strong>670/717</strong> Phase&nbsp;A files in <code>compiler_lib_spine_smoke</code> native link ([#2652](https://github.com/PurHur/php-compiler/issues/2652)). <code>bin/vm.php</code> is in the spine ([#2134](https://github.com/PurHur/php-compiler/issues/2134)); VM driver execute probe passes ([#2201](https://github.com/PurHur/php-compiler/issues/2201)).</p>
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
                 <th>Path</th>
-                <th>Why deferred</th>
+                <th>Why not in M2 ratio</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td><code>bin/vm.php</code></td>
-                <td>Full driver entry; M5 / inventory closure ([#2201](https://github.com/PurHur/php-compiler/issues/2201))</td>
+                <td><code>lib/VM/HashTable.php</code></td>
+                <td>Ratio-deferred; spine uses <code>lib/JIT/Builtin/Type/HashTable.php</code> ([#2543](https://github.com/PurHur/php-compiler/issues/2543))</td>
               </tr>
               <tr>
                 <td><code>lib/AOT/Linker.php</code></td>
-                <td>Uses external <code>clang</code> via <code>shell_exec</code> — excluded from self-host bundle (expected M5 floor)</td>
+                <td>In spine smoke; external <code>clang</code> via <code>shell_exec</code> (expected M5 native floor)</td>
               </tr>
             </tbody>
           </table>
