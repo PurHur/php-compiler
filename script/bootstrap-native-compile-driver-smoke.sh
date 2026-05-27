@@ -16,8 +16,10 @@ fi
 # Stage 1: build a native compile driver (Zend links the driver; driver does native compile).
 export PHP_COMPILER_M3_SOURCE="${ROOT}/bin/compile.php"
 export PHP_COMPILER_M3_OUT="${ROOT}/build/bin-compile-aot"
-rm -f "${PHP_COMPILER_M3_OUT}"
-./script/bootstrap-selfhost-helloworld-compile-bin.sh >/dev/null
+if [[ "${BOOTSTRAP_NATIVE_COMPILE_DRIVER_SKIP_LINK:-0}" != "1" ]]; then
+  rm -f "${PHP_COMPILER_M3_OUT}"
+  ./script/bootstrap-selfhost-helloworld-compile-bin.sh >/dev/null
+fi
 
 if [[ ! -x "${PHP_COMPILER_M3_OUT}" ]]; then
   echo "bootstrap-native-compile-driver-smoke: expected executable ${PHP_COMPILER_M3_OUT}" >&2
