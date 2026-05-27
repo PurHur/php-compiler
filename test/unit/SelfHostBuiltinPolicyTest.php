@@ -69,6 +69,8 @@ final class SelfHostBuiltinPolicyTest extends TestCase
             'ini_set',
             'ini_get',
             'shell_exec',
+            'escapeshellarg',
+            'phpc_run_command',
             'gettype',
             'var_export',
         ] as $fn) {

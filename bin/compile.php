@@ -127,6 +127,7 @@ function run(string $filename, string $code, array $options): void
             $debugFile = true === $options['-y'] ? $options['-o'] : $options['-y'];
             $runtime->setDebug($debugFile);
         }
+        require_once __DIR__.'/../lib/AOT/LinkerProcessPolyfill.php';
         $runtime->standalone($block, $options['-o']);
     }
 }

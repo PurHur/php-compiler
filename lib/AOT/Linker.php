@@ -155,21 +155,11 @@ final class Linker
             $sourceFlags = self::runtimeCIncludeFlagsFor(basename($source));
             $cmd = escapeshellarg($compiler).' -c -fPIC -O2'.$sourceFlags.' '
                 .escapeshellarg($source).' -o '.escapeshellarg($runtimeObject);
-            $descriptor = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
-            $proc = proc_open($cmd, $descriptor, $pipes, null, $env);
-            if (!is_resource($proc)) {
-                throw new \LogicException('Failed to start AOT runtime compiler: '.$cmd);
-            }
-            fclose($pipes[0]);
-            $stdout = stream_get_contents($pipes[1]);
-            $stderr = stream_get_contents($pipes[2]);
-            fclose($pipes[1]);
-            fclose($pipes[2]);
-            $code = proc_close($proc);
-            if (0 !== $code || !is_file($runtimeObject)) {
+            $captured = self::runCaptured($cmd, $env);
+            if (0 !== $captured['code'] || !is_file($runtimeObject)) {
                 throw new \LogicException(
                     'Failed to compile AOT runtime: '.trim(
-                        ($stderr !== false ? $stderr : '')."\n".($stdout !== false ? $stdout : '')
+                        $captured['stderr']."\n".$captured['stdout']
                     )
                 );
             }
@@ -393,16 +383,8 @@ final class Linker
             }
             $cmd = escapeshellarg($path) . ' '
                 . $objects . ' -lm '.self::RUNTIME_LINK_LIBS.' -o ' . escapeshellarg($executable);
-            $descriptor = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
-            $proc = proc_open($cmd, $descriptor, $pipes, null, null);
-            if (!is_resource($proc)) {
-                continue;
-            }
-            fclose($pipes[0]);
-            fclose($pipes[1]);
-            fclose($pipes[2]);
-            $code = proc_close($proc);
-            if (0 === $code) {
+            $captured = self::runCaptured($cmd, null);
+            if (0 === $captured['code']) {
                 self::unlinkIfTemp($runtimeObjects);
 
                 return;
@@ -416,21 +398,29 @@ final class Linker
 
     private static function run(string $command, array $env): void
     {
-        $descriptor = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
-        $proc = proc_open($command, $descriptor, $pipes, null, $env);
-        if (!is_resource($proc)) {
-            throw new \LogicException('Failed to start linker: ' . $command);
-        }
-        fclose($pipes[0]);
-        $stderr = stream_get_contents($pipes[2]);
-        fclose($pipes[1]);
-        fclose($pipes[2]);
-        $code = proc_close($proc);
-        if (0 !== $code) {
+        $captured = self::runCaptured($command, $env);
+        if (0 !== $captured['code']) {
             throw new \LogicException(
-                'Linking failed (exit ' . $code . '): ' . trim($stderr !== false ? $stderr : '')
+                'Linking failed (exit '.$captured['code'].'): '.trim($captured['stderr'])
             );
         }
+    }
+
+    /**
+     * @return array{code:int,stdout:string,stderr:string}
+     */
+    private static function runCaptured(string $command, ?array $env): array
+    {
+        $raw = null === $env ? \phpc_run_command($command) : \phpc_run_command($command, $env);
+        if (!\is_array($raw)) {
+            return ['code' => 127, 'stdout' => '', 'stderr' => ''];
+        }
+
+        return [
+            'code' => (int) ($raw['code'] ?? 127),
+            'stdout' => \is_string($raw['stdout'] ?? null) ? $raw['stdout'] : '',
+            'stderr' => \is_string($raw['stderr'] ?? null) ? $raw['stderr'] : '',
+        ];
     }
 
     /**
