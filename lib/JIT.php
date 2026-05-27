@@ -185,6 +185,24 @@ class JIT {
     }
 
     /** Bundle-only PHP constants (spine smoke defines; bin/compile.php AOT folds false — #2600). */
+    /**
+     * Fold OpCode::* class constants when php-cfg scopes the class as Type (#2666).
+     */
+    private function jitFoldOpCodeClassConstant(Operand $classOp, string $constName): ?JIT\Variable
+    {
+        if (!$classOp instanceof Operand\Literal) {
+            return null;
+        }
+        $ref = OpCode::class.'::'.$constName;
+        if (!defined($ref)) {
+            return null;
+        }
+        $lit = new Operand\Literal(constant($ref));
+        $lit->type = Type::int();
+
+        return JIT\Variable::fromLiteral($this->context, $lit);
+    }
+
     private function jitFoldPhpCompilerBundleConstant(string $label): ?JIT\Variable
     {
         if (
@@ -2430,6 +2448,11 @@ class JIT {
             );
         } elseif ('compile_smoke_m3_emit' === $logPrefix) {
             $this->registerM3EmitTuSidecarFromPath(
+                __DIR__.'/../examples/000-HelloWorld/example.php',
+                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::HELLOWORLD_SIDECAR_REL,
+                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::helloworldSentinelBlock'
+            );
+            $this->registerM3EmitTuSidecarFromPath(
                 __DIR__.'/../test/bootstrap-aot/compiler_smoke_standalone.php',
                 \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILE_SMOKE_SIDECAR_REL,
                 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compileSmokeSentinelBlock'
@@ -3676,6 +3699,11 @@ class JIT {
                                 break;
                             }
                         }
+                    }
+                    $opcodeConst = $this->jitFoldOpCodeClassConstant($classOp, $nameOp->value);
+                    if (null !== $opcodeConst) {
+                        $this->assignOperand($block->getOperand($op->arg1), $opcodeConst);
+                        break;
                     }
                     $classId = $this->context->type->object->resolveClassId($classOp);
                     $value = $this->context->type->object->classConstFetch($classId, $nameOp->value);
@@ -6302,6 +6330,12 @@ class JIT {
         );
         $proxyName = $declaringClassLc.'::'.$methodLc;
         if (!$this->context->functionIsRegistered($proxyName)) {
+            if ($this->context->type->object->isExternalOnlyClass($declaringClassId)) {
+                $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
+                $this->context->scope->args = [];
+
+                return;
+            }
             throw new \LogicException("Call to undefined static method {$className}::{$nameOp->value}()");
         }
         $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
