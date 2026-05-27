@@ -39,6 +39,8 @@ final class BootstrapBootstrapLoopProbeTest extends TestCase
     {
         $script = (string) file_get_contents(self::$root.'/script/bootstrap-loop-probe.sh');
         $this->assertStringContainsString('--dry-run', $script);
+        $this->assertStringContainsString('--with-full-spine', $script);
+        $this->assertStringContainsString('bootstrap-loop-gen1-full-spine-emit.sh', $script);
         $this->assertStringContainsString('Exit codes:', $script);
         $this->assertStringContainsString('exit 2', $script);
         $this->assertStringContainsString('bootstrap-selfhost-lib-spine-smoke-link.sh', $script);
@@ -122,6 +124,8 @@ final class BootstrapBootstrapLoopProbeTest extends TestCase
         $this->assertStringContainsString('./script/bootstrap-loop-probe.sh', $makefile);
         $this->assertStringContainsString('bootstrap-loop-gen1-link:', $makefile);
         $this->assertStringContainsString('bootstrap-loop-probe-dry-run:', $makefile);
+        $this->assertStringContainsString('bootstrap-loop-full-spine-probe:', $makefile);
+        $this->assertStringContainsString('--with-full-spine', $makefile);
         $this->assertStringContainsString('BOOTSTRAP_M3_HELLOWORLD_STRICT=1', $makefile);
         $this->assertStringContainsString('BOOTSTRAP_M4_RUNTIME_COMPILE', $makefile);
         $gen1 = (string) file_get_contents(self::$root.'/script/bootstrap-loop-gen1-link.sh');

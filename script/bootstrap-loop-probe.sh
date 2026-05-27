@@ -10,10 +10,14 @@ SPINE_LINK="${ROOT}/script/bootstrap-selfhost-lib-spine-smoke-link.sh"
 GEN1_LINK="${ROOT}/script/bootstrap-loop-gen1-link.sh"
 FULL_SPINE_EMIT="${ROOT}/script/bootstrap-loop-gen1-full-spine-emit.sh"
 DRY_RUN=0
+WITH_FULL_SPINE=0
+if [[ "${BOOTSTRAP_M4_GEN1_COMPILE_FULL_SPINE:-0}" == "1" ]]; then
+  WITH_FULL_SPINE=1
+fi
 
 usage() {
   cat <<'EOF'
-Usage: script/bootstrap-loop-probe.sh [--dry-run]
+Usage: script/bootstrap-loop-probe.sh [--dry-run] [--with-full-spine]
 
 M4 bootstrap-loop probe (#1498). Runs M2 spine + M3 HelloWorld with the same strict env as
 `make bootstrap-selfhost-helloworld` (#2612), then gen-1 link / gen-2 attempt.
@@ -27,7 +31,9 @@ Exit codes:
 
 Examples:
   make bootstrap-loop-probe
+  make bootstrap-loop-full-spine-probe
   ./script/bootstrap-loop-probe.sh --dry-run
+  ./script/bootstrap-loop-probe.sh --with-full-spine
   make bootstrap-selfhost-helloworld
 EOF
 }
@@ -35,6 +41,7 @@ EOF
 for arg in "$@"; do
   case "${arg}" in
     --dry-run) DRY_RUN=1 ;;
+    --with-full-spine) WITH_FULL_SPINE=1 ;;
     -h|--help)
       usage
       exit 0
@@ -84,6 +91,8 @@ m4_run_subprobe() {
 echo "=== M4 bootstrap-loop probe (#1498) ==="
 if [[ "${DRY_RUN}" -eq 1 ]]; then
   echo "mode: --dry-run (lint + M2 spine + M3 HelloWorld Makefile parity — strict native emit; no gen-2 strict slice)"
+elif [[ "${WITH_FULL_SPINE}" -eq 1 ]]; then
+  echo "mode: full + full-spine gen-1 emit (717-unit compiler_lib_spine_smoke after gen-1 slice; #2664)"
 else
   echo "mode: full (M3 HelloWorld strict before gen-1; then gen-1→gen-2 slice per #2611/#2612)"
 fi
@@ -209,7 +218,7 @@ fi
 echo "==> M4 exit status (M3 HelloWorld strict already verified above)"
 if grep -q 'emit_path=native' "${GEN1_LOG}" 2>/dev/null; then
   echo "bootstrap-loop-probe: M4 gen-1→gen-2 native slice OK (exit 0)"
-  if [[ "${BOOTSTRAP_M4_GEN1_COMPILE_FULL_SPINE:-0}" == "1" ]]; then
+  if [[ "${WITH_FULL_SPINE}" -eq 1 ]]; then
     echo ""
     if ! m4_run_subprobe "M4 gen-1 full-spine native emit (compiler_lib_spine_smoke, #2664)" \
       env BOOTSTRAP_M4_LINK_COMPILE_DRIVER="${BOOTSTRAP_M4_LINK_COMPILE_DRIVER:-1}" \

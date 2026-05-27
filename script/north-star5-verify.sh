@@ -7,7 +7,7 @@
 # Order: inventory → spine 716/717 → vendor bundles → selfhost link → vendor objects (partial OK)
 #        → optional north-star4 dry-run when LLVM present.
 #
-# Default exits 0 when vendor prelink is partial (php-types object_ok; cfg/llvm blocked on parse).
+# Default exits 0 when vendor prelink is partial (legacy); --strict requires 3/3 object_ok.
 # Use --strict to require all three vendor packages object_ok.
 set -euo pipefail
 
@@ -83,7 +83,7 @@ ns5_print_summary() {
   echo
   echo "north-star5-verify: M5 status"
   echo "  Spine: 717/717 (Phase A inventory SSOT)"
-  echo "  Vendor prelink: ${vendor_ok}/3 object_ok (php-types first; cfg/llvm parse blockers)"
+  echo "  Vendor prelink: ${vendor_ok}/3 object_ok (php-cfg, php-types, php-llvm prelinked .o)"
   echo "  Cold boot: Zend still drives bin/compile.php — target is compiled driver + prelinked vendor"
   echo "north-star5-verify: Next — shrink self-host stubs; link spine + prelinked .o; retire vendor/autoload (#1416)"
 }

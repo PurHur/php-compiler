@@ -73,6 +73,14 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString('bootstrap-selfhost-helloworld-probe.sh', $wave);
     }
 
+    public function testWaveCheckDocumentsDriverSmokeGate(): void
+    {
+        $wave = (string) file_get_contents(self::$root.'/script/bootstrap-wave-check.sh');
+        $this->assertStringContainsString('--with-driver-smoke', $wave);
+        $this->assertStringContainsString('bootstrap-native-compile-driver-smoke.sh', $wave);
+        $this->assertStringContainsString('NATIVE_COMPILE_DRIVER_GATE', $wave);
+    }
+
     public function testBootstrapSelfhostDocMentionsHelloWorldProbe(): void
     {
         $doc = (string) file_get_contents(self::$root.'/docs/bootstrap-selfhost.md');
