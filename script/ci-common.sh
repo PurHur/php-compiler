@@ -874,15 +874,15 @@ ci_run_bootstrap_m5_driver_smoke() {
 }
 
 ci_run_bootstrap_m4_loop_probe() {
-  if [[ "${BOOTSTRAP_M4_LOOP_PROBE:-0}" != "1" ]]; then
+  if [[ "${BOOTSTRAP_M4_LOOP_PROBE:-1}" != "1" ]]; then
     return 0
   fi
   if ! ci_llvm_ready; then
     echo "bootstrap-m4-loop-probe: skipped (LLVM 9 not available)"
     return 0
   fi
-  echo "bootstrap-m4-loop-probe (BOOTSTRAP_M4_LOOP_PROBE=1, --dry-run, issue #1498, #2058)..."
-  if ! "$_CI_SCRIPT_DIR/bootstrap-loop-probe.sh" --dry-run; then
+  echo "bootstrap-m4-loop-probe (BOOTSTRAP_M4_LOOP_PROBE=1, full ladder, issue #1498, #2780)..."
+  if ! "$_CI_SCRIPT_DIR/bootstrap-loop-probe.sh"; then
     echo "bootstrap-m4-loop-probe: failed — see docs/bootstrap-selfhost.md (#1498)" >&2
     return 1
   fi
