@@ -14,6 +14,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 source "${ROOT}/script/php-env.sh"
 ci_apply_llvm_memory_env
 
+COMPILED_ENV="${ROOT}/build/selfhost-helloworld-compile"
 COMPILED_COMPILE="${ROOT}/build/bin-compile-aot"
 SOURCE="${ROOT}/test/bootstrap-aot/compiler_smoke_standalone.php"
 GEN2_OUT="${ROOT}/build/selfhost-driver-smoke-gen2"
@@ -32,11 +33,24 @@ fi
 mkdir -p "${ROOT}/build"
 rm -f "${GEN2_OUT}"
 
-echo "bootstrap-selfhost-driver-smoke: stage 0 — link native M3 compile driver (Zend link only)"
+echo "bootstrap-selfhost-driver-smoke: stage 0a — link M3 env compile driver (Zend link only)"
 # Build the HelloWorld compile driver first; do not point this script at bin/compile.php
 # (that path builds the argv -o helper instead of build/selfhost-helloworld-compile).
 if ! ./script/bootstrap-selfhost-helloworld-compile-bin.sh >/dev/null; then
   echo "bootstrap-selfhost-driver-smoke: helloworld compile-driver link failed" >&2
+  exit 1
+fi
+
+if [[ ! -x "${COMPILED_ENV}" ]]; then
+  echo "bootstrap-selfhost-driver-smoke: missing M3 env compile driver ${COMPILED_ENV}" >&2
+  exit 1
+fi
+
+echo "bootstrap-selfhost-driver-smoke: stage 0b — link argv bin/compile.php driver (#1521)"
+export PHP_COMPILER_M3_SOURCE="${ROOT}/bin/compile.php"
+export PHP_COMPILER_M3_OUT="${COMPILED_COMPILE}"
+if ! ./script/bootstrap-selfhost-helloworld-compile-bin.sh >/dev/null; then
+  echo "bootstrap-selfhost-driver-smoke: native bin/compile.php helper link failed" >&2
   exit 1
 fi
 
@@ -51,7 +65,7 @@ compile_out="$(
   env -u PHP_COMPILER_M3_COMPILE_MODE \
     PHP_COMPILER_M3_SOURCE="${SOURCE}" \
     PHP_COMPILER_M3_OUT="${GEN2_OUT}" \
-    "${COMPILED_COMPILE}" 2>&1
+    "${COMPILED_ENV}" 2>&1
 )"
 compile_code=$?
 set -e
@@ -89,28 +103,10 @@ if ! grep -qx "${EXPECTED_STDOUT}" <<< "${run_out}"; then
   exit 1
 fi
 
-if [[ -x "${COMPILED_COMPILE}" ]]; then
-  echo "bootstrap-selfhost-driver-smoke: stage 3 — compiled driver native emit (no Zend)"
-  EMIT_PROBE="${ROOT}/test/bootstrap-aot/compiler_smoke_standalone.php"
-  EMIT_OUT="${ROOT}/build/selfhost-driver-smoke-emit-aot"
-  rm -f "${EMIT_OUT}"
-else
-  echo "bootstrap-selfhost-driver-smoke: stage 3 — build native bin/compile.php helper (argv -o) then emit (no Zend)"
-  export PHP_COMPILER_M3_SOURCE="${ROOT}/bin/compile.php"
-  export PHP_COMPILER_M3_OUT="${COMPILED_COMPILE}"
-  if ! ./script/bootstrap-selfhost-helloworld-compile-bin.sh >/dev/null; then
-    echo "bootstrap-selfhost-driver-smoke: native bin/compile.php helper link failed" >&2
-    exit 1
-  fi
-  if [[ ! -x "${COMPILED_COMPILE}" ]]; then
-    echo "bootstrap-selfhost-driver-smoke: missing compiled bin/compile.php helper ${COMPILED_COMPILE}" >&2
-    exit 1
-  fi
-  echo "bootstrap-selfhost-driver-smoke: stage 4 — compiled driver native emit (no Zend)"
-  EMIT_PROBE="${ROOT}/test/bootstrap-aot/compiler_smoke_standalone.php"
-  EMIT_OUT="${ROOT}/build/selfhost-driver-smoke-emit-aot"
-  rm -f "${EMIT_OUT}"
-fi
+echo "bootstrap-selfhost-driver-smoke: stage 3 — compiled driver native emit via argv -o (no Zend)"
+EMIT_PROBE="${ROOT}/test/bootstrap-aot/compiler_smoke_standalone.php"
+EMIT_OUT="${ROOT}/build/selfhost-driver-smoke-emit-aot"
+rm -f "${EMIT_OUT}"
   set +e
   emit_out="$(
     env PHP_COMPILER_M3_SOURCE="${EMIT_PROBE}" \
