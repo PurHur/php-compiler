@@ -21,6 +21,7 @@ fi
 mkdir -p "${ROOT}/build"
 export PHP_COMPILER_SELFHOST_AOT=1
 export PHP_COMPILER_M3_COMPILE_DRIVER=1
+export PHP_COMPILER_M3_COMPILE_DRIVER_MAIN=1
 export PHP_COMPILER_JIT_PROGRESS_FILE="${ROOT}/build/.last-jit-func-compile-driver-link"
 rm -f "${OUT}" "${PHP_COMPILER_JIT_PROGRESS_FILE}"
 

@@ -25,7 +25,7 @@ final class BootstrapCompilerUnitProbeTest extends TestCase
         $this->assertStringContainsString('emit_path=', $source);
         $this->assertStringContainsString('compiler_unit_probe_m3_emit_native_entry.php', $source);
         $this->assertStringContainsString('compile_smoke_m3_emit: compile OK', $source);
-        $this->assertStringContainsString('compiler unit probe', $source);
+        $this->assertStringContainsString('compiler unit probe compile OK', $source);
     }
 
     public function testCompilerUnitProbeM3EmitNativeEntryExists(): void
@@ -49,7 +49,7 @@ final class BootstrapCompilerUnitProbeTest extends TestCase
     {
         $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
         $this->assertStringContainsString('PHP_COMPILER_M3_COMPILER_UNIT_PROBE_EMIT', $jit);
-        $this->assertStringContainsString('compiler_unit_probe_fixture.php', $jit);
+        $this->assertStringContainsString('compiler_unit_probe_compile.php', $jit);
         $this->assertStringContainsString('COMPILER_UNIT_PROBE_SIDECAR_REL', $jit);
         $compile = (string) file_get_contents(self::$root.'/bin/compile.php');
         $this->assertStringContainsString('PHP_COMPILER_M3_COMPILER_UNIT_PROBE_EMIT', $compile);
@@ -59,7 +59,7 @@ final class BootstrapCompilerUnitProbeTest extends TestCase
 
     public function testCompilerUnitProbeFixtureLintPasses(): void
     {
-        $fixture = self::$root.'/test/selfhost/compiler_unit_probe/compiler_unit_probe_fixture.php';
+        $fixture = self::$root.'/test/selfhost/compiler_unit_probe/compiler_unit_probe_compile.php';
         $cmd = 'php '.escapeshellarg(self::$root.'/bin/compile.php').' -l '.escapeshellarg($fixture).' 2>&1';
         exec($cmd, $lines, $exitCode);
         $this->assertSame(0, $exitCode, implode("\n", $lines));
@@ -88,7 +88,7 @@ final class BootstrapCompilerUnitProbeTest extends TestCase
         $out = implode("\n", $lines);
         $this->assertSame(0, $exitCode, $out);
         $this->assertStringContainsString('emit_path=native', $out);
-        $this->assertStringContainsString('compiler unit probe', $out);
+        $this->assertStringContainsString('compiler unit probe compile OK', $out);
         $this->assertTrue(is_executable(self::$root.'/build/compiler-unit-probe-aot'));
     }
 }

@@ -291,10 +291,10 @@ bootstrap-selfhost-compile-driver-link:
 bootstrap-selfhost-compiler-unit-probe:
 	./script/bootstrap-selfhost-compiler-unit-probe.sh
 bootstrap-selfhost-compiler-unit-probe-strict:
-	BOOTSTRAP_M3_COMPILER_UNIT_PROBE_STRICT=1 \
 	BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1 \
 	BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING=1 \
 	BOOTSTRAP_M3_RUNTIME_COMPILE=1 \
+	BOOTSTRAP_M3_COMPILER_UNIT_PROBE_STRICT=1 \
 	./script/bootstrap-selfhost-compiler-unit-probe.sh
 bootstrap-selfhost-jit-unit-probe:
 	./script/bootstrap-selfhost-jit-unit-probe.sh

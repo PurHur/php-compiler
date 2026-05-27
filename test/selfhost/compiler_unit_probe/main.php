@@ -6,8 +6,7 @@ declare(strict_types=1);
  * M3 compiler unit probe: minimal bundle that loads lib/Compiler.php under selfhost AOT (#2216).
  * Gate: php bin/compile.php -l test/selfhost/compiler_unit_probe/main.php
  * Native: ./script/bootstrap-selfhost-compiler-unit-probe.sh (strict: make bootstrap-selfhost-compiler-unit-probe-strict)
- * Zend CFG smoke: compiler_unit_probe_compile_smoke() in compiler_unit_probe_compile.php
- * M3 fixture: compiler_unit_probe_fixture.php (#2618)
+ * M3 fixture: compiler_unit_probe_compile.php (#2618)
  */
 
 require_once __DIR__.'/../../../lib/OpCode.php';

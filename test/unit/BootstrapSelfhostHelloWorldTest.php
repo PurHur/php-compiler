@@ -124,7 +124,7 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $prefix = LlvmToolchain::envPrefix(self::$root);
         $cmd = implode(' ', array_map('escapeshellarg', [
             ...$prefix,
-            'env', 'PHP_COMPILER_SELFHOST_AOT=1', 'PHP_COMPILER_M3_COMPILE_DRIVER=1',
+            'env', 'PHP_COMPILER_SELFHOST_AOT=1', 'PHP_COMPILER_M3_COMPILE_DRIVER=1', 'PHP_COMPILER_M3_COMPILE_DRIVER_MAIN=1',
             'php', self::$root.'/bin/compile.php', '-o', $out, $driver,
         ])).' 2>&1';
         exec($cmd, $lines, $exitCode);
@@ -132,6 +132,32 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertSame(0, $exitCode, implode("\n", $lines));
         $this->assertFileExists($out);
         $this->assertTrue(is_executable($out));
+    }
+
+    public function testCompilePhpSetsM3CompileDriverMainForSelfhostCompileDriver(): void
+    {
+        $compile = (string) file_get_contents(self::$root.'/bin/compile.php');
+        $this->assertStringContainsString('PHP_COMPILER_M3_COMPILE_DRIVER_MAIN=1', $compile);
+        $this->assertStringContainsString('compile_driver.php', $compile);
+    }
+
+    public function testNativeCompileDriverMainNativePrintsReadyWhenLlvmPresent(): void
+    {
+        if (!LlvmToolchain::isReady(self::$root)) {
+            $this->markTestSkipped('LLVM 9 not available for M3 compile driver native main test.');
+        }
+
+        $script = self::$root.'/script/bootstrap-selfhost-compile-driver-link-probe.sh';
+        $prefix = LlvmToolchain::envPrefix(self::$root);
+        $cmd = implode(' ', array_map('escapeshellarg', [...$prefix, 'bash', $script])).' 2>&1';
+        exec($cmd, $lines, $exitCode);
+        $this->assertSame(0, $exitCode, implode("\n", $lines));
+
+        $driver = self::$root.'/build/selfhost-helloworld-compile-driver';
+        $this->assertFileIsExecutable($driver);
+        $runOut = shell_exec($driver);
+        $this->assertIsString($runOut);
+        $this->assertStringContainsString('compiler_helloworld_compile_driver ready', $runOut);
     }
 
     public function testHelloWorldCompileDriverHasModeDispatch(): void

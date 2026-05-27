@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# M3 compiler unit probe: lib/Compiler.php bundle link + optional native emit (#2216, #2618).
+# M3 compiler unit probe: lib/Compiler.php bundle native link + optional native emit (issues #2216, #2618).
 set -euo pipefail
 if [[ "${BOOTSTRAP_M3_COMPILER_UNIT_PROBE_STRICT:-0}" == "1" ]]; then
   export BOOTSTRAP_M3_LINK_COMPILE_DRIVER="${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-1}"
@@ -7,8 +7,9 @@ if [[ "${BOOTSTRAP_M3_COMPILER_UNIT_PROBE_STRICT:-0}" == "1" ]]; then
   export BOOTSTRAP_M3_RUNTIME_COMPILE="${BOOTSTRAP_M3_RUNTIME_COMPILE:-1}"
 fi
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-ENTRY="${ROOT}/test/selfhost/compiler_unit_probe/main.php"
-SOURCE="${ROOT}/test/selfhost/compiler_unit_probe/compiler_unit_probe_fixture.php"
+cd "${ROOT}"
+BUNDLE_ENTRY="${ROOT}/test/selfhost/compiler_unit_probe/main.php"
+SOURCE="${ROOT}/test/selfhost/compiler_unit_probe/compiler_unit_probe_compile.php"
 PROBE="${ROOT}/build/selfhost-compiler-unit-probe"
 EMIT_HELPER="${ROOT}/build/selfhost-compiler-unit-probe-emit"
 AOT_OUT="${ROOT}/build/compiler-unit-probe-aot"
@@ -33,8 +34,8 @@ m3_exit_label() {
   fi
 }
 
-if [[ ! -f "${ENTRY}" ]]; then
-  echo "bootstrap-selfhost-compiler-unit-probe: missing ${ENTRY}" >&2
+if [[ ! -f "${BUNDLE_ENTRY}" ]]; then
+  echo "bootstrap-selfhost-compiler-unit-probe: missing ${BUNDLE_ENTRY}" >&2
   exit 1
 fi
 
@@ -55,7 +56,8 @@ fi
 
 mkdir -p "${ROOT}/build"
 export PHP_COMPILER_SELFHOST_AOT=1
-rm -f "${PROBE}" "${EMIT_HELPER}" "${AOT_OUT}"
+export PHP_COMPILER_JIT_PROGRESS_FILE="${ROOT}/build/.last-jit-func-compiler-unit-probe"
+rm -f "${PROBE}" "${EMIT_HELPER}" "${AOT_OUT}" "${PHP_COMPILER_JIT_PROGRESS_FILE}"
 
 if [[ "${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
   : "${BOOTSTRAP_M3_RUNTIME_COMPILE:=1}"
@@ -107,10 +109,7 @@ if [[ "${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
   fi
 fi
 
-export PHP_COMPILER_JIT_PROGRESS_FILE="${ROOT}/build/.last-jit-func-compiler-unit-probe"
-rm -f "${PHP_COMPILER_JIT_PROGRESS_FILE}"
-
-if ! php bin/compile.php -o build/selfhost-compiler-unit-probe "${ENTRY}" 2>&1; then
+if ! php bin/compile.php -o build/selfhost-compiler-unit-probe "${BUNDLE_ENTRY}" 2>&1; then
   echo "bootstrap-selfhost-compiler-unit-probe: link bundle failed (see stderr above)" >&2
   exit 1
 fi
@@ -124,18 +123,25 @@ if ! grep -q 'compiler_unit_probe bundle OK' <<< "${bundle_out}"; then
 fi
 
 if [[ "${M3_NATIVE_COMPILE}" -eq 0 ]]; then
-  echo "bootstrap-selfhost-compiler-unit-probe: native emit unavailable (M3 partial) — ${M3_BLOCK_REASON}" >&2
+  if [[ "${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
+    echo "bootstrap-selfhost-compiler-unit-probe: native emit unavailable (M3 partial) — ${M3_BLOCK_REASON}" >&2
+  fi
   if [[ "${BOOTSTRAP_M3_COMPILER_UNIT_PROBE_STRICT:-0}" == "1" ]]; then
     echo "bootstrap-selfhost-compiler-unit-probe: BOOTSTRAP_M3_COMPILER_UNIT_PROBE_STRICT=1 — require native emit; refusing Zend compile.php fallback" >&2
     echo "bootstrap-selfhost-compiler-unit-probe: emit_path=zend_fallback_would_be_used block_reason=${M3_BLOCK_REASON}" >&2
     exit 1
   fi
-  M3_EMIT_PATH="zend"
-  echo "bootstrap-selfhost-compiler-unit-probe: emit_path=zend (bin/compile.php) — compiler unit probe AOT until native spine is ready" >&2
-  rm -f "${AOT_OUT}"
-  if ! php bin/compile.php -o build/compiler-unit-probe-aot "${SOURCE}" 2>&1; then
-    echo "bootstrap-selfhost-compiler-unit-probe: Zend fixture emit failed (emit_path=zend)" >&2
-    exit 1
+  if [[ "${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
+    M3_EMIT_PATH="zend"
+    echo "bootstrap-selfhost-compiler-unit-probe: emit_path=zend (bin/compile.php) — compiler unit probe AOT until native spine is ready" >&2
+    rm -f "${AOT_OUT}"
+    if ! php bin/compile.php -o build/compiler-unit-probe-aot "${SOURCE}" 2>&1; then
+      echo "bootstrap-selfhost-compiler-unit-probe: Zend compiler unit probe emit failed (emit_path=zend)" >&2
+      exit 1
+    fi
+  else
+    echo "bootstrap-selfhost-compiler-unit-probe: OK ${PROBE} (link-only)"
+    exit 0
   fi
 fi
 
@@ -145,8 +151,8 @@ if [[ ! -x "${AOT_OUT}" ]]; then
 fi
 
 run_out="$("${AOT_OUT}" 2>&1)"
-if ! grep -q 'compiler unit probe' <<< "${run_out}"; then
-  echo "bootstrap-selfhost-compiler-unit-probe: unexpected AOT stdout (want compiler unit probe, emit_path=${M3_EMIT_PATH})" >&2
+if ! grep -q 'compiler unit probe compile OK' <<< "${run_out}"; then
+  echo "bootstrap-selfhost-compiler-unit-probe: unexpected AOT stdout (want compiler unit probe compile OK, emit_path=${M3_EMIT_PATH})" >&2
   printf '%s\n' "${run_out}" >&2
   exit 1
 fi

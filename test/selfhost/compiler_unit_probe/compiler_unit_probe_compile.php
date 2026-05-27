@@ -3,11 +3,13 @@
 declare(strict_types=1);
 
 /**
- * Zend CFG smoke for compiler unit probe (#2216, #2618).
- * Native emit uses compile_smoke_m3_emit via compiler_unit_probe_m3_emit_native_entry.php.
+ * Standalone AOT fixture for compiler unit probe native emit (issue #2618).
+ * Exercises Runtime::parseAndCompileEmitSmoke / lib/Compiler.php via M3 emit helper.
  */
 
-function compiler_unit_probe_compile_smoke()
+function compiler_unit_probe_greeting()
 {
-    return 'compiler unit probe';
+    return 'compiler unit probe compile OK';
 }
+
+echo compiler_unit_probe_greeting(), "\n";
