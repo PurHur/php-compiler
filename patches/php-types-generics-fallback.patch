@@ -1,6 +1,6 @@
 --- vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
 +++ vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
-@@ -369,6 +369,19 @@
+@@ -379,6 +379,19 @@
  
              return new self(self::TYPE_ARRAY, [$type]);
          }
@@ -19,4 +19,4 @@
 +        }
          $regex = '(^([a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*\\\\)*[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*$)';
          if (! preg_match($regex, $decl)) {
-             throw new \RuntimeException("Unknown type declaration found: ${decl}");
+             throw new \RuntimeException("Unknown type declaration found: {$decl}");

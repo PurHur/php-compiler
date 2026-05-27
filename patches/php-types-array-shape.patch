@@ -1,27 +1,10 @@
 --- vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
 +++ vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
-@@ -251,13 +251,13 @@
-         switch ($kind) {
-             case 'var':
--                if (preg_match('(@var\s+(\S+))', $comment, $match)) {
-+                if (preg_match('(@var\s+(.+?)(?:\s*\*\/|\s*$))m', $comment, $match)) {
-                     return self::fromDecl($match[1]);
-                 }
- 
-                 break;
-             case 'return':
--                if (preg_match('(@return\s+(\S+))', $comment, $match)) {
-+                if (preg_match('(@return\s+(.+?)(?:\s*\*\/|\s*$))m', $comment, $match)) {
-                     return self::fromDecl($match[1]);
-                 }
- 
-                 break;
-@@ -328,7 +328,10 @@
-                 $type,
+@@ -342,6 +342,9 @@
                  new self(self::TYPE_NULL),
              ]))->simplify();
          }
-+        if (preg_match('/^array\{/i', $decl)) {
++        if (preg_match('/^array\\{/i', $decl)) {
 +            return new self(self::TYPE_ARRAY);
 +        }
          switch (strtolower($decl)) {

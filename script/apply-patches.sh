@@ -89,8 +89,8 @@ patch_already_applied() {
       grep -q 'function xor(' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php" 2>/dev/null
       ;;
     php-llvm-no-closures-array-map.patch)
-      grep -q '\\$paramTypes = \\[\\];' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Context.php" 2>/dev/null \
-        && grep -q '\\$valueRefs = \\[\\];' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php" 2>/dev/null
+      grep -q '\$paramTypes = \[\];' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Context.php" 2>/dev/null \
+        && grep -q '\$elementTypes = \[\];' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Type/Struct.php" 2>/dev/null
       ;;
     php-llvm-pass-registry-interface.patch)
       grep -q "class PassRegistry implements CorePassRegistry" "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/PassRegistry.php" 2>/dev/null
@@ -348,9 +348,11 @@ from pathlib import Path
 
 parser_path = Path(sys.argv[1])
 printer_path = Path(sys.argv[2])
+
 parser = parser_path.read_text()
-parser_anchor = "        if ($node instanceof Node\\UnionType) {"
-parser_insert = """        if ($node instanceof Node\\IntersectionType) {
+if 'Node\\IntersectionType' not in parser:
+    anchor = "        throw new \\LogicException('Unknown type node: '.$node->getType());"
+    insert = """        if ($node instanceof Node\\IntersectionType) {
             $types = [];
             foreach ($node->types as $sub) {
                 $types[] = $this->parseTypeNode($sub);
@@ -358,32 +360,105 @@ parser_insert = """        if ($node instanceof Node\\IntersectionType) {
 
             return new Op\\Type\\Intersection($types, $this->mapAttributes($node));
         }
-        """
-if parser_anchor not in parser:
-    sys.stderr.write("php-cfg-intersection-type: UnionType anchor not found in Parser.php\n")
-    raise SystemExit(1)
-parser = parser.replace(
-    parser_anchor,
-    parser_insert + parser_anchor,
-    1,
-)
-parser_path.write_text(parser)
+
+"""
+    if anchor not in parser:
+        sys.stderr.write("php-cfg-intersection-type: throw anchor not found in Parser.php\\n")
+        raise SystemExit(1)
+    parser = parser.replace(anchor, insert + anchor, 1)
+    parser_path.write_text(parser)
+
 printer = printer_path.read_text()
-printer_anchor = "        if ($type instanceof Op\\Type\\Literal) {"
-printer_insert = """        if ($type instanceof Op\\Type\\Intersection) {
+if 'Op\\\\Type\\\\Intersection' not in printer:
+    anchor = "        if ($type instanceof Op\\Type\\Literal) {"
+    insert = """        if ($type instanceof Op\\Type\\Intersection) {
             return implode('&', array_map(
                 fn (Op\\Type $t) => $this->renderType($t),
                 $type->types
             ));
         }
-        """
-if printer_anchor not in printer:
-    sys.stderr.write("php-cfg-intersection-type: Literal anchor not found in Printer.php\n")
-    raise SystemExit(1)
-printer = printer.replace(printer_anchor, printer_insert + printer_anchor, 1)
-printer_path.write_text(printer)
+"""
+    if anchor not in printer:
+        sys.stderr.write("php-cfg-intersection-type: Literal anchor not found in Printer.php\\n")
+        raise SystemExit(1)
+    printer = printer.replace(anchor, insert + anchor, 1)
+    printer_path.write_text(printer)
 PY
   echo "Applied php-cfg-intersection-type.patch (overlay)"
+}
+
+apply_php_cfg_union_type_overlay() {
+  local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
+  local printer="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Printer.php"
+  local op="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Type/Union_.php"
+  if [[ -f "$op" ]] && grep -q 'UnionType' "$parser" 2>/dev/null; then
+    echo "Skip php-cfg-union-type.patch (already applied)"
+    return 0
+  fi
+  mkdir -p "$(dirname "$op")"
+  cat >"$op" <<'PHP'
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCfg\Op\Type;
+
+use PHPCfg\Op\Type;
+
+class Union_ extends Type
+{
+    /** @var Type[] */
+    public $types;
+
+    public function __construct(array $types, array $attributes = [])
+    {
+        $this->types = $types;
+    }
+}
+PHP
+  python3 - "$parser" "$printer" <<'PY'
+import sys
+from pathlib import Path
+
+parser_path = Path(sys.argv[1])
+printer_path = Path(sys.argv[2])
+
+parser = parser_path.read_text()
+if 'Node\\UnionType' not in parser:
+    anchor = "        throw new \\LogicException('Unknown type node: '.$node->getType());"
+    insert = """        if ($node instanceof Node\\UnionType) {
+            $types = [];
+            foreach ($node->types as $sub) {
+                $types[] = $this->parseTypeNode($sub);
+            }
+
+            return new Op\\Type\\Union_($types, $this->mapAttributes($node));
+        }
+
+"""
+    if anchor not in parser:
+        sys.stderr.write("php-cfg-union-type: throw anchor not found in Parser.php\\n")
+        raise SystemExit(1)
+    parser = parser.replace(anchor, insert + anchor, 1)
+    parser_path.write_text(parser)
+
+printer = printer_path.read_text()
+if 'Op\\\\Type\\\\Union_' not in printer:
+    anchor = "        if ($type instanceof Op\\Type\\Literal) {"
+    insert = """        if ($type instanceof Op\\Type\\Union_) {
+            return implode('|', array_map(
+                fn (Op\\Type $t) => $this->renderType($t),
+                $type->types
+            ));
+        }
+"""
+    if anchor not in printer:
+        sys.stderr.write("php-cfg-union-type: Literal anchor not found in Printer.php\\n")
+        raise SystemExit(1)
+    printer = printer.replace(anchor, insert + anchor, 1)
+    printer_path.write_text(printer)
+PY
+  echo "Applied php-cfg-union-type.patch (overlay)"
 }
 
 apply_php_cfg_attribute_groups_overlay() {
@@ -442,21 +517,19 @@ from pathlib import Path
 
 path = Path(sys.argv[1])
 text = path.read_text()
-old = """        if ($decl instanceof CfgType\\Reference) {
-            if ($decl->declaration instanceof \\PHPCfg\\Operand\\Literal) {
-                return self::fromDecl($decl->declaration->value);
+
+anchor = "        throw new \\LogicException('Unsupported declaration type: '.get_class($decl));"
+if anchor not in text:
+    sys.stderr.write("php-types-intersection-type: throw anchor not found\n")
+    raise SystemExit(1)
+
+insert = """        if ($decl instanceof CfgType\\Union_) {
+            $subs = [];
+            foreach ($decl->types as $sub) {
+                $subs[] = self::fromTypeDecl($sub);
             }
 
-            return self::mixed();
-        }
-
-        if ($decl instanceof CfgType\\Union_) {"""
-new = """        if ($decl instanceof CfgType\\Reference) {
-            if ($decl->declaration instanceof \\PHPCfg\\Operand\\Literal) {
-                return self::fromDecl($decl->declaration->value);
-            }
-
-            return self::mixed();
+            return new self(self::TYPE_UNION, $subs);
         }
         if ($decl instanceof CfgType\\Intersection) {
             $subs = [];
@@ -467,13 +540,20 @@ new = """        if ($decl instanceof CfgType\\Reference) {
             return new self(self::TYPE_INTERSECTION, $subs);
         }
 
-        if ($decl instanceof CfgType\\Union_) {"""
-if old not in text:
-    sys.stderr.write("php-types-intersection-type: Type.php anchor not found\n")
-    raise SystemExit(1)
-path.write_text(text.replace(old, new, 1))
+"""
+path.write_text(text.replace(anchor, insert + anchor, 1))
 PY
   echo "Applied php-types-intersection-type.patch (overlay)"
+}
+
+apply_php_types_union_type_overlay() {
+  local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php"
+  if grep -q 'instanceof CfgType\\Union_' "$target" 2>/dev/null; then
+    echo "Skip php-types-union-type.patch (already applied)"
+    return 0
+  fi
+  # Union support is inserted by php-types-intersection-type overlay now.
+  apply_php_types_intersection_type_overlay
 }
 
 apply_php_types_first_class_callable_overlay() {
@@ -576,6 +656,134 @@ if needle not in text:
 path.write_text(text.replace(needle, insert, 1))
 PY
   echo "Applied php-types-str-bool-fns.patch (overlay)"
+}
+
+apply_php_types_docblock_trailing_text_overlay() {
+  local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php"
+  if patch_already_applied "$PATCH_DIR/php-types-docblock-trailing-text.patch"; then
+    echo "Skip php-types-docblock-trailing-text.patch (already applied)"
+    return 0
+  fi
+  python3 - "$target" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+
+if 'stripTrailingDocText' not in text:
+    anchor = "        }\n        switch (strtolower($decl)) {"
+    if anchor not in text:
+        sys.stderr.write("php-types-docblock-trailing-text: fromDecl switch anchor not found\n")
+        raise SystemExit(1)
+    insert = "        }\n        $decl = self::stripTrailingDocText($decl);\n        switch (strtolower($decl)) {"
+    text = text.replace(anchor, insert, 1)
+
+    class_end = "\n}\n"
+    if not text.endswith(class_end):
+        sys.stderr.write("php-types-docblock-trailing-text: expected Type.php to end with class brace\n")
+        raise SystemExit(1)
+    helper = """
+    private static function stripTrailingDocText(string $decl): string
+    {
+        $decl = trim($decl);
+        if ('' === $decl) {
+            return $decl;
+        }
+        if (false === strpos($decl, ' ')) {
+            return $decl;
+        }
+
+        $depthAngle = 0;
+        $depthParen = 0;
+        $depthSquare = 0;
+        $depthCurly = 0;
+
+        $len = strlen($decl);
+        for ($i = 0; $i < $len; $i++) {
+            $ch = $decl[$i];
+            switch ($ch) {
+                case '<':
+                    $depthAngle++;
+                    break;
+                case '>':
+                    if ($depthAngle > 0) {
+                        $depthAngle--;
+                    }
+                    break;
+                case '(':
+                    $depthParen++;
+                    break;
+                case ')':
+                    if ($depthParen > 0) {
+                        $depthParen--;
+                    }
+                    break;
+                case '[':
+                    $depthSquare++;
+                    break;
+                case ']':
+                    if ($depthSquare > 0) {
+                        $depthSquare--;
+                    }
+                    break;
+                case '{':
+                    $depthCurly++;
+                    break;
+                case '}':
+                    if ($depthCurly > 0) {
+                        $depthCurly--;
+                    }
+                    break;
+                default:
+                    if ($ch <= ' ' && 0 === $depthAngle && 0 === $depthParen && 0 === $depthSquare && 0 === $depthCurly) {
+                        return trim(substr($decl, 0, $i));
+                    }
+                    break;
+            }
+        }
+
+        return $decl;
+    }
+"""
+    text = text[: -len(class_end)] + helper + class_end
+
+path.write_text(text)
+PY
+  echo "Applied php-types-docblock-trailing-text.patch (overlay)"
+}
+
+apply_php_types_fromdecl_junk_fragments_overlay() {
+  local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php"
+  if patch_already_applied "$PATCH_DIR/php-types-fromdecl-junk-fragments.patch"; then
+    echo "Skip php-types-fromdecl-junk-fragments.patch (already applied)"
+    return 0
+  fi
+  python3 - "$target" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+
+needle = "        $decl = self::stripTrailingDocText($decl);\n"
+if needle not in text:
+    sys.stderr.write("php-types-fromdecl-junk-fragments: stripTrailingDocText line not found\n")
+    raise SystemExit(1)
+
+insert = needle + (
+    "        $trimmedDecl = trim($decl);\n"
+    "        if ('' === $trimmedDecl || '*' === $trimmedDecl || '*/' === $trimmedDecl\n"
+    "            || str_starts_with($trimmedDecl, '*/')) {\n"
+    "            return self::mixed();\n"
+    "        }\n"
+)
+
+if "$trimmedDecl" not in text:
+    text = text.replace(needle, insert, 1)
+    path.write_text(text)
+PY
+  echo "Applied php-types-fromdecl-junk-fragments.patch (overlay)"
 }
 
 apply_php_cfg_magic_script_const_overlay() {
@@ -692,6 +900,158 @@ PY
   echo "Applied php-cfg-trycatch.patch (overlay)"
 }
 
+apply_php_llvm_no_closures_array_map_overlay() {
+  local context="$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Context.php"
+  local struct="$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Type/Struct.php"
+  if patch_already_applied "$PATCH_DIR/php-llvm-no-closures-array-map.patch"; then
+    echo "Skip php-llvm-no-closures-array-map.patch (already applied)"
+    return 0
+  fi
+  python3 - "$context" "$struct" <<'PY'
+import sys
+from pathlib import Path
+
+context_path = Path(sys.argv[1])
+struct_path = Path(sys.argv[2])
+
+context = context_path.read_text()
+old_function_type = """    public function functionType(CoreType $returnType, bool $isVarArgs, CoreType ... $parameters): CoreFunctionType {
+        $paramWrapper = $this->llvm->lib->makeArray(
+            LLVMTypeRef_ptr::class,
+            array_map(
+                function(Type $type) {
+                    return $type->type;
+                }, 
+                $parameters
+            )
+        );
+        return $this->llvm->factory->type(
+            $this, 
+            $this->llvm->lib->LLVMFunctionType(
+                $returnType->type,
+                $paramWrapper,
+                count($parameters),
+                // LLVM is stupid, and even though the type is declared LLVMBool, it's not, and is a normal "1/0" bool instead of the weird reversed...
+                $isVarArgs ? 1 : 0
+            )
+        );
+    }"""
+new_function_type = """    public function functionType(CoreType $returnType, bool $isVarArgs, CoreType ... $parameters): CoreFunctionType {
+        $paramWrapper = null;
+        if (count($parameters) > 0) {
+            $paramTypes = [];
+            foreach ($parameters as $type) {
+                $paramTypes[] = $type->type;
+            }
+            $paramWrapper = $this->llvm->lib->makeArray(
+                LLVMTypeRef_ptr::class,
+                $paramTypes
+            );
+        }
+        return $this->llvm->factory->type(
+            $this, 
+            $this->llvm->lib->LLVMFunctionType(
+                $returnType->type,
+                $paramWrapper,
+                count($parameters),
+                // LLVM is stupid, and even though the type is declared LLVMBool, it's not, and is a normal "1/0" bool instead of the weird reversed...
+                $isVarArgs ? 1 : 0
+            )
+        );
+    }"""
+
+old_struct_type = """    public function structType(bool $packed, CoreType ... $elements): CoreType {
+        $elementWrapper = $this->llvm->lib->makeArray(
+            LLVMTypeRef_ptr::class,
+            array_map(
+                function(Type $type) {
+                    return $type->type;
+                }, 
+                $elements
+            )
+        );
+        return $this->llvm->factory->type(
+            $this,
+            $this->llvm->lib->LLVMStructTypeInContext(
+                $this->context,
+                $elementWrapper,
+                count($elements),
+                $this->llvm->toBool($packed)
+            )
+        );
+    }"""
+new_struct_type = """    public function structType(bool $packed, CoreType ... $elements): CoreType {
+        $elementWrapper = null;
+        if (count($elements) > 0) {
+            $elementTypes = [];
+            foreach ($elements as $type) {
+                $elementTypes[] = $type->type;
+            }
+            $elementWrapper = $this->llvm->lib->makeArray(
+                LLVMTypeRef_ptr::class,
+                $elementTypes
+            );
+        }
+        return $this->llvm->factory->type(
+            $this,
+            $this->llvm->lib->LLVMStructTypeInContext(
+                $this->context,
+                $elementWrapper,
+                count($elements),
+                $this->llvm->toBool($packed)
+            )
+        );
+    }"""
+
+if old_function_type not in context or old_struct_type not in context:
+    sys.stderr.write("php-llvm-no-closures-array-map: expected Context.php anchors not found\n")
+    sys.exit(1)
+context = context.replace(old_function_type, new_function_type, 1)
+context = context.replace(old_struct_type, new_struct_type, 1)
+context_path.write_text(context)
+
+struct = struct_path.read_text()
+old_set_body = """    public function setBody(bool $packed, CoreType ... $elements): void {
+        $elementWrapper = $this->llvm->lib->makeArray(
+            LLVMTypeRef_ptr::class,
+            array_map(
+                function(Type $type) {
+                    return $type->type;
+                }, 
+                $elements
+            )
+        );
+        $this->llvm->lib->LLVMStructSetBody(
+            $this->type,
+            $elementWrapper,
+            count($elements),
+            $this->llvm->toBool($packed)
+        );
+    }"""
+new_set_body = """    public function setBody(bool $packed, CoreType ... $elements): void {
+        $elementTypes = [];
+        foreach ($elements as $type) {
+            $elementTypes[] = $type->type;
+        }
+        $elementWrapper = $this->llvm->lib->makeArray(
+            LLVMTypeRef_ptr::class,
+            $elementTypes
+        );
+        $this->llvm->lib->LLVMStructSetBody(
+            $this->type,
+            $elementWrapper,
+            count($elements),
+            $this->llvm->toBool($packed)
+        );
+    }"""
+if old_set_body not in struct:
+    sys.stderr.write("php-llvm-no-closures-array-map: expected Struct.php anchor not found\n")
+    sys.exit(1)
+struct_path.write_text(struct.replace(old_set_body, new_set_body, 1))
+PY
+  echo "Applied php-llvm-no-closures-array-map.patch (overlay)"
+}
+
 record_patch_failure() {
   local patch_name="$1"
   local detail="${2:-}"
@@ -754,6 +1114,14 @@ apply_patch() {
     apply_php_types_str_bool_fns_overlay
     return $?
   fi
+  if [[ "$(basename "$patch")" == "php-types-docblock-trailing-text.patch" ]]; then
+    apply_php_types_docblock_trailing_text_overlay
+    return $?
+  fi
+  if [[ "$(basename "$patch")" == "php-types-fromdecl-junk-fragments.patch" ]]; then
+    apply_php_types_fromdecl_junk_fragments_overlay
+    return $?
+  fi
   if [[ "$(basename "$patch")" == "php-types-magic-script-const.patch" ]]; then
     apply_php_types_magic_script_const_overlay
     return $?
@@ -764,6 +1132,10 @@ apply_patch() {
   fi
   if [[ "$(basename "$patch")" == "php-types-intersection-type.patch" ]]; then
     apply_php_types_intersection_type_overlay
+    return $?
+  fi
+  if [[ "$(basename "$patch")" == "php-types-union-type.patch" ]]; then
+    apply_php_types_union_type_overlay
     return $?
   fi
   if [[ "$(basename "$patch")" == "php-cfg-match.patch" ]]; then
@@ -780,6 +1152,14 @@ apply_patch() {
   fi
   if [[ "$(basename "$patch")" == "php-llvm-memory-buffer-bitcode.patch" ]]; then
     apply_php_llvm_memory_buffer_overlay
+    return $?
+  fi
+  if [[ "$(basename "$patch")" == "php-llvm-no-closures-array-map.patch" ]]; then
+    apply_php_llvm_no_closures_array_map_overlay
+    return $?
+  fi
+  if [[ "$(basename "$patch")" == "php-cfg-union-type.patch" ]]; then
+    apply_php_cfg_union_type_overlay
     return $?
   fi
   if patch_already_applied "$patch"; then
@@ -827,6 +1207,7 @@ apply_patch() {
 }
 
 apply_patch "$PATCH_DIR/php-llvm-chooser.patch"
+apply_patch "$PATCH_DIR/php-llvm-no-closures-array-map.patch"
 apply_patch "$PATCH_DIR/php-llvm-context-empty-arrays.patch"
 apply_patch "$PATCH_DIR/php-llvm-makearray-empty.patch"
 apply_patch "$PATCH_DIR/php-llvm-builder-select.patch"
@@ -834,7 +1215,6 @@ apply_patch "$PATCH_DIR/php-llvm-value-addincoming.patch"
 apply_patch "$PATCH_DIR/php-llvm-llvmabstract-value-addincoming.patch"
 apply_patch "$PATCH_DIR/php-llvm-builder-and-or.patch"
 apply_patch "$PATCH_DIR/php-llvm-builder-xor.patch"
-apply_patch "$PATCH_DIR/php-llvm-no-closures-array-map.patch"
 apply_patch "$PATCH_DIR/php-llvm-pass-registry-interface.patch"
 apply_patch "$PATCH_DIR/php-llvm-pass-manager-builder-semicolon.patch"
 apply_patch "$PATCH_DIR/php-llvm-pass-manager-builder-typed-prop.patch"
