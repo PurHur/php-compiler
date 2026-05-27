@@ -1,0 +1,12 @@
+diff --git vendor/ircmaxell/php-cfg/lib/PHPCfg/Printer.php vendor/ircmaxell/php-cfg/lib/PHPCfg/Printer.php
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Printer.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Printer.php
+@@ -265,7 +265,7 @@
+         }
+         if ($type instanceof Op\Type\Union_) {
+             return implode('|', array_map(
+-                fn (Op\Type $t) => $this->renderType($t),
++                [$this, 'renderType'],
+                 $type->types
+             ));
+         }

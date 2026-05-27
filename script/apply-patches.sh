@@ -38,6 +38,10 @@ patch_already_applied() {
     php-types-doc-comment-string.patch)
       grep -q 'instanceof \\PhpParser\\Comment' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
       ;;
+    php-types-docblock-first-token.patch)
+      grep -q "(@return\\\\s+\\\\(\\[\\^\\\\s\\*\\]\\[\\^\\\\s\\]\\*\\\\)" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null \
+        && grep -q "(@var\\\\s+\\\\(\\[\\^\\\\s\\*\\]\\[\\^\\\\s\\]\\*\\\\)" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
+      ;;
     php-types-array-shape.patch)
       grep -q "preg_match('/^array\\{/'" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
       ;;
@@ -102,6 +106,13 @@ patch_already_applied() {
       ;;
     php-cfg-switch-cond-property.patch)
       grep -q 'public \$cond;' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Switch_.php" 2>/dev/null
+      ;;
+    php-cfg-no-arrow-function.patch)
+      ! grep -q 'fn (Op\\Type $t) => ' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Printer.php" 2>/dev/null
+      ;;
+    php-cfg-no-closure-preg-replace-callback.patch)
+      grep -q "repairCommentsCallback" "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/MagicStringResolver.php" 2>/dev/null \
+        && grep -q "docCommentTypeCallback" "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/NameResolver.php" 2>/dev/null
       ;;
     php-cfg-property-type.patch)
       grep -q 'public \\$type;' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php" 2>/dev/null \
@@ -363,6 +374,8 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-magic-script-const.patch"
   apply_patch "$PATCH_DIR/php-cfg-magic-line.patch"
   apply_patch "$PATCH_DIR/php-cfg-switch-cond-property.patch"
+  apply_patch "$PATCH_DIR/php-cfg-no-arrow-function.patch"
+  apply_patch "$PATCH_DIR/php-cfg-no-closure-preg-replace-callback.patch"
   apply_patch "$PATCH_DIR/php-cfg-property-type.patch"
   apply_patch "$PATCH_DIR/php-cfg-assertion-expr-property.patch"
   apply_patch "$PATCH_DIR/php-cfg-match.patch"
@@ -401,6 +414,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-nullable-optype-return.patch"
   apply_patch "$PATCH_DIR/php-types-fromvalue-null.patch"
   apply_patch "$PATCH_DIR/php-types-doc-comment-string.patch"
+  apply_patch "$PATCH_DIR/php-types-docblock-first-token.patch"
   apply_patch "$PATCH_DIR/php-types-array-shape.patch"
   apply_patch "$PATCH_DIR/php-types-generics-fallback.patch"
   apply_patch "$PATCH_DIR/php-types-generics-list-array.patch"
