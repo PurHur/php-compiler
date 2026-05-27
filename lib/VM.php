@@ -748,6 +748,7 @@ restart:
                     }
                     $classEntry = new ClassEntry($name);
                     $classEntry->isEnum = true;
+                    $classEntry->interfaces = $op->classImplements;
                     self::defineClass($classEntry, $op->block1);
                     $this->context->classes[$lcname] = $classEntry;
                     $this->context->enums[$lcname] = true;

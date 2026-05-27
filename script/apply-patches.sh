@@ -185,6 +185,9 @@ patch_already_applied() {
     php-cfg-enum.patch)
       grep -q 'parseStmt_Enum' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
       ;;
+    php-cfg-enum-implements.patch)
+      grep -q 'public $implements' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Enum_.php" 2>/dev/null
+      ;;
     php-cfg-named-args.patch)
       grep -q 'callArgName' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
       ;;
@@ -335,6 +338,46 @@ if anchor not in text:
 parser_path.write_text(text.replace(anchor, insert + anchor, 1))
 PY
   echo "Applied php-cfg-enum.patch (overlay)"
+}
+
+apply_php_cfg_enum_implements_overlay() {
+  local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
+  local op="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Enum_.php"
+  local overlay="$PATCH_DIR/overlays/php-cfg"
+  if grep -q 'public $implements' "$op" 2>/dev/null; then
+    echo "Skip php-cfg-enum-implements.patch (already applied)"
+    return 0
+  fi
+  if ! grep -q 'function parseStmt_Enum' "$parser" 2>/dev/null; then
+    echo "Skip php-cfg-enum-implements.patch (parseStmt_Enum missing; apply php-cfg-enum.patch first)" >&2
+    return 1
+  fi
+  cp "$overlay/Op/Stmt/Enum_.php" "$op"
+  python3 - "$parser" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+parser_path = Path(sys.argv[1])
+text = parser_path.read_text()
+pattern = re.compile(
+    r"(        \$this->block->children\[\] = new Op\\Stmt\\Enum_\(\n"
+    r"            \$name,\n"
+    r"            \$backedType,\n)"
+    r"(            \$stmtsBlock,)",
+    re.MULTILINE,
+)
+replacement = r"\1            $this->parseExprList($node->implements),\n\2"
+if 'parseExprList($node->implements)' in text:
+    parser_path.write_text(text)
+    raise SystemExit(0)
+new_text, count = pattern.subn(replacement, text, count=1)
+if count != 1:
+    sys.stderr.write("php-cfg-enum-implements: Enum_ ctor call not found in Parser.php\n")
+    raise SystemExit(1)
+parser_path.write_text(new_text)
+PY
+  echo "Applied php-cfg-enum-implements.patch (overlay)"
 }
 
 apply_php_cfg_intersection_type_overlay() {
@@ -1154,6 +1197,10 @@ apply_patch() {
     apply_php_cfg_enum_overlay
     return $?
   fi
+  if [[ "$(basename "$patch")" == "php-cfg-enum-implements.patch" ]]; then
+    apply_php_cfg_enum_implements_overlay
+    return $?
+  fi
   if [[ "$(basename "$patch")" == "php-cfg-intersection-type.patch" ]]; then
     apply_php_cfg_intersection_type_overlay
     return $?
@@ -1297,6 +1344,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-arrow-function.patch"
   apply_patch "$PATCH_DIR/php-cfg-anonymous-class.patch"
   apply_patch "$PATCH_DIR/php-cfg-enum.patch"
+  apply_patch "$PATCH_DIR/php-cfg-enum-implements.patch"
   apply_patch "$PATCH_DIR/php-cfg-named-args.patch"
   apply_patch "$PATCH_DIR/php-cfg-spread.patch"
   apply_patch "$PATCH_DIR/php-cfg-never-type.patch"

@@ -922,6 +922,7 @@ class Compiler {
             OpCode::TYPE_DECLARE_ENUM,
             $this->compileOperand($enum->name, $block, true)
         );
+        $return->classImplements = $this->interfaceNamesFromOperands($enum->implements);
         $return->block1 = $this->compileEnumBody($enum->stmts);
 
         return $return;
