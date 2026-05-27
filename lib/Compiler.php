@@ -932,18 +932,54 @@ class Compiler {
     {
         $result = new Block($block);
         foreach ($block->children as $child) {
-            if (!$child instanceof Op\Terminal\Const_) {
-                $this->throwCompileLogic('Unsupported enum body element: '.get_class($child));
+            if ($child instanceof Op\Terminal\Const_) {
+                $this->compileOps($child->valueBlock->children, $result);
+                $result->addOpCode(new OpCode(
+                    OpCode::TYPE_DECLARE_CLASS_CONST,
+                    $this->compileOperand($child->name, $result, true),
+                    $this->compileOperand($child->value, $result, true)
+                ));
+                continue;
             }
-            $this->compileOps($child->valueBlock->children, $result);
-            $result->addOpCode(new OpCode(
-                OpCode::TYPE_DECLARE_CLASS_CONST,
-                $this->compileOperand($child->name, $result, true),
-                $this->compileOperand($child->value, $result, true)
-            ));
+            if ($child instanceof Op\Stmt\ClassMethod) {
+                $this->compileClassMethodDeclaration($child, $result);
+
+                continue;
+            }
+            $this->throwCompileLogic('Unsupported enum body element: '.get_class($child));
         }
 
         return $result;
+    }
+
+    protected function compileClassMethodDeclaration(Op\Stmt\ClassMethod $child, Block $result): void
+    {
+        if ('__construct' === $child->func->name) {
+            foreach ($child->func->params as $param) {
+                if ($this->isPromotedParam($param)) {
+                    $this->compilePromotedPropertyDeclaration($param, $result);
+                }
+            }
+        }
+        $methodName = new Operand\Literal($child->func->name);
+        $methodName->type = Type::string();
+        $visVar = new Variable(Variable::TYPE_INTEGER);
+        $visVar->int(MethodVisibility::mask($child->func->flags));
+        $visOperand = new Operand\Temporary;
+        $visOperand->type = Type::int();
+        $visIdx = $result->registerConstant($visOperand, $visVar);
+        $declare = new OpCode(
+            OpCode::TYPE_DECLARE_METHOD,
+            $this->compileOperand($methodName, $result, true),
+            null,
+            $visIdx
+        );
+        if (null !== $child->func->cfg) {
+            $methodBlock = $this->compileCfgBlock($child->func->cfg, $child->func->params, $child->func);
+            $declare->block1 = $methodBlock;
+        }
+        $declare->attributeNames = AttributeNames::fromOp($child);
+        $result->addOpCode($declare);
     }
 
     protected function compileClassLike(Op\Stmt\ClassLike $class, Block $block): OpCode {
@@ -1113,32 +1149,7 @@ class Compiler {
                     ));
                     break;
                 case Op\Stmt\ClassMethod::class:
-                    if ('__construct' === $child->func->name) {
-                        foreach ($child->func->params as $param) {
-                            if ($this->isPromotedParam($param)) {
-                                $this->compilePromotedPropertyDeclaration($param, $result);
-                            }
-                        }
-                    }
-                    $methodName = new Operand\Literal($child->func->name);
-                    $methodName->type = Type::string();
-                    $visVar = new Variable(Variable::TYPE_INTEGER);
-                    $visVar->int(MethodVisibility::mask($child->func->flags));
-                    $visOperand = new Operand\Temporary;
-                    $visOperand->type = Type::int();
-                    $visIdx = $result->registerConstant($visOperand, $visVar);
-                    $declare = new OpCode(
-                        OpCode::TYPE_DECLARE_METHOD,
-                        $this->compileOperand($methodName, $result, true),
-                        null,
-                        $visIdx
-                    );
-                    if (null !== $child->func->cfg) {
-                        $methodBlock = $this->compileCfgBlock($child->func->cfg, $child->func->params, $child->func);
-                        $declare->block1 = $methodBlock;
-                    }
-                    $declare->attributeNames = AttributeNames::fromOp($child);
-                    $result->addOpCode($declare);
+                    $this->compileClassMethodDeclaration($child, $result);
                     break;
                 case Op\Terminal\Const_::class:
                     if (OpCode::TYPE_DECLARE_CLASS !== $type) {

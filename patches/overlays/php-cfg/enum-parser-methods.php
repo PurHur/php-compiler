@@ -16,6 +16,8 @@
         foreach ($node->stmts as $stmt) {
             if ($stmt instanceof Stmt\EnumCase) {
                 $this->parseEnumCase($stmt);
+            } elseif ($stmt instanceof Stmt\ClassMethod) {
+                $this->parseStmt_ClassMethod($stmt);
             }
         }
         $this->block = $savedBlock;
