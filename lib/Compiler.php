@@ -89,7 +89,12 @@ class Compiler {
     {
         $this->resetCompileAbortDetail();
 
-        return $this->compileCfgBlock($script->main->cfg, $script->main->params, $script->main);
+        $block = $this->compileCfgBlock($script->main->cfg, $script->main->params, $script->main);
+        if (null === $block && null !== $this->compileAbortDetail && '' !== $this->compileAbortDetail) {
+            echo 'Compiler::compileEmitSmoke: '.$this->compileAbortDetail."\n";
+        }
+
+        return $block;
     }
 
     public function compileFunc(string $name, CfgFunc $func): Func {

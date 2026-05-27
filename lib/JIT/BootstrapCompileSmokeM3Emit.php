@@ -164,7 +164,8 @@ final class BootstrapCompileSmokeM3Emit
     {
         unset($context);
 
-        return EmitTuMode::isMinimalRuntime();
+        // Emit-helper binaries must init parse/compiler spine (#2633); env may be unset at runtime.
+        return true;
     }
 
     private static function echoPhaseError(Context $context, string $logPrefix, string $line1, string $phase): void
