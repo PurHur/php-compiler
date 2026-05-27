@@ -1,57 +1,27 @@
---- vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Context.php
-+++ vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Context.php
-@@ -94,14 +94,17 @@ class Context implements CoreContext {
-     }
- 
-     public function functionType(CoreType $returnType, bool $isVarArgs, CoreType ... $parameters): CoreFunctionType {
--        $paramWrapper = $this->llvm->lib->makeArray(
--            LLVMTypeRef_ptr::class,
--            array_map(
--                function(Type $type) {
--                    return $type->type;
--                }, 
--                $parameters
--            )
--        );
-+        $paramWrapper = null;
-+        if (count($parameters) > 0) {
-+            $paramWrapper = $this->llvm->lib->makeArray(
-+                LLVMTypeRef_ptr::class,
-+                array_map(
-+                    function(Type $type) {
-+                        return $type->type;
-+                    },
-+                    $parameters
-+                )
-+            );
-+        }
-         return $this->llvm->factory->type(
-             $this, 
-             $this->llvm->lib->LLVMFunctionType(
-@@ -116,14 +119,17 @@ class Context implements CoreContext {
+--- vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Context.php	2026-05-27 18:51:49.221534016 +0000
++++ vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Context.php	2026-05-27 18:51:49.221590214 +0000
+@@ -118,14 +118,17 @@
      }
  
      public function structType(bool $packed, CoreType ... $elements): CoreType {
--        $elementWrapper = $this->llvm->lib->makeArray(
--            LLVMTypeRef_ptr::class,
--            array_map(
--                function(Type $type) {
--                    return $type->type;
--                }, 
--                $elements
--            )
--        );
+-        $elementTypes = [];
+-        foreach ($elements as $type) {
+-            $elementTypes[] = $type->type;
 +        $elementWrapper = null;
 +        if (count($elements) > 0) {
++            $elementTypes = [];
++            foreach ($elements as $type) {
++                $elementTypes[] = $type->type;
++            }
 +            $elementWrapper = $this->llvm->lib->makeArray(
 +                LLVMTypeRef_ptr::class,
-+                array_map(
-+                    function(Type $type) {
-+                        return $type->type;
-+                    },
-+                    $elements
-+                )
++                $elementTypes
 +            );
-+        }
+         }
+-        $elementWrapper = $this->llvm->lib->makeArray(
+-            LLVMTypeRef_ptr::class,
+-            $elementTypes
+-        );
          return $this->llvm->factory->type(
              $this,
+             $this->llvm->lib->LLVMStructTypeInContext(

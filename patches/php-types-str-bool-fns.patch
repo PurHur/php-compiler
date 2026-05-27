@@ -7,10 +7,5 @@
          'strspn' => ['int', 'str' => 'string', 'mask' => 'string', 'start=' => 'int', 'len=' => 'int'],
 +        'str_contains' => ['bool', 'haystack' => 'string', 'needle' => 'string'],
 +        'str_ends_with' => ['bool', 'haystack' => 'string', 'needle' => 'string'],
-+                 'str_starts_with' => ['bool', 'haystack' => 'string', 'needle' => 'string'],
++        'str_starts_with' => ['bool', 'haystack' => 'string', 'needle' => 'string'],
          'strstr' => ['string', 'haystack' => 'string', 'needle' => '', 'part=' => 'bool'],
-@@ -1836,7 +1839,7 @@
--        'getenv' => ['string', 'varname' => 'string'],
-+        'getenv' => ['string|false', 'varname' => 'string'],
-         'strtok 1' => ['string', 'token' => 'string'],
-         'strtok' => ['string', 'str' => 'string', 'token' => 'str'],

@@ -1,5 +1,3 @@
-diff --git vendor/ircmaxell/php-types/lib/PHPTypes/Type.php vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
-index 07dc9aa..0f1c8a0 100644
 --- vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
 +++ vendor/ircmaxell/php-types/lib/PHPTypes/Type.php
 @@ -255,13 +255,13 @@ class Type

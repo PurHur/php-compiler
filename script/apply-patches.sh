@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PATCH_DIR="$ROOT/patches"
 VENDOR_LLVM="$ROOT/vendor/ircmaxell/php-llvm"
+APPLY_PATCH_FAILURES=()
 
 if [[ ! -d "$VENDOR_LLVM" ]]; then
   echo "vendor/ircmaxell/php-llvm not found; run composer install first" >&2
@@ -13,6 +14,9 @@ fi
 patch_already_applied() {
   local patch="$1"
   case "$(basename "$patch")" in
+    php-llvm-chooser.patch)
+      grep -q 'PHP_COMPILER_LLVM_PATH' "$ROOT/vendor/ircmaxell/php-llvm/lib/Chooser.php" 2>/dev/null
+      ;;
     php-types-binaryop-coalesce.patch)
       grep -q "case 'Expr_BinaryOp_Coalesce':" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
       ;;
@@ -39,8 +43,8 @@ patch_already_applied() {
       grep -q 'instanceof \\PhpParser\\Comment' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
       ;;
     php-types-docblock-first-token.patch)
-      grep -q "(@return\\\\s+\\\\(\\[\\^\\\\s\\*\\]\\[\\^\\\\s\\]\\*\\\\)" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null \
-        && grep -q "(@var\\\\s+\\\\(\\[\\^\\\\s\\*\\]\\[\\^\\\\s\\]\\*\\\\)" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
+      grep -qF '(@var\s+(.+?)(?:\s*\*\/|\s*$))m' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null \
+        && grep -qF '(@return\s+(.+?)(?:\s*\*\/|\s*$))m' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
       ;;
     php-types-array-shape.patch)
       grep -q "preg_match('/^array\\{/'" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php" 2>/dev/null
@@ -62,6 +66,9 @@ patch_already_applied() {
       ;;
     php-types-arrow-function.patch)
       grep -q 'function resolveOp_Expr_ArrowFunction' "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
+      ;;
+    php-types-str-bool-fns.patch)
+      grep -q "'str_contains' => \['bool'" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php" 2>/dev/null
       ;;
     php-types-str-split-string-array.patch)
       grep -q "'str_split' => \['string\[\]'" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php" 2>/dev/null
@@ -97,9 +104,20 @@ patch_already_applied() {
     php-llvm-pass-manager-builder-populate.patch)
       grep -q 'PopulateFunctionPassManager(\\$this->passManagerBuilder, \\$passManager->passManager' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/PassManagerBuilder.php" 2>/dev/null
       ;;
+    php-llvm-context-empty-arrays.patch)
+      grep -q '\$paramWrapper = null' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Context.php" 2>/dev/null \
+        && grep -qE 'count\(\$elements\) > 0|\$elementWrapper = null' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Context.php" 2>/dev/null
+      ;;
+    php-llvm-makearray-empty.patch)
+      grep -q 'count(\$elements) === 0' "$ROOT/vendor/ircmaxell/php-llvm/ffi/llvm9.php" 2>/dev/null
+      ;;
     php-llvm-memory-buffer-bitcode.patch)
       grep -q 'use llvm\\string_ptr;' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/MemoryBuffer.php" 2>/dev/null \
         && grep -q '\$this->llvm->lib->getFFI()' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/MemoryBuffer.php" 2>/dev/null
+      ;;
+    php-cfg-mixed-reserved.patch)
+      [[ -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Type/Mixed_.php" ]] \
+        && [[ ! -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Type/Mixed.php" ]]
       ;;
     php-cfg-nullsafe.patch)
       [[ -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/NullsafePropertyFetch.php" ]]
@@ -180,7 +198,7 @@ patch_already_applied() {
       grep -q 'promotionFlags' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Param.php" 2>/dev/null
       ;;
     php-cfg-attribute-groups.patch)
-      grep -q "attrGroups' = \$expr->attrGroups" "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
+      grep -q "attrGroups'\] = \$expr->attrGroups" "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
       ;;
     php-cfg-trait-use.patch)
       [[ -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/TraitUse.php" ]]
@@ -286,6 +304,360 @@ PY
   echo "Applied php-cfg-arrow-function.patch (overlay)"
 }
 
+apply_php_cfg_enum_overlay() {
+  local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
+  local op="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Enum_.php"
+  local overlay="$PATCH_DIR/overlays/php-cfg"
+  if grep -q 'function parseStmt_Enum' "$parser" 2>/dev/null; then
+    echo "Skip php-cfg-enum.patch (already applied)"
+    return 0
+  fi
+  mkdir -p "$(dirname "$op")"
+  cp "$overlay/Op/Stmt/Enum_.php" "$op"
+  python3 - "$parser" "$overlay/enum-parser-methods.php" <<'PY'
+import sys
+from pathlib import Path
+
+parser_path = Path(sys.argv[1])
+method_path = Path(sys.argv[2])
+text = parser_path.read_text()
+anchor = "    protected function parseStmt_Echo(Stmt\\Echo_ $node)"
+insert = method_path.read_text().rstrip("\n") + "\n\n"
+if anchor not in text:
+    sys.stderr.write("php-cfg-enum: parseStmt_Echo anchor not found in Parser.php\n")
+    raise SystemExit(1)
+parser_path.write_text(text.replace(anchor, insert + anchor, 1))
+PY
+  echo "Applied php-cfg-enum.patch (overlay)"
+}
+
+apply_php_cfg_intersection_type_overlay() {
+  local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
+  local printer="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Printer.php"
+  local op="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Type/Intersection.php"
+  local overlay="$PATCH_DIR/overlays/php-cfg/Op/Type/Intersection.php"
+  if [[ -f "$op" ]] && grep -q 'IntersectionType' "$parser" 2>/dev/null; then
+    echo "Skip php-cfg-intersection-type.patch (already applied)"
+    return 0
+  fi
+  mkdir -p "$(dirname "$op")"
+  cp "$overlay" "$op"
+  python3 - "$parser" "$printer" <<'PY'
+import sys
+from pathlib import Path
+
+parser_path = Path(sys.argv[1])
+printer_path = Path(sys.argv[2])
+parser = parser_path.read_text()
+parser_anchor = "        if ($node instanceof Node\\UnionType) {"
+parser_insert = """        if ($node instanceof Node\\IntersectionType) {
+            $types = [];
+            foreach ($node->types as $sub) {
+                $types[] = $this->parseTypeNode($sub);
+            }
+
+            return new Op\\Type\\Intersection($types, $this->mapAttributes($node));
+        }
+        """
+if parser_anchor not in parser:
+    sys.stderr.write("php-cfg-intersection-type: UnionType anchor not found in Parser.php\n")
+    raise SystemExit(1)
+parser = parser.replace(
+    parser_anchor,
+    parser_insert + parser_anchor,
+    1,
+)
+parser_path.write_text(parser)
+printer = printer_path.read_text()
+printer_anchor = "        if ($type instanceof Op\\Type\\Literal) {"
+printer_insert = """        if ($type instanceof Op\\Type\\Intersection) {
+            return implode('&', array_map(
+                fn (Op\\Type $t) => $this->renderType($t),
+                $type->types
+            ));
+        }
+        """
+if printer_anchor not in printer:
+    sys.stderr.write("php-cfg-intersection-type: Literal anchor not found in Printer.php\n")
+    raise SystemExit(1)
+printer = printer.replace(printer_anchor, printer_insert + printer_anchor, 1)
+printer_path.write_text(printer)
+PY
+  echo "Applied php-cfg-intersection-type.patch (overlay)"
+}
+
+apply_php_cfg_attribute_groups_overlay() {
+  local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
+  if grep -q "attrGroups'\] = \$expr->attrGroups" "$parser" 2>/dev/null; then
+    echo "Skip php-cfg-attribute-groups.patch (already applied)"
+    return 0
+  fi
+  python3 - "$parser" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+old = """    private function mapAttributes(Node $expr)
+    {
+        return array_merge(
+            [
+                'filename' => $this->fileName,
+                'doccomment' => $expr->getDocComment(),
+            ],
+            $expr->getAttributes()
+        );
+    }"""
+new = """    private function mapAttributes(Node $expr)
+    {
+        $attrs = array_merge(
+            [
+                'filename' => $this->fileName,
+                'doccomment' => $expr->getDocComment(),
+            ],
+            $expr->getAttributes()
+        );
+        if (property_exists($expr, 'attrGroups') && [] !== $expr->attrGroups) {
+            $attrs['attrGroups'] = $expr->attrGroups;
+        }
+        return $attrs;
+    }"""
+if old not in text:
+    sys.stderr.write("php-cfg-attribute-groups: mapAttributes anchor not found\n")
+    raise SystemExit(1)
+path.write_text(text.replace(old, new, 1))
+PY
+  echo "Applied php-cfg-attribute-groups.patch (overlay)"
+}
+
+apply_php_types_intersection_type_overlay() {
+  local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php"
+  if grep -q 'instanceof CfgType\\Intersection' "$target" 2>/dev/null; then
+    echo "Skip php-types-intersection-type.patch (already applied)"
+    return 0
+  fi
+  python3 - "$target" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+old = """        if ($decl instanceof CfgType\\Reference) {
+            if ($decl->declaration instanceof \\PHPCfg\\Operand\\Literal) {
+                return self::fromDecl($decl->declaration->value);
+            }
+
+            return self::mixed();
+        }
+
+        if ($decl instanceof CfgType\\Union_) {"""
+new = """        if ($decl instanceof CfgType\\Reference) {
+            if ($decl->declaration instanceof \\PHPCfg\\Operand\\Literal) {
+                return self::fromDecl($decl->declaration->value);
+            }
+
+            return self::mixed();
+        }
+        if ($decl instanceof CfgType\\Intersection) {
+            $subs = [];
+            foreach ($decl->types as $sub) {
+                $subs[] = self::fromTypeDecl($sub);
+            }
+
+            return new self(self::TYPE_INTERSECTION, $subs);
+        }
+
+        if ($decl instanceof CfgType\\Union_) {"""
+if old not in text:
+    sys.stderr.write("php-types-intersection-type: Type.php anchor not found\n")
+    raise SystemExit(1)
+path.write_text(text.replace(old, new, 1))
+PY
+  echo "Applied php-types-intersection-type.patch (overlay)"
+}
+
+apply_php_types_first_class_callable_overlay() {
+  local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+  if grep -q 'Expr_FirstClassCallable' "$target" 2>/dev/null; then
+    echo "Skip php-types-first-class-callable.patch (already applied)"
+    return 0
+  fi
+  python3 - "$target" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+old = """            case 'Expr_Yield':
+            case 'Expr_Include':
+                // TODO: we may be able to determine these...
+                return false;
+            case 'Expr_MagicScriptConst':"""
+new = """            case 'Expr_Yield':
+            case 'Expr_Include':
+                // TODO: we may be able to determine these...
+                return false;
+            case 'Expr_FirstClassCallable':
+                if (\\PHPCfg\\Op\\Expr\\FirstClassCallable::KIND_METHOD === $op->kind) {
+                    return [Type::array()];
+                }
+
+                return [Type::string()];
+            case 'Expr_MagicScriptConst':"""
+if old not in text:
+    sys.stderr.write("php-types-first-class-callable: TypeReconstructor anchor not found\n")
+    raise SystemExit(1)
+path.write_text(text.replace(old, new, 1))
+PY
+  echo "Applied php-types-first-class-callable.patch (overlay)"
+}
+
+apply_php_types_magic_script_const_overlay() {
+  local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php"
+  if grep -q 'Expr_MagicScriptConst' "$target" 2>/dev/null; then
+    echo "Skip php-types-magic-script-const.patch (already applied)"
+    return 0
+  fi
+  python3 - "$target" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+old = """            case 'Expr_Yield':
+            case 'Expr_Include':
+                // TODO: we may be able to determine these...
+                return false;
+        }
+
+        throw new \\LogicException('Unknown variable op found: '.$op->getType());"""
+new = """            case 'Expr_Yield':
+            case 'Expr_Include':
+                // TODO: we may be able to determine these...
+                return false;
+            case 'Expr_MagicScriptConst':
+                if (\\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_LINE === $op->kind) {
+                    return [Type::int()];
+                }
+
+                return [Type::string()];
+        }
+
+        throw new \\LogicException('Unknown variable op found: '.$op->getType());"""
+if old not in text:
+    sys.stderr.write("php-types-magic-script-const: TypeReconstructor anchor not found\n")
+    raise SystemExit(1)
+path.write_text(text.replace(old, new, 1))
+PY
+  echo "Applied php-types-magic-script-const.patch (overlay)"
+}
+
+apply_php_types_str_bool_fns_overlay() {
+  local target="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php"
+  if grep -q "'str_contains' => \['bool'" "$target" 2>/dev/null; then
+    echo "Skip php-types-str-bool-fns.patch (already applied)"
+    return 0
+  fi
+  python3 - "$target" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+needle = "        'strspn' => ['int', 'str' => 'string', 'mask' => 'string', 'start=' => 'int', 'len=' => 'int'],\n"
+insert = needle + (
+    "        'str_contains' => ['bool', 'haystack' => 'string', 'needle' => 'string'],\n"
+    "        'str_ends_with' => ['bool', 'haystack' => 'string', 'needle' => 'string'],\n"
+    "        'str_starts_with' => ['bool', 'haystack' => 'string', 'needle' => 'string'],\n"
+)
+if needle not in text:
+    sys.stderr.write("php-types-str-bool-fns: strspn anchor not found\n")
+    raise SystemExit(1)
+path.write_text(text.replace(needle, insert, 1))
+PY
+  echo "Applied php-types-str-bool-fns.patch (overlay)"
+}
+
+apply_php_cfg_magic_script_const_overlay() {
+  local op="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/MagicScriptConst.php"
+  local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
+  local overlay_op="$PATCH_DIR/overlays/php-cfg/Op/Expr/MagicScriptConst.php"
+  if grep -q 'MagicScriptConst::KIND_DIR' "$parser" 2>/dev/null; then
+    echo "Skip php-cfg-magic-script-const.patch (already applied)"
+    return 0
+  fi
+  if [[ ! -f "$overlay_op" ]]; then
+    echo "Skip php-cfg-magic-script-const.patch (overlay missing)" >&2
+    return 1
+  fi
+  mkdir -p "$(dirname "$op")"
+  cp "$overlay_op" "$op"
+  python3 - "$parser" <<'PY'
+import sys
+from pathlib import Path
+
+parser_path = Path(sys.argv[1])
+text = parser_path.read_text()
+replacements = [
+    (
+        "            case 'Scalar_MagicConst_Dir':\n"
+        "                return new Literal(dirname($this->fileName));",
+        "            case 'Scalar_MagicConst_Dir':\n"
+        "                $op = new Op\\Expr\\MagicScriptConst(Op\\Expr\\MagicScriptConst::KIND_DIR, $this->mapAttributes($scalar));\n"
+        "                $this->block->children[] = $op;\n"
+        "                return $op->result;",
+    ),
+    (
+        "            case 'Scalar_MagicConst_File':\n"
+        "                return new Literal($this->fileName);",
+        "            case 'Scalar_MagicConst_File':\n"
+        "                $op = new Op\\Expr\\MagicScriptConst(Op\\Expr\\MagicScriptConst::KIND_FILE, $this->mapAttributes($scalar));\n"
+        "                $this->block->children[] = $op;\n"
+        "                return $op->result;",
+    ),
+    (
+        "            case 'Scalar_MagicConst_File':\n"
+        "                $op = new Op\\Expr\\MagicScriptConst(Op\\Expr\\MagicScriptConst::KIND_FILE, $this->mapAttributes($scalar));\n"
+        "                $this->block->children[] = $op;\n"
+        "                return $op->result;\n"
+        "            case 'Scalar_MagicConst_Namespace':",
+        "            case 'Scalar_MagicConst_File':\n"
+        "                $op = new Op\\Expr\\MagicScriptConst(Op\\Expr\\MagicScriptConst::KIND_FILE, $this->mapAttributes($scalar));\n"
+        "                $this->block->children[] = $op;\n"
+        "                return $op->result;\n"
+        "            case 'Scalar_MagicConst_Line':\n"
+        "                $op = new Op\\Expr\\MagicScriptConst(Op\\Expr\\MagicScriptConst::KIND_LINE, $this->mapAttributes($scalar));\n"
+        "                $this->block->children[] = $op;\n"
+        "                return $op->result;\n"
+        "            case 'Scalar_MagicConst_Namespace':",
+    ),
+]
+for old, new in replacements:
+    if old in text:
+        text = text.replace(old, new, 1)
+        parser_path.write_text(text)
+        print("Applied php-cfg-magic-script-const.patch (overlay)")
+        raise SystemExit(0)
+sys.stderr.write("php-cfg-magic-script-const: Parser.php anchor not found\n")
+raise SystemExit(1)
+PY
+}
+
+apply_php_cfg_magic_constants_overlay() {
+  local target="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/MagicStringResolver.php"
+  local overlay="$PATCH_DIR/overlays/php-cfg/MagicStringResolver.php"
+  if patch_already_applied "$PATCH_DIR/php-cfg-magic-constants.patch"; then
+    echo "Skip php-cfg-magic-constants.patch (already applied)"
+    return 0
+  fi
+  if [[ ! -f "$overlay" ]]; then
+    echo "Skip php-cfg-magic-constants.patch (overlay missing)" >&2
+    return 1
+  fi
+  cp "$overlay" "$target"
+  echo "Applied php-cfg-magic-constants.patch (overlay)"
+}
+
 apply_php_cfg_trycatch_overlay() {
   local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
   local op="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/TryCatch.php"
@@ -320,10 +692,79 @@ PY
   echo "Applied php-cfg-trycatch.patch (overlay)"
 }
 
+record_patch_failure() {
+  local patch_name="$1"
+  local detail="${2:-}"
+  APPLY_PATCH_FAILURES+=("$patch_name")
+  echo "ERROR: failed to apply ${patch_name}" >&2
+  if [[ -n "$detail" ]]; then
+    echo "  ${detail}" >&2
+  fi
+  echo "  Hint: git -C \"${ROOT}\" apply --check -p0 \"${PATCH_DIR}/${patch_name}\"" >&2
+}
+
+# When git apply / patch(1) cannot run (stale hunk lines, corrupt diff), detect prior apply
+# from the first added line or new-file target in the patch file.
+patch_marker_present() {
+  local patch="$1"
+  local old_path new_path marker
+  old_path="$(grep -m1 '^--- ' "$patch" | awk '{print $2}')"
+  new_path="$(grep -m1 '^\+\+\+ ' "$patch" | awk '{print $2}')"
+  old_path="${old_path#a/}"
+  new_path="${new_path#b/}"
+  if [[ "$old_path" == "/dev/null" ]]; then
+    [[ -n "$new_path" && -f "$ROOT/$new_path" ]]
+    return
+  fi
+  marker="$(grep -m1 '^+[^+]' "$patch" | sed 's/^+//' || true)"
+  if [[ -z "$marker" || -z "$old_path" ]]; then
+    return 1
+  fi
+  grep -qF "$marker" "$ROOT/$old_path" 2>/dev/null
+}
+
 apply_patch() {
   local patch="$1"
+  local patch_name
+  patch_name="$(basename "$patch")"
   if [[ ! -f "$patch" ]]; then
     return 0
+  fi
+  if [[ "$(basename "$patch")" == "php-cfg-magic-constants.patch" ]]; then
+    apply_php_cfg_magic_constants_overlay
+    return $?
+  fi
+  if [[ "$(basename "$patch")" == "php-cfg-magic-script-const.patch" ]]; then
+    apply_php_cfg_magic_script_const_overlay
+    return $?
+  fi
+  if [[ "$(basename "$patch")" == "php-cfg-enum.patch" ]]; then
+    apply_php_cfg_enum_overlay
+    return $?
+  fi
+  if [[ "$(basename "$patch")" == "php-cfg-intersection-type.patch" ]]; then
+    apply_php_cfg_intersection_type_overlay
+    return $?
+  fi
+  if [[ "$(basename "$patch")" == "php-cfg-attribute-groups.patch" ]]; then
+    apply_php_cfg_attribute_groups_overlay
+    return $?
+  fi
+  if [[ "$(basename "$patch")" == "php-types-str-bool-fns.patch" ]]; then
+    apply_php_types_str_bool_fns_overlay
+    return $?
+  fi
+  if [[ "$(basename "$patch")" == "php-types-magic-script-const.patch" ]]; then
+    apply_php_types_magic_script_const_overlay
+    return $?
+  fi
+  if [[ "$(basename "$patch")" == "php-types-first-class-callable.patch" ]]; then
+    apply_php_types_first_class_callable_overlay
+    return $?
+  fi
+  if [[ "$(basename "$patch")" == "php-types-intersection-type.patch" ]]; then
+    apply_php_types_intersection_type_overlay
+    return $?
   fi
   if [[ "$(basename "$patch")" == "php-cfg-match.patch" ]]; then
     apply_php_cfg_match_overlay
@@ -342,34 +783,47 @@ apply_patch() {
     return $?
   fi
   if patch_already_applied "$patch"; then
-    echo "Skip $(basename "$patch") (already applied)"
+    echo "Skip ${patch_name} (already applied)"
     return 0
   fi
-  if git -C "$ROOT" apply --check -p0 "$patch" 2>/dev/null; then
+  if git -C "$ROOT" apply --check -p0 "$patch" >/dev/null 2>&1; then
     git -C "$ROOT" apply -p0 "$patch"
-    echo "Applied $(basename "$patch")"
-  elif patch -p0 --dry-run -s -f < "$patch" >/dev/null 2>&1; then
-    patch -p0 -s -f < "$patch" >/dev/null 2>&1
-    echo "Applied $(basename "$patch") (patch(1))"
-  elif patch -p0 --reverse --dry-run -s -f < "$patch" >/dev/null 2>&1; then
-    echo "Skip $(basename "$patch") (already applied)"
-  else
-    echo "Skip $(basename "$patch") (already applied or failed)" >&2
-    case "$(basename "$patch")" in
-      php-cfg-match.patch)
-        if python3 "$ROOT/script/patch-php-cfg-match.py"; then
-          echo "Applied $(basename "$patch") (python fallback)"
-        else
-          echo "ERROR: php-cfg-match.patch failed (match lowering required for self-host spine)." >&2
-          return 1
-        fi
-        ;;
-      php-cfg-strict-types.patch)
-        echo "ERROR: php-cfg-strict-types.patch is required for AOT (declare(strict_types))." >&2
-        return 1
-        ;;
-    esac
+    echo "Applied ${patch_name}"
+    return 0
   fi
+  if command -v patch >/dev/null 2>&1; then
+    if patch -p0 --dry-run -s -f < "$patch" >/dev/null 2>&1; then
+      patch -p0 -s -f < "$patch" >/dev/null 2>&1
+      echo "Applied ${patch_name} (patch(1))"
+      return 0
+    fi
+    if patch -p0 --reverse --dry-run -s -f < "$patch" >/dev/null 2>&1; then
+      echo "Skip ${patch_name} (already applied)"
+      return 0
+    fi
+  fi
+  case "${patch_name}" in
+    php-cfg-match.patch)
+      if python3 "$ROOT/script/patch-php-cfg-match.py"; then
+        echo "Applied ${patch_name} (python fallback)"
+        return 0
+      fi
+      record_patch_failure "${patch_name}" "match lowering required for self-host spine"
+      return 1
+      ;;
+    php-cfg-strict-types.patch)
+      record_patch_failure "${patch_name}" "required for AOT (declare(strict_types))"
+      return 1
+      ;;
+    *)
+      if patch_marker_present "$patch"; then
+        echo "Skip ${patch_name} (already applied)"
+        return 0
+      fi
+      record_patch_failure "${patch_name}"
+      return 1
+      ;;
+  esac
 }
 
 apply_patch "$PATCH_DIR/php-llvm-chooser.patch"
@@ -459,4 +913,9 @@ fi
 if [[ -d "$ROOT/vendor/pre/plugin" ]]; then
   apply_patch "$PATCH_DIR/pre-plugin-parser-macros.patch"
   apply_patch "$PATCH_DIR/pre-plugin-autoload-prepend.patch"
+fi
+
+if ((${#APPLY_PATCH_FAILURES[@]} > 0)); then
+  echo "apply-patches: ${#APPLY_PATCH_FAILURES[@]} patch(es) failed: ${APPLY_PATCH_FAILURES[*]}" >&2
+  exit 1
 fi
