@@ -24,11 +24,24 @@ if (
 
 $autoloadEnv = getenv('PHP_COMPILER_VENDOR_AUTOLOAD');
 $skipVendor = getenv('PHP_COMPILER_CLI_SKIP_VENDOR');
+$selfhostAot = getenv('PHP_COMPILER_SELFHOST_AOT');
+$m3EmitTu = getenv('PHP_COMPILER_M3_EMIT_TU');
+$m3CompileDriver = getenv('PHP_COMPILER_M3_COMPILE_DRIVER');
+
+// Under self-host AOT / native-emit bootstrap modes, vendor autoload is out-of-scope and can drag in
+// unsupported vendor constructs. Default to skipping it unless explicitly overridden (issue #2640).
+if ('1' === $selfhostAot || 'true' === strtolower((string) $selfhostAot)) {
+    $inBootstrapCompilePath = ('1' === $m3EmitTu || 'true' === strtolower((string) $m3EmitTu))
+        || ('1' === $m3CompileDriver || 'true' === strtolower((string) $m3CompileDriver));
+    if ($inBootstrapCompilePath && ('0' !== $skipVendor && 'false' !== strtolower((string) $skipVendor))) {
+        $skipVendor = '1';
+    }
+}
 // Keep vendor out of literal include discovery for bootstrap AOT/self-host emit paths (issue #2640).
 if ('1' !== $skipVendor && 'true' !== strtolower((string) $skipVendor)) {
     // In JIT/AOT, include/require must use a compile-time literal path. If an override is provided,
     // fail fast with a clear message instead of producing non-compilable code.
-    if (('1' === getenv('PHP_COMPILER_SELFHOST_AOT') || 'true' === strtolower((string) getenv('PHP_COMPILER_SELFHOST_AOT')))
+    if (('1' === $selfhostAot || 'true' === strtolower((string) $selfhostAot))
         && is_string($autoloadEnv) && '' !== $autoloadEnv
     ) {
         fwrite(STDERR, "PHP_COMPILER_VENDOR_AUTOLOAD override is not supported under PHP_COMPILER_SELFHOST_AOT (must be a literal require).\n");
@@ -43,32 +56,38 @@ if ('1' !== $skipVendor && 'true' !== strtolower((string) $skipVendor)) {
     /** @psalm-suppress UnresolvableInclude */
     require __DIR__.'/../vendor/autoload.php';
 } else {
-    // Minimal project autoloader for self-host bootstrap paths where composer/vendor is out of scope (issue #2640).
-    // Intentionally does not attempt to load vendor namespaces (PHPCfg/PHPTypes/PhpParser/etc).
+    // Minimal project autoloader for self-host bootstrap paths where composer autoload can pull in
+    // unsupported vendor trees. We avoid `vendor/autoload.php` and instead resolve a small PSR-4
+    // subset that is required for bootstrap compile paths (issue #2640).
     if (!function_exists('php_compiler_cli_minimal_autoload')) {
         function php_compiler_cli_minimal_autoload(string $class): void
         {
-            $prefix = 'PHPCompiler\\';
-            if (!str_starts_with($class, $prefix)) {
-                return;
-            }
-            $rel = substr($class, strlen($prefix));
-            $relPath = str_replace('\\', '/', $rel).'.php';
+            /** @var array<string, string> $prefixMap */
+            static $prefixMap = [
+                // Extension modules (historical lowercase namespace).
+                'PHPCompiler\\ext\\' => __DIR__.'/../ext/',
+                'PHPCompiler\\' => __DIR__.'/../lib/',
+                'PHPCompiler\\Ext\\Standard\\' => __DIR__.'/../ext/standard/',
+                // Legacy global helper namespace used by VM data structures.
+                'php\\' => __DIR__.'/../php/',
+                // Vendor namespaces required by the compiler parse/type/JIT spine.
+                'PhpParser\\' => __DIR__.'/../vendor/nikic/php-parser/lib/PhpParser/',
+                'PHPCfg\\' => __DIR__.'/../vendor/ircmaxell/php-cfg/lib/PHPCfg/',
+                'PHPTypes\\' => __DIR__.'/../vendor/ircmaxell/php-types/lib/PHPTypes/',
+                'PHPLLVM\\' => __DIR__.'/../vendor/ircmaxell/php-llvm/lib/',
+            ];
 
-            $libPath = __DIR__.'/../lib/'.$relPath;
-            if (is_file($libPath)) {
-                /** @psalm-suppress UnresolvableInclude */
-                require $libPath;
-                return;
-            }
-
-            if (str_starts_with($rel, 'Ext\\Standard\\')) {
-                $extRel = substr($rel, strlen('Ext\\Standard\\'));
-                $extPath = __DIR__.'/../ext/standard/'.str_replace('\\', '/', $extRel).'.php';
-                if (is_file($extPath)) {
-                    /** @psalm-suppress UnresolvableInclude */
-                    require $extPath;
+            foreach ($prefixMap as $prefix => $baseDir) {
+                if (!str_starts_with($class, $prefix)) {
+                    continue;
                 }
+                $rel = substr($class, strlen($prefix));
+                $path = $baseDir.str_replace('\\', '/', $rel).'.php';
+                if (is_file($path)) {
+                    /** @psalm-suppress UnresolvableInclude */
+                    require $path;
+                }
+                return;
             }
         }
     }
