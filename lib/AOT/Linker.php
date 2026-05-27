@@ -97,9 +97,10 @@ final class Linker
     public static function link(string $objectFile, string $executable): void
     {
         $runtimeObjects = self::compileRuntimeObjects($objectFile);
+        $vendorObjects = self::resolvePrelinkedVendorObjects();
         $llvmDir = getenv('PHP_COMPILER_LLVM_PATH');
         if (false === $llvmDir || '' === $llvmDir) {
-            self::linkWithSystemCompiler($objectFile, $executable, $runtimeObjects);
+            self::linkWithSystemCompiler($objectFile, $executable, $runtimeObjects, $vendorObjects);
 
             return;
         }
@@ -120,6 +121,9 @@ final class Linker
             $objects = [escapeshellarg($objectFile)];
             foreach ($runtimeObjects as $runtimeObject) {
                 $objects[] = escapeshellarg($runtimeObject);
+            }
+            foreach ($vendorObjects as $vendorObject) {
+                $objects[] = escapeshellarg($vendorObject);
             }
             $cmd = implode(' ', [
                 escapeshellarg($ld),
@@ -150,6 +154,9 @@ final class Linker
             foreach ($runtimeObjects as $runtimeObject) {
                 $objects .= ' '.escapeshellarg($runtimeObject);
             }
+            foreach ($vendorObjects as $vendorObject) {
+                $objects .= ' '.escapeshellarg($vendorObject);
+            }
             $cmd = escapeshellarg($clang).' '.$objects.' -lm '.self::RUNTIME_LINK_LIBS.' -o '.escapeshellarg($executable);
             self::run($cmd, $env);
             self::unlinkIfTemp($runtimeObjects);
@@ -157,7 +164,7 @@ final class Linker
             return;
         }
 
-        self::linkWithSystemCompiler($objectFile, $executable, $runtimeObjects);
+        self::linkWithSystemCompiler($objectFile, $executable, $runtimeObjects, $vendorObjects);
     }
 
     /**
@@ -391,11 +398,13 @@ final class Linker
 
     /**
      * @param list<string> $runtimeObjects
+     * @param list<string> $vendorObjects
      */
     private static function linkWithSystemCompiler(
         string $objectFile,
         string $executable,
-        array $runtimeObjects = []
+        array $runtimeObjects = [],
+        array $vendorObjects = []
     ): void {
         $linkers = [
             'clang-9', 'clang', 'clang-17', 'clang-14', 'gcc', 'cc',
@@ -403,6 +412,9 @@ final class Linker
         $objects = escapeshellarg($objectFile);
         foreach ($runtimeObjects as $runtimeObject) {
             $objects .= ' '.escapeshellarg($runtimeObject);
+        }
+        foreach ($vendorObjects as $vendorObject) {
+            $objects .= ' '.escapeshellarg($vendorObject);
         }
         foreach ($linkers as $linker) {
             $path = self::which($linker);
@@ -422,6 +434,42 @@ final class Linker
         throw new \LogicException(
             'No supported linker found. Run script/install-llvm9.sh or install clang/gcc.'
         );
+    }
+
+    /**
+     * When vendor prelink is enabled, link precompiled vendor objects into the AOT binary
+     * so compiled code can run without a vendor/ tree on disk (M5 cold boot; #1416).
+     *
+     * @return list<string>
+     */
+    private static function resolvePrelinkedVendorObjects(): array
+    {
+        $flag = getenv('PHP_COMPILER_VENDOR_PRELINK');
+        if ('1' !== $flag && 'true' !== strtolower((string) $flag)) {
+            return [];
+        }
+
+        $root = self::projectRoot();
+        $paths = self::prelinkedVendorObjectPaths($root);
+        if ([] === $paths) {
+            return [];
+        }
+
+        $abs = [];
+        foreach ($paths as $rel) {
+            $p = $root.'/'.$rel;
+            if (is_file($p)) {
+                $abs[] = $p;
+            }
+        }
+
+        return $abs;
+    }
+
+    private static function projectRoot(): string
+    {
+        // lib/AOT/Linker.php → repo root
+        return dirname(__DIR__, 3);
     }
 
     private static function run(string $command, array $env): void
