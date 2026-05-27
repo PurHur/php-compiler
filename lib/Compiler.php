@@ -87,13 +87,15 @@ class Compiler {
     /** M3 emit TU: trivial single-block sources without full seen-map compile (#1937). */
     public function compileEmitSmoke(Script $script): ?Block
     {
-        // Production drivers (e.g. bin/compile.php) declare user functions; use full compile (#2633).
-        if ([] !== $script->functions) {
-            return $this->compile($script);
-        }
         $this->resetCompileAbortDetail();
+        // Inventory-scale sources (lib/Compiler.php, bin/compile.php) declare user functions but
+        // emit-smoke only needs {main} — same as compile() without a compile() callee (#2633, #2666).
+        if ([] !== $script->functions) {
+            $this->seen = new SplObjectStorage;
+        }
 
         $block = $this->compileCfgBlock($script->main->cfg, $script->main->params, $script->main);
+        $this->seen = null;
         if (null === $block && null !== $this->compileAbortDetail && '' !== $this->compileAbortDetail) {
             echo 'Compiler::compileEmitSmoke: '.$this->compileAbortDetail."\n";
         }

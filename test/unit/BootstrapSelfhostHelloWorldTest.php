@@ -392,6 +392,25 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertTrue(is_executable($out));
     }
 
+    public function testCompileEmitSmokeInlinesMainCompileForFunctionScripts(): void
+    {
+        $source = (string) file_get_contents(self::$root.'/lib/Compiler.php');
+        $this->assertStringContainsString('emit-smoke only needs {main}', $source);
+        $this->assertStringNotContainsString('return $this->compile($script);', $source);
+    }
+
+    public function testEmitTuInitDoesNotVoidStubInitParsePipeline(): void
+    {
+        $emit = (string) file_get_contents(self::$root.'/lib/JIT/BootstrapCompileSmokeM3Emit.php');
+        $this->assertStringNotContainsString("'initparsepipeline', 'initcompiler', 'loadcoremodules'", $emit);
+    }
+
+    public function testEmitTuEnsureEmitBridgeSpineSymbols(): void
+    {
+        $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
+        $this->assertStringContainsString('ensureM3EmitTuEmitBridgeSpineSymbols', $jit);
+    }
+
     public function testExternalJitClassRegistersIdToName(): void
     {
         $source = (string) file_get_contents(self::$root.'/lib/JIT/Builtin/Type/Object_.php');
