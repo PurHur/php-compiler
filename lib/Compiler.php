@@ -110,8 +110,8 @@ class Compiler {
     public function compileEmitSmoke(Script $script): ?Block
     {
         $this->resetCompileAbortDetail();
-        // Inventory-scale sources declare user functions and/or class-like units; emit-smoke only
-        // needs {main} — same as compile() without a compile() callee in the M3 emit TU (#2633, #2666).
+        // Inventory-scale sources declare user functions and/or class-like units; emit-smoke only needs {main}
+        // — same as compile() without a compile() callee in the M3 emit TU (#2633, #2666).
         if ([] !== $script->functions || $this->emitSmokeScriptHasClassLike($script)) {
             $this->seen = new SplObjectStorage;
         }
