@@ -4477,6 +4477,17 @@ class JIT {
                     assert($nameOp instanceof Operand\Literal);
                     $this->compileBlock($op->block1, $nameOp->value);
                     break;
+                case OpCode::TYPE_CLOSURE:
+                    // Bootstrap stub: closures are not executable yet; represent as null.
+                    $nullVar = new Variable(
+                        $this->context,
+                        Variable::TYPE_NULL,
+                        Variable::KIND_VALUE,
+                        $this->context->getTypeFromString('__value__*')->constNull()
+                    );
+                    $nullVar->isNullConstant = true;
+                    $this->assignOperandValue($block->getOperand($op->arg1), $nullVar);
+                    break;
                 case OpCode::TYPE_FUNCCALL_INIT:
                     $nameOp = $block->getOperand($op->arg1);
                     if ($nameOp instanceof Operand\Literal) {

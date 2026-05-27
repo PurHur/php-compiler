@@ -132,6 +132,16 @@ class OpCode {
     const TYPE_USE_TRAIT = 107;
     /** Suspend generator and expose value/key to foreach (issue #167). arg2=value slot, arg3=key slot. */
     const TYPE_YIELD = 108;
+    /**
+     * Closure literal (`function (...) { ... }`).
+     *
+     * Today this is a bootstrap-oriented stub: the compiler must be able to parse and compile vendor code
+     * that contains closures (e.g. php-llvm prelink), even when full closure runtime semantics are not yet
+     * implemented in VM/JIT/AOT.
+     *
+     * arg1 = destination scope slot (result).
+     */
+    const TYPE_CLOSURE = 109;
 
     public int $type;
     public ?int $arg1;
