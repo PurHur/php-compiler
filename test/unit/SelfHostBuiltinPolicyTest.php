@@ -45,6 +45,9 @@ final class SelfHostBuiltinPolicyTest extends TestCase
         $this->assertFalse(SelfHostBuiltinPolicy::shouldExternalStub('filter_var'));
         $this->assertFalse(SelfHostBuiltinPolicy::shouldExternalStub('hash'));
         $this->assertFalse(SelfHostBuiltinPolicy::shouldExternalStub('preg_match'));
+        $this->assertTrue(SelfHostBuiltinPolicy::isRequiredForBundle('shell_exec'));
+        $this->assertSame('process', SelfHostBuiltinPolicy::categoryFor('shell_exec'));
+        $this->assertFalse(SelfHostBuiltinPolicy::shouldExternalStub('shell_exec'));
     }
 
     public function testWave12ArrayOpsUseRealLoweringUnderSelfHostAot(): void
@@ -65,6 +68,7 @@ final class SelfHostBuiltinPolicyTest extends TestCase
             'putenv',
             'ini_set',
             'ini_get',
+            'shell_exec',
         ] as $fn) {
             $this->assertTrue(
                 SelfHostBuiltinPolicy::isRequiredForBundle($fn),
