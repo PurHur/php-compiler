@@ -135,9 +135,16 @@ function bootstrapVmPathPhpFiles(string $root): array
 {
     $entryFiles = [
         'bin/vm.php',
-        'src/cli.php',
         'src/tokenizer-compat.php',
         'src/yay-php8-compat.php',
+        // bootstrap spine uses shims to avoid unsupported lowering for entry scripts (#1467).
+        'test/bootstrap-aot/cli_spine_shim.php',
+        'test/bootstrap-aot/llvm_env_spine_shim.php',
+        'test/bootstrap-aot/macro_functions_spine_shim.php',
+    ];
+    $exclude = [
+        'src/cli.php',
+        'src/cli_driver.php',
         'src/llvm-env.php',
         'src/macro_functions.php',
     ];
@@ -157,6 +164,10 @@ function bootstrapVmPathPhpFiles(string $root): array
         $it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($base));
         foreach ($it as $file) {
             if ($file->isFile() && str_ends_with($file->getPathname(), '.php')) {
+                $rel = substr($file->getPathname(), strlen($root) + 1);
+                if (in_array($rel, $exclude, true)) {
+                    continue;
+                }
                 $files[$file->getPathname()] = true;
             }
         }
