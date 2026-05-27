@@ -130,6 +130,11 @@ if [[ "${BOOTSTRAP_VENDOR_PRELINK_GATE:-0}" == "1" ]]; then
   print_summary
 fi
 
+if [[ "${NATIVE_COMPILE_DRIVER_GATE:-0}" == "1" ]]; then
+  run_step "native-compile-driver-smoke" ./script/bootstrap-native-compile-driver-smoke.sh
+  print_summary
+fi
+
 for code in "${STEP_CODES[@]}"; do
   if [[ "${code}" -ne 0 && "${code}" -ne 2 ]]; then
     exit "${code}"
