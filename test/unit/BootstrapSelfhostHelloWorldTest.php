@@ -150,6 +150,7 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString('selfhost-helloworld-compile', $source);
         $this->assertStringContainsString('helloworld_compile_smoke:', $source);
         $this->assertStringContainsString('PHP_COMPILER_M3_COMPILE_MODE=compile', $source);
+        $this->assertStringContainsString('.m3_bin_compile_aot_blob', $source);
     }
 
     public function testCliDriverEmitProbeAndVmSidecarConstantsExist(): void
@@ -518,6 +519,117 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         }
         $this->assertSame(0, $runCode, $runOut);
         $this->assertStringContainsString('compile_smoke_m3_emit: compile OK', $runOut);
+        $this->assertFileExists($aotOut);
+        $this->assertGreaterThan(0, filesize($aotOut));
+    }
+
+    /** Issue #2827 / #2697: M5 bin/compile.php sidecar + native emit via compile_smoke_m3_emit TU. */
+    public function testM3EmitHelperNativeEmitBinCompilePhpViaSidecar(): void
+    {
+        if (!LlvmToolchain::isReady(self::$root)) {
+            $this->markTestSkipped('LLVM 9 not available for M3 bin/compile.php sidecar emit test.');
+        }
+
+        $entry = self::$root.'/test/bootstrap-aot/helloworld_m3_emit_native_entry.php';
+        $emitHelper = self::$root.'/build/selfhost-helloworld-emit-bin-compile-test';
+        $aotOut = self::$root.'/build/m3-bin-compile-aot-test';
+        $sidecar = self::$root.'/'.JIT\M3EmitTuTrivialEchoAot::BIN_COMPILE_SIDECAR_REL;
+        @unlink($emitHelper);
+        @unlink($aotOut);
+        @unlink($sidecar);
+
+        $prefix = LlvmToolchain::envPrefix(self::$root);
+        $linkCmd = implode(' ', array_map('escapeshellarg', [
+            ...$prefix,
+            'env',
+            'PHP_COMPILER_SELFHOST_AOT=1',
+            'PHP_COMPILER_M3_COMPILE_DRIVER=1',
+            'PHP_COMPILER_EMIT_HELPER_LINK=1',
+            'php',
+            self::$root.'/bin/compile.php',
+            '-o',
+            $emitHelper,
+            $entry,
+        ])).' 2>&1';
+        exec($linkCmd, $linkLines, $linkCode);
+        if (139 === $linkCode) {
+            $this->markTestSkipped('LLVM 9 segfault during M3 emit-helper link (#2442).');
+        }
+        $this->assertSame(0, $linkCode, implode("\n", $linkLines));
+        $this->assertFileExists($emitHelper);
+        $this->assertFileExists($sidecar, 'bin/compile.php sidecar must be registered at emit-helper link (#2827)');
+
+        $runCmd = implode(' ', array_map('escapeshellarg', [
+            ...$prefix,
+            'env',
+            'PHP_COMPILER_M3_EMIT_MINIMAL=1',
+            'PHP_COMPILER_M3_SOURCE='.self::$root.'/bin/compile.php',
+            'PHP_COMPILER_M3_OUT='.$aotOut,
+            $emitHelper,
+        ])).' 2>&1';
+        exec($runCmd, $runLines, $runCode);
+        $runOut = implode("\n", $runLines);
+        if (139 === $runCode) {
+            $this->markTestSkipped('LLVM 9 segfault during M3 bin/compile.php sidecar emit (#2540).');
+        }
+        $this->assertSame(0, $runCode, $runOut);
+        $this->assertStringContainsString('compile_smoke_m3_emit: compile OK', $runOut);
+        $this->assertFileExists($aotOut);
+        $this->assertGreaterThan(0, filesize($aotOut));
+    }
+
+    /** Issue #2827: M5 driver path uses helloworld_compile_smoke log prefix + compile_driver sidecars. */
+    public function testM3HelloWorldCompileDriverNativeEmitBinCompilePhp(): void
+    {
+        if (!LlvmToolchain::isReady(self::$root)) {
+            $this->markTestSkipped('LLVM 9 not available for M3 helloworld compile-driver bin/compile.php test.');
+        }
+
+        $entry = self::$root.'/test/bootstrap-aot/helloworld_compile_m3_emit_native_entry.php';
+        $compileDriver = self::$root.'/build/selfhost-helloworld-compile-bin-compile-test';
+        $aotOut = self::$root.'/build/m3-bin-compile-hw-driver-aot-test';
+        $sidecar = self::$root.'/'.JIT\M3EmitTuTrivialEchoAot::BIN_COMPILE_SIDECAR_REL;
+        @unlink($compileDriver);
+        @unlink($aotOut);
+        @unlink($sidecar);
+
+        $prefix = LlvmToolchain::envPrefix(self::$root);
+        $linkCmd = implode(' ', array_map('escapeshellarg', [
+            ...$prefix,
+            'env',
+            'PHP_COMPILER_SELFHOST_AOT=1',
+            'PHP_COMPILER_M3_COMPILE_DRIVER=1',
+            'PHP_COMPILER_EMIT_HELPER_LINK=1',
+            'php',
+            self::$root.'/bin/compile.php',
+            '-o',
+            $compileDriver,
+            $entry,
+        ])).' 2>&1';
+        exec($linkCmd, $linkLines, $linkCode);
+        if (139 === $linkCode) {
+            $this->markTestSkipped('LLVM 9 segfault during helloworld compile-driver link (#2442).');
+        }
+        $this->assertSame(0, $linkCode, implode("\n", $linkLines));
+        $this->assertFileExists($compileDriver);
+        $this->assertFileExists($sidecar, 'helloworld_compile_smoke link must register bin/compile.php sidecar (#2827)');
+
+        $runCmd = implode(' ', array_map('escapeshellarg', [
+            ...$prefix,
+            'env',
+            'PHP_COMPILER_M3_COMPILE_MODE=compile',
+            'PHP_COMPILER_M3_RUNTIME_COMPILE=1',
+            'PHP_COMPILER_M3_SOURCE='.self::$root.'/bin/compile.php',
+            'PHP_COMPILER_M3_OUT='.$aotOut,
+            $compileDriver,
+        ])).' 2>&1';
+        exec($runCmd, $runLines, $runCode);
+        $runOut = implode("\n", $runLines);
+        if (139 === $runCode) {
+            $this->markTestSkipped('LLVM 9 segfault during helloworld_compile_smoke bin/compile.php emit.');
+        }
+        $this->assertSame(0, $runCode, $runOut);
+        $this->assertStringContainsString('helloworld_compile_smoke: compile OK', $runOut);
         $this->assertFileExists($aotOut);
         $this->assertGreaterThan(0, filesize($aotOut));
     }
