@@ -36,6 +36,13 @@ ci_docker_acquire_single_ci_lock() {
   exec 200>"$lockfile"
   if flock -n 200; then
     printf '%s %s\n' "$$" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >"$lockfile"
+    # Best-effort hygiene: ensure an interrupted wrapper does not leave a confusing lock file behind.
+    # The actual lock is held by the file descriptor and is released automatically on process exit.
+    if [[ -z "${_CI_DOCKER_LOCK_TRAP_INSTALLED:-}" ]]; then
+      export _CI_DOCKER_LOCK_TRAP_INSTALLED=1
+      export _CI_DOCKER_LOCKFILE="$lockfile"
+      trap 'rm -f "${_CI_DOCKER_LOCKFILE:-}" 2>/dev/null || true' EXIT INT TERM
+    fi
     if [[ "${PHP_COMPILER_CI_VERBOSE:-0}" = "1" ]]; then
       echo "ci-docker-preflight: acquired CI lock (${lockfile})" >&2
     fi
@@ -50,7 +57,23 @@ ci_docker_acquire_single_ci_lock() {
   if [[ -n "$holder" ]]; then
     echo "ci-docker-preflight: lock holder: ${holder}" >&2
   fi
+  if command -v stat >/dev/null 2>&1; then
+    # GNU coreutils: stat -c %Y yields epoch seconds.
+    local mtime=""
+    mtime=$(stat -c %Y "$lockfile" 2>/dev/null || true)
+    if [[ -n "$mtime" ]] && [[ "$mtime" =~ ^[0-9]+$ ]]; then
+      local now=""
+      now=$(date +%s 2>/dev/null || true)
+      if [[ -n "$now" ]] && [[ "$now" =~ ^[0-9]+$ ]]; then
+        local age=$(( now - mtime ))
+        if (( age >= 0 )); then
+          echo "ci-docker-preflight: lock age: ${age}s" >&2
+        fi
+      fi
+    fi
+  fi
   echo "ci-docker-preflight: wait for the other run to finish, or stop its container, then retry" >&2
+  echo "ci-docker-preflight: safe cleanup (only if you're sure nothing is running): rm -f ${lockfile}" >&2
   echo "ci-docker-preflight: opt-out (not recommended): PHP_COMPILER_CI_SINGLE_CONTAINER=0" >&2
   exit 1
 }
