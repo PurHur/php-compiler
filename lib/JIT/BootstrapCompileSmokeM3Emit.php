@@ -346,7 +346,9 @@ final class BootstrapCompileSmokeM3Emit
 
   private static function isRuntimeVoidInitSpine(string $methodLc): bool
     {
-        return \in_array($methodLc, ['initparsepipeline', 'initcompiler', 'loadcoremodules'], true);
+        // initparsepipeline/initcompiler are real spine symbols (RuntimeEmitTuInit uses
+        // RuntimeInitCompiler for initcompiler; initparsepipeline is pre-lowered — #2666).
+        return 'loadcoremodules' === $methodLc;
     }
 
     private static function emitRuntimeVoidInitSpine(Context $context, string $logical, string $mangled): Value

@@ -2247,6 +2247,7 @@ class JIT {
             $this->runQueue();
             if ($emitTu && null !== $stubBlock) {
                 $this->ensureM3EmitTuRuntimeInitSpineSymbols($stubBlock);
+                $this->ensureM3EmitTuEmitBridgeSpineSymbols();
             }
             $this->compileM3EmitTuRuntimeParseAndCompileNativeDecl([
                 'parseandcompile' => true,
@@ -2379,6 +2380,22 @@ class JIT {
             );
         }
         $this->runQueue();
+    }
+
+    /** Ensure parse + Compiler::compileEmitSmoke exist before emit-bridge LLVM (#2666). */
+    private function ensureM3EmitTuEmitBridgeSpineSymbols(): void
+    {
+        if (!$this->shouldUseM3EmitTuNativeBridge() || !$this->shouldUseM3CompileDriverRealLowering()) {
+            return;
+        }
+        $parseLc = strtolower('PHPCompiler\\Runtime::parse');
+        if (!isset($this->context->functions[$parseLc])) {
+            $this->compileM3EmitTuRuntimeMethodFromModules('parse');
+        }
+        $compilerEmitLc = 'phpcompiler\\compiler::compileemitsmoke';
+        if (!isset($this->context->functions[$compilerEmitLc])) {
+            $this->compileM3EmitTuCompilerMethodFromRuntimeModules('compileemitsmoke');
+        }
     }
 
     /**

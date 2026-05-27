@@ -109,15 +109,15 @@ class Compiler {
     /** M3 emit TU: trivial single-block sources without full seen-map compile (#1937). */
     public function compileEmitSmoke(Script $script): ?Block
     {
-        // Production drivers (e.g. bin/compile.php) declare user functions; use full compile (#2633).
-        // Also treat class-like definitions as non-trivial: emitting method bodies and hoisting
-        // definitions relies on full compile setup on the self-host path (#2666).
-        if ([] !== $script->functions || $this->emitSmokeScriptHasClassLike($script)) {
-            return $this->compile($script);
-        }
         $this->resetCompileAbortDetail();
+        // Inventory-scale sources declare user functions and/or class-like units; emit-smoke only
+        // needs {main} — same as compile() without a compile() callee in the M3 emit TU (#2633, #2666).
+        if ([] !== $script->functions || $this->emitSmokeScriptHasClassLike($script)) {
+            $this->seen = new SplObjectStorage;
+        }
 
         $block = $this->compileCfgBlock($script->main->cfg, $script->main->params, $script->main);
+        $this->seen = null;
         if (null === $block && null !== $this->compileAbortDetail && '' !== $this->compileAbortDetail) {
             echo 'Compiler::compileEmitSmoke: '.$this->compileAbortDetail."\n";
         }
