@@ -78,6 +78,28 @@ class Runtime {
         $this->typeReconstructor = new TypeReconstructor;
     }
 
+    /**
+     * M5 vendor prelink compiles curated vendor bundles for cold boot. Some vendor doc-comments can
+     * contain junk type fragments that upstream PHPTypes rejects (issue #2751 / #2743).
+     *
+     * This is intentionally bootstrap-only: keep normal compilation strict.
+     */
+    private function shouldTolerateBootstrapTypeReconstructorErrors(): bool
+    {
+        $flag = getenv('PHP_COMPILER_VENDOR_PRELINK');
+
+        return '1' === $flag || 'true' === strtolower((string) $flag);
+    }
+
+    private function isBootstrapTolerableTypeReconstructorError(\Throwable $e): bool
+    {
+        if (!$e instanceof \RuntimeException) {
+            return false;
+        }
+
+        return str_starts_with($e->getMessage(), 'Unknown type declaration found:');
+    }
+
     /** Compiler instance; split from VMContext for M3 link (#1494). */
     private function initCompiler(): void {
         $this->compiler = new Compiler;
@@ -172,7 +194,30 @@ class Runtime {
         $script = $this->parser->parse($code, $filename);
         $this->preprocessor->traverse($script);
         $state = new State($script);
-        $this->typeReconstructor->resolve($state);
+        try {
+            $this->typeReconstructor->resolve($state);
+        } catch (\Throwable $e) {
+            if (
+                $this->shouldTolerateBootstrapTypeReconstructorErrors()
+                && $this->isBootstrapTolerableTypeReconstructorError($e)
+            ) {
+                static $warned = false;
+                if (!$warned) {
+                    $warned = true;
+                    $msg = sprintf(
+                        "bootstrap vendor prelink: suppressed PHPTypes type reconstruction error: %s\n",
+                        $e->getMessage()
+                    );
+                    if (\defined('STDERR') && \is_resource(STDERR)) {
+                        fwrite(STDERR, $msg);
+                    } else {
+                        error_log(rtrim($msg));
+                    }
+                }
+            } else {
+                throw $e;
+            }
+        }
         $this->postprocessor->traverse($script);
         $this->detector->detect($script);
         return $script;
