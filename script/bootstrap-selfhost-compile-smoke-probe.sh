@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # M3 compile-smoke self-host probe (issues #1056, #1492, #1937, #1983): link bundle, native or Zend emit, run natively.
 set -euo pipefail
+if [[ "${BOOTSTRAP_M3_COMPILE_SMOKE_STRICT:-0}" == "1" ]]; then
+  export BOOTSTRAP_M3_LINK_COMPILE_DRIVER="${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-1}"
+  export BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING="${BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING:-1}"
+  export BOOTSTRAP_M3_RUNTIME_COMPILE="${BOOTSTRAP_M3_RUNTIME_COMPILE:-1}"
+fi
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "${ROOT}"
 BUNDLE_ENTRY="${ROOT}/test/selfhost/compiler_compile_smoke/main.php"

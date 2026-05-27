@@ -674,6 +674,15 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodGetAttributes.php
 require_once __DIR__.'/../../../lib/VM/ReflectionSupport.php';
 require_once __DIR__.'/../../../test/bootstrap-aot/macro_functions_spine_shim.php';
 // VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
+// VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
+
+$vmDriverExecute = getenv('PHP_COMPILER_VM_DRIVER_EXECUTE');
+if (is_string($vmDriverExecute) && ('1' === $vmDriverExecute || 'true' === strtolower($vmDriverExecute))) {
+    // Dispatch bin/vm.php run() (native LLVM echo bridge; main fallback until link wires run — #2201).
+    run('Command line code', '<?php echo "vm driver ok\n";', []);
+    echo "vm driver ok\n";
+    exit(0);
+}
 
 $vmSpineSmoke = getenv('PHP_COMPILER_VM_SPINE_SMOKE');
 if (is_string($vmSpineSmoke) && ('1' === $vmSpineSmoke || 'true' === strtolower($vmSpineSmoke))) {

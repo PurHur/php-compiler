@@ -69,6 +69,7 @@ if ci_llvm_ready; then
   ci_run_bootstrap_aot_lint
   BOOTSTRAP_SELFHOST_PROBE_GATE="${BOOTSTRAP_SELFHOST_PROBE_GATE:-1}" ci_run_bootstrap_selfhost_probe
   ci_run_bootstrap_lib_spine_vm_smoke
+  ci_run_bootstrap_vm_driver_execute_probe
   ci_run_bootstrap_compiler_driver_smoke
   ci_run_bootstrap_compiler_unit_probe
   ci_run_bootstrap_jit_unit_probe

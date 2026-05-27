@@ -17,6 +17,7 @@ require_once __DIR__.'/JIT/RuntimeInitVmContext.php';
 require_once __DIR__.'/JIT/RuntimeInitCompiler.php';
 require_once __DIR__.'/JIT/M3EmitTuTrivialEchoAot.php';
 require_once __DIR__.'/JIT/VmSpineSmokeNative.php';
+require_once __DIR__.'/JIT/VmDriverExecuteNative.php';
 
 use PHPCfg\Operand;
 use PHPCfg\Op;
@@ -75,6 +76,18 @@ class JIT {
                 return;
             }
             $skipName = $this->jitFunctionSkipName($name, $func->block);
+            if (
+                $this->shouldUseSelfHostJitStubs()
+                && JIT\VmDriverExecuteNative::isBinVmRunName($skipName, $func->block)
+            ) {
+                $this->compileBinVmRunNative(
+                    $this->llvmInternalName($name),
+                    $func->block,
+                    $name
+                );
+
+                return;
+            }
             if (
                 $this->isSkippedVmHotPathName($skipName)
                 || $this->isSkippedCompilerHotPathName($skipName)
@@ -466,6 +479,13 @@ class JIT {
                     $logicalName
                 );
             }
+            if (JIT\VmDriverExecuteNative::isBinVmRunName($vmSpineLc, $block)) {
+                return $this->compileBinVmRunNative(
+                    $this->llvmInternalName($internalName),
+                    $block,
+                    $logicalName
+                );
+            }
         }
         if (
             $this->shouldUseSelfHostJitStubs()
@@ -617,6 +637,27 @@ class JIT {
         }
 
         return JIT\VmSpineSmokeNative::compileVmRunSmokeNative(
+            $this->context,
+            $internalName,
+            $logicalName,
+            $paramTypes
+        );
+    }
+
+    /** Native bin/vm.php run() for M2 VM driver execute gate (#2201). */
+    private function compileBinVmRunNative(
+        string $internalName,
+        Block $block,
+        string $logicalName
+    ): PHPLLVM\Value {
+        $paramTypes = [];
+        if (null !== $block->func) {
+            foreach ($block->func->params as $param) {
+                $paramTypes[] = $this->llvmTypeForCfgParam($param);
+            }
+        }
+
+        return JIT\VmDriverExecuteNative::compileBinVmRunNative(
             $this->context,
             $internalName,
             $logicalName,
