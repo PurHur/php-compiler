@@ -1251,7 +1251,8 @@ class JIT {
         if ($this->shouldUseM3EmitTuRuntimeMethodStub('initcompiler')) {
             return $this->emitM3EmitTuRuntimeInitVoidStub($internalName, $logicalName, $block);
         }
-        if ($this->shouldUseM3EmitTuNativeBridge()) {
+        // Emit TU and M3 compile_driver share C-floor initCompiler (#2568); PHP CFG LLVM 9 crash on ctor spine.
+        if ($this->shouldUseM3EmitTuNativeBridge() || $this->shouldUseM3CompileDriverRealLowering()) {
             $lcname = strtolower($logicalName);
             if (isset($this->context->functions[$lcname])) {
                 return $this->context->functions[$lcname];

@@ -168,6 +168,17 @@ final class BootstrapRuntimeCompileSmokeTest extends TestCase
         $this->assertStringContainsString("'PHPCompiler\\\\Runtime::'", $emit);
     }
 
+    /** M3 compile_driver must C-floor initCompiler, not only emit TU (#2568). */
+    public function testM3CompileDriverInitCompilerUsesRuntimeInitCompilerFloor(): void
+    {
+        $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
+        $this->assertStringContainsString(
+            'shouldUseM3EmitTuNativeBridge() || $this->shouldUseM3CompileDriverRealLowering()',
+            $jit
+        );
+        $this->assertStringContainsString('RuntimeInitCompiler::emit', $jit);
+    }
+
     public function testEmitTuModeDetectsHelperLinkEnv(): void
     {
         $source = (string) file_get_contents(self::$root.'/lib/JIT/EmitTuMode.php');
