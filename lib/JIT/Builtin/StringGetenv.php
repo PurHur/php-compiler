@@ -19,11 +19,12 @@ final class StringGetenv
 {
     public static function implement(Context $context): void
     {
+        $fn = $context->lookupFunction('__compiler_getenv');
+        // Standalone AOT links a C runtime implementation of __compiler_getenv; only declare it here.
         if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
             return;
         }
 
-        $fn = $context->lookupFunction('__compiler_getenv');
         $entry = $fn->appendBasicBlock('main');
         $context->builder->positionAtEnd($entry);
 
