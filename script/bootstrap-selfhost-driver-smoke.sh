@@ -14,7 +14,6 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 source "${ROOT}/script/php-env.sh"
 ci_apply_llvm_memory_env
 
-DRIVER="${ROOT}/build/selfhost-helloworld-compile"
 COMPILED_COMPILE="${ROOT}/build/bin-compile-aot"
 SOURCE="${ROOT}/test/bootstrap-aot/compiler_smoke_standalone.php"
 GEN2_OUT="${ROOT}/build/selfhost-driver-smoke-gen2"
@@ -41,18 +40,18 @@ if ! ./script/bootstrap-selfhost-helloworld-compile-bin.sh >/dev/null; then
   exit 1
 fi
 
-if [[ ! -x "${DRIVER}" ]]; then
-  echo "bootstrap-selfhost-driver-smoke: missing executable ${DRIVER}" >&2
+if [[ ! -x "${COMPILED_COMPILE}" ]]; then
+  echo "bootstrap-selfhost-driver-smoke: missing compiled bin/compile.php driver ${COMPILED_COMPILE}" >&2
   exit 1
 fi
 
 echo "bootstrap-selfhost-driver-smoke: stage 1 — native gen-2 compile (no Zend on compile)"
 set +e
 compile_out="$(
-  env PHP_COMPILER_M3_COMPILE_MODE=compile \
+  env -u PHP_COMPILER_M3_COMPILE_MODE \
     PHP_COMPILER_M3_SOURCE="${SOURCE}" \
     PHP_COMPILER_M3_OUT="${GEN2_OUT}" \
-    "${DRIVER}" 2>&1
+    "${COMPILED_COMPILE}" 2>&1
 )"
 compile_code=$?
 set -e
@@ -119,4 +118,4 @@ if [[ -x "${COMPILED_COMPILE}" ]]; then
 fi
 
 echo "bootstrap-selfhost-driver-smoke: emit_path=native (gen-2 compile + run)"
-echo "bootstrap-selfhost-driver-smoke: OK ${DRIVER} -> ${GEN2_OUT}"
+echo "bootstrap-selfhost-driver-smoke: OK ${COMPILED_COMPILE} -> ${GEN2_OUT}"
