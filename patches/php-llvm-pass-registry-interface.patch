@@ -1,0 +1,11 @@
+--- vendor/ircmaxell/php-llvm/lib/LLVMAbstract/PassRegistry.php
++++ vendor/ircmaxell/php-llvm/lib/LLVMAbstract/PassRegistry.php
+@@ -5,7 +5,7 @@
+ 
+ use llvm\LLVMPassRegistryRef;
+ 
+-class PassRegistry extends CorePassRegistry {
++class PassRegistry implements CorePassRegistry {
+ 
+     public LLVM $llvm;
+     public LLVMPassRegistryRef $passRegistry;

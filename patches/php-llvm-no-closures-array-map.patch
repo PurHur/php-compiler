@@ -20,26 +20,26 @@
              );
          }
          return $this->llvm->factory->type(
-@@ -119,14 +118,13 @@
-     }
- 
+@@ -121,14 +120,13 @@
      public function structType(bool $packed, CoreType ... $elements): CoreType {
-+        $elementTypes = [];
-+        foreach ($elements as $type) {
-+            $elementTypes[] = $type->type;
-+        }
-         $elementWrapper = $this->llvm->lib->makeArray(
-             LLVMTypeRef_ptr::class,
--            array_map(
--                function(Type $type) {
--                    return $type->type;
--                }, 
--                $elements
--            )
-+            $elementTypes
-         );
+         $elementWrapper = null;
+         if (count($elements) > 0) {
++            $elementTypes = [];
++            foreach ($elements as $type) {
++                $elementTypes[] = $type->type;
++            }
+             $elementWrapper = $this->llvm->lib->makeArray(
+                 LLVMTypeRef_ptr::class,
+-                array_map(
+-                    function(Type $type) {
+-                        return $type->type;
+-                    },
+-                    $elements
+-                )
++                $elementTypes
+             );
+         }
          return $this->llvm->factory->type(
-             $this,
 --- vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php
 +++ vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php
 @@ -84,14 +84,13 @@
@@ -142,3 +142,4 @@
          );
          $this->llvm->lib->LLVMStructSetBody(
              $this->type,
+

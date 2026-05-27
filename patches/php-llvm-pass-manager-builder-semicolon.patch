@@ -1,0 +1,8 @@
+--- vendor/ircmaxell/php-llvm/lib/LLVMAbstract/PassManagerBuilder.php
++++ vendor/ircmaxell/php-llvm/lib/LLVMAbstract/PassManagerBuilder.php
+@@ -13,4 +13,4 @@
+ use PHPLLVM\TargetMachine as CoreTargetMachine;
+ use PHPLLVM\PassManager as CorePassManager;
+-use PHPLLVM\PassManagerBuilder as CorePassManagerBuilder
++use PHPLLVM\PassManagerBuilder as CorePassManagerBuilder;
+ 
