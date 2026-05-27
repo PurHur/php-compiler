@@ -1,0 +1,144 @@
+--- vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Context.php
++++ vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Context.php
+@@ -96,14 +96,13 @@
+     public function functionType(CoreType $returnType, bool $isVarArgs, CoreType ... $parameters): CoreFunctionType {
+         $paramWrapper = null;
+         if (count($parameters) > 0) {
++            $paramTypes = [];
++            foreach ($parameters as $type) {
++                $paramTypes[] = $type->type;
++            }
+             $paramWrapper = $this->llvm->lib->makeArray(
+                 LLVMTypeRef_ptr::class,
+-                array_map(
+-                    function(Type $type) {
+-                        return $type->type;
+-                    },
+-                    $parameters
+-                )
++                $paramTypes
+             );
+         }
+         return $this->llvm->factory->type(
+@@ -119,14 +118,13 @@
+     }
+ 
+     public function structType(bool $packed, CoreType ... $elements): CoreType {
++        $elementTypes = [];
++        foreach ($elements as $type) {
++            $elementTypes[] = $type->type;
++        }
+         $elementWrapper = $this->llvm->lib->makeArray(
+             LLVMTypeRef_ptr::class,
+-            array_map(
+-                function(Type $type) {
+-                    return $type->type;
+-                }, 
+-                $elements
+-            )
++            $elementTypes
+         );
+         return $this->llvm->factory->type(
+             $this,
+--- vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php
++++ vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php
+@@ -84,14 +84,13 @@
+     }
+ 
+     public function returnAggregate(CoreValue ...$values): CoreValue {
++        $valueRefs = [];
++        foreach ($values as $value) {
++            $valueRefs[] = $value->value;
++        }
+         $valueWrapper = $this->llvm->lib->makeArray(
+             LLVMValueRef_ptr::class,
+-            array_map(
+-                function(Value $value) {
+-                    return $value->value;
+-                }, 
+-                $values
+-            )
++            $valueRefs
+         );
+         return $this->llvm->factory->value($this->context, $this->llvm->lib->LLVMBuildAggregateRet($this->builder, $valueWrapper, count($values)));
+     }
+@@ -277,27 +276,25 @@
+     }
+ 
+     public function gep(CoreValue $pointer, CoreValue ... $indices): CoreValue {
++        $indexRefs = [];
++        foreach ($indices as $value) {
++            $indexRefs[] = $value->value;
++        }
+         $valueWrapper = $this->llvm->lib->makeArray(
+             LLVMValueRef_ptr::class,
+-            array_map(
+-                function(Value $value) {
+-                    return $value->value;
+-                }, 
+-                $indices
+-            )
++            $indexRefs
+         );
+         return $this->llvm->factory->value($this->context, $this->llvm->lib->LLVMBuildGEP($this->builder, $pointer->value, $valueWrapper, count($indices), ''));
+     }
+ 
+     public function inBoundsGep(CoreValue $pointer, CoreValue ... $indices): CoreValue {
++        $indexRefs = [];
++        foreach ($indices as $value) {
++            $indexRefs[] = $value->value;
++        }
+         $valueWrapper = $this->llvm->lib->makeArray(
+             LLVMValueRef_ptr::class,
+-            array_map(
+-                function(Value $value) {
+-                    return $value->value;
+-                }, 
+-                $indices
+-            )
++            $indexRefs
+         );
+         return $this->llvm->factory->value($this->context, $this->llvm->lib->LLVMBuildInBoundsGEP($this->builder, $pointer->value, $valueWrapper, count($indices), ''));
+     }
+@@ -483,14 +480,13 @@
+     }
+ 
+     public function call(CoreValue\Function_ $function, CoreValue ... $args): CoreValue {
++        $argRefs = [];
++        foreach ($args as $value) {
++            $argRefs[] = $value->value;
++        }
+         $valueWrapper = $this->llvm->lib->makeArray(
+             LLVMValueRef_ptr::class,
+-            array_map(
+-                function(Value $value) {
+-                    return $value->value;
+-                }, 
+-                $args
+-            )
++            $argRefs
+         );
+         return $this->llvm->factory->value($this->context, $this->llvm->lib->LLVMBuildCall($this->builder, $function->value, $valueWrapper, count($args), ''));
+     }
+--- vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Type/Struct.php
++++ vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Type/Struct.php
+@@ -15,14 +15,13 @@
+     }
+ 
+     public function setBody(bool $packed, CoreType ... $elements): void {
++        $elementTypes = [];
++        foreach ($elements as $type) {
++            $elementTypes[] = $type->type;
++        }
+         $elementWrapper = $this->llvm->lib->makeArray(
+             LLVMTypeRef_ptr::class,
+-            array_map(
+-                function(Type $type) {
+-                    return $type->type;
+-                }, 
+-                $elements
+-            )
++            $elementTypes
+         );
+         $this->llvm->lib->LLVMStructSetBody(
+             $this->type,
