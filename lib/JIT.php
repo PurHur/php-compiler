@@ -215,6 +215,38 @@ class JIT {
         return '1' === $flag || 'true' === strtolower((string) $flag);
     }
 
+    /**
+     * M5 vendor prelink: AOT-compile literal-require vendor bundles without full class lowering (#1416).
+     * Set by script/bootstrap-vendor-objects.php during --compile only.
+     */
+    private function shouldUseVendorPrelinkJitStubs(): bool
+    {
+        $flag = getenv('PHP_COMPILER_VENDOR_PRELINK');
+
+        return '1' === $flag || 'true' === strtolower((string) $flag);
+    }
+
+    private function shouldSkipExternalClassBodyLowering(int $classId): bool
+    {
+        if ($this->shouldUseSelfHostJitStubs()
+            || $this->shouldUseEmitHelperLinkStubs()
+            || $this->shouldUseM3EmitTuNativeBridge()
+            || $this->shouldUseVendorPrelinkJitStubs()
+            || $this->isBundledSuperglobalsClass($classId)
+        ) {
+            return true;
+        }
+        $className = strtolower($this->context->type->object->classNameForId($classId));
+        if ('' === $className) {
+            return false;
+        }
+
+        return str_starts_with($className, 'phpcfg\\')
+            || str_starts_with($className, 'phptypes\\')
+            || str_starts_with($className, 'phpllvm\\')
+            || str_starts_with($className, 'nikic\\');
+    }
+
     /** Opt-in when linking test/selfhost compile_driver.php bundles (#1056, #1768). */
     private function shouldUseM3CompileDriverMainNative(): bool
     {
@@ -4969,7 +5001,9 @@ class JIT {
                             $attrNames
                         );
                     }
-                    if ($this->isBundledSuperglobalsClass($classId) && 'issuperglobalname' !== $methodLc) {
+                    if (($this->isBundledSuperglobalsClass($classId) || $this->shouldSkipExternalClassBodyLowering($classId))
+                        && 'issuperglobalname' !== $methodLc
+                    ) {
                         break;
                     }
                     $visFlags = \PHPCfg\Func::FLAG_PUBLIC;
@@ -4997,10 +5031,7 @@ class JIT {
                     $name = $block->getOperand($op->arg1);
                     assert($name instanceof Operand\Literal);
                     if (!isset($block->constants[$op->arg2])) {
-                        if ($this->shouldUseSelfHostJitStubs()
-                            || $this->shouldUseEmitHelperLinkStubs()
-                            || $this->isBundledSuperglobalsClass($classId)
-                        ) {
+                        if ($this->shouldSkipExternalClassBodyLowering($classId)) {
                             break;
                         }
                         throw new \LogicException('Class constant value must be a compile-time constant');
@@ -5012,11 +5043,7 @@ class JIT {
                     );
                     break;
                 default:
-                    if ($this->shouldUseSelfHostJitStubs()
-                        || $this->shouldUseEmitHelperLinkStubs()
-                        || $this->shouldUseM3EmitTuNativeBridge()
-                        || $this->isBundledSuperglobalsClass($classId)
-                    ) {
+                    if ($this->shouldSkipExternalClassBodyLowering($classId)) {
                         break;
                     }
                     throw new \LogicException('Other class body types are not jittable for now');
