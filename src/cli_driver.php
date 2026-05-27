@@ -21,7 +21,46 @@ if (
     return;
 }
 
-require __DIR__.'/../vendor/autoload.php';
+$autoload = getenv('PHP_COMPILER_VENDOR_AUTOLOAD');
+if (false === $autoload || '' === $autoload) {
+    $autoload = __DIR__.'/../vendor/autoload.php';
+}
+// Keep vendor out of literal include discovery for bootstrap AOT/self-host emit paths (issue #2640).
+if ('1' !== getenv('PHP_COMPILER_CLI_SKIP_VENDOR') && 'true' !== strtolower((string) getenv('PHP_COMPILER_CLI_SKIP_VENDOR'))) {
+    if (!is_file($autoload)) {
+        fwrite(STDERR, "Missing vendor autoload at {$autoload} (did you run composer install?)\n");
+        exit(1);
+    }
+    /** @psalm-suppress UnresolvableInclude */
+    require $autoload;
+} else {
+    // Minimal project autoloader for self-host bootstrap paths where composer/vendor is out of scope (issue #2640).
+    // Intentionally does not attempt to load vendor namespaces (PHPCfg/PHPTypes/PhpParser/etc).
+    spl_autoload_register(static function (string $class): void {
+        $prefix = 'PHPCompiler\\';
+        if (!str_starts_with($class, $prefix)) {
+            return;
+        }
+        $rel = substr($class, strlen($prefix));
+        $relPath = str_replace('\\', '/', $rel).'.php';
+
+        $libPath = __DIR__.'/../lib/'.$relPath;
+        if (is_file($libPath)) {
+            /** @psalm-suppress UnresolvableInclude */
+            require $libPath;
+            return;
+        }
+
+        if (str_starts_with($rel, 'Ext\\Standard\\')) {
+            $extRel = substr($rel, strlen('Ext\\Standard\\'));
+            $extPath = __DIR__.'/../ext/standard/'.str_replace('\\', '/', $extRel).'.php';
+            if (is_file($extPath)) {
+                /** @psalm-suppress UnresolvableInclude */
+                require $extPath;
+            }
+        }
+    });
+}
 
 $memoryLimit = getenv('PHP_COMPILER_MEMORY_LIMIT');
 if (false === $memoryLimit || '' === $memoryLimit) {
