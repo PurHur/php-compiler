@@ -191,7 +191,8 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertSame(0, $exitCode, implode("\n", $lines));
 
         $driver = self::$root.'/build/selfhost-helloworld-compile-driver';
-        $this->assertFileIsExecutable($driver);
+        $this->assertFileExists($driver);
+        $this->assertTrue(is_executable($driver), "Expected {$driver} to be executable");
         $runOut = shell_exec($driver);
         $this->assertIsString($runOut);
         $this->assertStringContainsString('compiler_helloworld_compile_driver ready', $runOut);

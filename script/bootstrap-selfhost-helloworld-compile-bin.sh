@@ -39,7 +39,8 @@ echo "bootstrap-selfhost-helloworld-compile-bin: link OK ${OUT}"
 
 set +e
 compile_out="$(
-  env PHP_COMPILER_M3_SOURCE="${SOURCE}" \
+  env PHP_COMPILER_M3_COMPILE_MODE=compile \
+    PHP_COMPILER_M3_SOURCE="${SOURCE}" \
     PHP_COMPILER_M3_OUT="${AOT_OUT}" \
     "${OUT}" 2>&1
 )"
