@@ -51,7 +51,9 @@ function helloworld_compile_smoke(string $sourceFile, string $outFile): int
     $runtime = new \PHPCompiler\Runtime(\PHPCompiler\Runtime::MODE_AOT);
     $block = $runtime->parseAndCompile($code, $resolved);
     if (null === $block) {
-        echo "helloworld_compile_smoke: parseAndCompile returned null (CFG/compile spine)\n";
+        $diag = $runtime->compiler->getCompileAbortDetail();
+        $extra = null !== $diag && '' !== $diag ? ' — '.$diag : '';
+        echo "helloworld_compile_smoke: parseAndCompile returned null (CFG/compile spine)".$extra."\n";
         echo "helloworld_compile_smoke: native emit failed at phase=parseAndCompile\n";
 
         return 1;

@@ -102,6 +102,12 @@ function run(string $filename, string $code, array $options): void
         $scriptFilename
     );
     $block = $runtime->parseAndCompile($code, $filename);
+    if (! isset($options['-l']) && null === $block) {
+        $diag = $runtime->compiler->getCompileAbortDetail();
+        $suffix = null !== $diag && '' !== $diag ? ' — '.$diag : '';
+        fwrite(STDERR, 'compile.php: parseAndCompile returned null for '.$filename.$suffix."\n");
+        exit(2);
+    }
     if (! isset($options['-l'])) {
         if (! isset($options['-o']) || $options['-o'] === true) {
             $options['-o'] = str_replace('.php', '', $filename);
