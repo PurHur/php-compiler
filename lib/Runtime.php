@@ -181,17 +181,66 @@ class Runtime {
     /**
      * Log the first CFG-level abort before rethrowing (issue #2642, self-host triage).
      */
-    private function emitParseCompileFailureStderr(string $sourcePath, \Throwable $e): void
+    private function emitParseCompileFailureStderr(string $sourcePath, \Throwable $e, ?string $sourceCode = null): void
     {
         $detail = $this->compiler->getCompileAbortDetail();
         $primary = null !== $detail && '' !== $detail ? $detail : $e->getMessage();
         $line = sprintf("parseAndCompile failure: target=%s: %s\n", $sourcePath, $primary);
+        $context = null;
+        if (null !== $sourceCode && $e instanceof \PhpParser\Error) {
+            $context = $this->formatPhpParserErrorContext($sourceCode, $e);
+        }
         if (\defined('STDERR') && \is_resource(STDERR)) {
             fwrite(STDERR, $line);
+            if (null !== $context && '' !== $context) {
+                fwrite(STDERR, $context);
+            }
 
             return;
         }
         error_log(rtrim($line));
+        if (null !== $context && '' !== $context) {
+            error_log(rtrim($context));
+        }
+    }
+
+    private function formatPhpParserErrorContext(string $sourceCode, \PhpParser\Error $e): ?string
+    {
+        // nikic/php-parser messages commonly end with "on line N". Provide a snippet plus
+        // best-effort mapping to the bundled file marker emitted by SourceBundler.
+        if (!preg_match('/\\bon line (\\d+)\\b/', $e->getMessage(), $m)) {
+            return null;
+        }
+        $lineNo = (int) $m[1];
+        if ($lineNo <= 0) {
+            return null;
+        }
+        $lines = preg_split('/\\r\\n|\\n|\\r/', $sourceCode) ?: [];
+        $idx = $lineNo - 1;
+        if (!isset($lines[$idx])) {
+            return null;
+        }
+
+        $marker = null;
+        for ($i = $idx; $i >= 0; --$i) {
+            if (\PHPCompiler\Web\SourceBundler::isBundleFileMarker($lines[$i])) {
+                $marker = trim($lines[$i]);
+                break;
+            }
+        }
+        $from = max(0, $idx - 4);
+        $to = min(count($lines) - 1, $idx + 4);
+        $out = "\n";
+        if (null !== $marker) {
+            $out .= "  bundle_context: {$marker}\n";
+        }
+        $out .= "  bundle_snippet:\n";
+        for ($i = $from; $i <= $to; ++$i) {
+            $prefix = ($i === $idx) ? '>' : ' ';
+            $out .= sprintf("  %s %6d | %s\n", $prefix, $i + 1, $lines[$i]);
+        }
+
+        return $out;
     }
 
     public function compile(Script $script): ?Block {
@@ -231,7 +280,7 @@ class Runtime {
 
             return $block;
         } catch (\Throwable $e) {
-            $this->emitParseCompileFailureStderr($filename, $e);
+            $this->emitParseCompileFailureStderr($filename, $e, $code);
             throw $e;
         }
     }
@@ -276,7 +325,7 @@ class Runtime {
 
             return $block;
         } catch (\Throwable $e) {
-            $this->emitParseCompileFailureStderr($filename, $e);
+            $this->emitParseCompileFailureStderr($filename, $e, $code);
             throw $e;
         }
     }
@@ -289,7 +338,8 @@ class Runtime {
                 $filename = $normalized;
             }
 
-            $script = $this->parse(file_get_contents($filename), $filename);
+            $code = (string) file_get_contents($filename);
+            $script = $this->parse($code, $filename);
             $block = $this->compile($script);
             if (null !== $block) {
                 $block->setScriptPath($filename);
@@ -299,7 +349,7 @@ class Runtime {
 
             return $block;
         } catch (\Throwable $e) {
-            $this->emitParseCompileFailureStderr($filename, $e);
+            $this->emitParseCompileFailureStderr($filename, $e, isset($code) ? $code : null);
             throw $e;
         }
     }

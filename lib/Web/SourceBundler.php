@@ -9,6 +9,8 @@ namespace PHPCompiler\Web;
  */
 final class SourceBundler
 {
+    private const BUNDLE_FILE_MARKER_PREFIX = 'PHPC_BUNDLE_FILE:';
+
     /**
      * @param list<string> $includePaths absolute paths, compiled before entry
      *
@@ -29,6 +31,7 @@ final class SourceBundler
             if (false === $raw) {
                 throw new \RuntimeException('cannot read include: '.$path);
             }
+            $parts[] = self::bundleFileMarker($path);
             $body = self::rewriteDeployPathIncludes(
                 self::rewriteDirConstant(
                     self::stripStrictTypesDeclare(self::stripOpenTag($raw)),
@@ -49,11 +52,24 @@ final class SourceBundler
         if ([] !== $includePaths) {
             $entryRaw = self::stripResolvedRequires($entryRaw, $includePaths);
         }
+        $parts[] = self::bundleFileMarker($entryPath);
         $parts[] = self::rewriteDeployPathIncludes(
             self::stripStrictTypesDeclare(self::stripOpenTag($entryRaw))
         );
 
         return ['<?php'."\n".implode("\n", $parts), $entryPath];
+    }
+
+    public static function isBundleFileMarker(string $line): bool
+    {
+        return str_contains($line, self::BUNDLE_FILE_MARKER_PREFIX);
+    }
+
+    private static function bundleFileMarker(string $absolutePath): string
+    {
+        // Keep this marker grep-friendly and stable: it is used to map parser errors back to the
+        // concatenated file in AOT bundles (bootstrap vendor prelink triage, issue #1416).
+        return sprintf("\n/* %s %s */\n", self::BUNDLE_FILE_MARKER_PREFIX, str_replace('*/', '* /', $absolutePath));
     }
 
     /**
