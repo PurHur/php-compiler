@@ -2609,6 +2609,11 @@ class JIT {
                 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerUnitProbeSentinelBlock'
             );
             $this->registerM3EmitTuSidecarFromPath(
+                __DIR__.'/../test/selfhost/jit_unit_probe/jit_unit_probe_compile.php',
+                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::JIT_UNIT_PROBE_SIDECAR_REL,
+                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::jitUnitProbeSentinelBlock'
+            );
+            $this->registerM3EmitTuSidecarFromPath(
                 __DIR__.'/../test/selfhost/compiler_helloworld_smoke/compile_driver.php',
                 \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILE_DRIVER_SIDECAR_REL,
                 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compileDriverSentinelBlock'

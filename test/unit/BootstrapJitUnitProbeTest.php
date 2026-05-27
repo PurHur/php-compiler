@@ -71,7 +71,85 @@ final class BootstrapJitUnitProbeTest extends TestCase
     {
         $makefile = (string) file_get_contents(self::$root.'/Makefile');
         $this->assertStringContainsString('bootstrap-selfhost-jit-unit-probe:', $makefile);
+        $this->assertStringContainsString('bootstrap-selfhost-jit-unit-probe-strict:', $makefile);
         $this->assertStringContainsString('bootstrap-selfhost-jit-unit-probe.sh', $makefile);
+    }
+
+    public function testJitUnitProbeScriptDocumentsEmitPathAndStrict(): void
+    {
+        $script = self::$root.'/script/bootstrap-selfhost-jit-unit-probe.sh';
+        $this->assertFileExists($script);
+        $source = (string) file_get_contents($script);
+        $this->assertStringContainsString('BOOTSTRAP_M3_JIT_UNIT_PROBE_STRICT=1', $source);
+        $this->assertStringContainsString('emit_path=', $source);
+        $this->assertStringContainsString('jit_unit_probe_m3_emit_native_entry.php', $source);
+        $this->assertStringContainsString('compile_smoke_m3_emit: compile OK', $source);
+        $this->assertStringContainsString('jit unit probe compile OK', $source);
+    }
+
+    public function testJitUnitProbeM3EmitNativeEntryExists(): void
+    {
+        $entry = self::$root.'/test/bootstrap-aot/jit_unit_probe_m3_emit_native_entry.php';
+        $this->assertFileExists($entry);
+        $source = (string) file_get_contents($entry);
+        $this->assertStringContainsString('compile_smoke_m3_emit', $source);
+        $this->assertStringContainsString('lib/JIT.php', $source);
+    }
+
+    public function testCompilePhpRecognizesJitUnitProbeM3EmitEntry(): void
+    {
+        $compile = (string) file_get_contents(self::$root.'/bin/compile.php');
+        $this->assertStringContainsString('jit_unit_probe_m3_emit_native_entry.php', $compile);
+        $this->assertStringContainsString('PHP_COMPILER_M3_JIT_UNIT_PROBE_EMIT', $compile);
+        $this->assertStringContainsString('PHP_COMPILER_EMIT_HELPER_LINK=1', $compile);
+        $this->assertStringContainsString('PHP_COMPILER_M3_EMIT_TU=1', $compile);
+    }
+
+    public function testJitCachesJitUnitProbeFixtureSidecar(): void
+    {
+        $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
+        $this->assertStringContainsString('jit_unit_probe_compile.php', $jit);
+        $this->assertStringContainsString('JIT_UNIT_PROBE_SIDECAR_REL', $jit);
+        $aot = (string) file_get_contents(self::$root.'/lib/JIT/M3EmitTuTrivialEchoAot.php');
+        $this->assertStringContainsString('JIT_UNIT_PROBE_SIDECAR_REL', $aot);
+    }
+
+    public function testJitUnitProbeFixtureLintPasses(): void
+    {
+        $fixture = self::$root.'/test/selfhost/jit_unit_probe/jit_unit_probe_compile.php';
+        $cmd = 'php '.escapeshellarg(self::$root.'/bin/compile.php').' -l '.escapeshellarg($fixture).' 2>&1';
+        exec($cmd, $lines, $exitCode);
+        $this->assertSame(0, $exitCode, implode("\n", $lines));
+    }
+
+    /**
+     * @group llvm
+     */
+    public function testJitUnitProbeStrictGreenWhenLlvmPresent(): void
+    {
+        if (!LlvmToolchain::isReady(self::$root)) {
+            $this->markTestSkipped('LLVM 9 not available for M3 JIT unit probe strict test.');
+        }
+
+        $script = self::$root.'/script/bootstrap-selfhost-jit-unit-probe.sh';
+        $prefix = LlvmToolchain::envPrefix(self::$root);
+        $cmd = implode(' ', array_map('escapeshellarg', [
+            ...$prefix,
+            'env',
+            'BOOTSTRAP_M3_JIT_UNIT_PROBE_STRICT=1',
+            'BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1',
+            'BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING=1',
+            'BOOTSTRAP_M3_RUNTIME_COMPILE=1',
+            'bash',
+            $script,
+        ])).' 2>&1';
+        exec($cmd, $lines, $exitCode);
+
+        $out = implode("\n", $lines);
+        $this->assertSame(0, $exitCode, $out);
+        $this->assertStringContainsString('emit_path=native', $out);
+        $this->assertStringContainsString('jit unit probe compile OK', $out);
+        $this->assertTrue(is_executable(self::$root.'/build/jit-unit-probe-aot'));
     }
 
     public function testCiDefaultsEnvDefinesJitUnitProbeGateDefaultOff(): void
