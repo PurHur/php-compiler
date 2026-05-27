@@ -1727,6 +1727,40 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('#2361', $docSelfhost);
     }
 
+    public function testCiDefaultsEnvDefinesVmUnitProbeGateDefaultOff(): void
+    {
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString(
+            'BOOTSTRAP_VM_UNIT_PROBE_GATE="${BOOTSTRAP_VM_UNIT_PROBE_GATE:-0}"',
+            $defaults
+        );
+        $this->assertStringContainsString('#2354', $defaults);
+        $this->assertStringContainsString('#2368', $defaults);
+    }
+
+    public function testCiLocalHonorsVmUnitProbeGate(): void
+    {
+        $local = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-local.sh');
+        $this->assertStringContainsString('ci_run_bootstrap_vm_unit_probe', $local);
+
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('BOOTSTRAP_VM_UNIT_PROBE_GATE', $common);
+        $this->assertStringContainsString('BOOTSTRAP_VM_UNIT_PROBE_GATE:-0', $common);
+        $this->assertStringContainsString('bootstrap-selfhost-vm-unit-probe.sh', $common);
+    }
+
+    public function testLocalCiMatrixDocumentsVmUnitProbeGate(): void
+    {
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('BOOTSTRAP_VM_UNIT_PROBE_GATE', $doc);
+        $this->assertStringContainsString('bootstrap-selfhost-vm-unit-probe.sh', $doc);
+        $this->assertStringContainsString('#2368', $doc);
+
+        $docSelfhost = (string) file_get_contents(dirname(__DIR__, 2).'/docs/bootstrap-selfhost.md');
+        $this->assertStringContainsString('vm_unit_probe bundle OK', $docSelfhost);
+        $this->assertStringContainsString('#2368', $docSelfhost);
+    }
+
     public function testCiDefaultsEnvDefinesParserUnitProbeGateDefaultOn(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
