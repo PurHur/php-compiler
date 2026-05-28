@@ -27,12 +27,13 @@ fi
 
 mkdir -p "${ROOT}/build"
 
-if [[ ! -x "${GEN2}" ]]; then
-  echo "bootstrap-selfhost-full-revision-probe: building gen-2 argv driver (driver smoke)" >&2
-  if ! BOOTSTRAP_M5_DRIVER_SMOKE=1 ./script/bootstrap-selfhost-driver-smoke.sh >/dev/null; then
-    echo "bootstrap-selfhost-full-revision-probe: driver smoke failed (need ${GEN2})" >&2
-    exit 1
-  fi
+echo "bootstrap-selfhost-full-revision-probe: building gen-2 argv driver (driver smoke)" >&2
+# Ensure GEN2 is the driver-smoke variant (not a compile_smoke_m3_emit helper) so this
+# probe can assert a non-smoke inventory path even when earlier M4 steps created a
+# different build/bin-compile-aot (#2900).
+if ! BOOTSTRAP_M5_DRIVER_SMOKE=1 ./script/bootstrap-selfhost-driver-smoke.sh >/dev/null; then
+  echo "bootstrap-selfhost-full-revision-probe: driver smoke failed (need ${GEN2})" >&2
+  exit 1
 fi
 
 if [[ ! -x "${GEN2}" ]]; then
