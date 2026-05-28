@@ -50,6 +50,16 @@ $check = in_array('--check', $argv, true);
 $jsonOut = in_array('--json', $argv, true);
 $outFile = $root.'/docs/bootstrap-inventory.md';
 
+if (!class_exists(\PhpParser\ParserFactory::class)) {
+    if ($check) {
+        fwrite(STDERR, "bootstrap-inventory: nikic/php-parser missing (vendor/ absent); skipping --check\n");
+        exit(0);
+    }
+    fwrite(STDERR, "bootstrap-inventory: nikic/php-parser missing (vendor/ absent); cannot regenerate {$outFile}\n");
+    fwrite(STDERR, "Hint: run via a dev env with vendor installed, or use docker scripts on a host with network access.\n");
+    exit(1);
+}
+
 $report = bootstrapCollectInventoryReport($root);
 
 if ($jsonOut) {
