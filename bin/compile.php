@@ -107,7 +107,9 @@ function run(string $filename, string $code, array $options): void
         $inventoryEmit = getenv('BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER') ?: getenv('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER');
         if ('1' === $inventoryEmit || 'true' === strtolower((string) $inventoryEmit)) {
             putenv('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1');
-            putenv('PHP_COMPILER_EMIT_HELPER_LINK=1');
+            // Runtime: do not force emit-helper TU/minimal mode here.
+            // The inventory driver is expected to compile arbitrary sources; forcing emit-helper
+            // mode can route Runtime::parseAndCompile through minimal sentinel stubs and recurse (#2967).
         }
     }
     if ('' !== $normalized && str_contains($normalized, 'jit_result_stub.php')) {

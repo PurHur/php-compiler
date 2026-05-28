@@ -380,14 +380,12 @@ final class BootstrapCompileSmokeM3Emit
         Value $code,
         Value $filename
     ): Value {
-        // Emit-helper must compile inventory-scale sources (bin/compile.php, lib/Compiler.php) for M5;
-        // the old emit-smoke subset is only valid for trivial fixtures.
-        return $context->builder->call(
-            self::runtimeSpine($context, 'parseandcompile', '__object__*', ['__object__*', '__string__*', '__string__*']),
-            $runtimeThis,
-            $code,
-            $filename
-        );
+        unset($runtimeThis, $code, $filename);
+
+        // Inventory-scale parseAndCompile lowering is not always available in emit-helper builds.
+        // If we try to call Runtime::parseandcompile here and it resolves to the same wrapper,
+        // we can recurse and segfault. Returning null cleanly signals "compile failed" to callers.
+        return $context->getTypeFromString('__object__*')->constNull();
     }
 
     /** Register native LLVM for Runtime::parseandcompile / parseandcompileemitsmoke (#2516). */
