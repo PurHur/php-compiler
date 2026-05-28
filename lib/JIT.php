@@ -67,7 +67,7 @@ class JIT {
             $this->m3EmitTuMainBlock = $block;
         }
         if ($this->shouldUseM4BinCompileArgvMainNative() && $this->isM4BinCompileScriptMain($block)) {
-            $this->m3EmitTuMainBlock = $block;
+            $this->m3CompileDriverMainBlock = $block;
         }
         if ($this->shouldUseM3CompileDriverMainNative() && $this->isM3CompileDriverBundleScriptMain($block)) {
             $path = $block->scriptPath();
@@ -282,6 +282,9 @@ class JIT {
         if (!$this->shouldUseM3CompileDriverRealLowering()) {
             return false;
         }
+        if ($this->shouldUseM4BinCompileArgvMainNative()) {
+            return true;
+        }
         $flag = getenv('PHP_COMPILER_M3_COMPILE_DRIVER_MAIN');
 
         return '1' === $flag || 'true' === strtolower((string) $flag);
@@ -294,6 +297,9 @@ class JIT {
     {
         if (!$this->shouldUseM3CompileDriverMainNative()) {
             return false;
+        }
+        if ($this->shouldUseM4BinCompileArgvMainNative()) {
+            return $this->shouldUseM3CompileDriverRealLowering();
         }
         foreach (['PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER', 'BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER'] as $envKey) {
             $flag = getenv($envKey);
@@ -605,7 +611,7 @@ class JIT {
             return $this->compileM3EmitTuMainNative($internalName, $block, $logicalName);
         }
         if ($this->shouldUseM4BinCompileArgvMainNative() && $this->isM4BinCompileScriptMain($block)) {
-            return $this->compileM3EmitTuMainNative($internalName, $block, $logicalName);
+            return $this->compileM3CompileDriverMainNative($internalName, $block, $logicalName);
         }
         if ($this->shouldUseM3EmitTuNativeBridge() && null !== $logicalName) {
             $m3EmitRuntime = strtolower($logicalName);
@@ -3062,10 +3068,20 @@ class JIT {
         $compileEnv['PHP_COMPILER_M3_EMIT_SIDECAR_RECURSION_GUARD'] = '1';
         $compileEnv['PHP_COMPILER_M3_EMIT_SIDECAR_DEPTH'] = (string) ($depth + 1);
         $compileEnv['PHP_COMPILER_M3_EMIT_SIDECAR_MAX_DEPTH'] = (string) $maxDepth;
-        if (str_ends_with($pathNorm, '/bin/compile.php') && !$this->shouldUseM3InventoryEmitDriver()) {
-            $compileEnv['PHP_COMPILER_EMIT_HELPER_LINK'] = '1';
-            $compileEnv['PHP_COMPILER_M3_EMIT_TU'] = '1';
-            $compileEnv['PHP_COMPILER_M3_EMIT_LOG_PREFIX'] = 'helloworld_compile_smoke';
+        if (str_ends_with($pathNorm, '/bin/compile.php')) {
+            if ($this->shouldUseM3InventoryEmitDriver() || $this->shouldUseM4BinCompileArgvMainNative()) {
+                $compileEnv['PHP_COMPILER_M3_COMPILE_DRIVER_MAIN'] = '1';
+                $compileEnv['PHP_COMPILER_M4_BIN_COMPILE_DRIVER'] = '1';
+                $compileEnv['PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER'] = '1';
+                $compileEnv['BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER'] = '1';
+                $compileEnv['PHP_COMPILER_EMIT_HELPER_LINK'] = '1';
+                $compileEnv['PHP_COMPILER_M3_EMIT_LOG_PREFIX'] = 'helloworld_compile_smoke';
+                unset($compileEnv['PHP_COMPILER_M3_EMIT_TU']);
+            } elseif (!$this->shouldUseM3InventoryEmitDriver()) {
+                $compileEnv['PHP_COMPILER_EMIT_HELPER_LINK'] = '1';
+                $compileEnv['PHP_COMPILER_M3_EMIT_TU'] = '1';
+                $compileEnv['PHP_COMPILER_M3_EMIT_LOG_PREFIX'] = 'helloworld_compile_smoke';
+            }
         }
         if ($sidecarHostStubNonLiteralIncludes) {
             $compileEnv['PHP_COMPILER_M3_SIDECAR_HOST'] = '1';

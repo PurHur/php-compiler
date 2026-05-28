@@ -59,6 +59,18 @@ function run(string $filename, string $code, array $options): void
             putenv('PHP_COMPILER_SELFHOST_AOT=1');
         }
     }
+    if ('' !== $normalized && str_ends_with($normalized, '/bin/compile.php') && !isset($options['-l'])) {
+        putenv('PHP_COMPILER_SELFHOST_AOT=1');
+        putenv('PHP_COMPILER_M3_COMPILE_DRIVER=1');
+        putenv('PHP_COMPILER_M3_COMPILE_DRIVER_MAIN=1');
+        putenv('PHP_COMPILER_M4_BIN_COMPILE_DRIVER=1');
+        putenv('PHP_COMPILER_EMIT_HELPER_LINK=1');
+        putenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX=helloworld_compile_smoke');
+        $inventoryEmit = getenv('BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER') ?: getenv('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER');
+        if ('0' !== $inventoryEmit && 'false' !== strtolower((string) $inventoryEmit)) {
+            putenv('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1');
+        }
+    }
     if ('' !== $normalized && str_contains($normalized, 'selfhost/') && str_contains($normalized, 'compile_driver.php') && !isset($options['-l'])) {
         putenv('PHP_COMPILER_SELFHOST_AOT=1');
         putenv('PHP_COMPILER_M3_COMPILE_DRIVER=1');

@@ -21,10 +21,19 @@ final class BootstrapSelfhostFullRevisionProbeTest extends TestCase
         $this->assertStringContainsString('bootstrap-selfhost-full-revision-probe:', $script);
         $this->assertStringContainsString('bin/compile.php', $script);
         $this->assertStringContainsString('bin-compile-aot', $script);
-        $this->assertStringContainsString('compiler_smoke_standalone.php', $script);
+        $this->assertStringContainsString('compiler_unit_probe_compile.php', $script);
         $this->assertStringContainsString('env -u PHP_COMPILER_M3_SOURCE -u PHP_COMPILER_M3_OUT', $script);
         $this->assertStringContainsString('emit_path=native', $script);
         $this->assertStringContainsString('#2880', $script);
+        $this->assertStringContainsString('compile_smoke_m3_emit:', $script);
+    }
+
+    public function testHelloworldCompileBinLinksInventoryBinCompile(): void
+    {
+        $script = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-helloworld-compile-bin.sh');
+        $this->assertStringContainsString('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1', $script);
+        $this->assertStringContainsString('bin/compile.php"', $script);
+        $this->assertStringContainsString('#2900', $script);
     }
 
     public function testMakefileExposesFullRevisionProbeTarget(): void
@@ -46,6 +55,8 @@ final class BootstrapSelfhostFullRevisionProbeTest extends TestCase
         $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
         $this->assertStringContainsString("'/bin/compile.php'))", $jit);
         $this->assertStringContainsString('PHP_COMPILER_M5_DRIVER_HOST', $jit);
-        $this->assertStringContainsString('#2880', $jit);
+        $this->assertStringContainsString('shouldUseM4BinCompileArgvMainNative', $jit);
+        $this->assertStringContainsString('compileM3CompileDriverMainNative', $jit);
+        $this->assertStringContainsString('#2900', $jit);
     }
 }
