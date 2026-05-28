@@ -16,7 +16,34 @@ declare(strict_types=1);
  */
 
 $root = dirname(__DIR__);
-require $root.'/vendor/autoload.php';
+// Inventory generation is used on harness hosts where `vendor/` may be absent.
+// Keep vendor autoload when present, but fall back to the repo's own PSR-4 roots.
+if (is_file($root.'/vendor/autoload.php')) {
+    require $root.'/vendor/autoload.php';
+} else {
+    if (is_file($root.'/src/macro_functions.php')) {
+        require $root.'/src/macro_functions.php';
+    }
+    spl_autoload_register(static function (string $class) use ($root): void {
+        $map = [
+            'PHPCompiler\\ext\\' => $root.'/ext/',
+            'PHPCompiler\\' => $root.'/lib/',
+            'php\\' => $root.'/php/',
+        ];
+        foreach ($map as $prefix => $dir) {
+            if (0 !== strpos($class, $prefix)) {
+                continue;
+            }
+            $rel = substr($class, strlen($prefix));
+            $path = $dir.str_replace('\\', '/', $rel).'.php';
+            if (is_file($path)) {
+                require $path;
+            }
+
+            return;
+        }
+    });
+}
 require __DIR__.'/bootstrap-lib.php';
 
 $check = in_array('--check', $argv, true);
