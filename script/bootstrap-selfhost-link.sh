@@ -43,8 +43,8 @@ fi
 
 mkdir -p "${ROOT}/build"
 
-if [[ "${BOOTSTRAP_GEN0_ENSURE_COMPILED_DRIVER:-0}" == "1" && ! -x "${ROOT}/build/bin-compile-aot" ]]; then
-  echo "bootstrap-selfhost-link: building gen-0 driver (BOOTSTRAP_GEN0_ENSURE_COMPILED_DRIVER=1, #2894)" >&2
+if [[ "${BOOTSTRAP_GEN0_ENSURE_COMPILED_DRIVER:-1}" == "1" && ! -x "${ROOT}/build/bin-compile-aot" ]]; then
+  echo "bootstrap-selfhost-link: building gen-0 compiled driver (BOOTSTRAP_GEN0_ENSURE_COMPILED_DRIVER=1, #2894)" >&2
   if ! BOOTSTRAP_M5_DRIVER_SMOKE=1 "${ROOT}/script/bootstrap-selfhost-driver-smoke.sh" >/dev/null; then
     echo "bootstrap-selfhost-link: bootstrap-selfhost-driver-smoke failed (#2894)" >&2
     exit 1
