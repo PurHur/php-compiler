@@ -63,7 +63,8 @@ function run(string $filename, string $code, array $options): void
         putenv('PHP_COMPILER_SELFHOST_AOT=1');
         putenv('PHP_COMPILER_M3_COMPILE_DRIVER=1');
         putenv('PHP_COMPILER_M3_COMPILE_DRIVER_MAIN=1');
-        if (str_contains($normalized, 'compiler_helloworld_smoke/compile_driver.php')) {
+        if (str_contains($normalized, 'compiler_helloworld_smoke/compile_driver.php')
+            || str_contains($normalized, 'bootstrap_loop_smoke/compile_driver.php')) {
             putenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX=helloworld_compile_smoke');
         } elseif (str_contains($normalized, 'runtime_compile_smoke/compile_driver.php')) {
             putenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX=runtime_compile_smoke_m3_emit');

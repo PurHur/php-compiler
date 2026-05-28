@@ -88,18 +88,21 @@ final class BootstrapBootstrapLoopProbeTest extends TestCase
         $this->assertStringContainsString('PHP_COMPILER_M4_COMPILE_MODE', $driver);
         $this->assertStringContainsString('PHP_COMPILER_M4_SOURCE', $driver);
         $this->assertStringContainsString('compiler_helloworld_smoke/compile_driver.php', $driver);
+        $this->assertStringNotContainsString('bootstrap_loop_compile_driver ready', $driver);
     }
 
-    public function testBootstrapLoopGen1LinkUsesM3EmitTu(): void
+    public function testBootstrapLoopGen1LinkDefaultsInventoryEmitDriver(): void
     {
         $script = (string) file_get_contents(self::$root.'/script/bootstrap-loop-gen1-link.sh');
         $this->assertStringContainsString('cd "${ROOT}"', $script);
+        $this->assertStringContainsString('BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER:-1', $script);
+        $this->assertStringContainsString('BOOTSTRAP_M3_EMIT_HELPER_TU', $script);
+        $this->assertStringContainsString('compiler_helloworld_smoke/compile_driver.php', $script);
+        $this->assertStringContainsString('inventory compile_driver (helloworld compile_driver', $script);
         $this->assertStringContainsString('compile_smoke_m3_emit_native_entry.php', $script);
         $this->assertStringContainsString('compile_smoke_m3_emit: compile OK', $script);
         $this->assertStringContainsString('PHP_COMPILER_M3_EMIT_MINIMAL=1', $script);
-        $this->assertStringContainsString('php bin/compile.php -o "${EMIT_HELPER}"', $script);
-        $this->assertStringContainsString('m4_emit_entry="${EMIT_ENTRY}"', $script);
-        $this->assertStringNotContainsString('bootstrap_loop_smoke/compile_driver.php" 2>&1', $script);
+        $this->assertStringContainsString('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1', $script);
         $this->assertStringContainsString('==> link gen-1 emit helper', $script);
         $this->assertStringContainsString('==> link gen-1 (bootstrap_loop_smoke bundle)', $script);
         $emitPos = strpos($script, '==> link gen-1 emit helper');

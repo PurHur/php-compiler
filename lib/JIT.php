@@ -67,7 +67,11 @@ class JIT {
             $this->m3EmitTuMainBlock = $block;
         }
         if ($this->shouldUseM3CompileDriverMainNative() && $this->isM3CompileDriverBundleScriptMain($block)) {
-            $this->m3CompileDriverMainBlock = $block;
+            $path = $block->scriptPath();
+            // bootstrap_loop_smoke/compile_driver.php delegates to helloworld; use that {main} (#2893).
+            if (!str_contains($path, 'bootstrap_loop_smoke/compile_driver.php')) {
+                $this->m3CompileDriverMainBlock = $block;
+            }
         }
         JIT\Progress::noteFunction('jit_compile_compile_block_begin');
         $return = $this->compileBlock($block);
