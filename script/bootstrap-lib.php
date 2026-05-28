@@ -6,11 +6,6 @@ declare(strict_types=1);
  * Shared bootstrap self-host helpers (issue #212).
  */
 
-use PhpParser\Node;
-use PhpParser\NodeTraverser;
-use PhpParser\NodeVisitorAbstract;
-use PhpParser\ParserFactory;
-
 /** Language constructs excluded from the bootstrap AOT subset until lowered. */
 const BOOTSTRAP_UNSUPPORTED_CONSTRUCTS = [
     'generator yield',
@@ -20,62 +15,68 @@ const BOOTSTRAP_UNSUPPORTED_CONSTRUCTS = [
     'passthru()',
 ];
 
-final class BootstrapConstructVisitor extends NodeVisitorAbstract
-{
-    /** @var list<string> */
-    public array $blockers = [];
-
-    /** @var list<string> */
-    public array $warnings = [];
-
-    private int $classMethodCount = 0;
-
-    private int $closureCount = 0;
-
-    public function enterNode(Node $node)
+/**
+ * The inventory scanner prefers nikic/php-parser, but some harness runs intentionally operate
+ * without a full `vendor/` tree. Define the PhpParser visitor only when the classes exist.
+ */
+if (class_exists(\PhpParser\NodeVisitorAbstract::class)) {
+    final class BootstrapConstructVisitor extends \PhpParser\NodeVisitorAbstract
     {
-        if ($node instanceof Node\Expr\Yield_ || $node instanceof Node\Expr\YieldFrom) {
-            $this->blockers[] = 'generator yield (line '.$node->getLine().')';
-        } elseif ($node instanceof Node\Stmt\ClassMethod && $node->name->toString() !== '__construct') {
-            ++$this->classMethodCount;
-        } elseif ($node instanceof Node\Stmt\Enum_) {
-            $this->blockers[] = 'enum (line '.$node->getLine().')';
-        } elseif ($node instanceof Node\Stmt\Trait_) {
-            $this->warnings[] = 'trait '.$node->name.' (line '.$node->getLine().')';
-        } elseif ($node instanceof Node\Expr\Closure || $node instanceof Node\Expr\ArrowFunction) {
-            ++$this->closureCount;
-        } elseif ($node instanceof Node\Expr\New_ && $node->class instanceof Node\Name) {
-            $name = $node->class->toString();
-            if (!str_starts_with($name, 'PHPCompiler\\')
-                && !str_starts_with($name, 'PHPCfg\\')
-                && !str_starts_with($name, 'PHPTypes\\')
-                && !str_starts_with($name, 'PhpParser\\')
-                && !str_starts_with($name, 'PHPLLVM\\')
-                && !in_array($name, ['LogicException', 'RuntimeException', 'InvalidArgumentException', 'TypeError', 'ValueError', 'ReflectionClass', 'SplObjectStorage'], true)
-            ) {
-                $this->warnings[] = 'new '.$name.' (line '.$node->getLine().')';
-            }
-        } elseif ($node instanceof Node\Expr\FuncCall && $node->name instanceof Node\Name) {
-            $fn = $node->name->toString();
-            if (in_array($fn, ['eval', 'create_function', 'passthru'], true)) {
-                $this->blockers[] = $fn.'() (line '.$node->getLine().')';
+        /** @var list<string> */
+        public array $blockers = [];
+
+        /** @var list<string> */
+        public array $warnings = [];
+
+        private int $classMethodCount = 0;
+
+        private int $closureCount = 0;
+
+        public function enterNode(\PhpParser\Node $node)
+        {
+            if ($node instanceof \PhpParser\Node\Expr\Yield_ || $node instanceof \PhpParser\Node\Expr\YieldFrom) {
+                $this->blockers[] = 'generator yield (line '.$node->getLine().')';
+            } elseif ($node instanceof \PhpParser\Node\Stmt\ClassMethod && $node->name->toString() !== '__construct') {
+                ++$this->classMethodCount;
+            } elseif ($node instanceof \PhpParser\Node\Stmt\Enum_) {
+                $this->blockers[] = 'enum (line '.$node->getLine().')';
+            } elseif ($node instanceof \PhpParser\Node\Stmt\Trait_) {
+                $this->warnings[] = 'trait '.$node->name.' (line '.$node->getLine().')';
+            } elseif ($node instanceof \PhpParser\Node\Expr\Closure || $node instanceof \PhpParser\Node\Expr\ArrowFunction) {
+                ++$this->closureCount;
+            } elseif ($node instanceof \PhpParser\Node\Expr\New_ && $node->class instanceof \PhpParser\Node\Name) {
+                $name = $node->class->toString();
+                if (!str_starts_with($name, 'PHPCompiler\\')
+                    && !str_starts_with($name, 'PHPCfg\\')
+                    && !str_starts_with($name, 'PHPTypes\\')
+                    && !str_starts_with($name, 'PhpParser\\')
+                    && !str_starts_with($name, 'PHPLLVM\\')
+                    && !in_array($name, ['LogicException', 'RuntimeException', 'InvalidArgumentException', 'TypeError', 'ValueError', 'ReflectionClass', 'SplObjectStorage'], true)
+                ) {
+                    $this->warnings[] = 'new '.$name.' (line '.$node->getLine().')';
+                }
+            } elseif ($node instanceof \PhpParser\Node\Expr\FuncCall && $node->name instanceof \PhpParser\Node\Name) {
+                $fn = $node->name->toString();
+                if (in_array($fn, ['eval', 'create_function', 'passthru'], true)) {
+                    $this->blockers[] = $fn.'() (line '.$node->getLine().')';
+                }
             }
         }
-    }
 
-    public function beforeTraverse(array $nodes)
-    {
-        $this->classMethodCount = 0;
-        $this->closureCount = 0;
-    }
-
-    public function afterTraverse(array $nodes)
-    {
-        if ($this->classMethodCount > 0) {
-            $this->warnings[] = $this->classMethodCount.' class method(s) — PHPCfg Op\\Stmt\\ClassMethod not lowered in Compiler';
+        public function beforeTraverse(array $nodes)
+        {
+            $this->classMethodCount = 0;
+            $this->closureCount = 0;
         }
-        if ($this->closureCount > 0) {
-            $this->warnings[] = $this->closureCount.' closure(s)';
+
+        public function afterTraverse(array $nodes)
+        {
+            if ($this->classMethodCount > 0) {
+                $this->warnings[] = $this->classMethodCount.' class method(s) — PHPCfg Op\\Stmt\\ClassMethod not lowered in Compiler';
+            }
+            if ($this->closureCount > 0) {
+                $this->warnings[] = $this->closureCount.' closure(s)';
+            }
         }
     }
 }
@@ -103,28 +104,149 @@ function bootstrapExtractCompilerBlockers(string $compilerFile): array
  */
 function bootstrapScanConstructs(string $file): array
 {
-    $parser = (new ParserFactory())->create(ParserFactory::PREFER_PHP7);
     $code = (string) file_get_contents($file);
-    try {
-        $ast = $parser->parse($code);
-    } catch (Throwable $e) {
+    if (class_exists(\PhpParser\ParserFactory::class) && class_exists(BootstrapConstructVisitor::class)) {
+        $parser = (new \PhpParser\ParserFactory())->create(\PhpParser\ParserFactory::PREFER_PHP7);
+        try {
+            $ast = $parser->parse($code);
+        } catch (Throwable $e) {
+            return [
+                'blockers' => ['parse error: '.$e->getMessage()],
+                'warnings' => [],
+            ];
+        }
+        if (!is_array($ast)) {
+            return ['blockers' => [], 'warnings' => []];
+        }
+
+        $visitor = new BootstrapConstructVisitor();
+        $traverser = new \PhpParser\NodeTraverser();
+        $traverser->addVisitor($visitor);
+        $traverser->traverse($ast);
+
         return [
-            'blockers' => ['parse error: '.$e->getMessage()],
-            'warnings' => [],
+            'blockers' => $visitor->blockers,
+            'warnings' => $visitor->warnings,
         ];
     }
-    if (!is_array($ast)) {
-        return ['blockers' => [], 'warnings' => []];
+
+    return bootstrapScanConstructsToken($code);
+}
+
+/**
+ * Token-based fallback for harness runs without nikic/php-parser.
+ *
+ * @return array{blockers: list<string>, warnings: list<string>}
+ */
+function bootstrapScanConstructsToken(string $code): array
+{
+    $tokens = token_get_all($code);
+    $blockers = [];
+    $warnings = [];
+
+    $classMethodCount = 0;
+    $closureCount = 0;
+    $inClass = 0;
+
+    $count = count($tokens);
+    for ($i = 0; $i < $count; ++$i) {
+        $t = $tokens[$i];
+
+        if (!is_array($t)) {
+            if ('{' === $t) {
+                if ($inClass > 0) {
+                    ++$inClass;
+                }
+            } elseif ('}' === $t) {
+                if ($inClass > 0) {
+                    --$inClass;
+                }
+            }
+            continue;
+        }
+
+        [$id, $text, $line] = $t;
+
+        if (T_YIELD === $id || (defined('T_YIELD_FROM') && T_YIELD_FROM === $id)) {
+            $blockers[] = 'generator yield (line '.$line.')';
+            continue;
+        }
+
+        if (defined('T_ENUM') && T_ENUM === $id) {
+            $blockers[] = 'enum (line '.$line.')';
+            continue;
+        }
+
+        if (T_TRAIT === $id) {
+            $warnings[] = 'trait (line '.$line.')';
+            continue;
+        }
+
+        if (T_CLASS === $id || (defined('T_INTERFACE') && T_INTERFACE === $id)) {
+            $inClass = max(1, $inClass);
+            continue;
+        }
+
+        if (T_FUNCTION === $id) {
+            $j = $i + 1;
+            while ($j < $count) {
+                $n = $tokens[$j];
+                if (is_array($n) && in_array($n[0], [T_WHITESPACE, T_COMMENT, T_DOC_COMMENT], true)) {
+                    ++$j;
+                    continue;
+                }
+                if ('&' === $n) {
+                    ++$j;
+                    continue;
+                }
+                if ('(' === $n) {
+                    ++$closureCount;
+                } elseif (is_array($n) && T_STRING === $n[0]) {
+                    $name = $n[1];
+                    if ($inClass > 0 && '__construct' !== strtolower($name)) {
+                        ++$classMethodCount;
+                    }
+                }
+                break;
+            }
+            continue;
+        }
+
+        if (defined('T_FN') && T_FN === $id) {
+            ++$closureCount;
+            continue;
+        }
+
+        if (T_STRING === $id) {
+            $lower = strtolower($text);
+            if (in_array($lower, ['eval', 'create_function', 'passthru'], true)) {
+                $j = $i + 1;
+                while ($j < $count) {
+                    $n = $tokens[$j];
+                    if (is_array($n) && in_array($n[0], [T_WHITESPACE, T_COMMENT, T_DOC_COMMENT], true)) {
+                        ++$j;
+                        continue;
+                    }
+                    if ('(' === $n) {
+                        $blockers[] = $lower.'() (line '.$line.')';
+                    }
+                    break;
+                }
+            }
+            continue;
+        }
     }
 
-    $visitor = new BootstrapConstructVisitor();
-    $traverser = new NodeTraverser();
-    $traverser->addVisitor($visitor);
-    $traverser->traverse($ast);
+    if ($classMethodCount > 0) {
+        $warnings[] = $classMethodCount.' class method(s) — PHPCfg Op\\Stmt\\ClassMethod not lowered in Compiler';
+    }
+    if ($closureCount > 0) {
+        $warnings[] = $closureCount.' closure(s)';
+    }
 
     return [
-        'blockers' => $visitor->blockers,
-        'warnings' => $visitor->warnings,
+        'blockers' => array_values(array_unique($blockers)),
+        'warnings' => array_values(array_unique($warnings)),
     ];
 }
 
