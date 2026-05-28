@@ -40,7 +40,15 @@ fi
 
 EMIT_ENTRY="${ROOT}/test/bootstrap-aot/runtime_m3_emit_native_entry.php"
 INVENTORY_EMIT_DRIVER="${ROOT}/test/selfhost/runtime_compile_smoke/compile_driver.php"
-USE_INVENTORY_EMIT_DRIVER="${BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER:-0}"
+default_inventory_emit_driver=0
+if [[ "${BOOTSTRAP_M3_RUNTIME_COMPILE_SMOKE_STRICT:-0}" == "1" ]]; then
+  default_inventory_emit_driver=1
+fi
+if [[ -n "${BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER+x}" ]]; then
+  USE_INVENTORY_EMIT_DRIVER="${BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER}"
+else
+  USE_INVENTORY_EMIT_DRIVER="${default_inventory_emit_driver}"
+fi
 if [[ ! -f "${EMIT_ENTRY}" ]]; then
   echo "bootstrap-selfhost-runtime-compile-smoke: missing ${EMIT_ENTRY}" >&2
   exit 1
