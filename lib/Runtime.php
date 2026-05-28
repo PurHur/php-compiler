@@ -369,6 +369,8 @@ class Runtime {
     public function parseAndCompile(string $code, string $filename): ?Block {
         $this->compiler->resetCompileAbortDetail();
         $this->compiler->setDebugLastPhaseInputFile($filename);
+        \PHPCompiler\JIT\Progress::notePhase('runtime_parseandcompile_begin');
+        \PHPCompiler\JIT\Progress::noteEntry($filename);
         try {
             $script = $this->parse($code, $filename);
             $block = $this->compile($script);
@@ -393,6 +395,8 @@ class Runtime {
                 $filename = $normalized;
             }
             $this->compiler->setDebugLastPhaseInputFile($filename);
+            \PHPCompiler\JIT\Progress::notePhase('runtime_parseandcompilefile_begin');
+            \PHPCompiler\JIT\Progress::noteEntry($filename);
 
             \PHPCompiler\JIT\Progress::noteFunction('runtime_parseandcompilefile_read_begin');
             $code = (string) file_get_contents($filename);

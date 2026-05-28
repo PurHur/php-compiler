@@ -18,6 +18,19 @@ use PHPCompiler\Web\Superglobals;
 function run(string $filename, string $code, array $options): void
 {
     $normalized = '-' !== $filename ? str_replace('\\', '/', $filename) : '';
+    if (\class_exists(\PHPCompiler\JIT\Progress::class, false)) {
+        \PHPCompiler\JIT\Progress::notePhase('bin_compile_run_begin');
+        \PHPCompiler\JIT\Progress::noteEntry($filename);
+    }
+    // When executing as a compiled native driver, default to self-host mode. Relying on getenv()
+    // alone is fragile in early bootstrap contexts, and the native driver is only used for the
+    // self-host ladder.
+    if (\function_exists('php_compiler_cli_should_skip_entry_driver')) {
+        $selfhostAot = getenv('PHP_COMPILER_SELFHOST_AOT');
+        if (false === $selfhostAot || '' === $selfhostAot) {
+            putenv('PHP_COMPILER_SELFHOST_AOT=1');
+        }
+    }
     if ('' !== $normalized && str_contains($normalized, 'bootstrap-aot/')) {
         // M3 native emit TU: self-host M3 allowlist (not full bootstrap JIT) (#1937, #1983).
         $m3EmitEntry = str_contains($normalized, 'compile_smoke_m3_emit_native_entry.php')
@@ -60,7 +73,16 @@ function run(string $filename, string $code, array $options): void
             }
         } else {
             // Bootstrap AOT fixtures require real JIT lowering; ignore inherited self-host stub env (#1086).
-            putenv('PHP_COMPILER_SELFHOST_AOT=0');
+            //
+            // But: if we're already running under a compiled self-host driver, forcing stub-off
+            // can crash before we have a chance to fall back (e.g. inventory argv driver compiling
+            // bootstrap-aot fixtures as part of self-host compile-smoke, #2967).
+            //
+            // Use a runtime-native marker instead of getenv(): self-host AOT execution stubs and
+            // env access can be unreliable precisely in the scenarios we’re trying to debug.
+            if (!\function_exists('php_compiler_cli_should_skip_entry_driver')) {
+                putenv('PHP_COMPILER_SELFHOST_AOT=0');
+            }
         }
     }
     if ('-' !== $filename && str_contains($normalized, 'test/selfhost/')) {
