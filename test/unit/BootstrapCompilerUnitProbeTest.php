@@ -23,6 +23,8 @@ final class BootstrapCompilerUnitProbeTest extends TestCase
         $source = (string) file_get_contents($script);
         $this->assertStringContainsString('BOOTSTRAP_M3_COMPILER_UNIT_PROBE_STRICT=1', $source);
         $this->assertStringContainsString('emit_path=', $source);
+        $this->assertStringContainsString('BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER', $source);
+        $this->assertStringContainsString('inventory compile_driver', $source);
         $this->assertStringContainsString('compiler_unit_probe_m3_emit_native_entry.php', $source);
         $this->assertStringContainsString('compile_smoke_m3_emit: compile OK', $source);
         $this->assertStringContainsString('compiler unit probe compile OK', $source);

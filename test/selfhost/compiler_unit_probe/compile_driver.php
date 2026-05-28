@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * M3 compiler unit probe native compile driver (issues #2618, #2879).
+ * M3 compiler unit probe native compile driver (issues #2216, #2618, #2879).
  * Gate: php bin/compile.php -l test/selfhost/compiler_unit_probe/compile_driver.php
  *
  * Compile mode (env dispatch — avoid top-level __DIR__ concat in AOT entry; #1493):

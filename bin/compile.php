@@ -67,6 +67,7 @@ function run(string $filename, string $code, array $options): void
             putenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX=helloworld_compile_smoke');
         } elseif (str_contains($normalized, 'runtime_compile_smoke/compile_driver.php')) {
             putenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX=runtime_compile_smoke_m3_emit');
+            putenv('PHP_COMPILER_M3_EMIT_HELPER_SPINE=1');
         } elseif (str_contains($normalized, 'compile_driver.php')) {
             putenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX=compile_smoke_m3_emit');
         }

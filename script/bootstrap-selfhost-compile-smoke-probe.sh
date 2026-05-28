@@ -64,6 +64,7 @@ if [[ "${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
   : "${BOOTSTRAP_M3_RUNTIME_COMPILE:=1}"
   m3_link_env=()
   m3_link_mode="stub"
+  m3_emit_source="${EMIT_ENTRY}"
   # Default REAL_LOWERING on when LINK_COMPILE_DRIVER=1 (stub-only path fails link — #2571, #2582).
   m3_emit_source="${EMIT_ENTRY}"
   if [[ "${BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING:-1}" == "1" ]]; then
