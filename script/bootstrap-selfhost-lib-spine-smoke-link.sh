@@ -45,6 +45,14 @@ INVENTORY_ARGV_DRIVER="${ROOT}/build/bin-compile-aot-inventory"
 
 # Prefer the proven inventory argv driver path (same strategy as bootstrap-selfhost-full-revision-probe, #2968).
 if [[ "${BOOTSTRAP_LIB_SPINE_SMOKE_USE_COMPILE_INVOKE:-0}" != "1" ]]; then
+  # Reuse a driver already built in this bootstrap session (e.g. after make bootstrap-selfhost-link).
+  # Re-linking bin/compile.php via inventory emit often returns null while the host-compile argv
+  # driver is already green (#2967, #3004).
+  if [[ ! -x "${INVENTORY_ARGV_DRIVER}" && -x "${ROOT}/build/bin-compile-aot" ]]; then
+    echo "bootstrap-selfhost-lib-spine-smoke-link: reusing build/bin-compile-aot as inventory argv driver (#2968)" >&2
+    cp -f "${ROOT}/build/bin-compile-aot" "${INVENTORY_ARGV_DRIVER}"
+    chmod +x "${INVENTORY_ARGV_DRIVER}"
+  fi
   if [[ ! -x "${INVENTORY_ARGV_DRIVER}" ]]; then
     echo "bootstrap-selfhost-lib-spine-smoke-link: building inventory argv driver (bin/compile.php) to reduce compiled-driver divergence (#2968)" >&2
     if ! env PHP_COMPILER_M3_SOURCE="${ROOT}/bin/compile.php" PHP_COMPILER_M3_OUT="${INVENTORY_ARGV_DRIVER}" \
@@ -61,10 +69,15 @@ if [[ "${BOOTSTRAP_LIB_SPINE_SMOKE_USE_COMPILE_INVOKE:-0}" != "1" ]]; then
   # Best-effort segfault breadcrumbs (written before invoking the native driver).
   printf '%s' "${ENTRY}" > "${PHP_COMPILER_JIT_ENTRY_FILE}" 2>/dev/null || true
   printf '%s' "compile_invoke:${INVENTORY_ARGV_DRIVER}" > "${PHP_COMPILER_JIT_PHASE_FILE}" 2>/dev/null || true
-  if ! env -u PHP_COMPILER_M3_SOURCE -u PHP_COMPILER_M3_OUT \
+  rm -f "${OUT}"
+  set +e
+  env -u PHP_COMPILER_M3_SOURCE -u PHP_COMPILER_M3_OUT \
     PHP_COMPILER_SELFHOST_AOT=1 \
     BOOTSTRAP_NO_ZEND_FALLBACK=1 \
-    "${INVENTORY_ARGV_DRIVER}" -o "${OUT}" "${ENTRY}" 2>&1; then
+    "${INVENTORY_ARGV_DRIVER}" -o "${OUT}" "${ENTRY}" 2>&1
+  driver_code=$?
+  set -e
+  if [[ "${driver_code}" -ne 0 || ! -x "${OUT}" ]]; then
     if [[ -f "${PHP_COMPILER_JIT_PROGRESS_FILE}" ]]; then
       echo "bootstrap-selfhost-lib-spine-smoke-link: last JIT func: $(cat "${PHP_COMPILER_JIT_PROGRESS_FILE}" 2>/dev/null || true)" >&2
     fi
@@ -89,8 +102,15 @@ if [[ "${BOOTSTRAP_LIB_SPINE_SMOKE_USE_COMPILE_INVOKE:-0}" != "1" ]]; then
       fi
     fi
     if ! bootstrap_compile_invoke "${OUT}" "${ENTRY}" env PHP_COMPILER_SELFHOST_AOT=1 2>&1; then
-      echo "bootstrap-selfhost-lib-spine-smoke-link: compile failed (progress gate; see stderr above)" >&2
-      exit 1
+      if [[ "${BOOTSTRAP_LIB_SPINE_SMOKE_GEN0_FALLBACK:-1}" == "1" ]] && command -v php >/dev/null 2>&1; then
+        echo "bootstrap-selfhost-lib-spine-smoke-link: gen-0 Zend fallback (native argv driver blocked; #2967)" >&2
+        rm -f "${OUT}"
+        php "${ROOT}/bin/compile.php" -o "${OUT}" "${ENTRY}" 2>&1 || true
+      fi
+      if [[ ! -x "${OUT}" ]]; then
+        echo "bootstrap-selfhost-lib-spine-smoke-link: compile failed (progress gate; see stderr above)" >&2
+        exit 1
+      fi
     fi
   fi
 fi

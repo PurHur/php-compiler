@@ -27,6 +27,12 @@ fi
 
 mkdir -p "${ROOT}/build"
 
+if [[ ! -x "${GEN2_INVENTORY}" && -x "${ROOT}/build/bin-compile-aot" ]]; then
+  echo "bootstrap-selfhost-full-revision-probe: reusing build/bin-compile-aot as gen-2 inventory argv driver (#2968)" >&2
+  cp -f "${ROOT}/build/bin-compile-aot" "${GEN2_INVENTORY}"
+  chmod +x "${GEN2_INVENTORY}"
+fi
+
 if [[ ! -x "${GEN2_INVENTORY}" ]]; then
   echo "bootstrap-selfhost-full-revision-probe: building gen-2 inventory argv driver (bin/compile.php)" >&2
   if ! env PHP_COMPILER_M3_SOURCE="${ROOT}/bin/compile.php" PHP_COMPILER_M3_OUT="${GEN2_INVENTORY}" \
