@@ -14,6 +14,54 @@ set -euo pipefail
 BOOTSTRAP_COMPILE_DRIVER_MODE=""
 BOOTSTRAP_COMPILE_DRIVER=""
 
+# True when DRIVER is the inventory bin/compile.php argv driver (not emit-helper gen-2).
+# helloworld-compile-bin copies the same bytes to OUT and build/.m3_bin_compile_aot_blob (#2880).
+bootstrap_is_inventory_bin_compile_argv_driver() {
+  local driver=$1
+  local root="${ROOT:-}"
+  if [[ -z "${root}" || ! -x "${driver}" ]]; then
+    return 1
+  fi
+  if [[ "${driver}" == *"/bin-compile-aot-inventory" ]]; then
+    return 0
+  fi
+  local marker="${root}/build/.m3_bin_compile_aot_blob"
+  if [[ ! -f "${marker}" ]]; then
+    return 1
+  fi
+  local driver_bytes marker_bytes
+  driver_bytes="$(wc -c <"${driver}" 2>/dev/null || echo 0)"
+  marker_bytes="$(wc -c <"${marker}" 2>/dev/null || echo 0)"
+  [[ "${driver_bytes}" -gt 0 && "${driver_bytes}" -eq "${marker_bytes}" ]]
+}
+
+# Build or refresh build/bin-compile-aot-inventory for M4 full-revision / spine argv paths (#3012).
+bootstrap_ensure_inventory_argv_driver() {
+  local root="${ROOT:-}"
+  local out="${1:-${root}/build/bin-compile-aot-inventory}"
+  if [[ -z "${root}" ]]; then
+    echo "bootstrap-ensure-inventory-argv-driver: ROOT unset" >&2
+    return 1
+  fi
+  if bootstrap_is_inventory_bin_compile_argv_driver "${out}"; then
+    return 0
+  fi
+  if [[ ! -f "${root}/bin/compile.php" ]]; then
+    echo "bootstrap-ensure-inventory-argv-driver: missing ${root}/bin/compile.php" >&2
+    return 1
+  fi
+  echo "bootstrap-ensure-inventory-argv-driver: building inventory argv driver ${out} (#3012)" >&2
+  if ! env PHP_COMPILER_M3_SOURCE="${root}/bin/compile.php" PHP_COMPILER_M3_OUT="${out}" \
+    "${root}/script/bootstrap-selfhost-helloworld-compile-bin.sh"; then
+    echo "bootstrap-ensure-inventory-argv-driver: helloworld-compile-bin failed" >&2
+    return 1
+  fi
+  if ! bootstrap_is_inventory_bin_compile_argv_driver "${out}"; then
+    echo "bootstrap-ensure-inventory-argv-driver: ${out} is not a verified inventory argv driver" >&2
+    return 1
+  fi
+}
+
 bootstrap_list_native_compile_drivers() {
   local root="${ROOT:-}"
   if [[ -z "${root}" ]]; then
