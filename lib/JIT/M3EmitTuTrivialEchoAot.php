@@ -54,6 +54,12 @@ final class M3EmitTuTrivialEchoAot
 
     public const CLI_DRIVER_SIDECAR_REL = 'build/.m3_cli_driver_aot_blob';
 
+    public const VENDOR_PHP_CFG_SIDECAR_REL = 'build/.m3_vendor_php_cfg_prelink.o';
+
+    public const VENDOR_PHP_TYPES_SIDECAR_REL = 'build/.m3_vendor_php_types_prelink.o';
+
+    public const VENDOR_PHP_LLVM_SIDECAR_REL = 'build/.m3_vendor_php_llvm_prelink.o';
+
     /** @var list<string> */
     private static array $registeredSidecarRels = [];
 
@@ -68,7 +74,8 @@ final class M3EmitTuTrivialEchoAot
         string $source,
         string $aotBytes,
         string $sidecarRel = self::TRIVIAL_ECHO_SIDECAR_REL,
-        ?string $sentinelLogical = null
+        ?string $sentinelLogical = null,
+        bool $objectOnlySidecar = false
     ): void {
         if ('' === $aotBytes || in_array($sidecarRel, self::$registeredSidecarRels, true)) {
             return;
@@ -93,6 +100,9 @@ final class M3EmitTuTrivialEchoAot
                 self::BIN_COMPILE_SIDECAR_REL => 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::binCompileSentinelBlock',
                 self::BIN_VM_SIDECAR_REL => 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::binVmSentinelBlock',
                 self::CLI_DRIVER_SIDECAR_REL => 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::cliDriverSentinelBlock',
+                self::VENDOR_PHP_CFG_SIDECAR_REL => 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::vendorPhpCfgSentinelBlock',
+                self::VENDOR_PHP_TYPES_SIDECAR_REL => 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::vendorPhpTypesSentinelBlock',
+                self::VENDOR_PHP_LLVM_SIDECAR_REL => 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::vendorPhpLlvmSentinelBlock',
                 default => self::HELLOWORLD_SENTINEL_LOGICAL,
             };
         }
@@ -126,6 +136,7 @@ final class M3EmitTuTrivialEchoAot
             'sourceGlobal' => $sourceGlobal,
             'sidecarGlobal' => $sidecarGlobal,
             'sentinelLc' => $sentinelLc,
+            'objectOnly' => $objectOnlySidecar,
         ];
 
         if (null === $context->m3EmitTuTrivialEchoSourceGlobal) {

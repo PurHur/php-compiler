@@ -406,6 +406,19 @@ function bootstrapVendorPrelinkCompilePackages(
             continue;
         }
 
+        // Native emit-helper sidecar: compile OK copies cached executable, not buildBase.o (#3028).
+        if (0 === $code && !is_file($objectCandidate)) {
+            $vendorShort = str_replace('-', '_', preg_replace('/^ircmaxell-/', '', $slug));
+            $linktimeObject = $root.'/build/.m3_vendor_'.$vendorShort.'_prelink.o';
+            if (is_file($linktimeObject)) {
+                copy($linktimeObject, $objectAbs);
+                $manifest['packages'][$package]['status'] = 'object_ok';
+                $manifest['packages'][$package]['blocker'] = null;
+                fwrite(STDOUT, "OK {$package} → {$objectRel} (link-time vendor sidecar)\n");
+                continue;
+            }
+        }
+
         $blocker = 0 !== $code
             ? 'compile exit '.$code.' (vendor bundle AOT — #1416, #2849)'
             : 'missing object file after compile';
