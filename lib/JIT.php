@@ -2891,7 +2891,10 @@ class JIT {
     /** Link-time trivial-echo AOT sidecar for emit-helper TU (#2559, #2566). */
     private function isM3EmitTuTrivialEchoSidecarActive(): bool
     {
-        if (!$this->shouldUseEmitHelperLinkStubs()) {
+        // M4 argv bin/compile.php links with -u PHP_COMPILER_EMIT_HELPER_LINK but still needs
+        // compile_smoke / HelloWorld sidecars at link time (#3004, #2880).
+        $inventoryArgvSidecar = $this->shouldUseM3InventoryEmitDriver() && $this->shouldUseM4BinCompileArgvMainNative();
+        if (!$this->shouldUseEmitHelperLinkStubs() && !$inventoryArgvSidecar) {
             return false;
         }
         if (!$this->shouldUseM3EmitTuNativeBridge() && !$this->shouldUseM3InventoryEmitDriver()) {
