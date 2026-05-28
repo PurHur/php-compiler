@@ -432,8 +432,10 @@ class Context {
                 $main->getParam(0),
                 $main->getParam(1)
             );
-            CliArgvGlobalInit::emitRefreshAfterStoreArgv($this);
             $this->builder->call($this->initFunc);
+            // Refreshing `$argv` may allocate hashtables; do it after runtime init to avoid
+            // allocator use before init (segfault in argv AOT binaries, #2930).
+            CliArgvGlobalInit::emitRefreshAfterStoreArgv($this);
             if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
                 Builtin\HttpResponseCode::emitResetForStandaloneMain($this);
                 Builtin\SessionId::emitResetForStandaloneMain($this);
