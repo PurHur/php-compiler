@@ -16,7 +16,7 @@ All submissions, including submissions by project members, require review. We us
 **Generated docs** (run locally before push; see [docs/bootstrap-selfhost.md](docs/bootstrap-selfhost.md)):
 
 - `php script/bootstrap-inventory.php` when the `bin/vm.php` dependency path changes
-- `php script/bootstrap-selfhost-compile-probe.php --update-inventory` when the live self-host probe section changes, then `php script/bootstrap-inventory.php` if needed
+- `php script/bootstrap-selfhost-compile-probe.php --update-inventory` writes `docs/bootstrap-inventory-live-probe.md` (not `docs/bootstrap-inventory.md`; #2891); run `php script/bootstrap-inventory.php` if inventory headers drift
 - `php script/capability-matrix.php` / `php script/capability-syntax.php` when builtins or unsupported-syntax registry change
 
 Also run `php script/bootstrap-inventory.php --check` before push when bootstrap paths change.

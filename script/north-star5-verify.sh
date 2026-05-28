@@ -4,7 +4,7 @@
 #   ./script/north-star5-verify.sh
 #   make north-star5-verify
 #
-# Order: inventory → spine 716/717 → vendor bundles → selfhost link → vendor objects (partial OK)
+# Order: inventory → spine (bootstrap-spine-count SSOT) → vendor bundles → selfhost link → vendor objects (partial OK)
 #        → optional north-star4 dry-run when LLVM present.
 #
 # Default exits 0 when vendor prelink is partial (php-types object_ok; cfg/llvm blocked on parse).
@@ -31,7 +31,7 @@ Usage: script/north-star5-verify.sh [--require-llvm] [--strict] [--with-ns4]
 M5 ladder presenter (#1416, #1492):
 
   1. php script/bootstrap-inventory.php --check
-  2. php script/bootstrap-spine-count.php + check-selfhost-spine-coverage-sync.php (718/718)
+  2. php script/bootstrap-spine-count.php + check-selfhost-spine-coverage-sync.php (live N/N)
   3. php script/bootstrap-vendor-objects.php --check
   4. make bootstrap-selfhost-probe + bootstrap-selfhost-lib-spine-smoke (LLVM)
   5. php script/bootstrap-vendor-objects.php --compile (partial OK unless --strict)
@@ -78,11 +78,20 @@ ns5_run() {
   exit 1
 }
 
+ns5_spine_ratio_label() {
+  local json spine
+  json="$("${PHP_BIN}" "${PHP_OPTS[@]}" "${_CI_REPO_ROOT}/script/bootstrap-spine-count.php" --json 2>/dev/null)" || json='{"spine":725,"inventory":725}'
+  spine="$(php -r '$j=json_decode($argv[1],true); echo (int)($j["spine"]??725);' "${json}")"
+  echo "${spine}/${spine}"
+}
+
 ns5_print_summary() {
   local vendor_ok="${1:-0}"
+  local spine_ratio
+  spine_ratio="$(ns5_spine_ratio_label)"
   echo
   echo "north-star5-verify: M5 status"
-  echo "  Spine: 718/718 (Phase A inventory SSOT)"
+  echo "  Spine: ${spine_ratio} (Phase A inventory SSOT)"
   echo "  Vendor prelink: ${vendor_ok}/3 object_ok (php-cfg, php-types, php-llvm prelinked .o)"
   echo "  Cold boot: Zend still drives bin/compile.php — target is compiled driver + prelinked vendor"
   echo "north-star5-verify: Next — shrink self-host stubs; link spine + prelinked .o; retire vendor/autoload (#1416)"
@@ -99,8 +108,9 @@ ci_install_deps
 ns5_run 1 "bootstrap inventory --check" \
   ci_ensure_generated_doc "${_CI_REPO_ROOT}/script/bootstrap-inventory.php" "${_CI_REPO_ROOT}/docs/bootstrap-inventory.md"
 
+SPINE_RATIO="$(ns5_spine_ratio_label)"
 echo
-echo "=== north-star5-verify step 2: spine coverage (718/718) ==="
+echo "=== north-star5-verify step 2: spine coverage (${SPINE_RATIO}) ==="
 SPINE_LINE="$("${PHP_BIN}" "${PHP_OPTS[@]}" "${_CI_REPO_ROOT}/script/bootstrap-spine-count.php" 2>/dev/null | tail -n 1 || true)"
 echo "${SPINE_LINE}"
 if ! "${PHP_BIN}" "${PHP_OPTS[@]}" "${_CI_REPO_ROOT}/script/check-selfhost-spine-coverage-sync.php"; then

@@ -37,7 +37,8 @@ final class NorthStar5VerifyScriptTest extends TestCase
         $this->assertStringContainsString('north-star5-verify', $combined);
         $this->assertStringContainsString('bootstrap-vendor-objects.php', $combined);
         $this->assertStringContainsString('bootstrap-spine-count.php', $combined);
-        $this->assertStringContainsString('718/718', $combined);
+        $this->assertStringContainsString('bootstrap-spine-count.php', $combined);
+        $this->assertStringContainsString('live N/N', $combined);
         $this->assertStringContainsString('--strict', $combined);
         $this->assertStringContainsString('#1416', $combined);
         $this->assertStringContainsString('#1492', $combined);
@@ -50,6 +51,8 @@ final class NorthStar5VerifyScriptTest extends TestCase
         $this->assertStringContainsString('bootstrap-selfhost-probe', $body);
         $this->assertStringContainsString('PHP_COMPILER_VENDOR_PRELINK', $body);
         $this->assertStringContainsString('north-star5-verify: OK', $body);
+        $this->assertStringContainsString('ns5_spine_ratio_label', $body);
+        $this->assertStringNotContainsString('718/718', $body);
         $this->assertStringNotContainsString('cfg/llvm parse blockers', $body);
     }
 

@@ -119,6 +119,29 @@ OUT;
         $this->assertStringContainsString('LAST_JIT_FUNC:', $script);
     }
 
+    public function testUpdateInventoryWritesLiveProbeSidecarNotInventoryMd(): void
+    {
+        $sidecar = bootstrapInventoryLiveProbeFile(self::$root);
+        $inventory = self::$root.'/docs/bootstrap-inventory.md';
+        $priorSidecar = is_file($sidecar) ? (string) file_get_contents($sidecar) : null;
+        $priorInventory = (string) file_get_contents($inventory);
+
+        bootstrapWriteInventoryLiveProbe(self::$root, 'unit-test NEXT_LOWER fixture');
+
+        try {
+            $this->assertFileExists($sidecar);
+            $this->assertStringContainsString('unit-test NEXT_LOWER fixture', (string) file_get_contents($sidecar));
+            $this->assertStringContainsString('#2891', (string) file_get_contents($sidecar));
+            $this->assertSame($priorInventory, (string) file_get_contents($inventory));
+        } finally {
+            if (null === $priorSidecar) {
+                @unlink($sidecar);
+            } else {
+                file_put_contents($sidecar, $priorSidecar);
+            }
+        }
+    }
+
     public function testShellProbePrintsLastJitFuncOnSegfault(): void
     {
         $script = self::$root.'/script/bootstrap-selfhost-compile-probe.sh';
