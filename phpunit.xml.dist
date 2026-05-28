@@ -28,6 +28,7 @@
             <file>./test/compliance/VariableFunctionDynamicJITTest.php</file>
             <file>./test/compliance/VMTest.php</file>
             <file>./test/compliance/GeneratorVMTest.php</file>
+            <file>./test/compliance/GeneratorJITTest.php</file>
             <file>./test/compliance/VisibilityTest.php</file>
             <file>./test/compliance/VisibilityJitTest.php</file>
             <file>./test/compliance/IncludeScopeVMTest.php</file>
