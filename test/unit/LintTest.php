@@ -38,6 +38,23 @@ PHP;
         $this->assertStringNotContainsString('Expr_AssignOp_Coalesce', $exit['stdout']);
     }
 
+    public function testLintThrowExpressionAccepted(): void
+    {
+        $code = '<?php $e = $x; $y = (throw $e);';
+        $exit = $this->runLint(['-r', $code]);
+        $this->assertSame(0, $exit['code']);
+        $this->assertStringNotContainsString('Expr_Throw', $exit['stdout']);
+    }
+
+    public function testLintYieldFromReportsIssue167(): void
+    {
+        $code = '<?php function f() { yield from [1, 2]; }';
+        $exit = $this->runLint(['-r', $code]);
+        $this->assertSame(1, $exit['code']);
+        $this->assertStringContainsString('Expr_YieldFrom', $exit['stdout']);
+        $this->assertStringContainsString('#167', $exit['stdout']);
+    }
+
     public function testLintNullsafePropertyAccepted(): void
     {
         $code = '<?php class C { public int $x = 1; } $c = null; $c?->x;';

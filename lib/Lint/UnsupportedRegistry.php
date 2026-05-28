@@ -15,8 +15,6 @@ final class UnsupportedRegistry
 
     /** @var array<string, int> */
     private const KIND_TO_ISSUE = [
-        'Expr_Throw' => 195,
-        'Expr_New' => 136,
         'Stmt_Try' => 57,
         'Stmt_TryCatch' => 57,
         'Stmt_Catch' => 57,
@@ -24,8 +22,6 @@ final class UnsupportedRegistry
         'Expr_YieldFrom' => 167,
         'Expr_ArrowFunction' => 142,
         'Expr_Closure' => 72,
-        'Stmt_Trait' => 168,
-        'Expr_NamedArgument' => 168,
     ];
 
     public static function trackingIssueForKind(string $kind): ?int

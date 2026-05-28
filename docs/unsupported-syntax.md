@@ -29,15 +29,10 @@ Some constructs (for example `break`/`continue`, `goto`/`label`, `list()` / shor
 
 | CFG kind | Tracking |
 |----------|----------|
-| `Expr_Throw` | [#195](https://github.com/PurHur/php-compiler/issues/195) |
 | `Stmt_Try`, `Stmt_TryCatch`, `Stmt_Catch`, `Stmt_Finally` | [#57](https://github.com/PurHur/php-compiler/issues/57) (AOT lint lowering; VM unwind follow-up) |
 | `Expr_YieldFrom` | [#167](https://github.com/PurHur/php-compiler/issues/167) |
 | `Expr_Closure` | [#72](https://github.com/PurHur/php-compiler/issues/72) |
-| `Expr_ArrowFunction` | [#142](https://github.com/PurHur/php-compiler/issues/142) |
-| `Expr_New` (non-trivial) | [#136](https://github.com/PurHur/php-compiler/issues/136) |
-| Named arguments, traits, enums | [#168](https://github.com/PurHur/php-compiler/issues/168), [#169](https://github.com/PurHur/php-compiler/issues/169) |
-| `Expr_MethodCall` | [#58](https://github.com/PurHur/php-compiler/issues/58) |
-| `Stmt_ClassMethod` (class body methods) | [#58](https://github.com/PurHur/php-compiler/issues/58) (visibility/ctors: [#145](https://github.com/PurHur/php-compiler/issues/145)) |
+| Arrow functions (`fn () =>`) | [#142](https://github.com/PurHur/php-compiler/issues/142) (currently reported as `Expr_Closure` by lint) |
 
 The mapping lives in `lib/Lint/UnsupportedRegistry.php`. Compiler gaps are also listed in `docs/bootstrap-inventory.md` (self-host bootstrap).
 

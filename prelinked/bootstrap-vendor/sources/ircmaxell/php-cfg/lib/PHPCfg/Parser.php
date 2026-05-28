@@ -724,6 +724,18 @@ class Parser
         $this->block->dead = true;
     }
 
+    protected function parseExpr_Throw(Expr\Throw_ $expr)
+    {
+        $this->block->children[] = new Op\Terminal\Throw_(
+            $this->readVariable($this->parseExprNode($expr->expr)),
+            $this->mapAttributes($expr)
+        );
+        $this->block = new Block(); // dead code
+        $this->block->dead = true;
+
+        return new Operand\NullOperand();
+    }
+
     protected function parseStmt_Trait(Stmt\Trait_ $node)
     {
         $name = $this->parseExprNode($node->namespacedName);
