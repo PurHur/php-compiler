@@ -21,6 +21,7 @@ final class SelfhostSpineSubstitutesTest extends TestCase
         $root = dirname(__DIR__, 2);
         $main = (string) file_get_contents($root.'/test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('src/yay-php8-compat.php', $main);
+        $this->assertStringContainsString('src/cli_driver.php', $main);
         $this->assertStringContainsString('llvm_env_spine_shim.php', $main);
         $this->assertStringContainsString('macro_functions_spine_shim.php', $main);
     }

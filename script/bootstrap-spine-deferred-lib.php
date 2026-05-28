@@ -16,9 +16,7 @@ function bootstrap_spine_native_link_deferred(): array
     return [];
 }
 
-/**
- * Inventory paths covered by spine shims but not literal require_once (issue #2543, #2868).
- */
+/** Inventory paths covered by spine shims without a 1:1 literal require_once (issue #2543, #2868). */
 function bootstrap_spine_shim_substitute_extra_inventory(): int
 {
     return 0;

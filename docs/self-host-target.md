@@ -34,8 +34,8 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | Layer | Today | Target |
 |-------|-------|--------|
 | **Bootstrap driver** | Gen-0 Zend `php bin/compile.php` once; routine `bootstrap-selfhost-link` / spine / M4 gen-1 prefer `build/bin-compile-aot` or `build/selfhost-compile-driver` when present ([#2842](https://github.com/PurHur/php-compiler/issues/2842)) | Compiled `bin/compile.php` only |
-| **Bundle size** | **725** curated `require_once` in spine smoke (literal `src/cli_driver.php` + `cli_spine_shim` for `src/cli.php`) | **725** Phase A inventory files (SSOT) |
-| **Inventory coverage** | **725/725** literal `require_once` (`check-selfhost-spine-coverage-sync`) with real **`bin/vm.php`** ([#2134](https://github.com/PurHur/php-compiler/issues/2134); **#2652** emit-TU JIT batch; **`lib/VM/HashTable.php`** promoted [#2543](https://github.com/PurHur/php-compiler/issues/2543); **`src/cli_driver.php`** literal [#2868](https://github.com/PurHur/php-compiler/issues/2868)) | **~100%** |
+| **Bundle size** | **725** curated `require_once` in spine smoke (`cli_spine_shim` for `src/cli.php` only) | **725** Phase A inventory files (SSOT) |
+| **Inventory coverage** | **725/725** literal `require_once` with real **`bin/vm.php`** ([#2134](https://github.com/PurHur/php-compiler/issues/2134); **#2652** emit-TU JIT batch; **`lib/VM/HashTable.php`** promoted [#2543](https://github.com/PurHur/php-compiler/issues/2543); **`src/cli_driver.php`** literal [#2868](https://github.com/PurHur/php-compiler/issues/2868)) | **~100%** |
 | **HelloWorld** | Native **run** ✅; strict probe **emit_path=native** ✅ (27 May 2026) | Native compile for arbitrary PHP |
 | **Bootstrap loop (M4)** | Gen-1→gen-2 smoke/spine **native** ✅; gen-2→gen-3 spine **725/725** ✅; full revision / argv CLI ⬜ | Native full revision rebuild |
 | **Vendor** | `ircmaxell/php-types` **object_ok** ([#1416](https://github.com/PurHur/php-compiler/issues/1416)); cfg/llvm parse blockers | Prelinked artifacts only (no `vendor/autoload.php`) |
@@ -134,7 +134,7 @@ Parallel batches ([#1419](https://github.com/PurHur/php-compiler/issues/1419), [
 | Entry | Units | Role |
 |-------|------:|------|
 | `test/selfhost/compiler_minimal/main.php` | **108** | M0 core |
-| `test/selfhost/compiler_lib_spine_smoke/main.php` | **725** | M2 complete ([#2868](https://github.com/PurHur/php-compiler/issues/2868)) |
+| `test/selfhost/compiler_lib_spine_smoke/main.php` | **725** literal | M2 complete ([#2868](https://github.com/PurHur/php-compiler/issues/2868)) |
 | `test/selfhost/compiler_helloworld_smoke/` | — | M3 probe + compile driver |
 | `test/selfhost/bootstrap_loop_smoke/` | — | M4 scaffold (gen-1→gen-2→gen-3 loop; [#1498](https://github.com/PurHur/php-compiler/issues/1498)) |
 

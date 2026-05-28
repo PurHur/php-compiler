@@ -1,6 +1,6 @@
 {
     "version": 1,
-    "generated_at": "2026-05-27T19:22:39+00:00",
+    "generated_at": "2026-05-27T23:55:27+00:00",
     "packages": {
         "ircmaxell/php-cfg": {
             "role": "CFG + traversers",
@@ -29,7 +29,7 @@
             "object": "prelinked/bootstrap-vendor/ircmaxell-php-llvm.o",
             "archive": "prelinked/bootstrap-vendor/ircmaxell-php-llvm.a",
             "php_files": 88,
-            "status": "bundle_ok",
+            "status": "object_ok",
             "blocker": null
         }
     }
