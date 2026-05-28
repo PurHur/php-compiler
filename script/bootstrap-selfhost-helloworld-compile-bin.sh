@@ -36,9 +36,10 @@ if [[ "${SOURCE_NORM}" == "${ROOT}/bin/compile.php" ]]; then
   rm -f "${EMIT_HELPER}" "${AOT_OUT}" "${ROOT}/build/.last-jit-func-native-compile-driver" "${ROOT}/build/.m3_bin_compile_aot_blob"
   export PHP_COMPILER_JIT_PROGRESS_FILE="${ROOT}/build/.last-jit-func-native-compile-driver"
   if ! env PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_M3_COMPILE_DRIVER=1 PHP_COMPILER_M3_COMPILE_DRIVER_MAIN=1 \
-    PHP_COMPILER_M4_BIN_COMPILE_DRIVER=1 PHP_COMPILER_EMIT_HELPER_LINK=1 \
+    PHP_COMPILER_M4_BIN_COMPILE_DRIVER=1 \
     PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1 BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER=1 \
     PHP_COMPILER_M3_EMIT_LOG_PREFIX=helloworld_compile_smoke \
+    PHP_COMPILER_EMIT_HELPER_LINK=1 \
     php "${ROOT}/bin/compile.php" -o "${AOT_OUT}" "${ROOT}/bin/compile.php" 2>&1; then
     echo "bootstrap-selfhost-helloworld-compile-bin: native compile driver link failed" >&2
     exit 1

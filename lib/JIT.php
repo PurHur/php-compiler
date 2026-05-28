@@ -2916,6 +2916,11 @@ class JIT {
                 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compileDriverSentinelBlock'
             );
             $this->registerM3EmitTuSidecarFromPath(
+                __DIR__.'/../test/selfhost/compiler_minimal/main.php',
+                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_MINIMAL_SIDECAR_REL,
+                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerMinimalSentinelBlock'
+            );
+            $this->registerM3EmitTuSidecarFromPath(
                 __DIR__.'/../lib/Compiler.php',
                 \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_PHP_SIDECAR_REL,
                 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerPhpSentinelBlock'
@@ -2951,6 +2956,11 @@ class JIT {
                 __DIR__.'/../test/selfhost/compiler_lib_spine_smoke/main.php',
                 \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_LIB_SIDECAR_REL,
                 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerLibSentinelBlock'
+            );
+            $this->registerM3EmitTuSidecarFromPath(
+                __DIR__.'/../test/selfhost/compiler_minimal/main.php',
+                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_MINIMAL_SIDECAR_REL,
+                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerMinimalSentinelBlock'
             );
             $this->registerM3EmitTuSidecarFromPath(
                 __DIR__.'/../test/selfhost/compiler_unit_probe/compiler_unit_probe_compile.php',

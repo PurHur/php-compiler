@@ -45,6 +45,16 @@ function run(string $filename, string $code, array $options): void
             } elseif (str_contains($normalized, 'helloworld_m3_emit_native_entry.php')) {
                 // HelloWorld strict probe emit TU (#2610); M5 bin/compile.php uses helloworld_compile_m3_emit_native_entry (#2681).
                 putenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX=compile_smoke_m3_emit');
+            } elseif (
+                str_contains($normalized, 'compile_smoke_m3_emit_native_entry.php')
+                && (
+                    '1' === (string) getenv('PHP_COMPILER_M4_BIN_COMPILE_DRIVER')
+                    || '1' === (string) getenv('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER')
+                    || '1' === (string) getenv('BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER')
+                )
+            ) {
+                // M5 argv driver + inventory emit (#2894, #2900): helloworld prefix + compiler_minimal sidecar.
+                putenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX=helloworld_compile_smoke');
             } else {
                 putenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX=compile_smoke_m3_emit');
             }

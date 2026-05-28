@@ -33,7 +33,7 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 
 | Layer | Today | Target |
 |-------|-------|--------|
-| **Bootstrap driver** | Gen-0 Zend `php bin/compile.php` once; routine `bootstrap-selfhost-link` / spine / M4 gen-1 prefer `build/bin-compile-aot` or `build/selfhost-compile-driver` when present ([#2842](https://github.com/PurHur/php-compiler/issues/2842)) | Compiled `bin/compile.php` only |
+| **Bootstrap driver** | Gen-0 Zend once on empty `build/`; after `bootstrap-selfhost-driver-smoke`, `bootstrap-selfhost-link` uses `build/bin-compile-aot` via link-time sidecars ([#2894](https://github.com/PurHur/php-compiler/issues/2894), [#2842](https://github.com/PurHur/php-compiler/issues/2842)) | Compiled `bin/compile.php` only |
 | **Bundle size** | **725** curated `require_once` in spine smoke (`cli_spine_shim` for `src/cli.php` only) | **725** Phase A inventory files (SSOT) |
 | **Inventory coverage** | **725/725** literal `require_once` with real **`bin/vm.php`** ([#2134](https://github.com/PurHur/php-compiler/issues/2134); **#2652** emit-TU JIT batch; **`lib/VM/HashTable.php`** promoted [#2543](https://github.com/PurHur/php-compiler/issues/2543); **`src/cli_driver.php`** literal [#2868](https://github.com/PurHur/php-compiler/issues/2868)) | **~100%** |
 | **HelloWorld** | Native **run** ✅; strict probe **emit_path=native** ✅ (27 May 2026) | Native compile for arbitrary PHP |
