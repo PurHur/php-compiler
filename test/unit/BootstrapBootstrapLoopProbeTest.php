@@ -52,6 +52,8 @@ final class BootstrapBootstrapLoopProbeTest extends TestCase
         $gen1 = (string) file_get_contents(self::$root.'/script/bootstrap-loop-gen1-link.sh');
         $this->assertStringContainsString('BOOTSTRAP_M4_LINK_COMPILE_DRIVER', $gen1);
         $this->assertStringContainsString('BOOTSTRAP_M4_COMPILE_DRIVER_REAL_LOWERING', $gen1);
+        $this->assertStringContainsString('bootstrap-spine-count.php', $script);
+        $this->assertStringNotContainsString('717/717', $script);
     }
 
     public function testBootstrapLoopGen1LinkScriptExists(): void
