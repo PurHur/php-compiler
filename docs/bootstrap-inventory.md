@@ -4524,9 +4524,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Call/Native.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 403)
-- new Variable (line 411)
-- new Variable (line 420)
+- new Variable (line 399)
+- new Variable (line 407)
+- new Variable (line 416)
 - 4 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Call/ReflectionAttributeGetName.php`
