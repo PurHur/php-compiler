@@ -21,7 +21,8 @@ final class BootstrapSelfhostFullRevisionProbeTest extends TestCase
         $this->assertStringContainsString('bootstrap-selfhost-full-revision-probe:', $script);
         $this->assertStringContainsString('bin/compile.php', $script);
         $this->assertStringContainsString('bin-compile-aot', $script);
-        $this->assertStringContainsString('compiler_smoke_standalone.php', $script);
+        $this->assertStringContainsString('compiler_unit_probe_compile.php', $script);
+        $this->assertStringContainsString('compile_smoke_m3_emit:', $script);
         $this->assertStringContainsString('env -u PHP_COMPILER_M3_SOURCE -u PHP_COMPILER_M3_OUT', $script);
         $this->assertStringContainsString('emit_path=native', $script);
         $this->assertStringContainsString('#2880', $script);

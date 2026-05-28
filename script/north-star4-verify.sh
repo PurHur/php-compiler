@@ -5,7 +5,8 @@
 #   make north-star4-verify
 #
 # Order: bootstrap inventory --check → M3 strict probes → M4 gen-1 link → M4 loop probe
-#        → gen-2→gen-3 spine recompile → next-step hints (#2112, #1521, #2075).
+#        (incl. gen-2→gen-3 spine + full-revision argv probe #2898) → fallback gen-3 spine
+#        → next-step hints (#2112, #1521, #2075).
 #
 # Default exits 0 on partial M4 (M3 strict or full probe exit 2) with documented hints.
 # Use --strict to fail on partial M4; --dry-run-only to run bootstrap-loop-probe --dry-run only.
@@ -34,9 +35,10 @@ Runs North Star 4 M4 strict ladder checks (issue #2379, epic #1492):
   2. BOOTSTRAP_M3_HELLOWORLD_STRICT=1 bootstrap-selfhost-helloworld-probe.sh (LLVM)
   3. BOOTSTRAP_M3_COMPILE_SMOKE_STRICT=1 bootstrap-selfhost-compile-smoke-probe.sh (LLVM)
   4. BOOTSTRAP_M4_LINK_COMPILE_DRIVER=1 bootstrap-loop-gen1-link.sh (LLVM)
-  5. bootstrap-loop-probe.sh (full ladder, or --dry-run with --dry-run-only)
-  6. bootstrap-loop-gen2-recompile-spine.sh (gen-2→gen-3 spine when gen-1 green)
-  7. Print next steps for #2112 BOOTSTRAP_M4_GEN2_STRICT_GATE, #1521 compiled driver
+  5. bootstrap-loop-probe.sh (full ladder incl. full-revision #2898, or --dry-run with --dry-run-only)
+  6. bootstrap-loop-gen2-recompile-spine.sh (gen-2→gen-3 spine when step 5 partial)
+  7. bootstrap-selfhost-full-revision-probe.sh (when step 6 ran but step 5 was not full green)
+  8. Print next steps for #2112 BOOTSTRAP_M4_GEN2_STRICT_GATE, #1521 compiled driver
 
 Options:
   --require-llvm     fail if LLVM 9 is missing (default: skip LLVM steps, exit 0)
@@ -88,7 +90,7 @@ ns4_print_m4_next_steps() {
   if [[ "${partial}" -eq 1 ]]; then
     echo "north-star4-verify: M4 partial — gen-2 native emit, gen-3 spine, or M3 strict still blocked (#2075, #1402)"
   else
-    echo "north-star4-verify: M4 ladder green (gen-1→gen-2 native + gen-2→gen-3 spine when step 6 ran)"
+    echo "north-star4-verify: M4 ladder green (gen-1→gen-2 native + gen-2→gen-3 spine + full-revision when steps 5–7 ran)"
   fi
   echo "north-star4-verify: Generation ladder — docs/bootstrap-generations.md"
   echo "north-star4-verify: Next strict CI — BOOTSTRAP_M4_GEN2_STRICT_GATE=1 in ci-local.sh (#2112)"
@@ -217,7 +219,7 @@ else
     case "${PROBE_CODE}" in
       0)
         PROBE_FULL_GREEN=1
-        echo "north-star4-verify: step 5 ok (full M4 ladder incl. gen-2→gen-3)"
+        echo "north-star4-verify: step 5 ok (full M4 ladder incl. gen-2→gen-3 + full-revision #2898)"
         ;;
       2)
         if [[ "${STRICT_M4}" -eq 1 ]]; then
@@ -238,12 +240,37 @@ else
 fi
 
 GEN3_PARTIAL=0
+FULL_REVISION_OK=0
 if [[ "${GEN1_OK}" -eq 1 && "${DRY_RUN_ONLY}" -eq 0 && "${M3_STRICT_OK}" -eq 1 && "${PROBE_FULL_GREEN}" -eq 0 ]]; then
   echo
   echo "=== north-star4-verify step 6: M4 gen-2→gen-3 spine recompile ==="
   if "${_CI_SCRIPT_DIR}/bootstrap-loop-gen2-recompile-spine.sh"; then
     spine_ratio="$("${PHP_BIN}" "${PHP_OPTS[@]}" "${_CI_SCRIPT_DIR}/bootstrap-spine-count.php" --json 2>/dev/null | "${PHP_BIN}" -r '$j=json_decode(stream_get_contents(STDIN),true); $s=(int)($j["spine"]??725); echo $s."/".$s;' || echo "725/725")"
     echo "north-star4-verify: step 6 ok (gen-3 spine ${spine_ratio})"
+    echo
+    echo "=== north-star4-verify step 7: M4 full-revision argv probe (#2898) ==="
+    set +e
+    "${_CI_SCRIPT_DIR}/bootstrap-selfhost-full-revision-probe.sh"
+    full_rev_code=$?
+    set -e
+    case "${full_rev_code}" in
+      0)
+        FULL_REVISION_OK=1
+        echo "north-star4-verify: step 7 ok (full-revision argv bin/compile.php)"
+        ;;
+      2)
+        if [[ "${STRICT_M4}" -eq 1 ]]; then
+          echo "north-star4-verify: step 7 FAILED (full-revision exit 2)" >&2
+          exit 1
+        fi
+        PROBE_PARTIAL=1
+        echo "north-star4-verify: step 7 partial (full-revision exit 2 — documented M4 blocker)"
+        ;;
+      *)
+        echo "north-star4-verify: step 7 FAILED (full-revision exit ${full_rev_code})" >&2
+        exit 1
+        ;;
+    esac
   else
     gen3_code=$?
     if [[ "${STRICT_M4}" -eq 1 ]]; then
@@ -255,6 +282,8 @@ if [[ "${GEN1_OK}" -eq 1 && "${DRY_RUN_ONLY}" -eq 0 && "${M3_STRICT_OK}" -eq 1 &
     PROBE_PARTIAL=1
     echo "north-star4-verify: step 6 partial (gen-2→gen-3 spine exit ${gen3_code} — documented M4 blocker)"
   fi
+elif [[ "${PROBE_FULL_GREEN}" -eq 1 ]]; then
+  FULL_REVISION_OK=1
 fi
 
 ns4_print_m4_next_steps "$((PROBE_PARTIAL || GEN3_PARTIAL))"

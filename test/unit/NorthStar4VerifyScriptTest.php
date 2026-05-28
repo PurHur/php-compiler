@@ -59,6 +59,8 @@ final class NorthStar4VerifyScriptTest extends TestCase
         $this->assertStringContainsString('ci_run_bootstrap_m3_compile_smoke_strict', $body);
         $this->assertStringContainsString('bootstrap-loop-gen1-link.sh', $body);
         $this->assertStringContainsString('bootstrap-loop-probe.sh', $body);
+        $this->assertStringContainsString('bootstrap-selfhost-full-revision-probe.sh', $body);
+        $this->assertStringContainsString('#2898', $body);
         $this->assertStringContainsString('BOOTSTRAP_M4_LINK_COMPILE_DRIVER=1', $body);
         $this->assertStringContainsString('BOOTSTRAP_M4_RUNTIME_COMPILE=1', $body);
         $this->assertStringContainsString('BOOTSTRAP_M4_GEN2_STRICT', $body);

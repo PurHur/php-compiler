@@ -360,7 +360,7 @@ bootstrap-loop-gen2-recompile-spine:
 bootstrap-loop-gen2-recompile-bin-compile:
 	./script/bootstrap-loop-gen2-recompile-bin-compile.sh
 bootstrap-loop-gen2-recompile-minimal: bootstrap-loop-gen2-recompile-spine
-# Script dry-run ladder: make bootstrap-loop-probe-dry (not `make bootstrap-loop-probe --dry-run`, which is GNU make recipe print only — #2828).
+# M4 ladder incl. full-revision argv probe (#2898). Dry-run: make bootstrap-loop-probe-dry (not `make bootstrap-loop-probe --dry-run` — #2828).
 bootstrap-loop-probe:
 	./script/bootstrap-loop-probe.sh
 bootstrap-loop-probe-dry:

@@ -47,6 +47,8 @@ final class BootstrapBootstrapLoopProbeTest extends TestCase
         $this->assertStringContainsString('Makefile parity', $script);
         $this->assertStringContainsString('#2612', $script);
         $this->assertStringContainsString('bootstrap-loop-gen1-link.sh', $script);
+        $this->assertStringContainsString('bootstrap-selfhost-full-revision-probe.sh', $script);
+        $this->assertStringContainsString('#2898', $script);
         $this->assertStringContainsString('BOOTSTRAP_M3_HELLOWORLD_STRICT=1', $script);
         $this->assertStringContainsString('gen-1 link', $script);
         $gen1 = (string) file_get_contents(self::$root.'/script/bootstrap-loop-gen1-link.sh');
