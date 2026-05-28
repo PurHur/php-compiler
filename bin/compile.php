@@ -30,6 +30,20 @@ function run(string $filename, string $code, array $options): void
         if (false === $selfhostAot || '' === $selfhostAot) {
             putenv('PHP_COMPILER_SELFHOST_AOT=1');
         }
+        // Compiled argv drivers must enable the M3 compile-driver lowering allowlist; otherwise
+        // key Runtime entrypoints can be stubbed and compilation returns null (#3004).
+        $m3CompileDriver = getenv('PHP_COMPILER_M3_COMPILE_DRIVER');
+        if (false === $m3CompileDriver || '' === $m3CompileDriver) {
+            putenv('PHP_COMPILER_M3_COMPILE_DRIVER=1');
+        }
+        $m3CompileDriverMain = getenv('PHP_COMPILER_M3_COMPILE_DRIVER_MAIN');
+        if (false === $m3CompileDriverMain || '' === $m3CompileDriverMain) {
+            putenv('PHP_COMPILER_M3_COMPILE_DRIVER_MAIN=1');
+        }
+        $m4BinCompile = getenv('PHP_COMPILER_M4_BIN_COMPILE_DRIVER');
+        if (false === $m4BinCompile || '' === $m4BinCompile) {
+            putenv('PHP_COMPILER_M4_BIN_COMPILE_DRIVER=1');
+        }
     }
     if ('' !== $normalized && str_contains($normalized, 'bootstrap-aot/')) {
         // M3 native emit TU: self-host M3 allowlist (not full bootstrap JIT) (#1937, #1983).

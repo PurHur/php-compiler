@@ -141,66 +141,76 @@ if (!function_exists('php_compiler_cli_dispatch')) {
             exit(1);
         }
 
-        $opts = $argv;
-        // get rid of this
-        array_shift($opts);
-
         $execFile = '';
         $execCode = '';
         $options = [];
-        while (! empty($opts)) {
-            $opt = array_shift($opts);
+        // Avoid array_shift() in the compiled CLI driver: it mutates arrays and can hit
+        // bootstrap AOT lowering gaps. Use an index cursor instead (#3004).
+        $argc = count($argv);
+        $i = 1; // skip argv[0]
+        while ($i < $argc) {
+            $opt = $argv[$i];
+            ++$i;
             switch ($opt) {
                 case '-l':
                     $options['-l'] = true;
 
                     break;
                 case '-y':
-                    if (empty($opts) || substr($opts[0], 0, 1) === '-') {
+                    if ($i >= $argc || substr((string) $argv[$i], 0, 1) === '-') {
                         $options['-y'] = true;
-                    } elseif (count($opts) === 1 && substr($opts[0], -4) === '.php') {
+                    } elseif ($i === $argc - 1 && substr((string) $argv[$i], -4) === '.php') {
                         // will assume the same name as the input file...
                         $options['-y'] = true;
                     } else {
-                        $options['-y'] = array_shift($opts);
+                        $options['-y'] = $argv[$i];
+                        ++$i;
                     }
 
                     break;
                 case '-o':
-                    if (empty($opts) || substr($opts[0], 0, 1) === '-') {
+                    if ($i >= $argc || substr((string) $argv[$i], 0, 1) === '-') {
                         $options['-o'] = true;
-                    } elseif (count($opts) === 1 && substr($opts[0], -4) === '.php') {
+                    } elseif ($i === $argc - 1 && substr((string) $argv[$i], -4) === '.php') {
                         // will assume the same name as the input file...
                         $options['-o'] = true;
                     } else {
-                        $options['-o'] = array_shift($opts);
+                        $options['-o'] = $argv[$i];
+                        ++$i;
                     }
 
                     break;
                 case '-r':
-                    $execCode = '<?php '.array_shift($opts);
+                    if ($i >= $argc) {
+                        die("Option -r requires a code argument\n");
+                    }
+                    $execCode = '<?php '.$argv[$i];
+                    ++$i;
                     $execFile = 'Command line code';
 
                     break;
                 case '-q':
-                    if (empty($opts) || substr($opts[0], 0, 1) === '-') {
+                    if ($i >= $argc || substr((string) $argv[$i], 0, 1) === '-') {
                         die("Option -q requires a query string argument\n");
                     }
-                    $options['-q'] = array_shift($opts);
+                    $options['-q'] = $argv[$i];
+                    ++$i;
 
                     break;
                 case '-p':
-                    if (empty($opts) || substr($opts[0], 0, 1) === '-') {
+                    if ($i >= $argc || substr((string) $argv[$i], 0, 1) === '-') {
                         die("Option -p requires a POST body argument\n");
                     }
-                    $options['-p'] = array_shift($opts);
+                    $options['-p'] = $argv[$i];
+                    ++$i;
 
                     break;
                 case '--include':
-                    if (empty($opts) || substr($opts[0], 0, 1) === '-') {
+                    if ($i >= $argc || substr((string) $argv[$i], 0, 1) === '-') {
                         die("Option --include requires a file path\n");
                     }
-                    $includePath = array_shift($opts);
+                    $includePath = (string) $argv[$i];
+                    ++$i;
                     if (!is_file($includePath)) {
                         die("Could not open include file {$includePath}\n");
                     }
@@ -209,7 +219,7 @@ if (!function_exists('php_compiler_cli_dispatch')) {
 
                     break;
                 default:
-                    if (! empty($opts)) {
+                    if ($i < $argc) {
                         die("Extra argument not understood: {$opt}\n");
                     }
                     if (! empty($execCode)) {

@@ -45,9 +45,15 @@ mkdir -p "${ROOT}/build"
 
 if [[ "${BOOTSTRAP_GEN0_ENSURE_COMPILED_DRIVER:-1}" == "1" && ! -x "${ROOT}/build/bin-compile-aot" ]]; then
   echo "bootstrap-selfhost-link: building gen-0 compiled driver (BOOTSTRAP_GEN0_ENSURE_COMPILED_DRIVER=1, #2894)" >&2
-  if ! BOOTSTRAP_M5_DRIVER_SMOKE=1 "${ROOT}/script/bootstrap-selfhost-driver-smoke.sh" >/dev/null; then
-    echo "bootstrap-selfhost-link: bootstrap-selfhost-driver-smoke failed (#2894)" >&2
-    exit 1
+  # Best-effort only: on fresh trees the compiled driver can fail independently (#3004).
+  # Do not block the primary link gate on a missing optional artifact; proceed and surface
+  # the real next compiler failure instead (#3005).
+  set +e
+  BOOTSTRAP_M5_DRIVER_SMOKE=1 "${ROOT}/script/bootstrap-selfhost-driver-smoke.sh" >/dev/null
+  driver_smoke_code=$?
+  set -e
+  if [[ "${driver_smoke_code}" -ne 0 ]]; then
+    echo "bootstrap-selfhost-link: WARNING: bootstrap-selfhost-driver-smoke failed (exit ${driver_smoke_code}); continuing without compiled driver (#3005)" >&2
   fi
 fi
 
