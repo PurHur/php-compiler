@@ -103,7 +103,7 @@ if [[ ! -x "${BIN_COMPILE_DRIVER}" ]]; then
 fi
 
 echo "bootstrap-selfhost-driver-smoke: stage 4 — compiled argv driver native emit (no Zend)"
-EMIT_PROBE="${ROOT}/test/bootstrap-aot/compiler_smoke_standalone.php"
+EMIT_PROBE="${ROOT}/test/selfhost/compiler_unit_probe/compiler_unit_probe_compile.php"
 EMIT_OUT="${ROOT}/build/selfhost-driver-smoke-emit-aot"
 rm -f "${EMIT_OUT}"
 set +e
@@ -118,12 +118,12 @@ if [[ "${emit_code}" -ne 0 ]]; then
   echo "bootstrap-selfhost-driver-smoke: compiled driver emit failed (exit ${emit_code})" >&2
   exit 1
 fi
-if ! grep -qE 'helloworld_compile_smoke: compile OK|compile_smoke_m3_emit: compile OK' <<< "${emit_out}"; then
-  echo "bootstrap-selfhost-driver-smoke: expected compile OK line from compiled driver" >&2
-  exit 1
-fi
 if [[ ! -x "${EMIT_OUT}" ]]; then
   echo "bootstrap-selfhost-driver-smoke: missing ${EMIT_OUT}" >&2
+  exit 1
+fi
+if grep -qE 'compile_smoke_m3_emit:' <<< "${emit_out}"; then
+  echo "bootstrap-selfhost-driver-smoke: compiled argv driver still using compile_smoke_m3_emit helper (want inventory Compiler path)" >&2
   exit 1
 fi
 

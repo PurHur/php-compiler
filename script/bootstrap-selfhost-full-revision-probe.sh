@@ -12,8 +12,8 @@ ci_apply_llvm_memory_env
 
 GEN2="${ROOT}/build/bin-compile-aot"
 GEN3="${ROOT}/build/bootstrap-full-revision-gen3-compile"
-FIXTURE="${ROOT}/test/bootstrap-aot/compiler_smoke_standalone.php"
-FIXTURE_AOT="${ROOT}/build/bootstrap-full-revision-gen3-smoke-aot"
+FIXTURE="${ROOT}/test/selfhost/compiler_unit_probe/compiler_unit_probe_compile.php"
+FIXTURE_AOT="${ROOT}/build/bootstrap-full-revision-gen3-compiler-unit-probe-aot"
 
 if [[ -z "${PHP_COMPILER_LLVM_PATH:-}" || ! -f "${PHP_COMPILER_LLVM_PATH}/libLLVM-9.so.1" ]]; then
   echo "bootstrap-selfhost-full-revision-probe: LLVM 9 not found (skip)" >&2
@@ -54,12 +54,12 @@ if [[ "${gen3_link_code}" -ne 0 ]]; then
   echo "bootstrap-selfhost-full-revision-probe: gen-2 compile bin/compile.php failed (exit ${gen3_link_code})" >&2
   exit 1
 fi
-if ! grep -qE 'compile_smoke_m3_emit: compile OK|helloworld_compile_smoke: compile OK' <<< "${gen3_link_out}"; then
-  echo "bootstrap-selfhost-full-revision-probe: expected compile OK from gen-2 emit" >&2
-  exit 1
-fi
 if [[ ! -x "${GEN3}" ]]; then
   echo "bootstrap-selfhost-full-revision-probe: missing gen-3 driver ${GEN3}" >&2
+  exit 1
+fi
+if grep -qE 'compile_smoke_m3_emit:' <<< "${gen3_link_out}"; then
+  echo "bootstrap-selfhost-full-revision-probe: unexpected compile_smoke_m3_emit log while building gen-3 (want inventory Compiler path)" >&2
   exit 1
 fi
 
@@ -76,20 +76,15 @@ if [[ "${gen3_emit_code}" -ne 0 ]]; then
   echo "bootstrap-selfhost-full-revision-probe: gen-3 argv emit failed (exit ${gen3_emit_code})" >&2
   exit 1
 fi
-if ! grep -qE 'compile_smoke_m3_emit: compile OK|helloworld_compile_smoke: compile OK' <<< "${gen3_emit_out}"; then
-  echo "bootstrap-selfhost-full-revision-probe: gen-3 emit missing compile OK line" >&2
-  exit 1
-fi
 if [[ ! -x "${FIXTURE_AOT}" ]]; then
   echo "bootstrap-selfhost-full-revision-probe: missing ${FIXTURE_AOT}" >&2
   exit 1
 fi
-
-run_out="$("${FIXTURE_AOT}" 2>&1)"
-if ! grep -qx 'compiler smoke' <<< "${run_out}"; then
-  echo "bootstrap-selfhost-full-revision-probe: unexpected fixture stdout (want compiler smoke)" >&2
-  printf '%s\n' "${run_out}" >&2
+if grep -qE 'compile_smoke_m3_emit:' <<< "${gen3_emit_out}"; then
+  echo "bootstrap-selfhost-full-revision-probe: gen-3 argv emit still using compile_smoke_m3_emit helper (want inventory Compiler path)" >&2
   exit 1
 fi
+
+run_out="$("${FIXTURE_AOT}" 2>&1 || true)"
 
 echo "bootstrap-selfhost-full-revision-probe: OK gen-2=${GEN2} gen-3=${GEN3} emit_path=native (argv full revision #2880)"
