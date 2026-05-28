@@ -147,7 +147,7 @@ final class BootstrapCompileSmokeM3Emit
 
         $context->builder->positionAtEnd($readFail);
         self::echoPhaseError($context, $logPrefix, $logPrefix.': empty source (lint)', 'source');
-        $context->builder->returnValue($retFail);
+        self::exitWithStatus($context, $retFail);
 
         $context->builder->positionAtEnd($readOk);
         $runtime = RuntimeEmitTuAlloc::emit($context);
@@ -172,7 +172,7 @@ final class BootstrapCompileSmokeM3Emit
             $logPrefix.': lint failed (parseAndCompile returned null)',
             'parseAndCompile'
         );
-        $context->builder->returnValue($retFail);
+        self::exitWithStatus($context, $retFail);
 
         $context->builder->positionAtEnd($lintOk);
         $context->builder->returnValue($retOk);
@@ -277,7 +277,7 @@ final class BootstrapCompileSmokeM3Emit
 
         $context->builder->positionAtEnd($readFail);
         self::echoPhaseError($context, $logPrefix, $logPrefix.': empty source (native bridge)', 'source');
-        $context->builder->returnValue($retFail);
+        self::exitWithStatus($context, $retFail);
 
         $context->builder->positionAtEnd($readOk);
         $runtime = RuntimeEmitTuAlloc::emit($context);
@@ -310,7 +310,7 @@ final class BootstrapCompileSmokeM3Emit
             $logPrefix.': parseAndCompile returned null (parser/CFG spine)',
             'parseAndCompile'
         );
-        $context->builder->returnValue($retFail);
+        self::exitWithStatus($context, $retFail);
 
         $context->builder->positionAtEnd($pacOk);
         $context->builder->call(
@@ -344,6 +344,16 @@ final class BootstrapCompileSmokeM3Emit
     {
         ValueEchoHelper::echoLiteral($context, $line1."\n");
         ValueEchoHelper::echoLiteral($context, $logPrefix.': native emit failed at phase='.$phase."\n");
+    }
+
+    /** Propagate failure to the process exit code (return from {main} alone is not honored by AOT link). */
+    private static function exitWithStatus(Context $context, Value $retFail): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $context->builder->call(
+            $context->lookupFunction('exit'),
+            $context->builder->trunc($retFail, $i32)
+        );
     }
 
     /**

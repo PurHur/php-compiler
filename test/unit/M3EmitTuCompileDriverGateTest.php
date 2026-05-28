@@ -23,6 +23,7 @@ final class M3EmitTuCompileDriverGateTest extends TestCase
         $this->assertStringContainsString('isSourceBundlerRealLoweringMethod', $jit);
         $this->assertStringContainsString('shouldUseM3CompileDriverRealLowering()', $jit);
         $this->assertStringContainsString('Emit-helper binaries must init parse/compiler spine (#2633)', $emit);
+        $this->assertStringContainsString('exitWithStatus', $emit);
         $this->assertStringContainsString('return true;', $emit);
     }
 }
