@@ -5,6 +5,8 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+#include <signal.h>
+#include <unistd.h>
 
 typedef struct __string__ __string__;
 typedef struct __hashtable__ __hashtable__;
@@ -18,21 +20,56 @@ extern void __value__writeHashtable(__value__ *out, __hashtable__ *ht);
 static int phpc_cli_argc = 0;
 static char **phpc_cli_argv = NULL;
 
+static int phpc_segv_handler_installed = 0;
+static char phpc_last_progress[256];
+static size_t phpc_last_progress_len = 0;
+
+static void phpc_segv_handler(int sig)
+{
+    (void) sig;
+    if (phpc_last_progress_len > 0) {
+        (void) write(2, "phpc: fatal signal (segfault) after ", 37);
+        (void) write(2, phpc_last_progress, phpc_last_progress_len);
+        (void) write(2, "\n", 1);
+    } else {
+        (void) write(2, "phpc: fatal signal (segfault)\n", 30);
+    }
+    _exit(139);
+}
+
+static void phpc_install_segv_handler(void)
+{
+    if (phpc_segv_handler_installed) {
+        return;
+    }
+    phpc_segv_handler_installed = 1;
+    (void) signal(SIGSEGV, phpc_segv_handler);
+}
+
 static void phpc_progress_note(const char *msg)
 {
     const char *path;
     FILE *fp;
     size_t len;
 
+    phpc_install_segv_handler();
     path = getenv("PHP_COMPILER_JIT_PROGRESS_FILE");
     if (NULL == path || '\0' == *path || NULL == msg) {
         return;
+    }
+    len = strlen(msg);
+    if (len > 0) {
+        if (len >= sizeof(phpc_last_progress)) {
+            len = sizeof(phpc_last_progress) - 1;
+        }
+        memcpy(phpc_last_progress, msg, len);
+        phpc_last_progress[len] = '\0';
+        phpc_last_progress_len = len;
     }
     fp = fopen(path, "wb");
     if (NULL == fp) {
         return;
     }
-    len = strlen(msg);
     if (len > 0) {
         (void) fwrite(msg, 1, len, fp);
     }

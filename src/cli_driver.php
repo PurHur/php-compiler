@@ -38,6 +38,18 @@ if (!function_exists('php_compiler_cli_should_run_entry_driver')) {
 }
 
 if (!function_exists('php_compiler_cli_dispatch')) {
+    function php_compiler_cli_note_progress(string $msg): void
+    {
+        try {
+            if (!class_exists(\PHPCompiler\JIT\Progress::class)) {
+                return;
+            }
+            \PHPCompiler\JIT\Progress::noteFunction($msg);
+        } catch (\Throwable $e) {
+            // best-effort only: progress breadcrumbs must not affect CLI behavior
+        }
+    }
+
     /**
      * Parse argv and invoke the entry script run() callback.
      *
@@ -48,6 +60,7 @@ if (!function_exists('php_compiler_cli_dispatch')) {
         if (!php_compiler_cli_should_run_entry_driver()) {
             return;
         }
+        php_compiler_cli_note_progress('php:cli_dispatch_begin');
 
         $autoloadEnv = getenv('PHP_COMPILER_VENDOR_AUTOLOAD');
         $selfhostAot = getenv('PHP_COMPILER_SELFHOST_AOT');
@@ -117,6 +130,7 @@ if (!function_exists('php_compiler_cli_dispatch')) {
             // Compiled driver still resolves spine classes at runtime without composer autoload (#1521).
             spl_autoload_register('php_compiler_cli_minimal_autoload');
         }
+        php_compiler_cli_note_progress('php:cli_dispatch_after_autoload');
 
         $memoryLimit = getenv('PHP_COMPILER_MEMORY_LIMIT');
         if (false === $memoryLimit || '' === $memoryLimit) {
@@ -140,6 +154,7 @@ if (!function_exists('php_compiler_cli_dispatch')) {
             fwrite(STDERR, "php_compiler_cli_dispatch: missing CLI \$argv\n");
             exit(1);
         }
+        php_compiler_cli_note_progress('php:cli_dispatch_have_argv');
 
         $opts = $argv;
         // get rid of this
@@ -148,6 +163,7 @@ if (!function_exists('php_compiler_cli_dispatch')) {
         $execFile = '';
         $execCode = '';
         $options = [];
+        php_compiler_cli_note_progress('php:cli_dispatch_parse_begin');
         while (! empty($opts)) {
             $opt = array_shift($opts);
             switch ($opt) {
@@ -204,7 +220,9 @@ if (!function_exists('php_compiler_cli_dispatch')) {
                     if (!is_file($includePath)) {
                         die("Could not open include file {$includePath}\n");
                     }
-                    $options['--include'] ??= [];
+                    if (!isset($options['--include']) || !is_array($options['--include'])) {
+                        $options['--include'] = [];
+                    }
                     $options['--include'][] = realpath($includePath) ?: $includePath;
 
                     break;
@@ -231,6 +249,7 @@ if (!function_exists('php_compiler_cli_dispatch')) {
                     $execFile = $opt;
             }
         }
+        php_compiler_cli_note_progress('php:cli_dispatch_parse_done');
 
         if (empty($execCode)) {
             $execFile = '-';
@@ -238,6 +257,7 @@ if (!function_exists('php_compiler_cli_dispatch')) {
         }
 
         if (function_exists('run')) {
+            php_compiler_cli_note_progress('php:cli_dispatch_run');
             // @phan-suppress-next-line PhanUndeclaredFunction yes it is we just made a function_exists call
             run($execFile, $execCode, $options);
         } else {

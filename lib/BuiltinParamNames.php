@@ -9,23 +9,21 @@ namespace PHPCompiler;
  */
 final class BuiltinParamNames
 {
-    /** @var array<string, list<string>> */
-    private const MAP = [
-        'strlen' => ['string'],
-        'parse_str' => ['string', 'array'],
-        'similar_text' => ['string1', 'string2', 'percent'],
-    ];
-
     /**
      * @return list<string>|null
      */
     public static function forFunction(string $name): ?array
     {
         $lc = strtolower($name);
-        if (!isset(self::MAP[$lc])) {
-            return null;
+        switch ($lc) {
+            case 'strlen':
+                return ['string'];
+            case 'parse_str':
+                return ['string', 'array'];
+            case 'similar_text':
+                return ['string1', 'string2', 'percent'];
         }
 
-        return self::MAP[$lc];
+        return null;
     }
 }
