@@ -2889,7 +2889,17 @@ class JIT {
     /** Link-time trivial-echo AOT sidecar for emit-helper TU (#2559, #2566). */
     private function isM3EmitTuTrivialEchoSidecarActive(): bool
     {
-        if (!$this->shouldUseEmitHelperLinkStubs()) {
+        // M5 argv driver + inventory gen-2→gen-3 bin/compile.php links need bootstrap-aot sidecars
+        // even when EMIT_HELPER_LINK is unset (#3004).
+        if ($this->shouldUseM5DriverHostCompile() || $this->shouldUseM3InventoryEmitDriver()) {
+            $this->cacheM3EmitTuTrivialEchoAtLinkTime();
+
+            return \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::isRegistered($this->context);
+        }
+        // M4 argv bin/compile.php links with -u PHP_COMPILER_EMIT_HELPER_LINK but still needs
+        // compile_smoke / HelloWorld sidecars at link time (#3004, #2880).
+        $inventoryArgvSidecar = $this->shouldUseM3InventoryEmitDriver() && $this->shouldUseM4BinCompileArgvMainNative();
+        if (!$this->shouldUseEmitHelperLinkStubs() && !$inventoryArgvSidecar) {
             return false;
         }
         if (!$this->shouldUseM3EmitTuNativeBridge() && !$this->shouldUseM3InventoryEmitDriver()) {
@@ -3067,6 +3077,22 @@ class JIT {
             $this->context->m3EmitTuTrivialEchoPath = $path;
         }
         $repoRoot = dirname(__DIR__);
+        $repoSidecar = $repoRoot.'/'.ltrim($sidecarRel, '/');
+        if (is_readable($repoSidecar)) {
+            $aotBytes = file_get_contents($repoSidecar);
+            if (is_string($aotBytes) && '' !== $aotBytes) {
+                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::registerLinktime(
+                    $this->context,
+                    $repoRoot,
+                    $code,
+                    $aotBytes,
+                    $sidecarRel,
+                    $sentinelLogical
+                );
+
+                return;
+            }
+        }
         $pathNorm = str_replace('\\', '/', $path);
         $hostCompilePath = $path;
         if (str_ends_with($pathNorm, '/bin/compile.php')) {
@@ -3151,6 +3177,24 @@ class JIT {
                 );
             }
             @unlink($tmpOut);
+            // Gen-2 native argv driver cannot always spawn Zend during link; reuse blobs from an
+            // earlier Zend host-compile in the same workspace (#3004).
+            $repoSidecar = $repoRoot.'/'.ltrim($sidecarRel, '/');
+            if (is_readable($repoSidecar)) {
+                $aotBytes = file_get_contents($repoSidecar);
+                if (is_string($aotBytes) && '' !== $aotBytes) {
+                    \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::registerLinktime(
+                        $this->context,
+                        $repoRoot,
+                        $code,
+                        $aotBytes,
+                        $sidecarRel,
+                        $sentinelLogical
+                    );
+
+                    return;
+                }
+            }
 
             return;
         }

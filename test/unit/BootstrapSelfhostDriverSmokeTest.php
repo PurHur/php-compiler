@@ -75,4 +75,16 @@ final class BootstrapSelfhostDriverSmokeTest extends TestCase
         $apply = (string) file_get_contents(self::$root.'/script/apply-patches.sh');
         $this->assertStringContainsString('php-types-fromdecl-junk-fragments.patch', $apply);
     }
+
+    /** Issue #3004: argv bin/compile.php must not return null from parseAndCompile stub when sidecars miss. */
+    public function testInventoryArgvDriverUsesParseCompileSpineNotNullStub(): void
+    {
+        $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
+        $this->assertStringContainsString('inventoryArgvSidecar', $jit);
+        $this->assertStringContainsString('shouldUseM4BinCompileArgvMainNative', $jit);
+        $emit = (string) file_get_contents(self::$root.'/lib/JIT/BootstrapCompileSmokeM3Emit.php');
+        $this->assertStringContainsString("'compileemitsmoke', 'compile'", $emit);
+        $this->assertStringContainsString("strtolower('PHPCompiler\\\\Runtime::parse')", $emit);
+        $this->assertStringNotContainsString('unset($runtimeThis, $code, $filename)', $emit);
+    }
 }
