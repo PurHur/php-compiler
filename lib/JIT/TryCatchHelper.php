@@ -91,9 +91,7 @@ final class TryCatchHelper
             $jit->compileIncludedAtEntry($func, $handler->mergeBlock, $mergeBb);
             $handler->mergeBodyCompiled = true;
         }
-        if (null === $handler->dispatchBb) {
-            $handler->dispatchBb = self::buildDispatch($jit, $func, $context, $handler, $args);
-        }
+        $handler->dispatchBb = self::dispatchBbFor($jit, $func, $context, $handler, $args);
         self::emitMergeEntryCheck($jit, $func, $context, $mergeBlock, $mergeBb, $args);
         $jit->compileSubBlock($func, $tryOp->block1, ...$args);
         $tryTail = $builder->getInsertBlock();
@@ -122,9 +120,7 @@ final class TryCatchHelper
             return;
         }
         $handler->mergeEntryEmitted = true;
-        if (null === $handler->dispatchBb) {
-            $handler->dispatchBb = self::buildDispatch($jit, $func, $context, $handler, $args);
-        }
+        $dispatchBb = self::dispatchBbFor($jit, $func, $context, $handler, $args);
 
         $builder = $context->builder;
         $saved = $builder->getInsertBlock();
@@ -138,7 +134,7 @@ final class TryCatchHelper
             $hasPending,
             $i32->constInt(0, false)
         );
-        $builder->branchIf($hasBool, $handler->dispatchBb, $mergeBb);
+        $builder->branchIf($hasBool, $dispatchBb, $mergeBb);
         if (null !== $saved) {
             $builder->positionAtEnd($saved);
         }
@@ -164,9 +160,7 @@ final class TryCatchHelper
 
             return;
         }
-        if (null === $handler->dispatchBb) {
-            $handler->dispatchBb = self::buildDispatch($jit, $func, $context, $handler, []);
-        }
+        $dispatchBb = self::dispatchBbFor($jit, $func, $context, $handler, []);
 
         $thrown = $context->getVariableFromOp($block->getOperand($op->arg1));
         $obj = $context->helper->loadValue($thrown);
@@ -179,7 +173,28 @@ final class TryCatchHelper
         $throwBlock = $builder->getInsertBlock();
         $builder->positionAtEnd($throwBlock);
         $builder->call($context->lookupFunction('phpc_jit_set_throw_pending'), $obj);
-        $builder->branch($handler->dispatchBb);
+        $builder->branch($dispatchBb);
+    }
+
+    /**
+     * @param list<Variable> $args
+     */
+    private static function dispatchBbFor(
+        \PHPCompiler\JIT $jit,
+        Function_ $func,
+        Context $context,
+        TryCatchHandler $handler,
+        array $args
+    ): BasicBlock {
+        if (null !== $handler->dispatchBb) {
+            $parent = $handler->dispatchBb->getParent();
+            if ($parent instanceof Function_ && $parent === $func) {
+                return $handler->dispatchBb;
+            }
+            $handler->dispatchBb = null;
+        }
+
+        return $handler->dispatchBb = self::buildDispatch($jit, $func, $context, $handler, $args);
     }
 
     /**
