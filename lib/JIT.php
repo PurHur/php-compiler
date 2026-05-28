@@ -2046,7 +2046,6 @@ class JIT {
         }
 
         return str_contains($lower, 'splitcfgblockafterstringkeyedarray')
-            || str_contains($lower, 'compilecfgbranch')
             || str_contains($lower, 'compilecfgblock')
             || str_contains($lower, 'compileblock')
             || str_contains($lower, 'compileops')
