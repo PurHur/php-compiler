@@ -57,6 +57,7 @@ source "$(dirname "$0")/selfhost-preflight.sh"
 ci_apply_llvm_memory_env
 
 selfhost_preflight bootstrap-selfhost-helloworld-probe php-or-docker
+selfhost_apply_patches_if_needed
 
 # Strict mode requires native emit — auto-enable compile-driver link env (mirror compile-smoke; #2610).
 if [[ "${BOOTSTRAP_M3_HELLOWORLD_STRICT:-0}" == "1" ]]; then

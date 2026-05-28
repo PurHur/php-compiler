@@ -22,9 +22,12 @@ M4_EMIT_PATH="none"
 M4_BLOCK_REASON="native compile driver not linked (set BOOTSTRAP_M4_LINK_COMPILE_DRIVER=1)"
 # shellcheck source=php-env.sh
 source "$(dirname "$0")/php-env.sh"
+# shellcheck source=selfhost-preflight.sh
+source "$(dirname "$0")/selfhost-preflight.sh"
 # shellcheck source=bootstrap-resolve-compile-invoke.sh
 source "$(dirname "$0")/bootstrap-resolve-compile-invoke.sh"
 ci_apply_llvm_memory_env
+selfhost_apply_patches_if_needed
 
 m4_gen_exit_label() {
   local code=$1

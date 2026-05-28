@@ -118,3 +118,24 @@ selfhost_preflight() {
       ;;
   esac
 }
+
+# Apply vendor patches once per process. Some self-host probes host-compile inventory/spine sources
+# before the gen-0 link path runs apply-patches, which can trip on missing upstream ops (eg Union_).
+selfhost_apply_patches_if_needed() {
+  local root
+  root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+  if [[ "${SELFHOST_APPLY_PATCHES_DONE:-0}" == "1" ]]; then
+    return 0
+  fi
+  if [[ ! -x "${root}/script/apply-patches.sh" ]]; then
+    export SELFHOST_APPLY_PATCHES_DONE=1
+    return 0
+  fi
+  if [[ ! -d "${root}/vendor/ircmaxell/php-llvm" ]]; then
+    # composer install not run yet; let the caller fail with a clearer message later.
+    export SELFHOST_APPLY_PATCHES_DONE=1
+    return 0
+  fi
+  "${root}/script/apply-patches.sh" >/dev/null
+  export SELFHOST_APPLY_PATCHES_DONE=1
+}
