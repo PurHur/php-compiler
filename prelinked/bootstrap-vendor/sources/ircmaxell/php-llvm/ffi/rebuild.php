@@ -1,0 +1,80 @@
+<?php
+
+require __DIR__ . '/../vendor/autoload.php';
+
+$llvm = new FFIMe\FFIMe('/usr/lib/llvm-4.0/lib/libLLVM-4.0.so.1', ['/usr/include/llvm-c-4.0/', '/usr/include/llvm-4.0/']);
+$llvm->include("llvm-c/Core.h");
+$llvm->include("llvm-c/Target.h");
+$llvm->include("llvm-c/TargetMachine.h");
+$llvm->include("llvm-c/ExecutionEngine.h");
+$llvm->include("llvm-c/Analysis.h");
+$llvm->include("llvm-c/BitReader.h");
+$llvm->include("llvm-c/BitWriter.h");
+$llvm->include("llvm-c/Disassembler.h");
+$llvm->include("llvm-c/IRReader.h");
+$llvm->include("llvm-c/Linker.h");
+$llvm->include("llvm-c/Object.h");
+$llvm->include("llvm-c/Support.h");
+$llvm->include("llvm-c/Transforms/PassManagerBuilder.h");
+$llvm->include("llvm-c/Transforms/Scalar.h");
+$llvm->include("llvm-c/Transforms/IPO.h");
+$llvm->include("llvm-c/Transforms/Vectorize.h");
+$llvm->codegen('llvm\\llvm', __DIR__ . '/llvm4.php');
+
+$llvm = new FFIMe\FFIMe('/usr/lib/llvm-7/lib/libLLVM-7.so.1', ['/usr/include/llvm-c-7/', '/usr/include/llvm-7/']);
+$llvm->include("llvm-c/Core.h");
+$llvm->include("llvm-c/Target.h");
+$llvm->include("llvm-c/TargetMachine.h");
+$llvm->include("llvm-c/ExecutionEngine.h");
+$llvm->include("llvm-c/Analysis.h");
+$llvm->include("llvm-c/BitReader.h");
+$llvm->include("llvm-c/BitWriter.h");
+$llvm->include("llvm-c/Disassembler.h");
+$llvm->include("llvm-c/IRReader.h");
+$llvm->include("llvm-c/Linker.h");
+$llvm->include("llvm-c/Object.h");
+$llvm->include("llvm-c/Support.h");
+$llvm->include("llvm-c/Transforms/PassManagerBuilder.h");
+$llvm->include("llvm-c/Transforms/Scalar.h");
+$llvm->include("llvm-c/Transforms/IPO.h");
+$llvm->include("llvm-c/Transforms/Vectorize.h");
+$llvm->codegen('llvm\\llvm', __DIR__ . '/llvm7.php');
+
+$llvm = new FFIMe\FFIMe('/usr/lib/llvm-8/lib/libLLVM-8.so.1', ['/usr/include/llvm-c-8/', '/usr/include/llvm-8/']);
+$llvm->include("llvm-c/Core.h");
+$llvm->include("llvm-c/Target.h");
+$llvm->include("llvm-c/TargetMachine.h");
+$llvm->include("llvm-c/ExecutionEngine.h");
+$llvm->include("llvm-c/Analysis.h");
+$llvm->include("llvm-c/BitReader.h");
+$llvm->include("llvm-c/BitWriter.h");
+$llvm->include("llvm-c/Disassembler.h");
+$llvm->include("llvm-c/IRReader.h");
+$llvm->include("llvm-c/Linker.h");
+$llvm->include("llvm-c/Object.h");
+$llvm->include("llvm-c/Support.h");
+$llvm->include("llvm-c/Transforms/PassManagerBuilder.h");
+$llvm->include("llvm-c/Transforms/Scalar.h");
+$llvm->include("llvm-c/Transforms/IPO.h");
+$llvm->include("llvm-c/Transforms/Vectorize.h");
+$llvm->codegen('llvm\\llvm', __DIR__ . '/llvm8.php');
+
+$llvm = new FFIMe\FFIMe('/usr/lib/llvm-9/lib/libLLVM-9.so.1', ['/usr/include/llvm-c-9/', '/usr/include/llvm-9/']);
+$llvm->include("llvm-c/Core.h");
+$llvm->include("llvm-c/Target.h");
+$llvm->include("llvm-c/TargetMachine.h");
+$llvm->include("llvm-c/ExecutionEngine.h");
+$llvm->include("llvm-c/Analysis.h");
+$llvm->include("llvm-c/BitReader.h");
+$llvm->include("llvm-c/BitWriter.h");
+$llvm->include("llvm-c/Disassembler.h");
+$llvm->include("llvm-c/IRReader.h");
+$llvm->include("llvm-c/Linker.h");
+$llvm->include("llvm-c/Object.h");
+$llvm->include("llvm-c/Support.h");
+$llvm->include("llvm-c/Transforms/PassManagerBuilder.h");
+$llvm->include("llvm-c/Transforms/Scalar.h");
+$llvm->include("llvm-c/Transforms/IPO.h");
+$llvm->include("llvm-c/Transforms/Vectorize.h");
+$llvm->codegen('llvm\\llvm', __DIR__ . '/llvm9.php');
+

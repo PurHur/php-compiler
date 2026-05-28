@@ -44,7 +44,7 @@ if ($check && !$vendorPresent) {
 }
 
 if ($compile && !$vendorPresent) {
-    exit(bootstrapVendorPrelinkColdBootCompileFromCommitted($root, $manifestPath, $manifest));
+    exit(bootstrapVendorPrelinkColdBootCompile($root, $manifestPath, $manifest, $one));
 }
 
 foreach (BOOTSTRAP_VENDOR_PRELINK_PACKAGES as $package => $role) {
@@ -145,91 +145,7 @@ fwrite(
     .' ('.($compileInvoker['argv'][0] ?? 'unknown').") (#2849)\n"
 );
 
-$failures = 0;
-foreach (BOOTSTRAP_VENDOR_PRELINK_PACKAGES as $package => $role) {
-    if (null !== $one && $one !== $package && $one !== bootstrapVendorPrelinkSlug($package)) {
-        continue;
-    }
-    $slug = bootstrapVendorPrelinkSlug($package);
-    $bundleRel = $manifest['packages'][$package]['bundle'];
-    $bundleAbs = $root.'/'.$bundleRel;
-    $objectRel = $manifest['packages'][$package]['object'];
-    $objectAbs = $root.'/'.$objectRel;
-    $buildBase = $root.'/build/bootstrap-vendor/'.$slug;
-
-    if (!is_file($bundleAbs)) {
-        $manifest['packages'][$package]['status'] = 'missing_bundle';
-        ++$failures;
-        continue;
-    }
-
-    if (!is_dir(dirname($buildBase))) {
-        mkdir(dirname($buildBase), 0775, true);
-    }
-    if (!is_dir(dirname($objectAbs))) {
-        mkdir(dirname($objectAbs), 0775, true);
-    }
-
-    @unlink($buildBase);
-    @unlink($buildBase.'.o');
-    @unlink($objectAbs);
-
-    $cmd = bootstrapVendorPrelinkBuildCompileCommand($root, $buildBase, $bundleAbs);
-    $output = [];
-    exec($cmd, $output, $code);
-    $objectCandidate = $buildBase.'.o';
-
-    if (0 === $code && is_file($objectCandidate)) {
-        copy($objectCandidate, $objectAbs);
-        $manifest['packages'][$package]['status'] = 'object_ok';
-        $manifest['packages'][$package]['blocker'] = null;
-        fwrite(STDOUT, "OK {$package} → {$objectRel}\n");
-        continue;
-    }
-
-    $blocker = 0 !== $code
-        ? 'compile exit '.$code.' (vendor bundle AOT — #1416, #2849)'
-        : 'missing object file after compile';
-
-    $firstActionable = null;
-    foreach ($output as $line) {
-        $line = (string) $line;
-        if (str_contains($line, 'Missing vendor autoload')) {
-            $firstActionable = $line;
-            $blocker = 'vendor prelink must not require composer autoload (#2849)';
-            break;
-        }
-        if (str_contains($line, 'PHP Fatal error:') || str_contains($line, 'Fatal error:') || str_contains($line, 'Uncaught ')) {
-            $firstActionable = $line;
-            break;
-        }
-    }
-    if (null === $firstActionable && [] !== $output) {
-        $last = (string) end($output);
-        if ('' !== $last) {
-            $firstActionable = $last;
-        }
-    }
-    if (null !== $firstActionable) {
-        $blocker .= ' — '.$firstActionable;
-    }
-
-    $logPath = $buildBase.'.log';
-    file_put_contents($logPath, implode("\n", array_map('strval', $output))."\n");
-    $manifest['packages'][$package]['status'] = 139 === $code ? 'compile_segfault' : 'compile_failed';
-    $manifest['packages'][$package]['blocker'] = $blocker;
-    fwrite(STDERR, "FAIL {$package}: {$blocker}\n");
-    fwrite(STDERR, "  cmd: {$cmd}\n");
-    fwrite(STDERR, "  log: {$logPath}\n");
-    if ([] !== $output) {
-        $tail = array_slice($output, -60);
-        fwrite(STDERR, "  tail:\n");
-        foreach ($tail as $line) {
-            fwrite(STDERR, "    ".(string) $line."\n");
-        }
-    }
-    ++$failures;
-}
+$failures = bootstrapVendorPrelinkCompilePackages($root, $manifest, $one);
 
 bootstrapVendorPrelinkWriteManifest($manifestPath, $manifest);
 

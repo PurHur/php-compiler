@@ -13,12 +13,46 @@ const BOOTSTRAP_VENDOR_PRELINK_PACKAGES = [
     'ircmaxell/php-llvm' => 'LLVM FFI from PHP JIT',
 ];
 
+/** Zend compile-driver deps materialized for cold-boot rebuild without composer (#2881). */
+const BOOTSTRAP_VENDOR_PRELINK_DRIVER_PACKAGES = [
+    'nikic/php-parser',
+];
+
 /**
  * @return list<string> repo-relative paths under vendor/<package>/lib
  */
+function bootstrapVendorPrelinkSourcesRoot(string $root): string
+{
+    return $root.'/prelinked/bootstrap-vendor/sources';
+}
+
+/** Committed vendor lib/ snapshot for cold-boot AOT rebuild without composer (#2881). */
+function bootstrapVendorPrelinkSourcesTreePresent(string $root): bool
+{
+    foreach (array_keys(BOOTSTRAP_VENDOR_PRELINK_PACKAGES) as $package) {
+        $base = bootstrapVendorPrelinkSourcesRoot($root).'/'.$package;
+        if (!is_dir($base.'/lib')) {
+            return false;
+        }
+        if ('ircmaxell/php-llvm' === $package && !is_dir($base.'/ffi')) {
+            return false;
+        }
+    }
+    foreach (BOOTSTRAP_VENDOR_PRELINK_DRIVER_PACKAGES as $package) {
+        if (!is_dir(bootstrapVendorPrelinkSourcesRoot($root).'/'.$package.'/lib')) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 function bootstrapVendorPrelinkLibPhpFiles(string $root, string $package): array
 {
     $libDir = $root.'/vendor/'.$package.'/lib';
+    if (!is_dir($libDir)) {
+        $libDir = bootstrapVendorPrelinkSourcesRoot($root).'/'.$package.'/lib';
+    }
     if (!is_dir($libDir)) {
         return [];
     }
@@ -207,43 +241,312 @@ function bootstrapVendorPrelinkColdBootCheck(string $root, string $manifestPath,
 }
 
 /**
- * When vendor/ is absent, reuse committed prelinked .o artifacts instead of Zend rebuild (#2841).
+ * Symlink vendor/ircmaxell/* → committed sources when composer tree is absent (#2881).
+ *
+ * @return string|null marker file when materialized (caller must cleanup)
+ */
+function bootstrapVendorPrelinkMaterializeVendorTree(string $root): ?string
+{
+    if (bootstrapVendorPrelinkVendorTreePresent($root)) {
+        return null;
+    }
+    if (!bootstrapVendorPrelinkSourcesTreePresent($root)) {
+        return null;
+    }
+
+    $marker = $root.'/build/bootstrap-vendor/.vendor-materialized';
+    $sources = bootstrapVendorPrelinkSourcesRoot($root);
+    $vendorIrc = $root.'/vendor/ircmaxell';
+    if (!is_dir($root.'/vendor')) {
+        mkdir($root.'/vendor', 0775, true);
+    }
+    if (!is_dir($vendorIrc)) {
+        mkdir($vendorIrc, 0775, true);
+    }
+
+    $packages = [...array_keys(BOOTSTRAP_VENDOR_PRELINK_PACKAGES), ...BOOTSTRAP_VENDOR_PRELINK_DRIVER_PACKAGES];
+    foreach ($packages as $package) {
+        $target = $root.'/vendor/'.$package;
+        $source = $sources.'/'.$package;
+        $parent = dirname($target);
+        if (!is_dir($parent)) {
+            mkdir($parent, 0775, true);
+        }
+        if (is_link($target) || is_dir($target)) {
+            if (is_link($target)) {
+                unlink($target);
+            } elseif (is_dir($target) && !str_starts_with(realpath($target) ?: '', realpath($source) ?: "\0")) {
+                fwrite(STDERR, "bootstrap-vendor-prelink: vendor/{$package} exists and is not a symlink to sources\n");
+
+                return null;
+            } else {
+                continue;
+            }
+        }
+        $rel = bootstrapVendorPrelinkRelativePath($target, $source);
+        if (!symlink($rel, $target)) {
+            fwrite(STDERR, "bootstrap-vendor-prelink: failed to symlink vendor/{$package} → sources\n");
+
+            return null;
+        }
+    }
+
+    if (!is_dir($marker)) {
+        mkdir(dirname($marker), 0775, true);
+    }
+    file_put_contents($marker, gmdate('c')."\n");
+
+    return $marker;
+}
+
+function bootstrapVendorPrelinkCleanupMaterializedVendorTree(string $root, ?string $marker): void
+{
+    if (null === $marker || !is_file($marker)) {
+        return;
+    }
+
+    $packages = [...array_keys(BOOTSTRAP_VENDOR_PRELINK_PACKAGES), ...BOOTSTRAP_VENDOR_PRELINK_DRIVER_PACKAGES];
+    foreach ($packages as $package) {
+        $target = $root.'/vendor/'.$package;
+        if (is_link($target)) {
+            unlink($target);
+        }
+    }
+    @rmdir($root.'/vendor/ircmaxell');
+    @rmdir($root.'/vendor/nikic');
+    if (is_dir($root.'/vendor') && [] === array_diff(scandir($root.'/vendor') ?: [], ['.', '..'])) {
+        @rmdir($root.'/vendor');
+    }
+    @unlink($marker);
+}
+
+function bootstrapVendorPrelinkRelativePath(string $linkPath, string $targetPath): string
+{
+    $fromReal = realpath(dirname($linkPath)) ?: dirname($linkPath);
+    $toReal = realpath($targetPath) ?: $targetPath;
+    $fromParts = explode('/', str_replace('\\', '/', $fromReal));
+    $toParts = explode('/', str_replace('\\', '/', $toReal));
+    while ([] !== $fromParts && [] !== $toParts && $fromParts[0] === $toParts[0]) {
+        array_shift($fromParts);
+        array_shift($toParts);
+    }
+    $ups = array_fill(0, count($fromParts), '..');
+    $rel = array_merge($ups, $toParts);
+
+    return implode('/', $rel);
+}
+
+/**
+ * AOT-compile vendor prelink bundles → prelinked .o (shared by warm and cold boot).
  *
  * @param array{version: int, generated_at: string, packages: array<string, array<string, mixed>>} $manifest
  *
- * @return int exit code (0 = all packages satisfied from disk)
+ * @return int number of failures
  */
-function bootstrapVendorPrelinkColdBootCompileFromCommitted(string $root, string $manifestPath, array &$manifest): int
+/**
+ * @param list<string>|null $onlyPackages restrict to these package names (e.g. cold-boot rebuild subset)
+ */
+function bootstrapVendorPrelinkCompilePackages(string $root, array &$manifest, ?string $one = null, ?array $onlyPackages = null): int
 {
     $failures = 0;
     foreach (BOOTSTRAP_VENDOR_PRELINK_PACKAGES as $package => $role) {
+        if (null !== $onlyPackages && !in_array($package, $onlyPackages, true)) {
+            continue;
+        }
+        if (null !== $one && $one !== $package && $one !== bootstrapVendorPrelinkSlug($package)) {
+            continue;
+        }
         $slug = bootstrapVendorPrelinkSlug($package);
+        $bundleRel = $manifest['packages'][$package]['bundle'] ?? '';
+        $bundleAbs = $root.'/'.$bundleRel;
         $objectRel = $manifest['packages'][$package]['object'] ?? '';
+        $objectAbs = $root.'/'.$objectRel;
+        $buildBase = $root.'/build/bootstrap-vendor/'.$slug;
+
+        if (!is_string($bundleRel) || '' === $bundleRel || !is_file($bundleAbs)) {
+            $manifest['packages'][$package]['status'] = 'missing_bundle';
+            ++$failures;
+            continue;
+        }
         if (!is_string($objectRel) || '' === $objectRel) {
             ++$failures;
             continue;
         }
-        $objectAbs = $root.'/'.$objectRel;
-        if (!is_file($objectAbs)) {
-            $manifest['packages'][$package]['status'] = 'missing_object';
-            $manifest['packages'][$package]['blocker'] = 'cold boot: committed '.$objectRel.' missing (restore vendor/ for rebuild — #2849)';
-            ++$failures;
+
+        if (!is_dir(dirname($buildBase))) {
+            mkdir(dirname($buildBase), 0775, true);
+        }
+        if (!is_dir(dirname($objectAbs))) {
+            mkdir(dirname($objectAbs), 0775, true);
+        }
+
+        @unlink($buildBase);
+        @unlink($buildBase.'.o');
+        @unlink($objectAbs);
+
+        $cmd = bootstrapVendorPrelinkBuildCompileCommand($root, $buildBase, $bundleAbs);
+        $output = [];
+        exec($cmd, $output, $code);
+        $objectCandidate = $buildBase.'.o';
+
+        if (0 === $code && is_file($objectCandidate)) {
+            copy($objectCandidate, $objectAbs);
+            $manifest['packages'][$package]['status'] = 'object_ok';
+            $manifest['packages'][$package]['blocker'] = null;
+            fwrite(STDOUT, "OK {$package} → {$objectRel}\n");
             continue;
         }
-        $manifest['packages'][$package]['status'] = 'object_ok';
-        $manifest['packages'][$package]['blocker'] = null;
-        fwrite(STDOUT, "OK {$package} → {$objectRel} (cold boot: committed prelink)\n");
+
+        $blocker = 0 !== $code
+            ? 'compile exit '.$code.' (vendor bundle AOT — #1416, #2849)'
+            : 'missing object file after compile';
+
+        $firstActionable = null;
+        foreach ($output as $line) {
+            $line = (string) $line;
+            if (str_contains($line, 'Missing vendor autoload')) {
+                $firstActionable = $line;
+                $blocker = 'vendor prelink must not require composer autoload (#2849)';
+                break;
+            }
+            if (str_contains($line, 'PHP Fatal error:') || str_contains($line, 'Fatal error:') || str_contains($line, 'Uncaught ')) {
+                $firstActionable = $line;
+                break;
+            }
+        }
+        if (null === $firstActionable && [] !== $output) {
+            $last = (string) end($output);
+            if ('' !== $last) {
+                $firstActionable = $last;
+            }
+        }
+        if (null !== $firstActionable) {
+            $blocker .= ' — '.$firstActionable;
+        }
+
+        $logPath = $buildBase.'.log';
+        file_put_contents($logPath, implode("\n", array_map('strval', $output))."\n");
+        $manifest['packages'][$package]['status'] = 139 === $code ? 'compile_segfault' : 'compile_failed';
+        $manifest['packages'][$package]['blocker'] = $blocker;
+        fwrite(STDERR, "FAIL {$package}: {$blocker}\n");
+        fwrite(STDERR, "  cmd: {$cmd}\n");
+        fwrite(STDERR, "  log: {$logPath}\n");
+        if ([] !== $output) {
+            $tail = array_slice($output, -60);
+            fwrite(STDERR, "  tail:\n");
+            foreach ($tail as $line) {
+                fwrite(STDERR, "    ".(string) $line."\n");
+            }
+        }
+        ++$failures;
     }
 
-    bootstrapVendorPrelinkWriteManifest($manifestPath, $manifest);
+    return $failures;
+}
 
-    if ($failures > 0) {
-        fwrite(STDERR, "bootstrap-vendor-objects: {$failures} package(s) missing committed prelink .o (vendor/ absent)\n");
+/**
+ * Cold boot: reuse committed .o or AOT-rebuild missing ones via sources snapshot (#2841, #2881).
+ *
+ * @param array{version: int, generated_at: string, packages: array<string, array<string, mixed>>} $manifest
+ */
+function bootstrapVendorPrelinkColdBootCompile(string $root, string $manifestPath, array &$manifest, ?string $one = null): int
+{
+    $needsRebuild = [];
+    foreach (BOOTSTRAP_VENDOR_PRELINK_PACKAGES as $package => $role) {
+        if (null !== $one && $one !== $package && $one !== bootstrapVendorPrelinkSlug($package)) {
+            continue;
+        }
+        $objectRel = $manifest['packages'][$package]['object'] ?? '';
+        if (!is_string($objectRel) || '' === $objectRel) {
+            $needsRebuild[] = $package;
+            continue;
+        }
+        if (!is_file($root.'/'.$objectRel)) {
+            $needsRebuild[] = $package;
+        }
+    }
+
+    if ([] === $needsRebuild) {
+        foreach (BOOTSTRAP_VENDOR_PRELINK_PACKAGES as $package => $role) {
+            if (null !== $one && $one !== $package && $one !== bootstrapVendorPrelinkSlug($package)) {
+                continue;
+            }
+            $objectRel = $manifest['packages'][$package]['object'] ?? '';
+            $manifest['packages'][$package]['status'] = 'object_ok';
+            $manifest['packages'][$package]['blocker'] = null;
+            fwrite(STDOUT, "OK {$package} → {$objectRel} (cold boot: committed prelink)\n");
+        }
+        bootstrapVendorPrelinkWriteManifest($manifestPath, $manifest);
+        fwrite(STDOUT, "bootstrap-vendor-objects: cold boot — all prelink objects from committed artifacts\n");
+
+        return 0;
+    }
+
+    if (!bootstrapVendorPrelinkSourcesTreePresent($root)) {
+        foreach ($needsRebuild as $package) {
+            $objectRel = $manifest['packages'][$package]['object'] ?? '';
+            $manifest['packages'][$package]['status'] = 'missing_object';
+            $manifest['packages'][$package]['blocker'] = 'cold boot: committed '.$objectRel.' missing (no sources snapshot — #2881)';
+        }
+        bootstrapVendorPrelinkWriteManifest($manifestPath, $manifest);
+        fwrite(STDERR, 'bootstrap-vendor-objects: '.count($needsRebuild).' package(s) missing prelink .o and sources snapshot (vendor/ absent)'."\n");
 
         return 1;
     }
 
-    fwrite(STDOUT, "bootstrap-vendor-objects: cold boot — all prelink objects from committed artifacts\n");
+    $llvm = getenv('PHP_COMPILER_LLVM_PATH') ?: '';
+    if ('' === $llvm || !is_file($llvm.'/libLLVM-9.so.1')) {
+        fwrite(STDERR, "bootstrap-vendor-objects: LLVM 9 required to rebuild missing prelink .o (set PHP_COMPILER_LLVM_PATH)\n");
+
+        return 2;
+    }
+
+    $marker = bootstrapVendorPrelinkMaterializeVendorTree($root);
+    if (null === $marker) {
+        fwrite(STDERR, "bootstrap-vendor-objects: failed to materialize vendor sources for cold-boot rebuild\n");
+
+        return 1;
+    }
+
+    putenv('PHP_COMPILER_SELFHOST_AOT=0');
+    putenv('PHP_COMPILER_VENDOR_PRELINK=1');
+    putenv('PHP_COMPILER_KEEP_OBJECT_FILE=1');
+
+    $compileInvoker = bootstrapVendorPrelinkResolveCompileInvoker($root);
+    fwrite(
+        STDERR,
+        'bootstrap-vendor-objects: cold-boot rebuild invoker='.$compileInvoker['mode']
+        .' ('.($compileInvoker['argv'][0] ?? 'unknown').") (#2881)\n"
+    );
+    fwrite(STDERR, "bootstrap-vendor-objects: materialized vendor/ from prelinked/bootstrap-vendor/sources\n");
+
+    $failures = 0;
+    foreach (BOOTSTRAP_VENDOR_PRELINK_PACKAGES as $package => $role) {
+        if (null !== $one && $one !== $package && $one !== bootstrapVendorPrelinkSlug($package)) {
+            continue;
+        }
+        $objectRel = $manifest['packages'][$package]['object'] ?? '';
+        $objectAbs = is_string($objectRel) && '' !== $objectRel ? $root.'/'.$objectRel : '';
+        if ('' !== $objectAbs && is_file($objectAbs) && !in_array($package, $needsRebuild, true)) {
+            $manifest['packages'][$package]['status'] = 'object_ok';
+            $manifest['packages'][$package]['blocker'] = null;
+            fwrite(STDOUT, "OK {$package} → {$objectRel} (cold boot: committed prelink)\n");
+            continue;
+        }
+    }
+
+    $failures += bootstrapVendorPrelinkCompilePackages($root, $manifest, $one, $needsRebuild);
+
+    bootstrapVendorPrelinkCleanupMaterializedVendorTree($root, $marker);
+    bootstrapVendorPrelinkWriteManifest($manifestPath, $manifest);
+
+    if ($failures > 0) {
+        fwrite(STDERR, "bootstrap-vendor-objects: {$failures} package(s) failed cold-boot rebuild (manifest updated)\n");
+
+        return 1;
+    }
+
+    fwrite(STDOUT, "bootstrap-vendor-objects: cold boot — prelink objects OK (committed + rebuilt)\n");
 
     return 0;
 }

@@ -9,6 +9,54 @@ use PHPUnit\Framework\TestCase;
 /** @group unit */
 final class BootstrapVendorPrelinkColdBootTest extends TestCase
 {
+    /** Issue #2881: vendor absent + missing .o — rebuild from committed sources snapshot. */
+    public function testVendorAbsentRebuildsMissingPrelinkFromSources(): void
+    {
+        $root = dirname(__DIR__, 2);
+        require_once $root.'/script/bootstrap-vendor-prelink-lib.php';
+        if (!is_dir($root.'/vendor')) {
+            $this->markTestSkipped('vendor/ not installed');
+        }
+        if (!bootstrapVendorPrelinkSourcesTreePresent($root)) {
+            $this->markTestSkipped('prelinked/bootstrap-vendor/sources not present');
+        }
+        $vendorBak = $root.'/.phpc-vendor-hygiene-bak';
+        if (is_dir($vendorBak)) {
+            $this->markTestSkipped('stale '.$vendorBak.' from interrupted test');
+        }
+        $cfgObj = $root.'/prelinked/bootstrap-vendor/ircmaxell-php-cfg.o';
+        $llvmObj = $root.'/prelinked/bootstrap-vendor/ircmaxell-php-llvm.o';
+        if (!is_file($cfgObj) || !is_file($llvmObj)) {
+            $this->markTestSkipped('committed prelink .o not present');
+        }
+        $cfgBak = $cfgObj.'.phpc-test-bak';
+        $llvmBak = $llvmObj.'.phpc-test-bak';
+        rename($cfgObj, $cfgBak);
+        rename($llvmObj, $llvmBak);
+        $cmd = 'cd '.escapeshellarg($root)
+            .' && mv vendor '.escapeshellarg(basename($vendorBak))
+            .' && '.escapeshellarg(PHP_BINARY).' script/bootstrap-vendor-objects.php --compile 2>&1'
+            .'; code=$?; mv '.escapeshellarg(basename($vendorBak)).' vendor'
+            .'; mv '.escapeshellarg($cfgBak).' '.escapeshellarg($cfgObj)
+            .'; mv '.escapeshellarg($llvmBak).' '.escapeshellarg($llvmObj)
+            .'; exit $code';
+        try {
+            exec('bash -lc '.escapeshellarg($cmd), $out, $code);
+            $joined = implode("\n", $out);
+            $this->assertSame(0, $code, $joined);
+            $this->assertStringContainsString('materialized vendor/', $joined, $joined);
+            $this->assertFileExists($cfgObj, $joined);
+            $this->assertFileExists($llvmObj, $joined);
+        } finally {
+            if (is_file($cfgBak)) {
+                rename($cfgBak, $cfgObj);
+            }
+            if (is_file($llvmBak)) {
+                rename($llvmBak, $llvmObj);
+            }
+        }
+    }
+
     /** Issue #2865: vendor absent — bootstrap-vendor-objects --compile uses committed .o only. */
     public function testVendorAbsentCompileUsesCommittedPrelinkObjects(): void
     {
@@ -65,11 +113,13 @@ final class BootstrapVendorPrelinkColdBootTest extends TestCase
     {
         $root = dirname(__DIR__, 2);
         $script = (string) file_get_contents($root.'/script/bootstrap-vendor-objects.php');
-        $this->assertStringContainsString('bootstrapVendorPrelinkResolveCompileInvoker', $script);
-        $this->assertStringContainsString('bootstrapVendorPrelinkBuildCompileCommand', $script);
+        $this->assertStringContainsString('bootstrapVendorPrelinkColdBootCompile', $script);
+        $this->assertStringContainsString('bootstrapVendorPrelinkCompilePackages', $script);
         $lib = (string) file_get_contents($root.'/script/bootstrap-vendor-prelink-lib.php');
         $this->assertStringContainsString('build/bin-compile-aot', $lib);
         $this->assertStringContainsString('build/selfhost-compile-driver', $lib);
+        $this->assertStringContainsString('bootstrapVendorPrelinkColdBootCompile', $lib);
+        $this->assertStringContainsString('bootstrapVendorPrelinkSourcesTreePresent', $lib);
     }
 
     public function testResolveCompileInvokerPrefersNativeDriverWhenPresent(): void
