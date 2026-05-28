@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# M4/M5: native driver recompiles full compiler spine (725/725) — issue #1498, #2697, #2866.
+# M4/M5: native driver recompiles full compiler spine — issue #1498, #2697, #2866.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "${ROOT}"
@@ -55,4 +55,15 @@ if ! grep -q 'compiler_lib_spine_smoke bundle OK' <<< "${run_out}"; then
   exit 1
 fi
 
-echo "bootstrap-loop-gen2-recompile-spine: OK gen-2=${DRIVER} gen-3=${GEN3} (725/725 spine, argv -o)"
+spine_counts="unknown"
+if command -v php >/dev/null 2>&1; then
+  # Avoid hardcoding the spine ratio; keep it consistent with the M2 ratio SSOT.
+  # Output format: "bootstrap-spine-count: N/M"
+  spine_counts="$(php script/bootstrap-spine-count.php 2>/dev/null | sed -n 's/^bootstrap-spine-count: //p' || true)"
+  if [[ -z "${spine_counts}" ]]; then
+    spine_counts="unknown"
+  fi
+fi
+
+echo "bootstrap-loop-gen2-recompile-spine: OK gen-2=${DRIVER} gen-3=${GEN3} (${spine_counts} spine, argv -o)"
+
