@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 
 /**
@@ -15,14 +14,6 @@ final class IniSet
 {
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
-
-        $fn = $context->lookupFunction('__compiler_ini_set');
-        $entry = $fn->appendBasicBlock('ini_set_stub');
-        $context->builder->positionAtEnd($entry);
-        $context->builder->returnVoid();
-        $context->builder->clearInsertionPosition();
+        IniRuntime::ensureLinked($context);
     }
 }
