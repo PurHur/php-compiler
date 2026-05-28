@@ -141,6 +141,32 @@ putenv('PHP_COMPILER_VENDOR_PRELINK=1');
 putenv('PHP_COMPILER_KEEP_OBJECT_FILE=1');
 
 $compileInvoker = bootstrapVendorPrelinkResolveCompileInvoker($root);
+if (
+    'zend' === $compileInvoker['mode']
+    && '1' !== (string) getenv('BOOTSTRAP_M5_VENDOR_ALLOW_ZEND')
+) {
+    fwrite(
+        STDERR,
+        "bootstrap-vendor-objects: compile requires native compile driver (no Zend in loop)\n"
+    );
+    fwrite(
+        STDERR,
+        "bootstrap-vendor-objects: no compiled driver under build/ (expected one of bin-compile-aot, selfhost-compile-driver, selfhost-native-compile-driver)\n"
+    );
+    fwrite(
+        STDERR,
+        "bootstrap-vendor-objects: one-time bootstrap:\n"
+    );
+    fwrite(
+        STDERR,
+        "  ./script/docker-exec.sh -- bash -lc 'make bootstrap-selfhost-driver-smoke'\n"
+    );
+    fwrite(
+        STDERR,
+        "bootstrap-vendor-objects: or set BOOTSTRAP_M5_VENDOR_ALLOW_ZEND=1 to permit gen-0 fallback (NOT M5)\n"
+    );
+    exit(1);
+}
 fwrite(
     STDERR,
     'bootstrap-vendor-objects: compile invoker='.$compileInvoker['mode']
