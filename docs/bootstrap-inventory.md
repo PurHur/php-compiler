@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 726 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 1878 |
+| Source constructs flagged (warnings) | 1880 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -529,13 +529,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Func/JIT.php` | 0 | 2 |
 | `lib/Func/PHP.php` | 0 | 1 |
 | `lib/Handler.php` | 0 | 1 |
-| `lib/JIT.php` | 0 | 56 |
+| `lib/JIT.php` | 0 | 57 |
 | `lib/JIT/Analyzer.php` | 0 | 1 |
 | `lib/JIT/ArrayBuiltinHelper.php` | 0 | 47 |
 | `lib/JIT/ArrayMapCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/ArrayReduceCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/BasicBlockHelper.php` | 0 | 1 |
-| `lib/JIT/BootstrapCompileSmokeM3Emit.php` | 0 | 2 |
+| `lib/JIT/BootstrapCompileSmokeM3Emit.php` | 0 | 3 |
 | `lib/JIT/Builtin.php` | 0 | 1 |
 | `lib/JIT/Builtin/AttributeRegistry.php` | 0 | 1 |
 | `lib/JIT/Builtin/CallArgv.php` | 0 | 1 |
@@ -3964,62 +3964,63 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT\Call\ExternalMethod (line 146)
-- new JIT\Scope (line 172)
-- new Operand\Literal (line 223)
-- new Operand\Literal (line 239)
-- new Variable (line 925)
-- new JIT\Call\Vararg (line 935)
-- new JIT\Call\Native (line 945)
-- new JIT\Call\Native (line 1089)
-- new JIT\Variable (line 1279)
-- new JIT\Call\Native (line 1296)
-- new JIT\Call\Native (line 1355)
-- new JIT\Call\Native (line 1397)
-- new JIT\Call\Native (line 1443)
-- new JIT\Call\Native (line 2461)
-- new JIT\Call\Native (line 2492)
-- new JIT\Call\Native (line 2539)
-- new JIT\Call\Native (line 2586)
-- new JIT\Call\Native (line 2648)
-- new JIT\Call\Native (line 3252)
-- new JIT\Call\Native (line 3290)
-- new JIT\Call\Native (line 3324)
-- new JIT\Call\Native (line 3368)
-- new JIT\Call\Native (line 3725)
-- new JIT\Call\Native (line 3791)
-- new ext\standard\boolval (line 4156)
-- new Operand\Literal (line 4236)
-- new JIT\Variable (line 4270)
-- new Operand\Literal (line 4345)
-- new ext\standard\intval (line 4449)
-- new Variable (line 4478)
-- new Variable (line 4589)
-- new OpCode (line 4672)
-- new Variable (line 4921)
-- new JIT\Call\RuntimeVariableFunction (line 4960)
-- new Variable (line 5017)
-- new Variable (line 5146)
-- new Variable (line 5165)
-- new Variable (line 5946)
-- new Variable (line 5986)
-- new Variable (line 6005)
-- new Variable (line 6538)
-- new Variable (line 6558)
-- new Variable (line 6628)
-- new Variable (line 6834)
-- new Variable (line 6873)
-- new Operand\Literal (line 6882)
-- new Variable (line 6897)
-- new Operand\Literal (line 7236)
-- new Operand\Literal (line 7240)
-- new Operand\Literal (line 7244)
-- new Variable (line 7248)
-- new Variable (line 7272)
-- new Variable (line 7284)
-- new Variable (line 7497)
-- new Variable (line 7513)
-- 189 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new JIT\Call\ExternalMethod (line 152)
+- new JIT\Scope (line 178)
+- new JIT\TryCatchState (line 186)
+- new Operand\Literal (line 231)
+- new Operand\Literal (line 247)
+- new Variable (line 960)
+- new JIT\Call\Vararg (line 970)
+- new JIT\Call\Native (line 980)
+- new JIT\Call\Native (line 1124)
+- new JIT\Variable (line 1313)
+- new JIT\Call\Native (line 1330)
+- new JIT\Call\Native (line 1389)
+- new JIT\Call\Native (line 1431)
+- new JIT\Call\Native (line 1477)
+- new JIT\Call\Native (line 2495)
+- new JIT\Call\Native (line 2526)
+- new JIT\Call\Native (line 2573)
+- new JIT\Call\Native (line 2620)
+- new JIT\Call\Native (line 2682)
+- new JIT\Call\Native (line 3403)
+- new JIT\Call\Native (line 3441)
+- new JIT\Call\Native (line 3475)
+- new JIT\Call\Native (line 3519)
+- new JIT\Call\Native (line 3947)
+- new JIT\Call\Native (line 4013)
+- new ext\standard\boolval (line 4378)
+- new Operand\Literal (line 4458)
+- new JIT\Variable (line 4492)
+- new Operand\Literal (line 4567)
+- new ext\standard\intval (line 4671)
+- new Variable (line 4700)
+- new Variable (line 4811)
+- new OpCode (line 4894)
+- new Variable (line 5143)
+- new JIT\Call\RuntimeVariableFunction (line 5182)
+- new Variable (line 5239)
+- new Variable (line 5368)
+- new Variable (line 5387)
+- new Variable (line 6168)
+- new Variable (line 6208)
+- new Variable (line 6227)
+- new Variable (line 6760)
+- new Variable (line 6780)
+- new Variable (line 6850)
+- new Variable (line 7056)
+- new Variable (line 7095)
+- new Operand\Literal (line 7104)
+- new Variable (line 7119)
+- new Operand\Literal (line 7458)
+- new Operand\Literal (line 7462)
+- new Operand\Literal (line 7466)
+- new Variable (line 7470)
+- new Variable (line 7494)
+- new Variable (line 7506)
+- new Variable (line 7719)
+- new Variable (line 7735)
+- 193 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Analyzer.php`
 
@@ -4095,8 +4096,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/BootstrapCompileSmokeM3Emit.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\Native (line 424)
-- 16 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new Call\Native (line 476)
+- new Call\Native (line 531)
+- 19 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/Builtin.php`
 
@@ -4701,11 +4703,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Temporary (line 111)
 - new Variable (line 115)
-- new Variable (line 146)
-- new Variable (line 300)
-- new Variable (line 327)
-- new Literal (line 488)
-- new Variable (line 738)
+- new Variable (line 155)
+- new Variable (line 309)
+- new Variable (line 336)
+- new Literal (line 497)
+- new Variable (line 747)
 - 21 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/IssetHelper.php`
@@ -4886,9 +4888,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new TryCatchHandler (line 76)
-- new Variable (line 220)
-- new Variable (line 240)
-- 6 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+- new Variable (line 237)
+- new Variable (line 257)
+- 9 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/TypeCheck.php`
 
@@ -5068,7 +5070,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JIT (line 148)
 - new JITContext (line 162)
 - new State (line 188)
-- new LintCompiler (line 432)
+- new LintCompiler (line 436)
 - 33 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/VM.php`

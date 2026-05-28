@@ -729,11 +729,13 @@ fcc_case = """            case 'Expr_FirstClassCallable':
 anchors = [
     (
         """            case 'Expr_Yield':
+            case 'Expr_YieldFrom':
             case 'Expr_Include':
                 // TODO: we may be able to determine these...
                 return false;
             case 'Expr_MagicScriptConst':""",
         """            case 'Expr_Yield':
+            case 'Expr_YieldFrom':
             case 'Expr_Include':
                 // TODO: we may be able to determine these...
                 return false;
@@ -741,6 +743,7 @@ anchors = [
     ),
     (
         """            case 'Expr_Yield':
+            case 'Expr_YieldFrom':
             case 'Expr_Include':
                 // TODO: we may be able to determine these...
                 return false;
@@ -748,6 +751,7 @@ anchors = [
 
         throw new \\LogicException('Unknown variable op found: '.$op->getType());""",
         """            case 'Expr_Yield':
+            case 'Expr_YieldFrom':
             case 'Expr_Include':
                 // TODO: we may be able to determine these...
                 return false;
@@ -788,6 +792,7 @@ msc_case = """            case 'Expr_MagicScriptConst':
 anchors = [
     (
         """            case 'Expr_Yield':
+            case 'Expr_YieldFrom':
             case 'Expr_Include':
                 // TODO: we may be able to determine these...
                 return false;
@@ -795,6 +800,7 @@ anchors = [
 
         throw new \\LogicException('Unknown variable op found: '.$op->getType());""",
         """            case 'Expr_Yield':
+            case 'Expr_YieldFrom':
             case 'Expr_Include':
                 // TODO: we may be able to determine these...
                 return false;

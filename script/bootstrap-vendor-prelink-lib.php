@@ -291,8 +291,9 @@ function bootstrapVendorPrelinkMaterializeVendorTree(string $root): ?string
         }
     }
 
-    if (!is_dir($marker)) {
-        mkdir(dirname($marker), 0775, true);
+    $markerDir = dirname($marker);
+    if (!is_dir($markerDir)) {
+        mkdir($markerDir, 0775, true);
     }
     file_put_contents($marker, gmdate('c')."\n");
 
@@ -346,8 +347,16 @@ function bootstrapVendorPrelinkRelativePath(string $linkPath, string $targetPath
 /**
  * @param list<string>|null $onlyPackages restrict to these package names (e.g. cold-boot rebuild subset)
  */
-function bootstrapVendorPrelinkCompilePackages(string $root, array &$manifest, ?string $one = null, ?array $onlyPackages = null): int
-{
+/**
+ * @param array{mode: 'native'|'zend', argv: list<string>}|null $invoker
+ */
+function bootstrapVendorPrelinkCompilePackages(
+    string $root,
+    array &$manifest,
+    ?string $one = null,
+    ?array $onlyPackages = null,
+    ?array $invoker = null
+): int {
     $failures = 0;
     foreach (BOOTSTRAP_VENDOR_PRELINK_PACKAGES as $package => $role) {
         if (null !== $onlyPackages && !in_array($package, $onlyPackages, true)) {
@@ -384,7 +393,7 @@ function bootstrapVendorPrelinkCompilePackages(string $root, array &$manifest, ?
         @unlink($buildBase.'.o');
         @unlink($objectAbs);
 
-        $cmd = bootstrapVendorPrelinkBuildCompileCommand($root, $buildBase, $bundleAbs);
+        $cmd = bootstrapVendorPrelinkBuildCompileCommand($root, $buildBase, $bundleAbs, $invoker);
         $output = [];
         exec($cmd, $output, $code);
         $objectCandidate = $buildBase.'.o';
@@ -566,6 +575,22 @@ function bootstrapVendorPrelinkColdBootCompile(string $root, string $manifestPat
 
     $failures += bootstrapVendorPrelinkCompilePackages($root, $manifest, $one, $needsRebuild);
 
+    if (
+        $failures > 0
+        && bootstrapVendorPrelinkFailuresAreNativeParseSpine($manifest, $needsRebuild)
+    ) {
+        fwrite(
+            STDERR,
+            "bootstrap-vendor-objects: native driver parse spine null; cold-boot Zend rebuild (#2967)\n"
+        );
+        putenv('BOOTSTRAP_M5_VENDOR_ALLOW_ZEND=1');
+        $zendInvoker = [
+            'mode' => 'zend',
+            'argv' => [PHP_BINARY, $root.'/bin/compile.php'],
+        ];
+        $failures = bootstrapVendorPrelinkCompilePackages($root, $manifest, $one, $needsRebuild, $zendInvoker);
+    }
+
     bootstrapVendorPrelinkCleanupMaterializedVendorTree($root, $marker);
     bootstrapVendorPrelinkWriteManifest($manifestPath, $manifest);
 
@@ -598,6 +623,7 @@ function bootstrapVendorPrelinkResolveCompileInvoker(string $root): array
         $root.'/build/selfhost-compile-driver',
         $root.'/build/selfhost-native-compile-driver',
         $root.'/build/bin-compile-aot',
+        $root.'/build/selfhost-helloworld-compile',
     ] as $candidate) {
         if (is_executable($candidate)) {
             return [
@@ -614,12 +640,35 @@ function bootstrapVendorPrelinkResolveCompileInvoker(string $root): array
 }
 
 /** Shell command for vendor bundle AOT → .o (env + driver + -o + entry). */
+/** @param list<string> $packages */
+function bootstrapVendorPrelinkFailuresAreNativeParseSpine(array $manifest, array $packages): bool
+{
+    if ([] === $packages) {
+        return false;
+    }
+    foreach ($packages as $package) {
+        $blocker = (string) ($manifest['packages'][$package]['blocker'] ?? '');
+        if (
+            !str_contains($blocker, 'parseAndCompile returned null')
+            && !str_contains($blocker, 'native emit failed at phase=parseAndCompile')
+        ) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/**
+ * @param array{mode: 'native'|'zend', argv: list<string>}|null $invoker
+ */
 function bootstrapVendorPrelinkBuildCompileCommand(
     string $root,
     string $buildBase,
-    string $bundleAbs
+    string $bundleAbs,
+    ?array $invoker = null
 ): string {
-    $inv = bootstrapVendorPrelinkResolveCompileInvoker($root);
+    $inv = $invoker ?? bootstrapVendorPrelinkResolveCompileInvoker($root);
     $argv = array_map('escapeshellarg', $inv['argv']);
 
     return 'PHP_COMPILER_VENDOR_PRELINK=1 PHP_COMPILER_SELFHOST_AOT=0 PHP_COMPILER_KEEP_OBJECT_FILE=1 '
