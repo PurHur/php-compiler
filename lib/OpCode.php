@@ -133,6 +133,12 @@ class OpCode {
     /** Suspend generator and expose value/key to foreach (issue #167). arg2=value slot, arg3=key slot. */
     const TYPE_YIELD = 108;
     /**
+     * Delegate yields from an array / generator (issue #167).
+     *
+     * VM-only today: arg2 = container slot (array or Generator).
+     */
+    const TYPE_YIELD_FROM = 110;
+    /**
      * Closure literal (`function (...) { ... }`).
      *
      * Today this is a bootstrap-oriented stub: the compiler must be able to parse and compile vendor code
