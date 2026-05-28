@@ -157,7 +157,10 @@ final class Linker
             foreach ($vendorObjects as $vendorObject) {
                 $objects .= ' '.escapeshellarg($vendorObject);
             }
-            $cmd = escapeshellarg($clang).' '.$objects.' -lm '.self::RUNTIME_LINK_LIBS.' -o '.escapeshellarg($executable);
+            // When linking with the bundled clang, ensure we can still resolve host libraries
+            // (libpcre2-8, libcrypt, ...). Some bootstrap envs only ship the runtime .so/.a under
+            // /usr/lib/x86_64-linux-gnu without a full sysroot lib tree.
+            $cmd = escapeshellarg($clang).' '.$objects.' -L/usr/lib/x86_64-linux-gnu -lm '.self::RUNTIME_LINK_LIBS.' -o '.escapeshellarg($executable);
             self::run($cmd, $env);
             self::unlinkIfTemp($runtimeObjects);
 
@@ -175,9 +178,16 @@ final class Linker
         $objects = [];
         $compiler = self::resolveRuntimeCompiler();
         $llvmDir = getenv('PHP_COMPILER_LLVM_PATH');
-        $env = (false !== $llvmDir && '' !== $llvmDir)
-            ? self::toolchainEnvironment($llvmDir)
-            : null;
+        // When we use a host compiler (gcc/cc), prefer the host sysroot/headers.
+        // The bundled LLVM sysroot is primarily for clang-9; it can be incomplete in some
+        // environments and break libc headers (eg stddef.h).
+        $env = null;
+        if (false !== $llvmDir && '' !== $llvmDir) {
+            $llvmDir = rtrim($llvmDir, '/');
+            if (str_starts_with($compiler, $llvmDir.'/')) {
+                $env = self::toolchainEnvironment($llvmDir);
+            }
+        }
         $index = 0;
         foreach (self::RUNTIME_C_SOURCES as $source) {
             if (!is_file($source)) {
@@ -240,9 +250,18 @@ final class Linker
 
     private static function runtimeCIncludeFlagsFor(string $basename): string
     {
-        $flags = in_array($basename, self::RUNTIME_HOST_LIBC_BASENAMES, true)
-            ? self::runtimeCHostLibcIncludeFlags()
-            : self::runtimeCIncludeFlags();
+        if (in_array($basename, self::RUNTIME_HOST_LIBC_BASENAMES, true)) {
+            // These units prefer host headers when available, but still require a usable baseline
+            // include set. Always include the bundled sysroot (when present) and layer host include
+            // dirs on top to fill gaps (eg linux/limits.h).
+            $flags = self::runtimeCIncludeFlags();
+            $hostFlags = self::runtimeCHostLibcIncludeFlags();
+            if ('' !== $hostFlags) {
+                $flags .= $hostFlags;
+            }
+        } else {
+            $flags = self::runtimeCIncludeFlags();
+        }
         if ('function_exists.c' === $basename) {
             $flags .= ' -I'.escapeshellarg(__DIR__.'/runtime');
         }

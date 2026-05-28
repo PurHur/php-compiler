@@ -2926,7 +2926,6 @@ class Compiler {
         if ($operand instanceof Operand\NullOperand) {
             return null;
         } elseif ($operand instanceof Operand\Literal) {
-            assert($isRead === true);
             $mappedType = null !== $operand->type
                 ? Variable::mapFromType($operand->type)
                 : Variable::TYPE_UNDEFINED;

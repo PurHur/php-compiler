@@ -80,11 +80,14 @@ export PHP_COMPILER_JIT_PROGRESS_FILE="${ROOT}/build/.last-jit-func-helloworld-c
 rm -f "${OUT}" "${AOT_OUT}" "${PHP_COMPILER_JIT_PROGRESS_FILE}"
 
 set +e
-php "${ROOT}/bin/compile.php" -o "${OUT}" "${ENTRY}" >/dev/null 2>&1
+link_out="$(
+  php "${ROOT}/bin/compile.php" -o "${OUT}" "${ENTRY}" 2>&1
+)"
 link_code=$?
 set -e
 if [[ ! -x "${OUT}" ]]; then
   echo "bootstrap-selfhost-helloworld-compile-bin: link failed (exit ${link_code})" >&2
+  printf '%s\n' "${link_out}" >&2
   exit 1
 fi
 echo "bootstrap-selfhost-helloworld-compile-bin: link OK ${OUT}"
