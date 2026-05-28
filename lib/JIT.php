@@ -66,7 +66,13 @@ class JIT {
         if ($this->shouldUseM3EmitTuNativeBridge() && $this->isM3EmitTuScriptMain($block)) {
             $this->m3EmitTuMainBlock = $block;
         }
-        if ($this->shouldUseM4BinCompileArgvMainNative() && $this->isM4BinCompileScriptMain($block)) {
+        if (
+            $this->isM4BinCompileScriptMain($block)
+            && (
+                $this->shouldUseM4BinCompileArgvMainNative()
+                || $this->shouldUseHelloworldBinCompileInventoryArgvLink()
+            )
+        ) {
             $this->m3CompileDriverMainBlock = $block;
         }
         if ($this->shouldUseM3CompileDriverMainNative() && $this->isM3CompileDriverBundleScriptMain($block)) {
@@ -316,6 +322,24 @@ class JIT {
         }
 
         return false;
+    }
+
+    /**
+     * Gen-2 helloworld-prefix argv driver re-linking bin/compile.php — inventory {main}, not stub sidecar (#3011).
+     */
+    private function shouldUseHelloworldBinCompileInventoryArgvLink(): bool
+    {
+        // Only consulted together with isM4BinCompileScriptMain() — always inventory argv link (#3011).
+        return true;
+    }
+
+    private function shouldUseM3InventoryEmitForCompileDriverBlock(Block $block): bool
+    {
+        if ($this->shouldUseM3InventoryEmitDriver()) {
+            return true;
+        }
+
+        return $this->isM4BinCompileScriptMain($block) && $this->shouldUseHelloworldBinCompileInventoryArgvLink();
     }
 
     /** Inventory emit TU is compile_driver.php — do not host-compile it again as a link sidecar (#2843). */
@@ -617,7 +641,13 @@ class JIT {
         if ($this->shouldUseM3EmitTuNativeBridge() && $this->isM3EmitTuScriptMain($block)) {
             return $this->compileM3EmitTuMainNative($internalName, $block, $logicalName);
         }
-        if ($this->shouldUseM4BinCompileArgvMainNative() && $this->isM4BinCompileScriptMain($block)) {
+        if (
+            $this->isM4BinCompileScriptMain($block)
+            && (
+                $this->shouldUseM4BinCompileArgvMainNative()
+                || $this->shouldUseHelloworldBinCompileInventoryArgvLink()
+            )
+        ) {
             return $this->compileM3CompileDriverMainNative($internalName, $block, $logicalName);
         }
         if ($this->shouldUseM3EmitTuNativeBridge() && null !== $logicalName) {
@@ -2602,11 +2632,11 @@ class JIT {
         $saved = $this->context->builder;
         $this->context->builder = $this->context->context->builderCreate();
         $this->context->builder->positionAtEnd($bb);
-        if ($this->shouldUseM3InventoryEmitDriver()) {
+        if ($this->shouldUseM3InventoryEmitForCompileDriverBlock($block)) {
             if (!$this->m3CompileDriverRuntimeSpineLowered) {
                 $this->m3CompileDriverRuntimeSpineLowered = true;
                 $sidecar = $this->isM3EmitTuTrivialEchoSidecarActive();
-                $inventoryEmit = $this->shouldUseM3InventoryEmitDriver();
+                $inventoryEmit = $this->shouldUseM3InventoryEmitForCompileDriverBlock($block);
                 foreach (['parse', 'compileemitsmoke', 'standalone'] as $methodLc) {
                     if ('standalone' === $methodLc && ($sidecar || $inventoryEmit)) {
                         continue;
@@ -2652,18 +2682,21 @@ class JIT {
     private function compileM3EmitTuRuntimeSpineDecls(?Block $compileDriverStubBlock = null): void
     {
         $emitTu = $this->shouldUseM3EmitTuNativeBridge() && null !== $this->m3EmitTuMainBlock;
-        $compileDriver = $this->shouldUseM3CompileDriverMainNative() && null !== $compileDriverStubBlock;
+        $inventoryArgvCompileDriver = null !== $compileDriverStubBlock
+            && $this->shouldUseM3InventoryEmitForCompileDriverBlock($compileDriverStubBlock);
+        $compileDriver = null !== $compileDriverStubBlock
+            && ($this->shouldUseM3CompileDriverMainNative() || $inventoryArgvCompileDriver);
         if (!$emitTu && !$compileDriver) {
             return;
         }
         $stubBlock = $emitTu ? $this->m3EmitTuMainBlock : $compileDriverStubBlock;
-        if ($this->shouldUseM3CompileDriverRealLowering()) {
+        if ($this->shouldUseM3CompileDriverRealLowering() || $inventoryArgvCompileDriver) {
             $sidecar = $emitTu && $this->isM3EmitTuTrivialEchoSidecarActive();
             $this->compileM3EmitTuRuntimeSpineMethodsForRealLowering();
             foreach (['initparsepipeline', 'initcompiler', 'initvmcontext', 'loadcoremodules', 'standalone'] as $methodLc) {
-                if ('standalone' === $methodLc && ($sidecar || $this->shouldUseM3InventoryEmitDriver())) {
+                if ('standalone' === $methodLc && ($sidecar || $this->shouldUseM3InventoryEmitForCompileDriverBlock($stubBlock))) {
                     if (null !== $stubBlock) {
-                        if ($this->shouldUseM3InventoryEmitDriver()) {
+                        if ($this->shouldUseM3InventoryEmitForCompileDriverBlock($stubBlock)) {
                             $standaloneLc = strtolower('PHPCompiler\\Runtime::standalone');
                             unset(
                                 $this->context->functions[$standaloneLc],
@@ -2762,7 +2795,10 @@ class JIT {
 
             return;
         }
-        if ($this->shouldUseM3InventoryEmitDriver() && null !== $this->m3CompileDriverMainBlock) {
+        if (
+            null !== $this->m3CompileDriverMainBlock
+            && $this->shouldUseM3InventoryEmitForCompileDriverBlock($this->m3CompileDriverMainBlock)
+        ) {
             $this->compileM3EmitTuRuntimeParseAndCompileNativeDecl([
                 'parseandcompile' => true,
                 'parseandcompileemitsmoke' => true,

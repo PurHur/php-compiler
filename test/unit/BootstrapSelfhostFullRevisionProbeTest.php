@@ -34,6 +34,7 @@ final class BootstrapSelfhostFullRevisionProbeTest extends TestCase
         $this->assertStringContainsString('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1', $script);
         $this->assertStringContainsString('bin/compile.php"', $script);
         $this->assertStringContainsString('#2900', $script);
+        $this->assertStringContainsString('#3011', $script);
     }
 
     public function testMakefileExposesFullRevisionProbeTarget(): void
