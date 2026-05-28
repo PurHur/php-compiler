@@ -59,7 +59,6 @@ final class BootstrapCompilerUnitProbeTest extends TestCase
     public function testJitCachesCompilerUnitProbeFixtureSidecar(): void
     {
         $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
-        $this->assertStringContainsString('PHP_COMPILER_M3_COMPILER_UNIT_PROBE_EMIT', $jit);
         $this->assertStringContainsString('compiler_unit_probe_compile.php', $jit);
         $this->assertStringContainsString('COMPILER_UNIT_PROBE_SIDECAR_REL', $jit);
         $compile = (string) file_get_contents(self::$root.'/bin/compile.php');

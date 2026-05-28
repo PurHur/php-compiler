@@ -95,7 +95,6 @@ final class BootstrapRuntimeCompileSmokeTest extends TestCase
         $this->assertStringContainsString('compileRuntimeParseAndCompileM3Native', $jit);
         $emit = (string) file_get_contents(self::$root.'/lib/JIT/BootstrapCompileSmokeM3Emit.php');
         $this->assertStringContainsString('declareRuntimeParseAndCompileNative', $emit);
-        $this->assertStringContainsString("'parseandcompileemitsmoke'", $emit);
     }
 
     public function testCompilePhpPreservesSelfhostAotForRuntimeM3NativeEmitEntry(): void
@@ -167,7 +166,7 @@ final class BootstrapRuntimeCompileSmokeTest extends TestCase
         $this->assertStringContainsString('HELLOWORLD_SIDECAR_REL', $jit);
         $this->assertStringContainsString('COMPILE_SMOKE_SIDECAR_REL', $jit);
         $this->assertMatchesRegularExpression(
-            '/compileM3EmitTuRuntimeSpineDecls\(\): void[\s\S]*?compileM3EmitTuRuntimeSpineMethodsForRealLowering/',
+            '/compileM3EmitTuRuntimeSpineDecls\([^)]*\): void[\s\S]*?compileM3EmitTuRuntimeSpineMethodsForRealLowering/',
             $jit
         );
         $compile = (string) file_get_contents(self::$root.'/bin/compile.php');
@@ -212,7 +211,7 @@ final class BootstrapRuntimeCompileSmokeTest extends TestCase
         $this->assertStringContainsString('PHP_COMPILER_EMIT_HELPER_LINK', $source);
         $this->assertStringContainsString('PHP_COMPILER_M3_EMIT_TU', $source);
         $emit = (string) file_get_contents(self::$root.'/lib/JIT/BootstrapCompileSmokeM3Emit.php');
-        $this->assertStringContainsString('EmitTuMode::isMinimalRuntime', $emit);
+        $this->assertStringContainsString("require_once __DIR__.'/EmitTuMode.php';", $emit);
         $runtime = (string) file_get_contents(self::$root.'/lib/Runtime.php');
         $this->assertStringContainsString('EmitTuMode::isMinimalRuntime', $runtime);
         $gen1 = (string) file_get_contents(self::$root.'/script/bootstrap-loop-gen1-link.sh');

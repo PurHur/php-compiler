@@ -15,7 +15,15 @@ EMIT_HELPER="${ROOT}/build/selfhost-compiler-unit-probe-emit"
 AOT_OUT="${ROOT}/build/compiler-unit-probe-aot"
 EMIT_ENTRY="${ROOT}/test/bootstrap-aot/compiler_unit_probe_m3_emit_native_entry.php"
 INVENTORY_EMIT_DRIVER="${ROOT}/test/selfhost/compiler_unit_probe/compile_driver.php"
-USE_INVENTORY_EMIT_DRIVER="${BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER:-0}"
+default_inventory_emit_driver=0
+if [[ "${BOOTSTRAP_M3_COMPILER_UNIT_PROBE_STRICT:-0}" == "1" ]]; then
+  default_inventory_emit_driver=1
+fi
+if [[ -n "${BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER+x}" ]]; then
+  USE_INVENTORY_EMIT_DRIVER="${BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER}"
+else
+  USE_INVENTORY_EMIT_DRIVER="${default_inventory_emit_driver}"
+fi
 M3_NATIVE_COMPILE=0
 M3_EMIT_PATH="none"
 M3_BLOCK_REASON="native emit helper not linked (set BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1)"
