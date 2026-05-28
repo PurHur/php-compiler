@@ -76,6 +76,21 @@ if [[ ${#SYNC_BACK_PATHS[@]} -eq 0 ]]; then
   esac
 fi
 
+# Self-host bootstrap uses compiled drivers under build/ across multiple docker-exec invocations.
+# In tar-fallback mode the container is ephemeral, so keep the key driver artifacts on the host.
+if [[ ${#SYNC_BACK_PATHS[@]} -eq 0 ]]; then
+  case " $* " in
+    *" script/north-star5-verify.sh "*|*" ./script/north-star5-verify.sh "*|\
+    *" script/bootstrap-vendor-objects.php "*|*" ./script/bootstrap-vendor-objects.php "*|\
+    *" script/bootstrap-vendor-prelink-"*|*" ./script/bootstrap-vendor-prelink-"*|\
+    *" bootstrap-selfhost-driver-smoke "*|*" bootstrap-selfhost-full-revision-probe "*|*" bootstrap-loop-"*)
+      SYNC_BACK_PATHS+=("build/bin-compile-aot")
+      SYNC_BACK_PATHS+=("build/selfhost-compile-driver")
+      SYNC_BACK_PATHS+=("build/selfhost-native-compile-driver")
+      ;;
+  esac
+fi
+
 quoted=$(printf '%q ' "$@")
 inner="source script/php-env.sh; ${_llvm_exports} ${quoted}"
 
