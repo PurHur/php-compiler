@@ -1681,6 +1681,10 @@ class JIT {
             'compileglobalconst',
             'compileincludeop',
             'compileswitchasjumpifchain',
+            'trycompiledefineasglobalconst',
+            'compileclassconstfetch',
+            'getopcodetype',
+            'markcallerlocalsusedbyliteralinclude',
         ];
     }
 
