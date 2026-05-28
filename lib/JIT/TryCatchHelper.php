@@ -85,7 +85,7 @@ final class TryCatchHelper
         $builder->positionAtEnd($branchBlock);
         $mergeBb = $context->scope->blockStorage[$mergeBlock] ?? null;
         if (null === $mergeBb) {
-            $mergeBb = BasicBlockHelper::append($context, 'try_merge');
+            $mergeBb = self::appendBlock($func, 'try_merge_'.self::blockSuffix($handler));
         }
         if (!$handler->mergeBodyCompiled) {
             $jit->compileIncludedAtEntry($func, $handler->mergeBlock, $mergeBb);
@@ -99,6 +99,7 @@ final class TryCatchHelper
             $builder->positionAtEnd($tryTail);
             $builder->branch($handler->mergeEntryBb);
         }
+        self::popHandler($context);
         $tryEntry = $context->scope->blockStorage[$tryOp->block1];
         $builder->positionAtEnd($branchBlock);
         if (0 === $context->inlineIncludeDepth) {
@@ -124,7 +125,7 @@ final class TryCatchHelper
 
         $builder = $context->builder;
         $saved = $builder->getInsertBlock();
-        $entryBb = BasicBlockHelper::append($context, 'try_merge_entry');
+        $entryBb = self::appendBlock($func, 'try_merge_entry_'.self::blockSuffix($handler));
         $handler->mergeEntryBb = $entryBb;
         $builder->positionAtEnd($entryBb);
         $hasPending = $builder->call($context->lookupFunction('phpc_jit_has_throw_pending'));
@@ -207,7 +208,8 @@ final class TryCatchHelper
         TryCatchHandler $handler,
         array $args
     ): BasicBlock {
-        $dispatch = BasicBlockHelper::append($context, 'try_catch_dispatch');
+        $suffix = self::blockSuffix($handler);
+        $dispatch = self::appendBlock($func, 'try_catch_dispatch_'.$suffix);
         $builder = $context->builder;
         $saved = $builder->getInsertBlock();
         $builder->positionAtEnd($dispatch);
@@ -215,15 +217,15 @@ final class TryCatchHelper
         $pendingObj = $builder->call($context->lookupFunction('phpc_jit_take_throw_pending'));
         $mergeBody = $context->scope->blockStorage[$handler->mergeBlock] ?? null;
 
-        $uncaught = BasicBlockHelper::append($context, 'try_uncaught');
+        $uncaught = self::appendBlock($func, 'try_uncaught_'.$suffix);
         $nextCatch = $dispatch;
         $singleArm = 1 === count($handler->catchArms);
 
         foreach ($handler->catchArms as $arm) {
             $catchOp = $arm['op'];
             $types = $arm['catchTypes'];
-            $matchBb = BasicBlockHelper::append($context, 'try_catch_match');
-            $noMatchBb = BasicBlockHelper::append($context, 'try_catch_nomatch');
+            $matchBb = self::appendBlock($func, 'try_catch_match_'.$suffix);
+            $noMatchBb = self::appendBlock($func, 'try_catch_nomatch_'.$suffix);
 
             $builder->positionAtEnd($nextCatch);
             if ([] === $types || $singleArm) {
@@ -241,7 +243,7 @@ final class TryCatchHelper
                     if ($isLast) {
                         $builder->branchIf($isBool, $matchBb, $noMatchBb);
                     } else {
-                        $nextCheck = BasicBlockHelper::append($context, 'try_catch_type_next');
+                        $nextCheck = self::appendBlock($func, 'try_catch_type_next_'.$suffix);
                         $builder->branchIf($isBool, $matchBb, $nextCheck);
                         $checkBb = $nextCheck;
                         $builder->positionAtEnd($checkBb);
@@ -286,6 +288,16 @@ final class TryCatchHelper
         }
         $handler = array_pop($context->tryCatch->handlerStack);
         unset($context->tryCatch->mergeHandlers[spl_object_id($handler->mergeBlock)]);
+    }
+
+    private static function blockSuffix(TryCatchHandler $handler): string
+    {
+        return (string) spl_object_id($handler);
+    }
+
+    private static function appendBlock(Function_ $func, string $name): BasicBlock
+    {
+        return $func->appendBasicBlock($name);
     }
 }
 
