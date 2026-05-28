@@ -67,8 +67,9 @@ if [[ "${SOURCE_NORM}" == "${ROOT}/bin/compile.php" ]]; then
   fi
   rm -f "${SELFTEST_OUT}"
   cp -f "${AOT_OUT}" "${EMIT_HELPER}"
-  chmod +x "${EMIT_HELPER}" "${AOT_OUT}"
-  echo "bootstrap-selfhost-helloworld-compile-bin: OK ${AOT_OUT} (M3 emit helper; argv -o OUT SOURCE.php)"
+  cp -f "${AOT_OUT}" "${ROOT}/build/.m3_bin_compile_aot_blob"
+  chmod +x "${EMIT_HELPER}" "${AOT_OUT}" "${ROOT}/build/.m3_bin_compile_aot_blob"
+  echo "bootstrap-selfhost-helloworld-compile-bin: OK ${AOT_OUT} (M3 emit helper; argv -o OUT SOURCE.php; sidecar #2880)"
   exit 0
 fi
 

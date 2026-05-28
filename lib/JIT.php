@@ -2991,6 +2991,12 @@ class JIT {
         if ($sidecarHostStubNonLiteralIncludes) {
             $compileEnv['PHP_COMPILER_M3_SIDECAR_HOST'] = '1';
         }
+        // Full-revision gen-3 must copy a functional argv driver, not stub {main} (#2880).
+        if (str_ends_with(str_replace('\\', '/', $path), '/bin/compile.php')) {
+            $compileEnv['PHP_COMPILER_M5_DRIVER_HOST'] = '1';
+            $compileEnv['PHP_COMPILER_CLI_COMPILED'] = '1';
+            $compileEnv['PHP_COMPILER_CLI_SKIP_VENDOR'] = '1';
+        }
         unset($compileEnv['PHP_COMPILER_EMIT_HELPER_LINK'], $compileEnv['PHP_COMPILER_M3_EMIT_TU']);
         $descriptor = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
         $proc = proc_open($compileCmd, $descriptor, $pipes, $repoRoot, $compileEnv);
