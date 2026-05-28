@@ -159,9 +159,8 @@ class JIT {
             $run = array_shift($this->queue);
             JIT\Progress::notePhase('jit_run_queue_item');
             try {
-                /** @var Block $block */
-                $block = $run[1];
-                if (null !== $block->func) {
+                $block = $run[1] ?? null;
+                if ($block instanceof Block && null !== $block->func) {
                     JIT\Progress::noteEntry($block->func->getScopedName());
                 }
             } catch (\Throwable $e) {
@@ -308,9 +307,7 @@ class JIT {
         if (!$this->shouldUseM3CompileDriverMainNative()) {
             return false;
         }
-        if ($this->shouldUseM4BinCompileArgvMainNative()) {
-            return $this->shouldUseM3CompileDriverRealLowering();
-        }
+        // M4/M5 bin/compile.php host link uses real argv {main} unless inventory emit is explicit (#3004).
         foreach (['PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER', 'BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER'] as $envKey) {
             $flag = getenv($envKey);
             if ('1' === $flag || 'true' === strtolower((string) $flag)) {
@@ -2892,7 +2889,17 @@ class JIT {
     /** Link-time trivial-echo AOT sidecar for emit-helper TU (#2559, #2566). */
     private function isM3EmitTuTrivialEchoSidecarActive(): bool
     {
-        if (!$this->shouldUseEmitHelperLinkStubs()) {
+        // M5 argv driver + inventory gen-2→gen-3 bin/compile.php links need bootstrap-aot sidecars
+        // even when EMIT_HELPER_LINK is unset (#3004).
+        if ($this->shouldUseM5DriverHostCompile() || $this->shouldUseM3InventoryEmitDriver()) {
+            $this->cacheM3EmitTuTrivialEchoAtLinkTime();
+
+            return \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::isRegistered($this->context);
+        }
+        // M4 argv bin/compile.php links with -u PHP_COMPILER_EMIT_HELPER_LINK but still needs
+        // compile_smoke / HelloWorld sidecars at link time (#3004, #2880).
+        $inventoryArgvSidecar = $this->shouldUseM3InventoryEmitDriver() && $this->shouldUseM4BinCompileArgvMainNative();
+        if (!$this->shouldUseEmitHelperLinkStubs() && !$inventoryArgvSidecar) {
             return false;
         }
         if (!$this->shouldUseM3EmitTuNativeBridge() && !$this->shouldUseM3InventoryEmitDriver()) {
@@ -2922,6 +2929,12 @@ class JIT {
                 \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILE_SMOKE_SIDECAR_REL,
                 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compileSmokeSentinelBlock'
             );
+            // M2 lib spine smoke via inventory argv driver (#2967): same sidecar as compile_smoke_m3_emit branch.
+            $this->registerM3EmitTuSidecarFromPath(
+                __DIR__.'/../test/selfhost/compiler_lib_spine_smoke/main.php',
+                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_LIB_SIDECAR_REL,
+                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerLibSentinelBlock'
+            );
             // Gen-3 argv driver (full revision) must be able to emit non-smoke fixtures (eg compiler unit probe)
             // without falling back to compile_smoke_m3_emit helpers (#2900, #2925).
             $this->registerM3EmitTuSidecarFromPath(
@@ -2938,6 +2951,12 @@ class JIT {
                 __DIR__.'/../test/selfhost/compiler_minimal/main.php',
                 \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_MINIMAL_SIDECAR_REL,
                 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerMinimalSentinelBlock'
+            );
+            // Inventory argv driver (helloworld prefix) compiles spine smoke — register sidecar (#3012).
+            $this->registerM3EmitTuSidecarFromPath(
+                __DIR__.'/../test/selfhost/compiler_lib_spine_smoke/main.php',
+                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_LIB_SIDECAR_REL,
+                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerLibSentinelBlock'
             );
             $this->registerM3EmitTuSidecarFromPath(
                 __DIR__.'/../lib/Compiler.php',
@@ -3070,6 +3089,22 @@ class JIT {
             $this->context->m3EmitTuTrivialEchoPath = $path;
         }
         $repoRoot = dirname(__DIR__);
+        $repoSidecar = $repoRoot.'/'.ltrim($sidecarRel, '/');
+        if (is_readable($repoSidecar)) {
+            $aotBytes = file_get_contents($repoSidecar);
+            if (is_string($aotBytes) && '' !== $aotBytes) {
+                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::registerLinktime(
+                    $this->context,
+                    $repoRoot,
+                    $code,
+                    $aotBytes,
+                    $sidecarRel,
+                    $sentinelLogical
+                );
+
+                return;
+            }
+        }
         $pathNorm = str_replace('\\', '/', $path);
         $hostCompilePath = $path;
         if (str_ends_with($pathNorm, '/bin/compile.php')) {
@@ -3154,6 +3189,24 @@ class JIT {
                 );
             }
             @unlink($tmpOut);
+            // Gen-2 native argv driver cannot always spawn Zend during link; reuse blobs from an
+            // earlier Zend host-compile in the same workspace (#3004).
+            $repoSidecar = $repoRoot.'/'.ltrim($sidecarRel, '/');
+            if (is_readable($repoSidecar)) {
+                $aotBytes = file_get_contents($repoSidecar);
+                if (is_string($aotBytes) && '' !== $aotBytes) {
+                    \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::registerLinktime(
+                        $this->context,
+                        $repoRoot,
+                        $code,
+                        $aotBytes,
+                        $sidecarRel,
+                        $sentinelLogical
+                    );
+
+                    return;
+                }
+            }
 
             return;
         }
@@ -4926,8 +4979,12 @@ class JIT {
                         $this->context->getTypeFromString('__value__*')->constNull()
                     );
                     $nullVar->isNullConstant = true;
-                    $this->assignOperandValue($block->getOperand($op->arg1), $nullVar);
+                    $this->assignOperandValue($block->getOperand($op->arg1), $nullVar->value);
                     break;
+                case OpCode::TYPE_YIELD:
+                case OpCode::TYPE_YIELD_FROM:
+                    // Not lowered in LLVM/JIT/AOT yet; VM-only support lives in lib/VM.php (#167).
+                    throw new \LogicException('Generators (yield) are VM-only (issue #167)');
                 case OpCode::TYPE_FUNCCALL_INIT:
                     $nameOp = $block->getOperand($op->arg1);
                     if ($nameOp instanceof Operand\Literal) {
@@ -5009,6 +5066,18 @@ class JIT {
                     $this->context->callerStrictTypes = $prevStrict;
                     break;
                 case OpCode::TYPE_FUNCCALL_EXEC_RETURN:
+                    if (is_null($this->context->scope->toCall)) {
+                        // Self-host stub/short-circuit (eg runtime variable function): represent as null.
+                        $nullVar = new Variable(
+                            $this->context,
+                            Variable::TYPE_NULL,
+                            Variable::KIND_VALUE,
+                            $this->context->getTypeFromString('__value__*')->constNull()
+                        );
+                        $nullVar->isNullConstant = true;
+                        $this->assignOperandValue($block->getOperand($op->arg1), $nullVar->value);
+                        break;
+                    }
                     $callArgs = $this->prependImplicitThisForStaticInstanceCall(
                         $block,
                         $this->context->scope->toCall,
@@ -6969,8 +7038,27 @@ class JIT {
      */
     private function initJitMethodCall(Block $block, Operand $receiverOp, string $methodName): void
     {
-        assert(null !== $receiverOp->type && Type::TYPE_OBJECT === $receiverOp->type->type);
-        $className = $receiverOp->type->userType
+        if (null === $receiverOp->type) {
+            // Bootstrap/self-host can hit methodcall init before operand typing stabilizes.
+            // Prefer a safe short-circuit for stubbed self-host JIT paths over hard-crashing.
+            if ($this->shouldUseSelfHostJitStubs()) {
+                $this->context->scope->toCall = null;
+                $this->context->scope->args = [];
+
+                return;
+            }
+        } elseif (Type::TYPE_OBJECT !== $receiverOp->type->type) {
+            // Some bootstrap paths produce a receiver operand whose inferred PHPCfg type
+            // is not yet marked as object (but is still an object at runtime).
+            if ($this->shouldUseSelfHostJitStubs()) {
+                $this->context->scope->toCall = null;
+                $this->context->scope->args = [];
+
+                return;
+            }
+        }
+
+        $className = $receiverOp->type?->userType
             ?? ($this->context->scope->className !== '' ? $this->context->scope->className : 'object');
         $declaringClassLc = strtolower($className);
         $methodLc = strtolower($methodName);

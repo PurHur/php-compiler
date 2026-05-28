@@ -38,7 +38,11 @@ ci_docker_acquire_single_ci_lock() {
   local did_retry="${_CI_DOCKER_LOCK_STALE_RETRY:-0}"
 
   _ci_docker_lock_fd=200
-  exec 200>"$lockfile"
+  # IMPORTANT: do not truncate the lockfile before we acquire the flock.
+  # Using `> lockfile` clears it even when another process is holding the lock,
+  # leaving an empty file that can persist and confuse subsequent runs (#2975).
+  touch "$lockfile"
+  exec 200<>"$lockfile"
   if flock -n 200; then
     printf '%s %s\n' "$$" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >"$lockfile"
     # Best-effort hygiene: ensure an interrupted wrapper does not leave a confusing lock file behind.
@@ -70,6 +74,8 @@ ci_docker_acquire_single_ci_lock() {
     # GNU coreutils: stat -c %Y yields epoch seconds.
     local mtime=""
     mtime=$(stat -c %Y "$lockfile" 2>/dev/null || true)
+    local size=""
+    size=$(stat -c %s "$lockfile" 2>/dev/null || true)
     if [[ -n "$mtime" ]] && [[ "$mtime" =~ ^[0-9]+$ ]]; then
       local now=""
       now=$(date +%s 2>/dev/null || true)
@@ -77,12 +83,32 @@ ci_docker_acquire_single_ci_lock() {
         local age=$(( now - mtime ))
         if (( age >= 0 )); then
           echo "ci-docker-preflight: lock age: ${age}s" >&2
+          # Empty/partial lockfiles can be left behind if a wrapper dies between acquiring the flock
+          # and writing holder metadata. Treat a small, older-than-a-blip lockfile as stale and retry.
+          if [[ "$did_retry" != "1" ]] \
+            && [[ -n "$size" ]] && [[ "$size" =~ ^[0-9]+$ ]] \
+            && (( size == 0 )) && (( age >= 5 ))
+          then
+            echo "ci-docker-preflight: lockfile is empty (size 0) and older than 5s; attempting one-time cleanup + retry" >&2
+            rm -f "$lockfile" 2>/dev/null || true
+            export _CI_DOCKER_LOCK_STALE_RETRY=1
+            ci_docker_acquire_single_ci_lock
+            return $?
+          fi
           if [[ "$did_retry" != "1" ]] \
             && [[ -n "$stale_after" ]] && [[ "$stale_after" =~ ^[0-9]+$ ]] \
             && (( age >= stale_after ))
           then
             if [[ -n "$holder_pid" ]] && [[ "$holder_pid" =~ ^[0-9]+$ ]] && ! kill -0 "$holder_pid" 2>/dev/null; then
               echo "ci-docker-preflight: lock appears stale (pid ${holder_pid} not running; age ${age}s >= ${stale_after}s)" >&2
+              echo "ci-docker-preflight: attempting one-time stale cleanup + retry" >&2
+              rm -f "$lockfile" 2>/dev/null || true
+              export _CI_DOCKER_LOCK_STALE_RETRY=1
+              ci_docker_acquire_single_ci_lock
+              return $?
+            fi
+            if [[ -z "$holder_pid" ]]; then
+              echo "ci-docker-preflight: lock appears stale (missing holder pid; age ${age}s >= ${stale_after}s)" >&2
               echo "ci-docker-preflight: attempting one-time stale cleanup + retry" >&2
               rm -f "$lockfile" 2>/dev/null || true
               export _CI_DOCKER_LOCK_STALE_RETRY=1

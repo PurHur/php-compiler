@@ -6,20 +6,18 @@ namespace PHPCompiler;
 
 require_once __DIR__.'/../BaseTest.php';
 
-/** VM compliance for generators (`yield`, issue #167). */
-final class GeneratorVMTest extends BaseTest
+/** JIT/AOT does not lower generators yet (issue #167). */
+final class GeneratorJITTest extends BaseTest
 {
     protected static string $DIR = __DIR__;
 
     public static function providePHPTests(): \Generator
     {
-        foreach (
-            [
-                'generator_basic.phpt',
-                'generator_nested.phpt',
-                'generator_yield_from_array.phpt',
-            ] as $file
-        ) {
+        foreach ([
+            'generator_basic.phpt',
+            'generator_nested.phpt',
+            'generator_yield_from_array.phpt',
+        ] as $file) {
             yield $file => self::parsePHPT(
                 __DIR__.'/cases/language/'.$file,
                 $file
@@ -29,6 +27,7 @@ final class GeneratorVMTest extends BaseTest
 
     public function setUp(): void
     {
-        $this->BIN = realpath(__DIR__.'/../../bin/vm.php');
+        $this->BIN = realpath(__DIR__.'/../../bin/jit.php');
     }
 }
+

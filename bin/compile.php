@@ -18,6 +18,38 @@ use PHPCompiler\Web\Superglobals;
 function run(string $filename, string $code, array $options): void
 {
     $normalized = '-' !== $filename ? str_replace('\\', '/', $filename) : '';
+    if (\class_exists(\PHPCompiler\JIT\Progress::class, false)) {
+        \PHPCompiler\JIT\Progress::notePhase('bin_compile_run_begin');
+        \PHPCompiler\JIT\Progress::noteEntry($filename);
+    }
+    // When executing as a compiled native driver, default to self-host mode. Relying on getenv()
+    // alone is fragile in early bootstrap contexts, and the native driver is only used for the
+    // self-host ladder.
+    if (\function_exists('php_compiler_cli_should_skip_entry_driver')) {
+        $selfhostAot = getenv('PHP_COMPILER_SELFHOST_AOT');
+        if (false === $selfhostAot || '' === $selfhostAot) {
+            putenv('PHP_COMPILER_SELFHOST_AOT=1');
+        }
+        // Compiled argv drivers must enable the M3 compile-driver lowering allowlist; otherwise
+        // key Runtime entrypoints can be stubbed and compilation returns null (#3004).
+        $m3CompileDriver = getenv('PHP_COMPILER_M3_COMPILE_DRIVER');
+        if (false === $m3CompileDriver || '' === $m3CompileDriver) {
+            putenv('PHP_COMPILER_M3_COMPILE_DRIVER=1');
+        }
+        $m3CompileDriverMain = getenv('PHP_COMPILER_M3_COMPILE_DRIVER_MAIN');
+        if (false === $m3CompileDriverMain || '' === $m3CompileDriverMain) {
+            putenv('PHP_COMPILER_M3_COMPILE_DRIVER_MAIN=1');
+        }
+        $m4BinCompile = getenv('PHP_COMPILER_M4_BIN_COMPILE_DRIVER');
+        if (false === $m4BinCompile || '' === $m4BinCompile) {
+            putenv('PHP_COMPILER_M4_BIN_COMPILE_DRIVER=1');
+        }
+        // Gen-2+ argv driver recompiling bin/compile.php must register bootstrap-aot sidecars (#3004).
+        $m5DriverHost = getenv('PHP_COMPILER_M5_DRIVER_HOST');
+        if (false === $m5DriverHost || '' === $m5DriverHost) {
+            putenv('PHP_COMPILER_M5_DRIVER_HOST=1');
+        }
+    }
     if ('' !== $normalized && str_contains($normalized, 'bootstrap-aot/')) {
         // M3 native emit TU: self-host M3 allowlist (not full bootstrap JIT) (#1937, #1983).
         $m3EmitEntry = str_contains($normalized, 'compile_smoke_m3_emit_native_entry.php')
@@ -60,7 +92,16 @@ function run(string $filename, string $code, array $options): void
             }
         } else {
             // Bootstrap AOT fixtures require real JIT lowering; ignore inherited self-host stub env (#1086).
-            putenv('PHP_COMPILER_SELFHOST_AOT=0');
+            //
+            // But: if we're already running under a compiled self-host driver, forcing stub-off
+            // can crash before we have a chance to fall back (e.g. inventory argv driver compiling
+            // bootstrap-aot fixtures as part of self-host compile-smoke, #2967).
+            //
+            // Use a runtime-native marker instead of getenv(): self-host AOT execution stubs and
+            // env access can be unreliable precisely in the scenarios we’re trying to debug.
+            if (!\function_exists('php_compiler_cli_should_skip_entry_driver')) {
+                putenv('PHP_COMPILER_SELFHOST_AOT=0');
+            }
         }
     }
     if ('-' !== $filename && str_contains($normalized, 'test/selfhost/')) {
@@ -85,7 +126,9 @@ function run(string $filename, string $code, array $options): void
         $inventoryEmit = getenv('BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER') ?: getenv('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER');
         if ('1' === $inventoryEmit || 'true' === strtolower((string) $inventoryEmit)) {
             putenv('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1');
-            putenv('PHP_COMPILER_EMIT_HELPER_LINK=1');
+            // Runtime: do not force emit-helper TU/minimal mode here.
+            // The inventory driver is expected to compile arbitrary sources; forcing emit-helper
+            // mode can route Runtime::parseAndCompile through minimal sentinel stubs and recurse (#2967).
         }
     }
     if ('' !== $normalized && str_contains($normalized, 'jit_result_stub.php')) {
@@ -165,7 +208,25 @@ function run(string $filename, string $code, array $options): void
                 return \PHPCompiler\AOT\LinkerProcessPolyfill::run($command, $env);
             }
         }
-        $runtime->standalone($block, $options['-o']);
+        $prevSelfHostAot = getenv('PHP_COMPILER_SELFHOST_AOT');
+        $setSelfHostAotForCompile = \function_exists('putenv') && (false === $prevSelfHostAot || '' === (string) $prevSelfHostAot);
+        if ($setSelfHostAotForCompile) {
+            // Keep LLVM 9 stable during AOT compilation; some lowering paths are still sensitive (#2600).
+            putenv('PHP_COMPILER_SELFHOST_AOT=1');
+            $_ENV['PHP_COMPILER_SELFHOST_AOT'] = '1';
+            $_SERVER['PHP_COMPILER_SELFHOST_AOT'] = '1';
+        }
+        try {
+            $runtime->standalone($block, $options['-o'], $code, $filename);
+        } catch (\LogicException $e) {
+            fwrite(STDERR, $e->getMessage()."\n");
+            exit(2);
+        } finally {
+            if ($setSelfHostAotForCompile) {
+                putenv('PHP_COMPILER_SELFHOST_AOT=');
+                unset($_ENV['PHP_COMPILER_SELFHOST_AOT'], $_SERVER['PHP_COMPILER_SELFHOST_AOT']);
+            }
+        }
     }
 }
 

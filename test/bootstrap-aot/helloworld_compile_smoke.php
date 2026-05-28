@@ -21,6 +21,23 @@ require_once __DIR__.'/runtime_ctor_smoke.php';
 
 function helloworld_compile_smoke(string $sourceFile, string $outFile): int
 {
+    // This probe is only used on the self-host path. Ensure the compile-driver lowering
+    // allowlist is enabled even when invoked from a compiled argv driver where env
+    // propagation can be incomplete (#3004).
+    if (\function_exists('putenv')) {
+        $selfhostAot = getenv('PHP_COMPILER_SELFHOST_AOT');
+        if (false === $selfhostAot || '' === $selfhostAot) {
+            putenv('PHP_COMPILER_SELFHOST_AOT=1');
+        }
+        $m3CompileDriver = getenv('PHP_COMPILER_M3_COMPILE_DRIVER');
+        if (false === $m3CompileDriver || '' === $m3CompileDriver) {
+            putenv('PHP_COMPILER_M3_COMPILE_DRIVER=1');
+        }
+        $m3CompileDriverMain = getenv('PHP_COMPILER_M3_COMPILE_DRIVER_MAIN');
+        if (false === $m3CompileDriverMain || '' === $m3CompileDriverMain) {
+            putenv('PHP_COMPILER_M3_COMPILE_DRIVER_MAIN=1');
+        }
+    }
     if (!is_file($sourceFile)) {
         echo 'helloworld_compile_smoke: missing source '.$sourceFile."\n";
         echo "helloworld_compile_smoke: native emit failed at phase=source\n";
@@ -71,7 +88,7 @@ function helloworld_compile_smoke(string $sourceFile, string $outFile): int
         return 1;
     }
 
-    $runtime->standalone($block, $outFile);
+    $runtime->standalone($block, $outFile, $code, $resolved);
 
     echo 'helloworld_compile_smoke: compile OK -> '.$outFile."\n";
 

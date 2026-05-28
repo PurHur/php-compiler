@@ -218,6 +218,8 @@ int __compiler_mkdir(__string__ *path, long long mode, int recursive)
 }
 
 
+void __phpc_strvec_free(char **items, int count);
+
 /** Collect glob matches; returns count (>= 0) or -1 on error. Caller frees with __phpc_strvec_free. */
 int __phpc_glob_vec(__string__ *pattern, int flags, char ***out_items)
 {

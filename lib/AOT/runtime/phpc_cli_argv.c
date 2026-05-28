@@ -48,15 +48,17 @@ static void phpc_install_segv_handler(void)
 
 static void phpc_progress_note(const char *msg)
 {
-    const char *path;
+    const char *progress_path;
+    const char *phase_path;
+    const char *entry_path;
     FILE *fp;
     size_t len;
 
     phpc_install_segv_handler();
-    path = getenv("PHP_COMPILER_JIT_PROGRESS_FILE");
-    if (NULL == path || '\0' == *path || NULL == msg) {
+    if (NULL == msg) {
         return;
     }
+
     len = strlen(msg);
     if (len > 0) {
         if (len >= sizeof(phpc_last_progress)) {
@@ -66,14 +68,46 @@ static void phpc_progress_note(const char *msg)
         phpc_last_progress[len] = '\0';
         phpc_last_progress_len = len;
     }
-    fp = fopen(path, "wb");
-    if (NULL == fp) {
+
+    progress_path = getenv("PHP_COMPILER_JIT_PROGRESS_FILE");
+    phase_path = getenv("PHP_COMPILER_JIT_PHASE_FILE");
+    entry_path = getenv("PHP_COMPILER_JIT_ENTRY_FILE");
+
+    if ((NULL == progress_path || '\0' == *progress_path) && (NULL == phase_path || '\0' == *phase_path) && (NULL == entry_path || '\0' == *entry_path)) {
         return;
     }
-    if (len > 0) {
-        (void) fwrite(msg, 1, len, fp);
+
+    if (NULL != progress_path && '\0' != *progress_path) {
+        fp = fopen(progress_path, "wb");
+        if (NULL != fp) {
+            if (len > 0) {
+                (void) fwrite(msg, 1, len, fp);
+            }
+            (void) fclose(fp);
+        }
     }
-    (void) fclose(fp);
+
+    /* Mirror progress to PHASE file for pre-PHP segfault triage (#2978/#2967). */
+    if (NULL != phase_path && '\0' != *phase_path) {
+        fp = fopen(phase_path, "wb");
+        if (NULL != fp) {
+            if (len > 0) {
+                (void) fwrite(msg, 1, len, fp);
+            }
+            (void) fclose(fp);
+        }
+    }
+
+    /* Mirror progress to ENTRY file for pre-PHP segfault triage when caller can't set it yet. */
+    if (NULL != entry_path && '\0' != *entry_path) {
+        fp = fopen(entry_path, "wb");
+        if (NULL != fp) {
+            if (len > 0) {
+                (void) fwrite(msg, 1, len, fp);
+            }
+            (void) fclose(fp);
+        }
+    }
 }
 
 void __phpc_progress_note(const char *msg)

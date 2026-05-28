@@ -147,7 +147,7 @@ final class BootstrapCompileSmokeM3Emit
 
         $context->builder->positionAtEnd($readFail);
         self::echoPhaseError($context, $logPrefix, $logPrefix.': empty source (lint)', 'source');
-        $context->builder->returnValue($retFail);
+        self::exitWithStatus($context, $retFail);
 
         $context->builder->positionAtEnd($readOk);
         $runtime = RuntimeEmitTuAlloc::emit($context);
@@ -172,7 +172,7 @@ final class BootstrapCompileSmokeM3Emit
             $logPrefix.': lint failed (parseAndCompile returned null)',
             'parseAndCompile'
         );
-        $context->builder->returnValue($retFail);
+        self::exitWithStatus($context, $retFail);
 
         $context->builder->positionAtEnd($lintOk);
         $context->builder->returnValue($retOk);
@@ -277,7 +277,7 @@ final class BootstrapCompileSmokeM3Emit
 
         $context->builder->positionAtEnd($readFail);
         self::echoPhaseError($context, $logPrefix, $logPrefix.': empty source (native bridge)', 'source');
-        $context->builder->returnValue($retFail);
+        self::exitWithStatus($context, $retFail);
 
         $context->builder->positionAtEnd($readOk);
         $runtime = RuntimeEmitTuAlloc::emit($context);
@@ -310,7 +310,7 @@ final class BootstrapCompileSmokeM3Emit
             $logPrefix.': parseAndCompile returned null (parser/CFG spine)',
             'parseAndCompile'
         );
-        $context->builder->returnValue($retFail);
+        self::exitWithStatus($context, $retFail);
 
         $context->builder->positionAtEnd($pacOk);
         $context->builder->call(
@@ -344,6 +344,16 @@ final class BootstrapCompileSmokeM3Emit
     {
         ValueEchoHelper::echoLiteral($context, $line1."\n");
         ValueEchoHelper::echoLiteral($context, $logPrefix.': native emit failed at phase='.$phase."\n");
+    }
+
+    /** Propagate failure to the process exit code (return from {main} alone is not honored by AOT link). */
+    private static function exitWithStatus(Context $context, Value $retFail): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $context->builder->call(
+            $context->lookupFunction('exit'),
+            $context->builder->trunc($retFail, $i32)
+        );
     }
 
     /**
@@ -380,14 +390,43 @@ final class BootstrapCompileSmokeM3Emit
         Value $code,
         Value $filename
     ): Value {
-        // Emit-helper must compile inventory-scale sources (bin/compile.php, lib/Compiler.php) for M5;
-        // the old emit-smoke subset is only valid for trivial fixtures.
-        return $context->builder->call(
-            self::runtimeSpine($context, 'parseandcompile', '__object__*', ['__object__*', '__string__*', '__string__*']),
-            $runtimeThis,
-            $code,
-            $filename
-        );
+        $objPtr = $context->getTypeFromString('__object__*');
+        $parseLc = strtolower('PHPCompiler\\Runtime::parse');
+        if (!isset($context->functions[$parseLc])) {
+            return $objPtr->constNull();
+        }
+        $parseFn = $context->functions[$parseLc];
+        // Inventory argv driver lowers parse + compileEmitSmoke on the link spine (#3004).
+        // Call them directly — not Runtime::parseandcompile (same native wrapper → recursion).
+        foreach (['compileemitsmoke', 'compile'] as $compileMethod) {
+            $compileLc = strtolower('PHPCompiler\\Runtime::'.$compileMethod);
+            if (!isset($context->functions[$compileLc])) {
+                continue;
+            }
+            $tag = 'd'.(string) ++self::$seq;
+            $failBb = BasicBlockHelper::append($context, 'csm3_pac_default_fail_'.$tag);
+            $compileBb = BasicBlockHelper::append($context, 'csm3_pac_default_compile_'.$tag);
+            $tailBb = BasicBlockHelper::append($context, 'csm3_pac_default_tail_'.$tag);
+            $script = $context->builder->call($parseFn, $runtimeThis, $code, $filename);
+            $scriptNull = $context->builder->icmp(Builder::INT_EQ, $script, $objPtr->constNull());
+            $context->builder->branchIf($scriptNull, $failBb, $compileBb);
+
+            $context->builder->positionAtEnd($failBb);
+            $context->builder->branch($tailBb);
+
+            $context->builder->positionAtEnd($compileBb);
+            $block = $context->builder->call($context->functions[$compileLc], $runtimeThis, $script);
+            $context->builder->branch($tailBb);
+
+            $context->builder->positionAtEnd($tailBb);
+            $phi = $context->builder->phi($objPtr);
+            $phi->addIncoming($objPtr->constNull(), $failBb);
+            $phi->addIncoming($block, $compileBb);
+
+            return $phi;
+        }
+
+        return $objPtr->constNull();
     }
 
     /** Register native LLVM for Runtime::parseandcompile / parseandcompileemitsmoke (#2516). */

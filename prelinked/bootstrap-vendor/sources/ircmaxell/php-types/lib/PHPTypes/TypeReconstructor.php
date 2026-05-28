@@ -289,6 +289,7 @@ class TypeReconstructor
 
                 return [Type::null()];
             case 'Expr_Yield':
+            case 'Expr_YieldFrom':
             case 'Expr_Include':
                 // TODO: we may be able to determine these...
                 return false;

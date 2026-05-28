@@ -323,6 +323,44 @@ PY
   echo "Applied php-cfg-arrow-function.patch (overlay)"
 }
 
+apply_php_cfg_yield_from_overlay() {
+  local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
+  local op="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/YieldFrom.php"
+  local overlay="$PATCH_DIR/overlays/php-cfg"
+  if grep -q 'function parseExpr_YieldFrom' "$parser" 2>/dev/null && [[ -f "$op" ]]; then
+    echo "Skip php-cfg-yield-from.patch (already applied)"
+    return 0
+  fi
+  if [[ ! -f "$overlay/Op/Expr/YieldFrom.php" || ! -f "$overlay/yield-from-parser-method.php" ]]; then
+    echo "Skip php-cfg-yield-from.patch (overlay files missing)" >&2
+    return 1
+  fi
+  mkdir -p "$(dirname "$op")"
+  cp "$overlay/Op/Expr/YieldFrom.php" "$op"
+  python3 - "$parser" "$overlay/yield-from-parser-method.php" <<'PY'
+import sys
+from pathlib import Path
+
+parser_path = Path(sys.argv[1])
+method_path = Path(sys.argv[2])
+text = parser_path.read_text()
+
+if 'function parseExpr_YieldFrom' in text:
+    parser_path.write_text(text)
+    raise SystemExit(0)
+
+anchor = """    protected function parseExpr_Yield(Expr\\Yield_ $expr)
+    {"""
+if anchor not in text:
+    sys.stderr.write("php-cfg-yield-from: parseExpr_Yield anchor not found in Parser.php\n")
+    raise SystemExit(1)
+
+insert = method_path.read_text().rstrip("\n") + "\n\n"
+parser_path.write_text(text.replace(anchor, insert + anchor, 1))
+PY
+  echo "Applied php-cfg-yield-from.patch (overlay)"
+}
+
 apply_php_cfg_enum_overlay() {
   local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
   local op="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Enum_.php"
@@ -1253,6 +1291,10 @@ apply_patch() {
   if [[ ! -f "$patch" ]]; then
     return 0
   fi
+  if [[ "$(basename "$patch")" == "php-cfg-yield-from.patch" ]]; then
+    apply_php_cfg_yield_from_overlay
+    return $?
+  fi
   if [[ "$(basename "$patch")" == "php-cfg-magic-constants.patch" ]]; then
     apply_php_cfg_magic_constants_overlay
     return $?
@@ -1406,6 +1448,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-no-closure-preg-replace-callback.patch"
   apply_patch "$PATCH_DIR/php-cfg-property-type.patch"
   apply_patch "$PATCH_DIR/php-cfg-assertion-expr-property.patch"
+  apply_patch "$PATCH_DIR/php-cfg-yield-from.patch"
   apply_patch "$PATCH_DIR/php-cfg-match.patch"
   apply_patch "$PATCH_DIR/php-cfg-assignop-coalesce.patch"
   apply_patch "$PATCH_DIR/php-cfg-first-class-callable.patch"
@@ -1442,6 +1485,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-nullable-return.patch"
   apply_patch "$PATCH_DIR/php-types-cfg-reference.patch"
   apply_patch "$PATCH_DIR/php-types-nullable-optype-return.patch"
+  apply_patch "$PATCH_DIR/php-types-yield-from.patch"
   apply_patch "$PATCH_DIR/php-types-fromvalue-null.patch"
   apply_patch "$PATCH_DIR/php-types-doc-comment-string.patch"
   apply_patch "$PATCH_DIR/php-types-docblock-first-token.patch"

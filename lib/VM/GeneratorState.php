@@ -24,6 +24,10 @@ final class GeneratorState
 
     public ?Frame $frame = null;
 
+    public bool $yieldFromActive = false;
+
+    public Variable $yieldFromContainer;
+
     public function __construct(
         public readonly \PHPCompiler\VM $vm,
         public readonly Func\PHP $func,
@@ -32,6 +36,7 @@ final class GeneratorState
     ) {
         $this->currentKey = new Variable();
         $this->currentValue = new Variable();
+        $this->yieldFromContainer = new Variable();
     }
 
     public static function register(Context $ctx): void
@@ -54,5 +59,6 @@ final class GeneratorState
         $this->hasCurrent = false;
         $this->frame = null;
         $this->autoKey = 0;
+        $this->yieldFromActive = false;
     }
 }
