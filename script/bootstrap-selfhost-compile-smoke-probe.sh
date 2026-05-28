@@ -39,6 +39,8 @@ if [[ ! -f "${SOURCE}" ]]; then
 fi
 
 EMIT_ENTRY="${ROOT}/test/bootstrap-aot/compile_smoke_m3_emit_native_entry.php"
+INVENTORY_EMIT_DRIVER="${ROOT}/test/selfhost/compiler_compile_smoke/compile_driver.php"
+USE_INVENTORY_EMIT_DRIVER="${BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER:-0}"
 if [[ ! -f "${EMIT_ENTRY}" ]]; then
   echo "bootstrap-selfhost-compile-smoke-probe: missing ${EMIT_ENTRY} (#1983)" >&2
   exit 1
@@ -62,28 +64,35 @@ if [[ "${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
   : "${BOOTSTRAP_M3_RUNTIME_COMPILE:=1}"
   m3_link_env=()
   m3_link_mode="stub"
+  m3_emit_source="${EMIT_ENTRY}"
   # Default REAL_LOWERING on when LINK_COMPILE_DRIVER=1 (stub-only path fails link — #2571, #2582).
   if [[ "${BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING:-1}" == "1" ]]; then
-    # Self-host M3 allowlist — full Runtime JIT without stubs segfaults at link (#1937, #1983).
-    m3_link_env=(env PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_M3_COMPILE_DRIVER=1 PHP_COMPILER_EMIT_HELPER_LINK=1)
-    m3_link_mode="selfhost M3 emit TU (compile_smoke_m3_emit_native_entry.php)"
+    if [[ "${USE_INVENTORY_EMIT_DRIVER}" == "1" && -f "${INVENTORY_EMIT_DRIVER}" ]]; then
+      m3_link_env=(env PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_M3_COMPILE_DRIVER=1 PHP_COMPILER_EMIT_HELPER_LINK=1 PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1 BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER=1 PHP_COMPILER_M3_EMIT_LOG_PREFIX=compile_smoke_m3_emit)
+      m3_link_mode="inventory compile_driver (no emit-helper TU, #2879)"
+      m3_emit_source="${INVENTORY_EMIT_DRIVER}"
+    else
+      m3_link_env=(env PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_M3_COMPILE_DRIVER=1 PHP_COMPILER_EMIT_HELPER_LINK=1)
+      m3_link_mode="selfhost M3 emit TU (compile_smoke_m3_emit_native_entry.php)"
+    fi
   else
     m3_link_env=(env PHP_COMPILER_SELFHOST_AOT=1)
     m3_link_mode="selfhost stubs (no PHP_COMPILER_M3_COMPILE_DRIVER)"
   fi
   set +e
-  "${m3_link_env[@]}" php bin/compile.php -o build/selfhost-compile-smoke-emit "${EMIT_ENTRY}" >/dev/null 2>&1
+  "${m3_link_env[@]}" php bin/compile.php -o build/selfhost-compile-smoke-emit "${m3_emit_source}" >/dev/null 2>&1
   m3_link_code=$?
   set -e
   if [[ -x "${EMIT_HELPER}" ]]; then
     echo "bootstrap-selfhost-compile-smoke-probe: native emit helper link OK (${EMIT_HELPER}, ${m3_link_mode})"
     if [[ "${BOOTSTRAP_M3_RUNTIME_COMPILE:-1}" == "1" ]]; then
       set +e
+      m3_run_env=(PHP_COMPILER_M3_EMIT_MINIMAL=1 PHP_COMPILER_M3_SOURCE="${SOURCE}" PHP_COMPILER_M3_OUT="${AOT_OUT}")
+      if [[ "${USE_INVENTORY_EMIT_DRIVER}" == "1" ]]; then
+        m3_run_env+=(PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1)
+      fi
       compile_out="$(
-        env PHP_COMPILER_M3_EMIT_MINIMAL=1 \
-          PHP_COMPILER_M3_SOURCE="${SOURCE}" \
-          PHP_COMPILER_M3_OUT="${AOT_OUT}" \
-          "${EMIT_HELPER}" 2>&1
+        env "${m3_run_env[@]}" "${EMIT_HELPER}" 2>&1
       )"
       native_compile_code=$?
       set -e

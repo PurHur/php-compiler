@@ -24,6 +24,24 @@ final class BootstrapRuntimeCompileSmokeTest extends TestCase
         $this->assertStringContainsString('BOOTSTRAP_M3_RUNTIME_COMPILE_SMOKE_STRICT=1', $source);
         $this->assertStringContainsString('emit_path=', $source);
         $this->assertStringContainsString('runtime_compile_smoke bundle OK', $source);
+        $this->assertStringContainsString('BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER', $source);
+        $this->assertStringContainsString('inventory compile_driver', $source);
+    }
+
+    public function testRuntimeCompileDriverLintPasses(): void
+    {
+        $driver = self::$root.'/test/selfhost/runtime_compile_smoke/compile_driver.php';
+        $cmd = 'php '.escapeshellarg(self::$root.'/bin/compile.php').' -l '.escapeshellarg($driver).' 2>&1';
+        exec($cmd, $lines, $exitCode);
+        $this->assertSame(0, $exitCode, implode("\n", $lines));
+    }
+
+    public function testCompilerUnitProbeCompileDriverLintPasses(): void
+    {
+        $driver = self::$root.'/test/selfhost/compiler_unit_probe/compile_driver.php';
+        $cmd = 'php '.escapeshellarg(self::$root.'/bin/compile.php').' -l '.escapeshellarg($driver).' 2>&1';
+        exec($cmd, $lines, $exitCode);
+        $this->assertSame(0, $exitCode, implode("\n", $lines));
     }
 
     public function testRuntimeCompileSmokeProbePartialGreenWhenLlvmPresent(): void

@@ -305,7 +305,9 @@ class JIT {
             return false;
         }
 
-        return str_contains(str_replace('\\', '/', $path), 'compiler_helloworld_smoke/compile_driver.php');
+        $norm = str_replace('\\', '/', $path);
+
+        return str_contains($norm, 'test/selfhost/') && str_ends_with($norm, '/compile_driver.php');
     }
 
     private function isM3CompileDriverScriptMain(Block $block): bool
@@ -2925,6 +2927,13 @@ class JIT {
                 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::cliDriverSentinelBlock',
                 true
             );
+            if ('runtime_compile_smoke_m3_emit' === $logPrefix) {
+                $this->registerM3EmitTuSidecarFromPath(
+                    __DIR__.'/../test/bootstrap-aot/runtime_trivial_echo.php',
+                    \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::TRIVIAL_ECHO_SIDECAR_REL,
+                    'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::sentinelBlock'
+                );
+            }
         } else {
             $this->registerM3EmitTuSidecarFromPath(
                 __DIR__.'/../test/bootstrap-aot/runtime_trivial_echo.php',
