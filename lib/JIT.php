@@ -1342,11 +1342,12 @@ class JIT {
         Block $block,
         string $logicalName
     ): PHPLLVM\Value {
-        if ($this->shouldUseM3EmitTuRuntimeMethodStub('initparsepipeline')) {
-            return $this->emitM3EmitTuRuntimeInitVoidStub($internalName, $logicalName, $block);
-        }
-
-        return $this->compileRuntimeSpinePhpLowering($internalName, $block, $logicalName);
+        // No dedicated C-floor 1-arg emitter exists for this method (unlike initVmContext/initCompiler).
+        // Its PHP-CFG lowering drops the implicit $this and emits a 0-arg no-op body (the parser-pipeline
+        // construction is elided in the self-host spine), which mismatches the 1-arg `void(__object__*)`
+        // call emitted by RuntimeEmitTuInit and breaks LLVM verification of the full driver (#2967).
+        // Emit the 1-arg void stub in every mode so call/definition signatures agree.
+        return $this->emitM3EmitTuRuntimeInitVoidStub($internalName, $logicalName, $block);
     }
 
     private function compileRuntimeInitCompilerM3Native(
@@ -1442,11 +1443,10 @@ class JIT {
         Block $block,
         string $logicalName
     ): PHPLLVM\Value {
-        if ($this->shouldUseM3EmitTuRuntimeMethodStub('loadcoremodules')) {
-            return $this->emitM3EmitTuRuntimeInitVoidStub($internalName, $logicalName, $block);
-        }
-
-        return $this->compileRuntimeSpinePhpLowering($internalName, $block, $logicalName);
+        // Same 0-arg-vs-1-arg signature mismatch as initParsePipeline (#2967): the PHP-CFG lowering
+        // drops the implicit $this (module load() calls are elided in the self-host spine) while
+        // RuntimeEmitTuInit calls it as `void(__object__*)`. Emit the 1-arg void stub in every mode.
+        return $this->emitM3EmitTuRuntimeInitVoidStub($internalName, $logicalName, $block);
     }
 
     /** No-op init helper for emit TU link — real init deferred to Batch A (#2516). */
