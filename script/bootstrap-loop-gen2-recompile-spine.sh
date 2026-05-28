@@ -24,7 +24,16 @@ SOURCE="${ROOT}/test/selfhost/compiler_lib_spine_smoke/main.php"
 if [[ "${BOOTSTRAP_LOOP_USE_EXISTING_BIN_COMPILE_AOT:-0}" != "1" ]]; then
   EMIT_ENTRY="${ROOT}/test/bootstrap-aot/compile_smoke_m3_emit_native_entry.php"
   rm -f "${DRIVER}"
-  env PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_M3_COMPILE_DRIVER=1 PHP_COMPILER_EMIT_HELPER_LINK=1 \
+  _driver_debug_env=()
+  if [[ "${BOOTSTRAP_DEBUG:-0}" == "1" || "${-}" == *x* ]]; then
+    _driver_debug_env+=(
+      PHP_COMPILER_DEBUG_LAST_PHASE=1
+      PHP_COMPILER_DEBUG_LAST_PHASE_FILE="${ROOT}/build/last_lowering_phase.json"
+      PHP_COMPILER_DEBUG_LAST_PHASE_STDERR=1
+    )
+    rm -f "${ROOT}/build/last_lowering_phase.json" || true
+  fi
+  env "${_driver_debug_env[@]}" PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_M3_COMPILE_DRIVER=1 PHP_COMPILER_EMIT_HELPER_LINK=1 \
     php "${ROOT}/bin/compile.php" -o "${DRIVER}" "${EMIT_ENTRY}" >/dev/null
 fi
 if [[ ! -x "${DRIVER}" ]]; then
@@ -35,7 +44,19 @@ fi
 rm -f "${GEN3}"
 set +e
 out="$(
-  env -u PHP_COMPILER_M3_SOURCE -u PHP_COMPILER_M3_OUT \
+  _debug_env=()
+  # Optional crash-triage breadcrumbs: last lowering phase / op / func (#2941).
+  # Auto-enable in `bash -x` mode or when BOOTSTRAP_DEBUG=1 is set.
+  if [[ "${BOOTSTRAP_DEBUG:-0}" == "1" || "${-}" == *x* ]]; then
+    _debug_env+=(
+      PHP_COMPILER_DEBUG_LAST_PHASE=1
+      PHP_COMPILER_DEBUG_LAST_PHASE_FILE="${ROOT}/build/last_lowering_phase.json"
+      PHP_COMPILER_DEBUG_LAST_PHASE_STDERR=1
+    )
+    rm -f "${ROOT}/build/last_lowering_phase.json" || true
+  fi
+
+  env -u PHP_COMPILER_M3_SOURCE -u PHP_COMPILER_M3_OUT "${_debug_env[@]}" \
     "${DRIVER}" -o "${GEN3}" "${SOURCE}" 2>&1
 )"
 code=$?

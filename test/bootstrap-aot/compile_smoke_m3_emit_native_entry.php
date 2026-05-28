@@ -100,11 +100,33 @@ require_once __DIR__.'/../../lib/Lint/LintCompiler.php';
 require_once __DIR__.'/../../lib/Lint/Linter.php';
 require_once __DIR__.'/compile_smoke_m3_emit.php';
 
+$debug = getenv('PHP_COMPILER_DEBUG_LAST_PHASE');
+if (is_string($debug) && ('1' === $debug || 'true' === strtolower($debug))) {
+    if (!defined('PHP_COMPILER_DEBUG_LAST_PHASE')) {
+        define('PHP_COMPILER_DEBUG_LAST_PHASE', true);
+    }
+    $debugFile = getenv('PHP_COMPILER_DEBUG_LAST_PHASE_FILE');
+    if (is_string($debugFile) && '' !== $debugFile && !defined('PHP_COMPILER_DEBUG_LAST_PHASE_FILE')) {
+        define('PHP_COMPILER_DEBUG_LAST_PHASE_FILE', $debugFile);
+    }
+    $debugStderr = getenv('PHP_COMPILER_DEBUG_LAST_PHASE_STDERR');
+    if (
+        is_string($debugStderr)
+        && ('1' === $debugStderr || 'true' === strtolower($debugStderr))
+        && !defined('PHP_COMPILER_DEBUG_LAST_PHASE_STDERR')
+    ) {
+        define('PHP_COMPILER_DEBUG_LAST_PHASE_STDERR', true);
+    }
+}
+
 $sourceFile = getenv('PHP_COMPILER_M3_SOURCE');
 $outFile = getenv('PHP_COMPILER_M3_OUT');
 if (!is_string($sourceFile) || '' === $sourceFile || !is_string($outFile) || '' === $outFile) {
     echo "compile_smoke_m3_emit_entry: set PHP_COMPILER_M3_SOURCE and PHP_COMPILER_M3_OUT, or run: DRIVER -o OUT SOURCE.php\n";
     exit(1);
+}
+if (defined('PHP_COMPILER_DEBUG_LAST_PHASE') && PHP_COMPILER_DEBUG_LAST_PHASE && !defined('PHP_COMPILER_DEBUG_LAST_PHASE_INPUT_FILE')) {
+    define('PHP_COMPILER_DEBUG_LAST_PHASE_INPUT_FILE', $sourceFile);
 }
 
 exit(\PHPCompiler\BootstrapAot\compile_smoke_m3_emit($sourceFile, $outFile));
