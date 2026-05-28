@@ -45,11 +45,9 @@ final class JitEnv
         );
         $bytes = $context->builder->structGep($assignmentStr, $map['value']);
         $bufLen = $context->builder->add($len, $one);
-        $mallocFn = $context->lookupFunction(
-            \PHPCompiler\JIT\Builtin::LOAD_TYPE_STANDALONE === $context->loadType
-                ? 'malloc'
-                : '__mm__malloc'
-        );
+        // putenv() retains the buffer for the lifetime of the process.
+        // Use libc malloc rather than the managed allocator so the assignment string is never reclaimed.
+        $mallocFn = $context->lookupFunction('malloc');
         $buf = $context->builder->call($mallocFn, $bufLen);
         $cStr = $context->builder->pointerCast($buf, $i8p);
         $context->intrinsic->memcpy($cStr, $bytes, $len, false);
