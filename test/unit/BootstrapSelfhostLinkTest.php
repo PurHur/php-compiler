@@ -40,9 +40,9 @@ final class BootstrapSelfhostLinkTest extends TestCase
         $this->assertNotFalse($driverPos);
         $this->assertNotFalse($argvPos);
         $this->assertNotFalse($nativeAliasPos);
-        $this->assertLessThan($argvPos, $driverPos, 'prefer selfhost-compile-driver before bin-compile-aot');
+        $this->assertLessThan($driverPos, $argvPos, 'prefer bin-compile-aot before selfhost-compile-driver (#2894)');
         $this->assertLessThan($nativeAliasPos, $argvPos, 'prefer bin-compile-aot before emit-helper alias (#2894)');
-        $this->assertStringContainsString('trying next native driver (#2894)', $body);
+        $this->assertStringContainsString('failed (exit', $body);
         $this->assertStringContainsString('falling back to Zend gen-0', $body);
     }
 
