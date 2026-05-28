@@ -26,6 +26,9 @@ final class BootstrapSelfhostDriverSmokeTest extends TestCase
         $this->assertStringContainsString('selfhost-helloworld-compile', $script);
         $this->assertStringContainsString('bin-compile-aot', $script);
         $this->assertStringContainsString('"${BIN_COMPILE_DRIVER}" -o "${EMIT_OUT}"', $script);
+        $this->assertStringContainsString('stage 5', $script);
+        $this->assertStringContainsString('bootstrap-driver-smoke-gen3', $script);
+        $this->assertStringContainsString('silent success guard #2890', $script);
         $this->assertStringNotContainsString(' -l ', $script);
     }
 

@@ -3,16 +3,16 @@
 declare(strict_types=1);
 
 /**
- * M4 gen-1 native compile driver (linkable; runtime dispatch via env — issue #1498).
+ * M4 gen-1 inventory emit entry — delegates to M3 helloworld compile driver (#2893).
  *
  * Gate: php bin/compile.php -l test/selfhost/bootstrap_loop_smoke/compile_driver.php
  *
- * Compile mode (maps M4 env → M3 helloworld driver; avoid top-level __DIR__ concat):
- *   PHP_COMPILER_M4_COMPILE_MODE=compile PHP_COMPILER_M4_RUNTIME_COMPILE=1
- *   PHP_COMPILER_M4_SOURCE=… PHP_COMPILER_M4_OUT=… ./build/bootstrap-loop-gen1-compile
+ * Native link: bootstrap-loop-gen1-link.sh links compiler_helloworld_smoke/compile_driver.php
+ * (this file is lint/M4 env alias; wrapper {main} must not be the inventory link TU).
  *
- * Native link: bootstrap-loop-gen1-link.sh links compile_smoke_m3_emit_native_entry.php
- * (compile_driver.php bundle segfaults on LLVM 9 — #1768); this file stays lint-only for M4 env dispatch.
+ * M4 env (optional; gen-1-link sets PHP_COMPILER_M3_* before invoke):
+ *   PHP_COMPILER_M4_COMPILE_MODE=compile PHP_COMPILER_M4_RUNTIME_COMPILE=1
+ *   PHP_COMPILER_M4_SOURCE=… PHP_COMPILER_M4_OUT=…
  */
 
 if ('compile' === (string) getenv('PHP_COMPILER_M4_COMPILE_MODE')) {
@@ -31,8 +31,3 @@ if ('compile' === (string) getenv('PHP_COMPILER_M4_COMPILE_MODE')) {
 }
 
 require_once __DIR__.'/../compiler_helloworld_smoke/compile_driver.php';
-
-if ('compile' !== (string) getenv('PHP_COMPILER_M4_COMPILE_MODE')
-    && 'compile' !== (string) getenv('PHP_COMPILER_M3_COMPILE_MODE')) {
-    echo "bootstrap_loop_compile_driver ready (delegates to M3 helloworld compile driver)\n";
-}

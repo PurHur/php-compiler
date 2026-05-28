@@ -127,5 +127,56 @@ if [[ ! -x "${EMIT_OUT}" ]]; then
   exit 1
 fi
 
-echo "bootstrap-selfhost-driver-smoke: emit_path=native (gen-2 compile + run)"
-echo "bootstrap-selfhost-driver-smoke: OK ${HELLOWORLD_DRIVER} -> ${GEN2_OUT} (argv driver ${BIN_COMPILE_DRIVER})"
+echo "bootstrap-selfhost-driver-smoke: stage 5 — gen-3 recompile bin/compile.php + argv emit (#2890)"
+GEN3_DRIVER="${ROOT}/build/bootstrap-driver-smoke-gen3-compile"
+GEN3_SMOKE="${ROOT}/build/bootstrap-driver-smoke-gen3-smoke"
+rm -f "${GEN3_DRIVER}" "${GEN3_SMOKE}"
+set +e
+gen3_link_out="$(
+  env -u PHP_COMPILER_M3_SOURCE -u PHP_COMPILER_M3_OUT \
+    "${BIN_COMPILE_DRIVER}" -o "${GEN3_DRIVER}" "${ROOT}/bin/compile.php" 2>&1
+)"
+gen3_link_code=$?
+set -e
+printf '%s\n' "${gen3_link_out}"
+if [[ "${gen3_link_code}" -ne 0 ]]; then
+  echo "bootstrap-selfhost-driver-smoke: gen-3 link bin/compile.php failed (exit ${gen3_link_code})" >&2
+  exit 1
+fi
+if ! grep -qE 'helloworld_compile_smoke: compile OK|compile_smoke_m3_emit: compile OK' <<< "${gen3_link_out}"; then
+  echo "bootstrap-selfhost-driver-smoke: gen-3 link missing compile OK line" >&2
+  exit 1
+fi
+if [[ ! -x "${GEN3_DRIVER}" ]]; then
+  echo "bootstrap-selfhost-driver-smoke: missing gen-3 driver ${GEN3_DRIVER}" >&2
+  exit 1
+fi
+set +e
+gen3_emit_out="$(
+  env -u PHP_COMPILER_M3_SOURCE -u PHP_COMPILER_M3_OUT \
+    "${GEN3_DRIVER}" -o "${GEN3_SMOKE}" "${EMIT_PROBE}" 2>&1
+)"
+gen3_emit_code=$?
+set -e
+printf '%s\n' "${gen3_emit_out}"
+if [[ "${gen3_emit_code}" -ne 0 ]]; then
+  echo "bootstrap-selfhost-driver-smoke: gen-3 argv emit failed (exit ${gen3_emit_code})" >&2
+  exit 1
+fi
+if ! grep -qE 'helloworld_compile_smoke: compile OK|compile_smoke_m3_emit: compile OK' <<< "${gen3_emit_out}"; then
+  echo "bootstrap-selfhost-driver-smoke: gen-3 emit missing compile OK line (silent success guard #2890)" >&2
+  exit 1
+fi
+if [[ ! -x "${GEN3_SMOKE}" ]]; then
+  echo "bootstrap-selfhost-driver-smoke: gen-3 missing output ${GEN3_SMOKE} (silent success guard #2890)" >&2
+  exit 1
+fi
+gen3_run_out="$("${GEN3_SMOKE}" 2>&1)"
+if ! grep -qx "${EXPECTED_STDOUT}" <<< "${gen3_run_out}"; then
+  echo "bootstrap-selfhost-driver-smoke: gen-3 smoke run unexpected stdout (want ${EXPECTED_STDOUT})" >&2
+  printf '%s\n' "${gen3_run_out}" >&2
+  exit 1
+fi
+
+echo "bootstrap-selfhost-driver-smoke: emit_path=native (gen-2 compile + run + gen-3 argv)"
+echo "bootstrap-selfhost-driver-smoke: OK ${HELLOWORLD_DRIVER} -> ${GEN2_OUT} (argv driver ${BIN_COMPILE_DRIVER}, gen-3 ${GEN3_DRIVER})"
