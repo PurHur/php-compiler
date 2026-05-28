@@ -68,8 +68,7 @@ function run(string $filename, string $code, array $options): void
         } elseif (str_contains($normalized, 'runtime_compile_smoke/compile_driver.php')) {
             putenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX=runtime_compile_smoke_m3_emit');
             putenv('PHP_COMPILER_M3_EMIT_HELPER_SPINE=1');
-        } elseif (str_contains($normalized, 'compiler_compile_smoke/compile_driver.php')
-            || str_contains($normalized, 'compiler_unit_probe/compile_driver.php')) {
+        } elseif (str_contains($normalized, 'compile_driver.php')) {
             putenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX=compile_smoke_m3_emit');
         }
         $inventoryEmit = getenv('BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER') ?: getenv('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER');

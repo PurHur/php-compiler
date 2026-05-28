@@ -6,7 +6,7 @@ declare(strict_types=1);
  * M3 compiler unit probe native compile driver (issues #2216, #2618, #2879).
  * Gate: php bin/compile.php -l test/selfhost/compiler_unit_probe/compile_driver.php
  *
- * Compile mode:
+ * Compile mode (env dispatch — avoid top-level __DIR__ concat in AOT entry; #1493):
  *   PHP_COMPILER_M3_COMPILE_MODE=compile PHP_COMPILER_M3_RUNTIME_COMPILE=1
  *   PHP_COMPILER_M3_SOURCE=… PHP_COMPILER_M3_OUT=… ./build/selfhost-compiler-unit-probe-emit
  */
@@ -106,13 +106,13 @@ if ('compile' === (string) getenv('PHP_COMPILER_M3_COMPILE_MODE')) {
         putenv('PHP_COMPILER_M3_COMPILE_DRIVER=1');
     }
     if ('1' !== (string) getenv('PHP_COMPILER_M3_RUNTIME_COMPILE')) {
-        echo "compiler_unit_probe_compile_driver: emit path blocked (gate: set BOOTSTRAP_M3_RUNTIME_COMPILE=1 and PHP_COMPILER_M3_RUNTIME_COMPILE=1)\n";
+        echo "compiler_unit_probe: emit path blocked (gate: set BOOTSTRAP_M3_RUNTIME_COMPILE=1 and PHP_COMPILER_M3_RUNTIME_COMPILE=1)\n";
         exit(1);
     }
     $sourceFile = getenv('PHP_COMPILER_M3_SOURCE');
     $outFile = getenv('PHP_COMPILER_M3_OUT');
     if (!is_string($sourceFile) || '' === $sourceFile || !is_string($outFile) || '' === $outFile) {
-        echo "compiler_unit_probe_compile_driver: emit path blocked (set PHP_COMPILER_M3_SOURCE and PHP_COMPILER_M3_OUT for compile mode)\n";
+        echo "compiler_unit_probe: emit path blocked (set PHP_COMPILER_M3_SOURCE and PHP_COMPILER_M3_OUT for compile mode)\n";
         exit(1);
     }
     exit(\PHPCompiler\BootstrapAot\compile_smoke_m3_emit($sourceFile, $outFile));

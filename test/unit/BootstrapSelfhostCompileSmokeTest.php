@@ -150,4 +150,13 @@ final class BootstrapSelfhostCompileSmokeTest extends TestCase
         $source = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-compile-smoke-probe.sh');
         $this->assertStringContainsString('PHP_COMPILER_EMIT_HELPER_LINK=1', $source);
     }
+
+    /** Issue #2879: inventory compile_driver without *_m3_emit_native_entry.php. */
+    public function testCompileSmokeProbeDocumentsInventoryEmitDriverOptIn(): void
+    {
+        $script = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-compile-smoke-probe.sh');
+        $this->assertStringContainsString('BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER', $script);
+        $this->assertStringContainsString('inventory compile_driver', $script);
+        $this->assertFileExists(self::$root.'/test/selfhost/compiler_compile_smoke/compile_driver.php');
+    }
 }

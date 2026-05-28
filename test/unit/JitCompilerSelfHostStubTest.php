@@ -68,6 +68,14 @@ final class JitCompilerSelfHostStubTest extends TestCase
     ];
 
     /** @var list<string> */
+    private const M3_COMPILER_PHP_LOWERING_ISSET_CHAIN_SUFFIXES = [
+        'compileisset',
+        'compilecoalesce',
+        'resolveisset',
+        'requireoperandslot',
+    ];
+
+    /** @var list<string> */
     private const M3_WEB_CONSTSTRINGFOLDER_REAL_LOWERING_METHODS = [
         'fold',
         'foldconcat',
@@ -436,6 +444,45 @@ final class JitCompilerSelfHostStubTest extends TestCase
     public static function m3CompilerNativeLoweringSuffixProvider(): iterable
     {
         foreach (self::M3_COMPILER_NATIVE_LOWERING_SUFFIXES as $suffix) {
+            yield $suffix => [$suffix];
+        }
+    }
+
+    /**
+     * @dataProvider m3CompilerPhpLoweringIssetChainSuffixProvider
+     */
+    public function testM3CompileDriverCompilerIssetChainLoweringIsNotStubbed(string $suffix): void
+    {
+        $prevSelfHost = getenv('PHP_COMPILER_SELFHOST_AOT');
+        $prevM3 = getenv('PHP_COMPILER_M3_COMPILE_DRIVER');
+        putenv('PHP_COMPILER_SELFHOST_AOT=1');
+        putenv('PHP_COMPILER_M3_COMPILE_DRIVER=1');
+        try {
+            $this->assertFalse(
+                $this->invokeSkipCheck(
+                    'isSkippedCompilerHotPathName',
+                    'phpcompiler\\compiler::'.$suffix
+                ),
+                "Expected PHP CFG lowering for Compiler::{$suffix} on M3 compile driver"
+            );
+        } finally {
+            if (false === $prevSelfHost) {
+                putenv('PHP_COMPILER_SELFHOST_AOT');
+            } else {
+                putenv('PHP_COMPILER_SELFHOST_AOT='.$prevSelfHost);
+            }
+            if (false === $prevM3) {
+                putenv('PHP_COMPILER_M3_COMPILE_DRIVER');
+            } else {
+                putenv('PHP_COMPILER_M3_COMPILE_DRIVER='.$prevM3);
+            }
+        }
+    }
+
+    /** @return iterable<string, array{0: string}> */
+    public static function m3CompilerPhpLoweringIssetChainSuffixProvider(): iterable
+    {
+        foreach (self::M3_COMPILER_PHP_LOWERING_ISSET_CHAIN_SUFFIXES as $suffix) {
             yield $suffix => [$suffix];
         }
     }
