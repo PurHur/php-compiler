@@ -28,6 +28,19 @@ export PHP_COMPILER_JIT_PHASE_FILE="${ROOT}/build/.last-jit-phase-lib-spine-smok
 export PHP_COMPILER_JIT_ENTRY_FILE="${ROOT}/build/.last-jit-entry-lib-spine-smoke"
 rm -f "${OUT}" "${PHP_COMPILER_JIT_PROGRESS_FILE}" "${PHP_COMPILER_JIT_PHASE_FILE}" "${PHP_COMPILER_JIT_ENTRY_FILE}"
 
+# Optional minimization path to bisect segfaults in the compiled inventory argv driver (#2989).
+if [[ "${BOOTSTRAP_LIB_SPINE_SMOKE_MINIMIZE:-0}" == "1" ]]; then
+  limit="${BOOTSTRAP_LIB_SPINE_SMOKE_REQUIRE_LIMIT:-}"
+  if [[ -z "${limit}" ]]; then
+    echo "bootstrap-selfhost-lib-spine-smoke-link: BOOTSTRAP_LIB_SPINE_SMOKE_MINIMIZE=1 requires BOOTSTRAP_LIB_SPINE_SMOKE_REQUIRE_LIMIT=<n>" >&2
+    exit 1
+  fi
+  min_entry="${ROOT}/build/spine-minimize-lib-spine-smoke-limit-${limit}.php"
+  # Use host PHP to generate a literal-require subset entry; the compiled driver will compile this file.
+  php "${ROOT}/script/bootstrap-spine-minimize-entry.php" --in "${ENTRY}" --out "${min_entry}" --limit "${limit}" >&2
+  ENTRY="${min_entry}"
+fi
+
 INVENTORY_ARGV_DRIVER="${ROOT}/build/bin-compile-aot-inventory"
 
 # Prefer the proven inventory argv driver path (same strategy as bootstrap-selfhost-full-revision-probe, #2968).
