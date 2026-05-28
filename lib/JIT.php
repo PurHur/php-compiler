@@ -3000,6 +3000,15 @@ class JIT {
         string $sentinelLogical,
         bool $sidecarHostStubNonLiteralIncludes = false
     ): void {
+        $maxDepthRaw = getenv('PHP_COMPILER_M3_EMIT_SIDECAR_MAX_DEPTH');
+        $maxDepth = is_string($maxDepthRaw) && '' !== $maxDepthRaw ? (int) $maxDepthRaw : 4;
+        $depthRaw = getenv('PHP_COMPILER_M3_EMIT_SIDECAR_DEPTH');
+        $depth = is_string($depthRaw) && '' !== $depthRaw ? (int) $depthRaw : 0;
+        if ($depth >= $maxDepth) {
+            throw new \LogicException(
+                "m3-emit-tu sidecar host-compile exceeded max depth: depth={$depth} max={$maxDepth} sidecar={$sidecarRel} source={$path}"
+            );
+        }
         // Prevent unbounded sidecar recursion: a sidecar host-compile runs bin/compile.php, which would
         // otherwise register/host-compile additional sidecars again (hang in bootstrap-selfhost-helloworld).
         $guard = getenv('PHP_COMPILER_M3_EMIT_SIDECAR_RECURSION_GUARD');
@@ -3021,9 +3030,6 @@ class JIT {
             $this->context->m3EmitTuTrivialEchoSource = $code;
             $this->context->m3EmitTuTrivialEchoPath = $path;
         }
-        // Sidecar-only: avoid host compileEmitSmoke in emit TU LLVM module (#2540).
-        $tmpOut = sys_get_temp_dir().'/m3_emit_sidecar_aot_'.getmypid().'_'.substr(md5($sidecarRel), 0, 8);
-        @unlink($tmpOut);
         $repoRoot = dirname(__DIR__);
         $pathNorm = str_replace('\\', '/', $path);
         $hostCompilePath = $path;
@@ -3033,6 +3039,14 @@ class JIT {
             // so bootstrap products stop depending on compile_smoke_m3_emit helpers (#2900).
             $hostCompilePath = $repoRoot.'/test/bootstrap-aot/compile_smoke_m3_emit_native_entry.php';
         }
+        // Sidecar-only: avoid host compileEmitSmoke in emit TU LLVM module (#2540).
+        // Memoize per-entrypoint+source to prevent runaway sidecar chains (#2908).
+        $hostCode = @file_get_contents($hostCompilePath);
+        $hostCodeHash = is_string($hostCode) && '' !== $hostCode ? substr(sha1($hostCode), 0, 16) : 'missing';
+        $cacheKey = substr(sha1($hostCompilePath."\n".$sidecarRel."\n".$hostCodeHash), 0, 24);
+        $cacheOut = sys_get_temp_dir().'/m3_emit_sidecar_cache_'.$cacheKey;
+        $tmpOut = sys_get_temp_dir().'/m3_emit_sidecar_aot_'.getmypid().'_'.substr(md5($sidecarRel), 0, 8);
+        @unlink($tmpOut);
         $compileCmd = 'php '.escapeshellarg($repoRoot.'/bin/compile.php')
             .' -o '.escapeshellarg($tmpOut)
             .' '.escapeshellarg($hostCompilePath);
@@ -3042,6 +3056,8 @@ class JIT {
         $compileEnv['PHP_COMPILER_M3_COMPILE_DRIVER'] = '1';
         // Recursion guard: nested bin/compile.php invocations should not spawn further sidecar host-compiles.
         $compileEnv['PHP_COMPILER_M3_EMIT_SIDECAR_RECURSION_GUARD'] = '1';
+        $compileEnv['PHP_COMPILER_M3_EMIT_SIDECAR_DEPTH'] = (string) ($depth + 1);
+        $compileEnv['PHP_COMPILER_M3_EMIT_SIDECAR_MAX_DEPTH'] = (string) $maxDepth;
         if (str_ends_with($pathNorm, '/bin/compile.php') && !$this->shouldUseM3InventoryEmitDriver()) {
             $compileEnv['PHP_COMPILER_EMIT_HELPER_LINK'] = '1';
             $compileEnv['PHP_COMPILER_M3_EMIT_TU'] = '1';
@@ -3052,6 +3068,21 @@ class JIT {
         }
         if (!str_ends_with($pathNorm, '/bin/compile.php')) {
             unset($compileEnv['PHP_COMPILER_EMIT_HELPER_LINK'], $compileEnv['PHP_COMPILER_M3_EMIT_TU']);
+        }
+        if (is_readable($cacheOut)) {
+            $aotBytes = file_get_contents($cacheOut);
+            if (is_string($aotBytes) && '' !== $aotBytes) {
+                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::registerLinktime(
+                    $this->context,
+                    $repoRoot,
+                    $code,
+                    $aotBytes,
+                    $sidecarRel,
+                    $sentinelLogical
+                );
+
+                return;
+            }
         }
         $descriptor = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
         $proc = proc_open($compileCmd, $descriptor, $pipes, $repoRoot, $compileEnv);
@@ -3085,6 +3116,9 @@ class JIT {
         if (!is_string($aotBytes) || '' === $aotBytes) {
             return;
         }
+        // Persist a stable copy for memoization across multiple sidecar registrations in the same link.
+        // If a concurrent writer races, the content should be identical for this cacheKey.
+        @file_put_contents($cacheOut, $aotBytes);
         \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::registerLinktime(
             $this->context,
             $repoRoot,
