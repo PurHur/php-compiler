@@ -277,6 +277,7 @@ class Module extends ModuleAbstract
             new fwrite(),
             new fclose(),
             new getenv_(),
+            new putenv_(),
             new shell_exec(),
             new escapeshellarg(),
             new phpc_run_command(),

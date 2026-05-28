@@ -9,10 +9,9 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
-use PHPCompiler\Web\Superglobals;
 use PHPLLVM\Value;
 
-/** putenv() — set or unset process environment (VM; JIT defers to VM). */
+/** putenv() — set/unset process environment (VM; JIT/AOT via libc putenv). */
 final class putenv_ extends Internal
 {
     public function __construct()
@@ -32,12 +31,7 @@ final class putenv_ extends Internal
         if (Variable::TYPE_STRING !== $v->type) {
             throw new \LogicException('putenv() requires a string assignment in this compiler build');
         }
-        $assignment = $v->toString();
-        $ok = \putenv($assignment);
-        $frame->returnVar->bool($ok);
-        if ($ok) {
-            Superglobals::syncEnvAfterPutenv($assignment);
-        }
+        $frame->returnVar->bool(\putenv($v->toString()));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
@@ -49,7 +43,6 @@ final class putenv_ extends Internal
             throw new \LogicException('putenv() requires a string assignment in this compiler build');
         }
 
-        $this->jitString($context, $args[0], 'putenv() argument #1');
-        return JitEnv::putenv($context, $context->helper->loadValue($args[0]));
+        return JitEnv::putenv($context, $this->jitString($context, $args[0], 'putenv() assignment'));
     }
 }
