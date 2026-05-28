@@ -127,6 +127,15 @@ final class IncludeHelper
             $context->builder->branch($entryBb);
         }
         $context->builder->positionAtEnd($entryBb);
+        // Best-effort breadcrumb for self-host segfault triage: many bootstrap bundles are pure include
+        // spines; record which include boundary we last entered before a fatal crash.
+        $context->builder->call(
+            $context->lookupFunction('__phpc_progress_note'),
+            $context->builder->pointerCast(
+                $context->constantFromString('c:include:'.$path),
+                $context->getTypeFromString('int8*')
+            )
+        );
         // Materialize inherited locals at include_entry so if/elseif arms that assign
         // from $_REQUEST before this include are visible (#764, #747).
         self::syncLocalBindingsFromScope($context, $localBindings);

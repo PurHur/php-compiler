@@ -133,6 +133,15 @@ bootstrap_compile_invoke() {
       return 0
     fi
     echo "bootstrap-compile-invoke: compiled driver ${BOOTSTRAP_COMPILE_DRIVER} failed (exit ${last_code})" >&2
+    if [[ -n "${PHP_COMPILER_JIT_ENTRY_FILE:-}" && -f "${PHP_COMPILER_JIT_ENTRY_FILE}" ]]; then
+      echo "bootstrap-compile-invoke: last entry: $(cat "${PHP_COMPILER_JIT_ENTRY_FILE}" 2>/dev/null || true)" >&2
+    fi
+    if [[ -n "${PHP_COMPILER_JIT_PHASE_FILE:-}" && -f "${PHP_COMPILER_JIT_PHASE_FILE}" ]]; then
+      echo "bootstrap-compile-invoke: last phase: $(cat "${PHP_COMPILER_JIT_PHASE_FILE}" 2>/dev/null || true)" >&2
+    fi
+    if [[ -n "${PHP_COMPILER_JIT_PROGRESS_FILE:-}" && -f "${PHP_COMPILER_JIT_PROGRESS_FILE}" ]]; then
+      echo "bootstrap-compile-invoke: last progress: $(cat "${PHP_COMPILER_JIT_PROGRESS_FILE}" 2>/dev/null || true)" >&2
+    fi
   done < <(bootstrap_list_native_compile_drivers)
 
   if [[ "${attempted_native}" -eq 1 && "${no_zend_fallback}" -eq 1 ]]; then
