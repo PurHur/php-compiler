@@ -26,23 +26,48 @@ export BOOTSTRAP_NO_ZEND_FALLBACK=1
 export PHP_COMPILER_JIT_PROGRESS_FILE="${ROOT}/build/.last-jit-func-lib-spine-smoke"
 rm -f "${OUT}" "${PHP_COMPILER_JIT_PROGRESS_FILE}"
 
-# north-star5 step 4b requires "no Zend in the compile step". Ensure a compiled driver exists
-# before attempting to compile this bundle, otherwise bootstrap_compile_invoke will fall back to
-# Zend gen-0 (#2958).
-if ! bootstrap_resolve_compile_driver || [[ "${BOOTSTRAP_COMPILE_DRIVER_MODE:-}" != "native" ]]; then
-  echo "bootstrap-selfhost-lib-spine-smoke-link: building compiled argv driver (bootstrap-selfhost-driver-smoke) to avoid Zend fallback" >&2
-  if ! ./script/bootstrap-selfhost-driver-smoke.sh >/dev/null; then
-    echo "bootstrap-selfhost-lib-spine-smoke-link: failed to build compiled driver (see stderr above)" >&2
+INVENTORY_ARGV_DRIVER="${ROOT}/build/bin-compile-aot-inventory"
+
+# Prefer the proven inventory argv driver path (same strategy as bootstrap-selfhost-full-revision-probe, #2968).
+if [[ "${BOOTSTRAP_LIB_SPINE_SMOKE_USE_COMPILE_INVOKE:-0}" != "1" ]]; then
+  if [[ ! -x "${INVENTORY_ARGV_DRIVER}" ]]; then
+    echo "bootstrap-selfhost-lib-spine-smoke-link: building inventory argv driver (bin/compile.php) to reduce compiled-driver divergence (#2968)" >&2
+    if ! env PHP_COMPILER_M3_SOURCE="${ROOT}/bin/compile.php" PHP_COMPILER_M3_OUT="${INVENTORY_ARGV_DRIVER}" \
+      ./script/bootstrap-selfhost-helloworld-compile-bin.sh >/dev/null; then
+      echo "bootstrap-selfhost-lib-spine-smoke-link: failed to build inventory argv driver ${INVENTORY_ARGV_DRIVER}" >&2
+      exit 1
+    fi
+  fi
+  if [[ ! -x "${INVENTORY_ARGV_DRIVER}" ]]; then
+    echo "bootstrap-selfhost-lib-spine-smoke-link: missing inventory argv driver ${INVENTORY_ARGV_DRIVER}" >&2
     exit 1
   fi
+
+  if ! env -u PHP_COMPILER_M3_SOURCE -u PHP_COMPILER_M3_OUT \
+    PHP_COMPILER_SELFHOST_AOT=1 \
+    BOOTSTRAP_NO_ZEND_FALLBACK=1 \
+    "${INVENTORY_ARGV_DRIVER}" -o "${OUT}" "${ENTRY}" 2>&1; then
+    echo "bootstrap-selfhost-lib-spine-smoke-link: compile failed via inventory argv driver (see stderr above)" >&2
+    exit 1
+  fi
+else
+  # Bisect / compatibility: use shared driver resolver (may select non-inventory drivers).
+  # north-star5 step 4b requires "no Zend in the compile step".
   if ! bootstrap_resolve_compile_driver || [[ "${BOOTSTRAP_COMPILE_DRIVER_MODE:-}" != "native" ]]; then
-    echo "bootstrap-selfhost-lib-spine-smoke-link: compiled driver still missing after driver-smoke (would require Zend fallback)" >&2
+    echo "bootstrap-selfhost-lib-spine-smoke-link: building compiled argv driver (bootstrap-selfhost-driver-smoke) to avoid Zend fallback" >&2
+    if ! ./script/bootstrap-selfhost-driver-smoke.sh >/dev/null; then
+      echo "bootstrap-selfhost-lib-spine-smoke-link: failed to build compiled driver (see stderr above)" >&2
+      exit 1
+    fi
+    if ! bootstrap_resolve_compile_driver || [[ "${BOOTSTRAP_COMPILE_DRIVER_MODE:-}" != "native" ]]; then
+      echo "bootstrap-selfhost-lib-spine-smoke-link: compiled driver still missing after driver-smoke (would require Zend fallback)" >&2
+      exit 1
+    fi
+  fi
+  if ! bootstrap_compile_invoke "${OUT}" "${ENTRY}" env PHP_COMPILER_SELFHOST_AOT=1 2>&1; then
+    echo "bootstrap-selfhost-lib-spine-smoke-link: compile failed (progress gate; see stderr above)" >&2
     exit 1
   fi
-fi
-if ! bootstrap_compile_invoke "${OUT}" "${ENTRY}" env PHP_COMPILER_SELFHOST_AOT=1 2>&1; then
-  echo "bootstrap-selfhost-lib-spine-smoke-link: compile failed (progress gate; see stderr above)" >&2
-  exit 1
 fi
 test -x "${OUT}"
 out="$({ PHP_COMPILER_CLI_SPINE_BUNDLE=1 "${OUT}"; })"

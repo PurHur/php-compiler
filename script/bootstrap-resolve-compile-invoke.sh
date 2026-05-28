@@ -24,6 +24,7 @@ bootstrap_list_native_compile_drivers() {
   # If a fully compiled `bin/compile.php` exists, always prefer it for gen-0 bootstrap work (#2894).
   # Keep older driver names as fallbacks for bisection.
   printf '%s\n' \
+    "${root}/build/bin-compile-aot-inventory" \
     "${root}/build/bin-compile-aot" \
     "${root}/build/selfhost-compile-driver" \
     "${root}/build/selfhost-native-compile-driver"
