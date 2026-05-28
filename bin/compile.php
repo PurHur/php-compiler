@@ -44,6 +44,11 @@ function run(string $filename, string $code, array $options): void
         if (false === $m4BinCompile || '' === $m4BinCompile) {
             putenv('PHP_COMPILER_M4_BIN_COMPILE_DRIVER=1');
         }
+        // Gen-2+ argv driver recompiling bin/compile.php must register bootstrap-aot sidecars (#3004).
+        $m5DriverHost = getenv('PHP_COMPILER_M5_DRIVER_HOST');
+        if (false === $m5DriverHost || '' === $m5DriverHost) {
+            putenv('PHP_COMPILER_M5_DRIVER_HOST=1');
+        }
     }
     if ('' !== $normalized && str_contains($normalized, 'bootstrap-aot/')) {
         // M3 native emit TU: self-host M3 allowlist (not full bootstrap JIT) (#1937, #1983).

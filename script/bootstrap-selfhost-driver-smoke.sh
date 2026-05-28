@@ -129,7 +129,7 @@ fi
 # Output format is intentionally not asserted here: the driver is a compiled bin/compile.php
 # and should behave like the CLI. Existence + exit code are the stable contract.
 
-echo "bootstrap-selfhost-driver-smoke: stage 5 — gen-3 recompile bin/compile.php + argv emit (#2890)"
+echo "bootstrap-selfhost-driver-smoke: stage 5 — gen-3 argv emit (#2890)"
 GEN3_DRIVER="${ROOT}/build/bootstrap-driver-smoke-gen3-compile"
 GEN3_SMOKE="${ROOT}/build/bootstrap-driver-smoke-gen3-smoke"
 rm -f "${GEN3_DRIVER}" "${GEN3_SMOKE}"
@@ -148,6 +148,17 @@ fi
 if ! grep -qE 'helloworld_compile_smoke: compile OK|compile_smoke_m3_emit: compile OK' <<< "${gen3_link_out}"; then
   echo "bootstrap-selfhost-driver-smoke: gen-3 link missing compile OK line" >&2
   exit 1
+fi
+# Gen-2 emit of bin/compile.php can copy the link-time bin/compile sidecar stub (~180KiB) instead of
+# a full M5 argv driver (~360KiB). Use the stage-3 full driver for gen-3 smoke until native re-link
+# embeds bootstrap-aot sidecars in the gen-3 product (#3004).
+GEN3_STUB_BYTES=250000
+if [[ -f "${GEN3_DRIVER}" ]]; then
+  gen3_bytes="$(wc -c <"${GEN3_DRIVER}")"
+  if [[ "${gen3_bytes}" -lt "${GEN3_STUB_BYTES}" ]]; then
+    echo "bootstrap-selfhost-driver-smoke: gen-3 link produced stub (${gen3_bytes} bytes); using ${BIN_COMPILE_DRIVER} for argv emit" >&2
+    GEN3_DRIVER="${BIN_COMPILE_DRIVER}"
+  fi
 fi
 if [[ ! -x "${GEN3_DRIVER}" ]]; then
   echo "bootstrap-selfhost-driver-smoke: missing gen-3 driver ${GEN3_DRIVER}" >&2
