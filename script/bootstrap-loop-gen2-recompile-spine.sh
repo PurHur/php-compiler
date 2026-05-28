@@ -18,9 +18,12 @@ GEN3="${ROOT}/build/bootstrap-loop-gen3-full-spine"
 SOURCE="${ROOT}/test/selfhost/compiler_lib_spine_smoke/main.php"
 
 if [[ ! -x "${DRIVER}" ]]; then
-  export PHP_COMPILER_M3_SOURCE="${ROOT}/bin/compile.php"
-  export PHP_COMPILER_M3_OUT="${DRIVER}"
-  "${ROOT}/script/bootstrap-selfhost-helloworld-compile-bin.sh" >/dev/null
+  # Build the emit-helper compile driver (argv `-o OUT SOURCE.php`) explicitly.
+  # Do not route through bootstrap-selfhost-helloworld-compile-bin.sh here: it may
+  # build the inventory bin/compile.php driver which can segfault on spine sources.
+  EMIT_ENTRY="${ROOT}/test/bootstrap-aot/compile_smoke_m3_emit_native_entry.php"
+  env PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_M3_COMPILE_DRIVER=1 PHP_COMPILER_EMIT_HELPER_LINK=1 \
+    php "${ROOT}/bin/compile.php" -o "${DRIVER}" "${EMIT_ENTRY}" >/dev/null
 fi
 if [[ ! -x "${DRIVER}" ]]; then
   echo "bootstrap-loop-gen2-recompile-spine: missing native driver ${DRIVER}" >&2

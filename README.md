@@ -43,7 +43,7 @@ Presenter script and troubleshooting: [`docs/GETTING-STARTED.md`](docs/GETTING-S
 | Self-host **M0–M1** | ✅ |
 | Self-host **M2** spine | ✅ **725/725** link (literal `src/cli_driver.php`) ([#1492](https://github.com/PurHur/php-compiler/issues/1492), [#2868](https://github.com/PurHur/php-compiler/issues/2868), [#2201](https://github.com/PurHur/php-compiler/issues/2201), [#2543](https://github.com/PurHur/php-compiler/issues/2543), [#2652](https://github.com/PurHur/php-compiler/issues/2652)) |
 | Self-host **M3** emit | 🚧 smoke strict **native** ✅ ([#2610](https://github.com/PurHur/php-compiler/issues/2610)); full `Compiler` CFG 🚧 ([#1937](https://github.com/PurHur/php-compiler/issues/1937)) |
-| Self-host **M4** loop | 🚧 gen-2→gen-3 spine **717/717** ✅ ([#2697](https://github.com/PurHur/php-compiler/pull/2697)); full revision / argv CLI ⬜ ([#1498](https://github.com/PurHur/php-compiler/issues/1498)) · [bootstrap-generations.md](docs/bootstrap-generations.md) |
+| Self-host **M4** loop | 🚧 gen-2→gen-3 spine **725/725** ✅ ([#2697](https://github.com/PurHur/php-compiler/pull/2697)); full revision rebuild ⬜ ([#1498](https://github.com/PurHur/php-compiler/issues/1498)) · [bootstrap-generations.md](docs/bootstrap-generations.md) |
 | Self-host **M5** vendor prelink | 🚧 `php-types` **object_ok** ([#1416](https://github.com/PurHur/php-compiler/issues/1416)); `make north-star5-verify` |
 | Full Zend PHP compatibility | ❌ — subset only (matrices in `docs/`, not on status site) |
 

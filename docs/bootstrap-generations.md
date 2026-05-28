@@ -51,7 +51,7 @@ This document is the **canonical reference** for generation numbering, artifacts
 ```bash
 script/apply-patches.sh
 make bootstrap-loop-gen1-link                    # gen-1 → gen-2 smoke (native)
-make bootstrap-loop-gen1-full-spine-emit       # gen-1 → gen-2 spine (717/717)
+make bootstrap-loop-gen1-full-spine-emit       # gen-1 → gen-2 spine (725/725)
 make bootstrap-loop-gen2-recompile-spine       # gen-2 → gen-3 spine (725/725, argv -o)
 ```
 

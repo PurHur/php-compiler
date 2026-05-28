@@ -45,7 +45,7 @@ permalink: /development-status.html
 | **M4** — Bootstrap loop (next revision) | 🚧 gen-2→gen-3 spine **725/725** ✅ · full revision / argv CLI ⬜ |
 | **M5** — Full self-host, no `vendor/` cold boot | 🚧 vendor **1/3** prelinked · cold boot ⬜ |
 
-**Critical path:** argv `bin/compile.php` on compiled driver → full revision rebuild → M5 vendor prelink ([#1416](https://github.com/PurHur/php-compiler/issues/1416)).
+**Critical path:** full revision rebuild (gen-3 compiles a changed tree) → M5 vendor prelink ([#1416](https://github.com/PurHur/php-compiler/issues/1416)).
 
 **Verified 27 May 2026** (`master`, Docker `php-compiler:22.04-dev`, LLVM 9): `make north-star5-verify`, `bootstrap-selfhost-lib-spine-smoke`, `bootstrap-selfhost-compile-smoke-strict`, `bootstrap-selfhost-helloworld`, `bootstrap-loop-gen1-link`, `bootstrap-loop-gen2-recompile-spine`, `bootstrap-loop-probe`.
 
