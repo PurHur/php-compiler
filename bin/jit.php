@@ -69,19 +69,28 @@ function run(string $filename, string $code, array $options): void
     }
 }
 
-function jit_block_contains_trycatch(Block $block): bool
+function jit_block_contains_trycatch(Block $block, ?\SplObjectStorage $seen = null): bool
 {
+    if (null === $seen) {
+        $seen = new \SplObjectStorage();
+    }
+    if ($seen->contains($block)) {
+        return false;
+    }
+    $seen->attach($block);
     foreach ($block->opCodes as $op) {
         if (
             OpCode::TYPE_TRY === $op->type
             || OpCode::TYPE_CATCH === $op->type
             || OpCode::TYPE_FINALLY === $op->type
             || OpCode::TYPE_THROW === $op->type
+            || OpCode::TYPE_YIELD === $op->type
+            || OpCode::TYPE_YIELD_FROM === $op->type
         ) {
             return true;
         }
         foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
-            if ($sub instanceof Block && jit_block_contains_trycatch($sub)) {
+            if ($sub instanceof Block && jit_block_contains_trycatch($sub, $seen)) {
                 return true;
             }
         }

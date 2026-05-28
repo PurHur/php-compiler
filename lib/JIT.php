@@ -4927,6 +4927,10 @@ class JIT {
                     $nullVar->isNullConstant = true;
                     $this->assignOperandValue($block->getOperand($op->arg1), $nullVar);
                     break;
+                case OpCode::TYPE_YIELD:
+                case OpCode::TYPE_YIELD_FROM:
+                    // Not lowered in LLVM/JIT/AOT yet; VM-only support lives in lib/VM.php (#167).
+                    throw new \LogicException('Generators (yield) are VM-only (issue #167)');
                 case OpCode::TYPE_FUNCCALL_INIT:
                     $nameOp = $block->getOperand($op->arg1);
                     if ($nameOp instanceof Operand\Literal) {
