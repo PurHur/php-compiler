@@ -925,6 +925,12 @@ class String_ extends Type {
         if ($dest->kind === Variable::KIND_VALUE) {
             throw new \LogicException('Unknown how to assign to a value');
         }
+        // The shared intrinsic helper caches the builder it was constructed with; while a
+        // per-function builder is swapped in (lib/JIT.php save/restore sites) its memcpy calls
+        // would otherwise be emitted into the stale builder's block, producing cross-block
+        // "instruction does not dominate all uses" verifier failures (#2967). Re-point it at the
+        // live builder so the copies land in the current insertion block.
+        $this->context->intrinsic->builder = $this->context->builder;
         $left = \PHPCompiler\JIT\JitNativeString::coerce($this->context, $left);
         $right = \PHPCompiler\JIT\JitNativeString::coerce($this->context, $right);
         $leftVar = $this->context->helper->loadValue($left);
