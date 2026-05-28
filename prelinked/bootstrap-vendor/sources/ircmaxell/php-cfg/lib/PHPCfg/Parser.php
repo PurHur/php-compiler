@@ -1635,6 +1635,13 @@ class Parser
         return new Op\Expr\Yield_($value, $key, $this->mapAttributes($expr));
     }
 
+    protected function parseExpr_YieldFrom(Expr\YieldFrom $expr)
+    {
+        $inner = $this->readVariable($this->parseExprNode($expr->expr));
+
+        return new Op\Expr\YieldFrom($inner, $this->mapAttributes($expr));
+    }
+
     protected function parseExpr_ShellExec(Expr\ShellExec $expr)
     {
         $this->block->children[] = $arg = new Op\Expr\ConcatList(

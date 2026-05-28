@@ -2022,6 +2022,13 @@ class Compiler {
                         ? $this->compileOperand($yieldKey, $block, true)
                         : null,
                 )];
+            case Op\Expr\YieldFrom::class:
+                $this->markFunctionGenerator($block);
+                return [new OpCode(
+                    OpCode::TYPE_YIELD_FROM,
+                    null,
+                    $this->compileOperand($expr->expr, $block, true),
+                )];
             case Op\Expr\Closure::class:
                 // Bootstrap-oriented stub: allow compiling vendor code containing closures (e.g. php-llvm prelink).
                 // Full closure runtime semantics are not implemented yet; the VM/JIT lower this opcode to null.

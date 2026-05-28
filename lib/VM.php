@@ -950,6 +950,53 @@ restart:
                     $gen->frame = $frame;
                     $frame->generatorYield = true;
                     break;
+                case OpCode::TYPE_YIELD_FROM:
+                    $gen = $this->findGeneratorState($frame);
+                    if (null === $gen) {
+                        throw new \LogicException('yield from outside generator function');
+                    }
+                    if (null === $op->arg2 || !isset($frame->scope[$op->arg2])) {
+                        throw new \LogicException('yield from missing container operand');
+                    }
+                    if (!$gen->yieldFromActive) {
+                        $container = $frame->scope[$op->arg2]->resolveIndirect();
+                        $gen->yieldFromContainer->copyFrom($container);
+                        $gen->yieldFromActive = true;
+                        if (Variable::TYPE_ARRAY === $container->type) {
+                            $container->toArray()->iterReset();
+                        } elseif ($this->variableIsGenerator($container)) {
+                            $container->toObject()->generatorState->rewind();
+                        }
+                    }
+                    $container = $gen->yieldFromContainer->resolveIndirect();
+                    if (Variable::TYPE_ARRAY === $container->type) {
+                        if ($container->toArray()->iterValid()) {
+                            $gen->currentKey->copyFrom($container->toArray()->iterCurrentKey());
+                            $gen->currentValue->copyFrom($container->toArray()->iterCurrentValue(false));
+                            $gen->hasCurrent = true;
+                            $gen->frame = $frame;
+                            $frame->pos--;
+                            $frame->generatorYield = true;
+                            break;
+                        }
+                        $gen->yieldFromActive = false;
+                        break;
+                    }
+                    if ($this->variableIsGenerator($container)) {
+                        $inner = $container->toObject()->generatorState;
+                        if ($this->advanceGeneratorIteration($inner)) {
+                            $gen->currentKey->copyFrom($inner->currentKey);
+                            $gen->currentValue->copyFrom($inner->currentValue);
+                            $gen->hasCurrent = true;
+                            $gen->frame = $frame;
+                            $frame->pos--;
+                            $frame->generatorYield = true;
+                            break;
+                        }
+                        $gen->yieldFromActive = false;
+                        break;
+                    }
+                    throw new \LogicException('yield from requires array or Generator');
                 case OpCode::TYPE_ITER_RESET:
                     $container = $frame->scope[$op->arg1]->resolveIndirect();
                     $frame->iterators[$op->arg1] = $container;
