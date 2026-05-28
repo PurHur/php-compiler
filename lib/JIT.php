@@ -2512,9 +2512,12 @@ class JIT {
         $saved = $this->context->builder;
         $this->context->builder = $this->context->context->builderCreate();
         $this->context->builder->positionAtEnd($bb);
-        $logPrefix = str_contains($lcname, 'runtime_compile_smoke_m3_emit')
-            ? 'runtime_compile_smoke_m3_emit'
-            : 'compile_smoke_m3_emit';
+        $logPrefix = getenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX');
+        if (!is_string($logPrefix) || '' === $logPrefix) {
+            $logPrefix = str_contains($lcname, 'runtime_compile_smoke_m3_emit')
+                ? 'runtime_compile_smoke_m3_emit'
+                : 'compile_smoke_m3_emit';
+        }
         \PHPCompiler\JIT\BootstrapCompileSmokeM3Emit::emit(
             $this->context,
             $func->getParam(0),
