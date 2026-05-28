@@ -42,4 +42,14 @@ final class BootstrapLoopFullSpineProbeTest extends TestCase
         $this->assertStringContainsString('compiler_lib_spine_smoke', $body);
         $this->assertStringContainsString('build/bin-compile-aot', $body);
     }
+
+    /** Issue #2866: gen-2→gen-3 spine uses argv -o (no PHP_COMPILER_M3_* env). */
+    public function testGen2RecompileSpineUsesArgvNotM3Env(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $body = (string) file_get_contents($root.'/script/bootstrap-loop-gen2-recompile-spine.sh');
+        $this->assertStringContainsString('"${DRIVER}" -o "${GEN3}" "${SOURCE}"', $body);
+        $this->assertStringContainsString('env -u PHP_COMPILER_M3_SOURCE -u PHP_COMPILER_M3_OUT', $body);
+        $this->assertStringNotContainsString('PHP_COMPILER_M3_SOURCE="${SOURCE}"', $body);
+    }
 }

@@ -13,10 +13,10 @@ This document is the **canonical reference** for generation numbering, artifacts
 | **0** | Zend `php bin/compile.php` | `build/selfhost-helloworld-compile`, emit helpers | M3 emit TU links; Zend still drives the link step (`emit_path=zend partial` when gen-1 native emit blocked) |
 | **1** | Gen-0 emit helper | `build/bootstrap-loop-gen1-compile` | Native compile driver (M3 bridge) is linkable |
 | **2 (smoke)** | Gen-1 emit helper | `build/bootstrap-loop-gen2` | Gen-1 **native-emits** a smoke fixture (`compiler smoke`) |
-| **2 (spine)** | Gen-1 full-spine emit | `build/bootstrap-loop-gen2-full-spine` | Gen-1 **native-emits** the **717/717** spine bundle |
-| **3** | Gen-2 native driver | `build/bootstrap-loop-gen3-full-spine` | Gen-2 **recompiles** the **717/717** spine without Zend on the compile step |
+| **2 (spine)** | Gen-1 full-spine emit | `build/bootstrap-loop-gen2-full-spine` | Gen-1 **native-emits** the **725/725** spine bundle |
+| **3** | Gen-2 native driver | `build/bootstrap-loop-gen3-full-spine` | Gen-2 **recompiles** the **725/725** spine via argv `-o` (no `PHP_COMPILER_M3_*` env — [#2866](https://github.com/PurHur/php-compiler/issues/2866)) |
 
-**Gen-2 compiles itself** in the M4 sense: `build/bin-compile-aot` (M3 native compile driver, linked via `./script/bootstrap-loop-gen1-link.sh`) reads a source path and emits the next native binary via `PHP_COMPILER_M3_SOURCE` / `PHP_COMPILER_M3_OUT`. Zend **fallback** (`emit_path=zend partial`) remains in gen-1 link when native emit is blocked. The driver is **not** yet a full argv `bin/compile.php -o` CLI for arbitrary PHP ([#1937](https://github.com/PurHur/php-compiler/issues/1937)).
+**Gen-2 compiles itself** in the M4 sense: `build/bin-compile-aot` (M3 native compile driver from `./script/bootstrap-selfhost-helloworld-compile-bin.sh` with `PHP_COMPILER_M3_SOURCE=bin/compile.php`) emits the next native binary via **argv** `DRIVER -o OUT SOURCE.php` for smoke and full spine ([#2866](https://github.com/PurHur/php-compiler/issues/2866), [#2697](https://github.com/PurHur/php-compiler/pull/2697)). Gen-1 link may still use `PHP_COMPILER_M3_SOURCE` / `PHP_COMPILER_M3_OUT` when building gen-2 from the emit helper ([#1937](https://github.com/PurHur/php-compiler/issues/1937)). Zend **fallback** (`emit_path=zend partial`) remains when native emit is blocked.
 
 ---
 
@@ -28,8 +28,8 @@ This document is the **canonical reference** for generation numbering, artifacts
 | `build/bootstrap-loop-gen1` | Gen-1 smoke bundle (runs before emit) |
 | `build/bootstrap-loop-gen1-compile` | Gen-1 emit helper |
 | `build/bootstrap-loop-gen2` | Gen-2 smoke binary |
-| `build/bootstrap-loop-gen2-full-spine` | Gen-2 full spine (717/717) |
-| `build/bootstrap-loop-gen3-full-spine` | Gen-3 full spine (717/717) — **gen-2 output** |
+| `build/bootstrap-loop-gen2-full-spine` | Gen-2 full spine (725/725) |
+| `build/bootstrap-loop-gen3-full-spine` | Gen-3 full spine (725/725) — **gen-2 argv output** |
 
 ---
 
@@ -40,8 +40,8 @@ This document is the **canonical reference** for generation numbering, artifacts
 ```bash
 script/apply-patches.sh
 make bootstrap-loop-gen1-link                    # gen-1 → gen-2 smoke (native)
-make bootstrap-loop-gen1-full-spine-emit       # gen-1 → gen-2 spine (717/717)
-make bootstrap-loop-gen2-recompile-spine       # gen-2 → gen-3 spine (717/717)
+make bootstrap-loop-gen1-full-spine-emit       # gen-1 → gen-2 spine (725/725)
+make bootstrap-loop-gen2-recompile-spine       # gen-2 → gen-3 spine (725/725, argv -o)
 ```
 
 **One-shot probes:**
@@ -73,12 +73,19 @@ Gen-1 link defaults (see `./script/bootstrap-loop-gen1-link.sh`):
 - `BOOTSTRAP_M4_RUNTIME_COMPILE=1` — run gen-1 emit helper at link time
 - `BOOTSTRAP_M4_GEN2_STRICT=1` — opt-in: refuse Zend fallback (`emit_path=zend_fallback_would_be_used`)
 
-The native driver expects M3 env at runtime (not argv `-o`):
+**Preferred (gen-2→gen-3 spine, #2866):** argv compile — no `PHP_COMPILER_M3_*` env:
+
+```bash
+./build/bin-compile-aot -o build/bootstrap-loop-gen3-full-spine \
+  test/selfhost/compiler_lib_spine_smoke/main.php
+```
+
+**Gen-1 emit helper** may still use M3 env when building gen-2 from `compile_smoke_m3_emit_native_entry.php`:
 
 ```bash
 export PHP_COMPILER_M3_SOURCE=/path/to/source.php
 export PHP_COMPILER_M3_OUT=/path/to/output-binary
-./build/bin-compile-aot
+./build/bootstrap-loop-gen1-compile
 ```
 
 Expect stdout: `compile_smoke_m3_emit: compile OK -> …` (or `helloworld_compile_smoke:` variant).
@@ -89,7 +96,7 @@ Expect stdout: `compile_smoke_m3_emit: compile OK -> …` (or `helloworld_compil
 
 | Gap | Tracker |
 |-----|---------|
-| Full argv `bin/compile.php -o` on compiled driver | [#1937](https://github.com/PurHur/php-compiler/issues/1937), [#2633](https://github.com/PurHur/php-compiler/issues/2633) |
+| Gen-1→gen-2 still uses M3 env on emit helper (gen-2→gen-3 spine uses argv — #2866) | [#1937](https://github.com/PurHur/php-compiler/issues/1937) |
 | Gen-3 compiles **changed** tree (not just re-link same revision) | [#1498](https://github.com/PurHur/php-compiler/issues/1498) |
 | No `vendor/` cold boot | [#1416](https://github.com/PurHur/php-compiler/issues/1416) |
 | `php-cfg` / `php-llvm` vendor prelink (`Expr_Closure`) | [#1416](https://github.com/PurHur/php-compiler/issues/1416) |
