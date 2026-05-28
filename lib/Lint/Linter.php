@@ -142,7 +142,11 @@ final class Linter
      */
     private function lintSourceStandalone(string $code, string $filename): array
     {
-        $script = $this->parseForLint($code, $filename);
+        try {
+            $script = $this->parseForLint($code, $filename);
+        } catch (\Throwable $e) {
+            return $this->issuesFromParseFailure($e, $filename);
+        }
 
         return $this->lintScript($script);
     }
@@ -153,7 +157,11 @@ final class Linter
     public function lintSource(string $code, string $filename): array
     {
         $issues = [];
-        $script = $this->parseForLint($code, $filename);
+        try {
+            $script = $this->parseForLint($code, $filename);
+        } catch (\Throwable $e) {
+            return $this->issuesFromParseFailure($e, $filename);
+        }
         foreach ($this->lintScript($script) as $issue) {
             $issues[] = $issue;
         }
@@ -177,6 +185,9 @@ final class Linter
                         $resolved
                     );
                 } catch (\Throwable $e) {
+                    foreach ($this->issuesFromParseFailure($e, $resolved) as $issue) {
+                        $issues[] = $issue;
+                    }
                     continue;
                 }
                 foreach ($this->lintScript($included) as $issue) {
@@ -202,6 +213,30 @@ final class Linter
         $this->runtime->detector->detect($script);
 
         return $script;
+    }
+
+    /**
+     * Convert parse-level failures (php-cfg / parser pipeline) into lint issues.
+     *
+     * @return list<Issue>
+     */
+    private function issuesFromParseFailure(\Throwable $e, string $filename): array
+    {
+        $message = trim($e->getMessage());
+        if ('' === $message) {
+            $message = get_class($e);
+        }
+        $kind = Issue::kindFromMessage($message);
+
+        return [
+            new Issue(
+                $filename,
+                0,
+                $kind,
+                $message,
+                \PHPCompiler\Lint\UnsupportedRegistry::trackingIssueForKind($kind)
+            ),
+        ];
     }
 
     /**

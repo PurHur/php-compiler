@@ -1167,7 +1167,16 @@ restart:
             if (null !== $op->arg3) {
                 $catchFrame->scope[$op->arg3]->copyFrom($caught);
             }
+            $mergeFrame = null;
+            if (null !== $op->block2) {
+                $mergeFrame = $op->block2->getFrame($this->context, $handler);
+                $mergeFrame->parent = $handler->parent;
+            }
             $this->skipTryCatchHandlerTail($handler);
+            if (null !== $mergeFrame) {
+                $handler->pos = $handler->block->nOpCodes;
+                $catchFrame->parent = $mergeFrame;
+            }
 
             return $catchFrame;
         }

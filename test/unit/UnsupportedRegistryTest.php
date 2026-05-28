@@ -36,6 +36,11 @@ final class UnsupportedRegistryTest extends TestCase
         $this->assertNull(UnsupportedRegistry::trackingIssueForKind('Expr_AssignOp_Coalesce'));
     }
 
+    public function testThrowExpressionNoLongerTrackedAsUnsupported(): void
+    {
+        $this->assertNull(UnsupportedRegistry::trackingIssueForKind('Expr_Throw'));
+    }
+
     public function testPrePostIncrementKindsNoLongerTrackedAsUnsupported(): void
     {
         $this->assertNull(UnsupportedRegistry::trackingIssueForKind('Expr_PreInc'));

@@ -50,7 +50,7 @@ final class Issue
         if (preg_match('/^Unsupported expression: (.+)$/', $message, $m)) {
             return trim($m[1]);
         }
-        if (preg_match('/^Unknown (?:Stmt|Op|BinaryOp|CastOp|UnaryOp|Terminal|Operand|Literal) Type: (.+)$/', $message, $m)) {
+        if (preg_match('/^Unknown (?:Stmt|Expr|Op|BinaryOp|CastOp|UnaryOp|Terminal|Operand|Literal) Type:?\s*(.+)$/', $message, $m)) {
             return trim($m[1]);
         }
         if (preg_match('/^Unknown Literal Operand Type:/', $message)) {
