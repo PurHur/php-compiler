@@ -3,10 +3,10 @@
 declare(strict_types=1);
 
 /**
- * Spine-safe cli entry shims (issues #1467, #2050).
+ * Spine-safe cli entry shim for src/cli.php (issues #1467, #2868).
  *
- * Substitutes for src/cli.php + src/cli_driver.php in compiler_lib_spine_smoke so the
- * bundle does not pull vendor/autoload argv driver or Expr_Closure during self-host link.
+ * src/cli_driver.php is a literal require_once in compiler_lib_spine_smoke; this shim
+ * only supplies php_compiler_cli_should_skip_entry_driver() for src/cli.php coverage.
  */
 
 if (!\function_exists('php_compiler_cli_should_skip_entry_driver')) {
