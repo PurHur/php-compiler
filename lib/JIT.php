@@ -7038,12 +7038,10 @@ class JIT {
 
                 return;
             }
-            // bin/compile.php Zend polyfill → phpc_run_command AOT builtin (#2779, #2697).
-            if (
-                $this->shouldUseSelfHostJitStubs()
-                && 'phpcompiler\aot\linkerprocesspolyfill' === $declaringClassLc
-                && 'run' === $methodLc
-            ) {
+            // bin/compile.php process capture: lower LinkerProcessPolyfill::run() to the AOT builtin
+            // phpc_run_command() (proc_open is not lowered; #2779). This applies to any native AOT/JIT
+            // compilation path (not only self-host stubs).
+            if ('phpcompiler\\aot\\linkerprocesspolyfill' === $declaringClassLc && 'run' === $methodLc) {
                 if (!$this->context->functionIsRegistered('phpc_run_command')) {
                     throw new \LogicException(
                         'phpc_run_command internal missing for LinkerProcessPolyfill::run lowering (#2779)'
