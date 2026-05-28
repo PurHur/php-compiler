@@ -14,6 +14,35 @@ if (!function_exists('php_compiler_cli_should_skip_entry_driver')) {
     }
 }
 
+if (!function_exists('php_compiler_cli_argv_from_env')) {
+    /**
+     * Rebuild CLI argv from native process args exported at AOT main() (#2794, #2880).
+     *
+     * @return list<string>|null
+     */
+    function php_compiler_cli_argv_from_env(): ?array
+    {
+        $argcRaw = getenv('PHP_COMPILER_CLI_ARGC');
+        if (false === $argcRaw || '' === $argcRaw) {
+            return null;
+        }
+        $argc = (int) $argcRaw;
+        if ($argc <= 0) {
+            return null;
+        }
+        $argv = [];
+        for ($i = 0; $i < $argc; ++$i) {
+            $piece = getenv('PHP_COMPILER_CLI_ARGV_'.$i);
+            if (false === $piece) {
+                return null;
+            }
+            $argv[] = $piece;
+        }
+
+        return $argv;
+    }
+}
+
 if (!function_exists('php_compiler_cli_should_run_entry_driver')) {
     function php_compiler_cli_should_run_entry_driver(): bool
     {
@@ -135,6 +164,13 @@ if (!function_exists('php_compiler_cli_dispatch')) {
         global $argv;
         if (!isset($argv) || !is_array($argv)) {
             $argv = $GLOBALS['argv'] ?? null;
+        }
+        $nativeArgv = php_compiler_cli_argv_from_env();
+        if (null !== $nativeArgv && count($nativeArgv) >= 2) {
+            $argv = $nativeArgv;
+        } elseif ($isCompiledCli && false === getenv('PHP_COMPILER_CLI_ARGC')) {
+            fwrite(STDERR, "php_compiler_cli_dispatch: compiled CLI missing native argv export (PHP_COMPILER_CLI_ARGC)\n");
+            exit(1);
         }
         if (!is_array($argv)) {
             fwrite(STDERR, "php_compiler_cli_dispatch: missing CLI \$argv\n");

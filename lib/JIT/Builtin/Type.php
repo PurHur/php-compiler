@@ -160,6 +160,11 @@ class Type extends Builtin {
             $this->context->context->functionType($voidTy, false, $valuePtr)
         );
         $this->context->registerFunction('__phpc_cli_refresh_argv_global', $fnRefreshArgv);
+        $fnExportArgvEnv = $this->context->module->addFunction(
+            '__phpc_cli_export_argv_to_env',
+            $this->context->context->functionType($voidTy, false)
+        );
+        $this->context->registerFunction('__phpc_cli_export_argv_to_env', $fnExportArgvEnv);
         $ftOpen = $this->context->context->functionType($i32, false, $i8p, $i32);
         $fnOpen = $this->context->module->addFunction('open', $ftOpen);
         $this->context->registerFunction('open', $fnOpen);

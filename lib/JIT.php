@@ -310,6 +310,18 @@ class JIT {
         return str_contains($norm, 'test/selfhost/') && str_contains($norm, '/compile_driver.php');
     }
 
+    /** Full-revision emit must lower bin/compile.php, not copy link-only sidecar bytes (#2880). */
+    private function shouldSkipM3BinCompileSidecarForFullRevision(string $path): bool
+    {
+        $norm = str_replace('\\', '/', $path);
+        if (!str_ends_with($norm, '/bin/compile.php')) {
+            return false;
+        }
+        $flag = getenv('PHP_COMPILER_M4_FULL_REVISION_EMIT');
+
+        return '1' === $flag || 'true' === strtolower((string) $flag);
+    }
+
     private function isM3CompileDriverScriptMain(Block $block): bool
     {
         return null !== $block->func
@@ -2962,7 +2974,8 @@ class JIT {
         string $sentinelLogical,
         bool $sidecarHostStubNonLiteralIncludes = false
     ): void {
-        if ($this->shouldSkipM3InventoryEmitDriverSelfSidecar($path)) {
+        if ($this->shouldSkipM3InventoryEmitDriverSelfSidecar($path)
+            || $this->shouldSkipM3BinCompileSidecarForFullRevision($path)) {
             return;
         }
         if (!is_readable($path)) {

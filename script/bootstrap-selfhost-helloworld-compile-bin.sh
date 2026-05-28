@@ -45,9 +45,11 @@ if [[ "${SOURCE_NORM}" == "${ROOT}/bin/compile.php" ]]; then
     echo "bootstrap-selfhost-helloworld-compile-bin: missing ${AOT_OUT}" >&2
     exit 1
   fi
-  if [[ ! -s "${ROOT}/build/.m3_bin_compile_aot_blob" ]]; then
-    echo "bootstrap-selfhost-helloworld-compile-bin: missing build/.m3_bin_compile_aot_blob (bin/compile.php sidecar; #2827)" >&2
-    exit 1
+  if [[ "${PHP_COMPILER_M4_FULL_REVISION_EMIT:-0}" != "1" ]]; then
+    if [[ ! -s "${ROOT}/build/.m3_bin_compile_aot_blob" ]]; then
+      echo "bootstrap-selfhost-helloworld-compile-bin: missing build/.m3_bin_compile_aot_blob (bin/compile.php sidecar; #2827)" >&2
+      exit 1
+    fi
   fi
   SELFTEST_SRC="${ROOT}/test/bootstrap-aot/compiler_smoke_standalone.php"
   SELFTEST_OUT="${ROOT}/build/.m3-driver-argv-selftest"

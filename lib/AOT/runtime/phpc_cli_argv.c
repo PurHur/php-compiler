@@ -2,6 +2,8 @@
  * Store process argc/argv for native M3 emit / compiled compile driver (#1937, #2697, #2794).
  */
 #include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 typedef struct __string__ __string__;
@@ -37,6 +39,28 @@ void __phpc_cli_store_argv(int argc, char **argv)
 {
     phpc_cli_argc = argc;
     phpc_cli_argv = argv;
+}
+
+/** Mirror process argv into getenv keys for compiled php_compiler_cli_dispatch (#2794, #2880). */
+void __phpc_cli_export_argv_to_env(void)
+{
+    char buf[32];
+    int i;
+
+    if (phpc_cli_argc < 1) {
+        return;
+    }
+    snprintf(buf, sizeof(buf), "%d", phpc_cli_argc);
+    setenv("PHP_COMPILER_CLI_ARGC", buf, 1);
+    for (i = 0; i < phpc_cli_argc; ++i) {
+        char name[48];
+        snprintf(name, sizeof(name), "PHP_COMPILER_CLI_ARGV_%d", i);
+        if (NULL != phpc_cli_argv && NULL != phpc_cli_argv[i]) {
+            setenv(name, phpc_cli_argv[i], 1);
+        } else {
+            unsetenv(name);
+        }
+    }
 }
 
 long long __phpc_cli_argc(void)

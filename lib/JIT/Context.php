@@ -432,6 +432,7 @@ class Context {
                 $main->getParam(0),
                 $main->getParam(1)
             );
+            $this->builder->call($this->lookupFunction('__phpc_cli_export_argv_to_env'));
             CliArgvGlobalInit::emitRefreshAfterStoreArgv($this);
             $this->builder->call($this->initFunc);
             if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
