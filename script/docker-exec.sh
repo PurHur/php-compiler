@@ -95,7 +95,9 @@ echo "docker-exec: bind-mount incomplete; copying repo via tar..." >&2
 # shellcheck disable=SC2086
 if [[ "${#SYNC_BACK_PATHS[@]}" -gt 0 ]]; then
   sync_quoted=$(printf '%q ' "${SYNC_BACK_PATHS[@]}")
-  # Stream the repo into a throwaway container, run the command, then stream selected paths back.
+  # Stream the repo into a throwaway container, run the command, then sync selected paths back.
+  # NOTE: `docker start -ai` multiplexes stdout+stderr, so streaming a tarball back can be corrupted
+  # by any stderr output. Use `docker cp` for sync-back instead so bootstrap tools can print freely.
   # Use docker create/start + trap cleanup so tar-fallback never leaks long-lived containers (#2708).
   container_id="$(ci_docker_create -i -w /compiler "$IMAGE" bash -c "
     set -euo pipefail
@@ -103,14 +105,18 @@ if [[ "${#SYNC_BACK_PATHS[@]}" -gt 0 ]]; then
     chmod +x bin/*.php script/*.sh 2>/dev/null || true
     ${_llvm_exports}
     source script/php-env.sh
-    ${quoted} 1>&2
-    tar -cf - ${sync_quoted}
+    ${quoted}
   ")"
   trap 'docker rm -f "${container_id}" >/dev/null 2>&1 || true' EXIT INT TERM
   set +e
-  tar -cf - --exclude='.git' --exclude='.llvm' . | docker start -ai "${container_id}" | tar -xf -
-  status=$?
+  tar -cf - --exclude='.git' --exclude='.llvm' . | docker start -ai "${container_id}"
+  status="$(docker wait "${container_id}" 2>/dev/null)"
+  docker logs "${container_id}" 1>&2
   set -e
+  for p in "${SYNC_BACK_PATHS[@]}"; do
+    mkdir -p "$(dirname "${p}")"
+    docker cp "${container_id}:/compiler/${p}" "${p}" >/dev/null 2>&1 || true
+  done
   docker rm -f "${container_id}" >/dev/null 2>&1 || true
   exit "$status"
 else
