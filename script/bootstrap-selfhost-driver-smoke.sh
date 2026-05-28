@@ -171,10 +171,17 @@ if [[ ! -x "${GEN3_SMOKE}" ]]; then
   echo "bootstrap-selfhost-driver-smoke: gen-3 missing output ${GEN3_SMOKE} (silent success guard #2890)" >&2
   exit 1
 fi
+set +e
 gen3_run_out="$("${GEN3_SMOKE}" 2>&1)"
+gen3_run_code=$?
+set -e
+printf '%s\n' "${gen3_run_out}"
+if [[ "${gen3_run_code}" -ne 0 ]]; then
+  echo "bootstrap-selfhost-driver-smoke: gen-3 smoke run failed (exit ${gen3_run_code})" >&2
+  exit 1
+fi
 if ! grep -qx "${EXPECTED_STDOUT}" <<< "${gen3_run_out}"; then
   echo "bootstrap-selfhost-driver-smoke: gen-3 smoke run unexpected stdout (want ${EXPECTED_STDOUT})" >&2
-  printf '%s\n' "${gen3_run_out}" >&2
   exit 1
 fi
 

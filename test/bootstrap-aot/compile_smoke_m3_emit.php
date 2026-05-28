@@ -46,19 +46,24 @@ function compile_smoke_m3_emit(string $sourceFile, string $outFile): int
         return 1;
     }
 
+    $isBinCompile = str_ends_with(str_replace('\\', '/', $resolved), '/bin/compile.php');
     if (\function_exists('putenv')) {
-        // Native emit TU is linked with self-host stubs; runtime must not re-read those flags (#1937).
-        putenv('PHP_COMPILER_SELFHOST_AOT');
-        putenv('PHP_COMPILER_M3_COMPILE_DRIVER');
-        putenv('PHP_COMPILER_EMIT_HELPER_LINK');
-        putenv('PHP_COMPILER_M3_EMIT_MINIMAL=1');
-    }
-    if (
-        \function_exists('putenv')
-        && str_ends_with(str_replace('\\', '/', $resolved), '/bin/compile.php')
-    ) {
-        // Bake compiled CLI mode into native bin/compile.php output (#2697).
-        putenv('PHP_COMPILER_CLI_COMPILED=1');
+        if ($isBinCompile) {
+            // M4 full revision: native argv {main} on bin/compile.php (not stubbed cli dispatch — #2880, #2890).
+            putenv('PHP_COMPILER_SELFHOST_AOT=1');
+            putenv('PHP_COMPILER_M3_COMPILE_DRIVER=1');
+            putenv('PHP_COMPILER_M4_BIN_COMPILE_DRIVER=1');
+            putenv('PHP_COMPILER_EMIT_HELPER_LINK=1');
+            putenv('PHP_COMPILER_M3_EMIT_MINIMAL=1');
+            putenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX=compile_smoke_m3_emit');
+            putenv('PHP_COMPILER_CLI_COMPILED=1');
+        } else {
+            // Native emit TU is linked with self-host stubs; runtime must not re-read those flags (#1937).
+            putenv('PHP_COMPILER_SELFHOST_AOT');
+            putenv('PHP_COMPILER_M3_COMPILE_DRIVER');
+            putenv('PHP_COMPILER_EMIT_HELPER_LINK');
+            putenv('PHP_COMPILER_M3_EMIT_MINIMAL=1');
+        }
     }
 
     $runtime = new \PHPCompiler\Runtime(\PHPCompiler\Runtime::MODE_AOT);

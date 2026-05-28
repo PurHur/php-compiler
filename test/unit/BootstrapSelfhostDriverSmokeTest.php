@@ -32,6 +32,14 @@ final class BootstrapSelfhostDriverSmokeTest extends TestCase
         $this->assertStringNotContainsString(' -l ', $script);
     }
 
+    public function testCompileSmokeM3EmitSetsM4BinCompileDriverForBinCompilePhp(): void
+    {
+        $source = (string) file_get_contents(self::$root.'/test/bootstrap-aot/compile_smoke_m3_emit.php');
+        $this->assertStringContainsString('$isBinCompile', $source);
+        $this->assertStringContainsString('PHP_COMPILER_M4_BIN_COMPILE_DRIVER=1', $source);
+        $this->assertStringContainsString('PHP_COMPILER_M3_EMIT_LOG_PREFIX=compile_smoke_m3_emit', $source);
+    }
+
     public function testCompileSmokeM3EmitRegistersLinkerPolyfillBeforeStandalone(): void
     {
         $source = (string) file_get_contents(self::$root.'/test/bootstrap-aot/compile_smoke_m3_emit.php');
