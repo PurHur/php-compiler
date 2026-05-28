@@ -11,6 +11,7 @@ SPINE_LINK="${ROOT}/script/bootstrap-selfhost-lib-spine-smoke-link.sh"
 GEN1_LINK="${ROOT}/script/bootstrap-loop-gen1-link.sh"
 FULL_SPINE_EMIT="${ROOT}/script/bootstrap-loop-gen1-full-spine-emit.sh"
 GEN2_RECOMPILE="${ROOT}/script/bootstrap-loop-gen2-recompile-spine.sh"
+FULL_REVISION_PROBE="${ROOT}/script/bootstrap-selfhost-full-revision-probe.sh"
 DRY_RUN=0
 SPINE_RATIO="725/725"
 
@@ -30,7 +31,7 @@ M4 bootstrap-loop probe (#1498). Runs M0 link + M2 spine + M3 HelloWorld with th
 
 Exit codes:
   0  --dry-run: lint + M0 link + M2 spine + M3 HelloWorld strict + gen-1 link (gen-2 Zend partial OK)
-     full:      same + gen-1→gen-2 native + gen-2→gen-3 spine (${SPINE_RATIO})
+     full:      same + gen-1→gen-2 native + gen-2→gen-3 spine (${SPINE_RATIO}) + full-revision argv probe (#2880, #2898)
   1  hard failure (missing entry/scripts, lint, M0 link, M2 spine, M3 HelloWorld, or gen-1 link)
   2  LLVM 9 not found (skip), or full mode: gen-2 native emit or gen-3 spine recompile blocked
   3  reserved
@@ -101,7 +102,7 @@ echo "=== M4 bootstrap-loop probe (#1498) ==="
 if [[ "${DRY_RUN}" -eq 1 ]]; then
   echo "mode: --dry-run (lint + M0 link + M2 spine + M3 HelloWorld Makefile parity — strict native emit; no gen-2 strict slice)"
 else
-  echo "mode: full (M3 HelloWorld strict before gen-1; gen-1→gen-2 + gen-2→gen-3 spine per #2611/#2697)"
+  echo "mode: full (M3 HelloWorld strict before gen-1; gen-1→gen-2 + gen-2→gen-3 spine + full-revision per #2611/#2697/#2880)"
 fi
 echo ""
 echo "Exit codes: 0=green gate | 1=hard failure | 2=LLVM skip or M4 gen-2/gen-3 blocked | 3=reserved"
@@ -139,6 +140,11 @@ fi
 
 if [[ ! -f "${GEN2_RECOMPILE}" ]]; then
   echo "bootstrap-loop-probe: missing ${GEN2_RECOMPILE}" >&2
+  exit 1
+fi
+
+if [[ ! -f "${FULL_REVISION_PROBE}" ]]; then
+  echo "bootstrap-loop-probe: missing ${FULL_REVISION_PROBE}" >&2
   exit 1
 fi
 
@@ -258,7 +264,11 @@ if grep -q 'emit_path=native' "${GEN1_LOG}" 2>/dev/null; then
     echo "bootstrap-loop-probe: M4 gen-2→gen-3 spine recompile blocked (exit 2)" >&2
     exit 2
   fi
-  echo "bootstrap-loop-probe: M4 full ladder OK — gen-1→gen-2 native + gen-2→gen-3 spine (exit 0)"
+  if ! m4_run_subprobe "M4 full-revision argv probe (gen-2 bin/compile.php → gen-3, #2880/#2898)" bash "${FULL_REVISION_PROBE}"; then
+    echo "bootstrap-loop-probe: M4 full-revision probe blocked (exit 2)" >&2
+    exit 2
+  fi
+  echo "bootstrap-loop-probe: M4 full ladder OK — gen-1→gen-2 native + gen-2→gen-3 spine + full-revision (exit 0)"
   exit 0
 fi
 

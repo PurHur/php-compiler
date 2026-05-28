@@ -40,7 +40,7 @@ if ($check) {
     if ($committed !== $markdown) {
         fwrite(STDERR, "Stale {$outFile}; regenerate with:\n");
         fwrite(STDERR, "  php script/bootstrap-inventory.php\n");
-        fwrite(STDERR, "If the live probe section changed, also run:\n");
+        fwrite(STDERR, "Live probe sidecar (optional): docs/bootstrap-inventory-live-probe.md\n");
         fwrite(STDERR, "  php script/bootstrap-selfhost-compile-probe.php --update-inventory\n");
         fwrite(STDERR, "  php script/bootstrap-inventory.php\n");
         exit(1);

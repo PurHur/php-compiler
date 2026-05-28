@@ -13,6 +13,7 @@ declare(strict_types=1);
  * Usage:
  *   php script/bootstrap-selfhost-compile-probe.php
  *   php script/bootstrap-selfhost-compile-probe.php --update-inventory
+ *     (writes docs/bootstrap-inventory-live-probe.md — not docs/bootstrap-inventory.md; #2891)
  */
 
 $root = dirname(__DIR__);
@@ -137,35 +138,7 @@ function bootstrapSelfhostProbeRunCompile(
 
 function bootstrapSelfhostProbeAppendInventory(string $inventoryFile, string $message): void
 {
-    if (!is_file($inventoryFile)) {
-        fwrite(STDERR, "bootstrap-selfhost-compile-probe: missing {$inventoryFile}\n");
-
-        return;
-    }
-    $content = (string) file_get_contents($inventoryFile);
-    $needle = '## Live self-host compile probe';
-    $bullet = '- `'.$message.'`';
-    if (str_contains($content, $bullet)) {
-        return;
-    }
-    if (!str_contains($content, $needle)) {
-        $anchor = '## Compiler CFG gaps (`lib/Compiler.php`)';
-        $pos = strpos($content, $anchor);
-        if (false === $pos) {
-            $content .= "\n".$needle."\n\n".$bullet."\n";
-        } else {
-            $after = strpos($content, "\n## ", $pos + strlen($anchor));
-            $insertAt = false !== $after ? $after : strlen($content);
-            $block = "\n\n".$needle."\n\n".$bullet."\n";
-            $content = substr($content, 0, $insertAt).$block.substr($content, $insertAt);
-        }
-    } else {
-        $content = preg_replace(
-            '/(## Live self-host compile probe\n\n)(?:- `[^`]+`\n)*/',
-            '$1'.$bullet."\n",
-            $content,
-            1
-        ) ?? $content;
-    }
-    file_put_contents($inventoryFile, $content);
+    $root = dirname($inventoryFile);
+    bootstrapWriteInventoryLiveProbe($root, $message);
+    fwrite(STDOUT, 'bootstrap-selfhost-compile-probe: updated '.bootstrapInventoryLiveProbeFile($root)."\n");
 }

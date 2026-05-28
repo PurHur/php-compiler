@@ -415,7 +415,25 @@ function bootstrapRenderMarkdown(array $report): string
 }
 
 /**
- * Strip optional probe section appended by bootstrap-selfhost-compile-probe.php --update-inventory.
+ * Sidecar for live self-host compile probe (issue #2891) — not part of inventory --check SSOT.
+ */
+function bootstrapInventoryLiveProbeFile(string $root): string
+{
+    return $root.'/docs/bootstrap-inventory-live-probe.md';
+}
+
+function bootstrapWriteInventoryLiveProbe(string $root, string $message): void
+{
+    $file = bootstrapInventoryLiveProbeFile($root);
+    $body = "# Live self-host compile probe\n\n"
+        ."Auto-updated by `bootstrap-selfhost-compile-probe.php --update-inventory`.\n"
+        ."Not compared by `php script/bootstrap-inventory.php --check` ([#2891](https://github.com/PurHur/php-compiler/issues/2891)).\n\n"
+        .'- `'.$message."`\n";
+    file_put_contents($file, $body);
+}
+
+/**
+ * Strip legacy probe section from committed docs/bootstrap-inventory.md (pre-#2891).
  */
 function bootstrapStripInventoryProbeSection(string $content): string
 {
