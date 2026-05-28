@@ -157,11 +157,14 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
     /** Issue #2880: M4 full-revision probe script and native argv main for bin/compile.php. */
     public function testM4BinCompileRevisionProbeScriptExists(): void
     {
-        $script = self::$root.'/script/bootstrap-loop-gen2-recompile-bin-compile.sh';
+        $script = self::$root.'/script/bootstrap-selfhost-full-revision-probe.sh';
         $this->assertFileExists($script);
         $source = (string) file_get_contents($script);
-        $this->assertStringContainsString('bootstrap-loop-gen3-bin-compile-aot', $source);
+        $this->assertStringContainsString('bootstrap-full-revision-gen3-compile', $source);
         $this->assertStringContainsString('bin/compile.php', $source);
+        $alias = self::$root.'/script/bootstrap-loop-gen2-recompile-bin-compile.sh';
+        $this->assertFileExists($alias);
+        $this->assertStringContainsString('bootstrap-selfhost-full-revision-probe.sh', (string) file_get_contents($alias));
         $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
         $this->assertStringContainsString('PHP_COMPILER_M4_BIN_COMPILE_DRIVER', $jit);
         $this->assertStringContainsString('shouldUseM4BinCompileArgvMainNative', $jit);

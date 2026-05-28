@@ -1674,6 +1674,9 @@ class JIT {
             // class-heavy sources (lib/*.php) need class lowering
             'compileclasslike',
             'compileclassbody',
+            'compileglobalconst',
+            'compileincludeop',
+            'compileswitchasjumpifchain',
         ];
     }
 

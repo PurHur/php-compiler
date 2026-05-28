@@ -42,6 +42,7 @@ Supporting fixes from #1402:
 | `Runtime::createJit` / `jitContextForLoadJit` / `loadJitCompileModuleFuncs` | Separate FUNCDEFs via `compileRuntime*M3Native` → PHP CFG (#2847) |
 | `Block::slotIndexForVariableName` / `Block::slotForOperand` | PHP CFG via `isM3CompileDriverBlockPhpLoweringName` (#2848) |
 | `Compiler::compileIsset` / `compileCoalesce` / `resolveIsset` / `requireOperandSlot` | PHP CFG via `m3CompileDriverCompilerPhpLoweringSuffixes` (emit-TU chain parity on compile-driver link) |
+| `Compiler::compileGlobalConst` / `compileIncludeOp` / `compileSwitchAsJumpIfChain` | PHP CFG via `m3CompileDriverCompilerPhpLoweringSuffixes` (emit-TU chain parity on compile-driver link) |
 | `Runtime::standalone` | Compile-driver link OK (#1402, #1056) |
 | `helloworld_compile_smoke` | Deny-listed for link (LLVM 9); compile_driver bundle keeps stub; runtime emit via `helloworld_m3_emit_native_entry.php` / `compile_smoke_m3_emit_native_entry.php` + `PHP_COMPILER_EMIT_HELPER_LINK=1` (#1768, #1983) |
 | Native emit runtime | `BOOTSTRAP_M3_RUNTIME_COMPILE=1` + `PHP_COMPILER_M3_EMIT_MINIMAL=1` skips eager `loadJitCompileModuleFuncs` during smoke emit |
