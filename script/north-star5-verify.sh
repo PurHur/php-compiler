@@ -149,13 +149,22 @@ fi
 ci_apply_llvm_memory_env
 
 ns5_run 4a "selfhost compile probe" make -C "${_CI_REPO_ROOT}" bootstrap-selfhost-probe
-ns5_run 4b "lib spine smoke link" make -C "${_CI_REPO_ROOT}" bootstrap-selfhost-lib-spine-smoke
+if [[ "${STRICT_M5}" -eq 1 ]]; then
+  ns5_run 4a2 "build compiled argv driver (bin-compile-aot)" make -C "${_CI_REPO_ROOT}" bootstrap-selfhost-driver-smoke
+  ns5_run 4b "lib spine smoke link" env BOOTSTRAP_NO_ZEND_FALLBACK=1 make -C "${_CI_REPO_ROOT}" bootstrap-selfhost-lib-spine-smoke
+else
+  ns5_run 4b "lib spine smoke link" make -C "${_CI_REPO_ROOT}" bootstrap-selfhost-lib-spine-smoke
+fi
 
 echo
 echo "=== north-star5-verify step 5: vendor prelink AOT (--compile) ==="
 VENDOR_OK=0
 set +e
-"${PHP_BIN}" "${PHP_OPTS[@]}" "${_CI_REPO_ROOT}/script/bootstrap-vendor-objects.php" --compile
+if [[ "${STRICT_M5}" -eq 1 ]]; then
+  env BOOTSTRAP_GEN0_ZEND_ONLY=1 "${PHP_BIN}" "${PHP_OPTS[@]}" "${_CI_REPO_ROOT}/script/bootstrap-vendor-objects.php" --compile
+else
+  "${PHP_BIN}" "${PHP_OPTS[@]}" "${_CI_REPO_ROOT}/script/bootstrap-vendor-objects.php" --compile
+fi
 vendor_code=$?
 set -e
 if [[ -f "${_CI_REPO_ROOT}/prelinked/bootstrap-vendor/manifest.json" ]]; then

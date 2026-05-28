@@ -82,6 +82,11 @@ bootstrap_compile_invoke() {
   local entry=$2
   shift 2
 
+  local no_zend_fallback=0
+  if [[ "${BOOTSTRAP_NO_ZEND_FALLBACK:-0}" == "1" ]]; then
+    no_zend_fallback=1
+  fi
+
   if [[ "${BOOTSTRAP_GEN0_ZEND_ONLY:-0}" == "1" ]]; then
     if ! bootstrap_resolve_compile_driver; then
       echo "bootstrap-compile-invoke: no compiled driver under build/ and php missing on PATH (#2842)" >&2
@@ -95,10 +100,12 @@ bootstrap_compile_invoke() {
   # This avoids "first native candidate crashes → immediate Zend" which hides usable drivers (#2894).
   local native_candidate
   local last_code=1
+  local attempted_native=0
   while IFS= read -r native_candidate; do
     if [[ ! -x "${native_candidate}" ]]; then
       continue
     fi
+    attempted_native=1
     BOOTSTRAP_COMPILE_DRIVER="${native_candidate}"
     echo "bootstrap-compile-invoke: ${BOOTSTRAP_COMPILE_DRIVER} -o ${out} ${entry} (#2842)" >&2
     rm -f "${out}"
@@ -111,6 +118,11 @@ bootstrap_compile_invoke() {
     fi
     echo "bootstrap-compile-invoke: compiled driver ${BOOTSTRAP_COMPILE_DRIVER} failed (exit ${last_code})" >&2
   done < <(bootstrap_list_native_compile_drivers)
+
+  if [[ "${attempted_native}" -eq 1 && "${no_zend_fallback}" -eq 1 ]]; then
+    echo "bootstrap-compile-invoke: compiled driver(s) failed; BOOTSTRAP_NO_ZEND_FALLBACK=1 — no Zend fallback" >&2
+    return "${last_code}"
+  fi
 
   if [[ "${BOOTSTRAP_GEN0_ZEND_ONLY:-0}" == "1" ]]; then
     echo "bootstrap-compile-invoke: compiled driver(s) failed; BOOTSTRAP_GEN0_ZEND_ONLY=1 — no fallback" >&2
