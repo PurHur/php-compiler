@@ -100,6 +100,127 @@ require_once __DIR__.'/../../../lib/Lint/Linter.php';
 require_once __DIR__.'/../../bootstrap-aot/compiler_smoke.php';
 require_once __DIR__.'/../../bootstrap-aot/helloworld_compile_smoke.php';
 
+/**
+ * Minimal argv driver for compiled `build/bin-compile-aot` (issue #2957).
+ *
+ * This file is also used as an M3 env-driven emit entry (see below), so keep
+ * the paths separate: argv mode must not require PHP_COMPILER_M3_SOURCE/OUT.
+ *
+ * Supported:
+ * - `DRIVER -l path.php` (lint: compile-only)
+ * - `DRIVER -o out path.php` (compile: AOT standalone)
+ */
+function compiler_helloworld_compile_driver_run(string $filename, string $code, array $options): void
+{
+    putenv('PHP_COMPILER_SELFHOST_AOT=1');
+    // Hint for cli minimal autoload paths (src/cli_driver.php) if reused elsewhere.
+    putenv('PHP_COMPILER_CLI_COMPILED=1');
+
+    $runtime = new \PHPCompiler\Runtime(\PHPCompiler\Runtime::MODE_AOT);
+    $block = $runtime->parseAndCompile($code, $filename);
+    if (null === $block) {
+        if (!isset($options['-l'])) {
+            $diag = $runtime->compiler->getCompileAbortDetail();
+            $suffix = null !== $diag && '' !== $diag ? ' — '.$diag : '';
+            fwrite(\STDERR, 'compile_driver: parseAndCompile returned null for '.$filename.$suffix."\n");
+            exit(2);
+        }
+        fwrite(\STDERR, "phpc lint: failed to compile {$filename}\n");
+        exit(1);
+    }
+    if (isset($options['-l'])) {
+        return;
+    }
+    if (!isset($options['-o']) || true === $options['-o']) {
+        $options['-o'] = str_replace('.php', '', $filename);
+    }
+
+    // Literal path so self-host AOT can fold includes.
+    require_once __DIR__.'/../../../lib/AOT/LinkerProcessPolyfill.php';
+    if (!\function_exists('phpc_run_command')) {
+        /**
+         * @param array<string, string>|null $env
+         *
+         * @return array{code:int,stdout:string,stderr:string}|null
+         */
+        function phpc_run_command(string $command, ?array $env = null): ?array
+        {
+            return \PHPCompiler\AOT\LinkerProcessPolyfill::run($command, $env);
+        }
+    }
+
+    $runtime->standalone($block, (string) $options['-o']);
+}
+
+function compiler_helloworld_compile_driver_dispatch_argv(): bool
+{
+    global $argv;
+    if (!isset($argv) || !is_array($argv)) {
+        $argv = $GLOBALS['argv'] ?? null;
+    }
+    if (!is_array($argv) || [] === $argv) {
+        return false;
+    }
+    // If invoked as a compiled CLI driver with args, prefer argv mode.
+    if (count($argv) < 2) {
+        return false;
+    }
+
+    $opts = $argv;
+    array_shift($opts);
+    $options = [];
+    $sourcePath = null;
+    while ([] !== $opts) {
+        $opt = array_shift($opts);
+        switch ($opt) {
+            case '-l':
+                $options['-l'] = true;
+                break;
+            case '-o':
+                if ([] === $opts) {
+                    fwrite(\STDERR, "compile_driver: -o requires an output path\n");
+                    exit(1);
+                }
+                $options['-o'] = array_shift($opts);
+                break;
+            default:
+                if (str_starts_with((string) $opt, '-')) {
+                    fwrite(\STDERR, "compile_driver: unsupported option {$opt}\n");
+                    exit(1);
+                }
+                if (null !== $sourcePath) {
+                    fwrite(\STDERR, "compile_driver: multiple input files are not supported\n");
+                    exit(1);
+                }
+                $sourcePath = (string) $opt;
+        }
+    }
+
+    if (!is_string($sourcePath) || '' === $sourcePath) {
+        fwrite(\STDERR, "compile_driver: missing input file\n");
+        exit(1);
+    }
+    if (!is_file($sourcePath)) {
+        fwrite(\STDERR, "compile_driver: could not open file {$sourcePath}\n");
+        exit(1);
+    }
+
+    $code = file_get_contents($sourcePath);
+    if (!is_string($code)) {
+        fwrite(\STDERR, "compile_driver: failed reading file {$sourcePath}\n");
+        exit(1);
+    }
+
+    compiler_helloworld_compile_driver_run($sourcePath, $code, $options);
+
+    return true;
+}
+
+// If invoked directly with CLI args, behave like a tiny `bin/compile.php`.
+if (compiler_helloworld_compile_driver_dispatch_argv()) {
+    exit(0);
+}
+
 if ('compile' === (string) getenv('PHP_COMPILER_M3_COMPILE_MODE')) {
     if (\function_exists('putenv')) {
         // Compile-driver lowering is guarded by env flags at runtime; keep self-host mode enabled

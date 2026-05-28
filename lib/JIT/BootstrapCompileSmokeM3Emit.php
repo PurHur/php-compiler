@@ -49,7 +49,10 @@ final class BootstrapCompileSmokeM3Emit
         $i64 = $context->getTypeFromString('int64');
         $strPtr = $context->getTypeFromString('__string__*');
         $argc = $context->builder->call($context->lookupFunction('__phpc_cli_argc'));
-        $argcOk = $context->builder->icmp(Builder::INT_SGE, $argc, $i64->constInt(4, false));
+        // Support:
+        // - `DRIVER -o OUT SOURCE.php` (argc >= 4)
+        // - `DRIVER -l SOURCE.php` (argc >= 3) for lint parity with bin/compile.php (#2957).
+        $argcOk = $context->builder->icmp(Builder::INT_SGE, $argc, $i64->constInt(3, false));
         $argvOk = BasicBlockHelper::append($context, 'csm3_argv_parse');
         $argvFail = BasicBlockHelper::append($context, 'csm3_argv_fail');
         $context->builder->branchIf($argcOk, $argvOk, $argvFail);
@@ -57,22 +60,53 @@ final class BootstrapCompileSmokeM3Emit
         $context->builder->positionAtEnd($argvOk);
         $flagCstr = $context->builder->call($context->lookupFunction('__phpc_cli_argv_cstr'), $i32->constInt(1, false));
         $isMinusO = self::cstrEqualsLiteral($context, $flagCstr, '-o');
+        $isMinusL = self::cstrEqualsLiteral($context, $flagCstr, '-l');
+        $i8p = $context->getTypeFromString('int8*');
+        $argvEmit = BasicBlockHelper::append($context, 'csm3_argv_emit');
+        $argvLint = BasicBlockHelper::append($context, 'csm3_argv_lint');
+        $argvWhichFail = BasicBlockHelper::append($context, 'csm3_argv_which_fail');
+        $context->builder->branchIf($isMinusO, $argvEmit, $argvWhichFail);
+        $context->builder->positionAtEnd($argvWhichFail);
+        $context->builder->branchIf($isMinusL, $argvLint, $argvFail);
+
+        $context->builder->positionAtEnd($argvLint);
+        $srcLintCstr = $context->builder->call($context->lookupFunction('__phpc_cli_argv_cstr'), $i32->constInt(2, false));
+        $srcLintFile = self::cstrAsPhpcString($context, $srcLintCstr);
+        $srcLintNull = $context->builder->icmp(Builder::INT_EQ, $srcLintCstr, $i8p->constNull());
+        $srcLintPhpcNull = $context->builder->icmp(Builder::INT_EQ, $srcLintFile, $strPtr->constNull());
+        $lintBad = $context->builder->or($srcLintNull, $srcLintPhpcNull);
+        $lintOk = BasicBlockHelper::append($context, 'csm3_lint_ok');
+        $lintFail = BasicBlockHelper::append($context, 'csm3_lint_fail');
+        $context->builder->branchIf($lintBad, $lintFail, $lintOk);
+        $context->builder->positionAtEnd($lintOk);
+        self::emitLint($context, $srcLintFile, $logPrefix);
+        $context->builder->positionAtEnd($lintFail);
+        self::echoPhaseError(
+            $context,
+            $logPrefix,
+            $logPrefix.': lint usage: DRIVER -l SOURCE.php',
+            'argv'
+        );
+        $context->builder->call(
+            $context->lookupFunction('exit'),
+            $context->builder->trunc($retFail, $i32)
+        );
+
+        $context->builder->positionAtEnd($argvEmit);
         $outCstr = $context->builder->call($context->lookupFunction('__phpc_cli_argv_cstr'), $i32->constInt(2, false));
         $srcCstr = $context->builder->call($context->lookupFunction('__phpc_cli_argv_cstr'), $i32->constInt(3, false));
         $outFile = self::cstrAsPhpcString($context, $outCstr);
         $sourceFile = self::cstrAsPhpcString($context, $srcCstr);
-        $i8p = $context->getTypeFromString('int8*');
         $outNull = $context->builder->icmp(Builder::INT_EQ, $outCstr, $i8p->constNull());
         $srcNull = $context->builder->icmp(Builder::INT_EQ, $srcCstr, $i8p->constNull());
         $outPhpcNull = $context->builder->icmp(Builder::INT_EQ, $outFile, $strPtr->constNull());
         $srcPhpcNull = $context->builder->icmp(Builder::INT_EQ, $sourceFile, $strPtr->constNull());
-        $argvBad = $context->builder->or($context->builder->not($isMinusO), $outNull);
-        $argvBad = $context->builder->or($argvBad, $srcNull);
+        $argvBad = $context->builder->or($outNull, $srcNull);
         $argvBad = $context->builder->or($argvBad, $outPhpcNull);
         $argvBad = $context->builder->or($argvBad, $srcPhpcNull);
-        $argvEmit = BasicBlockHelper::append($context, 'csm3_argv_emit');
-        $context->builder->branchIf($argvBad, $argvFail, $argvEmit);
-        $context->builder->positionAtEnd($argvEmit);
+        $argvEmitOk = BasicBlockHelper::append($context, 'csm3_argv_emit_ok');
+        $context->builder->branchIf($argvBad, $argvFail, $argvEmitOk);
+        $context->builder->positionAtEnd($argvEmitOk);
         self::emit($context, $sourceFile, $outFile, $logPrefix);
 
         $context->builder->positionAtEnd($argvFail);
@@ -86,6 +120,62 @@ final class BootstrapCompileSmokeM3Emit
             $context->lookupFunction('exit'),
             $context->builder->trunc($retFail, $i32)
         );
+    }
+
+    /** Lint path for compiled driver: parseAndCompile only, no standalone emit (#2957). */
+    private static function emitLint(Context $context, Value $sourceFile, string $logPrefix = 'compile_smoke_m3_emit'): void
+    {
+        $tag = 'csm3l'.(string) ++self::$seq;
+        $i64 = $context->getTypeFromString('int64');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $objPtr = $context->getTypeFromString('__object__*');
+        $retOk = $i64->constInt(0, false);
+        $retFail = $i64->constInt(1, false);
+
+        $code = $context->builder->call(
+            $context->lookupFunction('__compiler_file_get_contents'),
+            $sourceFile
+        );
+        $codeLen = $context->builder->call($context->lookupFunction('__string__strlen'), $code);
+        $codeBad = $context->builder->or(
+            $context->builder->icmp(Builder::INT_EQ, $code, $strPtr->constNull()),
+            $context->builder->icmp(Builder::INT_EQ, $codeLen, $i64->constInt(0, false))
+        );
+        $readOk = BasicBlockHelper::append($context, 'csm3_lint_read_ok_'.$tag);
+        $readFail = BasicBlockHelper::append($context, 'csm3_lint_read_fail_'.$tag);
+        $context->builder->branchIf($codeBad, $readFail, $readOk);
+
+        $context->builder->positionAtEnd($readFail);
+        self::echoPhaseError($context, $logPrefix, $logPrefix.': empty source (lint)', 'source');
+        $context->builder->returnValue($retFail);
+
+        $context->builder->positionAtEnd($readOk);
+        $runtime = RuntimeEmitTuAlloc::emit($context);
+        $mode = $i64->constInt(self::MODE_AOT, false);
+        RuntimeEmitTuInit::emitInitSequence($context, $runtime, $mode);
+        $block = M3EmitTuTrivialEchoAot::emitParseAndCompileWithTrivialFallback(
+            $context,
+            $runtime,
+            $code,
+            $sourceFile,
+            [self::class, 'emitRuntimeParseAndCompileDefault']
+        );
+        $blockNull = $context->builder->icmp(Builder::INT_EQ, $block, $objPtr->constNull());
+        $lintFail = BasicBlockHelper::append($context, 'csm3_lint_pac_fail_'.$tag);
+        $lintOk = BasicBlockHelper::append($context, 'csm3_lint_pac_ok_'.$tag);
+        $context->builder->branchIf($blockNull, $lintFail, $lintOk);
+
+        $context->builder->positionAtEnd($lintFail);
+        self::echoPhaseError(
+            $context,
+            $logPrefix,
+            $logPrefix.': lint failed (parseAndCompile returned null)',
+            'parseAndCompile'
+        );
+        $context->builder->returnValue($retFail);
+
+        $context->builder->positionAtEnd($lintOk);
+        $context->builder->returnValue($retOk);
     }
 
     private static function cstrEqualsLiteral(Context $context, Value $cstr, string $literal): Value
