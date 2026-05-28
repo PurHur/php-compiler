@@ -159,9 +159,8 @@ class JIT {
             $run = array_shift($this->queue);
             JIT\Progress::notePhase('jit_run_queue_item');
             try {
-                /** @var Block $block */
-                $block = $run[1];
-                if (null !== $block->func) {
+                $block = $run[1] ?? null;
+                if ($block instanceof Block && null !== $block->func) {
                     JIT\Progress::noteEntry($block->func->getScopedName());
                 }
             } catch (\Throwable $e) {
