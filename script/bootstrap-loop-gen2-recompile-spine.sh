@@ -17,11 +17,13 @@ DRIVER="${ROOT}/build/bin-compile-aot"
 GEN3="${ROOT}/build/bootstrap-loop-gen3-full-spine"
 SOURCE="${ROOT}/test/selfhost/compiler_lib_spine_smoke/main.php"
 
-if [[ ! -x "${DRIVER}" ]]; then
-  # Build the emit-helper compile driver (argv `-o OUT SOURCE.php`) explicitly.
-  # Do not route through bootstrap-selfhost-helloworld-compile-bin.sh here: it may
-  # build the inventory bin/compile.php driver which can segfault on spine sources.
+# Always (re)build the emit-helper compile driver (argv `-o OUT SOURCE.php`) explicitly.
+# Do not route through bootstrap-selfhost-helloworld-compile-bin.sh here: it may produce
+# a different `build/bin-compile-aot` (inventory bin/compile.php) which can segfault on
+# spine-scale sources (#2930).
+if [[ "${BOOTSTRAP_LOOP_USE_EXISTING_BIN_COMPILE_AOT:-0}" != "1" ]]; then
   EMIT_ENTRY="${ROOT}/test/bootstrap-aot/compile_smoke_m3_emit_native_entry.php"
+  rm -f "${DRIVER}"
   env PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_M3_COMPILE_DRIVER=1 PHP_COMPILER_EMIT_HELPER_LINK=1 \
     php "${ROOT}/bin/compile.php" -o "${DRIVER}" "${EMIT_ENTRY}" >/dev/null
 fi
