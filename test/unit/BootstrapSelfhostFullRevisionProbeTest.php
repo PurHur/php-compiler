@@ -20,7 +20,7 @@ final class BootstrapSelfhostFullRevisionProbeTest extends TestCase
         $script = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-full-revision-probe.sh');
         $this->assertStringContainsString('bootstrap-selfhost-full-revision-probe:', $script);
         $this->assertStringContainsString('bin/compile.php', $script);
-        $this->assertStringContainsString('bin-compile-aot', $script);
+        $this->assertStringContainsString('bin-compile-aot-inventory', $script);
         $this->assertStringContainsString('compiler_unit_probe_compile.php', $script);
         $this->assertStringContainsString('env -u PHP_COMPILER_M3_SOURCE -u PHP_COMPILER_M3_OUT', $script);
         $this->assertStringContainsString('emit_path=native', $script);
