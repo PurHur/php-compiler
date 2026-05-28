@@ -45,24 +45,9 @@ INVENTORY_ARGV_DRIVER="${ROOT}/build/bin-compile-aot-inventory"
 
 # Prefer the proven inventory argv driver path (same strategy as bootstrap-selfhost-full-revision-probe, #2968).
 if [[ "${BOOTSTRAP_LIB_SPINE_SMOKE_USE_COMPILE_INVOKE:-0}" != "1" ]]; then
-  # Reuse a driver already built in this bootstrap session (e.g. after make bootstrap-selfhost-link).
-  # Re-linking bin/compile.php via inventory emit often returns null while the host-compile argv
-  # driver is already green (#2967, #3004).
-  if [[ ! -x "${INVENTORY_ARGV_DRIVER}" && -x "${ROOT}/build/bin-compile-aot" ]]; then
-    echo "bootstrap-selfhost-lib-spine-smoke-link: reusing build/bin-compile-aot as inventory argv driver (#2968)" >&2
-    cp -f "${ROOT}/build/bin-compile-aot" "${INVENTORY_ARGV_DRIVER}"
-    chmod +x "${INVENTORY_ARGV_DRIVER}"
-  fi
-  if [[ ! -x "${INVENTORY_ARGV_DRIVER}" ]]; then
-    echo "bootstrap-selfhost-lib-spine-smoke-link: building inventory argv driver (bin/compile.php) to reduce compiled-driver divergence (#2968)" >&2
-    if ! env PHP_COMPILER_M3_SOURCE="${ROOT}/bin/compile.php" PHP_COMPILER_M3_OUT="${INVENTORY_ARGV_DRIVER}" \
-      ./script/bootstrap-selfhost-helloworld-compile-bin.sh >/dev/null; then
-      echo "bootstrap-selfhost-lib-spine-smoke-link: failed to build inventory argv driver ${INVENTORY_ARGV_DRIVER}" >&2
-      exit 1
-    fi
-  fi
-  if [[ ! -x "${INVENTORY_ARGV_DRIVER}" ]]; then
-    echo "bootstrap-selfhost-lib-spine-smoke-link: missing inventory argv driver ${INVENTORY_ARGV_DRIVER}" >&2
+  # Emit-helper build/bin-compile-aot (gen-2 spine) must not masquerade as inventory argv driver (#3012).
+  if ! bootstrap_ensure_inventory_argv_driver "${INVENTORY_ARGV_DRIVER}"; then
+    echo "bootstrap-selfhost-lib-spine-smoke-link: failed to ensure inventory argv driver ${INVENTORY_ARGV_DRIVER}" >&2
     exit 1
   fi
 

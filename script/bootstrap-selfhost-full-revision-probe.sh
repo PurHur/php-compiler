@@ -8,6 +8,8 @@ cd "${ROOT}"
 
 # shellcheck source=php-env.sh
 source "$(dirname "$0")/php-env.sh"
+# shellcheck source=bootstrap-resolve-compile-invoke.sh
+source "$(dirname "$0")/bootstrap-resolve-compile-invoke.sh"
 ci_apply_llvm_memory_env
 
 GEN2_INVENTORY="${ROOT}/build/bin-compile-aot-inventory"
@@ -27,23 +29,8 @@ fi
 
 mkdir -p "${ROOT}/build"
 
-if [[ ! -x "${GEN2_INVENTORY}" && -x "${ROOT}/build/bin-compile-aot" ]]; then
-  echo "bootstrap-selfhost-full-revision-probe: reusing build/bin-compile-aot as gen-2 inventory argv driver (#2968)" >&2
-  cp -f "${ROOT}/build/bin-compile-aot" "${GEN2_INVENTORY}"
-  chmod +x "${GEN2_INVENTORY}"
-fi
-
-if [[ ! -x "${GEN2_INVENTORY}" ]]; then
-  echo "bootstrap-selfhost-full-revision-probe: building gen-2 inventory argv driver (bin/compile.php)" >&2
-  if ! env PHP_COMPILER_M3_SOURCE="${ROOT}/bin/compile.php" PHP_COMPILER_M3_OUT="${GEN2_INVENTORY}" \
-    ./script/bootstrap-selfhost-helloworld-compile-bin.sh >/dev/null; then
-    echo "bootstrap-selfhost-full-revision-probe: failed to build gen-2 inventory argv driver ${GEN2_INVENTORY}" >&2
-    exit 1
-  fi
-fi
-
-if [[ ! -x "${GEN2_INVENTORY}" ]]; then
-  echo "bootstrap-selfhost-full-revision-probe: missing gen-2 inventory argv driver ${GEN2_INVENTORY}" >&2
+if ! bootstrap_ensure_inventory_argv_driver "${GEN2_INVENTORY}"; then
+  echo "bootstrap-selfhost-full-revision-probe: failed to ensure gen-2 inventory argv driver ${GEN2_INVENTORY}" >&2
   exit 1
 fi
 
@@ -68,6 +55,11 @@ if [[ "${gen3_link_code}" -ne 0 ]]; then
 fi
 if [[ ! -x "${GEN3}" ]]; then
   echo "bootstrap-selfhost-full-revision-probe: missing gen-3 driver ${GEN3}" >&2
+  exit 1
+fi
+gen3_bytes="$(wc -c <"${GEN3}" 2>/dev/null || echo 0)"
+if [[ "${gen3_bytes}" -lt 350000 ]]; then
+  echo "bootstrap-selfhost-full-revision-probe: gen-3 driver looks like link-time sidecar stub (${gen3_bytes} bytes; want inventory argv driver #3012)" >&2
   exit 1
 fi
 if grep -qE 'compile_smoke_m3_emit:' <<< "${gen3_link_out}"; then
