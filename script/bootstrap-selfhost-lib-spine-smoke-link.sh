@@ -24,7 +24,9 @@ mkdir -p "${ROOT}/build"
 export PHP_COMPILER_SELFHOST_AOT=1
 export BOOTSTRAP_NO_ZEND_FALLBACK=1
 export PHP_COMPILER_JIT_PROGRESS_FILE="${ROOT}/build/.last-jit-func-lib-spine-smoke"
-rm -f "${OUT}" "${PHP_COMPILER_JIT_PROGRESS_FILE}"
+export PHP_COMPILER_JIT_PHASE_FILE="${ROOT}/build/.last-jit-phase-lib-spine-smoke"
+export PHP_COMPILER_JIT_ENTRY_FILE="${ROOT}/build/.last-jit-entry-lib-spine-smoke"
+rm -f "${OUT}" "${PHP_COMPILER_JIT_PROGRESS_FILE}" "${PHP_COMPILER_JIT_PHASE_FILE}" "${PHP_COMPILER_JIT_ENTRY_FILE}"
 
 INVENTORY_ARGV_DRIVER="${ROOT}/build/bin-compile-aot-inventory"
 
@@ -43,10 +45,22 @@ if [[ "${BOOTSTRAP_LIB_SPINE_SMOKE_USE_COMPILE_INVOKE:-0}" != "1" ]]; then
     exit 1
   fi
 
+  # Best-effort segfault breadcrumbs (written before invoking the native driver).
+  printf '%s' "${ENTRY}" > "${PHP_COMPILER_JIT_ENTRY_FILE}" 2>/dev/null || true
+  printf '%s' "compile_invoke:${INVENTORY_ARGV_DRIVER}" > "${PHP_COMPILER_JIT_PHASE_FILE}" 2>/dev/null || true
   if ! env -u PHP_COMPILER_M3_SOURCE -u PHP_COMPILER_M3_OUT \
     PHP_COMPILER_SELFHOST_AOT=1 \
     BOOTSTRAP_NO_ZEND_FALLBACK=1 \
     "${INVENTORY_ARGV_DRIVER}" -o "${OUT}" "${ENTRY}" 2>&1; then
+    if [[ -f "${PHP_COMPILER_JIT_PROGRESS_FILE}" ]]; then
+      echo "bootstrap-selfhost-lib-spine-smoke-link: last JIT func: $(cat "${PHP_COMPILER_JIT_PROGRESS_FILE}" 2>/dev/null || true)" >&2
+    fi
+    if [[ -f "${PHP_COMPILER_JIT_PHASE_FILE}" ]]; then
+      echo "bootstrap-selfhost-lib-spine-smoke-link: last phase: $(cat "${PHP_COMPILER_JIT_PHASE_FILE}" 2>/dev/null || true)" >&2
+    fi
+    if [[ -f "${PHP_COMPILER_JIT_ENTRY_FILE}" ]]; then
+      echo "bootstrap-selfhost-lib-spine-smoke-link: last entry: $(cat "${PHP_COMPILER_JIT_ENTRY_FILE}" 2>/dev/null || true)" >&2
+    fi
     echo "bootstrap-selfhost-lib-spine-smoke-link: compile failed via inventory argv driver (see stderr above)" >&2
     exit 1
   fi
