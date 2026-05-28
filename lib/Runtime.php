@@ -329,6 +329,7 @@ class Runtime {
 
     public function parseAndCompile(string $code, string $filename): ?Block {
         $this->compiler->resetCompileAbortDetail();
+        $this->compiler->setDebugLastPhaseInputFile($filename);
         try {
             $script = $this->parse($code, $filename);
             $block = $this->compile($script);
@@ -352,6 +353,7 @@ class Runtime {
             if ('' !== $normalized) {
                 $filename = $normalized;
             }
+            $this->compiler->setDebugLastPhaseInputFile($filename);
 
             $code = (string) file_get_contents($filename);
             $script = $this->parse($code, $filename);

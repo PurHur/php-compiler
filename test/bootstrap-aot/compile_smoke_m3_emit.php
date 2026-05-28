@@ -73,6 +73,7 @@ function compile_smoke_m3_emit(string $sourceFile, string $outFile): int
 
         return 1;
     }
+    $runtime->compiler->setDebugLastPhaseInputFile($resolved);
     // M3 emit helper links with self-host stubs; keep compile path on the emit-smoke subset (#1937).
     try {
         $script = $runtime->parse($code, $resolved);

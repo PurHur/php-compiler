@@ -33,8 +33,125 @@ class Compiler {
     protected ?SplObjectStorage $seen = null;
     protected ?SplObjectStorage $funcs = null;
 
+    private ?string $debugLastPhaseInputFile = null;
+    private int $debugLastPhaseCounter = 0;
+    private ?string $debugLastPhaseKey = null;
+
     /** Set from the first compile-time abort (#2642, self-host diagnostics). */
     private ?string $compileAbortDetail = null;
+
+    public function setDebugLastPhaseInputFile(?string $filename): void
+    {
+        $this->debugLastPhaseInputFile = $filename;
+    }
+
+    private function debugLastPhaseIsEnabled(): bool
+    {
+        if (\defined('PHP_COMPILER_DEBUG_LAST_PHASE') && PHP_COMPILER_DEBUG_LAST_PHASE) {
+            return true;
+        }
+        $v = $_SERVER['PHP_COMPILER_DEBUG_LAST_PHASE'] ?? $_ENV['PHP_COMPILER_DEBUG_LAST_PHASE'] ?? getenv('PHP_COMPILER_DEBUG_LAST_PHASE');
+        if (false === $v || null === $v || '' === $v) {
+            return false;
+        }
+        $v = strtolower((string) $v);
+
+        return '1' === $v || 'true' === $v || 'yes' === $v;
+    }
+
+    private function debugLastPhaseFile(): ?string
+    {
+        if (\defined('PHP_COMPILER_DEBUG_LAST_PHASE_FILE') && is_string(PHP_COMPILER_DEBUG_LAST_PHASE_FILE) && '' !== PHP_COMPILER_DEBUG_LAST_PHASE_FILE) {
+            return PHP_COMPILER_DEBUG_LAST_PHASE_FILE;
+        }
+        $explicit = $_SERVER['PHP_COMPILER_DEBUG_LAST_PHASE_FILE'] ?? $_ENV['PHP_COMPILER_DEBUG_LAST_PHASE_FILE'] ?? getenv('PHP_COMPILER_DEBUG_LAST_PHASE_FILE');
+        if (is_string($explicit) && '' !== $explicit) {
+            return $explicit;
+        }
+        if (is_dir('build')) {
+            return 'build/last_lowering_phase.json';
+        }
+
+        return null;
+    }
+
+    private function debugWriteLastPhase(string $label, ?Block $block = null, mixed $node = null): void
+    {
+        if (!$this->debugLastPhaseIsEnabled()) {
+            return;
+        }
+        if ('Compiler::compileOps op' === $label) {
+            ++$this->debugLastPhaseCounter;
+            // Keep stderr/file noise low: sample op breadcrumbs (still frequent enough to localize crash).
+            if (0 !== ($this->debugLastPhaseCounter % 200)) {
+                return;
+            }
+        }
+        $file = $this->debugLastPhaseFile();
+
+        $funcName = null;
+        if (null !== $block && null !== $block->func) {
+            $funcName = $block->func->name ?? null;
+            if (null !== $block->func->class && isset($block->func->class->name)) {
+                $funcName = $block->func->class->name.'::'.((string) $funcName);
+            }
+        }
+
+        $nodeType = null;
+        if (null !== $node) {
+            $nodeType = \is_object($node) ? \get_class($node) : \gettype($node);
+        }
+
+        $key = ($this->debugLastPhaseInputFile ?? '').'|'.($funcName ?? '').'|'.$label.'|'.($nodeType ?? '');
+        if ($key === $this->debugLastPhaseKey) {
+            return;
+        }
+        $this->debugLastPhaseKey = $key;
+
+        $input = $this->debugLastPhaseInputFile;
+        if (\defined('PHP_COMPILER_DEBUG_LAST_PHASE_INPUT_FILE') && is_string(PHP_COMPILER_DEBUG_LAST_PHASE_INPUT_FILE) && '' !== PHP_COMPILER_DEBUG_LAST_PHASE_INPUT_FILE) {
+            $input = PHP_COMPILER_DEBUG_LAST_PHASE_INPUT_FILE;
+        }
+        if (
+            (null === $input || '' === $input || str_ends_with(str_replace('\\', '/', $input), '/compile_smoke_m3_emit_native_entry.php'))
+            && \function_exists('getenv')
+        ) {
+            $fromSource = getenv('PHP_COMPILER_M3_SOURCE');
+            if (is_string($fromSource) && '' !== $fromSource) {
+                $input = $fromSource;
+            }
+        }
+        if (
+            (null === $input || '' === $input || str_ends_with(str_replace('\\', '/', $input), '/compile_smoke_m3_emit_native_entry.php'))
+            && isset($_SERVER['argv'])
+            && \is_array($_SERVER['argv'])
+            && [] !== $_SERVER['argv']
+        ) {
+            $last = $_SERVER['argv'][\count($_SERVER['argv']) - 1] ?? null;
+            if (is_string($last) && '' !== $last && str_ends_with(strtolower($last), '.php')) {
+                $input = $last;
+            }
+        }
+
+        $payload = [
+            'ts' => \microtime(true),
+            'input' => $input,
+            'func' => $funcName,
+            'label' => $label,
+            'node' => $nodeType,
+        ];
+
+        $line = \json_encode($payload, JSON_UNESCAPED_SLASHES)."\n";
+        if (null !== $file && '' !== $file) {
+            @\file_put_contents($file, $line, LOCK_EX);
+        }
+        $stderr = (\defined('PHP_COMPILER_DEBUG_LAST_PHASE_STDERR') && PHP_COMPILER_DEBUG_LAST_PHASE_STDERR)
+            ? '1'
+            : ($_SERVER['PHP_COMPILER_DEBUG_LAST_PHASE_STDERR'] ?? $_ENV['PHP_COMPILER_DEBUG_LAST_PHASE_STDERR'] ?? getenv('PHP_COMPILER_DEBUG_LAST_PHASE_STDERR'));
+        if (false !== $stderr && null !== $stderr && '' !== $stderr && '0' !== $stderr) {
+            @\fwrite(STDERR, "last_phase: {$line}");
+        }
+    }
 
     public function resetCompileAbortDetail(): void
     {
@@ -88,6 +205,7 @@ class Compiler {
     public function compile(Script $script): ?Block {
         $this->resetCompileAbortDetail();
         $this->seen = new SplObjectStorage;
+        $this->debugWriteLastPhase('Compiler::compile enter');
 
         /** @var mixed $main */
         $main = $this->compileCfgBlock($script->main->cfg, $script->main->params, $script->main);
@@ -115,7 +233,6 @@ class Compiler {
         if ([] !== $script->functions || $this->emitSmokeScriptHasClassLike($script)) {
             $this->seen = new SplObjectStorage;
         }
-
         $block = $this->compileCfgBlock($script->main->cfg, $script->main->params, $script->main);
         $this->seen = null;
         if (null === $block && null !== $this->compileAbortDetail && '' !== $this->compileAbortDetail) {
@@ -308,6 +425,7 @@ class Compiler {
         $opCount = count($ops);
         for ($i = 0; $i < $opCount; ++$i) {
             $child = $ops[$i];
+            $this->debugWriteLastPhase('Compiler::compileOps op', $block, $child);
             switch (get_class($child)) {
                 case Op\Stmt\Function_::class:
                 case Op\Stmt\Class_::class:
