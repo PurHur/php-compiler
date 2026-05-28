@@ -14,6 +14,21 @@ set -euo pipefail
 BOOTSTRAP_COMPILE_DRIVER_MODE=""
 BOOTSTRAP_COMPILE_DRIVER=""
 
+bootstrap_list_native_compile_drivers() {
+  local root="${ROOT:-}"
+  if [[ -z "${root}" ]]; then
+    echo "bootstrap-resolve-compile-invoke: ROOT unset" >&2
+    return 1
+  fi
+
+  # If a fully compiled `bin/compile.php` exists, always prefer it for gen-0 bootstrap work (#2894).
+  # Keep older driver names as fallbacks for bisection.
+  printf '%s\n' \
+    "${root}/build/bin-compile-aot" \
+    "${root}/build/selfhost-compile-driver" \
+    "${root}/build/selfhost-native-compile-driver"
+}
+
 bootstrap_resolve_compile_driver() {
   local root="${ROOT:-}"
   if [[ -z "${root}" ]]; then
@@ -27,18 +42,14 @@ bootstrap_resolve_compile_driver() {
     return 0
   fi
 
-  # Prefer full bin/compile.php host link before argv-only M3 driver (#2842).
   local candidate
-  for candidate in \
-    "${root}/build/selfhost-compile-driver" \
-    "${root}/build/selfhost-native-compile-driver" \
-    "${root}/build/bin-compile-aot"; do
+  while IFS= read -r candidate; do
     if [[ -x "${candidate}" ]]; then
       BOOTSTRAP_COMPILE_DRIVER_MODE=native
       BOOTSTRAP_COMPILE_DRIVER="${candidate}"
       return 0
     fi
-  done
+  done < <(bootstrap_list_native_compile_drivers)
 
   if command -v php >/dev/null 2>&1; then
     BOOTSTRAP_COMPILE_DRIVER_MODE=zend
@@ -83,27 +94,38 @@ bootstrap_compile_invoke() {
     return $?
   fi
 
-  echo "bootstrap-compile-invoke: ${BOOTSTRAP_COMPILE_DRIVER} -o ${out} ${entry} (#2842)" >&2
-  set +e
-  "$@" "${BOOTSTRAP_COMPILE_DRIVER}" -o "${out}" "${entry}"
-  local code=$?
-  set -e
-
-  if [[ "${code}" -eq 0 && -x "${out}" ]]; then
-    return 0
-  fi
+  # If a compiled driver exists, try them in priority order before falling back to gen-0 Zend.
+  # This avoids "first native candidate crashes → immediate Zend" which hides usable drivers (#2894).
+  local native_candidate
+  local last_code=1
+  while IFS= read -r native_candidate; do
+    if [[ ! -x "${native_candidate}" ]]; then
+      continue
+    fi
+    BOOTSTRAP_COMPILE_DRIVER="${native_candidate}"
+    echo "bootstrap-compile-invoke: ${BOOTSTRAP_COMPILE_DRIVER} -o ${out} ${entry} (#2842)" >&2
+    rm -f "${out}"
+    set +e
+    "$@" "${BOOTSTRAP_COMPILE_DRIVER}" -o "${out}" "${entry}"
+    last_code=$?
+    set -e
+    if [[ "${last_code}" -eq 0 && -x "${out}" ]]; then
+      return 0
+    fi
+    echo "bootstrap-compile-invoke: compiled driver ${BOOTSTRAP_COMPILE_DRIVER} failed (exit ${last_code})" >&2
+  done < <(bootstrap_list_native_compile_drivers)
 
   if [[ "${BOOTSTRAP_GEN0_ZEND_ONLY:-0}" == "1" ]]; then
-    echo "bootstrap-compile-invoke: compiled driver failed (exit ${code}); BOOTSTRAP_GEN0_ZEND_ONLY=1 — no fallback" >&2
-    return "${code}"
+    echo "bootstrap-compile-invoke: compiled driver(s) failed; BOOTSTRAP_GEN0_ZEND_ONLY=1 — no fallback" >&2
+    return "${last_code}"
   fi
 
   if ! command -v php >/dev/null 2>&1; then
-    echo "bootstrap-compile-invoke: compiled driver failed (exit ${code}) and php missing — cannot fall back (#2842)" >&2
-    return "${code}"
+    echo "bootstrap-compile-invoke: compiled driver(s) failed and php missing — cannot fall back (#2842)" >&2
+    return "${last_code}"
   fi
 
-  echo "bootstrap-compile-invoke: compiled driver failed or missing ${out} — falling back to Zend gen-0 (#2842)" >&2
+  echo "bootstrap-compile-invoke: compiled driver(s) failed — falling back to Zend gen-0 (#2842)" >&2
   BOOTSTRAP_COMPILE_DRIVER_MODE=zend
   BOOTSTRAP_COMPILE_DRIVER="${ROOT}/bin/compile.php"
   rm -f "${out}"
