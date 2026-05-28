@@ -3000,6 +3000,12 @@ class JIT {
         string $sentinelLogical,
         bool $sidecarHostStubNonLiteralIncludes = false
     ): void {
+        // Prevent unbounded sidecar recursion: a sidecar host-compile runs bin/compile.php, which would
+        // otherwise register/host-compile additional sidecars again (hang in bootstrap-selfhost-helloworld).
+        $guard = getenv('PHP_COMPILER_M3_EMIT_SIDECAR_RECURSION_GUARD');
+        if ('1' === $guard || 'true' === strtolower((string) $guard)) {
+            return;
+        }
         if ($this->shouldSkipM3InventoryEmitDriverSelfSidecar($path)) {
             return;
         }
@@ -3034,6 +3040,8 @@ class JIT {
         // Self-host skips cli/vendor includes during link; M3 compile-driver Runtime ctor native (#2600, #2633).
         $compileEnv['PHP_COMPILER_SELFHOST_AOT'] = '1';
         $compileEnv['PHP_COMPILER_M3_COMPILE_DRIVER'] = '1';
+        // Recursion guard: nested bin/compile.php invocations should not spawn further sidecar host-compiles.
+        $compileEnv['PHP_COMPILER_M3_EMIT_SIDECAR_RECURSION_GUARD'] = '1';
         if (str_ends_with($pathNorm, '/bin/compile.php') && !$this->shouldUseM3InventoryEmitDriver()) {
             $compileEnv['PHP_COMPILER_EMIT_HELPER_LINK'] = '1';
             $compileEnv['PHP_COMPILER_M3_EMIT_TU'] = '1';
