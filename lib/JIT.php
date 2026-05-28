@@ -159,9 +159,11 @@ class JIT {
             $run = array_shift($this->queue);
             JIT\Progress::notePhase('jit_run_queue_item');
             try {
-                /** @var Block $b */
-                $b = $run[0];
-                JIT\Progress::noteEntry($b->func->getScopedName());
+                /** @var Block $block */
+                $block = $run[1];
+                if (null !== $block->func) {
+                    JIT\Progress::noteEntry($block->func->getScopedName());
+                }
             } catch (\Throwable $e) {
                 // best-effort only: progress breadcrumbs must not affect codegen
             }
