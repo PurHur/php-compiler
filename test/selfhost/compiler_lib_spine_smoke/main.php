@@ -39,6 +39,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/ErrorHandler.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ErrorHandlerOutput.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/SplAutoloadOutput.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/HttpResponseCode.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/IniRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/IniGet.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/IniSet.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/Internal.php';
