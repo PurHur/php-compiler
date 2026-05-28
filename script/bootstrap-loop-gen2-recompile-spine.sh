@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# M4/M5: native driver recompiles full compiler spine (717/717) — issue #1498, #2697.
+# M4/M5: native driver recompiles full compiler spine (725/725) — issue #1498, #2697, #2866.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "${ROOT}"
@@ -30,9 +30,8 @@ fi
 rm -f "${GEN3}"
 set +e
 out="$(
-  env PHP_COMPILER_M3_SOURCE="${SOURCE}" \
-    PHP_COMPILER_M3_OUT="${GEN3}" \
-    "${DRIVER}" 2>&1
+  env -u PHP_COMPILER_M3_SOURCE -u PHP_COMPILER_M3_OUT \
+    "${DRIVER}" -o "${GEN3}" "${SOURCE}" 2>&1
 )"
 code=$?
 set -e
@@ -53,4 +52,4 @@ if ! grep -q 'compiler_lib_spine_smoke bundle OK' <<< "${run_out}"; then
   exit 1
 fi
 
-echo "bootstrap-loop-gen2-recompile-spine: OK gen-2=${DRIVER} gen-3=${GEN3} (717/717 spine)"
+echo "bootstrap-loop-gen2-recompile-spine: OK gen-2=${DRIVER} gen-3=${GEN3} (725/725 spine, argv -o)"

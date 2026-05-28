@@ -22,7 +22,7 @@ final class BootstrapCompileSmokeM3Emit
 
     private static int $seq = 0;
 
-    /** M3 emit TU {main}: env PHP_COMPILER_M3_* or argv `-o OUT SOURCE` (#1937, #2697). */
+    /** M3 emit TU {main}: argv `-o OUT SOURCE` (preferred) or env PHP_COMPILER_M3_* (#1937, #2697, #2866). */
     public static function emitMainEntry(Context $context, string $logPrefix): void
     {
         $i64 = $context->getTypeFromString('int64');

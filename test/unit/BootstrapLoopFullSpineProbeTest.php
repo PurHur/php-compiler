@@ -38,8 +38,11 @@ final class BootstrapLoopFullSpineProbeTest extends TestCase
 
         $makefile = (string) file_get_contents($root.'/Makefile');
         $this->assertStringContainsString('bootstrap-loop-gen2-recompile-minimal:', $makefile);
-        $body = (string) file_get_contents($script);
+        $spineScript = $root.'/script/bootstrap-loop-gen2-recompile-spine.sh';
+        $body = (string) file_get_contents($spineScript);
         $this->assertStringContainsString('compiler_lib_spine_smoke', $body);
         $this->assertStringContainsString('build/bin-compile-aot', $body);
+        $this->assertStringContainsString('-o "${GEN3}"', $body);
+        $this->assertStringNotContainsString('PHP_COMPILER_M3_SOURCE="${SOURCE}"', $body);
     }
 }
