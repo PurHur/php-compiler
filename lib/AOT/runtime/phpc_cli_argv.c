@@ -1,7 +1,9 @@
 /**
  * Store process argc/argv for native M3 emit / compiled compile driver (#1937, #2697, #2794).
  */
+#include <stdio.h>
 #include <stddef.h>
+#include <stdlib.h>
 #include <string.h>
 
 typedef struct __string__ __string__;
@@ -15,6 +17,32 @@ extern void __value__writeHashtable(__value__ *out, __hashtable__ *ht);
 
 static int phpc_cli_argc = 0;
 static char **phpc_cli_argv = NULL;
+
+static void phpc_progress_note(const char *msg)
+{
+    const char *path;
+    FILE *fp;
+    size_t len;
+
+    path = getenv("PHP_COMPILER_JIT_PROGRESS_FILE");
+    if (NULL == path || '\0' == *path || NULL == msg) {
+        return;
+    }
+    fp = fopen(path, "wb");
+    if (NULL == fp) {
+        return;
+    }
+    len = strlen(msg);
+    if (len > 0) {
+        (void) fwrite(msg, 1, len, fp);
+    }
+    (void) fclose(fp);
+}
+
+void __phpc_progress_note(const char *msg)
+{
+    phpc_progress_note(msg);
+}
 
 static __string__ *phpc_cli_cstr_to_string(const char *cstr)
 {
@@ -35,6 +63,7 @@ static __string__ *phpc_cli_cstr_to_string(const char *cstr)
 
 void __phpc_cli_store_argv(int argc, char **argv)
 {
+    phpc_progress_note("c:cli_store_argv");
     phpc_cli_argc = argc;
     phpc_cli_argv = argv;
 }
@@ -68,6 +97,7 @@ void __phpc_cli_refresh_argv_global(__value__ *out)
     __hashtable__ *ht;
     int i;
 
+    phpc_progress_note("c:cli_refresh_argv_begin");
     if (NULL == out) {
         return;
     }
@@ -77,4 +107,5 @@ void __phpc_cli_refresh_argv_global(__value__ *out)
         __hashtable__setStringAt(ht, (size_t) i, phpc_cli_cstr_to_string(phpc_cli_argv[i]));
     }
     __value__writeHashtable(out, ht);
+    phpc_progress_note("c:cli_refresh_argv_done");
 }

@@ -322,9 +322,13 @@ class Runtime {
     }
 
     public function standalone(?Block $block, string $outfile) {
+        \PHPCompiler\JIT\Progress::noteFunction('runtime_standalone_begin');
         $context = $this->loadJitContext();
+        \PHPCompiler\JIT\Progress::noteFunction('runtime_standalone_loadjitcontext_done');
         $context->setMain($this->loadJit()->compile($block));
+        \PHPCompiler\JIT\Progress::noteFunction('runtime_standalone_compile_done');
         $context->compileToFile($outfile);
+        \PHPCompiler\JIT\Progress::noteFunction('runtime_standalone_compiletofile_done');
     }
 
     public function parseAndCompile(string $code, string $filename): ?Block {
@@ -355,9 +359,13 @@ class Runtime {
             }
             $this->compiler->setDebugLastPhaseInputFile($filename);
 
+            \PHPCompiler\JIT\Progress::noteFunction('runtime_parseandcompilefile_read_begin');
             $code = (string) file_get_contents($filename);
+            \PHPCompiler\JIT\Progress::noteFunction('runtime_parseandcompilefile_read_done');
             $script = $this->parse($code, $filename);
+            \PHPCompiler\JIT\Progress::noteFunction('runtime_parseandcompilefile_parse_done');
             $block = $this->compile($script);
+            \PHPCompiler\JIT\Progress::noteFunction('runtime_parseandcompilefile_compile_done');
             if (null !== $block) {
                 $block->setScriptPath($filename);
             } else {
