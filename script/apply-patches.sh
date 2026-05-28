@@ -234,6 +234,13 @@ patch_already_applied() {
     php-types-missing-parent-no-echo.patch)
       ! grep -q "Could not find parent" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/State.php" 2>/dev/null
       ;;
+    pre-plugin-autoload-prepend.patch)
+      grep -q 'prepend: true' "$ROOT/vendor/pre/plugin/source/autoload.php" 2>/dev/null \
+        && ! grep -q ', false,' "$ROOT/vendor/pre/plugin/source/autoload.php" 2>/dev/null
+      ;;
+    pre-plugin-parser-macros.patch)
+      grep -q 'private array \$macros' "$ROOT/vendor/pre/plugin/source/Parser.php" 2>/dev/null
+      ;;
     *)
       return 1
       ;;

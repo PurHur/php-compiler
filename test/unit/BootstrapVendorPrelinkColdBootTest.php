@@ -9,6 +9,30 @@ use PHPUnit\Framework\TestCase;
 /** @group unit */
 final class BootstrapVendorPrelinkColdBootTest extends TestCase
 {
+    /** Issue #2865: vendor absent — bootstrap-vendor-objects --compile uses committed .o only. */
+    public function testVendorAbsentCompileUsesCommittedPrelinkObjects(): void
+    {
+        $root = dirname(__DIR__, 2);
+        if (!is_dir($root.'/vendor')) {
+            $this->markTestSkipped('vendor/ not installed');
+        }
+        $vendorBak = $root.'/.phpc-vendor-hygiene-bak';
+        if (is_dir($vendorBak)) {
+            $this->markTestSkipped('stale '.$vendorBak.' from interrupted test');
+        }
+        // Subshell so PHPUnit keeps vendor/ loaded; script runs without composer autoload.
+        $cmd = 'cd '.escapeshellarg($root)
+            .' && mv vendor '.escapeshellarg(basename($vendorBak))
+            .' && '.escapeshellarg(PHP_BINARY).' script/bootstrap-vendor-objects.php --compile 2>&1'
+            .'; code=$?; mv '.escapeshellarg(basename($vendorBak)).' vendor; exit $code';
+        exec('bash -lc '.escapeshellarg($cmd), $out, $code);
+        $joined = implode("\n", $out);
+        $this->assertSame(0, $code, $joined);
+        $this->assertStringContainsString('cold boot', $joined, $joined);
+        $this->assertStringContainsString('ircmaxell-php-cfg.o', $joined, $joined);
+        $this->assertStringContainsString('ircmaxell-php-llvm.o', $joined, $joined);
+    }
+
     public function testColdBootCheckPassesWithCommittedBundles(): void
     {
         $root = dirname(__DIR__, 2);

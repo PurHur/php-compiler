@@ -705,6 +705,16 @@ ci_run_bootstrap_m3_emit_tu_execute() {
   ci_run_phpunit --group selfhost-m3-emit
 }
 
+# M2/M5 bootstrap log hygiene — vendor patch regressions (#2723, #2729); default on in ci-fast.
+ci_run_bootstrap_vendor_hygiene() {
+  if [[ "${BOOTSTRAP_VENDOR_HYGIENE_GATE:-1}" != "1" ]]; then
+    echo "bootstrap-vendor-hygiene: skipped (BOOTSTRAP_VENDOR_HYGIENE_GATE=0)"
+    return 0
+  fi
+  echo "PHPUnit (fast): bootstrap vendor hygiene (#2723, #2729)..."
+  ci_run_phpunit --filter BootstrapVendorPrelinkColdBootTest
+}
+
 # Bootstrap test subset in fast CI (issue #2069); default off — opt-in BOOTSTRAP_TEST_SUBSET_GATE=1.
 ci_run_bootstrap_test_subset() {
   if [[ "${BOOTSTRAP_TEST_SUBSET_GATE:-0}" != "1" ]]; then
