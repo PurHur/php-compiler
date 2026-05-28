@@ -151,6 +151,21 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString('helloworld_compile_smoke:', $source);
         $this->assertStringContainsString('PHP_COMPILER_M3_COMPILE_MODE=compile', $source);
         $this->assertStringContainsString('.m3_bin_compile_aot_blob', $source);
+        $this->assertStringContainsString('PHP_COMPILER_M4_BIN_COMPILE_DRIVER=1', $source);
+    }
+
+    /** Issue #2880: M4 full-revision probe script and native argv main for bin/compile.php. */
+    public function testM4BinCompileRevisionProbeScriptExists(): void
+    {
+        $script = self::$root.'/script/bootstrap-loop-gen2-recompile-bin-compile.sh';
+        $this->assertFileExists($script);
+        $source = (string) file_get_contents($script);
+        $this->assertStringContainsString('bootstrap-loop-gen3-bin-compile-aot', $source);
+        $this->assertStringContainsString('bin/compile.php', $source);
+        $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
+        $this->assertStringContainsString('PHP_COMPILER_M4_BIN_COMPILE_DRIVER', $jit);
+        $this->assertStringContainsString('shouldUseM4BinCompileArgvMainNative', $jit);
+        $this->assertStringContainsString('isM4BinCompileScriptMain', $jit);
     }
 
     public function testCliDriverEmitProbeAndVmSidecarConstantsExist(): void

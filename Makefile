@@ -253,7 +253,7 @@ test-docker-exec:
 .PHONY: test-docker-quick
 test-docker-quick: test-docker-fast
 
-.PHONY: bootstrap-inventory bootstrap-spine-phpcfg-parse-check bootstrap-profile bootstrap-aot-lint bootstrap-aot-link bootstrap-aot-link-lib bootstrap-vendor-prelink-bundles bootstrap-vendor-objects bootstrap-selfhost-probe bootstrap-selfhost-link bootstrap-selfhost-compile-smoke bootstrap-selfhost-compile-smoke-strict bootstrap-selfhost-runtime-compile-smoke bootstrap-selfhost-runtime-compile-smoke-strict bootstrap-m3-emit-tu-execute bootstrap-selfhost-compiler-driver-smoke bootstrap-selfhost-compiler-unit-probe bootstrap-selfhost-compiler-unit-probe-strict bootstrap-selfhost-jit-unit-probe bootstrap-selfhost-jit-unit-probe-strict bootstrap-selfhost-vm-unit-probe bootstrap-selfhost-parser-unit-probe bootstrap-selfhost-types-unit-probe bootstrap-selfhost-lib-spine-smoke bootstrap-selfhost-lib-spine-vm-smoke bootstrap-selfhost-vm-driver-execute-probe bootstrap-selfhost-helloworld bootstrap-selfhost-helloworld-compile-bin bootstrap-selfhost-cli-driver-emit bootstrap-selfhost-driver-host-compile bootstrap-selfhost-driver-smoke bootstrap-native-compile-driver-smoke bootstrap-loop-gen1-link bootstrap-loop-gen1-full-spine-emit bootstrap-loop-gen2-recompile-spine bootstrap-loop-gen2-recompile-minimal bootstrap-loop-probe bootstrap-loop-full-spine-probe bootstrap-loop-probe-dry bootstrap-loop-probe-dry-run bootstrap-wave-check
+.PHONY: bootstrap-inventory bootstrap-spine-phpcfg-parse-check bootstrap-profile bootstrap-aot-lint bootstrap-aot-link bootstrap-aot-link-lib bootstrap-vendor-prelink-bundles bootstrap-vendor-objects bootstrap-selfhost-probe bootstrap-selfhost-link bootstrap-selfhost-compile-smoke bootstrap-selfhost-compile-smoke-strict bootstrap-selfhost-runtime-compile-smoke bootstrap-selfhost-runtime-compile-smoke-strict bootstrap-m3-emit-tu-execute bootstrap-selfhost-compiler-driver-smoke bootstrap-selfhost-compiler-unit-probe bootstrap-selfhost-compiler-unit-probe-strict bootstrap-selfhost-jit-unit-probe bootstrap-selfhost-jit-unit-probe-strict bootstrap-selfhost-vm-unit-probe bootstrap-selfhost-parser-unit-probe bootstrap-selfhost-types-unit-probe bootstrap-selfhost-lib-spine-smoke bootstrap-selfhost-lib-spine-vm-smoke bootstrap-selfhost-vm-driver-execute-probe bootstrap-selfhost-helloworld bootstrap-selfhost-helloworld-compile-bin bootstrap-selfhost-cli-driver-emit bootstrap-selfhost-driver-host-compile bootstrap-selfhost-driver-smoke bootstrap-native-compile-driver-smoke bootstrap-loop-gen1-link bootstrap-loop-gen1-full-spine-emit bootstrap-loop-gen2-recompile-spine bootstrap-loop-gen2-recompile-bin-compile bootstrap-loop-gen2-recompile-minimal bootstrap-loop-probe bootstrap-loop-full-spine-probe bootstrap-loop-probe-dry bootstrap-loop-probe-dry-run bootstrap-wave-check
 bootstrap-inventory:
 	php script/bootstrap-inventory.php
 .PHONY: bootstrap-inventory-check bootstrap-inventory-regenerate
@@ -355,6 +355,8 @@ bootstrap-loop-full-spine-probe:
 	./script/bootstrap-loop-full-spine-probe.sh
 bootstrap-loop-gen2-recompile-spine:
 	./script/bootstrap-loop-gen2-recompile-spine.sh
+bootstrap-loop-gen2-recompile-bin-compile:
+	./script/bootstrap-loop-gen2-recompile-bin-compile.sh
 bootstrap-loop-gen2-recompile-minimal: bootstrap-loop-gen2-recompile-spine
 # Script dry-run ladder: make bootstrap-loop-probe-dry (not `make bootstrap-loop-probe --dry-run`, which is GNU make recipe print only — #2828).
 bootstrap-loop-probe:

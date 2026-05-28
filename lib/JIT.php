@@ -66,6 +66,9 @@ class JIT {
         if ($this->shouldUseM3EmitTuNativeBridge() && $this->isM3EmitTuScriptMain($block)) {
             $this->m3EmitTuMainBlock = $block;
         }
+        if ($this->shouldUseM4BinCompileArgvMainNative() && $this->isM4BinCompileScriptMain($block)) {
+            $this->m3EmitTuMainBlock = $block;
+        }
         if ($this->shouldUseM3CompileDriverMainNative() && $this->isM3CompileDriverBundleScriptMain($block)) {
             $this->m3CompileDriverMainBlock = $block;
         }
@@ -329,6 +332,31 @@ class JIT {
         return '1' === $flag || 'true' === strtolower((string) $flag);
     }
 
+    /**
+     * Native argv {main} for production bin/compile.php (M4 full revision / BIN_COMPILE sidecar — #2880).
+     */
+    private function shouldUseM4BinCompileArgvMainNative(): bool
+    {
+        if (!$this->shouldUseM3CompileDriverRealLowering()) {
+            return false;
+        }
+        if ($this->shouldUseM5DriverHostCompile()) {
+            return true;
+        }
+        $flag = getenv('PHP_COMPILER_M4_BIN_COMPILE_DRIVER');
+
+        return '1' === $flag || 'true' === strtolower((string) $flag);
+    }
+
+    private function isM4BinCompileScriptMain(Block $block): bool
+    {
+        if (!$this->isM3CompileDriverScriptMain($block)) {
+            return false;
+        }
+
+        return str_ends_with(str_replace('\\', '/', $block->scriptPath()), '/bin/compile.php');
+    }
+
     /** M5 emit sidecar host-compile targets — stub {main} under self-host AOT (#2697, #2699). */
     private function isM5BootstrapSidecarScriptMain(Block $block): bool
     {
@@ -570,6 +598,9 @@ class JIT {
             return $this->compileM3CompileDriverMainNative($internalName, $block, $logicalName);
         }
         if ($this->shouldUseM3EmitTuNativeBridge() && $this->isM3EmitTuScriptMain($block)) {
+            return $this->compileM3EmitTuMainNative($internalName, $block, $logicalName);
+        }
+        if ($this->shouldUseM4BinCompileArgvMainNative() && $this->isM4BinCompileScriptMain($block)) {
             return $this->compileM3EmitTuMainNative($internalName, $block, $logicalName);
         }
         if ($this->shouldUseM3EmitTuNativeBridge() && null !== $logicalName) {
@@ -2981,17 +3012,30 @@ class JIT {
         $tmpOut = sys_get_temp_dir().'/m3_emit_sidecar_aot_'.getmypid().'_'.substr(md5($sidecarRel), 0, 8);
         @unlink($tmpOut);
         $repoRoot = dirname(__DIR__);
+        $pathNorm = str_replace('\\', '/', $path);
+        $hostCompilePath = $path;
+        if (str_ends_with($pathNorm, '/bin/compile.php')) {
+            // Match key stays bin/compile.php; host link uses M3 emit TU argv native {main} (#2880).
+            $hostCompilePath = $repoRoot.'/test/bootstrap-aot/compile_smoke_m3_emit_native_entry.php';
+        }
         $compileCmd = 'php '.escapeshellarg($repoRoot.'/bin/compile.php')
             .' -o '.escapeshellarg($tmpOut)
-            .' '.escapeshellarg($path);
+            .' '.escapeshellarg($hostCompilePath);
         $compileEnv = $_ENV;
         // Self-host skips cli/vendor includes during link; M3 compile-driver Runtime ctor native (#2600, #2633).
         $compileEnv['PHP_COMPILER_SELFHOST_AOT'] = '1';
         $compileEnv['PHP_COMPILER_M3_COMPILE_DRIVER'] = '1';
+        if (str_ends_with($pathNorm, '/bin/compile.php')) {
+            $compileEnv['PHP_COMPILER_EMIT_HELPER_LINK'] = '1';
+            $compileEnv['PHP_COMPILER_M3_EMIT_TU'] = '1';
+            $compileEnv['PHP_COMPILER_M3_EMIT_LOG_PREFIX'] = 'helloworld_compile_smoke';
+        }
         if ($sidecarHostStubNonLiteralIncludes) {
             $compileEnv['PHP_COMPILER_M3_SIDECAR_HOST'] = '1';
         }
-        unset($compileEnv['PHP_COMPILER_EMIT_HELPER_LINK'], $compileEnv['PHP_COMPILER_M3_EMIT_TU']);
+        if (!str_ends_with($pathNorm, '/bin/compile.php')) {
+            unset($compileEnv['PHP_COMPILER_EMIT_HELPER_LINK'], $compileEnv['PHP_COMPILER_M3_EMIT_TU']);
+        }
         $descriptor = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
         $proc = proc_open($compileCmd, $descriptor, $pipes, $repoRoot, $compileEnv);
         if (!is_resource($proc)) {
