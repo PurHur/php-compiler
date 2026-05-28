@@ -63,6 +63,19 @@ if [[ $# -eq 0 ]]; then
   exit 0
 fi
 
+# When we fall back to tar-copy (no bind mount), generated docs won't persist unless we sync them back.
+# Auto-sync the inventory docs for the common regeneration commands so that a follow-up `--check` works.
+if [[ ${#SYNC_BACK_PATHS[@]} -eq 0 ]]; then
+  case " $* " in
+    *" script/bootstrap-inventory.php "*)
+      SYNC_BACK_PATHS+=("docs/bootstrap-inventory.md")
+      ;;
+    *" script/bootstrap-vendor-inventory.php "*)
+      SYNC_BACK_PATHS+=("docs/bootstrap-vendor-inventory.md")
+      ;;
+  esac
+fi
+
 quoted=$(printf '%q ' "$@")
 inner="source script/php-env.sh; ${_llvm_exports} ${quoted}"
 
