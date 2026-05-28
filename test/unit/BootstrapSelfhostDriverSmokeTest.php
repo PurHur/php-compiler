@@ -76,6 +76,17 @@ final class BootstrapSelfhostDriverSmokeTest extends TestCase
         $this->assertStringContainsString('php-types-fromdecl-junk-fragments.patch', $apply);
     }
 
+    /** Issue #3011: M4 bin/compile.php argv {main} uses emit bridge without inventory env flag. */
+    public function testM4BinCompileArgvEmitMainWithoutInventoryFlag(): void
+    {
+        $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
+        $this->assertStringContainsString('shouldUseM3BinCompileArgvEmitMain', $jit);
+        $this->assertStringContainsString(
+            'return $this->shouldUseM4BinCompileArgvMainNative() && $this->isM4BinCompileScriptMain($block);',
+            $jit
+        );
+    }
+
     /** Issue #3004: argv bin/compile.php must not return null from parseAndCompile stub when sidecars miss. */
     public function testInventoryArgvDriverUsesParseCompileSpineNotNullStub(): void
     {

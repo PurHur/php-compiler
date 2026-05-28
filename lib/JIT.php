@@ -318,6 +318,21 @@ class JIT {
         return false;
     }
 
+    /**
+     * Native argv {main} for bin/compile.php — explicit inventory driver or M4/M5 argv (#3011).
+     */
+    private function shouldUseM3BinCompileArgvEmitMain(Block $block): bool
+    {
+        if (!$this->shouldUseM3CompileDriverMainNative()) {
+            return false;
+        }
+        if ($this->shouldUseM3InventoryEmitDriver()) {
+            return true;
+        }
+
+        return $this->shouldUseM4BinCompileArgvMainNative() && $this->isM4BinCompileScriptMain($block);
+    }
+
     /** Inventory emit TU is compile_driver.php — do not host-compile it again as a link sidecar (#2843). */
     private function shouldSkipM3InventoryEmitDriverSelfSidecar(string $path): bool
     {
@@ -2602,7 +2617,7 @@ class JIT {
         $saved = $this->context->builder;
         $this->context->builder = $this->context->context->builderCreate();
         $this->context->builder->positionAtEnd($bb);
-        if ($this->shouldUseM3InventoryEmitDriver()) {
+        if ($this->shouldUseM3BinCompileArgvEmitMain($block)) {
             if (!$this->m3CompileDriverRuntimeSpineLowered) {
                 $this->m3CompileDriverRuntimeSpineLowered = true;
                 $sidecar = $this->isM3EmitTuTrivialEchoSidecarActive();
@@ -2762,7 +2777,12 @@ class JIT {
 
             return;
         }
-        if ($this->shouldUseM3InventoryEmitDriver() && null !== $this->m3CompileDriverMainBlock) {
+        if (
+            null !== $this->m3CompileDriverMainBlock
+            && ($this->shouldUseM3InventoryEmitDriver()
+                || ($this->shouldUseM4BinCompileArgvMainNative()
+                    && $this->isM4BinCompileScriptMain($this->m3CompileDriverMainBlock)))
+        ) {
             $this->compileM3EmitTuRuntimeParseAndCompileNativeDecl([
                 'parseandcompile' => true,
                 'parseandcompileemitsmoke' => true,
@@ -2896,9 +2916,15 @@ class JIT {
 
             return \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::isRegistered($this->context);
         }
+        // M4 argv bin/compile.php (non-inventory) still needs bootstrap-aot sidecars at link (#3011).
+        if ($this->shouldUseM4BinCompileArgvMainNative()) {
+            $this->cacheM3EmitTuTrivialEchoAtLinkTime();
+
+            return \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::isRegistered($this->context);
+        }
         // M4 argv bin/compile.php links with -u PHP_COMPILER_EMIT_HELPER_LINK but still needs
         // compile_smoke / HelloWorld sidecars at link time (#3004, #2880).
-        $inventoryArgvSidecar = $this->shouldUseM3InventoryEmitDriver() && $this->shouldUseM4BinCompileArgvMainNative();
+        $inventoryArgvSidecar = $this->shouldUseM4BinCompileArgvMainNative();
         if (!$this->shouldUseEmitHelperLinkStubs() && !$inventoryArgvSidecar) {
             return false;
         }
@@ -2979,7 +3005,11 @@ class JIT {
                 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::cliDriverSentinelBlock',
                 true
             );
-        } elseif ('compile_smoke_m3_emit' === $logPrefix || $this->shouldUseM3InventoryEmitDriver()) {
+        } elseif (
+            'compile_smoke_m3_emit' === $logPrefix
+            || $this->shouldUseM3InventoryEmitDriver()
+            || $this->shouldUseM4BinCompileArgvMainNative()
+        ) {
             $this->registerM3EmitTuSidecarFromPath(
                 __DIR__.'/../examples/000-HelloWorld/example.php',
                 \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::HELLOWORLD_SIDECAR_REL,
