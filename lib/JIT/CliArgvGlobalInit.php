@@ -44,6 +44,10 @@ final class CliArgvGlobalInit
         if (null === self::$global) {
             throw new \LogicException('CLI argv global not initialized for JIT');
         }
+        // Lazily populate `$argv` on first access, rather than from `main`.
+        // Some standalone AOT binaries crash when allocating hashtables during early startup,
+        // even after runtime init; defer to the user-level CLI entry reading `$argv` (#2930, #2967).
+        self::emitRefreshAfterStoreArgv($context);
 
         return new Variable(
             $context,

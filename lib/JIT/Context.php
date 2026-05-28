@@ -432,10 +432,21 @@ class Context {
                 $main->getParam(0),
                 $main->getParam(1)
             );
+            $this->builder->call(
+                $this->lookupFunction('__phpc_progress_note'),
+                $this->builder->pointerCast(
+                    $this->constantFromString('c:main_before_init'),
+                    $this->getTypeFromString('int8*')
+                )
+            );
             $this->builder->call($this->initFunc);
-            // Refreshing `$argv` may allocate hashtables; do it after runtime init to avoid
-            // allocator use before init (segfault in argv AOT binaries, #2930).
-            CliArgvGlobalInit::emitRefreshAfterStoreArgv($this);
+            $this->builder->call(
+                $this->lookupFunction('__phpc_progress_note'),
+                $this->builder->pointerCast(
+                    $this->constantFromString('c:main_after_init'),
+                    $this->getTypeFromString('int8*')
+                )
+            );
             if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
                 Builtin\HttpResponseCode::emitResetForStandaloneMain($this);
                 Builtin\SessionId::emitResetForStandaloneMain($this);
@@ -445,7 +456,21 @@ class Context {
                 Builtin\JitThrow::registerDeclarations($this);
                 $this->builder->call($this->lookupFunction('phpc_jit_clear_throw_pending'));
             }
+            $this->builder->call(
+                $this->lookupFunction('__phpc_progress_note'),
+                $this->builder->pointerCast(
+                    $this->constantFromString('c:main_before_php'),
+                    $this->getTypeFromString('int8*')
+                )
+            );
             $this->builder->call($this->main);
+            $this->builder->call(
+                $this->lookupFunction('__phpc_progress_note'),
+                $this->builder->pointerCast(
+                    $this->constantFromString('c:main_after_php'),
+                    $this->getTypeFromString('int8*')
+                )
+            );
             if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
                 Builtin\PendingHeaders::emitFlushForStandalone($this);
             }
