@@ -165,11 +165,24 @@ function run(string $filename, string $code, array $options): void
                 return \PHPCompiler\AOT\LinkerProcessPolyfill::run($command, $env);
             }
         }
+        $prevSelfHostAot = getenv('PHP_COMPILER_SELFHOST_AOT');
+        $setSelfHostAotForCompile = \function_exists('putenv') && (false === $prevSelfHostAot || '' === (string) $prevSelfHostAot);
+        if ($setSelfHostAotForCompile) {
+            // Keep LLVM 9 stable during AOT compilation; some lowering paths are still sensitive (#2600).
+            putenv('PHP_COMPILER_SELFHOST_AOT=1');
+            $_ENV['PHP_COMPILER_SELFHOST_AOT'] = '1';
+            $_SERVER['PHP_COMPILER_SELFHOST_AOT'] = '1';
+        }
         try {
             $runtime->standalone($block, $options['-o'], $code, $filename);
         } catch (\LogicException $e) {
             fwrite(STDERR, $e->getMessage()."\n");
             exit(2);
+        } finally {
+            if ($setSelfHostAotForCompile) {
+                putenv('PHP_COMPILER_SELFHOST_AOT=');
+                unset($_ENV['PHP_COMPILER_SELFHOST_AOT'], $_SERVER['PHP_COMPILER_SELFHOST_AOT']);
+            }
         }
     }
 }
