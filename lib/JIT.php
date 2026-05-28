@@ -307,9 +307,7 @@ class JIT {
         if (!$this->shouldUseM3CompileDriverMainNative()) {
             return false;
         }
-        if ($this->shouldUseM4BinCompileArgvMainNative()) {
-            return $this->shouldUseM3CompileDriverRealLowering();
-        }
+        // M4/M5 bin/compile.php host link uses real argv {main} unless inventory emit is explicit (#3004).
         foreach (['PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER', 'BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER'] as $envKey) {
             $flag = getenv($envKey);
             if ('1' === $flag || 'true' === strtolower((string) $flag)) {

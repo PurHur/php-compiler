@@ -393,8 +393,27 @@ final class BootstrapCompileSmokeM3Emit
             if (!isset($context->functions[$compileLc])) {
                 continue;
             }
+            $tag = 'd'.(string) ++self::$seq;
+            $failBb = BasicBlockHelper::append($context, 'csm3_pac_default_fail_'.$tag);
+            $compileBb = BasicBlockHelper::append($context, 'csm3_pac_default_compile_'.$tag);
+            $tailBb = BasicBlockHelper::append($context, 'csm3_pac_default_tail_'.$tag);
             $script = $context->builder->call($parseFn, $runtimeThis, $code, $filename);
-            return $context->builder->call($context->functions[$compileLc], $runtimeThis, $script);
+            $scriptNull = $context->builder->icmp(Builder::INT_EQ, $script, $objPtr->constNull());
+            $context->builder->branchIf($scriptNull, $failBb, $compileBb);
+
+            $context->builder->positionAtEnd($failBb);
+            $context->builder->branch($tailBb);
+
+            $context->builder->positionAtEnd($compileBb);
+            $block = $context->builder->call($context->functions[$compileLc], $runtimeThis, $script);
+            $context->builder->branch($tailBb);
+
+            $context->builder->positionAtEnd($tailBb);
+            $phi = $context->builder->phi($objPtr);
+            $phi->addIncoming($objPtr->constNull(), $failBb);
+            $phi->addIncoming($block, $compileBb);
+
+            return $phi;
         }
 
         return $objPtr->constNull();
