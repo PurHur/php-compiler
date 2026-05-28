@@ -19,4 +19,5 @@ allow:\runtime::parseandcompile
 allow:\runtime::parseandcompileemitsmoke
 allow:\runtime::standalone
 allow:slotindexforvariablename
+allow:slotforoperand
 deny:\bootstrapaot\helloworld_compile_smoke

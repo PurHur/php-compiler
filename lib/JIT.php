@@ -468,6 +468,9 @@ class JIT {
         if (str_ends_with($lower, 'slotindexforvariablename')) {
             return true;
         }
+        if (str_ends_with($lower, 'slotforoperand')) {
+            return true;
+        }
         if ($this->shouldUseM5DriverHostCompile()) {
             if ('run' === $lower || str_ends_with($lower, '\\php_compiler_cli_dispatch')
                 || str_ends_with($lower, '\\php_compiler_cli_should_run_entry_driver')
@@ -503,14 +506,15 @@ class JIT {
         return false;
     }
 
-    /** Block helpers real-lowered on M3 compile-driver spine (#2848). */
+    /** Block helpers real-lowered on M3 compile-driver spine (#2848, JIT VarFetch path). */
     private function isM3CompileDriverBlockPhpLoweringName(string $lower): bool
     {
         if (!$this->shouldUseM3CompileDriverRealLowering()) {
             return false;
         }
 
-        return str_ends_with($lower, '\\block::slotindexforvariablename');
+        return str_ends_with($lower, '\\block::slotindexforvariablename')
+            || str_ends_with($lower, '\\block::slotforoperand');
     }
 
     /**
