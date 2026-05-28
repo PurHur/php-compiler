@@ -380,12 +380,24 @@ final class BootstrapCompileSmokeM3Emit
         Value $code,
         Value $filename
     ): Value {
-        unset($runtimeThis, $code, $filename);
+        $objPtr = $context->getTypeFromString('__object__*');
+        $parseLc = strtolower('PHPCompiler\\Runtime::parse');
+        if (!isset($context->functions[$parseLc])) {
+            return $objPtr->constNull();
+        }
+        $parseFn = $context->functions[$parseLc];
+        // Inventory argv driver lowers parse + compileEmitSmoke on the link spine (#3004).
+        // Call them directly — not Runtime::parseandcompile (same native wrapper → recursion).
+        foreach (['compileemitsmoke', 'compile'] as $compileMethod) {
+            $compileLc = strtolower('PHPCompiler\\Runtime::'.$compileMethod);
+            if (!isset($context->functions[$compileLc])) {
+                continue;
+            }
+            $script = $context->builder->call($parseFn, $runtimeThis, $code, $filename);
+            return $context->builder->call($context->functions[$compileLc], $runtimeThis, $script);
+        }
 
-        // Inventory-scale parseAndCompile lowering is not always available in emit-helper builds.
-        // If we try to call Runtime::parseandcompile here and it resolves to the same wrapper,
-        // we can recurse and segfault. Returning null cleanly signals "compile failed" to callers.
-        return $context->getTypeFromString('__object__*')->constNull();
+        return $objPtr->constNull();
     }
 
     /** Register native LLVM for Runtime::parseandcompile / parseandcompileemitsmoke (#2516). */
