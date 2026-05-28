@@ -144,7 +144,7 @@ php script/bootstrap-vendor-objects.php --check    # validates committed bundles
 php script/bootstrap-vendor-objects.php --compile  # reuses committed .o when vendor/ absent
 ```
 
-Rebuild of vendor `.o` requires literal `vendor/{package}` sources on disk (bundle `require_once` paths); use Zend or a gen-0 native driver under `build/` ([#2842](https://github.com/PurHur/php-compiler/issues/2842), [#2849](https://github.com/PurHur/php-compiler/issues/2849)). With `vendor/` absent, `--compile` reuses committed `prelinked/bootstrap-vendor/*.o` ([#2841](https://github.com/PurHur/php-compiler/issues/2841)).
+Rebuild of vendor `.o` uses literal `vendor/{package}` sources (bundle `require_once` paths) via Zend or a gen-0 native driver under `build/` ([#2842](https://github.com/PurHur/php-compiler/issues/2842), [#2849](https://github.com/PurHur/php-compiler/issues/2849)). With `vendor/` absent, `--compile` reuses committed `prelinked/bootstrap-vendor/*.o` when present ([#2841](https://github.com/PurHur/php-compiler/issues/2841)); missing `.o` rebuild from `prelinked/bootstrap-vendor/sources/` + symlinked `vendor/ircmaxell/*` (no autoload — [#2881](https://github.com/PurHur/php-compiler/issues/2881)).
 
 Presenter: `make north-star5-verify` / `./script/north-star5-verify.sh` ([#1416](https://github.com/PurHur/php-compiler/issues/1416)).
 
