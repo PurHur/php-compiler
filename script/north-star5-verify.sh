@@ -169,6 +169,35 @@ if [[ "${vendor_code}" -ne 0 && "${STRICT_M5}" -eq 1 ]]; then
 fi
 echo "north-star5-verify: step 5 ok (partial allowed)"
 
+echo
+echo "=== north-star5-verify step 5b: vendor cold boot (--compile, vendor/ absent) ==="
+if [[ -d "${_CI_REPO_ROOT}/vendor" ]]; then
+  vendor_bak="${_CI_REPO_ROOT}/.north-star5-vendor.bak"
+  rm -rf "${vendor_bak}"
+  mv "${_CI_REPO_ROOT}/vendor" "${vendor_bak}"
+  set +e
+  "${PHP_BIN}" "${PHP_OPTS[@]}" "${_CI_REPO_ROOT}/script/bootstrap-vendor-objects.php" --compile
+  cold_code=$?
+  set -e
+  mv "${vendor_bak}" "${_CI_REPO_ROOT}/vendor"
+  if [[ "${cold_code}" -ne 0 ]]; then
+    echo "north-star5-verify: step 5b FAILED (cold boot vendor prelink — #2865)" >&2
+    ns5_hint 5 >&2
+    exit 1
+  fi
+  echo "north-star5-verify: step 5b ok (3/3 committed .o, no vendor/)"
+else
+  set +e
+  "${PHP_BIN}" "${PHP_OPTS[@]}" "${_CI_REPO_ROOT}/script/bootstrap-vendor-objects.php" --compile
+  cold_code=$?
+  set -e
+  if [[ "${cold_code}" -ne 0 ]]; then
+    echo "north-star5-verify: step 5b FAILED (vendor/ already absent)" >&2
+    exit 1
+  fi
+  echo "north-star5-verify: step 5b ok (vendor/ absent)"
+fi
+
 if [[ "${RUN_NS4}" -eq 1 ]]; then
   echo
   echo "=== north-star5-verify step 6: north-star4 dry-run (--with-ns4) ==="
