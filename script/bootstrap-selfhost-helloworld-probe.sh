@@ -152,7 +152,9 @@ if [[ "${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
   fi
   set +e
   echo "bootstrap-selfhost-helloworld-probe: linking native emit helper (${m3_link_mode})..."
-  "${m3_link_env[@]}" php "${ROOT}/bin/compile.php" -o "${EMIT_HELPER}" "${m3_emit_source}" >/dev/null 2>&1
+  m3_link_out="$(
+    "${m3_link_env[@]}" php "${ROOT}/bin/compile.php" -o "${EMIT_HELPER}" "${m3_emit_source}" 2>&1
+  )"
   m3_link_code=$?
   set -e
   if [[ -x "${EMIT_HELPER}" ]]; then
@@ -189,6 +191,7 @@ if [[ "${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
   else
     M3_BLOCK_REASON="emit helper link failed ($(m3_exit_label "${m3_link_code}"), mode=${m3_link_mode})"
     echo "bootstrap-selfhost-helloworld-probe: ${M3_BLOCK_REASON}" >&2
+    printf '%s\n' "${m3_link_out}" >&2
   fi
 fi
 

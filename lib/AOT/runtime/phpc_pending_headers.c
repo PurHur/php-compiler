@@ -17,6 +17,8 @@ extern __string__ *__string__init(long long size, const char *value);
 extern int __phpc_http_response_status;
 extern int __phpc_http_response_status_explicit;
 
+void __phpc_pending_header_add(__string__ *line, int replace);
+
 static __string__ *cstr_to_string(const char *cstr)
 {
     size_t len = strlen(cstr);

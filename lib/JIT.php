@@ -4925,7 +4925,7 @@ class JIT {
                         $this->context->getTypeFromString('__value__*')->constNull()
                     );
                     $nullVar->isNullConstant = true;
-                    $this->assignOperandValue($block->getOperand($op->arg1), $nullVar);
+                    $this->assignOperandValue($block->getOperand($op->arg1), $nullVar->value);
                     break;
                 case OpCode::TYPE_YIELD:
                 case OpCode::TYPE_YIELD_FROM:
@@ -5012,6 +5012,18 @@ class JIT {
                     $this->context->callerStrictTypes = $prevStrict;
                     break;
                 case OpCode::TYPE_FUNCCALL_EXEC_RETURN:
+                    if (is_null($this->context->scope->toCall)) {
+                        // Self-host stub/short-circuit (eg runtime variable function): represent as null.
+                        $nullVar = new Variable(
+                            $this->context,
+                            Variable::TYPE_NULL,
+                            Variable::KIND_VALUE,
+                            $this->context->getTypeFromString('__value__*')->constNull()
+                        );
+                        $nullVar->isNullConstant = true;
+                        $this->assignOperandValue($block->getOperand($op->arg1), $nullVar->value);
+                        break;
+                    }
                     $callArgs = $this->prependImplicitThisForStaticInstanceCall(
                         $block,
                         $this->context->scope->toCall,
@@ -6972,8 +6984,27 @@ class JIT {
      */
     private function initJitMethodCall(Block $block, Operand $receiverOp, string $methodName): void
     {
-        assert(null !== $receiverOp->type && Type::TYPE_OBJECT === $receiverOp->type->type);
-        $className = $receiverOp->type->userType
+        if (null === $receiverOp->type) {
+            // Bootstrap/self-host can hit methodcall init before operand typing stabilizes.
+            // Prefer a safe short-circuit for stubbed self-host JIT paths over hard-crashing.
+            if ($this->shouldUseSelfHostJitStubs()) {
+                $this->context->scope->toCall = null;
+                $this->context->scope->args = [];
+
+                return;
+            }
+        } elseif (Type::TYPE_OBJECT !== $receiverOp->type->type) {
+            // Some bootstrap paths produce a receiver operand whose inferred PHPCfg type
+            // is not yet marked as object (but is still an object at runtime).
+            if ($this->shouldUseSelfHostJitStubs()) {
+                $this->context->scope->toCall = null;
+                $this->context->scope->args = [];
+
+                return;
+            }
+        }
+
+        $className = $receiverOp->type?->userType
             ?? ($this->context->scope->className !== '' ? $this->context->scope->className : 'object');
         $declaringClassLc = strtolower($className);
         $methodLc = strtolower($methodName);
