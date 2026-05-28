@@ -63,6 +63,9 @@ if [[ "${BOOTSTRAP_M3_HELLOWORLD_STRICT:-0}" == "1" ]]; then
   export BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1
   export BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING=1
   export BOOTSTRAP_M3_RUNTIME_COMPILE="${BOOTSTRAP_M3_RUNTIME_COMPILE:-1}"
+  # Prefer the inventory compile driver when available: it avoids the heavier
+  # "emit helper TU" path and makes strict HelloWorld more reliable under memory caps.
+  USE_INVENTORY_EMIT_DRIVER="${BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER:-1}"
 fi
 
 m3_exit_label() {
@@ -108,8 +111,12 @@ export PHP_COMPILER_SELFHOST_AOT=1
 export PHP_COMPILER_JIT_PROGRESS_FILE="${ROOT}/build/.last-jit-func-helloworld-probe"
 rm -f "${PROBE}" "${EMIT_HELPER}" "${COMPILE_DRIVER_BIN}" "${AOT_OUT}" "${PHP_COMPILER_JIT_PROGRESS_FILE}"
 
-if [[ "${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-0}" == "1" && -f "${COMPILE_ENTRY}" ]]; then
+# Optional (opt-in) diagnostic: also link a native "compile driver" binary.
+# This is not required for the M3 HelloWorld acceptance; keep it off by default
+# to avoid long/oomy LLVM AOT links in constrained environments.
+if [[ "${BOOTSTRAP_M3_BUILD_COMPILE_DRIVER_BIN:-0}" == "1" && "${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-0}" == "1" && -f "${COMPILE_ENTRY}" ]]; then
   set +e
+  echo "bootstrap-selfhost-helloworld-probe: linking helloworld compile driver binary..."
   env PHP_COMPILER_SELFHOST_AOT=1 \
     PHP_COMPILER_M3_COMPILE_DRIVER=1 \
     PHP_COMPILER_EMIT_HELPER_LINK=1 \
@@ -143,6 +150,7 @@ if [[ "${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
     m3_link_mode="selfhost stubs (no PHP_COMPILER_M3_COMPILE_DRIVER)"
   fi
   set +e
+  echo "bootstrap-selfhost-helloworld-probe: linking native emit helper (${m3_link_mode})..."
   "${m3_link_env[@]}" php "${ROOT}/bin/compile.php" -o "${EMIT_HELPER}" "${m3_emit_source}" >/dev/null 2>&1
   m3_link_code=$?
   set -e
