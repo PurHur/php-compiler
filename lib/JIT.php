@@ -182,6 +182,8 @@ class JIT {
             $this->context->scopeStack = [];
             $this->context->inlineIncludeReturnOperands = [];
             $this->context->coalesceAssignTargets = new \SplObjectStorage();
+            // Each queued CFG function gets a fresh try/catch stack — dispatch BBs are per-LLVM-function (#3012).
+            $this->context->tryCatch = new JIT\TryCatchState();
             $this->compileBlockInternal($run[0], $run[1], null, null, ...$run[2]);
         }
     }
