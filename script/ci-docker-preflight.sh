@@ -38,7 +38,11 @@ ci_docker_acquire_single_ci_lock() {
   local did_retry="${_CI_DOCKER_LOCK_STALE_RETRY:-0}"
 
   _ci_docker_lock_fd=200
-  exec 200>"$lockfile"
+  # IMPORTANT: do not truncate the lockfile before we acquire the flock.
+  # Using `> lockfile` clears it even when another process is holding the lock,
+  # leaving an empty file that can persist and confuse subsequent runs (#2975).
+  touch "$lockfile"
+  exec 200<>"$lockfile"
   if flock -n 200; then
     printf '%s %s\n' "$$" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >"$lockfile"
     # Best-effort hygiene: ensure an interrupted wrapper does not leave a confusing lock file behind.
