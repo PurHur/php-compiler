@@ -71,7 +71,7 @@ function helloworld_compile_smoke(string $sourceFile, string $outFile): int
         return 1;
     }
 
-    $runtime->standalone($block, $outFile);
+    $runtime->standalone($block, $outFile, $code, $resolved);
 
     echo 'helloworld_compile_smoke: compile OK -> '.$outFile."\n";
 

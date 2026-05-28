@@ -165,7 +165,12 @@ function run(string $filename, string $code, array $options): void
                 return \PHPCompiler\AOT\LinkerProcessPolyfill::run($command, $env);
             }
         }
-        $runtime->standalone($block, $options['-o']);
+        try {
+            $runtime->standalone($block, $options['-o'], $code, $filename);
+        } catch (\LogicException $e) {
+            fwrite(STDERR, $e->getMessage()."\n");
+            exit(2);
+        }
     }
 }
 

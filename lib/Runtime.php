@@ -321,14 +321,49 @@ class Runtime {
         $this->loadJitContext()->compileInPlace();
     }
 
-    public function standalone(?Block $block, string $outfile) {
+    public function standalone(?Block $block, string $outfile, ?string $sourceCode = null, ?string $sourceFilename = null) {
         \PHPCompiler\JIT\Progress::noteFunction('runtime_standalone_begin');
         $context = $this->loadJitContext();
         \PHPCompiler\JIT\Progress::noteFunction('runtime_standalone_loadjitcontext_done');
+        if (null !== $block && self::blockContainsGeneratorOpcodes($block)) {
+            // AOT lowering for generator suspension is not implemented yet; VM-only + jit.php fallback exist (#167).
+            throw new \LogicException('Generators (yield) are not supported in AOT yet (issue #167).');
+        }
         $context->setMain($this->loadJit()->compile($block));
         \PHPCompiler\JIT\Progress::noteFunction('runtime_standalone_compile_done');
         $context->compileToFile($outfile);
         \PHPCompiler\JIT\Progress::noteFunction('runtime_standalone_compiletofile_done');
+    }
+
+    private static function blockContainsGeneratorOpcodes(Block $block): bool
+    {
+        $seen = new \SplObjectStorage();
+        $stack = [$block];
+        while ([] !== $stack) {
+            $b = array_pop($stack);
+            if (!$b instanceof Block) {
+                continue;
+            }
+            if ($seen->contains($b)) {
+                continue;
+            }
+            $seen->attach($b);
+            foreach ($b->opCodes as $op) {
+                if (
+                    OpCode::TYPE_YIELD === $op->type
+                    || OpCode::TYPE_YIELD_FROM === $op->type
+                ) {
+                    return true;
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof Block) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+
+        return false;
     }
 
     public function parseAndCompile(string $code, string $filename): ?Block {
