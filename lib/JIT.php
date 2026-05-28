@@ -2929,6 +2929,12 @@ class JIT {
                 \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILE_SMOKE_SIDECAR_REL,
                 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compileSmokeSentinelBlock'
             );
+            // M2 lib spine smoke via inventory argv driver (#2967): same sidecar as compile_smoke_m3_emit branch.
+            $this->registerM3EmitTuSidecarFromPath(
+                __DIR__.'/../test/selfhost/compiler_lib_spine_smoke/main.php',
+                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_LIB_SIDECAR_REL,
+                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerLibSentinelBlock'
+            );
             // Gen-3 argv driver (full revision) must be able to emit non-smoke fixtures (eg compiler unit probe)
             // without falling back to compile_smoke_m3_emit helpers (#2900, #2925).
             $this->registerM3EmitTuSidecarFromPath(
