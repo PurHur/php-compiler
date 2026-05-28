@@ -27,6 +27,8 @@ unset PHP_COMPILER_EMIT_HELPER_LINK PHP_COMPILER_M3_EMIT_TU
 
 if [[ "${BOOTSTRAP_M5_DRIVER_HOST_FULL_CLI:-0}" == "1" ]]; then
   export PHP_COMPILER_M5_DRIVER_HOST=1
+  export PHP_COMPILER_M4_BIN_COMPILE_DRIVER=1
+  export PHP_COMPILER_M3_EMIT_LOG_PREFIX=helloworld_compile_smoke
   export PHP_COMPILER_CLI_COMPILED=1
   export PHP_COMPILER_CLI_SKIP_VENDOR=1
   echo "bootstrap-selfhost-driver-host-compile: attempting full cli bundle (BOOTSTRAP_M5_DRIVER_HOST_FULL_CLI=1)" >&2

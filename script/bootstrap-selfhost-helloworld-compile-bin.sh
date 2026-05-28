@@ -34,7 +34,7 @@ fi
 if [[ "${SOURCE_NORM}" == "${ROOT}/bin/compile.php" ]]; then
   EMIT_ENTRY="${ROOT}/test/bootstrap-aot/compile_smoke_m3_emit_native_entry.php"
   EMIT_HELPER="${ROOT}/build/selfhost-native-compile-driver"
-  rm -f "${EMIT_HELPER}" "${AOT_OUT}" "${ROOT}/build/.last-jit-func-native-compile-driver"
+  rm -f "${EMIT_HELPER}" "${AOT_OUT}" "${ROOT}/build/.last-jit-func-native-compile-driver" "${ROOT}/build/.m3_bin_compile_aot_blob"
   export PHP_COMPILER_JIT_PROGRESS_FILE="${ROOT}/build/.last-jit-func-native-compile-driver"
   if ! env PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_M3_COMPILE_DRIVER=1 PHP_COMPILER_EMIT_HELPER_LINK=1 \
     php "${ROOT}/bin/compile.php" -o "${AOT_OUT}" "${EMIT_ENTRY}" 2>&1; then
