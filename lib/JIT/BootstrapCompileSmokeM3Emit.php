@@ -429,6 +429,74 @@ final class BootstrapCompileSmokeM3Emit
         return $objPtr->constNull();
     }
 
+    /**
+     * Runtime::parseandcompile* via parse → compileEmitSmoke (no self-recursive bridge; #2967).
+     *
+     * @param 'parseandcompile'|'parseandcompileemitsmoke' $targetLc
+     */
+    public static function declareRuntimeParseAndCompileViaParseEmitSmoke(
+        Context $context,
+        string $internalName,
+        string $logicalName,
+        string $targetLc
+    ): Value {
+        $lc = strtolower($logicalName);
+        if (isset($context->functions[$lc])) {
+            return $context->functions[$lc];
+        }
+        $objPtr = $context->getTypeFromString('__object__*');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $func = $context->module->addFunction(
+            $internalName,
+            $context->context->functionType($objPtr, false, $objPtr, $strPtr, $strPtr)
+        );
+        $bb = $func->appendBasicBlock('entry');
+        $saved = $context->builder;
+        $context->builder = $context->context->builderCreate();
+        $context->builder->positionAtEnd($bb);
+        $runtime = $func->getParam(0);
+        $code = $func->getParam(1);
+        $filename = $func->getParam(2);
+        $script = $context->builder->call(
+            self::runtimeSpine($context, 'parse', '__object__*', ['__object__*', '__string__*', '__string__*']),
+            $runtime,
+            $code,
+            $filename
+        );
+        $block = $context->builder->call(
+            self::runtimeSpine($context, 'compileemitsmoke', '__object__*', ['__object__*', '__object__*']),
+            $runtime,
+            $script
+        );
+        $context->builder->returnValue($block);
+        $context->builder->clearInsertionPosition();
+        $context->builder = $saved;
+        $context->functions[$lc] = $func;
+        $context->functionReturnType[$lc] = '__object__*';
+        $context->functionProxies[$lc] = new Call\Native(
+            $func,
+            $logicalName,
+            [$objPtr, $strPtr, $strPtr],
+            []
+        );
+
+        return $func;
+    }
+
+    /** @deprecated use declareRuntimeParseAndCompileViaParseEmitSmoke */
+    public static function declareRuntimeParseAndCompileForward(
+        Context $context,
+        string $internalName,
+        string $logicalName
+    ): Value {
+        return self::declareRuntimeParseAndCompileViaParseEmitSmoke(
+            $context,
+            $internalName,
+            $logicalName,
+            'parseandcompile'
+        );
+    }
+
     /** Register native LLVM for Runtime::parseandcompile / parseandcompileemitsmoke (#2516). */
     public static function declareRuntimeParseAndCompileNative(
         Context $context,

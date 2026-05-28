@@ -89,6 +89,7 @@ require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Stat
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/StaticPropertyFetch.php';
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/UnaryMinus.php';
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/UnaryPlus.php';
+require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/YieldFrom.php';
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Yield_.php';
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Iterator/Key.php';
 require_once __DIR__.'/../../../vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Iterator/Next.php';
