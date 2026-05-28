@@ -12,17 +12,25 @@ GEN1_LINK="${ROOT}/script/bootstrap-loop-gen1-link.sh"
 FULL_SPINE_EMIT="${ROOT}/script/bootstrap-loop-gen1-full-spine-emit.sh"
 GEN2_RECOMPILE="${ROOT}/script/bootstrap-loop-gen2-recompile-spine.sh"
 DRY_RUN=0
+SPINE_RATIO="725/725"
+
+m4_spine_ratio_label() {
+  local json spine
+  json="$(php "${ROOT}/script/bootstrap-spine-count.php" --json 2>/dev/null)" || json='{"spine":725}'
+  spine="$(php -r '$j=json_decode($argv[1],true); echo (int)($j["spine"]??725);' "${json}")"
+  echo "${spine}/${spine}"
+}
 
 usage() {
-  cat <<'EOF'
+  cat <<EOF
 Usage: script/bootstrap-loop-probe.sh [--dry-run]
 
 M4 bootstrap-loop probe (#1498). Runs M0 link + M2 spine + M3 HelloWorld with the same strict env as
-`make bootstrap-selfhost-helloworld` (#2612), then gen-1 link / gen-2 attempt, then gen-2→gen-3 spine recompile.
+\`make bootstrap-selfhost-helloworld\` (#2612), then gen-1 link / gen-2 attempt, then gen-2→gen-3 spine recompile.
 
 Exit codes:
   0  --dry-run: lint + M0 link + M2 spine + M3 HelloWorld strict + gen-1 link (gen-2 Zend partial OK)
-     full:      same + gen-1→gen-2 native + gen-2→gen-3 spine (717/717)
+     full:      same + gen-1→gen-2 native + gen-2→gen-3 spine (${SPINE_RATIO})
   1  hard failure (missing entry/scripts, lint, M0 link, M2 spine, M3 HelloWorld, or gen-1 link)
   2  LLVM 9 not found (skip), or full mode: gen-2 native emit or gen-3 spine recompile blocked
   3  reserved
@@ -57,6 +65,7 @@ source "$(dirname "$0")/selfhost-preflight.sh"
 ci_apply_llvm_memory_env
 
 selfhost_preflight bootstrap-loop-probe php-or-docker
+SPINE_RATIO="$(m4_spine_ratio_label)"
 
 m4_probe_tail() {
   local file=$1
@@ -245,7 +254,7 @@ if grep -q 'emit_path=native' "${GEN1_LOG}" 2>/dev/null; then
     fi
   fi
   echo ""
-  if ! m4_run_subprobe "M4 gen-2→gen-3 spine recompile (717/717, #2697)" bash "${GEN2_RECOMPILE}"; then
+  if ! m4_run_subprobe "M4 gen-2→gen-3 spine recompile (${SPINE_RATIO}, #2697)" bash "${GEN2_RECOMPILE}"; then
     echo "bootstrap-loop-probe: M4 gen-2→gen-3 spine recompile blocked (exit 2)" >&2
     exit 2
   fi

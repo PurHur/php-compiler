@@ -242,7 +242,8 @@ if [[ "${GEN1_OK}" -eq 1 && "${DRY_RUN_ONLY}" -eq 0 && "${M3_STRICT_OK}" -eq 1 &
   echo
   echo "=== north-star4-verify step 6: M4 gen-2→gen-3 spine recompile ==="
   if "${_CI_SCRIPT_DIR}/bootstrap-loop-gen2-recompile-spine.sh"; then
-    echo "north-star4-verify: step 6 ok (gen-3 spine 717/717)"
+    spine_ratio="$("${PHP_BIN}" "${PHP_OPTS[@]}" "${_CI_SCRIPT_DIR}/bootstrap-spine-count.php" --json 2>/dev/null | "${PHP_BIN}" -r '$j=json_decode(stream_get_contents(STDIN),true); $s=(int)($j["spine"]??725); echo $s."/".$s;' || echo "725/725")"
+    echo "north-star4-verify: step 6 ok (gen-3 spine ${spine_ratio})"
   else
     gen3_code=$?
     if [[ "${STRICT_M4}" -eq 1 ]]; then
