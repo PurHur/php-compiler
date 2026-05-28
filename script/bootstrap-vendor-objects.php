@@ -9,6 +9,8 @@ declare(strict_types=1);
  * Usage:
  *   php script/bootstrap-vendor-objects.php              # generate bundles + manifest
  *   php script/bootstrap-vendor-objects.php --compile    # AOT via gen-0 driver resolver (needs LLVM 9; #2849)
+ *     - Cold boot (vendor/ absent): requires a compiled driver under build/ by default (no Zend in loop; #2901).
+ *       Opt-out (NOT M5): BOOTSTRAP_M5_VENDOR_ALLOW_ZEND=1
  *   php script/bootstrap-vendor-objects.php --check        # manifest + bundles fresh
  */
 
