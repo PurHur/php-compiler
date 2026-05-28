@@ -294,9 +294,13 @@ bootstrap-selfhost-compile-smoke-run:
 bootstrap-selfhost-runtime-compile-smoke:
 	./script/bootstrap-selfhost-runtime-compile-smoke.sh
 bootstrap-selfhost-compile-smoke-strict:
-	BOOTSTRAP_M3_COMPILE_SMOKE_STRICT=1 ./script/bootstrap-selfhost-compile-smoke-probe.sh
+	BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER=1 \
+	BOOTSTRAP_M3_COMPILE_SMOKE_STRICT=1 \
+	./script/bootstrap-selfhost-compile-smoke-probe.sh
 bootstrap-selfhost-runtime-compile-smoke-strict:
-	BOOTSTRAP_M3_RUNTIME_COMPILE_SMOKE_STRICT=1 ./script/bootstrap-selfhost-runtime-compile-smoke.sh
+	BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER=1 \
+	BOOTSTRAP_M3_RUNTIME_COMPILE_SMOKE_STRICT=1 \
+	./script/bootstrap-selfhost-runtime-compile-smoke.sh
 bootstrap-m3-emit-tu-execute:
 	./script/bootstrap-m3-emit-tu-execute.sh
 bootstrap-selfhost-compiler-driver-smoke:
@@ -309,6 +313,7 @@ bootstrap-selfhost-compiler-unit-probe-strict:
 	BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1 \
 	BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING=1 \
 	BOOTSTRAP_M3_RUNTIME_COMPILE=1 \
+	BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER=1 \
 	BOOTSTRAP_M3_COMPILER_UNIT_PROBE_STRICT=1 \
 	./script/bootstrap-selfhost-compiler-unit-probe.sh
 bootstrap-selfhost-jit-unit-probe:
