@@ -88,6 +88,16 @@ final class BootstrapSelfhostDriverSmokeTest extends TestCase
         $this->assertStringNotContainsString('unset($runtimeThis, $code, $filename)', $emit);
     }
 
+    /** Issue #3011: M4 argv gen-3 must register parseAndCompile decls without inventory env. */
+    public function testM4BinCompileArgvParseAndCompileDeclWithoutInventoryEnv(): void
+    {
+        $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
+        $this->assertStringContainsString(
+            '&& !$this->shouldUseM4BinCompileArgvMainNative()',
+            $jit
+        );
+    }
+
     /** Issue #3011: gen-2 helloworld driver must not stub-link bin/compile.php via sidecar shortcut. */
     public function testHelloworldBinCompileArgvUsesInventoryLinkNotStubSidecar(): void
     {

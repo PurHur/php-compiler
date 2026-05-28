@@ -2817,7 +2817,11 @@ class JIT {
         if ([] === $methods) {
             return;
         }
-        if (!$this->shouldUseM3EmitTuNativeBridge() && !$this->shouldUseM3InventoryEmitDriver()) {
+        if (
+            !$this->shouldUseM3EmitTuNativeBridge()
+            && !$this->shouldUseM3InventoryEmitDriver()
+            && !$this->shouldUseM4BinCompileArgvMainNative()
+        ) {
             return;
         }
         $this->context->pushScope();
@@ -3468,7 +3472,11 @@ class JIT {
     /** Register native compileEmitSmoke with Compiler object metadata (#1937). */
     private function compileM3EmitTuCompilerEmitSmokeNativeDecl(): void
     {
-        if (!$this->shouldUseM3EmitTuNativeBridge() && !$this->shouldUseM3InventoryEmitDriver()) {
+        if (
+            !$this->shouldUseM3EmitTuNativeBridge()
+            && !$this->shouldUseM3InventoryEmitDriver()
+            && !$this->shouldUseM4BinCompileArgvMainNative()
+        ) {
             return;
         }
         if ($this->shouldUseM3CompileDriverRealLowering()) {
