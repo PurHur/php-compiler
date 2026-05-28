@@ -42,6 +42,15 @@ if [[ "${BOOTSTRAP_COMPILE_DRIVER_MODE}" == "zend" && -d "${ROOT}/vendor" ]]; th
 fi
 
 mkdir -p "${ROOT}/build"
+
+if [[ "${BOOTSTRAP_GEN0_ENSURE_COMPILED_DRIVER:-0}" == "1" && ! -x "${ROOT}/build/bin-compile-aot" ]]; then
+  echo "bootstrap-selfhost-link: building gen-0 driver (BOOTSTRAP_GEN0_ENSURE_COMPILED_DRIVER=1, #2894)" >&2
+  if ! BOOTSTRAP_M5_DRIVER_SMOKE=1 "${ROOT}/script/bootstrap-selfhost-driver-smoke.sh" >/dev/null; then
+    echo "bootstrap-selfhost-link: bootstrap-selfhost-driver-smoke failed (#2894)" >&2
+    exit 1
+  fi
+fi
+
 export PHP_COMPILER_SELFHOST_AOT=1
 export PHP_COMPILER_JIT_PROGRESS_FILE="${ROOT}/build/.last-jit-func"
 rm -f "${OUT}" "${PHP_COMPILER_JIT_PROGRESS_FILE}"

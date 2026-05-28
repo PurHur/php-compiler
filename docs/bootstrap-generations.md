@@ -31,6 +31,17 @@ This document is the **canonical reference** for generation numbering, artifacts
 | `build/bootstrap-loop-gen2-full-spine` | Gen-2 full spine (725/725) |
 | `build/bootstrap-loop-gen3-full-spine` | Gen-3 full spine (725/725) — **gen-2 output** |
 
+### Gen-0 compile invoker (`bootstrap-resolve-compile-invoke.sh`, #2894)
+
+| Priority | Artifact | When used |
+|----------|----------|-----------|
+| 1 | `build/selfhost-compile-driver` | M5 host-linked `bin/compile.php` (optional) |
+| 2 | `build/bin-compile-aot` | After `make bootstrap-selfhost-driver-smoke` — argv driver + M0 `compiler_minimal` sidecar |
+| 3 | `build/selfhost-native-compile-driver` | Emit-helper alias (same bytes as `bin-compile-aot`; last resort) |
+| — | Zend `php bin/compile.php` | Empty `build/` or all native drivers failed; `BOOTSTRAP_GEN0_ZEND_ONLY=1` forces Zend |
+
+`make bootstrap-selfhost-link-compiled` runs driver-smoke once if `build/bin-compile-aot` is missing (`BOOTSTRAP_GEN0_ENSURE_COMPILED_DRIVER=1`). Resolver tries **each** native candidate before Zend fallback.
+
 ---
 
 ## Presenter commands (copy-paste)

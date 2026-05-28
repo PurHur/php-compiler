@@ -28,6 +28,7 @@ final class BootstrapSelfhostLinkTest extends TestCase
         $link = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-link.sh');
         $this->assertStringContainsString('bootstrap-resolve-compile-invoke.sh', $link);
         $this->assertStringContainsString('bootstrap_compile_invoke', $link);
+        $this->assertStringContainsString('BOOTSTRAP_GEN0_ENSURE_COMPILED_DRIVER', $link);
         $resolver = self::$root.'/script/bootstrap-resolve-compile-invoke.sh';
         $this->assertFileExists($resolver);
         $body = (string) file_get_contents($resolver);
@@ -35,9 +36,13 @@ final class BootstrapSelfhostLinkTest extends TestCase
         $this->assertStringContainsString('build/bin-compile-aot', $body);
         $driverPos = strpos($body, 'build/selfhost-compile-driver');
         $argvPos = strpos($body, 'build/bin-compile-aot');
+        $nativeAliasPos = strpos($body, 'build/selfhost-native-compile-driver');
         $this->assertNotFalse($driverPos);
         $this->assertNotFalse($argvPos);
-        $this->assertLessThan($argvPos, $driverPos, 'prefer selfhost-compile-driver before bin-compile-aot');
+        $this->assertNotFalse($nativeAliasPos);
+        $this->assertLessThan($driverPos, $argvPos, 'prefer bin-compile-aot before selfhost-compile-driver (#2894)');
+        $this->assertLessThan($nativeAliasPos, $argvPos, 'prefer bin-compile-aot before emit-helper alias (#2894)');
+        $this->assertStringContainsString('failed (exit', $body);
         $this->assertStringContainsString('falling back to Zend gen-0', $body);
     }
 

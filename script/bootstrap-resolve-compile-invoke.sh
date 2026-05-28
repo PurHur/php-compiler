@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Resolve gen-0 AOT link invoker: compiled driver when present, else Zend php bin/compile.php (#2842).
+# Resolve gen-0 AOT link invoker: compiled driver when present, else Zend php bin/compile.php (#2842, #2894).
 #
 # Usage (from another bootstrap script after setting ROOT):
 #   # shellcheck source=bootstrap-resolve-compile-invoke.sh
@@ -82,14 +82,11 @@ bootstrap_compile_invoke() {
   local entry=$2
   shift 2
 
-  if ! bootstrap_resolve_compile_driver; then
-    echo "bootstrap-compile-invoke: no compiled driver under build/ and php missing on PATH (#2842)" >&2
-    echo "bootstrap-compile-invoke: one-time gen-0: ./script/docker-exec.sh -- bash -lc 'make bootstrap-selfhost-driver-smoke'" >&2
-    echo "bootstrap-compile-invoke: or set BOOTSTRAP_GEN0_ZEND_ONLY=1 with host php + vendor/" >&2
-    return 1
-  fi
-
-  if [[ "${BOOTSTRAP_COMPILE_DRIVER_MODE}" == "zend" ]]; then
+  if [[ "${BOOTSTRAP_GEN0_ZEND_ONLY:-0}" == "1" ]]; then
+    if ! bootstrap_resolve_compile_driver; then
+      echo "bootstrap-compile-invoke: no compiled driver under build/ and php missing on PATH (#2842)" >&2
+      return 1
+    fi
     bootstrap_compile_invoke_zend "${out}" "${entry}" "$@"
     return $?
   fi
@@ -128,6 +125,5 @@ bootstrap_compile_invoke() {
   echo "bootstrap-compile-invoke: compiled driver(s) failed — falling back to Zend gen-0 (#2842)" >&2
   BOOTSTRAP_COMPILE_DRIVER_MODE=zend
   BOOTSTRAP_COMPILE_DRIVER="${ROOT}/bin/compile.php"
-  rm -f "${out}"
   bootstrap_compile_invoke_zend "${out}" "${entry}" "$@"
 }
