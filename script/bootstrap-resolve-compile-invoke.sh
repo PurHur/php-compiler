@@ -83,6 +83,20 @@ bootstrap_compile_invoke() {
   local entry=$2
   shift 2
 
+  # Best-effort crash breadcrumbs for compiled drivers (AOT segfaults) (#2969).
+  # These are intentionally written from bash before invoking the native driver,
+  # since a hard segfault can happen before PHP-level progress logging runs.
+  if [[ -z "${PHP_COMPILER_JIT_PROGRESS_FILE:-}" ]]; then
+    export PHP_COMPILER_JIT_PROGRESS_FILE="${ROOT}/build/.last-jit-func"
+  fi
+  if [[ -z "${PHP_COMPILER_JIT_PHASE_FILE:-}" ]]; then
+    export PHP_COMPILER_JIT_PHASE_FILE="${ROOT}/build/.last-jit-phase"
+  fi
+  if [[ -z "${PHP_COMPILER_JIT_ENTRY_FILE:-}" ]]; then
+    export PHP_COMPILER_JIT_ENTRY_FILE="${ROOT}/build/.last-jit-entry"
+  fi
+  printf '%s' "${entry}" > "${PHP_COMPILER_JIT_ENTRY_FILE}" 2>/dev/null || true
+
   local no_zend_fallback=0
   if [[ "${BOOTSTRAP_NO_ZEND_FALLBACK:-0}" == "1" ]]; then
     no_zend_fallback=1
@@ -108,6 +122,7 @@ bootstrap_compile_invoke() {
     fi
     attempted_native=1
     BOOTSTRAP_COMPILE_DRIVER="${native_candidate}"
+    printf '%s' "compile_invoke:${BOOTSTRAP_COMPILE_DRIVER}" > "${PHP_COMPILER_JIT_PHASE_FILE}" 2>/dev/null || true
     echo "bootstrap-compile-invoke: ${BOOTSTRAP_COMPILE_DRIVER} -o ${out} ${entry} (#2842)" >&2
     rm -f "${out}"
     set +e
