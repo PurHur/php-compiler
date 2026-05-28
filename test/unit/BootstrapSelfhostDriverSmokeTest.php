@@ -87,4 +87,17 @@ final class BootstrapSelfhostDriverSmokeTest extends TestCase
         $this->assertStringContainsString("strtolower('PHPCompiler\\\\Runtime::parse')", $emit);
         $this->assertStringNotContainsString('unset($runtimeThis, $code, $filename)', $emit);
     }
+
+    /** Issue #3012: inventory argv driver (helloworld prefix) must register spine smoke sidecar. */
+    public function testHelloworldEmitPrefixRegistersCompilerLibSpineSidecar(): void
+    {
+        $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
+        $needle = "'helloworld_compile_smoke' === \$logPrefix";
+        $start = strpos($jit, $needle);
+        $this->assertNotFalse($start, 'helloworld_compile_smoke logPrefix branch');
+        $branch = substr($jit, $start, 4000);
+        $this->assertStringContainsString('compiler_lib_spine_smoke/main.php', $branch);
+        $this->assertStringContainsString('COMPILER_LIB_SIDECAR_REL', $branch);
+        $this->assertStringContainsString('compilerLibSentinelBlock', $branch);
+    }
 }
