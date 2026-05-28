@@ -30,15 +30,16 @@ if [[ "${SOURCE}" != /* ]]; then
   SOURCE_NORM="${ROOT}/${SOURCE#./}"
 fi
 
-# M5: native bin/compile.php driver — link emit TU only (helloworld link first breaks argv -o — #1937).
+# M5/M4: native bin/compile.php argv driver — inventory Compiler {main}, not emit-TU (#2900, #2880).
 if [[ "${SOURCE_NORM}" == "${ROOT}/bin/compile.php" ]]; then
-  EMIT_ENTRY="${ROOT}/test/bootstrap-aot/compile_smoke_m3_emit_native_entry.php"
   EMIT_HELPER="${ROOT}/build/selfhost-native-compile-driver"
   rm -f "${EMIT_HELPER}" "${AOT_OUT}" "${ROOT}/build/.last-jit-func-native-compile-driver" "${ROOT}/build/.m3_bin_compile_aot_blob"
   export PHP_COMPILER_JIT_PROGRESS_FILE="${ROOT}/build/.last-jit-func-native-compile-driver"
-  if ! env PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_M3_COMPILE_DRIVER=1 PHP_COMPILER_M4_BIN_COMPILE_DRIVER=1 \
-    PHP_COMPILER_EMIT_HELPER_LINK=1 \
-    php "${ROOT}/bin/compile.php" -o "${AOT_OUT}" "${EMIT_ENTRY}" 2>&1; then
+  if ! env PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_M3_COMPILE_DRIVER=1 PHP_COMPILER_M3_COMPILE_DRIVER_MAIN=1 \
+    PHP_COMPILER_M4_BIN_COMPILE_DRIVER=1 PHP_COMPILER_EMIT_HELPER_LINK=1 \
+    PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1 BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER=1 \
+    PHP_COMPILER_M3_EMIT_LOG_PREFIX=helloworld_compile_smoke \
+    php "${ROOT}/bin/compile.php" -o "${AOT_OUT}" "${ROOT}/bin/compile.php" 2>&1; then
     echo "bootstrap-selfhost-helloworld-compile-bin: native compile driver link failed" >&2
     exit 1
   fi
@@ -61,7 +62,7 @@ if [[ "${SOURCE_NORM}" == "${ROOT}/bin/compile.php" ]]; then
   selftest_code=$?
   set -e
   if [[ "${selftest_code}" -ne 0 ]] || [[ ! -x "${SELFTEST_OUT}" ]] \
-    || ! grep -qE 'compile_smoke_m3_emit: compile OK' <<< "${selftest_out}"; then
+    || ! grep -qE 'helloworld_compile_smoke: compile OK|compile_smoke_m3_emit: compile OK' <<< "${selftest_out}"; then
     echo "bootstrap-selfhost-helloworld-compile-bin: argv -o self-test failed (exit ${selftest_code})" >&2
     printf '%s\n' "${selftest_out}" >&2
     exit 1
@@ -70,7 +71,7 @@ if [[ "${SOURCE_NORM}" == "${ROOT}/bin/compile.php" ]]; then
   cp -f "${AOT_OUT}" "${EMIT_HELPER}"
   cp -f "${AOT_OUT}" "${ROOT}/build/.m3_bin_compile_aot_blob"
   chmod +x "${EMIT_HELPER}" "${AOT_OUT}" "${ROOT}/build/.m3_bin_compile_aot_blob"
-  echo "bootstrap-selfhost-helloworld-compile-bin: OK ${AOT_OUT} (M3 emit helper; argv -o OUT SOURCE.php; sidecar #2880)"
+  echo "bootstrap-selfhost-helloworld-compile-bin: OK ${AOT_OUT} (inventory bin/compile.php argv driver; sidecar #2880/#2900)"
   exit 0
 fi
 
