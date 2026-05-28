@@ -2910,6 +2910,13 @@ class JIT {
                 \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILE_SMOKE_SIDECAR_REL,
                 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compileSmokeSentinelBlock'
             );
+            // Gen-3 argv driver (full revision) must be able to emit non-smoke fixtures (eg compiler unit probe)
+            // without falling back to compile_smoke_m3_emit helpers (#2900, #2925).
+            $this->registerM3EmitTuSidecarFromPath(
+                __DIR__.'/../test/selfhost/compiler_unit_probe/compiler_unit_probe_compile.php',
+                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILER_UNIT_PROBE_SIDECAR_REL,
+                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::compilerUnitProbeSentinelBlock'
+            );
             $this->registerM3EmitTuSidecarFromPath(
                 __DIR__.'/../test/selfhost/compiler_helloworld_smoke/compile_driver.php',
                 \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::COMPILE_DRIVER_SIDECAR_REL,
@@ -3053,11 +3060,12 @@ class JIT {
         $repoRoot = dirname(__DIR__);
         $pathNorm = str_replace('\\', '/', $path);
         $hostCompilePath = $path;
-        if (str_ends_with($pathNorm, '/bin/compile.php') && !$this->shouldUseM3InventoryEmitDriver()) {
-            // Match key stays bin/compile.php; host link uses M3 emit TU argv native {main} (#2880).
-            // When the inventory emit driver is enabled (#2843), prefer compiling the real bin/compile.php
-            // so bootstrap products stop depending on compile_smoke_m3_emit helpers (#2900).
-            $hostCompilePath = $repoRoot.'/test/bootstrap-aot/compile_smoke_m3_emit_native_entry.php';
+        if (str_ends_with($pathNorm, '/bin/compile.php')) {
+            // For gen-3 (argv) and other bootstrap products, compiling bin/compile.php must default to the
+            // inventory emit driver (compile_driver.php) instead of the compile_smoke_m3_emit helper (#2925, #2900).
+            // The helper TU is a narrow smoke path and has been observed to LLVM-segfault when used to emit
+            // inventory fixtures like compiler_unit_probe_compile.php.
+            $hostCompilePath = $path;
         }
         // Sidecar-only: avoid host compileEmitSmoke in emit TU LLVM module (#2540).
         // Memoize per-entrypoint+source to prevent runaway sidecar chains (#2908).
@@ -3079,19 +3087,15 @@ class JIT {
         $compileEnv['PHP_COMPILER_M3_EMIT_SIDECAR_DEPTH'] = (string) ($depth + 1);
         $compileEnv['PHP_COMPILER_M3_EMIT_SIDECAR_MAX_DEPTH'] = (string) $maxDepth;
         if (str_ends_with($pathNorm, '/bin/compile.php')) {
-            if ($this->shouldUseM3InventoryEmitDriver() || $this->shouldUseM4BinCompileArgvMainNative()) {
-                $compileEnv['PHP_COMPILER_M3_COMPILE_DRIVER_MAIN'] = '1';
-                $compileEnv['PHP_COMPILER_M4_BIN_COMPILE_DRIVER'] = '1';
-                $compileEnv['PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER'] = '1';
-                $compileEnv['BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER'] = '1';
-                $compileEnv['PHP_COMPILER_EMIT_HELPER_LINK'] = '1';
-                $compileEnv['PHP_COMPILER_M3_EMIT_LOG_PREFIX'] = 'helloworld_compile_smoke';
-                unset($compileEnv['PHP_COMPILER_M3_EMIT_TU']);
-            } elseif (!$this->shouldUseM3InventoryEmitDriver()) {
-                $compileEnv['PHP_COMPILER_EMIT_HELPER_LINK'] = '1';
-                $compileEnv['PHP_COMPILER_M3_EMIT_TU'] = '1';
-                $compileEnv['PHP_COMPILER_M3_EMIT_LOG_PREFIX'] = 'helloworld_compile_smoke';
-            }
+            // Treat host-compiling bin/compile.php as an argv-driver build: enable the inventory emit driver
+            // regardless of outer env defaults so gen-3 products don't depend on compile_smoke_m3_emit (#2925).
+            $compileEnv['PHP_COMPILER_M3_COMPILE_DRIVER_MAIN'] = '1';
+            $compileEnv['PHP_COMPILER_M4_BIN_COMPILE_DRIVER'] = '1';
+            $compileEnv['PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER'] = '1';
+            $compileEnv['BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER'] = '1';
+            $compileEnv['PHP_COMPILER_EMIT_HELPER_LINK'] = '1';
+            $compileEnv['PHP_COMPILER_M3_EMIT_LOG_PREFIX'] = 'helloworld_compile_smoke';
+            unset($compileEnv['PHP_COMPILER_M3_EMIT_TU']);
         }
         if ($sidecarHostStubNonLiteralIncludes) {
             $compileEnv['PHP_COMPILER_M3_SIDECAR_HOST'] = '1';
