@@ -157,6 +157,14 @@ class JIT {
     private function runQueue(): void {
         while (!empty($this->queue)) {
             $run = array_shift($this->queue);
+            JIT\Progress::notePhase('jit_run_queue_item');
+            try {
+                /** @var Block $b */
+                $b = $run[0];
+                JIT\Progress::noteEntry($b->func->getScopedName());
+            } catch (\Throwable $e) {
+                // best-effort only: progress breadcrumbs must not affect codegen
+            }
             $classId = $this->context->scope->classId;
             $className = $this->context->scope->className;
             $calledClassName = $this->context->scope->calledClassName;
