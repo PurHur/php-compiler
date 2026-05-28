@@ -88,6 +88,17 @@ final class BootstrapSelfhostDriverSmokeTest extends TestCase
         $this->assertStringNotContainsString('unset($runtimeThis, $code, $filename)', $emit);
     }
 
+    /** Issue #3011: gen-2 helloworld driver must not stub-link bin/compile.php via sidecar shortcut. */
+    public function testHelloworldBinCompileArgvUsesInventoryLinkNotStubSidecar(): void
+    {
+        $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');
+        $this->assertStringContainsString('shouldUseHelloworldBinCompileInventoryArgvLink', $jit);
+        $this->assertStringContainsString('shouldUseM3InventoryEmitForCompileDriverBlock', $jit);
+        $compileBin = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-helloworld-compile-bin.sh');
+        $this->assertStringContainsString('build/bin-compile-aot', $compileBin);
+        $this->assertStringContainsString('#3011', $compileBin);
+    }
+
     /** Issue #3012: inventory argv driver (helloworld prefix) must register spine smoke sidecar. */
     public function testHelloworldEmitPrefixRegistersCompilerLibSpineSidecar(): void
     {
