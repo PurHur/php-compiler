@@ -685,7 +685,7 @@ final class IncludeHelper
 
     /**
      * Skip argv/cli driver includes when bundling bin/vm.php in compiler_lib_spine_smoke (#2134).
-     * cli_spine_shim.php provides php_compiler_cli_should_skip_entry_driver() at runtime; this
+     * cli_spine_shim.php (src/cli.php) and src/cli_driver.php provide skip-entry helpers at runtime; this
      * avoids compiling vendor/autoload Expr_Closure during self-host AOT link.
      */
     /** Stub dynamic requires while host-compiling M3 emit sidecars (issue #2699). */

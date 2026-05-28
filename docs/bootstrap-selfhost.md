@@ -233,7 +233,7 @@ Extends `compiler_minimal` with remaining vm.php-path `lib/` units that pass bun
 | `lib/JIT/Builtin/Type.php`, `lib/JIT/Builtin/Type/String_.php` | JIT builtin type hierarchy toward full stdlib lowering |
 | `lib/Doctor.php` | compile-time diagnostics helper |
 | `lib/Cli/InvokeCwd.php`, `lib/Cli/PhpcBuild.php`, `lib/Cli/PhpcInit.php`, `lib/Cli/PhpcRun.php` | `phpc` CLI spine toward `bin/compile.php` / `phpc run` |
-| `bin/vm.php` | Real `require_once` in `compiler_lib_spine_smoke` (#2134); cli argv via `cli_spine_shim.php` |
+| `bin/vm.php` | Real `require_once` in `compiler_lib_spine_smoke` (#2134); literal `src/cli_driver.php` + `cli_spine_shim` for `src/cli.php` (#2868) |
 | `lib/Web/CgiAotDriver.php`, `lib/Web/CgiDriver.php`, `lib/Web/ProjectDeploy.php` | CGI / deploy drivers on vm.php path |
 | `ext/standard/JitAddslashes.php`, `JitBase64Encode.php`, `JitBin2hex.php`, `JitChunkSplit.php`, `JitCrc32.php`, `JitExplode.php`, `JitChmod.php`, `JitCopy.php`, `JitDate.php`, `JitImplode.php`, `JitNl2br.php`, `JitPregQuote.php`, `JitQuotemeta.php`, `JitStrRot13.php`, `JitSessionId.php`, `JitSessionName.php`, `ext/standard/Module.php` | stdlib JIT leaf modules toward full inventory |
 
