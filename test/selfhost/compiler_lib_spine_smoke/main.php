@@ -633,6 +633,7 @@ require_once __DIR__.'/../../../ext/types/mb_strlen.php';
 require_once __DIR__.'/../../../ext/types/strlen.php';
 require_once __DIR__.'/../../../src/tokenizer-compat.php';
 require_once __DIR__.'/../../../test/bootstrap-aot/cli_spine_shim.php';
+require_once __DIR__.'/../../../src/cli_driver.php';
 if (!defined('PHP_COMPILER_LIB_SPINE_SMOKE')) {
     define('PHP_COMPILER_LIB_SPINE_SMOKE', true);
 }
