@@ -62,7 +62,7 @@
               </tr>
               <tr>
                 <td><strong>M4</strong> bootstrap loop</td>
-                <td>Full revision rebuild + argv <code>bin/compile.php</code> on compiled driver (gen-2→gen-3 spine <strong>717/717</strong> recompile ✅ via <code>make bootstrap-loop-gen2-recompile-spine</code>)</td>
+                <td>Changed-tree rebuild (gen-3 compiles a different revision); gen-2→gen-3 spine <strong>726/726</strong> recompile ✅ via <code>make bootstrap-loop-gen2-recompile-spine</code>; revision probe can still segfault 139 (<code>make bootstrap-selfhost-full-revision-probe</code>, <a href="https://github.com/PurHur/php-compiler/issues/2967">#2967</a>)</td>
                 <td><a href="https://github.com/PurHur/php-compiler/issues/1498">#1498</a></td>
               </tr>
               <tr>
@@ -150,7 +150,7 @@
 
       <section>
         <h2>M2 spine — shim / native-floor notes</h2>
-        <p>SSOT: <code>script/bootstrap-spine-count.php</code> — <strong>725/725</strong> Phase&nbsp;A files in <code>compiler_lib_spine_smoke</code> native link ([#2868](https://github.com/PurHur/php-compiler/issues/2868), [#2543](https://github.com/PurHur/php-compiler/issues/2543), [#2652](https://github.com/PurHur/php-compiler/issues/2652)). <code>bin/vm.php</code> is in the spine ([#2134](https://github.com/PurHur/php-compiler/issues/2134)); literal <code>src/cli_driver.php</code>; VM driver execute probe passes ([#2201](https://github.com/PurHur/php-compiler/issues/2201)). No ratio-deferred inventory paths.</p>
+        <p>SSOT: <code>script/bootstrap-spine-count.php</code> — <strong>726/726</strong> Phase&nbsp;A files in <code>compiler_lib_spine_smoke</code> native link ([#2868](https://github.com/PurHur/php-compiler/issues/2868), [#2543](https://github.com/PurHur/php-compiler/issues/2543), [#2652](https://github.com/PurHur/php-compiler/issues/2652)). <code>bin/vm.php</code> is in the spine ([#2134](https://github.com/PurHur/php-compiler/issues/2134)); literal <code>src/cli_driver.php</code>; VM driver execute probe passes ([#2201](https://github.com/PurHur/php-compiler/issues/2201)). No ratio-deferred inventory paths.</p>
         <div class="table-wrap">
           <table>
             <thead>
