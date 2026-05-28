@@ -185,8 +185,9 @@ final class M3EmitTuTrivialEchoAot
         $context->builder->branch($defaultBb);
         $context->builder->positionAtEnd($defaultBb);
         $default = $defaultEmit($context, $runtimeThis, $code, $filename);
+        $defaultTail = $context->builder->getInsertBlock();
         $context->builder->branch($merge);
-        $incoming[] = [$default, $defaultBb];
+        $incoming[] = [$default, $defaultTail];
 
         $context->builder->positionAtEnd($merge);
         $phi = $context->builder->phi($objPtr);

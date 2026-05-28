@@ -31,6 +31,9 @@ if [[ "${BOOTSTRAP_M5_DRIVER_HOST_FULL_CLI:-0}" == "1" ]]; then
   export PHP_COMPILER_M3_EMIT_LOG_PREFIX=helloworld_compile_smoke
   export PHP_COMPILER_CLI_COMPILED=1
   export PHP_COMPILER_CLI_SKIP_VENDOR=1
+  # Emit-bridge {main} for argv `-o OUT SOURCE` (not implicit via M4_BIN alone — #3004).
+  export PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1
+  export PHP_COMPILER_EMIT_HELPER_LINK=1
   echo "bootstrap-selfhost-driver-host-compile: attempting full cli bundle (BOOTSTRAP_M5_DRIVER_HOST_FULL_CLI=1)" >&2
 fi
 

@@ -380,12 +380,36 @@ final class BootstrapCompileSmokeM3Emit
         Value $code,
         Value $filename
     ): Value {
-        unset($runtimeThis, $code, $filename);
+        $objPtr = $context->getTypeFromString('__object__*');
+        $parseLc = strtolower('PHPCompiler\\Runtime::parse');
+        $compileLc = strtolower('PHPCompiler\\Runtime::compileemitsmoke');
+        if (!isset($context->functions[$parseLc], $context->functions[$compileLc])) {
+            return $objPtr->constNull();
+        }
 
-        // Inventory-scale parseAndCompile lowering is not always available in emit-helper builds.
-        // If we try to call Runtime::parseandcompile here and it resolves to the same wrapper,
-        // we can recurse and segfault. Returning null cleanly signals "compile failed" to callers.
-        return $context->getTypeFromString('__object__*')->constNull();
+        // Decompose parseAndCompile so we never call the native parseandcompile wrapper (recursion #2967).
+        // M5 argv drivers link Runtime::parse + compileEmitSmoke on the compile-driver spine (#3004).
+        $tag = 'd'.(string) ++self::$seq;
+        $failBb = BasicBlockHelper::append($context, 'csm3_pac_default_fail_'.$tag);
+        $compileBb = BasicBlockHelper::append($context, 'csm3_pac_default_compile_'.$tag);
+        $tailBb = BasicBlockHelper::append($context, 'csm3_pac_default_tail_'.$tag);
+        $script = $context->builder->call($context->functions[$parseLc], $runtimeThis, $code, $filename);
+        $scriptNull = $context->builder->icmp(Builder::INT_EQ, $script, $objPtr->constNull());
+        $context->builder->branchIf($scriptNull, $failBb, $compileBb);
+
+        $context->builder->positionAtEnd($failBb);
+        $context->builder->branch($tailBb);
+
+        $context->builder->positionAtEnd($compileBb);
+        $block = $context->builder->call($context->functions[$compileLc], $runtimeThis, $script);
+        $context->builder->branch($tailBb);
+
+        $context->builder->positionAtEnd($tailBb);
+        $phi = $context->builder->phi($objPtr);
+        $phi->addIncoming($objPtr->constNull(), $failBb);
+        $phi->addIncoming($block, $compileBb);
+
+        return $phi;
     }
 
     /** Register native LLVM for Runtime::parseandcompile / parseandcompileemitsmoke (#2516). */

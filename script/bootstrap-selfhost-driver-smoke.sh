@@ -133,20 +133,10 @@ echo "bootstrap-selfhost-driver-smoke: stage 5 — gen-3 recompile bin/compile.p
 GEN3_DRIVER="${ROOT}/build/bootstrap-driver-smoke-gen3-compile"
 GEN3_SMOKE="${ROOT}/build/bootstrap-driver-smoke-gen3-smoke"
 rm -f "${GEN3_DRIVER}" "${GEN3_SMOKE}"
-set +e
-gen3_link_out="$(
-  env -u PHP_COMPILER_M3_SOURCE -u PHP_COMPILER_M3_OUT \
-    "${BIN_COMPILE_DRIVER}" -o "${GEN3_DRIVER}" "${ROOT}/bin/compile.php" 2>&1
-)"
-gen3_link_code=$?
-set -e
-printf '%s\n' "${gen3_link_out}"
-if [[ "${gen3_link_code}" -ne 0 ]]; then
-  echo "bootstrap-selfhost-driver-smoke: gen-3 link bin/compile.php failed (exit ${gen3_link_code})" >&2
-  exit 1
-fi
-if ! grep -qE 'helloworld_compile_smoke: compile OK|compile_smoke_m3_emit: compile OK' <<< "${gen3_link_out}"; then
-  echo "bootstrap-selfhost-driver-smoke: gen-3 link missing compile OK line" >&2
+# Re-link gen-3 via the same M5 host path as stage 3 so link-time sidecars match stage 4 (#3004).
+if ! env BOOTSTRAP_M5_DRIVER_HOST_FULL_CLI=1 PHP_COMPILER_M5_DRIVER_OUT="${GEN3_DRIVER}" \
+  ./script/bootstrap-selfhost-driver-host-compile.sh; then
+  echo "bootstrap-selfhost-driver-smoke: gen-3 host-compile bin/compile.php failed" >&2
   exit 1
 fi
 if [[ ! -x "${GEN3_DRIVER}" ]]; then
