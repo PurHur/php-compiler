@@ -93,7 +93,9 @@ if [[ "${BOOTSTRAP_LIB_SPINE_SMOKE_USE_COMPILE_INVOKE:-0}" != "1" ]]; then
       exit 1
     fi
   fi
-else
+fi
+
+if [[ "${BOOTSTRAP_LIB_SPINE_SMOKE_USE_COMPILE_INVOKE:-0}" == "1" ]]; then
   # Bisect / compatibility: use shared driver resolver (may select non-inventory drivers).
   # north-star5 step 4b requires "no Zend in the compile step".
   if ! bootstrap_resolve_compile_driver || [[ "${BOOTSTRAP_COMPILE_DRIVER_MODE:-}" != "native" ]]; then
