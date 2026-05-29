@@ -480,6 +480,11 @@ class Type extends Builtin {
             $this->context->context->functionType($htPtr, false)
         );
         $this->context->registerFunction('__phpc_pending_header_list', $fnPendingList);
+        $fnFnmatch = $this->context->module->addFunction(
+            '__phpc_fnmatch',
+            $this->context->context->functionType($i32, false, $strPtr, $strPtr, $i32)
+        );
+        $this->context->registerFunction('__phpc_fnmatch', $fnFnmatch);
         $fnGlobVec = $this->context->module->addFunction(
             '__phpc_glob_vec',
             $this->context->context->functionType($i32, false, $strPtr, $i32, $i8pppPtr)

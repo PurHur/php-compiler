@@ -96,6 +96,7 @@ static const char *phpc_builtin_functions[] = {
     "filter_var",
     "floatval",
     "floor",
+    "fnmatch",
     "fmod",
     "fopen",
     "fpassthru",
