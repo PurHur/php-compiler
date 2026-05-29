@@ -102,6 +102,9 @@ class Context {
      */
     public array $foreachObjectAdvance = [];
 
+    /** Fiber executing on this VM stack (issue #3130). */
+    public ?FiberState $currentFiber = null;
+
     public function __construct(Runtime $runtime) {
         $this->runtime = $runtime;
         $this->errors = new ErrorReporter();
