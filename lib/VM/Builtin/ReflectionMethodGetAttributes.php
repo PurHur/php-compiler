@@ -28,13 +28,20 @@ final class ReflectionMethodGetAttributes extends VmClassMethod
         }
         $methodLc = strtolower($method);
         $all = $entry->methodAttributeNames[$methodLc] ?? [];
+        $allEntries = $entry->methodAttributeEntries[$methodLc] ?? [];
         $filter = null;
         if (isset($frame->calledArgs[1])) {
             $filter = VmReflection::stringArg($frame->calledArgs[1], 'ReflectionMethod::getAttributes() name');
         }
-        $names = ReflectionSupport::filterByName($all, $filter);
+        $entries = ReflectionSupport::filterEntriesByName($allEntries, $filter);
+        if ([] !== $entries) {
+            $out = ReflectionSupport::attributesArrayFromEntries($frame, $entries);
+        } else {
+            $names = ReflectionSupport::filterByName($all, $filter);
+            $out = ReflectionSupport::attributesArray($frame, $names);
+        }
         if (null !== $frame->returnVar) {
-            $frame->returnVar->copyFrom(ReflectionSupport::attributesArray($frame, $names));
+            $frame->returnVar->copyFrom($out);
         }
     }
 }

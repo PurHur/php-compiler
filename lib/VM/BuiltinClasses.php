@@ -15,6 +15,7 @@ use PHPCompiler\VM\Builtin\ExceptionGetCode;
 use PHPCompiler\VM\Builtin\ExceptionGetFile;
 use PHPCompiler\VM\Builtin\ExceptionGetLine;
 use PHPCompiler\VM\Builtin\ExceptionGetMessage;
+use PHPCompiler\VM\Builtin\ReflectionAttributeGetArguments;
 use PHPCompiler\VM\Builtin\ReflectionAttributeGetName;
 use PHPCompiler\VM\Builtin\ReflectionClassConstruct;
 use PHPCompiler\VM\Builtin\ReflectionClassGetAttributes;
@@ -27,9 +28,12 @@ use PHPCompiler\VM\Builtin\ReflectionFunctionConstruct;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetName;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetParameters;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetReturnType;
+use PHPCompiler\VM\Builtin\ReflectionMethodConstruct;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetAttributes;
+use PHPCompiler\VM\Builtin\ReflectionMethodGetParameters;
 use PHPCompiler\VM\Builtin\ReflectionNamedTypeGetName;
 use PHPCompiler\VM\Builtin\ReflectionNamedTypeIsBuiltin;
+use PHPCompiler\VM\Builtin\ReflectionParameterGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionParameterGetType;
 use PHPCompiler\VM\Builtin\ReflectionPropertyConstruct;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetName;
@@ -145,15 +149,36 @@ final class BuiltinClasses
 
         $attr = new ClassEntry('ReflectionAttribute');
         $attr->properties[] = new ClassProperty(ReflectionSupport::PROP_ATTR_NAME, null, $strProto);
+        $attr->properties[] = new ClassProperty(ReflectionSupport::PROP_ATTR_ARGS, null, $arrayProto);
         $attr->methods['getname'] = new ReflectionAttributeGetName();
         $attr->methodVisibility['getname'] = $pub;
+        $attr->methods['getarguments'] = new ReflectionAttributeGetArguments();
+        $attr->methodVisibility['getarguments'] = $pub;
         $ctx->classes[ReflectionSupport::REFLECTION_ATTRIBUTE] = $attr;
+
+        $rparam = new ClassEntry('ReflectionParameter');
+        $rparam->properties[] = new ClassProperty(ReflectionSupport::PROP_CLASS_NAME, null, $strProto);
+        $rparam->properties[] = new ClassProperty(ReflectionSupport::PROP_METHOD_NAME, null, $strProto);
+        $rparam->properties[] = new ClassProperty(ReflectionSupport::PROP_FUNC_NAME, null, $strProto);
+        $rparam->properties[] = new ClassProperty(ReflectionSupport::PROP_PARAM_INDEX, null, $intProto);
+        $rparam->properties[] = new ClassProperty(ReflectionSupport::PROP_PARAM_NAME, null, $strProto);
+        $rparam->properties[] = new ClassProperty(ReflectionSupport::PROP_PARAM_POSITION, null, $intProto);
+        $rparam->methods['getattributes'] = new ReflectionParameterGetAttributes();
+        $rparam->methodVisibility['getattributes'] = $pub;
+        $rparam->methods['gettype'] = new ReflectionParameterGetType();
+        $rparam->methodVisibility['gettype'] = $pub;
+        $ctx->classes[ReflectionSupport::REFLECTION_PARAMETER] = $rparam;
 
         $rm = new ClassEntry('ReflectionMethod');
         $rm->properties[] = new ClassProperty(ReflectionSupport::PROP_CLASS_NAME, null, $strProto);
         $rm->properties[] = new ClassProperty(ReflectionSupport::PROP_METHOD_NAME, null, $strProto);
+        $rm->constructor = new ReflectionMethodConstruct();
+        $rm->methods['__construct'] = $rm->constructor;
+        $rm->methodVisibility['__construct'] = $pub;
         $rm->methods['getattributes'] = new ReflectionMethodGetAttributes();
         $rm->methodVisibility['getattributes'] = $pub;
+        $rm->methods['getparameters'] = new ReflectionMethodGetParameters();
+        $rm->methodVisibility['getparameters'] = $pub;
         $ctx->classes[ReflectionSupport::REFLECTION_METHOD] = $rm;
 
         $rc = new ClassEntry('ReflectionClass');
@@ -210,14 +235,6 @@ final class BuiltinClasses
         $ctx->classes[ReflectionSupport::REFLECTION_CONSTANT] = $rconst;
 
         $ctx->classes[ReflectionSupport::REFLECTION_CLASS] = $rc;
-
-        $rp = new ClassEntry('ReflectionParameter');
-        $rp->properties[] = new ClassProperty(ReflectionSupport::PROP_FUNC_NAME, null, $strProto);
-        $rp->properties[] = new ClassProperty(ReflectionSupport::PROP_PARAM_INDEX, null, $intProto);
-        $rp->properties[] = new ClassProperty(ReflectionSupport::PROP_PARAM_NAME, null, $strProto);
-        $rp->methods['gettype'] = new ReflectionParameterGetType();
-        $rp->methodVisibility['gettype'] = $pub;
-        $ctx->classes[ReflectionSupport::REFLECTION_PARAMETER] = $rp;
 
         self::registerReflectionTypeClass(
             $ctx,

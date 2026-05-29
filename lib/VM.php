@@ -1464,6 +1464,7 @@ restart:
                     $traitEntry = new ClassEntry($name);
                     $traitEntry->isTrait = true;
                     $traitEntry->attributeNames = $op->attributeNames;
+                    $traitEntry->attributeEntries = $op->attributeEntries;
                     self::defineClass($traitEntry, $op->block1);
                     $this->context->classes[$lcname] = $traitEntry;
                     break;
@@ -1522,6 +1523,7 @@ restart:
                     $classEntry->allowsDynamicProperties = AttributeNames::hasAllowDynamicProperties(
                         $op->attributeNames
                     );
+                    $classEntry->attributeEntries = $op->attributeEntries;
                     self::defineClass($classEntry, $op->block1);
                     if (null !== $classEntry->parentLc) {
                         $this->inheritFromParent($classEntry);
@@ -3319,6 +3321,12 @@ restart:
             if (isset($trait->methodDeprecated[$name])) {
                 $entry->methodDeprecated[$name] = $trait->methodDeprecated[$name];
             }
+            if (isset($trait->methodAttributeEntries[$name])) {
+                $entry->methodAttributeEntries[$name] = $trait->methodAttributeEntries[$name];
+            }
+            if (isset($trait->methodParameterMetadata[$name])) {
+                $entry->methodParameterMetadata[$name] = $trait->methodParameterMetadata[$name];
+            }
         }
         foreach ($trait->staticProperties as $name => $storage) {
             if (!isset($entry->staticProperties[$name])) {
@@ -3512,6 +3520,12 @@ restart:
                     }
                     if (null !== $op->deprecatedMetadata) {
                         $entry->methodDeprecated[$name] = $op->deprecatedMetadata;
+                    }
+                    if ([] !== $op->attributeEntries) {
+                        $entry->methodAttributeEntries[$name] = $op->attributeEntries;
+                    }
+                    if ([] !== $op->parameterMetadata) {
+                        $entry->methodParameterMetadata[$name] = $op->parameterMetadata;
                     }
                     if (null !== $op->block1) {
                         $method = new Func\PHP($entry->name.'::'.$name, $op->block1);
