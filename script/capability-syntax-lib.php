@@ -102,8 +102,8 @@ function syntaxRowDefinitions(): array
             'construct' => 'Method return types (`: string` / `: void`)',
             'opcodes' => ['TYPE_DECLARE_METHOD', 'TYPE_RETURN', 'TYPE_RETURN_VOID'],
             'issue' => 55,
-            'jit' => false,
-            'notes' => ['Router `dispatch(): void`; JIT non-void deferred (#55)'],
+            'jit' => true,
+            'notes' => ['#55 native `: string`/`: int`/`: bool`/`: float`/`: array`/`: ?T` LLVM returns; MCJIT execute #2055'],
             'probe' => 'class C { public function f(): string { return "ok"; } public function g(): void {} } echo (new C())->f();',
         ],
         [
@@ -962,10 +962,10 @@ function miniWebAppOopNorthStarDefinitions(): array
         [
             'construct' => 'Method return types (`: string` / `: void`)',
             'vm' => 'yes',
-            'jit' => 'no',
-            'aot' => 'partial',
+            'jit' => 'yes',
+            'aot' => 'yes',
             'issue' => 55,
-            'notes' => ['#55 JIT non-void return types; VM `: void` on Router::dispatch'],
+            'notes' => ['#55 native scalar/array returns; nullable via __value__*; MCJIT execute #2055'],
         ],
     ];
 }

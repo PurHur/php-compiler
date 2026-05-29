@@ -18,7 +18,7 @@ Tracking issues: [#58](https://github.com/PurHur/php-compiler/issues/58), [#145]
 | Private methods | yes | yes | yes | [#145](https://github.com/PurHur/php-compiler/issues/145) | Router private `render*` paths (#2059); compliance PHPT; bootstrap AOT |
 | Property fetch `$this->x` | yes | yes | yes | [#58](https://github.com/PurHur/php-compiler/issues/58) | compliance PHPT; bootstrap AOT |
 | Constructor property promotion | yes | yes | yes | [#1359](https://github.com/PurHur/php-compiler/issues/1359) | Promoted params declare property + assign in __construct |
-| Method return types (`: string` / `: void`) | yes | no | yes | [#55](https://github.com/PurHur/php-compiler/issues/55) | Router `dispatch(): void`; JIT non-void deferred (#55); compliance PHPT; bootstrap AOT; VM-only lowering |
+| Method return types (`: string` / `: void`) | yes | yes | yes | [#55](https://github.com/PurHur/php-compiler/issues/55) | #55 native `: string`/`: int`/`: bool`/`: float`/`: array`/`: ?T` LLVM returns; MCJIT execute #2055 |
 | Dynamic property access `$obj->$name` | yes | yes | yes | [#1227](https://github.com/PurHur/php-compiler/issues/1227) | JIT compares runtime name to declared properties; unknown names abort at runtime; compliance PHPT |
 | Variable function call `$fn()` | yes | yes | yes | [#56](https://github.com/PurHur/php-compiler/issues/56) | VM resolves callee at runtime; JIT when callee name is compile-time string in variable (#56) |
 | Native user-class link (`phpc build --project`) | yes | yes | yes | [#764](https://github.com/PurHur/php-compiler/issues/764) | AOT link yes (#568 closed); native execute ✅ (#764 closed); compliance PHPT; bootstrap AOT |
@@ -106,7 +106,7 @@ ROADMAP Phase 1/4: [#78](https://github.com/PurHur/php-compiler/issues/78), acce
 | Public instance methods (`Expr_MethodCall`) | yes | partial | yes | [#58](https://github.com/PurHur/php-compiler/issues/58) | #58 ClassMethod + method dispatch; compliance PHPT; native execute ✅ (#764 closed) |
 | Static methods (`Expr_StaticCall`) | yes | partial | yes | [#2209](https://github.com/PurHur/php-compiler/issues/2209) | #2209 user static methods; factory `Class::method()` + instance chain |
 | Private methods + `__construct` | yes | partial | yes | [#145](https://github.com/PurHur/php-compiler/issues/145) | #145 visibility + ctor; Router private render paths |
-| Method return types (`: string` / `: void`) | yes | no | partial | [#55](https://github.com/PurHur/php-compiler/issues/55) | #55 JIT non-void return types; VM `: void` on Router::dispatch |
+| Method return types (`: string` / `: void`) | yes | yes | yes | [#55](https://github.com/PurHur/php-compiler/issues/55) | #55 native scalar/array returns; nullable via __value__*; MCJIT execute #2055 |
 
 _OOP rows are curated from ROADMAP issue state; methods [#58](https://github.com/PurHur/php-compiler/issues/58); visibility/ctor [#145](https://github.com/PurHur/php-compiler/issues/145); return types [#55](https://github.com/PurHur/php-compiler/issues/55). Opt-in gates: `MINIWEBAPP_VM_OOP_GATE` (#2189), `MINIWEBAPP_JIT_PROJECT_GATE` (#587); drift guard `CAPABILITIES_OOP_SYNC_GATE` (#2190)._
 ## Sessions reference (`examples/005-SessionsWeb`)
