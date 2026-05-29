@@ -161,6 +161,7 @@ final class SelfHostBuiltinPolicy
     private const CATEGORY_JSON = [
         'json_encode' => 'json',
         'json_decode' => 'json',
+        'json_validate' => 'json',
         'json_last_error' => 'json',
         'serialize' => 'json',
         'unserialize' => 'json',

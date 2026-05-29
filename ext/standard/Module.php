@@ -218,6 +218,7 @@ class Module extends ModuleAbstract
             new http_response_code(),
             new json_encode(),
             new json_decode(),
+            new json_validate(),
             new serialize(),
             new unserialize(),
             new json_last_error_(),

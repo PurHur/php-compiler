@@ -41,6 +41,7 @@ typedef struct {
     const char *pos;
     const char *end;
     int depth;
+    int max_depth;
 } phpc_json_ctx;
 
 static __string__ *cstr_to_string(const char *cstr)
@@ -367,7 +368,7 @@ static int phpc_json_parse_value(
 {
     char val_buf[4096];
 
-    if (ctx->depth > PHPC_JSON_MAX_DEPTH) {
+    if (ctx->depth > ctx->max_depth) {
         phpc_json_last_error = PHPC_JSON_ERROR_DEPTH;
 
         return 0;
@@ -566,8 +567,57 @@ void __compiler_json_decode(__string__ *json, __value__ *out)
     ctx.pos = body;
     ctx.end = body + len;
     ctx.depth = 0;
+    ctx.max_depth = PHPC_JSON_MAX_DEPTH;
     if (!phpc_json_parse_top(&ctx, out)) {
         phpc_json_last_error = PHPC_JSON_ERROR_SYNTAX;
         __value__writeNull(out);
     }
+}
+
+/*
+ * json_validate() — syntax check without returning a PHP value (issue #3101).
+ * Returns 1 when valid, 0 on syntax error, -1 when nesting exceeds max_depth.
+ */
+int64_t __compiler_json_validate(__string__ *json, int64_t max_depth)
+{
+    phpc_json_ctx ctx;
+    unsigned char out_storage[128];
+    __value__ *out = (__value__ *) out_storage;
+    const char *body;
+    size_t len;
+    int saved_error;
+
+    phpc_json_last_error = PHPC_JSON_ERROR_NONE;
+    if (NULL == json) {
+        return 0;
+    }
+    if (max_depth < 1) {
+        return 0;
+    }
+    body = phpc_string_data(json);
+    len = phpc_string_len(json);
+    if (0 == len || len > PHPC_JSON_MAX_LEN) {
+        return 0;
+    }
+    memset(out_storage, 0, sizeof(out_storage));
+    __value__writeNull(out);
+    ctx.pos = body;
+    ctx.end = body + len;
+    ctx.depth = 0;
+    ctx.max_depth = (int) max_depth;
+    saved_error = phpc_json_last_error;
+    if (!phpc_json_parse_top(&ctx, out)) {
+        if (PHPC_JSON_ERROR_DEPTH == phpc_json_last_error) {
+            return -1;
+        }
+
+        return 0;
+    }
+    phpc_json_skip_ws(&ctx);
+    if (ctx.pos != ctx.end) {
+        return 0;
+    }
+    phpc_json_last_error = saved_error;
+
+    return 1;
 }

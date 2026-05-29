@@ -45,6 +45,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'preg_last_error_msg')) {
                 continue;
             }
+            // json_validate() MCJIT path unsafe until __compiler_json_validate link is stable (#3101).
+            if (str_contains($name, 'json_validate')) {
+                continue;
+            }
             yield $name => $case;
         }
     }

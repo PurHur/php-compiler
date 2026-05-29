@@ -589,6 +589,11 @@ class Type extends Builtin {
         $fntypeJsonLastError = $this->context->context->functionType($i64, false);
         $fnJsonLastError = $this->context->module->addFunction('__compiler_json_last_error', $fntypeJsonLastError);
         $this->context->registerFunction('__compiler_json_last_error', $fnJsonLastError);
+        $fnJsonValidate = $this->context->module->addFunction(
+            '__compiler_json_validate',
+            $this->context->context->functionType($i64, false, $strPtr, $i64)
+        );
+        $this->context->registerFunction('__compiler_json_validate', $fnJsonValidate);
         $fntypeSerializeHashtable = $this->context->context->functionType(
             $this->context->getTypeFromString('__string__*'),
             false,
