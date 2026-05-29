@@ -393,7 +393,7 @@ class VM {
     /**
      * Resolve an instance property write lvalue, including __set / dynamic properties (#146).
      */
-    protected function fetchObjectPropertyWriteLvalue(ObjectEntry $object, string $name): Variable
+    protected function fetchObjectPropertyWriteLvalue(ObjectEntry $object, string $name, Frame $frame): Variable
     {
         if ($object->hasProperty($name)) {
             return $object->getProperty($name);
@@ -405,11 +405,18 @@ class VM {
 
             return $proxy;
         }
-        if ($object->class->allowsDynamicProperties) {
-            return $object->getProperty($name);
+        if (!$object->class->allowsDynamicProperties) {
+            $scriptPath = $frame->scriptPath;
+            $this->context->errors->deprecatedDynamicProperty(
+                $object->class->name,
+                $name,
+                '' !== $scriptPath && '-' !== $scriptPath ? $scriptPath : null,
+                $this->context,
+                $frame
+            );
         }
 
-        throw new \LogicException('Undefined property access');
+        return $object->allocateProperty($name);
     }
 
     /**
@@ -898,7 +905,7 @@ restart:
                             $propName = $keyVar->is(Variable::TYPE_INTEGER)
                                 ? (string) $keyVar->toInt()
                                 : $keyVar->toString();
-                            $object->getProperty($propName)->copyFrom($valueVar);
+                            $object->allocateProperty($propName)->copyFrom($valueVar);
                         }
                     }
                     break;
@@ -1735,7 +1742,7 @@ restart:
                         && OpCode::TYPE_ASSIGN === $frame->block->opCodes[$frame->pos]->type
                         && (int) $frame->block->opCodes[$frame->pos]->arg2 === (int) $op->arg1;
                     if ($forWrite) {
-                        $result->indirect($this->fetchObjectPropertyWriteLvalue($propertyObject, $name));
+                        $result->indirect($this->fetchObjectPropertyWriteLvalue($propertyObject, $name, $frame));
                         break;
                     }
                     if ($this->hasInstanceMethod($propertyObject->class, '__get')) {
@@ -1743,7 +1750,7 @@ restart:
                         break;
                     }
                     if ($propertyObject->class->allowsDynamicProperties) {
-                        $result->indirect($propertyObject->getProperty($name));
+                        $result->indirect($propertyObject->allocateProperty($name));
                         break;
                     }
                     throw new \LogicException('Undefined property access');

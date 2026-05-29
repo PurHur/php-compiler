@@ -92,18 +92,22 @@ class ObjectEntry {
         return isset($this->properties[$name]);
     }
 
+    public function allocateProperty(string $name): Variable
+    {
+        $var = new Variable(Variable::TYPE_NULL);
+        $var->objectPropertyOwner = $this;
+        $var->objectPropertyName = $name;
+        $this->properties[$name] = $var;
+
+        return $var;
+    }
+
     public function getProperty(string $name): Variable {
         if ($this->isEnumCase) {
             return EnumCaseSupport::getProperty($this, $name);
         }
         if (!isset($this->properties[$name])) {
-            if (!$this->class->allowsDynamicProperties) {
-                throw new \LogicException("Undefined property access");
-            }
-            $var = new Variable(Variable::TYPE_NULL);
-            $var->objectPropertyOwner = $this;
-            $var->objectPropertyName = $name;
-            $this->properties[$name] = $var;
+            throw new \LogicException('Undefined property access');
         }
 
         return $this->properties[$name];
