@@ -167,9 +167,6 @@ class VM {
     }
 
     /**
-     * Invoke a closure from a VM builtin (isolated run stack; issue #72).
-     */
-    /**
      * Zend zend_std_clone_object: shallow copy then user __clone() when defined (#3170).
      */
     protected function invokeCloneMagicMethod(ObjectEntry $object): void
@@ -183,6 +180,9 @@ class VM {
         $this->invokePhpFunction($class->methods['__clone'], $thisVar);
     }
 
+    /**
+     * Invoke a closure from a VM builtin (isolated run stack; issue #72).
+     */
     public function invokeClosure(ClosureState $closureState, Variable ...$args): Variable
     {
         $savedStack = $this->context->swapRunStack(null);
