@@ -54,6 +54,7 @@ final class SelfHostBuiltinPolicy
         'ob_start' => 'output', 'ob_get_clean' => 'output', 'ob_end_flush' => 'output',
         'ob_get_level' => 'output',
         'getallheaders' => 'output', 'header_list' => 'output',
+        'headers_sent' => 'output', 'register_shutdown_function' => 'output',
         'set_error_handler' => 'error', 'restore_error_handler' => 'error',
     ];
 
@@ -110,6 +111,7 @@ final class SelfHostBuiltinPolicy
         'soundex' => 'string',
         'base64_encode' => 'string', 'base64_decode' => 'string',
         'htmlspecialchars' => 'string', 'htmlspecialchars_decode' => 'string', 'header' => 'string', 'http_response_code' => 'string',
+        'headers_sent' => 'string', 'register_shutdown_function' => 'string',
         'substr' => 'string', 'trim' => 'string', 'ltrim' => 'string', 'rtrim' => 'string',
         'urlencode' => 'string', 'rawurlencode' => 'string', 'http_build_query' => 'string',
         'parse_str' => 'string',

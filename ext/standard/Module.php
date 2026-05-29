@@ -209,6 +209,8 @@ class Module extends ModuleAbstract
             new html_entity_decode(),
             new strip_tags(),
             new header_(),
+            new headers_sent(),
+            new register_shutdown_function(),
             new setcookie(),
             new setrawcookie(),
             new session_start(),

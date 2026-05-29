@@ -26,6 +26,7 @@ use PHPCompiler\JIT\Context as JITContext;
 use PHPCompiler\Ast\GroupUseStripper;
 use PHPCompiler\Web\Superglobals;
 use PHPCompiler\Lint\LintCompiler;
+use PHPCompiler\VM\ShutdownQueue;
 
 class Runtime {
     const MODE_NORMAL   = 0b0001;
@@ -511,6 +512,7 @@ class Runtime {
         try {
             return $this->vm->run($block);
         } finally {
+            ShutdownQueue::run($this->vmContext);
             Superglobals::setActiveContext(null);
         }
     }

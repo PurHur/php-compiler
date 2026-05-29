@@ -53,6 +53,9 @@ class Context {
     /** CFG block currently being lowered (get_defined_vars snapshot, #3135). */
     public ?Block $jitCurrentBlock = null;
 
+    /** Most recent closure call proxy from TYPE_CLOSURE (register_shutdown_function, #3120). */
+    public ?Call $lastClosureCallProxy = null;
+
     /** Call-site file strict_types while lowering FUNCCALL (issues #156, #1229). */
     public bool $callerStrictTypes = false;
 
@@ -864,6 +867,23 @@ class Context {
         $oldBuilder = $this->builder;
         $this->builder = $this->context->builderCreate();
         $this->builder->positionAtEnd($this->initBlock);
+        try {
+            $emit($this);
+        } finally {
+            $this->builder = $oldBuilder;
+        }
+    }
+
+    /**
+     * Temporarily position the builder at __shutdown__ (register_shutdown_function, issue #3120).
+     *
+     * @param callable(self): void $emit
+     */
+    public function emitInShutdown(callable $emit): void
+    {
+        $oldBuilder = $this->builder;
+        $this->builder = $this->context->builderCreate();
+        $this->builder->positionAtEnd($this->shutdownBlock);
         try {
             $emit($this);
         } finally {

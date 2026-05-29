@@ -43,6 +43,7 @@ final class ClosureHelper
         self::storeTargetName($context, $obj, $internalName);
         $var = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $obj);
         $var->closureCall = $callProxy;
+        $context->lastClosureCallProxy = $callProxy;
 
         return $var;
     }

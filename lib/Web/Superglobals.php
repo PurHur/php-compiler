@@ -29,6 +29,11 @@ final class Superglobals
         self::$activeContext = $context;
     }
 
+    public static function getActiveContext(): ?Context
+    {
+        return self::$activeContext;
+    }
+
     /** Maximum incoming request headers mapped into $_SERVER (issue #77). */
     public const MAX_HTTP_HEADERS = 64;
 
