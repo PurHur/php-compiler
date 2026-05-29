@@ -101,7 +101,7 @@ final class SelfHostBuiltinPolicy
         'chr' => 'string',
         'chunk_split' => 'string',
         'pack' => 'string',
-        'strtolower' => 'string', 'strtoupper' => 'string', 'strcmp' => 'string', 'strncmp' => 'string', 'substr_compare' => 'string',
+        'strtolower' => 'string', 'strtoupper' => 'string', 'strcmp' => 'string', 'strncmp' => 'string', 'substr_compare' => 'string', 'strtok' => 'string',
         'strcasecmp' => 'string', 'strncasecmp' => 'string', 'strlen' => 'string', 'count' => 'string',
         'sizeof' => 'string', 'gettype' => 'string', 'get_debug_type' => 'string', 'var_export' => 'string',
         'str_replace' => 'string', 'str_ireplace' => 'string', 'strtr' => 'string', 'str_rot13' => 'string',

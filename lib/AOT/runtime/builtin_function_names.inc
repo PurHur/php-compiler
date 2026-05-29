@@ -282,6 +282,7 @@ static const char *phpc_builtin_functions[] = {
     "strrpos",
     "strspn",
     "strstr",
+    "strtok",
     "strtolower",
     "str_word_count",
     "strtoupper",
