@@ -49,6 +49,7 @@ class Module extends ModuleAbstract
             new boolval(),
             new settype(),
             new var_export(),
+            new var_dump_(),
             new gettype(),
             new get_debug_type(),
             new gc_collect_cycles(),
