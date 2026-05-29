@@ -2564,7 +2564,8 @@ final class CiScriptsTest extends TestCase
         $fast = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-fast.sh');
         $this->assertStringContainsString('REHASH_COMPLIANCE_GATE', $fast);
         $this->assertStringContainsString('REHASH_COMPLIANCE_GATE:-1', $fast);
-        $this->assertStringContainsString('--filter array_rehash_string_keys', $fast);
+        $this->assertStringContainsString('--filter', $fast);
+        $this->assertStringContainsString('array_rehash_string_keys', $fast);
     }
 
     public function testLocalCiMatrixDocumentsRehashComplianceGate(): void

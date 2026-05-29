@@ -12,14 +12,14 @@ class VMTest extends BaseTest {
 
     public static function providePHPTests(): \Generator
     {
-        foreach (parent::providePHPTests() as $case) {
+        foreach (parent::providePHPTests() as $name => $case) {
             if (str_contains(strtolower($case[0]), 'splobjectstorage')) {
                 continue;
             }
             if (str_contains(strtolower($case[0]), 'spl_autoload_register_jit')) {
                 continue;
             }
-            yield $case;
+            yield $name => $case;
         }
     }
 
