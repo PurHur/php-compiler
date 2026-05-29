@@ -14,6 +14,7 @@ require_once __DIR__.'/OpCodeNames.php';
 use PHPCompiler\Func;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ClassEntry;
+use PHPCompiler\VM\ClosureState;
 use PHPCompiler\VM\GeneratorState;
 use PHPCompiler\VM\NamedArgs;
 use PHPCompiler\VM\ObjectEntry;
@@ -508,8 +509,16 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_CLOSURE:
-                    // Bootstrap stub: closures are not executable yet; represent as null.
-                    $frame->scope[$op->arg1]->null();
+                    if (null === $op->block1) {
+                        $frame->scope[$op->arg1]->null();
+                        break;
+                    }
+                    $funcName = null !== $op->block1->func
+                        ? $op->block1->func->name
+                        : '{closure}';
+                    $closureFunc = new Func\PHP($funcName, $op->block1);
+                    $state = new ClosureState($closureFunc);
+                    $frame->scope[$op->arg1]->object($state->wrapObject($this->context));
                     break;
                 case OpCode::TYPE_RETURN_VOID:
                     $this->enforceReturnType($frame, null);
@@ -567,6 +576,13 @@ restart:
                 case OpCode::TYPE_FUNCCALL_INIT:
                     $callee = $frame->scope[$op->arg1]->resolveIndirect();
                     if (Variable::TYPE_OBJECT === $callee->type) {
+                        $closureState = $callee->toObject()->closureState;
+                        if (null !== $closureState) {
+                            $frame->call = $closureState->func;
+                            $frame->callArgs = [];
+                            $frame->callArgEntries = [];
+                            break;
+                        }
                         $this->initMethodCall($frame, $callee, '__invoke');
                         break;
                     }
@@ -1506,7 +1522,15 @@ restart:
     protected function initMethodCall(Frame $frame, Variable $receiver, string $methodName): void
     {
         $methodLc = strtolower($methodName);
-        $class = $receiver->toObject()->class;
+        $object = $receiver->toObject();
+        if (null !== $object->closureState && '__invoke' === $methodLc) {
+            $frame->call = $object->closureState->func;
+            $frame->callArgs = [];
+            $frame->callArgEntries = [];
+
+            return;
+        }
+        $class = $object->class;
         if (!isset($class->methods[$methodLc])) {
             throw new \LogicException("Call to undefined method {$class->name}::{$methodLc}()");
         }
