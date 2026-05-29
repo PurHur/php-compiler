@@ -2168,6 +2168,45 @@ final class VmString
     }
 
     /**
+     * count_chars() — byte-frequency histogram (PHP 8 modes 0–4; ext/standard/string.c).
+     *
+     * @return array<int, int>|string
+     */
+    public static function count_chars(string $string, int $mode = 0): array|string
+    {
+        if ($mode < 0 || $mode > 4) {
+            throw new \LogicException('count_chars(): Argument #2 ($mode) must be between 0 and 4 (inclusive)');
+        }
+        $counts = array_fill(0, 256, 0);
+        $len = self::byteLength($string);
+        for ($i = 0; $i < $len; ++$i) {
+            ++$counts[self::byteOrd($string[$i])];
+        }
+        if (3 === $mode || 4 === $mode) {
+            $out = '';
+            for ($byte = 0; $byte < 256; ++$byte) {
+                if ((3 === $mode && $counts[$byte] > 0) || (4 === $mode && 0 === $counts[$byte])) {
+                    $out .= self::byteChr($byte);
+                }
+            }
+
+            return $out;
+        }
+        $result = [];
+        for ($byte = 0; $byte < 256; ++$byte) {
+            if (0 === $mode) {
+                $result[$byte] = $counts[$byte];
+            } elseif (1 === $mode && $counts[$byte] > 0) {
+                $result[$byte] = $counts[$byte];
+            } elseif (2 === $mode && 0 === $counts[$byte]) {
+                $result[$byte] = 0;
+            }
+        }
+
+        return $result;
+    }
+
+    /**
      * @return int|false
      */
     public static function stripos(string $haystack, string $needle, int $offset = 0)

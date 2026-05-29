@@ -101,6 +101,7 @@ class Module extends ModuleAbstract
             new stripos(),
             new strrpos(),
             new substr_count(),
+            new count_chars(),
             new str_word_count(),
             new str_contains(),
             new str_starts_with(),

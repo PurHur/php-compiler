@@ -32,6 +32,7 @@ final class Linker
         __DIR__.'/runtime/strtr.c',
         __DIR__.'/runtime/filter_validate.c',
         __DIR__.'/runtime/phpc_fs_dir.c',
+        __DIR__.'/runtime/phpc_count_chars.c',
         __DIR__.'/runtime/phpc_upload_temp.c',
         __DIR__.'/runtime/phpc_session_id_storage.c',
         __DIR__.'/runtime/phpc_session_name_storage.c',
