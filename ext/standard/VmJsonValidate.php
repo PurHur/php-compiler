@@ -15,10 +15,14 @@ final class VmJsonValidate
             throw new \ValueError('json_validate(): Argument #2 ($depth) must be greater than 0');
         }
         if (\function_exists('json_validate')) {
-            return \json_validate($json, $depth);
+            $ok = \json_validate($json, $depth);
+            VmJson::syncLastErrorFromHost();
+
+            return $ok;
         }
         \json_decode($json, true, $depth);
-        $err = \json_last_error();
+        VmJson::syncLastErrorFromHost();
+        $err = VmJson::lastError();
         if (\JSON_ERROR_DEPTH === $err) {
             throw new \ValueError('json_validate(): Argument #1 ($json) depth exceeds the maximum allowed depth of '.$depth);
         }

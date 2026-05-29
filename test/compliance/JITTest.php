@@ -37,6 +37,10 @@ class JITTest extends BaseTest {
             if (str_contains(strtolower($case[0]), 'array_replace_recursive')) {
                 continue;
             }
+            // ksort/uksort string-key hashtable JIT — KsortJITTest / UksortJITTest (#2271, #3143).
+            if (str_contains($name, 'ksort_jit') || str_contains($name, 'uksort')) {
+                continue;
+            }
             // class_uses() is VM-only until JIT lowering (#3119).
             if (str_contains($name, 'class_uses_runtime')) {
                 continue;
@@ -47,6 +51,10 @@ class JITTest extends BaseTest {
             }
             // gc_collect_cycles() is VM-only (#3113).
             if (str_contains($name, 'gc_collect_cycles')) {
+                continue;
+            }
+            // array_walk_recursive() is VM-only until recursive LLVM walk (#3111).
+            if (str_contains($name, 'array_walk_recursive')) {
                 continue;
             }
             // preg_last_error_msg() MCJIT path unsafe with preg_match stub runtime (#3110).

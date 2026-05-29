@@ -36,6 +36,7 @@ final class json_encode extends Internal
         }
         $value = VmJson::export($frame->calledArgs[0]->resolveIndirect());
         $encoded = \json_encode($value);
+        VmJson::syncLastErrorFromHost();
         if (false === $encoded) {
             throw new \LogicException('json_encode() failed');
         }

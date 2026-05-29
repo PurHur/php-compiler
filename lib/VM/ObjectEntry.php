@@ -86,7 +86,17 @@ class ObjectEntry {
         $this->properties[$name]->null();
     }
 
-    public function getProperties(int $purpose): array {
+    /** @return array<string, Variable> */
+    public function getRawProperties(): array
+    {
+        return $this->properties;
+    }
+
+    public function getProperties(int $purpose, ?\PHPCompiler\VM $vm = null): array {
+        if (ClassEntry::PROP_PURPOSE_DEBUG === $purpose && null !== $vm) {
+            return $vm->getObjectDebugProperties($this);
+        }
+
         return $this->class->getProperties($this->properties, $purpose);
     }
 
