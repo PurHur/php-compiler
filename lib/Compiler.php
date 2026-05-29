@@ -1854,15 +1854,17 @@ class Compiler {
                     if (OpCode::TYPE_DECLARE_CLASS !== $type) {
                         $this->throwCompileLogic('Trait use is only supported on classes for now');
                     }
-                    if ([] !== $child->adaptations) {
-                        $this->throwCompileLogic('TraitUseAdaptation is not supported yet');
-                    }
                     foreach ($child->traits as $traitOperand) {
                         $result->addOpCode(new OpCode(
                             OpCode::TYPE_USE_TRAIT,
                             $this->compileOperand($traitOperand, $result, true)
                         ));
                     }
+                    $adaptOp = new OpCode(OpCode::TYPE_TRAIT_USE_ADAPTATION);
+                    $adaptOp->traitAdaptations = [] !== $child->adaptations
+                        ? $this->compileTraitAdaptations($child->adaptations)
+                        : [];
+                    $result->addOpCode($adaptOp);
                     break;
                 default:
                     $this->throwCompileLogic('Unsupported class body element: ' . get_class($child));
@@ -1967,6 +1969,44 @@ class Compiler {
             default:
                 return 'mixed';
         }
+    }
+
+    /**
+     * @param list<\PhpParser\Node\Stmt\TraitUseAdaptation> $adaptations
+     *
+     * @return list<array<string, mixed>>
+     */
+    protected function compileTraitAdaptations(array $adaptations): array
+    {
+        $out = [];
+        foreach ($adaptations as $adaptation) {
+            if ($adaptation instanceof \PhpParser\Node\Stmt\TraitUseAdaptation\Alias) {
+                if (null !== $adaptation->newModifier) {
+                    $this->throwCompileLogic('TraitUseAdaptation visibility changes are not supported yet');
+                }
+                $out[] = [
+                    'kind' => 'alias',
+                    'trait' => null !== $adaptation->trait ? $adaptation->trait->toString() : null,
+                    'method' => $adaptation->method->name,
+                    'newName' => null !== $adaptation->newName ? $adaptation->newName->name : null,
+                ];
+            } elseif ($adaptation instanceof \PhpParser\Node\Stmt\TraitUseAdaptation\Precedence) {
+                $insteadof = [];
+                foreach ($adaptation->insteadof as $name) {
+                    $insteadof[] = $name->toString();
+                }
+                $out[] = [
+                    'kind' => 'precedence',
+                    'trait' => $adaptation->trait->toString(),
+                    'method' => $adaptation->method->name,
+                    'insteadof' => $insteadof,
+                ];
+            } else {
+                $this->throwCompileLogic('Unsupported TraitUseAdaptation node: ' . get_class($adaptation));
+            }
+        }
+
+        return $out;
     }
 
     protected function isPromotedParam(Op\Expr\Param $param): bool
