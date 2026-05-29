@@ -96,6 +96,21 @@ final class SuperglobalInit
 
     public static function initialize(Context $context): void
     {
+        if (Builtin::LOAD_TYPE_EMBED === $context->loadType) {
+            self::$globals = [];
+            $htPtr = $context->getTypeFromString('__hashtable__*');
+            foreach (Superglobals::NAMES as $name) {
+                $globalName = 'sg_'.substr($name, 1);
+                $existing = $context->module->getNamedGlobal($globalName);
+                $global = null !== $existing
+                    ? $existing
+                    : $context->module->addGlobal($htPtr, $globalName);
+                $global->setInitializer($htPtr->constNull());
+                self::$globals[$name] = $global;
+            }
+
+            return;
+        }
         self::$globals = [];
         $oldBuilder = $context->builder;
         $context->builder->positionAtEnd($context->initBlock);
