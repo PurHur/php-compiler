@@ -607,19 +607,25 @@ class Block {
         );
     }
 
-    /**
-     * CFG regions that MCJIT must not lower yet; `bin/jit.php` runs the VM instead (#2114, #167).
-     */
-    public static function requiresVmLowering(?self $root): bool
+    /** Script contains try/catch/finally/throw opcodes (#2114). IR may verify; MCJIT execute is not yet safe. */
+    public static function containsExceptionHandlingOpcodes(?self $root): bool
     {
         return self::containsOpcodeTypes(
             $root,
             OpCode::TYPE_TRY,
             OpCode::TYPE_CATCH,
             OpCode::TYPE_FINALLY,
-            OpCode::TYPE_THROW,
-            OpCode::TYPE_YIELD,
-            OpCode::TYPE_YIELD_FROM
+            OpCode::TYPE_THROW
         );
+    }
+
+    /**
+     * CFG regions that MCJIT must not execute yet; `bin/jit.php` runs the VM instead (#2114, #167).
+     * JIT IR lowering for simple try/catch may still compile and verify — see TryCatchJitCompileTest.
+     */
+    public static function requiresVmLowering(?self $root): bool
+    {
+        return self::containsExceptionHandlingOpcodes($root)
+            || self::containsGeneratorOpcodes($root);
     }
 }
