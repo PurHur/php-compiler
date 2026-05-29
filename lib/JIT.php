@@ -936,9 +936,13 @@ class JIT {
         if ($this->isSkippedVmHotPathName($skipName)) {
             return $this->compileSkippedVmHotPathStub($internalName, $block, $logicalName ?? $internalName);
         }
-        if ($block->isGenerator || Block::containsGeneratorOpcodes($block)) {
-            // Generator bodies suspend via VM::GENERATOR_YIELD; MCJIT stub until #167 lands.
-            return $this->compileSkippedVmHotPathStub($internalName, $block, $logicalName ?? $internalName);
+        if ($block->isGenerator) {
+            return JIT\GeneratorHelper::compileResumeFunction(
+                $this,
+                $internalName,
+                $block,
+                $logicalName ?? $internalName
+            );
         }
         if ($this->isSkippedM3EmitTuBundledHelperName($skipName)) {
             return $this->compileSkippedCompilerSplitCfgStub($internalName, $block, $logicalName ?? $internalName);
@@ -4693,6 +4697,10 @@ class JIT {
                 case OpCode::TYPE_ITER_RESET:
                     $arrayOp = $block->getOperand($op->arg1);
                     $array = $this->context->getVariableFromOp($arrayOp);
+                    if (JIT\GeneratorHelper::isGeneratorVariable($array)) {
+                        JIT\GeneratorHelper::compileIterReset($this->context, $array);
+                        break;
+                    }
                     JIT\IteratorHelper::compileReset(
                         $this->context,
                         $array,
@@ -4702,6 +4710,11 @@ class JIT {
                 case OpCode::TYPE_ITER_VALID:
                     $arrayOp = $block->getOperand($op->arg2);
                     $array = $this->context->getVariableFromOp($arrayOp);
+                    if (JIT\GeneratorHelper::isGeneratorVariable($array)) {
+                        $valid = JIT\GeneratorHelper::compileIterValid($this->context, $array);
+                        $this->assignOperandValue($block->getOperand($op->arg1), $valid);
+                        break;
+                    }
                     $valid = JIT\IteratorHelper::compileValid(
                         $this->context,
                         $array,
@@ -4712,6 +4725,11 @@ class JIT {
                 case OpCode::TYPE_ITER_KEY:
                     $arrayOp = $block->getOperand($op->arg2);
                     $array = $this->context->getVariableFromOp($arrayOp);
+                    if (JIT\GeneratorHelper::isGeneratorVariable($array)) {
+                        $key = JIT\GeneratorHelper::compileIterKey($this->context, $array);
+                        $this->assignOperand($block->getOperand($op->arg1), $key);
+                        break;
+                    }
                     $key = JIT\IteratorHelper::compileKey(
                         $this->context,
                         $array,
@@ -4722,6 +4740,14 @@ class JIT {
                 case OpCode::TYPE_ITER_VALUE:
                     $arrayOp = $block->getOperand($op->arg2);
                     $array = $this->context->getVariableFromOp($arrayOp);
+                    if (JIT\GeneratorHelper::isGeneratorVariable($array)) {
+                        if ($op->arg3) {
+                            throw new \LogicException('Generator foreach by-ref is not supported in JIT yet (issue #3074)');
+                        }
+                        $value = JIT\GeneratorHelper::compileIterValue($this->context, $array);
+                        $this->assignOperand($block->getOperand($op->arg1), $value);
+                        break;
+                    }
                     if ($op->arg3) {
                         $value = JIT\IteratorHelper::compileValueByRef(
                             $this->context,
@@ -5470,12 +5496,18 @@ class JIT {
                     break;
                 case OpCode::TYPE_YIELD:
                 case OpCode::TYPE_YIELD_FROM:
-                    // compileBlock() stubs generator bodies before opcode lowering (#167).
+                    if ($this->context->compilingGeneratorResume) {
+                        throw new \LogicException('yield should be lowered via GeneratorHelper resume switch (issue #3074)');
+                    }
                     throw new \LogicException('Generators (yield) are VM-only (issue #167)');
                 case OpCode::TYPE_FUNCCALL_INIT:
                     $nameOp = $block->getOperand($op->arg1);
                     if ($nameOp instanceof Operand\Literal) {
                         $lcname = strtolower($nameOp->value);
+                        $this->context->scope->generatorResumeCallee = JIT\GeneratorHelper::creatorResumeName(
+                            $this->context,
+                            $lcname
+                        );
                         $this->context->scope->toCall = $this->context->resolveFunctionProxy($lcname);
                     } else {
                         $nameVar = $this->context->getVariableFromOp($nameOp);
@@ -5590,6 +5622,16 @@ class JIT {
                             $block->getOperand($op->arg1),
                             JIT\JitNativeString::coerce($this->context, $callArgs[1])
                         );
+                        break;
+                    }
+                    $resumeName = $this->context->scope->generatorResumeCallee;
+                    $this->context->scope->generatorResumeCallee = null;
+                    if (null !== $resumeName) {
+                        $genVar = JIT\GeneratorHelper::emitCreateFromCall(
+                            $this,
+                            $resumeName
+                        );
+                        $this->assignOperand($block->getOperand($op->arg1), $genVar);
                         break;
                     }
                     $prevStrict = $this->context->callerStrictTypes;
@@ -7279,6 +7321,82 @@ class JIT {
         $dest->objectPropertyName = $src->objectPropertyName;
         $dest->objectPropertyClassName = $src->objectPropertyClassName;
         $dest->closureCall = $src->closureCall;
+        $dest->generatorStatePtr = $src->generatorStatePtr;
+        $dest->generatorResumeName = $src->generatorResumeName;
+    }
+
+    /**
+     * Write a JIT value into an embedded {@see __value__} field on generator state (#3074).
+     */
+    public function assignValueToGeneratorField(
+        \PHPLLVM\Value $destField,
+        Variable $src,
+        ?Operand $srcOp
+    ): void {
+        $destPtr = JIT\JitValueBox::pointer($this->context, $destField);
+        if (JIT\Variable::TYPE_STRING === $src->type) {
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeString'),
+                $destPtr,
+                $this->context->helper->loadValue($src)
+            );
+
+            return;
+        }
+        if (JIT\Variable::TYPE_NATIVE_LONG === $src->type) {
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeLong'),
+                $destPtr,
+                $this->context->helper->loadValue($src)
+            );
+
+            return;
+        }
+        if (JIT\Variable::TYPE_NATIVE_DOUBLE === $src->type) {
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeDouble'),
+                $destPtr,
+                $this->context->helper->loadValue($src)
+            );
+
+            return;
+        }
+        if (JIT\Variable::TYPE_NATIVE_BOOL === $src->type) {
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeBool'),
+                $destPtr,
+                $this->context->helper->loadValue($src)
+            );
+
+            return;
+        }
+        if (JIT\Variable::TYPE_NULL === $src->type) {
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeNull'),
+                $destPtr
+            );
+
+            return;
+        }
+        if (JIT\Variable::TYPE_VALUE === $src->type) {
+            JIT\JitValueBox::copyFromPointer(
+                $this->context,
+                $destField,
+                JIT\JitValueBox::valuePtrFromVariable($this->context, $src)
+            );
+
+            return;
+        }
+        if (null !== $srcOp) {
+            $lit = $srcOp instanceof Operand\Literal ? $srcOp : null;
+            if (null !== $lit && null !== $lit->type) {
+                $boxed = JIT\Variable::fromLiteral($this->context, $lit);
+                $this->assignValueToGeneratorField($destField, $boxed, null);
+
+                return;
+            }
+        }
+        throw new \LogicException('Unsupported generator yield value type in JIT (issue #3074)');
     }
 
     private function markJitThisConstructedIfLeavingConstruct(Block $block): void

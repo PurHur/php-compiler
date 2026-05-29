@@ -122,6 +122,11 @@ final class Variable {
     /** Native call proxy when this object is a JIT-lowered closure (#72). */
     public ?Call $closureCall = null;
 
+    /** Heap {@see __generator_state__*} for JIT Generator objects (#3074). */
+    public ?\PHPLLVM\Value $generatorStatePtr = null;
+
+    public ?string $generatorResumeName = null;
+
     /** Live {@see __value__*} for closure use (&$var) capture slots (issue #72). */
     public ?\PHPLLVM\Value $valueBoxAliasPtr = null;
 

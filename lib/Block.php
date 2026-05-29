@@ -607,6 +607,54 @@ class Block {
         );
     }
 
+    /**
+     * Top-level script scope only (skips nested TYPE_FUNCDEF bodies; issue #3074).
+     * Used so bin/jit.php can MCJIT the main script while generator bodies use resume lowering.
+     */
+    public static function containsGeneratorOpcodesInScriptScope(?self $root): bool
+    {
+        return self::containsOpcodeTypesSkippingFuncDefs(
+            $root,
+            OpCode::TYPE_YIELD,
+            OpCode::TYPE_YIELD_FROM
+        );
+    }
+
+    /**
+     * @param int ...$types OpCode::TYPE_* values to match
+     */
+    private static function containsOpcodeTypesSkippingFuncDefs(?self $root, int ...$types): bool
+    {
+        if (null === $root || [] === $types) {
+            return false;
+        }
+        $want = array_fill_keys($types, true);
+        $seen = new \SplObjectStorage();
+        $stack = [$root];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if (!$block instanceof self || $seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $op) {
+                if (isset($want[$op->type])) {
+                    return true;
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        if (OpCode::TYPE_FUNCDEF === $op->type && $sub === $op->block1) {
+                            continue;
+                        }
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
     /** Script contains try/catch/finally/throw opcodes (#2114). IR may verify; MCJIT execute is not yet safe. */
     public static function containsExceptionHandlingOpcodes(?self $root): bool
     {
@@ -626,6 +674,6 @@ class Block {
     public static function requiresVmLowering(?self $root): bool
     {
         return self::containsExceptionHandlingOpcodes($root)
-            || self::containsGeneratorOpcodes($root);
+            || self::containsGeneratorOpcodesInScriptScope($root);
     }
 }

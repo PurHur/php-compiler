@@ -19,6 +19,9 @@ class Scope {
     public ?Call $toCall = null;
     public array $args = [];
 
+    /** Resume LLVM symbol when calling a user generator (#3074). */
+    public ?string $generatorResumeCallee = null;
+
     public function __construct() {
         $this->blockStorage = new \SplObjectStorage;
         $this->variables = new \SplObjectStorage;

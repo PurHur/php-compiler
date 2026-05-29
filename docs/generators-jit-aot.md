@@ -6,7 +6,7 @@
 |-------|--------|-----------|
 | **Compiler** | Done | `TYPE_YIELD` / `TYPE_YIELD_FROM`; `Block::$isGenerator` |
 | **VM** | Done | `GeneratorState`, `VM::GENERATOR_YIELD`, foreach over generators |
-| **JIT (`bin/jit.php`)** | VM fallback | Skips MCJIT when `Block::requiresVmLowering()` (yield or EH) |
+| **JIT (`bin/jit.php`)** | MCJIT resume (#3074) | Main script MCJIT when yield only in nested functions; `GeneratorHelper` switch-on-resume-ip |
 | **AOT (`phpc build`)** | Blocked | `Runtime::standalone()` throws before link |
 | **Bootstrap spine AOT** | Blocked | `script/bootstrap-lib.php` inventory flags `generator yield` |
 
@@ -44,7 +44,7 @@ Requires LLVM coroutine passes (or hand-rolled switch-on-IP state machine like m
 
 1. ✅ VM + JIT fallback + compile-time guards (this issue)
 2. EH stability in MCJIT (#2114) — share `requiresVmLowering` gate
-3. JIT stub → selective VM dispatch for generator *calls* while main script stays native
+3. ✅ MCJIT resume lowering for generator *calls* while main script stays native (#3074)
 4. Prototype switch-on-IP lowering for single-function generators without `yield from`
 5. AOT link only after JIT path is stable; remove bootstrap inventory blocker last
 
