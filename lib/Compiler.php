@@ -2607,6 +2607,23 @@ class Compiler {
         return $operand instanceof Operand\Literal ? $operand : null;
     }
 
+    /**
+     * Scope slot for the local alias created by `global $name` (#3413).
+     *
+     * php-cfg may pass writeVariable(Literal('x')) rather than a Variable operand.
+     */
+    protected function compileGlobalImportSlot(Operand $var, string $globalName, Block $block): int
+    {
+        if ($var instanceof Operand\Variable) {
+            return $block->getVarSlot($var, false);
+        }
+        $nameLiteral = new Operand\Literal($globalName);
+        $nameLiteral->type = Type::string();
+        $local = new Operand\Variable($nameLiteral);
+
+        return $block->getVarSlot($local, false);
+    }
+
     protected function resolveSimpleVariableName(Operand $var): string
     {
         while ($var instanceof Temporary) {
@@ -3142,7 +3159,7 @@ class Compiler {
                 $nameSlot = $block->registerConstant($nameOperand, $nameVar);
                 return [new OpCode(
                     OpCode::TYPE_DECLARE_GLOBAL,
-                    $this->compileOperand($terminal->var, $block, false),
+                    $this->compileGlobalImportSlot($terminal->var, $globalName, $block),
                     $nameSlot
                 )];
             case 'Terminal_StaticVar':

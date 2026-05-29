@@ -53,6 +53,7 @@ final class Superglobals
     {
         // Compile-time switch for self-host AOT: avoid class-const NAMES fetch in JIT (#816).
         switch ($name) {
+            case 'GLOBALS':
             case '_GET':
             case '_POST':
             case '_SERVER':

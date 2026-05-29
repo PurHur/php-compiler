@@ -334,7 +334,7 @@ restart:
                     $dest = $frame->scope[$op->arg1];
                     $name = $frame->scope[$op->arg2]->resolveIndirect()->toString();
                     if (Superglobals::isSuperglobalName($name)) {
-                        $target = $this->context->ensureGlobal($name);
+                        $target = $this->context->ensureSuperglobal($name);
                     } else {
                         $target = $frame->block->findVariableByRuntimeName($name, $frame);
                         if (null === $target) {
@@ -382,6 +382,19 @@ restart:
                         $offset->stringOffset($container, $arg3->toInt());
                         $arg1->indirect($offset);
                     } elseif ($container->type === Variable::TYPE_ARRAY) {
+                        if ($this->context->isGlobalsTable($container)) {
+                            if (!$forWrite && Variable::TYPE_STRING === $arg3->type
+                                && null === $container->toArray()->find($arg3->toString())) {
+                                $this->context->errors->undefinedArrayKey(
+                                    $arg3,
+                                    $this->context,
+                                    $frame,
+                                    '' !== $frame->scriptPath ? $frame->scriptPath : null
+                                );
+                            }
+                            $arg1->indirect($this->context->globalsTableOffsetFetch($arg3, $forWrite));
+                            break;
+                        }
                         $table = $container->toArray();
                         if (!$forWrite && !$table->keyExists($arg3)) {
                             $this->context->errors->undefinedArrayKey(
