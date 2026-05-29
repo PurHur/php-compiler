@@ -111,6 +111,12 @@ class Runtime {
         }
     }
 
+    public function vm(): VM {
+        $this->ensureVm();
+
+        return $this->vm;
+    }
+
     public function __destruct() {
         foreach ($this->modules as $module) {
             $module->shutdown();

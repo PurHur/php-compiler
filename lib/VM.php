@@ -12,6 +12,7 @@ namespace PHPCompiler;
 require_once __DIR__.'/OpCodeNames.php';
 
 use PHPCompiler\Func;
+use PHPCompiler\ext\standard\VmEval;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\ClosureState;
@@ -188,6 +189,32 @@ class VM {
         } finally {
             $this->context->swapRunStack($savedStack);
         }
+    }
+
+    /**
+     * Execute dynamically compiled eval() code in the caller variable scope (#3358).
+     */
+    public function executeEvalBlock(Block $block, Frame $caller): Variable
+    {
+        $out = new Variable();
+        $child = $block->getFrame($this->context, $caller);
+        $child->ephemeral = true;
+        // Scope comes from getFrame($caller); parent must stay null so nested runFrames exits.
+        $child->parent = null;
+        $child->returnVar = $out;
+        $child->scriptPath = VmEval::EVAL_FILENAME;
+        $this->context->scriptStack->push($child->scriptPath);
+        try {
+            $this->context->push($child);
+            $result = $this->runFrames();
+            if (self::SUCCESS !== $result) {
+                throw new \LogicException('eval() execution failed in this compiler build');
+            }
+        } finally {
+            $this->context->scriptStack->pop();
+        }
+
+        return $out->resolveIndirect();
     }
 
     /**
@@ -506,6 +533,23 @@ restart:
                 case OpCode::TYPE_PRINT:
                     VM\OutputBuffer::append($frame->scope[$op->arg2]->toString());
                     $frame->scope[$op->arg1]->int(1);
+                    break;
+                case OpCode::TYPE_EVAL:
+                    $codeVar = $frame->scope[$op->arg2]->resolveIndirect();
+                    $dest = $frame->scope[$op->arg1];
+                    if (Variable::TYPE_STRING !== $codeVar->type) {
+                        return $this->raise('eval() expects a string argument', $frame);
+                    }
+                    $evalResult = VmEval::evalCodeInFrame(
+                        $this,
+                        $frame,
+                        $codeVar->toString()
+                    );
+                    if (false === $evalResult) {
+                        $dest->bool(false);
+                        break;
+                    }
+                    $dest->copyFrom($evalResult);
                     break;
                 case OpCode::TYPE_COALESCE:
                     $takeLeft = $frame->scope[$op->arg2]->toBool();
