@@ -492,7 +492,15 @@ class Context {
         $machine->emitToFile($this->module, $objectFile, $machine::CODEGEN_FILE_TYPE_OBJECT);
         Progress::noteFunction('jit_context_emit_object_done');
         $keepObject = getenv('PHP_COMPILER_KEEP_OBJECT_FILE');
-        if ('1' === $keepObject || 'true' === strtolower((string) $keepObject)) {
+        $vendorPrelink = getenv('PHP_COMPILER_VENDOR_PRELINK');
+        $selfhostAot = getenv('PHP_COMPILER_SELFHOST_AOT');
+        $vendorObjectOnly = ('1' === $vendorPrelink || 'true' === strtolower((string) $vendorPrelink))
+            && ('0' === $selfhostAot || 'false' === strtolower((string) $selfhostAot));
+        if (
+            '1' === $keepObject
+            || 'true' === strtolower((string) $keepObject)
+            || $vendorObjectOnly
+        ) {
             return;
         }
         Progress::noteFunction('jit_context_link_begin');

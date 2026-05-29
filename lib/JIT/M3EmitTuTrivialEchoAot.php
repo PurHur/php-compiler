@@ -209,6 +209,68 @@ final class M3EmitTuTrivialEchoAot
         return $phi;
     }
 
+    /**
+     * Runtime::standalone dispatch: sidecar copy unless PHP_COMPILER_KEEP_OBJECT_FILE=1 and no
+     * sentinel match — then call real standalone lowering (vendor prelink .o — #3036).
+     */
+    public static function emitStandaloneWithKeepObjectDispatch(
+        Context $context,
+        Value $runtime,
+        Value $block,
+        Value $outFile,
+        Value $realStandaloneFn
+    ): void {
+        $charPtr = $context->getTypeFromString('char*');
+        $i8p = $context->getTypeFromString('int8*');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $keepKey = $context->builder->pointerCast(
+            $context->constantFromString('PHP_COMPILER_KEEP_OBJECT_FILE'),
+            $charPtr
+        );
+        $vendorKey = $context->builder->pointerCast(
+            $context->constantFromString('PHP_COMPILER_VENDOR_PRELINK'),
+            $charPtr
+        );
+        $keepEnv = $context->builder->call($context->lookupFunction('getenv'), $keepKey);
+        $vendorEnv = $context->builder->call($context->lookupFunction('getenv'), $vendorKey);
+        $useReal = self::envIsTruthy($context, $keepEnv, $i8p, $charPtr);
+        $useReal = $context->builder->or($useReal, self::envIsTruthy($context, $vendorEnv, $i8p, $charPtr));
+        $sidecarBb = BasicBlockHelper::append($context, 'm3te_std_sidecar_path');
+        $realBb = BasicBlockHelper::append($context, 'm3te_std_keepobject_real');
+        $context->builder->branchIf($useReal, $realBb, $sidecarBb);
+        $context->builder->positionAtEnd($sidecarBb);
+        if (self::isRegistered($context)) {
+            self::emitStandaloneWriteCachedAot($context, $block, $outFile);
+        } else {
+            $context->builder->returnVoid();
+        }
+        $context->builder->positionAtEnd($realBb);
+        $nullStr = $strPtr->constNull();
+        $context->builder->call($realStandaloneFn, $runtime, $block, $outFile, $nullStr, $nullStr);
+        $context->builder->returnVoid();
+    }
+
+    private static function envIsTruthy(Context $context, Value $env, Value $i8p, Value $charPtr): Value
+    {
+        $envNull = $context->builder->icmp(Builder::INT_EQ, $env, $i8p->constNull());
+        $checkBb = BasicBlockHelper::append($context, 'm3te_env_chk');
+        $falseBb = BasicBlockHelper::append($context, 'm3te_env_false');
+        $mergeBb = BasicBlockHelper::append($context, 'm3te_env_done');
+        $context->builder->branchIf($envNull, $falseBb, $checkBb);
+        $context->builder->positionAtEnd($checkBb);
+        $first = $context->builder->load($env);
+        $isOne = $context->builder->icmp(Builder::INT_EQ, $first, $charPtr->constInt(ord('1'), false));
+        $context->builder->branch($mergeBb);
+        $context->builder->positionAtEnd($falseBb);
+        $context->builder->branch($mergeBb);
+        $context->builder->positionAtEnd($mergeBb);
+        $phi = $context->builder->phi($context->getTypeFromString('int1'));
+        $phi->addIncoming($context->getTypeFromString('int1')->constInt(0, false), $falseBb);
+        $phi->addIncoming($isOne, $checkBb);
+
+        return $phi;
+    }
+
     /** Runtime::standalone native for emit-helper SPINE — copy matched sidecar to outfile. */
     public static function emitStandaloneWriteCachedAot(Context $context, Value $block, Value $outFile): void
     {

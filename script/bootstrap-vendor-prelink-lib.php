@@ -431,6 +431,14 @@ function bootstrapVendorPrelinkCompilePackages(
             fwrite(STDOUT, "OK {$package} → {$objectRel}\n");
             continue;
         }
+        // Native argv / emit-helper may write object bytes to -o without separate .o suffix (#3036).
+        if (0 === $code && !is_file($objectCandidate) && is_file($buildBase)) {
+            copy($buildBase, $objectAbs);
+            $manifest['packages'][$package]['status'] = 'object_ok';
+            $manifest['packages'][$package]['blocker'] = null;
+            fwrite(STDOUT, "OK {$package} → {$objectRel} (native compile)\n");
+            continue;
+        }
 
         $sidecarSource = bootstrapVendorPrelinkCopySidecarFallback($root, $slug, $objectAbs);
         if (null !== $sidecarSource) {
@@ -556,6 +564,8 @@ function bootstrapVendorPrelinkColdBootCompile(string $root, string $manifestPat
     putenv('PHP_COMPILER_VENDOR_PRELINK=1');
     putenv('PHP_COMPILER_KEEP_OBJECT_FILE=1');
 
+    bootstrapVendorPrelinkEnsureDriverSidecars($root);
+
     $compileInvoker = bootstrapVendorPrelinkResolveCompileInvoker($root);
     if (
         'zend' === $compileInvoker['mode']
@@ -641,6 +651,36 @@ function bootstrapVendorPrelinkColdBootCompile(string $root, string $manifestPat
 }
 
 /**
+ * Link-time vendor .o sidecars for M3 emit-helper (inventory driver — #3036).
+ *
+ * Built by bootstrap-selfhost-driver-host-compile.sh with BOOTSTRAP_M5_DRIVER_HOST_FULL_CLI=1.
+ */
+function bootstrapVendorPrelinkEnsureDriverSidecars(string $root): bool
+{
+    if (is_file($root.'/build/.m3_vendor_php_cfg_prelink.o')) {
+        return true;
+    }
+    $script = $root.'/script/bootstrap-selfhost-driver-host-compile.sh';
+    if (!is_file($script)) {
+        fwrite(STDERR, "bootstrap-vendor-objects: missing {$script} (cannot build vendor sidecars)\n");
+
+        return false;
+    }
+    $llvm = getenv('PHP_COMPILER_LLVM_PATH') ?: '';
+    if ('' === $llvm || !is_file($llvm.'/libLLVM-9.so.1')) {
+        fwrite(STDERR, "bootstrap-vendor-objects: LLVM 9 required to build vendor emit sidecars\n");
+
+        return false;
+    }
+    fwrite(STDERR, "bootstrap-vendor-objects: building M5 vendor emit sidecars (BOOTSTRAP_M5_DRIVER_HOST_FULL_CLI=1 — #3036)\n");
+    putenv('BOOTSTRAP_M5_DRIVER_HOST_FULL_CLI=1');
+    $cmd = 'bash '.escapeshellarg($script);
+    passthru($cmd, $code);
+
+    return 0 === $code && is_file($root.'/build/.m3_vendor_php_cfg_prelink.o');
+}
+
+/**
  * Resolve gen-0 vendor prelink AOT invoker: compiled driver when present, else Zend php bin/compile.php (#2842, #2849).
  *
  * @return array{mode: 'native'|'zend', argv: list<string>}
@@ -705,10 +745,13 @@ function bootstrapVendorPrelinkBuildCompileCommand(
 ): string {
     $inv = $invoker ?? bootstrapVendorPrelinkResolveCompileInvoker($root);
     $argv = array_map('escapeshellarg', $inv['argv']);
+    // Native argv driver copies link-time vendor .o sidecar to -o; use .o path (#3036).
+    $compileOut = $buildBase.'.o';
 
     return 'PHP_COMPILER_VENDOR_PRELINK=1 PHP_COMPILER_SELFHOST_AOT=0 PHP_COMPILER_KEEP_OBJECT_FILE=1 '
+        .' PHP_COMPILER_M3_EMIT_HELPER_SPINE=1 '
         .implode(' ', $argv)
-        .' -o '.escapeshellarg($buildBase)
+        .' -o '.escapeshellarg($compileOut)
         .' '.escapeshellarg($bundleAbs)
         .' 2>&1';
 }

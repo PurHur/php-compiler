@@ -25,17 +25,26 @@ function helloworld_compile_smoke(string $sourceFile, string $outFile): int
     // allowlist is enabled even when invoked from a compiled argv driver where env
     // propagation can be incomplete (#3004).
     if (\function_exists('putenv')) {
-        $selfhostAot = getenv('PHP_COMPILER_SELFHOST_AOT');
-        if (false === $selfhostAot || '' === $selfhostAot) {
-            putenv('PHP_COMPILER_SELFHOST_AOT=1');
-        }
-        $m3CompileDriver = getenv('PHP_COMPILER_M3_COMPILE_DRIVER');
-        if (false === $m3CompileDriver || '' === $m3CompileDriver) {
-            putenv('PHP_COMPILER_M3_COMPILE_DRIVER=1');
-        }
-        $m3CompileDriverMain = getenv('PHP_COMPILER_M3_COMPILE_DRIVER_MAIN');
-        if (false === $m3CompileDriverMain || '' === $m3CompileDriverMain) {
-            putenv('PHP_COMPILER_M3_COMPILE_DRIVER_MAIN=1');
+        $vendorPrelink = getenv('PHP_COMPILER_VENDOR_PRELINK');
+        if ('1' === $vendorPrelink || 'true' === strtolower((string) $vendorPrelink)) {
+            putenv('PHP_COMPILER_SELFHOST_AOT=0');
+            putenv('PHP_COMPILER_KEEP_OBJECT_FILE=1');
+            putenv('PHP_COMPILER_M3_EMIT_HELPER_SPINE=1');
+            putenv('PHP_COMPILER_M3_COMPILE_DRIVER=0');
+            putenv('PHP_COMPILER_M3_COMPILE_DRIVER_MAIN=0');
+        } else {
+            $selfhostAot = getenv('PHP_COMPILER_SELFHOST_AOT');
+            if (false === $selfhostAot || '' === $selfhostAot) {
+                putenv('PHP_COMPILER_SELFHOST_AOT=1');
+            }
+            $m3CompileDriver = getenv('PHP_COMPILER_M3_COMPILE_DRIVER');
+            if (false === $m3CompileDriver || '' === $m3CompileDriver) {
+                putenv('PHP_COMPILER_M3_COMPILE_DRIVER=1');
+            }
+            $m3CompileDriverMain = getenv('PHP_COMPILER_M3_COMPILE_DRIVER_MAIN');
+            if (false === $m3CompileDriverMain || '' === $m3CompileDriverMain) {
+                putenv('PHP_COMPILER_M3_COMPILE_DRIVER_MAIN=1');
+            }
         }
     }
     if (!is_file($sourceFile)) {
@@ -88,7 +97,18 @@ function helloworld_compile_smoke(string $sourceFile, string $outFile): int
         return 1;
     }
 
-    $runtime->standalone($block, $outFile, $code, $resolved);
+    $vendorPrelinkEmit = \function_exists('getenv')
+        && ('1' === getenv('PHP_COMPILER_VENDOR_PRELINK') || 'true' === strtolower((string) getenv('PHP_COMPILER_VENDOR_PRELINK')))
+        && ('1' === getenv('PHP_COMPILER_KEEP_OBJECT_FILE') || 'true' === strtolower((string) getenv('PHP_COMPILER_KEEP_OBJECT_FILE')));
+    if ($vendorPrelinkEmit) {
+        // Inventory driver stubs Runtime::standalone (sidecar copy). Emit object file directly (#3036).
+        $jit = $runtime->loadJit();
+        $context = $runtime->loadJitContext();
+        $context->setMain($jit->compile($block));
+        $context->compileToFile($outFile);
+    } else {
+        $runtime->standalone($block, $outFile, $code, $resolved);
+    }
 
     echo 'helloworld_compile_smoke: compile OK -> '.$outFile."\n";
 

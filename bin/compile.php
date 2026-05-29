@@ -136,6 +136,14 @@ function run(string $filename, string $code, array $options): void
     if ('' !== $normalized && str_contains($normalized, 'jit_result_stub.php')) {
         putenv('PHP_COMPILER_SELFHOST_AOT=1');
     }
+    if ('' !== $normalized && str_contains($normalized, 'bootstrap-vendor-prelink/generated/')) {
+        $vendorPrelink = getenv('PHP_COMPILER_VENDOR_PRELINK');
+        if ('1' === $vendorPrelink || 'true' === strtolower((string) $vendorPrelink)) {
+            // Real-lower parse/compile for vendor bundles; avoid M3 emit-TU sidecar host-compile (#3028, #3036).
+            putenv('PHP_COMPILER_M3_EMIT_HELPER_SPINE=1');
+            putenv('PHP_COMPILER_KEEP_OBJECT_FILE=1');
+        }
+    }
     $includes = $options['--include'] ?? [];
     if (!is_array($includes)) {
         $includes = [] === $includes || '' === $includes ? [] : [$includes];

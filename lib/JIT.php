@@ -272,6 +272,38 @@ class JIT {
         return '1' === $flag || 'true' === strtolower((string) $flag);
     }
 
+    /**
+     * M5 vendor cold boot: argv compile drivers must real-lower Runtime::standalone so
+     * PHP_COMPILER_KEEP_OBJECT_FILE=1 leaves buildBase.o (not sidecar copy only — #3036).
+     */
+    private function shouldPrelowerRuntimeStandaloneForKeepObjectEmit(): bool
+    {
+        if (!$this->shouldUseM3CompileDriverRealLowering()) {
+            return false;
+        }
+        // Sidecar host-compiles (bin/compile.php blob, vendor bundles) must keep standalone stubbed.
+        if ('1' === (string) getenv('PHP_COMPILER_M3_EMIT_SIDECAR_RECURSION_GUARD')) {
+            return false;
+        }
+        if ('1' === (string) getenv('PHP_COMPILER_M3_EMIT_TU')) {
+            return false;
+        }
+
+        return $this->shouldUseM4BinCompileArgvMainNative()
+            || ($this->shouldUseM3CompileDriverMainNative() && $this->shouldUseEmitHelperLinkStubs());
+    }
+
+    /** M5 vendor argv compile: emit-helper spine real-lowers parse/compile/standalone (#3036). */
+    private function shouldUseVendorPrelinkObjectEmit(): bool
+    {
+        if (!$this->shouldUseVendorPrelinkJitStubs()) {
+            return false;
+        }
+        $keep = getenv('PHP_COMPILER_KEEP_OBJECT_FILE');
+
+        return '1' === $keep || 'true' === strtolower((string) $keep);
+    }
+
     private function shouldSkipExternalClassBodyLowering(int $classId): bool
     {
         if ($this->shouldUseSelfHostJitStubs()
@@ -1247,7 +1279,10 @@ class JIT {
         }
         if (!$this->shouldUseM3CompileDriverRealLowering()) {
             if ($this->shouldUseM3EmitTuEmitHelperSpineRealLowering()) {
-                static $emitHelperSpineReal = ['parse', 'compileemitsmoke'];
+                $emitHelperSpineReal = ['parse', 'compileemitsmoke'];
+                if ($this->shouldUseVendorPrelinkObjectEmit()) {
+                    $emitHelperSpineReal = ['parse', 'compile', 'standalone'];
+                }
 
                 return !in_array($methodLc, $emitHelperSpineReal, true);
             }
@@ -3557,6 +3592,55 @@ class JIT {
         return $func;
     }
 
+    /**
+     * Real Runtime::standalone for M5 vendor .o emit (separate symbol from sidecar stub — #3036).
+     */
+    private function ensureRuntimeStandaloneKeepObjectLoweringForLink(): ?PHPLLVM\Value
+    {
+        if (!$this->shouldPrelowerRuntimeStandaloneForKeepObjectEmit()) {
+            return null;
+        }
+        $logical = 'PHPCompiler\\Runtime::standaloneKeepObject';
+        $lc = strtolower($logical);
+        if (isset($this->context->functions[$lc])) {
+            return $this->context->functions[$lc];
+        }
+        $standaloneBlock = null;
+        foreach ($this->queue as $item) {
+            $func = $item[0];
+            if (!$func instanceof CoreFunc\PHP) {
+                continue;
+            }
+            if ('phpcompiler\\runtime::standalone' === strtolower($func->getName())) {
+                $standaloneBlock = $func->block;
+                break;
+            }
+        }
+        if (null === $standaloneBlock) {
+            $this->compileM3EmitTuRuntimeMethodFromModules('standalone');
+            $this->runQueue();
+            foreach ($this->queue as $item) {
+                $func = $item[0];
+                if (!$func instanceof CoreFunc\PHP) {
+                    continue;
+                }
+                if ('phpcompiler\\runtime::standalone' === strtolower($func->getName())) {
+                    $standaloneBlock = $func->block;
+                    break;
+                }
+            }
+            if (null === $standaloneBlock) {
+                return null;
+            }
+        }
+
+        return $this->compileRuntimeSpinePhpLowering(
+            $this->llvmInternalName($logical),
+            $standaloneBlock,
+            $logical
+        );
+    }
+
     /** Stub Runtime::standalone for emit TU link — Batch A replaces (#2516). */
     private function emitM3EmitTuRuntimeStandaloneStubNative(
         string $internalName,
@@ -3567,6 +3651,7 @@ class JIT {
         if (isset($this->context->functions[$lcname])) {
             return $this->context->functions[$lcname];
         }
+        $keepObjectStandalone = $this->ensureRuntimeStandaloneKeepObjectLoweringForLink();
         $objectPtr = $this->context->getTypeFromString('__object__*');
         $strPtr = $this->context->getTypeFromString('__string__*');
         $voidTy = $this->context->getTypeFromString('void');
@@ -3578,7 +3663,15 @@ class JIT {
         $saved = $this->context->builder;
         $this->context->builder = $this->context->context->builderCreate();
         $this->context->builder->positionAtEnd($bb);
-        if (\PHPCompiler\JIT\M3EmitTuTrivialEchoAot::isRegistered($this->context)) {
+        if (null !== $keepObjectStandalone) {
+            \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::emitStandaloneWithKeepObjectDispatch(
+                $this->context,
+                $func->getParam(0),
+                $func->getParam(1),
+                $func->getParam(2),
+                $keepObjectStandalone
+            );
+        } elseif (\PHPCompiler\JIT\M3EmitTuTrivialEchoAot::isRegistered($this->context)) {
             \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::emitStandaloneWriteCachedAot(
                 $this->context,
                 $func->getParam(1),
