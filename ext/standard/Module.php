@@ -295,6 +295,7 @@ class Module extends ModuleAbstract
             new defined_(),
             new debug_backtrace(),
             new class_exists_(),
+            new class_alias(),
             new enum_exists_(),
             new interface_exists_(),
             new trait_exists_(),

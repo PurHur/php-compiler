@@ -37,6 +37,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'class_uses_runtime')) {
                 continue;
             }
+            // class_alias() is VM-only (#3095).
+            if (str_contains(strtolower($case[0]), 'class_alias')) {
+                continue;
+            }
             yield $name => $case;
         }
     }
