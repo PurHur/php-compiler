@@ -91,6 +91,11 @@ class Compiler {
         $this->debugLastPhaseInputFile = $filename;
     }
 
+    public function getDebugLastPhaseInputFile(): ?string
+    {
+        return $this->debugLastPhaseInputFile;
+    }
+
     private function debugLastPhaseIsEnabled(): bool
     {
         if (\defined('PHP_COMPILER_DEBUG_LAST_PHASE') && PHP_COMPILER_DEBUG_LAST_PHASE) {
@@ -238,6 +243,21 @@ class Compiler {
         }
 
         throw new \LogicException($detail);
+    }
+
+    /**
+     * Like {@see throwCompileLogic} but enriches abort detail with CFG file/line (#2988).
+     */
+    protected function throwCompileLogicForOp(Op $op, string $detail): void
+    {
+        if (
+            str_contains($detail, 'Unknown ')
+            || str_contains($detail, 'Unsupported ')
+        ) {
+            $detail = Lint\Issue::fromOp($op, $detail)->formatHuman();
+        }
+
+        $this->throwCompileLogic($detail);
     }
 
     /**
@@ -2679,7 +2699,7 @@ class Compiler {
                 $block->addOpCode($terminalOp);
             }
         } else {
-            $this->throwCompileLogic("Unknown Op Type: " . opcode_type_name($op->type));
+            $this->throwCompileLogicForOp($op, 'Unknown Op Type: '.opcode_type_name($op->type));
         }
     }
 
@@ -2743,7 +2763,7 @@ class Compiler {
             }
             $block->addOpCode(new OpCode(OpCode::TYPE_RETURN_VOID));
         } else {
-            $this->throwCompileLogic("Unknown Stmt Type: " . $stmt->getType());
+            $this->throwCompileLogicForOp($stmt, 'Unknown Stmt Type: '.$stmt->getType());
         }
     }
 
@@ -3331,7 +3351,7 @@ class Compiler {
                     $this->compileOperand($expr->expr, $block, true),
                 )];
         }
-        $this->throwCompileLogic("Unsupported expression: " . $expr->getType());
+        $this->throwCompileLogicForOp($expr, 'Unsupported expression: '.$expr->getType());
     }
 
     /**
