@@ -19,8 +19,6 @@ final class ReadonlyRaise
 
     private static ?int $clearPendingAddress = null;
 
-    private static bool $globalsRegistered = false;
-
     public static function ensureLinked(Context $context): void
     {
         if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
@@ -49,9 +47,6 @@ final class ReadonlyRaise
 
     private static function registerPendingGlobals(Context $context): void
     {
-        if (self::$globalsRegistered) {
-            return;
-        }
         $i8 = $context->getTypeFromString('int8');
         $msgTy = $i8->arrayType(512);
         if (null === $context->module->getNamedGlobal('phpc_jit_pending_flag')) {
@@ -61,7 +56,6 @@ final class ReadonlyRaise
         if (null === $context->module->getNamedGlobal('phpc_jit_pending_msg')) {
             $context->module->addGlobal($msgTy, 'phpc_jit_pending_msg');
         }
-        self::$globalsRegistered = true;
     }
 
     private static function implementRaiseFunction(Context $context): void
