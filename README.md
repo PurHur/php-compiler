@@ -125,21 +125,100 @@ make examples-web-smoke     # phpc serve + HTTP curls
 
 ---
 
-## What works today (honest snapshot)
+## Capabilities & limitations
 
-| Area | Status |
-|------|--------|
-| `phpc` CLI (`run`, `serve`, `build`, `deploy`, `lint`, `test`, `init`) | ✅ Stable for the supported subset |
-| Examples **000–007** (VM + AOT on supported paths) | ✅ |
-| **003-MiniWebApp** native execute (home, routes, contact POST) | ✅ |
-| Wave 3 language/stdlib batch (tracked subset) | ✅ 12/12 + 13/13 on master |
-| **Self-host M0–M4** (bundled compiler, spine **726/726**, gen-3 loop) | ✅ experimental |
-| **Self-host M5** (vendor prelink, Zend-free gen-0 seed) | 🚧 in progress |
-| Full Zend PHP 8 compatibility | ❌ — [gap tables](https://purhur.github.io/php-compiler/missing-implementation.html) |
+php-compiler is **not** a drop-in Zend PHP replacement. It implements a **web-capable PHP 8 subset** aimed at small CLI/CGI apps, native deployment, and (experimentally) compiling its own `lib/` tree. Capabilities differ by backend — **VM**, **JIT**, and **AOT** do not always match.
 
-**Not yet native everywhere:** some constructs (e.g. full exception unwind in JIT, generators in AOT, rich closure/`use` semantics) remain VM-first or in progress — details on the [missing-implementation](https://purhur.github.io/php-compiler/missing-implementation.html) page and [capability comparison](https://purhur.github.io/php-compiler/capability-comparison.html).
+| Column | Meaning |
+|--------|---------|
+| **VM** | Runs under `phpc run` / `bin/vm.php` — broadest language coverage, slowest |
+| **JIT** | `bin/jit.php` — native code via LLVM MCJIT; some CFGs fall back to VM |
+| **AOT** | `phpc build` — standalone binary; strictest; many features blocked at link time |
 
-**Public status:** [Overview](https://purhur.github.io/php-compiler/docs/pages/index.html) · [Development status](https://purhur.github.io/php-compiler/development-status.html) · [PHP vs us](https://purhur.github.io/php-compiler/capability-comparison.html).
+Full matrices (auto-generated): [`docs/capabilities.md`](docs/capabilities.md) (builtins) · [`docs/capabilities-syntax.md`](docs/capabilities-syntax.md) (language) · public [gap tables](https://purhur.github.io/php-compiler/missing-implementation.html) · [PHP vs us](https://purhur.github.io/php-compiler/capability-comparison.html).
+
+### What v1.0 supports well
+
+**Language & OOP (typical app code)**
+
+- Classes, `new`, interfaces, `instanceof`, constructors, visibility, promoted properties, `readonly` classes
+- Instance and static methods, `parent::`, late static binding, magic constants (`__DIR__`, `__FILE__`, `__CLASS__`, …)
+- Namespaces, `use function` / `use const`, group `use`
+- `match`, scalar `declare(strict_types=1)`, union/intersection types (intersection AOT-limited)
+- `try` / `catch` / `throw` on VM (compliance-tested); multi-type `catch`
+- Attributes — reflection read path (`getAttributes()`, name only; no `newInstance()` on attributes)
+- Generators (`yield`, `yield from`) — **VM only**; JIT runs generator scripts on VM fallback
+- Enums (backed), traits (simple `use Trait;` — VM-first for some trait paths)
+
+**Web & deployment**
+
+- CGI-style superglobals (`$_GET`, `$_POST`, `$_SERVER`, `$_FILES`, `$_COOKIE`, `$_SESSION`)
+- `phpc serve` dev server and `phpc serve --aot` for prebuilt binaries
+- Sessions, multipart uploads, JSON APIs — see examples **005–007**
+- `phpc build`, `phpc deploy`, `phpc.json` project manifests
+- Reference **003-MiniWebApp**: router, templates, forms, native AOT execute on supported routes
+
+**Standard library**
+
+- Large builtin surface for strings, arrays, JSON, hashing, `preg_*`, filesystem, streams — see matrix (~200+ functions with VM/JIT/AOT columns)
+- Wave 3 tracked batch: **12/12** language + **13/13** stdlib items closed on master (May 2026)
+- Callback builtins (`array_map`, etc.): string/function name callees; **closures in callbacks still deferred**
+
+**Tooling**
+
+- `phpc lint` — scan trees for unsupported syntax before compile
+- `phpc doctor` — environment and example gate probes
+- Local/Docker CI: `phpc test`, `phpc test --fast`
+
+### Known limitations
+
+**Language (subset gaps)**
+
+| Area | VM | JIT / AOT | Notes |
+|------|:--:|:---------:|-------|
+| `try` / `catch` / `finally` | Partial | Unwind incomplete | `finally` and post-catch edge cases; JIT EH not production-safe ([#2114](https://github.com/PurHur/php-compiler/issues/2114)) |
+| Closures / arrow `fn () =>` | No / limited | Not lowered | Not in v1.0 app path; bootstrap may stub to `null` for self-host link ([#72](https://github.com/PurHur/php-compiler/issues/72), [#142](https://github.com/PurHur/php-compiler/issues/142)) |
+| Generators (`yield`) | Yes | No native | JIT/AOT skip or VM-fallback ([#167](https://github.com/PurHur/php-compiler/issues/167)) |
+| By-ref parameters | VM | No JIT | [#140](https://github.com/PurHur/php-compiler/issues/140) |
+| Enums in AOT | VM/JIT | No | [#1356](https://github.com/PurHur/php-compiler/issues/1356) |
+| Full trait adaptation (`insteadof` / `as`) | Partial | Gaps | [#144](https://github.com/PurHur/php-compiler/issues/144) |
+
+**Runtime & platform**
+
+- **Not Zend-compatible** — no `ext-*` ecosystem, no Composer autoload at AOT runtime, no `eval()`, no full reflection beyond supported paths
+- **LLVM 9 only** — JIT/AOT tied to bundled toolchain; upgrading LLVM is non-trivial
+- **JIT compile cost** — recompiles on each `bin/jit.php` run; not a long-lived FPM replacement
+- **Performance** — AOT can be fast; VM path is PHP-on-PHP; see [`benchmarks/`](benchmarks/)
+- **Security model** — same trust as running native code; no sandbox; body size limits on `phpc serve` (default 8 MiB)
+
+**Self-host (experimental, not “stable app” scope)**
+
+| Milestone | Status |
+|-----------|--------|
+| M0–M1 bundled compiler smoke | ✅ |
+| M2 spine **726/726** + `bin/vm.php` in link | ✅ |
+| M4 gen-2→gen-3 without Zend on compile | ✅ |
+| M5 vendor prelink + Zend-free gen-0 seed | 🚧 ([#1492](https://github.com/PurHur/php-compiler/issues/1492)) |
+| Full Zend-free cold boot on empty `build/` | 🚧 |
+
+**What we do not target in v1.0**
+
+- Running arbitrary Composer packages unmodified
+- WordPress, Laravel, Symfony, or full framework stacks
+- pthreads, fibers, or parallel extension semantics
+- Every PHP 8.3+ feature as Zend ships it
+
+### Check your code before shipping
+
+```bash
+./phpc lint path/to/your-app.php
+./phpc lint --project .          # uses phpc.json roots
+./phpc build -o /tmp/app entry.php   # fails early on unsupported constructs
+```
+
+Regenerate maintainer matrices after builtin changes: `php script/capability-matrix.php` and `php script/capability-syntax.php`.
+
+**Live status:** [Overview](https://purhur.github.io/php-compiler/docs/pages/index.html) · [Development status](https://purhur.github.io/php-compiler/development-status.html).
 
 ---
 
