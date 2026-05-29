@@ -161,6 +161,7 @@ class Module extends ModuleAbstract
             new array_unique(),
             new array_diff(),
             new array_intersect(),
+            new iterator_to_array(),
             new array_replace(),
             new array_fill(),
             new array_fill_keys(),

@@ -16,6 +16,7 @@ use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\ClosureState;
 use PHPCompiler\VM\GeneratorState;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\NamedArgs;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\TypeCheck;
@@ -137,6 +138,61 @@ class VM {
         } finally {
             $this->context->swapRunStack($savedStack);
         }
+    }
+
+    /**
+     * Materialize a Traversable (array or Generator) into a new array (ext/spl iterator_to_array parity, #3100).
+     */
+    public function iteratorToArray(Variable $iterator, bool $preserveKeys = false): HashTable
+    {
+        $iterator = $iterator->resolveIndirect();
+        $out = new HashTable();
+        if (Variable::TYPE_ARRAY === $iterator->type) {
+            $index = 0;
+            foreach ($iterator->toArray()->iterateKeyed(true) as [$key, $value]) {
+                if ($preserveKeys) {
+                    self::appendHashTableEntry($out, $key, $value);
+                } else {
+                    $packedKey = new Variable();
+                    $packedKey->int($index++);
+                    self::appendHashTableEntry($out, $packedKey, $value);
+                }
+            }
+
+            return $out;
+        }
+        if ($this->variableIsGenerator($iterator)) {
+            $gen = $iterator->toObject()->generatorState;
+            $gen->rewind();
+            $index = 0;
+            while ($this->advanceGeneratorIteration($gen)) {
+                if ($preserveKeys) {
+                    self::appendHashTableEntry($out, $gen->currentKey, $gen->currentValue);
+                } else {
+                    $packedKey = new Variable();
+                    $packedKey->int($index++);
+                    self::appendHashTableEntry($out, $packedKey, $gen->currentValue);
+                }
+            }
+
+            return $out;
+        }
+
+        throw new \LogicException(
+            'iterator_to_array() argument must be an array or Generator in this compiler build'
+        );
+    }
+
+    private static function appendHashTableEntry(HashTable $out, Variable $key, Variable $value): void
+    {
+        $copy = new Variable();
+        $copy->copyFrom($value);
+        if (Variable::TYPE_INTEGER === $key->type) {
+            $out->append($copy);
+
+            return;
+        }
+        $out->add($key->toString(), $copy);
     }
 
     private function seedScriptPath(Frame $frame): void
