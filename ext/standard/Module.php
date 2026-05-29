@@ -47,6 +47,7 @@ class Module extends ModuleAbstract
             new floatval(),
             new doubleval(),
             new boolval(),
+            new settype(),
             new var_export(),
             new gettype(),
             new get_debug_type(),
