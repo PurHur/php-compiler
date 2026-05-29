@@ -29,6 +29,10 @@ class JITTest extends BaseTest {
             if (str_contains(strtolower($case[0]), 'spl_autoload_register_jit')) {
                 continue;
             }
+            // preserve_keys=true is VM-only until ArrayBuiltinHelper gains the branch (#3096).
+            if (str_contains($name, 'array_chunk_preserve_keys')) {
+                continue;
+            }
             yield $name => $case;
         }
     }

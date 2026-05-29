@@ -14,7 +14,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * array_chunk() for packed list arrays (preserve_keys=false subset; LLVM via ArrayBuiltinHelper).
+ * array_chunk() — packed lists (JIT/AOT) and preserve_keys=true assoc arrays (VM).
  */
 final class array_chunk extends Internal
 {
@@ -50,7 +50,7 @@ final class array_chunk extends Internal
         }
         if (3 === $argc) {
             if (JITVariable::TYPE_NATIVE_BOOL === $args[2]->type && ($args[2]->isConstant ?? false) && $args[2]->value) {
-                throw new \LogicException('array_chunk() preserve_keys=true is not supported in this compiler build');
+                throw new \LogicException('array_chunk() preserve_keys=true is not supported in JIT in this compiler build');
             }
             if (!(JITVariable::TYPE_NULL === $args[2]->type
                 || ($args[2]->isNullConstant ?? false)
