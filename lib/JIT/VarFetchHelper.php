@@ -31,6 +31,11 @@ final class VarFetchHelper
         return $target;
     }
 
+    public static function bindingByName(Context $context, Block $block, string $name): ?Variable
+    {
+        return self::resolveBinding($context, $block, $context->resolveRefAliasName($name));
+    }
+
     private static function resolveBinding(Context $context, Block $block, string $name): ?Variable
     {
         if (isset($context->namedVariableBindings[$name])) {
