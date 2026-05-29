@@ -372,6 +372,12 @@ class Type extends Builtin {
         $fntypePregLastError = $this->context->context->functionType($i64, false);
         $fnPregLastError = $this->context->module->addFunction('__compiler_preg_last_error', $fntypePregLastError);
         $this->context->registerFunction('__compiler_preg_last_error', $fnPregLastError);
+        $fntypePregLastErrorMsg = $this->context->context->functionType($strPtr, false);
+        $fnPregLastErrorMsg = $this->context->module->addFunction(
+            '__compiler_preg_last_error_msg',
+            $fntypePregLastErrorMsg
+        );
+        $this->context->registerFunction('__compiler_preg_last_error_msg', $fnPregLastErrorMsg);
         $fntypeSuperglobalName = $this->context->context->functionType($i64, false, $strPtr);
         $fnSuperglobalName = $this->context->module->addFunction(
             '__compiler_is_superglobal_name',

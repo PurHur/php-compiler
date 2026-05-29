@@ -19,6 +19,10 @@ class VMTest extends BaseTest {
             if (str_contains(strtolower($case[0]), 'spl_autoload_register_jit')) {
                 continue;
             }
+            // Native preg stub error codes (JIT/AOT); VM uses host PCRE (issue #1181, #3110).
+            if (str_contains(strtolower($case[0]), 'preg_last_error') && str_contains(strtolower($case[0]), 'jit')) {
+                continue;
+            }
             yield $name => $case;
         }
     }

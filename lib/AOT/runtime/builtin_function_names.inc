@@ -195,6 +195,7 @@ static const char *phpc_builtin_functions[] = {
     "pow",
     "preg_grep",
     "preg_last_error",
+    "preg_last_error_msg",
     "preg_match",
     "preg_match_all",
     "preg_quote",

@@ -151,6 +151,7 @@ class Module extends ModuleAbstract
             new preg_replace_callback(),
             new preg_split(),
             new preg_last_error_(),
+            new preg_last_error_msg_(),
             new nl2br(),
             new array_reverse(),
             new array_search(),

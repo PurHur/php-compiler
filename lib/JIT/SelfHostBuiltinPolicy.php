@@ -151,6 +151,7 @@ final class SelfHostBuiltinPolicy
         'preg_split' => 'preg',
         'preg_quote' => 'preg',
         'preg_last_error' => 'preg',
+        'preg_last_error_msg' => 'preg',
     ];
 
     /** @var array<string, string> */
