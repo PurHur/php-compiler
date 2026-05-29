@@ -119,7 +119,7 @@
         <article class="track-panel track-panel--selfhost">
           <h3>North star — Self-host</h3>
           <p>Native binary from <code>lib/</code> compiles PHP and rebuilds the next compiler without Zend.</p>
-          <p><strong>Now:</strong> M0–M2 ✅ · spine <strong>726/726</strong> · M3 smoke emit <strong>native</strong> ✅ · M4 gen-3 spine (argv <code>-o</code>, no Zend on compile) ✅ · M5 vendor prelink <strong>3/3</strong> ✅ · Zend cold boot ⬜</p>
+          <p><strong>Now:</strong> M0–M2 ✅ · spine <strong>726/726</strong> · M3 smoke emit <strong>native</strong> ✅ · M4 full revision ✅ · M5 vendor prelink <strong>3/3</strong> ✅ · Zend-free gen-0 seed ✅ · remaining: native <code>bin/compile.php</code> inventory path (<a href="https://github.com/PurHur/php-compiler/issues/3024">#3024</a>)</p>
           <p><a href="development-status.html">Status</a> · <a href="missing-implementation.html">Gap tables</a> · <a href="capability-comparison.html">PHP vs us</a> · <a href="https://github.com/PurHur/php-compiler/issues/1492">#1492</a></p>
         </article>
         <article class="track-panel track-panel--web">
@@ -135,16 +135,18 @@
       <div class="overall-progress">
         <div class="overall-progress__label">
           <span>Toward self-hosting</span>
-          <span class="overall-progress__pct">~75%</span>
+          <span class="overall-progress__pct">~85%</span>
         </div>
-        <div class="progress-track" role="progressbar" aria-valuenow="75" aria-valuemin="0" aria-valuemax="100">
-          <div class="progress-fill" data-width="75" style="width: 0"></div>
+        <div class="progress-track" role="progressbar" aria-valuenow="85" aria-valuemin="0" aria-valuemax="100">
+          <div class="progress-fill" data-width="85" style="width: 0"></div>
         </div>
         <p class="overall-progress__note">
-          On <code>master</code> @ 03c44c5f (LLVM 9): spine <strong>726/726</strong>; gen-2→gen-3 recompile without Zend on the compile step;
-          vendor prelink <strong>3/3</strong> <code>object_ok</code> ([#3036](https://github.com/PurHur/php-compiler/pull/3036)).
-          Next: native <code>bin/compile.php</code> full revision probe → retire Zend on empty <code>build/</code> bootstrap.
-          Presenter: <code>make north-star5-verify</code> · <code>make bootstrap-loop-gen2-recompile-spine</code>.
+          On <code>master</code> @ 6f03eb43 (LLVM 9): spine <strong>726/726</strong>; gen-2→gen-3 recompile without Zend on the compile step;
+          full revision <code>bin/compile.php</code> probe ✅ ([#3058](https://github.com/PurHur/php-compiler/pull/3058));
+          vendor prelink <strong>3/3</strong> <code>object_ok</code> ✅ ([#3036](https://github.com/PurHur/php-compiler/pull/3036), [#3050](https://github.com/PurHur/php-compiler/pull/3050));
+          Zend-free gen-0 seed ✅ ([#3059](https://github.com/PurHur/php-compiler/pull/3059), [#3060](https://github.com/PurHur/php-compiler/pull/3060)).
+          Next: native <code>bin/compile.php</code> inventory path (no emit-helper TU) → full CLI parity (<a href="https://github.com/PurHur/php-compiler/issues/3024">#3024</a>).
+          Presenter: <code>make north-star5-verify</code>.
         </p>
       </div>
     </section>
@@ -154,9 +156,9 @@
       <ol class="ladder" aria-label="Self-host milestones">
         <li class="is-done"><span class="ladder__marker" aria-hidden="true">✓</span><h4>M0–M1</h4><p>Minimal + compiler-shaped bundles.</p></li>
         <li class="is-done"><span class="ladder__marker" aria-hidden="true">✓</span><h4>M2</h4><p>Spine <strong>726/726</strong> — Phase A inventory complete ([#2868](https://github.com/PurHur/php-compiler/issues/2868), [#2652](https://github.com/PurHur/php-compiler/issues/2652)).</p></li>
-        <li class="is-wip"><span class="ladder__marker" aria-hidden="true">3</span><h4>M3</h4><p>Smoke <strong>native emit</strong> ✅; emit TU grows Compiler spine ([#2667](https://github.com/PurHur/php-compiler/pull/2667)); <code>bin/compile.php</code> still open ([#1937](https://github.com/PurHur/php-compiler/issues/1937)).</p></li>
-        <li class="is-done"><span class="ladder__marker" aria-hidden="true">✓</span><h4>M4</h4><p>Gen-2→gen-3 spine <strong>726/726</strong> ✅; full revision <code>bin/compile.php</code> probe ✅ ([#2880](https://github.com/PurHur/php-compiler/issues/2880), [#3046](https://github.com/PurHur/php-compiler/issues/3046)).</p></li>
-        <li class="is-wip"><span class="ladder__marker" aria-hidden="true">5</span><h4>M5</h4><p>Vendor prelink <strong>3/3</strong> ✅ ([#3036](https://github.com/PurHur/php-compiler/pull/3036)); Zend cold boot for <code>bin/compile.php</code> ⬜ ([#1416](https://github.com/PurHur/php-compiler/issues/1416)).</p></li>
+        <li class="is-wip"><span class="ladder__marker" aria-hidden="true">3</span><h4>M3</h4><p>Smoke <strong>native emit</strong> ✅; emit TU grows Compiler spine ([#2667](https://github.com/PurHur/php-compiler/pull/2667)); remaining: native <code>bin/compile.php</code> inventory path (<a href="https://github.com/PurHur/php-compiler/issues/3024">#3024</a>).</p></li>
+        <li class="is-done"><span class="ladder__marker" aria-hidden="true">✓</span><h4>M4</h4><p>Gen-2→gen-3 spine <strong>726/726</strong> ✅; full revision <code>bin/compile.php</code> probe ✅ ([#3058](https://github.com/PurHur/php-compiler/pull/3058)).</p></li>
+        <li class="is-wip"><span class="ladder__marker" aria-hidden="true">5</span><h4>M5</h4><p>Vendor prelink <strong>3/3</strong> ✅ ([#3036](https://github.com/PurHur/php-compiler/pull/3036), [#3050](https://github.com/PurHur/php-compiler/pull/3050)); Zend-free gen-0 seed ✅ ([#3059](https://github.com/PurHur/php-compiler/pull/3059), [#3060](https://github.com/PurHur/php-compiler/pull/3060)); remaining: compiled <code>bin/vm.php</code> path + bootstrap parity (<a href="https://github.com/PurHur/php-compiler/issues/1492">#1492</a>).</p></li>
       </ol>
       <p style="margin-top: 1rem">
         <a class="btn btn--ghost" href="missing-implementation.html">See missing implementation tables →</a>
