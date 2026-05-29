@@ -8,15 +8,34 @@ OUT="${ROOT}/build/selfhost"
 source "$(dirname "$0")/php-env.sh"
 # shellcheck source=bootstrap-resolve-compile-invoke.sh
 source "$(dirname "$0")/bootstrap-resolve-compile-invoke.sh"
+# shellcheck source=bootstrap-gen0-seed.sh
+source "$(dirname "$0")/bootstrap-gen0-seed.sh"
 # shellcheck source=selfhost-preflight.sh
 source "$(dirname "$0")/selfhost-preflight.sh"
 ci_apply_llvm_memory_env
 
+if [[ "${BOOTSTRAP_M5_NO_ZEND:-0}" == "1" ]]; then
+  export BOOTSTRAP_NO_ZEND_FALLBACK=1
+  export BOOTSTRAP_GEN0_ENSURE_COMPILED_DRIVER=0
+  if ! bootstrap_gen0_seed_install; then
+    echo "bootstrap-selfhost-link: BOOTSTRAP_M5_NO_ZEND=1 requires prelinked/bootstrap-gen0 (#3053)" >&2
+    exit 1
+  fi
+fi
+
 if bootstrap_resolve_compile_driver; then
   if [[ "${BOOTSTRAP_COMPILE_DRIVER_MODE}" == "zend" ]]; then
+    if [[ "${BOOTSTRAP_M5_NO_ZEND:-0}" == "1" ]]; then
+      echo "bootstrap-selfhost-link: BOOTSTRAP_M5_NO_ZEND=1 forbids Zend gen-0 (#3053)" >&2
+      exit 1
+    fi
     selfhost_preflight bootstrap-selfhost-link php-only
   fi
 else
+  if [[ "${BOOTSTRAP_M5_NO_ZEND:-0}" == "1" ]]; then
+    echo "bootstrap-selfhost-link: BOOTSTRAP_M5_NO_ZEND=1 and no native gen-0 driver (#3053)" >&2
+    exit 1
+  fi
   selfhost_preflight bootstrap-selfhost-link php-or-docker
 fi
 
@@ -43,7 +62,7 @@ fi
 
 mkdir -p "${ROOT}/build"
 
-if [[ "${BOOTSTRAP_GEN0_ENSURE_COMPILED_DRIVER:-1}" == "1" && ! -x "${ROOT}/build/bin-compile-aot" ]]; then
+if [[ "${BOOTSTRAP_M5_NO_ZEND:-0}" != "1" && "${BOOTSTRAP_GEN0_ENSURE_COMPILED_DRIVER:-1}" == "1" && ! -x "${ROOT}/build/bin-compile-aot" ]]; then
   echo "bootstrap-selfhost-link: building gen-0 compiled driver (BOOTSTRAP_GEN0_ENSURE_COMPILED_DRIVER=1, #2894)" >&2
   # Best-effort only: on fresh trees the compiled driver can fail independently (#3004).
   # Do not block the primary link gate on a missing optional artifact; proceed and surface
