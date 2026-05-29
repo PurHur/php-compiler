@@ -23,6 +23,9 @@ abstract class MemoryManager extends Builtin {
         if ($loadtype === Builtin::LOAD_TYPE_STANDALONE) {
             return new MemoryManager\Native($context, $loadtype);
         }
+        if ($loadtype === Builtin::LOAD_TYPE_EMBED) {
+            return new MemoryManager\EmbedMcjit($context, $loadtype);
+        }
         return new MemoryManager\PHP($context, $loadtype);
     }
 

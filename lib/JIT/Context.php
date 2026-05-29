@@ -352,6 +352,7 @@ class Context {
             // so this way, cross-builtin dependencies are honored
             $builtin->implement();
         }
+        McjitEmbedRuntime::finalizeModule($this);
         $signature = $this->context->functionType(
             $this->context->voidType(),
             false
@@ -527,6 +528,7 @@ class Context {
 
     public function compileInPlace() {
         if (is_null($this->result)) {
+            McjitEmbedRuntime::prepareModule($this);
             $this->compileCommon();
             $engine = $this->module->createJITCompiler(0);
             if (!is_null($this->debugFile)) {
