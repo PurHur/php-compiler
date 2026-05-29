@@ -24,6 +24,7 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\JIT\OperandName;
 use PHPCompiler\Compiler\AttributeNames;
+use PHPCompiler\Compiler\InterfaceImplementationCheck;
 use PHPCompiler\Web\ConstStringFolder;
 use PHPCompiler\Web\IncludePathResolver;
 use PHPCompiler\Web\Superglobals;
@@ -220,6 +221,8 @@ class Compiler {
         }
 
         $this->seen = null;
+
+        InterfaceImplementationCheck::validate($script);
 
         return $main;
     }
