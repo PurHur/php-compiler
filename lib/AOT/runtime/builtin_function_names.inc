@@ -160,6 +160,7 @@ static const char *phpc_builtin_functions[] = {
     "join",
     "json_decode",
     "json_encode",
+    "json_validate",
     "json_last_error",
     "krsort",
     "ksort",

@@ -225,6 +225,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/hash_hmac.php',
         'ext/standard/json_decode.php',
         'ext/standard/json_encode.php',
+        'ext/standard/json_validate.php',
         'ext/standard/json_last_error_.php',
         'ext/standard/serialize.php',
         'ext/standard/unserialize.php',
