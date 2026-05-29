@@ -186,10 +186,12 @@ patch_already_applied() {
       grep -q 'parseStmt_Class($expr->class)' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
       ;;
     php-cfg-enum.patch)
-      grep -q 'parseStmt_Enum' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
+      grep -q 'parseStmt_Enum' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
+        && grep -q 'parseExprList($node->implements)' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
       ;;
     php-cfg-enum-implements.patch)
-      grep -q 'public $implements' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Enum_.php" 2>/dev/null
+      grep -q 'public $implements' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Enum_.php" 2>/dev/null \
+        && grep -q 'parseExprList($node->implements)' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
       ;;
     php-cfg-enum-class-method.patch)
       grep -q 'elseif ($stmt instanceof Stmt\\ClassMethod)' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
@@ -394,17 +396,61 @@ PY
   echo "Applied php-cfg-yield-keyed.patch (overlay)"
 }
 
+# Repair Enum_ Parser ctor when Stmt\\Enum_ gained $implements but Parser still passes Block (#3083).
+apply_php_cfg_enum_implements_parser_fix() {
+  local parser="$1"
+  python3 - "$parser" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+parser_path = Path(sys.argv[1])
+text = parser_path.read_text()
+if 'parseExprList($node->implements)' in text:
+    raise SystemExit(0)
+pattern = re.compile(
+    r"(        \$this->block->children\[\] = new Op\\Stmt\\Enum_\(\n"
+    r"            \$name,\n"
+    r"            \$backedType,\n)"
+    r"(            \$stmtsBlock,)",
+    re.MULTILINE,
+)
+replacement = r"\1            $this->parseExprList($node->implements),\n\2"
+new_text, count = pattern.subn(replacement, text, count=1)
+if count != 1:
+    sys.stderr.write("php-cfg-enum-implements: Enum_ ctor call not found in Parser.php\n")
+    raise SystemExit(1)
+parser_path.write_text(new_text)
+PY
+}
+
+apply_php_cfg_enum_class_method_parser_fix() {
+  local parser="$1"
+  if grep -q 'elseif ($stmt instanceof Stmt\\ClassMethod)' "$parser" 2>/dev/null \
+    && grep -A20 'function parseStmt_Enum' "$parser" | grep -q 'Stmt\\ClassMethod'; then
+    return 0
+  fi
+  if ! grep -q 'function parseStmt_Enum' "$parser" 2>/dev/null; then
+    echo "Skip php-cfg-enum-class-method.patch (parseStmt_Enum missing)" >&2
+    return 1
+  fi
+  apply_patch "$PATCH_DIR/php-cfg-enum-class-method.patch"
+}
+
 apply_php_cfg_enum_overlay() {
   local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
   local op="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Enum_.php"
   local overlay="$PATCH_DIR/overlays/php-cfg"
-  if grep -q 'function parseStmt_Enum' "$parser" 2>/dev/null; then
+  mkdir -p "$(dirname "$op")"
+  cp "$overlay/Op/Stmt/Enum_.php" "$op"
+  if grep -q 'function parseStmt_Enum' "$parser" 2>/dev/null \
+    && grep -q 'parseExprList($node->implements)' "$parser" 2>/dev/null \
+    && grep -A25 'function parseStmt_Enum' "$parser" | grep -q 'Stmt\\ClassMethod'; then
     echo "Skip php-cfg-enum.patch (already applied)"
     return 0
   fi
-  mkdir -p "$(dirname "$op")"
-  cp "$overlay/Op/Stmt/Enum_.php" "$op"
-  python3 - "$parser" "$overlay/enum-parser-methods.php" <<'PY'
+  if ! grep -q 'function parseStmt_Enum' "$parser" 2>/dev/null; then
+    python3 - "$parser" "$overlay/enum-parser-methods.php" <<'PY'
 import sys
 from pathlib import Path
 
@@ -418,46 +464,29 @@ if anchor not in text:
     raise SystemExit(1)
 parser_path.write_text(text.replace(anchor, insert + anchor, 1))
 PY
-  echo "Applied php-cfg-enum.patch (overlay)"
+    echo "Applied php-cfg-enum.patch (overlay)"
+  else
+    echo "Repair php-cfg-enum.patch (partial Parser.php)"
+  fi
+  apply_php_cfg_enum_implements_parser_fix "$parser"
+  apply_php_cfg_enum_class_method_parser_fix "$parser"
 }
 
 apply_php_cfg_enum_implements_overlay() {
   local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
   local op="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Enum_.php"
   local overlay="$PATCH_DIR/overlays/php-cfg"
-  if grep -q 'public $implements' "$op" 2>/dev/null; then
-    echo "Skip php-cfg-enum-implements.patch (already applied)"
-    return 0
-  fi
   if ! grep -q 'function parseStmt_Enum' "$parser" 2>/dev/null; then
     echo "Skip php-cfg-enum-implements.patch (parseStmt_Enum missing; apply php-cfg-enum.patch first)" >&2
     return 1
   fi
   cp "$overlay/Op/Stmt/Enum_.php" "$op"
-  python3 - "$parser" <<'PY'
-import re
-import sys
-from pathlib import Path
-
-parser_path = Path(sys.argv[1])
-text = parser_path.read_text()
-pattern = re.compile(
-    r"(        \$this->block->children\[\] = new Op\\Stmt\\Enum_\(\n"
-    r"            \$name,\n"
-    r"            \$backedType,\n)"
-    r"(            \$stmtsBlock,)",
-    re.MULTILINE,
-)
-replacement = r"\1            $this->parseExprList($node->implements),\n\2"
-if 'parseExprList($node->implements)' in text:
-    parser_path.write_text(text)
-    raise SystemExit(0)
-new_text, count = pattern.subn(replacement, text, count=1)
-if count != 1:
-    sys.stderr.write("php-cfg-enum-implements: Enum_ ctor call not found in Parser.php\n")
-    raise SystemExit(1)
-parser_path.write_text(new_text)
-PY
+  if grep -q 'parseExprList($node->implements)' "$parser" 2>/dev/null \
+    && grep -q 'public $implements' "$op" 2>/dev/null; then
+    echo "Skip php-cfg-enum-implements.patch (already applied)"
+    return 0
+  fi
+  apply_php_cfg_enum_implements_parser_fix "$parser"
   echo "Applied php-cfg-enum-implements.patch (overlay)"
 }
 

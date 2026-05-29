@@ -21,6 +21,8 @@ class ClassEntry {
     public string $name;
     /** True for user enums registered via TYPE_DECLARE_ENUM (#1356). */
     public bool $isEnum = false;
+    /** Backing scalar type name (`string` / `int`) for backed enums, or null for unit enums (#3083). */
+    public ?string $backedType = null;
     /** Parent class name (lowercase) for single inheritance (#101, #1231). */
     public ?string $parentLc = null;
     /** True for `interface` declarations (#1357). */

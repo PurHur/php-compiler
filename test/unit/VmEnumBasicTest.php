@@ -32,6 +32,7 @@ PHP;
         $this->assertTrue(VmReflection::enumExists($ctx, 'Status'));
         $this->assertTrue(isset($ctx->classes['status']));
         $this->assertTrue($ctx->classes['status']->isEnum);
+        $this->assertSame('string', $ctx->classes['status']->backedType);
         $active = $ctx->classes['status']->constants['active'] ?? null;
         $this->assertNotNull($active);
         $this->assertSame('active', $active->toString());

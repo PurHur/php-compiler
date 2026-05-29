@@ -1036,9 +1036,18 @@ class Compiler {
 
     protected function compileEnum(Op\Stmt\Enum_ $enum, Block $block): OpCode
     {
+        $backedTypeSlot = null;
+        if (null !== $enum->backedType && $enum->backedType instanceof Op\Type\Literal) {
+            $backedVar = new Variable(Variable::TYPE_STRING);
+            $backedVar->string($enum->backedType->name);
+            $backedOperand = new Operand\Temporary;
+            $backedOperand->type = Type::string();
+            $backedTypeSlot = $block->registerConstant($backedOperand, $backedVar);
+        }
         $return = new OpCode(
             OpCode::TYPE_DECLARE_ENUM,
-            $this->compileOperand($enum->name, $block, true)
+            $this->compileOperand($enum->name, $block, true),
+            $backedTypeSlot
         );
         $return->classImplements = $this->interfaceNamesFromOperands($enum->implements);
         $return->block1 = $this->compileEnumBody($enum->stmts);
