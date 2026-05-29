@@ -7010,49 +7010,13 @@ class JIT {
             return;
         }
         if (null !== $result->valueBoxAliasPtr) {
-            $destPtr = JIT\JitValueBox::normalizeValuePtr($this->context, $result->valueBoxAliasPtr);
-            if (Variable::TYPE_VALUE === $value->type || null !== $value->valueBoxAliasPtr) {
-                JIT\JitValueBox::copyFromPointer(
-                    $this->context,
-                    $result->valueBoxAliasPtr,
-                    $this->valueBoxPointer($value)
-                );
+            JIT\JitValueBox::assignToPointer(
+                $this->context,
+                $result->valueBoxAliasPtr,
+                $value
+            );
 
-                return;
-            }
-            $native = $this->context->helper->loadValue($value);
-            switch ($value->type) {
-                case Variable::TYPE_NATIVE_LONG:
-                    $this->context->builder->call(
-                        $this->context->lookupFunction('__value__writeLong'),
-                        $destPtr,
-                        $native
-                    );
-
-                    return;
-                case Variable::TYPE_NATIVE_BOOL:
-                    $this->context->builder->call(
-                        $this->context->lookupFunction('__value__writeLong'),
-                        $destPtr,
-                        $this->context->builder->zExt($native, $this->context->getTypeFromString('int64'))
-                    );
-
-                    return;
-                case Variable::TYPE_NATIVE_DOUBLE:
-                    $this->context->builder->call(
-                        $this->context->lookupFunction('__value__writeDouble'),
-                        $destPtr,
-                        $native
-                    );
-
-                    return;
-                default:
-                    throw new \LogicException(
-                        'Cannot assign '
-                        . Variable::getStringType($value->type)
-                        . ' through by-reference alias'
-                    );
-            }
+            return;
         }
         if ($value->isJitGenerator) {
             $this->context->setVariableOp($resultOp, $value);
@@ -8797,7 +8761,7 @@ class JIT {
     private function ensureValueBoxLvalueForByRefPass(Operand $op, Variable $var): Variable
     {
         if (Variable::TYPE_VALUE === $var->type || null !== $var->valueBoxAliasPtr) {
-            return JIT\ClosureHelper::referenceCapture($var);
+            return JIT\ClosureHelper::referenceCapture($this->context, $var);
         }
         $slot = JIT\JitValueBox::alloc($this->context);
         $native = $this->context->helper->loadValue($var);
@@ -8843,7 +8807,7 @@ class JIT {
             $this->context->bindVariableByName($name, $boxed);
         }
 
-        return JIT\ClosureHelper::referenceCapture($boxed);
+        return JIT\ClosureHelper::referenceCapture($this->context, $boxed);
     }
 
     private function collectParamDefaults(Block $block): array {

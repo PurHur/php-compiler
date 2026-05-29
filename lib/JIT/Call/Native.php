@@ -204,6 +204,9 @@ class Native implements Call {
                     "argument {$argNum} for {$this->name}()"
                 );
             case '__value__*':
+                if (null !== $arg->valueBoxAliasPtr) {
+                    return \PHPCompiler\JIT\JitValueBox::normalizeValuePtr($context, $arg->valueBoxAliasPtr);
+                }
                 switch ($arg->type) {
                     case Variable::TYPE_VALUE:
                         return \PHPCompiler\JIT\JitValueBox::valuePtrFromVariable($context, $arg);
