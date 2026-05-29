@@ -298,6 +298,7 @@ class Module extends ModuleAbstract
             new enum_exists_(),
             new interface_exists_(),
             new trait_exists_(),
+            new class_uses_(),
             new function_exists(),
             new func_get_args(),
             new func_num_args(),

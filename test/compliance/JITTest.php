@@ -33,6 +33,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'array_chunk_preserve_keys')) {
                 continue;
             }
+            // class_uses() is VM-only until JIT lowering (#3119).
+            if (str_contains($name, 'class_uses_runtime')) {
+                continue;
+            }
             yield $name => $case;
         }
     }
