@@ -78,6 +78,9 @@ function analyzeInternal(PHPCompiler\Func\Internal $fn): array
     if ('array_filter' === $fn->getName() && str_contains($source, 'VmClosureCall::isClosure')) {
         $notes[] = 'callbacks: string builtins; VM closure callbacks (#3086)';
     }
+    if ('array_walk_recursive' === $fn->getName() && str_contains($source, 'VmClosureCall::isClosure')) {
+        $notes[] = 'callbacks: VM closure + string builtins; JIT/AOT recursive walk deferred (#3111)';
+    }
     if ('array_reduce' === $fn->getName() && preg_match('/callables are deferred/i', $source)) {
         $notes[] = 'callbacks: string user functions VM-only; closures deferred (#1213, #142)';
     }
