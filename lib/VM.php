@@ -602,14 +602,15 @@ restart:
                     if (!isset($this->context->classes[$lcClass])) {
                         return $this->raise("Unknown class for constant fetch: {$className}", $frame);
                     }
-                    $constName = strtolower($frame->scope[$op->arg3]->toString());
+                    $constNameRaw = $frame->scope[$op->arg3]->toString();
+                    $constName = strtolower($constNameRaw);
                     $classEntry = $this->context->classes[$lcClass];
                     if ('class' === $constName) {
                         $frame->scope[$op->arg1]->string($classEntry->name);
                         break;
                     }
                     if (!isset($classEntry->constants[$constName])) {
-                        return $this->raise("Undefined class constant {$className}::{$constName}", $frame);
+                        return $this->raise("Undefined class constant {$className}::{$constNameRaw}", $frame);
                     }
                     $frame->scope[$op->arg1]->copyFrom($classEntry->constants[$constName]);
                     break;
@@ -908,6 +909,10 @@ restart:
                     $ifaceEntry = new VM\ClassEntry($name);
                     $ifaceEntry->isInterface = true;
                     $ifaceEntry->interfaces = $op->classImplements;
+                    if (null !== $op->block1) {
+                        self::defineClass($ifaceEntry, $op->block1);
+                    }
+                    $this->inheritFromInterfaces($ifaceEntry);
                     $this->context->classes[$lcname] = $ifaceEntry;
                     break;
                 case OpCode::TYPE_DECLARE_TRAIT:
@@ -974,6 +979,7 @@ restart:
                     if (null !== $classEntry->parentLc) {
                         $this->inheritFromParent($classEntry);
                     }
+                    $this->inheritFromInterfaces($classEntry);
                     $this->context->classes[$lcname] = $classEntry;
                     break;
                 case OpCode::TYPE_NEW:
@@ -2111,6 +2117,21 @@ restart:
         foreach ($trait->constants as $name => $value) {
             if (!isset($entry->constants[$name])) {
                 $entry->constants[$name] = $value;
+            }
+        }
+    }
+
+    protected function inheritFromInterfaces(ClassEntry $entry): void
+    {
+        foreach ($entry->interfaces as $ifaceLc) {
+            if (!isset($this->context->classes[$ifaceLc])) {
+                continue;
+            }
+            $iface = $this->context->classes[$ifaceLc];
+            foreach ($iface->constants as $name => $value) {
+                if (!isset($entry->constants[$name])) {
+                    $entry->constants[$name] = $value;
+                }
             }
         }
     }

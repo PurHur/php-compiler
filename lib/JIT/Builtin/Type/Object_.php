@@ -1265,6 +1265,25 @@ class Object_ extends Type {
         ];
     }
 
+    public function inheritInterfaceConstants(int $classId, string $className): void
+    {
+        $classLc = strtolower(ltrim($className, '\\'));
+        foreach ($this->allInterfacesForClassLc($classLc) as $ifaceLc) {
+            if ($ifaceLc === $classLc) {
+                continue;
+            }
+            $ifaceId = $this->lookup($ifaceLc);
+            if (!isset($this->classConstants[$ifaceId])) {
+                continue;
+            }
+            foreach ($this->classConstants[$ifaceId] as $name => $entry) {
+                if (!isset($this->classConstants[$classId][$name])) {
+                    $this->classConstants[$classId][$name] = $entry;
+                }
+            }
+        }
+    }
+
     public function resolveClassId(Operand $classOp): int
     {
         if (!$classOp instanceof Literal) {
