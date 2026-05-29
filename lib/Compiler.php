@@ -1510,6 +1510,7 @@ class Compiler {
                 $finallyOp->block1 = $compiledFinally;
                 $finallyOp->block2 = $merge;
                 $block->addOpCode($finallyOp);
+                $this->rewriteTryMergeJumpsToFinally($try, $merge, $compiledFinally);
             }
         } elseif ($stmt instanceof Op\Stmt\Switch_) {
             $this->compileSwitchAsJumpIfChain($stmt, $block);
@@ -1686,39 +1687,9 @@ class Compiler {
         }
         switch (get_class($expr)) {
             case Op\Expr\ArrowFunction::class:
-                // Vendor-prelink bundles (M5 cold-boot) include php-cfg code containing arrow functions.
-                // Full arrow-function semantics are closure-like and not supported yet; for compile-only
-                // vendor object generation, lower to a null placeholder to produce the .o artifact.
-                if ('1' !== (string) getenv('PHP_COMPILER_VENDOR_PRELINK') && '1' !== (string) getenv('PHP_COMPILER_SELFHOST_AOT')) {
-                    $this->throwCompileLogic("Unsupported expression: " . $expr->getType());
-                }
-
-                $resultSlot = $this->compileOperand($expr->result, $block, false);
-                $nullSlot = $this->compileOperand(new Operand\Literal(null), $block, true);
-
-                return [new OpCode(
-                    OpCode::TYPE_ASSIGN,
-                    $resultSlot,
-                    $resultSlot,
-                    $nullSlot
-                )];
+                return $this->compileAnonymousFunctionExpr($expr, $block);
             case Op\Expr\Closure::class:
-                // Vendor-prelink bundles (M5 cold-boot) include php-llvm which still contains closures.
-                // For the vendor-prelink compile-only path, lower closures to a null placeholder so we
-                // can produce the .o artifact without needing full closure/runtime support yet.
-                if ('1' !== (string) getenv('PHP_COMPILER_VENDOR_PRELINK') && '1' !== (string) getenv('PHP_COMPILER_SELFHOST_AOT')) {
-                    $this->throwCompileLogic("Unsupported expression: " . $expr->getType());
-                }
-
-                $resultSlot = $this->compileOperand($expr->result, $block, false);
-                $nullSlot = $this->compileOperand(new Operand\Literal(null), $block, true);
-
-                return [new OpCode(
-                    OpCode::TYPE_ASSIGN,
-                    $resultSlot,
-                    $resultSlot,
-                    $nullSlot
-                )];
+                return $this->compileAnonymousFunctionExpr($expr, $block);
             case Op\Expr\Assertion::class:
                 if ($expr->result instanceof Operand\Literal) {
                     //short circuit
@@ -2007,19 +1978,17 @@ class Compiler {
                 return $ops;
             case Op\Expr\Yield_::class:
                 $this->markFunctionGenerator($block);
-                // php-cfg bug: parseExpr_Yield assigns `$expr->value` into `$key` (upstream).
-                // For `yield $v`, treat `key` as the value when value is null.
-                $yieldValue = $expr->value ?? (null !== $expr->key ? $expr->key : null);
-                $yieldKey = null !== $expr->value ? $expr->key : null;
 
                 return [new OpCode(
                     OpCode::TYPE_YIELD,
                     null,
-                    null !== $yieldValue
-                        ? $this->compileOperand($yieldValue, $block, true)
-                        : null,
-                    null !== $yieldKey
-                        ? $this->compileOperand($yieldKey, $block, true)
+                    null !== $expr->value
+                        ? $this->compileOperand($expr->value, $block, true)
+                        : (null !== $expr->key
+                            ? $this->compileOperand($expr->key, $block, true)
+                            : null),
+                    null !== $expr->value && null !== $expr->key
+                        ? $this->compileOperand($expr->key, $block, true)
                         : null,
                 )];
             case Op\Expr\YieldFrom::class:
@@ -2029,15 +1998,46 @@ class Compiler {
                     null,
                     $this->compileOperand($expr->expr, $block, true),
                 )];
-            case Op\Expr\Closure::class:
-                // Bootstrap-oriented stub: allow compiling vendor code containing closures (e.g. php-llvm prelink).
-                // Full closure runtime semantics are not implemented yet; the VM/JIT lower this opcode to null.
-                return [new OpCode(
-                    OpCode::TYPE_CLOSURE,
-                    $this->compileOperand($expr->result, $block, false),
-                )];
         }
         $this->throwCompileLogic("Unsupported expression: " . $expr->getType());
+    }
+
+    /**
+     * @param Op\Expr\ArrowFunction|Op\Expr\Closure $expr
+     *
+     * @return OpCode[]
+     */
+    protected function compileAnonymousFunctionExpr($expr, Block $block): array
+    {
+        if ($this->shouldStubClosureForBootstrap()) {
+            $resultSlot = $this->compileOperand($expr->result, $block, false);
+            $nullSlot = $this->compileOperand(new Operand\Literal(null), $block, true);
+
+            return [new OpCode(
+                OpCode::TYPE_ASSIGN,
+                $resultSlot,
+                $resultSlot,
+                $nullSlot
+            )];
+        }
+        if ($expr instanceof Op\Expr\Closure && [] !== $expr->useVars) {
+            $this->throwCompileLogic('Closure use() captures are not supported yet (issue #72)');
+        }
+        $func = $expr->func;
+        $funcBlock = $this->compileCfgBlock($func->cfg, $func->params, $func);
+        $op = new OpCode(
+            OpCode::TYPE_CLOSURE,
+            $this->compileOperand($expr->result, $block, false),
+        );
+        $op->block1 = $funcBlock;
+
+        return [$op];
+    }
+
+    protected function shouldStubClosureForBootstrap(): bool
+    {
+        return '1' === (string) getenv('PHP_COMPILER_VENDOR_PRELINK')
+            || '1' === (string) getenv('PHP_COMPILER_SELFHOST_AOT');
     }
 
     protected function markFunctionGenerator(Block $block): void
@@ -2762,8 +2762,18 @@ class Compiler {
     }
 
     /**
-     * @param list<string> $types
+     * Normal try completion must run finally before merge; php-cfg jumps try straight to end (#2114).
      */
+    private function rewriteTryMergeJumpsToFinally(Block $try, Block $merge, Block $finally): void
+    {
+        for ($i = 0; $i < $try->nOpCodes; ++$i) {
+            $op = $try->opCodes[$i];
+            if (OpCode::TYPE_JUMP === $op->type && $op->block1 === $merge) {
+                $op->block1 = $finally;
+            }
+        }
+    }
+
     /**
      * php-cfg TryCatch emits a Stmt_Jump into the try body; TYPE_TRY already enters it (#2084).
      */

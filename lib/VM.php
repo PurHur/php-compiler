@@ -14,6 +14,7 @@ require_once __DIR__.'/OpCodeNames.php';
 use PHPCompiler\Func;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ClassEntry;
+use PHPCompiler\VM\ClosureState;
 use PHPCompiler\VM\GeneratorState;
 use PHPCompiler\VM\NamedArgs;
 use PHPCompiler\VM\ObjectEntry;
@@ -339,6 +340,11 @@ restart:
                     ext\standard\VmExit::terminate($exitArg);
                     break;
                 case OpCode::TYPE_JUMP:
+                    $resumeFrame = $this->resumeCatchAfterFinally($frame);
+                    if (null !== $resumeFrame) {
+                        $frame = $resumeFrame;
+                        goto restart;
+                    }
                     $frame = $this->frameForBranch($frame, $op->block1);
                     goto restart;
                 case OpCode::TYPE_JUMPIF:
@@ -508,8 +514,16 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_CLOSURE:
-                    // Bootstrap stub: closures are not executable yet; represent as null.
-                    $frame->scope[$op->arg1]->null();
+                    if (null === $op->block1) {
+                        $frame->scope[$op->arg1]->null();
+                        break;
+                    }
+                    $funcName = null !== $op->block1->func
+                        ? $op->block1->func->name
+                        : '{closure}';
+                    $closureFunc = new Func\PHP($funcName, $op->block1);
+                    $state = new ClosureState($closureFunc);
+                    $frame->scope[$op->arg1]->object($state->wrapObject($this->context));
                     break;
                 case OpCode::TYPE_RETURN_VOID:
                     $this->enforceReturnType($frame, null);
@@ -567,6 +581,13 @@ restart:
                 case OpCode::TYPE_FUNCCALL_INIT:
                     $callee = $frame->scope[$op->arg1]->resolveIndirect();
                     if (Variable::TYPE_OBJECT === $callee->type) {
+                        $closureState = $callee->toObject()->closureState;
+                        if (null !== $closureState) {
+                            $frame->call = $closureState->func;
+                            $frame->callArgs = [];
+                            $frame->callArgEntries = [];
+                            break;
+                        }
                         $this->initMethodCall($frame, $callee, '__invoke');
                         break;
                     }
@@ -1083,8 +1104,8 @@ restart:
                     if (null !== $this->context->pendingException) {
                         break;
                     }
-                    if (null !== $op->block2) {
-                        $frame = $op->block2->getFrame($this->context, $frame);
+                    if (null !== $op->block1) {
+                        $frame = $op->block1->getFrame($this->context, $frame);
                         goto restart;
                     }
                     break;
@@ -1095,16 +1116,8 @@ restart:
                         $frame = $catchFrame;
                         goto restart;
                     }
-                    if (Variable::TYPE_OBJECT === $thrown->type) {
-                        $entry = $thrown->toObject();
-                        try {
-                            $message = $entry->getProperty('message')->toString();
-                        } catch (\LogicException) {
-                            $message = 'Exception';
-                        }
-                        throw new \Exception($message);
-                    }
-                    throw new \Exception($thrown->toString());
+                    $this->raiseUncaughtException($thrown);
+                    break;
                 default:
                     throw new \LogicException("VM OpCode Not Implemented: " . opcode_type_name($op->type));
             }
@@ -1156,12 +1169,16 @@ restart:
         $this->context->pendingException = $thrown;
         for ($handler = $frame->parent ?? $frame; null !== $handler; $handler = $handler->parent) {
             $this->rewindHandlerToCatchChain($handler);
+            $finallyFrame = $this->enterFinallyHandlerForThrow($handler);
+            if (null !== $finallyFrame) {
+                return $finallyFrame;
+            }
             $catchFrame = $this->enterMatchingCatchHandler($handler);
             if (null !== $catchFrame) {
                 return $catchFrame;
             }
         }
-        $this->context->pendingException = null;
+        $this->clearTryCatchUnwindState();
 
         return null;
     }
@@ -1224,6 +1241,7 @@ restart:
                 $handler->pos = $handler->block->nOpCodes;
                 $catchFrame->parent = $mergeFrame;
             }
+            $this->clearTryCatchUnwindState();
 
             return $catchFrame;
         }
@@ -1249,6 +1267,79 @@ restart:
             }
             break;
         }
+    }
+
+    private function enterFinallyHandlerForThrow(Frame $handler): ?Frame
+    {
+        $handlerId = spl_object_id($handler);
+        if (isset($this->context->completedFinallyHandlers[$handlerId])) {
+            return null;
+        }
+        $finallyOp = $this->findFinallyOpForHandler($handler);
+        if (null === $finallyOp || null === $finallyOp->block1) {
+            return null;
+        }
+        $this->context->completedFinallyHandlers[$handlerId] = true;
+        $this->context->pendingCatchResumeHandler = $handler;
+
+        return $finallyOp->block1->getFrame($this->context, $handler);
+    }
+
+    private function findFinallyOpForHandler(Frame $handler): ?OpCode
+    {
+        foreach ($handler->block->opCodes as $op) {
+            if (OpCode::TYPE_FINALLY === $op->type) {
+                return $op;
+            }
+        }
+
+        return null;
+    }
+
+    private function resumeCatchAfterFinally(Frame $frame): ?Frame
+    {
+        $handler = $this->context->pendingCatchResumeHandler;
+        if (null === $handler) {
+            return null;
+        }
+        $this->context->pendingCatchResumeHandler = null;
+        $this->rewindHandlerToCatchChain($handler);
+        $catchFrame = $this->enterMatchingCatchHandler($handler);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+        $thrown = $this->context->pendingException;
+        if (null === $thrown) {
+            return null;
+        }
+        $outerCatch = $this->findCatchFrameForThrow($handler->parent ?? $handler, $thrown);
+        if (null !== $outerCatch) {
+            return $outerCatch;
+        }
+        $this->raiseUncaughtException($thrown);
+    }
+
+    private function clearTryCatchUnwindState(): void
+    {
+        $this->context->pendingException = null;
+        $this->context->pendingCatchResumeHandler = null;
+        $this->context->completedFinallyHandlers = [];
+    }
+
+    /** @return never */
+    private function raiseUncaughtException(Variable $thrown): void
+    {
+        $this->clearTryCatchUnwindState();
+        if (Variable::TYPE_OBJECT === $thrown->type) {
+            $entry = $thrown->toObject();
+            try {
+                $message = $entry->getProperty('message')->toString();
+            } catch (\LogicException) {
+                $message = 'Exception';
+            }
+            throw new \Exception($message);
+        }
+        throw new \Exception($thrown->toString());
     }
 
     private function catchTypesMatch(OpCode $op, Variable $thrown): bool
@@ -1506,7 +1597,15 @@ restart:
     protected function initMethodCall(Frame $frame, Variable $receiver, string $methodName): void
     {
         $methodLc = strtolower($methodName);
-        $class = $receiver->toObject()->class;
+        $object = $receiver->toObject();
+        if (null !== $object->closureState && '__invoke' === $methodLc) {
+            $frame->call = $object->closureState->func;
+            $frame->callArgs = [];
+            $frame->callArgEntries = [];
+
+            return;
+        }
+        $class = $object->class;
         if (!isset($class->methods[$methodLc])) {
             throw new \LogicException("Call to undefined method {$class->name}::{$methodLc}()");
         }
