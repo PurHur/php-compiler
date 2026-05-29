@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# M3 JIT unit probe: lib/JIT.php bundle native link + optional native emit (issues #2332, #2778).
+# M3 JIT unit probe: lib/JIT.php bundle native link + optional native emit (issues #2332, #2778, #3038).
 set -euo pipefail
 if [[ "${BOOTSTRAP_M3_JIT_UNIT_PROBE_STRICT:-0}" == "1" ]]; then
   export BOOTSTRAP_M3_LINK_COMPILE_DRIVER="${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-1}"
@@ -14,6 +14,16 @@ PROBE="${ROOT}/build/selfhost-jit-unit-probe"
 EMIT_HELPER="${ROOT}/build/selfhost-jit-unit-probe-emit"
 AOT_OUT="${ROOT}/build/jit-unit-probe-aot"
 EMIT_ENTRY="${ROOT}/test/bootstrap-aot/jit_unit_probe_m3_emit_native_entry.php"
+INVENTORY_EMIT_DRIVER="${ROOT}/test/selfhost/jit_unit_probe/compile_driver.php"
+default_inventory_emit_driver=0
+if [[ "${BOOTSTRAP_M3_JIT_UNIT_PROBE_STRICT:-0}" == "1" ]]; then
+  default_inventory_emit_driver=1
+fi
+if [[ -n "${BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER+x}" ]]; then
+  USE_INVENTORY_EMIT_DRIVER="${BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER}"
+else
+  USE_INVENTORY_EMIT_DRIVER="${default_inventory_emit_driver}"
+fi
 M3_NATIVE_COMPILE=0
 M3_EMIT_PATH="none"
 M3_BLOCK_REASON="native emit helper not linked (set BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1)"
@@ -63,26 +73,34 @@ if [[ "${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
   : "${BOOTSTRAP_M3_RUNTIME_COMPILE:=1}"
   m3_link_env=()
   m3_link_mode="stub"
+  m3_emit_source="${EMIT_ENTRY}"
   if [[ "${BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING:-1}" == "1" ]]; then
-    m3_link_env=(env PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_M3_COMPILE_DRIVER=1 PHP_COMPILER_EMIT_HELPER_LINK=1)
-    m3_link_mode="selfhost M3 emit TU (jit_unit_probe_m3_emit_native_entry.php)"
+    if [[ "${USE_INVENTORY_EMIT_DRIVER}" == "1" && -f "${INVENTORY_EMIT_DRIVER}" ]]; then
+      m3_link_env=(env PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_M3_COMPILE_DRIVER=1 PHP_COMPILER_EMIT_HELPER_LINK=1 PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1 BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER=1 PHP_COMPILER_M3_EMIT_LOG_PREFIX=compile_smoke_m3_emit)
+      m3_link_mode="inventory compile_driver (no emit-helper TU, #2879/#3038)"
+      m3_emit_source="${INVENTORY_EMIT_DRIVER}"
+    else
+      m3_link_env=(env PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_M3_COMPILE_DRIVER=1 PHP_COMPILER_EMIT_HELPER_LINK=1)
+      m3_link_mode="selfhost M3 emit TU (jit_unit_probe_m3_emit_native_entry.php)"
+    fi
   else
     m3_link_env=(env PHP_COMPILER_SELFHOST_AOT=1)
     m3_link_mode="selfhost stubs (no PHP_COMPILER_M3_COMPILE_DRIVER)"
   fi
   set +e
-  "${m3_link_env[@]}" php bin/compile.php -o build/selfhost-jit-unit-probe-emit "${EMIT_ENTRY}" >/dev/null 2>&1
+  "${m3_link_env[@]}" php bin/compile.php -o build/selfhost-jit-unit-probe-emit "${m3_emit_source}" >/dev/null 2>&1
   m3_link_code=$?
   set -e
   if [[ -x "${EMIT_HELPER}" ]]; then
     echo "bootstrap-selfhost-jit-unit-probe: native emit helper link OK (${EMIT_HELPER}, ${m3_link_mode})"
     if [[ "${BOOTSTRAP_M3_RUNTIME_COMPILE:-1}" == "1" ]]; then
       set +e
+      m3_run_env=(PHP_COMPILER_M3_EMIT_MINIMAL=1 PHP_COMPILER_M3_SOURCE="${SOURCE}" PHP_COMPILER_M3_OUT="${AOT_OUT}")
+      if [[ "${USE_INVENTORY_EMIT_DRIVER}" == "1" ]]; then
+        m3_run_env+=(PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1)
+      fi
       compile_out="$(
-        env PHP_COMPILER_M3_EMIT_MINIMAL=1 \
-          PHP_COMPILER_M3_SOURCE="${SOURCE}" \
-          PHP_COMPILER_M3_OUT="${AOT_OUT}" \
-          "${EMIT_HELPER}" 2>&1
+        env "${m3_run_env[@]}" "${EMIT_HELPER}" 2>&1
       )"
       native_compile_code=$?
       set -e
