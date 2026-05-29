@@ -18,7 +18,7 @@ This repository continues work that began as a **research compiler written in PH
 | | |
 |---|---|
 | **Original project** | [**ircmaxell/php-compiler**](https://github.com/ircmaxell/php-compiler) on GitHub |
-| **Original author** | [**Anthony Ferrara**](https://github.com/ircmaxell) (`ircmaxell`) — idea, early architecture, and MIT-licensed codebase (copyright © 2019 Anthony Ferrara; see [LICENSE](LICENSE)) |
+| **Original author** | [**Anthony Ferrara**](https://github.com/ircmaxell) (`ircmaxell`) — idea, early architecture, and MIT-licensed codebase ([LICENSE](LICENSE)) |
 | **This fork** | [**PurHur/php-compiler**](https://github.com/PurHur/php-compiler) — LLVM-backed JIT/AOT, `phpc` CLI, web examples, bootstrap/self-host ladder, and ongoing maintenance |
 
 **Disclaimer:** The *concept* of a PHP-in-PHP compiler with VM, JIT, and native compilation comes from Anthony Ferrara’s original project. This fork is a **separate continuation** with substantial new code, tooling, and goals (especially self-host and production-shaped `phpc` workflows). It is **not** an official release from the original author unless stated otherwise. If you cite the idea, please credit the [original repository](https://github.com/ircmaxell/php-compiler) and its author.
@@ -318,7 +318,7 @@ More: [`docs/GETTING-STARTED.md`](docs/GETTING-STARTED.md) · [`docs/local-ci-ma
 
 ## License
 
-[MIT](LICENSE) — Copyright © 2019 Anthony Ferrara. This fork is maintained under the same license; see [Lineage & disclaimer](#lineage--disclaimer) for attribution.
+[MIT](LICENSE) — see [Lineage & disclaimer](#lineage--disclaimer) for attribution to the original project.
 
 ---
 
