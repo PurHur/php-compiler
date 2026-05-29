@@ -262,6 +262,14 @@ class JIT {
     }
 
     /**
+     * Inventory compile_driver.php emit-helper link: stub argv driver bodies; native emit bridge only (#2540).
+     */
+    private function shouldStubInventoryEmitHelperBundledBodies(): bool
+    {
+        return $this->shouldUseM3InventoryEmitDriver() && $this->shouldUseEmitHelperLinkStubs();
+    }
+
+    /**
      * M5 vendor prelink: AOT-compile literal-require vendor bundles without full class lowering (#1416).
      * Set by script/bootstrap-vendor-objects.php during --compile only.
      */
@@ -694,7 +702,7 @@ class JIT {
         if (
             $this->shouldUseM3CompileDriverMainNative()
             && $this->isM3CompileDriverBundleScriptMain($block)
-            && !$this->shouldUseM3InventoryEmitDriver()
+            && !($this->shouldUseM3InventoryEmitDriver() && $this->shouldUseEmitHelperLinkStubs())
         ) {
             return $this->compileM3CompileDriverMainNative($internalName, $block, $logicalName);
         }
@@ -1298,7 +1306,8 @@ class JIT {
     /** Emit TU null-returning stubs unless M3 real-lowering is enabled (#2512, #2542). */
     private function shouldUseM3EmitTuRuntimeMethodStub(string $methodLc): bool
     {
-        if ($this->shouldUseM3InventoryEmitDriver()) {
+        // Inventory argv driver (bin/compile.php re-link) — not emit-helper inventory link (#2540).
+        if ($this->shouldUseM3InventoryEmitDriver() && !$this->shouldUseEmitHelperLinkStubs()) {
             static $inventoryEmitSpine = [
                 '__construct',
                 'initparsepipeline',
@@ -2227,6 +2236,16 @@ class JIT {
         if ($this->isM3EmitTuRuntimeSpineLoweringName($lower)) {
             return false;
         }
+        // Inventory emit-helper bundles compile_driver.php; PHP CFG for argv driver crashes at {main} (#2540).
+        if ($this->shouldStubInventoryEmitHelperBundledBodies()) {
+            if ($this->isBootstrapHelloWorldSmokeName($lower)
+                || str_contains($lower, 'compiler_helloworld_compile_driver')
+                || 'compiler_smoke_greeting' === $lower
+                || str_ends_with($lower, '\\compiler_smoke_greeting')
+            ) {
+                return true;
+            }
+        }
         // M3 compile-smoke wrapper: native bridge in emit TU only (#1983 approach 3, #1937).
         if ($this->shouldUseM3EmitTuNativeBridge() && $this->isBootstrapM3RuntimeEmitBridgeName($lower)) {
             return true;
@@ -3039,12 +3058,15 @@ class JIT {
         foreach (['initparsepipeline', 'loadcoremodules'] as $methodLc) {
             $logical = 'PHPCompiler\\Runtime::'.$methodLc;
             $lc = strtolower($logical);
-            if ($this->shouldUseM3InventoryEmitDriver()) {
+            if ($this->shouldUseM3InventoryEmitDriver() && !$this->shouldUseEmitHelperLinkStubs()) {
                 unset($this->context->functions[$lc], $this->context->functionReturnType[$lc], $this->context->functionProxies[$lc]);
             } elseif (!isset($this->context->functions[$lc])) {
                 $this->compileM3EmitTuRuntimeMethodFromModules($methodLc);
             }
-            if (!$this->shouldUseM3InventoryEmitDriver() && isset($this->context->functions[$lc])) {
+            if (
+                (!$this->shouldUseM3InventoryEmitDriver() || $this->shouldUseEmitHelperLinkStubs())
+                && isset($this->context->functions[$lc])
+            ) {
                 continue;
             }
             if ('initparsepipeline' === $methodLc) {
@@ -3917,8 +3939,8 @@ class JIT {
         if (isset($this->context->functions[$lc])) {
             return;
         }
-        if ($this->shouldUseM3InventoryEmitDriver()) {
-            // Never scan O(modules×funcs) on inventory links (#2967). parse/compileEmitSmoke from
+        if ($this->shouldUseM3InventoryEmitDriver() && !$this->shouldUseEmitHelperLinkStubs()) {
+            // Never scan O(modules×funcs) on inventory argv links (#2967). parse/compileEmitSmoke from
             // Runtime.php; ctor/init* use native M3 via compileBlock / ensureM3EmitTuRuntimeInitSpineSymbols.
             if (in_array($methodLc, ['parse', 'compileemitsmoke'], true)) {
                 unset(
@@ -4375,11 +4397,20 @@ class JIT {
                         if (!$this->context->hasVariableOp($captureOperand)) {
                             $this->context->makeVariableFromOp($func, $basicBlock, $block, $captureOperand);
                         }
-                        $this->assignOperand(
-                            $captureOperand,
-                            $args[$captureBase + $captureIdx],
-                            true
-                        );
+                        $captureArg = $args[$captureBase + $captureIdx];
+                        if (isset($block->closureCaptureByRef[$captureSlot])) {
+                            JIT\ClosureHelper::bindCaptureSlotByReference(
+                                $this->context,
+                                $this->context->getVariableFromOp($captureOperand),
+                                $captureArg
+                            );
+                        } else {
+                            $this->assignOperand(
+                                $captureOperand,
+                                $captureArg,
+                                true
+                            );
+                        }
                     }
                 }
             }
@@ -6472,6 +6503,15 @@ class JIT {
         }
         $result = $this->context->getVariableFromOp($resultOp);
         if ($result === $value) {
+            return;
+        }
+        if (null !== $result->valueBoxAliasPtr) {
+            JIT\JitValueBox::copyFromPointer(
+                $this->context,
+                $result->valueBoxAliasPtr,
+                $this->valueBoxPointer($value)
+            );
+
             return;
         }
         if (
