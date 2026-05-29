@@ -17,6 +17,12 @@ use PHPCompiler\Web\Superglobals;
 class Context {
     public array $functions = [];
     public array $classes = [];
+    /**
+     * User class aliases: lowercase alias => lowercase canonical class key (#3095).
+     *
+     * @var array<string, string>
+     */
+    public array $classAliases = [];
     /** @var array<string, true> lowercase enum name => registered (#1373, #1356) */
     public array $enums = [];
     /** @var list<callable(string): bool> */
@@ -146,6 +152,44 @@ class Context {
     public function declareFunction(Func $func): void {
         $lcname = strtolower($func->getName());
         $this->functions[$lcname] = $func;
+    }
+
+    /**
+     * Register an alternate name for a user-defined class (ext/standard class_alias, #3095).
+     *
+     * php-src: zend_register_class_alias_ex — v1: user classes only, no alias chains.
+     */
+    public function registerClassAlias(string $original, string $alias, bool $autoload = true): bool
+    {
+        $aliasLc = strtolower($alias);
+        $originalLc = strtolower($original);
+
+        if (isset($this->classes[$aliasLc]) || isset($this->classAliases[$aliasLc]) || isset($this->enums[$aliasLc])) {
+            return false;
+        }
+
+        if (!isset($this->classes[$originalLc])) {
+            if (!$autoload || !$this->autoloadClass($original)) {
+                return false;
+            }
+        }
+        if (!isset($this->classes[$originalLc])) {
+            return false;
+        }
+
+        if (isset($this->classAliases[$originalLc])) {
+            return false;
+        }
+
+        $entry = $this->classes[$originalLc];
+        if ($entry->isEnum || $entry->isInterface || $entry->isTrait) {
+            return false;
+        }
+
+        $this->classes[$aliasLc] = $entry;
+        $this->classAliases[$aliasLc] = $originalLc;
+
+        return true;
     }
 
     public function isCompileUnitLoaded(string $path): bool
