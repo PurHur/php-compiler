@@ -43,8 +43,8 @@ Presenter script and troubleshooting: [`docs/GETTING-STARTED.md`](docs/GETTING-S
 | Self-host **M0–M1** | ✅ |
 | Self-host **M2** spine | ✅ **726/726** link (literal `src/cli_driver.php`) ([#1492](https://github.com/PurHur/php-compiler/issues/1492), [#2868](https://github.com/PurHur/php-compiler/issues/2868), [#2201](https://github.com/PurHur/php-compiler/issues/2201), [#2543](https://github.com/PurHur/php-compiler/issues/2543), [#2652](https://github.com/PurHur/php-compiler/issues/2652)) |
 | Self-host **M3** emit | 🚧 smoke strict **native** ✅ ([#2610](https://github.com/PurHur/php-compiler/issues/2610)); full `Compiler` CFG 🚧 ([#1937](https://github.com/PurHur/php-compiler/issues/1937)) |
-| Self-host **M4** loop | 🚧 gen-2→gen-3 spine **726/726** ✅ ([#2697](https://github.com/PurHur/php-compiler/pull/2697)); full revision argv probe flakey/segfault 139 ([#2880](https://github.com/PurHur/php-compiler/issues/2880), [#2967](https://github.com/PurHur/php-compiler/issues/2967)); changed-tree rebuild ⬜ ([#1498](https://github.com/PurHur/php-compiler/issues/1498)) · [bootstrap-generations.md](docs/bootstrap-generations.md) |
-| Self-host **M5** vendor prelink | 🚧 `north-star5-verify` green — **3/3** vendor `object_ok` (cold-boot step 5b) via native→Zend rebuild fallback ([#2967](https://github.com/PurHur/php-compiler/issues/2967)); native vendor-bundle emit still 🚧 ([#3028](https://github.com/PurHur/php-compiler/issues/3028), [#3030](https://github.com/PurHur/php-compiler/issues/3030), [#3031](https://github.com/PurHur/php-compiler/issues/3031)); `make north-star5-verify` |
+| Self-host **M4** loop | ✅ gen-2→gen-3 spine **726/726** without Zend on compile ([#2697](https://github.com/PurHur/php-compiler/pull/2697), [#2866](https://github.com/PurHur/php-compiler/issues/2866)); full revision probe `bin/compile.php` → gen-3 ([#2880](https://github.com/PurHur/php-compiler/issues/2880), [#3046](https://github.com/PurHur/php-compiler/issues/3046)) · [bootstrap-generations.md](docs/bootstrap-generations.md) |
+| Self-host **M5** vendor prelink | 🚧 vendor **3/3** `object_ok` ✅ ([#3036](https://github.com/PurHur/php-compiler/pull/3036)); committed `.o` cold boot without `vendor/` ✅; Zend still drives empty `build/` bootstrap — `make north-star5-verify` |
 | Full Zend PHP compatibility | ❌ — subset only (matrices in `docs/`, not on status site) |
 
 MiniWebApp gates: [docs/miniwebapp-gates.md](docs/miniwebapp-gates.md) ([#472](https://github.com/PurHur/php-compiler/issues/472)). Presenter verify: `make north-star1-verify` ([#1845](https://github.com/PurHur/php-compiler/issues/1845)). Docker image: `php-compiler:22.04-dev`.
@@ -152,10 +152,10 @@ Matrix details: [docs/local-ci-matrix.md](docs/local-ci-matrix.md).
 |-----------|----------------|--------|
 | **M0 — Bundled subset runs** | ~**109** literal `require_once` units in `test/selfhost/compiler_minimal/main.php` compile+link under AOT; native binary prints `compiler_minimal bundle OK` | ✅ ([#557](https://github.com/PurHur/php-compiler/issues/557), [#913](https://github.com/PurHur/php-compiler/issues/913)) |
 | **M1 — Compiler-shaped bundle** | Same bundle **lints** as one translation unit; **compile-smoke** links a tiny fixture and runs AOT echo (`compiler smoke`); driver smoke bundles `bin/compile.php`-adjacent units | ✅ ([#1025](https://github.com/PurHur/php-compiler/issues/1025)) |
-| **M2 — Full top-level `lib/` + spine** | All **14** top-level `lib/*.php` lint ✅; **`compiler_lib_spine_smoke`** native link ✅ with real **`bin/vm.php`** (#2134); **717/717** spine units (#2543) | ✅ |
-| **M3 — Native compiles PHP** | Self-host bundle links; HelloWorld AOT **runs** natively; **compile emit still Zend fallback** | 🚧 partial |
-| **M4 — Bootstrap loop** | Native toolchain rebuilds the **next** compiler sources (gen-2→gen-3 spine ✅) | 🚧 |
-| **M5 — Full self-host** | Real `bin/vm.php` / `bin/compile.php` on full inventory; **no Zend bootstrap** | ⬜ **north star** ([#1492](https://github.com/PurHur/php-compiler/issues/1492)) |
+| **M2 — Full top-level `lib/` + spine** | All **14** top-level `lib/*.php` lint ✅; **`compiler_lib_spine_smoke`** native link ✅ with real **`bin/vm.php`** (#2134); **726/726** spine units (#2868, #2543) | ✅ |
+| **M3 — Native compiles PHP** | Smoke strict probes **`emit_path=native`** ✅; native **`bin/compile.php`** emit still 🚧 | 🚧 |
+| **M4 — Bootstrap loop** | Gen-2→gen-3 spine **726/726** without Zend on compile ✅; full revision `bin/compile.php` probe ✅ | ✅ |
+| **M5 — Full self-host** | Vendor prelink **3/3** ✅; committed `.o` cold boot without `vendor/` ✅; Zend cold boot for empty `build/` still open | 🚧 ([#1492](https://github.com/PurHur/php-compiler/issues/1492)) |
 
 **How it works today:** Zend PHP runs `php bin/compile.php` to AOT-compile a **fixed bundle** of `lib/*.php` (not the whole tree). With `PHP_COMPILER_SELFHOST_AOT=1`, hot paths in `Compiler`, `JIT`, and web bootstrap use LLVM stubs so the bundle links on LLVM 9; stdlib uses `SelfHostBuiltinPolicy` (real lowering for ~40 builtins, `ExternalMethod` stubs for the rest). `PHP_COMPILER_JIT_PROGRESS_FILE` is optional segfault logging only.
 

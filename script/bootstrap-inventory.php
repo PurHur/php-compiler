@@ -74,7 +74,9 @@ if ($check) {
         exit(1);
     }
     $committed = bootstrapStripInventoryProbeSection((string) file_get_contents($outFile));
-    if ($committed !== $markdown) {
+    $committedNorm = bootstrapNormalizeInventoryLineNumbers($committed);
+    $markdownNorm = bootstrapNormalizeInventoryLineNumbers($markdown);
+    if ($committedNorm !== $markdownNorm) {
         fwrite(STDERR, "Stale {$outFile}; regenerate with:\n");
         fwrite(STDERR, "  php script/bootstrap-inventory.php\n");
         fwrite(STDERR, "Live probe sidecar (optional): docs/bootstrap-inventory-live-probe.md\n");

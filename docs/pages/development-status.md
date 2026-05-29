@@ -5,7 +5,7 @@ description: High-level snapshot of php-compiler — VM, AOT web apps, and self-
 permalink: /development-status.html
 ---
 
-*Last updated: 27 May 2026 (`master` @ 177b2efb) · Tracker: [#1492](https://github.com/PurHur/php-compiler/issues/1492) · Roadmap: [#78](https://github.com/PurHur/php-compiler/issues/78)*
+*Last updated: 29 May 2026 (`master` @ 03c44c5f) · Tracker: [#1492](https://github.com/PurHur/php-compiler/issues/1492) · Roadmap: [#78](https://github.com/PurHur/php-compiler/issues/78)*
 
 ## At a glance
 
@@ -25,10 +25,10 @@ permalink: /development-status.html
 
 - **`phpc` CLI** — `run`, `serve`, `build`, `deploy`, `lint`, `test`, `init`
 - **Examples 000–009** — VM and AOT link/execute for the curated web subset
-- **Self-host M0–M2** — minimal bundle ✅; spine native link **726/726** ✅ ([#2868](https://github.com/PurHur/php-compiler/issues/2868), [#1960](https://github.com/PurHur/php-compiler/issues/1960), [#2543](https://github.com/PurHur/php-compiler/issues/2543), [#2652](https://github.com/PurHur/php-compiler/issues/2652))
-- **Self-host M3 (smoke native)** — strict probes emit **`emit_path=native`** ✅ ([#2610](https://github.com/PurHur/php-compiler/issues/2610), [#2618](https://github.com/PurHur/php-compiler/issues/2618)); emit TU routes **`compileEmitSmoke`** through Compiler spine ([#2667](https://github.com/PurHur/php-compiler/pull/2667)); native **`bin/compile.php`** still 🚧 ([#1937](https://github.com/PurHur/php-compiler/issues/1937)).
-- **Self-host M4 (gen-2→gen-3)** — gen-1→gen-2 smoke/spine **native emit** ✅ ([#2611](https://github.com/PurHur/php-compiler/issues/2611)); gen-2→gen-3 **726/726** spine recompile ✅ ([#2697](https://github.com/PurHur/php-compiler/pull/2697)); revision probe (`bootstrap-selfhost-full-revision-probe`) still flakey/segfault 139 ([#2880](https://github.com/PurHur/php-compiler/issues/2880), [#2967](https://github.com/PurHur/php-compiler/issues/2967)); changed-tree rebuild still open ([#1498](https://github.com/PurHur/php-compiler/issues/1498)).
-- **Self-host M5 (started)** — `ircmaxell/php-types` vendor prelink **`object_ok`** ([#1416](https://github.com/PurHur/php-compiler/issues/1416)); `php-cfg` / `php-llvm` bundles blocked on parse; presenter `make north-star5-verify`.
+- **Self-host M0–M2** — minimal bundle ✅; spine native link **726** / **726** ✅ ([#2868](https://github.com/PurHur/php-compiler/issues/2868), [#1960](https://github.com/PurHur/php-compiler/issues/1960), [#2543](https://github.com/PurHur/php-compiler/issues/2543), [#2652](https://github.com/PurHur/php-compiler/issues/2652))
+- **Self-host M3 (smoke native)** — HelloWorld strict **`emit_path=native`** ✅ ([#1493](https://github.com/PurHur/php-compiler/issues/1493), [#2610](https://github.com/PurHur/php-compiler/issues/2610), [#2618](https://github.com/PurHur/php-compiler/issues/2618)); emit TU routes **`compileEmitSmoke`** through Compiler spine ([#2667](https://github.com/PurHur/php-compiler/pull/2667)); inventory **compile-smoke** / native **`bin/compile.php`** emit still 🚧 ([#1937](https://github.com/PurHur/php-compiler/issues/1937)).
+- **Self-host M4 (gen-2→gen-3)** — gen-2→gen-3 **726/726** spine recompile **without Zend on the compile step** ✅ ([#2697](https://github.com/PurHur/php-compiler/pull/2697), [#2866](https://github.com/PurHur/php-compiler/issues/2866)); `make bootstrap-loop-gen2-recompile-spine` → `compiler_lib_spine_smoke bundle OK`. Full revision probe (`make bootstrap-selfhost-full-revision-probe`) ✅ — inventory argv driver compiles `bin/compile.php` → gen-3 ([#2880](https://github.com/PurHur/php-compiler/issues/2880), [#3046](https://github.com/PurHur/php-compiler/issues/3046)).
+- **Self-host M5 (partial)** — vendor prelink **3/3** `object_ok` (cfg, types, llvm) ✅ ([#3036](https://github.com/PurHur/php-compiler/pull/3036), [#1416](https://github.com/PurHur/php-compiler/issues/1416)); committed `.o` cold boot without `vendor/` ✅; default bootstrap still uses Zend for `bin/compile.php` when `build/` is empty — presenter `make north-star5-verify`.
 
 **Not claimed:** full Zend PHP compatibility (subset compiler only).
 
@@ -41,13 +41,13 @@ permalink: /development-status.html
 | **M0** — Small `lib/` bundle runs | ✅ |
 | **M1** — Compiler-shaped bundle + compile-smoke | ✅ |
 | **M2** — Spine toward full inventory | ✅ **726/726** link (complete) |
-| **M3** — Native compiles PHP (no Zend emit) | 🚧 smoke strict **native emit** ✅ · `bin/compile.php` emit 🚧 |
-| **M4** — Bootstrap loop (next revision) | 🚧 gen-2→gen-3 spine **726/726** ✅ · full revision argv probe ✅ · changed-tree rebuild ⬜ |
-| **M5** — Full self-host, no `vendor/` cold boot | 🚧 vendor **1/3** prelinked · cold boot ⬜ |
+| **M3** — Native compiles PHP (no Zend emit) | 🚧 HelloWorld strict ✅ · compile-smoke / `bin/compile.php` emit 🚧 ([#1937](https://github.com/PurHur/php-compiler/issues/1937)) |
+| **M4** — Bootstrap loop (next revision) | ✅ gen-2→gen-3 spine **726/726** (native argv `-o`) · full revision `bin/compile.php` probe ✅ |
+| **M5** — Full self-host, no `vendor/` cold boot | 🚧 vendor **3/3** prelinked ✅ · Zend cold boot for `bin/compile.php` ⬜ |
 
-**Critical path:** full revision rebuild (gen-3 compiles a changed tree) → M5 vendor prelink ([#1416](https://github.com/PurHur/php-compiler/issues/1416)).
+**Critical path:** native `bin/compile.php` emit (full revision probe) → retire Zend on empty `build/` bootstrap ([#1416](https://github.com/PurHur/php-compiler/issues/1416), [#1492](https://github.com/PurHur/php-compiler/issues/1492)).
 
-**Verified 28 May 2026** (`master`, Docker `php-compiler:22.04-dev`, LLVM 9): `bootstrap-native-compile-driver-smoke`, `bootstrap-loop-gen2-recompile-spine` (revision probe still flakey).
+**Verified 29 May 2026** (`master` @ 03c44c5f, Docker `php-compiler:22.04-dev`, LLVM 9): `bootstrap-loop-gen2-recompile-spine` (gen-3 **726/726**, no Zend on compile); `bootstrap-selfhost-full-revision-probe` (inventory argv `bin/compile.php` → gen-3); `north-star5-verify` (vendor **3/3**, committed `.o` cold boot).
 
 Contributor detail: [`docs/self-host-target.md`](https://github.com/PurHur/php-compiler/blob/master/docs/self-host-target.md), [`docs/bootstrap-generations.md`](https://github.com/PurHur/php-compiler/blob/master/docs/bootstrap-generations.md), [`docs/bootstrap-selfhost.md`](https://github.com/PurHur/php-compiler/blob/master/docs/bootstrap-selfhost.md).
 

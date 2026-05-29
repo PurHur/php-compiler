@@ -557,6 +557,14 @@ function bootstrapWriteInventoryLiveProbe(string $root, string $message): void
 /**
  * Strip legacy probe section from committed docs/bootstrap-inventory.md (pre-#2891).
  */
+/**
+ * Ignore line-number-only drift in per-file warning rows (#3048).
+ */
+function bootstrapNormalizeInventoryLineNumbers(string $content): string
+{
+    return preg_replace('/ \(line \d+\)/', ' (line ?)', $content) ?? $content;
+}
+
 function bootstrapStripInventoryProbeSection(string $content): string
 {
     $needle = "\n## Live self-host compile probe\n";

@@ -53,6 +53,10 @@ if [[ "${gen3_link_code}" -ne 0 ]]; then
   echo "bootstrap-selfhost-full-revision-probe: gen-2 compile bin/compile.php failed (exit ${gen3_link_code})" >&2
   exit 1
 fi
+if ! grep -qE 'helloworld_compile_smoke: compile OK|compile_smoke_m3_emit: compile OK' <<< "${gen3_link_out}"; then
+  echo "bootstrap-selfhost-full-revision-probe: gen-2 compile bin/compile.php missing compile OK line (#3046)" >&2
+  exit 1
+fi
 if [[ ! -x "${GEN3}" ]]; then
   echo "bootstrap-selfhost-full-revision-probe: missing gen-3 driver ${GEN3}" >&2
   exit 1
