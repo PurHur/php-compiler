@@ -80,6 +80,7 @@ static const char *phpc_builtin_functions[] = {
     "explode",
     "extract",
     "fclose",
+    "flock",
     "feof",
     "fflush",
     "fgetc",

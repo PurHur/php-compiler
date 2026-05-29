@@ -77,7 +77,7 @@ final class SelfHostBuiltinPolicy
         'fopen' => 'filesystem', 'fread' => 'filesystem', 'fwrite' => 'filesystem', 'fgetc' => 'filesystem', 'fgets' => 'filesystem',
         'fgetcsv' => 'filesystem',
         'fputcsv' => 'filesystem',
-        'ftell' => 'filesystem', 'fseek' => 'filesystem', 'fclose' => 'filesystem',
+        'ftell' => 'filesystem', 'fseek' => 'filesystem', 'fclose' => 'filesystem', 'flock' => 'filesystem',
         'feof' => 'filesystem', 'fflush' => 'filesystem', 'fpassthru' => 'filesystem',
         'pathinfo' => 'filesystem', 'readfile' => 'filesystem', 'readlink' => 'filesystem', 'rename' => 'filesystem',
         'is_uploaded_file' => 'filesystem', 'move_uploaded_file' => 'filesystem', 'touch' => 'filesystem',
