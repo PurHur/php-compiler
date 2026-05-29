@@ -25,6 +25,7 @@ use PHPCompiler\VM\Variable;
 use PHPCompiler\JIT\OperandName;
 use PHPCompiler\Compiler\AttributeNames;
 use PHPCompiler\Compiler\InterfaceImplementationCheck;
+use PHPCompiler\Compiler\TraitCollisionCheck;
 use PHPCompiler\Web\ConstStringFolder;
 use PHPCompiler\Web\IncludePathResolver;
 use PHPCompiler\Web\Superglobals;
@@ -223,6 +224,7 @@ class Compiler {
         $this->seen = null;
 
         InterfaceImplementationCheck::validate($script);
+        TraitCollisionCheck::validate($script);
 
         return $main;
     }

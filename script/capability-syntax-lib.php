@@ -412,6 +412,7 @@ function syntaxRowDefinitions(): array
             'notes' => [
                 'php-cfg-trait-use.patch; VM merges trait methods into class',
                 'TraitUseAdaptation (alias/insteadof) is #144',
+                'Horizontal trait method collision fatals at compile time (#3416)',
             ],
             'probe' => 'trait T { public function m(): int { return 1; } } class C { use T; } echo (new C())->m();',
         ],

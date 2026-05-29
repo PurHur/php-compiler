@@ -2080,7 +2080,7 @@ restart:
         return [$thisVar];
     }
 
-    protected function applyTraitUse(ClassEntry $entry, string $traitName): void
+    protected function applyTraitUse(ClassEntry $entry, string $traitName, array $ownMethods = []): void
     {
         $traitLc = strtolower(ltrim($traitName, '\\'));
         if (!isset($this->context->classes[$traitLc])) {
@@ -2094,13 +2094,38 @@ restart:
             throw new \LogicException("{$traitName} is not a trait");
         }
         $entry->usedTraits[$trait->name] = $trait->name;
+        $excluded = $ownMethods;
+        $visited = [];
+        $current = $entry->parentLc;
+        while (null !== $current && !isset($visited[$current])) {
+            $visited[$current] = true;
+            if (!isset($this->context->classes[$current])) {
+                break;
+            }
+            foreach ($this->context->classes[$current]->methods as $name => $_) {
+                $excluded[$name] = true;
+            }
+            $current = $this->context->classes[$current]->parentLc;
+        }
         foreach ($trait->methods as $name => $method) {
-            if (!isset($entry->methods[$name])) {
-                $entry->methods[$name] = $method;
-                $entry->methodVisibility[$name] = $trait->methodVisibility[$name] ?? \PHPCfg\Func::FLAG_PUBLIC;
-                if (isset($trait->methodAttributeNames[$name])) {
-                    $entry->methodAttributeNames[$name] = $trait->methodAttributeNames[$name];
-                }
+            if (isset($excluded[$name])) {
+                continue;
+            }
+            if (isset($entry->methods[$name]) && !isset($entry->traitMethodSources[$name])) {
+                continue;
+            }
+            if (isset($entry->traitMethodSources[$name])) {
+                $prevTrait = $entry->traitMethodSources[$name];
+                throw new \CompileError(
+                    "Trait method {$trait->name}::{$name} has not been applied as {$entry->name}::{$name}, "
+                    ."because of collision with {$prevTrait}::{$name}"
+                );
+            }
+            $entry->methods[$name] = $method;
+            $entry->traitMethodSources[$name] = $trait->name;
+            $entry->methodVisibility[$name] = $trait->methodVisibility[$name] ?? \PHPCfg\Func::FLAG_PUBLIC;
+            if (isset($trait->methodAttributeNames[$name])) {
+                $entry->methodAttributeNames[$name] = $trait->methodAttributeNames[$name];
             }
         }
         foreach ($trait->staticProperties as $name => $storage) {
@@ -2206,6 +2231,7 @@ restart:
 
     protected function defineClass(ClassEntry $entry, Block $block): void {
         $frame = $block->getFrame($this->context);
+        $ownMethods = $this->classBodyOwnMethodNames($block, $frame);
         foreach ($block->opCodes as $op) {
             if ($this->isClassBodyDefaultInitOpcode($op->type)) {
                 $this->executeClassBodyDefaultInitOpcode($frame, $op);
@@ -2237,6 +2263,7 @@ restart:
                         $vis = MethodVisibility::mask($block->constants[$op->arg3]->toInt());
                     }
                     $entry->methodVisibility[$name] = $vis;
+                    unset($entry->traitMethodSources[$name]);
                     if ([] !== $op->attributeNames) {
                         $entry->methodAttributeNames[$name] = $op->attributeNames;
                     }
@@ -2256,7 +2283,7 @@ restart:
                     $entry->constants[$name] = $block->constants[$op->arg2];
                     break;
                 case OpCode::TYPE_USE_TRAIT:
-                    $this->applyTraitUse($entry, $frame->scope[$op->arg1]->toString());
+                    $this->applyTraitUse($entry, $frame->scope[$op->arg1]->toString(), $ownMethods);
                     break;
                 default:
                     throw new \LogicException(
@@ -2271,6 +2298,25 @@ restart:
         return OpCode::TYPE_INIT_ARRAY === $type
             || OpCode::TYPE_ADD_ARRAY_ELEMENT === $type
             || OpCode::TYPE_ARRAY_SPREAD === $type;
+    }
+
+    /**
+     * @return array<string, true>
+     */
+    private function classBodyOwnMethodNames(Block $block, Frame $frame): array
+    {
+        $methods = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_DECLARE_METHOD !== $op->type) {
+                continue;
+            }
+            if (null === $op->block1) {
+                continue;
+            }
+            $methods[strtolower($frame->scope[$op->arg1]->toString())] = true;
+        }
+
+        return $methods;
     }
 
     private function executeClassBodyDefaultInitOpcode(Frame $frame, OpCode $op): void
