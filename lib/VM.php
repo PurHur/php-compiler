@@ -17,6 +17,7 @@ use PHPCompiler\ext\standard\VmEval;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\CastSupport;
 use PHPCompiler\VM\ClassEntry;
+use PHPCompiler\VM\DnfCheck;
 use PHPCompiler\VM\ClosureState;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ErrorReporter;
@@ -789,6 +790,9 @@ restart:
                         : $frame->block->strictTypes;
                     try {
                         TypeCheck::coercePropertyWrite($arg2, $strict);
+                        if (null !== $arg2->dnfArms) {
+                            DnfCheck::assertMatches($arg3, $arg2->dnfArms, $this->context, 'Property');
+                        }
                     } catch (\TypeError $e) {
                         $catchFrame = $this->dispatchVmTypeError($e, $frame);
                         if (null !== $catchFrame) {
@@ -1720,6 +1724,13 @@ restart:
                         TypeCheck::assertParamIntersection(
                             $arg1,
                             $frame->block->paramIntersectionConstraints[$op->arg1],
+                            $this->context
+                        );
+                    }
+                    if (isset($frame->block->paramDnfConstraints[$op->arg1])) {
+                        DnfCheck::assertMatches(
+                            $arg1,
+                            $frame->block->paramDnfConstraints[$op->arg1],
                             $this->context
                         );
                     }

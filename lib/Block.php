@@ -76,6 +76,9 @@ class Block {
     /** Declared return type AST for reflection (#3355), or null when untyped. */
     public ?Op\Type $returnDeclaredType = null;
 
+    /** @var array<int, list<array{kind: string, interfaces?: list<string>, name?: string}>> */
+    public array $paramDnfConstraints = [];
+
     /** Declared scalar return type for this function (issue #205), or null when untyped. */
     public ?int $returnTypeConstraint = null;
 

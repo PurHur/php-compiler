@@ -1778,6 +1778,18 @@ class Compiler {
 
             return;
         }
+        $dnfArms = DnfType::armsFromCfgType(
+            $declared,
+            fn (Op\Type\Intersection $t) => $this->intersectionNamesFromCfgType($t)
+        );
+        if (DnfType::hasConstraints($dnfArms)) {
+            $block->paramDnfConstraints[$slot] = $dnfArms;
+
+            return;
+        }
+
+            return;
+        }
         if ($declared instanceof Op\Type\Literal) {
             $declName = strtolower($declared->name);
             if ('mixed' !== $declName) {
@@ -1830,7 +1842,7 @@ class Compiler {
                     $propertyDeclName = $this->declNameFromCfgType($child->declaredType);
                     $declared = null !== $propertyDeclName
                         ? Type::fromDecl($propertyDeclName)
-                        : ($child->type ?? Type::mixed());
+                        : $this->typeFromPropertyDecl($child);
                     AttributeNames::assertNoDuplicates(AttributeNames::fromOp($child));
                     if ($child->static && null !== $this->currentClassStaticPropertyCompile) {
                         $staticPropName = $this->staticNameFromOperand($child->name);
@@ -1864,7 +1876,11 @@ class Compiler {
                         $declareType,
                         $this->compileOperand($child->name, $result, true),
                         $defaultSlot,
-                        $this->compileTypeConstrainedVariable($result, $declared, $propertyDeclName)
+                        $this->compileTypeConstrainedVariable(
+                            $result,
+                            $declared,
+                            null !== $propertyDeclName ? $propertyDeclName : $child->declaredType
+                        )
                     );
                     if (!$child->static) {
                         $declare->propertyReadonly = (property_exists($child, 'readonly') && $child->readonly)
@@ -2056,16 +2072,14 @@ class Compiler {
     protected function compilePromotedPropertyDeclaration(Op\Expr\Param $param, Block $result): void
     {
         $defaultSlot = $this->resolvePropertyOrParamDefaultSlot($param, $result);
-        $declared = $param->declaredType instanceof Op\Type\Literal
-            ? Type::fromDecl($param->declaredType->name)
-            : Type::mixed();
+        $declared = $this->typeFromParamDecl($param);
         $propName = new Operand\Literal($param->name->value);
         $propName->type = Type::string();
         $declare = new OpCode(
             OpCode::TYPE_DECLARE_PROPERTY,
             $this->compileOperand($propName, $result, true),
             $defaultSlot,
-            $this->compileTypeConstrainedVariable($result, $declared)
+            $this->compileTypeConstrainedVariable($result, $declared, $param->declaredType)
         );
         $declare->propertyReadonly = $this->isPromotedParamReadonly($param);
         $declare->propertyVisibility = MethodVisibility::mask($param->promotionFlags);
@@ -2133,7 +2147,33 @@ class Compiler {
         }
     }
 
-    protected function compileTypeConstrainedVariable(Block $block, Type $type, ?string $declName = null): int {
+    protected function typeFromPropertyDecl(Op\Stmt\Property $child): Type
+    {
+        if ($child->declaredType instanceof Op\Type\Literal) {
+            return Type::fromDecl($child->declaredType->name);
+        }
+        if (null !== $child->declaredType) {
+            return Type::fromTypeDecl($child->declaredType);
+        }
+
+        return $child->type ?? Type::mixed();
+    }
+
+    protected function typeFromParamDecl(Op\Expr\Param $param): Type
+    {
+        if ($param->declaredType instanceof Op\Type\Literal) {
+            return Type::fromDecl($param->declaredType->name);
+        }
+        if (null !== $param->declaredType) {
+            return Type::fromTypeDecl($param->declaredType);
+        }
+
+        return Type::mixed();
+    }
+
+    protected function compileTypeConstrainedVariable(Block $block, Type $type, Op\Type|string|null $cfgTypeOrDeclName = null): int {
+        $cfgType = $cfgTypeOrDeclName instanceof Op\Type ? $cfgTypeOrDeclName : null;
+        $declName = is_string($cfgTypeOrDeclName) ? $cfgTypeOrDeclName : null;
         $var = new Variable(Variable::TYPE_UNDEFINED);
         $operand = new Operand\Temporary;
         $operand->type = $type;
@@ -2158,14 +2198,24 @@ class Compiler {
                 $var->unionTypeConstraints = $members;
                 $var->declaredTypeLabel = $type->toString();
             }
+        }
+        $dnfArms = DnfType::armsFromCfgType(
+            $cfgType,
+            fn (Op\Type\Intersection $t) => $this->intersectionNamesFromCfgType($t)
+        );
+        if (DnfType::hasConstraints($dnfArms)) {
+            $var->dnfArms = $dnfArms;
 
+            return $return;
+        }
+        if (Type::TYPE_UNION === $type->type && [] !== ($var->unionTypeConstraints ?? [])) {
             return $return;
         }
         $mappedType = Variable::mapFromType($type);
         if ($mappedType === Variable::TYPE_UNDEFINED) {
-            // Mixed
             return $return;
-        } elseif ($mappedType === Variable::TYPE_OBJECT) {
+        }
+        if ($mappedType === Variable::TYPE_OBJECT) {
             $var->classConstraint = $type->userType;
         }
         $var->typeConstraint = $mappedType;
