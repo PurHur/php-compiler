@@ -1161,14 +1161,6 @@ class Compiler {
         return null;
     }
 
-    protected function rejectDeferredParentAccess(?string $className, string $construct): void
-    {
-        if (null === $className || 'parent' !== strtolower($className)) {
-            return;
-        }
-        $this->throwCompileError("{$construct} is not supported (issue #1858)");
-    }
-
     protected function literalScopeClassName(Operand $class): ?string
     {
         if ($class instanceof Operand\Literal && is_string($class->value)) {
@@ -1824,11 +1816,6 @@ class Compiler {
             case Op\Expr\ClassConstFetch::class:
                 return $this->compileClassConstFetch($expr, $block);
             case Op\Expr\StaticPropertyFetch::class:
-                $this->rejectDeferredParentAccess(
-                    $this->literalScopeClassName($expr->class),
-                    'parent::$property'
-                );
-
                 return [new OpCode(
                     OpCode::TYPE_STATIC_PROPERTY_FETCH,
                     $this->compileOperand($expr->result, $block, false),
@@ -3170,13 +3157,6 @@ class Compiler {
      */
     protected function compileClassConstFetch(Op\Expr\ClassConstFetch $expr, Block $block): array
     {
-        if (
-            'parent' === strtolower((string) $this->literalScopeClassName($expr->class))
-            && 'class' === strtolower((string) $this->literalScopeClassName($expr->name))
-        ) {
-            $this->throwCompileError('parent::class is not supported (issue #1858)');
-        }
-
         return [new OpCode(
             OpCode::TYPE_CLASS_CONST_FETCH,
             $this->compileOperand($expr->result, $block, false),

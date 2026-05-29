@@ -1194,7 +1194,15 @@ class Object_ extends Type {
             throw new \LogicException('static:: used outside of class scope');
         }
         if ('parent' === $name) {
-            throw new \LogicException('parent::class is not supported (issue #1858)');
+            if ('' === $this->context->scope->className) {
+                throw new \LogicException('parent:: used outside of class scope');
+            }
+            $parentLc = $this->parentClassLc($this->context->scope->className);
+            if (null === $parentLc) {
+                throw new \LogicException('parent:: used when class has no parent');
+            }
+
+            return $this->lookup($parentLc);
         }
 
         return $this->lookup($classOp->value);

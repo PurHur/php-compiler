@@ -428,9 +428,6 @@ restart:
                         return $this->raise("Unknown class for constant fetch: {$className}", $frame);
                     }
                     $constName = strtolower($frame->scope[$op->arg3]->toString());
-                    if ('class' === $constName && $this->isParentClassDispatch($frame, $lcClass)) {
-                        return $this->raise('parent::class is not supported (issue #1858)', $frame);
-                    }
                     $classEntry = $this->context->classes[$lcClass];
                     if ('class' === $constName) {
                         $frame->scope[$op->arg1]->string($classEntry->name);
@@ -458,9 +455,6 @@ restart:
                     break;
                 case OpCode::TYPE_STATIC_PROPERTY_FETCH:
                     $rawClass = $frame->scope[$op->arg2]->toString();
-                    if ('parent' === strtolower($rawClass)) {
-                        return $this->raise('parent::$property is not supported (issue #1858)', $frame);
-                    }
                     $lcClass = $this->resolveStaticClassName(
                         $rawClass,
                         $frame
@@ -486,9 +480,6 @@ restart:
                     break;
                 case OpCode::TYPE_STATIC_PROPERTY_UNSET:
                     $rawClass = $frame->scope[$op->arg2]->toString();
-                    if ('parent' === strtolower($rawClass)) {
-                        return $this->raise('parent::$property is not supported (issue #1858)', $frame);
-                    }
                     $lcClass = $this->resolveStaticClassName($rawClass, $frame);
                     if (!isset($this->context->classes[$lcClass])) {
                         if ('self' !== strtolower($rawClass) && 'static' !== strtolower($rawClass)) {
