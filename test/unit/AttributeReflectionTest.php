@@ -75,6 +75,21 @@ PHP;
         $this->assertSame("/api\n/api\ndiff", ob_get_clean());
     }
 
+    public function testReflectionAttributeNewInstanceMissingClass(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+#[\NoSuchAttributeClassForReflectionTest]
+class Box {}
+$a = (new ReflectionClass(Box::class))->getAttributes()[0];
+$a->newInstance();
+PHP;
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Attribute class "NoSuchAttributeClassForReflectionTest" not found');
+        $runtime->run($runtime->parseAndCompile($code, 'attr_missing_class.php'));
+    }
+
     public function testAttributeNamesExtractedAtCompileTime(): void
     {
         $runtime = new Runtime();
