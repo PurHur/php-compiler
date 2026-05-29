@@ -136,6 +136,24 @@ class VM {
         return $this->invokePhpFunction($func, $thisVar);
     }
 
+    /** (string) cast on objects — invoke __toString (Zend zend_operators.c, issue #3421). */
+    public function castObjectToString(ObjectEntry $object): string
+    {
+        if (!$this->hasInstanceMethod($object->class, '__tostring')) {
+            throw new \LogicException(
+                'Object of class '.$object->class->name.' could not be converted to string'
+            );
+        }
+        $result = $this->invokeInstanceMethod($object, '__toString')->resolveIndirect();
+        if (Variable::TYPE_STRING !== $result->type) {
+            throw new \LogicException(
+                $object->class->name.'::__toString() must return a string'
+            );
+        }
+
+        return $result->toString();
+    }
+
     /**
      * Properties for var_dump / print_r when __debugInfo is defined (Zend parity, #3259).
      *
@@ -403,7 +421,14 @@ restart:
                     $frame->scope[$op->arg1]->castFrom(Variable::TYPE_INTEGER, $frame->scope[$op->arg2]);
                     break;
                 case OpCode::TYPE_CAST_STRING:
-                    $frame->scope[$op->arg1]->castFrom(Variable::TYPE_STRING, $frame->scope[$op->arg2]);
+                    $castSrc = $frame->scope[$op->arg2]->resolveIndirect();
+                    if (Variable::TYPE_OBJECT === $castSrc->type) {
+                        $frame->scope[$op->arg1]->string(
+                            $this->castObjectToString($castSrc->toObject())
+                        );
+                    } else {
+                        $frame->scope[$op->arg1]->castFrom(Variable::TYPE_STRING, $frame->scope[$op->arg2]);
+                    }
                     break;
                 case OpCode::TYPE_CAST_OBJECT:
                     $dst = $frame->scope[$op->arg1];
