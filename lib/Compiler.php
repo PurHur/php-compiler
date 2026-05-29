@@ -207,6 +207,13 @@ class Compiler {
         $this->seen = new SplObjectStorage;
         $this->debugWriteLastPhase('Compiler::compile enter');
 
+        Compiler\InheritanceVariance::validateScript(
+            $script,
+            function (string $detail): void {
+                $this->throwCompileError($detail);
+            }
+        );
+
         /** @var mixed $main */
         $main = $this->compileCfgBlock($script->main->cfg, $script->main->params, $script->main);
         if (!$main instanceof Block) {
