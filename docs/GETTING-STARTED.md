@@ -1,6 +1,8 @@
 # Getting started
 
-Guide for **first-time contributors** and **demo presenters**. For the public narrative, see the [status site](https://purhur.github.io/php-compiler/docs/pages/index.html) and [development status](https://purhur.github.io/php-compiler/development-status.html).
+Guide for **aligned collaborators** and **demo presenters**. For the public narrative, see the [status site](https://purhur.github.io/php-compiler/docs/pages/index.html) and [development status](https://purhur.github.io/php-compiler/development-status.html).
+
+**Contributing policy:** We do not accept GitHub issues or pull requests without prior coordination — contact maintainers on other channels first and align with the AI-agent workflow. See [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 ## Prerequisites
 

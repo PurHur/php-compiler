@@ -1,17 +1,26 @@
-# How to Contribute
+# Contributing
 
-We'd love to accept your patches and contributions to this project. There are just a few small guidelines you need to follow.
+## Before you open an issue or pull request
 
-When contributing to this repository, please first discuss that new features be discussed via issue before making a change.
+**We do not accept issues or pull requests on this repository without prior coordination.**
 
-Please report any bugs to the issues page, due to the fact this project is done in free time, it may take a while to process the issues, but security vulnerabilities will have precedence over feature requests.
+If you want to contribute, **write to the maintainers on other channels first** — not via a drive-by GitHub issue or pull request here. **Do not waste your time** preparing changes on this repo until scope and approach are agreed.
 
-Please note we have a code of conduct, [CODE\_OF\_CONDUCT.md](CODE_OF_CONDUCT.md), please follow it in all your interactions with the project.
+Development moves quickly and is largely coordinated through **AI agents** and maintainer workflows. You are still free to **fork** and experiment under the MIT license, but at this pace **you are unlikely to make progress on upstream** unless you **align with the AI-agent workflow first**; otherwise your work may diverge or be superseded before it can land.
 
-# Pull Request Process
+This policy applies to **issues and pull requests on `PurHur/php-compiler`**. Forks and private experiments are fine.
 
-All submissions, including submissions by project members, require review. We use GitHub pull requests for this purpose. Consult
-[GitHub Help](https://help.github.com/articles/about-pull-requests/) for more information on using pull requests.
+Please follow [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) in all project interactions.
+
+---
+
+## If you are already aligned
+
+The sections below are for **maintainers and collaborators who have already coordinated** on other channels.
+
+### Pull request process
+
+All submissions, including by project members, require review via GitHub pull requests. See [GitHub Help](https://help.github.com/articles/about-pull-requests/) for using pull requests.
 
 **Generated docs** (run locally before push; see [docs/bootstrap-selfhost.md](docs/bootstrap-selfhost.md)):
 
@@ -21,11 +30,11 @@ All submissions, including submissions by project members, require review. We us
 
 Also run `php script/bootstrap-inventory.php --check` before push when bootstrap paths change.
 
-## Verifying your change
+### Verifying your change
 
 Merge gates are **local/Docker only** — GitHub Actions and CircleCI are disabled ([#394](https://github.com/PurHur/php-compiler/issues/394)); optional mirrors live under [`.github/workflows-disabled/`](.github/workflows-disabled/). See the full matrix in [docs/local-ci-matrix.md](docs/local-ci-matrix.md).
 
-### Host PHP available
+#### Host PHP available
 
 From the repo root (after `composer install` and `script/apply-patches.sh`):
 
@@ -35,7 +44,7 @@ From the repo root (after `composer install` and `script/apply-patches.sh`):
 
 The first `ci-local.sh` run downloads LLVM 9 into `.llvm/` (`script/install-llvm9.sh`). See [README.md](README.md) Quick start (host PHP).
 
-### Docker-only / harness (Runforge)
+#### Docker-only / harness (Runforge)
 
 On hosts **without** system PHP/LLVM, or on Runforge/harness sandboxes where `docker run -v "$(pwd):/compiler"` often mounts an **empty** tree:
 
