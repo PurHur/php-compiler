@@ -63,7 +63,11 @@ class JIT {
 
     public function compile(Block $block): PHPLLVM\Value {
         JIT\Progress::noteFunction('jit_compile_begin');
-        if ($this->shouldUseM3EmitTuNativeBridge() && $this->isM3EmitTuScriptMain($block)) {
+        if (
+            $this->shouldUseM3EmitTuNativeBridge()
+            && $this->isM3EmitTuScriptMain($block)
+            && !($this->shouldUseM3InventoryEmitDriver() && $this->isM3CompileDriverBundleScriptMain($block))
+        ) {
             $this->m3EmitTuMainBlock = $block;
         }
         if (

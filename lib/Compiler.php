@@ -2035,6 +2035,9 @@ class Compiler {
                 $name = $this->boundVariableName($useVar);
                 $slot = $funcBlock->getVarSlot($useVar, false);
                 $funcBlock->closureCaptureSlots[$slot] = true;
+                if ($useVar->byRef) {
+                    $funcBlock->closureCaptureByRef[$slot] = true;
+                }
                 $op->closureCaptures[] = [
                     'name' => $name,
                     'slot' => $slot,

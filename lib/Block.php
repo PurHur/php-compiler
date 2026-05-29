@@ -91,6 +91,9 @@ class Block {
     /** Closure `use ($var)` slots populated at call from {@see ClosureState} (issue #72). */
     public array $closureCaptureSlots = [];
 
+    /** Closure `use (&$var)` slots that alias enclosing storage at call (issue #72). */
+    public array $closureCaptureByRef = [];
+
     /** Resolved absolute paths for TYPE_INCLUDE opcodes (arg3 index, issue #54). */
     public array $literalIncludePaths = [];
 
