@@ -10,6 +10,11 @@ use PHPCompiler\VM\Builtin\DateTimeFormat;
 use PHPCompiler\VM\Builtin\DateTimeGetTimestamp;
 use PHPCompiler\VM\Builtin\DateTimeSetTimezone;
 use PHPCompiler\VM\Builtin\DateTimeZoneConstruct;
+use PHPCompiler\VM\Builtin\ExceptionConstruct;
+use PHPCompiler\VM\Builtin\ExceptionGetCode;
+use PHPCompiler\VM\Builtin\ExceptionGetFile;
+use PHPCompiler\VM\Builtin\ExceptionGetLine;
+use PHPCompiler\VM\Builtin\ExceptionGetMessage;
 use PHPCompiler\VM\Builtin\ReflectionAttributeGetName;
 use PHPCompiler\VM\Builtin\ReflectionClassConstruct;
 use PHPCompiler\VM\Builtin\ReflectionClassGetAttributes;
@@ -24,9 +29,10 @@ use PHPCompiler\VM\Builtin\WeakMapOffsetUnset;
 use PHPCompiler\VM\Builtin\WeakReferenceConstruct;
 use PHPCompiler\VM\Builtin\WeakReferenceCreate;
 use PHPCompiler\VM\Builtin\WeakReferenceGet;
+use PHPCompiler\VM\ExceptionSupport;
 
 /**
- * Register VM builtin classes stdClass, WeakReference, WeakMap, and Reflection* (#1366, #1936, #3117).
+ * Register VM builtin classes stdClass, WeakReference, WeakMap, Reflection*, and Throwable* (#1366, #1936, #3117, #195).
  */
 final class BuiltinClasses
 {
@@ -37,6 +43,7 @@ final class BuiltinClasses
         self::registerWeakMap($ctx);
         self::registerReflection($ctx);
         self::registerDateTime($ctx);
+        self::registerExceptions($ctx);
         GeneratorState::register($ctx);
         ClosureState::register($ctx);
     }
@@ -156,5 +163,44 @@ final class BuiltinClasses
             $dt->methodVisibility[$name] = $pub;
         }
         $ctx->classes[DateTimeSupport::CLASS_DATETIME] = $dt;
+    }
+
+    private static function registerExceptions(Context $ctx): void
+    {
+        $throwable = new ClassEntry('Throwable');
+        $throwable->isInterface = true;
+        $ctx->classes[ExceptionSupport::CLASS_THROWABLE] = $throwable;
+
+        self::registerThrowableClass($ctx, 'Exception', ExceptionSupport::CLASS_EXCEPTION);
+        self::registerThrowableClass($ctx, 'Error', ExceptionSupport::CLASS_ERROR);
+    }
+
+    private static function registerThrowableClass(Context $ctx, string $name, string $lcKey): void
+    {
+        $strProto = new Variable(Variable::TYPE_STRING);
+        $intProto = new Variable(Variable::TYPE_INTEGER);
+        $pub = CfgFunc::FLAG_PUBLIC;
+
+        $entry = new ClassEntry($name);
+        $entry->interfaces = [ExceptionSupport::CLASS_THROWABLE];
+        $entry->properties[] = new ClassProperty(ExceptionSupport::PROP_MESSAGE, null, $strProto);
+        $entry->properties[] = new ClassProperty(ExceptionSupport::PROP_CODE, null, $intProto);
+        $entry->properties[] = new ClassProperty(ExceptionSupport::PROP_FILE, null, $strProto);
+        $entry->properties[] = new ClassProperty(ExceptionSupport::PROP_LINE, null, $intProto);
+        $entry->constructor = new ExceptionConstruct();
+        $entry->methods['__construct'] = $entry->constructor;
+        $entry->methodVisibility['__construct'] = $pub;
+        foreach (
+            [
+                'getmessage' => new ExceptionGetMessage(),
+                'getcode' => new ExceptionGetCode(),
+                'getfile' => new ExceptionGetFile(),
+                'getline' => new ExceptionGetLine(),
+            ] as $methodName => $method
+        ) {
+            $entry->methods[$methodName] = $method;
+            $entry->methodVisibility[$methodName] = $pub;
+        }
+        $ctx->classes[$lcKey] = $entry;
     }
 }

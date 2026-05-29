@@ -1495,14 +1495,15 @@ class Compiler {
             $block->addOpCode($tryOp);
             foreach ($stmt->catches as $i => $catchBlock) {
                 $compiledCatch = $this->compileCfgBranch($catchBlock, $block);
+                $compiledCatch->inheritUndefinedLocals = true;
                 $catchOp = new OpCode(OpCode::TYPE_CATCH);
                 $catchOp->block1 = $compiledCatch;
                 $catchOp->block2 = $merge;
                 $catchOp->catchTypes = $this->encodeCatchTypeList($stmt->catchTypes[$i] ?? []);
-                $catchVar = $stmt->catchVars[$i] ?? null;
-                $catchOp->arg3 = null !== $catchVar
-                    ? $compiledCatch->slotForOperand($catchVar)
-                    : null;
+                $catchOp->arg3 = $this->resolveCatchVarSlot(
+                    $compiledCatch,
+                    $stmt->catchVars[$i] ?? null
+                );
                 $block->addOpCode($catchOp);
             }
             if (null !== $stmt->finally) {
@@ -2821,6 +2822,46 @@ class Compiler {
         }
 
         return implode('|', $encoded);
+    }
+
+    /**
+     * php-cfg catch vars are registered on the handler block; the catch body may use
+     * a distinct operand for the same name (#195, #2084).
+     */
+    protected function resolveCatchVarSlot(Block $compiledCatch, ?Operand $catchVar): ?int
+    {
+        if (null === $catchVar) {
+            return null;
+        }
+        $slot = $compiledCatch->slotForOperand($catchVar);
+        if (null !== $slot) {
+            return $slot;
+        }
+        $name = $this->resolveCatchVariableName($catchVar);
+        if (null !== $name) {
+            return $compiledCatch->slotIndexForVariableName($name);
+        }
+
+        return null;
+    }
+
+    protected function resolveCatchVariableName(?Operand $catchVar): ?string
+    {
+        while ($catchVar instanceof Operand\Temporary && null !== $catchVar->original) {
+            $catchVar = $catchVar->original;
+        }
+        if (!$catchVar instanceof Operand\Variable) {
+            return null;
+        }
+        $nameOp = $catchVar->name;
+        while ($nameOp instanceof Operand\Temporary && null !== $nameOp->original) {
+            $nameOp = $nameOp->original;
+        }
+        if ($nameOp instanceof Literal && is_string($nameOp->value)) {
+            return $nameOp->value;
+        }
+
+        return null;
     }
 
     /**
