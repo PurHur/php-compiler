@@ -139,13 +139,10 @@ class OpCode {
      */
     const TYPE_YIELD_FROM = 110;
     /**
-     * Closure literal (`function (...) { ... }`).
-     *
-     * Today this is a bootstrap-oriented stub: the compiler must be able to parse and compile vendor code
-     * that contains closures (e.g. php-llvm prelink), even when full closure runtime semantics are not yet
-     * implemented in VM/JIT/AOT.
+     * Closure literal (`function (...) { ... }` / `fn (...) => ...`).
      *
      * arg1 = destination scope slot (result).
+     * block1 = compiled anonymous function body (VM-only today; JIT still lowers to null).
      */
     const TYPE_CLOSURE = 109;
 
