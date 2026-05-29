@@ -675,7 +675,7 @@ final class HashTable {
     }
 
     /**
-     * Split a packed list array into consecutive chunks (preserve_keys=false subset).
+     * Split an array into consecutive chunks (array_chunk; ext/standard/array.c preserve_keys branch).
      */
     public function chunkCopy(int $size, bool $preserveKeys = false): HashTable
     {
@@ -683,7 +683,7 @@ final class HashTable {
             throw new \LogicException('array_chunk() size must be greater than zero');
         }
         if ($preserveKeys) {
-            throw new \LogicException('array_chunk() preserve_keys=true is not supported in this compiler build');
+            return $this->chunkCopyPreserveKeys($size);
         }
         if (!$this->isWithoutHoles()) {
             throw new \LogicException('array_chunk() only supports packed list arrays without holes');
@@ -698,6 +698,43 @@ final class HashTable {
             $copy = new Variable();
             $copy->copyFrom($value);
             $chunk->append($copy);
+            ++$count;
+            if ($count >= $size) {
+                $wrapper = new Variable();
+                $wrapper->array($chunk);
+                $out->append($wrapper);
+                $chunk = null;
+                $count = 0;
+            }
+        }
+        if (null !== $chunk && $count > 0) {
+            $wrapper = new Variable();
+            $wrapper->array($chunk);
+            $out->append($wrapper);
+        }
+
+        return $out;
+    }
+
+    private function chunkCopyPreserveKeys(int $size): HashTable
+    {
+        $out = new self();
+        $chunk = null;
+        $count = 0;
+        foreach ($this->iterateKeyed(true) as [$key, $value]) {
+            if (Variable::TYPE_INTEGER !== $key->type && Variable::TYPE_STRING !== $key->type) {
+                throw new \TypeError('array_chunk(): Argument #1 ($array) must contain only int and string keys');
+            }
+            if (0 === $count) {
+                $chunk = new self();
+            }
+            $copy = new Variable();
+            $copy->copyFrom($value);
+            if (Variable::TYPE_INTEGER === $key->type) {
+                $chunk->addIndex($key->toInt(), $copy);
+            } else {
+                $chunk->add($key->toString(), $copy);
+            }
             ++$count;
             if ($count >= $size) {
                 $wrapper = new Variable();
