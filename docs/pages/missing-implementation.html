@@ -48,8 +48,9 @@
         <p class="section-intro" style="margin-top: 0.5rem">
           Real gaps toward the
           <a href="https://github.com/PurHur/php-compiler/issues/1492">self-host north star (#1492)</a>.
-          Updated 29 May 2026 (<code>master</code> @ b1f6ca07; LLVM&nbsp;9).
-          VM, examples, and wave-3 language/stdlib batches are largely done; this page lists what is
+          Updated 29 May 2026 (<code>master</code> @ 49da93c3; LLVM&nbsp;9).
+          Wave-2 language merges landed: closure <code>use()</code> + JIT IR (#3081),
+          generators VM-fallback SSOT (#3085), <code>array_map</code> closure callbacks (#3086).
           <strong>not</strong> implemented yet for compiling the compiler without Zend.
         </p>
       </header>
@@ -196,21 +197,27 @@
             <tbody>
               <tr>
                 <td>Try / catch / finally</td>
-                <td class="status-wip">Partial</td>
-                <td class="status-no">Unwind incomplete</td>
-                <td><a href="https://github.com/PurHur/php-compiler/issues/2114">#2114</a></td>
+                <td class="status-yes">VM yes</td>
+                <td class="status-wip">EH gate</td>
+                <td><a href="https://github.com/PurHur/php-compiler/pull/3081">#3081</a> VM finally-before-catch ✅; JIT shares <code>requiresVmLowering</code> with generators — <a href="https://github.com/PurHur/php-compiler/issues/2114">#2114</a></td>
               </tr>
               <tr>
-                <td>Closures / arrow functions (no <code>use</code>)</td>
+                <td>Closures / arrow functions</td>
                 <td class="status-yes">VM yes</td>
-                <td class="status-no">Not lowered</td>
-                <td><a href="https://github.com/PurHur/php-compiler/issues/72">#72</a>, <a href="https://github.com/PurHur/php-compiler/issues/142">#142</a> — <code>use()</code> still open</td>
+                <td class="status-wip">Partial</td>
+                <td><a href="https://github.com/PurHur/php-compiler/pull/3081">#3081</a> JIT without <code>use()</code>; <code>use($var)</code> by-value VM-only; bootstrap AOT stubs <code>null</code> — <a href="https://github.com/PurHur/php-compiler/issues/72">#72</a>, <a href="https://github.com/PurHur/php-compiler/issues/142">#142</a></td>
               </tr>
               <tr>
                 <td>Generators (<code>yield</code>)</td>
-                <td class="status-wip">VM-only</td>
-                <td class="status-no">No</td>
-                <td><a href="https://github.com/PurHur/php-compiler/issues/167">#167</a></td>
+                <td class="status-yes">VM yes</td>
+                <td class="status-wip">VM fallback</td>
+                <td><a href="https://github.com/PurHur/php-compiler/pull/3085">#3085</a> keyed yield + <code>Block::requiresVmLowering</code>; native MCJIT lowering still open — <a href="https://github.com/PurHur/php-compiler/issues/167">#167</a></td>
+              </tr>
+              <tr>
+                <td><code>array_map</code> / callback builtins</td>
+                <td class="status-yes">Closures VM</td>
+                <td class="status-wip">String only</td>
+                <td><a href="https://github.com/PurHur/php-compiler/pull/3086">#3086</a> VM closure callbacks; JIT/AOT still null + compile-time string builtins — <a href="https://github.com/PurHur/php-compiler/issues/1154">#1154</a></td>
               </tr>
               <tr>
                 <td>Method calls / class methods (general)</td>
