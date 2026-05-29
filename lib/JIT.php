@@ -1052,7 +1052,8 @@ class JIT {
                     $args,
                     $defaultArgs,
                     $variadicArgIndex,
-                    $this->paramTypeConstraintsForNativeCall($block)
+                    $this->paramTypeConstraintsForNativeCall($block),
+                    $this->paramIntersectionConstraintsForNativeCall($block)
                 );
             }
         }
@@ -5579,6 +5580,13 @@ class JIT {
                     $nameOp = $block->getOperand($op->arg1);
                     assert($nameOp instanceof Operand\Literal);
                     $this->context->type->object->declareClass($nameOp);
+                    $this->context->type->object->markInterfaceClass($nameOp->value);
+                    if ([] !== $op->classImplements) {
+                        $this->context->type->object->setInterfaceExtends(
+                            $nameOp->value,
+                            $op->classImplements
+                        );
+                    }
                     break;
                 case OpCode::TYPE_DECLARE_TRAIT:
                     $nameOp = $block->getOperand($op->arg1);
@@ -5635,6 +5643,12 @@ class JIT {
                         $this->context->type->object->inheritReadonlyFromParent(
                             $this->context->scope->classId,
                             $parentOp->value
+                        );
+                    }
+                    if ([] !== $op->classImplements) {
+                        $this->context->type->object->setClassInterfaces(
+                            $nameOp->value,
+                            $op->classImplements
                         );
                     }
                     $this->context->popScope();
@@ -7713,6 +7727,26 @@ class JIT {
                 continue;
             }
             $constraints[(int) $op->arg2 + $offset] = $block->paramTypeConstraints[$op->arg1];
+        }
+
+        return $constraints;
+    }
+
+    /**
+     * @return array<int, list<string>>
+     */
+    private function paramIntersectionConstraintsForNativeCall(Block $block): array
+    {
+        $constraints = [];
+        $offset = $this->instanceMethodUsesThis($block) ? 1 : 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_ARG_RECV !== $op->type) {
+                continue;
+            }
+            if (!isset($block->paramIntersectionConstraints[$op->arg1])) {
+                continue;
+            }
+            $constraints[(int) $op->arg2 + $offset] = $block->paramIntersectionConstraints[$op->arg1];
         }
 
         return $constraints;

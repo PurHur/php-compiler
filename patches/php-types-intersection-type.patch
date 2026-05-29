@@ -15,3 +15,19 @@
  
          throw new \LogicException('Unsupported declaration type: '.get_class($decl));
      }
+--- vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php
+@@ -805,6 +805,13 @@
+             }
+ 
+             return (new Type(Type::TYPE_UNION, $subs))->simplify();
++        } elseif ($type instanceof Op\Type\Intersection) {
++            $subs = [];
++            foreach ($type->types as $sub) {
++                $subs[] = $this->resolveOpType($sub);
++            }
++
++            return new Type(Type::TYPE_INTERSECTION, $subs);
+         }
+ 
+         throw new \LogicException('Unknown Op\\Type provided: '.get_class($type));

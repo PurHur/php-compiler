@@ -38,13 +38,17 @@ class Native implements Call {
     /** @var array<int, int> LLVM arg index => VM scalar type constraint (issue #1229) */
     public array $paramTypeConstraintsByArg = [];
 
+    /** @var array<int, list<string>> LLVM arg index => intersection interface lc names (#3077) */
+    public array $paramIntersectionConstraintsByArg = [];
+
     public function __construct(
         Value $function,
         string $name,
         array $argTypes,
         array $defaultArgs = [],
         ?int $variadicArgIndex = null,
-        array $paramTypeConstraintsByArg = []
+        array $paramTypeConstraintsByArg = [],
+        array $paramIntersectionConstraintsByArg = []
     ) {
         $this->function = $function;
         $this->name = $name;
@@ -52,6 +56,7 @@ class Native implements Call {
         $this->defaultArgs = $defaultArgs;
         $this->variadicArgIndex = $variadicArgIndex;
         $this->paramTypeConstraintsByArg = $paramTypeConstraintsByArg;
+        $this->paramIntersectionConstraintsByArg = $paramIntersectionConstraintsByArg;
     }
 
     public function call(Context $context, Variable ... $args): Value {
@@ -77,6 +82,13 @@ class Native implements Call {
                     $arg,
                     $this->paramTypeConstraintsByArg[$index],
                     $context->callerStrictTypes
+                );
+            }
+            if (isset($this->paramIntersectionConstraintsByArg[$index])) {
+                \PHPCompiler\JIT\IntersectionParamCheck::enforce(
+                    $context,
+                    $arg,
+                    $this->paramIntersectionConstraintsByArg[$index]
                 );
             }
             $argValues[] = $this->compileArg($context, $arg, $index);
