@@ -20,6 +20,9 @@ final class ErrorHandlerOutput
         $decls = [
             '__phpc_error_handler_set_apply' => [$void, false, [$valuePtr, $i8p, $sizeT, $i8p, $i32]],
             '__phpc_error_handler_restore_apply' => [$void, false, [$valuePtr]],
+            '__phpc_last_error_is_active' => [$i32, false, []],
+            '__phpc_last_error_to_hashtable' => [$context->getTypeFromString('__hashtable__*'), false, []],
+            '__phpc_last_error_clear' => [$void, false, []],
         ];
 
         foreach ($decls as $name => [$ret, $vararg, $params]) {

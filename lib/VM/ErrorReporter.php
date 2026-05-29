@@ -24,6 +24,9 @@ final class ErrorReporter
     /** @var list<array{0: ?string, 1: int}> */
     private array $handlerStack = [];
 
+    /** @var array{type: int, message: string, file: string, line: int}|null */
+    private ?array $lastError = null;
+
     public function __construct(
         int $errorReporting = E_ALL,
         bool $displayErrors = true
@@ -50,6 +53,55 @@ final class ErrorReporter
     public function setDisplayErrors(bool $display): void
     {
         $this->displayErrors = $display;
+    }
+
+    /**
+     * @return array{type: int, message: string, file: string, line: int}|null
+     */
+    public function getLastError(): ?array
+    {
+        return $this->lastError;
+    }
+
+    public function clearLastError(): void
+    {
+        $this->lastError = null;
+    }
+
+    public function recordLastError(int $type, string $message, ?string $file, int $line): void
+    {
+        $this->lastError = [
+            'type' => $type,
+            'message' => $message,
+            'file' => null !== $file ? $file : '',
+            'line' => $line,
+        ];
+    }
+
+    public function getLastErrorVariable(): Variable
+    {
+        $out = new Variable();
+        if (null === $this->lastError) {
+            $out->null();
+
+            return $out;
+        }
+        $ht = new HashTable();
+        $typeVar = new Variable(Variable::TYPE_INTEGER);
+        $typeVar->int($this->lastError['type']);
+        $ht->add('type', $typeVar);
+        $messageVar = new Variable(Variable::TYPE_STRING);
+        $messageVar->string($this->lastError['message']);
+        $ht->add('message', $messageVar);
+        $fileVar = new Variable(Variable::TYPE_STRING);
+        $fileVar->string($this->lastError['file']);
+        $ht->add('file', $fileVar);
+        $lineVar = new Variable(Variable::TYPE_INTEGER);
+        $lineVar->int($this->lastError['line']);
+        $ht->add('line', $lineVar);
+        $out->array($ht);
+
+        return $out;
     }
 
     public function pushHandler(?string $callbackName, int $mask): ?string
@@ -81,6 +133,7 @@ final class ErrorReporter
         }
         $key = $this->formatArrayKey($index);
         $message = "Undefined array key {$key}";
+        $this->recordLastError(self::E_WARNING, $message, $file, 0);
         if ($this->dispatchUserHandler($context, $frame, self::E_WARNING, $message, $file, 0)) {
             return;
         }
@@ -104,6 +157,7 @@ final class ErrorReporter
         if (0 === ($this->errorReporting & $level)) {
             return;
         }
+        $this->recordLastError($level, $message, $file, 0);
         if ($this->dispatchUserHandler($context, $frame, $level, $message, $file, 0)) {
             if (self::E_USER_ERROR === $level) {
                 throw new \LogicException("Fatal error: {$message}");

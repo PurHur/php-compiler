@@ -62,7 +62,6 @@ class ClassEntry {
     }
 
     public function getProperties(array $properties, int $reason): array {
-        // todo: implement __debug_info
         return $properties;
     }
 
