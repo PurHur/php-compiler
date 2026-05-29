@@ -23,7 +23,8 @@ INSERT = r'''    /**
             $attrs
         );
         $cond = $this->matchPatternOperand($expr->cond, $attrs);
-        $chainBlock = $entryBlock;
+        // Subject/pattern lowering may advance $this->block (nested match, etc.) — #3397.
+        $chainBlock = $this->block;
         $defaultArm = null;
 
         foreach ($expr->arms as $arm) {
@@ -38,6 +39,8 @@ INSERT = r'''    /**
             $lastCondIdx = count($conds) - 1;
             foreach ($conds as $idx => $condNode) {
                 $caseOperand = $this->matchPatternOperand($condNode, $attrs);
+                // Pattern expr may finish in a different block than $testBlock started (#3397).
+                $testBlock = $this->block;
                 $cmp = new Op\Expr\BinaryOp\Identical(
                     $cond,
                     $caseOperand,
