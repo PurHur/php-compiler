@@ -16,11 +16,11 @@ Compliance PHPT: `test/compliance/GeneratorVMTest.php`, `GeneratorJITTest.php`.
 
 `Block::containsGeneratorOpcodes()` walks nested CFG blocks (including `TYPE_FUNCDEF` bodies) for `TYPE_YIELD` / `TYPE_YIELD_FROM`.
 
-`Block::requiresVmLowering()` extends that scan with try/catch/throw opcodes (#2114).
+`Block::requiresVmLowering()` uses script-scope generator scan plus try/catch/throw (#2114, #3074).
 
 Used by:
 
-- `bin/jit.php` — skip `$runtime->jit()` and execute via VM
+- `bin/jit.php` — skip `$runtime->jit()` when script-scope yield or EH; nested generator bodies use `GeneratorHelper` (#3074)
 - `Runtime::standalone()` — fail fast for AOT
 - `JIT::compileBlock()` — stub generator function bodies instead of lowering opcodes
 
