@@ -322,6 +322,7 @@ bootstrap-selfhost-jit-unit-probe-strict:
 	BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1 \
 	BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING=1 \
 	BOOTSTRAP_M3_RUNTIME_COMPILE=1 \
+	BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER=1 \
 	BOOTSTRAP_M3_JIT_UNIT_PROBE_STRICT=1 \
 	./script/bootstrap-selfhost-jit-unit-probe.sh
 bootstrap-selfhost-vm-unit-probe:

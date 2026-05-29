@@ -83,8 +83,19 @@ final class BootstrapJitUnitProbeTest extends TestCase
         $this->assertStringContainsString('BOOTSTRAP_M3_JIT_UNIT_PROBE_STRICT=1', $source);
         $this->assertStringContainsString('emit_path=', $source);
         $this->assertStringContainsString('jit_unit_probe_m3_emit_native_entry.php', $source);
+        $this->assertStringContainsString('jit_unit_probe/compile_driver.php', $source);
+        $this->assertStringContainsString('BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER', $source);
         $this->assertStringContainsString('compile_smoke_m3_emit: compile OK', $source);
         $this->assertStringContainsString('jit unit probe compile OK', $source);
+    }
+
+    public function testJitUnitProbeInventoryCompileDriverLintPasses(): void
+    {
+        $entry = self::$root.'/test/selfhost/jit_unit_probe/compile_driver.php';
+        $this->assertFileExists($entry);
+        $cmd = 'php '.escapeshellarg(self::$root.'/bin/compile.php').' -l '.escapeshellarg($entry).' 2>&1';
+        exec($cmd, $lines, $exitCode);
+        $this->assertSame(0, $exitCode, implode("\n", $lines));
     }
 
     public function testJitUnitProbeM3EmitNativeEntryExists(): void
