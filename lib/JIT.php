@@ -998,6 +998,13 @@ class JIT {
                 $rawTypes[] = $rawType;
                 $args[] = $type;
             }
+            foreach (JIT\ClosureHelper::orderedCaptureSlots($block) as $_captureSlot) {
+                $captureType = $this->context->getTypeFromString('__value__*');
+                $callbackType .= $callbackSep . '__value__*';
+                $callbackSep = ', ';
+                $rawTypes[] = Type::mixed();
+                $args[] = $captureType;
+            }
             if ($this->shouldUseSelfHostJitStubs() && null !== $logicalName) {
                 $args = $this->normalizeSelfHostNativeCallArgTypes($args, $logicalName);
             }
@@ -4357,6 +4364,24 @@ class JIT {
                     }
                     $this->assignOperand($param->result, $args[$argIdx], true);
                 }
+                $captureSlots = JIT\ClosureHelper::orderedCaptureSlots($block);
+                if ([] !== $captureSlots) {
+                    $captureBase = count($args) - count($captureSlots);
+                    foreach ($captureSlots as $captureIdx => $captureSlot) {
+                        $captureOperand = JIT\ClosureHelper::operandForCaptureSlot($block, $captureSlot);
+                        if (null === $captureOperand) {
+                            continue;
+                        }
+                        if (!$this->context->hasVariableOp($captureOperand)) {
+                            $this->context->makeVariableFromOp($func, $basicBlock, $block, $captureOperand);
+                        }
+                        $this->assignOperand(
+                            $captureOperand,
+                            $args[$captureBase + $captureIdx],
+                            true
+                        );
+                    }
+                }
             }
         }
 
@@ -5380,9 +5405,18 @@ class JIT {
                     if (!isset($this->context->functionProxies[$lcname])) {
                         throw new \LogicException("Closure body failed to register JIT proxy: {$internalName}");
                     }
+                    $callProxy = $this->context->functionProxies[$lcname];
+                    if ([] !== $op->closureCaptures) {
+                        $captures = JIT\ClosureHelper::snapshotCapturesForClosure(
+                            $this->context,
+                            $op->block1,
+                            $op->closureCaptures
+                        );
+                        $callProxy = JIT\ClosureHelper::wrapCallWithCaptures($callProxy, $captures);
+                    }
                     $closureObj = JIT\ClosureHelper::allocateClosureObject(
                         $this->context,
-                        $this->context->functionProxies[$lcname]
+                        $callProxy
                     );
                     $this->assignOperand($block->getOperand($op->arg1), $closureObj, true);
                     break;

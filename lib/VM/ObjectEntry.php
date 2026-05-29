@@ -69,6 +69,7 @@ class ObjectEntry {
             $clone->properties[$name]->copyFrom($var);
         }
         $clone->constructed = $this->constructed;
+        $clone->closureState = $this->closureState;
 
         return $clone;
     }
