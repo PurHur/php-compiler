@@ -483,6 +483,20 @@ function syntaxRowDefinitions(): array
             ],
             'probe' => 'class Box {} $o = new Box(); $r = WeakReference::create($o); unset($o); echo $r->get() === null ? "1" : "0";',
         ],
+        [
+            'id' => 'datetime_oop',
+            'construct' => 'DateTime / DateTimeZone OOP',
+            'opcodes' => ['TYPE_NEW'],
+            'issue' => 3072,
+            'jit' => false,
+            'aot' => false,
+            'notes' => [
+                'VM builtins: DateTime::__construct/format/getTimestamp/setTimezone; DateTimeZone::__construct',
+                'Host PHP date extension for parsing/formatting; UTC and named timezone subset (php-src ext/date/php_datetime.c)',
+                'JIT/AOT method bodies VM-only in phase 1',
+            ],
+            'probe' => '$dt = new DateTime("2026-05-29", new DateTimeZone("UTC")); echo $dt->format("Y-m-d");',
+        ],
     ];
 }
 
