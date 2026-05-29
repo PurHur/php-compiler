@@ -88,6 +88,9 @@ class Block {
     /** Function body contains `yield` (issue #167). */
     public bool $isGenerator = false;
 
+    /** Closure `use ($var)` slots populated at call from {@see ClosureState} (issue #72). */
+    public array $closureCaptureSlots = [];
+
     /** Resolved absolute paths for TYPE_INCLUDE opcodes (arg3 index, issue #54). */
     public array $literalIncludePaths = [];
 
@@ -240,7 +243,7 @@ class Block {
             if ($parent->args->contains($operand)) {
                 $this->args[$operand] = $slot;
             }
-            if (isset($parent->constants[$slot])) {
+            if (isset($parent->constants[$slot]) && !isset($this->constants[$slot])) {
                 $this->constants[$slot] = $parent->constants[$slot];
             }
         }
@@ -338,7 +341,7 @@ class Block {
         return self::findVariableInParentFramesByName($name, $frame);
     }
 
-    private static function findVariableInParentFramesByName(string $name, Frame $frame): ?Variable
+    public static function findVariableInParentFramesByName(string $name, Frame $frame): ?Variable
     {
         for ($f = $frame; null !== $f; $f = $f->parent) {
             if ('this' === $name && !empty($f->calledArgs)) {
@@ -388,6 +391,8 @@ class Block {
 
             if (isset($this->constants[$pos])) {
                 $scope[$pos] = $this->constants[$pos];
+            } elseif (isset($this->closureCaptureSlots[$pos])) {
+                $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
             } elseif ($this->args->contains($op)) {
                 if (is_null($frame)) {
                     $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);

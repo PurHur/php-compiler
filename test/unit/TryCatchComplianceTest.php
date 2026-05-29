@@ -60,6 +60,63 @@ try {
         );
     }
 
+    public function testFinallyRunsBeforeCatchOnThrow(): void
+    {
+        $this->assertVmOutput(
+            '<?php
+class Ex {}
+try {
+    throw new Ex();
+} catch (Ex $e) {
+    echo "catch\n";
+} finally {
+    echo "finally\n";
+}
+echo "after\n";
+',
+            "finally\ncatch\nafter\n"
+        );
+    }
+
+    public function testFinallyRunsOnNormalTryCompletion(): void
+    {
+        $this->assertVmOutput(
+            '<?php
+try {
+    echo "try\n";
+} finally {
+    echo "finally\n";
+}
+echo "after\n";
+',
+            "try\nfinally\nafter\n"
+        );
+    }
+
+    public function testFinallyRunsBeforeUncaughtThrow(): void
+    {
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(
+            '<?php
+class Ex {}
+try {
+    throw new Ex();
+} finally {
+    echo "finally\n";
+}
+',
+            'test.php'
+        );
+        ob_start();
+        try {
+            $runtime->run($block);
+            $this->fail('expected uncaught exception');
+        } catch (\Exception) {
+            // finally must run before the VM maps the throw to a native exception
+        }
+        $this->assertSame("finally\n", ob_get_clean(), 'VM stdout');
+    }
+
     public function testUncaughtThrowNonZeroExit(): void
     {
         $bin = realpath(__DIR__ . '/../../bin/vm.php');

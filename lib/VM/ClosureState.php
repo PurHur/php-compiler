@@ -14,9 +14,21 @@ use PHPCompiler\Func;
  */
 final class ClosureState
 {
+    /**
+     * Bound `use ($var)` values captured when the closure object was created.
+     *
+     * @var list<array{slot: int, var: Variable, byRef: bool}>
+     */
+    public array $captures;
+
+    /**
+     * @param list<array{slot: int, var: Variable, byRef: bool}> $captures
+     */
     public function __construct(
         public readonly Func\PHP $func,
+        array $captures = [],
     ) {
+        $this->captures = $captures;
     }
 
     public static function register(Context $ctx): void

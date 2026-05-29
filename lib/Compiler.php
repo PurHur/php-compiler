@@ -1510,6 +1510,7 @@ class Compiler {
                 $finallyOp->block1 = $compiledFinally;
                 $finallyOp->block2 = $merge;
                 $block->addOpCode($finallyOp);
+                $this->rewriteTryMergeJumpsToFinally($try, $merge, $compiledFinally);
             }
         } elseif ($stmt instanceof Op\Stmt\Switch_) {
             $this->compileSwitchAsJumpIfChain($stmt, $block);
@@ -2021,9 +2022,6 @@ class Compiler {
                 $nullSlot
             )];
         }
-        if ($expr instanceof Op\Expr\Closure && [] !== $expr->useVars) {
-            $this->throwCompileLogic('Closure use() captures are not supported yet (issue #72)');
-        }
         $func = $expr->func;
         $funcBlock = $this->compileCfgBlock($func->cfg, $func->params, $func);
         $op = new OpCode(
@@ -2031,8 +2029,31 @@ class Compiler {
             $this->compileOperand($expr->result, $block, false),
         );
         $op->block1 = $funcBlock;
+        if ($expr instanceof Op\Expr\Closure) {
+            foreach ($expr->useVars as $useVar) {
+                if (!$useVar instanceof Operand\BoundVariable) {
+                    continue;
+                }
+                $name = $this->boundVariableName($useVar);
+                $slot = $funcBlock->getVarSlot($useVar, false);
+                $funcBlock->closureCaptureSlots[$slot] = true;
+                $op->closureCaptures[] = [
+                    'name' => $name,
+                    'slot' => $slot,
+                    'byRef' => $useVar->byRef,
+                ];
+            }
+        }
 
         return [$op];
+    }
+
+    private function boundVariableName(Operand\BoundVariable $useVar): string
+    {
+        if ($useVar->name instanceof Operand\Literal && is_string($useVar->name->value)) {
+            return $useVar->name->value;
+        }
+        $this->throwCompileLogic('Closure use() variable name must be a literal');
     }
 
     protected function shouldStubClosureForBootstrap(): bool
@@ -2763,8 +2784,18 @@ class Compiler {
     }
 
     /**
-     * @param list<string> $types
+     * Normal try completion must run finally before merge; php-cfg jumps try straight to end (#2114).
      */
+    private function rewriteTryMergeJumpsToFinally(Block $try, Block $merge, Block $finally): void
+    {
+        for ($i = 0; $i < $try->nOpCodes; ++$i) {
+            $op = $try->opCodes[$i];
+            if (OpCode::TYPE_JUMP === $op->type && $op->block1 === $merge) {
+                $op->block1 = $finally;
+            }
+        }
+    }
+
     /**
      * php-cfg TryCatch emits a Stmt_Jump into the try body; TYPE_TRY already enters it (#2084).
      */

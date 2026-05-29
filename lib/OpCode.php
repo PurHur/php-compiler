@@ -164,6 +164,13 @@ class OpCode {
     /** Pipe-separated lowercase catch class names for TYPE_CATCH (#1362). */
     public ?string $catchTypes = null;
 
+    /**
+     * Closure `use ($var)` metadata for TYPE_CLOSURE (issue #72).
+     *
+     * @var list<array{name: string, slot: int, byRef: bool}>
+     */
+    public array $closureCaptures = [];
+
     public function __construct(int $type, ?int $arg1 = null, ?int $arg2 = null, ?int $arg3 = null) {
         $this->type = $type;
         $this->arg1 = $arg1;

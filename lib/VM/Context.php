@@ -45,6 +45,12 @@ class Context {
     /** Pending thrown value while dispatching catch handlers (issue #1362). */
     public ?Variable $pendingException = null;
 
+    /** Handler frame whose catch chain resumes after a throw-path finally (issue #2114). */
+    public ?Frame $pendingCatchResumeHandler = null;
+
+    /** @var array<int, true> handler frame object id => finally already ran for current unwind */
+    public array $completedFinallyHandlers = [];
+
     public ErrorReporter $errors;
 
     public ScriptStack $scriptStack;

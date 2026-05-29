@@ -47,6 +47,9 @@ class Frame {
     /** Active generator while executing a generator function body (issue #167). */
     public ?VM\GeneratorState $generatorState = null;
 
+    /** Pending closure call: captures bound when the callee frame is entered (issue #72). */
+    public ?VM\ClosureState $closureCall = null;
+
     /** Set when TYPE_YIELD suspends; runFrames returns GENERATOR_YIELD. */
     public bool $generatorYield = false;
 
