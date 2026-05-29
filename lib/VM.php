@@ -3370,6 +3370,7 @@ restart:
             $entry->methods[$name] = $method;
             $entry->traitMethodSources[$name] = $trait->name;
             $entry->methodVisibility[$name] = $trait->methodVisibility[$name] ?? \PHPCfg\Func::FLAG_PUBLIC;
+            $entry->methodNames[$name] = $trait->methodNames[$name] ?? $name;
             if (isset($trait->methodAttributeNames[$name])) {
                 $entry->methodAttributeNames[$name] = $trait->methodAttributeNames[$name];
             }
@@ -3485,6 +3486,7 @@ restart:
                 if (isset($parent->methodDeprecated[$name])) {
                     $entry->methodDeprecated[$name] = $parent->methodDeprecated[$name];
                 }
+                $entry->methodNames[$name] = $parent->methodNames[$name] ?? $name;
             }
         }
         foreach ($parent->staticProperties as $name => $storage) {
@@ -3614,13 +3616,15 @@ restart:
                     $entry->staticProperties[$name] = $storage;
                     break;
                 case OpCode::TYPE_DECLARE_METHOD:
-                    $name = strtolower($frame->scope[$op->arg1]->toString());
+                    $declaredName = $frame->scope[$op->arg1]->toString();
+                    $name = strtolower($declaredName);
                     $vis = \PHPCfg\Func::FLAG_PUBLIC;
                     if (null !== $op->arg3 && isset($block->constants[$op->arg3])) {
                         $vis = MethodVisibility::mask($block->constants[$op->arg3]->toInt());
                     }
                     $entry->methodVisibility[$name] = $vis;
                     unset($entry->traitMethodSources[$name]);
+                    $entry->methodNames[$name] = $declaredName;
                     if ([] !== $op->attributeNames) {
                         $entry->methodAttributeNames[$name] = $op->attributeNames;
                     }

@@ -5846,6 +5846,13 @@ class JIT {
                         $parentOp = $block->getOperand($op->arg2);
                         assert($parentOp instanceof Operand\Literal);
                         $this->context->type->object->setClassParentName($nameOp->value, $parentOp->value);
+                        if (JIT\Builtin::LOAD_TYPE_STANDALONE === $this->context->loadType) {
+                            JIT\Builtin\MethodRegistry::emitSetParent(
+                                $this->context,
+                                strtolower(ltrim($nameOp->value, '\\')),
+                                strtolower(ltrim($parentOp->value, '\\'))
+                            );
+                        }
                     }
                     if ([] !== $op->attributeNames) {
                         $attrNames = [];
@@ -6741,20 +6748,31 @@ class JIT {
                             );
                         }
                     }
-                    if (($this->isBundledSuperglobalsClass($classId) || $this->shouldSkipExternalClassBodyLowering($classId))
-                        && 'issuperglobalname' !== $methodLc
-                    ) {
-                        break;
-                    }
                     $visFlags = \PHPCfg\Func::FLAG_PUBLIC;
                     if (null !== $op->arg3 && isset($block->constants[$op->arg3])) {
                         $visFlags = MethodVisibility::mask($block->constants[$op->arg3]->toInt());
                     }
                     $this->context->type->object->defineMethodVisibility(
-                        $this->context->scope->classId,
+                        $classId,
                         $methodLc,
-                        $visFlags
+                        $visFlags,
+                        $name->value
                     );
+                    if ('' !== ($this->context->scope->className ?? '')
+                        && JIT\Builtin::LOAD_TYPE_STANDALONE === $this->context->loadType) {
+                        JIT\Builtin\MethodRegistry::emitRegisterMethod(
+                            $this->context,
+                            strtolower(ltrim($this->context->scope->className, '\\')),
+                            $methodLc,
+                            $name->value,
+                            $visFlags
+                        );
+                    }
+                    if (($this->isBundledSuperglobalsClass($classId) || $this->shouldSkipExternalClassBodyLowering($classId))
+                        && 'issuperglobalname' !== $methodLc
+                    ) {
+                        break;
+                    }
                     $methodBlock = $op->block1;
                     $className = null !== $methodBlock && null !== $methodBlock->func && null !== $methodBlock->func->class
                         ? strtolower($methodBlock->func->class->value)

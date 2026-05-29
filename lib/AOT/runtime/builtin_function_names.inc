@@ -123,6 +123,7 @@ static const char *phpc_builtin_functions[] = {
     "fwrite",
     "gc_collect_cycles",
     "get_class",
+    "get_class_methods",
     "get_class_vars",
     "get_debug_type",
     "get_declared_enums",

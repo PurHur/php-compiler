@@ -86,7 +86,8 @@ final class sort_ extends Internal
                 'sort() only supports homogeneous string or integer arrays in this compiler build'
             );
         }
-        $ht->replacePackedValues($values);
+        $array->separateArrayForWrite();
+        $array->resolveIndirect()->toArray()->replacePackedValues($values);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(true);
         }
