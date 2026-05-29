@@ -183,7 +183,7 @@ class JIT {
             $this->context->inlineIncludeReturnOperands = [];
             $this->context->coalesceAssignTargets = new \SplObjectStorage();
             // Each queued CFG function gets a fresh try/catch stack — dispatch BBs are per-LLVM-function (#3012).
-            $this->context->tryCatch = new JIT\TryCatchState();
+            $this->context->tryCatch->reset();
             $this->compileBlockInternal($run[0], $run[1], null, null, ...$run[2]);
         }
     }
@@ -3224,6 +3224,31 @@ class JIT {
             $this->context->m3EmitTuTrivialEchoPath = $path;
         }
         $repoRoot = dirname(__DIR__);
+        $pathNorm = str_replace('\\', '/', $path);
+        // M5 vendor bundles: Zend host-compile hits non-literal includes in php-cfg; reuse committed
+        // prelinked .o at emit-helper link so native argv driver can sidecar-copy at runtime (#3028).
+        if (str_contains($pathNorm, 'bootstrap-vendor-prelink/generated/')
+            && preg_match('#/([^/]+)_bundle\\.php$#', $pathNorm, $vendorBundleMatch)
+        ) {
+            $vendorSlug = $vendorBundleMatch[1];
+            $prelinkedObject = $repoRoot.'/prelinked/bootstrap-vendor/'.$vendorSlug.'.o';
+            if (is_readable($prelinkedObject)) {
+                $aotBytes = file_get_contents($prelinkedObject);
+                if (is_string($aotBytes) && '' !== $aotBytes) {
+                    \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::registerLinktime(
+                        $this->context,
+                        $repoRoot,
+                        $code,
+                        $aotBytes,
+                        $sidecarRel,
+                        $sentinelLogical,
+                        true
+                    );
+
+                    return;
+                }
+            }
+        }
         $repoSidecar = $repoRoot.'/'.ltrim($sidecarRel, '/');
         if (is_readable($repoSidecar)) {
             $aotBytes = file_get_contents($repoSidecar);
@@ -3240,7 +3265,6 @@ class JIT {
                 return;
             }
         }
-        $pathNorm = str_replace('\\', '/', $path);
         $hostCompilePath = $path;
         if (str_ends_with($pathNorm, '/bin/compile.php')) {
             // For gen-3 (argv) and other bootstrap products, compiling bin/compile.php must default to the

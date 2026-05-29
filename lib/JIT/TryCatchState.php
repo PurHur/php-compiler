@@ -11,4 +11,11 @@ final class TryCatchState
 
     /** @var array<int, TryCatchHandler> */
     public array $mergeHandlers = [];
+
+    /** Fresh stack for each queued CFG function (#3012, #3027). */
+    public function reset(): void
+    {
+        $this->handlerStack = [];
+        $this->mergeHandlers = [];
+    }
 }
