@@ -19,11 +19,14 @@ ci_cd_repo
 REQUIRE_LLVM=0
 STRICT_M5=0
 RUN_NS4=0
+# -1 = auto (no Zend when prelinked gen-0 seed exists), 0 = allow Zend, 1 = forbid Zend
+NS5_NO_ZEND=-1
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --require-llvm) REQUIRE_LLVM=1; shift ;;
     --strict) STRICT_M5=1; shift ;;
     --with-ns4) RUN_NS4=1; shift ;;
+    --zend-gen0) NS5_NO_ZEND=0; shift ;;
     -h|--help)
       cat <<'EOF'
 Usage: script/north-star5-verify.sh [--require-llvm] [--strict] [--with-ns4]
@@ -42,6 +45,7 @@ Options:
   --require-llvm   fail if LLVM 9 missing (default: skip LLVM steps, exit 0)
   --strict         fail unless all vendor packages reach object_ok
   --with-ns4       also run north-star4-verify --dry-run-only when LLVM present
+  --zend-gen0      allow Zend gen-0 bootstrap (default: no Zend when seed present)
 
 Docker:
   ./script/docker-exec.sh -- bash -lc './script/north-star5-verify.sh'
@@ -97,6 +101,11 @@ ns5_prelinked_vendor_ready() {
   [[ "${ok}" -eq 3 ]]
 }
 
+ns5_has_gen0_seed() {
+  [[ -x "${_CI_REPO_ROOT}/prelinked/bootstrap-gen0/bin-compile-aot" ]] \
+    && [[ -f "${_CI_REPO_ROOT}/prelinked/bootstrap-gen0/manifest.json" ]]
+}
+
 ns5_print_summary() {
   local vendor_ok="${1:-0}"
   local spine_ratio
@@ -105,7 +114,11 @@ ns5_print_summary() {
   echo "north-star5-verify: M5 status"
   echo "  Spine: ${spine_ratio} (Phase A inventory SSOT)"
   echo "  Vendor prelink: ${vendor_ok}/3 object_ok (php-cfg, php-types, php-llvm prelinked .o)"
-  echo "  Cold boot: Zend still drives bin/compile.php — target is compiled driver + prelinked vendor"
+  if [[ "${NS5_NO_ZEND}" -eq 1 ]]; then
+    echo "  Cold boot: compiled driver only (no Zend gen-0; BOOTSTRAP_M5_NO_ZEND=1, #3053)"
+  else
+    echo "  Cold boot: Zend gen-0 allowed (use --zend-gen0 to force this; target is no Zend, #3053)"
+  fi
   echo "north-star5-verify: Next — shrink self-host stubs; link spine + prelinked .o; retire vendor/autoload (#1416)"
 }
 
@@ -116,6 +129,14 @@ fi
 
 ci_prepare_test_runtime
 ci_install_deps
+
+if [[ "${NS5_NO_ZEND}" -eq -1 ]]; then
+  if ns5_has_gen0_seed; then
+    NS5_NO_ZEND=1
+  else
+    NS5_NO_ZEND=0
+  fi
+fi
 
 ns5_run 1 "bootstrap inventory --check" \
   ci_ensure_generated_doc "${_CI_REPO_ROOT}/script/bootstrap-inventory.php" "${_CI_REPO_ROOT}/docs/bootstrap-inventory.md"
@@ -179,7 +200,11 @@ fi
 if ! ns5_prelinked_vendor_ready; then
   echo "north-star5-verify: step 4c skipped (prelinked/bootstrap-vendor/*.o missing)" >&2
 else
-  ns5_run 4c0 "native compile driver for vendor-absent spine" make -C "${_CI_REPO_ROOT}" bootstrap-selfhost-link
+  if [[ "${NS5_NO_ZEND}" -eq 1 ]]; then
+    ns5_run 4c0 "native compile driver for vendor-absent spine (no Zend gen-0)" env BOOTSTRAP_M5_NO_ZEND=1 make -C "${_CI_REPO_ROOT}" bootstrap-selfhost-link
+  else
+    ns5_run 4c0 "native compile driver for vendor-absent spine" make -C "${_CI_REPO_ROOT}" bootstrap-selfhost-link
+  fi
   vendor_spine_bak=""
   if [[ -d "${_CI_REPO_ROOT}/vendor" ]]; then
     vendor_spine_bak="${_CI_REPO_ROOT}/.north-star5-vendor-spine.bak"
