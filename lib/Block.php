@@ -551,5 +551,61 @@ class Block {
         return $nameOp->value;
     }
 
+    /**
+     * @param int ...$types OpCode::TYPE_* values to match
+     */
+    public static function containsOpcodeTypes(?self $root, int ...$types): bool
+    {
+        if (null === $root || [] === $types) {
+            return false;
+        }
+        $want = array_fill_keys($types, true);
+        $seen = new \SplObjectStorage();
+        $stack = [$root];
+        while ([] !== $stack) {
+            $block = array_pop($stack);
+            if (!$block instanceof self || $seen->contains($block)) {
+                continue;
+            }
+            $seen->attach($block);
+            foreach ($block->opCodes as $op) {
+                if (isset($want[$op->type])) {
+                    return true;
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof self) {
+                        $stack[] = $sub;
+                    }
+                }
+            }
+        }
 
+        return false;
+    }
+
+    /** Script or nested function body contains `yield` / `yield from` (issue #167). */
+    public static function containsGeneratorOpcodes(?self $root): bool
+    {
+        return self::containsOpcodeTypes(
+            $root,
+            OpCode::TYPE_YIELD,
+            OpCode::TYPE_YIELD_FROM
+        );
+    }
+
+    /**
+     * CFG regions that MCJIT must not lower yet; `bin/jit.php` runs the VM instead (#2114, #167).
+     */
+    public static function requiresVmLowering(?self $root): bool
+    {
+        return self::containsOpcodeTypes(
+            $root,
+            OpCode::TYPE_TRY,
+            OpCode::TYPE_CATCH,
+            OpCode::TYPE_FINALLY,
+            OpCode::TYPE_THROW,
+            OpCode::TYPE_YIELD,
+            OpCode::TYPE_YIELD_FROM
+        );
+    }
 }

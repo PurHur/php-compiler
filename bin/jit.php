@@ -11,7 +11,6 @@ declare(strict_types=1);
 
 use PHPCompiler\Runtime;
 use PHPCompiler\Block;
-use PHPCompiler\OpCode;
 use PHPCompiler\Web\Superglobals;
 
 /**
@@ -54,11 +53,10 @@ function run(string $filename, string $code, array $options): void
         $runtime->setDebug($debugFile);
     }
     $block = $runtime->parseAndCompile($code, $filename);
-    if (null !== $block && jit_block_contains_trycatch($block)) {
+    if (null !== $block && Block::requiresVmLowering($block)) {
         // JIT EH lowering is not yet stable; try/catch currently segfaults in MCJIT (issue #2114).
+        // Generators (`yield`) are VM-only until LLVM coroutine lowering lands (issue #167).
         // Fall back to VM semantics rather than producing silent miscompiles or hard crashes.
-        //
-        // This keeps JIT usable for the rest of the language while #2114 is implemented.
     } else {
         $runtime->jit($block);
     }
@@ -67,36 +65,6 @@ function run(string $filename, string $code, array $options): void
         $runtime->syncJitSuperglobals($queryArg, $postArg, $scriptFilename);
         $runtime->run($block);
     }
-}
-
-function jit_block_contains_trycatch(Block $block, ?\SplObjectStorage $seen = null): bool
-{
-    if (null === $seen) {
-        $seen = new \SplObjectStorage();
-    }
-    if ($seen->contains($block)) {
-        return false;
-    }
-    $seen->attach($block);
-    foreach ($block->opCodes as $op) {
-        if (
-            OpCode::TYPE_TRY === $op->type
-            || OpCode::TYPE_CATCH === $op->type
-            || OpCode::TYPE_FINALLY === $op->type
-            || OpCode::TYPE_THROW === $op->type
-            || OpCode::TYPE_YIELD === $op->type
-            || OpCode::TYPE_YIELD_FROM === $op->type
-        ) {
-            return true;
-        }
-        foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
-            if ($sub instanceof Block && jit_block_contains_trycatch($sub, $seen)) {
-                return true;
-            }
-        }
-    }
-
-    return false;
 }
 
 // libffi RTLD_GLOBAL preload before MCJIT segfaults on php-compiler:22.04-dev (#98, #2055).
