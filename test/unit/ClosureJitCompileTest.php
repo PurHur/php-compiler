@@ -29,7 +29,7 @@ final class ClosureJitCompileTest extends TestCase
     public function testClosureModuleVerify(): void
     {
         $runtime = new Runtime();
-        foreach (['closure_simple.phpt', 'closure_use.phpt'] as $file) {
+        foreach (['closure_simple.phpt', 'closure_use.phpt', 'closure_use_byref.phpt'] as $file) {
             $block = $runtime->parseAndCompile($this->fixtureCode($file), $file);
             $runtime->jitCompileBlock($block);
         }
@@ -38,6 +38,40 @@ final class ClosureJitCompileTest extends TestCase
         $verify = new \ReflectionMethod($context, 'compileCommon');
         $verify->setAccessible(true);
         $verify->invoke($context);
+    }
+
+    public function testBinJitRunClosureUseByRefInline(): void
+    {
+        if (!$this->jitProbeOk()) {
+            $this->markTestSkipped('JIT MCJIT probe failed — bin/jit.php not runnable (#72)');
+        }
+        $jit = realpath($this->repoRoot.'/bin/jit.php');
+        if (false === $jit) {
+            $this->markTestSkipped('bin/jit.php missing');
+        }
+        $code = '$n = 10; $f = function($x) use (&$n) { return $x + $n; }; echo $f(5), "\n"; $n = 99; echo $f(5), "\n";';
+        $env = $this->llvmProcessEnv();
+        $cmd = array_merge(
+            LlvmToolchain::envPrefix($this->repoRoot),
+            [PHP_BINARY, $jit, '-r', $code]
+        );
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open($cmd, $descriptorSpec, $pipes, $this->repoRoot, $env);
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+        $combined = trim(($stdout !== false ? $stdout : '').($stderr !== false ? $stderr : ''));
+        $this->assertSame(0, $exit, $combined);
+        $this->assertStringContainsString('15', $combined);
+        $this->assertStringContainsString('104', $combined);
     }
 
     public function testBinJitRunClosureUseInline(): void

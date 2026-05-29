@@ -125,6 +125,14 @@ final class ClosureHelper
         return $dest;
     }
 
+    /** By-reference bind to enclosing storage; resolved at each invoke (issue #72). */
+    public static function referenceCapture(Variable $src): Variable
+    {
+        $src->addref();
+
+        return $src;
+    }
+
     /**
      * @param list<array{name: string, slot: int, byRef: bool}> $captureSpecs
      *
@@ -137,9 +145,6 @@ final class ClosureHelper
     ): array {
         $specsBySlot = [];
         foreach ($captureSpecs as $spec) {
-            if ($spec['byRef']) {
-                throw new \LogicException('Closure use (&$x) not supported in JIT yet (issue #72)');
-            }
             $specsBySlot[$spec['slot']] = $spec;
         }
 
@@ -152,9 +157,14 @@ final class ClosureHelper
                 continue;
             }
             $src = $context->variableForScopedName($spec['name']);
-            $captures[] = null !== $src
-                ? self::snapshotCapture($context, $src)
-                : self::nullCapture($context);
+            if (null === $src) {
+                $captures[] = self::nullCapture($context);
+
+                continue;
+            }
+            $captures[] = $spec['byRef']
+                ? self::referenceCapture($src)
+                : self::snapshotCapture($context, $src);
         }
 
         return $captures;
