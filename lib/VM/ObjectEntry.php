@@ -50,6 +50,12 @@ class ObjectEntry {
         return array_values($this->properties);
     }
 
+    /** @return array<string, Variable> */
+    public function propertiesWithNames(): array
+    {
+        return $this->properties;
+    }
+
     /** Break property edges and detach generator/closure state after cycle collection (#3113). */
     public function destroyForGc(): void
     {

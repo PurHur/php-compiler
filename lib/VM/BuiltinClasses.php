@@ -77,6 +77,11 @@ final class BuiltinClasses
             null,
             $arrayProto
         );
+        $entry->properties[] = new ClassProperty(
+            WeakRefSupport::MAP_KEYS_PROPERTY,
+            null,
+            $arrayProto
+        );
         $pub = CfgFunc::FLAG_PUBLIC;
         $entry->constructor = new WeakMapConstruct();
         $entry->methods['__construct'] = $entry->constructor;
