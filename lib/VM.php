@@ -793,6 +793,9 @@ restart:
                     }
                     $classEntry = new ClassEntry($name);
                     $classEntry->isEnum = true;
+                    if (null !== $op->arg2 && isset($frame->block->constants[$op->arg2])) {
+                        $classEntry->backedType = $frame->block->constants[$op->arg2]->toString();
+                    }
                     $classEntry->interfaces = $op->classImplements;
                     self::defineClass($classEntry, $op->block1);
                     $this->context->classes[$lcname] = $classEntry;
