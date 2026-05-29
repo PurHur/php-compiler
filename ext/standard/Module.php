@@ -131,6 +131,7 @@ class Module extends ModuleAbstract
             new array_multisort(),
             new usort_(),
             new uasort_(),
+            new uksort_(),
             new sprintf_(),
             new array_values(),
             new array_keys(),
