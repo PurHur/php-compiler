@@ -545,6 +545,13 @@ class Compiler {
                     } elseif (
                         $child instanceof Op\Expr\PropertyFetch
                         && $i + 1 < $opCount
+                        && $this->isPropertyFetchOnlyIssetVar($child, $ops[$i + 1])
+                    ) {
+                        // Lowered by compileIsset via TYPE_ISSET(container, name) (#3298).
+                        break;
+                    } elseif (
+                        $child instanceof Op\Expr\PropertyFetch
+                        && $i + 1 < $opCount
                         && $this->isPropertyFetchOnlyUnsetVar($child, $ops[$i + 1])
                     ) {
                         break;
@@ -553,9 +560,9 @@ class Compiler {
                     } elseif (
                         $child instanceof Op\Expr\PropertyFetch
                         && $i + 1 < $opCount
-                        && $this->isPropertyFetchOnlyIssetVar($child, $ops[$i + 1])
+                        && $this->isPropertyFetchOnlyEmptyVar($child, $ops[$i + 1])
                     ) {
-                        // Lowered by compileIsset via isset(object, prop) — no eager fetch (#3603).
+                        // Lowered by compileExpr Empty_ via TYPE_ISSET + TYPE_BOOLEAN_NOT (#3298).
                         break;
                     } else {
                         if ($this->needsCfgSplitBeforeStringDimFetch($child, $block, $ops, $i)) {
@@ -1062,6 +1069,9 @@ class Compiler {
             return false;
         }
         foreach ($next->vars as $var) {
+            if ($var === $fetch) {
+                return true;
+            }
             $target = $var;
             while ($target instanceof Temporary) {
                 if ($target === $fetch->result) {
@@ -1078,6 +1088,30 @@ class Compiler {
         }
 
         return false;
+    }
+
+    private function isPropertyFetchOnlyEmptyVar(
+        Op\Expr\PropertyFetch $fetch,
+        Op $next
+    ): bool {
+        if (!$next instanceof Op\Expr\Empty_) {
+            return false;
+        }
+        $target = $next->expr;
+        if ($target === $fetch) {
+            return true;
+        }
+        while ($target instanceof Temporary) {
+            if ($target === $fetch->result) {
+                return true;
+            }
+            if (null === $target->original) {
+                break;
+            }
+            $target = $target->original;
+        }
+
+        return $target === $fetch->result;
     }
 
     private function isPropertyFetchOnlyUnsetVar(
@@ -1994,6 +2028,35 @@ class Compiler {
             case Op\Expr\BooleanNot::class:
             case Op\Expr\Clone_::class:
             case Op\Expr\Empty_::class:
+                $propFetch = $this->unwrapPropertyFetch($expr->expr);
+                if (null !== $propFetch) {
+                    $resultSlot = $this->compileOperand($expr->result, $block, false);
+                    $checkSlot = $this->compileBoolTemporary($block);
+                    [$containerSlot, $dimSlot] = [
+                        $this->compileOperand($propFetch->var, $block, true),
+                        $this->compileOperand($propFetch->name, $block, true),
+                    ];
+
+                    return [
+                        new OpCode(
+                            OpCode::TYPE_ISSET,
+                            $checkSlot,
+                            $containerSlot,
+                            $dimSlot
+                        ),
+                        new OpCode(
+                            OpCode::TYPE_BOOLEAN_NOT,
+                            $resultSlot,
+                            $checkSlot
+                        ),
+                    ];
+                }
+
+                return [new OpCode(
+                    $this->getOpCodeTypeFromUnaryOp($expr),
+                    $this->compileOperand($expr->result, $block, false),
+                    $this->compileOperand($expr->expr, $block, true)
+                )];
             case Op\Expr\Eval_::class:
                 return [new OpCode(
                     $this->getOpCodeTypeFromUnaryOp($expr),
@@ -3046,6 +3109,13 @@ class Compiler {
         if (null !== $fetch) {
             return $this->resolveIssetTargetFromArrayDimFetch($fetch, $block);
         }
+        $propFetch = $this->unwrapPropertyFetch($operand);
+        if (null !== $propFetch) {
+            return [
+                $this->compileOperand($propFetch->var, $block, true),
+                $this->compileOperand($propFetch->name, $block, true),
+            ];
+        }
         if (null !== $this->unwrapVariableOperand($operand)) {
             return $this->resolveIssetTarget($operand, $block);
         }
@@ -3301,19 +3371,42 @@ class Compiler {
     }
 
     /**
+     * @param Op\Expr|Operand $expr
+     *
      * @return array{0: int, 1: ?int}
      */
-    protected function resolveIssetTarget(Operand $operand, Block $block): array
+    protected function resolveIssetTarget($expr, Block $block): array
     {
-        $fetch = $this->unwrapArrayDimFetch($operand);
-        if (null !== $fetch) {
+        if ($expr instanceof Op\Expr\ArrayDimFetch) {
+            return $this->resolveIssetTargetFromArrayDimFetch($expr, $block);
+        }
+        if ($expr instanceof Op\Expr\PropertyFetch) {
             return [
-                $this->compileOperand($fetch->var, $block, true),
-                $this->compileOperand($fetch->dim, $block, true),
+                $this->compileOperand($expr->var, $block, true),
+                $this->compileOperand($expr->name, $block, true),
             ];
         }
+        if ($expr instanceof Operand) {
+            $fetch = $this->unwrapArrayDimFetch($expr);
+            if (null !== $fetch) {
+                return [
+                    $this->compileOperand($fetch->var, $block, true),
+                    $this->compileOperand($fetch->dim, $block, true),
+                ];
+            }
+            foreach ($block->orig->children as $child) {
+                if ($child instanceof Op\Expr\PropertyFetch && $child->result === $expr) {
+                    return [
+                        $this->compileOperand($child->var, $block, true),
+                        $this->compileOperand($child->name, $block, true),
+                    ];
+                }
+            }
 
-        return [$this->compileOperand($operand, $block, true), null];
+            return [$this->compileOperand($expr, $block, true), null];
+        }
+
+        $this->throwCompileLogic('Unsupported isset target: ' . (is_object($expr) ? $expr->getType() : gettype($expr)));
     }
 
     /**
