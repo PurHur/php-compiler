@@ -42,6 +42,7 @@ class Module extends ModuleAbstract
             new hypot(),
             new atan2(),
             new fmod(),
+            new fdiv(),
             new intval(),
             new floatval(),
             new doubleval(),
