@@ -28,6 +28,9 @@ class ObjectEntry {
     /** User generator instance state (issue #167). */
     public ?GeneratorState $generatorState = null;
 
+    /** Anonymous function / closure body (issue #72). */
+    public ?ClosureState $closureState = null;
+
     public function __construct(ClassEntry $class) {
         $this->class = $class;
         $this->id = ++self::$counter;
