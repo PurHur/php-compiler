@@ -18,6 +18,7 @@ final class Linker
         __DIR__.'/runtime/hash_crypto.c',
         __DIR__.'/runtime/phpc_microtime.c',
         __DIR__.'/runtime/phpc_getdate.c',
+        __DIR__.'/runtime/phpc_info.c',
         __DIR__.'/runtime/phpc_strnatcmp.c',
         __DIR__.'/runtime/phpc_strnatcasecmp.c',
         __DIR__.'/runtime/phpc_substr_compare.c',
