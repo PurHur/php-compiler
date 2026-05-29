@@ -1,0 +1,11 @@
+--- vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php
+@@ -7561,6 +7561,8 @@
+         'str_replace' => ['string|array', 'search' => 'string|array', 'replace' => 'string|array', 'subject' => 'string|array', '&replace_count=' => 'int'],
+         'strrev' => ['string', 'str' => 'string'],
+         'strripos' => ['int', 'haystack' => 'string', 'needle' => 'string', 'offset=' => 'int'],
++        'str_decrement' => ['string', 'string' => 'string'],
++        'str_increment' => ['string', 'string' => 'string'],
+         'str_rot13' => ['string', 'str' => 'string'],
+         'strrpos' => ['int', 'haystack' => 'string', 'needle' => 'string', 'offset=' => 'int'],
+         'str_shuffle' => ['', 'str' => 'string'],
