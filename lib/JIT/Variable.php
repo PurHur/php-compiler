@@ -127,6 +127,9 @@ final class Variable {
 
     public ?string $generatorResumeName = null;
 
+    /** MCJIT/AOT foreach over a {@see Generator} object (#3074, #3115). */
+    public bool $isJitGenerator = false;
+
     /** Live {@see __value__*} for closure use (&$var) capture slots (issue #72). */
     public ?\PHPLLVM\Value $valueBoxAliasPtr = null;
 

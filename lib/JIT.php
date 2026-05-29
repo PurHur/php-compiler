@@ -5631,7 +5631,7 @@ class JIT {
                             $this,
                             $resumeName
                         );
-                        $this->assignOperand($block->getOperand($op->arg1), $genVar);
+                        $this->assignOperandForced($block->getOperand($op->arg1), $genVar);
                         break;
                     }
                     $prevStrict = $this->context->callerStrictTypes;
@@ -6729,6 +6729,12 @@ class JIT {
             $this->copyValueBoxJitFlags($result, $value, $force);
             $result->compileTimeConstantName = $value->compileTimeConstantName;
             $this->syncCompileTimeString($result, $value, $force);
+            if ($value->isJitGenerator) {
+                $resolved = JIT\OperandName::resolve($resultOp);
+                if (null !== $resolved && '' !== $resolved) {
+                    $this->context->bindVariableByName($resolved, $result);
+                }
+            }
 
             return;
         } elseif ($result->type === Variable::TYPE_VALUE) {
@@ -7323,6 +7329,7 @@ class JIT {
         $dest->closureCall = $src->closureCall;
         $dest->generatorStatePtr = $src->generatorStatePtr;
         $dest->generatorResumeName = $src->generatorResumeName;
+        $dest->isJitGenerator = $src->isJitGenerator;
     }
 
     /**
@@ -7333,7 +7340,7 @@ class JIT {
         Variable $src,
         ?Operand $srcOp
     ): void {
-        $destPtr = JIT\JitValueBox::pointer($this->context, $destField);
+        $destPtr = JIT\JitValueBox::normalizeValuePtr($this->context, $destField);
         if (JIT\Variable::TYPE_STRING === $src->type) {
             $this->context->builder->call(
                 $this->context->lookupFunction('__value__writeString'),

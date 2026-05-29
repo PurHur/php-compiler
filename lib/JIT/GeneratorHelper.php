@@ -20,6 +20,9 @@ final class GeneratorHelper
 {
     public const TARGET_PROPERTY = '__generator_resume';
 
+    /** int64 property holding {@see __generator_state__*} bits (#3115). */
+    public const STATE_PROPERTY = '__generator_state';
+
     private static bool $typesRegistered = false;
 
     public static function ensureTypes(Context $context): void
@@ -37,8 +40,8 @@ final class GeneratorHelper
             $context->getTypeFromString('size_t'),
             $context->getTypeFromString('int1'),
             $context->getTypeFromString('int1'),
-            $context->getTypeFromString('__value__'),
-            $context->getTypeFromString('__value__'),
+            $context->getTypeFromString('__value__*'),
+            $context->getTypeFromString('__value__*'),
         );
         $context->structFieldMap['__generator_state__'] = [
             'resume_ip' => 0,
@@ -73,7 +76,41 @@ final class GeneratorHelper
 
     public static function isGeneratorVariable(Variable $var): bool
     {
-        return null !== $var->generatorStatePtr;
+        return null !== $var->generatorStatePtr
+            || null !== $var->generatorResumeName
+            || $var->isJitGenerator;
+    }
+
+    /**
+     * @return array{0: \PHPLLVM\Value, 1: string} state pointer and resume LLVM symbol base name
+     */
+    private static function resolveStateAndResume(Context $context, Variable $gen): array
+    {
+        if (null !== $gen->generatorStatePtr && null !== $gen->generatorResumeName) {
+            return [$gen->generatorStatePtr, $gen->generatorResumeName];
+        }
+        if (Variable::TYPE_OBJECT !== $gen->type) {
+            throw new \LogicException('foreach requires a Generator value in this compiler build');
+        }
+        $obj = $context->helper->loadValue($gen);
+        $stateBits = $context->type->object->propertyFetch($obj, 'Generator', self::STATE_PROPERTY);
+        if (Variable::TYPE_NATIVE_LONG !== $stateBits->type) {
+            throw new \LogicException('Generator object missing __generator_state property');
+        }
+        $statePtr = $context->builder->inttoptr(
+            $context->helper->loadValue($stateBits),
+            $context->getTypeFromString('__generator_state__*')
+        );
+        $resumeName = $gen->generatorResumeName;
+        if (null === $resumeName) {
+            $resumeProp = $context->type->object->propertyFetch($obj, 'Generator', self::TARGET_PROPERTY);
+            if (Variable::TYPE_STRING !== $resumeProp->type || null === $resumeProp->compileTimeString) {
+                throw new \LogicException('Generator object missing resume function name');
+            }
+            $resumeName = $resumeProp->compileTimeString;
+        }
+
+        return [$statePtr, $resumeName];
     }
 
     /**
@@ -138,7 +175,18 @@ final class GeneratorHelper
         $i1 = $context->getTypeFromString('int1');
         $zero = $sizeT->constInt(0, false);
 
+        $resumeIp = $context->builder->load($context->builder->structGep($stateParam, $map['resume_ip']));
+        $freshBb = $func->appendBasicBlock('gen_fresh');
+        $resumeBb = $func->appendBasicBlock('gen_resume');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $resumeIp, $zero),
+            $freshBb,
+            $resumeBb
+        );
+        $context->builder->positionAtEnd($freshBb);
         $context->builder->store($zero, $context->builder->structGep($stateParam, $map['auto_key']));
+        $context->builder->branch($resumeBb);
+        $context->builder->positionAtEnd($resumeBb);
         $resumeIp = $context->builder->load($context->builder->structGep($stateParam, $map['resume_ip']));
         $doneBb = $func->appendBasicBlock('gen_done');
         $switchInst = $context->builder->branchSwitch($resumeIp, $doneBb, $n);
@@ -182,8 +230,8 @@ final class GeneratorHelper
 
         $valueOp = null !== $op->arg2 ? $block->getOperand($op->arg2) : null;
         $keyOp = null !== $op->arg3 ? $block->getOperand($op->arg3) : null;
-        $valField = $context->builder->structGep($stateParam, $map['current_value']);
-        $keyField = $context->builder->structGep($stateParam, $map['current_key']);
+        $valField = $context->builder->load($context->builder->structGep($stateParam, $map['current_value']));
+        $keyField = $context->builder->load($context->builder->structGep($stateParam, $map['current_key']));
 
         if (null !== $valueOp) {
             $valVar = $context->getVariableFromOp($valueOp);
@@ -191,7 +239,7 @@ final class GeneratorHelper
         } else {
             $context->builder->call(
                 $context->lookupFunction('__value__writeNull'),
-                JitValueBox::pointer($context, $valField)
+                JitValueBox::normalizeValuePtr($context, $valField)
             );
         }
 
@@ -202,7 +250,7 @@ final class GeneratorHelper
             $autoKey = $context->builder->load($context->builder->structGep($stateParam, $map['auto_key']));
             $context->builder->call(
                 $context->lookupFunction('__value__writeLong'),
-                JitValueBox::pointer($context, $keyField),
+                JitValueBox::normalizeValuePtr($context, $keyField),
                 $context->builder->truncOrBitCast($autoKey, $context->getTypeFromString('int64'))
             );
             $context->builder->store(
@@ -238,23 +286,32 @@ final class GeneratorHelper
         $context->builder->store($zero, $context->builder->structGep($statePtr, $map['auto_key']));
         $context->builder->store($i1->constInt(0, false), $context->builder->structGep($statePtr, $map['has_current']));
         $context->builder->store($i1->constInt(0, false), $context->builder->structGep($statePtr, $map['done']));
-        $context->builder->call(
-            $context->lookupFunction('__value__writeNull'),
-            JitValueBox::pointer($context, $context->builder->structGep($statePtr, $map['current_key']))
+        $keyBox = JitValueBox::alloc($context);
+        $valBox = JitValueBox::alloc($context);
+        $context->builder->store(
+            $keyBox,
+            $context->builder->structGep($statePtr, $map['current_key'])
         );
-        $context->builder->call(
-            $context->lookupFunction('__value__writeNull'),
-            JitValueBox::pointer($context, $context->builder->structGep($statePtr, $map['current_value']))
+        $context->builder->store(
+            $valBox,
+            $context->builder->structGep($statePtr, $map['current_value'])
         );
 
         $classId = $context->type->object->lookup('Generator');
         $obj = $context->type->object->allocate($classId);
         $context->type->object->markObjectConstructed($obj);
         self::storeResumeName($context, $obj, $resumeInternalName);
+        $stateBits = $context->builder->ptrtoint(
+            $statePtr,
+            $context->getTypeFromString('int64')
+        );
+        $stateBitsVar = new Variable($context, Variable::TYPE_NATIVE_LONG, Variable::KIND_VALUE, $stateBits);
+        $context->type->object->storeInstanceProperty($obj, 'Generator', self::STATE_PROPERTY, $stateBitsVar);
 
         $var = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $obj);
         $var->generatorStatePtr = $statePtr;
         $var->generatorResumeName = $resumeInternalName;
+        $var->isJitGenerator = true;
 
         return $var;
     }
@@ -278,10 +335,7 @@ final class GeneratorHelper
 
     public static function compileIterValid(Context $context, Variable $gen): Value
     {
-        if (null === $gen->generatorStatePtr || null === $gen->generatorResumeName) {
-            throw new \LogicException('foreach requires a Generator value in this compiler build');
-        }
-        $state = $gen->generatorStatePtr;
+        [$state, $resumeName] = self::resolveStateAndResume($context, $gen);
         $map = $context->structFieldMap['__generator_state__'];
         $i1 = $context->getTypeFromString('int1');
         $done = $context->builder->load($context->builder->structGep($state, $map['done']));
@@ -293,9 +347,9 @@ final class GeneratorHelper
         $context->builder->positionAtEnd($early);
         $context->builder->branch($merge);
         $context->builder->positionAtEnd($body);
-        $resumeFn = $context->functions[strtolower($gen->generatorResumeName)] ?? null;
+        $resumeFn = $context->functions[strtolower($resumeName)] ?? null;
         if (!$resumeFn instanceof \PHPLLVM\Value\Function_) {
-            throw new \LogicException('Generator resume function missing from JIT context');
+            throw new \LogicException('Generator resume function missing from JIT context: '.$resumeName);
         }
         $yielded = $context->builder->call($resumeFn, $state);
         $has = $context->builder->icmp(
@@ -314,13 +368,11 @@ final class GeneratorHelper
 
     public static function compileIterKey(Context $context, Variable $gen): Variable
     {
-        if (null === $gen->generatorStatePtr) {
-            throw new \LogicException('Generator iterator key requires generator state');
-        }
-        $keyField = $context->builder->structGep(
-            $gen->generatorStatePtr,
+        [$state] = self::resolveStateAndResume($context, $gen);
+        $keyField = $context->builder->load($context->builder->structGep(
+            $state,
             $context->structFieldMap['__generator_state__']['current_key']
-        );
+        ));
         $slot = JitValueBox::alloc($context);
         JitValueBox::copyFromPointer($context, $slot, $keyField);
 
@@ -329,13 +381,11 @@ final class GeneratorHelper
 
     public static function compileIterValue(Context $context, Variable $gen): Variable
     {
-        if (null === $gen->generatorStatePtr) {
-            throw new \LogicException('Generator iterator value requires generator state');
-        }
-        $valField = $context->builder->structGep(
-            $gen->generatorStatePtr,
+        [$state] = self::resolveStateAndResume($context, $gen);
+        $valField = $context->builder->load($context->builder->structGep(
+            $state,
             $context->structFieldMap['__generator_state__']['current_value']
-        );
+        ));
         $slot = JitValueBox::alloc($context);
         JitValueBox::copyFromPointer($context, $slot, $valField);
 
@@ -344,10 +394,10 @@ final class GeneratorHelper
 
     public static function compileIterReset(Context $context, Variable $gen): void
     {
-        if (null === $gen->generatorStatePtr) {
+        if (!self::isGeneratorVariable($gen)) {
             return;
         }
-        $state = $gen->generatorStatePtr;
+        [$state] = self::resolveStateAndResume($context, $gen);
         $map = $context->structFieldMap['__generator_state__'];
         $sizeT = $context->getTypeFromString('size_t');
         $i1 = $context->getTypeFromString('int1');
