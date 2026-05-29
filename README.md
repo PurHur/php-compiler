@@ -7,7 +7,7 @@
 [![LLVM](https://img.shields.io/badge/LLVM-9-orange)](https://llvm.org/)
 [![Status](https://img.shields.io/badge/docs-status%20site-4F5B93)](https://purhur.github.io/php-compiler/docs/pages/index.html)
 
-> **Stable line (2026)** — First maintained **stable** release of this fork: demo-ready VM + AOT for a **web-capable PHP subset**, reference examples **000–009**, and an experimental **self-host** path (compiler compiling its own `lib/`). Not full Zend PHP compatibility — see [what’s missing](https://purhur.github.io/php-compiler/missing-implementation.html).
+> **Stable line (2026)** — First maintained **stable** release of this fork: demo-ready VM + AOT for a **web-capable PHP subset**, reference examples **000–009**, and an experimental **self-host** path (compiler compiling its own `lib/`). Not full Zend PHP compatibility — see [what’s missing](https://purhur.github.io/php-compiler/docs/pages/missing-implementation.html).
 
 ---
 
@@ -135,7 +135,7 @@ php-compiler is **not** a drop-in Zend PHP replacement. It implements a **web-ca
 | **JIT** | `bin/jit.php` — native code via LLVM MCJIT; some CFGs fall back to VM |
 | **AOT** | `phpc build` — standalone binary; strictest; many features blocked at link time |
 
-Full matrices (auto-generated): [`docs/capabilities.md`](docs/capabilities.md) (builtins) · [`docs/capabilities-syntax.md`](docs/capabilities-syntax.md) (language) · public [gap tables](https://purhur.github.io/php-compiler/missing-implementation.html) · [PHP vs us](https://purhur.github.io/php-compiler/capability-comparison.html).
+Full matrices (auto-generated): [`docs/capabilities.md`](docs/capabilities.md) (builtins) · [`docs/capabilities-syntax.md`](docs/capabilities-syntax.md) (language) · public [gap tables](https://purhur.github.io/php-compiler/docs/pages/missing-implementation.html) · [PHP vs us](https://purhur.github.io/php-compiler/docs/pages/capability-comparison.html).
 
 ### What v1.0 supports well
 

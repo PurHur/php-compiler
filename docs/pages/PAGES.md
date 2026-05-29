@@ -8,8 +8,8 @@ Only **`docs/pages/`** is published. Contributor docs stay in the repo root `doc
 |------|-----|
 | **Overview** | https://purhur.github.io/php-compiler/docs/pages/index.html |
 | **Status** (short) | https://purhur.github.io/php-compiler/development-status.html |
-| **Missing implementation** (gap tables) | https://purhur.github.io/php-compiler/missing-implementation.html |
-| **PHP capability comparison** | https://purhur.github.io/php-compiler/capability-comparison.html |
+| **Missing implementation** (gap tables) | https://purhur.github.io/php-compiler/docs/pages/missing-implementation.html |
+| **PHP capability comparison** | https://purhur.github.io/php-compiler/docs/pages/capability-comparison.html |
 | **Repository** | https://github.com/PurHur/php-compiler |
 
 ## Site map
