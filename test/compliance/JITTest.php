@@ -65,6 +65,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'json_validate')) {
                 continue;
             }
+            // Anonymous class extends abstract parent — VM-only until anonymous class JIT (#1233, #3385).
+            if (str_contains($name, 'abstract_instantiate_anon')) {
+                continue;
+            }
             yield $name => $case;
         }
     }

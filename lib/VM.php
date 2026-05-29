@@ -970,6 +970,7 @@ restart:
                         $classEntry->readonly = (bool) $frame->block->constants[$op->arg3]->toInt();
                     }
                     $classEntry->attributeNames = $op->attributeNames;
+                    $classEntry->isAbstract = $op->classIsAbstract;
                     self::defineClass($classEntry, $op->block1);
                     if (null !== $classEntry->parentLc) {
                         $this->inheritFromParent($classEntry);
@@ -987,6 +988,9 @@ restart:
                         throw new \LogicException("Attempting to instantiate non-existing class $name");
                     }
                     $class = $this->context->classes[$lcname];
+                    if ($class->isAbstract) {
+                        return $this->raise("Cannot instantiate abstract class {$class->name}", $frame);
+                    }
                     $object = new ObjectEntry($class);
                     $result->object($object);
                     $frame->call = $object->constructor;
