@@ -10,7 +10,8 @@
     ],
     "require": {
         "ext-ffi": "*",
-        "php": ">=7.4",
+        "php": ">=8.1",
+        "nikic/php-parser": "^4.19.1 || ^5.1.0",
         "ircmaxell/php-cfg": "^1.0",
         "ircmaxell/php-types": "^1.0",
         "ircmaxell/php-optimizer": "dev-master",
