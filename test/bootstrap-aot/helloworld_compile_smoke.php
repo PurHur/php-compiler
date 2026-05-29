@@ -39,6 +39,7 @@ function helloworld_compile_smoke(string $sourceFile, string $outFile): int
         }
         $vendorPrelink = getenv('PHP_COMPILER_VENDOR_PRELINK');
         if ('1' === $vendorPrelink || 'true' === strtolower((string) $vendorPrelink)) {
+            putenv('PHP_COMPILER_SELFHOST_AOT=0');
             putenv('PHP_COMPILER_KEEP_OBJECT_FILE=1');
             putenv('PHP_COMPILER_M3_EMIT_HELPER_SPINE=1');
         }
