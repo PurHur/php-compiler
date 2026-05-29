@@ -136,4 +136,31 @@ final class RuntimeAotLintTest extends TestCase
 
         $this->assertSame('parse returned null', $runtime->formatParseAndCompileNullDetail(null));
     }
+
+    public function testGetLastParseFailureRecordsThrownCompileError(): void
+    {
+        $runtime = new Runtime(Runtime::MODE_AOT);
+        $code = '<?php $x = fn() => 1;';
+
+        try {
+            $runtime->parseAndCompile($code, 'arrow.php');
+            $this->fail('expected LogicException for arrow function');
+        } catch (\LogicException $e) {
+            $this->assertStringContainsString('Expr_ArrowFunction', $e->getMessage());
+        }
+
+        $this->assertSame(
+            'Unsupported expression: Expr_ArrowFunction',
+            Runtime::getLastParseFailure()
+        );
+    }
+
+    public function testNoteParseCompileNullForScriptRecordsDetail(): void
+    {
+        $runtime = new Runtime(Runtime::MODE_AOT);
+        $runtime->noteParseCompileNullForScript(null);
+
+        $this->assertSame('parse returned null', Runtime::getLastParseFailure());
+        $this->assertSame('parse returned null', $runtime->peekLastParseFailure());
+    }
 }

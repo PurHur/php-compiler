@@ -47,7 +47,11 @@ class Runtime {
 
     public TypeReconstructor $typeReconstructor;
 
+    /** Last parse/compile failure for native M3 emit bridge (#3037). */
+    private static ?string $lastParseFailure = null;
+
     public function __construct(int $mode = self::MODE_NORMAL) {
+        self::clearLastParseFailure();
         $this->mode = $mode;
         $this->initParsePipeline();
         $this->initCompiler();
@@ -200,6 +204,7 @@ class Runtime {
     {
         $detail = $this->compiler->getCompileAbortDetail();
         $primary = null !== $detail && '' !== $detail ? $detail : $e->getMessage();
+        $this->recordLastParseFailure($primary);
         $line = sprintf("parseAndCompile failure: target=%s: %s\n", $sourcePath, $primary);
         $context = null;
         if (null !== $sourceCode && $e instanceof \PhpParser\Error) {
@@ -264,6 +269,7 @@ class Runtime {
         if (!$block instanceof Block) {
             // Self-host AOT can surface unexpected stub returns as null; preserve a stable abort detail.
             $this->compiler->setCompileAbortDetailIfEmpty('Runtime::compile: Compiler::compile returned non-Block');
+            $this->recordLastParseFailure($this->formatParseAndCompileNullDetail($script));
 
             return null;
         }
@@ -276,13 +282,52 @@ class Runtime {
     /** M3 native emit: compile trivial scripts via compileEmitSmoke (#1937). */
     public function compileEmitSmoke(Script $script): ?Block {
         $block = $this->compiler->compileEmitSmoke($script);
+        if (!$block instanceof Block) {
+            $this->compiler->setCompileAbortDetailIfEmpty('Runtime::compileEmitSmoke: Compiler::compileEmitSmoke returned non-Block');
+            $this->recordLastParseFailure($this->formatParseAndCompileNullDetail($script));
+
+            return null;
+        }
         $this->assignOpResolver->optimize($block);
 
         return $block;
     }
 
+    /** Last parse/compile failure text for native vendor invoker (#3037). */
+    public static function getLastParseFailure(): ?string
+    {
+        return self::$lastParseFailure;
+    }
+
+    /** Instance shim so M3 emit TU can read {@see getLastParseFailure()} via runtimeSpine (#3037). */
+    public function peekLastParseFailure(): ?string
+    {
+        return self::getLastParseFailure();
+    }
+
+    public static function clearLastParseFailure(): void
+    {
+        self::$lastParseFailure = null;
+    }
+
+    /**
+     * Record compile-null detail when parse+compile are split (M3 emit TU bridge, #3037).
+     */
+    public function noteParseCompileNullForScript(?Script $script): void
+    {
+        $this->recordLastParseFailure($this->formatParseAndCompileNullDetail($script));
+    }
+
+    private function recordLastParseFailure(?string $detail): void
+    {
+        if (null !== $detail && '' !== $detail) {
+            self::$lastParseFailure = $detail;
+        }
+    }
+
     public function parseAndCompileEmitSmoke(string $code, string $filename): ?Block
     {
+        self::clearLastParseFailure();
         $this->compiler->resetCompileAbortDetail();
         try {
             $script = $this->parse($code, $filename);
@@ -367,6 +412,7 @@ class Runtime {
     }
 
     public function parseAndCompile(string $code, string $filename): ?Block {
+        self::clearLastParseFailure();
         $this->compiler->resetCompileAbortDetail();
         $this->compiler->setDebugLastPhaseInputFile($filename);
         \PHPCompiler\JIT\Progress::notePhase('runtime_parseandcompile_begin');
@@ -388,6 +434,7 @@ class Runtime {
     }
 
     public function parseAndCompileFile(string $filename): ?Block {
+        self::clearLastParseFailure();
         $this->compiler->resetCompileAbortDetail();
         try {
             $normalized = VM\ScriptStack::normalize($filename);
@@ -464,6 +511,7 @@ class Runtime {
         }
 
         $detail = $this->formatParseAndCompileNullDetail($script);
+        $this->recordLastParseFailure($detail);
         if (null !== $detail && '' !== $detail) {
             echo "parseAndCompile: {$detail}\n";
         }
