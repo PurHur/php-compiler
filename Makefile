@@ -341,7 +341,6 @@ bootstrap-selfhost-helloworld:
 	BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1 \
 	BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING=1 \
 	BOOTSTRAP_M3_RUNTIME_COMPILE=1 \
-	BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER=1 \
 	BOOTSTRAP_M3_HELLOWORLD_STRICT=1 \
 	./script/bootstrap-selfhost-helloworld-probe.sh
 bootstrap-selfhost-helloworld-compile-bin:

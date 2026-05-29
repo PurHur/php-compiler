@@ -10,7 +10,8 @@ EMIT_ENTRY="test/bootstrap-aot/compile_smoke_m3_emit_native_entry.php"
 EMIT_ENTRY_ABS="${ROOT}/test/bootstrap-aot/compile_smoke_m3_emit_native_entry.php"
 # bootstrap_loop_smoke/compile_driver.php delegates here; link helloworld bundle directly (#2893).
 INVENTORY_EMIT_DRIVER="${ROOT}/test/selfhost/compiler_helloworld_smoke/compile_driver.php"
-USE_INVENTORY_EMIT_DRIVER="${BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER:-1}"
+# Inventory compile_driver emit-helper runtime segfaults at {main} (#2540); thin emit TU works.
+USE_INVENTORY_EMIT_DRIVER="${BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER:-0}"
 if [[ "${BOOTSTRAP_M3_EMIT_HELPER_TU:-0}" == "1" ]]; then
   USE_INVENTORY_EMIT_DRIVER=0
 fi
@@ -113,7 +114,7 @@ if [[ "${BOOTSTRAP_M4_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
     m4_link_env=(env PHP_COMPILER_SELFHOST_AOT=1)
     m4_link_mode="selfhost stubs (no PHP_COMPILER_M3_COMPILE_DRIVER)"
   fi
-  echo "==> link gen-1 emit helper (inventory compile_driver by default; BOOTSTRAP_M3_EMIT_HELPER_TU=1 for emit TU bisect)"
+  echo "==> link gen-1 emit helper (emit TU by default; BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER=1 for inventory bisect)"
   rm -f "${EMIT_HELPER}" "build/.last-jit-func-bootstrap-loop-gen1-emit"
   export PHP_COMPILER_JIT_PROGRESS_FILE="build/.last-jit-func-bootstrap-loop-gen1-emit"
   set +e
