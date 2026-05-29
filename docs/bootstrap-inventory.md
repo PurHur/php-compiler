@@ -529,7 +529,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Func/JIT.php` | 0 | 2 |
 | `lib/Func/PHP.php` | 0 | 1 |
 | `lib/Handler.php` | 0 | 1 |
-| `lib/JIT.php` | 0 | 57 |
+| `lib/JIT.php` | 0 | 56 |
 | `lib/JIT/Analyzer.php` | 0 | 1 |
 | `lib/JIT/ArrayBuiltinHelper.php` | 0 | 47 |
 | `lib/JIT/ArrayMapCallbackPolicy.php` | 0 | 1 |
@@ -665,6 +665,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/StringOffsetHelper.php` | 0 | 1 |
 | `lib/JIT/SuperglobalInit.php` | 0 | 3 |
 | `lib/JIT/TryCatchHelper.php` | 0 | 4 |
+| `lib/JIT/TryCatchState.php` | 0 | 1 |
 | `lib/JIT/TypeCheck.php` | 0 | 1 |
 | `lib/JIT/UnsetHelper.php` | 0 | 2 |
 | `lib/JIT/UsortCallbackPolicy.php` | 0 | 1 |
@@ -3966,7 +3967,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new JIT\Call\ExternalMethod (line 152)
 - new JIT\Scope (line 178)
-- new JIT\TryCatchState (line 186)
 - new Operand\Literal (line 231)
 - new Operand\Literal (line 247)
 - new Variable (line 960)
@@ -3975,8 +3975,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JIT\Call\Native (line 1124)
 - new JIT\Variable (line 1313)
 - new JIT\Call\Native (line 1330)
-- new JIT\Call\Native (line 1389)
-- new JIT\Call\Native (line 1431)
+- new JIT\Call\Native (line 1390)
+- new JIT\Call\Native (line 1432)
 - new JIT\Call\Native (line 1477)
 - new JIT\Call\Native (line 2495)
 - new JIT\Call\Native (line 2526)
@@ -4891,6 +4891,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 237)
 - new Variable (line 257)
 - 9 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
+
+### `lib/JIT/TryCatchState.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s) — PHPCfg Op\Stmt\ClassMethod not lowered in Compiler
 
 ### `lib/JIT/TypeCheck.php`
 

@@ -11,4 +11,11 @@ final class TryCatchState
 
     /** @var array<int, TryCatchHandler> */
     public array $mergeHandlers = [];
+
+    /** Fresh stack per queued LLVM function without `new` in lib/JIT.php (#3012, #3027). */
+    public function reset(): void
+    {
+        $this->handlerStack = [];
+        $this->mergeHandlers = [];
+    }
 }
