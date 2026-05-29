@@ -364,6 +364,36 @@ PY
   echo "Applied php-cfg-yield-from.patch (overlay)"
 }
 
+apply_php_cfg_yield_keyed_overlay() {
+  local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
+  local overlay="$PATCH_DIR/overlays/php-cfg"
+  if grep -A2 'if ($expr->value)' "$parser" 2>/dev/null | grep -q '\$value = \$this->readVariable'; then
+    echo "Skip php-cfg-yield-keyed.patch (already applied)"
+    return 0
+  fi
+  if [[ ! -f "$overlay/yield-parser-method.php" ]]; then
+    echo "Skip php-cfg-yield-keyed.patch (overlay files missing)" >&2
+    return 1
+  fi
+  python3 - "$parser" "$overlay/yield-parser-method.php" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+parser_path = Path(sys.argv[1])
+method_path = Path(sys.argv[2])
+text = parser_path.read_text()
+replacement = method_path.read_text().rstrip("\n") + "\n"
+pattern = r"    protected function parseExpr_Yield\(Expr\\Yield_ \$expr\)\s*\{.*?\n    \}\n\n"
+match = re.search(pattern, text, re.S)
+if not match:
+    sys.stderr.write("php-cfg-yield-keyed: parseExpr_Yield method not found in Parser.php\n")
+    raise SystemExit(1)
+parser_path.write_text(text[: match.start()] + replacement + text[match.end() :])
+PY
+  echo "Applied php-cfg-yield-keyed.patch (overlay)"
+}
+
 apply_php_cfg_enum_overlay() {
   local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
   local op="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Enum_.php"
@@ -1304,6 +1334,10 @@ apply_patch() {
     apply_php_cfg_yield_from_overlay
     return $?
   fi
+  if [[ "$(basename "$patch")" == "php-cfg-yield-keyed.patch" ]]; then
+    apply_php_cfg_yield_keyed_overlay
+    return $?
+  fi
   if [[ "$(basename "$patch")" == "php-cfg-magic-constants.patch" ]]; then
     apply_php_cfg_magic_constants_overlay
     return $?
@@ -1458,6 +1492,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-property-type.patch"
   apply_patch "$PATCH_DIR/php-cfg-assertion-expr-property.patch"
   apply_patch "$PATCH_DIR/php-cfg-yield-from.patch"
+  apply_patch "$PATCH_DIR/php-cfg-yield-keyed.patch"
   apply_patch "$PATCH_DIR/php-cfg-match.patch"
   apply_patch "$PATCH_DIR/php-cfg-assignop-coalesce.patch"
   apply_patch "$PATCH_DIR/php-cfg-first-class-callable.patch"

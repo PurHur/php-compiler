@@ -1978,19 +1978,17 @@ class Compiler {
                 return $ops;
             case Op\Expr\Yield_::class:
                 $this->markFunctionGenerator($block);
-                // php-cfg bug: parseExpr_Yield assigns `$expr->value` into `$key` (upstream).
-                // For `yield $v`, treat `key` as the value when value is null.
-                $yieldValue = $expr->value ?? (null !== $expr->key ? $expr->key : null);
-                $yieldKey = null !== $expr->value ? $expr->key : null;
 
                 return [new OpCode(
                     OpCode::TYPE_YIELD,
                     null,
-                    null !== $yieldValue
-                        ? $this->compileOperand($yieldValue, $block, true)
-                        : null,
-                    null !== $yieldKey
-                        ? $this->compileOperand($yieldKey, $block, true)
+                    null !== $expr->value
+                        ? $this->compileOperand($expr->value, $block, true)
+                        : (null !== $expr->key
+                            ? $this->compileOperand($expr->key, $block, true)
+                            : null),
+                    null !== $expr->value && null !== $expr->key
+                        ? $this->compileOperand($expr->key, $block, true)
                         : null,
                 )];
             case Op\Expr\YieldFrom::class:
