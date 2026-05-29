@@ -421,6 +421,10 @@ final class Variable {
                 if (EnumCaseSupport::isEnumCase($var->object)) {
                     return EnumCaseSupport::toString($var->object);
                 }
+                $typeString = ReflectionTypeSupport::tryObjectTypeString($var->object);
+                if (null !== $typeString) {
+                    return $typeString;
+                }
 
                 return 'Object';
             case self::TYPE_ENUM_CASE:

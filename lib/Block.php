@@ -70,6 +70,12 @@ class Block {
     /** @var array<int, list<string>> */
     public array $paramIntersectionConstraints = [];
 
+    /** @var array<int, Op\Type> declared parameter types for reflection (#3355). */
+    public array $paramDeclaredTypes = [];
+
+    /** Declared return type AST for reflection (#3355), or null when untyped. */
+    public ?Op\Type $returnDeclaredType = null;
+
     /** Declared scalar return type for this function (issue #205), or null when untyped. */
     public ?int $returnTypeConstraint = null;
 
@@ -297,6 +303,11 @@ class Block {
             $this->returnTypeVoid = $parent->returnTypeVoid;
             $this->returnTypeNever = $parent->returnTypeNever;
             $this->returnTypeStatic = $parent->returnTypeStatic;
+            $this->returnDeclaredType = $parent->returnDeclaredType;
+            $this->paramDeclaredTypes = $parent->paramDeclaredTypes;
+            $this->paramTypeConstraints = $parent->paramTypeConstraints;
+            $this->paramIntersectionConstraints = $parent->paramIntersectionConstraints;
+            $this->paramNames = $parent->paramNames;
         }
     }
 

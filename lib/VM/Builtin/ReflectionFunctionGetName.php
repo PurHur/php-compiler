@@ -7,7 +7,7 @@ namespace PHPCompiler\VM\Builtin;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ReflectionSupport;
 
-/** ReflectionFunction::getName() — VM (#3354). */
+/** ReflectionFunction::getName() — VM (#3354, #3355). */
 final class ReflectionFunctionGetName extends VmClassMethod
 {
     public function __construct()

@@ -8,7 +8,7 @@ use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ReflectionSupport;
 
-/** ReflectionFunction::__construct($function) — VM (#3354). */
+/** ReflectionFunction::__construct($function) — VM (#3354, #3355). */
 final class ReflectionFunctionConstruct extends VmClassMethod
 {
     public function __construct()
@@ -23,9 +23,9 @@ final class ReflectionFunctionConstruct extends VmClassMethod
         }
         $ctx = VmReflection::requireContext($frame);
         $name = VmReflection::stringArg($frame->calledArgs[1], 'ReflectionFunction::__construct() name');
-        VmReflection::requireFunction($ctx, $name);
+        ReflectionSupport::resolveUserFunction($ctx, $name);
         $receiver = ReflectionSupport::requireReflectionFunction($frame, $frame->calledArgs[0]);
-        $receiver->getProperty(ReflectionSupport::PROP_FUNCTION_NAME)->string($name);
+        $receiver->getProperty(ReflectionSupport::PROP_FUNC_NAME)->string($name);
         $receiver->constructed = true;
         if (null !== $frame->returnVar) {
             $frame->returnVar->null();
