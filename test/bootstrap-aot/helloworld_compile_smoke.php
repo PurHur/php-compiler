@@ -97,11 +97,21 @@ function helloworld_compile_smoke(string $sourceFile, string $outFile): int
         return 1;
     }
 
-    $vendorPrelinkEmit = \function_exists('getenv')
-        && ('1' === getenv('PHP_COMPILER_VENDOR_PRELINK') || 'true' === strtolower((string) getenv('PHP_COMPILER_VENDOR_PRELINK')))
-        && ('1' === getenv('PHP_COMPILER_KEEP_OBJECT_FILE') || 'true' === strtolower((string) getenv('PHP_COMPILER_KEEP_OBJECT_FILE')));
+    $envTruthy = static function (string $name): bool {
+        if (!\function_exists('getenv')) {
+            return false;
+        }
+        $v = getenv($name);
+
+        return false !== $v && ('1' === $v || 'true' === strtolower((string) $v));
+    };
+    $vendorPrelink = $envTruthy('PHP_COMPILER_VENDOR_PRELINK');
+    $keepObject = $envTruthy('PHP_COMPILER_KEEP_OBJECT_FILE');
+    $selfhostAot = $envTruthy('PHP_COMPILER_SELFHOST_AOT');
+    // Vendor .o rebuild (#3036) or spine link with prelinked vendor objects (#3052).
+    $vendorPrelinkEmit = $vendorPrelink && ($keepObject || $selfhostAot);
     if ($vendorPrelinkEmit) {
-        // Inventory driver stubs Runtime::standalone (sidecar copy). Emit object file directly (#3036).
+        // Inventory driver stubs Runtime::standalone (sidecar copy). Emit via compileToFile (#3036, #3052).
         $jit = $runtime->loadJit();
         $context = $runtime->loadJitContext();
         $context->setMain($jit->compile($block));

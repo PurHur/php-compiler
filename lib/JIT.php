@@ -290,7 +290,8 @@ class JIT {
         }
 
         return $this->shouldUseM4BinCompileArgvMainNative()
-            || ($this->shouldUseM3CompileDriverMainNative() && $this->shouldUseEmitHelperLinkStubs());
+            || ($this->shouldUseM3CompileDriverMainNative() && $this->shouldUseEmitHelperLinkStubs())
+            || $this->shouldUseVendorPrelinkExecutableEmit();
     }
 
     /** M5 vendor argv compile: emit-helper spine real-lowers parse/compile/standalone (#3036). */
@@ -302,6 +303,20 @@ class JIT {
         $keep = getenv('PHP_COMPILER_KEEP_OBJECT_FILE');
 
         return '1' === $keep || 'true' === strtolower((string) $keep);
+    }
+
+    /** M5 spine link: prelinked vendor .o + native executable (not object-only — #3052). */
+    private function shouldUseVendorPrelinkExecutableEmit(): bool
+    {
+        if (!$this->shouldUseVendorPrelinkJitStubs()) {
+            return false;
+        }
+        if ($this->shouldUseVendorPrelinkObjectEmit()) {
+            return true;
+        }
+        $selfhost = getenv('PHP_COMPILER_SELFHOST_AOT');
+
+        return '1' === $selfhost || 'true' === strtolower((string) $selfhost);
     }
 
     private function shouldSkipExternalClassBodyLowering(int $classId): bool
@@ -1280,7 +1295,7 @@ class JIT {
         if (!$this->shouldUseM3CompileDriverRealLowering()) {
             if ($this->shouldUseM3EmitTuEmitHelperSpineRealLowering()) {
                 $emitHelperSpineReal = ['parse', 'compileemitsmoke'];
-                if ($this->shouldUseVendorPrelinkObjectEmit()) {
+                if ($this->shouldUseVendorPrelinkExecutableEmit()) {
                     $emitHelperSpineReal = ['parse', 'compile', 'standalone'];
                 }
 

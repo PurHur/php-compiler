@@ -34,6 +34,7 @@ M5 ladder presenter (#1416, #1492):
   2. php script/bootstrap-spine-count.php + check-selfhost-spine-coverage-sync.php (live N/N)
   3. php script/bootstrap-vendor-objects.php --check
   4. make bootstrap-selfhost-probe + bootstrap-selfhost-lib-spine-smoke (LLVM)
+  4c. spine link+run with vendor/ absent when prelinked .o present (#3052)
   5. php script/bootstrap-vendor-objects.php --compile (partial OK unless --strict)
   6. Optional: ./script/north-star4-verify.sh --dry-run-only (--with-ns4)
 
@@ -83,6 +84,17 @@ ns5_spine_ratio_label() {
   json="$("${PHP_BIN}" "${PHP_OPTS[@]}" "${_CI_REPO_ROOT}/script/bootstrap-spine-count.php" --json 2>/dev/null)" || json='{"spine":725,"inventory":725}'
   spine="$(php -r '$j=json_decode($argv[1],true); echo (int)($j["spine"]??725);' "${json}")"
   echo "${spine}/${spine}"
+}
+
+ns5_prelinked_vendor_ready() {
+  local manifest="${_CI_REPO_ROOT}/prelinked/bootstrap-vendor/manifest.json"
+  local slug o ok=0
+  [[ -f "${manifest}" ]] || return 1
+  for slug in ircmaxell-php-cfg ircmaxell-php-types ircmaxell-php-llvm; do
+    o="${_CI_REPO_ROOT}/prelinked/bootstrap-vendor/${slug}.o"
+    [[ -f "${o}" ]] && ok=$((ok + 1))
+  done
+  [[ "${ok}" -eq 3 ]]
 }
 
 ns5_print_summary() {
@@ -154,6 +166,43 @@ if [[ "${STRICT_M5}" -eq 1 ]]; then
   ns5_run 4b "lib spine smoke link" env BOOTSTRAP_NO_ZEND_FALLBACK=1 make -C "${_CI_REPO_ROOT}" bootstrap-selfhost-lib-spine-smoke
 else
   ns5_run 4b "lib spine smoke link" make -C "${_CI_REPO_ROOT}" bootstrap-selfhost-lib-spine-smoke
+fi
+
+echo
+echo "=== north-star5-verify step 4c: lib spine smoke run (vendor/ absent, prelinked .o — #3052) ==="
+SPINE_BIN="${_CI_REPO_ROOT}/build/selfhost-lib-spine-smoke"
+if [[ ! -x "${SPINE_BIN}" ]]; then
+  echo "north-star5-verify: step 4c FAILED (missing ${SPINE_BIN}; run step 4b)" >&2
+  ns5_hint 4 >&2
+  exit 1
+fi
+if ! ns5_prelinked_vendor_ready; then
+  echo "north-star5-verify: step 4c skipped (prelinked/bootstrap-vendor/*.o missing)" >&2
+else
+  ns5_run 4c0 "native compile driver for vendor-absent spine" make -C "${_CI_REPO_ROOT}" bootstrap-selfhost-link
+  vendor_spine_bak=""
+  if [[ -d "${_CI_REPO_ROOT}/vendor" ]]; then
+    vendor_spine_bak="${_CI_REPO_ROOT}/.north-star5-vendor-spine.bak"
+    rm -rf "${vendor_spine_bak}"
+    mv "${_CI_REPO_ROOT}/vendor" "${vendor_spine_bak}"
+  fi
+  set +e
+  env VENDOR_TREE_ABSENT=1 BOOTSTRAP_NO_ZEND_FALLBACK=1 make -C "${_CI_REPO_ROOT}" bootstrap-selfhost-lib-spine-smoke >/dev/null
+  spine_relink=$?
+  set -e
+  if [[ -n "${vendor_spine_bak}" ]]; then
+    mv "${vendor_spine_bak}" "${_CI_REPO_ROOT}/vendor"
+  fi
+  if [[ "${spine_relink}" -ne 0 || ! -x "${SPINE_BIN}" ]]; then
+    echo "north-star5-verify: step 4c FAILED (spine link with vendor/ absent — #3052)" >&2
+    ns5_hint 4 >&2
+    exit 1
+  fi
+  if ! "${SPINE_BIN}" | grep -q 'compiler_lib_spine_smoke bundle OK'; then
+    echo "north-star5-verify: step 4c FAILED (spine binary run without vendor/)" >&2
+    exit 1
+  fi
+  echo "north-star5-verify: step 4c ok (725-file spine, prelinked vendor .o only)"
 fi
 
 echo
