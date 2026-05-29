@@ -166,6 +166,7 @@ class Module extends ModuleAbstract
             new array_intersect(),
             new iterator_to_array(),
             new array_replace(),
+            new array_replace_recursive(),
             new array_fill(),
             new array_fill_keys(),
             new array_pad(),

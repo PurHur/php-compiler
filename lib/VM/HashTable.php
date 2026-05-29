@@ -437,6 +437,74 @@ final class HashTable {
     }
 
     /**
+     * array_replace_recursive(): copy this array, then overlay keys from each replacement array.
+     * When both the destination and replacement values for a key are arrays, merge recursively.
+     *
+     * @param HashTable ...$others
+     */
+    public function replaceRecursiveCopy(HashTable ...$others): HashTable
+    {
+        $out = new self();
+        foreach ($this->iterateKeyed(true) as [$key, $value]) {
+            $copy = new Variable();
+            $copy->copyFrom($value);
+            if (Variable::TYPE_INTEGER === $key->type) {
+                $out->addIndex($key->toInt(), $copy);
+            } else {
+                $out->add($key->toString(), $copy);
+            }
+        }
+        foreach ($others as $other) {
+            self::replaceRecursiveOverlay($out, $other);
+        }
+
+        return $out;
+    }
+
+    private static function replaceRecursiveOverlay(HashTable $out, HashTable $other): void
+    {
+        foreach ($other->iterateKeyed(true) as [$key, $value]) {
+            $copy = new Variable();
+            $copy->copyFrom($value);
+            if (Variable::TYPE_INTEGER === $key->type) {
+                $idx = $key->toInt();
+                $existing = $out->findIndex($idx);
+                if (null !== $existing) {
+                    $existing = $existing->resolveIndirect();
+                    $overlay = $copy->resolveIndirect();
+                    if (Variable::TYPE_ARRAY === $existing->type && Variable::TYPE_ARRAY === $overlay->type) {
+                        $existing->array($existing->toArray()->replaceRecursiveCopy($overlay->toArray()));
+                    } else {
+                        $slot = $out->findIndex($idx);
+                        if (null !== $slot) {
+                            $slot->copyFrom($copy);
+                        }
+                    }
+                } else {
+                    $out->addIndex($idx, $copy);
+                }
+            } else {
+                $k = $key->toString();
+                $existing = $out->find($k);
+                if (null !== $existing) {
+                    $existing = $existing->resolveIndirect();
+                    $overlay = $copy->resolveIndirect();
+                    if (Variable::TYPE_ARRAY === $existing->type && Variable::TYPE_ARRAY === $overlay->type) {
+                        $existing->array($existing->toArray()->replaceRecursiveCopy($overlay->toArray()));
+                    } else {
+                        $slot = $out->find($k);
+                        if (null !== $slot) {
+                            $slot->copyFrom($copy);
+                        }
+                    }
+                } else {
+                    $out->add($k, $copy);
+                }
+            }
+        }
+    }
+
+    /**
      * Copy string-keyed entries from another array into this one.
      */
     public function mergeStringKeysFrom(HashTable $other, bool $overwrite = false): void

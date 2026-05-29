@@ -33,6 +33,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'array_chunk_preserve_keys')) {
                 continue;
             }
+            // VM-only until ArrayBuiltinHelper gains recursive replace (#3127).
+            if (str_contains(strtolower($case[0]), 'array_replace_recursive')) {
+                continue;
+            }
             // class_uses() is VM-only until JIT lowering (#3119).
             if (str_contains($name, 'class_uses_runtime')) {
                 continue;
