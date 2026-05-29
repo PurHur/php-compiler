@@ -611,6 +611,16 @@ restart:
                     if (!isset($classEntry->constants[$constName])) {
                         return $this->raise("Undefined class constant {$className}::{$constName}", $frame);
                     }
+                    if ($classEntry->isEnum) {
+                        $canonical = $classEntry->enumCaseCanonicalNames[$constName]
+                            ?? $frame->scope[$op->arg3]->toString();
+                        $backing = new Variable();
+                        $backing->copyFrom($classEntry->constants[$constName]);
+                        $frame->scope[$op->arg1]->enumCase(
+                            new VM\EnumCaseEntry($classEntry, $canonical, $backing)
+                        );
+                        break;
+                    }
                     $frame->scope[$op->arg1]->copyFrom($classEntry->constants[$constName]);
                     break;
                 case OpCode::TYPE_INSTANCEOF:
@@ -1000,6 +1010,15 @@ restart:
                     $result = $frame->scope[$op->arg1];
                     $var = $frame->scope[$op->arg2]->resolveIndirect();
                     $name = $frame->scope[$op->arg3]->toString();
+                    if (Variable::TYPE_ENUM_CASE === $var->type) {
+                        try {
+                            $prop = $var->toEnumCase()->fetchProperty($name);
+                        } catch (\LogicException $e) {
+                            return $this->raise($e->getMessage(), $frame);
+                        }
+                        $result->copyFrom($prop);
+                        break;
+                    }
                     if ($var->type !== Variable::TYPE_OBJECT) {
                         throw new \LogicException("Unsupported property fetch on non-object");
                     }
@@ -2249,11 +2268,15 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_DECLARE_CLASS_CONST:
-                    $name = strtolower($frame->scope[$op->arg1]->toString());
+                    $canonical = $frame->scope[$op->arg1]->toString();
+                    $name = strtolower($canonical);
                     if (!isset($block->constants[$op->arg2])) {
                         throw new \LogicException('Class constant value must be a compile-time constant');
                     }
                     $entry->constants[$name] = $block->constants[$op->arg2];
+                    if ($entry->isEnum) {
+                        $entry->enumCaseCanonicalNames[$name] = $canonical;
+                    }
                     break;
                 case OpCode::TYPE_USE_TRAIT:
                     $this->applyTraitUse($entry, $frame->scope[$op->arg1]->toString());
