@@ -5609,11 +5609,19 @@ class JIT {
                     }
                     break;
                 case OpCode::TYPE_DECLARE_INTERFACE:
-                    if ($this->shouldUseSelfHostJitStubs()) {
-                        break;
-                    }
                     $nameOp = $block->getOperand($op->arg1);
                     assert($nameOp instanceof Operand\Literal);
+                    if ($this->shouldUseSelfHostJitStubs()) {
+                        $this->context->type->object->declareClass($nameOp);
+                        $this->context->type->object->markInterfaceClass($nameOp->value);
+                        if ([] !== $op->classImplements) {
+                            $this->context->type->object->setInterfaceExtends(
+                                $nameOp->value,
+                                $op->classImplements
+                            );
+                        }
+                        break;
+                    }
                     $this->context->type->object->declareClass($nameOp);
                     $this->context->type->object->markInterfaceClass($nameOp->value);
                     if ([] !== $op->classImplements) {
