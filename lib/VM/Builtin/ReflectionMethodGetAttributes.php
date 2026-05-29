@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM\Builtin;
 
+use PHPCompiler\Compiler\AttributeEntry;
 use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ReflectionSupport;
@@ -27,14 +28,19 @@ final class ReflectionMethodGetAttributes extends VmClassMethod
             throw new \LogicException('ReflectionMethod refers to unknown class in this compiler build');
         }
         $methodLc = strtolower($method);
-        $all = $entry->methodAttributeNames[$methodLc] ?? [];
+        $entries = $entry->methodAttributeEntries[$methodLc] ?? [];
+        if ([] === $entries && isset($entry->methodAttributeNames[$methodLc])) {
+            foreach ($entry->methodAttributeNames[$methodLc] as $name) {
+                $entries[] = new AttributeEntry($name);
+            }
+        }
         $filter = null;
         if (isset($frame->calledArgs[1])) {
             $filter = VmReflection::stringArg($frame->calledArgs[1], 'ReflectionMethod::getAttributes() name');
         }
-        $names = ReflectionSupport::filterByName($all, $filter);
+        $filtered = ReflectionSupport::filterEntriesByName($entries, $filter);
         if (null !== $frame->returnVar) {
-            $frame->returnVar->copyFrom(ReflectionSupport::attributesArray($frame, $names));
+            $frame->returnVar->copyFrom(ReflectionSupport::attributesArrayFromEntries($frame, $filtered));
         }
     }
 }

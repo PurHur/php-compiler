@@ -11,6 +11,7 @@ use PHPCompiler\VM\Builtin\DateTimeGetTimestamp;
 use PHPCompiler\VM\Builtin\DateTimeSetTimezone;
 use PHPCompiler\VM\Builtin\DateTimeZoneConstruct;
 use PHPCompiler\VM\Builtin\ReflectionAttributeGetName;
+use PHPCompiler\VM\Builtin\ReflectionAttributeNewInstance;
 use PHPCompiler\VM\Builtin\ReflectionClassConstruct;
 use PHPCompiler\VM\Builtin\ReflectionClassGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionClassGetMethod;
@@ -101,10 +102,14 @@ final class BuiltinClasses
         $strProto = new Variable(Variable::TYPE_STRING);
         $pub = CfgFunc::FLAG_PUBLIC;
 
+        $arrayProto = new Variable(Variable::TYPE_ARRAY);
         $attr = new ClassEntry('ReflectionAttribute');
         $attr->properties[] = new ClassProperty(ReflectionSupport::PROP_ATTR_NAME, null, $strProto);
+        $attr->properties[] = new ClassProperty(ReflectionSupport::PROP_ATTR_ARGS, null, $arrayProto);
         $attr->methods['getname'] = new ReflectionAttributeGetName();
         $attr->methodVisibility['getname'] = $pub;
+        $attr->methods['newinstance'] = new ReflectionAttributeNewInstance();
+        $attr->methodVisibility['newinstance'] = $pub;
         $ctx->classes[ReflectionSupport::REFLECTION_ATTRIBUTE] = $attr;
 
         $rm = new ClassEntry('ReflectionMethod');

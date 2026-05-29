@@ -50,8 +50,12 @@ class ClassEntry {
     public bool $allowsDynamicProperties = false;
     /** @var list<string> PHP 8 attribute names on this class (#1936). */
     public array $attributeNames = [];
+    /** @var list<\PHPCompiler\Compiler\AttributeEntry> class attributes with ctor args (#3206). */
+    public array $attributeEntries = [];
     /** @var array<string, list<string>> method (lowercase) => attribute names (#1936). */
     public array $methodAttributeNames = [];
+    /** @var array<string, list<\PHPCompiler\Compiler\AttributeEntry>> method attributes (#3206). */
+    public array $methodAttributeEntries = [];
 
     public function __construct(string $name) {
         $this->name = $name;

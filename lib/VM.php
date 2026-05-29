@@ -842,6 +842,7 @@ restart:
                     $traitEntry = new ClassEntry($name);
                     $traitEntry->isTrait = true;
                     $traitEntry->attributeNames = $op->attributeNames;
+                    $traitEntry->attributeEntries = $op->attributeEntries;
                     self::defineClass($traitEntry, $op->block1);
                     $this->context->classes[$lcname] = $traitEntry;
                     break;
@@ -893,6 +894,7 @@ restart:
                         $classEntry->readonly = (bool) $frame->block->constants[$op->arg3]->toInt();
                     }
                     $classEntry->attributeNames = $op->attributeNames;
+                    $classEntry->attributeEntries = $op->attributeEntries;
                     self::defineClass($classEntry, $op->block1);
                     if (null !== $classEntry->parentLc) {
                         $this->inheritFromParent($classEntry);
@@ -2162,6 +2164,7 @@ restart:
                     $entry->methodVisibility[$name] = $vis;
                     if ([] !== $op->attributeNames) {
                         $entry->methodAttributeNames[$name] = $op->attributeNames;
+                        $entry->methodAttributeEntries[$name] = $op->attributeEntries;
                     }
                     if (null !== $op->block1) {
                         $method = new Func\PHP($entry->name.'::'.$name, $op->block1);

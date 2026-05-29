@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM\Builtin;
 
+use PHPCompiler\Compiler\AttributeEntry;
 use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ReflectionSupport;
-use PHPCompiler\VM\Variable;
 
 /** ReflectionClass::getAttributes() — VM read path (#1936). */
 final class ReflectionClassGetAttributes extends VmClassMethod
@@ -30,9 +30,15 @@ final class ReflectionClassGetAttributes extends VmClassMethod
         if (isset($frame->calledArgs[1])) {
             $filter = VmReflection::stringArg($frame->calledArgs[1], 'ReflectionClass::getAttributes() name');
         }
-        $names = ReflectionSupport::filterByName($entry->attributeNames, $filter);
+        $entries = $entry->attributeEntries;
+        if ([] === $entries && [] !== $entry->attributeNames) {
+            foreach ($entry->attributeNames as $name) {
+                $entries[] = new AttributeEntry($name);
+            }
+        }
+        $filtered = ReflectionSupport::filterEntriesByName($entries, $filter);
         if (null !== $frame->returnVar) {
-            $frame->returnVar->copyFrom(ReflectionSupport::attributesArray($frame, $names));
+            $frame->returnVar->copyFrom(ReflectionSupport::attributesArrayFromEntries($frame, $filtered));
         }
     }
 }

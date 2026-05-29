@@ -23,6 +23,7 @@ use PHPTypes\Type;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\JIT\OperandName;
+use PHPCompiler\Compiler\AttributeMetadata;
 use PHPCompiler\Compiler\AttributeNames;
 use PHPCompiler\Web\ConstStringFolder;
 use PHPCompiler\Web\IncludePathResolver;
@@ -1028,7 +1029,7 @@ class Compiler {
             OpCode::TYPE_DECLARE_TRAIT,
             $this->compileOperand($trait->name, $block, true)
         );
-        $return->attributeNames = AttributeNames::fromOp($trait);
+        $this->assignAttributeMetadata($return, $trait);
         $return->block1 = $this->compileClassBody($trait->stmts, OpCode::TYPE_DECLARE_TRAIT);
 
         return $return;
@@ -1105,7 +1106,7 @@ class Compiler {
             $methodBlock = $this->compileCfgBlock($child->func->cfg, $child->func->params, $child->func);
             $declare->block1 = $methodBlock;
         }
-        $declare->attributeNames = AttributeNames::fromOp($child);
+        $this->assignAttributeMetadata($declare, $child);
         $result->addOpCode($declare);
     }
 
@@ -1134,9 +1135,15 @@ class Compiler {
             $readonlySlot
         );
         $return->classImplements = $this->interfaceNamesFromOperands($class->implements);
-        $return->attributeNames = AttributeNames::fromOp($class);
+        $this->assignAttributeMetadata($return, $class);
         $return->block1 = $this->compileClassBody($class->stmts, $type);
         return $return;
+    }
+
+    protected function assignAttributeMetadata(OpCode $op, Op $cfgOp): void
+    {
+        $op->attributeEntries = AttributeMetadata::fromOp($cfgOp);
+        $op->attributeNames = AttributeNames::fromOp($cfgOp);
     }
 
     /**

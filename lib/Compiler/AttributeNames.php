@@ -16,31 +16,6 @@ final class AttributeNames
      */
     public static function fromOp(Op $op): array
     {
-        if (!$op->hasAttribute('attrGroups')) {
-            return [];
-        }
-        $groups = $op->getAttribute('attrGroups');
-        if (!\is_array($groups)) {
-            return [];
-        }
-
-        return self::fromAttrGroups($groups);
-    }
-
-    /**
-     * @param list<\PhpParser\Node\AttributeGroup> $groups
-     *
-     * @return list<string>
-     */
-    public static function fromAttrGroups(array $groups): array
-    {
-        $names = [];
-        foreach ($groups as $group) {
-            foreach ($group->attrs as $attr) {
-                $names[] = $attr->name->toString();
-            }
-        }
-
-        return $names;
+        return AttributeEntry::namesFromList(AttributeMetadata::fromOp($op));
     }
 }

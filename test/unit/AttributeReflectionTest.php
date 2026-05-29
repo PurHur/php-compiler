@@ -50,6 +50,31 @@ PHP;
         $this->assertSame("1\nDeprecated", ob_get_clean());
     }
 
+    public function testReflectionAttributeNewInstance(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+#[Attribute]
+class Route {
+    public function __construct(public string $path) {}
+}
+#[Route('/api')]
+class Page {}
+$a = (new ReflectionClass(Page::class))->getAttributes()[0];
+$o1 = $a->newInstance();
+$o2 = $a->newInstance();
+echo $o1->path;
+echo "\n";
+echo $o2->path;
+echo "\n";
+echo ($o1 === $o2) ? 'same' : 'diff';
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'attr_new_instance.php'));
+        $this->assertSame("/api\n/api\ndiff", ob_get_clean());
+    }
+
     public function testAttributeNamesExtractedAtCompileTime(): void
     {
         $runtime = new Runtime();
