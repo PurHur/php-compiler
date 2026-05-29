@@ -120,7 +120,10 @@ function compiler_helloworld_compile_driver_run(string $filename, string $code, 
     $block = $runtime->parseAndCompile($code, $filename);
     if (null === $block) {
         if (!isset($options['-l'])) {
-            $diag = $runtime->compiler->getCompileAbortDetail();
+            $diag = \PHPCompiler\Runtime::getLastParseFailure();
+            if (null === $diag || '' === $diag) {
+                $diag = $runtime->formatParseAndCompileNullDetail(null);
+            }
             $suffix = null !== $diag && '' !== $diag ? ' — '.$diag : '';
             fwrite(\STDERR, 'compile_driver: parseAndCompile returned null for '.$filename.$suffix."\n");
             exit(2);

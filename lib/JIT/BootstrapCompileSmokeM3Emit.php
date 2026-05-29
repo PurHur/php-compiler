@@ -170,7 +170,8 @@ final class BootstrapCompileSmokeM3Emit
             $context,
             $logPrefix,
             $logPrefix.': lint failed (parseAndCompile returned null)',
-            'parseAndCompile'
+            'parseAndCompile',
+            true
         );
         self::exitWithStatus($context, $retFail);
 
@@ -308,7 +309,8 @@ final class BootstrapCompileSmokeM3Emit
             $context,
             $logPrefix,
             $logPrefix.': parseAndCompile returned null (parser/CFG spine)',
-            'parseAndCompile'
+            'parseAndCompile',
+            true
         );
         self::exitWithStatus($context, $retFail);
 
@@ -340,10 +342,51 @@ final class BootstrapCompileSmokeM3Emit
         return true;
     }
 
-    private static function echoPhaseError(Context $context, string $logPrefix, string $line1, string $phase): void
-    {
-        ValueEchoHelper::echoLiteral($context, $line1."\n");
+    private static function echoPhaseError(
+        Context $context,
+        string $logPrefix,
+        string $line1,
+        string $phase,
+        bool $appendLastParseFailure = false
+    ): void {
+        ValueEchoHelper::echoLiteral($context, $line1);
+        if ($appendLastParseFailure) {
+            self::echoLastParseFailureSuffix($context);
+        }
+        ValueEchoHelper::echoLiteral($context, "\n");
         ValueEchoHelper::echoLiteral($context, $logPrefix.': native emit failed at phase='.$phase."\n");
+    }
+
+    /** Append ` — {detail}` from Runtime::getLastParseFailure when native parse+compile returns null (#3037). */
+    private static function echoLastParseFailureSuffix(Context $context): void
+    {
+        $tag = 'lpf'.(string) ++self::$seq;
+        $strPtr = $context->getTypeFromString('__string__*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $strMap = $context->structFieldMap['__string__'];
+        $runtime = RuntimeEmitTuAlloc::emit($context);
+        $detail = $context->builder->call(
+            self::runtimeSpine($context, 'peeklastparsefailure', '__string__*', ['__object__*']),
+            $runtime
+        );
+        $detailNull = $context->builder->icmp(Builder::INT_EQ, $detail, $strPtr->constNull());
+        $hasDetail = BasicBlockHelper::append($context, 'csm3_lpf_ok_'.$tag);
+        $skipDetail = BasicBlockHelper::append($context, 'csm3_lpf_skip_'.$tag);
+        $mergeDetail = BasicBlockHelper::append($context, 'csm3_lpf_done_'.$tag);
+        $context->builder->branchIf($detailNull, $skipDetail, $hasDetail);
+        $context->builder->positionAtEnd($hasDetail);
+        ValueEchoHelper::echoLiteral($context, ' — ');
+        $detailLen = $context->builder->load($context->builder->structGep($detail, $strMap['length']));
+        $detailChars = $context->builder->structGep($detail, $strMap['value']);
+        $context->builder->call(
+            $context->lookupFunction('__phpc_ob_echo_substr'),
+            $detailChars,
+            $context->builder->zExt($detailLen, $sizeT)
+        );
+        $context->builder->branch($mergeDetail);
+        $context->builder->positionAtEnd($skipDetail);
+        $context->builder->branch($mergeDetail);
+        $context->builder->positionAtEnd($mergeDetail);
     }
 
     /** Propagate failure to the process exit code (return from {main} alone is not honored by AOT link). */
@@ -412,10 +455,27 @@ final class BootstrapCompileSmokeM3Emit
             $context->builder->branchIf($scriptNull, $failBb, $compileBb);
 
             $context->builder->positionAtEnd($failBb);
+            $context->builder->call(
+                self::runtimeSpine($context, 'noteparsecompilenullforscript', 'void', ['__object__*', '__object__*']),
+                $runtimeThis,
+                $objPtr->constNull()
+            );
             $context->builder->branch($tailBb);
 
             $context->builder->positionAtEnd($compileBb);
             $block = $context->builder->call($context->functions[$compileLc], $runtimeThis, $script);
+            $blockNull = $context->builder->icmp(Builder::INT_EQ, $block, $objPtr->constNull());
+            $recordBb = BasicBlockHelper::append($context, 'csm3_pac_record_'.$tag);
+            $afterRecordBb = BasicBlockHelper::append($context, 'csm3_pac_after_record_'.$tag);
+            $context->builder->branchIf($blockNull, $recordBb, $afterRecordBb);
+            $context->builder->positionAtEnd($recordBb);
+            $context->builder->call(
+                self::runtimeSpine($context, 'noteparsecompilenullforscript', 'void', ['__object__*', '__object__*']),
+                $runtimeThis,
+                $script
+            );
+            $context->builder->branch($afterRecordBb);
+            $context->builder->positionAtEnd($afterRecordBb);
             $context->builder->branch($tailBb);
 
             $context->builder->positionAtEnd($tailBb);
