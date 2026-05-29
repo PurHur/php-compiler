@@ -886,7 +886,8 @@ class Object_ extends Type {
             }
         }
         if ('closure' === $lcname) {
-            // Marker class for JIT-lowered closures; invoke target lives on Variable::$closureCall (#72).
+            // Invoke metadata for indirect holders (array elements, properties; issue #72).
+            $this->defineProperty($id, '__closure_target', Variable::TYPE_STRING);
         }
         if ('splobjectstorage' === $lcname) {
             $this->splObjectStorageClassId = $id;
@@ -1722,6 +1723,32 @@ class Object_ extends Type {
             }
         }
         throw new \LogicException("Could not find property $name for class $classId");
+    }
+
+    public function storeInstanceProperty(
+        PHPLLVM\Value $obj,
+        string $class,
+        string $name,
+        Variable $value
+    ): void {
+        $classId = $this->lookup('' !== $class ? $class : 'stdclass');
+        $nameId = $this->propNameMap[$name] ?? null;
+        if (null === $nameId) {
+            $this->defineProperty($classId, $name, Variable::TYPE_STRING);
+            $nameId = $this->propNameMap[$name];
+        }
+        foreach ($this->properties[$classId] as $propset) {
+            if ($propset[0] === $nameId) {
+                $this->propertyStore(
+                    $this->propertySlotPtr($obj, $propset[3]),
+                    $value,
+                    $propset[2]
+                );
+
+                return;
+            }
+        }
+        throw new \LogicException("Could not find property {$name} for class {$classId}");
     }
 
     /**
