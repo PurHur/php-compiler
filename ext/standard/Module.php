@@ -88,6 +88,8 @@ class Module extends ModuleAbstract
             new substr(),
             new strrev(),
             new str_rot13(),
+            new str_increment(),
+            new str_decrement(),
             new str_shuffle(),
             new strpos(),
             new strstr(),
