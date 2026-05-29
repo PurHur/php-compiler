@@ -10,9 +10,9 @@ namespace PHPCompiler\Web\FastCgi;
 final class Listener
 {
     /**
-     * Accept connections until interrupted; one request per connection (phase 2).
+     * Accept connections until interrupted; multiplex keep-alive per connection (php-fpm parity).
      */
-    public static function serve(string $listen, string $docroot): void
+    public static function serve(string $listen, string $docroot, ?string $aotBinary = null): void
     {
         $errno = 0;
         $errstr = '';
@@ -21,7 +21,7 @@ final class Listener
             throw new \RuntimeException('FastCGI listen failed on tcp://'.$listen.': '.$errstr);
         }
         stream_set_blocking($server, true);
-        $handler = new RequestHandler($docroot);
+        $handler = new RequestHandler($docroot, $aotBinary);
         while (true) {
             $conn = @stream_socket_accept($server, -1);
             if (false === $conn) {

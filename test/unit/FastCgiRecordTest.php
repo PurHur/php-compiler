@@ -26,6 +26,13 @@ final class FastCgiRecordTest extends TestCase
         $this->assertSame(Record::ROLE_RESPONDER, $role);
     }
 
+    public function testBeginRequestKeepConnFlag(): void
+    {
+        $raw = Record::encodeBeginRequest(7, Record::ROLE_RESPONDER, Record::KEEP_CONN);
+        $records = Record::decodeAll($raw);
+        $this->assertSame(Record::KEEP_CONN, ord($records[0]['content'][2]));
+    }
+
     public function testParamsCodecRoundTrip(): void
     {
         $params = [

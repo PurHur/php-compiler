@@ -29,6 +29,9 @@ final class Record
     public const ROLE_GET_FILTER = 2;
     public const ROLE_POST_FILTER = 3;
 
+    /** BEGIN_REQUEST flags (php-src main/fastcgi.c). */
+    public const KEEP_CONN = 1;
+
     public const PROTOCOL_STATUS_REQUEST_COMPLETE = 0;
     public const PROTOCOL_STATUS_CANT_MPX_CONN = 1;
     public const PROTOCOL_STATUS_OVERLOADED = 2;

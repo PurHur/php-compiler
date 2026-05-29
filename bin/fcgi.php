@@ -8,6 +8,7 @@ declare(strict_types=1);
  *
  * Usage:
  *   php bin/fcgi.php --listen 127.0.0.1:9000 examples/009-FastCGIWeb
+ *   php bin/fcgi.php --binary examples/009-FastCGIWeb/.phpc/bin/app examples/009-FastCGIWeb
  *   phpc fcgi --listen 127.0.0.1:9000 examples/009-FastCGIWeb
  */
 
@@ -17,10 +18,12 @@ require __DIR__.'/../src/llvm-env.php';
 require __DIR__.'/../vendor/autoload.php';
 
 use PHPCompiler\Web\FastCgi\Listener;
+use PHPCompiler\Web\CgiAotDriver;
 use PHPCompiler\Web\ProjectManifest;
 
 $listen = '127.0.0.1:9000';
 $docrootArg = getcwd();
+$aotBinary = null;
 $args = array_slice($argv, 1);
 while ([] !== $args) {
     $arg = array_shift($args);
@@ -36,6 +39,18 @@ while ([] !== $args) {
         $listen = substr($arg, strlen('--listen='));
         continue;
     }
+    if ('--binary' === $arg) {
+        $aotBinary = array_shift($args) ?? '';
+        if ('' === $aotBinary) {
+            fwrite(STDERR, "fcgi: --binary requires path\n");
+            exit(1);
+        }
+        continue;
+    }
+    if (str_starts_with($arg, '--binary=')) {
+        $aotBinary = substr($arg, strlen('--binary='));
+        continue;
+    }
     $docrootArg = $arg;
 }
 
@@ -45,8 +60,17 @@ if (null !== $projectDir) {
     $docroot = ProjectManifest::resolvePublicDir($projectDir);
 }
 
+if (null !== $aotBinary) {
+    try {
+        $aotBinary = CgiAotDriver::resolveBinary($aotBinary, $projectDir);
+    } catch (\Throwable $e) {
+        fwrite(STDERR, 'fcgi: '.$e->getMessage()."\n");
+        exit(1);
+    }
+}
+
 try {
-    Listener::serve($listen, $docroot);
+    Listener::serve($listen, $docroot, $aotBinary);
 } catch (\Throwable $e) {
     fwrite(STDERR, 'fcgi: '.$e->getMessage()."\n");
     exit(1);

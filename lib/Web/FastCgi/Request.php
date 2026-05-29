@@ -15,17 +15,21 @@ final class Request
 
     public int $flags = 0;
 
+    public bool $keepConn = false;
+
     /** @var array<string, string> */
     public array $params = [];
 
     public string $stdinBody = '';
 
     /**
-     * Read one complete request from a FastCGI stream (single-request connection).
+     * Read one complete request from a FastCGI stream.
      *
      * @param resource $stream
+     *
+     * @return self|null null on EOF before BEGIN_REQUEST (keep-alive connection closed)
      */
-    public static function readFromStream($stream): self
+    public static function readFromStream($stream): ?self
     {
         $req = new self();
         $paramsPayload = '';
@@ -48,6 +52,7 @@ final class Request
                     }
                     if (strlen($record['content']) >= 3) {
                         $req->flags = ord($record['content'][2]);
+                        $req->keepConn = 0 !== ($req->flags & Record::KEEP_CONN);
                     }
                     break;
                 case Record::PARAMS:
@@ -78,7 +83,7 @@ final class Request
         }
 
         if (!$sawBegin) {
-            throw new \InvalidArgumentException('FastCGI request missing BEGIN_REQUEST');
+            return null;
         }
         if ('' !== $paramsPayload) {
             $req->params = ParamsCodec::decode($paramsPayload);
@@ -96,9 +101,10 @@ final class Request
         int $requestId,
         array $params,
         string $stdinBody = '',
-        int $role = Record::ROLE_RESPONDER
+        int $role = Record::ROLE_RESPONDER,
+        int $flags = 0
     ): string {
-        $out = Record::encodeBeginRequest($requestId, $role, 0);
+        $out = Record::encodeBeginRequest($requestId, $role, $flags);
         $encoded = ParamsCodec::encode($params);
         if ('' !== $encoded) {
             $out .= Record::encodeParams($requestId, $encoded);

@@ -7,6 +7,7 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 use PHPCompiler\Web\FastCgi\Record;
 use PHPCompiler\Web\FastCgi\Request;
+use PHPCompiler\Web\FastCgi\RequestHandler;
 
 /**
  * FastCGI VM adapter over TCP (issue #173 slice 2).
@@ -98,5 +99,79 @@ final class FastCgiTest extends TestCase
 
         $this->assertTrue($endSeen);
         $this->assertStringContainsString('ok', $stdoutBody);
+    }
+
+    public function testKeepConnMultiplexesTwoRequestsOnOneStream(): void
+    {
+        $public = $this->repoRoot.'/examples/009-FastCGIWeb/public';
+        if (!is_dir($public)) {
+            $public = $this->repoRoot.'/examples/009-FastCGIWeb';
+        }
+        $script = is_file($public.'/example.php') ? $public.'/example.php' : $this->repoRoot.'/examples/009-FastCGIWeb/example.php';
+        if (!is_file($script)) {
+            $this->markTestSkipped('examples/009-FastCGIWeb missing (#2331)');
+        }
+        $docRoot = dirname($script);
+
+        $pair = stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP);
+        $this->assertNotFalse($pair);
+        [$client, $server] = $pair;
+
+        $params = [
+            'REQUEST_METHOD' => 'GET',
+            'SCRIPT_FILENAME' => $script,
+            'SCRIPT_NAME' => '/'.basename($script),
+            'REQUEST_URI' => '/'.basename($script),
+            'DOCUMENT_ROOT' => $docRoot,
+            'QUERY_STRING' => '',
+            'CONTENT_LENGTH' => '0',
+        ];
+        fwrite(
+            $client,
+            Request::encode(1, $params, '', Record::ROLE_RESPONDER, Record::KEEP_CONN)
+            .Request::encode(2, $params, '', Record::ROLE_RESPONDER, 0)
+        );
+
+        $handler = new RequestHandler($this->repoRoot.'/examples/009-FastCGIWeb');
+        $handler->handleStream($server);
+        fclose($server);
+
+        $responses = $this->readAllFastCgiResponses($client);
+        fclose($client);
+        $this->assertCount(2, $responses);
+        $this->assertStringContainsString('ok', $responses[0]['stdout']);
+        $this->assertStringContainsString('ok', $responses[1]['stdout']);
+        $this->assertTrue($responses[0]['end']);
+        $this->assertTrue($responses[1]['end']);
+    }
+
+    /**
+     * @return list<array{stdout: string, end: bool}>
+     */
+    private function readAllFastCgiResponses($stream): array
+    {
+        $responses = [];
+        $stdoutBody = '';
+        $endSeen = false;
+        while (true) {
+            $record = Record::readFromStream($stream);
+            if (null === $record) {
+                if ('' !== $stdoutBody || $endSeen) {
+                    $responses[] = ['stdout' => $stdoutBody, 'end' => $endSeen];
+                }
+                break;
+            }
+            if (Record::STDOUT === $record['type']) {
+                $stdoutBody .= $record['content'];
+            }
+            if (Record::END_REQUEST === $record['type']) {
+                $endSeen = true;
+                $responses[] = ['stdout' => $stdoutBody, 'end' => true];
+                $stdoutBody = '';
+                $endSeen = false;
+            }
+        }
+
+        return $responses;
     }
 }

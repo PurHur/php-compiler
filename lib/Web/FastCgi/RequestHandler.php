@@ -4,57 +4,83 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Web\FastCgi;
 
+use PHPCompiler\Web\CgiAotDriver;
 use PHPCompiler\Web\CgiDriver;
 use PHPCompiler\Web\DevServer;
 use PHPCompiler\Web\ProjectManifest;
 
 /**
- * Single-request FastCGI responder (VM scripts; issue #173 slice 2).
+ * FastCGI responder for VM scripts or AOT binaries (issue #173).
  */
 final class RequestHandler
 {
     private string $docroot;
 
-    public function __construct(string $docroot)
+    private ?string $aotBinary;
+
+    public function __construct(string $docroot, ?string $aotBinary = null)
     {
         $resolved = realpath($docroot);
         $this->docroot = false !== $resolved ? $resolved : $docroot;
+        $this->aotBinary = null !== $aotBinary && '' !== $aotBinary ? $aotBinary : null;
     }
 
     /**
-     * Handle one FastCGI request on a bidirectional stream (accept socket or stdin).
+     * Handle one or more FastCGI requests on a bidirectional stream (FCGI_KEEP_CONN multiplex).
      *
      * @param resource $stream
      */
     public function handleStream($stream): void
     {
-        try {
+        while (true) {
             $request = Request::readFromStream($stream);
-            Environment::apply($request->params);
-            Environment::applyRequestBody($request->params, $request->stdinBody);
+            if (null === $request) {
+                break;
+            }
+            $keepConn = $request->keepConn;
+            try {
+                $this->dispatchRequest($stream, $request);
+            } catch (\Throwable $e) {
+                DevServer::logException($e);
+                $body = DevServer::formatExceptionBody($e);
+                $cgiOut = CgiDriver::formatResponse(500, 'text/plain', $body);
+                foreach (Record::encodeStdoutChunks($request->requestId, $cgiOut) as $chunk) {
+                    fwrite($stream, $chunk);
+                }
+                fwrite(
+                    $stream,
+                    Record::encodeEndRequest($request->requestId, 1, Record::PROTOCOL_STATUS_REQUEST_COMPLETE)
+                );
+            }
+            if (!$keepConn) {
+                break;
+            }
+        }
+    }
+
+    private function dispatchRequest($stream, Request $request): void
+    {
+        Environment::apply($request->params);
+        Environment::applyRequestBody($request->params, $request->stdinBody);
+
+        if (null !== $this->aotBinary) {
+            [$status, $contentType, $body, $extraHeaders] = CgiAotDriver::runCapture(
+                $this->aotBinary,
+                ProjectManifest::resolveProjectDir($this->docroot)
+            );
+        } else {
             $script = $this->resolveScript($request->params);
             [$status, $contentType, $body, $extraHeaders] = CgiDriver::runVmScript($script);
-            $cgiOut = CgiDriver::formatResponse($status, $contentType, $body, $extraHeaders);
-            foreach (Record::encodeStdoutChunks($request->requestId, $cgiOut) as $chunk) {
-                fwrite($stream, $chunk);
-            }
-            fwrite(
-                $stream,
-                Record::encodeEndRequest($request->requestId, 0, Record::PROTOCOL_STATUS_REQUEST_COMPLETE)
-            );
-        } catch (\Throwable $e) {
-            DevServer::logException($e);
-            $body = DevServer::formatExceptionBody($e);
-            $cgiOut = CgiDriver::formatResponse(500, 'text/plain', $body);
-            $requestId = 1;
-            foreach (Record::encodeStdoutChunks($requestId, $cgiOut) as $chunk) {
-                fwrite($stream, $chunk);
-            }
-            fwrite(
-                $stream,
-                Record::encodeEndRequest($requestId, 1, Record::PROTOCOL_STATUS_REQUEST_COMPLETE)
-            );
         }
+
+        $cgiOut = CgiDriver::formatResponse($status, $contentType, $body, $extraHeaders);
+        foreach (Record::encodeStdoutChunks($request->requestId, $cgiOut) as $chunk) {
+            fwrite($stream, $chunk);
+        }
+        fwrite(
+            $stream,
+            Record::encodeEndRequest($request->requestId, 0, Record::PROTOCOL_STATUS_REQUEST_COMPLETE)
+        );
     }
 
     /**
