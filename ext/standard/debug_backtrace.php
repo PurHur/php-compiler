@@ -32,7 +32,7 @@ final class debug_backtrace extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->copyFrom(VmDebugBacktrace::build($frame));
+        $frame->returnVar->copyFrom(VmDebugBacktrace::build($frame, true));
     }
 
     public function call(Context $context, JITVariable ...$args): Value

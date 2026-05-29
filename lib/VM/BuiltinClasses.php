@@ -66,6 +66,7 @@ final class BuiltinClasses
         StringableSupport::register($ctx);
         self::registerStdClass($ctx);
         self::registerCountable($ctx);
+        SensitiveParamSupport::register($ctx);
         self::registerWeakReference($ctx);
         self::registerWeakMap($ctx);
         self::registerReflection($ctx);
