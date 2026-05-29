@@ -40,7 +40,10 @@ final class VmSerialize
         return $encoded;
     }
 
-    public static function unserializePayload(Context $ctx, string $payload): mixed
+    /**
+     * @param array<string, mixed>|null $options unserialize() options (allowed_classes only; #3300)
+     */
+    public static function unserializePayload(Context $ctx, string $payload, ?array $options = null): mixed
     {
         if (str_starts_with($payload, 'O:')) {
             $parsed = self::parseCustomObjectPayload($payload);
@@ -48,6 +51,9 @@ final class VmSerialize
                 return false;
             }
             [$className, $data] = $parsed;
+            if (!self::isClassAllowedForUnserialize($className, $options)) {
+                return false;
+            }
             $lc = strtolower($className);
             if (!isset($ctx->classes[$lc])) {
                 $ctx->autoloadClass($className);
@@ -64,6 +70,33 @@ final class VmSerialize
         }
 
         return @\unserialize($payload);
+    }
+
+    /**
+     * @param array<string, mixed>|null $options
+     */
+    public static function isClassAllowedForUnserialize(string $className, ?array $options): bool
+    {
+        if (null === $options || !\array_key_exists('allowed_classes', $options)) {
+            return true;
+        }
+        $allowed = $options['allowed_classes'];
+        if (false === $allowed) {
+            return false;
+        }
+        if (true === $allowed) {
+            return true;
+        }
+        if (!\is_array($allowed)) {
+            throw new \LogicException('allowed_classes must be of type bool or array');
+        }
+        foreach ($allowed as $entry) {
+            if (\is_string($entry) && 0 === \strcasecmp($entry, $className)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
