@@ -257,6 +257,18 @@ function syntaxRowDefinitions(): array
             'probe' => 'class C { public const array X = [1, 2]; } echo C::X[0];',
         ],
         [
+            'id' => 'class_const_object',
+            'construct' => 'Class constants with `new` object expressions (PHP 8.3)',
+            'opcodes' => ['TYPE_DECLARE_CLASS_CONST', 'TYPE_CLASS_CONST_FETCH', 'TYPE_NEW'],
+            'issue' => 3196,
+            'jit' => false,
+            'notes' => [
+                'Zend zend_compile_const_expr / zend_constants.c — materialize at class definition; shared identity on fetch',
+                'VM: ClassConstMaterializer + defineClass const-init opcodes; JIT compile lowers metadata (execute follow-up)',
+            ],
+            'probe' => 'class C { public const X = new stdClass(); } echo (C::X instanceof stdClass && C::X === C::X) ? "1" : "0";',
+        ],
+        [
             'id' => 'late_static_binding',
             'construct' => 'Late static binding `static::method()` / `static::class`',
             'opcodes' => ['TYPE_STATICCALL_INIT', 'TYPE_CLASS_CONST_FETCH'],
