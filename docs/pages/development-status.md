@@ -80,11 +80,13 @@ Representative gates (defaults from `script/ci-defaults.env`): **`BOOTSTRAP_M3_C
 
 ## Contribute
 
-1. Clone and run `./phpc test --fast`, then see [GETTING-STARTED](https://github.com/PurHur/php-compiler/blob/master/docs/GETTING-STARTED.md).
-2. Pick work from [#1492](https://github.com/PurHur/php-compiler/issues/1492) or [open issues](https://github.com/PurHur/php-compiler/issues).
-3. Update **`docs/pages/development-status.md`**, **`index.html`**, and **`missing-implementation.html`** when a user-visible gap closes.
+**We do not accept GitHub issues or pull requests without prior coordination.** Contact maintainers on other channels first; align with the AI-agent workflow before investing time on this repo. Forks are welcome — see the [contributing guide](https://github.com/PurHur/php-compiler/blob/master/CONTRIBUTING.md).
 
-[Contributing guide](https://github.com/PurHur/php-compiler/blob/master/CONTRIBUTING.md)
+For **aligned collaborators** only:
+
+1. Clone and run `./phpc test --fast`, then see [GETTING-STARTED](https://github.com/PurHur/php-compiler/blob/master/docs/GETTING-STARTED.md).
+2. Work from agreed scope (often tracked in [#1492](https://github.com/PurHur/php-compiler/issues/1492) or maintainer direction).
+3. Update **`docs/pages/development-status.md`**, **`index.html`**, and **`missing-implementation.html`** when a user-visible gap closes.
 
 ---
 
