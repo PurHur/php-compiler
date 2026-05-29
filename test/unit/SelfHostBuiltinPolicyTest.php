@@ -72,6 +72,7 @@ final class SelfHostBuiltinPolicyTest extends TestCase
             'escapeshellarg',
             'phpc_run_command',
             'gettype',
+            'get_debug_type',
             'var_export',
         ] as $fn) {
             $this->assertTrue(

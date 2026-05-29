@@ -49,6 +49,7 @@ class Module extends ModuleAbstract
             new boolval(),
             new var_export(),
             new gettype(),
+            new get_debug_type(),
             new strval(),
             new int_min(),
             new int_max(),
