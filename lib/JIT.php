@@ -5073,42 +5073,47 @@ class JIT {
                 case OpCode::TYPE_CLASS_CONST_FETCH:
                     $classOp = $block->getOperand($op->arg2);
                     $nameOp = $block->getOperand($op->arg3);
-                    assert($nameOp instanceof Operand\Literal);
-                    if ('class' === strtolower($nameOp->value)) {
-                        if ($classOp instanceof Operand\Literal) {
-                            $className = $this->resolveClassNameForPseudoConst($block, $classOp);
-                            $lit = new Operand\Literal($className);
-                            $lit->type = Type::string();
-                            $this->assignOperand(
-                                $block->getOperand($op->arg1),
-                                JIT\Variable::fromLiteral($this->context, $lit)
-                            );
-                            break;
-                        }
-                        $objectVar = $this->context->getVariableFromOp($classOp);
-                        $classNameVal = JIT\ReflectionBuiltinHelper::getClassName($this->context, $objectVar);
-                        $this->assignOperandValue($block->getOperand($op->arg1), $classNameVal);
-                        break;
-                    }
-                    if ('native_type_map' === strtolower($nameOp->value) || 'type_map' === strtolower($nameOp->value)) {
-                        $classLabel = $classOp instanceof Operand\Literal
-                            ? strtolower($classOp->value)
-                            : '';
-                        if (str_contains($classLabel, 'variable')) {
-                            $mapVar = $this->jitVariableArrayClassConstant($nameOp->value);
-                            if (null !== $mapVar) {
-                                $this->assignOperand($block->getOperand($op->arg1), $mapVar);
+                    $classId = $this->context->type->object->resolveClassId($classOp);
+                    if ($nameOp instanceof Operand\Literal) {
+                        if ('class' === strtolower($nameOp->value)) {
+                            if ($classOp instanceof Operand\Literal) {
+                                $className = $this->resolveClassNameForPseudoConst($block, $classOp);
+                                $lit = new Operand\Literal($className);
+                                $lit->type = Type::string();
+                                $this->assignOperand(
+                                    $block->getOperand($op->arg1),
+                                    JIT\Variable::fromLiteral($this->context, $lit)
+                                );
                                 break;
                             }
+                            $objectVar = $this->context->getVariableFromOp($classOp);
+                            $classNameVal = JIT\ReflectionBuiltinHelper::getClassName($this->context, $objectVar);
+                            $this->assignOperandValue($block->getOperand($op->arg1), $classNameVal);
+                            break;
                         }
-                    }
-                    $opcodeConst = $this->jitFoldOpCodeClassConstant($classOp, $nameOp->value);
-                    if (null !== $opcodeConst) {
-                        $this->assignOperand($block->getOperand($op->arg1), $opcodeConst);
+                        if ('native_type_map' === strtolower($nameOp->value) || 'type_map' === strtolower($nameOp->value)) {
+                            $classLabel = $classOp instanceof Operand\Literal
+                                ? strtolower($classOp->value)
+                                : '';
+                            if (str_contains($classLabel, 'variable')) {
+                                $mapVar = $this->jitVariableArrayClassConstant($nameOp->value);
+                                if (null !== $mapVar) {
+                                    $this->assignOperand($block->getOperand($op->arg1), $mapVar);
+                                    break;
+                                }
+                            }
+                        }
+                        $opcodeConst = $this->jitFoldOpCodeClassConstant($classOp, $nameOp->value);
+                        if (null !== $opcodeConst) {
+                            $this->assignOperand($block->getOperand($op->arg1), $opcodeConst);
+                            break;
+                        }
+                        $value = $this->context->type->object->classConstFetch($classId, $nameOp->value);
+                        $this->assignOperand($block->getOperand($op->arg1), $value);
                         break;
                     }
-                    $classId = $this->context->type->object->resolveClassId($classOp);
-                    $value = $this->context->type->object->classConstFetch($classId, $nameOp->value);
+                    $nameVar = $this->context->getVariableFromOp($nameOp);
+                    $value = $this->context->type->object->classConstFetchDynamic($classId, $nameVar, $classOp);
                     $this->assignOperand($block->getOperand($op->arg1), $value);
                     break;
                 case OpCode::TYPE_INSTANCEOF:

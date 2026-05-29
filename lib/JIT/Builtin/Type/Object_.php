@@ -13,6 +13,8 @@ use PHPCfg\Operand;
 use PHPCfg\Operand\Literal;
 use PHPCompiler\Block;
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\ClassConstFetchHelper;
+use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\GeneratorHelper;
 use PHPCompiler\JIT\Builtin\Refcount;
 use PHPCompiler\JIT\Builtin\Type;
@@ -1855,6 +1857,29 @@ class Object_ extends Type {
         }
 
         return $this->jitConstantFromEntry($this->classConstants[$classId][$key]);
+    }
+
+    public function classConstFetchDynamic(int $classId, Variable $nameVar, Operand $classOp): Variable
+    {
+        return ClassConstFetchHelper::fetchDynamic($this, $classId, $nameVar, $classOp);
+    }
+
+    public function jitContext(): Context
+    {
+        return $this->context;
+    }
+
+    /**
+     * @return list<array{0: string, 1: array{type: int, value: int|float|bool|string|null}}>
+     */
+    public function classConstantsForId(int $classId): array
+    {
+        $out = [];
+        foreach ($this->classConstants[$classId] ?? [] as $key => $entry) {
+            $out[] = [$key, $entry];
+        }
+
+        return $out;
     }
 
     public function defineStaticProperty(int $classId, string $name, int $jitType, ?VMVariable $default = null): void
