@@ -10,11 +10,12 @@ Tracking issues: [#58](https://github.com/PurHur/php-compiler/issues/58), [#145]
 | Construct | VM | JIT | AOT | Issue | Notes |
 |-----------|:--:|:---:|:---:|-------|-------|
 | `class` / `new` | yes | yes | yes | [#58](https://github.com/PurHur/php-compiler/issues/58) | compliance PHPT; bootstrap AOT |
-| Anonymous class `new class { }` | yes | yes | no | [#1233](https://github.com/PurHur/php-compiler/issues/1233) | php-cfg inline Stmt\Class_ in parseExpr_New; synthetic AnonymousClass@line name |
+| Anonymous class `new class { }` | yes | yes | yes | [#1233](https://github.com/PurHur/php-compiler/issues/1233) | php-cfg inline Stmt\Class_ in parseExpr_New; synthetic AnonymousClass@line name |
 | Enum declarations `enum Foo: string { case Bar = 'x'; }` | yes | yes | yes | [#1356](https://github.com/PurHur/php-compiler/issues/1356) | Backed enum cases as class constants; `Foo::Bar` const-like fetch; `enum_exists` registry; `implements` metadata (#2299); static methods (#2299) |
 | Instance methods (`ClassMethod` / `Expr_MethodCall`) | yes | yes | yes | [#58](https://github.com/PurHur/php-compiler/issues/58) | MiniWebApp `$router->dispatch()` (#2059); compliance PHPT; bootstrap AOT |
 | Static methods on user classes (`Expr_StaticCall`) | yes | yes | yes | [#2209](https://github.com/PurHur/php-compiler/issues/2209) | Public static methods without $this; `Router::fromConfig()` factory (#2059); Late static `static::method()` tracked separately (#1231) |
 | Constructors (`__construct`) | yes | yes | yes | [#145](https://github.com/PurHur/php-compiler/issues/145) | Router `__construct(array $config)` (#2059); compliance PHPT; bootstrap AOT |
+| `clone` + `__clone()` magic method | yes | yes | yes | [#3170](https://github.com/PurHur/php-compiler/issues/3170) | Zend zend_std_clone_object: shallow copy then __clone when defined; VM invokePhpFunction; JIT invokeCloneMagicIfPresent after cloneObject; compliance PHPT |
 | Private methods | yes | yes | yes | [#145](https://github.com/PurHur/php-compiler/issues/145) | Router private `render*` paths (#2059); compliance PHPT; bootstrap AOT |
 | Property fetch `$this->x` | yes | yes | yes | [#58](https://github.com/PurHur/php-compiler/issues/58) | compliance PHPT; bootstrap AOT |
 | Constructor property promotion | yes | yes | yes | [#1359](https://github.com/PurHur/php-compiler/issues/1359) | Promoted params declare property + assign in __construct |
