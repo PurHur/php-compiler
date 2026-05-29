@@ -1134,6 +1134,10 @@ class Compiler {
             $readonlySlot
         );
         $return->classImplements = $this->interfaceNamesFromOperands($class->implements);
+        if (VM\StringableSupport::requiresImplementation($return->classImplements)) {
+            $className = $this->staticNameFromOperand($class->name) ?? 'class';
+            VM\StringableSupport::assertConcreteClassImplements($class, $className);
+        }
         $return->attributeNames = AttributeNames::fromOp($class);
         $return->block1 = $this->compileClassBody($class->stmts, $type);
         return $return;

@@ -122,6 +122,27 @@ class VM {
         return false;
     }
 
+    /** Coerce a VM value to string, invoking __toString on objects when defined (issue #3296). */
+    public function coerceVariableToString(Variable $var): string
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $var->type) {
+            return $var->toString();
+        }
+        $object = $var->toObject();
+        if (!$this->hasInstanceMethod($object->class, '__tostring')) {
+            return 'Object';
+        }
+        $result = $this->invokeInstanceMethod($object, '__toString')->resolveIndirect();
+        if (Variable::TYPE_STRING !== $result->type) {
+            throw new \LogicException(
+                "{$object->class->name}::__toString() must return a string in this compiler build"
+            );
+        }
+
+        return $result->toString();
+    }
+
     /** Invoke a user instance method from VM internals (e.g. __debugInfo, #3259). */
     public function invokeInstanceMethod(ObjectEntry $object, string $methodName): Variable
     {
@@ -403,7 +424,9 @@ restart:
                     $frame->scope[$op->arg1]->castFrom(Variable::TYPE_INTEGER, $frame->scope[$op->arg2]);
                     break;
                 case OpCode::TYPE_CAST_STRING:
-                    $frame->scope[$op->arg1]->castFrom(Variable::TYPE_STRING, $frame->scope[$op->arg2]);
+                    $frame->scope[$op->arg1]->string(
+                        $this->coerceVariableToString($frame->scope[$op->arg2])
+                    );
                     break;
                 case OpCode::TYPE_CAST_OBJECT:
                     $dst = $frame->scope[$op->arg1];
@@ -496,15 +519,15 @@ restart:
                     break;
                 case OpCode::TYPE_CONCAT:
                     $arg1 = $frame->scope[$op->arg1];
-                    $arg2 = $frame->scope[$op->arg2]->toString();
-                    $arg3 = $frame->scope[$op->arg3]->toString();
+                    $arg2 = $this->coerceVariableToString($frame->scope[$op->arg2]);
+                    $arg3 = $this->coerceVariableToString($frame->scope[$op->arg3]);
                     $arg1->string($arg2 . $arg3);
                     break;
                 case OpCode::TYPE_ECHO:
-                    VM\OutputBuffer::append($frame->scope[$op->arg1]->toString());
+                    VM\OutputBuffer::append($this->coerceVariableToString($frame->scope[$op->arg1]));
                     break;
                 case OpCode::TYPE_PRINT:
-                    VM\OutputBuffer::append($frame->scope[$op->arg2]->toString());
+                    VM\OutputBuffer::append($this->coerceVariableToString($frame->scope[$op->arg2]));
                     $frame->scope[$op->arg1]->int(1);
                     break;
                 case OpCode::TYPE_COALESCE:

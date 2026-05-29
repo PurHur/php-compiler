@@ -32,6 +32,7 @@ final class BuiltinClasses
 {
     public static function register(Context $ctx): void
     {
+        StringableSupport::register($ctx);
         self::registerStdClass($ctx);
         self::registerWeakReference($ctx);
         self::registerWeakMap($ctx);
