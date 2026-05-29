@@ -77,6 +77,32 @@ function bootstrapVendorPrelinkSlug(string $package): string
 }
 
 /**
+ * Reuse link-time emit-helper or committed prelinked .o when native argv compile cannot (#3028).
+ *
+ * @return 'link-time'|'committed'|null
+ */
+function bootstrapVendorPrelinkCopySidecarFallback(string $root, string $slug, string $objectAbs): ?string
+{
+    $vendorShort = str_replace('-', '_', preg_replace('/^ircmaxell-/', '', $slug));
+    $linktimeObject = $root.'/build/.m3_vendor_'.$vendorShort.'_prelink.o';
+    if (is_file($linktimeObject)) {
+        copy($linktimeObject, $objectAbs);
+
+        return 'link-time';
+    }
+    $committedObject = $root.'/prelinked/bootstrap-vendor/'.$slug.'.o';
+    if (is_file($committedObject)) {
+        if (realpath($committedObject) !== realpath($objectAbs)) {
+            copy($committedObject, $objectAbs);
+        }
+
+        return 'committed';
+    }
+
+    return null;
+}
+
+/**
  * @param list<string> $vendorRelPaths repo-relative vendor/*.php paths
  */
 function bootstrapVendorPrelinkRenderBundle(
@@ -391,7 +417,7 @@ function bootstrapVendorPrelinkCompilePackages(
 
         @unlink($buildBase);
         @unlink($buildBase.'.o');
-        @unlink($objectAbs);
+        // Keep committed prelinked .o until we have a replacement (fallback copies from it; #3028).
 
         $cmd = bootstrapVendorPrelinkBuildCompileCommand($root, $buildBase, $bundleAbs, $invoker);
         $output = [];
@@ -406,17 +432,13 @@ function bootstrapVendorPrelinkCompilePackages(
             continue;
         }
 
-        // Native emit-helper sidecar: compile OK copies cached executable, not buildBase.o (#3028).
-        if (0 === $code && !is_file($objectCandidate)) {
-            $vendorShort = str_replace('-', '_', preg_replace('/^ircmaxell-/', '', $slug));
-            $linktimeObject = $root.'/build/.m3_vendor_'.$vendorShort.'_prelink.o';
-            if (is_file($linktimeObject)) {
-                copy($linktimeObject, $objectAbs);
-                $manifest['packages'][$package]['status'] = 'object_ok';
-                $manifest['packages'][$package]['blocker'] = null;
-                fwrite(STDOUT, "OK {$package} → {$objectRel} (link-time vendor sidecar)\n");
-                continue;
-            }
+        $sidecarSource = bootstrapVendorPrelinkCopySidecarFallback($root, $slug, $objectAbs);
+        if (null !== $sidecarSource) {
+            $manifest['packages'][$package]['status'] = 'object_ok';
+            $manifest['packages'][$package]['blocker'] = null;
+            $via = 'link-time' === $sidecarSource ? 'link-time vendor sidecar' : 'committed prelink';
+            fwrite(STDOUT, "OK {$package} → {$objectRel} ({$via})\n");
+            continue;
         }
 
         $blocker = 0 !== $code
