@@ -51,6 +51,18 @@ class Context {
     /** @var array<int, true> handler frame object id => finally already ran for current unwind */
     public array $completedFinallyHandlers = [];
 
+    /** Return from try/catch deferred until pending finally handlers run (#3082). */
+    public bool $pendingReturnActive = false;
+
+    public bool $pendingReturnIsVoid = true;
+
+    public ?Variable $pendingReturnValue = null;
+
+    public ?Frame $pendingReturnResumeFrame = null;
+
+    /** Set when a TYPE_JUMP finishes the finally chain for a deferred return (#3082). */
+    public bool $pendingReturnDispatch = false;
+
     public ErrorReporter $errors;
 
     public ScriptStack $scriptStack;

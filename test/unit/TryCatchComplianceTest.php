@@ -93,6 +93,59 @@ echo "after\n";
         );
     }
 
+    public function testFinallyRunsBeforeReturnFromTry(): void
+    {
+        $this->assertVmOutput(
+            '<?php
+try {
+    echo "try\n";
+    return;
+} finally {
+    echo "finally\n";
+}
+echo "after\n";
+',
+            "try\nfinally\n"
+        );
+    }
+
+    public function testFinallyRunsBeforeReturnValueFromTry(): void
+    {
+        $this->assertVmOutput(
+            '<?php
+function f() {
+    try {
+        return 42;
+    } finally {
+        echo "finally\n";
+    }
+}
+echo f(), "\n";
+',
+            "finally\n42\n"
+        );
+    }
+
+    public function testNestedFinallyOnReturn(): void
+    {
+        $this->assertVmOutput(
+            '<?php
+try {
+    try {
+        echo "inner\n";
+        return;
+    } finally {
+        echo "inner-finally\n";
+    }
+} finally {
+    echo "outer-finally\n";
+}
+echo "after\n";
+',
+            "inner\ninner-finally\nouter-finally\n"
+        );
+    }
+
     public function testFinallyRunsBeforeUncaughtThrow(): void
     {
         $runtime = new Runtime();

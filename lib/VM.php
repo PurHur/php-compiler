@@ -155,6 +155,17 @@ nextframe:
             return self::SUCCESS;
         }
 restart:
+        if ($this->context->pendingReturnDispatch) {
+            $this->context->pendingReturnDispatch = false;
+            $frame = $this->context->pendingReturnResumeFrame;
+            $isVoid = $this->context->pendingReturnIsVoid;
+            $returnValue = $this->context->pendingReturnValue;
+            $this->clearPendingReturnState();
+            if ($isVoid) {
+                goto return_void_complete;
+            }
+            goto return_value_complete;
+        }
 
         while ($frame->pos < $frame->block->nOpCodes) {
             $op = $frame->block->opCodes[$frame->pos++];
@@ -364,6 +375,15 @@ restart:
                     ext\standard\VmExit::terminate($exitArg);
                     break;
                 case OpCode::TYPE_JUMP:
+                    $this->markFinallyCompletedWhenLeavingFinallyBody($frame);
+                    $finallyFrame = $this->continueReturnFinallyChain();
+                    if (null !== $finallyFrame) {
+                        $frame = $finallyFrame;
+                        goto restart;
+                    }
+                    if ($this->schedulePendingReturnDispatch()) {
+                        goto restart;
+                    }
                     $resumeFrame = $this->resumeCatchAfterFinally($frame);
                     if (null !== $resumeFrame) {
                         $frame = $resumeFrame;
@@ -551,21 +571,12 @@ restart:
                     $frame->scope[$op->arg1]->object($state->wrapObject($this->context));
                     break;
                 case OpCode::TYPE_RETURN_VOID:
-                    $this->enforceReturnType($frame, null);
-                    // Do not null returnVar: it may alias the caller result slot (#1885).
-                    $this->markObjectConstructedIfLeavingConstruct($frame);
-                    $gen = $this->findGeneratorState($frame);
-                    if (null !== $gen) {
-                        $gen->done = true;
-                        $gen->frame = null;
-                        $gen->hasCurrent = false;
-                        goto nextframe;
-                    }
-                    if ($frame->ephemeral && null !== $frame->parent) {
-                        $frame = $frame->parent;
+                    $finallyFrame = $this->beginReturnFinallyUnwind($frame, null, true);
+                    if (null !== $finallyFrame) {
+                        $frame = $finallyFrame;
                         goto restart;
                     }
-                    goto nextframe;
+                    goto return_void_complete;
                 case OpCode::TYPE_RETURN:
                     if (isset($frame->scope[$op->arg1])) {
                         $returnValue = $frame->scope[$op->arg1]->resolveIndirect();
@@ -574,27 +585,12 @@ restart:
                     } else {
                         $returnValue = new Variable(Variable::TYPE_NULL);
                     }
-                    $this->enforceReturnType($frame, $returnValue);
-                    if (!is_null($frame->returnVar)) {
-                        $frame->returnVar->copyFrom($returnValue);
-                    }
-                    $this->markObjectConstructedIfLeavingConstruct($frame);
-                    $caller = $this->context->pop();
-                    if (null !== $caller) {
-                        $frame = $caller;
+                    $finallyFrame = $this->beginReturnFinallyUnwind($frame, $returnValue, false);
+                    if (null !== $finallyFrame) {
+                        $frame = $finallyFrame;
                         goto restart;
                     }
-                    // Nested return <call>(): callee may finish with an empty run stack (#1885).
-                    if (null !== $frame->parent && null !== $frame->returnVar) {
-                        $frame = $frame->parent;
-                        goto restart;
-                    }
-                    if ($frame->ephemeral && null !== $frame->parent) {
-                        $frame = $frame->parent;
-                        goto restart;
-                    }
-
-                    return self::SUCCESS;
+                    goto return_value_complete;
                 case OpCode::TYPE_FUNCDEF:
                     $name = $frame->scope[$op->arg1]->toString();
                     $lcname = strtolower($name);
@@ -1164,6 +1160,47 @@ restart:
             }
             goto nextframe;
         }
+
+        return self::SUCCESS;
+
+        return_void_complete:
+        $this->enforceReturnType($frame, null);
+        // Do not null returnVar: it may alias the caller result slot (#1885).
+        $this->markObjectConstructedIfLeavingConstruct($frame);
+        $gen = $this->findGeneratorState($frame);
+        if (null !== $gen) {
+            $gen->done = true;
+            $gen->frame = null;
+            $gen->hasCurrent = false;
+            goto nextframe;
+        }
+        if ($frame->ephemeral && null !== $frame->parent) {
+            $frame = $frame->parent;
+            goto restart;
+        }
+        goto nextframe;
+
+        return_value_complete:
+        $this->enforceReturnType($frame, $returnValue);
+        if (!is_null($frame->returnVar)) {
+            $frame->returnVar->copyFrom($returnValue);
+        }
+        $this->markObjectConstructedIfLeavingConstruct($frame);
+        $caller = $this->context->pop();
+        if (null !== $caller) {
+            $frame = $caller;
+            goto restart;
+        }
+        // Nested return <call>(): callee may finish with an empty run stack (#1885).
+        if (null !== $frame->parent && null !== $frame->returnVar) {
+            $frame = $frame->parent;
+            goto restart;
+        }
+        if ($frame->ephemeral && null !== $frame->parent) {
+            $frame = $frame->parent;
+            goto restart;
+        }
+
         return self::SUCCESS;
     }
 
@@ -1197,7 +1234,7 @@ restart:
         $this->context->pendingException = $thrown;
         for ($handler = $frame->parent ?? $frame; null !== $handler; $handler = $handler->parent) {
             $this->rewindHandlerToCatchChain($handler);
-            $finallyFrame = $this->enterFinallyHandlerForThrow($handler);
+            $finallyFrame = $this->enterFinallyHandlerForUnwind($handler);
             if (null !== $finallyFrame) {
                 return $finallyFrame;
             }
@@ -1277,7 +1314,7 @@ restart:
         return null;
     }
 
-    private function enterFinallyHandlerForThrow(Frame $handler): ?Frame
+    private function enterFinallyHandlerForUnwind(Frame $handler): ?Frame
     {
         $handlerId = spl_object_id($handler);
         if (isset($this->context->completedFinallyHandlers[$handlerId])) {
@@ -1332,6 +1369,93 @@ restart:
         $this->context->pendingException = null;
         $this->context->pendingCatchResumeHandler = null;
         $this->context->completedFinallyHandlers = [];
+        $this->clearPendingReturnState();
+    }
+
+    private function clearPendingReturnState(): void
+    {
+        $this->context->pendingReturnActive = false;
+        $this->context->pendingReturnDispatch = false;
+        $this->context->pendingReturnIsVoid = true;
+        $this->context->pendingReturnValue = null;
+        $this->context->pendingReturnResumeFrame = null;
+    }
+
+    private function hasPendingFinally(Frame $handler): bool
+    {
+        if (null === $this->findFinallyOpForHandler($handler)) {
+            return false;
+        }
+
+        return !isset($this->context->completedFinallyHandlers[spl_object_id($handler)]);
+    }
+
+    /** Normal try completion runs the finally CFG block directly; mark it done (#3082). */
+    private function markFinallyCompletedWhenLeavingFinallyBody(Frame $frame): void
+    {
+        for ($handler = $frame->parent; null !== $handler; $handler = $handler->parent) {
+            $finallyOp = $this->findFinallyOpForHandler($handler);
+            if (null === $finallyOp || null === $finallyOp->block1) {
+                continue;
+            }
+            if ($finallyOp->block1 !== $frame->block) {
+                continue;
+            }
+            $this->context->completedFinallyHandlers[spl_object_id($handler)] = true;
+
+            return;
+        }
+    }
+
+    private function findNextFinallyHandlerForReturn(Frame $from): ?Frame
+    {
+        for ($handler = $from->parent; null !== $handler; $handler = $handler->parent) {
+            if ($this->hasPendingFinally($handler)) {
+                return $handler;
+            }
+        }
+
+        return null;
+    }
+
+    private function beginReturnFinallyUnwind(Frame $frame, ?Variable $value, bool $isVoid): ?Frame
+    {
+        $handler = $this->findNextFinallyHandlerForReturn($frame);
+        if (null === $handler) {
+            return null;
+        }
+        $this->context->pendingReturnActive = true;
+        $this->context->pendingReturnIsVoid = $isVoid;
+        $this->context->pendingReturnValue = $value;
+        $this->context->pendingReturnResumeFrame = $frame;
+
+        return $this->enterFinallyHandlerForUnwind($handler);
+    }
+
+    private function continueReturnFinallyChain(): ?Frame
+    {
+        if (!$this->context->pendingReturnActive || null === $this->context->pendingReturnResumeFrame) {
+            return null;
+        }
+        $handler = $this->findNextFinallyHandlerForReturn($this->context->pendingReturnResumeFrame);
+        if (null === $handler) {
+            return null;
+        }
+
+        return $this->enterFinallyHandlerForUnwind($handler);
+    }
+
+    private function schedulePendingReturnDispatch(): bool
+    {
+        if (!$this->context->pendingReturnActive || null === $this->context->pendingReturnResumeFrame) {
+            return false;
+        }
+        if (null !== $this->findNextFinallyHandlerForReturn($this->context->pendingReturnResumeFrame)) {
+            return false;
+        }
+        $this->context->pendingReturnDispatch = true;
+
+        return true;
     }
 
     /** @return never */
