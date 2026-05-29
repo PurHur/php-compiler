@@ -1,0 +1,4 @@
+This file is intentionally kept as a placeholder.
+
+`script/apply-patches.sh` applies keyed `yield` parsing for `vendor/ircmaxell/php-cfg`
+via an overlay replacement of `parseExpr_Yield` (issue #167).

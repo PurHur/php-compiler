@@ -905,6 +905,10 @@ class JIT {
         if ($this->isSkippedVmHotPathName($skipName)) {
             return $this->compileSkippedVmHotPathStub($internalName, $block, $logicalName ?? $internalName);
         }
+        if ($block->isGenerator || Block::containsGeneratorOpcodes($block)) {
+            // Generator bodies suspend via VM::GENERATOR_YIELD; MCJIT stub until #167 lands.
+            return $this->compileSkippedVmHotPathStub($internalName, $block, $logicalName ?? $internalName);
+        }
         if ($this->isSkippedM3EmitTuBundledHelperName($skipName)) {
             return $this->compileSkippedCompilerSplitCfgStub($internalName, $block, $logicalName ?? $internalName);
         }
@@ -5358,7 +5362,7 @@ class JIT {
                     break;
                 case OpCode::TYPE_YIELD:
                 case OpCode::TYPE_YIELD_FROM:
-                    // Not lowered in LLVM/JIT/AOT yet; VM-only support lives in lib/VM.php (#167).
+                    // compileBlock() stubs generator bodies before opcode lowering (#167).
                     throw new \LogicException('Generators (yield) are VM-only (issue #167)');
                 case OpCode::TYPE_FUNCCALL_INIT:
                     $nameOp = $block->getOperand($op->arg1);

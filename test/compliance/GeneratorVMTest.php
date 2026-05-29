@@ -18,6 +18,8 @@ final class GeneratorVMTest extends BaseTest
                 'generator_basic.phpt',
                 'generator_nested.phpt',
                 'generator_yield_from_array.phpt',
+                'generator_yield_keys.phpt',
+                'generator_yield_from_generator.phpt',
             ] as $file
         ) {
             yield $file => self::parsePHPT(
