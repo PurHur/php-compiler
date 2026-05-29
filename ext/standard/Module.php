@@ -49,6 +49,7 @@ class Module extends ModuleAbstract
             new boolval(),
             new settype(),
             new var_export(),
+            new var_dump_(),
             new gettype(),
             new get_debug_type(),
             new gc_collect_cycles(),
@@ -89,9 +90,12 @@ class Module extends ModuleAbstract
             new substr(),
             new strrev(),
             new str_rot13(),
+            new str_increment(),
+            new str_decrement(),
             new str_shuffle(),
             new strpos(),
             new strstr(),
+            new strtok(),
             new strchr(),
             new stristr(),
             new strrchr(),
@@ -128,6 +132,7 @@ class Module extends ModuleAbstract
             new array_multisort(),
             new usort_(),
             new uasort_(),
+            new uksort_(),
             new sprintf_(),
             new array_values(),
             new array_keys(),
@@ -175,6 +180,7 @@ class Module extends ModuleAbstract
             new array_map(),
             new array_filter(),
             new array_walk(),
+            new array_walk_recursive(),
             new array_reduce(),
             new range(),
             new bin2hex(),
@@ -225,6 +231,7 @@ class Module extends ModuleAbstract
             new serialize(),
             new unserialize(),
             new json_last_error_(),
+            new json_last_error_msg_(),
             new web_int(),
             new web_string(),
             new web_bool(),
@@ -298,6 +305,8 @@ class Module extends ModuleAbstract
             new ini_get_(),
             new define_(),
             new defined_(),
+            new get_defined_constants_(),
+            new get_defined_vars_(),
             new debug_backtrace(),
             new class_exists_(),
             new class_alias(),
@@ -319,6 +328,8 @@ class Module extends ModuleAbstract
             new trigger_error_(),
             new set_error_handler_(),
             new restore_error_handler_(),
+            new error_get_last(),
+            new error_clear_last(),
             new phpc_deploy_path(),
             new compiler_is_superglobal_name(),
             new extract_(),
@@ -395,6 +406,15 @@ class Module extends ModuleAbstract
             $ft = $context->context->functionType($i32, false, $i8p, $i8p, $i64, $i64, $i32);
             $fn = $context->module->addFunction('substr_compare', $ft);
             $context->registerFunction('substr_compare', $fn);
+        }
+        try {
+            $context->lookupFunction('phpc_strtok');
+        } catch (\Throwable $e) {
+            $strPtr = $context->getTypeFromString('__string__*');
+            $i8 = $context->getTypeFromString('int8');
+            $ft = $context->context->functionType($strPtr, false, $strPtr, $strPtr, $i8);
+            $fn = $context->module->addFunction('phpc_strtok', $ft);
+            $context->registerFunction('phpc_strtok', $fn);
         }
         foreach (['strspn', 'strcspn'] as $name) {
             try {

@@ -90,6 +90,83 @@ class VM {
     }
 
     /**
+     * Walk inheritance for an instance method (Zend zend_object_handlers parity, #3259).
+     *
+     * @return array{0: ClassEntry, 1: string}
+     */
+    public function resolveInstanceMethod(ClassEntry $class, string $methodLc): array
+    {
+        return $this->resolveStaticMethod(strtolower($class->name), strtolower($methodLc));
+    }
+
+    public function hasInstanceMethod(ClassEntry $class, string $methodLc): bool
+    {
+        $methodLc = strtolower($methodLc);
+        $lcClass = strtolower($class->name);
+        $visited = [];
+        while (!isset($visited[$lcClass])) {
+            $visited[$lcClass] = true;
+            if (!isset($this->context->classes[$lcClass])) {
+                return false;
+            }
+            $entry = $this->context->classes[$lcClass];
+            if (isset($entry->methods[$methodLc])) {
+                return true;
+            }
+            if (null === $entry->parentLc) {
+                return false;
+            }
+            $lcClass = $entry->parentLc;
+        }
+
+        return false;
+    }
+
+    /** Invoke a user instance method from VM internals (e.g. __debugInfo, #3259). */
+    public function invokeInstanceMethod(ObjectEntry $object, string $methodName): Variable
+    {
+        $methodLc = strtolower($methodName);
+        [$declaring] = $this->resolveInstanceMethod($object->class, $methodLc);
+        $func = $declaring->methods[$methodLc];
+        if (!$func instanceof Func\PHP) {
+            throw new \LogicException("{$declaring->name}::{$methodName}() is not a user method in this compiler build");
+        }
+        $thisVar = new Variable();
+        $thisVar->object($object);
+        return $this->invokePhpFunction($func, $thisVar);
+    }
+
+    /**
+     * Properties for var_dump / print_r when __debugInfo is defined (Zend parity, #3259).
+     *
+     * @return array<string, Variable>
+     */
+    public function getObjectDebugProperties(ObjectEntry $object): array
+    {
+        if ($this->hasInstanceMethod($object->class, '__debuginfo')) {
+            $result = $this->invokeInstanceMethod($object, '__debugInfo')->resolveIndirect();
+            if (Variable::TYPE_ARRAY !== $result->type) {
+                throw new \LogicException(
+                    "{$object->class->name}::__debugInfo() must return an array in this compiler build"
+                );
+            }
+            $props = [];
+            foreach ($result->toArray()->iterateKeyed(true) as [$key, $value]) {
+                $name = Variable::TYPE_STRING === $key->type
+                    ? $key->toString()
+                    : (string) $key->toInt();
+                $copy = new Variable();
+                $copy->copyFrom($value->resolveIndirect());
+                $props[$name] = $copy;
+            }
+
+            return $props;
+        }
+
+        return $object->class->getProperties($object->getRawProperties(), ClassEntry::PROP_PURPOSE_DEBUG);
+    }
+
+    /**
      * Invoke a closure from a VM builtin (isolated run stack; issue #72).
      */
     /**

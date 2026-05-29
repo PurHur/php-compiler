@@ -1638,6 +1638,107 @@ final class VmString
         return $out;
     }
 
+    /** Whether every byte is ASCII alphanumeric ([0-9A-Za-z]). */
+    public static function onlyAsciiAlphanumeric(string $string): bool
+    {
+        $len = self::byteLength($string);
+        for ($i = 0; $i < $len; ++$i) {
+            $ord = self::byteOrd($string[$i]);
+            if (!(($ord >= 48 && $ord <= 57) || ($ord >= 65 && $ord <= 90) || ($ord >= 97 && $ord <= 122))) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * str_increment() — PHP 8.3 alphanumeric increment (ext/standard/string.c).
+     */
+    public static function strIncrement(string $string): string
+    {
+        if ('' === $string) {
+            throw new \ValueError('str_increment(): Argument #1 ($string) must not be empty');
+        }
+        if (!self::onlyAsciiAlphanumeric($string)) {
+            throw new \ValueError('str_increment(): Argument #1 ($string) must be composed only of alphanumeric ASCII characters');
+        }
+
+        $incremented = $string;
+        $len = self::byteLength($incremented);
+        $position = $len - 1;
+        $carry = false;
+
+        do {
+            $c = $incremented[$position];
+            if ('z' !== $c && 'Z' !== $c && '9' !== $c) {
+                $carry = false;
+                $incremented[$position] = self::byteChr(self::byteOrd($c) + 1);
+            } else {
+                $carry = true;
+                if ('9' === $c) {
+                    $incremented[$position] = '0';
+                } else {
+                    $incremented[$position] = self::byteChr(self::byteOrd($c) - 25);
+                }
+            }
+        } while ($carry && $position-- > 0);
+
+        if ($carry) {
+            $prefix = '0' === $incremented[0] ? '1' : $incremented[0];
+
+            return $prefix.$incremented;
+        }
+
+        return $incremented;
+    }
+
+    /**
+     * str_decrement() — PHP 8.3 alphanumeric decrement (ext/standard/string.c).
+     */
+    public static function strDecrement(string $string): string
+    {
+        if ('' === $string) {
+            throw new \ValueError('str_decrement(): Argument #1 ($string) must not be empty');
+        }
+        if (!self::onlyAsciiAlphanumeric($string)) {
+            throw new \ValueError('str_decrement(): Argument #1 ($string) must be composed only of alphanumeric ASCII characters');
+        }
+        if ('0' === $string[0]) {
+            throw new \ValueError('str_decrement(): Argument #1 ($string) "'.$string.'" is out of decrement range');
+        }
+
+        $decremented = $string;
+        $len = self::byteLength($decremented);
+        $position = $len - 1;
+        $carry = false;
+
+        do {
+            $c = $decremented[$position];
+            if ('a' !== $c && 'A' !== $c && '0' !== $c) {
+                $carry = false;
+                $decremented[$position] = self::byteChr(self::byteOrd($c) - 1);
+            } else {
+                $carry = true;
+                if ('0' === $c) {
+                    $decremented[$position] = '9';
+                } else {
+                    $decremented[$position] = self::byteChr(self::byteOrd($c) + 25);
+                }
+            }
+        } while ($carry && $position-- > 0);
+
+        if ($carry || ('0' === $decremented[0] && $len > 1)) {
+            if (1 === $len) {
+                throw new \ValueError('str_decrement(): Argument #1 ($string) "'.$string.'" is out of decrement range');
+            }
+
+            return substr($decremented, 1);
+        }
+
+        return $decremented;
+    }
+
     public static function pregQuote(string $string, ?string $delimiter = null): string
     {
         $delim = null;
@@ -2435,6 +2536,89 @@ final class VmString
         }
 
         return self::byteSlice($base, 0, $baseLen - $extLen - 1);
+    }
+
+    /** Source string for strtok() continuation (ext/standard/string.c; issue #3201). */
+    private static ?string $strtokString = null;
+
+    private static int $strtokLast = 0;
+
+    /**
+     * strtok() — tokenize with re-entrant static state (php-src ext/standard/string.c).
+     *
+     * @return string|false
+     */
+    public static function strtok(string $str, ?string $tok = null): string|false
+    {
+        if (null !== $tok) {
+            self::$strtokString = $str;
+            self::$strtokLast = 0;
+            $delimiter = $tok;
+        } else {
+            if (null === self::$strtokString) {
+                return false;
+            }
+            $delimiter = $str;
+        }
+
+        $len = self::byteLength(self::$strtokString);
+        $p = self::$strtokLast;
+        if ($p >= $len) {
+            self::strtokReset();
+
+            return false;
+        }
+
+        $table = array_fill(0, 256, false);
+        $delLen = self::byteLength($delimiter);
+        for ($i = 0; $i < $delLen; ++$i) {
+            $table[self::byteOrd($delimiter[$i])] = true;
+        }
+
+        $skipped = 0;
+        while ($p < $len && $table[self::byteOrd(self::$strtokString[$p])]) {
+            ++$p;
+            ++$skipped;
+            if ($p >= $len) {
+                self::strtokReset();
+
+                return false;
+            }
+        }
+
+        while (++$p < $len) {
+            if ($table[self::byteOrd(self::$strtokString[$p])]) {
+                $token = self::byteSlice(
+                    self::$strtokString,
+                    self::$strtokLast + $skipped,
+                    $p - self::$strtokLast - $skipped
+                );
+                self::$strtokLast = $p + 1;
+
+                return $token;
+            }
+        }
+
+        if ($p > self::$strtokLast) {
+            $token = self::byteSlice(
+                self::$strtokString,
+                self::$strtokLast + $skipped,
+                $p - self::$strtokLast - $skipped
+            );
+            self::strtokReset();
+
+            return $token;
+        }
+
+        self::strtokReset();
+
+        return false;
+    }
+
+    private static function strtokReset(): void
+    {
+        self::$strtokString = null;
+        self::$strtokLast = 0;
     }
 
     private static function byteOrd(string $byte): int

@@ -125,6 +125,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/JitJsonDecode.php',
         'ext/standard/JitJsonEncode.php',
         'ext/standard/JitJsonLastError.php',
+        'ext/standard/JitJsonLastErrorMsg.php',
         'ext/standard/JitNumberFormat.php',
         'ext/standard/JitPregMatch.php',
         'ext/standard/JitRealpath.php',
@@ -227,6 +228,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/json_encode.php',
         'ext/standard/json_validate.php',
         'ext/standard/json_last_error_.php',
+        'ext/standard/json_last_error_msg_.php',
         'ext/standard/serialize.php',
         'ext/standard/unserialize.php',
         'ext/standard/class_exists_.php',
@@ -354,6 +356,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/session_start.php',
         'ext/standard/VmSplAutoload.php',
         'ext/standard/uasort_.php',
+        'ext/standard/uksort_.php',
         'ext/standard/usort_.php',
     ];
 
