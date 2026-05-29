@@ -152,12 +152,15 @@ function syntaxRowDefinitions(): array
         ],
         [
             'id' => 'closures',
-            'construct' => 'Closures `function () { }` without `use`',
+            'construct' => 'Closures `function () { }` / `use ($var)`',
             'opcodes' => ['TYPE_CLOSURE'],
             'issue' => 72,
-            'jit' => false,
             'aot' => false,
-            'notes' => ['VM via ClosureState + __invoke; bootstrap stubs null; use() by-value on VM; use (&$x) deferred'],
+            'notes' => [
+                'VM via ClosureState + __invoke; use() by-value on VM (#3081)',
+                'JIT ClosureHelper lowers TYPE_CLOSURE without use() (#3081); use (&$x) deferred',
+                'Bootstrap / self-host AOT stubs null',
+            ],
             'probe' => '$f = function ($x) { return $x + 1; }; echo $f(2);',
         ],
         [
@@ -165,9 +168,8 @@ function syntaxRowDefinitions(): array
             'construct' => 'Arrow functions `fn () =>`',
             'opcodes' => ['TYPE_CLOSURE'],
             'issue' => 142,
-            'jit' => false,
             'aot' => false,
-            'notes' => ['Same lowering as closures (#72); VM without use()'],
+            'notes' => ['Same lowering as closures (#72); JIT without use() (#3081)'],
             'probe' => '$f = fn ($x) => $x + 1; echo $f(2);',
         ],
         [
@@ -177,7 +179,11 @@ function syntaxRowDefinitions(): array
             'issue' => 167,
             'jit' => false,
             'aot' => false,
-            'notes' => ['VM-only; `yield from` deferred (#167)'],
+            'notes' => [
+                'VM GeneratorState + foreach; keyed yield (#3085)',
+                'bin/jit.php VM fallback via Block::requiresVmLowering (#3085); see docs/generators-jit-aot.md',
+                '`yield from` generator path supported on VM (#167)',
+            ],
             'probe' => 'function g() { yield 1; yield 2; } foreach (g() as $v) echo $v;',
         ],
         [
@@ -439,8 +445,9 @@ function syntaxRowDefinitions(): array
             'opcodes' => ['TYPE_TRY', 'TYPE_CATCH', 'TYPE_THROW'],
             'issue' => 57,
             'notes' => [
-                'throw lowering #195; php-cfg TryCatch overlay (#2084); VM TYPE_TRY/CATCH/THROW',
-                'TryCatchComplianceTest + try_*.phpt; finally after catch still #57',
+                'throw lowering #195; php-cfg TryCatch overlay (#2084); VM TYPE_TRY/CATCH/THROW/FINALLY',
+                'VM finally-before-catch on throw + normal completion (#3081); TryCatchComplianceTest + try_*.phpt',
+                'JIT EH shares Block::requiresVmLowering gate (#2114)',
             ],
             'probe' => 'class E {} try { throw new E(); } catch (E $e) { echo "ok"; }',
         ],
@@ -608,6 +615,7 @@ function collectSyntaxPhptCoverage(string $root, array $definitions): array
         'native_user_class' => '/\b(?:class\s+\w+|new\s+\w+)/',
         'instanceof' => '/\binstanceof\b/',
         'match_expr' => '/\bmatch\s*\(/',
+        'closures' => '/function\s*\([^)]*\)\s*(?:use\s*\([^)]*\)\s*)?\{/',
         'arrow_functions' => '/\bfn\s*\(/',
         'generator_yield' => '/\byield\b/',
         'class_name_const' => '/::class\b/',
