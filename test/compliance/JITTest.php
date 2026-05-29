@@ -17,7 +17,7 @@ class JITTest extends BaseTest {
 
     public static function providePHPTests(): \Generator
     {
-        foreach (parent::providePHPTests() as $case) {
+        foreach (parent::providePHPTests() as $name => $case) {
             // ?-> on objects needs JIT class/property support (#308); VM compliance covers it.
             if (str_contains(strtolower($case[0]), 'nullsafe')) {
                 continue;
@@ -29,7 +29,7 @@ class JITTest extends BaseTest {
             if (str_contains(strtolower($case[0]), 'spl_autoload_register_jit')) {
                 continue;
             }
-            yield $case;
+            yield $name => $case;
         }
     }
 

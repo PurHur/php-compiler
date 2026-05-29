@@ -88,8 +88,14 @@ fi
 
 # HashTable rehash with string keys (#66, #1956). Default on; set REHASH_COMPLIANCE_GATE=0 to skip.
 if [[ "${REHASH_COMPLIANCE_GATE:-1}" == "1" ]]; then
-  echo "PHPUnit (fast): hashtable rehash VM compliance (array_rehash_string_keys)..."
-  ci_run_phpunit --filter array_rehash_string_keys
+  echo "PHPUnit (fast): hashtable rehash VM compliance (#66, #1956)..."
+  ci_run_phpunit test/compliance/VMTest.php --filter 'array/array_rehash_string_keys|array/hashtable_string_keys|hashtable_rehash_unset'
+fi
+
+# HashTable string-key loops under JIT when LLVM is ready (#66, #1959). Default on; set REHASH_JIT_COMPLIANCE_GATE=0 to skip.
+if [[ "${REHASH_JIT_COMPLIANCE_GATE:-1}" == "1" ]] && ci_llvm_ready && ci_should_run_jit; then
+  echo "PHPUnit (fast): hashtable rehash JIT compliance (array_rehash_string_keys_jit)..."
+  ci_run_phpunit test/compliance/JITTest.php --filter 'language/array_rehash_string_keys_jit'
 fi
 
 # Null coalescing ?? / ??= VM compliance (#99, #1960). Default on; set COALESCE_COMPLIANCE_GATE=0 to skip.
