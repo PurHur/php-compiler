@@ -160,11 +160,8 @@ echo
 echo "=== north-star5-verify step 5: vendor prelink AOT (--compile) ==="
 VENDOR_OK=0
 set +e
-if [[ "${STRICT_M5}" -eq 1 ]]; then
-  env BOOTSTRAP_GEN0_ZEND_ONLY=1 "${PHP_BIN}" "${PHP_OPTS[@]}" "${_CI_REPO_ROOT}/script/bootstrap-vendor-objects.php" --compile
-else
-  "${PHP_BIN}" "${PHP_OPTS[@]}" "${_CI_REPO_ROOT}/script/bootstrap-vendor-objects.php" --compile
-fi
+# Strict: step 4a2 leaves a native argv driver; vendor AOT must use it (no Zend loop — #3028).
+"${PHP_BIN}" "${PHP_OPTS[@]}" "${_CI_REPO_ROOT}/script/bootstrap-vendor-objects.php" --compile
 vendor_code=$?
 set -e
 if [[ -f "${_CI_REPO_ROOT}/prelinked/bootstrap-vendor/manifest.json" ]]; then

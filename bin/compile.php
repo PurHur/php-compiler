@@ -74,6 +74,8 @@ function run(string $filename, string $code, array $options): void
                 putenv('PHP_COMPILER_M3_EMIT_HELPER_SPINE=1');
             } elseif (str_contains($normalized, 'helloworld_compile_m3_emit_native_entry.php')) {
                 putenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX=helloworld_compile_smoke');
+                // M5 vendor prelink: native driver must host-lower parse/compileEmitSmoke, not null stubs (#3028).
+                putenv('PHP_COMPILER_M3_EMIT_HELPER_SPINE=1');
             } elseif (str_contains($normalized, 'helloworld_m3_emit_native_entry.php')) {
                 // HelloWorld strict probe emit TU (#2610); M5 bin/compile.php uses helloworld_compile_m3_emit_native_entry (#2681).
                 putenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX=compile_smoke_m3_emit');

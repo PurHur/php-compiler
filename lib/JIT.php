@@ -183,7 +183,7 @@ class JIT {
             $this->context->inlineIncludeReturnOperands = [];
             $this->context->coalesceAssignTargets = new \SplObjectStorage();
             // Each queued CFG function gets a fresh try/catch stack — dispatch BBs are per-LLVM-function (#3012).
-            $this->context->tryCatch = new JIT\TryCatchState();
+            $this->context->tryCatch->reset();
             $this->compileBlockInternal($run[0], $run[1], null, null, ...$run[2]);
         }
     }
@@ -1246,6 +1246,12 @@ class JIT {
             return false;
         }
         if (!$this->shouldUseM3CompileDriverRealLowering()) {
+            if ($this->shouldUseM3EmitTuEmitHelperSpineRealLowering()) {
+                static $emitHelperSpineReal = ['parse', 'compileemitsmoke'];
+
+                return !in_array($methodLc, $emitHelperSpineReal, true);
+            }
+
             return true;
         }
 
@@ -2750,17 +2756,18 @@ class JIT {
                     $stubBlock
                 );
             }
+        } elseif (null !== $stubBlock) {
+            $this->emitM3EmitTuRuntimeParseStubNative(
+                $this->llvmInternalName('PHPCompiler\\Runtime::parse'),
+                'PHPCompiler\\Runtime::parse',
+                $stubBlock
+            );
+            $this->emitM3EmitTuRuntimeCompileEmitSmokeNative(
+                $this->llvmInternalName('PHPCompiler\\Runtime::compileEmitSmoke'),
+                'PHPCompiler\\Runtime::compileEmitSmoke',
+                $stubBlock
+            );
         }
-        $this->emitM3EmitTuRuntimeParseStubNative(
-            $this->llvmInternalName('PHPCompiler\\Runtime::parse'),
-            'PHPCompiler\\Runtime::parse',
-            $stubBlock
-        );
-        $this->emitM3EmitTuRuntimeCompileEmitSmokeNative(
-            $this->llvmInternalName('PHPCompiler\\Runtime::compileEmitSmoke'),
-            'PHPCompiler\\Runtime::compileEmitSmoke',
-            $stubBlock
-        );
         $this->emitM3EmitTuRuntimeConstructNativeFunction(
             $this->llvmInternalName('PHPCompiler\\Runtime::__construct'),
             'PHPCompiler\\Runtime::__construct',
@@ -3076,6 +3083,22 @@ class JIT {
                 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::cliDriverSentinelBlock',
                 true
             );
+            // M5 vendor prelink bundles: Zend host-compile at emit-helper link (#3028, #3030, #3031).
+            $this->registerM3EmitTuSidecarFromPath(
+                __DIR__.'/../test/bootstrap-vendor-prelink/generated/ircmaxell-php-cfg_bundle.php',
+                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::VENDOR_PHP_CFG_SIDECAR_REL,
+                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::vendorPhpCfgSentinelBlock'
+            );
+            $this->registerM3EmitTuSidecarFromPath(
+                __DIR__.'/../test/bootstrap-vendor-prelink/generated/ircmaxell-php-types_bundle.php',
+                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::VENDOR_PHP_TYPES_SIDECAR_REL,
+                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::vendorPhpTypesSentinelBlock'
+            );
+            $this->registerM3EmitTuSidecarFromPath(
+                __DIR__.'/../test/bootstrap-vendor-prelink/generated/ircmaxell-php-llvm_bundle.php',
+                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::VENDOR_PHP_LLVM_SIDECAR_REL,
+                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::vendorPhpLlvmSentinelBlock'
+            );
         } elseif ('compile_smoke_m3_emit' === $logPrefix || $this->shouldUseM3InventoryEmitDriver()) {
             $this->registerM3EmitTuSidecarFromPath(
                 __DIR__.'/../examples/000-HelloWorld/example.php',
@@ -3139,6 +3162,21 @@ class JIT {
                 \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::TRIVIAL_ECHO_SIDECAR_REL,
                 'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::sentinelBlock'
             );
+            $this->registerM3EmitTuSidecarFromPath(
+                __DIR__.'/../test/bootstrap-vendor-prelink/generated/ircmaxell-php-cfg_bundle.php',
+                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::VENDOR_PHP_CFG_SIDECAR_REL,
+                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::vendorPhpCfgSentinelBlock'
+            );
+            $this->registerM3EmitTuSidecarFromPath(
+                __DIR__.'/../test/bootstrap-vendor-prelink/generated/ircmaxell-php-types_bundle.php',
+                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::VENDOR_PHP_TYPES_SIDECAR_REL,
+                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::vendorPhpTypesSentinelBlock'
+            );
+            $this->registerM3EmitTuSidecarFromPath(
+                __DIR__.'/../test/bootstrap-vendor-prelink/generated/ircmaxell-php-llvm_bundle.php',
+                \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::VENDOR_PHP_LLVM_SIDECAR_REL,
+                'PHPCompiler\\JIT\\M3EmitTuTrivialEchoAot::vendorPhpLlvmSentinelBlock'
+            );
         } else {
             $this->registerM3EmitTuSidecarFromPath(
                 __DIR__.'/../test/bootstrap-aot/runtime_trivial_echo.php',
@@ -3186,6 +3224,31 @@ class JIT {
             $this->context->m3EmitTuTrivialEchoPath = $path;
         }
         $repoRoot = dirname(__DIR__);
+        $pathNorm = str_replace('\\', '/', $path);
+        // M5 vendor bundles: Zend host-compile hits non-literal includes in php-cfg; reuse committed
+        // prelinked .o at emit-helper link so native argv driver can sidecar-copy at runtime (#3028).
+        if (str_contains($pathNorm, 'bootstrap-vendor-prelink/generated/')
+            && preg_match('#/([^/]+)_bundle\\.php$#', $pathNorm, $vendorBundleMatch)
+        ) {
+            $vendorSlug = $vendorBundleMatch[1];
+            $prelinkedObject = $repoRoot.'/prelinked/bootstrap-vendor/'.$vendorSlug.'.o';
+            if (is_readable($prelinkedObject)) {
+                $aotBytes = file_get_contents($prelinkedObject);
+                if (is_string($aotBytes) && '' !== $aotBytes) {
+                    \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::registerLinktime(
+                        $this->context,
+                        $repoRoot,
+                        $code,
+                        $aotBytes,
+                        $sidecarRel,
+                        $sentinelLogical,
+                        true
+                    );
+
+                    return;
+                }
+            }
+        }
         $repoSidecar = $repoRoot.'/'.ltrim($sidecarRel, '/');
         if (is_readable($repoSidecar)) {
             $aotBytes = file_get_contents($repoSidecar);
@@ -3202,7 +3265,6 @@ class JIT {
                 return;
             }
         }
-        $pathNorm = str_replace('\\', '/', $path);
         $hostCompilePath = $path;
         if (str_ends_with($pathNorm, '/bin/compile.php')) {
             // For gen-3 (argv) and other bootstrap products, compiling bin/compile.php must default to the
@@ -3244,6 +3306,12 @@ class JIT {
         if ($sidecarHostStubNonLiteralIncludes) {
             $compileEnv['PHP_COMPILER_M3_SIDECAR_HOST'] = '1';
         }
+        $vendorObjectSidecar = str_contains($pathNorm, 'bootstrap-vendor-prelink/generated/');
+        if ($vendorObjectSidecar) {
+            $compileEnv['PHP_COMPILER_VENDOR_PRELINK'] = '1';
+            $compileEnv['PHP_COMPILER_SELFHOST_AOT'] = '0';
+            $compileEnv['PHP_COMPILER_KEEP_OBJECT_FILE'] = '1';
+        }
         if (!str_ends_with($pathNorm, '/bin/compile.php')) {
             unset($compileEnv['PHP_COMPILER_EMIT_HELPER_LINK'], $compileEnv['PHP_COMPILER_M3_EMIT_TU']);
         }
@@ -3272,7 +3340,11 @@ class JIT {
         $stderr = stream_get_contents($pipes[2]);
         fclose($pipes[2]);
         $exit = proc_close($proc);
-        if (0 !== $exit || !is_readable($tmpOut)) {
+        $artifactPath = $tmpOut;
+        if ($vendorObjectSidecar && is_readable($tmpOut.'.o')) {
+            $artifactPath = $tmpOut.'.o';
+        }
+        if (0 !== $exit || !is_readable($artifactPath)) {
             if (is_string($stderr) && '' !== $stderr) {
                 $tail = strlen($stderr) > 8000 ? substr($stderr, -8000) : $stderr;
                 fwrite(
@@ -3286,6 +3358,7 @@ class JIT {
                 );
             }
             @unlink($tmpOut);
+            @unlink($tmpOut.'.o');
             // Gen-2 native argv driver cannot always spawn Zend during link; reuse blobs from an
             // earlier Zend host-compile in the same workspace (#3004).
             $repoSidecar = $repoRoot.'/'.ltrim($sidecarRel, '/');
@@ -3307,8 +3380,9 @@ class JIT {
 
             return;
         }
-        $aotBytes = file_get_contents($tmpOut);
+        $aotBytes = file_get_contents($artifactPath);
         @unlink($tmpOut);
+        @unlink($tmpOut.'.o');
         if (!is_string($aotBytes) || '' === $aotBytes) {
             return;
         }
@@ -3321,7 +3395,8 @@ class JIT {
             $code,
             $aotBytes,
             $sidecarRel,
-            $sentinelLogical
+            $sentinelLogical,
+            $vendorObjectSidecar
         );
     }
 
@@ -3536,7 +3611,9 @@ class JIT {
         ) {
             return;
         }
-        if ($this->shouldUseM3CompileDriverRealLowering()) {
+        if ($this->shouldUseM3CompileDriverRealLowering()
+            || $this->shouldUseM3EmitTuEmitHelperSpineRealLowering()
+        ) {
             $this->compileM3EmitTuCompilerMethodFromRuntimeModules('compileemitsmoke');
 
             return;
@@ -3681,6 +3758,15 @@ class JIT {
     private function compileM3EmitTuRuntimeMethodFromModules(string $methodLc): void
     {
         if ($this->shouldUseM3EmitTuEmitHelperSpineRealLowering()) {
+            static $emitHelperHostSpine = ['parse', 'compileemitsmoke'];
+            if (in_array($methodLc, $emitHelperHostSpine, true)) {
+                $logical = 'PHPCompiler\\Runtime::'.$methodLc;
+                $lc = strtolower($logical);
+                if (!isset($this->context->functions[$lc])) {
+                    $this->compileM3EmitTuRuntimeMethodFromRuntimePhpFile($methodLc, $logical, $lc);
+                }
+            }
+
             return;
         }
         $logical = 'PHPCompiler\\Runtime::'.$methodLc;
